@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { GadgetTemplate } from '../../propagation-core/types/template'
+import { createPrimitiveTemplates } from '../../propagation-core/primitives-registry'
 
 interface PaletteItem extends GadgetTemplate {
   id: string
@@ -15,12 +16,24 @@ interface PaletteState {
 
 const STORAGE_KEY = 'bassline-gadget-palette'
 
+// Create default palette items from primitive templates
+function createDefaultPaletteItems(): PaletteItem[] {
+  const primitiveTemplates = createPrimitiveTemplates()
+  console.log('Creating default palette items, primitive templates:', primitiveTemplates)
+  return primitiveTemplates.map(template => ({
+    ...template,
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    usageCount: 0
+  }))
+}
+
 export function usePalette() {
   // Always start with default state to avoid hydration mismatch
   const [state, setState] = useState<PaletteState>({
     items: [],
     categories: ['Math', 'Logic', 'Data', 'Utility'],
-    isVisible: true
+    isVisible: false // Start hidden to avoid flash
   })
   
   // Load from localStorage after mount
@@ -30,10 +43,38 @@ export function usePalette() {
         const stored = localStorage.getItem(STORAGE_KEY)
         if (stored) {
           const parsed = JSON.parse(stored)
+          
+          // Check if we need to add primitive gadgets to existing palette
+          const hasPrimitives = parsed.items.some((item: PaletteItem) => 
+            ['Adder', 'Subtractor', 'Multiplier', 'Divider'].includes(item.name)
+          )
+          
+          if (!hasPrimitives) {
+            console.log('Adding primitive gadgets to existing palette')
+            const primitiveItems = createDefaultPaletteItems()
+            parsed.items = [...primitiveItems, ...parsed.items]
+          }
+          
           setState(parsed)
+        } else {
+          // First time - load default primitive gadgets
+          console.log('No stored palette found, loading defaults')
+          const defaultItems = createDefaultPaletteItems()
+          setState({
+            items: defaultItems,
+            categories: ['Math', 'Logic', 'Data', 'Utility'],
+            isVisible: true // Show palette by default when first loaded
+          })
         }
       } catch (e) {
         console.error('Failed to load palette from storage:', e)
+        // On error, load defaults
+        const defaultItems = createDefaultPaletteItems()
+        setState({
+          items: defaultItems,
+          categories: ['Math', 'Logic', 'Data', 'Utility'],
+          isVisible: true
+        })
       }
     }
   }, [])
@@ -112,6 +153,15 @@ export function usePalette() {
       .slice(0, limit)
   }, [state.items])
   
+  const resetToDefaults = useCallback(() => {
+    const defaultItems = createDefaultPaletteItems()
+    setState({
+      items: defaultItems,
+      categories: ['Math', 'Logic', 'Data', 'Utility'],
+      isVisible: true
+    })
+  }, [])
+
   return {
     items: state.items,
     categories: state.categories,
@@ -123,6 +173,7 @@ export function usePalette() {
     toggleVisibility,
     getItemsByCategory,
     getMostUsed,
-    getRecent
+    getRecent,
+    resetToDefaults
   }
 }

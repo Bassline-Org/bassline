@@ -18,6 +18,7 @@ import { InlineGadgetOperation } from '../../propagation-core/refactoring/operat
 import { ConvertToBoundaryOperation } from '../../propagation-core/refactoring/operations/ConvertToBoundary'
 import type { Selection } from '../../propagation-core/refactoring/types'
 import type { GadgetTemplate } from '../../propagation-core/types/template'
+import { PrimitiveGadget } from '../../propagation-core/primitives'
 
 interface ContactNodeData {
   content: any
@@ -156,7 +157,7 @@ export function usePropagationNetwork() {
         },
         data: {
           name: group.name,
-          onNavigate: () => {
+          onNavigate: group instanceof PrimitiveGadget ? undefined : () => {
             network.navigateToGroup(group.id)
             setCurrentGroupId(group.id)
           },
@@ -317,6 +318,12 @@ export function usePropagationNetwork() {
     }
   }, [network, syncToReactFlow])
   
+  const connect = useCallback((fromId: string, toId: string, type?: 'bidirectional' | 'directed') => {
+    const wire = network.connect(fromId, toId, type)
+    syncToReactFlow()
+    return wire
+  }, [network, syncToReactFlow])
+  
   // Refactoring operations
   const extractToGadget = useCallback((gadgetName: string) => {
     if (!hasSelection || (selection.contacts.size === 0 && selection.groups.size === 0)) {
@@ -402,6 +409,7 @@ export function usePropagationNetwork() {
     addBoundaryContact,
     createGroup,
     updateContent,
+    connect,
     
     // Direct access to network
     network,

@@ -1,11 +1,11 @@
 import { memo, useCallback } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card, CardHeader, CardContent } from '~/components/ui/card'
-import { Package } from 'lucide-react'
+import { Package, Lock } from 'lucide-react'
 
 export interface GroupNodeData {
   name: string
-  onNavigate: () => void
+  onNavigate?: () => void
   inputContacts: { id: string; name?: string }[]
   outputContacts: { id: string; name?: string }[]
 }
@@ -13,27 +13,35 @@ export interface GroupNodeData {
 export const GroupNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as GroupNodeData
   const handleDoubleClick = useCallback(() => {
-    nodeData.onNavigate()
+    if (nodeData.onNavigate) {
+      nodeData.onNavigate()
+    }
   }, [nodeData])
   
   const maxContacts = Math.max(nodeData.inputContacts.length, nodeData.outputContacts.length, 1)
   
   return (
     <Card 
-      className={`min-w-[200px] cursor-pointer transition-all shadow-md hover:shadow-lg ${
+      className={`min-w-[200px] ${nodeData.onNavigate ? 'cursor-pointer' : 'cursor-default'} transition-all shadow-md hover:shadow-lg ${
         selected 
           ? 'ring-2 ring-purple-500 border-purple-400' 
           : 'border-purple-200'
       }`}
       style={{ 
-        background: 'linear-gradient(to bottom, #f3e8ff 0%, #faf5ff 100%)',
+        background: nodeData.onNavigate 
+          ? 'linear-gradient(to bottom, #f3e8ff 0%, #faf5ff 100%)'
+          : 'linear-gradient(to bottom, #e0e7ff 0%, #f0f4ff 100%)',
         borderWidth: '2px'
       }}
       onDoubleClick={handleDoubleClick}
     >
       <CardHeader className="p-3 pb-2 border-b border-purple-200">
         <div className="flex items-center gap-2">
-          <Package className="w-4 h-4 text-purple-600" />
+          {nodeData.onNavigate ? (
+            <Package className="w-4 h-4 text-purple-600" />
+          ) : (
+            <Lock className="w-4 h-4 text-indigo-600" />
+          )}
           <div className="font-semibold text-sm text-purple-900">{nodeData.name}</div>
         </div>
       </CardHeader>

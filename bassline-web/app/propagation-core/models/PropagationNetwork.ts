@@ -3,6 +3,7 @@ import { ContactGroup } from './ContactGroup'
 import { Contact } from './Contact'
 import { Wire } from './Wire'
 import type { GadgetTemplate } from '../types/template'
+import { createPrimitiveGadget, PRIMITIVE_GADGETS } from '../primitives-registry'
 
 export class PropagationNetwork {
   rootGroup: ContactGroup
@@ -107,6 +108,17 @@ export class PropagationNetwork {
   
   // Template methods
   instantiateTemplate(template: GadgetTemplate, position: Position): ContactGroup {
+    // Check if this is a primitive gadget
+    if (template.name in PRIMITIVE_GADGETS) {
+      const primitive = createPrimitiveGadget(template.name, this.currentGroup)
+      if (primitive) {
+        primitive.position = { ...position }
+        this.currentGroup.subgroups.set(primitive.id, primitive)
+        return primitive
+      }
+    }
+    
+    // Otherwise, create a regular gadget from template
     const gadget = ContactGroup.fromTemplate(template, this.currentGroup)
     gadget.position = { ...position }
     this.currentGroup.subgroups.set(gadget.id, gadget)

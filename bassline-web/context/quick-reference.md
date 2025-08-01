@@ -180,3 +180,27 @@ const template = group.toTemplate()
 // Instantiate template at position
 const instance = ContactGroup.fromTemplate(template, parentGroup)
 ```
+
+## Primitive Gadgets
+Pre-built gadgets with native implementations:
+
+### Available Primitives
+- **Adder**: (a, b) → sum
+- **Subtractor**: (minuend, subtrahend) → difference
+- **Multiplier**: (a, b) → product
+- **Divider**: (dividend, divisor) → quotient
+
+### Key Properties
+- Cannot be opened/navigated into (lock icon)
+- Unidirectional only (use composition for bidirectional)
+- Support numbers and Intervals
+- Handle Contradictions appropriately
+
+### Creating Bidirectional Constraints
+```typescript
+// To create (a + b = c) constraint, compose:
+// 1. Adder: (a, b) → c
+// 2. Subtractor: (c, b) → a
+// 3. Subtractor: (c, a) → b
+// Connect all three to same contacts
+```

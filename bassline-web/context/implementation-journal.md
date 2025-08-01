@@ -678,3 +678,139 @@ const defaultSettings: ViewSettings = {
 17. **Respect user preferences** - Make hints and helpers optional
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.
+
+## Phase 6: Primitive Gadgets
+
+### What We Built
+Implemented primitive gadgets - host-implemented propagators that look like regular gadgets but execute native code:
+
+1. **PrimitiveGadget Base Class**
+   - Extends ContactGroup with special `isPrimitive` flag
+   - Intercepts `deliverContent` to trigger computation
+   - Abstract `computeOutputs()` method for implementations
+   - Manually handles output propagation to bypass recursion
+
+2. **Arithmetic Primitives (Unidirectional)**
+   - **Adder**: `(a, b) → sum` - Supports numbers and Intervals
+   - **Subtractor**: `(minuend, subtrahend) → difference`
+   - **Multiplier**: `(a, b) → product` - Full interval arithmetic
+   - **Divider**: `(dividend, divisor) → quotient` - Division by zero handling
+
+3. **UI Integration**
+   - Lock icon instead of package icon for primitives
+   - Blue gradient background (vs purple for regular gadgets)
+   - Navigation disabled (no double-click to enter)
+   - Automatically added to palette on first load
+
+### Key Architecture Insights
+
+#### Primitives Are Unidirectional
+**Key Decision**: Primitive gadgets are simple functions, not bidirectional constraints
+- This matches how CPUs work - add instructions don't solve for inputs
+- Bidirectional behavior achieved by composing multiple primitives
+- Example: `(a + b = c)` constraint built from:
+  - Adder: `(a, b) → c`
+  - Subtractor: `(c, b) → a`  
+  - Subtractor: `(c, a) → b`
+
+#### Clean Primitive Integration
+```typescript
+// Check if template is primitive during instantiation
+if (template.name in PRIMITIVE_GADGETS) {
+  const primitive = createPrimitiveGadget(template.name, this.currentGroup)
+  // ... position and add to parent
+}
+```
+
+#### Propagation Interception
+```typescript
+override deliverContent(contactId: ContactId, content: any, sourceId: ContactId): void {
+  // Let contact update normally
+  super.deliverContent(contactId, content, sourceId)
+  
+  // Then compute outputs if input changed
+  if (contact.content !== oldContent) {
+    this.computeAndPropagate()
+  }
+}
+```
+
+### Implementation Challenges & Solutions
+
+1. **Private Propagate Method**
+   - **Issue**: Contact.propagate() is private
+   - **Solution**: Manually handle propagation in PrimitiveGadget
+   - Access `_content` directly and call deliverContent on connections
+
+2. **Import Organization**
+   - **Issue**: Contact not exported from ContactGroup module
+   - **Solution**: Import Contact from its own module
+
+3. **Hydration with Default Gadgets**
+   - **Issue**: Need primitives in palette on first load
+   - **Solution**: Check localStorage, if empty add default primitives
+
+### What Worked Well
+
+1. **Uniform Interface** - Primitives look identical to regular gadgets externally
+2. **Efficient Implementation** - Native TypeScript code for calculations
+3. **Composability** - Can build complex constraints from simple primitives
+4. **Visual Distinction** - Lock icon clearly indicates non-navigable gadgets
+
+### Future Primitive Gadgets to Add
+
+- **Comparison**: GreaterThan, LessThan, Equals
+- **Logic**: And, Or, Not
+- **Data**: Splitter, Joiner, Selector
+- **Control**: Switch, Mux, Demux
+
+### Lessons Learned
+
+1. **Keep primitives simple** - They're building blocks, not complete solutions
+2. **Unidirectional is cleaner** - Bidirectional behavior emerges from composition
+3. **Visual cues matter** - Lock icon immediately communicates "can't open"
+4. **Defaults improve UX** - Having primitives pre-loaded helps users start quickly
+
+### Architecture Evolution: Activation/Body Pattern
+
+After initial implementation, we refactored primitive gadgets to use a cleaner activation/body pattern:
+
+#### The Pattern
+```typescript
+class PrimitiveGadget {
+  protected abstract activation(boundaryValues: Map<ContactId, [Contact, any]>): boolean
+  protected abstract body(boundaryValues: Map<ContactId, [Contact, any]>): Map<ContactId, any>
+  
+  protected maybeRun() {
+    const inputs = this.getAllBoundaryValues()
+    if (this.activation(inputs)) {
+      const outputs = this.body(inputs)
+      this.propagateOutputs(outputs)
+    } else {
+      // Keep existing outputs (latch behavior)
+      // Only clear if ALL inputs are undefined
+    }
+  }
+}
+```
+
+#### Key Insights
+
+1. **Primitive gadgets are function wrappers** - They make regular JS functions work in the propagation network
+2. **Activation determines WHEN to run** - Typically checks if all required inputs are present
+3. **Body computes WHAT to output** - Pure computation based on inputs
+4. **Latch behavior** - Outputs persist until new computation or full disconnection
+5. **Wire removal triggers recomputation** - When wire removed, undefined is delivered, triggering maybeRun()
+
+#### Implementation Details
+
+- `deliverContent()` stores input value then calls `maybeRun()`
+- `removeWire()` in ContactGroup clears content if no incoming connections remain
+- Outputs only cleared when ALL inputs are undefined (complete disconnection)
+- This gives stateless computation with sensible persistence
+
+#### Future Extensions
+This pattern will make it trivial to:
+- Import JS libraries and wrap their functions as primitive gadgets
+- Support async operations (activation could check if async operation is ready)
+- Add more complex activation policies (e.g., run only if value changed by threshold)

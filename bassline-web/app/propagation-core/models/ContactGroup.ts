@@ -99,6 +99,24 @@ export class ContactGroup {
     return connections
   }
   
+  getIncomingConnections(contactId: ContactId): Array<{ wire: Wire; sourceId: ContactId }> {
+    const connections: Array<{ wire: Wire; sourceId: ContactId }> = []
+    
+    for (const wire of this.wires.values()) {
+      if (wire.type === 'bidirectional') {
+        if (wire.toId === contactId) {
+          connections.push({ wire, sourceId: wire.fromId })
+        } else if (wire.fromId === contactId) {
+          connections.push({ wire, sourceId: wire.toId })
+        }
+      } else if (wire.type === 'directed' && wire.toId === contactId) {
+        connections.push({ wire, sourceId: wire.fromId })
+      }
+    }
+    
+    return connections
+  }
+  
   // Check if a contact can be connected to (including boundary contacts in subgroups)
   canConnectTo(contactId: ContactId): Contact | undefined {
     // First check own contacts
@@ -117,10 +135,20 @@ export class ContactGroup {
   
   // Content delivery
   deliverContent(contactId: ContactId, content: any, sourceId: ContactId): void {
-    // Use canConnectTo to find the contact (includes boundary contacts in subgroups)
-    const contact = this.canConnectTo(contactId)
-    if (contact) {
-      contact.setContent(content, sourceId)
+    // First check if it's a local contact
+    const localContact = this.contacts.get(contactId)
+    if (localContact) {
+      localContact.setContent(content, sourceId)
+      return
+    }
+    
+    // Then check if it's a boundary contact in a subgroup
+    for (const subgroup of this.subgroups.values()) {
+      if (subgroup.boundaryContacts.has(contactId)) {
+        // Deliver to the subgroup instead
+        subgroup.deliverContent(contactId, content, sourceId)
+        return
+      }
     }
   }
   
@@ -185,9 +213,38 @@ export class ContactGroup {
   }
   
   removeWire(wireId: WireId): boolean {
-    if (this.wires.delete(wireId)) {
-      return true
+    const wire = this.wires.get(wireId)
+    if (!wire) return false
+    
+    // Remove the wire
+    this.wires.delete(wireId)
+    
+    // Check if target contact has no more incoming connections
+    const targetId = wire.toId
+    let hasIncomingConnections = false
+    
+    // Check for any incoming wires to the target
+    for (const otherWire of this.wires.values()) {
+      if (otherWire.toId === targetId || 
+          (otherWire.type === 'bidirectional' && otherWire.fromId === targetId)) {
+        hasIncomingConnections = true
+        break
+      }
     }
+    
+    // If no incoming connections, clear the contact's content
+    if (!hasIncomingConnections) {
+      const contact = this.contacts.get(targetId)
+      if (contact) {
+        contact['_content'] = undefined
+        // If it's a boundary contact in a primitive gadget, trigger recomputation
+        if (contact.isBoundary && contact.boundaryDirection === 'input') {
+          this.deliverContent(targetId, undefined, wireId)
+        }
+      }
+    }
+    
+    return true
     
     // Try subgroups
     for (const subgroup of this.subgroups.values()) {
