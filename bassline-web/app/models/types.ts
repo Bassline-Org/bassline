@@ -29,14 +29,8 @@ export interface Contact extends Identifiable {
   content: ContactContent | null;
   blendMode: BlendMode;
   position: Position;
-  incomingContacts: Set<UUID>;
-  outgoingContacts: Set<UUID>;
   groupId: UUID | null;
   setContent(value: any): void;
-  addIncomingContact(contactId: UUID): void;
-  removeIncomingContact(contactId: UUID): void;
-  addOutgoingContact(contactId: UUID): void;
-  removeOutgoingContact(contactId: UUID): void;
   isBoundary(): boolean;
 }
 

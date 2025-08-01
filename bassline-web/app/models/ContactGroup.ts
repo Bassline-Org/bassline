@@ -64,15 +64,45 @@ export class ContactGroupImpl implements ContactGroup {
   }
 
   addWire(wire: ContactGroupWire): void {
-    const fromContact = this.contacts.get(wire.from);
-    const toContact = this.contacts.get(wire.to);
+    // First check if contacts are in this group
+    let fromContact = this.contacts.get(wire.from);
+    let toContact = this.contacts.get(wire.to);
     
-    if (!fromContact || !toContact) {
-      throw new Error(`Cannot add wire: contacts not found in group`);
+    // If not found, check if they are boundary contacts in subgroups
+    let fromInSubgroup = false;
+    let toInSubgroup = false;
+    
+    if (!fromContact) {
+      for (const subgroup of this.subgroups.values()) {
+        fromContact = subgroup.contacts.get(wire.from);
+        if (fromContact && fromContact.isBoundary()) {
+          fromInSubgroup = true;
+          break;
+        }
+      }
     }
     
-    fromContact.addOutgoingContact(wire.to);
-    toContact.addIncomingContact(wire.from);
+    if (!toContact) {
+      for (const subgroup of this.subgroups.values()) {
+        toContact = subgroup.contacts.get(wire.to);
+        if (toContact && toContact.isBoundary()) {
+          toInSubgroup = true;
+          break;
+        }
+      }
+    }
+    
+    if (!fromContact || !toContact) {
+      throw new Error(`Cannot add wire: contacts not found in group or subgroups`);
+    }
+    
+    // Only allow connections to/from boundary contacts if they're in subgroups
+    if ((fromInSubgroup && !fromContact.isBoundary()) || 
+        (toInSubgroup && !toContact.isBoundary())) {
+      throw new Error(`Cannot connect to non-boundary contacts in subgroups`);
+    }
+    
+    // No need to track connections on contacts - the group owns the wires
     
     this.wires.set(wire.id, wire);
     
@@ -91,13 +121,7 @@ export class ContactGroupImpl implements ContactGroup {
     const fromContact = this.contacts.get(wire.from);
     const toContact = this.contacts.get(wire.to);
     
-    if (fromContact) {
-      fromContact.removeOutgoingContact(wire.to);
-    }
-    
-    if (toContact) {
-      toContact.removeIncomingContact(wire.from);
-    }
+    // No need to update contacts - the group owns the wires
     
     this.wires.delete(wireId);
     
@@ -217,5 +241,47 @@ export class ContactGroupImpl implements ContactGroup {
     });
     
     return allWires;
+  }
+  
+  // Query methods following Smalltalk pattern
+  getIncomingWires(contactId: UUID): ContactGroupWire[] {
+    return Array.from(this.wires.values()).filter(wire => wire.to === contactId);
+  }
+  
+  getOutgoingWires(contactId: UUID): ContactGroupWire[] {
+    return Array.from(this.wires.values()).filter(wire => wire.from === contactId);
+  }
+  
+  getIncomingContacts(contactId: UUID): Contact[] {
+    return this.getIncomingWires(contactId)
+      .map(wire => this.findContactById(wire.from))
+      .filter(c => c !== null) as Contact[];
+  }
+  
+  getOutgoingContacts(contactId: UUID): Contact[] {
+    return this.getOutgoingWires(contactId)
+      .map(wire => this.findContactById(wire.to))
+      .filter(c => c !== null) as Contact[];
+  }
+  
+  findContactById(contactId: UUID): Contact | null {
+    // Check in this group
+    const contact = this.contacts.get(contactId);
+    if (contact) return contact;
+    
+    // Check in subgroups (boundary contacts)
+    for (const subgroup of this.subgroups.values()) {
+      const subContact = subgroup.contacts.get(contactId);
+      if (subContact && subContact.isBoundary()) {
+        return subContact;
+      }
+    }
+    
+    return null;
+  }
+  
+  // Override in subclasses like PrimitiveGadget to mark as atomic
+  isAtomic(): boolean {
+    return false;
   }
 }

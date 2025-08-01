@@ -8,12 +8,14 @@ import { PropagationEngine } from '~/models/PropagationEngine';
 import { EventEmitter } from '~/utils/EventEmitter';
 import type { BlendMode } from '~/models/types';
 import { DEFAULT_BLEND_MODE } from '~/models/blendModes';
+import { GadgetRegistry, type GadgetTemplate } from '~/models/Gadget';
 
 interface PropagationContextValue {
   rootGroup: ContactGroup | null;
   currentGroup: ContactGroup | null;
   eventEmitter: EventEmitter;
   propagationEngine: PropagationEngine;
+  gadgetRegistry: GadgetRegistry;
   
   // Contact operations
   createContact: (position: { x: number; y: number }, blendMode?: BlendMode) => Contact;
@@ -29,6 +31,9 @@ interface PropagationContextValue {
   createSubgroup: (name: string, position: { x: number; y: number }) => ContactGroup;
   navigateToGroup: (groupId: UUID) => void;
   navigateToParent: () => void;
+  
+  // Gadget operations
+  instantiateGadget: (template: GadgetTemplate, position: { x: number; y: number }) => ContactGroup;
   
   // State
   selectedContactId: UUID | null;
@@ -52,6 +57,7 @@ interface PropagationProviderProps {
 export const PropagationProvider: React.FC<PropagationProviderProps> = ({ children }) => {
   const eventEmitterRef = useRef(new EventEmitter());
   const propagationEngineRef = useRef(new PropagationEngine(eventEmitterRef.current));
+  const gadgetRegistryRef = useRef(new GadgetRegistry());
   
   const [rootGroup, setRootGroup] = useState<ContactGroup | null>(null);
   const [currentGroup, setCurrentGroup] = useState<ContactGroup | null>(null);
@@ -83,8 +89,11 @@ export const PropagationProvider: React.FC<PropagationProviderProps> = ({ childr
   const createContact = useCallback((position: { x: number; y: number }, blendMode: BlendMode = DEFAULT_BLEND_MODE): Contact => {
     if (!currentGroup) throw new Error('No current group');
     
+    const contactId = crypto.randomUUID();
+    console.log('Creating contact with ID:', contactId);
+    
     const contact = new ContactImpl(
-      crypto.randomUUID(),
+      contactId,
       position,
       blendMode,
       eventEmitterRef.current
@@ -92,6 +101,7 @@ export const PropagationProvider: React.FC<PropagationProviderProps> = ({ childr
     
     if (currentGroup instanceof ContactGroupImpl) {
       currentGroup.addContact(contact);
+      console.log('Contact added to group. Current contacts:', Array.from(currentGroup.contacts.keys()));
     }
     
     return contact;
@@ -132,12 +142,30 @@ export const PropagationProvider: React.FC<PropagationProviderProps> = ({ childr
   const createWire = useCallback((from: UUID, to: UUID): ContactGroupWire | null => {
     if (!currentGroup || !(currentGroup instanceof ContactGroupImpl)) return null;
     
+    console.log('createWire called with:', { from, to });
+    console.log('Current group contacts:', Array.from(currentGroup.contacts.keys()));
+    console.log('Current group subgroups:', Array.from(currentGroup.subgroups.keys()));
+    
     // Check if both contacts exist in the current group
-    const fromContact = currentGroup.contacts.get(from);
-    const toContact = currentGroup.contacts.get(to);
+    let fromContact = currentGroup.contacts.get(from);
+    let toContact = currentGroup.contacts.get(to);
+    
+    // If not found directly, check if they are boundary contacts of subgroups
+    if (!fromContact || !toContact) {
+      // Search through subgroups for boundary contacts
+      for (const subgroup of currentGroup.subgroups.values()) {
+        if (!fromContact) {
+          fromContact = subgroup.contacts.get(from);
+        }
+        if (!toContact) {
+          toContact = subgroup.contacts.get(to);
+        }
+        if (fromContact && toContact) break;
+      }
+    }
     
     if (!fromContact || !toContact) {
-      console.error('Cannot create wire: one or both contacts not found');
+      console.error('Cannot create wire: one or both contacts not found', { from, to, fromContact, toContact });
       return null;
     }
     
@@ -190,11 +218,22 @@ export const PropagationProvider: React.FC<PropagationProviderProps> = ({ childr
     }
   }, [currentGroup, rootGroup, findGroupById]);
 
+  const instantiateGadget = useCallback((template: GadgetTemplate, position: { x: number; y: number }): ContactGroup => {
+    if (!currentGroup || !(currentGroup instanceof ContactGroupImpl)) {
+      throw new Error('No current group');
+    }
+    
+    const gadget = template.instantiate(position, eventEmitterRef.current);
+    currentGroup.addSubgroup(gadget);
+    return gadget;
+  }, [currentGroup]);
+
   const value: PropagationContextValue = {
     rootGroup,
     currentGroup,
     eventEmitter: eventEmitterRef.current,
     propagationEngine: propagationEngineRef.current,
+    gadgetRegistry: gadgetRegistryRef.current,
     createContact,
     createBoundaryContact,
     deleteContact,
@@ -204,6 +243,7 @@ export const PropagationProvider: React.FC<PropagationProviderProps> = ({ childr
     createSubgroup,
     navigateToGroup,
     navigateToParent,
+    instantiateGadget,
     selectedContactId,
     setSelectedContactId,
   };

@@ -7,8 +7,6 @@ export class ContactImpl implements Contact {
   content: ContactContent | null = null;
   blendMode: BlendMode;
   position: Position;
-  incomingContacts: Set<UUID> = new Set();
-  outgoingContacts: Set<UUID> = new Set();
   groupId: UUID | null = null;
   
   private eventEmitter: EventEmitter;
@@ -49,21 +47,6 @@ export class ContactImpl implements Contact {
     });
   }
 
-  addIncomingContact(contactId: UUID): void {
-    this.incomingContacts.add(contactId);
-  }
-
-  removeIncomingContact(contactId: UUID): void {
-    this.incomingContacts.delete(contactId);
-  }
-
-  addOutgoingContact(contactId: UUID): void {
-    this.outgoingContacts.add(contactId);
-  }
-
-  removeOutgoingContact(contactId: UUID): void {
-    this.outgoingContacts.delete(contactId);
-  }
 
   isBoundary(): boolean {
     return false;

@@ -126,8 +126,27 @@ export class PropagationEngine {
   }
 
   propagateThroughWire(wire: ContactGroupWire, group: ContactGroup): void {
-    const fromContact = group.contacts.get(wire.from);
-    const toContact = group.contacts.get(wire.to);
+    let fromContact = group.contacts.get(wire.from);
+    let toContact = group.contacts.get(wire.to);
+    let toGroup = group;
+
+    // Handle inter-group wires through boundary contacts
+    if (!fromContact) {
+      for (const subgroup of group.subgroups.values()) {
+        fromContact = subgroup.contacts.get(wire.from);
+        if (fromContact && fromContact.isBoundary()) break;
+      }
+    }
+
+    if (!toContact) {
+      for (const subgroup of group.subgroups.values()) {
+        toContact = subgroup.contacts.get(wire.to);
+        if (toContact && toContact.isBoundary()) {
+          toGroup = subgroup;
+          break;
+        }
+      }
+    }
 
     if (!fromContact || !toContact) {
       console.error(`Cannot propagate through wire ${wire.id}: contacts not found`);
@@ -139,8 +158,8 @@ export class PropagationEngine {
         wire.pulse(fromContact, toContact);
       }
 
-      // Continue propagation from the target contact
-      this.propagateFromContact(toContact, group);
+      // Continue propagation from the target contact in its group
+      this.propagateFromContact(toContact, toGroup);
     } catch (error) {
       this.eventEmitter.emit('PropagationError', {
         type: 'PropagationError',

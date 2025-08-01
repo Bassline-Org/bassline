@@ -25,7 +25,8 @@ export const ContactNode = memo(({ data, selected }: NodeProps<ContactNodeData>)
     >
       <Handle
         type="target"
-        position={Position.Top}
+        position={Position.Left}
+        id={`${contact.id}-left-target`}
         className="w-3 h-3 bg-gray-400 dark:bg-gray-600"
       />
       
@@ -47,7 +48,8 @@ export const ContactNode = memo(({ data, selected }: NodeProps<ContactNodeData>)
       
       <Handle
         type="source"
-        position={Position.Bottom}
+        position={Position.Right}
+        id={`${contact.id}-right-source`}
         className="w-3 h-3 bg-gray-400 dark:bg-gray-600"
       />
     </div>

@@ -55,49 +55,59 @@ export const ContactNode = memo(({ data, selected }: NodeProps<ContactNodeData>)
         <ContextMenuTrigger>
           <div
             className={cn(
-              "w-12 h-12 shadow-sm rounded-sm border",
-              "bg-card border-border hover:bg-accent/10",
-              selected && "bg-accent/20 shadow-md ring-2 ring-accent",
-              "transition-all duration-200",
-              "flex items-center justify-center"
+              "w-16 h-16 shadow-lg rounded-lg border-2",
+              "bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900",
+              "border-gray-300 dark:border-gray-600",
+              "hover:shadow-xl hover:scale-105",
+              selected && "ring-2 ring-blue-500 ring-offset-2 border-blue-500",
+              "transition-all duration-200 cursor-grab active:cursor-grabbing",
+              "flex items-center justify-center relative"
             )}
           >
-            {/* Handles that work as both source and target */}
+            {/* Left side handles */}
             <Handle
+              id={`${contact.id}-left-source`}
               type="source"
               position={Position.Left}
-              id={`${contact.id}-left`}
-              className="w-full h-full opacity-0"
+              className="!w-2 !h-2 !bg-blue-500 !-left-1"
+              style={{ top: '35%' }}
               isConnectable={true}
             />
             <Handle
-              type="target"
-              position={Position.Left}
               id={`${contact.id}-left-target`}
-              className="w-full h-full opacity-0"
+              type="target"
+              position={Position.Left}
+              className="!w-2 !h-2 !bg-red-500 !-left-1"
+              style={{ top: '65%' }}
               isConnectable={true}
             />
+            {/* Right side handles */}
             <Handle
+              id={`${contact.id}-right-source`}
               type="source"
               position={Position.Right}
-              id={`${contact.id}-right`}
-              className="w-full h-full opacity-0"
+              className="!w-2 !h-2 !bg-blue-500 !-right-1"
+              style={{ top: '35%' }}
               isConnectable={true}
             />
             <Handle
+              id={`${contact.id}-right-target`}
               type="target"
               position={Position.Right}
-              id={`${contact.id}-right-target`}
-              className="w-full h-full opacity-0"
+              className="!w-2 !h-2 !bg-red-500 !-right-1"
+              style={{ top: '65%' }}
               isConnectable={true}
             />
             
             {content !== null && content !== undefined ? (
-              <div className="text-xs font-mono text-center pointer-events-none">
-                {typeof content === 'object' ? '{}' : String(content).slice(0, 3)}
+              <div className="text-sm font-semibold text-gray-700 dark:text-gray-300 text-center pointer-events-none px-1">
+                {typeof content === 'object' ? 
+                  <span className="text-xs">{ JSON.stringify(content).slice(0, 10) }...</span> : 
+                  String(content).slice(0, 5)
+                }
               </div>
             ) : (
-              <div className="w-2 h-2 bg-muted rounded-sm pointer-events-none" />
+              <div className="w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded-full pointer-events-none animate-pulse" />
             )}
           </div>
         </ContextMenuTrigger>
