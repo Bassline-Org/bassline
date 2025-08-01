@@ -99,4 +99,8 @@ export class PropagationNetwork {
   removeWire(wireId: WireId): boolean {
     return this.currentGroup.removeWire(wireId)
   }
+  
+  removeGroup(groupId: string): boolean {
+    return this.currentGroup.removeSubgroup(groupId)
+  }
 }

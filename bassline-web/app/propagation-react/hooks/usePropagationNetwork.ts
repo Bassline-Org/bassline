@@ -15,6 +15,7 @@ import { PropagationNetwork, Contact, ContactGroup, type Position } from '../../
 import { useSelection } from './useSelection'
 import { ExtractToGadgetOperation } from '../../propagation-core/refactoring/operations/ExtractToGadget'
 import { InlineGadgetOperation } from '../../propagation-core/refactoring/operations/InlineGadget'
+import { ConvertToBoundaryOperation } from '../../propagation-core/refactoring/operations/ConvertToBoundary'
 import type { Selection } from '../../propagation-core/refactoring/types'
 
 interface ContactNodeData {
@@ -94,7 +95,6 @@ export function usePropagationNetwork() {
       id: wire.id,
       source: wire.fromId,
       target: wire.toId,
-      type: wire.type,
       animated: true,
       style: { 
         stroke: wire.type === 'directed' ? '#555' : '#888',
@@ -199,7 +199,6 @@ export function usePropagationNetwork() {
         target: targetNodeId,
         sourceHandle,
         targetHandle,
-        type: wire.type,
         animated: true,
         style: { 
           stroke: wire.type === 'directed' ? '#555' : '#888',
@@ -244,8 +243,12 @@ export function usePropagationNetwork() {
           }
         }
       } else if (change.type === 'remove') {
-        // Remove from core network
-        network.removeContact(change.id)
+        // Try to remove as contact first
+        const removed = network.removeContact(change.id)
+        if (!removed) {
+          // If not a contact, try to remove as a group
+          network.removeGroup(change.id)
+        }
         // Sync to update edges that might have been removed
         syncToReactFlow()
       }
@@ -352,6 +355,24 @@ export function usePropagationNetwork() {
     return result.success
   }, [network, clearSelection, syncToReactFlow])
   
+  const convertToBoundary = useCallback(() => {
+    if (!hasSelection || selection.contacts.size === 0) {
+      return false
+    }
+    
+    const operation = new ConvertToBoundaryOperation()
+    const result = operation.execute(network.currentGroup, selection)
+    
+    if (result.success) {
+      clearSelection()
+      syncToReactFlow()
+    } else {
+      console.error('Failed to convert to boundary:', result.errors)
+    }
+    
+    return result.success
+  }, [network, selection, hasSelection, clearSelection, syncToReactFlow])
+  
   return {
     // React Flow props
     nodes,
@@ -386,6 +407,7 @@ export function usePropagationNetwork() {
     selection,
     hasSelection,
     extractToGadget,
-    inlineGadget
+    inlineGadget,
+    convertToBoundary
   }
 }

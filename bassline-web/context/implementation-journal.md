@@ -367,11 +367,84 @@ selection.groups.forEach(groupId => {
 
 This enables true hierarchical composition - gadgets containing gadgets containing gadgets, etc.
 
+### Inline Gadget - Fixed to Preserve Hierarchy
+Fixed the inline operation to only collapse a single level instead of flattening all nested gadgets:
+
+#### Implementation
+1. **Move contacts** - Transfer non-boundary contacts to parent with adjusted positions
+2. **Move subgroups** - Transfer nested gadgets intact, preserving their internal structure
+3. **Rewire connections** - Skip boundaries of inlined gadget, preserve connections to moved subgroups
+
+```typescript
+// Move subgroups with adjusted positions
+for (const [subgroupId, subgroup] of gadget.subgroups) {
+  subgroup.position = {
+    x: gadget.position.x + subgroup.position.x,
+    y: gadget.position.y + subgroup.position.y
+  }
+  parentGroup.subgroups.set(subgroupId, subgroup)
+  subgroup.parent = parentGroup
+}
+```
+
+This maintains the hierarchical structure while removing one level of nesting.
+
+#### Inline Gadget - Connection Preservation Fix
+Fixed issue where connections to nested gadget boundaries were lost during inline:
+
+```typescript
+// Trace connections through gadget boundaries to subgroup boundaries
+// Before: parent contact -> gadget boundary -> subgroup boundary
+// After: parent contact -> subgroup boundary (direct connection)
+```
+
+The fix detects parent wires that route through the gadget being inlined to reach nested subgroup boundaries, and creates direct connections to preserve the data flow.
+
 ### Next Refactoring Operations
 With this foundation, we can add:
-- **Convert to Boundary** - Make internal contacts into boundaries
 - **Move Between Groups** - Relocate contacts while preserving wires
 - **Merge Gadgets** - Combine multiple gadgets into one
+
+### UI Improvements
+
+1. **Output Boundary Contacts** - Fixed UI to support creating both input and output boundary contacts
+   - Separate buttons for "Add Input Boundary" and "Add Output Boundary"
+   - Smart positioning: inputs on left (x=50), outputs on right (x=550)
+
+2. **Convert to Boundary Operation** - New refactoring operation to convert internal contacts to boundaries
+   - Automatically infers direction (input/output) based on existing connections
+   - Adds selected contacts to the group's boundary set
+   - Shows up when contacts are selected without groups
+
+3. **Gadget Deletion Fix** - Fixed issue where deleting gadgets didn't update the view
+   - Added `removeSubgroup` method to ContactGroup
+   - Enhanced node deletion handler to check for both contacts and groups
+   - Properly cleans up wires connected to deleted gadget's boundaries
+
+4. **React Flow Edge Warning Fix** - Removed custom edge types that caused warnings
+   - React Flow doesn't support custom edge type names like "bidirectional"
+   - Now uses default edge type with markers to show directionality
+   - Bidirectional edges have arrows on both ends
+
+## Summary of Today's Accomplishments
+
+### Refactoring Operations Completed
+- ✅ **Extract to Gadget** - Works with nested gadgets, creates appropriate boundaries
+- ✅ **Inline Gadget** - Preserves hierarchy, only collapses one level, maintains all connections
+- ✅ **Convert to Boundary** - Transforms internal contacts into interface boundaries with smart direction inference
+
+### UI/UX Improvements
+- ✅ Separate buttons for input/output boundary creation with smart positioning
+- ✅ Fixed gadget deletion to properly update the view
+- ✅ Added visual feedback for all refactoring operations
+- ✅ Fixed React Flow warnings about edge types
+
+### Core Fixes
+- ✅ Inline operation now preserves connections to nested gadget boundaries
+- ✅ Proper cleanup of wires when deleting gadgets
+- ✅ Support for both input and output boundary contacts throughout the system
+
+The propagation network implementation now supports sophisticated hierarchical composition with powerful refactoring operations that maintain system integrity. Users can build complex gadgets, nest them arbitrarily deep, and refactor them while preserving all connections and data flow.
 
 ## Lessons Learned
 
@@ -384,5 +457,6 @@ With this foundation, we can add:
 7. **Leverage existing patterns** - Gadgets are just groups with boundary contacts as their interface
 8. **Selection enables refactoring** - Making selection first-class enables powerful operations
 9. **Classify then transform** - Breaking down the problem (wire classification) simplifies the solution
+10. **Handle all entity types in operations** - Deletion needs to handle contacts AND groups
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.

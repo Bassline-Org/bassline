@@ -38,7 +38,8 @@ function Flow() {
     selection,
     hasSelection,
     extractToGadget,
-    inlineGadget
+    inlineGadget,
+    convertToBoundary
   } = usePropagationNetwork()
   
   const handleAddContact = useCallback(() => {
@@ -49,12 +50,20 @@ function Flow() {
     addContact(position)
   }, [addContact])
   
-  const handleAddBoundary = useCallback(() => {
+  const handleAddInputBoundary = useCallback(() => {
     const position = { 
-      x: Math.random() * 400 + 100, 
+      x: 50, 
       y: Math.random() * 300 + 100 
     }
-    addBoundaryContact(position)
+    addBoundaryContact(position, 'input')
+  }, [addBoundaryContact])
+  
+  const handleAddOutputBoundary = useCallback(() => {
+    const position = { 
+      x: 550, 
+      y: Math.random() * 300 + 100 
+    }
+    addBoundaryContact(position, 'output')
   }, [addBoundaryContact])
   
   const handleAddGroup = useCallback(() => {
@@ -76,6 +85,10 @@ function Flow() {
       inlineGadget(gadgetId)
     }
   }, [inlineGadget])
+  
+  const handleConvertToBoundary = useCallback(() => {
+    convertToBoundary()
+  }, [convertToBoundary])
   
   const breadcrumbs = getBreadcrumbs()
   
@@ -102,8 +115,11 @@ function Flow() {
             <Button onClick={handleAddContact} size="sm">
               Add Contact
             </Button>
-            <Button onClick={handleAddBoundary} size="sm" variant="outline">
-              Add Boundary Contact
+            <Button onClick={handleAddInputBoundary} size="sm" variant="outline">
+              Add Input Boundary
+            </Button>
+            <Button onClick={handleAddOutputBoundary} size="sm" variant="outline">
+              Add Output Boundary
             </Button>
             <Button onClick={handleAddGroup} size="sm" variant="secondary">
               Add Gadget
@@ -125,6 +141,15 @@ function Flow() {
                   Inline Gadget
                 </Button>
               )}
+              {selection.contacts.size > 0 && selection.groups.size === 0 && (
+                <Button 
+                  onClick={handleConvertToBoundary} 
+                  size="sm" 
+                  variant="outline"
+                >
+                  Convert to Boundary ({selection.contacts.size} contacts)
+                </Button>
+              )}
             </div>
           )}
           <div className="text-xs text-gray-600 bg-white/80 p-2 rounded">
@@ -132,6 +157,7 @@ function Flow() {
             <div>Double-click node to edit content</div>
             <div>Select nodes → "Extract to Gadget"</div>
             <div>Select gadget → "Inline Gadget"</div>
+            <div>Select contacts → "Convert to Boundary"</div>
             <div>Delete/Backspace to remove selected items</div>
           </div>
         </Panel>

@@ -63,31 +63,119 @@ export class InlineGadgetOperation {
       }
     }
     
+    // Move nested subgroups (gadgets) to parent - only one level!
+    for (const [subgroupId, subgroup] of gadget.subgroups) {
+      // Adjust position by parent gadget position
+      const adjustedPosition = {
+        x: gadget.position.x + subgroup.position.x,
+        y: gadget.position.y + subgroup.position.y
+      }
+      subgroup.position = adjustedPosition
+      
+      // Move subgroup to parent
+      parentGroup.subgroups.set(subgroupId, subgroup)
+      subgroup.parent = parentGroup
+      
+      // The subgroup keeps all its internal structure intact
+      // We only need to handle connections from gadget's contacts to this subgroup's boundaries
+    }
+    
+    // IMPORTANT: We need to handle parent wires that connect to moved subgroups' boundaries
+    // These wires were connecting: parent contact -> gadget boundary -> subgroup boundary
+    // After inlining, they should connect: parent contact -> subgroup boundary directly
+    const parentWiresToUpdate: Array<{wireId: string, wire: any}> = []
+    
+    for (const [wireId, wire] of parentGroup.wires) {
+      // Check if this wire connects through a gadget boundary to a subgroup boundary
+      const gadgetBoundary = gadget.boundaryContacts.has(wire.toId) ? wire.toId : 
+                            gadget.boundaryContacts.has(wire.fromId) ? wire.fromId : null
+                            
+      if (gadgetBoundary) {
+        // Find if there's an internal wire from this boundary to a subgroup boundary
+        for (const [internalWireId, internalWire] of gadget.wires) {
+          let shouldUpdate = false
+          let externalContactId: string | null = null
+          let subgroupBoundaryId: string | null = null
+          
+          // Check if internal wire connects gadget boundary to subgroup boundary
+          if (internalWire.fromId === gadgetBoundary) {
+            // Check if target is a subgroup boundary
+            for (const [subgroupId, subgroup] of gadget.subgroups) {
+              if (subgroup.boundaryContacts.has(internalWire.toId)) {
+                shouldUpdate = true
+                externalContactId = wire.fromId === gadgetBoundary ? wire.toId : wire.fromId
+                subgroupBoundaryId = internalWire.toId
+                break
+              }
+            }
+          } else if (internalWire.toId === gadgetBoundary) {
+            // Check if source is a subgroup boundary
+            for (const [subgroupId, subgroup] of gadget.subgroups) {
+              if (subgroup.boundaryContacts.has(internalWire.fromId)) {
+                shouldUpdate = true
+                externalContactId = wire.fromId === gadgetBoundary ? wire.toId : wire.fromId
+                subgroupBoundaryId = internalWire.fromId
+                break
+              }
+            }
+          }
+          
+          if (shouldUpdate && externalContactId && subgroupBoundaryId) {
+            // Queue this parent wire for update
+            parentWiresToUpdate.push({ wireId, wire })
+            
+            // Create new direct connection
+            if (wire.fromId === gadgetBoundary) {
+              // Was: external -> gadget boundary, now: external -> subgroup boundary
+              parentGroup.connect(externalContactId, subgroupBoundaryId, wire.type)
+            } else {
+              // Was: gadget boundary -> external, now: subgroup boundary -> external
+              parentGroup.connect(subgroupBoundaryId, externalContactId, wire.type)
+            }
+          }
+        }
+      }
+    }
+    
     // Move and remap internal wires
     for (const [wireId, wire] of gadget.wires) {
       const fromContact = gadget.contacts.get(wire.fromId)
       const toContact = gadget.contacts.get(wire.toId)
       
-      if (!fromContact || !toContact) continue
+      // Check if wire connects to a boundary contact of a moved subgroup
+      let fromIsSubgroupBoundary = false
+      let toIsSubgroupBoundary = false
+      
+      for (const [subgroupId, subgroup] of gadget.subgroups) {
+        if (subgroup.boundaryContacts.has(wire.fromId)) {
+          fromIsSubgroupBoundary = true
+        }
+        if (subgroup.boundaryContacts.has(wire.toId)) {
+          toIsSubgroupBoundary = true
+        }
+      }
+      
+      // Skip if both endpoints are missing (shouldn't happen)
+      if (!fromContact && !toContact && !fromIsSubgroupBoundary && !toIsSubgroupBoundary) continue
       
       // Determine new wire endpoints
       let newFromId = wire.fromId
       let newToId = wire.toId
       
       // If from is internal (not boundary), use its new ID
-      if (!gadget.boundaryContacts.has(wire.fromId) && (fromContact as any).__newId) {
+      if (fromContact && !gadget.boundaryContacts.has(wire.fromId) && (fromContact as any).__newId) {
         newFromId = (fromContact as any).__newId
       }
       
       // If to is internal (not boundary), use its new ID
-      if (!gadget.boundaryContacts.has(wire.toId) && (toContact as any).__newId) {
+      if (toContact && !gadget.boundaryContacts.has(wire.toId) && (toContact as any).__newId) {
         newToId = (toContact as any).__newId
       }
       
-      // Handle wires that connect to boundary contacts
+      // Handle wires that connect to boundary contacts of the gadget being inlined
       if (gadget.boundaryContacts.has(wire.fromId)) {
-        // This is: boundary -> internal
-        // Need to rewire: external -> internal (skip the boundary)
+        // This is: boundary -> internal/subgroup
+        // Need to rewire: external -> internal/subgroup (skip the boundary)
         const parentConnections = boundaryToParentWires.get(wire.fromId) || []
         for (const conn of parentConnections) {
           if (conn.type === 'incoming') {
@@ -96,8 +184,8 @@ export class InlineGadgetOperation {
           }
         }
       } else if (gadget.boundaryContacts.has(wire.toId)) {
-        // This is: internal -> boundary  
-        // Need to rewire: internal -> external (skip the boundary)
+        // This is: internal/subgroup -> boundary  
+        // Need to rewire: internal/subgroup -> external (skip the boundary)
         const parentConnections = boundaryToParentWires.get(wire.toId) || []
         for (const conn of parentConnections) {
           if (conn.type === 'outgoing') {
@@ -105,8 +193,12 @@ export class InlineGadgetOperation {
             parentGroup.connect(newFromId, conn.externalId, wire.type)
           }
         }
+      } else if (!fromIsSubgroupBoundary && !toIsSubgroupBoundary) {
+        // Both endpoints are internal contacts (not subgroup boundaries) - recreate in parent
+        parentGroup.connect(newFromId, newToId, wire.type)
       } else {
-        // Both endpoints are internal - just recreate in parent
+        // At least one endpoint is a subgroup boundary - recreate in parent as-is
+        // The subgroup boundaries maintain their IDs, so the connection remains valid
         parentGroup.connect(newFromId, newToId, wire.type)
       }
     }
@@ -120,6 +212,11 @@ export class InlineGadgetOperation {
       for (const conn of parentConnections) {
         parentGroup.wires.delete(conn.wireId)
       }
+    }
+    
+    // Also remove the parent wires we updated/replaced
+    for (const { wireId } of parentWiresToUpdate) {
+      parentGroup.wires.delete(wireId)
     }
     
     // Remove the now-empty gadget

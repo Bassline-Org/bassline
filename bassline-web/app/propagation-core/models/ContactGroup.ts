@@ -182,4 +182,27 @@ export class ContactGroup {
     
     return false
   }
+  
+  removeSubgroup(subgroupId: string): boolean {
+    const subgroup = this.subgroups.get(subgroupId)
+    if (!subgroup) {
+      return false
+    }
+    
+    // Remove all wires that connect to this subgroup's boundary contacts
+    const wiresToRemove: WireId[] = []
+    for (const [wireId, wire] of this.wires) {
+      if (subgroup.boundaryContacts.has(wire.fromId) || subgroup.boundaryContacts.has(wire.toId)) {
+        wiresToRemove.push(wireId)
+      }
+    }
+    
+    // Remove the wires
+    wiresToRemove.forEach(wireId => this.wires.delete(wireId))
+    
+    // Remove the subgroup
+    this.subgroups.delete(subgroupId)
+    
+    return true
+  }
 }
