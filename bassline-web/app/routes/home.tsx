@@ -1,18 +1,16 @@
 import type { Route } from "./+types/home";
-import { PropagationNetworkEditorWithProvider } from "~/components/PropagationNetworkEditor";
-import { PropagationProvider } from "~/contexts/PropagationContext";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Bassline - Propagation Network Editor" },
-    { name: "description", content: "Visual programming with propagation networks" },
+    { title: "Bassline" },
+    { name: "description", content: "Propagation networks" },
   ];
 }
 
 export default function Home() {
   return (
-    <PropagationProvider>
-      <PropagationNetworkEditorWithProvider />
-    </PropagationProvider>
+    <div>
+      <h1>Bassline</h1>
+    </div>
   );
 }
