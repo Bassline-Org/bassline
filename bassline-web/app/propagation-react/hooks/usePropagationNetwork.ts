@@ -17,6 +17,7 @@ import { ExtractToGadgetOperation } from '../../propagation-core/refactoring/ope
 import { InlineGadgetOperation } from '../../propagation-core/refactoring/operations/InlineGadget'
 import { ConvertToBoundaryOperation } from '../../propagation-core/refactoring/operations/ConvertToBoundary'
 import type { Selection } from '../../propagation-core/refactoring/types'
+import type { GadgetTemplate } from '../../propagation-core/types/template'
 
 interface ContactNodeData {
   content: any
@@ -373,6 +374,20 @@ export function usePropagationNetwork() {
     return result.success
   }, [network, selection, hasSelection, clearSelection, syncToReactFlow])
   
+  // Gadget template methods
+  const saveAsTemplate = useCallback((groupId: string): GadgetTemplate | null => {
+    const group = network.findGroup(groupId)
+    if (!group) return null
+    
+    return group.toTemplate()
+  }, [network])
+  
+  const instantiateTemplate = useCallback((template: GadgetTemplate, position: Position) => {
+    const gadget = network.instantiateTemplate(template, position)
+    syncToReactFlow()
+    return gadget
+  }, [network, syncToReactFlow])
+  
   return {
     // React Flow props
     nodes,
@@ -408,6 +423,10 @@ export function usePropagationNetwork() {
     hasSelection,
     extractToGadget,
     inlineGadget,
-    convertToBoundary
+    convertToBoundary,
+    
+    // Templates
+    saveAsTemplate,
+    instantiateTemplate
   }
 }

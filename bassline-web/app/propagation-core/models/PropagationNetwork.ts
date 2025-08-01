@@ -2,6 +2,7 @@ import type { ContactId, WireId, Position } from '../types'
 import { ContactGroup } from './ContactGroup'
 import { Contact } from './Contact'
 import { Wire } from './Wire'
+import type { GadgetTemplate } from '../types/template'
 
 export class PropagationNetwork {
   rootGroup: ContactGroup
@@ -102,5 +103,13 @@ export class PropagationNetwork {
   
   removeGroup(groupId: string): boolean {
     return this.currentGroup.removeSubgroup(groupId)
+  }
+  
+  // Template methods
+  instantiateTemplate(template: GadgetTemplate, position: Position): ContactGroup {
+    const gadget = ContactGroup.fromTemplate(template, this.currentGroup)
+    gadget.position = { ...position }
+    this.currentGroup.subgroups.set(gadget.id, gadget)
+    return gadget
   }
 }

@@ -135,3 +135,25 @@ http://localhost:5173/editor
 - **Double-click gadget** - Navigate inside
 - **Drag** - Connect nodes (from handle to handle)
 - **Click + Drag** - Multi-select nodes for refactoring
+- **Ctrl/Cmd + P** - Toggle gadget palette visibility
+
+## Gadget Palette
+- **Extract to Gadget** - Automatically adds to palette
+- **Drag from palette** - Creates new instance on canvas
+- **Categories** - Organize gadgets (Math, Logic, Data, Utility)
+- **Search** - Find gadgets by name or description
+- **Usage tracking** - See most used and recent gadgets
+
+## Smart Connection Features
+- **Proximity Connect** - Drag nodes close (within 50px of handles) to auto-connect
+- **Edge Drop Menu** - Drop edge on empty canvas for quick add options
+- **Visual Feedback** - Green edge preview with opacity based on distance
+
+## Template System
+```typescript
+// Save gadget as template
+const template = group.toTemplate()
+
+// Instantiate template at position
+const instance = ContactGroup.fromTemplate(template, parentGroup)
+```

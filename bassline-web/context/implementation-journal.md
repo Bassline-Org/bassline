@@ -446,6 +446,103 @@ With this foundation, we can add:
 
 The propagation network implementation now supports sophisticated hierarchical composition with powerful refactoring operations that maintain system integrity. Users can build complex gadgets, nest them arbitrarily deep, and refactor them while preserving all connections and data flow.
 
+## Phase 4: Gadget Palette & Smart UI Features
+
+### What We Built
+Implemented a comprehensive gadget palette system with drag-and-drop and smart connection features:
+
+1. **Gadget Templates**
+   - Added `toTemplate()` and `fromTemplate()` methods to ContactGroup
+   - Templates capture structure without runtime state
+   - Index-based wire mapping for portability
+   - Recursive support for nested gadgets
+
+2. **Palette UI System**
+   - Collapsible sidebar with drag-and-drop gadgets
+   - Categories, search, usage tracking
+   - Recent/popular views for quick access
+   - Persistent storage in localStorage
+   - Visual preview showing input/output counts
+
+3. **Smart Connection Features**
+   - **Proximity Connect**: Auto-connect when handles are dragged within 50px
+   - **Edge Drop Menu**: Drop edge on canvas shows quick-add menu
+   - **Handle-based Distance**: Calculates proximity from handle positions, not node centers
+   - Visual feedback with opacity based on distance
+
+### Key Architecture Decisions
+
+#### Template System Design
+```typescript
+interface GadgetTemplate {
+  name: string
+  contacts: ContactTemplate[]  // Position, type, blend mode
+  wires: WireTemplate[]       // Index-based references
+  subgroupTemplates: GadgetTemplate[]  // Recursive
+  boundaryIndices: number[]   // Which contacts are boundaries
+}
+```
+
+**Why it works**:
+- Index-based wire references make templates portable
+- No runtime IDs or state in templates
+- Clean separation between structure and instance
+
+#### Client-Only Components
+**Problem**: localStorage access caused SSR hydration mismatches
+**Solution**: Created `ClientOnly` wrapper component
+```typescript
+<ClientOnly>
+  <GadgetPalette {...props} />
+</ClientOnly>
+```
+
+#### Handle-Based Proximity
+Improved proximity connect to use handle positions:
+- Calculate actual handle locations based on node dimensions
+- Only connect compatible handles (source to target)
+- Opacity feedback based on proximity
+- 50px threshold for handle snapping
+
+### Implementation Challenges & Solutions
+
+1. **Hydration Errors**
+   - **Issue**: `localStorage` doesn't exist during SSR
+   - **Fix**: Load default state first, then hydrate from localStorage in useEffect
+
+2. **Drag & Drop Coordinates**
+   - **Issue**: Screen coordinates don't match React Flow coordinates
+   - **Fix**: Use `screenToFlowPosition()` from useReactFlow hook
+
+3. **Z-Index Layering**
+   - **Issue**: Palette hidden behind other elements
+   - **Fix**: Increased z-index to 50 for proper layering
+
+### Usage Patterns
+
+#### Creating Reusable Gadgets
+1. Build complex logic with contacts and wires
+2. Select and extract to gadget
+3. Automatically added to palette
+4. Drag from palette to instantiate
+
+#### Smart Connections
+- Drag nodes close together for auto-connect
+- Drop edges on empty space for quick-add menu
+- Visual feedback shows connection strength
+
+### What Worked Well
+1. **Drag & Drop UX** - Natural interaction pattern for component reuse
+2. **Automatic Palette Addition** - Extract operation adds to palette seamlessly
+3. **Usage Tracking** - Helps identify most useful gadgets
+4. **Proximity Feedback** - Clear visual indication of potential connections
+
+### Future Enhancements
+- Import/export palette as JSON
+- Share palettes between projects
+- Gadget versioning and updates
+- Custom categories and tags
+
 ## Lessons Learned
 
 1. **Start with the simplest thing** - Two wire types, two blend modes
@@ -458,5 +555,8 @@ The propagation network implementation now supports sophisticated hierarchical c
 8. **Selection enables refactoring** - Making selection first-class enables powerful operations
 9. **Classify then transform** - Breaking down the problem (wire classification) simplifies the solution
 10. **Handle all entity types in operations** - Deletion needs to handle contacts AND groups
+11. **Client-side storage needs SSR consideration** - Use ClientOnly wrappers or hydrate after mount
+12. **Visual feedback improves UX** - Proximity indicators and drag previews guide users
+13. **Templates enable reusability** - Separating structure from state makes gadgets portable
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.

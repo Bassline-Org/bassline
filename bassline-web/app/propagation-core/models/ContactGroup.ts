@@ -2,6 +2,7 @@ import type { ContactId, WireId, GroupId, Position } from '../types'
 import { Contradiction } from '../types'
 import { Contact } from './Contact'
 import { Wire } from './Wire'
+import type { GadgetTemplate, ContactTemplate, WireTemplate } from '../types/template'
 
 const generateId = (): string => crypto.randomUUID()
 
@@ -204,5 +205,105 @@ export class ContactGroup {
     this.subgroups.delete(subgroupId)
     
     return true
+  }
+  
+  // Template methods
+  toTemplate(): GadgetTemplate {
+    // Create a map from contact ID to index for wire mapping
+    const contactIdToIndex = new Map<ContactId, number>()
+    const contacts: ContactTemplate[] = []
+    const boundaryIndices: number[] = []
+    
+    // Convert contacts to templates and build ID mapping
+    let index = 0
+    for (const contact of this.contacts.values()) {
+      contactIdToIndex.set(contact.id, index)
+      
+      contacts.push({
+        position: { ...contact.position },
+        isBoundary: contact.isBoundary,
+        boundaryDirection: contact.boundaryDirection,
+        name: contact.name,
+        blendMode: contact.blendMode
+      })
+      
+      if (contact.isBoundary) {
+        boundaryIndices.push(index)
+      }
+      
+      index++
+    }
+    
+    // Convert wires to templates using the ID mapping
+    const wires: WireTemplate[] = []
+    for (const wire of this.wires.values()) {
+      const fromIndex = contactIdToIndex.get(wire.fromId)
+      const toIndex = contactIdToIndex.get(wire.toId)
+      
+      if (fromIndex !== undefined && toIndex !== undefined) {
+        wires.push({
+          fromIndex,
+          toIndex,
+          type: wire.type
+        })
+      }
+    }
+    
+    // Recursively convert subgroups
+    const subgroupTemplates: GadgetTemplate[] = []
+    for (const subgroup of this.subgroups.values()) {
+      subgroupTemplates.push(subgroup.toTemplate())
+    }
+    
+    return {
+      name: this.name,
+      contacts,
+      wires,
+      subgroupTemplates,
+      boundaryIndices
+    }
+  }
+  
+  static fromTemplate(template: GadgetTemplate, parent?: ContactGroup): ContactGroup {
+    const group = new ContactGroup(generateId(), template.name, parent)
+    
+    // Create contacts and build index to ID mapping
+    const indexToContactId = new Map<number, ContactId>()
+    template.contacts.forEach((contactTemplate, index) => {
+      const contact = new Contact(
+        generateId(),
+        { ...contactTemplate.position },
+        group
+      )
+      contact.isBoundary = contactTemplate.isBoundary
+      contact.boundaryDirection = contactTemplate.boundaryDirection
+      contact.name = contactTemplate.name
+      contact.blendMode = contactTemplate.blendMode
+      
+      group.contacts.set(contact.id, contact)
+      indexToContactId.set(index, contact.id)
+      
+      if (contactTemplate.isBoundary) {
+        group.boundaryContacts.add(contact.id)
+      }
+    })
+    
+    // Create wires using the mapping
+    template.wires.forEach(wireTemplate => {
+      const fromId = indexToContactId.get(wireTemplate.fromIndex)
+      const toId = indexToContactId.get(wireTemplate.toIndex)
+      
+      if (fromId && toId) {
+        group.connect(fromId, toId, wireTemplate.type)
+      }
+    })
+    
+    // Recursively create subgroups
+    template.subgroupTemplates.forEach(subTemplate => {
+      const subgroup = ContactGroup.fromTemplate(subTemplate, group)
+      group.subgroups.set(subgroup.id, subgroup)
+    })
+    
+    return group
   }
 }
