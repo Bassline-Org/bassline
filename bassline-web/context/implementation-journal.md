@@ -235,6 +235,92 @@ Group nodes use handle IDs to identify boundary contacts:
    }
    ```
 
+## Phase 3: Refactoring Operations
+
+### What We Built
+Implemented compositional refactoring operations starting with "Extract to Gadget":
+
+1. **Selection System**
+   - Tracks selected contacts, wires, and groups
+   - Integrates with React Flow's selection state
+   - Foundation for all refactoring operations
+
+2. **Wire Classification**
+   - Categorizes wires during refactoring: internal, incoming, outgoing, external
+   - Groups wires by external endpoint for smart boundary creation
+   - Preserves all connections through refactoring
+
+3. **Extract to Gadget Operation**
+   - Select multiple contacts and extract them into a reusable gadget
+   - Automatically creates boundary contacts for crossing wires
+   - Maintains all propagation paths through proper rewiring
+   - Validates all connections follow propagation rules
+
+### Architecture Insights
+
+#### Compositional Design
+Built refactoring as composable operations:
+```typescript
+// Primitive operations compose into complex refactorings
+extractToGadget = selectSubgraph + moveToNewGroup + createBoundaries + rewireConnections
+```
+
+#### Wire Handling Strategy
+Key insight: When extracting to gadget, wires fall into clear categories:
+- **Internal wires** → Just move to new group
+- **Incoming wires** → Create input boundary, rewire: external → boundary → internal
+- **Outgoing wires** → Create output boundary, rewire: internal → boundary → external
+
+#### Connection Validation
+Made Contact.group public readonly to enable validation:
+```typescript
+canConnect(from: Contact, to: Contact): boolean {
+  // Same group - always OK
+  if (from.group === to.group) return true
+  
+  // Parent to child boundary - OK
+  if (to.isBoundary && to.group.parent === from.group) return true
+  
+  // Other cases...
+}
+```
+
+### Implementation Details
+
+#### Smart Boundary Creation
+- Groups wires by external endpoint
+- Creates one boundary per external contact (not per wire)
+- Names boundaries based on their connections
+- Positions boundaries logically (inputs left, outputs right)
+
+#### Selection Integration
+```typescript
+// React Flow selection → Core selection model
+onSelectionChange={({ nodes, edges }) => {
+  updateSelection(nodes, edges)
+}}
+
+// Selection drives refactoring UI
+{hasSelection && selection.contacts.size > 0 && (
+  <Button onClick={handleExtractToGadget}>
+    Extract to Gadget ({selection.contacts.size} contacts)
+  </Button>
+)}
+```
+
+### What Worked Well
+1. **Compositional approach** - Operations build on each other naturally
+2. **Selection as first-class** - All refactoring works on selections
+3. **Automatic boundary creation** - Users don't manually wire boundaries
+4. **Connection preservation** - No lost connections during refactoring
+
+### Next Refactoring Operations
+With this foundation, we can easily add:
+- **Inline Gadget** - Expand gadget back into parent
+- **Convert to Boundary** - Make internal contacts into boundaries
+- **Move Between Groups** - Relocate contacts while preserving wires
+- **Merge Gadgets** - Combine multiple gadgets into one
+
 ## Lessons Learned
 
 1. **Start with the simplest thing** - Two wire types, two blend modes
@@ -244,5 +330,7 @@ Group nodes use handle IDs to identify boundary contacts:
 5. **Test the architecture early** - Clean separation pays off
 6. **Question assumptions** - Boundary contacts didn't need complex bridging, just visibility rules
 7. **Leverage existing patterns** - Gadgets are just groups with boundary contacts as their interface
+8. **Selection enables refactoring** - Making selection first-class enables powerful operations
+9. **Classify then transform** - Breaking down the problem (wire classification) simplifies the solution
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.

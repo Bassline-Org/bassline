@@ -12,6 +12,9 @@ import {
   MarkerType
 } from '@xyflow/react'
 import { PropagationNetwork, Contact, ContactGroup, type Position } from '../../propagation-core'
+import { useSelection } from './useSelection'
+import { ExtractToGadgetOperation } from '../../propagation-core/refactoring/operations/ExtractToGadget'
+import type { Selection } from '../../propagation-core/refactoring/types'
 
 interface ContactNodeData {
   content: any
@@ -24,6 +27,9 @@ export function usePropagationNetwork() {
   // Create the core network
   const [network] = useState(() => new PropagationNetwork())
   const [currentGroupId, setCurrentGroupId] = useState(network.currentGroup.id)
+  
+  // Selection management
+  const { selection, updateSelection, clearSelection, hasSelection } = useSelection()
   
   // Initialize with a couple of example nodes
   const initializeNetwork = useCallback(() => {
@@ -212,6 +218,11 @@ export function usePropagationNetwork() {
     syncToReactFlow()
   }, [currentGroupId, syncToReactFlow])
   
+  // Handle selection changes
+  const onSelectionChange = useCallback(({ nodes, edges }: { nodes: Node[], edges: Edge[] }) => {
+    updateSelection(nodes, edges)
+  }, [updateSelection])
+  
   // Handle node changes (position updates and deletions)
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     // Apply changes to React Flow state
@@ -301,6 +312,31 @@ export function usePropagationNetwork() {
     }
   }, [network, syncToReactFlow])
   
+  // Refactoring operations
+  const extractToGadget = useCallback((gadgetName: string) => {
+    if (!hasSelection || selection.contacts.size === 0) {
+      console.warn('No contacts selected for extraction')
+      return false
+    }
+    
+    const operation = new ExtractToGadgetOperation()
+    const result = operation.execute(
+      network.currentGroup,
+      selection,
+      gadgetName,
+      { x: 400, y: 200 } // TODO: Calculate better position
+    )
+    
+    if (result.success) {
+      clearSelection()
+      syncToReactFlow()
+    } else {
+      console.error('Extract to gadget failed:', result.errors)
+    }
+    
+    return result.success
+  }, [network, selection, hasSelection, clearSelection, syncToReactFlow])
+  
   return {
     // React Flow props
     nodes,
@@ -308,6 +344,7 @@ export function usePropagationNetwork() {
     onNodesChange,
     onEdgesChange,
     onConnect,
+    onSelectionChange,
     
     // API methods
     addContact,
@@ -328,6 +365,11 @@ export function usePropagationNetwork() {
       setCurrentGroupId(network.currentGroup.id)
     },
     getBreadcrumbs: () => network.getBreadcrumbs(),
-    currentGroupId
+    currentGroupId,
+    
+    // Selection and refactoring
+    selection,
+    hasSelection,
+    extractToGadget
   }
 }

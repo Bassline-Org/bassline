@@ -27,13 +27,17 @@ function Flow() {
     onNodesChange,
     onEdgesChange,
     onConnect,
+    onSelectionChange,
     addContact,
     addBoundaryContact,
     createGroup,
     navigateToGroup,
     navigateToParent,
     getBreadcrumbs,
-    network
+    network,
+    selection,
+    hasSelection,
+    extractToGadget
   } = usePropagationNetwork()
   
   const handleAddContact = useCallback(() => {
@@ -59,6 +63,13 @@ function Flow() {
     }
   }, [createGroup])
   
+  const handleExtractToGadget = useCallback(() => {
+    const name = prompt('Enter name for new gadget:')
+    if (name) {
+      extractToGadget(name)
+    }
+  }, [extractToGadget])
+  
   const breadcrumbs = getBreadcrumbs()
   
   return (
@@ -69,6 +80,7 @@ function Flow() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
         deleteKeyCode={['Delete', 'Backspace']}
         fitView
@@ -90,9 +102,17 @@ function Flow() {
               Add Gadget
             </Button>
           </div>
+          {hasSelection && selection.contacts.size > 0 && (
+            <div className="flex gap-2">
+              <Button onClick={handleExtractToGadget} size="sm" variant="default">
+                Extract to Gadget ({selection.contacts.size} contacts)
+              </Button>
+            </div>
+          )}
           <div className="text-xs text-gray-600 bg-white/80 p-2 rounded">
             <div>Double-click gadget to navigate inside</div>
             <div>Double-click node to edit content</div>
+            <div>Select nodes and click "Extract to Gadget"</div>
             <div>Delete/Backspace to remove selected items</div>
           </div>
         </Panel>

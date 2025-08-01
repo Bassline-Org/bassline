@@ -124,8 +124,14 @@ http://localhost:5173/editor
 - **Breadcrumbs** - Click to navigate to any parent level
 - **Current context** - All operations affect current group
 
+## Refactoring Operations
+- **Extract to Gadget** - Select contacts, click button to create gadget
+- Automatically creates boundary contacts for external connections
+- Preserves all wire connections through proper rewiring
+
 ## Keyboard Shortcuts
 - **Delete/Backspace** - Remove selected nodes/edges
 - **Double-click contact** - Edit content
 - **Double-click gadget** - Navigate inside
 - **Drag** - Connect nodes (from handle to handle)
+- **Click + Drag** - Multi-select nodes for refactoring

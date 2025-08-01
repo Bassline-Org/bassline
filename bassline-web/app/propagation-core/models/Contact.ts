@@ -11,7 +11,7 @@ export class Contact {
   constructor(
     public readonly id: ContactId,
     public position: Position,
-    private group: ContactGroup,
+    public readonly group: ContactGroup,
     public blendMode: BlendMode = 'accept-last'
   ) {}
   
