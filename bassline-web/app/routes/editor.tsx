@@ -37,7 +37,8 @@ function Flow() {
     network,
     selection,
     hasSelection,
-    extractToGadget
+    extractToGadget,
+    inlineGadget
   } = usePropagationNetwork()
   
   const handleAddContact = useCallback(() => {
@@ -69,6 +70,12 @@ function Flow() {
       extractToGadget(name)
     }
   }, [extractToGadget])
+  
+  const handleInlineGadget = useCallback((gadgetId: string) => {
+    if (confirm('Inline this gadget? This will expand its contents into the current group.')) {
+      inlineGadget(gadgetId)
+    }
+  }, [inlineGadget])
   
   const breadcrumbs = getBreadcrumbs()
   
@@ -102,17 +109,29 @@ function Flow() {
               Add Gadget
             </Button>
           </div>
-          {hasSelection && selection.contacts.size > 0 && (
+          {hasSelection && (
             <div className="flex gap-2">
-              <Button onClick={handleExtractToGadget} size="sm" variant="default">
-                Extract to Gadget ({selection.contacts.size} contacts)
-              </Button>
+              {(selection.contacts.size > 0 || selection.groups.size > 0) && (
+                <Button onClick={handleExtractToGadget} size="sm" variant="default">
+                  Extract to Gadget ({selection.contacts.size} contacts{selection.groups.size > 0 ? `, ${selection.groups.size} gadgets` : ''})
+                </Button>
+              )}
+              {selection.groups.size === 1 && (
+                <Button 
+                  onClick={() => handleInlineGadget(Array.from(selection.groups)[0])} 
+                  size="sm" 
+                  variant="secondary"
+                >
+                  Inline Gadget
+                </Button>
+              )}
             </div>
           )}
           <div className="text-xs text-gray-600 bg-white/80 p-2 rounded">
             <div>Double-click gadget to navigate inside</div>
             <div>Double-click node to edit content</div>
-            <div>Select nodes and click "Extract to Gadget"</div>
+            <div>Select nodes → "Extract to Gadget"</div>
+            <div>Select gadget → "Inline Gadget"</div>
             <div>Delete/Backspace to remove selected items</div>
           </div>
         </Panel>

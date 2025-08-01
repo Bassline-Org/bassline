@@ -15,10 +15,10 @@ export class ExtractToGadgetOperation {
     position: Position = { x: 100, y: 100 }
   ): RefactoringResult {
     // Validate selection
-    if (selection.contacts.size === 0) {
+    if (selection.contacts.size === 0 && selection.groups.size === 0) {
       return {
         success: false,
-        errors: ['No contacts selected']
+        errors: ['No contacts or gadgets selected']
       }
     }
     
@@ -26,31 +26,73 @@ export class ExtractToGadgetOperation {
     const gadget = parentGroup.createSubgroup(gadgetName)
     gadget.position = position
     
+    // First, move any selected subgroups into the new gadget
+    const movedGroups = new Set<string>()
+    selection.groups.forEach(groupId => {
+      const subgroup = parentGroup.subgroups.get(groupId)
+      if (subgroup) {
+        // Move the entire subgroup into the new gadget
+        gadget.subgroups.set(groupId, subgroup)
+        parentGroup.subgroups.delete(groupId)
+        subgroup.parent = gadget
+        movedGroups.add(groupId)
+        
+        // Add all boundary contacts of moved groups to our selection
+        // so they're considered when classifying wires
+        subgroup.boundaryContacts.forEach(contactId => {
+          selection.contacts.add(contactId)
+        })
+      }
+    })
+    
     // Classify wires
     const allWires = Array.from(parentGroup.wires.values())
     const classification = this.classifier.classify(allWires, selection)
     
-    // Move selected contacts to gadget
+    // Move selected contacts to gadget (but not those in moved subgroups)
     const movedContacts = new Map<string, string>() // old id -> new id
     selection.contacts.forEach(contactId => {
       const contact = parentGroup.contacts.get(contactId)
       if (contact) {
-        // Create new contact in gadget with same properties
-        const newContact = gadget.addContact(contact.position)
-        newContact.setContent(contact.content)
-        newContact.blendMode = contact.blendMode
-        movedContacts.set(contactId, newContact.id)
+        // Skip if this contact belongs to a moved subgroup
+        let belongsToMovedGroup = false
+        movedGroups.forEach(groupId => {
+          const group = gadget.subgroups.get(groupId)
+          if (group && (group.contacts.has(contactId) || group.boundaryContacts.has(contactId))) {
+            belongsToMovedGroup = true
+          }
+        })
         
-        // Remove from parent
-        parentGroup.contacts.delete(contactId)
+        if (!belongsToMovedGroup) {
+          // Create new contact in gadget with same properties
+          const newContact = gadget.addContact(contact.position)
+          newContact.setContent(contact.content)
+          newContact.blendMode = contact.blendMode
+          movedContacts.set(contactId, newContact.id)
+          
+          // Remove from parent
+          parentGroup.contacts.delete(contactId)
+        }
       }
     })
     
     // Handle internal wires - just recreate in gadget
     classification.internal.forEach(wire => {
-      const newFromId = movedContacts.get(wire.fromId)!
-      const newToId = movedContacts.get(wire.toId)!
-      gadget.connect(newFromId, newToId, wire.type)
+      // Check if wire connects boundary contacts of moved groups
+      let fromId = wire.fromId
+      let toId = wire.toId
+      
+      // If endpoints were moved as individual contacts, use new IDs
+      if (movedContacts.has(wire.fromId)) {
+        fromId = movedContacts.get(wire.fromId)!
+      }
+      if (movedContacts.has(wire.toId)) {
+        toId = movedContacts.get(wire.toId)!
+      }
+      
+      // Only create wire if both endpoints exist in gadget
+      // (boundary contacts of moved groups keep their IDs)
+      gadget.connect(fromId, toId, wire.type)
       parentGroup.wires.delete(wire.id)
     })
     
@@ -71,7 +113,8 @@ export class ExtractToGadgetOperation {
       
       // Wire inside gadget: boundary -> internal contacts
       wires.forEach(wire => {
-        const internalId = movedContacts.get(wire.toId)!
+        // Use new ID if contact was moved individually, otherwise keep original
+        const internalId = movedContacts.get(wire.toId) || wire.toId
         gadget.connect(boundary.id, internalId, wire.type)
         parentGroup.wires.delete(wire.id)
       })
@@ -91,7 +134,8 @@ export class ExtractToGadgetOperation {
       
       // Wire inside gadget: internal contacts -> boundary
       wires.forEach(wire => {
-        const internalId = movedContacts.get(wire.fromId)!
+        // Use new ID if contact was moved individually, otherwise keep original
+        const internalId = movedContacts.get(wire.fromId) || wire.fromId
         gadget.connect(internalId, boundary.id, wire.type)
         parentGroup.wires.delete(wire.id)
       })

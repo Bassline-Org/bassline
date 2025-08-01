@@ -14,6 +14,7 @@ import {
 import { PropagationNetwork, Contact, ContactGroup, type Position } from '../../propagation-core'
 import { useSelection } from './useSelection'
 import { ExtractToGadgetOperation } from '../../propagation-core/refactoring/operations/ExtractToGadget'
+import { InlineGadgetOperation } from '../../propagation-core/refactoring/operations/InlineGadget'
 import type { Selection } from '../../propagation-core/refactoring/types'
 
 interface ContactNodeData {
@@ -314,8 +315,8 @@ export function usePropagationNetwork() {
   
   // Refactoring operations
   const extractToGadget = useCallback((gadgetName: string) => {
-    if (!hasSelection || selection.contacts.size === 0) {
-      console.warn('No contacts selected for extraction')
+    if (!hasSelection || (selection.contacts.size === 0 && selection.groups.size === 0)) {
+      console.warn('No contacts or gadgets selected for extraction')
       return false
     }
     
@@ -336,6 +337,20 @@ export function usePropagationNetwork() {
     
     return result.success
   }, [network, selection, hasSelection, clearSelection, syncToReactFlow])
+  
+  const inlineGadget = useCallback((gadgetId: string) => {
+    const operation = new InlineGadgetOperation()
+    const result = operation.execute(network.currentGroup, gadgetId)
+    
+    if (result.success) {
+      clearSelection()
+      syncToReactFlow()
+    } else {
+      console.error('Inline gadget failed:', result.errors)
+    }
+    
+    return result.success
+  }, [network, clearSelection, syncToReactFlow])
   
   return {
     // React Flow props
@@ -370,6 +385,7 @@ export function usePropagationNetwork() {
     // Selection and refactoring
     selection,
     hasSelection,
-    extractToGadget
+    extractToGadget,
+    inlineGadget
   }
 }

@@ -314,9 +314,61 @@ onSelectionChange={({ nodes, edges }) => {
 3. **Automatic boundary creation** - Users don't manually wire boundaries
 4. **Connection preservation** - No lost connections during refactoring
 
+### Inline Gadget Operation
+Implemented the inverse of extract - expands a gadget back into its parent:
+
+#### How It Works
+1. **Track boundary connections** - Maps which external contacts connect to each boundary
+2. **Move internal contacts** - Recreates all non-boundary contacts in parent with adjusted positions
+3. **Rewire connections** - Bypasses boundaries by connecting external contacts directly
+4. **Clean up** - Removes empty gadget and boundary contacts
+
+#### Key Implementation Details
+```typescript
+// Adjust positions when inlining
+const adjustedPosition = {
+  x: gadget.position.x + contact.position.x,
+  y: gadget.position.y + contact.position.y
+}
+
+// Skip boundaries when rewiring
+if (boundary -> internal) {
+  // Rewire: external -> internal (skip boundary)
+  parentGroup.connect(externalId, internalId)
+}
+```
+
+### Extract with Nested Gadgets
+Enhanced extract operation to support selecting gadgets along with contacts:
+
+#### Implementation Changes
+1. **Move entire subgroups** - When gadgets are selected, move them intact into new parent
+2. **Update parent references** - `subgroup.parent = gadget`
+3. **Include boundary contacts** - Add boundary contacts of moved groups to selection for wire classification
+4. **Preserve IDs** - Boundary contacts of moved gadgets keep their original IDs
+
+#### Key Code
+```typescript
+// Move selected subgroups first
+selection.groups.forEach(groupId => {
+  const subgroup = parentGroup.subgroups.get(groupId)
+  if (subgroup) {
+    gadget.subgroups.set(groupId, subgroup)
+    parentGroup.subgroups.delete(groupId)
+    subgroup.parent = gadget
+    
+    // Include boundaries in wire classification
+    subgroup.boundaryContacts.forEach(contactId => {
+      selection.contacts.add(contactId)
+    })
+  }
+})
+```
+
+This enables true hierarchical composition - gadgets containing gadgets containing gadgets, etc.
+
 ### Next Refactoring Operations
-With this foundation, we can easily add:
-- **Inline Gadget** - Expand gadget back into parent
+With this foundation, we can add:
 - **Convert to Boundary** - Make internal contacts into boundaries
 - **Move Between Groups** - Relocate contacts while preserving wires
 - **Merge Gadgets** - Combine multiple gadgets into one
