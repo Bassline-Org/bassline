@@ -1,13 +1,18 @@
 import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
+import { PropagationNetworkEditorWithProvider } from "~/components/PropagationNetworkEditor";
+import { PropagationProvider } from "~/contexts/PropagationContext";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
+    { title: "Bassline - Propagation Network Editor" },
+    { name: "description", content: "Visual programming with propagation networks" },
   ];
 }
 
 export default function Home() {
-  return <Welcome />;
+  return (
+    <PropagationProvider>
+      <PropagationNetworkEditorWithProvider />
+    </PropagationProvider>
+  );
 }
