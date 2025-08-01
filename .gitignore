@@ -84,3 +84,4 @@ bassline-web/.env.test
 # Temporary files
 *.tmp
 *.temp
+/bassline-web/.react-router/
