@@ -4,6 +4,9 @@ import type { ContactGroup } from './ContactGroup'
 
 export class Contact {
   private _content: any = undefined
+  public isBoundary: boolean = false
+  public boundaryDirection?: 'input' | 'output'
+  public name?: string
   
   constructor(
     public readonly id: ContactId,
@@ -49,6 +52,14 @@ export class Contact {
     
     for (const { wire, targetId } of connections) {
       this.group.deliverContent(targetId, this._content, this.id)
+    }
+    
+    // If this is a boundary contact, also check parent group for connections
+    if (this.isBoundary && this.group.parent) {
+      const parentConnections = this.group.parent.getOutgoingConnections(this.id)
+      for (const { wire, targetId } of parentConnections) {
+        this.group.parent.deliverContent(targetId, this._content, this.id)
+      }
     }
   }
 }

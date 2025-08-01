@@ -24,10 +24,31 @@ export class ContactGroup {
     return contact
   }
   
-  addBoundaryContact(position: Position): Contact {
+  addBoundaryContact(position: Position, direction: 'input' | 'output' = 'input', name?: string): Contact {
     const contact = this.addContact(position)
+    contact.isBoundary = true
+    contact.boundaryDirection = direction
+    contact.name = name
     this.boundaryContacts.add(contact.id)
     return contact
+  }
+  
+  getBoundaryContacts(): { inputs: Contact[], outputs: Contact[] } {
+    const inputs: Contact[] = []
+    const outputs: Contact[] = []
+    
+    for (const contactId of this.boundaryContacts) {
+      const contact = this.contacts.get(contactId)
+      if (contact) {
+        if (contact.boundaryDirection === 'output') {
+          outputs.push(contact)
+        } else {
+          inputs.push(contact)
+        }
+      }
+    }
+    
+    return { inputs, outputs }
   }
   
   connect(fromId: ContactId, toId: ContactId, type: 'bidirectional' | 'directed' = 'bidirectional'): Wire {
@@ -61,9 +82,26 @@ export class ContactGroup {
     return connections
   }
   
+  // Check if a contact can be connected to (including boundary contacts in subgroups)
+  canConnectTo(contactId: ContactId): Contact | undefined {
+    // First check own contacts
+    const ownContact = this.contacts.get(contactId)
+    if (ownContact) return ownContact
+    
+    // Then check boundary contacts in immediate subgroups
+    for (const subgroup of this.subgroups.values()) {
+      if (subgroup.boundaryContacts.has(contactId)) {
+        return subgroup.contacts.get(contactId)
+      }
+    }
+    
+    return undefined
+  }
+  
   // Content delivery
   deliverContent(contactId: ContactId, content: any, sourceId: ContactId): void {
-    const contact = this.findContact(contactId)
+    // Use canConnectTo to find the contact (includes boundary contacts in subgroups)
+    const contact = this.canConnectTo(contactId)
     if (contact) {
       contact.setContent(content, sourceId)
     }

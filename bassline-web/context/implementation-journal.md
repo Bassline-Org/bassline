@@ -152,6 +152,80 @@ new Temperature(20).merge(new Temperature(25)) // → Temperature(25)
 - `app/components/nodes/ContactNode.tsx` - Editable node component
 - `app/routes/editor.tsx` - Main editor page
 
+## Phase 2: Hierarchical Navigation & Boundary Contacts
+
+### What We Built
+Implemented gadgets (user-defined components) as ContactGroups with hierarchical navigation:
+
+1. **Visual Gadget Representation**
+   - GroupNode component displays gadgets with input/output ports
+   - Shows boundary contacts as connection points on the gadget
+   - Double-click navigation to enter gadgets
+   
+2. **Boundary Contact Implementation**
+   - Boundary contacts are regular contacts with special visibility rules
+   - Can be connected from parent group even though they live in subgroup
+   - Act as parameters/interface for gadgets (inputs/outputs)
+   - Support bidirectional propagation across group boundaries
+
+3. **Navigation System**
+   - Breadcrumb navigation shows current location in hierarchy
+   - State management tracks current group context
+   - React Flow re-renders correctly when switching contexts
+
+### Key Architecture Insights
+
+#### Boundary Contacts Are Just Special Contacts
+**Initial misconception**: Thought boundary contacts needed complex bridging logic
+**Reality**: They're regular contacts with one special rule - parent group can see and connect to them
+
+```typescript
+// The key insight - check parent's subgroups for boundary contacts
+canConnectTo(contactId: ContactId): Contact | undefined {
+  // First check own contacts
+  const ownContact = this.contacts.get(contactId)
+  if (ownContact) return ownContact
+  
+  // Then check boundary contacts in immediate subgroups
+  for (const subgroup of this.subgroups.values()) {
+    if (subgroup.boundaryContacts.has(contactId)) {
+      return subgroup.contacts.get(contactId)
+    }
+  }
+}
+```
+
+#### Propagation Across Boundaries
+Boundary contacts propagate in both directions:
+- Within their own group (normal propagation)
+- To/from parent group connections (special case)
+
+```typescript
+// Boundary contacts check parent group for connections too
+if (this.isBoundary && this.group.parent) {
+  const parentConnections = this.group.parent.getOutgoingConnections(this.id)
+  for (const { wire, targetId } of parentConnections) {
+    this.group.parent.deliverContent(targetId, this._content, this.id)
+  }
+}
+```
+
+#### React Flow Handle Mapping
+Group nodes use handle IDs to identify boundary contacts:
+- Node ID = Group ID
+- Handle ID = Boundary Contact ID
+- Connection logic maps handles back to contact IDs
+
+### What Worked Well
+1. **Minimal Changes to Core** - Boundary contacts required only small additions to existing logic
+2. **Reusing Existing Patterns** - Contacts remain the active propagators
+3. **Clean Abstraction** - Gadgets hide internal complexity while exposing clear interfaces
+
+### Gotchas & Solutions
+1. **State Management on Navigation** - Used React state to trigger re-renders when changing groups
+2. **Edge Rendering** - Had to map boundary contact connections to show edges to/from group nodes
+3. **Handle IDs in React Flow** - Used boundary contact IDs as handle IDs for proper connection mapping
+
 ## Lessons Learned
 
 1. **Start with the simplest thing** - Two wire types, two blend modes
@@ -159,5 +233,7 @@ new Temperature(20).merge(new Temperature(25)) // → Temperature(25)
 3. **Let cells be active** - Contacts handle their own propagation
 4. **UUIDs everywhere** - Proper IDs from the start
 5. **Test the architecture early** - Clean separation pays off
+6. **Question assumptions** - Boundary contacts didn't need complex bridging, just visibility rules
+7. **Leverage existing patterns** - Gadgets are just groups with boundary contacts as their interface
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.

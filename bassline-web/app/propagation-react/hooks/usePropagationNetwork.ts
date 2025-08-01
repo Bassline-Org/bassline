@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { 
   type Node, 
   type Edge, 
@@ -23,12 +23,38 @@ interface ContactNodeData {
 export function usePropagationNetwork() {
   // Create the core network
   const [network] = useState(() => new PropagationNetwork())
+  const [currentGroupId, setCurrentGroupId] = useState(network.currentGroup.id)
   
   // Initialize with a couple of example nodes
   const initializeNetwork = useCallback(() => {
     const c1 = network.addContact({ x: 100, y: 100 })
     const c2 = network.addContact({ x: 300, y: 100 })
     network.connect(c1.id, c2.id)
+    
+    // Add an example gadget
+    const gadget = network.createGroup('Example Gadget')
+    // Switch to gadget to add internals
+    const prevGroup = network.currentGroup
+    network.currentGroup = gadget
+    
+    // Add input and output boundary contacts
+    const input = network.addBoundaryContact({ x: 50, y: 100 }, 'input', 'in')
+    const output = network.addBoundaryContact({ x: 350, y: 100 }, 'output', 'out')
+    
+    // Add internal contact
+    const internal = network.addContact({ x: 200, y: 100 })
+    
+    // Wire them up
+    network.connect(input.id, internal.id)
+    network.connect(internal.id, output.id)
+    
+    // Switch back
+    network.currentGroup = prevGroup
+    
+    // Connect the gadget to the network
+    network.connect(c2.id, input.id)
+    network.connect(output.id, c1.id)
+    
     return network.getCurrentView()
   }, [network])
   
@@ -70,14 +96,14 @@ export function usePropagationNetwork() {
     const currentView = network.getCurrentView()
     
     // Map contacts to nodes
-    const newNodes: Node[] = currentView.contacts.map(contact => ({
+    const contactNodes: Node[] = currentView.contacts.map(contact => ({
       id: contact.id,
       position: contact.position,
-      type: network.rootGroup.boundaryContacts.has(contact.id) ? 'boundary' : 'contact',
+      type: contact.isBoundary ? 'boundary' : 'contact',
       data: {
         content: contact.content,
         blendMode: contact.blendMode,
-        isBoundary: network.rootGroup.boundaryContacts.has(contact.id),
+        isBoundary: contact.isBoundary,
         setContent: (content: any) => {
           contact.setContent(content)
           syncToReactFlow() // Re-sync after change
@@ -85,24 +111,78 @@ export function usePropagationNetwork() {
       }
     }))
     
+    // Map subgroups to nodes
+    const groupNodes: Node[] = currentView.subgroups.map((group, index) => {
+      const boundary = group.getBoundaryContacts()
+      return {
+        id: group.id,
+        position: { x: 400 + (index % 3) * 200, y: 50 + Math.floor(index / 3) * 150 },
+        type: 'group',
+        data: {
+          name: group.name,
+          onNavigate: () => {
+            network.navigateToGroup(group.id)
+            setCurrentGroupId(group.id)
+          },
+          inputContacts: boundary.inputs.map(c => ({ id: c.id, name: c.name })),
+          outputContacts: boundary.outputs.map(c => ({ id: c.id, name: c.name }))
+        }
+      }
+    })
+    
+    const newNodes = [...contactNodes, ...groupNodes]
+    
     // Map wires to edges
-    const newEdges: Edge[] = currentView.wires.map(wire => ({
-      id: wire.id,
-      source: wire.fromId,
-      target: wire.toId,
-      type: wire.type,
-      animated: true,
-      style: { 
-        stroke: wire.type === 'directed' ? '#555' : '#888',
-        strokeWidth: 2
-      },
-      markerEnd: { type: MarkerType.ArrowClosed },
-      markerStart: wire.type === 'bidirectional' ? { type: MarkerType.ArrowClosed } : undefined
-    }))
+    const newEdges: Edge[] = currentView.wires.map(wire => {
+      // Check if the wire connects to boundary contacts in subgroups
+      let sourceNodeId = wire.fromId
+      let targetNodeId = wire.toId
+      let sourceHandle: string | undefined
+      let targetHandle: string | undefined
+      
+      // Check if source is a boundary contact in a subgroup
+      for (const subgroup of currentView.subgroups) {
+        if (subgroup.boundaryContacts.has(wire.fromId)) {
+          sourceNodeId = subgroup.id
+          sourceHandle = wire.fromId
+          break
+        }
+      }
+      
+      // Check if target is a boundary contact in a subgroup
+      for (const subgroup of currentView.subgroups) {
+        if (subgroup.boundaryContacts.has(wire.toId)) {
+          targetNodeId = subgroup.id
+          targetHandle = wire.toId
+          break
+        }
+      }
+      
+      return {
+        id: wire.id,
+        source: sourceNodeId,
+        target: targetNodeId,
+        sourceHandle,
+        targetHandle,
+        type: wire.type,
+        animated: true,
+        style: { 
+          stroke: wire.type === 'directed' ? '#555' : '#888',
+          strokeWidth: 2
+        },
+        markerEnd: { type: MarkerType.ArrowClosed },
+        markerStart: wire.type === 'bidirectional' ? { type: MarkerType.ArrowClosed } : undefined
+      }
+    })
     
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [network])
+  }, [network, setCurrentGroupId])
+  
+  // Re-sync when group changes
+  useEffect(() => {
+    syncToReactFlow()
+  }, [currentGroupId, syncToReactFlow])
   
   // Handle node changes (position updates and deletions)
   const onNodesChange = useCallback((changes: NodeChange[]) => {
@@ -140,7 +220,21 @@ export function usePropagationNetwork() {
   // Handle new connections
   const onConnect = useCallback((connection: Connection) => {
     if (connection.source && connection.target) {
-      network.connect(connection.source, connection.target)
+      // Handle connections involving group nodes (which use handle IDs for boundary contacts)
+      let sourceId = connection.source
+      let targetId = connection.target
+      
+      // If source is a group node with a handle, use the handle ID (which is the boundary contact ID)
+      if (connection.sourceHandle) {
+        sourceId = connection.sourceHandle
+      }
+      
+      // If target is a group node with a handle, use the handle ID (which is the boundary contact ID)
+      if (connection.targetHandle) {
+        targetId = connection.targetHandle
+      }
+      
+      network.connect(sourceId, targetId)
       syncToReactFlow()
     }
   }, [network, syncToReactFlow])
@@ -152,8 +246,8 @@ export function usePropagationNetwork() {
     return contact
   }, [network, syncToReactFlow])
   
-  const addBoundaryContact = useCallback((position: Position) => {
-    const contact = network.addBoundaryContact(position)
+  const addBoundaryContact = useCallback((position: Position, direction: 'input' | 'output' = 'input', name?: string) => {
+    const contact = network.addBoundaryContact(position, direction, name)
     syncToReactFlow()
     return contact
   }, [network, syncToReactFlow])
@@ -187,6 +281,18 @@ export function usePropagationNetwork() {
     updateContent,
     
     // Direct access to network
-    network
+    network,
+    
+    // Navigation
+    navigateToGroup: (groupId: string) => {
+      network.navigateToGroup(groupId)
+      setCurrentGroupId(groupId)
+    },
+    navigateToParent: () => {
+      network.navigateToParent()
+      setCurrentGroupId(network.currentGroup.id)
+    },
+    getBreadcrumbs: () => network.getBreadcrumbs(),
+    currentGroupId
   }
 }

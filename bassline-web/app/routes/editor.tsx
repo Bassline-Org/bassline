@@ -11,11 +11,14 @@ import '@xyflow/react/dist/style.css'
 import { usePropagationNetwork } from '~/propagation-react/hooks/usePropagationNetwork'
 import { ContactNode } from '~/components/nodes/ContactNode'
 import { BoundaryNode } from '~/components/nodes/BoundaryNode'
+import { GroupNode } from '~/components/nodes/GroupNode'
 import { Button } from '~/components/ui/button'
+import { Breadcrumbs } from '~/components/Breadcrumbs'
 
 const nodeTypes = {
   contact: ContactNode,
-  boundary: BoundaryNode
+  boundary: BoundaryNode,
+  group: GroupNode
 }
 
 function Flow() {
@@ -27,7 +30,11 @@ function Flow() {
     onConnect,
     addContact,
     addBoundaryContact,
-    createGroup
+    createGroup,
+    navigateToGroup,
+    navigateToParent,
+    getBreadcrumbs,
+    network
   } = usePropagationNetwork()
   
   const handleAddContact = useCallback(() => {
@@ -46,6 +53,15 @@ function Flow() {
     addBoundaryContact(position)
   }, [addBoundaryContact])
   
+  const handleAddGroup = useCallback(() => {
+    const name = prompt('Enter gadget name:')
+    if (name) {
+      createGroup(name)
+    }
+  }, [createGroup])
+  
+  const breadcrumbs = getBreadcrumbs()
+  
   return (
     <div className="w-full h-screen">
       <ReactFlow
@@ -63,6 +79,7 @@ function Flow() {
         <MiniMap />
         
         <Panel position="top-left" className="flex flex-col gap-2">
+          <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
           <div className="flex gap-2">
             <Button onClick={handleAddContact} size="sm">
               Add Contact
@@ -70,8 +87,12 @@ function Flow() {
             <Button onClick={handleAddBoundary} size="sm" variant="outline">
               Add Boundary
             </Button>
+            <Button onClick={handleAddGroup} size="sm" variant="secondary">
+              Add Gadget
+            </Button>
           </div>
           <div className="text-xs text-gray-600 bg-white/80 p-2 rounded">
+            <div>Double-click gadget to navigate inside</div>
             <div>Double-click node to edit content</div>
             <div>Delete/Backspace to remove selected items</div>
           </div>
