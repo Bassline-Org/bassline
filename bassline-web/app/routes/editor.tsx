@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { ReactFlow, 
   Background, 
   Controls, 
@@ -8,16 +8,19 @@ import { ReactFlow,
   useReactFlow
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { toast } from 'sonner'
 
 import { usePropagationNetwork } from '~/propagation-react/hooks/usePropagationNetwork'
 import { usePalette } from '~/propagation-react/hooks/usePalette'
 import { useProximityConnect } from '~/propagation-react/hooks/useProximityConnect'
+import { useViewSettings } from '~/propagation-react/hooks/useViewSettings'
 import { ContactNode } from '~/components/nodes/ContactNode'
 import { GroupNode } from '~/components/nodes/GroupNode'
 import { Button } from '~/components/ui/button'
 import { Breadcrumbs } from '~/components/Breadcrumbs'
 import { GadgetPalette } from '~/components/palette/GadgetPalette'
 import { QuickAddMenu } from '~/components/QuickAddMenu'
+import { ToolsMenu } from '~/components/ToolsMenu'
 import { ClientOnly } from '~/components/ClientOnly'
 import type { GadgetTemplate } from '~/propagation-core/types/template'
 import type { Position } from '~/propagation-core'
@@ -55,6 +58,7 @@ function Flow() {
   } = usePropagationNetwork()
   
   const palette = usePalette()
+  const { viewSettings, setViewSettings } = useViewSettings()
   
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges)
@@ -68,7 +72,12 @@ function Flow() {
       y: Math.random() * 300 + 100 
     }
     addContact(position)
-  }, [addContact])
+    if (viewSettings.showShortcutHints) {
+      toast.success('Contact added! Tip: Press A for quick add', {
+        duration: 4000,
+      })
+    }
+  }, [addContact, viewSettings])
   
   const handleAddInputBoundary = useCallback(() => {
     const position = { 
@@ -90,8 +99,13 @@ function Flow() {
     const name = prompt('Enter gadget name:')
     if (name) {
       createGroup(name)
+      if (viewSettings.showShortcutHints) {
+        toast.success('Gadget created! Tip: Press S for quick add', {
+          duration: 4000,
+        })
+      }
     }
-  }, [createGroup])
+  }, [createGroup, viewSettings])
   
   const handleAddGadgetAtPosition = useCallback((position: Position) => {
     const name = prompt('Enter gadget name:')
@@ -114,6 +128,9 @@ function Flow() {
           const template = saveAsTemplate(newGadget.id)
           if (template) {
             palette.addToPalette(template)
+            if (viewSettings.showShortcutHints) {
+              toast.success(`"${name}" added to palette! Press Q to view.`)
+            }
           }
         }
       }
@@ -131,20 +148,78 @@ function Flow() {
   }, [convertToBoundary])
   
   const breadcrumbs = getBreadcrumbs()
+  const hasShownWelcome = useRef(false)
   
-  // Debug: keyboard shortcut to toggle palette
+  // Show welcome toast on mount (if hints are enabled)
+  useEffect(() => {
+    if (viewSettings.showShortcutHints && !hasShownWelcome.current) {
+      hasShownWelcome.current = true
+      toast('Welcome! Press W to see keyboard shortcuts', {
+        duration: 5000,
+      })
+    }
+  }, [viewSettings.showShortcutHints])
+  
+  // Keyboard shortcuts (left-hand friendly)
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + P to toggle palette
-      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+      // Tab + P to toggle palette (left hand: Tab with thumb, P with pinky)
+      if (e.key === 'Tab') {
+        e.preventDefault() // Prevent default tab behavior
+      }
+      
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'q') {
         e.preventDefault()
         palette.toggleVisibility()
+      }
+      
+      // W to toggle instructions (left hand: W with ring finger)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'w') {
+        e.preventDefault()
+        setViewSettings({
+          ...viewSettings,
+          showInstructions: !viewSettings.showInstructions
+        })
+      }
+      
+      // E to toggle minimap (left hand: E with middle finger)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'e') {
+        e.preventDefault()
+        setViewSettings({
+          ...viewSettings,
+          showMiniMap: !viewSettings.showMiniMap
+        })
+      }
+      
+      // A to add contact (left hand: A with pinky)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'a') {
+        e.preventDefault()
+        const position = { 
+          x: Math.random() * 400 + 100, 
+          y: Math.random() * 300 + 100 
+        }
+        addContact(position)
+      }
+      
+      // S to add gadget (left hand: S with ring finger)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 's') {
+        e.preventDefault()
+        handleAddGroup()
+      }
+      
+      // D to toggle grid (left hand: D with middle finger)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'd') {
+        e.preventDefault()
+        setViewSettings({
+          ...viewSettings,
+          showGrid: !viewSettings.showGrid
+        })
       }
     }
     
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [palette])
+  }, [palette, viewSettings, setViewSettings, addContact, handleAddGroup])
   
   // Handle node drag with proximity connect
   const handleNodeDrag = useCallback((event: any, node: any) => {
@@ -195,6 +270,7 @@ function Flow() {
     // Instantiate the template at the drop position
     instantiateTemplate(paletteItem, position)
     palette.incrementUsageCount(paletteItemId)
+    toast.success(`Placed "${paletteItem.name}" gadget`)
   }, [palette, instantiateTemplate])
   
   // Combine edges with potential proximity edge
@@ -218,9 +294,9 @@ function Flow() {
         deleteKeyCode={['Delete', 'Backspace']}
         fitView
       >
-        <Background />
+        {viewSettings.showGrid && <Background />}
         <Controls />
-        <MiniMap />
+        {viewSettings.showMiniMap && <MiniMap />}
         
         <Panel position="top-left" className="flex flex-col gap-2">
           <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
@@ -257,9 +333,11 @@ function Flow() {
                   <Button 
                     onClick={() => {
                       const gadgetId = Array.from(selection.groups)[0]
+                      const gadget = network.findGroup(gadgetId)
                       const template = saveAsTemplate(gadgetId)
                       if (template) {
                         palette.addToPalette(template)
+                        toast.success(`"${gadget?.name || 'Gadget'}" added to palette`)
                       }
                     }} 
                     size="sm" 
@@ -280,15 +358,22 @@ function Flow() {
               )}
             </div>
           )}
-          <div className="text-xs text-gray-600 bg-white/80 p-2 rounded">
-            <div>Double-click gadget to navigate inside</div>
-            <div>Double-click node to edit content</div>
-            <div>Select nodes → "Extract to Gadget"</div>
-            <div>Select gadget → "Inline Gadget"</div>
-            <div>Select contacts → "Convert to Boundary"</div>
-            <div>Delete/Backspace to remove selected items</div>
-            <div>Ctrl/Cmd + P to toggle palette</div>
-          </div>
+          {viewSettings.showInstructions && (
+            <div className="text-xs text-gray-600 bg-white/80 p-2 rounded">
+              <div className="font-semibold mb-1">Controls:</div>
+              <div>Double-click gadget → Navigate inside</div>
+              <div>Double-click node → Edit content</div>
+              <div>Select & Extract → Create gadget</div>
+              <div>Delete/Backspace → Remove items</div>
+              <div className="font-semibold mt-2 mb-1">Left-hand shortcuts:</div>
+              <div>Q → Toggle palette</div>
+              <div>W → Toggle instructions (this)</div>
+              <div>E → Toggle minimap</div>
+              <div>A → Add contact</div>
+              <div>S → Add gadget</div>
+              <div>D → Toggle grid</div>
+            </div>
+          )}
           <ClientOnly>
             {/* Debug button */}
             <Button 
@@ -302,6 +387,15 @@ function Flow() {
             >
               Reset Palette Storage
             </Button>
+          </ClientOnly>
+        </Panel>
+        
+        <Panel position="bottom-center" className="mb-2">
+          <ClientOnly>
+            <ToolsMenu 
+              viewSettings={viewSettings}
+              onViewSettingsChange={setViewSettings}
+            />
           </ClientOnly>
         </Panel>
       </ReactFlow>
@@ -336,7 +430,9 @@ function Flow() {
 export default function Editor() {
   return (
     <ReactFlowProvider>
-      <Flow />
+      <ClientOnly>
+        <Flow />
+      </ClientOnly>
     </ReactFlowProvider>
   )
 }

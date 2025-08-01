@@ -56,6 +56,21 @@ export class ContactGroup {
   connect(fromId: ContactId, toId: ContactId, type: 'bidirectional' | 'directed' = 'bidirectional'): Wire {
     const wire = new Wire(generateId(), fromId, toId, type)
     this.wires.set(wire.id, wire)
+    
+    // Immediately propagate any existing content through the new connection
+    const fromContact = this.canConnectTo(fromId)
+    const toContact = this.canConnectTo(toId)
+    
+    if (fromContact && fromContact.content !== undefined && fromContact.content !== null) {
+      // Propagate from source to target
+      this.deliverContent(toId, fromContact.content, fromId)
+    }
+    
+    if (type === 'bidirectional' && toContact && toContact.content !== undefined && toContact.content !== null) {
+      // For bidirectional wires, also propagate from target to source
+      this.deliverContent(fromId, toContact.content, toId)
+    }
+    
     return wire
   }
   

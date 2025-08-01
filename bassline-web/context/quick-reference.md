@@ -129,13 +129,22 @@ http://localhost:5173/editor
 - Automatically creates boundary contacts for external connections
 - Preserves all wire connections through proper rewiring
 
-## Keyboard Shortcuts
-- **Delete/Backspace** - Remove selected nodes/edges
+## Keyboard Shortcuts (Left-Hand Friendly)
+- **Q** - Toggle gadget palette
+- **W** - Toggle instructions
+- **E** - Toggle minimap
+- **A** - Add contact
+- **S** - Add gadget
+- **D** - Toggle grid
+- **Delete/Backspace** - Remove selected items
+
+## Mouse Actions
 - **Double-click contact** - Edit content
 - **Double-click gadget** - Navigate inside
-- **Drag** - Connect nodes (from handle to handle)
-- **Click + Drag** - Multi-select nodes for refactoring
-- **Ctrl/Cmd + P** - Toggle gadget palette visibility
+- **Drag node** - Move or auto-connect when close
+- **Drag from handle** - Create connection
+- **Drop edge on canvas** - Quick add menu
+- **Click + Drag** - Multi-select for refactoring
 
 ## Gadget Palette
 - **Extract to Gadget** - Automatically adds to palette
@@ -148,6 +157,20 @@ http://localhost:5173/editor
 - **Proximity Connect** - Drag nodes close (within 50px of handles) to auto-connect
 - **Edge Drop Menu** - Drop edge on empty canvas for quick add options
 - **Visual Feedback** - Green edge preview with opacity based on distance
+
+## View Options (Tools Menu - Bottom Center)
+- **Instructions** - Help panel with shortcuts
+- **Mini Map** - Overview navigation
+- **Grid** - Background grid pattern
+- **Flow** - (Future) Propagation animations
+- **Labels** - (Future) Node label visibility
+- **Debug** - (Future) Debug information
+- **Hints** - Toast notifications for shortcuts
+
+## Auto-Propagation
+- Connections immediately propagate existing content
+- Bidirectional wires flow both ways if content exists
+- No manual triggering needed
 
 ## Template System
 ```typescript

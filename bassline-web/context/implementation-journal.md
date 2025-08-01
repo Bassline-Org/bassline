@@ -543,6 +543,120 @@ Improved proximity connect to use handle positions:
 - Gadget versioning and updates
 - Custom categories and tags
 
+## Phase 5: Tools Menu & UI Polish
+
+### What We Built
+Implemented a comprehensive view management system with contextual UI controls and user feedback:
+
+1. **Flexible Tools Menu**
+   - Bottom-center positioning with upward expansion
+   - Horizontal layout for better screen usage
+   - Toggle buttons with icons and keyboard shortcuts
+   - Persistent view settings in localStorage
+   - Clean, modern design with compact buttons
+
+2. **View Settings System**
+   - **Instructions** (W) - Toggle help panel
+   - **Mini Map** (E) - Show/hide React Flow minimap
+   - **Grid** (D) - Toggle background grid
+   - **Flow** - Ready for propagation visualization
+   - **Labels** - Ready for node label control
+   - **Debug** - Ready for debug overlays
+   - **Hints** - Control toast notifications
+
+3. **Left-Hand Keyboard Shortcuts**
+   - Redesigned for single-hand operation:
+     - Q → Toggle palette (pinky)
+     - W → Toggle instructions (ring finger)
+     - E → Toggle minimap (middle finger)
+     - A → Add contact (pinky)
+     - S → Add gadget (ring finger)
+     - D → Toggle grid (middle finger)
+   - Natural finger positions for mouse + keyboard workflow
+
+4. **Toast Notification System**
+   - Integrated `sonner` library for elegant toasts
+   - Top-center positioning with downward stacking
+   - White background with proper contrast (fixed hover issue)
+   - Contextual hints when clicking buttons
+   - Respects "Shortcut Hints" user preference
+   - No toasts when using keyboard shortcuts (non-intrusive)
+
+5. **Auto-Propagation on Connect**
+   - When creating new connections, existing content flows immediately
+   - Bidirectional wires propagate from both ends if content exists
+   - Makes the network feel more alive and responsive
+
+### Architecture Decisions
+
+#### View Settings Hook
+```typescript
+const defaultSettings: ViewSettings = {
+  showInstructions: true,
+  showMiniMap: true,
+  showGrid: true,
+  showPropagationFlow: false,
+  showNodeLabels: true,
+  showDebugInfo: false,
+  showShortcutHints: true
+}
+```
+- Centralized view state management
+- Automatic persistence to localStorage
+- Avoids hydration issues with proper useEffect loading
+
+#### Toast Implementation
+- **Unstyled mode** with Tailwind classes for full control
+- Conditional display based on user preferences
+- Success variants for positive feedback
+- useRef to prevent duplicate welcome messages
+
+#### Left-Hand Ergonomics
+- Shortcuts clustered around QWEASD keys
+- No modifier keys needed (direct key presses)
+- Complementary to right-hand mouse usage
+- Memorable positions (Q for palette like "Queue")
+
+### Implementation Challenges & Solutions
+
+1. **Toast Styling Issues**
+   - **Problem**: Toasts appeared with same color as background
+   - **Investigation**: Read sonner docs, discovered CSS conflicts
+   - **Solution**: Used `unstyled: true` with explicit Tailwind classes
+
+2. **Duplicate Welcome Toast**
+   - **Problem**: Toast appeared twice on mount
+   - **Solution**: Added useRef flag to ensure single display
+
+3. **Keyboard Shortcut Discovery**
+   - **Problem**: Users don't know shortcuts exist
+   - **Solution**: Toast hints on button clicks (not on shortcut use)
+
+### UI/UX Improvements
+
+1. **Progressive Disclosure**
+   - Tools menu collapsed by default
+   - Shortcuts shown in menu for learning
+   - Optional hint system for new users
+
+2. **Visual Feedback**
+   - Button states clearly indicate on/off
+   - Keyboard shortcuts displayed inline
+   - Toast notifications for important actions
+
+3. **Customization**
+   - All view options toggleable
+   - Settings persist across sessions
+   - Hints can be disabled when learned
+
+### What Worked Well
+
+1. **Bottom-Center Tools** - Easy to reach, doesn't obstruct canvas
+2. **Horizontal Layout** - Better use of wide screens
+3. **Left-Hand Shortcuts** - Natural for mouse users
+4. **Conditional Toasts** - Helpful without being annoying
+5. **View Persistence** - Settings remembered between sessions
+
 ## Lessons Learned
 
 1. **Start with the simplest thing** - Two wire types, two blend modes
@@ -558,5 +672,9 @@ Improved proximity connect to use handle positions:
 11. **Client-side storage needs SSR consideration** - Use ClientOnly wrappers or hydrate after mount
 12. **Visual feedback improves UX** - Proximity indicators and drag previews guide users
 13. **Templates enable reusability** - Separating structure from state makes gadgets portable
+14. **Read the docs!** - Library documentation often has the exact solution you need
+15. **Ergonomics matter** - Left-hand shortcuts + right-hand mouse creates fluid workflow
+16. **Progressive disclosure** - Hide complexity until users need it
+17. **Respect user preferences** - Make hints and helpers optional
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.

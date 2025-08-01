@@ -6,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import { Toaster } from 'sonner';
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -34,6 +35,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <Toaster 
+          position="top-center"
+          toastOptions={{
+            duration: 3000,
+            unstyled: true,
+            classNames: {
+              toast: 'bg-white text-slate-900 rounded-lg shadow-lg border border-slate-200 p-4',
+              title: 'font-semibold',
+              description: 'text-sm text-slate-600',
+              success: 'bg-white text-slate-900 border-green-200',
+              error: 'bg-white text-slate-900 border-red-200',
+            }
+          }}
+        />
         <ScrollRestoration />
         <Scripts />
       </body>
