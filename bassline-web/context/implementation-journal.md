@@ -225,6 +225,15 @@ Group nodes use handle IDs to identify boundary contacts:
 1. **State Management on Navigation** - Used React state to trigger re-renders when changing groups
 2. **Edge Rendering** - Had to map boundary contact connections to show edges to/from group nodes
 3. **Handle IDs in React Flow** - Used boundary contact IDs as handle IDs for proper connection mapping
+4. **React Flow Default Node Styling** - React Flow wraps custom nodes in a container with grey background and black border. Fixed by adding style props to nodes:
+   ```typescript
+   style: {
+     background: 'transparent',
+     border: 'none',
+     padding: 0,
+     borderRadius: 0
+   }
+   ```
 
 ## Lessons Learned
 

@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card, CardContent } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Badge } from '~/components/ui/badge'
+import { Circle } from 'lucide-react'
 
 export interface ContactNodeData {
   content: any
@@ -19,7 +20,7 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
   const handleDoubleClick = useCallback(() => {
     setEditValue(String(nodeData.content ?? ''))
     setIsEditing(true)
-  }, [data.content])
+  }, [nodeData.content])
   
   const handleSubmit = useCallback(() => {
     // Try to parse as JSON first, then as number, then as string
@@ -36,7 +37,7 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
     
     nodeData.setContent(newContent)
     setIsEditing(false)
-  }, [editValue, data])
+  }, [editValue, nodeData])
   
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -47,15 +48,44 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
   }, [handleSubmit])
   
   return (
-    <Card className={`min-w-[120px] ${selected ? 'ring-2 ring-blue-500' : ''}`}>
-      <Handle type="target" position={Position.Left} />
-      <Handle type="source" position={Position.Right} />
+    <Card 
+      className={`min-w-[100px] transition-all shadow-sm hover:shadow-md ${
+        selected 
+          ? 'ring-2 ring-blue-500 border-blue-400' 
+          : 'border-blue-200'
+      }`}
+      style={{ 
+        background: nodeData.isBoundary 
+          ? 'linear-gradient(to bottom, #fef3c7 0%, #fffbeb 100%)' 
+          : 'linear-gradient(to bottom, #e0f2fe 0%, #f0f9ff 100%)',
+        borderWidth: '2px'
+      }}
+    >
+      <Handle 
+        type="target" 
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-blue-500 !border-blue-600"
+      />
+      <Handle 
+        type="source" 
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-blue-500 !border-blue-600"
+      />
       
       <CardContent className="p-3">
         <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            <Badge variant={nodeData.blendMode === 'merge' ? 'default' : 'secondary'} className="text-xs">
-              {nodeData.blendMode}
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Circle className={`w-3 h-3 ${nodeData.isBoundary ? 'text-amber-600' : 'text-blue-600'}`} />
+              {nodeData.isBoundary && (
+                <span className="text-xs text-amber-700 font-medium">boundary</span>
+              )}
+            </div>
+            <Badge 
+              variant={nodeData.blendMode === 'merge' ? 'default' : 'secondary'} 
+              className="text-xs py-0 px-1"
+            >
+              {nodeData.blendMode === 'merge' ? 'M' : 'L'}
             </Badge>
           </div>
           
@@ -67,10 +97,12 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
                 onBlur={handleSubmit}
                 onKeyDown={handleKeyDown}
                 autoFocus
-                className="h-6 text-sm"
+                className="h-6 text-sm px-2"
               />
             ) : (
-              <div className="text-sm font-mono">
+              <div className={`text-sm font-mono text-center ${
+                nodeData.content === undefined ? 'text-gray-400' : 'text-gray-700'
+              }`}>
                 {nodeData.content !== undefined ? String(nodeData.content) : '∅'}
               </div>
             )}

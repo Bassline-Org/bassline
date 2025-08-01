@@ -1,6 +1,7 @@
 import { memo, useCallback } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card, CardHeader, CardContent } from '~/components/ui/card'
+import { Package } from 'lucide-react'
 
 export interface GroupNodeData {
   name: string
@@ -15,54 +16,71 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
     nodeData.onNavigate()
   }, [nodeData])
   
+  const maxContacts = Math.max(nodeData.inputContacts.length, nodeData.outputContacts.length, 1)
+  
   return (
     <Card 
-      className={`min-w-[160px] cursor-pointer transition-all bg-slate-50 border-2 ${selected ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-300'}`}
+      className={`min-w-[200px] cursor-pointer transition-all shadow-md hover:shadow-lg ${
+        selected 
+          ? 'ring-2 ring-purple-500 border-purple-400' 
+          : 'border-purple-200'
+      }`}
+      style={{ 
+        background: 'linear-gradient(to bottom, #f3e8ff 0%, #faf5ff 100%)',
+        borderWidth: '2px'
+      }}
       onDoubleClick={handleDoubleClick}
     >
-      <CardHeader className="p-2 pb-1 bg-slate-200 rounded-t-sm">
-        <div className="font-semibold text-sm text-center">{nodeData.name}</div>
+      <CardHeader className="p-3 pb-2 border-b border-purple-200">
+        <div className="flex items-center gap-2">
+          <Package className="w-4 h-4 text-purple-600" />
+          <div className="font-semibold text-sm text-purple-900">{nodeData.name}</div>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="flex">
+        <div className="flex" style={{ minHeight: `${maxContacts * 28}px` }}>
           {/* Input contacts (left side) */}
-          <div className="flex-1 border-r border-slate-300">
+          <div className="flex-1 flex flex-col border-r border-purple-200">
             {nodeData.inputContacts.map((contact, index) => (
-              <div key={contact.id} className="relative h-8 flex items-center">
+              <div key={contact.id} className="relative flex items-center h-7">
                 <Handle
                   type="target"
                   position={Position.Left}
                   id={contact.id}
-                  style={{ top: `${16 + index * 32}px` }}
-                  className="!w-3 !h-3"
+                  className="!w-3 !h-3 !bg-purple-500 !border-purple-600"
+                  style={{ left: '-8px' }}
                 />
-                <span className="text-xs text-muted-foreground pl-4">{contact.name || 'in'}</span>
+                <div className="pl-3 pr-2 w-full">
+                  <span className="text-xs text-purple-700 font-medium">{contact.name || `in${index + 1}`}</span>
+                </div>
               </div>
             ))}
             {nodeData.inputContacts.length === 0 && (
-              <div className="h-8 flex items-center justify-center text-xs text-muted-foreground">
-                no inputs
+              <div className="flex-1 flex items-center justify-center min-h-[40px]">
+                <span className="text-xs text-purple-400 italic">no inputs</span>
               </div>
             )}
           </div>
           
           {/* Output contacts (right side) */}
-          <div className="flex-1">
+          <div className="flex-1 flex flex-col">
             {nodeData.outputContacts.map((contact, index) => (
-              <div key={contact.id} className="relative h-8 flex items-center justify-end">
-                <span className="text-xs text-muted-foreground pr-4">{contact.name || 'out'}</span>
+              <div key={contact.id} className="relative flex items-center justify-end h-7">
+                <div className="pl-2 pr-3 w-full text-right">
+                  <span className="text-xs text-purple-700 font-medium">{contact.name || `out${index + 1}`}</span>
+                </div>
                 <Handle
                   type="source"
                   position={Position.Right}
                   id={contact.id}
-                  style={{ top: `${16 + index * 32}px` }}
-                  className="!w-3 !h-3"
+                  className="!w-3 !h-3 !bg-purple-500 !border-purple-600"
+                  style={{ right: '-8px' }}
                 />
               </div>
             ))}
             {nodeData.outputContacts.length === 0 && (
-              <div className="h-8 flex items-center justify-center text-xs text-muted-foreground">
-                no outputs
+              <div className="flex-1 flex items-center justify-center min-h-[40px]">
+                <span className="text-xs text-purple-400 italic">no outputs</span>
               </div>
             )}
           </div>

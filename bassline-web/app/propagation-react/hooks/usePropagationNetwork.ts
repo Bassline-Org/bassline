@@ -33,6 +33,7 @@ export function usePropagationNetwork() {
     
     // Add an example gadget
     const gadget = network.createGroup('Example Gadget')
+    gadget.position = { x: 600, y: 100 }
     // Switch to gadget to add internals
     const prevGroup = network.currentGroup
     network.currentGroup = gadget
@@ -65,6 +66,12 @@ export function usePropagationNetwork() {
       id: contact.id,
       position: contact.position,
       type: network.rootGroup.boundaryContacts.has(contact.id) ? 'boundary' : 'contact',
+      style: {
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        borderRadius: 0
+      },
       data: {
         content: contact.content,
         blendMode: contact.blendMode,
@@ -100,6 +107,12 @@ export function usePropagationNetwork() {
       id: contact.id,
       position: contact.position,
       type: contact.isBoundary ? 'boundary' : 'contact',
+      style: {
+        background: 'transparent',
+        border: 'none',
+        padding: 0,
+        borderRadius: 0
+      },
       data: {
         content: contact.content,
         blendMode: contact.blendMode,
@@ -111,13 +124,28 @@ export function usePropagationNetwork() {
       }
     }))
     
-    // Map subgroups to nodes
+    // Map subgroups to nodes - check if we have stored positions
     const groupNodes: Node[] = currentView.subgroups.map((group, index) => {
       const boundary = group.getBoundaryContacts()
+      
+      // Use stored position or create new one
+      const position = group.position.x === 0 && group.position.y === 0 
+        ? { 
+            x: 500 + (index % 2) * 250, 
+            y: 100 + Math.floor(index / 2) * 200 
+          }
+        : group.position
+      
       return {
         id: group.id,
-        position: { x: 400 + (index % 3) * 200, y: 50 + Math.floor(index / 3) * 150 },
+        position,
         type: 'group',
+        style: {
+          background: 'transparent',
+          border: 'none',
+          padding: 0,
+          borderRadius: 0
+        },
         data: {
           name: group.name,
           onNavigate: () => {
@@ -192,9 +220,16 @@ export function usePropagationNetwork() {
     // Handle changes in core network
     changes.forEach(change => {
       if (change.type === 'position' && change.position) {
+        // Check if it's a contact or a group
         const contact = network.findContact(change.id)
         if (contact) {
           contact.position = change.position
+        } else {
+          // Check if it's a group
+          const group = network.findGroup(change.id)
+          if (group) {
+            group.position = change.position
+          }
         }
       } else if (change.type === 'remove') {
         // Remove from core network

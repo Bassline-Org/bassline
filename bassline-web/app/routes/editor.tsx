@@ -10,14 +10,13 @@ import '@xyflow/react/dist/style.css'
 
 import { usePropagationNetwork } from '~/propagation-react/hooks/usePropagationNetwork'
 import { ContactNode } from '~/components/nodes/ContactNode'
-import { BoundaryNode } from '~/components/nodes/BoundaryNode'
 import { GroupNode } from '~/components/nodes/GroupNode'
 import { Button } from '~/components/ui/button'
 import { Breadcrumbs } from '~/components/Breadcrumbs'
 
 const nodeTypes = {
   contact: ContactNode,
-  boundary: BoundaryNode,
+  boundary: ContactNode, // Same component, different data
   group: GroupNode
 }
 
@@ -85,7 +84,7 @@ function Flow() {
               Add Contact
             </Button>
             <Button onClick={handleAddBoundary} size="sm" variant="outline">
-              Add Boundary
+              Add Boundary Contact
             </Button>
             <Button onClick={handleAddGroup} size="sm" variant="secondary">
               Add Gadget

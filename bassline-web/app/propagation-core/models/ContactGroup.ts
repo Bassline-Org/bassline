@@ -10,6 +10,7 @@ export class ContactGroup {
   wires = new Map<WireId, Wire>()
   boundaryContacts = new Set<ContactId>()
   subgroups = new Map<GroupId, ContactGroup>()
+  position: Position = { x: 0, y: 0 }
   
   constructor(
     public readonly id: GroupId,
