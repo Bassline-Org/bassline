@@ -1,0 +1,86 @@
+# Dependencies
+node_modules/
+bassline-web/node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+bassline-web/coverage/
+
+# Production
+build/
+dist/
+bassline-web/build/
+bassline-web/dist/
+
+# Misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Editor directories and files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+
+# React Router / Vite
+.cache/
+.vite/
+bassline-web/.cache/
+bassline-web/.vite/
+
+# TypeScript
+*.tsbuildinfo
+bassline-web/*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+bassline-web/.npm
+
+# Optional eslint cache
+.eslintcache
+bassline-web/.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+bassline-web/.stylelintcache
+
+# Optional REPL history
+.node_repl_history
+bassline-web/.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+bassline-web/.yarn-integrity
+
+# dotenv environment variable files
+.env
+.env.development
+.env.production
+.env.test
+bassline-web/.env
+bassline-web/.env.development
+bassline-web/.env.production
+bassline-web/.env.test
+
+# Temporary files
+*.tmp
+*.temp
