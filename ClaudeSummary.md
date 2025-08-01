@@ -30,7 +30,7 @@ Building a visual programming environment for **propagation networks** - computa
 - **Progressive disclosure** - manage complexity through hierarchical scoping, not overwhelming canvases
 
 ### UI Approach (Target)
-- **Pager flow** (like Glamorous Toolkit inspectors) instead of traditional canvas editor
+- **Pager flow** (like Glamorous Toolkit inspectors) as part of an infinite canvas editor
 - Navigate right to go deeper into subgroups, left to go up hierarchy levels  
 - Each "page" shows one abstraction level - complete visual isolation between levels
 - Inspired by Dreams' scoped-in views for complexity management
