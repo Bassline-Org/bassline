@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚨 IMPORTANT: Read Context Documentation First! 🚨
+
+**Before starting ANY work in this repository, you MUST read:**
+1. `bassline-web/context/implementation-journal.md` - Detailed implementation history, architecture decisions, and lessons learned
+2. `bassline-web/context/quick-reference.md` - Quick reference for current architecture and common patterns
+
+These files contain CRITICAL information about:
+- What has already been built and tested
+- Architecture decisions and why they were made
+- Common pitfalls that have been discovered and fixed
+- The current state of the implementation
+
+**Failing to read these will likely result in repeating past mistakes or breaking existing functionality.**
+
 ## Project Overview
 
 Bassline is a web frontend implementation for a visual programming environment based on propagation networks. This follows an existing Pharo Smalltalk implementation and represents the first dedicated web-based interface for the system.
