@@ -11,38 +11,34 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Switch } from '~/components/ui/switch'
-import type { Contact } from '~/propagation-core'
 import { Interval, Color, Temperature, SetValue, ConsensusBoolean, Point2D, ExactString } from '~/propagation-core/types/mergeable'
+import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
+import { useContact } from '~/propagation-react/hooks/useContact'
 
 interface PropertyPanelProps {
   isVisible: boolean
   onToggleVisibility: () => void
-  selection: {
-    contacts: Set<string>
-    groups: Set<string>
-  }
-  network: any
-  onUpdate: () => void
   shouldFocus: React.MutableRefObject<boolean>
 }
 
 type ValueType = 'number' | 'string' | 'interval' | 'color' | 'temperature' | 'boolean' | 'point2d' | 'exactString' | 'set'
 
-export function PropertyPanel({ isVisible, onToggleVisibility, selection, network, onUpdate, shouldFocus }: PropertyPanelProps) {
+export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: PropertyPanelProps) {
+  const { selectedContacts } = useContactSelection()
   const valueInputRef = useRef<HTMLInputElement>(null)
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
+  const contactData = useContact(selectedContactId)
   const [valueType, setValueType] = useState<ValueType>('string')
   const [tempValue, setTempValue] = useState<any>(null)
   
   // Track selected contact
   useEffect(() => {
-    if (selection.contacts.size === 1) {
-      const contactId = Array.from(selection.contacts)[0]
-      const contact = network.findContact(contactId)
-      setSelectedContact(contact)
+    if (selectedContacts.length === 1) {
+      const contactId = selectedContacts[0].id
+      setSelectedContactId(contactId)
       
       // Focus input only when opened via double-click
-      if (isVisible && contact && shouldFocus.current) {
+      if (isVisible && shouldFocus.current) {
         setTimeout(() => {
           valueInputRef.current?.focus()
           valueInputRef.current?.select()
@@ -50,15 +46,15 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
         }, 100)
       }
     } else {
-      setSelectedContact(null)
+      setSelectedContactId(null)
     }
-  }, [selection, network, isVisible])
+  }, [selectedContacts, isVisible])
   
   // Detect value type from current content
   useEffect(() => {
-    if (!selectedContact) return
+    if (!contactData.contact) return
     
-    const content = selectedContact.content
+    const content = contactData.content
     if (content === undefined || content === null) {
       setValueType('string')
     } else if (content instanceof Interval) {
@@ -89,10 +85,10 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
       setValueType('string')
       setTempValue(String(content))
     }
-  }, [selectedContact])
+  }, [contactData.contact, contactData.content])
   
   const applyValue = () => {
-    if (!selectedContact) return
+    if (!contactData.contact) return
     
     let newValue: any
     
@@ -130,8 +126,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
         newValue = tempValue
     }
     
-    selectedContact.setContent(newValue)
-    onUpdate()
+    contactData.setContent(newValue)
   }
   
   if (!isVisible) {
@@ -170,7 +165,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
       
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {!selectedContact ? (
+        {!contactData.contact ? (
           <div className="text-sm text-muted-foreground text-center py-8">
             Select a single contact to edit its properties
           </div>
@@ -178,8 +173,8 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
           <div className="space-y-4">
             {/* Contact Info */}
             <div className="text-xs text-muted-foreground">
-              {selectedContact.isBoundary ? 'Boundary Contact' : 'Contact'}
-              {selectedContact.name && ` - ${selectedContact.name}`}
+              {contactData.isBoundary ? 'Boundary Contact' : 'Contact'}
+              {contactData.name && ` - ${contactData.name}`}
             </div>
             
             {/* Blend Mode */}
@@ -187,10 +182,9 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
               <Label htmlFor="blend-mode" className="text-sm">Merge Mode</Label>
               <Switch
                 id="blend-mode"
-                checked={selectedContact.blendMode === 'merge'}
+                checked={contactData.blendMode === 'merge'}
                 onCheckedChange={(checked) => {
-                  selectedContact.setBlendMode(checked ? 'merge' : 'accept-last')
-                  onUpdate()
+                  contactData.setBlendMode(checked ? 'merge' : 'accept-last')
                 }}
               />
             </div>
@@ -315,8 +309,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
                   checked={tempValue || false}
                   onCheckedChange={(checked) => {
                     setTempValue(checked)
-                    selectedContact.setContent(new ConsensusBoolean(checked))
-                    onUpdate()
+                    contactData.setContent(new ConsensusBoolean(checked))
                   }}
                 />
               )}
@@ -371,10 +364,10 @@ export function PropertyPanel({ isVisible, onToggleVisibility, selection, networ
             </Button>
             
             {/* Contradiction Display */}
-            {selectedContact.lastContradiction && (
+            {contactData.lastContradiction && (
               <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
                 <div className="font-semibold mb-1">Contradiction</div>
-                <div>{selectedContact.lastContradiction.reason}</div>
+                <div>{contactData.lastContradiction.reason}</div>
               </div>
             )}
           </div>

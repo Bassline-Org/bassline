@@ -10,6 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
+import { useGroup } from '~/propagation-react/hooks/useGroup'
 
 const groupNodeVariants = cva(
   "transition-all shadow-md hover:shadow-lg",
@@ -57,36 +58,29 @@ const primitiveIcons: Record<string, React.ElementType> = {
 }
 
 
-export interface GroupNodeData {
-  name: string
-  onNavigate?: () => void
-  inputContacts: { id: string; name?: string }[]
-  outputContacts: { id: string; name?: string }[]
-  isPrimitive?: boolean
-}
-
-export const GroupNode = memo(({ data, selected }: NodeProps) => {
-  const nodeData = data as unknown as GroupNodeData
-  const handleDoubleClick = useCallback(() => {
-    if (nodeData.onNavigate) {
-      nodeData.onNavigate()
-    }
-  }, [nodeData])
+export const GroupNode = memo(({ id, selected }: NodeProps) => {
+  const { name, inputContacts, outputContacts, isPrimitive, navigate } = useGroup(id)
   
-  const maxContacts = Math.max(nodeData.inputContacts.length, nodeData.outputContacts.length, 1)
-  const nodeType = nodeData.isPrimitive ? 'primitive' : 'group'
-  const interactive = !!nodeData.onNavigate
+  const handleDoubleClick = useCallback(() => {
+    if (!isPrimitive) {
+      navigate()
+    }
+  }, [isPrimitive, navigate])
+  
+  const maxContacts = Math.max(inputContacts.length, outputContacts.length, 1)
+  const nodeType = isPrimitive ? 'primitive' : 'group'
+  const interactive = !isPrimitive
   
   // Get icon for primitive gadgets
-  const PrimitiveIcon = nodeData.isPrimitive ? primitiveIcons[nodeData.name] : null
+  const PrimitiveIcon = isPrimitive ? primitiveIcons[name] : null
   
   return (
     <TooltipProvider>
       <Card 
-        className={cn(groupNodeVariants({ nodeType, selected, interactive }), nodeData.isPrimitive && "p-[5px]")}
+        className={cn(groupNodeVariants({ nodeType, selected, interactive }), isPrimitive && "p-[5px]")}
         onDoubleClick={handleDoubleClick}
       >
-        {nodeData.isPrimitive ? (
+        {isPrimitive ? (
           // Primitive gadgets - just show icon
           <CardContent className="p-0 pb-0 flex items-center justify-center w-[40px] h-[40px]">
             {PrimitiveIcon && <PrimitiveIcon className="w-6 h-6 text-[var(--node-primitive)]" />}
@@ -95,21 +89,21 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
           // Regular gadgets - show header with name
           <CardHeader className="p-3 pb-2 border-b border-opacity-20">
             <div className="flex items-center gap-2">
-              {nodeData.onNavigate ? (
+              {!isPrimitive ? (
                 <Package className={cn("w-4 h-4", "[&]:text-[var(--node-group)]")} />
               ) : (
                 <Lock className={cn("w-4 h-4", "[&]:text-[var(--node-group)]")} />
               )}
-              <div className="font-semibold text-sm">{nodeData.name}</div>
+              <div className="font-semibold text-sm">{name}</div>
             </div>
           </CardHeader>
         )}
-        {!nodeData.isPrimitive && (
+        {!isPrimitive && (
           <CardContent className="p-0">
             <div className="flex" style={{ minHeight: `${maxContacts * 28}px` }}>
               {/* Input contacts (left side) */}
               <div className="flex-1 flex flex-col border-r border-current border-opacity-20">
-                {nodeData.inputContacts.map((contact, index) => (
+                {inputContacts.map((contact, index) => (
                   <div key={contact.id} className="relative flex items-center h-7">
                     <Handle
                       type="target"
@@ -126,7 +120,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
                     </div>
                   </div>
                 ))}
-                {nodeData.inputContacts.length === 0 && (
+                {inputContacts.length === 0 && (
                   <div className="flex-1 flex items-center justify-center min-h-[40px]">
                     <span className="text-xs italic opacity-50">no inputs</span>
                   </div>
@@ -135,7 +129,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
               
               {/* Output contacts (right side) */}
               <div className="flex-1 flex flex-col">
-                {nodeData.outputContacts.map((contact, index) => (
+                {outputContacts.map((contact, index) => (
                   <div key={contact.id} className="relative flex items-center justify-end h-7">
                     <div className="pl-2 pr-3 w-full text-right">
                       <span className="text-xs font-medium opacity-80">{contact.name || `out${index + 1}`}</span>
@@ -152,7 +146,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
                     />
                   </div>
                 ))}
-                {nodeData.outputContacts.length === 0 && (
+                {outputContacts.length === 0 && (
                   <div className="flex-1 flex items-center justify-center min-h-[40px]">
                     <span className="text-xs italic opacity-50">no outputs</span>
                   </div>
@@ -163,10 +157,10 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
         )}
         
         {/* Primitive gadget handles with tooltips */}
-        {nodeData.isPrimitive && (
+        {isPrimitive && (
           <>
             {/* Input handles */}
-            {nodeData.inputContacts.map((contact, index) => (
+            {inputContacts.map((contact, index) => (
               <Tooltip key={contact.id}>
                 <TooltipTrigger asChild>
                   <Handle
@@ -188,7 +182,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
             ))}
             
             {/* Output handles */}
-            {nodeData.outputContacts.map((contact, index) => (
+            {outputContacts.map((contact, index) => (
               <Tooltip key={contact.id}>
                 <TooltipTrigger asChild>
                   <Handle

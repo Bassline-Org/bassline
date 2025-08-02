@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom'
 import { Card } from '~/components/ui/card'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '~/lib/utils'
+import { useContact } from '~/propagation-react/hooks/useContact'
+import { usePropertyPanel } from '~/propagation-react/hooks/usePropertyPanel'
 
 const nodeVariants = cva(
   "w-[60px] h-[48px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -37,18 +39,9 @@ const nodeVariants = cva(
   }
 )
 
-export interface ContactNodeData {
-  content: any
-  blendMode: 'accept-last' | 'merge'
-  isBoundary: boolean
-  lastContradiction: any | null
-  setContent: (content: any) => void
-  setBlendMode: (mode: 'accept-last' | 'merge') => void
-  onDoubleClick?: () => void
-}
-
-export const ContactNode = memo(({ data, selected }: NodeProps) => {
-  const nodeData = data as unknown as ContactNodeData
+export const ContactNode = memo(({ id, selected }: NodeProps) => {
+  const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id)
+  const propertyPanel = usePropertyPanel()
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -63,24 +56,24 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
   }, [])
   
   const handleResetValue = useCallback(() => {
-    nodeData.setContent(undefined)
+    setContent(undefined)
     setShowContextMenu(false)
-  }, [nodeData])
+  }, [setContent])
   
   
-  const nodeType = nodeData.isBoundary ? 'boundary' : 'contact'
+  const nodeType = isBoundary ? 'boundary' : 'contact'
   
   return (
     <>
       <Card 
         className={cn(
           nodeVariants({ nodeType, selected }),
-          nodeData.lastContradiction && "ring-2 ring-red-500"
+          lastContradiction && "ring-2 ring-red-500"
         )}
         onContextMenu={handleContextMenu}
         onDoubleClick={(e) => {
           e.stopPropagation()
-          nodeData.onDoubleClick?.()
+          propertyPanel.show(true)
         }}
       >
         {/* Left and right visual borders */}
@@ -94,7 +87,7 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
           className="!w-4 !h-4 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all !z-10"
           style={{ 
             left: '-8px',
-            background: nodeData.isBoundary 
+            background: isBoundary 
               ? 'linear-gradient(135deg, var(--node-boundary), color-mix(in oklch, var(--node-boundary), white 20%))' 
               : 'linear-gradient(135deg, var(--node-contact), color-mix(in oklch, var(--node-contact), white 20%))'
           }}
@@ -105,7 +98,7 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
           className="!w-4 !h-4 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all !z-10"
           style={{ 
             right: '-8px',
-            background: nodeData.isBoundary 
+            background: isBoundary 
               ? 'linear-gradient(135deg, var(--node-boundary), color-mix(in oklch, var(--node-boundary), white 20%))' 
               : 'linear-gradient(135deg, var(--node-contact), color-mix(in oklch, var(--node-contact), white 20%))'
           }}
@@ -114,7 +107,7 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
         {/* Content */}
         <div className="flex flex-col h-full py-1 px-2">
           {/* Blend mode indicator */}
-          {nodeData.blendMode === 'merge' && (
+          {blendMode === 'merge' && (
             <div className="absolute top-1 right-2.5">
               <div className="w-2 h-2 rounded-full bg-green-500 ring-1 ring-green-400/50" />
             </div>
@@ -124,10 +117,10 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
           <div className="flex-1 flex items-center justify-center">
             <div className={cn(
               "text-xs font-mono text-center truncate max-w-full px-1",
-              nodeData.lastContradiction ? 'text-red-500 font-bold' : nodeData.content === undefined ? 'text-muted-foreground' : 'text-foreground'
+              lastContradiction ? 'text-red-500 font-bold' : content === undefined ? 'text-muted-foreground' : 'text-foreground'
             )}
-            title={nodeData.lastContradiction?.reason}>
-              {nodeData.lastContradiction ? '⚠' : nodeData.content !== undefined ? String(nodeData.content) : '∅'}
+            title={lastContradiction?.reason}>
+              {lastContradiction ? '⚠' : content !== undefined ? String(content) : '∅'}
             </div>
           </div>
         </div>
@@ -160,13 +153,13 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
         <button
           className="flex w-full items-center justify-between px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors"
           onClick={() => {
-            nodeData.setBlendMode(nodeData.blendMode === 'merge' ? 'accept-last' : 'merge')
+            setBlendMode(blendMode === 'merge' ? 'accept-last' : 'merge')
             setShowContextMenu(false)
           }}
         >
           <span>Blend Mode</span>
           <span className="text-xs opacity-70">
-            {nodeData.blendMode === 'merge' ? 'Merge' : 'Accept Last'}
+            {blendMode === 'merge' ? 'Merge' : 'Accept Last'}
           </span>
         </button>
       </div>

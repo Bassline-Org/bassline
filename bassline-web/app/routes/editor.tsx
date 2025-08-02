@@ -11,11 +11,12 @@ import {
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
 
-import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationNetwork";
+import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationNetworkCompat";
 import { usePalette } from "~/propagation-react/hooks/usePalette";
 import { useProximityConnect } from "~/propagation-react/hooks/useProximityConnect";
 import { useViewSettings } from "~/propagation-react/hooks/useViewSettings";
 import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
+import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
@@ -73,8 +74,17 @@ function Flow() {
   const proximity = useProximityConnect(nodes, edges);
 
   // Quick add menu state
+  interface QuickAddPosition {
+    screenX: number;
+    screenY: number;
+    flowX: number;
+    flowY: number;
+    fromNodeId: string;
+    fromHandleId?: string;
+    fromHandleType: 'source' | 'target';
+  }
   const [quickAddMenuPosition, setQuickAddMenuPosition] =
-    useState<Position | null>(null);
+    useState<QuickAddPosition | null>(null);
   const [menuJustOpened, setMenuJustOpened] = useState(false);
 
   const handleAddContact = useCallback(() => {
@@ -313,7 +323,7 @@ function Flow() {
           fromNodeId: connectionState.fromNode.id,
           fromHandleId: connectionState.fromHandle?.id,
           fromHandleType: connectionState.fromHandle?.type || "source",
-        } as any);
+        });
 
         // Set flag to prevent immediate closing
         setMenuJustOpened(true);
@@ -386,7 +396,6 @@ function Flow() {
           }
         }}
         selectNodesOnDrag={false}
-        deselectOnClick={false}
         fitView
       >
         {viewSettings.showGrid && <Background />}
@@ -576,12 +585,6 @@ function Flow() {
         <PropertyPanel
           isVisible={propertyPanel.isVisible}
           onToggleVisibility={propertyPanel.toggleVisibility}
-          selection={selection}
-          network={network}
-          onUpdate={() => {
-            // Force a re-render to update the UI
-            network.syncToReactFlow?.();
-          }}
           shouldFocus={propertyPanel.shouldFocus}
         />
       </ClientOnly>
@@ -591,10 +594,12 @@ function Flow() {
 
 export default function Editor() {
   return (
-    <ReactFlowProvider>
-      <ClientOnly>
-        <Flow />
-      </ClientOnly>
-    </ReactFlowProvider>
+    <NetworkProvider>
+      <ReactFlowProvider>
+        <ClientOnly>
+          <Flow />
+        </ClientOnly>
+      </ReactFlowProvider>
+    </NetworkProvider>
   );
 }
