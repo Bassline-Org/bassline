@@ -1,4 +1,4 @@
-import type { ContactId, WireId, Position } from '../types'
+import type { ContactId, WireId, Position, BlendMode } from '../types'
 import { ContactGroup } from './ContactGroup'
 import { Contact } from './Contact'
 import { Wire } from './Wire'
@@ -15,12 +15,12 @@ export class PropagationNetwork {
   }
   
   // Convenience methods that delegate to current group
-  addContact(position: Position): Contact {
-    return this.currentGroup.addContact(position)
+  addContact(position: Position, blendMode?: BlendMode): Contact {
+    return this.currentGroup.addContact(position, blendMode)
   }
   
-  addBoundaryContact(position: Position, direction: 'input' | 'output' = 'input', name?: string): Contact {
-    return this.currentGroup.addBoundaryContact(position, direction, name)
+  addBoundaryContact(position: Position, direction: 'input' | 'output' = 'input', name?: string, blendMode?: BlendMode): Contact {
+    return this.currentGroup.addBoundaryContact(position, direction, name, blendMode)
   }
   
   connect(fromId: ContactId, toId: ContactId, type: 'bidirectional' | 'directed' = 'bidirectional'): Wire {

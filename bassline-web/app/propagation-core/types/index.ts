@@ -21,3 +21,5 @@ export class Contradiction {
 
 export type BlendMode = 'accept-last' | 'merge'
 export type WireType = 'bidirectional' | 'directed'
+
+export * from './settings'

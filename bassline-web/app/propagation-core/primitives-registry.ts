@@ -1,6 +1,8 @@
 import type { GadgetTemplate } from './types/template'
 import type { ContactGroup } from './models/ContactGroup'
 import { Adder, Subtractor, Multiplier, Divider } from './primitives'
+import { Union, Intersection, Difference } from './primitives/set'
+import { Splitter, Joiner } from './primitives/data'
 import type { PrimitiveGadget } from './primitives'
 
 // Type for primitive gadget constructor
@@ -8,10 +10,20 @@ type PrimitiveConstructor = new (parent?: ContactGroup) => PrimitiveGadget
 
 // Registry of all primitive gadgets
 export const PRIMITIVE_GADGETS: Record<string, PrimitiveConstructor> = {
+  // Arithmetic
   'Adder': Adder,
   'Subtractor': Subtractor,
   'Multiplier': Multiplier,
   'Divider': Divider,
+  // Set operations
+  'Union': Union,
+  'Intersection': Intersection,
+  'Difference': Difference,
+  // Data flow
+  'Splitter': Splitter as any, // Cast needed due to constructor params
+  'Splitter3': Splitter as any,
+  'Joiner': Joiner as any,
+  'Joiner3': Joiner as any,
 }
 
 // Create templates for primitive gadgets that can be added to the palette
@@ -78,6 +90,83 @@ export function createPrimitiveTemplates(): GadgetTemplate[] {
     boundaryIndices: [0, 1, 2]
   })
   
+  // Union template
+  templates.push({
+    name: 'Union',
+    description: 'Union of two sets (A ∪ B)',
+    category: 'Set Operations',
+    contacts: [
+      { position: { x: 50, y: 80 }, isBoundary: true, boundaryDirection: 'input', name: 'a', blendMode: 'accept-last' },
+      { position: { x: 50, y: 120 }, isBoundary: true, boundaryDirection: 'input', name: 'b', blendMode: 'accept-last' },
+      { position: { x: 350, y: 100 }, isBoundary: true, boundaryDirection: 'output', name: 'result', blendMode: 'accept-last' }
+    ],
+    wires: [],
+    subgroupTemplates: [],
+    boundaryIndices: [0, 1, 2]
+  })
+  
+  // Intersection template
+  templates.push({
+    name: 'Intersection',
+    description: 'Intersection of two sets (A ∩ B)',
+    category: 'Set Operations',
+    contacts: [
+      { position: { x: 50, y: 80 }, isBoundary: true, boundaryDirection: 'input', name: 'a', blendMode: 'accept-last' },
+      { position: { x: 50, y: 120 }, isBoundary: true, boundaryDirection: 'input', name: 'b', blendMode: 'accept-last' },
+      { position: { x: 350, y: 100 }, isBoundary: true, boundaryDirection: 'output', name: 'result', blendMode: 'accept-last' }
+    ],
+    wires: [],
+    subgroupTemplates: [],
+    boundaryIndices: [0, 1, 2]
+  })
+  
+  // Difference template
+  templates.push({
+    name: 'Difference',
+    description: 'Set difference (A - B)',
+    category: 'Set Operations',
+    contacts: [
+      { position: { x: 50, y: 80 }, isBoundary: true, boundaryDirection: 'input', name: 'a', blendMode: 'accept-last' },
+      { position: { x: 50, y: 120 }, isBoundary: true, boundaryDirection: 'input', name: 'b', blendMode: 'accept-last' },
+      { position: { x: 350, y: 100 }, isBoundary: true, boundaryDirection: 'output', name: 'result', blendMode: 'accept-last' }
+    ],
+    wires: [],
+    subgroupTemplates: [],
+    boundaryIndices: [0, 1, 2]
+  })
+  
+  // Splitter template
+  templates.push({
+    name: 'Splitter3',
+    description: 'Splits one input to three outputs',
+    category: 'Data Flow',
+    contacts: [
+      { position: { x: 50, y: 100 }, isBoundary: true, boundaryDirection: 'input', name: 'in', blendMode: 'accept-last' },
+      { position: { x: 350, y: 30 }, isBoundary: true, boundaryDirection: 'output', name: 'out1', blendMode: 'accept-last' },
+      { position: { x: 350, y: 100 }, isBoundary: true, boundaryDirection: 'output', name: 'out2', blendMode: 'accept-last' },
+      { position: { x: 350, y: 170 }, isBoundary: true, boundaryDirection: 'output', name: 'out3', blendMode: 'accept-last' }
+    ],
+    wires: [],
+    subgroupTemplates: [],
+    boundaryIndices: [0, 1, 2, 3]
+  })
+  
+  // Joiner template
+  templates.push({
+    name: 'Joiner3',
+    description: 'Joins three inputs into an array',
+    category: 'Data Flow',
+    contacts: [
+      { position: { x: 50, y: 30 }, isBoundary: true, boundaryDirection: 'input', name: 'in1', blendMode: 'accept-last' },
+      { position: { x: 50, y: 100 }, isBoundary: true, boundaryDirection: 'input', name: 'in2', blendMode: 'accept-last' },
+      { position: { x: 50, y: 170 }, isBoundary: true, boundaryDirection: 'input', name: 'in3', blendMode: 'accept-last' },
+      { position: { x: 350, y: 100 }, isBoundary: true, boundaryDirection: 'output', name: 'out', blendMode: 'accept-last' }
+    ],
+    wires: [],
+    subgroupTemplates: [],
+    boundaryIndices: [0, 1, 2, 3]
+  })
+  
   return templates
 }
 
@@ -87,6 +176,13 @@ export function createPrimitiveGadget(name: string, parent?: ContactGroup): Prim
   if (!Constructor) {
     console.warn(`Unknown primitive gadget: ${name}`)
     return null
+  }
+  
+  // Special handling for gadgets with custom constructors
+  if (name === 'Splitter' || name === 'Splitter3') {
+    return new Splitter(parent, 3)
+  } else if (name === 'Joiner' || name === 'Joiner3') {
+    return new Joiner(parent, 3)
   }
   
   return new Constructor(parent)

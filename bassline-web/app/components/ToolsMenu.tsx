@@ -13,7 +13,8 @@ import {
   ChevronUp,
   Tag,
   Bug,
-  Lightbulb
+  Lightbulb,
+  Sliders
 } from 'lucide-react'
 
 export interface ViewSettings {
@@ -29,9 +30,10 @@ export interface ViewSettings {
 interface ToolsMenuProps {
   viewSettings: ViewSettings
   onViewSettingsChange: (settings: ViewSettings) => void
+  onOpenConfiguration?: () => void
 }
 
-export function ToolsMenu({ viewSettings, onViewSettingsChange }: ToolsMenuProps) {
+export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfiguration }: ToolsMenuProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   
   const toggleSetting = (key: keyof ViewSettings) => {
@@ -118,16 +120,29 @@ export function ToolsMenu({ viewSettings, onViewSettingsChange }: ToolsMenuProps
         </Card>
       )}
       
-      <Button
-        size="sm"
-        variant="ghost"
-        className="px-4 py-2"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <Settings className="w-4 h-4 mr-2" />
-        <span>View Options</span>
-        {isExpanded ? <ChevronDown className="w-4 h-4 ml-2" /> : <ChevronUp className="w-4 h-4 ml-2" />}
-      </Button>
+      <div className="flex gap-2">
+        {onOpenConfiguration && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="px-4 py-2"
+            onClick={onOpenConfiguration}
+          >
+            <Sliders className="w-4 h-4 mr-2" />
+            <span>Configuration</span>
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="px-4 py-2"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <Settings className="w-4 h-4 mr-2" />
+          <span>View Options</span>
+          {isExpanded ? <ChevronDown className="w-4 h-4 ml-2" /> : <ChevronUp className="w-4 h-4 ml-2" />}
+        </Button>
+      </div>
     </div>
   )
 }

@@ -29,7 +29,7 @@ interface UseCurrentGroupReturn {
 }
 
 export function useCurrentGroup(): UseCurrentGroupReturn {
-  const { network, syncToReactFlow, currentGroupId, setCurrentGroupId } = useNetworkContext()
+  const { network, syncToReactFlow, currentGroupId, setCurrentGroupId, appSettings } = useNetworkContext()
   const [currentGroup, setCurrentGroup] = useState(network.currentGroup)
   
   // Update current group when ID changes
@@ -74,16 +74,17 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
   
   // Operations
   const addContact = useCallback((position: Position): Contact => {
-    const contact = network.addContact(position)
+    const contact = network.addContact(position, appSettings.propagation.defaultBlendMode)
     syncToReactFlow()
     return contact
-  }, [network, syncToReactFlow])
+  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode])
   
   const addBoundaryContact = useCallback((position: Position, direction: 'input' | 'output', name?: string): Contact => {
-    const contact = network.addBoundaryContact(position, direction, name)
+    const blendMode = appSettings.propagation.defaultBoundaryBlendMode || appSettings.propagation.defaultBlendMode
+    const contact = network.addBoundaryContact(position, direction, name, blendMode)
     syncToReactFlow()
     return contact
-  }, [network, syncToReactFlow])
+  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, appSettings.propagation.defaultBoundaryBlendMode])
   
   const createSubgroup = useCallback((name: string, position?: Position): ContactGroup => {
     const group = network.createGroup(name)

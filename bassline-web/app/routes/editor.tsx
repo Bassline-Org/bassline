@@ -26,8 +26,10 @@ import { QuickAddMenu } from "~/components/QuickAddMenu";
 import { ToolsMenu } from "~/components/ToolsMenu";
 import { ClientOnly } from "~/components/ClientOnly";
 import { PropertyPanel } from "~/components/PropertyPanel";
+import { ConfigurationPanel } from "~/components/ConfigurationPanel";
 import type { GadgetTemplate } from "~/propagation-core/types/template";
 import type { Position } from "~/propagation-core";
+import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
 
 const nodeTypes = {
   contact: ContactNode,
@@ -37,6 +39,13 @@ const nodeTypes = {
 
 function Flow() {
   const { screenToFlowPosition } = useReactFlow();
+  const { 
+    appSettings, 
+    updatePropagationSettings, 
+    updateVisualSettings, 
+    updateBehaviorSettings,
+    resetSettings 
+  } = useNetworkContext();
 
   const {
     nodes,
@@ -69,6 +78,7 @@ function Flow() {
   const palette = usePalette();
   const propertyPanel = usePropertyPanel();
   const { viewSettings, setViewSettings } = useViewSettings();
+  const [showConfiguration, setShowConfiguration] = useState(false);
 
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
@@ -508,6 +518,7 @@ function Flow() {
             <ToolsMenu
               viewSettings={viewSettings}
               onViewSettingsChange={setViewSettings}
+              onOpenConfiguration={() => setShowConfiguration(true)}
             />
           </ClientOnly>
         </Panel>
@@ -588,6 +599,17 @@ function Flow() {
           shouldFocus={propertyPanel.shouldFocus}
         />
       </ClientOnly>
+
+      {showConfiguration && (
+        <ConfigurationPanel
+          appSettings={appSettings}
+          onUpdatePropagation={updatePropagationSettings}
+          onUpdateVisual={updateVisualSettings}
+          onUpdateBehavior={updateBehaviorSettings}
+          onReset={resetSettings}
+          onClose={() => setShowConfiguration(false)}
+        />
+      )}
     </div>
   );
 }

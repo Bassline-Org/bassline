@@ -155,3 +155,123 @@ export class ExactString implements Mergeable<ExactString> {
     return this.value
   }
 }
+
+// Numeric range with min/max constraints
+export class NumericRange implements Mergeable<NumericRange> {
+  constructor(
+    public readonly min: number | null = null,
+    public readonly max: number | null = null
+  ) {
+    if (min !== null && max !== null && min > max) {
+      throw new Error(`Invalid range: min (${min}) > max (${max})`)
+    }
+  }
+  
+  merge(other: NumericRange): NumericRange | Contradiction {
+    const newMin = this.min === null ? other.min : 
+                   other.min === null ? this.min : 
+                   Math.max(this.min, other.min)
+    
+    const newMax = this.max === null ? other.max :
+                   other.max === null ? this.max :
+                   Math.min(this.max, other.max)
+    
+    if (newMin !== null && newMax !== null && newMin > newMax) {
+      return new Contradiction(
+        `Range contradiction: [${this.min ?? '-∞'}, ${this.max ?? '+∞'}] ∩ [${other.min ?? '-∞'}, ${other.max ?? '+∞'}] = ∅`
+      )
+    }
+    
+    return new NumericRange(newMin, newMax)
+  }
+  
+  contains(value: number): boolean {
+    return (this.min === null || value >= this.min) &&
+           (this.max === null || value <= this.max)
+  }
+  
+  toString(): string {
+    return `[${this.min ?? '-∞'}, ${this.max ?? '+∞'}]`
+  }
+}
+
+// Set of strings that accumulates unique values
+export class StringSet implements Mergeable<StringSet> {
+  private values: Set<string>
+  
+  constructor(values: string[] | Set<string> = []) {
+    this.values = new Set(values)
+  }
+  
+  merge(other: StringSet): StringSet {
+    return new StringSet(new Set([...this.values, ...other.values]))
+  }
+  
+  add(value: string): void {
+    this.values.add(value)
+  }
+  
+  has(value: string): boolean {
+    return this.values.has(value)
+  }
+  
+  get size(): number {
+    return this.values.size
+  }
+  
+  toArray(): string[] {
+    return Array.from(this.values)
+  }
+  
+  toString(): string {
+    return `{${Array.from(this.values).join(', ')}}`
+  }
+}
+
+// Weighted average that accumulates values with sample count
+export class WeightedAverage implements Mergeable<WeightedAverage> {
+  constructor(
+    public readonly sum: number = 0,
+    public readonly count: number = 0
+  ) {}
+  
+  static fromValue(value: number): WeightedAverage {
+    return new WeightedAverage(value, 1)
+  }
+  
+  merge(other: WeightedAverage): WeightedAverage {
+    return new WeightedAverage(
+      this.sum + other.sum,
+      this.count + other.count
+    )
+  }
+  
+  get average(): number | null {
+    return this.count === 0 ? null : this.sum / this.count
+  }
+  
+  toString(): string {
+    const avg = this.average
+    return avg === null ? 'N/A' : `${avg.toFixed(2)} (n=${this.count})`
+  }
+}
+
+// Timestamp value that keeps the most recent
+export class TimestampValue<T = any> implements Mergeable<TimestampValue<T>> {
+  constructor(
+    public readonly value: T,
+    public readonly timestamp: number = Date.now()
+  ) {}
+  
+  merge(other: TimestampValue<T>): TimestampValue<T> {
+    return this.timestamp >= other.timestamp ? this : other
+  }
+  
+  get age(): number {
+    return Date.now() - this.timestamp
+  }
+  
+  toString(): string {
+    return `${this.value} @ ${new Date(this.timestamp).toISOString()}`
+  }
+}

@@ -1,4 +1,4 @@
-import type { ContactId, WireId, GroupId, Position } from '../types'
+import type { ContactId, WireId, GroupId, Position, BlendMode } from '../types'
 import { Contradiction } from '../types'
 import { Contact } from './Contact'
 import { Wire } from './Wire'
@@ -21,14 +21,14 @@ export class ContactGroup {
   ) {}
   
   // Factory methods
-  addContact(position: Position): Contact {
-    const contact = new Contact(generateId(), position, this)
+  addContact(position: Position, blendMode?: BlendMode): Contact {
+    const contact = new Contact(generateId(), position, this, blendMode)
     this.contacts.set(contact.id, contact)
     return contact
   }
   
-  addBoundaryContact(position: Position, direction: 'input' | 'output' = 'input', name?: string): Contact {
-    const contact = this.addContact(position)
+  addBoundaryContact(position: Position, direction: 'input' | 'output' = 'input', name?: string, blendMode?: BlendMode): Contact {
+    const contact = this.addContact(position, blendMode)
     contact.isBoundary = true
     contact.boundaryDirection = direction
     contact.name = name

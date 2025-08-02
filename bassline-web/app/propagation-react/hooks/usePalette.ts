@@ -32,7 +32,7 @@ export function usePalette() {
   // Always start with default state to avoid hydration mismatch
   const [state, setState] = useState<PaletteState>({
     items: [],
-    categories: ['Math', 'Logic', 'Data', 'Utility'],
+    categories: ['Math', 'Set Operations', 'Data Flow', 'Logic', 'Data', 'Utility'],
     isVisible: false // Start hidden to avoid flash
   })
   
@@ -45,8 +45,11 @@ export function usePalette() {
           const parsed = JSON.parse(stored)
           
           // Check if we need to add primitive gadgets to existing palette
+          const primitiveNames = ['Adder', 'Subtractor', 'Multiplier', 'Divider', 
+                                'Union', 'Intersection', 'Difference', 
+                                'Splitter3', 'Joiner3']
           const hasPrimitives = parsed.items.some((item: PaletteItem) => 
-            ['Adder', 'Subtractor', 'Multiplier', 'Divider'].includes(item.name)
+            primitiveNames.includes(item.name)
           )
           
           if (!hasPrimitives) {
@@ -62,7 +65,7 @@ export function usePalette() {
           const defaultItems = createDefaultPaletteItems()
           setState({
             items: defaultItems,
-            categories: ['Math', 'Logic', 'Data', 'Utility'],
+            categories: ['Math', 'Set Operations', 'Data Flow', 'Logic', 'Data', 'Utility'],
             isVisible: true // Show palette by default when first loaded
           })
         }
@@ -72,7 +75,7 @@ export function usePalette() {
         const defaultItems = createDefaultPaletteItems()
         setState({
           items: defaultItems,
-          categories: ['Math', 'Logic', 'Data', 'Utility'],
+          categories: ['Math', 'Set Operations', 'Data Flow', 'Logic', 'Data', 'Utility'],
           isVisible: true
         })
       }
@@ -157,7 +160,7 @@ export function usePalette() {
     const defaultItems = createDefaultPaletteItems()
     setState({
       items: defaultItems,
-      categories: ['Math', 'Logic', 'Data', 'Utility'],
+      categories: ['Math', 'Set Operations', 'Data Flow', 'Logic', 'Data', 'Utility'],
       isVisible: true
     })
   }, [])

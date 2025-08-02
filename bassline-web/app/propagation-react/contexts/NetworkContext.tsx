@@ -7,6 +7,8 @@ import { PrimitiveGadget } from '~/propagation-core/primitives'
 import { MarkerType } from '@xyflow/react'
 import type { Selection } from '~/propagation-core/refactoring/types'
 import { createEmptySelection } from '~/propagation-core/refactoring/types'
+import type { AppSettings } from '~/propagation-core/types'
+import { useAppSettings } from '~/propagation-react/hooks/useAppSettings'
 
 interface NetworkContextValue {
   network: PropagationNetwork
@@ -19,6 +21,11 @@ interface NetworkContextValue {
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
   selection: Selection
   setSelection: React.Dispatch<React.SetStateAction<Selection>>
+  appSettings: AppSettings
+  updatePropagationSettings: (updates: Partial<AppSettings['propagation']>) => void
+  updateVisualSettings: (updates: Partial<AppSettings['visual']>) => void
+  updateBehaviorSettings: (updates: Partial<AppSettings['behavior']>) => void
+  resetSettings: () => void
 }
 
 const NetworkContext = createContext<NetworkContextValue | null>(null)
@@ -48,6 +55,15 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
   // Selection state
   const [selection, setSelection] = useState<Selection>(createEmptySelection())
   
+  // App settings
+  const {
+    appSettings,
+    updatePropagationSettings,
+    updateVisualSettings,
+    updateBehaviorSettings,
+    resetToDefaults
+  } = useAppSettings()
+  
   // Sync network state to React Flow
   const syncToReactFlow = useCallback(() => {
     const currentView = network.getCurrentView()
@@ -57,7 +73,7 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
       id: contact.id,
       position: contact.position,
       type: contact.isBoundary ? 'boundary' : 'contact',
-      selected: nodes.find(n => n.id === contact.id)?.selected || false,
+      selected: selection.contacts.has(contact.id),
       style: {
         background: 'transparent',
         border: 'none',
@@ -85,7 +101,7 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
         id: group.id,
         position,
         type: 'group',
-        selected: nodes.find(n => n.id === group.id)?.selected || false,
+        selected: selection.groups.has(group.id),
         style: {
           background: 'transparent',
           border: 'none',
@@ -133,10 +149,11 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
         target: targetNodeId,
         sourceHandle,
         targetHandle,
-        animated: true,
+        hidden: !appSettings.visual.showEdges,
         style: { 
           stroke: wire.type === 'directed' ? '#555' : '#888',
-          strokeWidth: 2
+          strokeWidth: 2,
+          opacity: appSettings.visual.edgeOpacity
         },
         markerEnd: { type: MarkerType.ArrowClosed },
         markerStart: wire.type === 'bidirectional' ? { type: MarkerType.ArrowClosed } : undefined
@@ -145,46 +162,55 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
     
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [network, setCurrentGroupId, nodes])
+  }, [network, currentGroupId, appSettings.visual.showEdges, appSettings.visual.edgeOpacity, selection])
   
   // Initialize with example data
   useEffect(() => {
-    const c1 = network.addContact({ x: 100, y: 100 })
-    const c2 = network.addContact({ x: 300, y: 100 })
-    network.connect(c1.id, c2.id)
-    
-    // Add an example gadget
-    const gadget = network.createGroup('Example Gadget')
-    gadget.position = { x: 600, y: 100 }
-    // Switch to gadget to add internals
-    const prevGroup = network.currentGroup
-    network.currentGroup = gadget
-    
-    // Add input and output boundary contacts
-    const input = network.addBoundaryContact({ x: 50, y: 100 }, 'input', 'in')
-    const output = network.addBoundaryContact({ x: 350, y: 100 }, 'output', 'out')
-    
-    // Add internal contact
-    const internal = network.addContact({ x: 200, y: 100 })
-    
-    // Wire them up
-    network.connect(input.id, internal.id)
-    network.connect(internal.id, output.id)
-    
-    // Switch back
-    network.currentGroup = prevGroup
-    
-    // Connect the gadget to the network
-    network.connect(c2.id, input.id)
-    network.connect(output.id, c1.id)
-    
-    syncToReactFlow()
+    // Only initialize if the network is empty
+    if (network.rootGroup.contacts.size === 0 && network.rootGroup.subgroups.size === 0) {
+      const c1 = network.addContact({ x: 100, y: 100 }, appSettings.propagation.defaultBlendMode)
+      const c2 = network.addContact({ x: 300, y: 100 }, appSettings.propagation.defaultBlendMode)
+      network.connect(c1.id, c2.id)
+      
+      // Add an example gadget
+      const gadget = network.createGroup('Example Gadget')
+      gadget.position = { x: 600, y: 100 }
+      // Switch to gadget to add internals
+      const prevGroup = network.currentGroup
+      network.currentGroup = gadget
+      
+      // Add input and output boundary contacts
+      const blendMode = appSettings.propagation.defaultBoundaryBlendMode || appSettings.propagation.defaultBlendMode
+      const input = network.addBoundaryContact({ x: 50, y: 100 }, 'input', 'in', blendMode)
+      const output = network.addBoundaryContact({ x: 350, y: 100 }, 'output', 'out', blendMode)
+      
+      // Add internal contact
+      const internal = network.addContact({ x: 200, y: 100 }, appSettings.propagation.defaultBlendMode)
+      
+      // Wire them up
+      network.connect(input.id, internal.id)
+      network.connect(internal.id, output.id)
+      
+      // Switch back
+      network.currentGroup = prevGroup
+      
+      // Connect the gadget to the network
+      network.connect(c2.id, input.id)
+      network.connect(output.id, c1.id)
+      
+      syncToReactFlow()
+    }
   }, []) // Only run once on mount
   
   // Re-sync when current group changes
   useEffect(() => {
     syncToReactFlow()
   }, [currentGroupId])
+  
+  // Re-sync when visual settings change
+  useEffect(() => {
+    syncToReactFlow()
+  }, [appSettings.visual.showEdges, appSettings.visual.edgeOpacity, syncToReactFlow])
   
   const value: NetworkContextValue = {
     network,
@@ -196,7 +222,12 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
     setNodes,
     setEdges,
     selection,
-    setSelection
+    setSelection,
+    appSettings,
+    updatePropagationSettings,
+    updateVisualSettings,
+    updateBehaviorSettings,
+    resetSettings: resetToDefaults
   }
   
   return (
