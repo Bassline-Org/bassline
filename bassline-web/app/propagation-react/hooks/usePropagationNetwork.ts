@@ -116,6 +116,7 @@ export function usePropagationNetwork() {
       id: contact.id,
       position: contact.position,
       type: contact.isBoundary ? 'boundary' : 'contact',
+      dragHandle: '.drag-handle',
       style: {
         background: 'transparent',
         border: 'none',

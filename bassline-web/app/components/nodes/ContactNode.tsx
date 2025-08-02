@@ -1,15 +1,13 @@
 import { memo, useState, useCallback, useEffect, useRef } from 'react'
 import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react'
 import { createPortal } from 'react-dom'
-import { Card, CardContent } from '~/components/ui/card'
+import { Card } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
-import { Badge } from '~/components/ui/badge'
-import { Circle } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '~/lib/utils'
 
 const nodeVariants = cva(
-  "min-w-[100px] transition-all shadow-sm hover:shadow-md",
+  "w-[60px] h-[48px] transition-all shadow-sm hover:shadow-md cursor-pointer relative overflow-hidden",
   {
     variants: {
       nodeType: {
@@ -40,21 +38,6 @@ const nodeVariants = cva(
   }
 )
 
-const handleVariants = cva(
-  "!w-3 !h-3",
-  {
-    variants: {
-      nodeType: {
-        contact: "[&]:bg-[var(--node-contact)] [&]:border-[color-mix(in_oklch,var(--node-contact),black_20%)]",
-        boundary: "[&]:bg-[var(--node-boundary)] [&]:border-[color-mix(in_oklch,var(--node-boundary),black_20%)]"
-      }
-    },
-    defaultVariants: {
-      nodeType: "contact"
-    }
-  }
-)
-
 export interface ContactNodeData {
   content: any
   blendMode: 'accept-last' | 'merge'
@@ -70,9 +53,12 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const contextMenuRef = useRef<HTMLDivElement>(null)
   
-  const handleDoubleClick = useCallback(() => {
-    setEditValue(String(nodeData.content ?? ''))
-    setIsEditing(true)
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // Don't trigger edit if clicking on drag handle
+    if (!(e.target as HTMLElement).classList.contains('drag-handle')) {
+      setEditValue(String(nodeData.content ?? ''))
+      setIsEditing(true)
+    }
   }, [nodeData.content])
   
   const handleSubmit = useCallback(() => {
@@ -130,39 +116,36 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
       <Card 
         className={cn(nodeVariants({ nodeType, selected }))}
         onContextMenu={handleContextMenu}
+        onClick={handleClick}
       >
+        {/* Drag handle */}
+        <div className="drag-handle absolute top-0 left-0 right-0 h-2 bg-muted/50 cursor-move hover:bg-muted/70 transition-colors" />
+        
+        {/* Invisible handles covering left and right halves */}
         <Handle 
           type="target" 
           position={Position.Left}
-          className={handleVariants({ nodeType })}
+          className="!opacity-0 !pointer-events-auto !w-1/2 !h-full !left-0 !top-0 !transform-none !border-0 !bg-transparent"
+          style={{ position: 'absolute' }}
         />
         <Handle 
           type="source" 
           position={Position.Right}
-          className={handleVariants({ nodeType })}
+          className="!opacity-0 !pointer-events-auto !w-1/2 !h-full !right-0 !top-0 !transform-none !border-0 !bg-transparent"
+          style={{ position: 'absolute' }}
         />
         
-        <CardContent className="p-3">
-        <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Circle className={cn(
-                "w-3 h-3",
-                nodeData.isBoundary ? "[&]:fill-[var(--node-boundary)] [&]:text-[var(--node-boundary)]" : "[&]:fill-[var(--node-contact)] [&]:text-[var(--node-contact)]"
-              )} />
-              {nodeData.isBoundary && (
-                <span className="text-xs font-medium opacity-70">boundary</span>
-              )}
+        {/* Content */}
+        <div className="flex flex-col h-full pt-2 pb-1 px-1">
+          {/* Blend mode indicator */}
+          {nodeData.blendMode === 'merge' && (
+            <div className="absolute top-2 right-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-primary/70" />
             </div>
-            <Badge 
-              variant={nodeData.blendMode === 'merge' ? 'default' : 'secondary'} 
-              className="text-xs py-0 px-1"
-            >
-              {nodeData.blendMode === 'merge' ? 'M' : 'L'}
-            </Badge>
-          </div>
+          )}
           
-          <div onDoubleClick={handleDoubleClick} className="min-h-[24px]">
+          {/* Main content area */}
+          <div className="flex-1 flex items-center justify-center">
             {isEditing ? (
               <Input
                 value={editValue}
@@ -170,19 +153,20 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
                 onBlur={handleSubmit}
                 onKeyDown={handleKeyDown}
                 autoFocus
-                className="h-6 text-sm px-2"
+                className="h-6 text-xs px-1 py-0"
+                onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <div className={`text-sm font-mono text-center ${
-                nodeData.content === undefined ? 'text-gray-400' : 'text-gray-700'
-              }`}>
+              <div className={cn(
+                "text-xs font-mono text-center truncate max-w-full px-1",
+                nodeData.content === undefined ? 'text-muted-foreground' : 'text-foreground'
+              )}>
                 {nodeData.content !== undefined ? String(nodeData.content) : '∅'}
               </div>
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </Card>
     
     {/* Context Menu - Portal to document body */}
     {showContextMenu && createPortal(

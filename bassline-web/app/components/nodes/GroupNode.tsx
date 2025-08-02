@@ -42,20 +42,6 @@ const groupNodeVariants = cva(
   }
 )
 
-const groupHandleVariants = cva(
-  "!w-3 !h-3",
-  {
-    variants: {
-      nodeType: {
-        group: "[&]:bg-[var(--node-group)] [&]:border-[color-mix(in_oklch,var(--node-group),black_20%)]",
-        primitive: "[&]:bg-[var(--node-primitive)] [&]:border-[color-mix(in_oklch,var(--node-primitive),black_20%)]"
-      }
-    },
-    defaultVariants: {
-      nodeType: "group"
-    }
-  }
-)
 
 export interface GroupNodeData {
   name: string
@@ -102,8 +88,13 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
                   type="target"
                   position={Position.Left}
                   id={contact.id}
-                  className={groupHandleVariants({ nodeType })}
-                  style={{ left: '-8px' }}
+                  className="!w-6 !h-6 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all"
+                  style={{ 
+                    left: '-12px',
+                    background: nodeType === 'primitive' 
+                      ? 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))' 
+                      : 'linear-gradient(135deg, var(--node-group), color-mix(in oklch, var(--node-group), white 20%))'
+                  }}
                 />
                 <div className="pl-3 pr-2 w-full">
                   <span className="text-xs font-medium opacity-80">{contact.name || `in${index + 1}`}</span>
@@ -128,8 +119,13 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
                   type="source"
                   position={Position.Right}
                   id={contact.id}
-                  className={groupHandleVariants({ nodeType })}
-                  style={{ right: '-8px' }}
+                  className="!w-6 !h-6 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all"
+                  style={{ 
+                    right: '-12px',
+                    background: nodeType === 'primitive' 
+                      ? 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))' 
+                      : 'linear-gradient(135deg, var(--node-group), color-mix(in oklch, var(--node-group), white 20%))'
+                  }}
                 />
               </div>
             ))}

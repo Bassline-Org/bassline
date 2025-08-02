@@ -815,6 +815,37 @@ const nodeVariants = cva("min-w-[100px] transition-all", {
 - Follows shadcn's extensibility philosophy
 - Clean, maintainable component code
 
+### Theme Implementation - Doom 64
+
+Applied the Doom 64 theme from shadcn/ui themes collection:
+
+#### Key Theme Characteristics
+1. **Sharp, angular design** - `--radius: 0px` for retro gaming aesthetic
+2. **Gaming-inspired colors** - Oranges, greens, blues with darker palette
+3. **Custom fonts**:
+   - Sans: "Oxanium" (futuristic gaming font)
+   - Mono: "Source Code Pro"
+4. **Dramatic shadows** - Higher opacity and blur for depth
+
+#### Font Loading Fix
+**Issue**: Fonts weren't being applied even though CSS variables were set
+
+**Solution**: Updated the font imports in `root.tsx`:
+```typescript
+// Before: Loading Inter font
+href: "https://fonts.googleapis.com/css2?family=Inter..."
+
+// After: Loading theme fonts
+href: "https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Source+Code+Pro..."
+```
+
+**Key Learning**: When applying shadcn themes with custom fonts, you must:
+1. Update the Google Fonts import in `root.tsx` to load the theme's fonts
+2. The CSS variables alone aren't enough - the fonts need to be loaded
+3. The base styles in `app.css` already apply `font-family: var(--font-sans)` to body
+
+The Doom 64 theme now fully applies with its distinctive angular design and gaming-inspired typography.
+
 ## Phase 6: Primitive Gadgets
 
 ### What We Built
