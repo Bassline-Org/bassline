@@ -34,14 +34,13 @@ export class Joiner extends PrimitiveGadget {
   protected body(boundaryValues: Map<ContactId, [Contact, any]>): Map<ContactId, any> {
     const outputs = new Map<ContactId, any>()
     
-    // Collect all input values
+    // Collect all input values in order (preserving undefined slots)
     const inputValues: any[] = []
     for (let i = 0; i < this.inputCount; i++) {
       const inputEntry = Array.from(boundaryValues.values()).find(([c]) => c.name === `in${i + 1}`)
       const inputValue = inputEntry?.[1]
-      if (inputValue !== undefined) {
-        inputValues.push(inputValue)
-      }
+      // Always push the value (even if undefined) to maintain array structure
+      inputValues.push(inputValue)
     }
     
     // Find output contact
@@ -49,8 +48,19 @@ export class Joiner extends PrimitiveGadget {
     if (!outputEntry) return outputs
     const [outputId] = outputEntry
     
-    // Output as array
-    outputs.set(outputId, inputValues)
+    // Output as array - filter out trailing undefined values for cleaner arrays
+    let lastDefinedIndex = -1
+    for (let i = inputValues.length - 1; i >= 0; i--) {
+      if (inputValues[i] !== undefined) {
+        lastDefinedIndex = i
+        break
+      }
+    }
+    
+    // Slice to remove trailing undefineds
+    const trimmedValues = lastDefinedIndex === -1 ? [] : inputValues.slice(0, lastDefinedIndex + 1)
+    
+    outputs.set(outputId, trimmedValues)
     
     return outputs
   }

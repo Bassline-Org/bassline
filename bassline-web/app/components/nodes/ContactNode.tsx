@@ -119,7 +119,7 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
           {/* Main content area */}
           <div className="flex-1 flex items-center justify-center">
             <div className={cn(
-              "text-xs font-mono text-center truncate max-w-full px-1",
+              "text-xs font-mono text-center truncate max-w-full px-1 select-none",
               lastContradiction ? 'text-red-500 font-bold' : content === undefined ? 'text-muted-foreground' : 'text-foreground'
             )}
             title={lastContradiction?.reason}>

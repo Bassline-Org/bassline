@@ -14,6 +14,8 @@ export interface VisualSettings {
   nodeLabelsVisible: boolean
   compactNodeView: boolean
   animatePropagatation: boolean
+  showFatEdges: boolean  // Show thicker edges for arrays/sets
+  fatEdgeScale: number   // Multiplier for fat edge thickness (1-3)
 }
 
 // Behavior settings
@@ -42,7 +44,9 @@ export const defaultAppSettings: AppSettings = {
     edgeOpacity: 1,
     nodeLabelsVisible: true,
     compactNodeView: false,
-    animatePropagatation: false
+    animatePropagatation: false,
+    showFatEdges: true,
+    fatEdgeScale: 1.5
   },
   behavior: {
     multiSelectWithDrag: true,

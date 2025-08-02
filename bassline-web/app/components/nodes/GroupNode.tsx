@@ -1,7 +1,7 @@
 import { memo, useCallback } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card, CardHeader, CardContent } from '~/components/ui/card'
-import { Package, Lock, Plus, Minus, X, Divide } from 'lucide-react'
+import { Package, Lock, Plus, Minus, X, Divide, Circle, GitMerge, Split, Layers, Combine, Shuffle } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '~/lib/utils'
 import {
@@ -54,7 +54,14 @@ const primitiveIcons: Record<string, React.ElementType> = {
   'Adder': Plus,
   'Subtractor': Minus,
   'Multiplier': X,
-  'Divider': Divide
+  'Divider': Divide,
+  'Union': Circle,
+  'Intersection': Layers,
+  'Difference': GitMerge,
+  'Splitter3': Split,
+  'Joiner3': Combine,
+  'Splitter': Split,
+  'Joiner': Combine
 }
 
 
@@ -94,7 +101,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
               ) : (
                 <Lock className={cn("w-4 h-4", "[&]:text-[var(--node-group)]")} />
               )}
-              <div className="font-semibold text-sm">{name}</div>
+              <div className="font-semibold text-sm select-none">{name}</div>
             </div>
           </CardHeader>
         )}
@@ -116,13 +123,13 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
                       }}
                     />
                     <div className="pl-3 pr-2 w-full">
-                      <span className="text-xs font-medium opacity-80">{contact.name || `in${index + 1}`}</span>
+                      <span className="text-xs font-medium opacity-80 select-none">{contact.name || `in${index + 1}`}</span>
                     </div>
                   </div>
                 ))}
                 {inputContacts.length === 0 && (
                   <div className="flex-1 flex items-center justify-center min-h-[40px]">
-                    <span className="text-xs italic opacity-50">no inputs</span>
+                    <span className="text-xs italic opacity-50 select-none">no inputs</span>
                   </div>
                 )}
               </div>
@@ -132,7 +139,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
                 {outputContacts.map((contact, index) => (
                   <div key={contact.id} className="relative flex items-center justify-end h-7">
                     <div className="pl-2 pr-3 w-full text-right">
-                      <span className="text-xs font-medium opacity-80">{contact.name || `out${index + 1}`}</span>
+                      <span className="text-xs font-medium opacity-80 select-none">{contact.name || `out${index + 1}`}</span>
                     </div>
                     <Handle
                       type="source"
@@ -148,7 +155,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
                 ))}
                 {outputContacts.length === 0 && (
                   <div className="flex-1 flex items-center justify-center min-h-[40px]">
-                    <span className="text-xs italic opacity-50">no outputs</span>
+                    <span className="text-xs italic opacity-50 select-none">no outputs</span>
                   </div>
                 )}
               </div>

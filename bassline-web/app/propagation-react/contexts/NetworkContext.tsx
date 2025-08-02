@@ -9,6 +9,7 @@ import type { Selection } from '~/propagation-core/refactoring/types'
 import { createEmptySelection } from '~/propagation-core/refactoring/types'
 import type { AppSettings } from '~/propagation-core/types'
 import { useAppSettings } from '~/propagation-react/hooks/useAppSettings'
+import { getValueThickness } from '~/propagation-core/utils/value-detection'
 
 interface NetworkContextValue {
   network: PropagationNetwork
@@ -73,7 +74,6 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
       id: contact.id,
       position: contact.position,
       type: contact.isBoundary ? 'boundary' : 'contact',
-      selected: selection.contacts.has(contact.id),
       style: {
         background: 'transparent',
         border: 'none',
@@ -101,7 +101,6 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
         id: group.id,
         position,
         type: 'group',
-        selected: selection.groups.has(group.id),
         style: {
           background: 'transparent',
           border: 'none',
@@ -143,28 +142,41 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
         }
       }
       
+      // Get source contact to check its value
+      const sourceContact = network.findContact(wire.fromId)
+      const thickness = appSettings.visual.showFatEdges && sourceContact?.content !== undefined 
+        ? getValueThickness(sourceContact.content) 
+        : 1
+      
+      // Scale stroke width based on value thickness
+      const baseWidth = 2
+      const strokeWidth = baseWidth + (thickness - 1) * appSettings.visual.fatEdgeScale
+      
       return {
         id: wire.id,
+        type: thickness > 1 ? 'fat' : undefined,
         source: sourceNodeId,
         target: targetNodeId,
         sourceHandle,
         targetHandle,
+        selectable: true,
         hidden: !appSettings.visual.showEdges,
+        data: { thickness },
         style: { 
           stroke: wire.type === 'directed' ? '#555' : '#888',
-          strokeWidth: 2,
+          strokeWidth,
           opacity: appSettings.visual.edgeOpacity
         },
-        markerEnd: { type: MarkerType.ArrowClosed },
-        markerStart: wire.type === 'bidirectional' ? { type: MarkerType.ArrowClosed } : undefined
+        markerEnd: wire.type === 'directed' ? { type: MarkerType.ArrowClosed } : undefined,
+        markerStart: undefined
       }
     })
     
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [network, currentGroupId, appSettings.visual.showEdges, appSettings.visual.edgeOpacity, selection])
+  }, [network, currentGroupId, appSettings.visual.showEdges, appSettings.visual.edgeOpacity, appSettings.visual.showFatEdges, appSettings.visual.fatEdgeScale])
   
-  // Initialize with example data
+  // Effect 1: Initialize with example data (only on mount)
   useEffect(() => {
     // Only initialize if the network is empty
     if (network.rootGroup.contacts.size === 0 && network.rootGroup.subgroups.size === 0) {
@@ -202,15 +214,21 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
     }
   }, []) // Only run once on mount
   
-  // Re-sync when current group changes
+  // Effect 2: Re-sync when current group changes (navigation)
   useEffect(() => {
     syncToReactFlow()
-  }, [currentGroupId])
+  }, [currentGroupId, syncToReactFlow])
   
-  // Re-sync when visual settings change
+  // Effect 3: Re-sync when visual settings change (edge visibility/opacity)
   useEffect(() => {
     syncToReactFlow()
   }, [appSettings.visual.showEdges, appSettings.visual.edgeOpacity, syncToReactFlow])
+  
+  // Effect 4: Re-sync when fat edge settings change
+  useEffect(() => {
+    syncToReactFlow()
+  }, [appSettings.visual.showFatEdges, appSettings.visual.fatEdgeScale, syncToReactFlow])
+  
   
   const value: NetworkContextValue = {
     network,

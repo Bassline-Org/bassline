@@ -37,12 +37,50 @@ export class Splitter extends PrimitiveGadget {
     
     if (inputValue === undefined) return outputs
     
-    // Copy input to all outputs
-    for (let i = 0; i < this.outputCount; i++) {
-      const outputEntry = Array.from(boundaryValues.entries()).find(([_, [c]]) => c.name === `out${i + 1}`)
+    // If input is an array, destructure it to outputs
+    if (Array.isArray(inputValue)) {
+      for (let i = 0; i < this.outputCount; i++) {
+        const outputEntry = Array.from(boundaryValues.entries()).find(([_, [c]]) => c.name === `out${i + 1}`)
+        if (outputEntry) {
+          const [outputId] = outputEntry
+          // Get the i-th element if it exists, otherwise undefined
+          outputs.set(outputId, i < inputValue.length ? inputValue[i] : undefined)
+        }
+      }
+    } else if (inputValue instanceof Set || inputValue.constructor?.name === 'SetValue' || inputValue.constructor?.name === 'StringSet') {
+      // For sets, convert to array first
+      const array = Array.from(inputValue instanceof Set ? inputValue : inputValue.toArray?.() || [])
+      for (let i = 0; i < this.outputCount; i++) {
+        const outputEntry = Array.from(boundaryValues.entries()).find(([_, [c]]) => c.name === `out${i + 1}`)
+        if (outputEntry) {
+          const [outputId] = outputEntry
+          outputs.set(outputId, i < array.length ? array[i] : undefined)
+        }
+      }
+    } else if (typeof inputValue === 'object' && inputValue !== null && inputValue.constructor === Object) {
+      // For plain objects, destructure by key order
+      const entries = Object.entries(inputValue)
+      for (let i = 0; i < this.outputCount; i++) {
+        const outputEntry = Array.from(boundaryValues.entries()).find(([_, [c]]) => c.name === `out${i + 1}`)
+        if (outputEntry) {
+          const [outputId] = outputEntry
+          outputs.set(outputId, i < entries.length ? entries[i][1] : undefined)
+        }
+      }
+    } else {
+      // For scalar values, send to first output only
+      const outputEntry = Array.from(boundaryValues.entries()).find(([_, [c]]) => c.name === 'out1')
       if (outputEntry) {
         const [outputId] = outputEntry
         outputs.set(outputId, inputValue)
+      }
+      // Other outputs get undefined
+      for (let i = 1; i < this.outputCount; i++) {
+        const outputEntry = Array.from(boundaryValues.entries()).find(([_, [c]]) => c.name === `out${i + 1}`)
+        if (outputEntry) {
+          const [outputId] = outputEntry
+          outputs.set(outputId, undefined)
+        }
       }
     }
     

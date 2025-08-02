@@ -221,6 +221,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                   value={tempValue || ''}
                   onChange={(e) => setTempValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  onFocus={(e) => e.target.select()}
                 />
               )}
               
@@ -242,6 +243,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                     value={tempValue?.min || ''}
                     onChange={(e) => setTempValue({ ...tempValue, min: e.target.value })}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={(e) => e.target.select()}
                   />
                   <Input
                     type="number"
@@ -249,6 +251,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                     value={tempValue?.max || ''}
                     onChange={(e) => setTempValue({ ...tempValue, max: e.target.value })}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={(e) => e.target.select()}
                   />
                 </div>
               )}
@@ -264,6 +267,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                       value={tempValue?.r || ''}
                       onChange={(e) => setTempValue({ ...tempValue, r: e.target.value })}
                       onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                      onFocus={(e) => e.target.select()}
                     />
                     <Input
                       type="number"
@@ -273,6 +277,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                       value={tempValue?.g || ''}
                       onChange={(e) => setTempValue({ ...tempValue, g: e.target.value })}
                       onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                      onFocus={(e) => e.target.select()}
                     />
                     <Input
                       type="number"
@@ -282,6 +287,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                       value={tempValue?.b || ''}
                       onChange={(e) => setTempValue({ ...tempValue, b: e.target.value })}
                       onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                      onFocus={(e) => e.target.select()}
                     />
                   </div>
                   <div 
@@ -299,6 +305,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                     onChange={(e) => setTempValue(e.target.value)}
                     onBlur={applyValue}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={(e) => e.target.select()}
                   />
                   <span className="text-sm">°C</span>
                 </div>
@@ -322,6 +329,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                     value={tempValue?.x || ''}
                     onChange={(e) => setTempValue({ ...tempValue, x: e.target.value })}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={(e) => e.target.select()}
                   />
                   <Input
                     type="number"
@@ -329,6 +337,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                     value={tempValue?.y || ''}
                     onChange={(e) => setTempValue({ ...tempValue, y: e.target.value })}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={(e) => e.target.select()}
                   />
                 </div>
               )}

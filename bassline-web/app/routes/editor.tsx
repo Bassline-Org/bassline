@@ -22,11 +22,11 @@ import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { GadgetPalette } from "~/components/palette/GadgetPalette";
-import { QuickAddMenu } from "~/components/QuickAddMenu";
 import { ToolsMenu } from "~/components/ToolsMenu";
 import { ClientOnly } from "~/components/ClientOnly";
 import { PropertyPanel } from "~/components/PropertyPanel";
 import { ConfigurationPanel } from "~/components/ConfigurationPanel";
+import { FatEdge } from "~/components/edges/FatEdge";
 import type { GadgetTemplate } from "~/propagation-core/types/template";
 import type { Position } from "~/propagation-core";
 import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
@@ -35,6 +35,10 @@ const nodeTypes = {
   contact: ContactNode,
   boundary: ContactNode, // Same component, different data
   group: GroupNode,
+};
+
+const edgeTypes = {
+  fat: FatEdge,
 };
 
 function Flow() {
@@ -83,19 +87,6 @@ function Flow() {
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
 
-  // Quick add menu state
-  interface QuickAddPosition {
-    screenX: number;
-    screenY: number;
-    flowX: number;
-    flowY: number;
-    fromNodeId: string;
-    fromHandleId?: string;
-    fromHandleType: 'source' | 'target';
-  }
-  const [quickAddMenuPosition, setQuickAddMenuPosition] =
-    useState<QuickAddPosition | null>(null);
-  const [menuJustOpened, setMenuJustOpened] = useState(false);
 
   const handleAddContact = useCallback(() => {
     const position = {
@@ -313,34 +304,35 @@ function Flow() {
     [proximity, connect],
   );
 
-  // Handle edge drop - show quick add menu
+  // Handle edge drop - create contact directly
   const handleConnectEnd = useCallback(
     (event: any, connectionState: any) => {
-      // Only show menu if connection is not valid (dropped on empty space)
+      // Only create contact if connection is not valid (dropped on empty space)
       if (!connectionState?.isValid && connectionState?.fromNode) {
-        // Store the screen position for the menu (not flow position)
+        // Get the flow position for creating the contact
         const screenPos = {
           x: event.clientX,
           y: event.clientY,
         };
-        // But also store the flow position for creating nodes
         const flowPos = screenToFlowPosition(screenPos);
-        setQuickAddMenuPosition({
-          screenX: screenPos.x,
-          screenY: screenPos.y,
-          flowX: flowPos.x,
-          flowY: flowPos.y,
-          fromNodeId: connectionState.fromNode.id,
-          fromHandleId: connectionState.fromHandle?.id,
-          fromHandleType: connectionState.fromHandle?.type || "source",
-        });
-
-        // Set flag to prevent immediate closing
-        setMenuJustOpened(true);
-        setTimeout(() => setMenuJustOpened(false), 100);
+        
+        // Create a new contact at the drop position
+        const newContact = addContact({ x: flowPos.x, y: flowPos.y });
+        
+        if (newContact) {
+          // Use handle ID if dragging from a gadget, otherwise use node ID
+          const sourceId = connectionState.fromHandle?.id || connectionState.fromNode.id;
+          
+          // Connect based on the handle type
+          if (connectionState.fromHandle?.type === "source") {
+            connect(sourceId, newContact.id);
+          } else {
+            connect(newContact.id, sourceId);
+          }
+        }
       }
     },
-    [screenToFlowPosition],
+    [screenToFlowPosition, addContact, connect],
   );
 
   // Handle drag over for palette items
@@ -383,7 +375,7 @@ function Flow() {
 
   return (
     <div
-      className="w-full h-screen"
+      className="w-full h-screen select-none bg-background"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -398,17 +390,14 @@ function Flow() {
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         deleteKeyCode={["Delete", "Backspace"]}
-        onPaneClick={(event) => {
-          // Close quick add menu when clicking on canvas (but not if just opened)
-          if (quickAddMenuPosition && !menuJustOpened) {
-            setQuickAddMenuPosition(null);
-          }
-        }}
         selectNodesOnDrag={false}
+        elementsSelectable={true}
         fitView
+        className="select-none"
       >
-        {viewSettings.showGrid && <Background />}
+        {viewSettings.showGrid && <Background variant="dots" gap={12} className="!bg-muted/20" size={1} />}
         {/* <Controls /> */}
         {viewSettings.showMiniMap && <MiniMap />}
 
@@ -538,59 +527,6 @@ function Flow() {
         />
       </ClientOnly>
 
-      {quickAddMenuPosition && (
-        <QuickAddMenu
-          position={{
-            x: quickAddMenuPosition.screenX,
-            y: quickAddMenuPosition.screenY,
-          }}
-          onAddContact={() => {
-            const newContact = addContact({
-              x: quickAddMenuPosition.flowX,
-              y: quickAddMenuPosition.flowY,
-            });
-            if (newContact) {
-              // Use handle ID if dragging from a gadget, otherwise use node ID
-              const sourceId =
-                quickAddMenuPosition.fromHandleId ||
-                quickAddMenuPosition.fromNodeId;
-              // Connect based on the handle type
-              if (quickAddMenuPosition.fromHandleType === "source") {
-                connect(sourceId, newContact.id);
-              } else {
-                connect(newContact.id, sourceId);
-              }
-            }
-          }}
-          onAddBoundaryContact={(_, dir) => {
-            const newContact = addBoundaryContact(
-              { x: quickAddMenuPosition.flowX, y: quickAddMenuPosition.flowY },
-              dir,
-            );
-            if (newContact) {
-              // Use handle ID if dragging from a gadget, otherwise use node ID
-              const sourceId =
-                quickAddMenuPosition.fromHandleId ||
-                quickAddMenuPosition.fromNodeId;
-              // Connect based on the handle type
-              if (quickAddMenuPosition.fromHandleType === "source") {
-                connect(sourceId, newContact.id);
-              } else {
-                connect(newContact.id, sourceId);
-              }
-            }
-          }}
-          onAddGadget={() => {
-            const newGadget = handleAddGadgetAtPosition({
-              x: quickAddMenuPosition.flowX,
-              y: quickAddMenuPosition.flowY,
-            });
-            // For gadgets, we'd need to know which boundary contact to connect to
-            // This is more complex, so leaving unconnected for now
-          }}
-          onClose={() => setQuickAddMenuPosition(null)}
-        />
-      )}
 
       <ClientOnly>
         <PropertyPanel

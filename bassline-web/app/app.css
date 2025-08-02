@@ -300,3 +300,10 @@ body {
     --tw-ring-color: var(--node-boundary);
   }
 }
+
+/* Animation for fat edge dashes */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -60;
+  }
+}

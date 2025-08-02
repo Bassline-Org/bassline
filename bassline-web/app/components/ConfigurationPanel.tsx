@@ -192,6 +192,42 @@ export function ConfigurationPanel({
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
+                <Label htmlFor="show-fat-edges">Fat Edge Indicators</Label>
+                <p className="text-sm text-muted-foreground">
+                  Show thicker edges for arrays, sets, and objects
+                </p>
+              </div>
+              <Switch
+                id="show-fat-edges"
+                checked={appSettings.visual.showFatEdges}
+                onCheckedChange={(checked) => 
+                  onUpdateVisual({ showFatEdges: checked })
+                }
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fat-edge-scale">Fat Edge Scale</Label>
+              <div className="flex items-center space-x-3">
+                <Slider
+                  id="fat-edge-scale"
+                  min={1}
+                  max={3}
+                  step={0.5}
+                  value={[appSettings.visual.fatEdgeScale]}
+                  onValueChange={([value]) => 
+                    onUpdateVisual({ fatEdgeScale: value })
+                  }
+                  className="flex-1"
+                />
+                <span className="w-12 text-sm text-muted-foreground">
+                  {appSettings.visual.fatEdgeScale.toFixed(1)}x
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
                 <Label htmlFor="animate-propagation">Animate Propagation</Label>
                 <p className="text-sm text-muted-foreground">
                   Show visual feedback during propagation (future feature)
