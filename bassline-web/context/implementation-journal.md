@@ -679,6 +679,55 @@ const defaultSettings: ViewSettings = {
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.
 
+### Latch Behavior for All Contacts
+
+Fixed an issue where the latch behavior (contacts keeping their value until receiving a new one) wasn't working correctly for bidirectional connections:
+
+#### The Problem
+- `removeWire` only checked the "target" contact (wire.toId) for remaining connections
+- It ignored the "source" contact (wire.fromId)
+- This broke the latch behavior when contacts were connected via their "output" side
+
+#### The Solution
+1. Added `hasAnyConnections(contactId)` helper that checks for ANY connections (not just incoming)
+2. Updated `removeWire` to check BOTH endpoints of the removed wire
+3. Made `hasAnyConnections` check parent group for boundary contacts
+4. Properly handle boundary contacts in subgroups (including primitive gadgets)
+
+```typescript
+// Now checks both endpoints when removing a wire
+for (const contactId of [wire.fromId, wire.toId]) {
+  if (!hasAnyConnections(contactId)) {
+    contact['_content'] = undefined
+  }
+}
+```
+
+This ensures that:
+- Regular contacts maintain their value until all connections are removed
+- Primitive gadgets properly handle disconnection of boundary contacts
+- The system works correctly regardless of connection direction (truly bidirectional)
+
+#### Critical: Always Call syncToReactFlow() After State Changes
+
+**Recurring Issue**: The React Flow UI and core propagation network can get out of sync
+**Solution**: Always call `syncToReactFlow()` after any operation that changes the network state
+
+```typescript
+// Example from wire removal fix:
+if (changes.some(change => change.type === 'remove')) {
+  syncToReactFlow()  // Critical! Without this, UI won't reflect cleared contact values
+}
+```
+
+This pattern should be followed for:
+- Wire removal/addition
+- Contact value changes
+- Group navigation
+- Any operation that modifies the propagation network state
+
+The `syncToReactFlow()` method rebuilds the React Flow nodes/edges from the core network state, ensuring the UI accurately reflects the current state of the propagation network.
+
 ## Phase 6: Primitive Gadgets
 
 ### What We Built

@@ -22,7 +22,6 @@ export abstract class PrimitiveGadget extends ContactGroup {
     // Store the input value (including undefined when cleared)
     contact['_content'] = content
     
-    console.log(`Primitive ${this.name} received input on ${contact.name}:`, content)
     
     // Try to run the primitive computation
     this.maybeRun()
@@ -35,7 +34,6 @@ export abstract class PrimitiveGadget extends ContactGroup {
     
     // Check if we should run
     if (this.activation(inputs)) {
-      console.log(`Primitive ${this.name} activation returned true, running body`)
       
       // Run the body to compute outputs
       const outputs = this.body(inputs)
@@ -43,7 +41,6 @@ export abstract class PrimitiveGadget extends ContactGroup {
       // Propagate the computed outputs
       this.propagateOutputs(outputs)
     } else {
-      console.log(`Primitive ${this.name} activation returned false`)
       
       // Check if ALL inputs are undefined - if so, clear outputs
       const allInputsUndefined = Array.from(inputs.values())
@@ -51,7 +48,6 @@ export abstract class PrimitiveGadget extends ContactGroup {
         .every(([_, value]) => value === undefined)
       
       if (allInputsUndefined) {
-        console.log(`All inputs undefined, clearing outputs`)
         this.clearAllOutputs()
       }
       // Otherwise, keep current outputs (latch behavior)
@@ -79,8 +75,6 @@ export abstract class PrimitiveGadget extends ContactGroup {
       if (contact && contact.isBoundary && contact.boundaryDirection === 'output') {
         const oldContent = contact.content
         contact['_content'] = value
-        
-        console.log(`Setting output ${contact.name} to:`, value)
         
         // Propagate if changed
         if (value !== oldContent) {

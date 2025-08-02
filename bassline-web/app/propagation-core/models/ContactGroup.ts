@@ -12,6 +12,7 @@ export class ContactGroup {
   boundaryContacts = new Set<ContactId>()
   subgroups = new Map<GroupId, ContactGroup>()
   position: Position = { x: 0, y: 0 }
+  isPrimitive: boolean = false
   
   constructor(
     public readonly id: GroupId,
@@ -117,6 +118,24 @@ export class ContactGroup {
     return connections
   }
   
+  // Check if a contact has any connections (incoming or outgoing)
+  hasAnyConnections(contactId: ContactId): boolean {
+    // Check in this group
+    for (const wire of this.wires.values()) {
+      if (wire.fromId === contactId || wire.toId === contactId) {
+        return true
+      }
+    }
+    
+    // If this contact is a boundary contact and we have a parent, check parent too
+    const contact = this.contacts.get(contactId)
+    if (contact?.isBoundary && this.parent) {
+      return this.parent.hasAnyConnections(contactId)
+    }
+    
+    return false
+  }
+  
   // Check if a contact can be connected to (including boundary contacts in subgroups)
   canConnectTo(contactId: ContactId): Contact | undefined {
     // First check own contacts
@@ -214,46 +233,50 @@ export class ContactGroup {
   
   removeWire(wireId: WireId): boolean {
     const wire = this.wires.get(wireId)
-    if (!wire) return false
+    if (!wire) {
+      // Wire not in this group, try subgroups
+      for (const subgroup of this.subgroups.values()) {
+        if (subgroup.removeWire(wireId)) {
+          return true
+        }
+      }
+      return false
+    }
     
     // Remove the wire
     this.wires.delete(wireId)
     
-    // Check if target contact has no more incoming connections
-    const targetId = wire.toId
-    let hasIncomingConnections = false
+    // Check both endpoints of the wire for remaining connections
+    const contactsToCheck = [wire.fromId, wire.toId]
     
-    // Check for any incoming wires to the target
-    for (const otherWire of this.wires.values()) {
-      if (otherWire.toId === targetId || 
-          (otherWire.type === 'bidirectional' && otherWire.fromId === targetId)) {
-        hasIncomingConnections = true
-        break
+    for (const contactId of contactsToCheck) {
+      // Check if this is a boundary contact in a subgroup
+      let contact: Contact | undefined = this.contacts.get(contactId)
+      let checkGroup: ContactGroup = this
+      
+      // If not found in this group, check if it's a boundary contact in a subgroup
+      if (!contact) {
+        for (const subgroup of this.subgroups.values()) {
+          if (subgroup.boundaryContacts.has(contactId)) {
+            contact = subgroup.contacts.get(contactId)
+            checkGroup = subgroup
+            break
+          }
+        }
       }
-    }
-    
-    // If no incoming connections, clear the contact's content
-    if (!hasIncomingConnections) {
-      const contact = this.contacts.get(targetId)
-      if (contact) {
+      
+      // If the contact has no more connections, clear its content
+      if (contact && !checkGroup.hasAnyConnections(contactId)) {
         contact['_content'] = undefined
+        
         // If it's a boundary contact in a primitive gadget, trigger recomputation
-        if (contact.isBoundary && contact.boundaryDirection === 'input') {
-          this.deliverContent(targetId, undefined, wireId)
+        if (contact.isBoundary && contact.boundaryDirection === 'input' && checkGroup.isPrimitive) {
+          checkGroup.deliverContent(contactId, undefined, wireId)
         }
       }
     }
     
     return true
-    
-    // Try subgroups
-    for (const subgroup of this.subgroups.values()) {
-      if (subgroup.removeWire(wireId)) {
-        return true
-      }
-    }
-    
-    return false
   }
   
   removeSubgroup(subgroupId: string): boolean {

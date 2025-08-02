@@ -264,10 +264,18 @@ export function usePropagationNetwork() {
     // Handle edge deletions in core network
     changes.forEach(change => {
       if (change.type === 'remove') {
-        network.removeWire(change.id)
+        const currentGroup = currentGroupId ? network.findGroup(currentGroupId) : network.rootGroup
+        if (currentGroup) {
+          currentGroup.removeWire(change.id)
+        }
       }
     })
-  }, [network])
+    
+    // Sync after processing changes to ensure UI reflects the updated state
+    if (changes.some(change => change.type === 'remove')) {
+      syncToReactFlow()
+    }
+  }, [network, currentGroupId, syncToReactFlow])
   
   // Handle new connections
   const onConnect = useCallback((connection: Connection) => {

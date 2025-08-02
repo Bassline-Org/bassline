@@ -34,8 +34,6 @@ export class Adder extends PrimitiveGadget {
     const [, a] = boundaryValues.get(this.inputA.id) || [null, undefined]
     const [, b] = boundaryValues.get(this.inputB.id) || [null, undefined]
     
-    console.log(`Adder computing: a=${a}, b=${b}`)
-    
     // Handle different types of addition
     let result: any
     
