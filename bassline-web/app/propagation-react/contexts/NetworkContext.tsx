@@ -5,6 +5,8 @@ import type { ContactGroup } from '~/propagation-core/models/ContactGroup'
 import type { Contact } from '~/propagation-core/models/Contact'
 import { PrimitiveGadget } from '~/propagation-core/primitives'
 import { MarkerType } from '@xyflow/react'
+import type { Selection } from '~/propagation-core/refactoring/types'
+import { createEmptySelection } from '~/propagation-core/refactoring/types'
 
 interface NetworkContextValue {
   network: PropagationNetwork
@@ -15,6 +17,8 @@ interface NetworkContextValue {
   edges: Edge[]
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
+  selection: Selection
+  setSelection: React.Dispatch<React.SetStateAction<Selection>>
 }
 
 const NetworkContext = createContext<NetworkContextValue | null>(null)
@@ -40,6 +44,9 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
   // React Flow state
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
+  
+  // Selection state
+  const [selection, setSelection] = useState<Selection>(createEmptySelection())
   
   // Sync network state to React Flow
   const syncToReactFlow = useCallback(() => {
@@ -187,7 +194,9 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
     nodes,
     edges,
     setNodes,
-    setEdges
+    setEdges,
+    selection,
+    setSelection
   }
   
   return (

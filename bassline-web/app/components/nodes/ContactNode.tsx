@@ -6,6 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '~/lib/utils'
 import { useContact } from '~/propagation-react/hooks/useContact'
 import { usePropertyPanel } from '~/propagation-react/hooks/usePropertyPanel'
+import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
 
 const nodeVariants = cva(
   "w-[60px] h-[48px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -42,6 +43,7 @@ const nodeVariants = cva(
 export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id)
   const propertyPanel = usePropertyPanel()
+  const { selectContact } = useContactSelection()
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -73,6 +75,7 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
         onContextMenu={handleContextMenu}
         onDoubleClick={(e) => {
           e.stopPropagation()
+          selectContact(id, false) // Ensure this contact is selected
           propertyPanel.show(true)
         }}
       >

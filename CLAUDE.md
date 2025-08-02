@@ -88,3 +88,60 @@ npm run lint
 - `README.org`: Comprehensive technical specification and propagation network theory
 - `ClaudeSummary.md`: Implementation strategy and UI/UX plans
 - Existing Pharo implementation serves as reference for behavior and semantics
+
+## React Hooks Architecture (NEW)
+
+As of the latest refactoring, the codebase now uses a clean hooks-based architecture:
+
+### Core Hooks
+
+1. **NetworkContext** - Provides centralized state management
+   - Manages the propagation network instance
+   - Handles React Flow synchronization
+   - Stores selection state
+   - Auto-syncs on all mutations
+
+2. **useContact(contactId)** - Access individual contacts
+   - Returns reactive contact state
+   - Provides mutation methods with auto-sync
+   - Handles null/undefined gracefully
+
+3. **useGroup(groupId)** - Manage groups/gadgets
+   - Full access to group operations
+   - Navigation, adding contacts, wiring
+   - Automatic UI updates
+
+4. **useContactSelection()** - Enhanced selection management
+   - Returns actual Contact/Group objects, not just IDs
+   - Shared selection state via context
+   - Bulk operations (delete, extract, etc.)
+
+5. **useCurrentGroup()** - Current navigation context
+   - Access to visible entities
+   - Navigation methods
+   - Operations on current group
+
+### Key Patterns
+
+- **No manual syncToReactFlow()** - All hooks auto-sync
+- **No prop drilling** - Components get data directly from hooks
+- **Shared state via context** - Selection and network state are centralized
+- **Type-safe** - Full TypeScript support throughout
+
+### Example Usage
+
+```typescript
+// In a component
+function MyComponent() {
+  const { content, setContent } = useContact(contactId)
+  const { selectedContacts } = useContactSelection()
+  
+  // Direct access, no props needed
+  return <div onClick={() => setContent('new value')}>{content}</div>
+}
+```
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

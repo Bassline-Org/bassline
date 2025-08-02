@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { Node, Edge } from '@xyflow/react'
 import type { Selection } from '~/propagation-core/refactoring/types'
 import { createEmptySelection } from '~/propagation-core/refactoring/types'
@@ -39,8 +39,7 @@ interface UseContactSelectionReturn {
 }
 
 export function useContactSelection(): UseContactSelectionReturn {
-  const { network, syncToReactFlow } = useNetworkContext()
-  const [selection, setSelection] = useState<Selection>(createEmptySelection())
+  const { network, syncToReactFlow, selection, setSelection } = useNetworkContext()
   
   // Get actual objects from selection IDs
   const selectedContacts = useMemo(() => {
@@ -64,13 +63,14 @@ export function useContactSelection(): UseContactSelectionReturn {
   
   // Update selection from React Flow selected nodes/edges
   const updateSelection = useCallback((nodes: Node[], edges: Edge[]) => {
+    // React Flow's onSelectionChange provides only the currently selected nodes/edges
     const newSelection: Selection = {
       contacts: new Set(nodes.filter(n => n.type !== 'group').map(n => n.id)),
       wires: new Set(edges.map(e => e.id)),
       groups: new Set(nodes.filter(n => n.type === 'group').map(n => n.id))
     }
     setSelection(newSelection)
-  }, [])
+  }, [setSelection])
   
   // Selection methods
   const selectContact = useCallback((contactId: string, multi = false) => {

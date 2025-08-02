@@ -679,6 +679,106 @@ const defaultSettings: ViewSettings = {
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.
 
+## Phase 8: React Hooks Refactoring
+
+### The Problem
+The codebase had accumulated significant technical debt:
+- Manual `syncToReactFlow()` calls scattered everywhere
+- Complex prop drilling (network, callbacks, selection)
+- Imperative state updates
+- Components tightly coupled to implementation details
+
+### The Solution: Clean Hooks Architecture
+
+#### 1. NetworkContext Provider
+Created a central context that provides:
+- The propagation network instance
+- React Flow state management
+- Selection state (shared across all components)
+- Auto-sync functionality
+
+```typescript
+interface NetworkContextValue {
+  network: PropagationNetwork
+  syncToReactFlow: () => void
+  currentGroupId: string
+  setCurrentGroupId: (id: string) => void
+  nodes: Node[]
+  edges: Edge[]
+  selection: Selection
+  setSelection: React.Dispatch<React.SetStateAction<Selection>>
+}
+```
+
+#### 2. Core Hooks Implementation
+
+**useContact(contactId)**
+- Direct access to contact state
+- Auto-sync on all mutations
+- No more manual callbacks
+
+**useGroup(groupId)**
+- Full group/gadget control
+- Navigation, operations, queries
+- Handles primitive gadgets properly
+
+**useContactSelection()**
+- Returns actual objects, not just IDs
+- Shared state via context (fixed the selection bug!)
+- Bulk operations built-in
+
+**useCurrentGroup()**
+- Navigation context
+- Operations on current view
+- Breadcrumb support
+
+#### 3. Component Refactoring
+
+**Before:**
+```typescript
+<ContactNode 
+  data={{
+    content,
+    setContent: (c) => {
+      contact.setContent(c)
+      syncToReactFlow()
+    },
+    onDoubleClick: () => propertyPanel.show()
+  }}
+/>
+```
+
+**After:**
+```typescript
+<ContactNode id={contact.id} selected={selected} />
+// Component uses hooks internally
+```
+
+### Key Wins
+
+1. **Eliminated ~200 lines of boilerplate** - No more manual syncing
+2. **Fixed selection synchronization** - Moved selection to shared context
+3. **Cleaner components** - ContactNode, PropertyPanel, GroupNode all simplified
+4. **Better separation** - UI components don't know about network internals
+5. **Type safety** - Full TypeScript inference throughout
+
+### Selection Bug Fix
+
+The PropertyPanel wasn't showing selected contacts because:
+- Each `useContactSelection()` call created isolated state
+- Selection wasn't properly shared between components
+
+**Fix**: Moved selection state to NetworkContext, ensuring all components share the same selection.
+
+### Lessons Learned
+
+1. **Context is powerful** - Shared state solves many React problems
+2. **Hooks enable clean APIs** - Hide complexity behind simple interfaces
+3. **Auto-sync is essential** - Manual sync calls are error-prone
+4. **Selection needs special care** - It's cross-cutting state that many components need
+
+This refactoring sets a solid foundation for future features while making the codebase much more maintainable and truly embracing React's declarative model.
+
 ## Phase 7: UI Refinements & Handle-Centric Design
 
 ### What We Built
