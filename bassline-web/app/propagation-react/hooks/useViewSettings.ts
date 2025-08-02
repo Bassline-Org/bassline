@@ -1,50 +1,51 @@
-import { useState, useEffect } from 'react'
-import type { ViewSettings } from '~/components/ToolsMenu'
+import { useState, useEffect } from "react";
+import type { ViewSettings } from "~/components/ToolsMenu";
 
-const STORAGE_KEY = 'bassline-view-settings'
+const STORAGE_KEY = "bassline-view-settings";
 
 const defaultSettings: ViewSettings = {
-  showInstructions: true,
-  showMiniMap: true,
+  showInstructions: false,
+  showMiniMap: false,
   showGrid: true,
   showPropagationFlow: false,
   showNodeLabels: true,
   showDebugInfo: false,
-  showShortcutHints: true
-}
+  showShortcutHints: true,
+};
 
 export function useViewSettings() {
   // Always start with default state to avoid hydration mismatch
-  const [viewSettings, setViewSettings] = useState<ViewSettings>(defaultSettings)
-  
+  const [viewSettings, setViewSettings] =
+    useState<ViewSettings>(defaultSettings);
+
   // Load from localStorage after mount
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY)
+        const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
-          const parsed = JSON.parse(stored)
-          setViewSettings({ ...defaultSettings, ...parsed })
+          const parsed = JSON.parse(stored);
+          setViewSettings({ ...defaultSettings, ...parsed });
         }
       } catch (e) {
-        console.error('Failed to load view settings:', e)
+        console.error("Failed to load view settings:", e);
       }
     }
-  }, [])
-  
+  }, []);
+
   // Save to localStorage whenever settings change
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(viewSettings))
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(viewSettings));
       } catch (e) {
-        console.error('Failed to save view settings:', e)
+        console.error("Failed to save view settings:", e);
       }
     }
-  }, [viewSettings])
-  
+  }, [viewSettings]);
+
   return {
     viewSettings,
-    setViewSettings
-  }
+    setViewSettings,
+  };
 }

@@ -679,6 +679,95 @@ const defaultSettings: ViewSettings = {
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.
 
+## Phase 7: UI Refinements & Handle-Centric Design
+
+### What We Built
+Redesigned the visual appearance of nodes to create a cleaner, more intuitive interface:
+
+1. **Contact Node Redesign**
+   - Transformed contacts into minimal 60x48px cards
+   - Replaced top drag handle with left/right drag borders
+   - Made entire node body draggable (removed dragHandle restriction)
+   - Changed from invisible full-body handles to visible handle boxes (16x16px)
+   - Single-click to edit content (improved from double-click)
+   - Maintained blend mode indicator as small dot
+
+2. **Primitive Gadget Refinements**
+   - Reduced size to compact 50px width (auto-height based on content)
+   - Replaced text names with mathematical symbols:
+     - Adder → Plus (+) icon
+     - Subtractor → Minus (-) icon
+     - Multiplier → X (×) icon
+     - Divider → Divide (÷) icon
+   - Input/output names moved to tooltips on hover
+   - Smaller handles (20x20px) with closer spacing
+
+3. **Group Node Handle Improvements**
+   - Unified handle styling across all node types
+   - Gradient backgrounds matching node type colors
+   - Consistent hover effects and shadows
+   - Fixed React Flow's default width override with `width: 'auto'`
+
+### Key Architecture Decisions
+
+#### Handle Design Philosophy
+**Initial approach**: Invisible handles covering node halves
+**Final approach**: Small visible handle boxes
+
+**Why visible handles work better**:
+- Clear connection points for users
+- Consistent with gadget design
+- Avoids click/drag conflicts
+- Better visual feedback
+
+#### Quick Add Menu Click-Outside Fix
+**Problem**: Menu would instantly close when dropping connection
+**Root cause**: Both `onConnectEnd` and `onPaneClick` fire from same event
+
+**Solution**: Added timing flag to prevent race condition:
+```typescript
+// In handleConnectEnd
+setMenuJustOpened(true)
+setTimeout(() => setMenuJustOpened(false), 100)
+
+// In onPaneClick
+if (quickAddMenuPosition && !menuJustOpened) {
+  setQuickAddMenuPosition(null)
+}
+```
+
+### Visual Hierarchy Summary
+- **Contacts**: Minimal 60x48px cards with small visible handles
+- **Primitives**: Compact 50px icons with mathematical symbols
+- **Gadgets**: Full-sized cards with labeled ports
+
+### Lessons Learned
+1. **Visible is often better than invisible** - Users need clear interaction points
+2. **Race conditions in event handling** - Same user action can trigger multiple events
+3. **React Flow has default styles** - Need to explicitly override with inline styles
+4. **Icons communicate better than text** - Especially for mathematical operations
+5. **Consistent handle design** - Unifies the visual language across node types
+
+### Primitive Gadget Sizing Fix
+
+**Problem**: Primitive gadgets were too tall due to hidden default padding
+**Investigation**: 
+- Initially thought it was hardcoded height
+- Tried complex flexbox solutions for handle positioning
+- Discovered CardContent has default `padding-bottom: 24px` from shadcn
+
+**Solution**:
+1. Add explicit padding to Card: `p-[5px]` for primitives
+2. Set CardContent to `w-[40px] h-[40px]` with `p-0 pb-0`
+3. Total size: 50x50px (40px content + 5px padding × 2)
+4. Simple handle positioning with `top: ${15 + index * 20}px`
+
+**Lessons**:
+- Always check for default styles from component libraries
+- Explicit overrides (`pb-0`) needed for shadcn components
+- Simple solutions (direct positioning) often better than complex ones (flexbox containers)
+- Browser DevTools are essential for debugging layout issues
+
 ### Latch Behavior for All Contacts
 
 Fixed an issue where the latch behavior (contacts keeping their value until receiving a new one) wasn't working correctly for bidirectional connections:
@@ -845,6 +934,134 @@ href: "https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Sou
 3. The base styles in `app.css` already apply `font-family: var(--font-sans)` to body
 
 The Doom 64 theme now fully applies with its distinctive angular design and gaming-inspired typography.
+
+## Phase 7: Property Panel and React Best Practices
+
+### Critical Lessons Learned
+
+#### 1. React Best Practices MUST Be Followed
+- **NEVER use document.addEventListener in React components** - This is an anti-pattern that breaks React's event system
+- Instead use React's event handlers, portals with backdrops, or proper state management
+- Bad: `document.addEventListener('click', handler)` 
+- Good: Backdrop div with onClick handler or using React Flow's built-in events
+
+#### 2. Event Handling and Focus Management
+- Keyboard shortcuts must check if user is typing in input fields:
+  ```typescript
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+  ```
+- Blur handlers on inputs can cause unwanted side effects (lost selection, focus fighting)
+- Use explicit actions (buttons, Enter key) instead of onBlur for saving changes
+
+#### 3. UI State Separation
+- Inline editing in nodes creates complexity and focus issues
+- Better pattern: Separate property panel for editing, nodes just display values
+- Single click = select, Double click = edit (industry standard pattern)
+
+#### 4. Circular Dependencies and Re-render Loops
+- Be extremely careful with useCallback dependencies
+- Adding state that the callback modifies to its deps creates infinite loops
+- Example: `syncToReactFlow` modifying `nodes` while having `nodes` in deps
+- Solution: Use separate state (like selection state) instead of reading from what you're updating
+
+#### 5. Cursor Feedback
+- ALL interactive elements need proper cursor styling
+- Buttons, Switches, Selects should have `cursor-pointer`
+- Disabled state should have `cursor-not-allowed`
+- This is often missing from UI libraries and needs to be added
+
+#### 6. Selection Preservation
+- When updating UI state, preserve user's selection
+- Use selection state to mark nodes as selected when rebuilding
+- Don't let UI updates reset user's workflow
+
+#### 7. Controlled vs Uncontrolled Focus
+- Don't auto-focus inputs on selection - it's jarring
+- Only focus when explicitly requested (double-click, keyboard shortcut)
+- Use refs and flags to control when focus should happen
+
+### Hacky Patterns to Avoid
+1. Timing-based solutions (setTimeout for race conditions)
+2. Global document listeners in React components
+3. String parsing for complex data types
+4. Blur handlers for saving data
+5. Not cleaning up event listeners
+6. Using refs for state that should be in React state
+
+### Better Patterns Implemented
+1. Property panel as a slide-out panel (like Figma)
+2. Rich type-specific inputs instead of string parsing
+3. Explicit Apply button instead of blur saves
+4. React portal with backdrop for context menus
+5. Selection state separate from node state
+6. Flag-based focus control for property panel
+
+### Merge Mode and Contradiction UI
+- Added toggle switch for blend modes (accept-last vs merge)
+- Visual indicators for merge mode (green dot) and contradictions (red ring)
+- Implemented mergeable types: Color (RGB blending), ConsensusBoolean, Point2D, ExactString
+- Property panel provides type-specific inputs for all mergeable types
+
+### Future Improvements: Better React Patterns
+
+#### Current Code Smells
+1. **Manual syncToReactFlow() calls everywhere** - Error-prone and easy to forget
+2. **Direct network manipulation** - Components reaching into network internals
+3. **Imperative updates** - Calling methods instead of declarative state changes
+4. **Scattered state updates** - Same logic repeated in multiple places
+
+#### Proposed Hook-Based Architecture
+Instead of:
+```typescript
+// Current (bad) pattern
+nodeData.setContent(newContent)
+network.syncToReactFlow() // Easy to forget!
+```
+
+Build proper React hooks:
+```typescript
+// Future (good) pattern
+const contact = useContact(contactId)
+contact.setContent(newContent) // Automatically triggers sync
+
+// Or even better - fully declarative
+const [content, setContent] = useContactContent(contactId)
+setContent(newContent) // React handles everything
+```
+
+#### Suggested Hooks to Implement
+1. **useContact(id)** - Returns contact state and mutation methods
+   - `content`, `setContent()` 
+   - `blendMode`, `setBlendMode()`
+   - `position`, `setPosition()`
+   - Automatically handles sync and re-renders
+
+2. **useWire(id)** - Wire state management
+   - `connect()`, `disconnect()`
+   - `type`, `setType()`
+
+3. **useGroup(id)** - Group/gadget operations
+   - `navigate()`, `rename()`, `delete()`
+   - `boundaries`, `addBoundary()`
+
+4. **useSelection()** - Already exists but could be enhanced
+   - `selectedContacts`, `selectedGroups`
+   - `selectContact()`, `clearSelection()`
+
+5. **usePropagation()** - Propagation control
+   - `isPropagating`, `propagationPath`
+   - `triggerPropagation()`
+
+#### Benefits
+- **Declarative** - React manages when to update UI
+- **Type-safe** - TypeScript can infer types from hooks
+- **Testable** - Hooks can be tested in isolation
+- **Reusable** - Same hooks work across all components
+- **No manual sync** - Updates automatically trigger re-renders
+- **Single source of truth** - State managed in one place
+
+This would make the codebase much more maintainable and truly embrace React's programming model.
 
 ## Phase 6: Primitive Gadgets
 

@@ -1,39 +1,42 @@
-import { useCallback, useState, useEffect, useRef } from 'react'
-import { ReactFlow, 
-  Background, 
-  Controls, 
+import { useCallback, useState, useEffect, useRef } from "react";
+import {
+  ReactFlow,
+  Background,
+  Controls,
   MiniMap,
   Panel,
   ReactFlowProvider,
-  useReactFlow
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
-import { toast } from 'sonner'
+  useReactFlow,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { toast } from "sonner";
 
-import { usePropagationNetwork } from '~/propagation-react/hooks/usePropagationNetwork'
-import { usePalette } from '~/propagation-react/hooks/usePalette'
-import { useProximityConnect } from '~/propagation-react/hooks/useProximityConnect'
-import { useViewSettings } from '~/propagation-react/hooks/useViewSettings'
-import { ContactNode } from '~/components/nodes/ContactNode'
-import { GroupNode } from '~/components/nodes/GroupNode'
-import { Button } from '~/components/ui/button'
-import { Breadcrumbs } from '~/components/Breadcrumbs'
-import { GadgetPalette } from '~/components/palette/GadgetPalette'
-import { QuickAddMenu } from '~/components/QuickAddMenu'
-import { ToolsMenu } from '~/components/ToolsMenu'
-import { ClientOnly } from '~/components/ClientOnly'
-import type { GadgetTemplate } from '~/propagation-core/types/template'
-import type { Position } from '~/propagation-core'
+import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationNetwork";
+import { usePalette } from "~/propagation-react/hooks/usePalette";
+import { useProximityConnect } from "~/propagation-react/hooks/useProximityConnect";
+import { useViewSettings } from "~/propagation-react/hooks/useViewSettings";
+import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
+import { ContactNode } from "~/components/nodes/ContactNode";
+import { GroupNode } from "~/components/nodes/GroupNode";
+import { Button } from "~/components/ui/button";
+import { Breadcrumbs } from "~/components/Breadcrumbs";
+import { GadgetPalette } from "~/components/palette/GadgetPalette";
+import { QuickAddMenu } from "~/components/QuickAddMenu";
+import { ToolsMenu } from "~/components/ToolsMenu";
+import { ClientOnly } from "~/components/ClientOnly";
+import { PropertyPanel } from "~/components/PropertyPanel";
+import type { GadgetTemplate } from "~/propagation-core/types/template";
+import type { Position } from "~/propagation-core";
 
 const nodeTypes = {
   contact: ContactNode,
   boundary: ContactNode, // Same component, different data
-  group: GroupNode
-}
+  group: GroupNode,
+};
 
 function Flow() {
-  const { screenToFlowPosition } = useReactFlow()
-  
+  const { screenToFlowPosition } = useReactFlow();
+
   const {
     nodes,
     edges,
@@ -55,252 +58,315 @@ function Flow() {
     inlineGadget,
     convertToBoundary,
     saveAsTemplate,
-    instantiateTemplate
-  } = usePropagationNetwork()
-  
-  const palette = usePalette()
-  const { viewSettings, setViewSettings } = useViewSettings()
-  
+    instantiateTemplate,
+  } = usePropagationNetwork({
+    onContactDoubleClick: (contactId) => {
+      propertyPanel.show(true); // true = focus input
+    }
+  });
+
+  const palette = usePalette();
+  const propertyPanel = usePropertyPanel();
+  const { viewSettings, setViewSettings } = useViewSettings();
+
   // Proximity connect hook
-  const proximity = useProximityConnect(nodes, edges)
-  
+  const proximity = useProximityConnect(nodes, edges);
+
   // Quick add menu state
-  const [quickAddMenuPosition, setQuickAddMenuPosition] = useState<Position | null>(null)
-  
+  const [quickAddMenuPosition, setQuickAddMenuPosition] =
+    useState<Position | null>(null);
+  const [menuJustOpened, setMenuJustOpened] = useState(false);
+
   const handleAddContact = useCallback(() => {
-    const position = { 
-      x: Math.random() * 400 + 100, 
-      y: Math.random() * 300 + 100 
-    }
-    addContact(position)
+    const position = {
+      x: Math.random() * 400 + 100,
+      y: Math.random() * 300 + 100,
+    };
+    addContact(position);
     if (viewSettings.showShortcutHints) {
-      toast.success('Contact added! Tip: Press A for quick add', {
+      toast.success("Contact added! Tip: Press A for quick add", {
         duration: 4000,
-      })
+      });
     }
-  }, [addContact, viewSettings])
-  
+  }, [addContact, viewSettings]);
+
   const handleAddInputBoundary = useCallback(() => {
-    const position = { 
-      x: 50, 
-      y: Math.random() * 300 + 100 
-    }
-    addBoundaryContact(position, 'input')
-  }, [addBoundaryContact])
-  
+    const position = {
+      x: 50,
+      y: Math.random() * 300 + 100,
+    };
+    addBoundaryContact(position, "input");
+  }, [addBoundaryContact]);
+
   const handleAddOutputBoundary = useCallback(() => {
-    const position = { 
-      x: 550, 
-      y: Math.random() * 300 + 100 
-    }
-    addBoundaryContact(position, 'output')
-  }, [addBoundaryContact])
-  
+    const position = {
+      x: 550,
+      y: Math.random() * 300 + 100,
+    };
+    addBoundaryContact(position, "output");
+  }, [addBoundaryContact]);
+
   const handleAddGroup = useCallback(() => {
-    const name = prompt('Enter gadget name:')
+    const name = prompt("Enter gadget name:");
     if (name) {
-      createGroup(name)
+      createGroup(name);
       if (viewSettings.showShortcutHints) {
-        toast.success('Gadget created! Tip: Press S for quick add', {
+        toast.success("Gadget created! Tip: Press S for quick add", {
           duration: 4000,
-        })
+        });
       }
     }
-  }, [createGroup, viewSettings])
-  
-  const handleAddGadgetAtPosition = useCallback((position: Position) => {
-    const name = prompt('Enter gadget name:')
-    if (name) {
-      const gadget = createGroup(name)
-      gadget.position = position
-    }
-  }, [createGroup])
-  
+  }, [createGroup, viewSettings]);
+
+  const handleAddGadgetAtPosition = useCallback(
+    (position: Position) => {
+      const name = prompt("Enter gadget name:");
+      if (name) {
+        const gadget = createGroup(name);
+        gadget.position = position;
+      }
+    },
+    [createGroup],
+  );
+
   const handleExtractToGadget = useCallback(() => {
-    const name = prompt('Enter name for new gadget:')
+    const name = prompt("Enter name for new gadget:");
     if (name) {
-      const success = extractToGadget(name)
+      const success = extractToGadget(name);
       if (success) {
         // Find the newly created gadget
-        const newGadget = Array.from(network.currentGroup.subgroups.values())
-          .find(g => g.name === name)
-        
+        const newGadget = Array.from(
+          network.currentGroup.subgroups.values(),
+        ).find((g) => g.name === name);
+
         if (newGadget) {
-          const template = saveAsTemplate(newGadget.id)
+          const template = saveAsTemplate(newGadget.id);
           if (template) {
-            palette.addToPalette(template)
+            palette.addToPalette(template);
             if (viewSettings.showShortcutHints) {
-              toast.success(`"${name}" added to palette! Press Q to view.`)
+              toast.success(`"${name}" added to palette! Press Q to view.`);
             }
           }
         }
       }
     }
-  }, [extractToGadget, network, saveAsTemplate, palette])
-  
-  const handleInlineGadget = useCallback((gadgetId: string) => {
-    if (confirm('Inline this gadget? This will expand its contents into the current group.')) {
-      inlineGadget(gadgetId)
-    }
-  }, [inlineGadget])
-  
+  }, [extractToGadget, network, saveAsTemplate, palette]);
+
+  const handleInlineGadget = useCallback(
+    (gadgetId: string) => {
+      if (
+        confirm(
+          "Inline this gadget? This will expand its contents into the current group.",
+        )
+      ) {
+        inlineGadget(gadgetId);
+      }
+    },
+    [inlineGadget],
+  );
+
   const handleConvertToBoundary = useCallback(() => {
-    convertToBoundary()
-  }, [convertToBoundary])
-  
-  const breadcrumbs = getBreadcrumbs()
-  const hasShownWelcome = useRef(false)
-  
+    convertToBoundary();
+  }, [convertToBoundary]);
+
+  const breadcrumbs = getBreadcrumbs();
+  const hasShownWelcome = useRef(false);
+
   // Show welcome toast on mount (if hints are enabled)
   useEffect(() => {
     if (viewSettings.showShortcutHints && !hasShownWelcome.current) {
-      hasShownWelcome.current = true
-      toast('Welcome! Press W to see keyboard shortcuts', {
+      hasShownWelcome.current = true;
+      toast("Welcome! Press W to see keyboard shortcuts", {
         duration: 5000,
-      })
+      });
     }
-  }, [viewSettings.showShortcutHints])
-  
+  }, [viewSettings.showShortcutHints]);
+
   // Keyboard shortcuts (left-hand friendly)
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Don't handle shortcuts if user is typing in an input field
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' || 
+          target.tagName === 'SELECT' ||
+          target.isContentEditable) {
+        return;
+      }
+
       // Tab + P to toggle palette (left hand: Tab with thumb, P with pinky)
-      if (e.key === 'Tab') {
-        e.preventDefault() // Prevent default tab behavior
+      if (e.key === "Tab") {
+        e.preventDefault(); // Prevent default tab behavior
       }
-      
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'q') {
-        e.preventDefault()
-        palette.toggleVisibility()
+
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "q") {
+        e.preventDefault();
+        palette.toggleVisibility();
       }
-      
+
+      // T to toggle property panel (left hand: T with index finger)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "t") {
+        e.preventDefault();
+        propertyPanel.toggleVisibility();
+      }
+
       // W to toggle instructions (left hand: W with ring finger)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'w') {
-        e.preventDefault()
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "w") {
+        e.preventDefault();
         setViewSettings({
           ...viewSettings,
-          showInstructions: !viewSettings.showInstructions
-        })
+          showInstructions: !viewSettings.showInstructions,
+        });
       }
-      
+
       // E to toggle minimap (left hand: E with middle finger)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'e') {
-        e.preventDefault()
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "e") {
+        e.preventDefault();
         setViewSettings({
           ...viewSettings,
-          showMiniMap: !viewSettings.showMiniMap
-        })
+          showMiniMap: !viewSettings.showMiniMap,
+        });
       }
-      
+
       // A to add contact (left hand: A with pinky)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'a') {
-        e.preventDefault()
-        const position = { 
-          x: Math.random() * 400 + 100, 
-          y: Math.random() * 300 + 100 
-        }
-        addContact(position)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "a") {
+        e.preventDefault();
+        const position = {
+          x: Math.random() * 400 + 100,
+          y: Math.random() * 300 + 100,
+        };
+        addContact(position);
       }
-      
+
       // S to add gadget (left hand: S with ring finger)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 's') {
-        e.preventDefault()
-        handleAddGroup()
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "s") {
+        e.preventDefault();
+        handleAddGroup();
       }
-      
+
       // D to toggle grid (left hand: D with middle finger)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'd') {
-        e.preventDefault()
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "d") {
+        e.preventDefault();
         setViewSettings({
           ...viewSettings,
-          showGrid: !viewSettings.showGrid
-        })
+          showGrid: !viewSettings.showGrid,
+        });
       }
-      
+
       // R to reset palette (for debugging)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'r') {
-        e.preventDefault()
-        palette.resetToDefaults()
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "r") {
+        e.preventDefault();
+        palette.resetToDefaults();
         if (viewSettings.showShortcutHints) {
-          toast.success('Reset palette to default gadgets')
+          toast.success("Reset palette to default gadgets");
         }
       }
-    }
-    
-    window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [palette, viewSettings, setViewSettings, addContact, handleAddGroup, toast])
-  
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [
+    palette,
+    propertyPanel,
+    viewSettings,
+    setViewSettings,
+    addContact,
+    handleAddGroup,
+    toast,
+  ]);
+
   // Handle node drag with proximity connect
-  const handleNodeDrag = useCallback((event: any, node: any) => {
-    proximity.onNodeDrag(event, node)
-  }, [proximity])
-  
-  const handleNodeDragStop = useCallback((event: any, node: any) => {
-    const connection = proximity.onNodeDragStop(event, node)
-    if (connection) {
-      connect(connection.source, connection.target)
-    }
-  }, [proximity, connect])
-  
-  // Handle edge drop - show quick add menu
-  const handleConnectEnd = useCallback((event: any, connectionState: any) => {
-    // Only show menu if connection is not valid (dropped on empty space)
-    if (!connectionState?.isValid && connectionState?.fromNode) {
-      // Store the screen position for the menu (not flow position)
-      const screenPos = {
-        x: event.clientX,
-        y: event.clientY
+  const handleNodeDrag = useCallback(
+    (event: any, node: any) => {
+      proximity.onNodeDrag(event, node);
+    },
+    [proximity],
+  );
+
+  const handleNodeDragStop = useCallback(
+    (event: any, node: any) => {
+      const connection = proximity.onNodeDragStop(event, node);
+      if (connection) {
+        connect(connection.source, connection.target);
       }
-      // But also store the flow position for creating nodes
-      const flowPos = screenToFlowPosition(screenPos)
-      setQuickAddMenuPosition({ 
-        screenX: screenPos.x, 
-        screenY: screenPos.y,
-        flowX: flowPos.x,
-        flowY: flowPos.y,
-        fromNodeId: connectionState.fromNode.id,
-        fromHandleId: connectionState.fromHandle?.id,
-        fromHandleType: connectionState.fromHandle?.type || 'source'
-      } as any)
-    }
-  }, [screenToFlowPosition])
-  
+    },
+    [proximity, connect],
+  );
+
+  // Handle edge drop - show quick add menu
+  const handleConnectEnd = useCallback(
+    (event: any, connectionState: any) => {
+      // Only show menu if connection is not valid (dropped on empty space)
+      if (!connectionState?.isValid && connectionState?.fromNode) {
+        // Store the screen position for the menu (not flow position)
+        const screenPos = {
+          x: event.clientX,
+          y: event.clientY,
+        };
+        // But also store the flow position for creating nodes
+        const flowPos = screenToFlowPosition(screenPos);
+        setQuickAddMenuPosition({
+          screenX: screenPos.x,
+          screenY: screenPos.y,
+          flowX: flowPos.x,
+          flowY: flowPos.y,
+          fromNodeId: connectionState.fromNode.id,
+          fromHandleId: connectionState.fromHandle?.id,
+          fromHandleType: connectionState.fromHandle?.type || "source",
+        } as any);
+
+        // Set flag to prevent immediate closing
+        setMenuJustOpened(true);
+        setTimeout(() => setMenuJustOpened(false), 100);
+      }
+    },
+    [screenToFlowPosition],
+  );
+
   // Handle drag over for palette items
   const handleDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'copy'
-  }, [])
-  
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  }, []);
+
   // Handle drop from palette
-  const handleDrop = useCallback((event: React.DragEvent) => {
-    event.preventDefault()
-    
-    const paletteItemId = event.dataTransfer.getData('gadgetPaletteItem')
-    if (!paletteItemId) return
-    
-    const paletteItem = palette.items.find(item => item.id === paletteItemId)
-    if (!paletteItem) return
-    
-    // Get the drop position in flow coordinates
-    const position = screenToFlowPosition({
-      x: event.clientX,
-      y: event.clientY
-    })
-    
-    // Instantiate the template at the drop position
-    instantiateTemplate(paletteItem, position)
-    palette.incrementUsageCount(paletteItemId)
-    toast.success(`Placed "${paletteItem.name}" gadget`)
-  }, [palette, instantiateTemplate])
-  
+  const handleDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const paletteItemId = event.dataTransfer.getData("gadgetPaletteItem");
+      if (!paletteItemId) return;
+
+      const paletteItem = palette.items.find(
+        (item) => item.id === paletteItemId,
+      );
+      if (!paletteItem) return;
+
+      // Get the drop position in flow coordinates
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      // Instantiate the template at the drop position
+      instantiateTemplate(paletteItem, position);
+      palette.incrementUsageCount(paletteItemId);
+      toast.success(`Placed "${paletteItem.name}" gadget`);
+    },
+    [palette, instantiateTemplate],
+  );
+
   // Combine edges with potential proximity edge
-  const displayEdges = proximity.potentialEdge 
+  const displayEdges = proximity.potentialEdge
     ? [...edges, proximity.potentialEdge]
-    : edges
-  
+    : edges;
+
   return (
-    <div className="w-full h-screen" onDrop={handleDrop} onDragOver={handleDragOver}>
+    <div
+      className="w-full h-screen"
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
       <ReactFlow
         nodes={nodes}
         edges={displayEdges}
@@ -312,23 +378,39 @@ function Flow() {
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
         nodeTypes={nodeTypes}
-        deleteKeyCode={['Delete', 'Backspace']}
+        deleteKeyCode={["Delete", "Backspace"]}
+        onPaneClick={(event) => {
+          // Close quick add menu when clicking on canvas (but not if just opened)
+          if (quickAddMenuPosition && !menuJustOpened) {
+            setQuickAddMenuPosition(null);
+          }
+        }}
+        selectNodesOnDrag={false}
+        deselectOnClick={false}
         fitView
       >
         {viewSettings.showGrid && <Background />}
-        <Controls />
+        {/* <Controls /> */}
         {viewSettings.showMiniMap && <MiniMap />}
-        
+
         <Panel position="top-left" className="flex flex-col gap-2">
           <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
           <div className="flex gap-2">
             <Button onClick={handleAddContact} size="sm">
               Add Contact
             </Button>
-            <Button onClick={handleAddInputBoundary} size="sm" variant="outline">
+            <Button
+              onClick={handleAddInputBoundary}
+              size="sm"
+              variant="outline"
+            >
               Add Input Boundary
             </Button>
-            <Button onClick={handleAddOutputBoundary} size="sm" variant="outline">
+            <Button
+              onClick={handleAddOutputBoundary}
+              size="sm"
+              variant="outline"
+            >
               Add Output Boundary
             </Button>
             <Button onClick={handleAddGroup} size="sm" variant="secondary">
@@ -338,30 +420,42 @@ function Flow() {
           {hasSelection && (
             <div className="flex gap-2">
               {(selection.contacts.size > 0 || selection.groups.size > 0) && (
-                <Button onClick={handleExtractToGadget} size="sm" variant="default">
-                  Extract to Gadget ({selection.contacts.size} contacts{selection.groups.size > 0 ? `, ${selection.groups.size} gadgets` : ''})
+                <Button
+                  onClick={handleExtractToGadget}
+                  size="sm"
+                  variant="default"
+                >
+                  Extract to Gadget ({selection.contacts.size} contacts
+                  {selection.groups.size > 0
+                    ? `, ${selection.groups.size} gadgets`
+                    : ""}
+                  )
                 </Button>
               )}
               {selection.groups.size === 1 && (
                 <>
-                  <Button 
-                    onClick={() => handleInlineGadget(Array.from(selection.groups)[0])} 
-                    size="sm" 
+                  <Button
+                    onClick={() =>
+                      handleInlineGadget(Array.from(selection.groups)[0])
+                    }
+                    size="sm"
                     variant="secondary"
                   >
                     Inline Gadget
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => {
-                      const gadgetId = Array.from(selection.groups)[0]
-                      const gadget = network.findGroup(gadgetId)
-                      const template = saveAsTemplate(gadgetId)
+                      const gadgetId = Array.from(selection.groups)[0];
+                      const gadget = network.findGroup(gadgetId);
+                      const template = saveAsTemplate(gadgetId);
                       if (template) {
-                        palette.addToPalette(template)
-                        toast.success(`"${gadget?.name || 'Gadget'}" added to palette`)
+                        palette.addToPalette(template);
+                        toast.success(
+                          `"${gadget?.name || "Gadget"}" added to palette`,
+                        );
                       }
-                    }} 
-                    size="sm" 
+                    }}
+                    size="sm"
                     variant="outline"
                   >
                     Add to Palette
@@ -369,9 +463,9 @@ function Flow() {
                 </>
               )}
               {selection.contacts.size > 0 && selection.groups.size === 0 && (
-                <Button 
-                  onClick={handleConvertToBoundary} 
-                  size="sm" 
+                <Button
+                  onClick={handleConvertToBoundary}
+                  size="sm"
                   variant="outline"
                 >
                   Convert to Boundary ({selection.contacts.size} contacts)
@@ -386,41 +480,30 @@ function Flow() {
               <div>Double-click node → Edit content</div>
               <div>Select & Extract → Create gadget</div>
               <div>Delete/Backspace → Remove items</div>
-              <div className="font-semibold mt-2 mb-1">Left-hand shortcuts:</div>
+              <div className="font-semibold mt-2 mb-1">
+                Left-hand shortcuts:
+              </div>
               <div>Q → Toggle palette</div>
               <div>W → Toggle instructions (this)</div>
               <div>E → Toggle minimap</div>
               <div>A → Add contact</div>
               <div>S → Add gadget</div>
               <div>D → Toggle grid</div>
+              <div>T → Toggle properties</div>
             </div>
           )}
-          <ClientOnly>
-            {/* Debug button */}
-            <Button 
-              onClick={() => {
-                localStorage.removeItem('bassline-gadget-palette')
-                window.location.reload()
-              }}
-              size="sm"
-              variant="outline"
-              className="mt-2"
-            >
-              Reset Palette Storage
-            </Button>
-          </ClientOnly>
         </Panel>
-        
+
         <Panel position="bottom-center" className="mb-2">
           <ClientOnly>
-            <ToolsMenu 
+            <ToolsMenu
               viewSettings={viewSettings}
               onViewSettingsChange={setViewSettings}
             />
           </ClientOnly>
         </Panel>
       </ReactFlow>
-      
+
       <ClientOnly>
         <GadgetPalette
           items={palette.items}
@@ -434,46 +517,76 @@ function Flow() {
           getRecent={palette.getRecent}
         />
       </ClientOnly>
-      
+
       {quickAddMenuPosition && (
         <QuickAddMenu
-          position={{ x: quickAddMenuPosition.screenX, y: quickAddMenuPosition.screenY }}
+          position={{
+            x: quickAddMenuPosition.screenX,
+            y: quickAddMenuPosition.screenY,
+          }}
           onAddContact={() => {
-            const newContact = addContact({ x: quickAddMenuPosition.flowX, y: quickAddMenuPosition.flowY })
+            const newContact = addContact({
+              x: quickAddMenuPosition.flowX,
+              y: quickAddMenuPosition.flowY,
+            });
             if (newContact) {
               // Use handle ID if dragging from a gadget, otherwise use node ID
-              const sourceId = quickAddMenuPosition.fromHandleId || quickAddMenuPosition.fromNodeId
+              const sourceId =
+                quickAddMenuPosition.fromHandleId ||
+                quickAddMenuPosition.fromNodeId;
               // Connect based on the handle type
-              if (quickAddMenuPosition.fromHandleType === 'source') {
-                connect(sourceId, newContact.id)
+              if (quickAddMenuPosition.fromHandleType === "source") {
+                connect(sourceId, newContact.id);
               } else {
-                connect(newContact.id, sourceId)
+                connect(newContact.id, sourceId);
               }
             }
           }}
           onAddBoundaryContact={(_, dir) => {
-            const newContact = addBoundaryContact({ x: quickAddMenuPosition.flowX, y: quickAddMenuPosition.flowY }, dir)
+            const newContact = addBoundaryContact(
+              { x: quickAddMenuPosition.flowX, y: quickAddMenuPosition.flowY },
+              dir,
+            );
             if (newContact) {
               // Use handle ID if dragging from a gadget, otherwise use node ID
-              const sourceId = quickAddMenuPosition.fromHandleId || quickAddMenuPosition.fromNodeId
+              const sourceId =
+                quickAddMenuPosition.fromHandleId ||
+                quickAddMenuPosition.fromNodeId;
               // Connect based on the handle type
-              if (quickAddMenuPosition.fromHandleType === 'source') {
-                connect(sourceId, newContact.id)
+              if (quickAddMenuPosition.fromHandleType === "source") {
+                connect(sourceId, newContact.id);
               } else {
-                connect(newContact.id, sourceId)
+                connect(newContact.id, sourceId);
               }
             }
           }}
           onAddGadget={() => {
-            const newGadget = handleAddGadgetAtPosition({ x: quickAddMenuPosition.flowX, y: quickAddMenuPosition.flowY })
+            const newGadget = handleAddGadgetAtPosition({
+              x: quickAddMenuPosition.flowX,
+              y: quickAddMenuPosition.flowY,
+            });
             // For gadgets, we'd need to know which boundary contact to connect to
             // This is more complex, so leaving unconnected for now
           }}
           onClose={() => setQuickAddMenuPosition(null)}
         />
       )}
+
+      <ClientOnly>
+        <PropertyPanel
+          isVisible={propertyPanel.isVisible}
+          onToggleVisibility={propertyPanel.toggleVisibility}
+          selection={selection}
+          network={network}
+          onUpdate={() => {
+            // Force a re-render to update the UI
+            network.syncToReactFlow?.();
+          }}
+          shouldFocus={propertyPanel.shouldFocus}
+        />
+      </ClientOnly>
     </div>
-  )
+  );
 }
 
 export default function Editor() {
@@ -483,5 +596,5 @@ export default function Editor() {
         <Flow />
       </ClientOnly>
     </ReactFlowProvider>
-  )
+  );
 }

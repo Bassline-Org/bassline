@@ -27,7 +27,13 @@ interface ContactNodeData {
   setContent: (content: any) => void
 }
 
-export function usePropagationNetwork() {
+interface UsePropagationNetworkOptions {
+  onContactDoubleClick?: (contactId: string) => void
+}
+
+export function usePropagationNetwork(options: UsePropagationNetworkOptions = {}) {
+  const { onContactDoubleClick } = options
+  
   // Create the core network
   const [network] = useState(() => new PropagationNetwork())
   const [currentGroupId, setCurrentGroupId] = useState(network.currentGroup.id)
@@ -111,12 +117,15 @@ export function usePropagationNetwork() {
   const syncToReactFlow = useCallback(() => {
     const currentView = network.getCurrentView()
     
+    // Get current selected nodes from selection state to preserve selection
+    const currentSelectedNodes = [...selection.contacts, ...selection.groups]
+    
     // Map contacts to nodes
     const contactNodes: Node[] = currentView.contacts.map(contact => ({
       id: contact.id,
       position: contact.position,
       type: contact.isBoundary ? 'boundary' : 'contact',
-      dragHandle: '.drag-handle',
+      selected: currentSelectedNodes.includes(contact.id),
       style: {
         background: 'transparent',
         border: 'none',
@@ -127,10 +136,16 @@ export function usePropagationNetwork() {
         content: contact.content,
         blendMode: contact.blendMode,
         isBoundary: contact.isBoundary,
+        lastContradiction: contact.lastContradiction,
         setContent: (content: any) => {
           contact.setContent(content)
           syncToReactFlow() // Re-sync after change
-        }
+        },
+        setBlendMode: (mode: 'accept-last' | 'merge') => {
+          contact.setBlendMode(mode)
+          syncToReactFlow() // Re-sync after change
+        },
+        onDoubleClick: onContactDoubleClick ? () => onContactDoubleClick(contact.id) : undefined
       }
     }))
     
@@ -150,11 +165,13 @@ export function usePropagationNetwork() {
         id: group.id,
         position,
         type: 'group',
+        selected: currentSelectedNodes.includes(group.id),
         style: {
           background: 'transparent',
           border: 'none',
           padding: 0,
-          borderRadius: 0
+          borderRadius: 0,
+          width: 'auto'
         },
         data: {
           name: group.name,
@@ -215,7 +232,7 @@ export function usePropagationNetwork() {
     
     setNodes(newNodes)
     setEdges(newEdges)
-  }, [network, setCurrentGroupId])
+  }, [network, setCurrentGroupId, selection])
   
   // Re-sync when group changes
   useEffect(() => {
@@ -404,6 +421,9 @@ export function usePropagationNetwork() {
     syncToReactFlow()
     return gadget
   }, [network, syncToReactFlow])
+  
+  // Attach syncToReactFlow to network for external use
+  ;(network as any).syncToReactFlow = syncToReactFlow
   
   return {
     // React Flow props

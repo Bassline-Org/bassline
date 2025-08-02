@@ -72,3 +72,86 @@ export class Temperature implements Mergeable<Temperature> {
     return `${this.celsius}°C`
   }
 }
+
+// RGB Color that blends together
+export class Color implements Mergeable<Color> {
+  constructor(
+    public readonly r: number,
+    public readonly g: number,
+    public readonly b: number
+  ) {
+    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) {
+      throw new Error('RGB values must be between 0 and 255')
+    }
+  }
+  
+  merge(other: Color): Color {
+    // Average the colors
+    return new Color(
+      Math.round((this.r + other.r) / 2),
+      Math.round((this.g + other.g) / 2),
+      Math.round((this.b + other.b) / 2)
+    )
+  }
+  
+  toHex(): string {
+    const toHex = (n: number) => n.toString(16).padStart(2, '0')
+    return `#${toHex(this.r)}${toHex(this.g)}${toHex(this.b)}`
+  }
+  
+  toString(): string {
+    return this.toHex()
+  }
+}
+
+// Boolean that requires consensus (AND operation)
+export class ConsensusBoolean implements Mergeable<ConsensusBoolean> {
+  constructor(public readonly value: boolean) {}
+  
+  merge(other: ConsensusBoolean): ConsensusBoolean {
+    // Both must be true for consensus
+    return new ConsensusBoolean(this.value && other.value)
+  }
+  
+  toString(): string {
+    return this.value ? 'true' : 'false'
+  }
+}
+
+// Point2D that finds the center point
+export class Point2D implements Mergeable<Point2D> {
+  constructor(
+    public readonly x: number,
+    public readonly y: number
+  ) {}
+  
+  merge(other: Point2D): Point2D {
+    // Find the midpoint
+    return new Point2D(
+      (this.x + other.x) / 2,
+      (this.y + other.y) / 2
+    )
+  }
+  
+  toString(): string {
+    return `(${this.x.toFixed(1)}, ${this.y.toFixed(1)})`
+  }
+}
+
+// String that must match exactly or contradicts
+export class ExactString implements Mergeable<ExactString> {
+  constructor(public readonly value: string) {}
+  
+  merge(other: ExactString): ExactString | Contradiction {
+    if (this.value !== other.value) {
+      return new Contradiction(
+        `String mismatch: "${this.value}" ≠ "${other.value}"`
+      )
+    }
+    return this
+  }
+  
+  toString(): string {
+    return this.value
+  }
+}

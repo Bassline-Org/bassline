@@ -4,6 +4,7 @@ import type { ContactGroup } from './ContactGroup'
 
 export class Contact {
   private _content: any = undefined
+  private _lastContradiction: Contradiction | null = null
   public isBoundary: boolean = false
   public boundaryDirection?: 'input' | 'output'
   public name?: string
@@ -19,8 +20,15 @@ export class Contact {
     return this._content
   }
   
+  get lastContradiction(): Contradiction | null {
+    return this._lastContradiction
+  }
+  
   setContent(newContent: any, sourceId?: ContactId): void {
     const oldContent = this._content
+    
+    // Clear previous contradiction if we're getting new content
+    this._lastContradiction = null
     
     // Apply blend mode
     if (this._content !== undefined && this.blendMode === 'merge') {
@@ -28,6 +36,7 @@ export class Contact {
       if (this._content?.merge && newContent?.merge) {
         const result = this._content.merge(newContent)
         if (result instanceof Contradiction) {
+          this._lastContradiction = result
           this.group.handleContradiction(this.id, result)
           return
         }
@@ -45,6 +54,10 @@ export class Contact {
     if (this._content !== oldContent) {
       this.propagate()
     }
+  }
+  
+  setBlendMode(mode: 'accept-last' | 'merge'): void {
+    this.blendMode = mode
   }
   
   private propagate(): void {

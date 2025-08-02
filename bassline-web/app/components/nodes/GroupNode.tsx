@@ -17,7 +17,7 @@ const groupNodeVariants = cva(
     variants: {
       nodeType: {
         group: "node-gradient-group node-border-group min-w-[200px]",
-        primitive: "node-gradient-primitive node-border-primitive w-[80px]"
+        primitive: "node-gradient-primitive node-border-primitive w-fit"
       },
       selected: {
         true: "ring-2",
@@ -83,12 +83,12 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
   return (
     <TooltipProvider>
       <Card 
-        className={cn(groupNodeVariants({ nodeType, selected, interactive }))}
+        className={cn(groupNodeVariants({ nodeType, selected, interactive }), nodeData.isPrimitive && "p-[5px]")}
         onDoubleClick={handleDoubleClick}
       >
         {nodeData.isPrimitive ? (
           // Primitive gadgets - just show icon
-          <CardContent className="p-2 flex items-center justify-center">
+          <CardContent className="p-0 pb-0 flex items-center justify-center w-[40px] h-[40px]">
             {PrimitiveIcon && <PrimitiveIcon className="w-6 h-6 text-[var(--node-primitive)]" />}
           </CardContent>
         ) : (
@@ -176,7 +176,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
                     className="!w-5 !h-5 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all"
                     style={{ 
                       left: '-10px',
-                      top: `${20 + index * 20}px`,
+                      top: `${15 + index * 20}px`,
                       background: 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))'
                     }}
                   />
@@ -198,7 +198,7 @@ export const GroupNode = memo(({ data, selected }: NodeProps) => {
                     className="!w-5 !h-5 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all"
                     style={{ 
                       right: '-10px',
-                      top: '30px',
+                      top: `${15 + index * 20}px`,
                       background: 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))'
                     }}
                   />
