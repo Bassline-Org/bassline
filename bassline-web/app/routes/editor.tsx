@@ -397,7 +397,7 @@ function Flow() {
         fitView
         className="select-none"
       >
-        {viewSettings.showGrid && <Background variant="dots" gap={12} className="!bg-muted/20" size={1} />}
+        {viewSettings.showGrid && <Background gap={12} className="!bg-muted/20" size={1} />}
         {/* <Controls /> */}
         {viewSettings.showMiniMap && <MiniMap />}
 

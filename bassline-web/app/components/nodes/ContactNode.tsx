@@ -9,7 +9,7 @@ import { usePropertyPanel } from '~/propagation-react/hooks/usePropertyPanel'
 import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
 
 const nodeVariants = cva(
-  "w-[60px] h-[48px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
+  "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
   {
     variants: {
       nodeType: {
@@ -108,23 +108,28 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
         />
         
         {/* Content */}
-        <div className="flex flex-col h-full py-1 px-2">
+        <div className="absolute inset-0 flex items-center justify-center px-[10px]">
           {/* Blend mode indicator */}
           {blendMode === 'merge' && (
-            <div className="absolute top-1 right-2.5">
-              <div className="w-2 h-2 rounded-full bg-green-500 ring-1 ring-green-400/50" />
+            <div className="absolute top-0.5 right-1.5 z-10">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 ring-1 ring-green-400/50" />
             </div>
           )}
           
           {/* Main content area */}
-          <div className="flex-1 flex items-center justify-center">
-            <div className={cn(
-              "text-xs font-mono text-center truncate max-w-full px-1 select-none",
-              lastContradiction ? 'text-red-500 font-bold' : content === undefined ? 'text-muted-foreground' : 'text-foreground'
-            )}
-            title={lastContradiction?.reason}>
-              {lastContradiction ? '⚠' : content !== undefined ? String(content) : '∅'}
-            </div>
+          <div className={cn(
+            "text-[9px] leading-[1.1] font-mono text-center break-all select-none overflow-hidden",
+            "max-h-[32px] line-clamp-3",
+            lastContradiction ? 'text-red-500 font-bold' : content === undefined ? 'text-muted-foreground' : 'text-foreground'
+          )}
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            wordBreak: 'break-word'
+          }}
+          title={lastContradiction?.reason || (content !== undefined ? String(content) : undefined)}>
+            {lastContradiction ? '⚠' : content !== undefined ? String(content) : '∅'}
           </div>
         </div>
       </Card>
