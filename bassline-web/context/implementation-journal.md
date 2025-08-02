@@ -728,6 +728,93 @@ This pattern should be followed for:
 
 The `syncToReactFlow()` method rebuilds the React Flow nodes/edges from the core network state, ensuring the UI accurately reflects the current state of the propagation network.
 
+### Primitive Gadget Behavior Fix
+
+Fixed an issue where primitive gadgets weren't clearing their outputs when inputs were missing:
+
+#### The Problem
+- Initially, outputs were only cleared when ALL inputs were undefined
+- But primitive gadgets should clear outputs when ANY required input is missing
+- For example, an Adder can't compute if either input is missing
+
+#### The Solution
+Changed the `maybeRun()` logic in PrimitiveGadget:
+```typescript
+// Before: Only cleared when all inputs undefined
+if (allInputsUndefined) {
+  this.clearAllOutputs()
+}
+
+// After: Clear whenever activation returns false
+if (this.activation(inputs)) {
+  const outputs = this.body(inputs)
+  this.propagateOutputs(outputs)
+} else {
+  this.clearAllOutputs()  // Missing required inputs
+}
+```
+
+Now primitive gadgets properly clear outputs when any required input is disconnected.
+
+### Context Menu for Resetting Contact Values
+
+Added right-click context menu to reset contact values:
+
+#### Implementation
+- Right-click any contact to show context menu
+- "Reset Value (∅)" option sets content to undefined
+- Uses React portal to render at exact cursor position
+- Fixed positioning by using `createPortal` to document.body with clientX/clientY
+
+```typescript
+const handleContextMenu = useCallback((e: React.MouseEvent) => {
+  e.preventDefault()
+  setContextMenuPos({ x: e.clientX, y: e.clientY })
+  setShowContextMenu(true)
+}, [])
+```
+
+### Theme System Refactoring
+
+Refactored the entire theming system to follow shadcn/ui patterns:
+
+#### 1. Semantic Color Variables
+Added node-specific colors that adapt to light/dark mode:
+```css
+--node-contact: var(--primary);
+--node-group: oklch(0.65 0.15 280);
+--node-primitive: oklch(0.55 0.18 250);
+--node-boundary: oklch(0.75 0.15 85);
+```
+
+#### 2. Utility Classes
+Created reusable gradient and border utilities:
+```css
+.node-gradient-contact { /* gradient using theme colors */ }
+.node-border-contact { /* border using theme colors */ }
+.node-ring-contact { /* selection ring using theme colors */ }
+```
+
+#### 3. CVA Variants
+Used class-variance-authority for node styling:
+```typescript
+const nodeVariants = cva("min-w-[100px] transition-all", {
+  variants: {
+    nodeType: {
+      contact: "node-gradient-contact node-border-contact",
+      boundary: "node-gradient-boundary node-border-boundary"
+    }
+  }
+})
+```
+
+#### Benefits
+- No more hardcoded colors or inline styles
+- Proper dark mode support
+- Easy to customize via CSS variables
+- Follows shadcn's extensibility philosophy
+- Clean, maintainable component code
+
 ## Phase 6: Primitive Gadgets
 
 ### What We Built

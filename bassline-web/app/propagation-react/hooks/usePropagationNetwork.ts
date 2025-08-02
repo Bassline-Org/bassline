@@ -162,7 +162,8 @@ export function usePropagationNetwork() {
             setCurrentGroupId(group.id)
           },
           inputContacts: boundary.inputs.map(c => ({ id: c.id, name: c.name })),
-          outputContacts: boundary.outputs.map(c => ({ id: c.id, name: c.name }))
+          outputContacts: boundary.outputs.map(c => ({ id: c.id, name: c.name })),
+          isPrimitive: group instanceof PrimitiveGadget
         }
       }
     })

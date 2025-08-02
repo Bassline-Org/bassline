@@ -1,9 +1,59 @@
-import { memo, useState, useCallback } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { memo, useState, useCallback, useEffect, useRef } from 'react'
+import { Handle, Position, type NodeProps, useReactFlow } from '@xyflow/react'
+import { createPortal } from 'react-dom'
 import { Card, CardContent } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Badge } from '~/components/ui/badge'
 import { Circle } from 'lucide-react'
+import { cva, type VariantProps } from 'class-variance-authority'
+import { cn } from '~/lib/utils'
+
+const nodeVariants = cva(
+  "min-w-[100px] transition-all shadow-sm hover:shadow-md",
+  {
+    variants: {
+      nodeType: {
+        contact: "node-gradient-contact node-border-contact",
+        boundary: "node-gradient-boundary node-border-boundary"
+      },
+      selected: {
+        true: "ring-2",
+        false: ""
+      }
+    },
+    compoundVariants: [
+      {
+        nodeType: "contact",
+        selected: true,
+        className: "node-ring-contact"
+      },
+      {
+        nodeType: "boundary",
+        selected: true,
+        className: "node-ring-boundary"
+      }
+    ],
+    defaultVariants: {
+      nodeType: "contact",
+      selected: false
+    }
+  }
+)
+
+const handleVariants = cva(
+  "!w-3 !h-3",
+  {
+    variants: {
+      nodeType: {
+        contact: "[&]:bg-[var(--node-contact)] [&]:border-[color-mix(in_oklch,var(--node-contact),black_20%)]",
+        boundary: "[&]:bg-[var(--node-boundary)] [&]:border-[color-mix(in_oklch,var(--node-boundary),black_20%)]"
+      }
+    },
+    defaultVariants: {
+      nodeType: "contact"
+    }
+  }
+)
 
 export interface ContactNodeData {
   content: any
@@ -16,6 +66,9 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = data as unknown as ContactNodeData
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
+  const [showContextMenu, setShowContextMenu] = useState(false)
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
+  const contextMenuRef = useRef<HTMLDivElement>(null)
   
   const handleDoubleClick = useCallback(() => {
     setEditValue(String(nodeData.content ?? ''))
@@ -47,38 +100,58 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
     }
   }, [handleSubmit])
   
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Use client coordinates for fixed positioning
+    setContextMenuPos({ x: e.clientX, y: e.clientY })
+    setShowContextMenu(true)
+  }, [])
+  
+  const handleResetValue = useCallback(() => {
+    nodeData.setContent(undefined)
+    setShowContextMenu(false)
+  }, [nodeData])
+  
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClick = () => setShowContextMenu(false)
+    if (showContextMenu) {
+      document.addEventListener('click', handleClick)
+      return () => document.removeEventListener('click', handleClick)
+    }
+  }, [showContextMenu])
+  
+  const nodeType = nodeData.isBoundary ? 'boundary' : 'contact'
+  
   return (
-    <Card 
-      className={`min-w-[100px] transition-all shadow-sm hover:shadow-md ${
-        selected 
-          ? 'ring-2 ring-blue-500 border-blue-400' 
-          : 'border-blue-200'
-      }`}
-      style={{ 
-        background: nodeData.isBoundary 
-          ? 'linear-gradient(to bottom, #fef3c7 0%, #fffbeb 100%)' 
-          : 'linear-gradient(to bottom, #e0f2fe 0%, #f0f9ff 100%)',
-        borderWidth: '2px'
-      }}
-    >
-      <Handle 
-        type="target" 
-        position={Position.Left}
-        className="!w-3 !h-3 !bg-blue-500 !border-blue-600"
-      />
-      <Handle 
-        type="source" 
-        position={Position.Right}
-        className="!w-3 !h-3 !bg-blue-500 !border-blue-600"
-      />
-      
-      <CardContent className="p-3">
+    <>
+      <Card 
+        className={cn(nodeVariants({ nodeType, selected }))}
+        onContextMenu={handleContextMenu}
+      >
+        <Handle 
+          type="target" 
+          position={Position.Left}
+          className={handleVariants({ nodeType })}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Right}
+          className={handleVariants({ nodeType })}
+        />
+        
+        <CardContent className="p-3">
         <div className="flex flex-col gap-2">
           <div className="flex justify-between items-center gap-2">
             <div className="flex items-center gap-1">
-              <Circle className={`w-3 h-3 ${nodeData.isBoundary ? 'text-amber-600' : 'text-blue-600'}`} />
+              <Circle className={cn(
+                "w-3 h-3",
+                nodeData.isBoundary ? "[&]:fill-[var(--node-boundary)] [&]:text-[var(--node-boundary)]" : "[&]:fill-[var(--node-contact)] [&]:text-[var(--node-contact)]"
+              )} />
               {nodeData.isBoundary && (
-                <span className="text-xs text-amber-700 font-medium">boundary</span>
+                <span className="text-xs font-medium opacity-70">boundary</span>
               )}
             </div>
             <Badge 
@@ -110,5 +183,27 @@ export const ContactNode = memo(({ data, selected }: NodeProps) => {
         </div>
       </CardContent>
     </Card>
+    
+    {/* Context Menu - Portal to document body */}
+    {showContextMenu && createPortal(
+      <div
+        ref={contextMenuRef}
+        className="fixed z-[9999] min-w-[150px] bg-popover text-popover-foreground rounded-md border shadow-md p-1"
+        style={{ 
+          left: `${contextMenuPos.x}px`, 
+          top: `${contextMenuPos.y}px`
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          className="flex w-full items-center px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm transition-colors"
+          onClick={handleResetValue}
+        >
+          Reset Value (∅)
+        </button>
+      </div>,
+      document.body
+    )}
+    </>
   )
 })

@@ -136,6 +136,16 @@ body {
   --shadow-xl: 0px 8px 16px -4px hsl(0 0% 0% / 0.08), 0px 8px 10px -5px hsl(0 0% 0% / 0.08);
   --shadow-2xl: 0px 8px 16px -4px hsl(0 0% 0% / 0.20);
   --tracking-normal: 0em;
+  
+  /* Semantic colors for nodes */
+  --node-contact: var(--primary);
+  --node-contact-bg: oklch(from var(--primary) calc(l + 0.3) calc(c * 0.3) h);
+  --node-group: oklch(0.65 0.15 280);  /* Purple-ish */
+  --node-group-bg: oklch(from var(--node-group) calc(l + 0.3) calc(c * 0.3) h);
+  --node-primitive: oklch(0.55 0.18 250);  /* Blue-ish */
+  --node-primitive-bg: oklch(from var(--node-primitive) calc(l + 0.35) calc(c * 0.3) h);
+  --node-boundary: oklch(0.75 0.15 85);  /* Amber-ish */
+  --node-boundary-bg: oklch(from var(--node-boundary) calc(l + 0.2) calc(c * 0.3) h);
 }
 
 .dark {
@@ -191,6 +201,16 @@ body {
   --shadow-lg: 0px 8px 16px -4px hsl(0 0% 0% / 0.08), 0px 4px 6px -5px hsl(0 0% 0% / 0.08);
   --shadow-xl: 0px 8px 16px -4px hsl(0 0% 0% / 0.08), 0px 8px 10px -5px hsl(0 0% 0% / 0.08);
   --shadow-2xl: 0px 8px 16px -4px hsl(0 0% 0% / 0.20);
+  
+  /* Semantic colors for nodes (dark mode) */
+  --node-contact: var(--primary);
+  --node-contact-bg: oklch(from var(--primary) calc(l - 0.5) calc(c * 0.5) h);
+  --node-group: oklch(0.65 0.12 280);  /* Purple-ish */
+  --node-group-bg: oklch(from var(--node-group) calc(l - 0.45) calc(c * 0.5) h);
+  --node-primitive: oklch(0.60 0.13 250);  /* Blue-ish */
+  --node-primitive-bg: oklch(from var(--node-primitive) calc(l - 0.45) calc(c * 0.5) h);
+  --node-boundary: oklch(0.70 0.12 85);  /* Amber-ish */
+  --node-boundary-bg: oklch(from var(--node-boundary) calc(l - 0.5) calc(c * 0.5) h);
 }
 
 @layer base {
@@ -212,5 +232,60 @@ body {
   }
   .shadow-brutal-lg {
     box-shadow: 6px 6px 0px 0px black;
+  }
+  
+  /* Node gradient utilities */
+  .node-gradient-contact {
+    background: linear-gradient(to bottom, var(--node-contact-bg) 0%, color-mix(in oklch, var(--node-contact-bg), transparent 30%) 100%);
+  }
+  
+  .node-gradient-group {
+    background: linear-gradient(to bottom, var(--node-group-bg) 0%, color-mix(in oklch, var(--node-group-bg), transparent 30%) 100%);
+  }
+  
+  .node-gradient-primitive {
+    background: linear-gradient(to bottom, var(--node-primitive-bg) 0%, color-mix(in oklch, var(--node-primitive-bg), transparent 30%) 100%);
+  }
+  
+  .node-gradient-boundary {
+    background: linear-gradient(to bottom, var(--node-boundary-bg) 0%, color-mix(in oklch, var(--node-boundary-bg), transparent 30%) 100%);
+  }
+  
+  /* Node border utilities */
+  .node-border-contact {
+    @apply border-2;
+    border-color: color-mix(in oklch, var(--node-contact), transparent 30%);
+  }
+  
+  .node-border-group {
+    @apply border-2;
+    border-color: color-mix(in oklch, var(--node-group), transparent 30%);
+  }
+  
+  .node-border-primitive {
+    @apply border-2;
+    border-color: color-mix(in oklch, var(--node-primitive), transparent 30%);
+  }
+  
+  .node-border-boundary {
+    @apply border-2;
+    border-color: color-mix(in oklch, var(--node-boundary), transparent 30%);
+  }
+  
+  /* Node selection ring utilities */
+  .node-ring-contact {
+    --tw-ring-color: var(--node-contact);
+  }
+  
+  .node-ring-group {
+    --tw-ring-color: var(--node-group);
+  }
+  
+  .node-ring-primitive {
+    --tw-ring-color: var(--node-primitive);
+  }
+  
+  .node-ring-boundary {
+    --tw-ring-color: var(--node-boundary);
   }
 }

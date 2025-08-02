@@ -41,16 +41,9 @@ export abstract class PrimitiveGadget extends ContactGroup {
       // Propagate the computed outputs
       this.propagateOutputs(outputs)
     } else {
-      
-      // Check if ALL inputs are undefined - if so, clear outputs
-      const allInputsUndefined = Array.from(inputs.values())
-        .filter(([contact, _]) => contact.boundaryDirection === 'input')
-        .every(([_, value]) => value === undefined)
-      
-      if (allInputsUndefined) {
-        this.clearAllOutputs()
-      }
-      // Otherwise, keep current outputs (latch behavior)
+      // Activation returned false - not all required inputs are present
+      // Clear outputs to indicate the primitive can't compute
+      this.clearAllOutputs()
     }
   }
   
