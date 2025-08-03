@@ -3,7 +3,7 @@ import { getBezierPath, EdgeLabelRenderer, BaseEdge } from '@xyflow/react'
 import type { EdgeProps } from '@xyflow/react'
 import { getValueThickness } from '~/propagation-core/utils/value-detection'
 import { useLoaderData } from 'react-router'
-import type { loader } from '~/routes/editor'
+import type { clientLoader } from '~/routes/editor'
 
 export function FatEdge({
   id,
@@ -19,7 +19,7 @@ export function FatEdge({
   data,
   ...props
 }: EdgeProps) {
-  const loaderData = useLoaderData<typeof loader>()
+  const loaderData = useLoaderData<typeof clientLoader>()
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,

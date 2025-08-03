@@ -13,7 +13,7 @@ import { useUIStack } from '~/propagation-react/contexts/UIStackContext'
 import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext'
 import { toast } from 'sonner'
 import { useLoaderData } from 'react-router'
-import type { loader } from '~/routes/editor'
+import type { clientLoader } from '~/routes/editor'
 
 const nodeVariants = cva(
   "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -54,7 +54,7 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { highlightedNodeId, setHighlightedNodeId } = useNetworkContext()
   const { activeToolInstance } = useContextFrame()
   const uiStack = useUIStack()
-  const loaderData = useLoaderData<typeof loader>()
+  const loaderData = useLoaderData<typeof clientLoader>()
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -104,6 +104,16 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
           
           // Otherwise, default selection behavior
           selectContact(id, e.shiftKey || e.metaKey)
+          
+          // If this is a single selection (not multi-select), show property panel
+          if (!e.shiftKey && !e.metaKey) {
+            // Open property panel if not already open
+            if (!propertyPanel.isVisible) {
+              propertyPanel.toggleVisibility()
+            }
+            // Focus on the selected contact
+            propertyPanel.show(true)
+          }
         }}
         onDoubleClick={(e) => {
           e.stopPropagation()

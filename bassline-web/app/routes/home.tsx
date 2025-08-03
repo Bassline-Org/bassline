@@ -1,5 +1,5 @@
 import type { Route } from "./+types/home";
-import { Link, Form, redirect, useActionData, useNavigation } from "react-router";
+import { Link, Form, useActionData, useNavigation, useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { useRef, useEffect } from "react";
 import { toast } from "sonner";
@@ -11,8 +11,8 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-// Server action to handle file upload
-export async function action({ request }: Route.ActionArgs) {
+// Client action to handle file upload
+export async function clientAction({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const file = formData.get("basslineFile") as File;
   
@@ -29,12 +29,13 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "Invalid bassline format: missing rootGroup" };
     }
     
-    // Store in a temporary location (in production, you'd use a proper storage solution)
-    // For now, we'll encode it in the URL as a base64 string
-    const encodedTemplate = Buffer.from(text).toString('base64');
+    // Encode the template in base64 for URL transport
+    const encodedTemplate = btoa(text);
     
-    // Redirect to the editor with the encoded template
-    return redirect(`/editor/uploaded?data=${encodedTemplate}&name=${encodeURIComponent(file.name.replace('.json', ''))}`);
+    // Return redirect URL for client-side navigation
+    return { 
+      redirect: `/editor?bassline=uploaded&data=${encodedTemplate}&name=${encodeURIComponent(file.name.replace('.json', ''))}` 
+    };
   } catch (error) {
     return { error: "Failed to parse bassline file" };
   }
@@ -90,16 +91,20 @@ const basslines = [
 ];
 
 export default function Home() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData<typeof clientAction>();
   const navigation = useNavigation();
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isUploading = navigation.state === "submitting";
   
   useEffect(() => {
     if (actionData?.error) {
       toast.error(actionData.error);
+    } else if (actionData?.redirect) {
+      // Handle client-side redirect
+      navigate(actionData.redirect);
     }
-  }, [actionData]);
+  }, [actionData, navigate]);
   
   return (
     <div className="min-h-screen bg-slate-50">
@@ -123,7 +128,7 @@ export default function Home() {
           
           {/* Bassline templates */}
           {basslines.map((bassline) => (
-            <Link key={bassline.name} to={`/editor/${bassline.name}`} className="block">
+            <Link key={bassline.name} to={`/editor?bassline=${bassline.name}`} className="block">
               <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 hover:shadow-lg transition-all">
                 <h2 className="text-xl font-semibold mb-2">{bassline.title}</h2>
                 <p className="text-slate-600 mb-4">

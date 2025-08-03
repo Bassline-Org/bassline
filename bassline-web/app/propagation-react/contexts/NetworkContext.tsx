@@ -10,6 +10,7 @@ import { createEmptySelection } from '~/propagation-core/refactoring/types'
 import type { AppSettings } from '~/propagation-core/types'
 import { useAppSettings } from '~/propagation-react/hooks/useAppSettings'
 import { getValueThickness } from '~/propagation-core/utils/value-detection'
+import { useLocation } from 'react-router'
 
 interface NetworkContextValue {
   network: PropagationNetwork
@@ -50,7 +51,15 @@ interface NetworkProviderProps {
 export function NetworkProvider({ children, initialNetwork, skipDefaultContent = false }: NetworkProviderProps) {
   // Create the core network
   const [network] = useState(() => initialNetwork || new PropagationNetwork())
-  const [currentGroupId, setCurrentGroupId] = useState(network.currentGroup.id)
+  const location = useLocation()
+  
+  // Derive currentGroupId from URL
+  const currentGroupId = new URLSearchParams(location.search).get('groupId') || network.rootGroup.id
+  
+  // For backwards compatibility, expose a no-op setCurrentGroupId
+  const setCurrentGroupId = useCallback((id: string) => {
+    console.warn('setCurrentGroupId is deprecated. Use URL navigation instead.')
+  }, [])
   
   // React Flow state
   const [nodes, setNodes] = useState<Node[]>([])
@@ -70,6 +79,17 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
     updateBehaviorSettings,
     resetToDefaults
   } = useAppSettings()
+  
+  // Update network's current group based on URL
+  useEffect(() => {
+    const group = currentGroupId === network.rootGroup.id 
+      ? network.rootGroup 
+      : network.findGroup(currentGroupId)
+    
+    if (group) {
+      network.currentGroup = group
+    }
+  }, [currentGroupId, network])
   
   // Sync network state to React Flow
   const syncToReactFlow = useCallback(() => {

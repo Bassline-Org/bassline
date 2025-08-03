@@ -19,7 +19,6 @@ const STORAGE_KEY = 'bassline-gadget-palette'
 // Create default palette items from primitive templates
 function createDefaultPaletteItems(): PaletteItem[] {
   const primitiveTemplates = createPrimitiveTemplates()
-  console.log('Creating default palette items, primitive templates:', primitiveTemplates)
   return primitiveTemplates.map(template => ({
     ...template,
     id: crypto.randomUUID(),
@@ -53,7 +52,6 @@ export function usePalette() {
           )
           
           if (!hasPrimitives) {
-            console.log('Adding primitive gadgets to existing palette')
             const primitiveItems = createDefaultPaletteItems()
             parsed.items = [...primitiveItems, ...parsed.items]
           }
@@ -61,7 +59,6 @@ export function usePalette() {
           setState(parsed)
         } else {
           // First time - load default primitive gadgets
-          console.log('No stored palette found, loading defaults')
           const defaultItems = createDefaultPaletteItems()
           setState({
             items: defaultItems,

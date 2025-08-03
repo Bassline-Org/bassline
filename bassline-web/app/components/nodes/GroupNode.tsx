@@ -20,7 +20,7 @@ import { ValenceConnectOperation } from '~/propagation-core/refactoring/operatio
 import { toast } from 'sonner'
 import { useSound } from '~/components/SoundSystem'
 import { useLoaderData, useFetcher } from 'react-router'
-import type { loader } from '~/routes/editor'
+import type { clientLoader } from '~/routes/editor'
 
 const groupNodeVariants = cva(
   "transition-all shadow-md hover:shadow-lg",
@@ -66,7 +66,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { selectedGroups, selectedContacts } = useContextSelection()
   const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect()
   const { activeToolInstance } = useContextFrame()
-  const loaderData = useLoaderData<typeof loader>()
+  const loaderData = useLoaderData<typeof clientLoader>()
   const fetcher = useFetcher()
   const { play: playConnectionSound } = useSound('connection/create')
   

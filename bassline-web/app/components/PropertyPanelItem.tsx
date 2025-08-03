@@ -298,7 +298,164 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
               />
             )}
             
-            {/* Add other value type inputs as needed */}
+            {valueType === 'set' && (
+              <Input
+                ref={valueInputRef}
+                type="text"
+                value={tempValue || ''}
+                placeholder="comma-separated values"
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+              />
+            )}
+            
+            {valueType === 'map' && (
+              <Input
+                ref={valueInputRef}
+                type="text"
+                value={tempValue || ''}
+                placeholder="key:value, key:value"
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+              />
+            )}
+            
+            {valueType === 'array' && (
+              <textarea
+                ref={valueInputRef as any}
+                value={tempValue || ''}
+                placeholder="JSON array"
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && applyValue()}
+                className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md"
+                rows={3}
+              />
+            )}
+            
+            {valueType === 'object' && (
+              <textarea
+                ref={valueInputRef as any}
+                value={tempValue || ''}
+                placeholder="JSON object"
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && applyValue()}
+                className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md"
+                rows={4}
+              />
+            )}
+            
+            {valueType === 'date' && (
+              <Input
+                ref={valueInputRef}
+                type="date"
+                value={tempValue || ''}
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+              />
+            )}
+            
+            {valueType === 'interval' && (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={tempValue?.min || ''}
+                  placeholder="min"
+                  onChange={(e) => setTempValue({ ...tempValue, min: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+                <Input
+                  type="number"
+                  value={tempValue?.max || ''}
+                  placeholder="max"
+                  onChange={(e) => setTempValue({ ...tempValue, max: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+              </div>
+            )}
+            
+            {valueType === 'color' && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={tempValue?.r || ''}
+                    placeholder="R"
+                    min="0"
+                    max="255"
+                    onChange={(e) => setTempValue({ ...tempValue, r: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  />
+                  <Input
+                    type="number"
+                    value={tempValue?.g || ''}
+                    placeholder="G"
+                    min="0"
+                    max="255"
+                    onChange={(e) => setTempValue({ ...tempValue, g: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  />
+                  <Input
+                    type="number"
+                    value={tempValue?.b || ''}
+                    placeholder="B"
+                    min="0"
+                    max="255"
+                    onChange={(e) => setTempValue({ ...tempValue, b: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  />
+                </div>
+                {tempValue && (
+                  <div 
+                    className="h-8 rounded border"
+                    style={{ backgroundColor: `rgb(${tempValue.r || 0}, ${tempValue.g || 0}, ${tempValue.b || 0})` }}
+                  />
+                )}
+              </div>
+            )}
+            
+            {valueType === 'temperature' && (
+              <div className="flex gap-2 items-center">
+                <Input
+                  ref={valueInputRef}
+                  type="number"
+                  value={tempValue || ''}
+                  placeholder="celsius"
+                  onChange={(e) => setTempValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+                <span className="text-sm text-gray-400">°C</span>
+              </div>
+            )}
+            
+            {valueType === 'point2d' && (
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  value={tempValue?.x || ''}
+                  placeholder="x"
+                  onChange={(e) => setTempValue({ ...tempValue, x: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+                <Input
+                  type="number"
+                  value={tempValue?.y || ''}
+                  placeholder="y"
+                  onChange={(e) => setTempValue({ ...tempValue, y: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+              </div>
+            )}
+            
+            {valueType === 'exactString' && (
+              <Input
+                ref={valueInputRef}
+                type="text"
+                value={tempValue || ''}
+                placeholder="exact string (no merge)"
+                onChange={(e) => setTempValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+              />
+            )}
           </div>
           
           {/* Apply Button */}

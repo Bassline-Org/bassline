@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -8,7 +8,8 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, useLoaderData, redirect, useFetcher, useNavigate } from "react-router";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useURLState, useEditorModes, useNavigationState, useSelectionState } from "~/propagation-react/hooks/useURLState";
 
 import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationNetworkCompat";
 import { usePalette } from "~/propagation-react/hooks/usePalette";
@@ -44,22 +45,55 @@ import { ToolRegistry } from "~/propagation-react/tools/ToolRegistry";
 import { PropagationNetwork } from "~/propagation-core/models/PropagationNetwork";
 import { ValenceConnectOperation } from "~/propagation-core/refactoring/operations/ValenceConnect";
 
-// Loader - provides mode state from URL
-export async function loader({ request }: LoaderFunctionArgs) {
+// Client loader - provides mode state from URL and optionally loads a bassline
+export async function clientLoader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const mode = url.searchParams.get('mode') || 'normal';
   const nodeId = url.searchParams.get('node');
   const selection = url.searchParams.get('selection');
+  const basslineName = url.searchParams.get('bassline');
+  
+  let template = null;
+  
+  // Load bassline if specified
+  if (basslineName) {
+    // Special case for uploaded basslines
+    if (basslineName === 'uploaded') {
+      const encodedData = url.searchParams.get('data');
+      const name = url.searchParams.get('name');
+      
+      if (encodedData) {
+        try {
+          const decodedData = atob(encodedData);
+          template = JSON.parse(decodedData);
+        } catch (error) {
+          console.error('Failed to decode uploaded bassline:', error);
+        }
+      }
+    } else {
+      // Load from file
+      try {
+        const response = await fetch(`/basslines/${basslineName}.json`);
+        if (response.ok) {
+          template = await response.json();
+        }
+      } catch (error) {
+        console.error(`Failed to load bassline ${basslineName}:`, error);
+      }
+    }
+  }
   
   return {
     mode,
     nodeId,
     selection: selection ? JSON.parse(selection) : null,
+    template,
+    basslineName,
   };
 }
 
-// Action - handles all mutations
-export async function action({ request }: ActionFunctionArgs) {
+// Client action - handles all mutations
+export async function clientAction({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get('intent') as string;
   
@@ -68,11 +102,10 @@ export async function action({ request }: ActionFunctionArgs) {
       const sourceIds = JSON.parse(formData.get('sourceIds') as string);
       const targetId = formData.get('targetId') as string;
       
-      // For now, we'll rely on client-side state management
-      // In a production app, you'd retrieve the network from a database or session
-      // The client will handle the actual connection through React context
+      // Return data for the component to handle
+      // The component will update the network via context
       
-      return redirect('/editor'); // Exit valence mode after connection
+      return { success: true, intent: 'connect-valence', sourceIds, targetId };
     }
     
     case 'update-property': {
@@ -106,6 +139,18 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 }
 
+// Loading fallback
+export function HydrateFallback() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <div className="mb-4 text-lg">Loading editor...</div>
+        <div className="animate-pulse text-4xl">🎨</div>
+      </div>
+    </div>
+  );
+}
+
 const nodeTypes = {
   contact: ContactNode,
   boundary: ContactNode, // Same component, different data
@@ -119,9 +164,15 @@ const edgeTypes = {
 
 function Flow() {
   const { screenToFlowPosition } = useReactFlow();
-  const loaderData = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof clientLoader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
+  
+  // URL state management hooks
+  const { urlState, pushState, clearMode } = useURLState();
+  const { currentMode, enterPropertyMode, enterValenceMode, exitMode, toggleMode } = useEditorModes();
+  const { navigateToGroup: urlNavigateToGroup, navigateToParent: urlNavigateToParent } = useNavigationState();
+  const { selection: urlSelection, setSelection, clearSelection } = useSelectionState();
   
   const {
     appSettings,
@@ -399,17 +450,32 @@ function Flow() {
         e.preventDefault(); // Prevent default tab behavior
       }
 
-      // Escape - exit any mode
+      // Escape - exit any mode, deactivate tools, or close panels
       if (e.key === "Escape") {
         e.preventDefault();
         
-        if (loaderData.mode !== 'normal') {
-          // Exit any mode by navigating to base URL
-          navigate('/editor');
+        // First check if there's an active tool
+        if (activeTool) {
+          // If the tool has a handleKeyPress method, let it handle escape first
+          if (activeToolInstance && activeToolInstance.handleKeyPress) {
+            const handled = activeToolInstance.handleKeyPress(e, null as any); // TODO: pass actual context
+            if (handled) return;
+          }
+          // Otherwise deactivate the tool
+          deactivateTool();
+        } else if (currentMode !== 'normal') {
+          // Exit any mode
+          exitMode();
         } else if (propertyPanel.isVisible) {
           // If in normal mode and property panel is open, close it
           propertyPanel.toggleVisibility();
         }
+      }
+      
+      // Pass other key events to active tool if it has a handler
+      if (activeTool && activeToolInstance && activeToolInstance.handleKeyPress) {
+        const handled = activeToolInstance.handleKeyPress(e, null as any); // TODO: pass actual context
+        if (handled) return; // Stop processing if tool handled the key
       }
 
       // G to toggle gadget menu (left hand: G with index finger)
@@ -421,12 +487,12 @@ function Flow() {
       // T to toggle property panel (left hand: T with index finger)
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "t") {
         e.preventDefault();
-        if (loaderData.mode === 'property') {
-          navigate('/editor');
+        if (currentMode === 'property') {
+          exitMode();
         } else {
           const selectedIds = [...selection.contacts, ...selection.groups];
           if (selectedIds.length > 0) {
-            navigate(`/editor?mode=property&node=${selectedIds[0]}`);
+            enterPropertyMode(selectedIds[0]);
           }
         }
       }
@@ -448,12 +514,12 @@ function Flow() {
       // E to open property panel
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "e") {
         e.preventDefault();
-        if (loaderData.mode === 'property') {
-          navigate('/editor');
+        if (currentMode === 'property') {
+          exitMode();
         } else {
           const selectedIds = [...selection.contacts, ...selection.groups];
           if (selectedIds.length > 0) {
-            navigate(`/editor?mode=property&node=${selectedIds[0]}`);
+            enterPropertyMode(selectedIds[0]);
             if (viewSettings.showShortcutHints) {
               toast.success("Properties panel opened");
             }
@@ -486,15 +552,15 @@ function Flow() {
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "v") {
         e.preventDefault();
         
-        if (loaderData.mode === 'valence') {
+        if (currentMode === 'valence') {
           // Exit valence mode
-          navigate('/editor');
+          exitMode();
         } else {
           // Enter valence mode with current selection
           // Convert Set values to array of IDs
           const selectedIds = [...Array.from(selection.contacts), ...Array.from(selection.groups)];
           if (selectedIds.length > 0) {
-            navigate(`/editor?mode=valence&selection=${encodeURIComponent(JSON.stringify(selectedIds))}`);
+            enterValenceMode(selectedIds);
             toast.success('Valence mode: Click compatible gadgets to connect');
           } else {
             toast.error('Select contacts and/or gadgets first');
@@ -520,10 +586,16 @@ function Flow() {
     uiStack,
     toggleGadgetMenu,
     activeTool,
+    activeToolInstance,
     activateTool,
     deactivateTool,
     loaderData,
     navigate,
+    currentMode,
+    exitMode,
+    enterPropertyMode,
+    enterValenceMode,
+    toggleMode,
   ]);
 
   // Handle node drag with proximity connect
@@ -616,8 +688,8 @@ function Flow() {
 
   // Compute background color based on mode
   const getBackgroundClass = () => {
-    if (loaderData.mode === 'property') return "bg-gray-800";
-    if (loaderData.mode !== 'normal') return "bg-gray-700";
+    if (currentMode === 'property') return "bg-gray-800";
+    if (currentMode !== 'normal') return "bg-gray-700";
     return "bg-gray-600";
   };
 
@@ -630,7 +702,7 @@ function Flow() {
       onDragOver={handleDragOver}
     >
       {/* Mode-based visual indicators */}
-      {loaderData.mode === 'valence' && (
+      {currentMode === 'valence' && (
         <div className="absolute inset-0 pointer-events-none z-50">
           <div className="absolute inset-4 border-4 border-green-500/50 rounded-lg shadow-[inset_0_0_20px_rgba(34,197,94,0.3)] transition-all duration-300" />
         </div>
@@ -671,8 +743,8 @@ function Flow() {
             gap={12} 
             className={cn(
               "transition-colors duration-300",
-              loaderData.mode === 'property' ? "!bg-gray-700" : 
-              loaderData.mode !== 'normal' ? "!bg-gray-600" : 
+              currentMode === 'property' ? "!bg-gray-700" : 
+              currentMode !== 'normal' ? "!bg-gray-600" : 
               "!bg-gray-500"
             )} 
             size={1} 
@@ -681,13 +753,13 @@ function Flow() {
 
         <Panel position="top-left" className="flex flex-col gap-2">
           <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
-          {loaderData.mode === 'valence' && (
+          {currentMode === 'valence' && (
             <div className="bg-green-500 text-white px-4 py-2 rounded-md animate-pulse flex items-center justify-between">
               <span className="font-semibold">
                 Valence Mode: Click compatible gadgets to connect
               </span>
               <Button
-                onClick={() => navigate('/editor')}
+                onClick={() => exitMode()}
                 size="sm"
                 variant="ghost"
                 className="text-white hover:bg-green-600"
@@ -765,12 +837,12 @@ function Flow() {
                   </Button>
                 </>
               )}
-              {(selection.contacts.size > 0 || selection.groups.size > 0) && loaderData.mode !== 'valence' && (
+              {(selection.contacts.size > 0 || selection.groups.size > 0) && currentMode !== 'valence' && (
                 <Button
                   onClick={() => {
                     // Convert Set values to array of IDs
                     const selectedIds = [...Array.from(selection.contacts), ...Array.from(selection.groups)];
-                    navigate(`/editor?mode=valence&selection=${encodeURIComponent(JSON.stringify(selectedIds))}`);
+                    enterValenceMode(selectedIds);
                   }}
                   size="sm"
                   variant="default"
@@ -858,14 +930,14 @@ function Flow() {
 
       <ClientOnly>
         <PropertyPanel
-          isVisible={loaderData.mode === 'property'}
+          isVisible={currentMode === 'property'}
           onToggleVisibility={() => {
-            if (loaderData.mode === 'property') {
-              navigate('/editor');
+            if (currentMode === 'property') {
+              exitMode();
             } else {
               const selectedIds = [...selection.contacts, ...selection.groups];
               if (selectedIds.length > 0) {
-                navigate(`/editor?mode=property&node=${selectedIds[0]}`);
+                enterPropertyMode(selectedIds[0]);
               }
             }
           }}
@@ -888,8 +960,24 @@ function Flow() {
 }
 
 export default function Editor() {
+  const { template, basslineName } = useLoaderData<typeof clientLoader>();
+  
+  // Create network from template if provided
+  const network = useMemo(() => {
+    if (template) {
+      return PropagationNetwork.fromTemplate(template);
+    }
+    return new PropagationNetwork();
+  }, [template]);
+  
+  useEffect(() => {
+    if (template && basslineName) {
+      toast.success(`Loaded bassline: ${basslineName}`);
+    }
+  }, [template, basslineName]);
+  
   return (
-    <NetworkProvider>
+    <NetworkProvider initialNetwork={network} key={basslineName || 'default'} skipDefaultContent={!!template}>
       <UIStackProvider>
         <PropertyPanelStackProvider>
           <ReactFlowProvider>

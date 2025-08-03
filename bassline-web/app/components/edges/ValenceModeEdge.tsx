@@ -1,11 +1,11 @@
 import { memo } from 'react'
 import { getBezierPath, type EdgeProps } from '@xyflow/react'
 import { useLoaderData } from 'react-router'
-import type { loader } from '~/routes/editor'
+import type { clientLoader } from '~/routes/editor'
 
 export const ValenceModeEdge = memo((props: EdgeProps) => {
   const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, markerStart, style } = props
-  const loaderData = useLoaderData<typeof loader>()
+  const loaderData = useLoaderData<typeof clientLoader>()
   
   const [edgePath] = getBezierPath({
     sourceX,

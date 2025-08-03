@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
 import type { ContactGroup, Contact, Wire, Position, ContactId } from '~/propagation-core'
 import { PrimitiveGadget } from '~/propagation-core/primitives'
+import { useNavigationState } from './useURLState'
 
 interface UseGroupReturn {
   group: ContactGroup | null
@@ -28,7 +29,8 @@ interface UseGroupReturn {
 }
 
 export function useGroup(groupId: string | null | undefined): UseGroupReturn {
-  const { network, syncToReactFlow, setCurrentGroupId } = useNetworkContext()
+  const { network, syncToReactFlow } = useNetworkContext()
+  const { navigateToGroup: urlNavigateToGroup } = useNavigationState()
   const [group, setGroup] = useState<ContactGroup | null>(null)
   
   // Find and track the group
@@ -156,9 +158,16 @@ export function useGroup(groupId: string | null | undefined): UseGroupReturn {
   const navigate = useCallback(() => {
     if (!group || group instanceof PrimitiveGadget) return
     
-    network.navigateToGroup(group.id)
-    setCurrentGroupId(group.id)
-  }, [group, network, setCurrentGroupId])
+    // Build navigation path
+    const path: string[] = []
+    let current: ContactGroup | null = group
+    while (current && current !== network.rootGroup) {
+      path.unshift(current.id)
+      current = current.parent
+    }
+    
+    urlNavigateToGroup(group.id, path.join('/'))
+  }, [group, network, urlNavigateToGroup])
   
   const remove = useCallback(() => {
     if (!group || !group.parent) return

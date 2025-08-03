@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
 import type { ContactGroup, Contact, Wire, Position } from '~/propagation-core'
 import { useSound } from '~/components/SoundSystem'
+import { useNavigationState } from './useURLState'
 
 interface Breadcrumb {
   id: string
@@ -30,7 +31,8 @@ interface UseCurrentGroupReturn {
 }
 
 export function useCurrentGroup(): UseCurrentGroupReturn {
-  const { network, syncToReactFlow, currentGroupId, setCurrentGroupId, appSettings } = useNetworkContext()
+  const { network, syncToReactFlow, currentGroupId, appSettings } = useNetworkContext()
+  const { navigateToGroup: urlNavigateToGroup, navigateToParent: urlNavigateToParent } = useNavigationState()
   const [currentGroup, setCurrentGroup] = useState(network.currentGroup)
   const { play: playCreateSound } = useSound('node/create')
   const { play: playCreateGadgetSound } = useSound('gadget/create')
@@ -64,30 +66,40 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
   // Navigation
   const navigateToGroup = useCallback((groupId: string) => {
     const previousGroupId = network.currentGroup.id
-    network.navigateToGroup(groupId)
-    setCurrentGroupId(groupId)
+    
+    // Build navigation path
+    const targetGroup = network.findGroup(groupId)
+    if (!targetGroup) return
+    
+    const path: string[] = []
+    let current: ContactGroup | null = targetGroup as ContactGroup | null
+    while (current && current !== network.rootGroup) {
+      path.unshift(current.id)
+      current = current.parent
+    }
+    
+    // Use URL navigation
+    urlNavigateToGroup(groupId, path.join('/'))
     
     // Play navigation sound based on direction
-    const newGroup = network.currentGroup
     const previousGroup = network.findGroup(previousGroupId)
-    if (previousGroup && newGroup.parent === previousGroup) {
+    if (previousGroup && targetGroup.parent === previousGroup) {
       playEnterGadgetSound() // Going deeper
     } else {
       playExitGadgetSound() // Going up or sideways
     }
-  }, [network, setCurrentGroupId, playEnterGadgetSound, playExitGadgetSound])
+  }, [network, urlNavigateToGroup, playEnterGadgetSound, playExitGadgetSound])
   
   const navigateToParent = useCallback(() => {
-    network.navigateToParent()
-    setCurrentGroupId(network.currentGroup.id)
+    urlNavigateToParent()
     playExitGadgetSound() // Always going up when navigating to parent
-  }, [network, setCurrentGroupId, playExitGadgetSound])
+  }, [urlNavigateToParent, playExitGadgetSound])
   
   const navigateToRoot = useCallback(() => {
-    network.currentGroup = network.rootGroup
-    setCurrentGroupId(network.rootGroup.id)
+    // Clear navigation params to go to root
+    urlNavigateToGroup('', '')
     syncToReactFlow()
-  }, [network, setCurrentGroupId, syncToReactFlow])
+  }, [urlNavigateToGroup, syncToReactFlow])
   
   // Operations
   const addContact = useCallback((position: Position): Contact => {

@@ -9,7 +9,7 @@ import { PropertyPanelFrame } from './PropertyPanelFrame'
 import { ContactPropertySection, GroupPropertySection } from './PropertyPanelItem'
 import { cn } from '~/lib/utils'
 import { useLoaderData, useNavigate } from 'react-router'
-import type { loader } from '~/routes/editor'
+import type { clientLoader } from '~/routes/editor'
 
 interface PropertyPanelProps {
   isVisible: boolean
@@ -23,7 +23,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
   const { frames, currentFrame, pushFrame, popFrame, popToFrame, clearFrames } = usePropertyPanelStack()
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
-  const loaderData = useLoaderData<typeof loader>()
+  const loaderData = useLoaderData<typeof clientLoader>()
   const navigate = useNavigate()
   
   // Check if we're in property mode from URL
