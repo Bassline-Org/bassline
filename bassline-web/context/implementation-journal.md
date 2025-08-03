@@ -1762,3 +1762,184 @@ Primitive gadgets are **behavioral**, not structural. Their value comes from the
 - Copy/paste functionality for contacts and gadgets
 - Collaborative editing support
 - Export to other visual programming formats
+
+## Session 8: Set Serialization and Circular Dependencies (2025-08-04)
+
+### The Problems
+
+Several interconnected issues emerged when implementing network serialization:
+
+1. **"Class extends value undefined" error** - Circular dependency between ContactGroup and PrimitiveGadget
+2. **Sets displaying as "[object Object]"** - UI converting special types with String()
+3. **Property panel defaulting to 'string'** - Not detecting actual content types
+
+### Circular Dependency Resolution
+
+#### The Problem Chain
+```
+ContactGroup → imports primitives-registry → imports PrimitiveGadget → imports ContactGroup
+```
+
+This circular import caused PrimitiveGadget to extend `undefined` at runtime.
+
+#### Failed Attempts
+1. **Dynamic imports** - Tried using `await import()` but made the API async
+2. **require() in ContactGroup** - Doesn't work properly in browser/SSR context
+
+#### The Solution: Factory Pattern
+Created `GadgetFactory` to break the circular dependency:
+
+```typescript
+// GadgetFactory.ts
+export class GadgetFactory {
+  static fromTemplate(template: GadgetTemplate, parent?: ContactGroup): ContactGroup {
+    if (template.isPrimitive && template.primitiveType) {
+      const primitive = createPrimitiveGadget(template.primitiveType, parent)
+      if (primitive) return primitive
+    }
+    return ContactGroup.fromTemplateWithFactory(template, parent, GadgetFactory.fromTemplate)
+  }
+}
+```
+
+Key insights:
+- Factory imports both ContactGroup and primitives-registry
+- ContactGroup doesn't import primitives at all
+- Recursive template creation passes factory function down
+
+### Value Serialization System
+
+#### Implementation
+Created comprehensive `value-serialization.ts` utilities:
+
+```typescript
+const BASSLINE_TYPE_KEY = '@bassline-type@'
+
+export function serializeValue(value: any): any {
+  if (value instanceof Set) {
+    return {
+      [BASSLINE_TYPE_KEY]: 'Set',
+      data: Array.from(value)
+    }
+  }
+  // ... Map, Date, SetValue, Interval, Contradiction
+}
+```
+
+#### Special Type Handling
+- **Set**: Array of values
+- **Map**: Array of [key, value] pairs
+- **Date**: ISO string
+- **SetValue** (mergeable): Array with type marker
+- **Interval**: Object with min/max
+- **Contradiction**: Stores reason string
+
+#### Recursive Support
+Arrays and objects are handled recursively, allowing nested special types:
+```typescript
+{
+  "metadata": {
+    "@bassline-type@": "Map",
+    "data": [["tags", {
+      "@bassline-type@": "Set",
+      "data": ["important", "verified"]
+    }]]
+  }
+}
+```
+
+### UI Display Issues
+
+#### The Root Cause
+ContactNode and PropertyPanel were using `String(content)` to display values, which produces:
+- Set → "[object Set]"
+- Map → "[object Map]"
+- Object → "[object Object]"
+
+#### The Solution
+Created `content-display.ts` utilities:
+
+```typescript
+export function formatContentForDisplay(content: any): string {
+  if (content instanceof Set) {
+    return `{${Array.from(content).join(', ')}}`
+  }
+  if (content instanceof Map) {
+    const entries = Array.from(content.entries())
+      .map(([k, v]) => `${k}: ${v}`)
+    return `Map{${entries}}`
+  }
+  // ... proper formatting for all types
+}
+```
+
+### PropertyPanel Type Detection
+
+#### Enhanced Type System
+Extended ValueType to include native JavaScript types:
+```typescript
+type ValueType = 'number' | 'string' | 'boolean' | 'array' | 'object' | 
+                 'set' | 'map' | 'date' | 'interval' | 'color' | ...
+```
+
+#### Type Detection Logic
+```typescript
+if (content instanceof Set) {
+  setValueType('set')
+  setTempValue(Array.from(content).join(', '))
+} else if (content instanceof Map) {
+  setValueType('map')
+  const pairs = Array.from(content.entries()).map(([k, v]) => `${k}:${v}`)
+  setTempValue(pairs.join(', '))
+}
+// ... etc
+```
+
+#### Type-Specific Inputs
+- **Set**: Comma-separated values
+- **Map**: key:value pairs
+- **Date**: Native date picker
+- **Array/Object**: JSON textareas with Shift+Enter
+
+### Key Lessons Learned
+
+#### 1. Circular Dependencies Are Architectural Smells
+- Often indicate wrong abstraction boundaries
+- Factory pattern is a clean solution
+- Keep dependencies unidirectional where possible
+
+#### 2. Serialization Needs Comprehensive Planning
+- Must handle all value types users might create
+- Recursive handling is essential for nested structures
+- Use type markers for unambiguous deserialization
+
+#### 3. UI Should Understand Domain Types
+- Don't rely on toString() for complex types
+- Create proper formatters for display
+- Provide appropriate input methods for each type
+
+#### 4. Type Detection Must Be Exhaustive
+- Check instanceof before typeof
+- Order matters (Array before Object)
+- Provide fallbacks for unknown types
+
+#### 5. Test with Real Data
+- Create example files that exercise all features
+- Round-trip testing catches serialization bugs
+- UI testing reveals display issues
+
+### What Worked Well
+
+1. **Factory Pattern** - Clean solution to circular dependencies
+2. **Type Markers** - Unambiguous serialization format
+3. **Comprehensive Type Support** - Handles all JavaScript types users need
+4. **Display Utilities** - Consistent formatting across UI
+5. **Example Basslines** - Great for testing and documentation
+
+### Future Considerations
+
+1. **Custom Type Registration** - Allow users to register serializers
+2. **Binary Serialization** - For performance with large datasets
+3. **Streaming Support** - For huge networks
+4. **Schema Validation** - Ensure loaded files are valid
+5. **Migration System** - Handle format changes over time
