@@ -57,6 +57,26 @@ const basslines = [
     title: "Complex Network",
     description: "A complex network with multiple gadgets and connections",
   },
+  {
+    name: "with-values",
+    title: "Network with Values",
+    description: "A network with pre-filled contact values (string, number, array)",
+  },
+  {
+    name: "gadget-connected",
+    title: "Connected Gadget Example",
+    description: "A network with gadgets connected via boundary contacts",
+  },
+  {
+    name: "primitive-test",
+    title: "Primitive Gadget Test",
+    description: "Testing serialization of primitive gadgets (Adder)",
+  },
+  {
+    name: "set-test",
+    title: "Set Serialization Test", 
+    description: "Testing Set and other special value serialization",
+  },
 ];
 
 export default function Home() {

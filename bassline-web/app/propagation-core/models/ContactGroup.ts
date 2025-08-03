@@ -3,6 +3,7 @@ import { Contradiction } from '../types'
 import { Contact } from './Contact'
 import { Wire } from './Wire'
 import type { GadgetTemplate, ContactTemplate, WireTemplate } from '../types/template'
+import { serializeValue, deserializeValue } from '../utils/value-serialization'
 
 const generateId = (): string => crypto.randomUUID()
 
@@ -324,7 +325,8 @@ export class ContactGroup {
         isBoundary: contact.isBoundary,
         boundaryDirection: contact.boundaryDirection,
         name: contact.name,
-        blendMode: contact.blendMode
+        blendMode: contact.blendMode,
+        content: serializeValue(contact.content)
       })
       
       if (contact.isBoundary) {
@@ -334,19 +336,77 @@ export class ContactGroup {
       index++
     }
     
+    // Track which subgroup each boundary contact belongs to
+    const subgroupIdToIndex = new Map<string, number>()
+    const boundaryContactToSubgroup = new Map<ContactId, number>()
+    
+    // Map subgroups to indices and track their boundary contacts
+    let subgroupIndex = 0
+    for (const subgroup of this.subgroups.values()) {
+      subgroupIdToIndex.set(subgroup.id, subgroupIndex)
+      for (const boundaryId of subgroup.boundaryContacts) {
+        boundaryContactToSubgroup.set(boundaryId, subgroupIndex)
+      }
+      subgroupIndex++
+    }
+    
     // Convert wires to templates using the ID mapping
     const wires: WireTemplate[] = []
     for (const wire of this.wires.values()) {
-      const fromIndex = contactIdToIndex.get(wire.fromId)
-      const toIndex = contactIdToIndex.get(wire.toId)
+      let fromIndex = contactIdToIndex.get(wire.fromId)
+      let toIndex = contactIdToIndex.get(wire.toId)
       
-      if (fromIndex !== undefined && toIndex !== undefined) {
-        wires.push({
-          fromIndex,
-          toIndex,
-          type: wire.type
-        })
+      const wireTemplate: WireTemplate = {
+        fromIndex: -1,
+        toIndex: -1,
+        type: wire.type
       }
+      
+      // Handle 'from' side
+      if (fromIndex !== undefined) {
+        wireTemplate.fromIndex = fromIndex
+      } else {
+        // Check if it's a subgroup boundary contact
+        const fromSubgroupIndex = boundaryContactToSubgroup.get(wire.fromId)
+        if (fromSubgroupIndex !== undefined) {
+          wireTemplate.fromIndex = -1
+          wireTemplate.fromSubgroupIndex = fromSubgroupIndex
+          // Find the boundary contact name
+          const subgroups = Array.from(this.subgroups.values())
+          const fromSubgroup = subgroups[fromSubgroupIndex]
+          const fromContact = fromSubgroup.contacts.get(wire.fromId)
+          if (fromContact?.name) {
+            wireTemplate.fromBoundaryName = fromContact.name
+          }
+        } else {
+          console.warn(`Wire references unknown contact: ${wire.fromId}`)
+          continue
+        }
+      }
+      
+      // Handle 'to' side
+      if (toIndex !== undefined) {
+        wireTemplate.toIndex = toIndex
+      } else {
+        // Check if it's a subgroup boundary contact
+        const toSubgroupIndex = boundaryContactToSubgroup.get(wire.toId)
+        if (toSubgroupIndex !== undefined) {
+          wireTemplate.toIndex = -1
+          wireTemplate.toSubgroupIndex = toSubgroupIndex
+          // Find the boundary contact name
+          const subgroups = Array.from(this.subgroups.values())
+          const toSubgroup = subgroups[toSubgroupIndex]
+          const toContact = toSubgroup.contacts.get(wire.toId)
+          if (toContact?.name) {
+            wireTemplate.toBoundaryName = toContact.name
+          }
+        } else {
+          console.warn(`Wire references unknown contact: ${wire.toId}`)
+          continue
+        }
+      }
+      
+      wires.push(wireTemplate)
     }
     
     // Recursively convert subgroups
@@ -355,16 +415,36 @@ export class ContactGroup {
       subgroupTemplates.push(subgroup.toTemplate())
     }
     
-    return {
+    const template: GadgetTemplate = {
       name: this.name,
       contacts,
       wires,
       subgroupTemplates,
       boundaryIndices
     }
+    
+    // Include primitive information if this is a primitive gadget
+    if (this.isPrimitive) {
+      template.isPrimitive = true
+      // For primitives, the name is the primitive type
+      template.primitiveType = this.name
+    }
+    
+    return template
   }
   
   static fromTemplate(template: GadgetTemplate, parent?: ContactGroup): ContactGroup {
+    // For primitive gadgets, this will be handled by a higher-level factory
+    // This method only handles regular ContactGroups
+    return ContactGroup.fromTemplateWithFactory(template, parent, ContactGroup.fromTemplate)
+  }
+  
+  static fromTemplateWithFactory(
+    template: GadgetTemplate, 
+    parent: ContactGroup | undefined,
+    subgroupFactory: (template: GadgetTemplate, parent?: ContactGroup) => ContactGroup
+  ): ContactGroup {
+    // Create a regular ContactGroup
     const group = new ContactGroup(generateId(), template.name, parent)
     
     // Create contacts and build index to ID mapping
@@ -380,6 +460,11 @@ export class ContactGroup {
       contact.name = contactTemplate.name
       contact.blendMode = contactTemplate.blendMode
       
+      // Restore content if present
+      if (contactTemplate.content !== undefined) {
+        contact.setContent(deserializeValue(contactTemplate.content))
+      }
+      
       group.contacts.set(contact.id, contact)
       indexToContactId.set(index, contact.id)
       
@@ -388,30 +473,64 @@ export class ContactGroup {
       }
     })
     
-    // Create wires using the mapping
+    // Recursively create subgroups first (before wires, so boundary contacts exist)
+    const subgroups: ContactGroup[] = []
+    template.subgroupTemplates.forEach(subTemplate => {
+      const subgroup = subgroupFactory(subTemplate, group)
+      group.subgroups.set(subgroup.id, subgroup)
+      subgroups.push(subgroup)
+    })
+    
+    // Create wires using the mapping (now that subgroups exist)
     template.wires.forEach(wireTemplate => {
-      const fromId = indexToContactId.get(wireTemplate.fromIndex)
-      const toId = indexToContactId.get(wireTemplate.toIndex)
+      let fromId: ContactId | undefined
+      let toId: ContactId | undefined
+      
+      // Handle 'from' side
+      if (wireTemplate.fromIndex >= 0) {
+        fromId = indexToContactId.get(wireTemplate.fromIndex)
+      } else if (wireTemplate.fromSubgroupIndex !== undefined && wireTemplate.fromBoundaryName) {
+        // Find the boundary contact in the specified subgroup
+        const fromSubgroup = subgroups[wireTemplate.fromSubgroupIndex]
+        if (fromSubgroup) {
+          // Find boundary contact by name
+          for (const contact of fromSubgroup.contacts.values()) {
+            if (contact.isBoundary && contact.name === wireTemplate.fromBoundaryName) {
+              fromId = contact.id
+              break
+            }
+          }
+        }
+      }
+      
+      // Handle 'to' side
+      if (wireTemplate.toIndex >= 0) {
+        toId = indexToContactId.get(wireTemplate.toIndex)
+      } else if (wireTemplate.toSubgroupIndex !== undefined && wireTemplate.toBoundaryName) {
+        // Find the boundary contact in the specified subgroup
+        const toSubgroup = subgroups[wireTemplate.toSubgroupIndex]
+        if (toSubgroup) {
+          // Find boundary contact by name
+          for (const contact of toSubgroup.contacts.values()) {
+            if (contact.isBoundary && contact.name === wireTemplate.toBoundaryName) {
+              toId = contact.id
+              break
+            }
+          }
+        }
+      }
       
       if (fromId && toId) {
         try {
           group.connect(fromId, toId, wireTemplate.type)
         } catch (error) {
           console.error(`Failed to connect wire in template instantiation: ${error}`)
-          console.error(`Wire template: fromIndex=${wireTemplate.fromIndex}, toIndex=${wireTemplate.toIndex}`)
+          console.error(`Wire template:`, wireTemplate)
           console.error(`Mapped IDs: fromId=${fromId}, toId=${toId}`)
-          console.error(`Available contacts in group "${group.name}":`, Array.from(group.contacts.keys()))
-          console.error(`Index to ID mapping:`, Array.from(indexToContactId.entries()))
         }
       } else {
-        console.warn(`Missing contact IDs for wire: fromIndex=${wireTemplate.fromIndex} (${fromId}), toIndex=${wireTemplate.toIndex} (${toId})`)
+        console.warn(`Missing contact IDs for wire:`, wireTemplate, `fromId=${fromId}, toId=${toId}`)
       }
-    })
-    
-    // Recursively create subgroups
-    template.subgroupTemplates.forEach(subTemplate => {
-      const subgroup = ContactGroup.fromTemplate(subTemplate, group)
-      group.subgroups.set(subgroup.id, subgroup)
     })
     
     return group

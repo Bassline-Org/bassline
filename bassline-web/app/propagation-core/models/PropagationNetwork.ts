@@ -3,6 +3,7 @@ import { ContactGroup } from './ContactGroup'
 import { Contact } from './Contact'
 import { Wire } from './Wire'
 import type { GadgetTemplate } from '../types/template'
+import { GadgetFactory } from '../factories/GadgetFactory'
 import { createPrimitiveGadget, PRIMITIVE_GADGETS } from '../primitives-registry'
 
 // Network template includes metadata and the root group template
@@ -129,7 +130,7 @@ export class PropagationNetwork {
     }
     
     // Otherwise, create a regular gadget from template
-    const gadget = ContactGroup.fromTemplate(template, this.currentGroup)
+    const gadget = GadgetFactory.fromTemplate(template, this.currentGroup)
     gadget.position = { ...position }
     this.currentGroup.subgroups.set(gadget.id, gadget)
     return gadget
@@ -152,7 +153,7 @@ export class PropagationNetwork {
     const network = new PropagationNetwork()
     
     // Replace the root group with the one from the template
-    network.rootGroup = ContactGroup.fromTemplate(template.rootGroup)
+    network.rootGroup = GadgetFactory.fromTemplate(template.rootGroup)
     network.currentGroup = network.rootGroup
     
     return network

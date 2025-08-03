@@ -1,9 +1,15 @@
 import type { GadgetTemplate } from './types/template'
 import type { ContactGroup } from './models/ContactGroup'
-import { Adder, Subtractor, Multiplier, Divider } from './primitives'
-import { Union, Intersection, Difference } from './primitives/set'
-import { Splitter, Joiner } from './primitives/data'
-import type { PrimitiveGadget } from './primitives'
+import { Adder } from './primitives/arithmetic/Adder'
+import { Subtractor } from './primitives/arithmetic/Subtractor'  
+import { Multiplier } from './primitives/arithmetic/Multiplier'
+import { Divider } from './primitives/arithmetic/Divider'
+import { Union } from './primitives/set/Union'
+import { Intersection } from './primitives/set/Intersection'
+import { Difference } from './primitives/set/Difference'
+import { Splitter } from './primitives/data/Splitter'
+import { Joiner } from './primitives/data/Joiner'
+import type { PrimitiveGadget } from './primitives/base/PrimitiveGadget'
 
 // Type for primitive gadget constructor
 type PrimitiveConstructor = new (parent?: ContactGroup) => PrimitiveGadget

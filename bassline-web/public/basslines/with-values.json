@@ -1,0 +1,65 @@
+{
+  "name": "Network with Values",
+  "description": "A network with pre-filled contact values",
+  "version": "1.0",
+  "author": "Bassline",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "rootGroup": {
+    "name": "Root",
+    "contacts": [
+      {
+        "position": { "x": 100, "y": 200 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": "Hello, World!"
+      },
+      {
+        "position": { "x": 400, "y": 200 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": 42
+      },
+      {
+        "position": { "x": 250, "y": 350 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": [1, 2, 3, 4, 5]
+      },
+      {
+        "position": { "x": 100, "y": 500 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": {
+          "name": "John Doe",
+          "age": 30,
+          "hobbies": ["coding", "music", "reading"]
+        }
+      },
+      {
+        "position": { "x": 400, "y": 500 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": true
+      }
+    ],
+    "wires": [
+      {
+        "fromIndex": 0,
+        "toIndex": 2,
+        "type": "bidirectional"
+      },
+      {
+        "fromIndex": 1,
+        "toIndex": 2,
+        "type": "bidirectional"
+      },
+      {
+        "fromIndex": 3,
+        "toIndex": 4,
+        "type": "directed"
+      }
+    ],
+    "subgroupTemplates": [],
+    "boundaryIndices": []
+  }
+}

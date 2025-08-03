@@ -1633,12 +1633,132 @@ React Router provides actions and loaders for a reason - they handle:
 #### 4. Read the Docs
 When stuck, reading framework documentation reveals idiomatic solutions that are simpler and more robust than custom implementations.
 
+## Wire Serialization for Subgroup Boundaries
+
+### The Problem
+When serializing networks, connections to gadget (subgroup) boundary contacts weren't being saved. The wire serialization only handled contacts within the same group, losing connections that cross group boundaries.
+
+### The Solution
+Extended the WireTemplate interface to handle subgroup connections:
+
+```typescript
+interface WireTemplate {
+  fromIndex: number      // -1 for subgroup connections
+  toIndex: number        // -1 for subgroup connections
+  type: 'bidirectional' | 'directed'
+  fromSubgroupIndex?: number    // Which subgroup (by index)
+  toSubgroupIndex?: number      
+  fromBoundaryName?: string     // Boundary contact name
+  toBoundaryName?: string
+}
+```
+
+Key implementation details:
+1. **Serialization**: Track boundary contacts from subgroups with their parent subgroup index
+2. **Special marker**: Use -1 as fromIndex/toIndex to indicate subgroup connection
+3. **Deserialization**: Create subgroups BEFORE wires so boundary contacts exist
+4. **Lookup by name**: Find boundary contacts by their name property for stable references
+
+### Lessons Learned
+
+#### 1. Order Matters in Deserialization
+Always create parent objects before child references. In this case, subgroups must be created before wires that reference their boundary contacts.
+
+#### 2. Stable References for Serialization
+Using contact names for boundary identification is more stable than positions or indices, as positions might change but names are intentionally set.
+
+#### 3. Debug with Real Examples
+Creating actual JSON examples (like gadget-connected.json) helps verify serialization works correctly and provides test cases.
+
+## Value Serialization
+
+### Implementation
+Added `content?: any` to ContactTemplate to preserve contact values across save/load operations. Simple but powerful - allows networks to maintain state.
+
+### Considerations for Future
+- Consider serializing mergeable types with custom handlers
+- May need to handle circular references in complex objects
+- Could add compression for large value sets
+
+## Advice for Future Development
+
+### 1. Architecture Principles
+- **Keep core logic pure**: The propagation-core separation has been invaluable
+- **Let React Flow handle UI state**: Don't fight it - use their patterns
+- **Network state is truth**: UI should always reflect network state, not vice versa
+
+### 2. Common Pitfalls to Avoid
+- **Don't use sessionStorage for navigation**: Use React Router's data patterns
+- **Don't initialize in useEffect**: Use loaders and proper component lifecycle
+- **Don't assume render order**: Components may render in unexpected sequences
+- **Don't skip null checks**: Boundary contacts might not exist yet
+
+### 3. Debugging Tips
+- **Add console logs to serialization**: Helps track what's being saved/loaded
+- **Check ContactGroup.canConnectTo()**: This method controls what can be wired
+- **Verify with JSON examples**: Real files are better than unit tests for complex serialization
+- **Use React DevTools**: Check what NetworkContext is actually providing
+
+### 4. Key Files to Understand
+- `ContactGroup.ts`: Core of the hierarchy and connection logic
+- `NetworkContext.tsx`: Manages all state and React Flow sync
+- `usePropagationNetworkCompat.ts`: Bridge between old and new patterns
+- Template types in `types/template.ts`: Serialization format
+
+### 5. Testing Approach
+- Create example JSON files for different scenarios
+- Test full round-trip: create → save → load → modify → save → load
+- Check edge cases: empty networks, single contacts, complex hierarchies
+- Verify boundary contact connections across all operations
+
+### 6. Performance Considerations
+- Large networks may need virtualization
+- Consider memoizing `syncToReactFlow` for complex networks
+- Propagation cycles need detection/limits
+- File size grows with values - may need compression
+
+### 7. Future Enhancements Priority
+1. **Undo/redo system**: Track network state snapshots
+2. **Copy/paste**: Serialize selections to clipboard
+3. **Better type safety**: Generic types for contact content
+4. **Propagation visualization**: Show data flow animations
+5. **Advanced gadgets**: Filters, mappers, reducers
+
+## Primitive Gadget Serialization
+
+### The Problem
+Primitive gadgets (Adder, Multiplier, etc.) are special ContactGroups that create their own internal structure in their constructors. When serializing, they were being treated as regular user-defined gadgets, which would duplicate their contacts and potentially lose their special behavior.
+
+### The Solution
+Added special handling for primitive gadgets in serialization:
+
+```typescript
+interface GadgetTemplate {
+  // ... existing fields
+  isPrimitive?: boolean
+  primitiveType?: string  // 'Adder', 'Multiplier', etc.
+}
+```
+
+During serialization:
+- If `ContactGroup.isPrimitive` is true, mark template as primitive
+- Store the primitive type (which is the gadget's name)
+- Don't need to store contacts/wires - primitives create their own
+
+During deserialization:
+- Check if template is primitive
+- Use `createPrimitiveGadget()` to instantiate the correct type
+- The primitive's constructor creates all necessary contacts
+
+### Key Insight
+Primitive gadgets are **behavioral**, not structural. Their value comes from their computation logic, not their topology. Therefore, we only need to know the type to recreate them - they'll rebuild their own structure.
+
 ## Next Steps
 
 - Performance optimization for large networks
-- Undo/redo system  
-- Store contact values in network serialization
+- Undo/redo system
 - Additional primitive gadgets (filters, transformers, aggregators)
 - Enhanced debugging tools (value inspection, propagation tracing)
-- Keyboard shortcuts for common operations
 - Copy/paste functionality for contacts and gadgets
+- Collaborative editing support
+- Export to other visual programming formats
