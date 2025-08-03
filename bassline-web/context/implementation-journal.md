@@ -679,6 +679,193 @@ const defaultSettings: ViewSettings = {
 
 This architecture successfully implements the core propagation network concepts while maintaining flexibility for future enhancements.
 
+## Session 6: Dreams-Style Gadget Menu (2025-08-03)
+
+### What We Built
+
+Redesigned the gadget palette to follow Dreams (PlayStation) UI patterns with a multi-layered bottom menu:
+
+#### 1. Three-Layer Menu System
+- **Closed State**: Just the "Gadgets" button in ToolsMenu
+- **Category Layer**: Horizontal scrolling list of categories with icons
+- **Gadget Layer**: Grid of gadget icons within selected category
+
+#### 2. Component Architecture
+- **DreamsGadgetMenu**: Main orchestrator with state management
+- **CategorySelector**: Horizontal scrolling category picker with arrows
+- **GadgetGrid**: Icon grid display with drag-and-drop support
+
+#### 3. Visual Design
+- Category icons using Unicode symbols (∑ for Math, ⊻ for Logic, etc.)
+- Gadget icons shared with node display via centralized icon system
+- Smooth slide-up animations with backdrop
+- Semi-transparent backgrounds for modern layered look
+- Doom 64 theme integration
+
+#### 4. Interaction Patterns
+- **G key**: Toggle gadget menu (replaced Q for palette)
+- **Escape**: Go back one layer or close
+- **Click outside**: Close menu
+- **Drag & Drop**: Direct from grid to canvas
+- **Tooltips**: Show name/description on hover
+
+### Key Decisions
+
+#### Shared Icon System
+Created `gadget-icons.tsx` to centralize icon mappings:
+- Single source of truth for gadget icons
+- Used by both GroupNode and GadgetGrid
+- Easy to extend with new gadgets
+
+#### State Management
+- Menu state managed in editor component
+- Three distinct states: closed, categories, gadgets
+- Smooth transitions between states
+
+#### Layout Approach
+- Fixed positioning at bottom of screen
+- Layered approach with each level above previous
+- Responsive grid that adapts to content
+
+### Benefits Over Sidebar
+1. **Better use of horizontal space** - Wide screens utilized effectively
+2. **Scalable** - Can handle many more gadgets/categories
+3. **Modern UX** - Matches creative tools like Dreams, Blender
+4. **Icons over text** - More universal, quicker recognition
+5. **Keyboard friendly** - Single key access, escape navigation
+
+### Lessons Learned
+1. **Portal rendering** - Essential for overlay menus to avoid z-index issues
+2. **Backdrop clicks** - Need careful event handling to prevent accidental closes
+3. **Icon systems** - Centralizing icons prevents duplication and inconsistency
+4. **Animation timing** - Subtle animations (200ms) feel responsive but smooth
+5. **Keyboard navigation** - Escape for back is intuitive for modal interfaces
+
+### Boundary Direction Logic Fix
+
+Fixed a critical bug where boundary contact directions were being inferred incorrectly:
+
+#### The Problem
+When converting contacts to boundaries, the logic was backwards:
+- Contacts with only incoming connections were marked as INPUT (wrong!)
+- Contacts with only outgoing connections were marked as OUTPUT (wrong!)
+
+#### The Correct Logic
+Think of it like function parameters:
+- **INPUT boundaries** = function parameters (have NO incoming connections, only send data out)
+- **OUTPUT boundaries** = return values (have NO outgoing connections, only receive data)
+
+#### The Fix
+In `ConvertToBoundaryOperation`:
+```typescript
+// CORRECT:
+if (!hasIncoming && hasOutgoing) {
+  contact.boundaryDirection = 'input'  // Like a function parameter
+} else if (hasIncoming && !hasOutgoing) {
+  contact.boundaryDirection = 'output' // Like a return value
+}
+```
+
+This matches the conceptual model where:
+- INPUT boundaries provide input TO the gadget's internals
+- OUTPUT boundaries collect output FROM the gadget's internals
+
+## Session 5: Layout System and Audio Feedback (2025-08-03)
+
+### What We Built
+
+#### 1. Automatic Node Layout with Dagre
+Implemented a complete layout system using the Dagre library:
+
+**Features:**
+- Auto-layout button in ToolsMenu with 'L' keyboard shortcut
+- Left-to-right layout by default (matches data flow direction)
+- Smart layout that handles different node sizes (contacts: 60x48px, gadgets: variable)
+- Can layout entire network or just selected nodes
+- Properly updates both React Flow and core network positions
+
+**Key Implementation Details:**
+- Created `useLayout` hook that wraps Dagre functionality
+- Direct position updates in core network (not just React Flow state)
+- 50px node spacing, 100px rank spacing by default
+- Support for all layout directions (TB, BT, LR, RL)
+
+#### 2. Comprehensive Audio System
+Built a custom Web Audio API-based sound system (SSR-compatible):
+
+**Sound Categories:**
+- **Connection sounds**: create (440Hz), delete (220Hz)
+- **Node sounds**: create (523Hz), delete (261Hz)
+- **Gadget sounds**: create (440Hz - tab open), delete (196Hz), inline (330Hz - tab close)
+- **Navigation sounds**: enter (587Hz - ascending), exit (294Hz - descending)
+- **UI sounds**: layout (550Hz), plus ready sounds for buttons, toggles, success, error
+
+**Smart Sound Management:**
+- Idempotent sound playing within 100ms windows
+- Shared cooldown for related operations (node + edge deletion)
+- Different sounds for nodes vs gadgets deletion
+- Tab open/close metaphor for gadget creation/inlining
+
+**Technical Implementation:**
+- Custom `SoundSystemProvider` using Web Audio API
+- Simple sine wave generation (ready for real sound files)
+- Auto-initializes on first user interaction
+- Global volume control support
+
+#### 3. Enhanced Boundary Contact Controls
+Added full boundary management to PropertyPanel:
+
+**New Features:**
+- Toggle any contact to/from boundary status
+- Direction selector (Input/Output) for boundary contacts
+- Maintains selection after boundary changes (no focus loss)
+- Visual feedback shows current boundary status
+
+**Implementation:**
+- Enhanced `useContact` hook with `setBoundary()` and `setBoundaryDirection()`
+- Auto-sync with React Flow after changes
+- Re-selection logic to maintain PropertyPanel focus
+
+### Key Architecture Decisions
+
+#### Layout System Design
+- **Separate concern**: Layout logic isolated in dedicated hook
+- **Direct updates**: Positions updated in core network, not just UI
+- **Flexible API**: Support for full or partial layout
+
+#### Audio System Architecture
+- **Web Audio API**: More control than HTML5 audio elements
+- **Context-based**: Centralized sound management
+- **Debouncing strategy**: Prevents audio spam during bulk operations
+
+#### Boundary Control Pattern
+- **Hook-based mutations**: All changes go through useContact methods
+- **Auto-sync**: Every mutation triggers syncToReactFlow()
+- **Selection preservation**: Re-select after structural changes
+
+### Lessons Learned
+
+1. **Layout libraries need proper integration** - Dagre works well but requires translating between coordinate systems
+2. **Audio feedback enhances UX** - Even simple beeps make the system feel more responsive
+3. **State preservation matters** - Re-selecting nodes after changes prevents frustrating focus loss
+4. **Idempotent operations** - Critical for good audio UX during bulk operations
+5. **Tab metaphors work** - Open/close sounds for create/inline operations feel intuitive
+
+### What Works Well
+
+1. **Layout is fast and predictable** - Dagre handles complex networks efficiently
+2. **Audio provides clear feedback** - Different sounds for different operations help users understand what's happening
+3. **Boundary controls are intuitive** - Toggle + direction selector is clearer than separate buttons
+4. **Selection preservation** - Smooth workflow when making multiple property changes
+
+### Future Enhancements
+
+1. **Layout animations** - Smooth transitions when applying layout
+2. **Custom sound files** - Replace sine waves with designed sounds
+3. **Layout presets** - Save favorite layout configurations
+4. **Propagation sounds** - Audio feedback during value propagation
+5. **Sound settings** - Per-category volume controls
+
 ## Phase 8: React Hooks Refactoring
 
 ### The Problem

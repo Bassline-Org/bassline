@@ -15,7 +15,8 @@ import {
   Bug,
   Lightbulb,
   Sliders,
-  LayoutGrid
+  LayoutGrid,
+  Package
 } from 'lucide-react'
 
 export interface ViewSettings {
@@ -33,9 +34,10 @@ interface ToolsMenuProps {
   onViewSettingsChange: (settings: ViewSettings) => void
   onOpenConfiguration?: () => void
   onAutoLayout?: () => void
+  onOpenGadgets?: () => void
 }
 
-export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfiguration, onAutoLayout }: ToolsMenuProps) {
+export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfiguration, onAutoLayout, onOpenGadgets }: ToolsMenuProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   
   const toggleSetting = (key: keyof ViewSettings) => {
@@ -76,7 +78,7 @@ export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfigurat
   }
   
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center select-none">
       {isExpanded && (
         <Card className="mb-2 p-2">
           <div className="flex gap-2 flex-wrap justify-center">
@@ -122,7 +124,19 @@ export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfigurat
         </Card>
       )}
       
-      <div className="flex gap-2">
+      <div className="flex gap-3">
+        {onOpenGadgets && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="px-4 py-2"
+            onClick={onOpenGadgets}
+          >
+            <Package className="w-4 h-4 mr-2" />
+            <span>Gadgets</span>
+            <kbd className="text-xs bg-gray-200 px-1 rounded ml-2">G</kbd>
+          </Button>
+        )}
         {onAutoLayout && (
           <Button
             size="sm"

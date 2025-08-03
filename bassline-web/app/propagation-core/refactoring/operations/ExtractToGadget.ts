@@ -96,7 +96,7 @@ export class ExtractToGadgetOperation {
       parentGroup.wires.delete(wire.id)
     })
     
-    // Handle incoming wires - create input boundaries
+    // Handle incoming wires - these become INPUT boundaries because they SEND TO internal nodes
     const incomingGroups = this.classifier.groupByExternalEndpoint(
       classification.incoming, 
       selection, 
@@ -104,14 +104,14 @@ export class ExtractToGadgetOperation {
     )
     
     incomingGroups.forEach((wires, externalContactId) => {
-      // Create one input boundary per external source
+      // Create INPUT boundary - it will have outgoing connections inside the gadget
       const boundaryPos = this.calculateBoundaryPosition(wires, 'input')
       const boundary = gadget.addBoundaryContact(boundaryPos, 'input', `from_${externalContactId.slice(0, 6)}`)
       
       // Rewire in parent: external -> boundary
       parentGroup.connect(externalContactId, boundary.id, wires[0].type)
       
-      // Wire inside gadget: boundary -> internal contacts
+      // Wire inside gadget: boundary -> internal contacts (boundary has OUTGOING wires)
       wires.forEach(wire => {
         // Use new ID if contact was moved individually, otherwise keep original
         const internalId = movedContacts.get(wire.toId) || wire.toId
@@ -120,7 +120,7 @@ export class ExtractToGadgetOperation {
       })
     })
     
-    // Handle outgoing wires - create output boundaries
+    // Handle outgoing wires - these become OUTPUT boundaries because they RECEIVE FROM internal nodes
     const outgoingGroups = this.classifier.groupByExternalEndpoint(
       classification.outgoing,
       selection,
@@ -128,7 +128,7 @@ export class ExtractToGadgetOperation {
     )
     
     outgoingGroups.forEach((wires, externalContactId) => {
-      // Create one output boundary per external target
+      // Create OUTPUT boundary - it will have incoming connections inside the gadget
       const boundaryPos = this.calculateBoundaryPosition(wires, 'output')
       const boundary = gadget.addBoundaryContact(boundaryPos, 'output', `to_${externalContactId.slice(0, 6)}`)
       

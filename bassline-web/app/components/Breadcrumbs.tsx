@@ -13,7 +13,7 @@ interface BreadcrumbsProps {
 
 export function Breadcrumbs({ items, onNavigate }: BreadcrumbsProps) {
   return (
-    <div className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md">
+    <div className="flex items-center gap-1 px-2 py-1 bg-muted/50 rounded-md select-none">
       {items.map((item, index) => (
         <div key={item.id} className="flex items-center gap-1">
           {index > 0 && <ChevronRight className="w-4 h-4 text-muted-foreground" />}

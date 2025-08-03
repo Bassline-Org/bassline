@@ -1,7 +1,7 @@
 import { memo, useCallback } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card, CardHeader, CardContent } from '~/components/ui/card'
-import { Package, Lock, Plus, Minus, X, Divide, Circle, GitMerge, Split, Layers, Combine, Shuffle } from 'lucide-react'
+import { Package, Lock } from 'lucide-react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '~/lib/utils'
 import {
@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip'
 import { useGroup } from '~/propagation-react/hooks/useGroup'
+import { getGadgetIcon } from '~/components/gadgets/gadget-icons'
 
 const groupNodeVariants = cva(
   "transition-all shadow-md hover:shadow-lg",
@@ -49,21 +50,6 @@ const groupNodeVariants = cva(
   }
 )
 
-// Map primitive names to icons
-const primitiveIcons: Record<string, React.ElementType> = {
-  'Adder': Plus,
-  'Subtractor': Minus,
-  'Multiplier': X,
-  'Divider': Divide,
-  'Union': Circle,
-  'Intersection': Layers,
-  'Difference': GitMerge,
-  'Splitter3': Split,
-  'Joiner3': Combine,
-  'Splitter': Split,
-  'Joiner': Combine
-}
-
 
 export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { name, inputContacts, outputContacts, isPrimitive, navigate } = useGroup(id)
@@ -79,7 +65,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const interactive = !isPrimitive
   
   // Get icon for primitive gadgets
-  const PrimitiveIcon = isPrimitive ? primitiveIcons[name] : null
+  const PrimitiveIcon = isPrimitive ? getGadgetIcon(name) : null
   
   return (
     <TooltipProvider>

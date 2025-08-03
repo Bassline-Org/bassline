@@ -44,9 +44,11 @@ export class ConvertToBoundaryOperation {
       }
       
       // Set direction based on connections (default to input if ambiguous)
-      if (hasIncoming && !hasOutgoing) {
+      // A contact with only outgoing connections is an INPUT (it provides input to the gadget)
+      // A contact with only incoming connections is an OUTPUT (it outputs from the gadget)
+      if (!hasIncoming && hasOutgoing) {
         contact.boundaryDirection = 'input'
-      } else if (!hasIncoming && hasOutgoing) {
+      } else if (hasIncoming && !hasOutgoing) {
         contact.boundaryDirection = 'output'
       } else {
         // Ambiguous or no connections - default to input

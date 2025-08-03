@@ -23,6 +23,7 @@ import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { GadgetPalette } from "~/components/palette/GadgetPalette";
+import { InlineGadgetMenu } from "~/components/gadgets/InlineGadgetMenu";
 import { ToolsMenu } from "~/components/ToolsMenu";
 import { ClientOnly } from "~/components/ClientOnly";
 import { PropertyPanel } from "~/components/PropertyPanel";
@@ -85,6 +86,7 @@ function Flow() {
   const propertyPanel = usePropertyPanel();
   const { viewSettings, setViewSettings } = useViewSettings();
   const [showConfiguration, setShowConfiguration] = useState(false);
+  const [showDreamsGadgetMenu, setShowDreamsGadgetMenu] = useState(false);
   const { applyLayout, applyLayoutToSelection } = useLayout();
 
   // Proximity connect hook
@@ -230,9 +232,10 @@ function Flow() {
         e.preventDefault(); // Prevent default tab behavior
       }
 
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "q") {
+      // G to toggle gadget menu (left hand: G with index finger)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "g") {
         e.preventDefault();
-        palette.toggleVisibility();
+        setShowDreamsGadgetMenu(!showDreamsGadgetMenu);
       }
 
       // T to toggle property panel (left hand: T with index finger)
@@ -310,6 +313,7 @@ function Flow() {
     handleAddGroup,
     handleAutoLayout,
     toast,
+    showDreamsGadgetMenu,
   ]);
 
   // Handle node drag with proximity connect
@@ -520,7 +524,7 @@ function Flow() {
               <div className="font-semibold mt-2 mb-1">
                 Left-hand shortcuts:
               </div>
-              <div>Q → Toggle palette</div>
+              <div>G → Toggle gadgets</div>
               <div>W → Toggle instructions (this)</div>
               <div>E → Toggle minimap</div>
               <div>A → Add contact</div>
@@ -539,11 +543,13 @@ function Flow() {
               onViewSettingsChange={setViewSettings}
               onOpenConfiguration={() => setShowConfiguration(true)}
               onAutoLayout={handleAutoLayout}
+              onOpenGadgets={() => setShowDreamsGadgetMenu(true)}
             />
           </ClientOnly>
         </Panel>
       </ReactFlow>
 
+      {/* Old palette - replaced with Dreams-style menu
       <ClientOnly>
         <GadgetPalette
           items={palette.items}
@@ -555,6 +561,18 @@ function Flow() {
           getItemsByCategory={palette.getItemsByCategory}
           getMostUsed={palette.getMostUsed}
           getRecent={palette.getRecent}
+        />
+      </ClientOnly>
+      */}
+      
+      <ClientOnly>
+        <InlineGadgetMenu
+          isOpen={showDreamsGadgetMenu}
+          onClose={() => setShowDreamsGadgetMenu(false)}
+          items={palette.items}
+          categories={palette.categories}
+          onUseItem={palette.incrementUsageCount}
+          getItemsByCategory={palette.getItemsByCategory}
         />
       </ClientOnly>
 
