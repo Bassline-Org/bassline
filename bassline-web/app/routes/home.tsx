@@ -73,9 +73,19 @@ const basslines = [
     description: "Testing serialization of primitive gadgets (Adder)",
   },
   {
+    name: "primitive-chain",
+    title: "Primitive Chain Example",
+    description: "Chain of primitive gadgets: (a+b) * c",
+  },
+  {
     name: "set-test",
     title: "Set Serialization Test", 
     description: "Testing Set and other special value serialization",
+  },
+  {
+    name: "mergeable-values",
+    title: "Advanced Serialization Example",
+    description: "Demonstrates complex value serialization with nested special types",
   },
 ];
 

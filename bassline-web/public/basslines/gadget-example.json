@@ -10,15 +10,33 @@
       {
         "position": { "x": 100, "y": 200 },
         "isBoundary": false,
-        "blendMode": "accept-last"
+        "blendMode": "accept-last",
+        "content": "Input Data",
+        "name": "Source"
       },
       {
         "position": { "x": 700, "y": 200 },
         "isBoundary": false,
-        "blendMode": "accept-last"
+        "blendMode": "accept-last",
+        "name": "Output"
       }
     ],
-    "wires": [],
+    "wires": [
+      {
+        "fromIndex": 0,
+        "toIndex": -1,
+        "type": "bidirectional",
+        "toSubgroupIndex": 0,
+        "toBoundaryName": "in"
+      },
+      {
+        "fromIndex": -1,
+        "toIndex": 1,
+        "type": "bidirectional",
+        "fromSubgroupIndex": 0,
+        "fromBoundaryName": "out"
+      }
+    ],
     "subgroupTemplates": [
       {
         "name": "Processing Gadget",

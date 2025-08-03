@@ -14,6 +14,7 @@ import { Switch } from '~/components/ui/switch'
 import { Interval, Color, Temperature, SetValue, ConsensusBoolean, Point2D, ExactString } from '~/propagation-core/types/mergeable'
 import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
 import { useContact } from '~/propagation-react/hooks/useContact'
+import { formatContentForDisplay } from '~/utils/content-display'
 
 interface PropertyPanelProps {
   isVisible: boolean
@@ -21,7 +22,7 @@ interface PropertyPanelProps {
   shouldFocus: React.MutableRefObject<boolean>
 }
 
-type ValueType = 'number' | 'string' | 'interval' | 'color' | 'temperature' | 'boolean' | 'point2d' | 'exactString' | 'set'
+type ValueType = 'number' | 'string' | 'interval' | 'color' | 'temperature' | 'boolean' | 'point2d' | 'exactString' | 'set' | 'map' | 'date' | 'object' | 'array'
 
 export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: PropertyPanelProps) {
   const { selectedContacts } = useContactSelection()
@@ -78,9 +79,29 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
     } else if (content instanceof SetValue) {
       setValueType('set')
       setTempValue(content.toArray().join(', '))
+    } else if (content instanceof Set) {
+      setValueType('set')
+      setTempValue(Array.from(content).join(', '))
+    } else if (content instanceof Map) {
+      setValueType('map')
+      // Convert to editable format: key1:value1, key2:value2
+      const pairs = Array.from(content.entries()).map(([k, v]) => `${k}:${v}`)
+      setTempValue(pairs.join(', '))
+    } else if (content instanceof Date) {
+      setValueType('date')
+      setTempValue(content.toISOString().split('T')[0])
+    } else if (Array.isArray(content)) {
+      setValueType('array')
+      setTempValue(JSON.stringify(content))
     } else if (typeof content === 'number') {
       setValueType('number')
       setTempValue(content)
+    } else if (typeof content === 'boolean') {
+      setValueType('boolean')
+      setTempValue(content)
+    } else if (typeof content === 'object' && content !== null) {
+      setValueType('object')
+      setTempValue(JSON.stringify(content, null, 2))
     } else {
       setValueType('string')
       setTempValue(String(content))
@@ -120,7 +141,45 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
         break
       case 'set':
         const items = String(tempValue).split(',').map(s => s.trim()).filter(s => s)
-        newValue = new SetValue(items)
+        // Try to parse as numbers if possible
+        const parsedItems = items.map(item => {
+          const num = Number(item)
+          return isNaN(num) ? item : num
+        })
+        newValue = new Set(parsedItems)
+        break
+      case 'map':
+        try {
+          // Expect format: key1:value1, key2:value2
+          const pairs = String(tempValue).split(',').map(s => s.trim()).filter(s => s)
+          const map = new Map()
+          pairs.forEach(pair => {
+            const [key, value] = pair.split(':').map(s => s.trim())
+            if (key && value) {
+              map.set(key, value)
+            }
+          })
+          newValue = map
+        } catch {
+          newValue = new Map()
+        }
+        break
+      case 'date':
+        newValue = new Date(tempValue)
+        break
+      case 'array':
+        try {
+          newValue = JSON.parse(tempValue)
+        } catch {
+          newValue = []
+        }
+        break
+      case 'object':
+        try {
+          newValue = JSON.parse(tempValue)
+        } catch {
+          newValue = {}
+        }
         break
       default:
         newValue = tempValue
@@ -234,13 +293,17 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                 <SelectContent>
                   <SelectItem value="number">Number</SelectItem>
                   <SelectItem value="string">String</SelectItem>
+                  <SelectItem value="boolean">Boolean</SelectItem>
+                  <SelectItem value="array">Array</SelectItem>
+                  <SelectItem value="object">Object</SelectItem>
+                  <SelectItem value="set">Set</SelectItem>
+                  <SelectItem value="map">Map</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
                   <SelectItem value="interval">Interval</SelectItem>
                   <SelectItem value="color">Color</SelectItem>
                   <SelectItem value="temperature">Temperature</SelectItem>
-                  <SelectItem value="boolean">Boolean</SelectItem>
                   <SelectItem value="point2d">Point 2D</SelectItem>
                   <SelectItem value="exactString">Exact String</SelectItem>
-                  <SelectItem value="set">Set</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -393,6 +456,55 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                   value={tempValue || ''}
                   onChange={(e) => setTempValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+              )}
+              
+              {valueType === 'map' && (
+                <Input
+                  type="text"
+                  placeholder="key1:value1, key2:value2"
+                  value={tempValue || ''}
+                  onChange={(e) => setTempValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+              )}
+              
+              {valueType === 'date' && (
+                <Input
+                  type="date"
+                  value={tempValue || ''}
+                  onChange={(e) => setTempValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                />
+              )}
+              
+              {valueType === 'array' && (
+                <textarea
+                  className="w-full min-h-[80px] p-2 text-sm border rounded-md bg-background"
+                  placeholder="JSON array, e.g. [1, 2, 3]"
+                  value={tempValue || ''}
+                  onChange={(e) => setTempValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault()
+                      applyValue()
+                    }
+                  }}
+                />
+              )}
+              
+              {valueType === 'object' && (
+                <textarea
+                  className="w-full min-h-[100px] p-2 text-sm border rounded-md bg-background"
+                  placeholder='JSON object, e.g. {"key": "value"}'
+                  value={tempValue || ''}
+                  onChange={(e) => setTempValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault()
+                      applyValue()
+                    }
+                  }}
                 />
               )}
             </div>

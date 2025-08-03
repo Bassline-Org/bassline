@@ -11,18 +11,21 @@
         "position": { "x": 100, "y": 200 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": 5
+        "content": 15,
+        "name": "Input A"
       },
       {
         "position": { "x": 100, "y": 300 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": 3
+        "content": 27,
+        "name": "Input B"
       },
       {
         "position": { "x": 600, "y": 250 },
         "isBoundary": false,
-        "blendMode": "accept-last"
+        "blendMode": "accept-last",
+        "name": "Sum Result"
       }
     ],
     "wires": [

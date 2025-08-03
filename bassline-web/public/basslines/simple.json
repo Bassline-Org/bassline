@@ -10,12 +10,16 @@
       {
         "position": { "x": 100, "y": 200 },
         "isBoundary": false,
-        "blendMode": "accept-last"
+        "blendMode": "accept-last",
+        "content": "Hello Bassline!",
+        "name": "Source"
       },
       {
         "position": { "x": 400, "y": 200 },
         "isBoundary": false,
-        "blendMode": "accept-last"
+        "blendMode": "accept-last",
+        "content": 42,
+        "name": "Target"
       }
     ],
     "wires": [

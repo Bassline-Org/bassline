@@ -11,13 +11,14 @@
         "position": { "x": 50, "y": 300 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": "Initial Input"
+        "content": "Complex Data Stream",
+        "name": "Input Source"
       },
       {
         "position": { "x": 900, "y": 300 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": null
+        "name": "Final Output"
       }
     ],
     "wires": [

@@ -1,6 +1,6 @@
 {
   "name": "Network with Values",
-  "description": "A network with pre-filled contact values",
+  "description": "A network with pre-filled contact values showcasing different data types and special serialization",
   "version": "1.0",
   "author": "Bassline",
   "createdAt": "2024-01-01T00:00:00Z",
@@ -8,38 +8,76 @@
     "name": "Root",
     "contacts": [
       {
-        "position": { "x": 100, "y": 200 },
+        "position": { "x": 100, "y": 100 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": "Hello, World!"
+        "content": "Hello, Bassline!",
+        "name": "String Value"
       },
       {
-        "position": { "x": 400, "y": 200 },
+        "position": { "x": 400, "y": 100 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": 42
+        "content": 42,
+        "name": "Number Value"
       },
       {
-        "position": { "x": 250, "y": 350 },
+        "position": { "x": 700, "y": 100 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": [1, 2, 3, 4, 5]
+        "content": [1, 2, 3, 4, 5],
+        "name": "Array Value"
       },
       {
-        "position": { "x": 100, "y": 500 },
+        "position": { "x": 100, "y": 250 },
         "isBoundary": false,
         "blendMode": "accept-last",
         "content": {
-          "name": "John Doe",
-          "age": 30,
-          "hobbies": ["coding", "music", "reading"]
-        }
+          "@bassline-type@": "Set",
+          "data": ["apple", "banana", "cherry", "date"]
+        },
+        "name": "Set Value"
       },
       {
-        "position": { "x": 400, "y": 500 },
+        "position": { "x": 400, "y": 250 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": true
+        "content": {
+          "@bassline-type@": "Map",
+          "data": [["key1", "value1"], ["key2", 42], ["key3", true]]
+        },
+        "name": "Map Value"
+      },
+      {
+        "position": { "x": 700, "y": 250 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": {
+          "@bassline-type@": "Date",
+          "data": "2024-01-01T12:00:00.000Z"
+        },
+        "name": "Date Value"
+      },
+      {
+        "position": { "x": 100, "y": 400 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": {
+          "user": "John Doe",
+          "age": 30,
+          "preferences": {
+            "@bassline-type@": "Set",
+            "data": ["coding", "music", "reading"]
+          }
+        },
+        "name": "Complex Object"
+      },
+      {
+        "position": { "x": 400, "y": 400 },
+        "isBoundary": false,
+        "blendMode": "accept-last",
+        "content": true,
+        "name": "Boolean Value"
       }
     ],
     "wires": [
@@ -56,6 +94,16 @@
       {
         "fromIndex": 3,
         "toIndex": 4,
+        "type": "bidirectional"
+      },
+      {
+        "fromIndex": 4,
+        "toIndex": 5,
+        "type": "bidirectional"
+      },
+      {
+        "fromIndex": 6,
+        "toIndex": 7,
         "type": "directed"
       }
     ],

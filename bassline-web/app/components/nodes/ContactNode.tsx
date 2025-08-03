@@ -7,6 +7,7 @@ import { cn } from '~/lib/utils'
 import { useContact } from '~/propagation-react/hooks/useContact'
 import { usePropertyPanel } from '~/propagation-react/hooks/usePropertyPanel'
 import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
+import { formatContentForDisplay, formatContentForTooltip } from '~/utils/content-display'
 
 const nodeVariants = cva(
   "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -128,8 +129,8 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
             WebkitBoxOrient: 'vertical',
             wordBreak: 'break-word'
           }}
-          title={lastContradiction?.reason || (content !== undefined ? String(content) : undefined)}>
-            {lastContradiction ? '⚠' : content !== undefined ? String(content) : '∅'}
+          title={lastContradiction?.reason || (content !== undefined ? formatContentForTooltip(content) : undefined)}>
+            {lastContradiction ? '⚠' : content !== undefined ? formatContentForDisplay(content) : '∅'}
           </div>
         </div>
       </Card>

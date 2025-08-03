@@ -11,12 +11,17 @@
         "position": { "x": 100, "y": 200 },
         "isBoundary": false,
         "blendMode": "accept-last",
-        "content": "Start Value"
+        "content": {
+          "@bassline-type@": "Set",
+          "data": ["apple", "banana", "cherry"]
+        },
+        "name": "Input Data"
       },
       {
         "position": { "x": 700, "y": 200 },
         "isBoundary": false,
-        "blendMode": "accept-last"
+        "blendMode": "accept-last",
+        "name": "Processed Output"
       }
     ],
     "wires": [
@@ -50,7 +55,11 @@
             "position": { "x": 200, "y": 100 },
             "isBoundary": false,
             "blendMode": "merge",
-            "content": "Processor"
+            "content": {
+              "@bassline-type@": "Map",
+              "data": [["transform", "uppercase"], ["filter", "fruits"]]
+            },
+            "name": "Processor Logic"
           },
           {
             "position": { "x": 350, "y": 100 },
