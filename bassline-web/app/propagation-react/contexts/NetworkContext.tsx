@@ -42,9 +42,10 @@ export function useNetworkContext() {
 interface NetworkProviderProps {
   children: ReactNode
   initialNetwork?: PropagationNetwork
+  skipDefaultContent?: boolean
 }
 
-export function NetworkProvider({ children, initialNetwork }: NetworkProviderProps) {
+export function NetworkProvider({ children, initialNetwork, skipDefaultContent = false }: NetworkProviderProps) {
   // Create the core network
   const [network] = useState(() => initialNetwork || new PropagationNetwork())
   const [currentGroupId, setCurrentGroupId] = useState(network.currentGroup.id)
@@ -178,8 +179,8 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
   
   // Effect 1: Initialize with example data (only on mount)
   useEffect(() => {
-    // Only initialize if the network is empty
-    if (network.rootGroup.contacts.size === 0 && network.rootGroup.subgroups.size === 0) {
+    // Only initialize if the network is empty and skipDefaultContent is false
+    if (!skipDefaultContent && network.rootGroup.contacts.size === 0 && network.rootGroup.subgroups.size === 0) {
       const c1 = network.addContact({ x: 100, y: 100 }, appSettings.propagation.defaultBlendMode)
       const c2 = network.addContact({ x: 300, y: 100 }, appSettings.propagation.defaultBlendMode)
       network.connect(c1.id, c2.id)
@@ -213,7 +214,7 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
     
     // Always sync on mount (whether we added example data or loaded from template)
     syncToReactFlow()
-  }, []) // Only run once on mount
+  }, [skipDefaultContent, network, appSettings.propagation.defaultBlendMode, appSettings.propagation.defaultBoundaryBlendMode, syncToReactFlow]) // Only run once on mount
   
   // Effect 2: Re-sync when current group changes (navigation)
   useEffect(() => {

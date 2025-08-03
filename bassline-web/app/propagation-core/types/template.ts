@@ -6,6 +6,7 @@ export interface ContactTemplate {
   boundaryDirection?: 'input' | 'output'
   name?: string
   blendMode: 'accept-last' | 'merge'
+  content?: any // Store the contact's current value
 }
 
 export interface WireTemplate {

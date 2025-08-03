@@ -1529,11 +1529,115 @@ This pattern will make it trivial to:
 - Visual feedback (like fat edges) greatly improves understanding of data flow
 - Small UI improvements (font size, auto-select) have big impact on usability
 
+## Network Loading and File Upload Implementation
+
+### The Problem
+Users need to load network configurations ("basslines") from JSON files. Initial implementation used sessionStorage for file uploads, which had several issues:
+1. SessionStorage not available during SSR
+2. Complex client-side state management
+3. Race conditions between navigation and storage
+4. Network being overwritten by default content
+
+### Failed Attempts
+
+#### 1. SessionStorage Approach
+```typescript
+// In home page
+sessionStorage.setItem('uploadedBassline', text);
+navigate('/editor/uploaded');
+
+// In editor
+useEffect(() => {
+  const data = sessionStorage.getItem('uploadedBassline');
+  // Parse and load...
+});
+```
+
+**Why it failed**:
+- sessionStorage undefined during SSR
+- Timing issues with hydration
+- NetworkContext's default content initialization overwrote loaded networks
+
+#### 2. Client-Only Wrapper
+Tried wrapping file upload in ClientOnly component, but still had issues with:
+- Data not persisting across navigation
+- Complex useEffect chains
+- State management getting out of sync
+
+### The Solution: React Router Patterns
+
+#### 1. Server Action for File Upload
+```typescript
+// In home.tsx
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const file = formData.get("basslineFile") as File;
+  
+  const text = await file.text();
+  const template = JSON.parse(text);
+  
+  // Encode in URL and redirect
+  const encodedTemplate = Buffer.from(text).toString('base64');
+  return redirect(`/editor/uploaded?data=${encodedTemplate}&name=${file.name}`);
+}
+```
+
+#### 2. Loader Handles All Data
+```typescript
+// In editor.$bassline.tsx
+export async function loader({ params, request }: LoaderFunctionArgs) {
+  if (params.bassline === 'uploaded') {
+    const url = new URL(request.url);
+    const encodedData = url.searchParams.get('data');
+    
+    // Decode and return template
+    const decodedData = Buffer.from(encodedData, 'base64').toString('utf-8');
+    return { template: JSON.parse(decodedData), basslineName };
+  }
+  // ... handle file-based basslines
+}
+```
+
+#### 3. Prevent Default Content
+Added `skipDefaultContent` prop to NetworkProvider to prevent initialization:
+```typescript
+interface NetworkProviderProps {
+  skipDefaultContent?: boolean;
+}
+
+// In effect
+if (!skipDefaultContent && network.rootGroup.contacts.size === 0) {
+  // Add default content
+}
+```
+
+### Lessons Learned
+
+#### 1. Use Framework Patterns
+React Router provides actions and loaders for a reason - they handle:
+- SSR/client compatibility automatically
+- Data flow through navigation
+- Form handling with proper encoding
+- Error boundaries and loading states
+
+#### 2. Avoid Client-Side Storage for Navigation
+- sessionStorage/localStorage are fragile for navigation
+- URL parameters or server state are more reliable
+- Let the framework handle data flow
+
+#### 3. Component Initialization Order Matters
+- NetworkContext was initializing before uploaded data was available
+- Solution: Control when components render, not when they initialize
+- Use loader data to create initial state
+
+#### 4. Read the Docs
+When stuck, reading framework documentation reveals idiomatic solutions that are simpler and more robust than custom implementations.
+
 ## Next Steps
 
 - Performance optimization for large networks
 - Undo/redo system  
-- Network persistence and serialization
+- Store contact values in network serialization
 - Additional primitive gadgets (filters, transformers, aggregators)
 - Enhanced debugging tools (value inspection, propagation tracing)
 - Keyboard shortcuts for common operations

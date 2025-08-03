@@ -1,7 +1,7 @@
 import type { Route } from "./+types/home";
-import { Link, useNavigate } from "react-router";
+import { Link, Form, redirect, useActionData, useNavigation } from "react-router";
 import { Button } from "~/components/ui/button";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { toast } from "sonner";
 
 export function meta({}: Route.MetaArgs) {
@@ -9,6 +9,35 @@ export function meta({}: Route.MetaArgs) {
     { title: "Bassline" },
     { name: "description", content: "Propagation networks" },
   ];
+}
+
+// Server action to handle file upload
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const file = formData.get("basslineFile") as File;
+  
+  if (!file || file.size === 0) {
+    return { error: "No file uploaded" };
+  }
+  
+  try {
+    const text = await file.text();
+    const template = JSON.parse(text);
+    
+    // Validate the template
+    if (!template.rootGroup) {
+      return { error: "Invalid bassline format: missing rootGroup" };
+    }
+    
+    // Store in a temporary location (in production, you'd use a proper storage solution)
+    // For now, we'll encode it in the URL as a base64 string
+    const encodedTemplate = Buffer.from(text).toString('base64');
+    
+    // Redirect to the editor with the encoded template
+    return redirect(`/editor/uploaded?data=${encodedTemplate}&name=${encodeURIComponent(file.name.replace('.json', ''))}`);
+  } catch (error) {
+    return { error: "Failed to parse bassline file" };
+  }
 }
 
 // Available basslines - in a real app, this might come from a loader
@@ -31,28 +60,16 @@ const basslines = [
 ];
 
 export default function Home() {
-  const navigate = useNavigate();
+  const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isUploading = navigation.state === "submitting";
   
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
-    try {
-      const text = await file.text();
-      const template = JSON.parse(text);
-      
-      // Store the template in sessionStorage
-      sessionStorage.setItem('uploadedBassline', text);
-      sessionStorage.setItem('uploadedBasslineName', file.name.replace('.json', ''));
-      
-      // Navigate to a special route for uploaded basslines
-      navigate('/editor/uploaded');
-    } catch (error) {
-      console.error('Failed to load bassline:', error);
-      toast.error('Failed to load bassline. Please check the file format.');
+  useEffect(() => {
+    if (actionData?.error) {
+      toast.error(actionData.error);
     }
-  };
+  }, [actionData]);
   
   return (
     <div className="min-h-screen bg-slate-50">
@@ -88,23 +105,36 @@ export default function Home() {
           ))}
           
           {/* Load from file */}
-          <div 
-            className="border border-dashed border-slate-300 rounded-lg p-6 hover:border-slate-400 hover:shadow-lg transition-all cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <h2 className="text-xl font-semibold mb-2">Load from File</h2>
-            <p className="text-slate-600 mb-4">
-              Upload a bassline JSON file from your computer
-            </p>
-            <Button variant="secondary">Choose File</Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </div>
+          <Form method="post" encType="multipart/form-data">
+            <div 
+              className="border border-dashed border-slate-300 rounded-lg p-6 hover:border-slate-400 hover:shadow-lg transition-all cursor-pointer"
+              onClick={() => !isUploading && fileInputRef.current?.click()}
+            >
+              <h2 className="text-xl font-semibold mb-2">Load from File</h2>
+              <p className="text-slate-600 mb-4">
+                Upload a bassline JSON file from your computer
+              </p>
+              <Button 
+                type="button" 
+                variant="secondary" 
+                disabled={isUploading}
+              >
+                {isUploading ? "Uploading..." : "Choose File"}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                name="basslineFile"
+                accept=".json"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    e.target.form?.requestSubmit();
+                  }
+                }}
+                className="hidden"
+              />
+            </div>
+          </Form>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -37,13 +37,28 @@ import { SoundSystemProvider } from "~/components/SoundSystem";
 import { PropagationNetwork, type NetworkTemplate } from "~/propagation-core/models/PropagationNetwork";
 
 // Loader to fetch the bassline template
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
   const basslineName = params.bassline;
+  const url = new URL(request.url);
   
   // Special case for uploaded basslines
   if (basslineName === 'uploaded') {
-    // This will be handled on the client side
-    return { template: null, basslineName: 'uploaded' };
+    const encodedData = url.searchParams.get('data');
+    const name = url.searchParams.get('name');
+    
+    if (encodedData) {
+      try {
+        // Decode the template from base64
+        const decodedData = Buffer.from(encodedData, 'base64').toString('utf-8');
+        const template: NetworkTemplate = JSON.parse(decodedData);
+        return { template, basslineName: name || 'uploaded' };
+      } catch (error) {
+        console.error('Failed to decode uploaded bassline:', error);
+        throw new Response("Invalid bassline data", { status: 400 });
+      }
+    } else {
+      throw new Response("No bassline data provided", { status: 400 });
+    }
   }
   
   try {
@@ -75,7 +90,7 @@ const edgeTypes = {
   fat: FatEdge,
 };
 
-function Flow({ initialNetwork, basslineName }: { initialNetwork: PropagationNetwork; basslineName: string }) {
+function Flow({ basslineName }: { basslineName: string }) {
   const { screenToFlowPosition } = useReactFlow();
   const {
     appSettings,
@@ -114,7 +129,7 @@ function Flow({ initialNetwork, basslineName }: { initialNetwork: PropagationNet
     },
   });
 
-  const palette = useInitializedPalette(initialNetwork);
+  const palette = useInitializedPalette(contextNetwork);
   const propertyPanel = usePropertyPanel();
   const { viewSettings, setViewSettings } = useViewSettings();
   const [showConfiguration, setShowConfiguration] = useState(false);
@@ -294,12 +309,21 @@ function Flow({ initialNetwork, basslineName }: { initialNetwork: PropagationNet
         };
         const flowPos = screenToFlowPosition(screenPos);
 
-        // Create new contact at drop position
-        const newContact = addContact(flowPos);
+        // Create a new contact at the drop position
+        const newContact = addContact({ x: flowPos.x, y: flowPos.y });
 
-        // Connect from the source to the new contact
-        const sourceId = connectionState.fromHandle || connectionState.fromNode.id;
-        connect(sourceId, newContact.id);
+        if (newContact) {
+          // Use handle ID if dragging from a gadget, otherwise use node ID
+          const sourceId =
+            connectionState.fromHandle?.id || connectionState.fromNode.id;
+
+          // Connect based on the handle type
+          if (connectionState.fromHandle?.type === "source") {
+            connect(sourceId, newContact.id);
+          } else {
+            connect(newContact.id, sourceId);
+          }
+        }
       }
     },
     [screenToFlowPosition, addContact, connect],
@@ -654,58 +678,32 @@ function Flow({ initialNetwork, basslineName }: { initialNetwork: PropagationNet
 }
 
 export default function EditorWithBassline() {
-  const { template: serverTemplate, basslineName } = useLoaderData<typeof loader>();
-  
-  // Handle uploaded basslines
-  const [template, setTemplate] = useState<NetworkTemplate | null>(serverTemplate);
-  const [actualBasslineName, setActualBasslineName] = useState(basslineName);
-  
-  useEffect(() => {
-    if (basslineName === 'uploaded') {
-      // Load from sessionStorage
-      const uploadedData = sessionStorage.getItem('uploadedBassline');
-      const uploadedName = sessionStorage.getItem('uploadedBasslineName');
-      
-      if (uploadedData) {
-        try {
-          const uploadedTemplate = JSON.parse(uploadedData);
-          setTemplate(uploadedTemplate);
-          setActualBasslineName(uploadedName || 'uploaded');
-          
-          // Clear sessionStorage
-          sessionStorage.removeItem('uploadedBassline');
-          sessionStorage.removeItem('uploadedBasslineName');
-        } catch (error) {
-          console.error('Failed to parse uploaded bassline:', error);
-          toast.error('Failed to load uploaded bassline');
-        }
-      }
-    }
-  }, [basslineName]);
+  const { template, basslineName } = useLoaderData<typeof loader>();
   
   // Create network from template
-  const [initialNetwork] = useState(() => {
-    if (!template) return new PropagationNetwork();
-    const network = PropagationNetwork.fromTemplate(template);
-    return network;
-  });
+  const network = useMemo(() => {
+    if (template) {
+      return PropagationNetwork.fromTemplate(template);
+    }
+    return new PropagationNetwork();
+  }, [template]);
   
   useEffect(() => {
     if (template) {
-      toast.success(`Loaded bassline: ${actualBasslineName}`);
+      toast.success(`Loaded bassline: ${basslineName}`);
     }
-  }, [actualBasslineName, template]);
+  }, [template, basslineName]);
   
   return (
     <SoundSystemProvider>
       <div className="h-screen w-screen bg-slate-50">
-        <ClientOnly fallback={<div>Loading...</div>}>
-          <NetworkProvider initialNetwork={initialNetwork}>
-            <ReactFlowProvider>
-              <Flow initialNetwork={initialNetwork} basslineName={actualBasslineName || 'untitled'} />
-            </ReactFlowProvider>
-          </NetworkProvider>
-        </ClientOnly>
+        <NetworkProvider initialNetwork={network} key={basslineName} skipDefaultContent={true}>
+          <ReactFlowProvider>
+            <ClientOnly fallback={<div>Loading...</div>}>
+              <Flow basslineName={basslineName || 'untitled'} />
+            </ClientOnly>
+          </ReactFlowProvider>
+        </NetworkProvider>
       </div>
     </SoundSystemProvider>
   );

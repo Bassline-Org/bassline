@@ -43,7 +43,7 @@ export function useInitializedPalette(network: PropagationNetwork) {
     
     // Start extraction from the root group
     extractGadgetsRecursively(network.rootGroup)
-  }, []) // Only run once on mount
+  }, [network, palette]) // Re-run when network changes
   
   return palette
 }
