@@ -209,9 +209,10 @@ export function NetworkProvider({ children, initialNetwork }: NetworkProviderPro
       // Connect the gadget to the network
       network.connect(c2.id, input.id)
       network.connect(output.id, c1.id)
-      
-      syncToReactFlow()
     }
+    
+    // Always sync on mount (whether we added example data or loaded from template)
+    syncToReactFlow()
   }, []) // Only run once on mount
   
   // Effect 2: Re-sync when current group changes (navigation)

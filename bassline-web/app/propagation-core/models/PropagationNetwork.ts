@@ -5,6 +5,16 @@ import { Wire } from './Wire'
 import type { GadgetTemplate } from '../types/template'
 import { createPrimitiveGadget, PRIMITIVE_GADGETS } from '../primitives-registry'
 
+// Network template includes metadata and the root group template
+export interface NetworkTemplate {
+  name: string
+  description?: string
+  version?: string
+  author?: string
+  createdAt?: string
+  rootGroup: GadgetTemplate
+}
+
 export class PropagationNetwork {
   rootGroup: ContactGroup
   currentGroup: ContactGroup
@@ -123,5 +133,28 @@ export class PropagationNetwork {
     gadget.position = { ...position }
     this.currentGroup.subgroups.set(gadget.id, gadget)
     return gadget
+  }
+  
+  // Serialize the entire network to a template
+  toTemplate(name: string, description?: string): NetworkTemplate {
+    return {
+      name,
+      description,
+      version: '1.0',
+      author: 'Bassline',
+      createdAt: new Date().toISOString(),
+      rootGroup: this.rootGroup.toTemplate()
+    }
+  }
+  
+  // Create a network from a template
+  static fromTemplate(template: NetworkTemplate): PropagationNetwork {
+    const network = new PropagationNetwork()
+    
+    // Replace the root group with the one from the template
+    network.rootGroup = ContactGroup.fromTemplate(template.rootGroup)
+    network.currentGroup = network.rootGroup
+    
+    return network
   }
 }

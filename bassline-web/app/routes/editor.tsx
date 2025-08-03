@@ -200,8 +200,47 @@ function Flow() {
     }
   }, [selection, applyLayout, applyLayoutToSelection]);
 
+  const handleSaveBassline = useCallback(async () => {
+    try {
+      const name = prompt("Enter a name for this bassline:", "my-bassline");
+      if (!name) return;
+      
+      const networkTemplate = network.toTemplate(name, `Created in editor`);
+      
+      // Convert to JSON
+      const jsonContent = JSON.stringify(networkTemplate, null, 2);
+      
+      // Create a blob and download it
+      const blob = new Blob([jsonContent], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`Saved bassline as ${name}.json`);
+    } catch (error) {
+      console.error('Failed to save bassline:', error);
+      toast.error('Failed to save bassline');
+    }
+  }, [network]);
+
   const breadcrumbs = getBreadcrumbs();
   const hasShownWelcome = useRef(false);
+  
+  // Track current group ID for navigation changes
+  const currentGroupIdRef = useRef(network.currentGroup.id);
+  
+  // Update after navigation to ensure proper rendering
+  useEffect(() => {
+    if (currentGroupIdRef.current !== network.currentGroup.id) {
+      currentGroupIdRef.current = network.currentGroup.id;
+      // React Flow should handle node updates automatically in newer versions
+    }
+  }, [network.currentGroup.id]);
 
   // Show welcome toast on mount (if hints are enabled)
   useEffect(() => {
@@ -427,6 +466,10 @@ function Flow() {
         elementsSelectable={true}
         fitView
         className="select-none"
+        panOnScroll={false}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        panOnDrag={true}
       >
         {viewSettings.showGrid && (
           <Background gap={12} className="!bg-muted/20" size={1} />
@@ -456,6 +499,14 @@ function Flow() {
             </Button>
             <Button onClick={handleAddGroup} size="sm" variant="secondary">
               Add Gadget
+            </Button>
+            <Button 
+              onClick={handleSaveBassline} 
+              size="sm" 
+              variant="outline"
+              title="Save bassline (Cmd/Ctrl+S)"
+            >
+              💾 Save
             </Button>
           </div>
           {hasSelection && (

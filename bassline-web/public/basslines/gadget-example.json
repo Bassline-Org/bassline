@@ -1,0 +1,64 @@
+{
+  "name": "Gadget Example",
+  "description": "A network with a custom gadget that has boundary contacts",
+  "version": "1.0",
+  "author": "Bassline",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "rootGroup": {
+    "name": "Root",
+    "contacts": [
+      {
+        "position": { "x": 100, "y": 200 },
+        "isBoundary": false,
+        "blendMode": "accept-last"
+      },
+      {
+        "position": { "x": 700, "y": 200 },
+        "isBoundary": false,
+        "blendMode": "accept-last"
+      }
+    ],
+    "wires": [],
+    "subgroupTemplates": [
+      {
+        "name": "Processing Gadget",
+        "contacts": [
+          {
+            "position": { "x": 50, "y": 100 },
+            "isBoundary": true,
+            "boundaryDirection": "input",
+            "name": "in",
+            "blendMode": "accept-last"
+          },
+          {
+            "position": { "x": 200, "y": 100 },
+            "isBoundary": false,
+            "blendMode": "merge"
+          },
+          {
+            "position": { "x": 350, "y": 100 },
+            "isBoundary": true,
+            "boundaryDirection": "output",
+            "name": "out",
+            "blendMode": "accept-last"
+          }
+        ],
+        "wires": [
+          {
+            "fromIndex": 0,
+            "toIndex": 1,
+            "type": "bidirectional"
+          },
+          {
+            "fromIndex": 1,
+            "toIndex": 2,
+            "type": "bidirectional"
+          }
+        ],
+        "subgroupTemplates": [],
+        "boundaryIndices": [0, 2]
+      }
+    ],
+    "boundaryIndices": []
+  }
+}

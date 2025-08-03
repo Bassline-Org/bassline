@@ -55,12 +55,17 @@ export class ContactGroup {
   }
   
   connect(fromId: ContactId, toId: ContactId, type: 'bidirectional' | 'directed' = 'bidirectional'): Wire {
-    const wire = new Wire(generateId(), fromId, toId, type)
-    this.wires.set(wire.id, wire)
-    
-    // Immediately propagate any existing content through the new connection
+    // Validate contacts exist before creating wire
     const fromContact = this.canConnectTo(fromId)
     const toContact = this.canConnectTo(toId)
+    
+    if (!fromContact || !toContact) {
+      console.warn(`Cannot connect: contacts not found. From: ${fromId} (${fromContact ? 'found' : 'missing'}), To: ${toId} (${toContact ? 'found' : 'missing'})`)
+      throw new Error(`Cannot connect non-existent contacts: ${!fromContact ? fromId : toId}`)
+    }
+    
+    const wire = new Wire(generateId(), fromId, toId, type)
+    this.wires.set(wire.id, wire)
     
     if (fromContact && fromContact.content !== undefined && fromContact.content !== null) {
       // Propagate from source to target
@@ -389,7 +394,17 @@ export class ContactGroup {
       const toId = indexToContactId.get(wireTemplate.toIndex)
       
       if (fromId && toId) {
-        group.connect(fromId, toId, wireTemplate.type)
+        try {
+          group.connect(fromId, toId, wireTemplate.type)
+        } catch (error) {
+          console.error(`Failed to connect wire in template instantiation: ${error}`)
+          console.error(`Wire template: fromIndex=${wireTemplate.fromIndex}, toIndex=${wireTemplate.toIndex}`)
+          console.error(`Mapped IDs: fromId=${fromId}, toId=${toId}`)
+          console.error(`Available contacts in group "${group.name}":`, Array.from(group.contacts.keys()))
+          console.error(`Index to ID mapping:`, Array.from(indexToContactId.entries()))
+        }
+      } else {
+        console.warn(`Missing contact IDs for wire: fromIndex=${wireTemplate.fromIndex} (${fromId}), toIndex=${wireTemplate.toIndex} (${toId})`)
       }
     })
     
