@@ -16,6 +16,7 @@ import { usePalette } from "~/propagation-react/hooks/usePalette";
 import { useProximityConnect } from "~/propagation-react/hooks/useProximityConnect";
 import { useViewSettings } from "~/propagation-react/hooks/useViewSettings";
 import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
+import { useLayout } from "~/propagation-react/hooks/useLayout";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
@@ -30,6 +31,7 @@ import { FatEdge } from "~/components/edges/FatEdge";
 import type { GadgetTemplate } from "~/propagation-core/types/template";
 import type { Position } from "~/propagation-core";
 import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
+import { SoundSystemProvider } from "~/components/SoundSystem";
 
 const nodeTypes = {
   contact: ContactNode,
@@ -43,12 +45,12 @@ const edgeTypes = {
 
 function Flow() {
   const { screenToFlowPosition } = useReactFlow();
-  const { 
-    appSettings, 
-    updatePropagationSettings, 
-    updateVisualSettings, 
+  const {
+    appSettings,
+    updatePropagationSettings,
+    updateVisualSettings,
     updateBehaviorSettings,
-    resetSettings 
+    resetSettings,
   } = useNetworkContext();
 
   const {
@@ -76,17 +78,17 @@ function Flow() {
   } = usePropagationNetwork({
     onContactDoubleClick: (contactId) => {
       propertyPanel.show(true); // true = focus input
-    }
+    },
   });
 
   const palette = usePalette();
   const propertyPanel = usePropertyPanel();
   const { viewSettings, setViewSettings } = useViewSettings();
   const [showConfiguration, setShowConfiguration] = useState(false);
+  const { applyLayout, applyLayoutToSelection } = useLayout();
 
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
-
 
   const handleAddContact = useCallback(() => {
     const position = {
@@ -180,6 +182,22 @@ function Flow() {
     convertToBoundary();
   }, [convertToBoundary]);
 
+  const handleAutoLayout = useCallback(() => {
+    if (selection.contacts.size > 0 || selection.groups.size > 0) {
+      // Layout only selected nodes
+      const selectedNodeIds = new Set([
+        ...selection.contacts,
+        ...selection.groups,
+      ]);
+      applyLayoutToSelection(selectedNodeIds);
+      toast.success("Applied layout to selection");
+    } else {
+      // Layout all nodes
+      applyLayout();
+      toast.success("Applied auto layout");
+    }
+  }, [selection, applyLayout, applyLayoutToSelection]);
+
   const breadcrumbs = getBreadcrumbs();
   const hasShownWelcome = useRef(false);
 
@@ -198,10 +216,12 @@ function Flow() {
     const handleKeyPress = (e: KeyboardEvent) => {
       // Don't handle shortcuts if user is typing in an input field
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'SELECT' ||
-          target.isContentEditable) {
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      ) {
         return;
       }
 
@@ -219,6 +239,11 @@ function Flow() {
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "t") {
         e.preventDefault();
         propertyPanel.toggleVisibility();
+      }
+      // L for auto layout
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "l") {
+        e.preventDefault();
+        handleAutoLayout();
       }
 
       // W to toggle instructions (left hand: W with ring finger)
@@ -283,6 +308,7 @@ function Flow() {
     setViewSettings,
     addContact,
     handleAddGroup,
+    handleAutoLayout,
     toast,
   ]);
 
@@ -315,14 +341,15 @@ function Flow() {
           y: event.clientY,
         };
         const flowPos = screenToFlowPosition(screenPos);
-        
+
         // Create a new contact at the drop position
         const newContact = addContact({ x: flowPos.x, y: flowPos.y });
-        
+
         if (newContact) {
           // Use handle ID if dragging from a gadget, otherwise use node ID
-          const sourceId = connectionState.fromHandle?.id || connectionState.fromNode.id;
-          
+          const sourceId =
+            connectionState.fromHandle?.id || connectionState.fromNode.id;
+
           // Connect based on the handle type
           if (connectionState.fromHandle?.type === "source") {
             connect(sourceId, newContact.id);
@@ -397,7 +424,9 @@ function Flow() {
         fitView
         className="select-none"
       >
-        {viewSettings.showGrid && <Background gap={12} className="!bg-muted/20" size={1} />}
+        {viewSettings.showGrid && (
+          <Background gap={12} className="!bg-muted/20" size={1} />
+        )}
         {/* <Controls /> */}
         {viewSettings.showMiniMap && <MiniMap />}
 
@@ -498,6 +527,7 @@ function Flow() {
               <div>S → Add gadget</div>
               <div>D → Toggle grid</div>
               <div>T → Toggle properties</div>
+              <div>L → Auto layout</div>
             </div>
           )}
         </Panel>
@@ -508,6 +538,7 @@ function Flow() {
               viewSettings={viewSettings}
               onViewSettingsChange={setViewSettings}
               onOpenConfiguration={() => setShowConfiguration(true)}
+              onAutoLayout={handleAutoLayout}
             />
           </ClientOnly>
         </Panel>
@@ -526,7 +557,6 @@ function Flow() {
           getRecent={palette.getRecent}
         />
       </ClientOnly>
-
 
       <ClientOnly>
         <PropertyPanel
@@ -555,7 +585,9 @@ export default function Editor() {
     <NetworkProvider>
       <ReactFlowProvider>
         <ClientOnly>
-          <Flow />
+          <SoundSystemProvider>
+            <Flow />
+          </SoundSystemProvider>
         </ClientOnly>
       </ReactFlowProvider>
     </NetworkProvider>

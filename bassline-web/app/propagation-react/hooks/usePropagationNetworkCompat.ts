@@ -1,29 +1,40 @@
-import { useCallback } from 'react'
-import { 
-  type Connection, 
+import { useCallback, useRef, useState, useEffect } from "react";
+import {
+  type Connection,
   type NodeChange,
   type EdgeChange,
   applyNodeChanges,
-  applyEdgeChanges
-} from '@xyflow/react'
-import type { Position } from '../../propagation-core'
-import { useNetworkContext } from '../contexts/NetworkContext'
-import { useContactSelection } from './useContactSelection'
-import { useCurrentGroup } from './useCurrentGroup'
-import { usePalette } from './usePalette'
-import type { GadgetTemplate } from '../../propagation-core/types/template'
+  applyEdgeChanges,
+} from "@xyflow/react";
+import type { Position } from "../../propagation-core";
+import { useNetworkContext } from "../contexts/NetworkContext";
+import { useContactSelection } from "./useContactSelection";
+import { useCurrentGroup } from "./useCurrentGroup";
+import { usePalette } from "./usePalette";
+import type { GadgetTemplate } from "../../propagation-core/types/template";
+import { useSound } from "~/components/SoundSystem";
 
 interface UsePropagationNetworkOptions {
-  onContactDoubleClick?: (contactId: string) => void
+  onContactDoubleClick?: (contactId: string) => void;
 }
 
 /**
  * Compatibility hook that provides the same interface as the old usePropagationNetwork
  * but uses the new context and hooks under the hood.
  */
-export function usePropagationNetwork(options: UsePropagationNetworkOptions = {}) {
-  const { onContactDoubleClick } = options
-  const { network, syncToReactFlow, nodes, edges, setNodes, setEdges } = useNetworkContext()
+export function usePropagationNetwork(
+  options: UsePropagationNetworkOptions = {},
+) {
+  const { play: playDeleteNodeSound } = useSound("node/delete");
+  const { play: playDeleteGadgetSound } = useSound("gadget/delete");
+  const { play: playDeleteConnectionSound } = useSound("connection/delete");
+  const { onContactDoubleClick } = options;
+  
+  // Use a single ref to track delete sound cooldown (shared between nodes and connections)
+  const deleteSoundCooldownRef = useRef<boolean>(false);
+  
+  const { network, syncToReactFlow, nodes, edges, setNodes, setEdges } =
+    useNetworkContext();
   const {
     selection,
     hasSelection,
@@ -31,8 +42,8 @@ export function usePropagationNetwork(options: UsePropagationNetworkOptions = {}
     clearSelection,
     extractSelected,
     inlineSelectedGadget,
-    convertSelectedToBoundary
-  } = useContactSelection()
+    convertSelectedToBoundary,
+  } = useContactSelection();
   const {
     currentGroup,
     breadcrumbs,
@@ -41,113 +52,174 @@ export function usePropagationNetwork(options: UsePropagationNetworkOptions = {}
     addContact,
     addBoundaryContact,
     createSubgroup,
-    connect
-  } = useCurrentGroup()
-  const palette = usePalette()
-  
+    connect,
+  } = useCurrentGroup();
+  const palette = usePalette();
+
   // Handle selection changes
-  const onSelectionChange = useCallback(({ nodes, edges }: { nodes: any[], edges: any[] }) => {
-    updateSelection(nodes, edges)
-  }, [updateSelection])
-  
+  const onSelectionChange = useCallback(
+    ({ nodes, edges }: { nodes: any[]; edges: any[] }) => {
+      updateSelection(nodes, edges);
+    },
+    [updateSelection],
+  );
+
   // Handle node changes (position updates and deletions)
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    // Apply changes to React Flow state
-    setNodes(nds => applyNodeChanges(changes, nds))
-    
-    // Handle changes in core network
-    changes.forEach(change => {
-      if (change.type === 'position' && change.position) {
-        // Check if it's a contact or a group
-        const contact = network.findContact(change.id)
-        if (contact) {
-          contact.position = change.position
-        } else {
-          // Check if it's a group
-          const group = network.findGroup(change.id)
-          if (group) {
-            group.position = change.position
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      // Apply changes to React Flow state
+      setNodes((nds) => applyNodeChanges(changes, nds));
+
+      // Track if we have any deletions in this batch
+      let hasNodeRemovals = false;
+      let hasGadgetRemovals = false;
+
+      // Handle changes in core network
+      changes.forEach((change) => {
+        if (change.type === "position" && change.position) {
+          // Check if it's a contact or a group
+          const contact = network.findContact(change.id);
+          if (contact) {
+            contact.position = change.position;
+          } else {
+            // Check if it's a group
+            const group = network.findGroup(change.id);
+            if (group) {
+              group.position = change.position;
+            }
           }
+        } else if (change.type === "remove") {
+          // Try to remove as contact first
+          const removed = network.removeContact(change.id);
+          if (removed) {
+            hasNodeRemovals = true;
+          } else {
+            // If not a contact, try to remove as a group
+            const removedGroup = network.removeGroup(change.id);
+            if (removedGroup) {
+              hasGadgetRemovals = true;
+            }
+          }
+          
+          // Sync to update edges that might have been removed
+          syncToReactFlow();
         }
-      } else if (change.type === 'remove') {
-        // Try to remove as contact first
-        const removed = network.removeContact(change.id)
-        if (!removed) {
-          // If not a contact, try to remove as a group
-          network.removeGroup(change.id)
+      });
+
+      // Play sound only once for the entire batch
+      if ((hasNodeRemovals || hasGadgetRemovals) && !deleteSoundCooldownRef.current) {
+        // Prefer gadget sound if any gadgets were deleted
+        if (hasGadgetRemovals) {
+          playDeleteGadgetSound();
+        } else {
+          playDeleteNodeSound();
         }
-        // Sync to update edges that might have been removed
-        syncToReactFlow()
+        deleteSoundCooldownRef.current = true;
+        setTimeout(() => {
+          deleteSoundCooldownRef.current = false;
+        }, 100); // Increased to 100ms to catch cascading deletes
       }
-    })
-  }, [network, syncToReactFlow, setNodes])
-  
+    },
+    [network, syncToReactFlow, setNodes, playDeleteNodeSound, playDeleteGadgetSound],
+  );
+
   // Handle edge changes
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    setEdges(eds => applyEdgeChanges(changes, eds))
-    
-    // Handle edge deletions in core network
-    changes.forEach(change => {
-      if (change.type === 'remove') {
-        currentGroup.removeWire(change.id)
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+
+      // Track if we have any deletions in this batch
+      let hasRemovals = false;
+
+      // Handle edge deletions in core network
+      changes.forEach((change) => {
+        if (change.type === "remove") {
+          currentGroup.removeWire(change.id);
+          hasRemovals = true;
+        }
+      });
+
+      // Sync after processing changes to ensure UI reflects the updated state
+      if (hasRemovals) {
+        syncToReactFlow();
+        
+        // Play sound only once for the entire batch (using shared cooldown)
+        if (!deleteSoundCooldownRef.current) {
+          playDeleteConnectionSound();
+          deleteSoundCooldownRef.current = true;
+          setTimeout(() => {
+            deleteSoundCooldownRef.current = false;
+          }, 100); // Increased to 100ms to catch cascading deletes
+        }
       }
-    })
-    
-    // Sync after processing changes to ensure UI reflects the updated state
-    if (changes.some(change => change.type === 'remove')) {
-      syncToReactFlow()
-    }
-  }, [currentGroup, syncToReactFlow, setEdges])
-  
+    },
+    [currentGroup, syncToReactFlow, setEdges, playDeleteConnectionSound],
+  );
+
   // Handle new connections
-  const onConnect = useCallback((connection: Connection) => {
-    if (connection.source && connection.target) {
-      // Handle connections involving group nodes (which use handle IDs for boundary contacts)
-      let sourceId = connection.source
-      let targetId = connection.target
-      
-      // If source is a group node with a handle, use the handle ID (which is the boundary contact ID)
-      if (connection.sourceHandle) {
-        sourceId = connection.sourceHandle
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      if (connection.source && connection.target) {
+        // Handle connections involving group nodes (which use handle IDs for boundary contacts)
+        let sourceId = connection.source;
+        let targetId = connection.target;
+
+        // If source is a group node with a handle, use the handle ID (which is the boundary contact ID)
+        if (connection.sourceHandle) {
+          sourceId = connection.sourceHandle;
+        }
+
+        // If target is a group node with a handle, use the handle ID (which is the boundary contact ID)
+        if (connection.targetHandle) {
+          targetId = connection.targetHandle;
+        }
+
+        connect(sourceId, targetId);
       }
-      
-      // If target is a group node with a handle, use the handle ID (which is the boundary contact ID)
-      if (connection.targetHandle) {
-        targetId = connection.targetHandle
-      }
-      
-      connect(sourceId, targetId)
-    }
-  }, [connect])
-  
+    },
+    [connect],
+  );
+
   // Refactoring operations wrapped for compatibility
-  const extractToGadget = useCallback((gadgetName: string) => {
-    const newGadget = extractSelected(gadgetName)
-    return newGadget !== null
-  }, [extractSelected])
-  
-  const inlineGadget = useCallback((gadgetId: string) => {
-    return inlineSelectedGadget()
-  }, [inlineSelectedGadget])
-  
+  const extractToGadget = useCallback(
+    (gadgetName: string) => {
+      const newGadget = extractSelected(gadgetName);
+      return newGadget !== null;
+    },
+    [extractSelected],
+  );
+
+  const inlineGadget = useCallback(
+    (gadgetId: string) => {
+      return inlineSelectedGadget();
+    },
+    [inlineSelectedGadget],
+  );
+
   const convertToBoundary = useCallback(() => {
-    return convertSelectedToBoundary()
-  }, [convertSelectedToBoundary])
-  
+    return convertSelectedToBoundary();
+  }, [convertSelectedToBoundary]);
+
   // Gadget template methods
-  const saveAsTemplate = useCallback((groupId: string): GadgetTemplate | null => {
-    const group = network.findGroup(groupId)
-    if (!group) return null
-    
-    return group.toTemplate()
-  }, [network])
-  
-  const instantiateTemplate = useCallback((template: GadgetTemplate, position: Position) => {
-    const gadget = network.instantiateTemplate(template, position)
-    syncToReactFlow()
-    return gadget
-  }, [network, syncToReactFlow])
-  
+  const saveAsTemplate = useCallback(
+    (groupId: string): GadgetTemplate | null => {
+      const group = network.findGroup(groupId);
+      if (!group) return null;
+
+      return group.toTemplate();
+    },
+    [network],
+  );
+
+  const instantiateTemplate = useCallback(
+    (template: GadgetTemplate, position: Position) => {
+      const gadget = network.instantiateTemplate(template, position);
+      syncToReactFlow();
+      return gadget;
+    },
+    [network, syncToReactFlow],
+  );
+
   return {
     // React Flow props
     nodes,
@@ -156,32 +228,32 @@ export function usePropagationNetwork(options: UsePropagationNetworkOptions = {}
     onEdgesChange,
     onConnect,
     onSelectionChange,
-    
+
     // API methods
     addContact,
     addBoundaryContact,
     createGroup: createSubgroup,
     updateContent: () => {}, // No longer needed, components use hooks
     connect,
-    
+
     // Direct access to network
     network,
-    
+
     // Navigation
     navigateToGroup,
     navigateToParent,
     getBreadcrumbs: () => breadcrumbs,
     currentGroupId: currentGroup.id,
-    
+
     // Selection and refactoring
     selection,
     hasSelection,
     extractToGadget,
     inlineGadget,
     convertToBoundary,
-    
+
     // Templates
     saveAsTemplate,
-    instantiateTemplate
-  }
+    instantiateTemplate,
+  };
 }

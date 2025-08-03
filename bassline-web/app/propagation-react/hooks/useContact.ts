@@ -8,6 +8,7 @@ interface UseContactReturn {
   content: any
   blendMode: 'accept-last' | 'merge'
   isBoundary: boolean
+  boundaryDirection: 'input' | 'output' | undefined
   isContradicted: boolean
   lastContradiction: Contradiction | null
   position: Position
@@ -18,11 +19,13 @@ interface UseContactReturn {
   setBlendMode: (mode: BlendMode) => void
   setPosition: (position: Position) => void
   setName: (name: string | undefined) => void
+  setBoundary: (isBoundary: boolean, direction?: 'input' | 'output') => void
+  setBoundaryDirection: (direction: 'input' | 'output') => void
   remove: () => void
 }
 
 export function useContact(contactId: string | null | undefined): UseContactReturn {
-  const { network, syncToReactFlow } = useNetworkContext()
+  const { network, syncToReactFlow, setSelection } = useNetworkContext()
   const [contact, setContact] = useState<Contact | null>(null)
   
   // Find and track the contact
@@ -64,6 +67,47 @@ export function useContact(contactId: string | null | undefined): UseContactRetu
     syncToReactFlow()
   }, [contact, syncToReactFlow])
   
+  const setBoundary = useCallback((isBoundary: boolean, direction: 'input' | 'output' = 'input') => {
+    if (!contact) return
+    contact.isBoundary = isBoundary
+    
+    if (isBoundary) {
+      contact.group.boundaryContacts.add(contact.id)
+      contact.boundaryDirection = direction
+    } else {
+      contact.group.boundaryContacts.delete(contact.id)
+      contact.boundaryDirection = undefined
+    }
+    
+    syncToReactFlow()
+    
+    // Re-select the contact to maintain focus
+    setTimeout(() => {
+      setSelection(prev => ({
+        ...prev,
+        contacts: new Set([contact.id]),
+        groups: new Set(),
+        wires: new Set()
+      }))
+    }, 0)
+  }, [contact, syncToReactFlow, setSelection])
+  
+  const setBoundaryDirection = useCallback((direction: 'input' | 'output') => {
+    if (!contact || !contact.isBoundary) return
+    contact.boundaryDirection = direction
+    syncToReactFlow()
+    
+    // Re-select the contact to maintain focus
+    setTimeout(() => {
+      setSelection(prev => ({
+        ...prev,
+        contacts: new Set([contact.id]),
+        groups: new Set(),
+        wires: new Set()
+      }))
+    }, 0)
+  }, [contact, syncToReactFlow, setSelection])
+  
   const remove = useCallback(() => {
     if (!contact) return
     network.removeContact(contact.id)
@@ -76,6 +120,7 @@ export function useContact(contactId: string | null | undefined): UseContactRetu
     content: contact?.content ?? undefined,
     blendMode: contact?.blendMode ?? 'accept-last',
     isBoundary: contact?.isBoundary ?? false,
+    boundaryDirection: contact?.boundaryDirection,
     isContradicted: contact?.lastContradiction !== null,
     lastContradiction: contact?.lastContradiction ?? null,
     position: contact?.position ?? { x: 0, y: 0 },
@@ -86,6 +131,8 @@ export function useContact(contactId: string | null | undefined): UseContactRetu
     setBlendMode,
     setPosition,
     setName,
+    setBoundary,
+    setBoundaryDirection,
     remove
   }
 }

@@ -14,7 +14,8 @@ import {
   Tag,
   Bug,
   Lightbulb,
-  Sliders
+  Sliders,
+  LayoutGrid
 } from 'lucide-react'
 
 export interface ViewSettings {
@@ -31,9 +32,10 @@ interface ToolsMenuProps {
   viewSettings: ViewSettings
   onViewSettingsChange: (settings: ViewSettings) => void
   onOpenConfiguration?: () => void
+  onAutoLayout?: () => void
 }
 
-export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfiguration }: ToolsMenuProps) {
+export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfiguration, onAutoLayout }: ToolsMenuProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   
   const toggleSetting = (key: keyof ViewSettings) => {
@@ -121,6 +123,18 @@ export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfigurat
       )}
       
       <div className="flex gap-2">
+        {onAutoLayout && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="px-4 py-2"
+            onClick={onAutoLayout}
+          >
+            <LayoutGrid className="w-4 h-4 mr-2" />
+            <span>Auto Layout</span>
+            <kbd className="text-xs bg-gray-200 px-1 rounded ml-2">L</kbd>
+          </Button>
+        )}
         {onOpenConfiguration && (
           <Button
             size="sm"

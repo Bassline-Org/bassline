@@ -7,6 +7,7 @@ import type { Contact, ContactGroup, Wire } from '~/propagation-core'
 import { ExtractToGadgetOperation } from '~/propagation-core/refactoring/operations/ExtractToGadget'
 import { InlineGadgetOperation } from '~/propagation-core/refactoring/operations/InlineGadget'
 import { ConvertToBoundaryOperation } from '~/propagation-core/refactoring/operations/ConvertToBoundary'
+import { useSound } from '~/components/SoundSystem'
 
 interface UseContactSelectionReturn {
   // Selected entities (actual objects, not just IDs)
@@ -40,6 +41,7 @@ interface UseContactSelectionReturn {
 
 export function useContactSelection(): UseContactSelectionReturn {
   const { network, syncToReactFlow, selection, setSelection } = useNetworkContext()
+  const { play: playInlineSound } = useSound('gadget/inline')
   
   // Get actual objects from selection IDs
   const selectedContacts = useMemo(() => {
@@ -199,10 +201,11 @@ export function useContactSelection(): UseContactSelectionReturn {
     if (result.success) {
       clearSelection()
       syncToReactFlow()
+      playInlineSound()
     }
     
     return result.success
-  }, [selection, network, clearSelection, syncToReactFlow])
+  }, [selection, network, clearSelection, syncToReactFlow, playInlineSound])
   
   const convertSelectedToBoundary = useCallback((): boolean => {
     if (selection.contacts.size === 0) return false

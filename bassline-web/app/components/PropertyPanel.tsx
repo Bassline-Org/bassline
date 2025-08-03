@@ -189,6 +189,41 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
               />
             </div>
             
+            {/* Boundary Status */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="is-boundary" className="text-sm">Boundary Contact</Label>
+                <Switch
+                  id="is-boundary"
+                  checked={contactData.isBoundary}
+                  onCheckedChange={(checked) => {
+                    contactData.setBoundary(checked)
+                  }}
+                />
+              </div>
+              
+              {/* Boundary Direction */}
+              {contactData.isBoundary && (
+                <div className="space-y-2">
+                  <Label className="text-sm">Direction</Label>
+                  <Select 
+                    value={contactData.boundaryDirection || 'input'} 
+                    onValueChange={(value: 'input' | 'output') => {
+                      contactData.setBoundaryDirection(value)
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="input">Input</SelectItem>
+                      <SelectItem value="output">Output</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            
             {/* Value Type Selector */}
             <div className="space-y-2">
               <Label className="text-sm">Value Type</Label>

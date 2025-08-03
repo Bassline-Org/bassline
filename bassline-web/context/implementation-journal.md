@@ -1298,3 +1298,56 @@ This pattern will make it trivial to:
 - Import JS libraries and wrap their functions as primitive gadgets
 - Support async operations (activation could check if async operation is ready)
 - Add more complex activation policies (e.g., run only if value changed by threshold)
+
+## Session 4: UI Polish and Edge Interactions (2025-08-02)
+
+### What We Built
+1. **Configuration System**
+   - Comprehensive settings panel with tabs (propagation, visual, behavior)
+   - Persistent settings with localStorage
+   - Default blend modes for contacts and boundaries
+   - Visual settings for edge visibility, opacity, and fat edge rendering
+
+2. **Improved Merge System**
+   - Added new mergeable types: NumericRange, StringSet, WeightedAverage, TimestampValue
+   - Better error handling with MergeResult type
+   - Fixed merge rules that weren't working correctly
+
+3. **New Primitive Gadgets**
+   - Set operations: Union, Intersection, Difference
+   - Array operations: Splitter3, Joiner3 (3-way variants)
+   - Fixed splitters/joiners to be true array constructors/destructors
+   - Added icons for all new gadgets
+
+4. **Visual Improvements**
+   - Fat edge rendering with gradients for complex data types
+   - Removed excessive edge animations
+   - Proper theme-based canvas background
+   - Smaller, better-aligned text in contacts (9px font, 3-line clamp)
+   - Added select-none to prevent text selection during drag
+
+5. **Interaction Improvements**
+   - Edge drop now spawns contact directly (no menu)
+   - Auto-select for all number inputs
+   - Fixed infinite render loop during drag selection
+
+### Key Technical Decisions
+- **Selection State Management**: Let React Flow manage the `selected` property internally while maintaining our own selection state for UI purposes. This prevents circular dependencies.
+- **Fat Value Detection**: Created utility functions to detect and measure "thickness" of values (arrays, sets, objects)
+- **Effect Splitting**: Separated concerns into multiple useEffect hooks for better maintainability
+
+### Lessons Learned
+- React Flow's internal selection management can conflict with external state synchronization
+- Missing dependencies in useEffect can cause stale closures and infinite loops
+- Visual feedback (like fat edges) greatly improves understanding of data flow
+- Small UI improvements (font size, auto-select) have big impact on usability
+
+## Next Steps
+
+- Performance optimization for large networks
+- Undo/redo system  
+- Network persistence and serialization
+- Additional primitive gadgets (filters, transformers, aggregators)
+- Enhanced debugging tools (value inspection, propagation tracing)
+- Keyboard shortcuts for common operations
+- Copy/paste functionality for contacts and gadgets

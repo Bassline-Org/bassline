@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
 import type { ContactGroup, Contact, Wire, Position } from '~/propagation-core'
+import { useSound } from '~/components/SoundSystem'
 
 interface Breadcrumb {
   id: string
@@ -31,6 +32,11 @@ interface UseCurrentGroupReturn {
 export function useCurrentGroup(): UseCurrentGroupReturn {
   const { network, syncToReactFlow, currentGroupId, setCurrentGroupId, appSettings } = useNetworkContext()
   const [currentGroup, setCurrentGroup] = useState(network.currentGroup)
+  const { play: playCreateSound } = useSound('node/create')
+  const { play: playCreateGadgetSound } = useSound('gadget/create')
+  const { play: playConnectSound } = useSound('connection/create')
+  const { play: playEnterGadgetSound } = useSound('gadget/enter')
+  const { play: playExitGadgetSound } = useSound('gadget/exit')
   
   // Update current group when ID changes
   useEffect(() => {
@@ -57,14 +63,25 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
   
   // Navigation
   const navigateToGroup = useCallback((groupId: string) => {
+    const previousGroupId = network.currentGroup.id
     network.navigateToGroup(groupId)
     setCurrentGroupId(groupId)
-  }, [network, setCurrentGroupId])
+    
+    // Play navigation sound based on direction
+    const newGroup = network.currentGroup
+    const previousGroup = network.findGroup(previousGroupId)
+    if (previousGroup && newGroup.parent === previousGroup) {
+      playEnterGadgetSound() // Going deeper
+    } else {
+      playExitGadgetSound() // Going up or sideways
+    }
+  }, [network, setCurrentGroupId, playEnterGadgetSound, playExitGadgetSound])
   
   const navigateToParent = useCallback(() => {
     network.navigateToParent()
     setCurrentGroupId(network.currentGroup.id)
-  }, [network, setCurrentGroupId])
+    playExitGadgetSound() // Always going up when navigating to parent
+  }, [network, setCurrentGroupId, playExitGadgetSound])
   
   const navigateToRoot = useCallback(() => {
     network.currentGroup = network.rootGroup
@@ -76,15 +93,17 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
   const addContact = useCallback((position: Position): Contact => {
     const contact = network.addContact(position, appSettings.propagation.defaultBlendMode)
     syncToReactFlow()
+    playCreateSound()
     return contact
-  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode])
+  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, playCreateSound])
   
   const addBoundaryContact = useCallback((position: Position, direction: 'input' | 'output', name?: string): Contact => {
     const blendMode = appSettings.propagation.defaultBoundaryBlendMode || appSettings.propagation.defaultBlendMode
     const contact = network.addBoundaryContact(position, direction, name, blendMode)
     syncToReactFlow()
+    playCreateSound()
     return contact
-  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, appSettings.propagation.defaultBoundaryBlendMode])
+  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, appSettings.propagation.defaultBoundaryBlendMode, playCreateSound])
   
   const createSubgroup = useCallback((name: string, position?: Position): ContactGroup => {
     const group = network.createGroup(name)
@@ -92,14 +111,16 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
       group.position = position
     }
     syncToReactFlow()
+    playCreateGadgetSound()
     return group
-  }, [network, syncToReactFlow])
+  }, [network, syncToReactFlow, playCreateGadgetSound])
   
   const connect = useCallback((fromId: string, toId: string, type?: 'bidirectional' | 'directed'): Wire => {
     const wire = network.connect(fromId, toId, type)
     syncToReactFlow()
+    playConnectSound()
     return wire
-  }, [network, syncToReactFlow])
+  }, [network, syncToReactFlow, playConnectSound])
   
   return {
     currentGroup,
