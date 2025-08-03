@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
-import { useContactSelection } from './useContactSelection'
+import { useContextSelection } from './useContextSelection'
 import { usePropertyPanel } from './usePropertyPanel'
 import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect'
 import type { ContactGroup, Contact } from '~/propagation-core'
@@ -35,7 +35,7 @@ export interface UseValenceModeReturn {
 
 export function useValenceMode(): UseValenceModeReturn {
   const { network, syncToReactFlow, highlightedNodeId } = useNetworkContext()
-  const { selectedContacts, selectedGroups, clearSelection } = useContactSelection()
+  const { selectedContacts, selectedGroups, clearSelection } = useContextSelection()
   const { play: playConnectionSound } = useSound('connection/create')
   const propertyPanel = usePropertyPanel()
   

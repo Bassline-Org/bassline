@@ -3,6 +3,147 @@
 ## Overview
 This document captures the implementation of a propagation network system in React, based on a Smalltalk implementation. The goal was to create a visual programming environment supporting bidirectional constraint propagation.
 
+## Session: Context Frame & Tool System Architecture
+*Date: 2025-08-03*
+
+### Major Architectural Refactor Completed
+
+Today we completed a significant architectural overhaul to implement a UI stack metaphor and tool system. The session involved solving complex selection synchronization issues and establishing the foundation for context-aware tools.
+
+#### 1. UI Stack & Context Frame System
+**Problem**: Need for a stack-based UI system where tools (like valence mode) push views onto a stack, with escape to exit.
+
+**Solution**: Implemented a dual system:
+- **Context Frames**: Working environments containing group, selection, and view state
+- **Tools**: Operations that work within context frames (valence mode, copy mode, etc.)
+
+```typescript
+export interface ContextFrame {
+  id: string
+  groupId: string  // The ContactGroup we're currently working in
+  selection: SelectionState
+  viewState: ViewState
+  parentContextId?: string
+  timestamp: number
+}
+
+export interface Tool {
+  id: string
+  name: string
+  onActivate(context: ContextFrame): void
+  onDeactivate(): void
+  handleNodeClick?(nodeId: string, context: ContextFrame): void
+  handleKeyPress?(event: KeyboardEvent, context: ContextFrame): boolean
+  getNodeHighlight?(nodeId: string, context: ContextFrame): string | undefined
+}
+```
+
+#### 2. Selection System Migration & Fixes
+**Critical Bug Fixed**: Property panel not updating when selection changed from 1 to 2+ items
+
+**Root Cause**: Property panel only created selection frame when `frames.length === 0`, ignoring selection changes when frames existed.
+
+**Complex Selection Sync Issues**:
+- Had dual selection systems fighting: old NetworkContext selection + new ContextFrame selection
+- Circular dependencies causing infinite loops and timing bugs
+- `setTimeout` hacks in `useContact.ts` causing race conditions
+
+**Solutions Implemented**:
+1. **Fixed Property Panel Logic**: Always check if selection changed and recreate selection frame
+2. **Removed Circular Dependencies**: Stopped old selection operations from calling `syncToReactFlow()`
+3. **Eliminated setTimeout Hacks**: Removed timing workarounds that were causing race conditions
+4. **One-Way Sync**: Made React Flow the single source of truth, syncing one-way to context frames
+
+#### 3. Tool-Aware Click Handling
+**Problem**: Valence mode UI showed active but clicks were still handled by selection system
+
+**Solution**: Implemented tool-aware interaction system:
+```typescript
+// In ContactNode/GroupNode
+onClick={(e) => {
+  e.stopPropagation()
+  
+  // If there's an active tool, let it handle the click
+  if (activeToolInstance && activeToolInstance.handleNodeClick) {
+    activeToolInstance.handleNodeClick(id, context)
+    return
+  }
+  
+  // Otherwise, default selection behavior
+  selectContact(id, e.shiftKey || e.metaKey)
+}}
+```
+
+#### 4. Architecture Decisions Made
+
+**Context Frame as Source of Truth**:
+- Context frames manage selection state for UI components
+- Old selection system maintained for refactoring operations (to be migrated)
+- Property panel and tools use context selection
+
+**Tool System Design**:
+- Tools registered in ToolRegistry
+- Active tool intercepts interactions before default handlers
+- Tools operate on context frames, not global state
+
+**Hook-Based Architecture Maintained**:
+- `useContextSelection()` - Access context frame selection
+- `useContextFrame()` - Manage context stack and tools
+- Clean separation from old `useContactSelection()`
+
+#### 5. Key Files Modified
+
+**New Architecture**:
+- `contexts/ContextFrameContext.tsx` - Context frame management
+- `types/context-frame.ts` - Type definitions for frames and tools
+- `tools/ValenceTool.ts` - Example tool implementation
+- `hooks/useContextSelection.ts` - Context-based selection hook
+
+**Updated Components**:
+- `PropertyPanel.tsx` - Fixed selection frame updates
+- `PropertyPanelFrame.tsx` - Migrated to context selection
+- `ContactNode.tsx` / `GroupNode.tsx` - Added tool-aware click handling
+
+**Bug Fixes**:
+- Removed setTimeout hacks from `useContact.ts`
+- Fixed circular dependencies in `useContactSelection.ts`
+- Updated selection sync in `usePropagationNetworkCompat.ts`
+
+#### 6. Current State & Next Steps
+
+✅ **Completed**:
+- Context frame and tool system architecture
+- Selection sync between React Flow and context frames
+- Property panel correctly updates with selection changes
+- Tool system intercepts clicks when active
+- Valence mode now properly captures node clicks
+
+🔄 **Remaining Work**:
+- Migrate refactoring operations to use context selection
+- Remove old selection system once all operations migrated
+- Implement actual valence connection logic in ValenceTool
+- Add visual feedback for active tools
+- Test edge cases and refinements
+
+#### 7. Lessons Learned
+
+**Architecture Insights**:
+- Context frames provide clean separation between "where you are" vs "what you're doing"
+- Tool system allows different interaction modes without complex conditional logic
+- One-way data flow prevents circular update loops
+
+**Debugging Complex State**:
+- Multiple selection systems caused subtle timing bugs
+- React's update batching interacted poorly with setTimeout workarounds
+- Memoization critical for preventing unnecessary re-renders in context providers
+
+**Selection UI Patterns**:
+- Property panels need to detect and respond to all selection changes, not just initial selection
+- Multi-selection interfaces require careful frame management
+- Click handlers need prioritization (tools → selection → navigation)
+
+This session established the foundation for a flexible, context-aware tool system while fixing critical selection bugs. The architecture now supports the UI stack metaphor the user requested.
+
 ## Session: Valence Connections & Property Panel Redesign
 *Date: 2025-08-03*
 

@@ -18,6 +18,9 @@ import { useLayout } from "~/propagation-react/hooks/useLayout";
 import { useValenceConnect } from "~/propagation-react/hooks/useValenceConnect";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { ValenceModeProvider, useValenceMode } from "~/propagation-react/contexts/ValenceModeContext";
+import { UIStackProvider, useUIStack } from "~/propagation-react/contexts/UIStackContext";
+import { PropertyPanelStackProvider } from "~/propagation-react/contexts/PropertyPanelStackContext";
+import { ContextFrameProvider, useContextFrame } from "~/propagation-react/contexts/ContextFrameContext";
 import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
@@ -35,6 +38,9 @@ import type { GadgetTemplate } from "~/propagation-core/types/template";
 import type { Position } from "~/propagation-core";
 import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
 import { SoundSystemProvider } from "~/components/SoundSystem";
+import { StackDebugger } from "~/components/StackDebugger";
+import { ContextDebugger } from "~/components/ContextDebugger";
+import { ToolRegistry } from "~/propagation-react/tools/ToolRegistry";
 
 const nodeTypes = {
   contact: ContactNode,
@@ -58,6 +64,41 @@ function Flow() {
     highlightedNodeId,
     setHighlightedNodeId,
   } = useNetworkContext();
+
+
+  const palette = usePalette();
+  const propertyPanel = usePropertyPanel();
+  const { viewSettings, setViewSettings } = useViewSettings();
+  const [showConfiguration, setShowConfiguration] = useState(false);
+  const [showDreamsGadgetMenu, setShowDreamsGadgetMenu] = useState(false);
+  const { applyLayout, applyLayoutToSelection } = useLayout();
+  const { canValenceConnect, valenceConnect, valenceConnectionType, totalSourceCount } = useValenceConnect();
+  const { isValenceMode, enterValenceMode, exitValenceMode, valenceSource } = useValenceMode();
+  const uiStack = useUIStack();
+  const { activeTool, activeToolInstance, activateTool, deactivateTool } = useContextFrame();
+
+  // UI Stack integration for property panel
+  const showPropertyPanel = useCallback((focusInput = false) => {
+    if (!propertyPanel.isVisible) {
+      propertyPanel.toggleVisibility();
+    }
+    
+    if (focusInput && highlightedNodeId) {
+      // Push property focus mode onto stack
+      uiStack.push({
+        type: 'propertyFocus',
+        data: { nodeId: highlightedNodeId },
+        onEscape: () => {
+          // Clear focus but keep panel open
+          setHighlightedNodeId(null);
+          if (viewSettings.showShortcutHints) {
+            toast.info("Cleared property focus");
+          }
+          return true; // Prevent default pop
+        }
+      });
+    }
+  }, [propertyPanel, uiStack, highlightedNodeId, setHighlightedNodeId, viewSettings.showShortcutHints]);
 
   const {
     nodes,
@@ -83,21 +124,45 @@ function Flow() {
     instantiateTemplate,
   } = usePropagationNetwork({
     onContactDoubleClick: (contactId) => {
-      propertyPanel.show(true); // true = focus input
+      showPropertyPanel(true); // true = focus input
     },
   });
 
-  const palette = usePalette();
-  const propertyPanel = usePropertyPanel();
-  const { viewSettings, setViewSettings } = useViewSettings();
-  const [showConfiguration, setShowConfiguration] = useState(false);
-  const [showDreamsGadgetMenu, setShowDreamsGadgetMenu] = useState(false);
-  const { applyLayout, applyLayoutToSelection } = useLayout();
-  const { canValenceConnect, valenceConnect, valenceConnectionType, totalSourceCount } = useValenceConnect();
-  const { isValenceMode, enterValenceMode, exitValenceMode, valenceSource } = useValenceMode();
-
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
+
+  // UI Stack integration for valence mode
+  const enterStackedValenceMode = useCallback(() => {
+    enterValenceMode();
+    uiStack.push({
+      type: 'valenceMode',
+      onEscape: () => {
+        exitValenceMode();
+        // Let the default pop behavior happen
+        // This will return to whatever was below (property focus or base)
+      }
+    });
+  }, [enterValenceMode, exitValenceMode, uiStack]);
+
+  // UI Stack integration for gadget menu
+  const toggleGadgetMenu = useCallback(() => {
+    if (showDreamsGadgetMenu) {
+      setShowDreamsGadgetMenu(false);
+      // Find and pop the gadget menu layer
+      const gadgetLayer = uiStack.stack.find(item => item.type === 'gadgetMenu');
+      if (gadgetLayer) {
+        uiStack.popTo(gadgetLayer.id);
+      }
+    } else {
+      setShowDreamsGadgetMenu(true);
+      uiStack.push({
+        type: 'gadgetMenu',
+        onEscape: () => {
+          setShowDreamsGadgetMenu(false);
+        }
+      });
+    }
+  }, [showDreamsGadgetMenu, setShowDreamsGadgetMenu, uiStack]);
 
   const handleAddContact = useCallback(() => {
     const position = {
@@ -278,27 +343,24 @@ function Flow() {
         e.preventDefault(); // Prevent default tab behavior
       }
 
-      // Escape - stack-based UI flow
+      // Escape - unified stack handler
       if (e.key === "Escape") {
         e.preventDefault();
         
-        if (isValenceMode) {
-          // Exit valence mode first
-          exitValenceMode();
-          // Stay in property focus mode if property panel is open and has focus
-          if (propertyPanel.isVisible && highlightedNodeId) {
-            if (viewSettings.showShortcutHints) {
-              toast.info("Back to property editing");
+        const currentLayer = uiStack.peek();
+        if (currentLayer && currentLayer.type !== 'base') {
+          // Call the layer's custom escape handler if it exists
+          if (currentLayer.onEscape) {
+            const preventPop = currentLayer.onEscape();
+            if (!preventPop) {
+              uiStack.pop();
             }
+          } else {
+            // Default behavior: just pop the layer
+            uiStack.pop();
           }
-        } else if (propertyPanel.isVisible && highlightedNodeId) {
-          // Clear property focus but keep panel open
-          setHighlightedNodeId(null);
-          if (viewSettings.showShortcutHints) {
-            toast.info("Cleared property focus");
-          }
-        } else if (propertyPanel.isVisible) {
-          // Close property panel
+        } else if (propertyPanel.isVisible && !uiStack.isInMode('propertyFocus')) {
+          // Legacy behavior: close property panel if no stack layers
           propertyPanel.toggleVisibility();
         }
       }
@@ -306,7 +368,7 @@ function Flow() {
       // G to toggle gadget menu (left hand: G with index finger)
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "g") {
         e.preventDefault();
-        setShowDreamsGadgetMenu(!showDreamsGadgetMenu);
+        toggleGadgetMenu();
       }
 
       // T to toggle property panel (left hand: T with index finger)
@@ -357,13 +419,19 @@ function Flow() {
       }
 
 
-      // V for valence mode
+      // V for valence mode (using new tool system)
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "v") {
         e.preventDefault();
-        if (isValenceMode) {
-          exitValenceMode();
-        } else if (selection.contacts.size > 0 || selection.groups.size > 0) {
-          enterValenceMode();
+        
+        if (activeTool?.toolId === 'valence') {
+          // Deactivate valence tool
+          deactivateTool();
+        } else {
+          // Activate valence tool
+          const valenceTool = ToolRegistry.get('valence');
+          if (valenceTool) {
+            activateTool(valenceTool);
+          }
         }
       }
     };
@@ -380,11 +448,15 @@ function Flow() {
     toast,
     showDreamsGadgetMenu,
     isValenceMode,
-    enterValenceMode,
-    exitValenceMode,
+    enterStackedValenceMode,
     selection,
     highlightedNodeId,
     setHighlightedNodeId,
+    uiStack,
+    toggleGadgetMenu,
+    activeTool,
+    activateTool,
+    deactivateTool,
   ]);
 
   // Handle node drag with proximity connect
@@ -475,19 +547,34 @@ function Flow() {
     ? [...edges, proximity.potentialEdge]
     : edges;
 
+  // Compute background color based on stack depth
+  const getBackgroundClass = () => {
+    if (uiStack.isInMode('propertyFocus')) return "bg-gray-800";
+    if (uiStack.depth > 0) return "bg-gray-700";
+    return "bg-gray-600";
+  };
+
   return (
     <div
       className={cn("w-full h-screen select-none transition-colors duration-300 relative", 
-        highlightedNodeId ? "bg-gray-800" : "bg-gray-600"
+        getBackgroundClass()
       )}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* Valence mode border indicator */}
-      {isValenceMode && (
+      {/* Stack-based visual indicators */}
+      {uiStack.isInMode('valenceMode') && (
         <div className="absolute inset-0 pointer-events-none z-50">
           <div className="absolute inset-4 border-4 border-green-500/50 rounded-lg shadow-[inset_0_0_20px_rgba(34,197,94,0.3)] transition-all duration-300" />
         </div>
+      )}
+      
+      {/* Debug: Stack visualizer */}
+      {viewSettings.showDebugInfo && (
+        <>
+          <StackDebugger />
+          <ContextDebugger />
+        </>
       )}
       
       <ReactFlow
@@ -517,7 +604,9 @@ function Flow() {
             gap={12} 
             className={cn(
               "transition-colors duration-300",
-              highlightedNodeId ? "!bg-gray-700" : "!bg-gray-500"
+              uiStack.isInMode('propertyFocus') ? "!bg-gray-700" : 
+              uiStack.depth > 0 ? "!bg-gray-600" : 
+              "!bg-gray-500"
             )} 
             size={1} 
           />
@@ -531,7 +620,12 @@ function Flow() {
                 Valence Mode: Click gadgets with {valenceSource?.totalOutputCount || 0} inputs
               </span>
               <Button
-                onClick={exitValenceMode}
+                onClick={() => {
+                  const valenceLayer = uiStack.stack.find(item => item.type === 'valenceMode');
+                  if (valenceLayer) {
+                    uiStack.popTo(valenceLayer.id);
+                  }
+                }}
                 size="sm"
                 variant="ghost"
                 className="text-white hover:bg-green-600"
@@ -611,7 +705,7 @@ function Flow() {
               )}
               {(selection.contacts.size > 0 || selection.groups.size > 0) && !isValenceMode && (
                 <Button
-                  onClick={enterValenceMode}
+                  onClick={enterStackedValenceMode}
                   size="sm"
                   variant="default"
                   title="Enter valence mode to connect selected items (V)"
@@ -658,7 +752,7 @@ function Flow() {
               onViewSettingsChange={setViewSettings}
               onOpenConfiguration={() => setShowConfiguration(true)}
               onAutoLayout={handleAutoLayout}
-              onOpenGadgets={() => setShowDreamsGadgetMenu(true)}
+              onOpenGadgets={toggleGadgetMenu}
             />
           </ClientOnly>
         </Panel>
@@ -683,7 +777,12 @@ function Flow() {
       <ClientOnly>
         <InlineGadgetMenu
           isOpen={showDreamsGadgetMenu}
-          onClose={() => setShowDreamsGadgetMenu(false)}
+          onClose={() => {
+            const gadgetLayer = uiStack.stack.find(item => item.type === 'gadgetMenu');
+            if (gadgetLayer) {
+              uiStack.popTo(gadgetLayer.id);
+            }
+          }}
           items={palette.items}
           categories={palette.categories}
           onUseItem={palette.incrementUsageCount}
@@ -716,15 +815,21 @@ function Flow() {
 export default function Editor() {
   return (
     <NetworkProvider>
-      <ReactFlowProvider>
-        <ClientOnly>
-          <SoundSystemProvider>
-            <ValenceModeProvider>
-              <Flow />
-            </ValenceModeProvider>
-          </SoundSystemProvider>
-        </ClientOnly>
-      </ReactFlowProvider>
+      <UIStackProvider>
+        <PropertyPanelStackProvider>
+          <ReactFlowProvider>
+            <ContextFrameProvider>
+              <ClientOnly>
+                <SoundSystemProvider>
+                  <ValenceModeProvider>
+                    <Flow />
+                  </ValenceModeProvider>
+                </SoundSystemProvider>
+              </ClientOnly>
+            </ContextFrameProvider>
+          </ReactFlowProvider>
+        </PropertyPanelStackProvider>
+      </UIStackProvider>
     </NetworkProvider>
   );
 }

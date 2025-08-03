@@ -9,6 +9,7 @@ import {
 import type { Position } from "../../propagation-core";
 import { useNetworkContext } from "../contexts/NetworkContext";
 import { useContactSelection } from "./useContactSelection";
+import { useContextSelection } from "./useContextSelection";
 import { useCurrentGroup } from "./useCurrentGroup";
 import { usePalette } from "./usePalette";
 import type { GadgetTemplate } from "../../propagation-core/types/template";
@@ -36,13 +37,20 @@ export function usePropagationNetwork(
   const { network, syncToReactFlow, nodes, edges, setNodes, setEdges } =
     useNetworkContext();
   const {
-    selection,
+    selection: contextSelection,
     hasSelection,
-    updateSelection,
     clearSelection,
+    selectedContacts,
+    selectedGroups,
+    setSelection: setContextSelection,
+  } = useContextSelection();
+  
+  const {
+    selection: oldSelection,
     extractSelected,
     inlineSelectedGadget,
     convertSelectedToBoundary,
+    updateSelection,
   } = useContactSelection();
   const {
     currentGroup,
@@ -59,9 +67,15 @@ export function usePropagationNetwork(
   // Handle selection changes
   const onSelectionChange = useCallback(
     ({ nodes, edges }: { nodes: any[]; edges: any[] }) => {
+      // Update old selection system (for refactoring operations)
       updateSelection(nodes, edges);
+      
+      // Update context frame selection (one-way sync)
+      const contactIds = nodes.filter(n => n.type !== 'group').map(n => n.id);
+      const groupIds = nodes.filter(n => n.type === 'group').map(n => n.id);
+      setContextSelection(contactIds, groupIds);
     },
-    [updateSelection],
+    [updateSelection, setContextSelection],
   );
 
   // Handle node changes (position updates and deletions)
@@ -246,7 +260,7 @@ export function usePropagationNetwork(
     currentGroupId: currentGroup.id,
 
     // Selection and refactoring
-    selection,
+    selection: oldSelection,
     hasSelection,
     extractToGadget,
     inlineGadget,

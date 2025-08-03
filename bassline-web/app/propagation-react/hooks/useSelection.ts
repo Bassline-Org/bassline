@@ -1,2 +1,2 @@
-// Re-export from the enhanced hook for backward compatibility
-export { useContactSelection as useSelection } from './useContactSelection'
+// Re-export from the context selection hook for backward compatibility
+export { useContextSelection as useSelection } from './useContextSelection'

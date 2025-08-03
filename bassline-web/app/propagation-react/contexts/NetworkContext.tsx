@@ -178,14 +178,8 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
       }
     })
     
-    // Preserve selection state
-    setNodes(prevNodes => {
-      const selectedIds = new Set(prevNodes.filter(n => n.selected).map(n => n.id))
-      return newNodes.map(node => ({
-        ...node,
-        selected: selectedIds.has(node.id)
-      }))
-    })
+    // Don't preserve selection - let context frame be the source of truth
+    setNodes(newNodes)
     setEdges(newEdges)
   }, [network, currentGroupId, appSettings.visual.showEdges, appSettings.visual.edgeOpacity, appSettings.visual.showFatEdges, appSettings.visual.fatEdgeScale])
   

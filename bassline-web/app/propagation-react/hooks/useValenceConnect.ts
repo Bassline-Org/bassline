@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
-import { useContactSelection } from './useContactSelection'
+import { useContextSelection } from './useContextSelection'
 import { ValenceConnectOperation, type ValenceConnectionResult } from '~/propagation-core/refactoring/operations/ValenceConnect'
 import type { ContactGroup } from '~/propagation-core'
 import { useSound } from '~/components/SoundSystem'
@@ -28,7 +28,7 @@ export interface UseValenceConnectReturn {
 
 export function useValenceConnect(): UseValenceConnectReturn {
   const { network, syncToReactFlow } = useNetworkContext()
-  const { selectedGroups, selectedContacts, clearSelection } = useContactSelection()
+  const { selectedGroups, selectedContacts, clearSelection } = useContextSelection()
   const { play: playConnectionSound } = useSound('connection/create')
   
   // Determine what type of valence connection is possible

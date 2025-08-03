@@ -25,7 +25,7 @@ interface UseContactReturn {
 }
 
 export function useContact(contactId: string | null | undefined): UseContactReturn {
-  const { network, syncToReactFlow, setSelection } = useNetworkContext()
+  const { network, syncToReactFlow } = useNetworkContext()
   const [contact, setContact] = useState<Contact | null>(null)
   
   // Find and track the contact
@@ -80,33 +80,13 @@ export function useContact(contactId: string | null | undefined): UseContactRetu
     }
     
     syncToReactFlow()
-    
-    // Re-select the contact to maintain focus
-    setTimeout(() => {
-      setSelection(prev => ({
-        ...prev,
-        contacts: new Set([contact.id]),
-        groups: new Set(),
-        wires: new Set()
-      }))
-    }, 0)
-  }, [contact, syncToReactFlow, setSelection])
+  }, [contact, syncToReactFlow])
   
   const setBoundaryDirection = useCallback((direction: 'input' | 'output') => {
     if (!contact || !contact.isBoundary) return
     contact.boundaryDirection = direction
     syncToReactFlow()
-    
-    // Re-select the contact to maintain focus
-    setTimeout(() => {
-      setSelection(prev => ({
-        ...prev,
-        contacts: new Set([contact.id]),
-        groups: new Set(),
-        wires: new Set()
-      }))
-    }, 0)
-  }, [contact, syncToReactFlow, setSelection])
+  }, [contact, syncToReactFlow])
   
   const remove = useCallback(() => {
     if (!contact) return

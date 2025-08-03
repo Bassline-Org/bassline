@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '~/components/ui/button'
-import { ChevronLeft, ChevronRight, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, Layers } from 'lucide-react'
 import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
+import { useContextSelection } from '~/propagation-react/hooks/useContextSelection'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
+import { usePropertyPanelStack } from '~/propagation-react/contexts/PropertyPanelStackContext'
+import { PropertyPanelFrame } from './PropertyPanelFrame'
 import { ContactPropertySection, GroupPropertySection } from './PropertyPanelItem'
+import { cn } from '~/lib/utils'
 
 interface PropertyPanelProps {
   isVisible: boolean
@@ -12,31 +16,86 @@ interface PropertyPanelProps {
 }
 
 export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: PropertyPanelProps) {
-  const { selectedContacts, selectedGroups } = useContactSelection()
+  const { selectedContacts, selectedGroups } = useContextSelection() // Use context selection
   const { setHighlightedNodeId } = useNetworkContext()
+  const { frames, currentFrame, pushFrame, popFrame, popToFrame, clearFrames } = usePropertyPanelStack()
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
   
-  // Auto-expand single selection
+  // Update base frame when selection changes
   useEffect(() => {
     const totalSelected = selectedContacts.length + selectedGroups.length
+    const contactIds = selectedContacts.map(c => c.id)
+    const groupIds = selectedGroups.map(g => g.id)
     
-    if (totalSelected === 1) {
-      const itemId = selectedContacts.length === 1 
-        ? selectedContacts[0].id 
-        : selectedGroups[0].id
-      setExpandedItems(new Set([itemId]))
-      setFocusedItemId(itemId)
+    if (totalSelected > 0) {
+      // Check if we need to update or create the base selection frame
+      const baseFrame = frames[0]
+      const newTargetIds = [...contactIds, ...groupIds]
+      
+      if (!baseFrame || baseFrame.type !== 'selection') {
+        // No base frame or it's not a selection frame - create new
+        clearFrames()
+        pushFrame({
+          type: 'selection',
+          targetIds: newTargetIds,
+          title: `${totalSelected} items selected`
+        })
+      } else {
+        // Check if selection actually changed
+        const currentIds = new Set(baseFrame.targetIds)
+        const hasChanged = newTargetIds.length !== baseFrame.targetIds?.length ||
+          !newTargetIds.every(id => currentIds.has(id))
+        
+        if (hasChanged) {
+          // Selection changed - clear and recreate to update
+          clearFrames()
+          pushFrame({
+            type: 'selection',
+            targetIds: newTargetIds,
+            title: `${totalSelected} items selected`
+          })
+        }
+      }
     } else if (totalSelected === 0) {
-      setExpandedItems(new Set())
-      setFocusedItemId(null)
+      // Clear frames when nothing selected
+      clearFrames()
     }
-  }, [selectedContacts, selectedGroups])
+  }, [selectedContacts, selectedGroups, frames, pushFrame, clearFrames])
 
-  // Update highlighted node based on focused item
+  // Update highlighted node based on current frame
   useEffect(() => {
-    setHighlightedNodeId(focusedItemId)
-  }, [focusedItemId, setHighlightedNodeId])
+    if (currentFrame && currentFrame.type !== 'selection' && currentFrame.targetId) {
+      setHighlightedNodeId(currentFrame.targetId)
+    } else {
+      setHighlightedNodeId(null)
+    }
+  }, [currentFrame, setHighlightedNodeId])
+  
+  // Handle property panel show - check if we need to push a focused frame
+  useEffect(() => {
+    if (shouldFocus.current && frames.length > 0 && currentFrame?.type === 'selection') {
+      // If we're showing with focus and only have a selection frame,
+      // check if there's a single selected item to auto-focus
+      const totalSelected = selectedContacts.length + selectedGroups.length
+      if (totalSelected === 1) {
+        if (selectedContacts.length === 1) {
+          pushFrame({
+            type: 'contact',
+            targetId: selectedContacts[0].id,
+            title: `Contact ${selectedContacts[0].id.slice(0, 8)}`
+          })
+        } else if (selectedGroups.length === 1) {
+          pushFrame({
+            type: 'group',
+            targetId: selectedGroups[0].id,
+            title: selectedGroups[0].name || `Gadget ${selectedGroups[0].id.slice(0, 8)}`
+          })
+        }
+      }
+      shouldFocus.current = false
+    }
+  }, [shouldFocus, frames, currentFrame, selectedContacts, selectedGroups, pushFrame])
 
   const toggleExpanded = (itemId: string) => {
     const newExpanded = new Set(expandedItems)
@@ -86,50 +145,63 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
         </div>
       </div>
       
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {/* Selection info */}
-        {(selectedContacts.length + selectedGroups.length) > 0 && (
-          <div className="text-xs text-gray-400 mb-3">
-            {selectedContacts.length + selectedGroups.length} items selected
-            {selectedContacts.length > 0 && ` (${selectedContacts.length} contacts`}
-            {selectedGroups.length > 0 && `${selectedContacts.length > 0 ? ', ' : ' ('}${selectedGroups.length} gadgets`}
-            {(selectedContacts.length > 0 || selectedGroups.length > 0) && ')'}
+      {/* Frame Stack */}
+      <div className="flex-1 relative overflow-hidden">
+        {frames.length === 0 ? (
+          <div className="flex items-center justify-center h-full p-4">
+            <div className="text-sm text-gray-400 text-center">
+              Select items to edit their properties
+            </div>
+          </div>
+        ) : (
+          <div className="relative h-full">
+            {/* Render visible frames (max 3) */}
+            {frames.slice(-3).map((frame, index) => {
+              const visibleDepth = Math.max(0, frames.length - 3) + index
+              const isTop = index === frames.slice(-3).length - 1
+              
+              return (
+                <PropertyPanelFrame
+                  key={frame.id}
+                  frame={frame}
+                  isTop={isTop}
+                  visibleDepth={frames.slice(-3).length - 1 - index}
+                  onNavigateBack={() => popToFrame(frame.id)}
+                  shouldFocus={shouldFocus}
+                />
+              )
+            })}
+            
+            {/* Stack indicator */}
+            {frames.length > 3 && (
+              <div className="absolute top-4 left-4 text-xs text-gray-500 flex items-center gap-1">
+                <Layers className="w-3 h-3" />
+                +{frames.length - 3} more
+              </div>
+            )}
           </div>
         )}
-        
-        {/* No selection message */}
-        {selectedContacts.length === 0 && selectedGroups.length === 0 && (
-          <div className="text-sm text-gray-400 text-center py-8">
-            Select items to edit their properties
-          </div>
-        )}
-        
-        {/* Property sections */}
-        <div className="space-y-3">
-          {/* Contact sections */}
-          {selectedContacts.map((contact) => (
-            <ContactPropertySection
-              key={contact.id}
-              contactId={contact.id}
-              isExpanded={expandedItems.has(contact.id)}
-              onToggle={() => toggleExpanded(contact.id)}
-              isFocused={focusedItemId === contact.id}
-            />
-          ))}
-          
-          {/* Group sections */}
-          {selectedGroups.map((group) => (
-            <GroupPropertySection
-              key={group.id}
-              groupId={group.id}
-              isExpanded={expandedItems.has(group.id)}
-              onToggle={() => toggleExpanded(group.id)}
-              isFocused={focusedItemId === group.id}
-            />
+      </div>
+      
+      {/* Frame breadcrumbs */}
+      {frames.length > 0 && (
+        <div className="border-t border-gray-700 p-2 flex items-center gap-1 text-xs overflow-x-auto">
+          {frames.map((frame, index) => (
+            <React.Fragment key={frame.id}>
+              {index > 0 && <span className="text-gray-500">›</span>}
+              <button
+                className={cn(
+                  "px-2 py-1 rounded hover:bg-gray-700 transition-colors",
+                  index === frames.length - 1 ? "text-gray-200 bg-gray-700" : "text-gray-400"
+                )}
+                onClick={() => popToFrame(frame.id)}
+              >
+                {frame.title}
+              </button>
+            </React.Fragment>
           ))}
         </div>
-      </div>
+      )}
     </div>
   )
 }

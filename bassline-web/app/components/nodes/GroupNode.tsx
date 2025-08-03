@@ -13,8 +13,9 @@ import {
 import { useGroup } from '~/propagation-react/hooks/useGroup'
 import { getGadgetIcon } from '~/components/gadgets/gadget-icons'
 import { useValenceConnect } from '~/propagation-react/hooks/useValenceConnect'
-import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
+import { useContextSelection } from '~/propagation-react/hooks/useContextSelection'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
+import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext'
 import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect'
 import { useValenceMode } from '~/propagation-react/contexts/ValenceModeContext'
 
@@ -59,10 +60,11 @@ const groupNodeVariants = cva(
 export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { highlightedNodeId } = useNetworkContext()
   const { name, inputContacts, outputContacts, isPrimitive, navigate } = useGroup(id)
-  const { selectedGroups, selectedContacts } = useContactSelection()
+  const { selectedGroups, selectedContacts } = useContextSelection()
   const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect()
   const { network } = useNetworkContext()
   const { isValenceMode, canConnectToGadget, connectToGadget, valenceSource } = useValenceMode()
+  const { activeToolInstance } = useContextFrame()
   
   // Check if this gadget is valence-compatible
   const isValenceCompatible = useMemo(() => {
@@ -107,12 +109,22 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const isHighlighted = highlightedNodeId === id
   
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // In valence mode, single click connects
-    if (isValenceMode && canConnectToGadget(id)) {
-      e.stopPropagation() // Prevent selection
-      connectToGadget(id)
+    e.stopPropagation()
+    
+    // If there's an active tool, let it handle the click
+    if (activeToolInstance && activeToolInstance.handleNodeClick) {
+      activeToolInstance.handleNodeClick(id, null as any) // TODO: pass actual context
+      return
     }
-  }, [isValenceMode, canConnectToGadget, connectToGadget, id])
+    
+    // OLD valence mode behavior - keep for now but should be moved to ValenceTool
+    if (isValenceMode && canConnectToGadget(id)) {
+      connectToGadget(id)
+      return
+    }
+    
+    // Otherwise, no default click behavior for groups (selection is handled by React Flow)
+  }, [isValenceMode, canConnectToGadget, connectToGadget, id, activeToolInstance])
   
   const handleDoubleClick = useCallback(() => {
     // Double-click navigates, but not in valence mode

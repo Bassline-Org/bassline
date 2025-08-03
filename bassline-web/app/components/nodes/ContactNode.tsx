@@ -6,10 +6,12 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '~/lib/utils'
 import { useContact } from '~/propagation-react/hooks/useContact'
 import { usePropertyPanel } from '~/propagation-react/hooks/usePropertyPanel'
-import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
+import { useContextSelection } from '~/propagation-react/hooks/useContextSelection'
 import { formatContentForDisplay, formatContentForTooltip } from '~/utils/content-display'
 import { useValenceMode } from '~/propagation-react/contexts/ValenceModeContext'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
+import { useUIStack } from '~/propagation-react/contexts/UIStackContext'
+import { toast } from 'sonner'
 
 const nodeVariants = cva(
   "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -46,9 +48,11 @@ const nodeVariants = cva(
 export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id)
   const propertyPanel = usePropertyPanel()
-  const { selectContact } = useContactSelection()
+  const { selectContact } = useContextSelection()
   const { isValenceMode, valenceSource } = useValenceMode()
-  const { highlightedNodeId } = useNetworkContext()
+  const { highlightedNodeId, setHighlightedNodeId } = useNetworkContext()
+  const { activeToolInstance } = useContextFrame()
+  const uiStack = useUIStack()
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -87,9 +91,29 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
           isHighlighted && "ring-4 ring-blue-500 shadow-lg"
         )}
         onContextMenu={handleContextMenu}
+        onClick={(e) => {
+          e.stopPropagation()
+          
+          // If there's an active tool, let it handle the click
+          if (activeToolInstance && activeToolInstance.handleNodeClick) {
+            activeToolInstance.handleNodeClick(id, null as any) // TODO: pass actual context
+            return
+          }
+          
+          // Otherwise, default selection behavior
+          selectContact(id, e.shiftKey || e.metaKey)
+        }}
         onDoubleClick={(e) => {
           e.stopPropagation()
           selectContact(id, false) // Ensure this contact is selected
+          
+          // Open property panel if not already open
+          if (!propertyPanel.isVisible) {
+            propertyPanel.toggleVisibility()
+          }
+          
+          // The property panel will handle creating frames based on selection
+          // Just ensure this contact is selected and panel is open
           propertyPanel.show(true)
         }}
       >
