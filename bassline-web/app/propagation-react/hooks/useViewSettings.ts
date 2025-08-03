@@ -5,7 +5,6 @@ const STORAGE_KEY = "bassline-view-settings";
 
 const defaultSettings: ViewSettings = {
   showInstructions: false,
-  showMiniMap: false,
   showGrid: true,
   showPropagationFlow: false,
   showNodeLabels: true,

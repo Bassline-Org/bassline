@@ -57,11 +57,12 @@ const groupNodeVariants = cva(
 
 
 export const GroupNode = memo(({ id, selected }: NodeProps) => {
+  const { highlightedNodeId } = useNetworkContext()
   const { name, inputContacts, outputContacts, isPrimitive, navigate } = useGroup(id)
   const { selectedGroups, selectedContacts } = useContactSelection()
   const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect()
   const { network } = useNetworkContext()
-  const { isValenceMode, canConnectToGadget, connectToGadget } = useValenceMode()
+  const { isValenceMode, canConnectToGadget, connectToGadget, valenceSource } = useValenceMode()
   
   // Check if this gadget is valence-compatible
   const isValenceCompatible = useMemo(() => {
@@ -97,6 +98,14 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
     return false
   }, [selectedGroups, selectedContacts, id, selected, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget, network, isValenceMode, canConnectToGadget])
   
+  // Visual states for valence mode
+  const isSourceGadget = isValenceMode && valenceSource?.sourceIds.has(id)
+  const isDimmed = (isValenceMode && !isSourceGadget && !isValenceCompatible) ||
+                   (highlightedNodeId !== null && !selected)
+  
+  // Check if this node is highlighted
+  const isHighlighted = highlightedNodeId === id
+  
   const handleClick = useCallback((e: React.MouseEvent) => {
     // In valence mode, single click connects
     if (isValenceMode && canConnectToGadget(id)) {
@@ -125,8 +134,11 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
         className={cn(
           groupNodeVariants({ nodeType, selected, interactive }), 
           isPrimitive && "p-[5px]",
-          isValenceCompatible && "ring-2 ring-green-500 ring-opacity-50 animate-pulse",
-          isValenceMode && isValenceCompatible && "cursor-pointer"
+          isValenceCompatible && !isSourceGadget && "ring-2 ring-green-500 ring-opacity-50 animate-pulse",
+          isSourceGadget && "ring-2 ring-blue-500 ring-opacity-75",
+          isValenceMode && isValenceCompatible && "cursor-pointer",
+          isDimmed && "opacity-30",
+          isHighlighted && "ring-4 ring-blue-500 shadow-lg"
         )}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}

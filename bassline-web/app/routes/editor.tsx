@@ -2,8 +2,6 @@ import { useCallback, useState, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
-  Controls,
-  MiniMap,
   Panel,
   ReactFlowProvider,
   useReactFlow,
@@ -24,6 +22,7 @@ import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
+import { cn } from "~/lib/utils";
 import { GadgetPalette } from "~/components/palette/GadgetPalette";
 import { InlineGadgetMenu } from "~/components/gadgets/InlineGadgetMenu";
 import { ToolsMenu } from "~/components/ToolsMenu";
@@ -31,6 +30,7 @@ import { ClientOnly } from "~/components/ClientOnly";
 import { PropertyPanel } from "~/components/PropertyPanel";
 import { ConfigurationPanel } from "~/components/ConfigurationPanel";
 import { FatEdge } from "~/components/edges/FatEdge";
+import { ValenceModeEdge } from "~/components/edges/ValenceModeEdge";
 import type { GadgetTemplate } from "~/propagation-core/types/template";
 import type { Position } from "~/propagation-core";
 import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
@@ -44,6 +44,7 @@ const nodeTypes = {
 
 const edgeTypes = {
   fat: FatEdge,
+  valence: ValenceModeEdge,
 };
 
 function Flow() {
@@ -54,6 +55,8 @@ function Flow() {
     updateVisualSettings,
     updateBehaviorSettings,
     resetSettings,
+    highlightedNodeId,
+    setHighlightedNodeId,
   } = useNetworkContext();
 
   const {
@@ -275,6 +278,31 @@ function Flow() {
         e.preventDefault(); // Prevent default tab behavior
       }
 
+      // Escape - stack-based UI flow
+      if (e.key === "Escape") {
+        e.preventDefault();
+        
+        if (isValenceMode) {
+          // Exit valence mode first
+          exitValenceMode();
+          // Stay in property focus mode if property panel is open and has focus
+          if (propertyPanel.isVisible && highlightedNodeId) {
+            if (viewSettings.showShortcutHints) {
+              toast.info("Back to property editing");
+            }
+          }
+        } else if (propertyPanel.isVisible && highlightedNodeId) {
+          // Clear property focus but keep panel open
+          setHighlightedNodeId(null);
+          if (viewSettings.showShortcutHints) {
+            toast.info("Cleared property focus");
+          }
+        } else if (propertyPanel.isVisible) {
+          // Close property panel
+          propertyPanel.toggleVisibility();
+        }
+      }
+
       // G to toggle gadget menu (left hand: G with index finger)
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "g") {
         e.preventDefault();
@@ -301,48 +329,33 @@ function Flow() {
         });
       }
 
-      // E to toggle minimap (left hand: E with middle finger)
+      // E to open property panel
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "e") {
         e.preventDefault();
-        setViewSettings({
-          ...viewSettings,
-          showMiniMap: !viewSettings.showMiniMap,
-        });
-      }
-
-      // A to add contact (left hand: A with pinky)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "a") {
-        e.preventDefault();
-        const position = {
-          x: Math.random() * 400 + 100,
-          y: Math.random() * 300 + 100,
-        };
-        addContact(position);
-      }
-
-      // S to add gadget (left hand: S with ring finger)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "s") {
-        e.preventDefault();
-        handleAddGroup();
-      }
-
-      // D to toggle grid (left hand: D with middle finger)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "d") {
-        e.preventDefault();
-        setViewSettings({
-          ...viewSettings,
-          showGrid: !viewSettings.showGrid,
-        });
-      }
-
-      // R to reset palette (for debugging)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "r") {
-        e.preventDefault();
-        palette.resetToDefaults();
+        propertyPanel.toggleVisibility();
         if (viewSettings.showShortcutHints) {
-          toast.success("Reset palette to default gadgets");
+          toast.success(`Properties ${propertyPanel.isVisible ? "hidden" : "shown"}`);
         }
       }
+
+      // Q to auto-layout selection
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "q") {
+        e.preventDefault();
+        if (selection.contacts.size > 0 || selection.groups.size > 0) {
+          const selectedIds = new Set([...selection.contacts, ...selection.groups]);
+          applyLayoutToSelection(selectedIds);
+          if (viewSettings.showShortcutHints) {
+            toast.success("Formatted selection");
+          }
+        } else {
+          // Format all if nothing selected
+          handleAutoLayout();
+          if (viewSettings.showShortcutHints) {
+            toast.success("Formatted all");
+          }
+        }
+      }
+
 
       // V for valence mode
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "v") {
@@ -362,15 +375,16 @@ function Flow() {
     propertyPanel,
     viewSettings,
     setViewSettings,
-    addContact,
-    handleAddGroup,
     handleAutoLayout,
+    applyLayoutToSelection,
     toast,
     showDreamsGadgetMenu,
     isValenceMode,
     enterValenceMode,
     exitValenceMode,
     selection,
+    highlightedNodeId,
+    setHighlightedNodeId,
   ]);
 
   // Handle node drag with proximity connect
@@ -463,10 +477,19 @@ function Flow() {
 
   return (
     <div
-      className="w-full h-screen select-none bg-background"
+      className={cn("w-full h-screen select-none transition-colors duration-300 relative", 
+        highlightedNodeId ? "bg-gray-800" : "bg-gray-600"
+      )}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
+      {/* Valence mode border indicator */}
+      {isValenceMode && (
+        <div className="absolute inset-0 pointer-events-none z-50">
+          <div className="absolute inset-4 border-4 border-green-500/50 rounded-lg shadow-[inset_0_0_20px_rgba(34,197,94,0.3)] transition-all duration-300" />
+        </div>
+      )}
+      
       <ReactFlow
         nodes={nodes}
         edges={displayEdges}
@@ -490,10 +513,15 @@ function Flow() {
         panOnDrag={true}
       >
         {viewSettings.showGrid && (
-          <Background gap={12} className="!bg-muted/20" size={1} />
+          <Background 
+            gap={12} 
+            className={cn(
+              "transition-colors duration-300",
+              highlightedNodeId ? "!bg-gray-700" : "!bg-gray-500"
+            )} 
+            size={1} 
+          />
         )}
-        {/* <Controls /> */}
-        {viewSettings.showMiniMap && <MiniMap />}
 
         <Panel position="top-left" className="flex flex-col gap-2">
           <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
@@ -513,9 +541,6 @@ function Flow() {
             </div>
           )}
           <div className="flex gap-2">
-            <Button onClick={handleAddContact} size="sm">
-              Add Contact
-            </Button>
             <Button
               onClick={handleAddInputBoundary}
               size="sm"
@@ -529,9 +554,6 @@ function Flow() {
               variant="outline"
             >
               Add Output Boundary
-            </Button>
-            <Button onClick={handleAddGroup} size="sm" variant="secondary">
-              Add Gadget
             </Button>
             <Button 
               onClick={handleSaveBassline} 
@@ -620,10 +642,8 @@ function Flow() {
               </div>
               <div>G → Toggle gadgets</div>
               <div>W → Toggle instructions (this)</div>
-              <div>E → Toggle minimap</div>
-              <div>A → Add contact</div>
-              <div>S → Add gadget</div>
-              <div>D → Toggle grid</div>
+              <div>E → Open properties</div>
+              <div>Q → Format selection/all</div>
               <div>T → Toggle properties</div>
               <div>L → Auto layout</div>
               <div>V → Valence mode (select first)</div>

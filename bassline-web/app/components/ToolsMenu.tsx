@@ -21,7 +21,6 @@ import {
 
 export interface ViewSettings {
   showInstructions: boolean
-  showMiniMap: boolean
   showGrid: boolean
   showPropagationFlow: boolean
   showNodeLabels: boolean
@@ -89,16 +88,9 @@ export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfigurat
             shortcut="W"
           />
           <ViewToggle 
-            setting="showMiniMap" 
-            label="Mini Map" 
-            icon={Layers}
-            shortcut="E"
-          />
-          <ViewToggle 
             setting="showGrid" 
             label="Grid Background" 
             icon={Grid}
-            shortcut="D"
           />
           <ViewToggle 
             setting="showPropagationFlow" 

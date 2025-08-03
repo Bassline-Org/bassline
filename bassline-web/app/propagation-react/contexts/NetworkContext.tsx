@@ -22,6 +22,8 @@ interface NetworkContextValue {
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
   selection: Selection
   setSelection: React.Dispatch<React.SetStateAction<Selection>>
+  highlightedNodeId: string | null
+  setHighlightedNodeId: (id: string | null) => void
   appSettings: AppSettings
   updatePropagationSettings: (updates: Partial<AppSettings['propagation']>) => void
   updateVisualSettings: (updates: Partial<AppSettings['visual']>) => void
@@ -56,6 +58,9 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
   
   // Selection state
   const [selection, setSelection] = useState<Selection>(createEmptySelection())
+  
+  // Highlighted node for property panel focus
+  const [highlightedNodeId, setHighlightedNodeId] = useState<string | null>(null)
   
   // App settings
   const {
@@ -173,7 +178,14 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
       }
     })
     
-    setNodes(newNodes)
+    // Preserve selection state
+    setNodes(prevNodes => {
+      const selectedIds = new Set(prevNodes.filter(n => n.selected).map(n => n.id))
+      return newNodes.map(node => ({
+        ...node,
+        selected: selectedIds.has(node.id)
+      }))
+    })
     setEdges(newEdges)
   }, [network, currentGroupId, appSettings.visual.showEdges, appSettings.visual.edgeOpacity, appSettings.visual.showFatEdges, appSettings.visual.fatEdgeScale])
   
@@ -243,6 +255,8 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
     setEdges,
     selection,
     setSelection,
+    highlightedNodeId,
+    setHighlightedNodeId,
     appSettings,
     updatePropagationSettings,
     updateVisualSettings,

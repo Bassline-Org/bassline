@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
 import { useContactSelection } from './useContactSelection'
+import { usePropertyPanel } from './usePropertyPanel'
 import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect'
 import type { ContactGroup, Contact } from '~/propagation-core'
 import { useSound } from '~/components/SoundSystem'
@@ -10,6 +11,7 @@ export interface ValenceSource {
   contacts: Contact[]
   gadgets: ContactGroup[]
   totalOutputCount: number
+  sourceIds: Set<string> // All source contact and gadget IDs for visual filtering
 }
 
 export interface UseValenceModeReturn {
@@ -32,9 +34,10 @@ export interface UseValenceModeReturn {
 }
 
 export function useValenceMode(): UseValenceModeReturn {
-  const { network, syncToReactFlow } = useNetworkContext()
+  const { network, syncToReactFlow, highlightedNodeId } = useNetworkContext()
   const { selectedContacts, selectedGroups, clearSelection } = useContactSelection()
   const { play: playConnectionSound } = useSound('connection/create')
+  const propertyPanel = usePropertyPanel()
   
   const [isValenceMode, setIsValenceMode] = useState(false)
   const [valenceSource, setValenceSource] = useState<ValenceSource | null>(null)
@@ -58,10 +61,16 @@ export function useValenceMode(): UseValenceModeReturn {
       return
     }
     
+    // Collect all source IDs for visual filtering
+    const sourceIds = new Set<string>()
+    selectedContacts.forEach(c => sourceIds.add(c.id))
+    selectedGroups.forEach(g => sourceIds.add(g.id))
+    
     setValenceSource({
       contacts: [...selectedContacts],
       gadgets: [...selectedGroups],
-      totalOutputCount
+      totalOutputCount,
+      sourceIds
     })
     
     setIsValenceMode(true)
@@ -74,8 +83,14 @@ export function useValenceMode(): UseValenceModeReturn {
   const exitValenceMode = useCallback(() => {
     setIsValenceMode(false)
     setValenceSource(null)
-    toast.info('Exited valence mode')
-  }, [])
+    
+    // If property panel is open and has a focused item, stay in focus mode
+    if (propertyPanel.isVisible && highlightedNodeId) {
+      toast.info('Back to property focus mode')
+    } else {
+      toast.info('Exited valence mode')
+    }
+  }, [propertyPanel.isVisible, highlightedNodeId])
   
   // Check if a gadget can be connected to
   const canConnectToGadget = useCallback((gadgetId: string): boolean => {
@@ -141,19 +156,7 @@ export function useValenceMode(): UseValenceModeReturn {
     return compatible
   }, [valenceSource, isValenceMode, network, canConnectToGadget])
   
-  // Exit mode on Escape
-  useEffect(() => {
-    if (!isValenceMode) return
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        exitValenceMode()
-      }
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isValenceMode, exitValenceMode])
+  // Escape handling moved to editor for stack-based flow
   
   return {
     isValenceMode,

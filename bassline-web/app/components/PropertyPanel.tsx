@@ -1,20 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
 import { ChevronLeft, ChevronRight, Settings } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
-import { Switch } from '~/components/ui/switch'
-import { Interval, Color, Temperature, SetValue, ConsensusBoolean, Point2D, ExactString } from '~/propagation-core/types/mergeable'
 import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
-import { useContact } from '~/propagation-react/hooks/useContact'
-import { formatContentForDisplay } from '~/utils/content-display'
+import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
+import { ContactPropertySection, GroupPropertySection } from './PropertyPanelItem'
 
 interface PropertyPanelProps {
   isVisible: boolean
@@ -22,172 +11,47 @@ interface PropertyPanelProps {
   shouldFocus: React.MutableRefObject<boolean>
 }
 
-type ValueType = 'number' | 'string' | 'interval' | 'color' | 'temperature' | 'boolean' | 'point2d' | 'exactString' | 'set' | 'map' | 'date' | 'object' | 'array'
-
 export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: PropertyPanelProps) {
-  const { selectedContacts } = useContactSelection()
-  const valueInputRef = useRef<HTMLInputElement>(null)
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
-  const contactData = useContact(selectedContactId)
-  const [valueType, setValueType] = useState<ValueType>('string')
-  const [tempValue, setTempValue] = useState<any>(null)
+  const { selectedContacts, selectedGroups } = useContactSelection()
+  const { setHighlightedNodeId } = useNetworkContext()
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
   
-  // Track selected contact
+  // Auto-expand single selection
   useEffect(() => {
-    if (selectedContacts.length === 1) {
-      const contactId = selectedContacts[0].id
-      setSelectedContactId(contactId)
-      
-      // Focus input only when opened via double-click
-      if (isVisible && shouldFocus.current) {
-        setTimeout(() => {
-          valueInputRef.current?.focus()
-          valueInputRef.current?.select()
-          shouldFocus.current = false // Reset the flag
-        }, 100)
+    const totalSelected = selectedContacts.length + selectedGroups.length
+    
+    if (totalSelected === 1) {
+      const itemId = selectedContacts.length === 1 
+        ? selectedContacts[0].id 
+        : selectedGroups[0].id
+      setExpandedItems(new Set([itemId]))
+      setFocusedItemId(itemId)
+    } else if (totalSelected === 0) {
+      setExpandedItems(new Set())
+      setFocusedItemId(null)
+    }
+  }, [selectedContacts, selectedGroups])
+
+  // Update highlighted node based on focused item
+  useEffect(() => {
+    setHighlightedNodeId(focusedItemId)
+  }, [focusedItemId, setHighlightedNodeId])
+
+  const toggleExpanded = (itemId: string) => {
+    const newExpanded = new Set(expandedItems)
+    if (newExpanded.has(itemId)) {
+      newExpanded.delete(itemId)
+      if (focusedItemId === itemId) {
+        setFocusedItemId(null)
       }
     } else {
-      setSelectedContactId(null)
+      newExpanded.add(itemId)
+      setFocusedItemId(itemId)
     }
-  }, [selectedContacts, isVisible])
-  
-  // Detect value type from current content
-  useEffect(() => {
-    if (!contactData.contact) return
-    
-    const content = contactData.content
-    if (content === undefined || content === null) {
-      setValueType('string')
-    } else if (content instanceof Interval) {
-      setValueType('interval')
-      setTempValue({ min: content.min, max: content.max })
-    } else if (content instanceof Color) {
-      setValueType('color')
-      setTempValue({ r: content.r, g: content.g, b: content.b })
-    } else if (content instanceof Temperature) {
-      setValueType('temperature')
-      setTempValue(content.celsius)
-    } else if (content instanceof ConsensusBoolean) {
-      setValueType('boolean')
-      setTempValue(content.value)
-    } else if (content instanceof Point2D) {
-      setValueType('point2d')
-      setTempValue({ x: content.x, y: content.y })
-    } else if (content instanceof ExactString) {
-      setValueType('exactString')
-      setTempValue(content.value)
-    } else if (content instanceof SetValue) {
-      setValueType('set')
-      setTempValue(content.toArray().join(', '))
-    } else if (content instanceof Set) {
-      setValueType('set')
-      setTempValue(Array.from(content).join(', '))
-    } else if (content instanceof Map) {
-      setValueType('map')
-      // Convert to editable format: key1:value1, key2:value2
-      const pairs = Array.from(content.entries()).map(([k, v]) => `${k}:${v}`)
-      setTempValue(pairs.join(', '))
-    } else if (content instanceof Date) {
-      setValueType('date')
-      setTempValue(content.toISOString().split('T')[0])
-    } else if (Array.isArray(content)) {
-      setValueType('array')
-      setTempValue(JSON.stringify(content))
-    } else if (typeof content === 'number') {
-      setValueType('number')
-      setTempValue(content)
-    } else if (typeof content === 'boolean') {
-      setValueType('boolean')
-      setTempValue(content)
-    } else if (typeof content === 'object' && content !== null) {
-      setValueType('object')
-      setTempValue(JSON.stringify(content, null, 2))
-    } else {
-      setValueType('string')
-      setTempValue(String(content))
-    }
-  }, [contactData.contact, contactData.content])
-  
-  const applyValue = () => {
-    if (!contactData.contact) return
-    
-    let newValue: any
-    
-    switch (valueType) {
-      case 'number':
-        newValue = Number(tempValue)
-        break
-      case 'interval':
-        newValue = new Interval(Number(tempValue.min), Number(tempValue.max))
-        break
-      case 'color':
-        newValue = new Color(
-          Math.min(255, Math.max(0, Number(tempValue.r))),
-          Math.min(255, Math.max(0, Number(tempValue.g))),
-          Math.min(255, Math.max(0, Number(tempValue.b)))
-        )
-        break
-      case 'temperature':
-        newValue = new Temperature(Number(tempValue))
-        break
-      case 'boolean':
-        newValue = new ConsensusBoolean(Boolean(tempValue))
-        break
-      case 'point2d':
-        newValue = new Point2D(Number(tempValue.x), Number(tempValue.y))
-        break
-      case 'exactString':
-        newValue = new ExactString(String(tempValue))
-        break
-      case 'set':
-        const items = String(tempValue).split(',').map(s => s.trim()).filter(s => s)
-        // Try to parse as numbers if possible
-        const parsedItems = items.map(item => {
-          const num = Number(item)
-          return isNaN(num) ? item : num
-        })
-        newValue = new Set(parsedItems)
-        break
-      case 'map':
-        try {
-          // Expect format: key1:value1, key2:value2
-          const pairs = String(tempValue).split(',').map(s => s.trim()).filter(s => s)
-          const map = new Map()
-          pairs.forEach(pair => {
-            const [key, value] = pair.split(':').map(s => s.trim())
-            if (key && value) {
-              map.set(key, value)
-            }
-          })
-          newValue = map
-        } catch {
-          newValue = new Map()
-        }
-        break
-      case 'date':
-        newValue = new Date(tempValue)
-        break
-      case 'array':
-        try {
-          newValue = JSON.parse(tempValue)
-        } catch {
-          newValue = []
-        }
-        break
-      case 'object':
-        try {
-          newValue = JSON.parse(tempValue)
-        } catch {
-          newValue = {}
-        }
-        break
-      default:
-        newValue = tempValue
-    }
-    
-    contactData.setContent(newValue)
+    setExpandedItems(newExpanded)
   }
-  
+
   if (!isVisible) {
     return (
       <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50">
@@ -203,11 +67,11 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
   }
   
   return (
-    <div className="fixed left-0 top-0 h-full w-80 bg-white border-r shadow-lg z-50 flex flex-col">
+    <div className="fixed left-0 top-1/2 -translate-y-1/2 h-[80vh] max-h-[600px] w-80 bg-gray-800 border-r border-gray-700 shadow-xl z-40 flex flex-col rounded-r-lg">
       {/* Header */}
-      <div className="p-4 border-b">
+      <div className="p-4 border-b border-gray-700">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold flex items-center gap-2">
+          <h3 className="font-semibold flex items-center gap-2 text-gray-100">
             <Settings className="w-4 h-4" />
             Properties
           </h3>
@@ -224,310 +88,47 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
       
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
-        {!contactData.contact ? (
-          <div className="text-sm text-muted-foreground text-center py-8">
-            Select a single contact to edit its properties
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Contact Info */}
-            <div className="text-xs text-muted-foreground">
-              {contactData.isBoundary ? 'Boundary Contact' : 'Contact'}
-              {contactData.name && ` - ${contactData.name}`}
-            </div>
-            
-            {/* Blend Mode */}
-            <div className="flex items-center justify-between">
-              <Label htmlFor="blend-mode" className="text-sm">Merge Mode</Label>
-              <Switch
-                id="blend-mode"
-                checked={contactData.blendMode === 'merge'}
-                onCheckedChange={(checked) => {
-                  contactData.setBlendMode(checked ? 'merge' : 'accept-last')
-                }}
-              />
-            </div>
-            
-            {/* Boundary Status */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="is-boundary" className="text-sm">Boundary Contact</Label>
-                <Switch
-                  id="is-boundary"
-                  checked={contactData.isBoundary}
-                  onCheckedChange={(checked) => {
-                    contactData.setBoundary(checked)
-                  }}
-                />
-              </div>
-              
-              {/* Boundary Direction */}
-              {contactData.isBoundary && (
-                <div className="space-y-2">
-                  <Label className="text-sm">Direction</Label>
-                  <Select 
-                    value={contactData.boundaryDirection || 'input'} 
-                    onValueChange={(value: 'input' | 'output') => {
-                      contactData.setBoundaryDirection(value)
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="input">Input</SelectItem>
-                      <SelectItem value="output">Output</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            
-            {/* Value Type Selector */}
-            <div className="space-y-2">
-              <Label className="text-sm">Value Type</Label>
-              <Select value={valueType} onValueChange={(v) => setValueType(v as ValueType)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="number">Number</SelectItem>
-                  <SelectItem value="string">String</SelectItem>
-                  <SelectItem value="boolean">Boolean</SelectItem>
-                  <SelectItem value="array">Array</SelectItem>
-                  <SelectItem value="object">Object</SelectItem>
-                  <SelectItem value="set">Set</SelectItem>
-                  <SelectItem value="map">Map</SelectItem>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="interval">Interval</SelectItem>
-                  <SelectItem value="color">Color</SelectItem>
-                  <SelectItem value="temperature">Temperature</SelectItem>
-                  <SelectItem value="point2d">Point 2D</SelectItem>
-                  <SelectItem value="exactString">Exact String</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* Value Input */}
-            <div className="space-y-2">
-              <Label className="text-sm">Value</Label>
-              
-              {valueType === 'number' && (
-                <Input
-                  ref={valueInputRef}
-                  type="number"
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                  onFocus={(e) => e.target.select()}
-                />
-              )}
-              
-              {valueType === 'string' && (
-                <Input
-                  ref={valueInputRef}
-                  type="text"
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                />
-              )}
-              
-              {valueType === 'interval' && (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="Min"
-                    value={tempValue?.min || ''}
-                    onChange={(e) => setTempValue({ ...tempValue, min: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                    onFocus={(e) => e.target.select()}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Max"
-                    value={tempValue?.max || ''}
-                    onChange={(e) => setTempValue({ ...tempValue, max: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                    onFocus={(e) => e.target.select()}
-                  />
-                </div>
-              )}
-              
-              {valueType === 'color' && (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder="R"
-                      min="0"
-                      max="255"
-                      value={tempValue?.r || ''}
-                      onChange={(e) => setTempValue({ ...tempValue, r: e.target.value })}
-                      onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                      onFocus={(e) => e.target.select()}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="G"
-                      min="0"
-                      max="255"
-                      value={tempValue?.g || ''}
-                      onChange={(e) => setTempValue({ ...tempValue, g: e.target.value })}
-                      onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                      onFocus={(e) => e.target.select()}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="B"
-                      min="0"
-                      max="255"
-                      value={tempValue?.b || ''}
-                      onChange={(e) => setTempValue({ ...tempValue, b: e.target.value })}
-                      onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                      onFocus={(e) => e.target.select()}
-                    />
-                  </div>
-                  <div 
-                    className="h-8 rounded border"
-                    style={{ backgroundColor: tempValue ? `rgb(${tempValue.r || 0}, ${tempValue.g || 0}, ${tempValue.b || 0})` : '#000' }}
-                  />
-                </div>
-              )}
-              
-              {valueType === 'temperature' && (
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="number"
-                    value={tempValue || ''}
-                    onChange={(e) => setTempValue(e.target.value)}
-                    onBlur={applyValue}
-                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                    onFocus={(e) => e.target.select()}
-                  />
-                  <span className="text-sm">°C</span>
-                </div>
-              )}
-              
-              {valueType === 'boolean' && (
-                <Switch
-                  checked={tempValue || false}
-                  onCheckedChange={(checked) => {
-                    setTempValue(checked)
-                    contactData.setContent(new ConsensusBoolean(checked))
-                  }}
-                />
-              )}
-              
-              {valueType === 'point2d' && (
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    placeholder="X"
-                    value={tempValue?.x || ''}
-                    onChange={(e) => setTempValue({ ...tempValue, x: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                    onFocus={(e) => e.target.select()}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Y"
-                    value={tempValue?.y || ''}
-                    onChange={(e) => setTempValue({ ...tempValue, y: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                    onFocus={(e) => e.target.select()}
-                  />
-                </div>
-              )}
-              
-              {valueType === 'exactString' && (
-                <Input
-                  type="text"
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                />
-              )}
-              
-              {valueType === 'set' && (
-                <Input
-                  type="text"
-                  placeholder="Comma-separated values"
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                />
-              )}
-              
-              {valueType === 'map' && (
-                <Input
-                  type="text"
-                  placeholder="key1:value1, key2:value2"
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                />
-              )}
-              
-              {valueType === 'date' && (
-                <Input
-                  type="date"
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyValue()}
-                />
-              )}
-              
-              {valueType === 'array' && (
-                <textarea
-                  className="w-full min-h-[80px] p-2 text-sm border rounded-md bg-background"
-                  placeholder="JSON array, e.g. [1, 2, 3]"
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.shiftKey) {
-                      e.preventDefault()
-                      applyValue()
-                    }
-                  }}
-                />
-              )}
-              
-              {valueType === 'object' && (
-                <textarea
-                  className="w-full min-h-[100px] p-2 text-sm border rounded-md bg-background"
-                  placeholder='JSON object, e.g. {"key": "value"}'
-                  value={tempValue || ''}
-                  onChange={(e) => setTempValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.shiftKey) {
-                      e.preventDefault()
-                      applyValue()
-                    }
-                  }}
-                />
-              )}
-            </div>
-            
-            {/* Apply Button */}
-            <Button
-              onClick={applyValue}
-              size="sm"
-              className="w-full cursor-pointer"
-              type="button"
-            >
-              Apply Value
-            </Button>
-            
-            {/* Contradiction Display */}
-            {contactData.lastContradiction && (
-              <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                <div className="font-semibold mb-1">Contradiction</div>
-                <div>{contactData.lastContradiction.reason}</div>
-              </div>
-            )}
+        {/* Selection info */}
+        {(selectedContacts.length + selectedGroups.length) > 0 && (
+          <div className="text-xs text-gray-400 mb-3">
+            {selectedContacts.length + selectedGroups.length} items selected
+            {selectedContacts.length > 0 && ` (${selectedContacts.length} contacts`}
+            {selectedGroups.length > 0 && `${selectedContacts.length > 0 ? ', ' : ' ('}${selectedGroups.length} gadgets`}
+            {(selectedContacts.length > 0 || selectedGroups.length > 0) && ')'}
           </div>
         )}
+        
+        {/* No selection message */}
+        {selectedContacts.length === 0 && selectedGroups.length === 0 && (
+          <div className="text-sm text-gray-400 text-center py-8">
+            Select items to edit their properties
+          </div>
+        )}
+        
+        {/* Property sections */}
+        <div className="space-y-3">
+          {/* Contact sections */}
+          {selectedContacts.map((contact) => (
+            <ContactPropertySection
+              key={contact.id}
+              contactId={contact.id}
+              isExpanded={expandedItems.has(contact.id)}
+              onToggle={() => toggleExpanded(contact.id)}
+              isFocused={focusedItemId === contact.id}
+            />
+          ))}
+          
+          {/* Group sections */}
+          {selectedGroups.map((group) => (
+            <GroupPropertySection
+              key={group.id}
+              groupId={group.id}
+              isExpanded={expandedItems.has(group.id)}
+              onToggle={() => toggleExpanded(group.id)}
+              isFocused={focusedItemId === group.id}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )

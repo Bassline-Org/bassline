@@ -8,6 +8,8 @@ import { useContact } from '~/propagation-react/hooks/useContact'
 import { usePropertyPanel } from '~/propagation-react/hooks/usePropertyPanel'
 import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
 import { formatContentForDisplay, formatContentForTooltip } from '~/utils/content-display'
+import { useValenceMode } from '~/propagation-react/contexts/ValenceModeContext'
+import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 
 const nodeVariants = cva(
   "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -45,9 +47,18 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id)
   const propertyPanel = usePropertyPanel()
   const { selectContact } = useContactSelection()
+  const { isValenceMode, valenceSource } = useValenceMode()
+  const { highlightedNodeId } = useNetworkContext()
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const contextMenuRef = useRef<HTMLDivElement>(null)
+  
+  // Check if this node should be dimmed
+  const isDimmed = (isValenceMode && !valenceSource?.sourceIds.has(id)) || 
+                   (highlightedNodeId !== null && !selected)
+  
+  // Check if this node is highlighted
+  const isHighlighted = highlightedNodeId === id
   
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -71,7 +82,9 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
       <Card 
         className={cn(
           nodeVariants({ nodeType, selected }),
-          lastContradiction && "ring-2 ring-red-500"
+          lastContradiction && "ring-2 ring-red-500",
+          isDimmed && "opacity-30",
+          isHighlighted && "ring-4 ring-blue-500 shadow-lg"
         )}
         onContextMenu={handleContextMenu}
         onDoubleClick={(e) => {

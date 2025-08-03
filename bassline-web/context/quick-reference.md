@@ -130,12 +130,13 @@ http://localhost:5173/editor
 - Preserves all wire connections through proper rewiring
 
 ## Keyboard Shortcuts (Left-Hand Friendly)
-- **Q** - Toggle gadget palette
+- **G** - Toggle gadget palette
 - **W** - Toggle instructions
-- **E** - Toggle minimap
-- **A** - Add contact
-- **S** - Add gadget
-- **D** - Toggle grid
+- **E** - Open properties panel
+- **Q** - Format selection (or all if none selected)
+- **T** - Toggle properties panel
+- **L** - Auto layout all
+- **V** - Valence mode (select sources first)
 - **Delete/Backspace** - Remove selected items
 
 ## Mouse Actions
@@ -160,7 +161,6 @@ http://localhost:5173/editor
 
 ## View Options (Tools Menu - Bottom Center)
 - **Instructions** - Help panel with shortcuts
-- **Mini Map** - Overview navigation
 - **Grid** - Background grid pattern
 - **Flow** - (Future) Propagation animations
 - **Labels** - (Future) Node label visibility
@@ -171,6 +171,26 @@ http://localhost:5173/editor
 - Connections immediately propagate existing content
 - Bidirectional wires flow both ways if content exists
 - No manual triggering needed
+
+## Valence Connections
+Revolutionary system for rapid wiring of compatible gadgets:
+
+### Valence Mode Workflow
+1. **Select sources** - Any combination of contacts and gadgets
+2. **Press V** - Enter valence mode (green banner appears)
+3. **Click targets** - Compatible gadgets show green rings, click to connect all
+4. **Escape/V** - Exit mode when done
+
+### Connection Types
+- **Gadget-to-gadget** - Match outputs to inputs
+- **Contacts-to-gadget** - Connect N contacts to N inputs
+- **Mixed sources** - Combine gadget outputs + contacts
+
+### Key Features
+- Total output counting (gadget outputs + individual contacts)
+- Single click connects all sources to target
+- Stay in mode to connect to multiple targets
+- Y-position ordering for predictable connections
 
 ## Template System
 ```typescript
