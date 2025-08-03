@@ -8,10 +8,12 @@ import { useContact } from '~/propagation-react/hooks/useContact'
 import { usePropertyPanel } from '~/propagation-react/hooks/usePropertyPanel'
 import { useContextSelection } from '~/propagation-react/hooks/useContextSelection'
 import { formatContentForDisplay, formatContentForTooltip } from '~/utils/content-display'
-import { useValenceMode } from '~/propagation-react/contexts/ValenceModeContext'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 import { useUIStack } from '~/propagation-react/contexts/UIStackContext'
+import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext'
 import { toast } from 'sonner'
+import { useLoaderData } from 'react-router'
+import type { loader } from '~/routes/editor'
 
 const nodeVariants = cva(
   "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -49,16 +51,16 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id)
   const propertyPanel = usePropertyPanel()
   const { selectContact } = useContextSelection()
-  const { isValenceMode, valenceSource } = useValenceMode()
   const { highlightedNodeId, setHighlightedNodeId } = useNetworkContext()
   const { activeToolInstance } = useContextFrame()
   const uiStack = useUIStack()
+  const loaderData = useLoaderData<typeof loader>()
   const [showContextMenu, setShowContextMenu] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const contextMenuRef = useRef<HTMLDivElement>(null)
   
   // Check if this node should be dimmed
-  const isDimmed = (isValenceMode && !valenceSource?.sourceIds.has(id)) || 
+  const isDimmed = (loaderData.mode === 'valence' && !loaderData.selection?.includes(id)) || 
                    (highlightedNodeId !== null && !selected)
   
   // Check if this node is highlighted

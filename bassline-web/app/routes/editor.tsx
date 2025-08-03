@@ -8,6 +8,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, useLoaderData, redirect, useFetcher, useNavigate } from "react-router";
 
 import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationNetworkCompat";
 import { usePalette } from "~/propagation-react/hooks/usePalette";
@@ -17,7 +18,6 @@ import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
 import { useLayout } from "~/propagation-react/hooks/useLayout";
 import { useValenceConnect } from "~/propagation-react/hooks/useValenceConnect";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
-import { ValenceModeProvider, useValenceMode } from "~/propagation-react/contexts/ValenceModeContext";
 import { UIStackProvider, useUIStack } from "~/propagation-react/contexts/UIStackContext";
 import { PropertyPanelStackProvider } from "~/propagation-react/contexts/PropertyPanelStackContext";
 import { ContextFrameProvider, useContextFrame } from "~/propagation-react/contexts/ContextFrameContext";
@@ -41,6 +41,70 @@ import { SoundSystemProvider } from "~/components/SoundSystem";
 import { StackDebugger } from "~/components/StackDebugger";
 import { ContextDebugger } from "~/components/ContextDebugger";
 import { ToolRegistry } from "~/propagation-react/tools/ToolRegistry";
+import { PropagationNetwork } from "~/propagation-core/models/PropagationNetwork";
+import { ValenceConnectOperation } from "~/propagation-core/refactoring/operations/ValenceConnect";
+
+// Loader - provides mode state from URL
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const mode = url.searchParams.get('mode') || 'normal';
+  const nodeId = url.searchParams.get('node');
+  const selection = url.searchParams.get('selection');
+  
+  return {
+    mode,
+    nodeId,
+    selection: selection ? JSON.parse(selection) : null,
+  };
+}
+
+// Action - handles all mutations
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get('intent') as string;
+  
+  switch (intent) {
+    case 'connect-valence': {
+      const sourceIds = JSON.parse(formData.get('sourceIds') as string);
+      const targetId = formData.get('targetId') as string;
+      
+      // For now, we'll rely on client-side state management
+      // In a production app, you'd retrieve the network from a database or session
+      // The client will handle the actual connection through React context
+      
+      return redirect('/editor'); // Exit valence mode after connection
+    }
+    
+    case 'update-property': {
+      const nodeId = formData.get('nodeId') as string;
+      const value = formData.get('value') as string;
+      
+      // TODO: Update node property
+      
+      return { success: true };
+    }
+    
+    case 'create-contact': {
+      const x = Number(formData.get('x'));
+      const y = Number(formData.get('y'));
+      
+      // TODO: Create contact at position
+      
+      return { success: true };
+    }
+    
+    case 'delete-selection': {
+      const nodeIds = JSON.parse(formData.get('nodeIds') as string);
+      
+      // TODO: Delete selected nodes
+      
+      return { success: true };
+    }
+    
+    default:
+      return { error: `Unknown intent: ${intent}` };
+  }
+}
 
 const nodeTypes = {
   contact: ContactNode,
@@ -55,6 +119,10 @@ const edgeTypes = {
 
 function Flow() {
   const { screenToFlowPosition } = useReactFlow();
+  const loaderData = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
+  const fetcher = useFetcher();
+  
   const {
     appSettings,
     updatePropagationSettings,
@@ -73,7 +141,6 @@ function Flow() {
   const [showDreamsGadgetMenu, setShowDreamsGadgetMenu] = useState(false);
   const { applyLayout, applyLayoutToSelection } = useLayout();
   const { canValenceConnect, valenceConnect, valenceConnectionType, totalSourceCount } = useValenceConnect();
-  const { isValenceMode, enterValenceMode, exitValenceMode, valenceSource } = useValenceMode();
   const uiStack = useUIStack();
   const { activeTool, activeToolInstance, activateTool, deactivateTool } = useContextFrame();
 
@@ -124,25 +191,14 @@ function Flow() {
     instantiateTemplate,
   } = usePropagationNetwork({
     onContactDoubleClick: (contactId) => {
-      showPropertyPanel(true); // true = focus input
+      // Navigate to property mode with the double-clicked contact
+      navigate(`/editor?mode=property&node=${contactId}&focus=true`);
     },
   });
 
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
 
-  // UI Stack integration for valence mode
-  const enterStackedValenceMode = useCallback(() => {
-    enterValenceMode();
-    uiStack.push({
-      type: 'valenceMode',
-      onEscape: () => {
-        exitValenceMode();
-        // Let the default pop behavior happen
-        // This will return to whatever was below (property focus or base)
-      }
-    });
-  }, [enterValenceMode, exitValenceMode, uiStack]);
 
   // UI Stack integration for gadget menu
   const toggleGadgetMenu = useCallback(() => {
@@ -343,24 +399,15 @@ function Flow() {
         e.preventDefault(); // Prevent default tab behavior
       }
 
-      // Escape - unified stack handler
+      // Escape - exit any mode
       if (e.key === "Escape") {
         e.preventDefault();
         
-        const currentLayer = uiStack.peek();
-        if (currentLayer && currentLayer.type !== 'base') {
-          // Call the layer's custom escape handler if it exists
-          if (currentLayer.onEscape) {
-            const preventPop = currentLayer.onEscape();
-            if (!preventPop) {
-              uiStack.pop();
-            }
-          } else {
-            // Default behavior: just pop the layer
-            uiStack.pop();
-          }
-        } else if (propertyPanel.isVisible && !uiStack.isInMode('propertyFocus')) {
-          // Legacy behavior: close property panel if no stack layers
+        if (loaderData.mode !== 'normal') {
+          // Exit any mode by navigating to base URL
+          navigate('/editor');
+        } else if (propertyPanel.isVisible) {
+          // If in normal mode and property panel is open, close it
           propertyPanel.toggleVisibility();
         }
       }
@@ -374,7 +421,14 @@ function Flow() {
       // T to toggle property panel (left hand: T with index finger)
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "t") {
         e.preventDefault();
-        propertyPanel.toggleVisibility();
+        if (loaderData.mode === 'property') {
+          navigate('/editor');
+        } else {
+          const selectedIds = [...selection.contacts, ...selection.groups];
+          if (selectedIds.length > 0) {
+            navigate(`/editor?mode=property&node=${selectedIds[0]}`);
+          }
+        }
       }
       // L for auto layout
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "l") {
@@ -394,9 +448,18 @@ function Flow() {
       // E to open property panel
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "e") {
         e.preventDefault();
-        propertyPanel.toggleVisibility();
-        if (viewSettings.showShortcutHints) {
-          toast.success(`Properties ${propertyPanel.isVisible ? "hidden" : "shown"}`);
+        if (loaderData.mode === 'property') {
+          navigate('/editor');
+        } else {
+          const selectedIds = [...selection.contacts, ...selection.groups];
+          if (selectedIds.length > 0) {
+            navigate(`/editor?mode=property&node=${selectedIds[0]}`);
+            if (viewSettings.showShortcutHints) {
+              toast.success("Properties panel opened");
+            }
+          } else {
+            toast.error("Select a node first");
+          }
         }
       }
 
@@ -419,18 +482,22 @@ function Flow() {
       }
 
 
-      // V for valence mode (using new tool system)
+      // V for valence mode (using URL-based state)
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "v") {
         e.preventDefault();
         
-        if (activeTool?.toolId === 'valence') {
-          // Deactivate valence tool
-          deactivateTool();
+        if (loaderData.mode === 'valence') {
+          // Exit valence mode
+          navigate('/editor');
         } else {
-          // Activate valence tool
-          const valenceTool = ToolRegistry.get('valence');
-          if (valenceTool) {
-            activateTool(valenceTool);
+          // Enter valence mode with current selection
+          // Convert Set values to array of IDs
+          const selectedIds = [...Array.from(selection.contacts), ...Array.from(selection.groups)];
+          if (selectedIds.length > 0) {
+            navigate(`/editor?mode=valence&selection=${encodeURIComponent(JSON.stringify(selectedIds))}`);
+            toast.success('Valence mode: Click compatible gadgets to connect');
+          } else {
+            toast.error('Select contacts and/or gadgets first');
           }
         }
       }
@@ -447,8 +514,6 @@ function Flow() {
     applyLayoutToSelection,
     toast,
     showDreamsGadgetMenu,
-    isValenceMode,
-    enterStackedValenceMode,
     selection,
     highlightedNodeId,
     setHighlightedNodeId,
@@ -457,6 +522,8 @@ function Flow() {
     activeTool,
     activateTool,
     deactivateTool,
+    loaderData,
+    navigate,
   ]);
 
   // Handle node drag with proximity connect
@@ -547,10 +614,10 @@ function Flow() {
     ? [...edges, proximity.potentialEdge]
     : edges;
 
-  // Compute background color based on stack depth
+  // Compute background color based on mode
   const getBackgroundClass = () => {
-    if (uiStack.isInMode('propertyFocus')) return "bg-gray-800";
-    if (uiStack.depth > 0) return "bg-gray-700";
+    if (loaderData.mode === 'property') return "bg-gray-800";
+    if (loaderData.mode !== 'normal') return "bg-gray-700";
     return "bg-gray-600";
   };
 
@@ -562,8 +629,8 @@ function Flow() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* Stack-based visual indicators */}
-      {uiStack.isInMode('valenceMode') && (
+      {/* Mode-based visual indicators */}
+      {loaderData.mode === 'valence' && (
         <div className="absolute inset-0 pointer-events-none z-50">
           <div className="absolute inset-4 border-4 border-green-500/50 rounded-lg shadow-[inset_0_0_20px_rgba(34,197,94,0.3)] transition-all duration-300" />
         </div>
@@ -604,8 +671,8 @@ function Flow() {
             gap={12} 
             className={cn(
               "transition-colors duration-300",
-              uiStack.isInMode('propertyFocus') ? "!bg-gray-700" : 
-              uiStack.depth > 0 ? "!bg-gray-600" : 
+              loaderData.mode === 'property' ? "!bg-gray-700" : 
+              loaderData.mode !== 'normal' ? "!bg-gray-600" : 
               "!bg-gray-500"
             )} 
             size={1} 
@@ -614,18 +681,13 @@ function Flow() {
 
         <Panel position="top-left" className="flex flex-col gap-2">
           <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
-          {isValenceMode && (
+          {loaderData.mode === 'valence' && (
             <div className="bg-green-500 text-white px-4 py-2 rounded-md animate-pulse flex items-center justify-between">
               <span className="font-semibold">
-                Valence Mode: Click gadgets with {valenceSource?.totalOutputCount || 0} inputs
+                Valence Mode: Click compatible gadgets to connect
               </span>
               <Button
-                onClick={() => {
-                  const valenceLayer = uiStack.stack.find(item => item.type === 'valenceMode');
-                  if (valenceLayer) {
-                    uiStack.popTo(valenceLayer.id);
-                  }
-                }}
+                onClick={() => navigate('/editor')}
                 size="sm"
                 variant="ghost"
                 className="text-white hover:bg-green-600"
@@ -703,9 +765,13 @@ function Flow() {
                   </Button>
                 </>
               )}
-              {(selection.contacts.size > 0 || selection.groups.size > 0) && !isValenceMode && (
+              {(selection.contacts.size > 0 || selection.groups.size > 0) && loaderData.mode !== 'valence' && (
                 <Button
-                  onClick={enterStackedValenceMode}
+                  onClick={() => {
+                    // Convert Set values to array of IDs
+                    const selectedIds = [...Array.from(selection.contacts), ...Array.from(selection.groups)];
+                    navigate(`/editor?mode=valence&selection=${encodeURIComponent(JSON.stringify(selectedIds))}`);
+                  }}
                   size="sm"
                   variant="default"
                   title="Enter valence mode to connect selected items (V)"
@@ -792,8 +858,17 @@ function Flow() {
 
       <ClientOnly>
         <PropertyPanel
-          isVisible={propertyPanel.isVisible}
-          onToggleVisibility={propertyPanel.toggleVisibility}
+          isVisible={loaderData.mode === 'property'}
+          onToggleVisibility={() => {
+            if (loaderData.mode === 'property') {
+              navigate('/editor');
+            } else {
+              const selectedIds = [...selection.contacts, ...selection.groups];
+              if (selectedIds.length > 0) {
+                navigate(`/editor?mode=property&node=${selectedIds[0]}`);
+              }
+            }
+          }}
           shouldFocus={propertyPanel.shouldFocus}
         />
       </ClientOnly>
@@ -821,9 +896,7 @@ export default function Editor() {
             <ContextFrameProvider>
               <ClientOnly>
                 <SoundSystemProvider>
-                  <ValenceModeProvider>
-                    <Flow />
-                  </ValenceModeProvider>
+                  <Flow />
                 </SoundSystemProvider>
               </ClientOnly>
             </ContextFrameProvider>

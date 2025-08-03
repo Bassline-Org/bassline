@@ -10,7 +10,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
-import { useLoaderData, type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, type LoaderFunctionArgs, redirect, type ActionFunctionArgs, useFetcher, useNavigate } from "react-router";
 
 import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationNetworkCompat";
 import { useInitializedPalette } from "~/propagation-react/hooks/useInitializedPalette";
@@ -19,6 +19,9 @@ import { useViewSettings } from "~/propagation-react/hooks/useViewSettings";
 import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
 import { useLayout } from "~/propagation-react/hooks/useLayout";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
+import { UIStackProvider } from "~/propagation-react/contexts/UIStackContext";
+import { ContextFrameProvider } from "~/propagation-react/contexts/ContextFrameContext";
+import { PropertyPanelStackProvider } from "~/propagation-react/contexts/PropertyPanelStackContext";
 import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
@@ -36,10 +39,15 @@ import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
 import { SoundSystemProvider } from "~/components/SoundSystem";
 import { PropagationNetwork, type NetworkTemplate } from "~/propagation-core/models/PropagationNetwork";
 
-// Loader to fetch the bassline template
+// Loader to fetch the bassline template and URL mode state
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const basslineName = params.bassline;
   const url = new URL(request.url);
+  
+  // Get mode from URL params (same as main editor)
+  const mode = url.searchParams.get('mode') || 'normal';
+  const nodeId = url.searchParams.get('node');
+  const selection = url.searchParams.get('selection');
   
   // Special case for uploaded basslines
   if (basslineName === 'uploaded') {
@@ -51,7 +59,13 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
         // Decode the template from base64
         const decodedData = Buffer.from(encodedData, 'base64').toString('utf-8');
         const template: NetworkTemplate = JSON.parse(decodedData);
-        return { template, basslineName: name || 'uploaded' };
+        return { 
+          template, 
+          basslineName: name || 'uploaded',
+          mode,
+          nodeId,
+          selection: selection ? JSON.parse(selection) : null
+        };
       } catch (error) {
         console.error('Failed to decode uploaded bassline:', error);
         throw new Response("Invalid bassline data", { status: 400 });
@@ -73,10 +87,44 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
     const fileContent = await fs.readFile(basslineFilePath, 'utf-8');
     const template: NetworkTemplate = JSON.parse(fileContent);
     
-    return { template, basslineName };
+    return { 
+      template, 
+      basslineName,
+      mode,
+      nodeId,
+      selection: selection ? JSON.parse(selection) : null
+    };
   } catch (error) {
     console.error(`Failed to load bassline ${basslineName}:`, error);
     throw new Response("Bassline not found", { status: 404 });
+  }
+}
+
+// Action handler (same as main editor)
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get('intent') as string;
+  
+  switch (intent) {
+    case 'connect-valence': {
+      const sourceIds = JSON.parse(formData.get('sourceIds') as string);
+      const targetId = formData.get('targetId') as string;
+      
+      // NOTE: Same implementation note as main editor
+      // In a real app, we'd need to persist network state
+      
+      return redirect(new URL(request.url).pathname); // Stay on bassline route but exit mode
+    }
+    
+    case 'update-property': {
+      const nodeId = formData.get('nodeId') as string;
+      const value = formData.get('value') as string;
+      
+      return { success: true };
+    }
+    
+    default:
+      return { error: `Unknown intent: ${intent}` };
   }
 }
 
@@ -92,6 +140,9 @@ const edgeTypes = {
 
 function Flow({ basslineName }: { basslineName: string }) {
   const { screenToFlowPosition } = useReactFlow();
+  const loaderData = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
+  const fetcher = useFetcher();
   const {
     appSettings,
     updatePropagationSettings,
@@ -125,7 +176,8 @@ function Flow({ basslineName }: { basslineName: string }) {
     instantiateTemplate,
   } = usePropagationNetwork({
     onContactDoubleClick: (contactId) => {
-      propertyPanel.show(true); // true = focus input
+      // Navigate to property mode with the double-clicked contact
+      navigate(`?mode=property&node=${contactId}&focus=true`);
     },
   });
 
@@ -695,16 +747,22 @@ export default function EditorWithBassline() {
   }, [template, basslineName]);
   
   return (
-    <SoundSystemProvider>
-      <div className="h-screen w-screen bg-slate-50">
-        <NetworkProvider initialNetwork={network} key={basslineName} skipDefaultContent={true}>
-          <ReactFlowProvider>
-            <ClientOnly fallback={<div>Loading...</div>}>
-              <Flow basslineName={basslineName || 'untitled'} />
-            </ClientOnly>
-          </ReactFlowProvider>
-        </NetworkProvider>
-      </div>
-    </SoundSystemProvider>
+    <div className="h-screen w-screen bg-slate-50">
+      <NetworkProvider initialNetwork={network} key={basslineName} skipDefaultContent={true}>
+        <UIStackProvider>
+          <PropertyPanelStackProvider>
+            <ReactFlowProvider>
+              <ContextFrameProvider>
+                <ClientOnly fallback={<div>Loading...</div>}>
+                  <SoundSystemProvider>
+                    <Flow basslineName={basslineName || 'untitled'} />
+                  </SoundSystemProvider>
+                </ClientOnly>
+              </ContextFrameProvider>
+            </ReactFlowProvider>
+          </PropertyPanelStackProvider>
+        </UIStackProvider>
+      </NetworkProvider>
+    </div>
   );
 }

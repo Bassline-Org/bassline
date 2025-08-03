@@ -30,11 +30,9 @@ export class ValenceTool implements Tool {
   }
   
   handleNodeClick(nodeId: string, context: ContextFrame): void {
-    if (!this.sourceSelection) return
-    
-    // For now, just show that the tool intercepted the click
-    // TODO: Implement the actual valence connection logic
-    toast.info(`Valence tool: clicked ${nodeId}`)
+    // Don't handle clicks - let the existing valence mode system handle them
+    // This allows the current working implementation to continue functioning
+    return
   }
   
   getNodeHighlight(nodeId: string, context: ContextFrame): string | undefined {

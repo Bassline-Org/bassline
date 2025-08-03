@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback, useMemo, useEffect } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card, CardHeader, CardContent } from '~/components/ui/card'
 import { Package, Lock } from 'lucide-react'
@@ -17,7 +17,10 @@ import { useContextSelection } from '~/propagation-react/hooks/useContextSelecti
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext'
 import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect'
-import { useValenceMode } from '~/propagation-react/contexts/ValenceModeContext'
+import { toast } from 'sonner'
+import { useSound } from '~/components/SoundSystem'
+import { useLoaderData, useFetcher } from 'react-router'
+import type { loader } from '~/routes/editor'
 
 const groupNodeVariants = cva(
   "transition-all shadow-md hover:shadow-lg",
@@ -58,19 +61,43 @@ const groupNodeVariants = cva(
 
 
 export const GroupNode = memo(({ id, selected }: NodeProps) => {
-  const { highlightedNodeId } = useNetworkContext()
+  const { highlightedNodeId, network, syncToReactFlow } = useNetworkContext()
   const { name, inputContacts, outputContacts, isPrimitive, navigate } = useGroup(id)
   const { selectedGroups, selectedContacts } = useContextSelection()
   const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect()
-  const { network } = useNetworkContext()
-  const { isValenceMode, canConnectToGadget, connectToGadget, valenceSource } = useValenceMode()
   const { activeToolInstance } = useContextFrame()
+  const loaderData = useLoaderData<typeof loader>()
+  const fetcher = useFetcher()
+  const { play: playConnectionSound } = useSound('connection/create')
   
   // Check if this gadget is valence-compatible
   const isValenceCompatible = useMemo(() => {
     // In valence mode, check if this gadget can be connected to
-    if (isValenceMode) {
-      return canConnectToGadget(id)
+    if (loaderData.mode === 'valence' && loaderData.selection) {
+      // In valence mode, check compatibility based on selection
+      const selection = loaderData.selection as string[]
+      
+      // Get total output count from selection
+      let totalOutputCount = 0
+      for (const itemId of selection) {
+        const contact = network.currentGroup.contacts.get(itemId)
+        if (contact) {
+          totalOutputCount++
+        } else {
+          const gadget = network.currentGroup.subgroups.get(itemId)
+          if (gadget) {
+            const { outputs } = gadget.getBoundaryContacts()
+            totalOutputCount += outputs.length
+          }
+        }
+      }
+      
+      // Check if this gadget can accept the outputs
+      const targetGadget = network.currentGroup.subgroups.get(id)
+      if (!targetGadget || selection.includes(id)) return false
+      
+      const { inputs } = targetGadget.getBoundaryContacts()
+      return inputs.length === totalOutputCount
     }
     
     // Normal selection-based compatibility
@@ -98,11 +125,11 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
     }
     
     return false
-  }, [selectedGroups, selectedContacts, id, selected, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget, network, isValenceMode, canConnectToGadget])
+  }, [selectedGroups, selectedContacts, id, selected, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget, network, loaderData.mode, loaderData.selection])
   
   // Visual states for valence mode
-  const isSourceGadget = isValenceMode && valenceSource?.sourceIds.has(id)
-  const isDimmed = (isValenceMode && !isSourceGadget && !isValenceCompatible) ||
+  const isSourceGadget = loaderData.mode === 'valence' && loaderData.selection?.includes(id)
+  const isDimmed = (loaderData.mode === 'valence' && !isSourceGadget && !isValenceCompatible) ||
                    (highlightedNodeId !== null && !selected)
   
   // Check if this node is highlighted
@@ -111,27 +138,68 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     
-    // If there's an active tool, let it handle the click
-    if (activeToolInstance && activeToolInstance.handleNodeClick) {
-      activeToolInstance.handleNodeClick(id, null as any) // TODO: pass actual context
-      return
-    }
-    
-    // OLD valence mode behavior - keep for now but should be moved to ValenceTool
-    if (isValenceMode && canConnectToGadget(id)) {
-      connectToGadget(id)
+    // Handle valence mode clicks - perform connection directly
+    if (loaderData.mode === 'valence' && isValenceCompatible) {
+      const sourceIds = loaderData.selection as string[]
+      
+      // Separate contacts and gadgets
+      const contactIds: string[] = []
+      const gadgetIds: string[] = []
+      
+      for (const itemId of sourceIds) {
+        if (network.currentGroup.contacts.has(itemId)) {
+          contactIds.push(itemId)
+        } else if (network.currentGroup.subgroups.has(itemId)) {
+          gadgetIds.push(itemId)
+        }
+      }
+      
+      // Perform the connection
+      const operation = new ValenceConnectOperation()
+      const result = operation.executeMixedToGadget(
+        network.currentGroup,
+        gadgetIds,
+        contactIds,
+        id
+      )
+      
+      if (result.success) {
+        syncToReactFlow()
+        
+        // Play connection sounds
+        if (result.connectionCount) {
+          for (let i = 0; i < result.connectionCount; i++) {
+            setTimeout(() => playConnectionSound(), i * 50)
+          }
+        }
+        
+        const targetGadget = network.currentGroup.subgroups.get(id)
+        toast.success(`Connected ${result.connectionCount} wires to ${targetGadget?.name}`)
+      } else {
+        toast.error(result.message || 'Failed to connect')
+      }
+      
+      // Submit form to exit valence mode
+      fetcher.submit(
+        {
+          intent: 'connect-valence',
+          sourceIds: JSON.stringify(sourceIds),
+          targetId: id
+        },
+        { method: 'post' }
+      )
       return
     }
     
     // Otherwise, no default click behavior for groups (selection is handled by React Flow)
-  }, [isValenceMode, canConnectToGadget, connectToGadget, id, activeToolInstance])
+  }, [loaderData.mode, loaderData.selection, isValenceCompatible, id, network, syncToReactFlow, playConnectionSound, fetcher])
   
   const handleDoubleClick = useCallback(() => {
     // Double-click navigates, but not in valence mode
-    if (!isPrimitive && !isValenceMode) {
+    if (!isPrimitive && loaderData.mode !== 'valence') {
       navigate()
     }
-  }, [isPrimitive, navigate, isValenceMode])
+  }, [isPrimitive, navigate, loaderData.mode])
   
   const maxContacts = Math.max(inputContacts.length, outputContacts.length, 1)
   const nodeType = isPrimitive ? 'primitive' : 'group'
@@ -148,7 +216,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
           isPrimitive && "p-[5px]",
           isValenceCompatible && !isSourceGadget && "ring-2 ring-green-500 ring-opacity-50 animate-pulse",
           isSourceGadget && "ring-2 ring-blue-500 ring-opacity-75",
-          isValenceMode && isValenceCompatible && "cursor-pointer",
+          loaderData.mode === 'valence' && isValenceCompatible && "cursor-pointer",
           isDimmed && "opacity-30",
           isHighlighted && "ring-4 ring-blue-500 shadow-lg"
         )}
