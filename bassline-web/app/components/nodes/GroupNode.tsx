@@ -16,6 +16,7 @@ import { useValenceConnect } from '~/propagation-react/hooks/useValenceConnect'
 import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect'
+import { useValenceMode } from '~/propagation-react/contexts/ValenceModeContext'
 
 const groupNodeVariants = cva(
   "transition-all shadow-md hover:shadow-lg",
@@ -60,9 +61,16 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { selectedGroups, selectedContacts } = useContactSelection()
   const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect()
   const { network } = useNetworkContext()
+  const { isValenceMode, canConnectToGadget, connectToGadget } = useValenceMode()
   
-  // Check if this gadget is valence-compatible with current selection
+  // Check if this gadget is valence-compatible
   const isValenceCompatible = useMemo(() => {
+    // In valence mode, check if this gadget can be connected to
+    if (isValenceMode) {
+      return canConnectToGadget(id)
+    }
+    
+    // Normal selection-based compatibility
     // Don't highlight if this gadget is selected
     if (selected) return false
     
@@ -87,13 +95,22 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
     }
     
     return false
-  }, [selectedGroups, selectedContacts, id, selected, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget, network])
+  }, [selectedGroups, selectedContacts, id, selected, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget, network, isValenceMode, canConnectToGadget])
+  
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // In valence mode, single click connects
+    if (isValenceMode && canConnectToGadget(id)) {
+      e.stopPropagation() // Prevent selection
+      connectToGadget(id)
+    }
+  }, [isValenceMode, canConnectToGadget, connectToGadget, id])
   
   const handleDoubleClick = useCallback(() => {
-    if (!isPrimitive) {
+    // Double-click navigates, but not in valence mode
+    if (!isPrimitive && !isValenceMode) {
       navigate()
     }
-  }, [isPrimitive, navigate])
+  }, [isPrimitive, navigate, isValenceMode])
   
   const maxContacts = Math.max(inputContacts.length, outputContacts.length, 1)
   const nodeType = isPrimitive ? 'primitive' : 'group'
@@ -108,8 +125,10 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
         className={cn(
           groupNodeVariants({ nodeType, selected, interactive }), 
           isPrimitive && "p-[5px]",
-          isValenceCompatible && "ring-2 ring-green-500 ring-opacity-50 animate-pulse"
+          isValenceCompatible && "ring-2 ring-green-500 ring-opacity-50 animate-pulse",
+          isValenceMode && isValenceCompatible && "cursor-pointer"
         )}
+        onClick={handleClick}
         onDoubleClick={handleDoubleClick}
       >
         {isPrimitive ? (

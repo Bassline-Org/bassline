@@ -19,6 +19,7 @@ import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
 import { useLayout } from "~/propagation-react/hooks/useLayout";
 import { useValenceConnect } from "~/propagation-react/hooks/useValenceConnect";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
+import { ValenceModeProvider, useValenceMode } from "~/propagation-react/contexts/ValenceModeContext";
 import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
@@ -90,6 +91,7 @@ function Flow() {
   const [showDreamsGadgetMenu, setShowDreamsGadgetMenu] = useState(false);
   const { applyLayout, applyLayoutToSelection } = useLayout();
   const { canValenceConnect, valenceConnect, valenceConnectionType, totalSourceCount } = useValenceConnect();
+  const { isValenceMode, enterValenceMode, exitValenceMode, valenceSource } = useValenceMode();
 
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
@@ -342,11 +344,13 @@ function Flow() {
         }
       }
 
-      // V for valence connect
+      // V for valence mode
       if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "v") {
         e.preventDefault();
-        if (canValenceConnect) {
-          valenceConnect();
+        if (isValenceMode) {
+          exitValenceMode();
+        } else if (selection.contacts.size > 0 || selection.groups.size > 0) {
+          enterValenceMode();
         }
       }
     };
@@ -363,8 +367,10 @@ function Flow() {
     handleAutoLayout,
     toast,
     showDreamsGadgetMenu,
-    canValenceConnect,
-    valenceConnect,
+    isValenceMode,
+    enterValenceMode,
+    exitValenceMode,
+    selection,
   ]);
 
   // Handle node drag with proximity connect
@@ -491,6 +497,21 @@ function Flow() {
 
         <Panel position="top-left" className="flex flex-col gap-2">
           <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
+          {isValenceMode && (
+            <div className="bg-green-500 text-white px-4 py-2 rounded-md animate-pulse flex items-center justify-between">
+              <span className="font-semibold">
+                Valence Mode: Click gadgets with {valenceSource?.totalOutputCount || 0} inputs
+              </span>
+              <Button
+                onClick={exitValenceMode}
+                size="sm"
+                variant="ghost"
+                className="text-white hover:bg-green-600"
+              >
+                Exit (Esc)
+              </Button>
+            </div>
+          )}
           <div className="flex gap-2">
             <Button onClick={handleAddContact} size="sm">
               Add Contact
@@ -566,29 +587,14 @@ function Flow() {
                   </Button>
                 </>
               )}
-              {canValenceConnect && (
+              {(selection.contacts.size > 0 || selection.groups.size > 0) && !isValenceMode && (
                 <Button
-                  onClick={() => valenceConnect()}
+                  onClick={enterValenceMode}
                   size="sm"
                   variant="default"
-                  title={
-                    valenceConnectionType === 'gadget-to-gadget' 
-                      ? "Connect gadgets with matching input/output counts"
-                      : valenceConnectionType === 'contacts-to-gadget'
-                      ? "Connect selected contacts to gadget inputs"
-                      : valenceConnectionType === 'gadget-to-contacts'
-                      ? "Connect gadget outputs to selected contacts"
-                      : "Connect combined outputs to gadget inputs"
-                  }
+                  title="Enter valence mode to connect selected items (V)"
                 >
-                  {valenceConnectionType === 'gadget-to-gadget' 
-                    ? "Valence Connect"
-                    : valenceConnectionType === 'contacts-to-gadget'
-                    ? `Connect ${selection.contacts.size} → Inputs`
-                    : valenceConnectionType === 'gadget-to-contacts'
-                    ? `Connect Outputs → ${selection.contacts.size}`
-                    : `Connect ${totalSourceCount} Mixed → Inputs`
-                  }
+                  Valence Mode
                 </Button>
               )}
               {selection.contacts.size > 0 && selection.groups.size === 0 && (
@@ -620,7 +626,7 @@ function Flow() {
               <div>D → Toggle grid</div>
               <div>T → Toggle properties</div>
               <div>L → Auto layout</div>
-              <div>V → Valence connect (2 gadgets)</div>
+              <div>V → Valence mode (select first)</div>
             </div>
           )}
         </Panel>
@@ -693,7 +699,9 @@ export default function Editor() {
       <ReactFlowProvider>
         <ClientOnly>
           <SoundSystemProvider>
-            <Flow />
+            <ValenceModeProvider>
+              <Flow />
+            </ValenceModeProvider>
           </SoundSystemProvider>
         </ClientOnly>
       </ReactFlowProvider>
