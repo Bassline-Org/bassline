@@ -1,0 +1,151 @@
+{
+  "name": "Mixed Valence Connection Test",
+  "contacts": [
+    {
+      "position": {"x": 200, "y": 150},
+      "isBoundary": false,
+      "blendMode": "accept-last",
+      "content": "extra1"
+    },
+    {
+      "position": {"x": 200, "y": 250},
+      "isBoundary": false,
+      "blendMode": "accept-last",
+      "content": "extra2"
+    }
+  ],
+  "wires": [],
+  "subgroupTemplates": [
+    {
+      "name": "Single Output",
+      "contacts": [
+        {
+          "position": {"x": 50, "y": 100},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "input",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 100},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "output",
+          "blendMode": "accept-last"
+        }
+      ],
+      "wires": [],
+      "subgroupTemplates": [],
+      "boundaryIndices": [0, 1]
+    },
+    {
+      "name": "Triple Input Processor",
+      "contacts": [
+        {
+          "position": {"x": 50, "y": 50},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "in1",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 50, "y": 150},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "in2",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 50, "y": 250},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "in3",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 150},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "result",
+          "blendMode": "accept-last"
+        }
+      ],
+      "wires": [],
+      "subgroupTemplates": [],
+      "boundaryIndices": [0, 1, 2, 3]
+    },
+    {
+      "name": "Dual Output",
+      "contacts": [
+        {
+          "position": {"x": 50, "y": 100},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "input",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 50},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "out1",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 150},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "out2",
+          "blendMode": "accept-last"
+        }
+      ],
+      "wires": [],
+      "subgroupTemplates": [],
+      "boundaryIndices": [0, 1, 2]
+    },
+    {
+      "name": "Quad Input Collector",
+      "contacts": [
+        {
+          "position": {"x": 50, "y": 25},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "a",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 50, "y": 100},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "b",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 50, "y": 175},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "c",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 50, "y": 250},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "d",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 125},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "collected",
+          "blendMode": "accept-last"
+        }
+      ],
+      "wires": [],
+      "subgroupTemplates": [],
+      "boundaryIndices": [0, 1, 2, 3, 4]
+    }
+  ],
+  "boundaryIndices": []
+}

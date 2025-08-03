@@ -17,6 +17,7 @@ import { useProximityConnect } from "~/propagation-react/hooks/useProximityConne
 import { useViewSettings } from "~/propagation-react/hooks/useViewSettings";
 import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
 import { useLayout } from "~/propagation-react/hooks/useLayout";
+import { useValenceConnect } from "~/propagation-react/hooks/useValenceConnect";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
@@ -88,6 +89,7 @@ function Flow() {
   const [showConfiguration, setShowConfiguration] = useState(false);
   const [showDreamsGadgetMenu, setShowDreamsGadgetMenu] = useState(false);
   const { applyLayout, applyLayoutToSelection } = useLayout();
+  const { canValenceConnect, valenceConnect, valenceConnectionType, totalSourceCount } = useValenceConnect();
 
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
@@ -339,6 +341,14 @@ function Flow() {
           toast.success("Reset palette to default gadgets");
         }
       }
+
+      // V for valence connect
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "v") {
+        e.preventDefault();
+        if (canValenceConnect) {
+          valenceConnect();
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyPress);
@@ -353,6 +363,8 @@ function Flow() {
     handleAutoLayout,
     toast,
     showDreamsGadgetMenu,
+    canValenceConnect,
+    valenceConnect,
   ]);
 
   // Handle node drag with proximity connect
@@ -554,6 +566,31 @@ function Flow() {
                   </Button>
                 </>
               )}
+              {canValenceConnect && (
+                <Button
+                  onClick={() => valenceConnect()}
+                  size="sm"
+                  variant="default"
+                  title={
+                    valenceConnectionType === 'gadget-to-gadget' 
+                      ? "Connect gadgets with matching input/output counts"
+                      : valenceConnectionType === 'contacts-to-gadget'
+                      ? "Connect selected contacts to gadget inputs"
+                      : valenceConnectionType === 'gadget-to-contacts'
+                      ? "Connect gadget outputs to selected contacts"
+                      : "Connect combined outputs to gadget inputs"
+                  }
+                >
+                  {valenceConnectionType === 'gadget-to-gadget' 
+                    ? "Valence Connect"
+                    : valenceConnectionType === 'contacts-to-gadget'
+                    ? `Connect ${selection.contacts.size} → Inputs`
+                    : valenceConnectionType === 'gadget-to-contacts'
+                    ? `Connect Outputs → ${selection.contacts.size}`
+                    : `Connect ${totalSourceCount} Mixed → Inputs`
+                  }
+                </Button>
+              )}
               {selection.contacts.size > 0 && selection.groups.size === 0 && (
                 <Button
                   onClick={handleConvertToBoundary}
@@ -583,6 +620,7 @@ function Flow() {
               <div>D → Toggle grid</div>
               <div>T → Toggle properties</div>
               <div>L → Auto layout</div>
+              <div>V → Valence connect (2 gadgets)</div>
             </div>
           )}
         </Panel>

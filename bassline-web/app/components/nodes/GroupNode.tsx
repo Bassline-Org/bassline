@@ -1,4 +1,4 @@
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Card, CardHeader, CardContent } from '~/components/ui/card'
 import { Package, Lock } from 'lucide-react'
@@ -12,6 +12,10 @@ import {
 } from '~/components/ui/tooltip'
 import { useGroup } from '~/propagation-react/hooks/useGroup'
 import { getGadgetIcon } from '~/components/gadgets/gadget-icons'
+import { useValenceConnect } from '~/propagation-react/hooks/useValenceConnect'
+import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
+import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
+import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect'
 
 const groupNodeVariants = cva(
   "transition-all shadow-md hover:shadow-lg",
@@ -53,6 +57,37 @@ const groupNodeVariants = cva(
 
 export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { name, inputContacts, outputContacts, isPrimitive, navigate } = useGroup(id)
+  const { selectedGroups, selectedContacts } = useContactSelection()
+  const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect()
+  const { network } = useNetworkContext()
+  
+  // Check if this gadget is valence-compatible with current selection
+  const isValenceCompatible = useMemo(() => {
+    // Don't highlight if this gadget is selected
+    if (selected) return false
+    
+    // Case 1: Another gadget is selected
+    if (selectedGroups.length === 1 && selectedContacts.length === 0) {
+      const selectedGadget = selectedGroups[0]
+      return areGadgetsCompatible(selectedGadget.id, id)
+    }
+    
+    // Case 2: Contacts are selected, check if they match this gadget's inputs/outputs
+    if (selectedGroups.length === 0 && selectedContacts.length > 0) {
+      const thisGroup = network.currentGroup.subgroups.get(id)
+      if (!thisGroup) return false
+      
+      return ValenceConnectOperation.canConnectContactsToGadget(selectedContacts, thisGroup) ||
+             ValenceConnectOperation.canConnectGadgetToContacts(thisGroup, selectedContacts)
+    }
+    
+    // Case 3: Mixed selection (gadgets + contacts)
+    if (selectedGroups.length >= 1 && selectedContacts.length > 0) {
+      return isMixedSelectionCompatibleWithGadget(id)
+    }
+    
+    return false
+  }, [selectedGroups, selectedContacts, id, selected, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget, network])
   
   const handleDoubleClick = useCallback(() => {
     if (!isPrimitive) {
@@ -70,7 +105,11 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   return (
     <TooltipProvider>
       <Card 
-        className={cn(groupNodeVariants({ nodeType, selected, interactive }), isPrimitive && "p-[5px]")}
+        className={cn(
+          groupNodeVariants({ nodeType, selected, interactive }), 
+          isPrimitive && "p-[5px]",
+          isValenceCompatible && "ring-2 ring-green-500 ring-opacity-50 animate-pulse"
+        )}
         onDoubleClick={handleDoubleClick}
       >
         {isPrimitive ? (

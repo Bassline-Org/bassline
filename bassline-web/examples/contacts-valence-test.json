@@ -1,0 +1,102 @@
+{
+  "name": "Contact to Gadget Valence Test",
+  "contacts": [
+    {
+      "position": {"x": 100, "y": 100},
+      "isBoundary": false,
+      "blendMode": "accept-last",
+      "content": 10
+    },
+    {
+      "position": {"x": 100, "y": 200},
+      "isBoundary": false,
+      "blendMode": "accept-last",
+      "content": 20
+    },
+    {
+      "position": {"x": 100, "y": 300},
+      "isBoundary": false,
+      "blendMode": "accept-last",
+      "content": 30
+    },
+    {
+      "position": {"x": 600, "y": 150},
+      "isBoundary": false,
+      "blendMode": "accept-last"
+    },
+    {
+      "position": {"x": 600, "y": 250},
+      "isBoundary": false,
+      "blendMode": "accept-last"
+    }
+  ],
+  "wires": [],
+  "subgroupTemplates": [
+    {
+      "name": "Triple Processor",
+      "contacts": [
+        {
+          "position": {"x": 50, "y": 50},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "a",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 50, "y": 100},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "b",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 50, "y": 150},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "c",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 100},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "result",
+          "blendMode": "accept-last"
+        }
+      ],
+      "wires": [],
+      "subgroupTemplates": [],
+      "boundaryIndices": [0, 1, 2, 3]
+    },
+    {
+      "name": "Dual Output",
+      "contacts": [
+        {
+          "position": {"x": 50, "y": 100},
+          "isBoundary": true,
+          "boundaryDirection": "input",
+          "name": "input",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 50},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "out1",
+          "blendMode": "accept-last"
+        },
+        {
+          "position": {"x": 350, "y": 150},
+          "isBoundary": true,
+          "boundaryDirection": "output",
+          "name": "out2",
+          "blendMode": "accept-last"
+        }
+      ],
+      "wires": [],
+      "subgroupTemplates": [],
+      "boundaryIndices": [0, 1, 2]
+    }
+  ],
+  "boundaryIndices": []
+}
