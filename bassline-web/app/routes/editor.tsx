@@ -209,9 +209,7 @@ function Flow() {
         onEscape: () => {
           // Clear focus but keep panel open
           setHighlightedNodeId(null);
-          if (viewSettings.showShortcutHints) {
-            toast.info("Cleared property focus");
-          }
+          // Removed toast for clearing property focus
           return true; // Prevent default pop
         }
       });
@@ -277,11 +275,7 @@ function Flow() {
       y: Math.random() * 300 + 100,
     };
     addContact(position);
-    if (viewSettings.showShortcutHints) {
-      toast.success("Contact added! Tip: Press A for quick add", {
-        duration: 4000,
-      });
-    }
+    // Removed toast for adding contact
   }, [addContact, viewSettings]);
 
   const handleAddInputBoundary = useCallback(() => {
@@ -304,11 +298,7 @@ function Flow() {
     const name = prompt("Enter gadget name:");
     if (name) {
       createGroup(name);
-      if (viewSettings.showShortcutHints) {
-        toast.success("Gadget created! Tip: Press S for quick add", {
-          duration: 4000,
-        });
-      }
+      // Removed toast for creating gadget
     }
   }, [createGroup, viewSettings]);
 
@@ -337,9 +327,8 @@ function Flow() {
           const template = saveAsTemplate(newGadget.id);
           if (template) {
             palette.addToPalette(template);
-            if (viewSettings.showShortcutHints) {
-              toast.success(`"${name}" added to palette! Press Q to view.`);
-            }
+            // Show toast for palette addition (important feedback)
+            toast.success(`Added "${name}" to palette`, { duration: 2000 });
           }
         }
       }
@@ -371,11 +360,11 @@ function Flow() {
         ...selection.groups,
       ]);
       applyLayoutToSelection(selectedNodeIds);
-      toast.success("Applied layout to selection");
+      // Removed toast for layout
     } else {
       // Layout all nodes
       applyLayout();
-      toast.success("Applied auto layout");
+      // Removed toast for auto layout
     }
   }, [selection, applyLayout, applyLayoutToSelection]);
 
@@ -400,12 +389,104 @@ function Flow() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      toast.success(`Saved bassline as ${name}.json`);
+      toast.success(`Saved: ${name}.json`, { duration: 2000 });
     } catch (error) {
       console.error('Failed to save bassline:', error);
-      toast.error('Failed to save bassline');
+      toast.error('Failed to save', { duration: 2000 });
     }
   }, [network]);
+
+  // Selection handlers
+  const handleSelectAll = useCallback(() => {
+    const allContactIds = Array.from(network.currentGroup.contacts.keys());
+    const allGroupIds = Array.from(network.currentGroup.subgroups.keys());
+    
+    // Update selection through React Flow
+    const allNodes = [...allContactIds, ...allGroupIds];
+    onSelectionChange({ nodes: allNodes.map(id => ({ id })), edges: [] });
+    
+    // Removed toast for select all
+  }, [network.currentGroup, onSelectionChange]);
+
+  const handleDeselectAll = useCallback(() => {
+    // Clear selection through React Flow
+    onSelectionChange({ nodes: [], edges: [] });
+    // Removed toast for clear selection
+  }, [onSelectionChange]);
+
+  const handleInvertSelection = useCallback(() => {
+    const allContactIds = Array.from(network.currentGroup.contacts.keys());
+    const allGroupIds = Array.from(network.currentGroup.subgroups.keys());
+    
+    const currentContactIds = Array.from(selection.contacts);
+    const currentGroupIds = Array.from(selection.groups);
+    
+    const newContactIds = allContactIds.filter(id => !currentContactIds.includes(id));
+    const newGroupIds = allGroupIds.filter(id => !currentGroupIds.includes(id));
+    
+    // Update selection through React Flow
+    const newNodes = [...newContactIds, ...newGroupIds];
+    onSelectionChange({ nodes: newNodes.map(id => ({ id })), edges: [] });
+    
+    // Removed toast for invert selection
+  }, [network.currentGroup, selection, onSelectionChange]);
+
+  const handleSelectConnected = useCallback(() => {
+    // Get all currently selected items
+    const selectedContactIds = Array.from(selection.contacts);
+    const selectedGroupIds = Array.from(selection.groups);
+    
+    // Find all connected items
+    const connectedIds = new Set<string>();
+    
+    // Check wires for connections from selected contacts
+    network.currentGroup.wires.forEach(wire => {
+      if (selectedContactIds.includes(wire.fromId)) {
+        connectedIds.add(wire.toId);
+      }
+      if (selectedContactIds.includes(wire.toId)) {
+        connectedIds.add(wire.fromId);
+      }
+    });
+    
+    // For selected groups, find connections via their boundary contacts
+    selectedGroupIds.forEach(groupId => {
+      const group = network.currentGroup.subgroups.get(groupId);
+      if (group) {
+        const boundary = group.getBoundaryContacts();
+        const boundaryIds = [...boundary.inputs, ...boundary.outputs].map(c => c.id);
+        
+        network.currentGroup.wires.forEach(wire => {
+          if (boundaryIds.includes(wire.fromId)) {
+            connectedIds.add(wire.toId);
+          }
+          if (boundaryIds.includes(wire.toId)) {
+            connectedIds.add(wire.fromId);
+          }
+        });
+      }
+    });
+    
+    // Add connected items to selection
+    const newContactIds = [...selectedContactIds];
+    const newGroupIds = [...selectedGroupIds];
+    
+    connectedIds.forEach(id => {
+      if (network.currentGroup.contacts.has(id) && !newContactIds.includes(id)) {
+        newContactIds.push(id);
+      } else if (network.currentGroup.subgroups.has(id) && !newGroupIds.includes(id)) {
+        newGroupIds.push(id);
+      }
+    });
+    
+    // Update selection through React Flow
+    const allNodes = [...newContactIds, ...newGroupIds];
+    onSelectionChange({ nodes: allNodes.map(id => ({ id })), edges: [] });
+    
+    const addedCount = (newContactIds.length - selectedContactIds.length) + 
+                      (newGroupIds.length - selectedGroupIds.length);
+    // Removed toast for select connected
+  }, [network.currentGroup, selection, onSelectionChange]);
 
   const breadcrumbs = getBreadcrumbs();
   const hasShownWelcome = useRef(false);
@@ -426,7 +507,7 @@ function Flow() {
     if (viewSettings.showShortcutHints && !hasShownWelcome.current) {
       hasShownWelcome.current = true;
       toast("Welcome! Press W to see keyboard shortcuts", {
-        duration: 5000,
+        duration: 2000,
       });
     }
   }, [viewSettings.showShortcutHints]);
@@ -520,9 +601,7 @@ function Flow() {
           const selectedIds = [...selection.contacts, ...selection.groups];
           if (selectedIds.length > 0) {
             enterPropertyMode(selectedIds[0]);
-            if (viewSettings.showShortcutHints) {
-              toast.success("Properties panel opened");
-            }
+            // Removed toast for opening properties panel
           } else {
             toast.error("Select a node first");
           }
@@ -535,15 +614,11 @@ function Flow() {
         if (selection.contacts.size > 0 || selection.groups.size > 0) {
           const selectedIds = new Set([...selection.contacts, ...selection.groups]);
           applyLayoutToSelection(selectedIds);
-          if (viewSettings.showShortcutHints) {
-            toast.success("Formatted selection");
-          }
+          // Removed toast for formatting selection
         } else {
           // Format all if nothing selected
           handleAutoLayout();
-          if (viewSettings.showShortcutHints) {
-            toast.success("Formatted all");
-          }
+          // Removed toast for formatting all
         }
       }
 
@@ -561,10 +636,22 @@ function Flow() {
           const selectedIds = [...Array.from(selection.contacts), ...Array.from(selection.groups)];
           if (selectedIds.length > 0) {
             enterValenceMode(selectedIds);
-            toast.success('Valence mode: Click compatible gadgets to connect');
+            toast.success('Valence mode: Click compatible gadgets to connect', { duration: 2000 });
           } else {
             toast.error('Select contacts and/or gadgets first');
           }
+        }
+      }
+
+      // Cmd/Ctrl+A for select all
+      if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Cmd/Ctrl+Shift+A for deselect all
+          handleDeselectAll();
+        } else {
+          // Cmd/Ctrl+A for select all
+          handleSelectAll();
         }
       }
     };
@@ -596,6 +683,8 @@ function Flow() {
     enterPropertyMode,
     enterValenceMode,
     toggleMode,
+    handleSelectAll,
+    handleDeselectAll,
   ]);
 
   // Handle node drag with proximity connect
@@ -676,7 +765,7 @@ function Flow() {
       // Instantiate the template at the drop position
       instantiateTemplate(paletteItem, position);
       palette.incrementUsageCount(paletteItemId);
-      toast.success(`Placed "${paletteItem.name}" gadget`);
+      // Removed toast for placing gadget
     },
     [palette, instantiateTemplate],
   );
@@ -825,9 +914,7 @@ function Flow() {
                       const template = saveAsTemplate(gadgetId);
                       if (template) {
                         palette.addToPalette(template);
-                        toast.success(
-                          `"${gadget?.name || "Gadget"}" added to palette`,
-                        );
+                        toast.success(`Added to palette`, { duration: 2000 });
                       }
                     }}
                     size="sm"
@@ -891,6 +978,10 @@ function Flow() {
               onOpenConfiguration={() => setShowConfiguration(true)}
               onAutoLayout={handleAutoLayout}
               onOpenGadgets={toggleGadgetMenu}
+              onSelectAll={handleSelectAll}
+              onDeselectAll={handleDeselectAll}
+              onInvertSelection={handleInvertSelection}
+              onSelectConnected={handleSelectConnected}
             />
           </ClientOnly>
         </Panel>
@@ -970,9 +1061,12 @@ export default function Editor() {
     return new PropagationNetwork();
   }, [template]);
   
+  // Show loaded toast only on initial mount
+  const hasShownLoadedToast = useRef(false);
   useEffect(() => {
-    if (template && basslineName) {
-      toast.success(`Loaded bassline: ${basslineName}`);
+    if (template && basslineName && !hasShownLoadedToast.current) {
+      hasShownLoadedToast.current = true;
+      toast.success(`Loaded: ${basslineName}`, { duration: 2000 });
     }
   }, [template, basslineName]);
   

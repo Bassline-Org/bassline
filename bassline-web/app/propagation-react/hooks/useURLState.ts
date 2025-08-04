@@ -266,7 +266,7 @@ export function useSelectionState() {
       pushState({ selection: undefined })
     } else {
       pushState({
-        selection: encodeURIComponent(JSON.stringify(nodeIds))
+        selection: JSON.stringify(nodeIds)
       })
     }
   }, [pushState])

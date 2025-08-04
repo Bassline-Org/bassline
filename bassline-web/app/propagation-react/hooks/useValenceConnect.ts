@@ -148,9 +148,9 @@ export function useValenceConnect(): UseValenceConnectReturn {
         }
       }
       
-      toast.success(result.message || 'Connected')
+      // Removed success toast - sound effect is enough
     } else {
-      toast.error(result.message || 'Failed to connect')
+      toast.error(result.message || 'Failed to connect', { duration: 2000 })
     }
     
     return result.success

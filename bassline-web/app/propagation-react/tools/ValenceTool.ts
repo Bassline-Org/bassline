@@ -17,16 +17,16 @@ export class ValenceTool implements Tool {
     
     const totalSources = this.sourceSelection.contactIds.length + this.sourceSelection.groupIds.length
     if (totalSources === 0) {
-      toast.error('Select items before entering valence mode')
+      toast.error('Select items first', { duration: 2000 })
       return
     }
     
-    toast.success(`Valence mode: ${totalSources} sources selected`)
+    // Removed toast - already shown by editor
   }
   
   onDeactivate(): void {
     this.sourceSelection = null
-    toast.info('Exited valence mode')
+    // Removed toast for exiting valence mode
   }
   
   handleNodeClick(nodeId: string, context: ContextFrame): void {

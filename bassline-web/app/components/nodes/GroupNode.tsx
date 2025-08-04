@@ -14,6 +14,7 @@ import { useGroup } from '~/propagation-react/hooks/useGroup'
 import { getGadgetIcon } from '~/components/gadgets/gadget-icons'
 import { useValenceConnect } from '~/propagation-react/hooks/useValenceConnect'
 import { useContextSelection } from '~/propagation-react/hooks/useContextSelection'
+import { useEditorModes } from '~/propagation-react/hooks/useURLState'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext'
 import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect'
@@ -63,9 +64,10 @@ const groupNodeVariants = cva(
 export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { highlightedNodeId, network, syncToReactFlow } = useNetworkContext()
   const { name, inputContacts, outputContacts, isPrimitive, navigate } = useGroup(id)
-  const { selectedGroups, selectedContacts } = useContextSelection()
+  const { selectedGroups, selectedContacts, selectGroup, deselectGroup, isGroupSelected } = useContextSelection()
   const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect()
   const { activeToolInstance } = useContextFrame()
+  const { enterPropertyMode } = useEditorModes()
   const loaderData = useLoaderData<typeof clientLoader>()
   const fetcher = useFetcher()
   const { play: playConnectionSound } = useSound('connection/create')
@@ -138,6 +140,12 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const handleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     
+    // If there's an active tool, let it handle the click
+    if (activeToolInstance && activeToolInstance.handleNodeClick) {
+      activeToolInstance.handleNodeClick(id, null as any) // TODO: pass actual context
+      return
+    }
+    
     // Handle valence mode clicks - perform connection directly
     if (loaderData.mode === 'valence' && isValenceCompatible) {
       const sourceIds = loaderData.selection as string[]
@@ -173,10 +181,9 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
           }
         }
         
-        const targetGadget = network.currentGroup.subgroups.get(id)
-        toast.success(`Connected ${result.connectionCount} wires to ${targetGadget?.name}`)
+        // Removed toast - sound effect is enough feedback
       } else {
-        toast.error(result.message || 'Failed to connect')
+        toast.error(result.message || 'Failed to connect', { duration: 2000 })
       }
       
       // Submit form to exit valence mode
@@ -191,8 +198,23 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
       return
     }
     
-    // Otherwise, no default click behavior for groups (selection is handled by React Flow)
-  }, [loaderData.mode, loaderData.selection, isValenceCompatible, id, network, syncToReactFlow, playConnectionSound, fetcher])
+    // Handle regular selection based on modifier keys
+    if (e.shiftKey) {
+      // Shift-click: Add to selection
+      selectGroup(id, false)
+    } else if (e.metaKey || e.ctrlKey) {
+      // Cmd/Ctrl-click: Toggle selection
+      if (isGroupSelected(id)) {
+        deselectGroup(id)
+      } else {
+        selectGroup(id, false)
+      }
+    } else {
+      // Regular click: Select only this group and enter property mode
+      selectGroup(id, true)
+      enterPropertyMode(id)
+    }
+  }, [loaderData.mode, loaderData.selection, isValenceCompatible, id, network, syncToReactFlow, playConnectionSound, fetcher, selectGroup, deselectGroup, isGroupSelected, enterPropertyMode, activeToolInstance])
   
   const handleDoubleClick = useCallback(() => {
     // Double-click navigates, but not in valence mode

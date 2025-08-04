@@ -8,8 +8,6 @@ import { ExtractToGadgetOperation } from '~/propagation-core/refactoring/operati
 import { InlineGadgetOperation } from '~/propagation-core/refactoring/operations/InlineGadget'
 import { ConvertToBoundaryOperation } from '~/propagation-core/refactoring/operations/ConvertToBoundary'
 import { useSound } from '~/components/SoundSystem'
-import { useContextFrame } from '../contexts/ContextFrameContext'
-import { contextSelectionToRefactoringSelection } from '../utils/selection-conversion'
 
 interface UseContactSelectionReturn {
   // Selected entities (actual objects, not just IDs)
@@ -59,11 +57,10 @@ export function useContactSelection(): UseContactSelectionReturn {
   }, [selection.groups, network])
   
   const selectedWires = useMemo(() => {
-    // Need to search through current group for wires
     return Array.from(selection.wires)
       .map(id => network.currentGroup.wires.get(id))
       .filter((w): w is Wire => w !== undefined)
-  }, [selection.wires, network])
+  }, [selection.wires, network.currentGroup])
   
   // Update selection from React Flow selected nodes/edges
   const updateSelection = useCallback((nodes: Node[], edges: Edge[]) => {
@@ -86,7 +83,7 @@ export function useContactSelection(): UseContactSelectionReturn {
       wires: multi ? prev.wires : new Set(),
       groups: multi ? prev.groups : new Set()
     }))
-  }, [])
+  }, [setSelection])
   
   const selectGroup = useCallback((groupId: string, multi = false) => {
     setSelection(prev => ({
@@ -97,7 +94,7 @@ export function useContactSelection(): UseContactSelectionReturn {
       contacts: multi ? prev.contacts : new Set(),
       wires: multi ? prev.wires : new Set()
     }))
-  }, [])
+  }, [setSelection])
   
   const selectWire = useCallback((wireId: string, multi = false) => {
     setSelection(prev => ({
@@ -108,7 +105,7 @@ export function useContactSelection(): UseContactSelectionReturn {
       contacts: multi ? prev.contacts : new Set(),
       groups: multi ? prev.groups : new Set()
     }))
-  }, [])
+  }, [setSelection])
   
   const selectAll = useCallback(() => {
     const currentView = network.getCurrentView()
@@ -117,11 +114,11 @@ export function useContactSelection(): UseContactSelectionReturn {
       wires: new Set(currentView.wires.map(w => w.id)),
       groups: new Set(currentView.subgroups.map(g => g.id))
     })
-  }, [network])
+  }, [network, setSelection])
   
   const clearSelection = useCallback(() => {
     setSelection(createEmptySelection())
-  }, [])
+  }, [setSelection])
   
   // Calculate selection bounds
   const selectionBounds = useMemo(() => {
@@ -165,7 +162,8 @@ export function useContactSelection(): UseContactSelectionReturn {
     })
     
     clearSelection()
-  }, [selection, network, clearSelection])
+    syncToReactFlow()
+  }, [selection, network, clearSelection, syncToReactFlow])
   
   const extractSelected = useCallback((name: string): ContactGroup | null => {
     if (selection.contacts.size === 0 && selection.groups.size === 0) {
@@ -182,6 +180,7 @@ export function useContactSelection(): UseContactSelectionReturn {
     
     if (result.success) {
       clearSelection()
+      syncToReactFlow()
       
       // Find and return the newly created gadget
       return Array.from(network.currentGroup.subgroups.values())
@@ -189,7 +188,7 @@ export function useContactSelection(): UseContactSelectionReturn {
     }
     
     return null
-  }, [selection, network, clearSelection])
+  }, [selection, network, clearSelection, syncToReactFlow])
   
   const inlineSelectedGadget = useCallback((): boolean => {
     if (selection.groups.size !== 1) return false
@@ -200,11 +199,12 @@ export function useContactSelection(): UseContactSelectionReturn {
     
     if (result.success) {
       clearSelection()
+      syncToReactFlow()
       playInlineSound()
     }
     
     return result.success
-  }, [selection, network, clearSelection, playInlineSound])
+  }, [selection, network, clearSelection, syncToReactFlow, playInlineSound])
   
   const convertSelectedToBoundary = useCallback((): boolean => {
     if (selection.contacts.size === 0) return false
@@ -214,10 +214,11 @@ export function useContactSelection(): UseContactSelectionReturn {
     
     if (result.success) {
       clearSelection()
+      syncToReactFlow()
     }
     
     return result.success
-  }, [selection, network, clearSelection])
+  }, [selection, network, clearSelection, syncToReactFlow])
   
   // Check if selection has items
   const hasSelection = selection.contacts.size > 0 || 

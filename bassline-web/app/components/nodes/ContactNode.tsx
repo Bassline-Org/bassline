@@ -14,6 +14,7 @@ import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContex
 import { toast } from 'sonner'
 import { useLoaderData } from 'react-router'
 import type { clientLoader } from '~/routes/editor'
+import { useEditorModes } from '~/propagation-react/hooks/useURLState'
 
 const nodeVariants = cva(
   "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md cursor-pointer relative",
@@ -50,9 +51,10 @@ const nodeVariants = cva(
 export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id)
   const propertyPanel = usePropertyPanel()
-  const { selectContact } = useContextSelection()
+  const { selectContact, deselectContact, isContactSelected } = useContextSelection()
   const { highlightedNodeId, setHighlightedNodeId } = useNetworkContext()
   const { activeToolInstance } = useContextFrame()
+  const { enterPropertyMode } = useEditorModes()
   const uiStack = useUIStack()
   const loaderData = useLoaderData<typeof clientLoader>()
   const [showContextMenu, setShowContextMenu] = useState(false)
@@ -102,31 +104,27 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
             return
           }
           
-          // Otherwise, default selection behavior
-          selectContact(id, e.shiftKey || e.metaKey)
-          
-          // If this is a single selection (not multi-select), show property panel
-          if (!e.shiftKey && !e.metaKey) {
-            // Open property panel if not already open
-            if (!propertyPanel.isVisible) {
-              propertyPanel.toggleVisibility()
+          // Handle selection based on modifier keys
+          if (e.shiftKey) {
+            // Shift-click: Add to selection
+            selectContact(id, false)
+          } else if (e.metaKey || e.ctrlKey) {
+            // Cmd/Ctrl-click: Toggle selection
+            if (isContactSelected(id)) {
+              deselectContact(id)
+            } else {
+              selectContact(id, false)
             }
-            // Focus on the selected contact
-            propertyPanel.show(true)
+          } else {
+            // Regular click: Select only this contact and enter property mode
+            selectContact(id, true)
+            enterPropertyMode(id)
           }
         }}
         onDoubleClick={(e) => {
           e.stopPropagation()
-          selectContact(id, false) // Ensure this contact is selected
-          
-          // Open property panel if not already open
-          if (!propertyPanel.isVisible) {
-            propertyPanel.toggleVisibility()
-          }
-          
-          // The property panel will handle creating frames based on selection
-          // Just ensure this contact is selected and panel is open
-          propertyPanel.show(true)
+          selectContact(id, true) // Select only this contact
+          enterPropertyMode(id, true) // Enter property mode with focus
         }}
       >
         {/* Left and right visual borders */}

@@ -99,7 +99,7 @@ export default function Home() {
   
   useEffect(() => {
     if (actionData?.error) {
-      toast.error(actionData.error);
+      toast.error(actionData.error, { duration: 2000 });
     } else if (actionData?.redirect) {
       // Handle client-side redirect
       navigate(actionData.redirect);

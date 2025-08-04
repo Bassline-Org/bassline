@@ -16,8 +16,16 @@ import {
   Lightbulb,
   Sliders,
   LayoutGrid,
-  Package
+  Package,
+  MousePointer2
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 
 export interface ViewSettings {
   showInstructions: boolean
@@ -34,9 +42,23 @@ interface ToolsMenuProps {
   onOpenConfiguration?: () => void
   onAutoLayout?: () => void
   onOpenGadgets?: () => void
+  onSelectAll?: () => void
+  onDeselectAll?: () => void
+  onInvertSelection?: () => void
+  onSelectConnected?: () => void
 }
 
-export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfiguration, onAutoLayout, onOpenGadgets }: ToolsMenuProps) {
+export function ToolsMenu({ 
+  viewSettings, 
+  onViewSettingsChange, 
+  onOpenConfiguration, 
+  onAutoLayout, 
+  onOpenGadgets,
+  onSelectAll,
+  onDeselectAll,
+  onInvertSelection,
+  onSelectConnected
+}: ToolsMenuProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   
   const toggleSetting = (key: keyof ViewSettings) => {
@@ -117,6 +139,47 @@ export function ToolsMenu({ viewSettings, onViewSettingsChange, onOpenConfigurat
       )}
       
       <div className="flex gap-3">
+        {(onSelectAll || onDeselectAll || onInvertSelection || onSelectConnected) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="px-4 py-2"
+              >
+                <MousePointer2 className="w-4 h-4 mr-2" />
+                <span>Selection</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              {onSelectAll && (
+                <DropdownMenuItem onClick={onSelectAll}>
+                  Select All
+                  <kbd className="text-xs bg-gray-200 px-1 rounded ml-auto">⌘A</kbd>
+                </DropdownMenuItem>
+              )}
+              {onDeselectAll && (
+                <DropdownMenuItem onClick={onDeselectAll}>
+                  Deselect All
+                  <kbd className="text-xs bg-gray-200 px-1 rounded ml-auto">⌘⇧A</kbd>
+                </DropdownMenuItem>
+              )}
+              {(onSelectAll || onDeselectAll) && (onInvertSelection || onSelectConnected) && (
+                <DropdownMenuSeparator />
+              )}
+              {onInvertSelection && (
+                <DropdownMenuItem onClick={onInvertSelection}>
+                  Invert Selection
+                </DropdownMenuItem>
+              )}
+              {onSelectConnected && (
+                <DropdownMenuItem onClick={onSelectConnected}>
+                  Select Connected
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         {onOpenGadgets && (
           <Button
             size="sm"
