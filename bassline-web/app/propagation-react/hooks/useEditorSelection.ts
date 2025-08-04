@@ -1,20 +1,12 @@
 import { useMemo } from 'react'
-import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext'
+import { useEditorState } from '~/propagation-react/contexts/EditorStateContext'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 import type { Contact, ContactGroup } from '~/propagation-core'
 
-// Hook that provides selection from the current context frame
-export function useContextSelection() {
-  const { selection, setSelection, addToSelection, removeFromSelection, clearSelection } = useContextFrame()
+// Hook that provides selection with actual Contact and Group objects
+export function useEditorSelection() {
+  const { selection, setSelection, addToSelection, removeFromSelection, clearSelection } = useEditorState()
   const { network } = useNetworkContext()
-  
-  // Only log if selection is non-empty
-  if (selection && (selection.contactIds.size > 0 || selection.groupIds.size > 0)) {
-    console.log('[useContextSelection] Selection:', {
-      contactIds: Array.from(selection.contactIds),
-      groupIds: Array.from(selection.groupIds)
-    })
-  }
   
   // Get actual Contact and Group objects from IDs
   const selectedContacts = useMemo(() => {
@@ -41,11 +33,10 @@ export function useContextSelection() {
   
   // Selection actions
   const selectContact = (contactId: string, exclusive = true) => {
-    console.log('[useContextSelection] selectContact called:', {
+    console.log('[useEditorSelection] selectContact:', {
       contactId,
       exclusive,
-      timestamp: Date.now(),
-      stack: new Error().stack
+      timestamp: Date.now()
     })
     
     if (exclusive) {

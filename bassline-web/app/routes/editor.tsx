@@ -44,6 +44,8 @@ import { ContextDebugger } from "~/components/ContextDebugger";
 import { ToolRegistry } from "~/propagation-react/tools/ToolRegistry";
 import { PropagationNetwork } from "~/propagation-core/models/PropagationNetwork";
 import { ValenceConnectOperation } from "~/propagation-core/refactoring/operations/ValenceConnect";
+import { ModeSystemProvider, useModeContext } from "~/propagation-react/contexts/ModeContext";
+import { ModeMenu } from "~/components/ModeMenu";
 
 // Client loader - provides mode state from URL and optionally loads a bassline
 export async function clientLoader({ request, params }: LoaderFunctionArgs) {
@@ -143,6 +145,9 @@ function Flow() {
   const { screenToFlowPosition } = useReactFlow();
   const loaderData = useLoaderData<typeof clientLoader>();
   const fetcher = useFetcher();
+  
+  // Mode system
+  const modeSystem = useModeContext();
   
   // URL state management hooks
   const { urlState, pushState, clearMode } = useURLState();
@@ -516,6 +521,11 @@ function Flow() {
       ) {
         return;
       }
+      
+      // Let mode system handle keyboard events first
+      if (modeSystem.handleKeyPress(e)) {
+        return;
+      }
 
       // Tab + P to toggle palette (left hand: Tab with thumb, P with pinky)
       if (e.key === "Tab") {
@@ -614,25 +624,8 @@ function Flow() {
       }
 
 
-      // V for valence mode (using URL-based state)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "v") {
-        e.preventDefault();
-        
-        if (currentMode === 'valence') {
-          // Exit valence mode
-          exitMode();
-        } else {
-          // Enter valence mode with current selection
-          // Convert Set values to array of IDs
-          const selectedIds = [...Array.from(selection.contacts), ...Array.from(selection.groups)];
-          if (selectedIds.length > 0) {
-            enterValenceMode(selectedIds);
-            toast.success('Valence mode: Click compatible gadgets to connect', { duration: 2000 });
-          } else {
-            toast.error('Select contacts and/or gadgets first');
-          }
-        }
-      }
+      // V for valence mode is now handled by the mode system
+      // The ValenceMode minor mode handles the 'v' key
 
       // Cmd/Ctrl+A for select all
       if ((e.metaKey || e.ctrlKey) && e.key === "a") {
@@ -650,6 +643,7 @@ function Flow() {
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
   }, [
+    modeSystem,
     palette,
     propertyPanel,
     viewSettings,
@@ -779,12 +773,7 @@ function Flow() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* Mode-based visual indicators */}
-      {currentMode === 'valence' && (
-        <div className="absolute inset-0 pointer-events-none z-50">
-          <div className="absolute inset-4 border-4 border-green-500/50 rounded-lg shadow-[inset_0_0_20px_rgba(34,197,94,0.3)] transition-all duration-300" />
-        </div>
-      )}
+      {/* Mode-based visual indicators are now handled by the mode system */}
       
       {/* Debug: Stack visualizer */}
       {viewSettings.showDebugInfo && (
@@ -830,21 +819,13 @@ function Flow() {
 
         <Panel position="top-left" className="flex flex-col gap-2">
           <Breadcrumbs items={breadcrumbs} onNavigate={urlNavigateToGroup} />
-          {currentMode === 'valence' && (
-            <div className="bg-green-500 text-white px-4 py-2 rounded-md animate-pulse flex items-center justify-between">
-              <span className="font-semibold">
-                Valence Mode: Click compatible gadgets to connect
-              </span>
-              <Button
-                onClick={() => exitMode()}
-                size="sm"
-                variant="ghost"
-                className="text-white hover:bg-green-600"
-              >
-                Exit (Esc)
-              </Button>
-            </div>
-          )}
+          <ModeMenu
+            currentMajorMode={modeSystem.currentMajorMode}
+            activeMinorModes={modeSystem.activeMinorModes}
+            availableModes={modeSystem.availableModes}
+            onSwitchMajorMode={modeSystem.switchMajorMode}
+            onToggleMinorMode={modeSystem.toggleMinorMode}
+          />
           <div className="flex gap-2">
             <Button
               onClick={handleAddInputBoundary}
@@ -1064,11 +1045,13 @@ export default function Editor() {
         <PropertyPanelStackProvider>
           <ReactFlowProvider>
             <ContextFrameProvider>
-              <ClientOnly>
-                <SoundSystemProvider>
-                  <Flow />
-                </SoundSystemProvider>
-              </ClientOnly>
+              <ModeSystemProvider>
+                <ClientOnly>
+                  <SoundSystemProvider>
+                    <Flow />
+                  </SoundSystemProvider>
+                </ClientOnly>
+              </ModeSystemProvider>
             </ContextFrameProvider>
           </ReactFlowProvider>
         </PropertyPanelStackProvider>

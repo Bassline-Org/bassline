@@ -19,7 +19,7 @@ import { getGadgetIcon } from '~/components/gadgets/gadget-icons';
 import type { Contact } from '~/propagation-core';
 
 const groupNodeVariants = cva(
-  "transition-all shadow-md hover:shadow-lg",
+  "transition-all shadow-md hover:shadow-lg nopan",
   {
     variants: {
       nodeType: {

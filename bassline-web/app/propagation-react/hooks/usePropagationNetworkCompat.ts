@@ -62,23 +62,46 @@ export function usePropagationNetwork(
   } = useCurrentGroup();
   const palette = usePalette();
 
+  // Use refs to keep functions stable
+  const updateSelectionRef = useRef(updateSelection);
+  const setContextSelectionRef = useRef(setContextSelection);
+  
+  // Update refs on each render
+  useEffect(() => {
+    updateSelectionRef.current = updateSelection;
+    setContextSelectionRef.current = setContextSelection;
+  });
+  
   // Handle selection changes
   const onSelectionChange = useCallback(
     ({ nodes, edges }: { nodes: any[]; edges: any[] }) => {
+      console.log('[usePropagationNetwork] onSelectionChange:', {
+        nodes: nodes.map(n => ({ id: n.id, type: n.type })),
+        edges: edges.map(e => e.id),
+        timestamp: Date.now()
+      });
+      
       // Update old selection system (for refactoring operations)
-      updateSelection(nodes, edges);
+      updateSelectionRef.current(nodes, edges);
       
       // Update context frame selection (one-way sync)
       const contactIds = nodes.filter(n => n.type !== 'group').map(n => n.id);
       const groupIds = nodes.filter(n => n.type === 'group').map(n => n.id);
-      setContextSelection(contactIds, groupIds);
+      setContextSelectionRef.current(contactIds, groupIds);
     },
-    [updateSelection, setContextSelection],
+    [], // Empty deps to keep callback stable!
   );
+  
 
   // Handle node changes - wrap React Flow's handler to add our custom logic
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      // Log selection-related changes
+      const selectionChanges = changes.filter(c => c.type === 'select');
+      if (selectionChanges.length > 0) {
+        console.log('[usePropagationNetwork] Selection changes in onNodesChange:', selectionChanges);
+      }
+      
       // First, let React Flow handle all the state updates (including selection)
       rfOnNodesChange(changes);
 

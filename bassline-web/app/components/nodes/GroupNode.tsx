@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { useSound } from '~/components/SoundSystem';
 import { useContextSelection } from '~/propagation-react/hooks/useContextSelection';
 import { useValenceConnect } from '~/propagation-react/hooks/useValenceConnect';
+import { useModeContext } from '~/propagation-react/contexts/ModeContext';
 
 export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { highlightedNodeId, network, syncToReactFlow } = useNetworkContext();
@@ -24,6 +25,10 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { urlState } = useURLState();
   const fetcher = useFetcher();
   const { play: playConnectionSound } = useSound('connection/create');
+  const modeSystem = useModeContext();
+  
+  // Get visual class from mode system
+  const modeClassName = modeSystem.getNodeClassName(id);
   
   // Use existing hooks for valence checking
   const { selectedGroups, selectedContacts } = useContextSelection();
@@ -172,7 +177,8 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
         
         // Selection behaviors
         selection: {
-          onClick: () => enterPropertyMode(id),
+          // Don't provide onClick - let React Flow handle selection
+          // onClick: () => enterPropertyMode(id),
           onDoubleClick: () => {
             if (!isPrimitive) navigate();
           },
@@ -195,6 +201,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
         valenceSource={isSourceGadget}
         highlighted={isHighlighted}
         dimmed={isDimmed}
+        className={modeClassName}
       />
     </FlowNode>
   );

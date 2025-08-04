@@ -27,10 +27,9 @@ export function useSelection() {
     return createSelection(selectedContacts, selectedGroups);
   }, [selectedContacts, selectedGroups]);
   
-  // Sync to React Flow whenever selection changes
-  useEffect(() => {
-    syncToReactFlow();
-  }, [selectedContacts, selectedGroups, syncToReactFlow]);
+  // Don't sync to React Flow here - it causes a loop!
+  // React Flow manages its own selection state
+  // syncToReactFlow should only be called when the network data changes
   
   // Select only this item (clear others)
   const selectOnly = useCallback((id: string, type: 'contact' | 'group' | 'wire') => {

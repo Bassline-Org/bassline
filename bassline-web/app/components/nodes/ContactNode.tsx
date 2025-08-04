@@ -11,6 +11,7 @@ import { useContact } from '~/propagation-react/hooks/useContact';
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext';
 import { useEditorModes, useURLState } from '~/propagation-react/hooks/useURLState';
 import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext';
+import { useModeContext } from '~/propagation-react/contexts/ModeContext';
 
 export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id);
@@ -18,10 +19,13 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { enterPropertyMode, currentMode } = useEditorModes();
   const { urlState } = useURLState();
   const { activeToolInstance } = useContextFrame();
+  const modeSystem = useModeContext();
   
-  // Check if dimmed or highlighted
-  const isDimmed = (currentMode === 'valence' && !urlState.selection?.includes(id)) || 
-                   (highlightedNodeId !== null && !selected);
+  // Get visual class from mode system
+  const modeClassName = modeSystem.getNodeClassName(id);
+  
+  // Check if dimmed or highlighted (kept for compatibility during transition)
+  const isDimmed = highlightedNodeId !== null && !selected;
   const isHighlighted = highlightedNodeId === id;
   
   // Define mode behaviors
@@ -77,10 +81,14 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
       interactive={{
         type: 'contact',
         
-        // Selection behaviors - only use callbacks that don't interfere with selection
+        // Selection behaviors
         selection: {
-          // Don't use onClick - it interferes with selection
-          // onClick: () => enterPropertyMode(id),
+          // Let React Flow handle selection, but we can still have callbacks
+          // The key is not to interfere with the selection state
+          onClick: (selection) => {
+            // Don't do anything that would change selection state
+            console.log('[ContactNode] Selected:', id, selection);
+          },
           onDoubleClick: () => enterPropertyMode(id, true), // with focus
           // onShiftClick and onCommandClick use default behaviors
         },
@@ -108,6 +116,7 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
         selected={selected}
         highlighted={isHighlighted}
         dimmed={isDimmed}
+        className={modeClassName}
       />
     </FlowNode>
   );

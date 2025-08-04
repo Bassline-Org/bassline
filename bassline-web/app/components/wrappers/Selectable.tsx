@@ -30,6 +30,8 @@ export function Selectable({
   const { selection, isSelected } = useSelection();
   const wasSelectedRef = useRef(false);
   
+  // Removed verbose logging
+  
   // Track selection state changes
   useEffect(() => {
     const isNowSelected = isSelected(id);
@@ -47,17 +49,36 @@ export function Selectable({
   
   // Handle click - only for callbacks, not selection
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // Only fire callbacks - React Flow handles selection
+    console.log('[Selectable] Click event:', {
+      id,
+      type,
+      shiftKey: e.shiftKey,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+      hasOnClick: !!onClick,
+      hasOnShiftClick: !!onShiftClick,
+      hasOnCommandClick: !!onCommandClick,
+      currentSelection: selection,
+      inFlow
+    });
+    
+    // Don't stop propagation for React Flow nodes - let React Flow handle selection
+    // if (inFlow) {
+    //   e.stopPropagation();
+    // }
     
     // Only fire callbacks - React Flow handles selection
     if (e.shiftKey && onShiftClick) {
+      console.log('[Selectable] Firing onShiftClick');
       onShiftClick(selection);
     } else if ((e.metaKey || e.ctrlKey) && onCommandClick) {
+      console.log('[Selectable] Firing onCommandClick');
       onCommandClick(selection);
     } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && onClick) {
+      console.log('[Selectable] Firing onClick');
       onClick(selection);
     }
-  }, [id, selection, onClick, onShiftClick, onCommandClick]);
+  }, [id, type, selection, onClick, onShiftClick, onCommandClick, inFlow]);
   
   // Handle double-click
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -72,6 +93,7 @@ export function Selectable({
     return (
       <div
         className={cn("selectable-wrapper", className)}
+        onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         data-selected={isSelected(id)}
       >

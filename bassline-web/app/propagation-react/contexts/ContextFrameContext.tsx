@@ -55,9 +55,15 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
     }
   }, [])
   
-  const [contextStack, setContextStack] = useState<ContextFrame[]>(() => [
-    createContext(network.rootGroup.id)
-  ])
+  const [contextStack, setContextStack] = useState<ContextFrame[]>(() => {
+    const initialContext = createContext(network.rootGroup.id)
+    console.log('[ContextFrameContext] Initial context created:', {
+      contextId: initialContext.id,
+      groupId: initialContext.groupId,
+      timestamp: Date.now()
+    })
+    return [initialContext]
+  })
   
   const [activeTool, setActiveTool] = useState<ToolActivation | null>(null)
   
@@ -83,23 +89,48 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
   
   // Selection management
   const setSelection = useCallback((contactIds: string[], groupIds: string[]) => {
-    if (!currentContext) return
+    console.log('[ContextFrameContext] setSelection called:', {
+      contactIds,
+      groupIds,
+      currentContext: !!currentContext,
+      currentContextId: currentContext?.id,
+      contextStackLength: contextStack.length,
+      timestamp: Date.now(),
+      stack: new Error().stack
+    })
+    
+    if (!currentContext) {
+      console.error('[ContextFrameContext] No current context! Stack:', contextStack)
+      return
+    }
     
     setContextStack(prev => {
       const newStack = [...prev]
-      const ctx = newStack[newStack.length - 1]
+      const lastIndex = newStack.length - 1
+      const oldCtx = newStack[lastIndex]
       
       // Check if selection actually changed
-      const contactsChanged = contactIds.length !== ctx.selection.contactIds.size ||
-        !contactIds.every(id => ctx.selection.contactIds.has(id))
-      const groupsChanged = groupIds.length !== ctx.selection.groupIds.size ||
-        !groupIds.every(id => ctx.selection.groupIds.has(id))
+      const contactsChanged = contactIds.length !== oldCtx.selection.contactIds.size ||
+        !contactIds.every(id => oldCtx.selection.contactIds.has(id))
+      const groupsChanged = groupIds.length !== oldCtx.selection.groupIds.size ||
+        !groupIds.every(id => oldCtx.selection.groupIds.has(id))
       
       if (contactsChanged || groupsChanged) {
-        ctx.selection = {
-          contactIds: new Set(contactIds),
-          groupIds: new Set(groupIds),
-          lastModified: Date.now()
+        console.log('[ContextFrame] Selection changed:', {
+          before: { contacts: oldCtx.selection.contactIds.size, groups: oldCtx.selection.groupIds.size },
+          after: { contacts: contactIds.length, groups: groupIds.length },
+          contactIds,
+          groupIds
+        })
+        
+        // Create a new context object to ensure React detects the change
+        newStack[lastIndex] = {
+          ...oldCtx,
+          selection: {
+            contactIds: new Set(contactIds),
+            groupIds: new Set(groupIds),
+            lastModified: Date.now()
+          }
         }
       }
       
@@ -112,17 +143,22 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
     
     setContextStack(prev => {
       const newStack = [...prev]
-      const ctx = newStack[newStack.length - 1]
-      const newContactIds = new Set(ctx.selection.contactIds)
-      const newGroupIds = new Set(ctx.selection.groupIds)
+      const lastIndex = newStack.length - 1
+      const oldCtx = newStack[lastIndex]
+      const newContactIds = new Set(oldCtx.selection.contactIds)
+      const newGroupIds = new Set(oldCtx.selection.groupIds)
       
       contactIds.forEach(id => newContactIds.add(id))
       groupIds.forEach(id => newGroupIds.add(id))
       
-      ctx.selection = {
-        contactIds: newContactIds,
-        groupIds: newGroupIds,
-        lastModified: Date.now()
+      // Create new context object
+      newStack[lastIndex] = {
+        ...oldCtx,
+        selection: {
+          contactIds: newContactIds,
+          groupIds: newGroupIds,
+          lastModified: Date.now()
+        }
       }
       return newStack
     })
@@ -133,23 +169,32 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
     
     setContextStack(prev => {
       const newStack = [...prev]
-      const ctx = newStack[newStack.length - 1]
-      const newContactIds = new Set(ctx.selection.contactIds)
-      const newGroupIds = new Set(ctx.selection.groupIds)
+      const lastIndex = newStack.length - 1
+      const oldCtx = newStack[lastIndex]
+      const newContactIds = new Set(oldCtx.selection.contactIds)
+      const newGroupIds = new Set(oldCtx.selection.groupIds)
       
       contactIds.forEach(id => newContactIds.delete(id))
       groupIds.forEach(id => newGroupIds.delete(id))
       
-      ctx.selection = {
-        contactIds: newContactIds,
-        groupIds: newGroupIds,
-        lastModified: Date.now()
+      // Create new context object
+      newStack[lastIndex] = {
+        ...oldCtx,
+        selection: {
+          contactIds: newContactIds,
+          groupIds: newGroupIds,
+          lastModified: Date.now()
+        }
       }
       return newStack
     })
   }, [currentContext])
   
   const clearSelection = useCallback(() => {
+    console.log('[ContextFrameContext] clearSelection called:', {
+      timestamp: Date.now(),
+      stack: new Error().stack
+    })
     setSelection([], [])
   }, [setSelection])
   
@@ -221,22 +266,34 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
     }
   }, [network.currentGroup.id, currentContext, contextStack, createContext, pushContext])
   
-  const value: ContextFrameContextValue = useMemo(() => ({
-    contextStack,
-    currentContext,
-    pushContext,
-    popContext,
-    selection: currentContext?.selection || { contactIds: new Set(), groupIds: new Set(), lastModified: 0 },
-    setSelection,
-    addToSelection,
-    removeFromSelection,
-    clearSelection,
-    activeTool,
-    activeToolInstance,
-    activateTool,
-    deactivateTool,
-    updateViewState
-  }), [
+  const value: ContextFrameContextValue = useMemo(() => {
+    console.log('[ContextFrameContext] Creating context value:', {
+      hasCurrentContext: !!currentContext,
+      currentContextId: currentContext?.id,
+      selectionSize: currentContext ? {
+        contacts: currentContext.selection.contactIds.size,
+        groups: currentContext.selection.groupIds.size
+      } : null,
+      timestamp: Date.now()
+    })
+    
+    return {
+      contextStack,
+      currentContext,
+      pushContext,
+      popContext,
+      selection: currentContext?.selection || { contactIds: new Set(), groupIds: new Set(), lastModified: 0 },
+      setSelection,
+      addToSelection,
+      removeFromSelection,
+      clearSelection,
+      activeTool,
+      activeToolInstance,
+      activateTool,
+      deactivateTool,
+      updateViewState
+    }
+  }, [
     contextStack,
     currentContext,
     pushContext,

@@ -12,7 +12,7 @@ import { formatContentForDisplay, formatContentForTooltip } from '~/utils/conten
 import type { Contradiction } from '~/propagation-core';
 
 const nodeVariants = cva(
-  "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md relative",
+  "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md relative nopan",
   {
     variants: {
       nodeType: {
