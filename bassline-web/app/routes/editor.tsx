@@ -22,8 +22,11 @@ import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { UIStackProvider, useUIStack } from "~/propagation-react/contexts/UIStackContext";
 import { PropertyPanelStackProvider } from "~/propagation-react/contexts/PropertyPanelStackContext";
 import { ContextFrameProvider, useContextFrame } from "~/propagation-react/contexts/ContextFrameContext";
-import { ContactNode } from "~/components/nodes/ContactNode";
-import { GroupNode } from "~/components/nodes/GroupNode";
+// Test refactored components
+import { ContactNodeRefactored as ContactNode } from "~/components/nodes/ContactNodeRefactored";
+import { GroupNodeRefactored as GroupNode } from "~/components/nodes/GroupNodeRefactored";
+// import { ContactNode } from "~/components/nodes/ContactNode";
+// import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { cn } from "~/lib/utils";
