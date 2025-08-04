@@ -3,8 +3,6 @@ import {
   type Connection,
   type NodeChange,
   type EdgeChange,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from "@xyflow/react";
 import type { Position } from "../../propagation-core";
 import { useNetworkContext } from "../contexts/NetworkContext";
@@ -34,7 +32,7 @@ export function usePropagationNetwork(
   // Use a single ref to track delete sound cooldown (shared between nodes and connections)
   const deleteSoundCooldownRef = useRef<boolean>(false);
   
-  const { network, syncToReactFlow, nodes, edges, setNodes, setEdges } =
+  const { network, syncToReactFlow, nodes, edges, setNodes, setEdges, onNodesChange: rfOnNodesChange, onEdgesChange: rfOnEdgesChange } =
     useNetworkContext();
   const {
     selection: contextSelection,
@@ -78,37 +76,35 @@ export function usePropagationNetwork(
     [updateSelection, setContextSelection],
   );
 
-  // Handle node changes (position updates and deletions)
+  // Handle node changes - wrap React Flow's handler to add our custom logic
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // Apply changes to React Flow state
-      setNodes((nds) => applyNodeChanges(changes, nds));
+      // First, let React Flow handle all the state updates (including selection)
+      rfOnNodesChange(changes);
 
       // Track if we have any deletions in this batch
       let hasNodeRemovals = false;
       let hasGadgetRemovals = false;
 
-      // Handle changes in core network
+      // Then handle our custom logic for the network model
       changes.forEach((change) => {
         if (change.type === "position" && change.position) {
-          // Check if it's a contact or a group
+          // Update position in our network model
           const contact = network.findContact(change.id);
           if (contact) {
             contact.position = change.position;
           } else {
-            // Check if it's a group
             const group = network.findGroup(change.id);
             if (group) {
               group.position = change.position;
             }
           }
         } else if (change.type === "remove") {
-          // Try to remove as contact first
+          // Remove from our network model
           const removed = network.removeContact(change.id);
           if (removed) {
             hasNodeRemovals = true;
           } else {
-            // If not a contact, try to remove as a group
             const removedGroup = network.removeGroup(change.id);
             if (removedGroup) {
               hasGadgetRemovals = true;
@@ -118,11 +114,11 @@ export function usePropagationNetwork(
           // Sync to update edges that might have been removed
           syncToReactFlow();
         }
+        // Note: We don't need to handle "select" - React Flow's hook handles it!
       });
 
       // Play sound only once for the entire batch
       if ((hasNodeRemovals || hasGadgetRemovals) && !deleteSoundCooldownRef.current) {
-        // Prefer gadget sound if any gadgets were deleted
         if (hasGadgetRemovals) {
           playDeleteGadgetSound();
         } else {
@@ -131,21 +127,22 @@ export function usePropagationNetwork(
         deleteSoundCooldownRef.current = true;
         setTimeout(() => {
           deleteSoundCooldownRef.current = false;
-        }, 100); // Increased to 100ms to catch cascading deletes
+        }, 100);
       }
     },
-    [network, syncToReactFlow, setNodes, playDeleteNodeSound, playDeleteGadgetSound],
+    [network, syncToReactFlow, rfOnNodesChange, playDeleteNodeSound, playDeleteGadgetSound],
   );
 
-  // Handle edge changes
+  // Handle edge changes - wrap React Flow's handler to add our custom logic
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      setEdges((eds) => applyEdgeChanges(changes, eds));
+      // First, let React Flow handle the state updates
+      rfOnEdgesChange(changes);
 
       // Track if we have any deletions in this batch
       let hasRemovals = false;
 
-      // Handle edge deletions in core network
+      // Then handle our custom logic for the network model
       changes.forEach((change) => {
         if (change.type === "remove") {
           currentGroup.removeWire(change.id);
@@ -157,17 +154,17 @@ export function usePropagationNetwork(
       if (hasRemovals) {
         syncToReactFlow();
         
-        // Play sound only once for the entire batch (using shared cooldown)
+        // Play sound only once for the entire batch
         if (!deleteSoundCooldownRef.current) {
           playDeleteConnectionSound();
           deleteSoundCooldownRef.current = true;
           setTimeout(() => {
             deleteSoundCooldownRef.current = false;
-          }, 100); // Increased to 100ms to catch cascading deletes
+          }, 100);
         }
       }
     },
-    [currentGroup, syncToReactFlow, setEdges, playDeleteConnectionSound],
+    [currentGroup, syncToReactFlow, rfOnEdgesChange, playDeleteConnectionSound],
   );
 
   // Handle new connections

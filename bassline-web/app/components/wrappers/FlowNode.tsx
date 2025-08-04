@@ -15,35 +15,22 @@ export const FlowNode = memo(({
   className,
   children,
 }: FlowNodeProps) => {
-  // React Flow requires specific styles for proper node rendering
-  const flowNodeStyle = {
-    background: 'transparent',
-    border: 'none',
-    padding: 0,
-    borderRadius: 0,
-  };
+  // If we have interactive props, use the Interactive wrapper
+  if (interactive) {
+    return (
+      <Interactive
+        id={id}
+        selected={selected}
+        className={className}
+        {...interactive}
+      >
+        {children}
+      </Interactive>
+    );
+  }
   
-  return (
-    <div 
-      className={cn(
-        "flow-node-wrapper",
-        selected && "selected",
-        className
-      )}
-      style={flowNodeStyle}
-    >
-      {interactive ? (
-        <Interactive
-          id={id}
-          {...interactive}
-        >
-          {children}
-        </Interactive>
-      ) : (
-        children
-      )}
-    </div>
-  );
+  // Otherwise, just render children directly
+  return <>{children}</>;
 });
 
 FlowNode.displayName = 'FlowNode';

@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { useNavigate, useLocation } from 'react-router'
+import { useSearchParams } from 'react-router'
 
 export interface URLState {
   // Core parameters that should always be preserved
@@ -47,21 +47,19 @@ interface UseURLStateReturn {
  * Handles preservation of core parameters and mode transitions
  */
 export function useURLState(): UseURLStateReturn {
-  const navigate = useNavigate()
-  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   
   // Parse current URL state
   const urlState = useMemo(() => {
-    const params = new URLSearchParams(location.search)
     const state: URLState = {}
     
     // Extract all parameters
-    params.forEach((value, key) => {
+    searchParams.forEach((value, key) => {
       state[key] = value
     })
     
     return state
-  }, [location.search])
+  }, [searchParams])
   
   // Build URL from state object
   const buildURL = useCallback((updates: Partial<URLState>) => {
@@ -76,31 +74,41 @@ export function useURLState(): UseURLStateReturn {
     })
     
     const search = params.toString()
-    return search ? `${location.pathname}?${search}` : location.pathname
-  }, [urlState, location.pathname])
+    return search ? `?${search}` : ''
+  }, [urlState])
   
   // Push new state (merge with existing)
   const pushState = useCallback((updates: Partial<URLState>) => {
-    navigate(buildURL(updates))
-  }, [navigate, buildURL])
+    setSearchParams((currentParams) => {
+      // Create a new URLSearchParams to avoid mutating the current one
+      const newParams = new URLSearchParams(currentParams)
+      
+      // Apply updates
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === undefined || value === null) {
+          newParams.delete(key)
+        } else {
+          newParams.set(key, value)
+        }
+      })
+      
+      return newParams
+    }, { replace: true })
+  }, [setSearchParams])
   
   // Remove specific keys from state
   const popState = useCallback((keys: string[]) => {
-    const newState = { ...urlState }
-    keys.forEach(key => {
-      delete newState[key]
-    })
-    
-    const params = new URLSearchParams()
-    Object.entries(newState).forEach(([key, value]) => {
-      if (value !== undefined) {
-        params.set(key, value)
-      }
-    })
-    
-    const search = params.toString()
-    navigate(search ? `${location.pathname}?${search}` : location.pathname)
-  }, [urlState, navigate, location.pathname])
+    setSearchParams((currentParams) => {
+      const newParams = new URLSearchParams(currentParams)
+      
+      // Remove specified keys
+      keys.forEach(key => {
+        newParams.delete(key)
+      })
+      
+      return newParams
+    }, { replace: true })
+  }, [setSearchParams])
   
   // Replace entire state
   const replaceState = useCallback((state: URLState) => {
@@ -111,9 +119,8 @@ export function useURLState(): UseURLStateReturn {
       }
     })
     
-    const search = params.toString()
-    navigate(search ? `${location.pathname}?${search}` : location.pathname)
-  }, [navigate, location.pathname])
+    setSearchParams(params, { replace: true })
+  }, [setSearchParams])
   
   // Clear mode-related parameters
   const clearMode = useCallback(() => {
@@ -156,6 +163,7 @@ export function useURLState(): UseURLStateReturn {
  */
 export function useEditorModes() {
   const { urlState, pushState, clearMode } = useURLState()
+  
   
   const enterPropertyMode = useCallback((nodeId: string, focus = false) => {
     pushState({

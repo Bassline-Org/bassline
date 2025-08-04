@@ -163,7 +163,7 @@ export function useGroup(groupId: string | null | undefined): UseGroupReturn {
     let current: ContactGroup | null = group
     while (current && current !== network.rootGroup) {
       path.unshift(current.id)
-      current = current.parent
+      current = current.parent ?? null
     }
     
     urlNavigateToGroup(group.id, path.join('/'))

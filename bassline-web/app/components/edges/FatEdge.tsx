@@ -2,8 +2,7 @@ import React from 'react'
 import { getBezierPath, EdgeLabelRenderer, BaseEdge } from '@xyflow/react'
 import type { EdgeProps } from '@xyflow/react'
 import { getValueThickness } from '~/propagation-core/utils/value-detection'
-import { useLoaderData } from 'react-router'
-import type { clientLoader } from '~/routes/editor'
+import { useEditorModes } from '~/propagation-react/hooks/useURLState'
 
 export function FatEdge({
   id,
@@ -19,7 +18,7 @@ export function FatEdge({
   data,
   ...props
 }: EdgeProps) {
-  const loaderData = useLoaderData<typeof clientLoader>()
+  const { currentMode } = useEditorModes()
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -58,7 +57,7 @@ export function FatEdge({
   const strokeWidth = baseStrokeWidth // Don't double-scale since thickness is already in style
   
   // Apply dimming in valence mode
-  const edgeOpacity = loaderData.mode === 'valence' ? 0.2 : (style.opacity || 1)
+  const edgeOpacity = currentMode === 'valence' ? 0.2 : (style.opacity || 1)
   
   return (
     <>

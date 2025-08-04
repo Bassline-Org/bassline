@@ -75,7 +75,7 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
     let current: ContactGroup | null = targetGroup as ContactGroup | null
     while (current && current !== network.rootGroup) {
       path.unshift(current.id)
-      current = current.parent
+      current = current.parent ?? null
     }
     
     // Use URL navigation

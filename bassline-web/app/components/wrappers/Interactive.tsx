@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
 import { cn } from '~/lib/utils';
 import { useSelection } from './useSelection';
 import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext';
-import { useEditorModes } from '~/propagation-react/hooks/useURLState';
+import { useURLState } from '~/propagation-react/hooks/useURLState';
 import { Selectable } from './Selectable';
 import type { InteractiveProps, NodeDisplayConfig, Selection } from './types';
 
@@ -20,6 +20,7 @@ export function Interactive({
   
   // Selection behaviors
   selection,
+  selected = false,
   
   // Mode-specific behaviors
   modes = {},
@@ -40,11 +41,14 @@ export function Interactive({
 }: InteractiveProps) {
   const { selection: currentSelection } = useSelection();
   const { activeToolInstance } = useContextFrame();
-  const { currentMode } = useEditorModes();
+  const { urlState } = useURLState();
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
   const nodeRef = useRef<HTMLDivElement>(null);
+  
+  // Get current mode from URL state
+  const currentMode = urlState.mode || 'normal';
   
   // Get current mode behavior
   const modeBehavior = useMemo(() => {
@@ -101,21 +105,16 @@ export function Interactive({
     }
   }, [contextMenu]);
   
-  // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (currentSelection.includes(id) && onDelete) {
-        onDelete();
-      }
-    }
-  }, [id, currentSelection, onDelete]);
+  // React Flow handles deletion through its deleteKeyCode prop
+  // We don't need custom keyboard handling for Delete/Backspace
   
   // Build className from display config
   const computedClassName = cn(
     className,
     displayConfig.className,
     modeBehavior?.className,
-    !canInteract && 'pointer-events-none',
+    // Don't add pointer-events-none for flow nodes - it prevents selection!
+    // !canInteract && 'pointer-events-none',
     displayConfig.cursor && `cursor-${displayConfig.cursor}`,
     modeBehavior?.cursor && `cursor-${modeBehavior.cursor}`
   );
@@ -132,10 +131,8 @@ export function Interactive({
         className={computedClassName}
         style={computedStyle}
         onContextMenu={handleContextMenu}
-        onKeyDown={handleKeyDown}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
-        tabIndex={-1}
       >
         <Selectable
           id={id}

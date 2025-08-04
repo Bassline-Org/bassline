@@ -1,11 +1,10 @@
 import { memo } from 'react'
 import { getBezierPath, type EdgeProps } from '@xyflow/react'
-import { useLoaderData } from 'react-router'
-import type { clientLoader } from '~/routes/editor'
+import { useEditorModes } from '~/propagation-react/hooks/useURLState'
 
 export const ValenceModeEdge = memo((props: EdgeProps) => {
   const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, markerStart, style } = props
-  const loaderData = useLoaderData<typeof clientLoader>()
+  const { currentMode } = useEditorModes()
   
   const [edgePath] = getBezierPath({
     sourceX,
@@ -17,7 +16,7 @@ export const ValenceModeEdge = memo((props: EdgeProps) => {
   })
   
   // In valence mode, dim all edges since they're not part of the connection process
-  const isDimmed = loaderData.mode === 'valence'
+  const isDimmed = currentMode === 'valence'
   
   return (
     <path

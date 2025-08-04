@@ -8,7 +8,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { toast } from "sonner";
-import { type ActionFunctionArgs, type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
+import { type ActionFunctionArgs, type LoaderFunctionArgs, useLoaderData, useFetcher } from "react-router";
 import { useURLState, useEditorModes, useNavigationState, useSelectionState } from "~/propagation-react/hooks/useURLState";
 
 import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationNetworkCompat";
@@ -22,11 +22,8 @@ import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { UIStackProvider, useUIStack } from "~/propagation-react/contexts/UIStackContext";
 import { PropertyPanelStackProvider } from "~/propagation-react/contexts/PropertyPanelStackContext";
 import { ContextFrameProvider, useContextFrame } from "~/propagation-react/contexts/ContextFrameContext";
-// Test refactored components
-import { ContactNodeRefactored as ContactNode } from "~/components/nodes/ContactNodeRefactored";
-import { GroupNodeRefactored as GroupNode } from "~/components/nodes/GroupNodeRefactored";
-// import { ContactNode } from "~/components/nodes/ContactNode";
-// import { GroupNode } from "~/components/nodes/GroupNode";
+import { ContactNode } from "~/components/nodes/ContactNode";
+import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { cn } from "~/lib/utils";
@@ -95,52 +92,8 @@ export async function clientLoader({ request, params }: LoaderFunctionArgs) {
   };
 }
 
-// Client action - handles all mutations
-export async function clientAction({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const intent = formData.get('intent') as string;
-  
-  switch (intent) {
-    case 'connect-valence': {
-      const sourceIds = JSON.parse(formData.get('sourceIds') as string);
-      const targetId = formData.get('targetId') as string;
-      
-      // Return data for the component to handle
-      // The component will update the network via context
-      
-      return { success: true, intent: 'connect-valence', sourceIds, targetId };
-    }
-    
-    case 'update-property': {
-      const nodeId = formData.get('nodeId') as string;
-      const value = formData.get('value') as string;
-      
-      // TODO: Update node property
-      
-      return { success: true };
-    }
-    
-    case 'create-contact': {
-      const x = Number(formData.get('x'));
-      const y = Number(formData.get('y'));
-      
-      // TODO: Create contact at position
-      
-      return { success: true };
-    }
-    
-    case 'delete-selection': {
-      const nodeIds = JSON.parse(formData.get('nodeIds') as string);
-      
-      // TODO: Delete selected nodes
-      
-      return { success: true };
-    }
-    
-    default:
-      return { error: `Unknown intent: ${intent}` };
-  }
-}
+// Ensure the clientLoader runs on hydration
+clientLoader.hydrate = true;
 
 // Loading fallback
 export function HydrateFallback() {
@@ -153,6 +106,27 @@ export function HydrateFallback() {
     </div>
   );
 }
+
+// Client action - handles valence mode exit
+export async function clientAction({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get('intent') as string;
+  const url = new URL(request.url);
+  
+  switch (intent) {
+    case 'connect-valence': {
+      // Clear valence mode after connection
+      url.searchParams.delete('mode');
+      url.searchParams.delete('selection');
+      
+      return Response.redirect(url.toString());
+    }
+    
+    default:
+      return { error: `Unknown intent: ${intent}` };
+  }
+}
+
 
 const nodeTypes = {
   contact: ContactNode,
@@ -168,7 +142,6 @@ const edgeTypes = {
 function Flow() {
   const { screenToFlowPosition } = useReactFlow();
   const loaderData = useLoaderData<typeof clientLoader>();
-  const navigate = useNavigate();
   const fetcher = useFetcher();
   
   // URL state management hooks
@@ -243,8 +216,8 @@ function Flow() {
     instantiateTemplate,
   } = usePropagationNetwork({
     onContactDoubleClick: (contactId) => {
-      // Navigate to property mode with the double-clicked contact
-      navigate(`/editor?mode=property&node=${contactId}&focus=true`);
+      // Enter property mode with the double-clicked contact
+      enterPropertyMode(contactId, true);
     },
   });
 
@@ -504,6 +477,21 @@ function Flow() {
       // React Flow should handle node updates automatically in newer versions
     }
   }, [network.currentGroup.id]);
+  
+  // Handle property mode from URL changes
+  useEffect(() => {
+    if (currentMode === 'property') {
+      // Show property panel when in property mode
+      if (!propertyPanel.isVisible) {
+        propertyPanel.show(urlState.nodeId ? true : false);
+      }
+    } else {
+      // Hide property panel when not in property mode
+      if (propertyPanel.isVisible) {
+        propertyPanel.hide();
+      }
+    }
+  }, [currentMode, urlState.nodeId, propertyPanel]);
 
   // Show welcome toast on mount (if hints are enabled)
   useEffect(() => {
@@ -679,8 +667,6 @@ function Flow() {
     activeToolInstance,
     activateTool,
     deactivateTool,
-    loaderData,
-    navigate,
     currentMode,
     exitMode,
     enterPropertyMode,
@@ -824,7 +810,6 @@ function Flow() {
         selectNodesOnDrag={false}
         elementsSelectable={true}
         fitView
-        className="select-none"
         panOnScroll={false}
         zoomOnScroll={true}
         zoomOnPinch={true}
@@ -844,7 +829,7 @@ function Flow() {
         )}
 
         <Panel position="top-left" className="flex flex-col gap-2">
-          <Breadcrumbs items={breadcrumbs} onNavigate={navigateToGroup} />
+          <Breadcrumbs items={breadcrumbs} onNavigate={urlNavigateToGroup} />
           {currentMode === 'valence' && (
             <div className="bg-green-500 text-white px-4 py-2 rounded-md animate-pulse flex items-center justify-between">
               <span className="font-semibold">

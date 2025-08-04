@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useContextFrameStack } from '~/propagation-react/contexts/ContextFrameStackContext'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
-import type { Contact, ContactGroup } from '~/propagation-core/models'
+import type { Contact, ContactGroup } from '~/propagation-core'
 
 export function useFrameSelection() {
   const { currentFrame, updateSelection } = useContextFrameStack()

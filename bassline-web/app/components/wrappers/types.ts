@@ -89,6 +89,7 @@ export interface EdgeDisplayConfig {
 export interface InteractiveProps extends BaseInteractiveProps {
   // Selection behaviors
   selection?: SelectionCallbacks;
+  selected?: boolean;  // React Flow selection state
   
   // Mode-specific behaviors
   modes?: Record<string, ModeBehavior>;

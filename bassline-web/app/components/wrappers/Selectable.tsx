@@ -27,7 +27,7 @@ export function Selectable({
   // Options
   inFlow = true,
 }: SelectableProps) {
-  const { selection, selectOnly, addToSelection, toggleInSelection, isSelected } = useSelection();
+  const { selection, isSelected } = useSelection();
   const wasSelectedRef = useRef(false);
   
   // Track selection state changes
@@ -45,47 +45,42 @@ export function Selectable({
     wasSelectedRef.current = isNowSelected;
   }, [id, isSelected, selection, onSelect, onDeselect]);
   
-  // Handle click with modifier keys
+  // Handle click - only for callbacks, not selection
   const handleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+    // Only fire callbacks - React Flow handles selection
     
-    // Handle modifier keys
-    if (e.shiftKey) {
-      // Shift-click: add to selection
-      if (onShiftClick) {
-        onShiftClick(selection);
-      } else {
-        // Default behavior: add to selection
-        addToSelection(id, type);
-      }
-    } else if (e.metaKey || e.ctrlKey) {
-      // Cmd/Ctrl-click: toggle selection
-      if (onCommandClick) {
-        onCommandClick(selection);
-      } else {
-        // Default behavior: toggle
-        toggleInSelection(id, type);
-      }
-    } else {
-      // Regular click
-      if (onClick) {
-        onClick(selection);
-      } else {
-        // Default behavior: select only this
-        selectOnly(id, type);
-      }
+    // Only fire callbacks - React Flow handles selection
+    if (e.shiftKey && onShiftClick) {
+      onShiftClick(selection);
+    } else if ((e.metaKey || e.ctrlKey) && onCommandClick) {
+      onCommandClick(selection);
+    } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && onClick) {
+      onClick(selection);
     }
-  }, [id, type, selection, onClick, onShiftClick, onCommandClick, selectOnly, addToSelection, toggleInSelection]);
+  }, [id, selection, onClick, onShiftClick, onCommandClick]);
   
   // Handle double-click
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    
     if (onDoubleClick) {
       onDoubleClick(selection);
     }
   }, [selection, onDoubleClick]);
   
+  // For nodes in React Flow, we should not intercept clicks
+  // React Flow handles selection automatically
+  if (inFlow) {
+    return (
+      <div
+        className={cn("selectable-wrapper", className)}
+        onDoubleClick={handleDoubleClick}
+        data-selected={isSelected(id)}
+      >
+        {children}
+      </div>
+    );
+  }
+  
+  // For non-flow elements, handle clicks normally
   return (
     <div
       className={cn("selectable-wrapper", className)}

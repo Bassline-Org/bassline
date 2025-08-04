@@ -8,8 +8,7 @@ import { usePropertyPanelStack } from '~/propagation-react/contexts/PropertyPane
 import { PropertyPanelFrame } from './PropertyPanelFrame'
 import { ContactPropertySection, GroupPropertySection } from './PropertyPanelItem'
 import { cn } from '~/lib/utils'
-import { useLoaderData, useNavigate } from 'react-router'
-import type { clientLoader } from '~/routes/editor'
+import { useURLState } from '~/propagation-react/hooks/useURLState'
 
 interface PropertyPanelProps {
   isVisible: boolean
@@ -23,12 +22,12 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
   const { frames, currentFrame, pushFrame, popFrame, popToFrame, clearFrames } = usePropertyPanelStack()
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
-  const loaderData = useLoaderData<typeof clientLoader>()
-  const navigate = useNavigate()
+  const { urlState } = useURLState()
   
   // Check if we're in property mode from URL
-  const isPropertyMode = loaderData.mode === 'property'
-  const nodeIdFromUrl = loaderData.nodeId
+  const isPropertyMode = urlState.mode === 'property'
+  const nodeIdFromUrl = urlState.nodeId
+  
   
   // Update base frame when selection changes
   useEffect(() => {
@@ -69,7 +68,7 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
       // Clear frames when nothing selected
       clearFrames()
     }
-  }, [selectedContacts, selectedGroups, frames, pushFrame, clearFrames])
+  }, [selectedContacts, selectedGroups, pushFrame, clearFrames])
 
   // Update highlighted node based on current frame
   useEffect(() => {

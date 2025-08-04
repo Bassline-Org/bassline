@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import { PropagationNetwork } from '~/propagation-core'
 import type { Node, Edge } from '@xyflow/react'
+import { useNodesState, useEdgesState } from '@xyflow/react'
 import type { ContactGroup } from '~/propagation-core/models/ContactGroup'
 import type { Contact } from '~/propagation-core/models/Contact'
 import { PrimitiveGadget } from '~/propagation-core/primitives'
@@ -21,6 +22,8 @@ interface NetworkContextValue {
   edges: Edge[]
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>
+  onNodesChange: (changes: any[]) => void
+  onEdgesChange: (changes: any[]) => void
   selection: Selection
   setSelection: React.Dispatch<React.SetStateAction<Selection>>
   highlightedNodeId: string | null
@@ -61,9 +64,9 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
     console.warn('setCurrentGroupId is deprecated. Use URL navigation instead.')
   }, [])
   
-  // React Flow state
-  const [nodes, setNodes] = useState<Node[]>([])
-  const [edges, setEdges] = useState<Edge[]>([])
+  // React Flow state - using React Flow's state hooks for proper selection handling
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   
   // Selection state
   const [selection, setSelection] = useState<Selection>(createEmptySelection())
@@ -100,6 +103,8 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
       id: contact.id,
       position: contact.position,
       type: contact.isBoundary ? 'boundary' : 'contact',
+      selectable: true, // Make sure nodes are selectable!
+      // selected is now managed by React Flow's state hooks
       style: {
         background: 'transparent',
         border: 'none',
@@ -127,6 +132,8 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
         id: group.id,
         position,
         type: 'group',
+        selectable: true, // Make sure nodes are selectable!
+        // selected is now managed by React Flow's state hooks
         style: {
           background: 'transparent',
           border: 'none',
@@ -267,6 +274,8 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
     edges,
     setNodes,
     setEdges,
+    onNodesChange,
+    onEdgesChange,
     selection,
     setSelection,
     highlightedNodeId,
