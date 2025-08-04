@@ -59,6 +59,8 @@ export interface ContactNodeViewProps extends VariantProps<typeof nodeVariants> 
   isBoundary?: boolean;
   lastContradiction?: Contradiction | null;
   className?: string;
+  valenceCompatible?: boolean;
+  valenceSource?: boolean;
 }
 
 export const ContactNodeView = memo(({
@@ -70,6 +72,8 @@ export const ContactNodeView = memo(({
   highlighted = false,
   dimmed = false,
   className,
+  valenceCompatible = false,
+  valenceSource = false,
 }: ContactNodeViewProps) => {
   const nodeType = isBoundary ? 'boundary' : 'contact';
   
@@ -78,6 +82,8 @@ export const ContactNodeView = memo(({
       className={cn(
         nodeVariants({ nodeType, selected, highlighted, dimmed }),
         lastContradiction && "ring-2 ring-red-500",
+        valenceCompatible && "ring-2 ring-green-500 animate-pulse cursor-pointer",
+        valenceSource && "ring-2 ring-blue-500",
         className
       )}
     >

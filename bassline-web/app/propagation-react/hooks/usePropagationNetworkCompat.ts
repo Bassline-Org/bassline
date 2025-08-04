@@ -75,12 +75,6 @@ export function usePropagationNetwork(
   // Handle selection changes
   const onSelectionChange = useCallback(
     ({ nodes, edges }: { nodes: any[]; edges: any[] }) => {
-      console.log('[usePropagationNetwork] onSelectionChange:', {
-        nodes: nodes.map(n => ({ id: n.id, type: n.type })),
-        edges: edges.map(e => e.id),
-        timestamp: Date.now()
-      });
-      
       // Update old selection system (for refactoring operations)
       updateSelectionRef.current(nodes, edges);
       
@@ -96,11 +90,7 @@ export function usePropagationNetwork(
   // Handle node changes - wrap React Flow's handler to add our custom logic
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // Log selection-related changes
-      const selectionChanges = changes.filter(c => c.type === 'select');
-      if (selectionChanges.length > 0) {
-        console.log('[usePropagationNetwork] Selection changes in onNodesChange:', selectionChanges);
-      }
+      // Selection changes are handled by onSelectionChange
       
       // First, let React Flow handle all the state updates (including selection)
       rfOnNodesChange(changes);

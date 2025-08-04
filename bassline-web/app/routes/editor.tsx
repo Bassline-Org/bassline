@@ -21,7 +21,8 @@ import { useValenceConnect } from "~/propagation-react/hooks/useValenceConnect";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { UIStackProvider, useUIStack } from "~/propagation-react/contexts/UIStackContext";
 import { PropertyPanelStackProvider } from "~/propagation-react/contexts/PropertyPanelStackContext";
-import { ContextFrameProvider, useContextFrame } from "~/propagation-react/contexts/ContextFrameContext";
+import { EditorStateProvider } from "~/propagation-react/contexts/EditorStateContext";
+import { useContextFrame } from "~/propagation-react/hooks/useContextFrame";
 import { ContactNode } from "~/components/nodes/ContactNode";
 import { GroupNode } from "~/components/nodes/GroupNode";
 import { Button } from "~/components/ui/button";
@@ -41,7 +42,7 @@ import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
 import { SoundSystemProvider } from "~/components/SoundSystem";
 import { StackDebugger } from "~/components/StackDebugger";
 import { ContextDebugger } from "~/components/ContextDebugger";
-import { ToolRegistry } from "~/propagation-react/tools/ToolRegistry";
+import { MinorModesOverlay } from "~/components/MinorModesOverlay";
 import { PropagationNetwork } from "~/propagation-core/models/PropagationNetwork";
 import { ValenceConnectOperation } from "~/propagation-core/refactoring/operations/ValenceConnect";
 import { ModeSystemProvider, useModeContext } from "~/propagation-react/contexts/ModeContext";
@@ -174,7 +175,7 @@ function Flow() {
   const { applyLayout, applyLayoutToSelection } = useLayout();
   const { canValenceConnect, valenceConnect, valenceConnectionType, totalSourceCount } = useValenceConnect();
   const uiStack = useUIStack();
-  const { activeTool, activeToolInstance, activateTool, deactivateTool } = useContextFrame();
+  const { } = useContextFrame();
 
   // UI Stack integration for property panel
   const showPropertyPanel = useCallback((focusInput = false) => {
@@ -497,6 +498,19 @@ function Flow() {
       }
     }
   }, [currentMode, urlState.nodeId, propertyPanel]);
+  
+  // Hide property panel when selection is empty
+  useEffect(() => {
+    if (!hasSelection) {
+      if (propertyPanel.isVisible) {
+        propertyPanel.hide();
+      }
+      // Also exit property mode if we're in it
+      if (currentMode === 'property') {
+        exitMode();
+      }
+    }
+  }, [hasSelection]); // Only depend on hasSelection to avoid loops
 
   // Show welcome toast on mount (if hints are enabled)
   useEffect(() => {
@@ -526,6 +540,13 @@ function Flow() {
       if (modeSystem.handleKeyPress(e)) {
         return;
       }
+      
+      // Global hotkey for valence mode toggle
+      if (e.key === 'v' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        modeSystem.toggleMinorMode('valence');
+        return;
+      }
 
       // Tab + P to toggle palette (left hand: Tab with thumb, P with pinky)
       if (e.key === "Tab") {
@@ -536,28 +557,13 @@ function Flow() {
       if (e.key === "Escape") {
         e.preventDefault();
         
-        // First check if there's an active tool
-        if (activeTool) {
-          // If the tool has a handleKeyPress method, let it handle escape first
-          if (activeToolInstance && activeToolInstance.handleKeyPress) {
-            const handled = activeToolInstance.handleKeyPress(e, null as any); // TODO: pass actual context
-            if (handled) return;
-          }
-          // Otherwise deactivate the tool
-          deactivateTool();
-        } else if (currentMode !== 'normal') {
+        if (currentMode !== 'normal') {
           // Exit any mode
           exitMode();
         } else if (propertyPanel.isVisible) {
           // If in normal mode and property panel is open, close it
           propertyPanel.toggleVisibility();
         }
-      }
-      
-      // Pass other key events to active tool if it has a handler
-      if (activeTool && activeToolInstance && activeToolInstance.handleKeyPress) {
-        const handled = activeToolInstance.handleKeyPress(e, null as any); // TODO: pass actual context
-        if (handled) return; // Stop processing if tool handled the key
       }
 
       // G to toggle gadget menu (left hand: G with index finger)
@@ -657,10 +663,6 @@ function Flow() {
     setHighlightedNodeId,
     uiStack,
     toggleGadgetMenu,
-    activeTool,
-    activeToolInstance,
-    activateTool,
-    deactivateTool,
     currentMode,
     exitMode,
     enterPropertyMode,
@@ -956,6 +958,9 @@ function Flow() {
         </Panel>
       </ReactFlow>
 
+      {/* Minor modes overlay */}
+      <MinorModesOverlay />
+
       {/* Old palette - replaced with Dreams-style menu
       <ClientOnly>
         <GadgetPalette
@@ -1044,7 +1049,7 @@ export default function Editor() {
       <UIStackProvider>
         <PropertyPanelStackProvider>
           <ReactFlowProvider>
-            <ContextFrameProvider>
+            <EditorStateProvider>
               <ModeSystemProvider>
                 <ClientOnly>
                   <SoundSystemProvider>
@@ -1052,7 +1057,7 @@ export default function Editor() {
                   </SoundSystemProvider>
                 </ClientOnly>
               </ModeSystemProvider>
-            </ContextFrameProvider>
+            </EditorStateProvider>
           </ReactFlowProvider>
         </PropertyPanelStackProvider>
       </UIStackProvider>

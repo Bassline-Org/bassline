@@ -7,8 +7,9 @@ import { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '~/lib/utils';
 import { useSelection } from './useSelection';
-import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext';
+import { useContextFrame } from '~/propagation-react/hooks/useContextFrame';
 import { useURLState } from '~/propagation-react/hooks/useURLState';
+import { useModeContext } from '~/propagation-react/contexts/ModeContext';
 import { Selectable } from './Selectable';
 import type { InteractiveProps, NodeDisplayConfig, Selection } from './types';
 
@@ -25,9 +26,6 @@ export function Interactive({
   // Mode-specific behaviors
   modes = {},
   
-  // Tool display integration
-  toolDisplay,
-  
   // Lifecycle
   onDelete,
   onDragStart,
@@ -40,8 +38,9 @@ export function Interactive({
   tooltip,
 }: InteractiveProps) {
   const { selection: currentSelection } = useSelection();
-  const { activeToolInstance } = useContextFrame();
+  const { } = useContextFrame();
   const { urlState } = useURLState();
+  const modeSystem = useModeContext();
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
@@ -50,27 +49,33 @@ export function Interactive({
   // Get current mode from URL state
   const currentMode = urlState.mode || 'normal';
   
-  // Get current mode behavior
+  // Get current mode behavior - check both URL mode and active minor modes
   const modeBehavior = useMemo(() => {
+    // First check URL mode
     if (currentMode && modes[currentMode]) {
       return modes[currentMode];
     }
+    
+    // Then check active minor modes
+    for (const minorModeId of modeSystem.activeMinorModes) {
+      if (modes[minorModeId]) {
+        return modes[minorModeId];
+      }
+    }
+    
     return null;
-  }, [currentMode, modes]);
+  }, [currentMode, modes, modeSystem.activeMinorModes]);
   
   // Get tool display configuration
   const displayConfig = useMemo((): NodeDisplayConfig => {
-    if (activeToolInstance && toolDisplay) {
-      const config = toolDisplay(activeToolInstance, currentSelection);
-      if (config) return config;
-    }
+    // Tool display is deprecated - using mode system instead
     
     // Default display config
     return {
       interactive: true,
       opacity: 1,
     };
-  }, [activeToolInstance, toolDisplay, currentSelection]);
+  }, []);
   
   // Check if node can be interacted with
   const canInteract = useMemo(() => {

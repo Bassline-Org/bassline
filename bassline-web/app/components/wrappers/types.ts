@@ -94,9 +94,6 @@ export interface InteractiveProps extends BaseInteractiveProps {
   // Mode-specific behaviors
   modes?: Record<string, ModeBehavior>;
   
-  // Tool display integration
-  toolDisplay?: (tool: any, selection: Selection) => NodeDisplayConfig | undefined;
-  
   // Lifecycle
   onDelete?: () => void;
   onDragStart?: () => void;

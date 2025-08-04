@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
 
+// Match the SelectionState type from ContextFrame
 interface SelectionState {
   contactIds: Set<string>
   groupIds: Set<string>
+  lastModified: number
 }
 
 interface EditorStateContextValue {
@@ -28,29 +30,27 @@ interface EditorStateProviderProps {
 export function EditorStateProvider({ children }: EditorStateProviderProps) {
   const [selection, setSelectionState] = useState<SelectionState>({
     contactIds: new Set(),
-    groupIds: new Set()
+    groupIds: new Set(),
+    lastModified: Date.now()
   })
   
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
   
   // Selection management
   const setSelection = useCallback((contactIds: string[], groupIds: string[]) => {
-    console.log('[EditorState] setSelection:', {
-      contactIds,
-      groupIds,
-      timestamp: Date.now()
-    })
     
     setSelectionState({
       contactIds: new Set(contactIds),
-      groupIds: new Set(groupIds)
+      groupIds: new Set(groupIds),
+      lastModified: Date.now()
     })
   }, [])
   
   const addToSelection = useCallback((contactIds: string[], groupIds: string[]) => {
     setSelectionState(prev => ({
       contactIds: new Set([...prev.contactIds, ...contactIds]),
-      groupIds: new Set([...prev.groupIds, ...groupIds])
+      groupIds: new Set([...prev.groupIds, ...groupIds]),
+      lastModified: Date.now()
     }))
   }, [])
   
@@ -64,13 +64,13 @@ export function EditorStateProvider({ children }: EditorStateProviderProps) {
       
       return {
         contactIds: newContactIds,
-        groupIds: newGroupIds
+        groupIds: newGroupIds,
+        lastModified: Date.now()
       }
     })
   }, [])
   
   const clearSelection = useCallback(() => {
-    console.log('[EditorState] clearSelection')
     setSelection([], [])
   }, [setSelection])
   

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useContextFrame } from '~/propagation-react/contexts/ContextFrameContext'
+import { useContextFrame } from '~/propagation-react/hooks/useContextFrame'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 import type { Contact, ContactGroup } from '~/propagation-core'
 
@@ -8,13 +8,6 @@ export function useContextSelection() {
   const { selection, setSelection, addToSelection, removeFromSelection, clearSelection } = useContextFrame()
   const { network } = useNetworkContext()
   
-  // Only log if selection is non-empty
-  if (selection && (selection.contactIds.size > 0 || selection.groupIds.size > 0)) {
-    console.log('[useContextSelection] Selection:', {
-      contactIds: Array.from(selection.contactIds),
-      groupIds: Array.from(selection.groupIds)
-    })
-  }
   
   // Get actual Contact and Group objects from IDs
   const selectedContacts = useMemo(() => {
@@ -41,12 +34,6 @@ export function useContextSelection() {
   
   // Selection actions
   const selectContact = (contactId: string, exclusive = true) => {
-    console.log('[useContextSelection] selectContact called:', {
-      contactId,
-      exclusive,
-      timestamp: Date.now(),
-      stack: new Error().stack
-    })
     
     if (exclusive) {
       setSelection([contactId], [])

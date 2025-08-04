@@ -5,10 +5,10 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
 import { useContextSelection } from './useContextSelection'
+import { useModeSelection } from './useModeSelection'
 import { 
   modeManager,
   createModeContext,
-  SelectionImpl,
   createDefaultInteractionPoint,
   createDefaultViewState,
   EditMode,
@@ -84,7 +84,7 @@ export interface UseModeSystemReturn {
 
 export function useModeSystem(): UseModeSystemReturn {
   const { network, syncToReactFlow } = useNetworkContext()
-  const { selectedContacts, selectedGroups, selectContact, clearSelection } = useContextSelection()
+  const { selectContact, clearSelection } = useContextSelection()
   
   // Track current state
   const [currentMajorMode, setCurrentMajorMode] = useState<string | null>('edit')
@@ -95,14 +95,8 @@ export function useModeSystem(): UseModeSystemReturn {
     createDefaultViewState(network.currentGroup.id)
   )
   
-  // Create selection implementation
-  const selection = useMemo(() => {
-    const sel = new SelectionImpl()
-    // Populate from context selection
-    selectedContacts.forEach(contact => sel.nodes.add(contact.id))
-    selectedGroups.forEach(group => sel.nodes.add(group.id))
-    return sel
-  }, [selectedContacts, selectedGroups])
+  // Use the mode selection adapter
+  const selection = useModeSelection()
   
   // Create commands implementation
   const commands: Commands = useMemo(() => ({

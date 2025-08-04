@@ -56,6 +56,8 @@ export class ValenceMode extends MinorModeBase {
   onDisable(context: ModeContext): void {
     this.sourceSelection = null
     context.annotations.clearAll()
+    // Clear selection when exiting valence mode
+    context.commands.clearSelection()
   }
   
   private updateCompatibleTargets(context: ModeContext): void {

@@ -11,7 +11,7 @@ import { useGroup } from '~/propagation-react/hooks/useGroup';
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext';
 import { useEditorModes, useURLState } from '~/propagation-react/hooks/useURLState';
 import { useFetcher } from 'react-router';
-import { ValenceConnectOperation } from '~/propagation-core/refactoring/operations/ValenceConnect';
+import { ValenceConnectOperation, type ValenceConnectionResult } from '~/propagation-core/refactoring/operations/ValenceConnect';
 import { toast } from 'sonner';
 import { useSound } from '~/components/SoundSystem';
 import { useContextSelection } from '~/propagation-react/hooks/useContextSelection';
@@ -34,10 +34,14 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { selectedGroups, selectedContacts } = useContextSelection();
   const { areGadgetsCompatible, isMixedSelectionCompatibleWithGadget } = useValenceConnect();
   
+  // Check if valence mode is active in either URL or mode system
+  const isValenceModeActive = currentMode === 'valence' || modeSystem.activeMinorModes.includes('valence');
+  
   // Check valence compatibility
   const isValenceCompatible = useMemo(() => {
     // In valence mode, check if this gadget can be connected to
-    if (currentMode === 'valence' && urlState.selection) {
+    const hasSelection = selectedGroups.length > 0 || selectedContacts.length > 0;
+    if (isValenceModeActive && hasSelection) {
       // Don't highlight if this gadget is selected
       if (selected) return false;
       
@@ -62,41 +66,16 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
         return isMixedSelectionCompatibleWithGadget(id);
       }
       
-      // Also handle the URL-based selection for valence mode
-      const selection = urlState.selection;
-      if (selection && selection.includes(id)) return false;
-      
-      // Calculate total outputs from URL selection
-      let totalOutputCount = 0;
-      if (selection) {
-        for (const itemId of selection) {
-          const contact = network.currentGroup.contacts.get(itemId);
-          if (contact) {
-            totalOutputCount++;
-          } else {
-            const gadget = network.currentGroup.subgroups.get(itemId);
-            if (gadget) {
-              const { outputs } = gadget.getBoundaryContacts();
-              totalOutputCount += outputs.length;
-            }
-          }
-        }
-      }
-      
-      // Check if this gadget can accept the outputs
-      const targetGadget = network.currentGroup.subgroups.get(id);
-      if (!targetGadget) return false;
-      
-      const { inputs } = targetGadget.getBoundaryContacts();
-      return inputs.length === totalOutputCount;
+      // No other cases match
+      return false;
     }
     
     return false;
-  }, [id, selected, currentMode, urlState.selection, network, selectedGroups, selectedContacts, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget]);
+  }, [id, selected, isValenceModeActive, network, selectedGroups, selectedContacts, areGadgetsCompatible, isMixedSelectionCompatibleWithGadget]);
   
   // Visual states
-  const isSourceGadget = currentMode === 'valence' && urlState.selection?.includes(id);
-  const isDimmed = (currentMode === 'valence' && !isSourceGadget && !isValenceCompatible) ||
+  const isSourceGadget = isValenceModeActive && (selectedGroups.some(g => g.id === id) || selectedContacts.some(c => c.id === id));
+  const isDimmed = (isValenceModeActive && !isSourceGadget && !isValenceCompatible) ||
                    (highlightedNodeId !== null && !selected);
   const isHighlighted = highlightedNodeId === id;
   
@@ -104,28 +83,32 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const handleValenceConnection = useCallback(() => {
     if (!isValenceCompatible) return;
     
-    const sourceIds = urlState.selection || [];
-    
-    // Separate contacts and gadgets
-    const contactIds: string[] = [];
-    const gadgetIds: string[] = [];
-    
-    for (const itemId of sourceIds) {
-      if (network.currentGroup.contacts.has(itemId)) {
-        contactIds.push(itemId);
-      } else if (network.currentGroup.subgroups.has(itemId)) {
-        gadgetIds.push(itemId);
-      }
-    }
+    // Get source IDs from current selection
+    const contactIds = selectedContacts.map(c => c.id);
+    const gadgetIds = selectedGroups.map(g => g.id);
+    const sourceIds = [...contactIds, ...gadgetIds];
     
     // Perform the connection
     const operation = new ValenceConnectOperation();
-    const result = operation.executeMixedToGadget(
-      network.currentGroup,
-      gadgetIds,
-      contactIds,
-      id
-    );
+    let result: ValenceConnectionResult;
+    
+    // Case 1: Gadget-to-gadget connection
+    if (gadgetIds.length === 1 && contactIds.length === 0) {
+      result = operation.execute(network.currentGroup, gadgetIds[0], id);
+    }
+    // Case 2: Contacts-to-gadget connection
+    else if (gadgetIds.length === 0 && contactIds.length > 0) {
+      result = operation.executeContactsToGadget(network.currentGroup, contactIds, id);
+    }
+    // Case 3: Mixed selection
+    else {
+      result = operation.executeMixedToGadget(
+        network.currentGroup,
+        gadgetIds,
+        contactIds,
+        id
+      );
+    }
     
     if (result.success) {
       syncToReactFlow();
@@ -149,7 +132,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
       },
       { method: 'post' }
     );
-  }, [id, isValenceCompatible, urlState.selection, network, syncToReactFlow, playConnectionSound, fetcher]);
+  }, [id, isValenceCompatible, selectedContacts, selectedGroups, network, syncToReactFlow, playConnectionSound, fetcher]);
   
   // Define mode behaviors
   const modeBehaviors: Record<string, ModeBehavior> = {
@@ -160,13 +143,6 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
     }
   };
   
-  // Tool display function
-  const getToolDisplay = useCallback((tool: any, selection: Selection): NodeDisplayConfig | undefined => {
-    if (tool.displayRules?.getNodeDisplay) {
-      return tool.displayRules.getNodeDisplay(id, selection);
-    }
-    return undefined;
-  }, [id]);
   
   return (
     <FlowNode
@@ -186,9 +162,6 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
         
         // Mode-specific behaviors
         modes: modeBehaviors,
-        
-        // Tool display integration
-        toolDisplay: getToolDisplay,
       }}
     >
       <GroupNodeView

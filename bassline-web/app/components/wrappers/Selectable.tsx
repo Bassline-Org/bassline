@@ -49,36 +49,17 @@ export function Selectable({
   
   // Handle click - only for callbacks, not selection
   const handleClick = useCallback((e: React.MouseEvent) => {
-    console.log('[Selectable] Click event:', {
-      id,
-      type,
-      shiftKey: e.shiftKey,
-      metaKey: e.metaKey,
-      ctrlKey: e.ctrlKey,
-      hasOnClick: !!onClick,
-      hasOnShiftClick: !!onShiftClick,
-      hasOnCommandClick: !!onCommandClick,
-      currentSelection: selection,
-      inFlow
-    });
-    
     // Don't stop propagation for React Flow nodes - let React Flow handle selection
-    // if (inFlow) {
-    //   e.stopPropagation();
-    // }
     
     // Only fire callbacks - React Flow handles selection
     if (e.shiftKey && onShiftClick) {
-      console.log('[Selectable] Firing onShiftClick');
       onShiftClick(selection);
     } else if ((e.metaKey || e.ctrlKey) && onCommandClick) {
-      console.log('[Selectable] Firing onCommandClick');
       onCommandClick(selection);
     } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && onClick) {
-      console.log('[Selectable] Firing onClick');
       onClick(selection);
     }
-  }, [id, type, selection, onClick, onShiftClick, onCommandClick, inFlow]);
+  }, [selection, onClick, onShiftClick, onCommandClick]);
   
   // Handle double-click
   const handleDoubleClick = useCallback((e: React.MouseEvent) => {
