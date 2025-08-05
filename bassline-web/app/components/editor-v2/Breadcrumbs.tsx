@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { getNetworkClient } from '~/network/client'
 
@@ -13,13 +13,43 @@ interface BreadcrumbsProps {
 
 export function Breadcrumbs({ currentGroupId }: BreadcrumbsProps) {
   const navigate = useNavigate()
+  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([])
   
-  // For now, just show current group
-  // TODO: Build full breadcrumb trail by traversing parent groups
-  const breadcrumbs: BreadcrumbItem[] = [
-    { id: 'root', name: 'Root' },
-    ...(currentGroupId !== 'root' ? [{ id: currentGroupId, name: `Group ${currentGroupId}` }] : [])
-  ]
+  // Build breadcrumb trail
+  useEffect(() => {
+    const buildBreadcrumbs = async () => {
+      const client = getNetworkClient()
+      const items: BreadcrumbItem[] = []
+      let groupId = currentGroupId
+      
+      // Build trail from current to root
+      while (groupId) {
+        try {
+          const state = await client.getState(groupId)
+          items.unshift({
+            id: groupId,
+            name: state.group.name || (groupId === 'root' ? 'Root' : `Group ${groupId.slice(0, 8)}`)
+          })
+          
+          // Move to parent
+          groupId = state.group.parentId || ''
+          if (groupId === 'root' || !groupId) {
+            if (currentGroupId !== 'root') {
+              items.unshift({ id: 'root', name: 'Root' })
+            }
+            break
+          }
+        } catch (error) {
+          console.warn(`Failed to build breadcrumb for ${groupId}:`, error)
+          break
+        }
+      }
+      
+      setBreadcrumbs(items)
+    }
+    
+    buildBreadcrumbs()
+  }, [currentGroupId])
   
   const handleClick = useCallback((groupId: string) => {
     if (groupId === 'root') {

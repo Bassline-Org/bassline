@@ -65,6 +65,30 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   
+  // Track previous groupId to detect actual navigation
+  const [previousGroupId, setPreviousGroupId] = useState(groupId)
+  
+  // Reset state only when actually navigating to a different group
+  useEffect(() => {
+    if (groupId !== previousGroupId) {
+      // Clear everything when navigating to a new group
+      setNodeViewMetadata(loadNodeViewMetadata())
+      setNodes([])
+      setEdges([])
+      setSelectedNodes([])
+      setSelectedEdges([])
+      setPendingNodeType(null)
+      setPreviousGroupId(groupId)
+      
+      // Reset React Flow view
+      if (reactFlowInstance) {
+        setTimeout(() => {
+          reactFlowInstance.fitView({ padding: 0.2 })
+        }, 100)
+      }
+    }
+  }, [groupId, previousGroupId, reactFlowInstance])
+  
   // Save node view metadata to localStorage when it changes
   useEffect(() => {
     localStorage.setItem(`nodeViewMetadata-${groupId}`, JSON.stringify(Array.from(nodeViewMetadata.entries())))
@@ -88,39 +112,62 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   // Update nodes when groupState changes
   useEffect(() => {
     setNodes(currentNodes => {
+      // Create a map of existing nodes for efficient lookup
+      const existingNodesMap = new Map(currentNodes.map(n => [n.id, n]))
       const newNodes: Node[] = []
-      let index = 0
+      const seenNodeIds = new Set<string>()
       
       // Add/update contact nodes
       if (groupState.contacts instanceof Map) {
+        let newContactIndex = 0
         groupState.contacts.forEach((contact) => {
           if (contact && contact.id) {
-            const existingNode = currentNodes.find(n => n.id === contact.id)
+            seenNodeIds.add(contact.id)
+            const existingNode = existingNodesMap.get(contact.id)
             const metadata = nodeViewMetadata.get(contact.id)
             const nodeType = metadata?.viewComponent || 'contact'
+            
+            // Only increment index for new nodes
+            if (!existingNode) {
+              newContactIndex++
+            }
+            
             newNodes.push({
               id: contact.id,
               type: nodeType,
-              position: existingNode?.position || { x: 100 + (index * 150), y: 100 },
+              position: existingNode?.position || { 
+                x: 100 + ((newContactIndex - 1) * 150), 
+                y: 100 + (Math.floor((newContactIndex - 1) / 4) * 150) 
+              },
               data: {
                 contact,
                 groupId,
               },
             })
-            index++
           }
         })
       }
       
       // Add/update subgroup nodes (including gadgets)
-      groupState.group.subgroupIds.forEach((subgroupId, idx) => {
+      let newGroupIndex = 0
+      groupState.group.subgroupIds.forEach((subgroupId) => {
         if (subgroupId) {
-          const existingNode = currentNodes.find(n => n.id === subgroupId)
+          seenNodeIds.add(subgroupId)
+          const existingNode = existingNodesMap.get(subgroupId)
           const subgroup = subgroupData.get(subgroupId)
+          
+          // Only increment index for new nodes
+          if (!existingNode) {
+            newGroupIndex++
+          }
+          
           newNodes.push({
             id: subgroupId,
             type: 'group',
-            position: existingNode?.position || { x: 300 + (idx * 200), y: 200 },
+            position: existingNode?.position || { 
+              x: 300 + ((newGroupIndex - 1) * 200), 
+              y: 300 + (Math.floor((newGroupIndex - 1) / 3) * 200)
+            },
             data: {
               groupId: subgroupId,
               parentGroupId: groupId,
@@ -133,6 +180,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
         }
       })
       
+      // Preserve positions of nodes that still exist
       return newNodes
     })
   }, [groupState, groupId, subgroupData, nodeViewMetadata])

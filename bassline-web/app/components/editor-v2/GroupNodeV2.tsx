@@ -21,9 +21,11 @@ export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) =
   const { groupId, name, isGadget, primitiveId, boundaryContacts = [] } = data
   
   const handleDoubleClick = useCallback(() => {
-    // Navigate into the group
-    navigate(`/editor-v2/${groupId}`)
-  }, [groupId, navigate])
+    // Only navigate into non-gadget groups
+    if (!isGadget) {
+      navigate(`/editor-v2/${groupId}`)
+    }
+  }, [groupId, navigate, isGadget])
   
   // Different styling for gadgets vs regular groups
   const bgColor = isGadget ? 'bg-orange-50' : 'bg-purple-50'
@@ -72,7 +74,7 @@ export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) =
         {isGadget && '⚡ '}{name}
       </div>
       <div className="text-xs text-gray-500 mt-1">
-        {isGadget ? primitiveId : 'Double-click to enter'}
+        {isGadget ? `Primitive: ${primitiveId}` : 'Double-click to enter'}
       </div>
       
       {/* Show input/output labels for gadgets */}

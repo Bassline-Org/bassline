@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getNetworkClient } from '~/network/client'
-import type { GroupState, Contact, Change } from '~/propagation-core-v2/types'
+import type { GroupState, Contact, Change, Group } from '~/propagation-core-v2/types'
 
 /**
  * Hook to get and subscribe to NetworkClient singleton
@@ -20,20 +20,21 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
   useEffect(() => {
     const client = getNetworkClient()
     
-    // Load initial data if not provided
-    if (!initialState) {
-      client.getState(groupId)
-        .then(groupState => {
-          setState(groupState)
-          setLoading(false)
-        })
-        .catch(err => {
-          setError(err)
-          setLoading(false)
-        })
-    } else {
-      setLoading(false)
-    }
+    // Reset state when groupId changes
+    setState(initialState || ({} as GroupState))
+    setLoading(true)
+    setError(null)
+    
+    // Always fetch fresh data for the group
+    client.getState(groupId)
+      .then(groupState => {
+        setState(groupState)
+        setLoading(false)
+      })
+      .catch(err => {
+        setError(err)
+        setLoading(false)
+      })
     
     // Subscribe to changes that affect this group
     const unsubscribe = client.subscribe((changes: Change[]) => {

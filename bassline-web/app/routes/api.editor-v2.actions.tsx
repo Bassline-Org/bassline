@@ -130,12 +130,15 @@ export async function clientAction({ request }: { request: Request }) {
       case 'delete-group': {
         const groupId = formData.get('groupId') as string
         
-        // TODO: Implement group deletion
-        console.log('[EditorAction] Delete group not yet implemented:', { groupId })
+        // Remove the group
+        await client.removeGroup(groupId)
+        
+        // Note: The worker should handle removing it from parent's subgroupIds
+        console.log('[EditorAction] Group deleted:', groupId)
         
         return { 
-          success: false, 
-          error: 'Delete group not implemented' 
+          success: true, 
+          message: 'Group deleted successfully' 
         }
       }
       
