@@ -5,6 +5,9 @@ import type { ReactNode } from 'react'
 interface SelectionState {
   contactIds: Set<string>
   groupIds: Set<string>
+  // Ordered arrays that preserve selection order for valence mode
+  orderedContactIds: string[]
+  orderedGroupIds: string[]
   lastModified: number
 }
 
@@ -31,6 +34,8 @@ export function EditorStateProvider({ children }: EditorStateProviderProps) {
   const [selection, setSelectionState] = useState<SelectionState>({
     contactIds: new Set(),
     groupIds: new Set(),
+    orderedContactIds: [],
+    orderedGroupIds: [],
     lastModified: Date.now()
   })
   
@@ -42,16 +47,38 @@ export function EditorStateProvider({ children }: EditorStateProviderProps) {
     setSelectionState({
       contactIds: new Set(contactIds),
       groupIds: new Set(groupIds),
+      orderedContactIds: contactIds,
+      orderedGroupIds: groupIds,
       lastModified: Date.now()
     })
   }, [])
   
   const addToSelection = useCallback((contactIds: string[], groupIds: string[]) => {
-    setSelectionState(prev => ({
-      contactIds: new Set([...prev.contactIds, ...contactIds]),
-      groupIds: new Set([...prev.groupIds, ...groupIds]),
-      lastModified: Date.now()
-    }))
+    setSelectionState(prev => {
+      // Filter out duplicates while preserving order
+      const newOrderedContactIds = [...prev.orderedContactIds]
+      const newOrderedGroupIds = [...prev.orderedGroupIds]
+      
+      contactIds.forEach(id => {
+        if (!prev.contactIds.has(id)) {
+          newOrderedContactIds.push(id)
+        }
+      })
+      
+      groupIds.forEach(id => {
+        if (!prev.groupIds.has(id)) {
+          newOrderedGroupIds.push(id)
+        }
+      })
+      
+      return {
+        contactIds: new Set([...prev.contactIds, ...contactIds]),
+        groupIds: new Set([...prev.groupIds, ...groupIds]),
+        orderedContactIds: newOrderedContactIds,
+        orderedGroupIds: newOrderedGroupIds,
+        lastModified: Date.now()
+      }
+    })
   }, [])
   
   const removeFromSelection = useCallback((contactIds: string[], groupIds: string[]) => {
@@ -62,9 +89,15 @@ export function EditorStateProvider({ children }: EditorStateProviderProps) {
       contactIds.forEach(id => newContactIds.delete(id))
       groupIds.forEach(id => newGroupIds.delete(id))
       
+      // Update ordered arrays by filtering out removed items
+      const newOrderedContactIds = prev.orderedContactIds.filter(id => !contactIds.includes(id))
+      const newOrderedGroupIds = prev.orderedGroupIds.filter(id => !groupIds.includes(id))
+      
       return {
         contactIds: newContactIds,
         groupIds: newGroupIds,
+        orderedContactIds: newOrderedContactIds,
+        orderedGroupIds: newOrderedGroupIds,
         lastModified: Date.now()
       }
     })

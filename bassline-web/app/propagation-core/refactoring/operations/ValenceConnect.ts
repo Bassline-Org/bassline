@@ -66,9 +66,8 @@ export class ValenceConnectOperation {
       targetInputs = g1Boundary.inputs
     }
     
-    // Sort by Y position (top to bottom)
-    sourceOutputs.sort((a, b) => a.position.y - b.position.y)
-    targetInputs.sort((a, b) => a.position.y - b.position.y)
+    // Keep original order - don't sort by position
+    // The order should be determined by the caller based on selection order
     
     // Connect them in order
     let connectionCount = 0
@@ -114,6 +113,7 @@ export class ValenceConnectOperation {
   
   /**
    * Connect mixed selection (gadget outputs + contacts) to a target gadget's inputs
+   * The order of connections is based on the order of sourceGadgetIds and sourceContactIds
    */
   executeMixedToGadget(
     parentGroup: ContactGroup,
@@ -126,25 +126,26 @@ export class ValenceConnectOperation {
       return { success: false, message: 'Target gadget not found' }
     }
     
-    // Collect all source outputs
-    const sources: { id: ContactId, position: { x: number, y: number } }[] = []
+    // Collect all source outputs in selection order
+    const sources: ContactId[] = []
     
-    // Add outputs from source gadgets
+    // Add outputs from source gadgets in selection order
     for (const gadgetId of sourceGadgetIds) {
       const gadget = parentGroup.subgroups.get(gadgetId)
       if (!gadget) continue
       
       const { outputs } = gadget.getBoundaryContacts()
+      // Keep gadget outputs in their original order
       for (const output of outputs) {
-        sources.push({ id: output.id, position: output.position })
+        sources.push(output.id)
       }
     }
     
-    // Add source contacts
+    // Add source contacts in selection order
     for (const contactId of sourceContactIds) {
       const contact = parentGroup.contacts.get(contactId)
       if (!contact) continue
-      sources.push({ id: contact.id, position: contact.position })
+      sources.push(contact.id)
     }
     
     // Get target inputs
@@ -157,18 +158,16 @@ export class ValenceConnectOperation {
       }
     }
     
-    // Sort both by Y position
-    sources.sort((a, b) => a.position.y - b.position.y)
-    const sortedInputs = [...inputs].sort((a, b) => a.position.y - b.position.y)
+    // Keep inputs in their original order (don't sort by position)
     
-    // Connect them
+    // Connect them in order
     let connectionCount = 0
     for (let i = 0; i < sources.length; i++) {
       try {
-        parentGroup.connect(sources[i].id, sortedInputs[i].id)
+        parentGroup.connect(sources[i], inputs[i].id)
         connectionCount++
       } catch (error) {
-        console.warn(`Failed to connect ${sources[i].id} to ${sortedInputs[i].id}:`, error)
+        console.warn(`Failed to connect ${sources[i]} to ${inputs[i].id}:`, error)
       }
     }
     
@@ -245,15 +244,11 @@ export class ValenceConnectOperation {
       }
     }
     
-    // Sort contacts and inputs by Y position
-    const sortedContacts = [...contacts].sort((a, b) => a.position.y - b.position.y)
-    const sortedInputs = [...inputs].sort((a, b) => a.position.y - b.position.y)
-    
-    // Connect them
+    // Connect in selection order (contacts are already in order from contactIds)
     let connectionCount = 0
-    for (let i = 0; i < sortedContacts.length; i++) {
+    for (let i = 0; i < contacts.length; i++) {
       try {
-        parentGroup.connect(sortedContacts[i].id, sortedInputs[i].id)
+        parentGroup.connect(contacts[i].id, inputs[i].id)
         connectionCount++
       } catch (error) {
         console.warn(`Failed to connect contact to input:`, error)
@@ -298,15 +293,11 @@ export class ValenceConnectOperation {
       }
     }
     
-    // Sort outputs and contacts by Y position
-    const sortedOutputs = [...outputs].sort((a, b) => a.position.y - b.position.y)
-    const sortedContacts = [...contacts].sort((a, b) => a.position.y - b.position.y)
-    
-    // Connect them
+    // Connect in order (outputs in their natural order, contacts in selection order)
     let connectionCount = 0
-    for (let i = 0; i < sortedOutputs.length; i++) {
+    for (let i = 0; i < outputs.length; i++) {
       try {
-        parentGroup.connect(sortedOutputs[i].id, sortedContacts[i].id)
+        parentGroup.connect(outputs[i].id, contacts[i].id)
         connectionCount++
       } catch (error) {
         console.warn(`Failed to connect output to contact:`, error)

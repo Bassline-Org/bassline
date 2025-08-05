@@ -1,5 +1,6 @@
 import { createContext, useContext, useRef, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useModeContext } from '~/propagation-react/contexts/ModeContext'
 
 interface SoundSystemContextValue {
   playSound: (soundName: string) => void
@@ -24,21 +25,118 @@ interface SoundSystemProviderProps {
   globalVolume?: number
 }
 
-// Simple Web Audio API-based sound system
+// Map our sound names to LittleBigPlanet sound files
+const soundMap: Record<string, string> = {
+  // Connection sounds
+  'connection/create': '/lbp-sounds/grabbersgrab.mp3',
+  'connection/delete': '/lbp-sounds/broken.mp3',
+  
+  // Node sounds
+  'node/create': '/lbp-sounds/newobject.mp3',
+  'node/delete': '/lbp-sounds/broken.mp3',
+  'node/select': '/lbp-sounds/guiselect.mp3',
+  
+  // Gadget sounds
+  'gadget/create': '/lbp-sounds/newobject.mp3',
+  'gadget/delete': '/lbp-sounds/broken.mp3',
+  'gadget/inline': '/lbp-sounds/poppitback.mp3',
+  'gadget/extract': '/lbp-sounds/wearcostume.mp3',
+  'gadget/enter': '/lbp-sounds/controllinatorenter.mp3',
+  'gadget/exit': '/lbp-sounds/controllinatorexit.mp3',
+  
+  // Propagation sounds
+  'propagation/pulse': '/lbp-sounds/scorebubblecollect.mp3',
+  'propagation/contradiction': '/lbp-sounds/guierror.mp3',
+  'propagation/value-change': '/lbp-sounds/placesticker.mp3',
+  
+  // UI sounds
+  'ui/button-click': '/lbp-sounds/guiselect.mp3',
+  'ui/toggle': '/lbp-sounds/guinotify.mp3',
+  'ui/success': '/lbp-sounds/eventcomplete.mp3',
+  'ui/error': '/lbp-sounds/eventfail.mp3',
+  'ui/layout': '/lbp-sounds/subeventcomplete.mp3',
+  'ui/tool-enable': '/lbp-sounds/openpoppit.mp3',
+  'ui/tool-disable': '/lbp-sounds/closepoppit.mp3',
+  
+  // Special actions
+  'special/achievement': '/lbp-sounds/collectallprizes.mp3',
+  'special/score': '/lbp-sounds/scorebubblecollect.mp3',
+  'special/combo': '/lbp-sounds/scorebubblecombo.mp3',
+  'special/combo-end': '/lbp-sounds/scorebubblecomboend.mp3',
+  'special/photo': '/lbp-sounds/takephoto.mp3',
+  'special/favorite': '/lbp-sounds/heart.mp3',
+  'special/unfavorite': '/lbp-sounds/unheart.mp3',
+  'special/celebrate': '/lbp-sounds/yay.mp3',
+  'special/impact': '/lbp-sounds/smack.mp3',
+  'special/jump': '/lbp-sounds/jump.mp3',
+  'special/correct': '/lbp-sounds/stickerrollovercorrect.mp3',
+  'special/incorrect': '/lbp-sounds/stickerrolloverincorrect.mp3',
+  'special/publish': '/lbp-sounds/publishlevel.mp3',
+  'special/decoration': '/lbp-sounds/newdecoration.mp3',
+}
+
+// Cache for loaded audio buffers
+const audioBufferCache = new Map<string, AudioBuffer>()
+
+// Sound system using Web Audio API
 export function SoundSystemProvider({ 
   children, 
   initialEnabled = true,
-  globalVolume = 1.0 
+  globalVolume = 0.5 
 }: SoundSystemProviderProps) {
-  const [isEnabled, setEnabled] = useState(initialEnabled)
-  const audioContextRef = useRef<AudioContext | null>(null)
+  const [isEnabled, setEnabledState] = useState(initialEnabled)
   const globalVolumeRef = useRef(globalVolume)
+  const audioContextRef = useRef<AudioContext | null>(null)
+  
+  // Try to get mode context if available
+  let modeSystem: any = null
+  try {
+    modeSystem = useModeContext()
+  } catch (e) {
+    // Mode context not available - that's okay
+  }
 
   // Initialize audio context on first user interaction
   useEffect(() => {
-    const initAudioContext = () => {
+    const initAudioContext = async () => {
       if (!audioContextRef.current && typeof window !== 'undefined') {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
+        // Preload sounds
+        await preloadSoundsInternal()
+      }
+    }
+    
+    const preloadSoundsInternal = async () => {
+      if (!audioContextRef.current) return
+      
+      const soundsToPreload = [
+        'connection/create',
+        'connection/delete',
+        'node/create',
+        'node/delete',
+        'node/select',
+        'gadget/create',
+        'gadget/delete',
+        'gadget/enter',
+        'gadget/exit',
+        'ui/success',
+        'ui/error',
+        'special/celebrate',
+        'special/publish'
+      ]
+      
+      for (const soundName of soundsToPreload) {
+        const url = soundMap[soundName]
+        if (url && !audioBufferCache.has(url)) {
+          try {
+            const response = await fetch(url)
+            const arrayBuffer = await response.arrayBuffer()
+            const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
+            audioBufferCache.set(url, audioBuffer)
+          } catch (error) {
+            console.warn(`Failed to preload sound ${soundName}:`, error)
+          }
+        }
       }
     }
 
@@ -52,73 +150,52 @@ export function SoundSystemProvider({
     }
   }, [])
 
-  const playSound = useCallback((soundName: string) => {
-    if (!isEnabled || typeof window === 'undefined' || !audioContextRef.current) return
 
-    const ctx = audioContextRef.current
-    
-    // Sound definitions with frequencies and durations
-    const sounds: Record<string, { frequency: number; duration: number; volume: number }> = {
-      // Connection sounds
-      'connection/create': { frequency: 440, duration: 0.1, volume: 0.5 },
-      'connection/delete': { frequency: 220, duration: 0.1, volume: 0.4 },
-      
-      // Node sounds
-      'node/create': { frequency: 523, duration: 0.05, volume: 0.3 },
-      'node/delete': { frequency: 261, duration: 0.05, volume: 0.3 },
-      'node/select': { frequency: 660, duration: 0.03, volume: 0.2 },
-      
-      // Gadget sounds (lower, more complex)
-      'gadget/create': { frequency: 440, duration: 0.15, volume: 0.4 }, // A4 - like tab opening
-      'gadget/delete': { frequency: 196, duration: 0.08, volume: 0.4 }, // G3
-      'gadget/inline': { frequency: 330, duration: 0.15, volume: 0.4 }, // E4 - like tab closing
-      'gadget/enter': { frequency: 587, duration: 0.15, volume: 0.3 }, // D5 (ascending)
-      'gadget/exit': { frequency: 294, duration: 0.15, volume: 0.3 }, // D4 (descending)
-      
-      // Propagation sounds
-      'propagation/pulse': { frequency: 330, duration: 0.15, volume: 0.4 },
-      'propagation/contradiction': { frequency: 110, duration: 0.3, volume: 0.6 },
-      'propagation/value-change': { frequency: 493, duration: 0.05, volume: 0.2 }, // B4
-      
-      // UI sounds
-      'ui/button-click': { frequency: 880, duration: 0.02, volume: 0.3 },
-      'ui/toggle': { frequency: 440, duration: 0.05, volume: 0.2 },
-      'ui/success': { frequency: 659, duration: 0.2, volume: 0.4 },
-      'ui/error': { frequency: 147, duration: 0.3, volume: 0.5 },
-      'ui/layout': { frequency: 550, duration: 0.1, volume: 0.3 }, // For auto-layout
+  const playSound = useCallback(async (soundName: string) => {
+    // Check if sound mode is active (if mode system is available)
+    const soundModeActive = modeSystem ? modeSystem.activeMinorModes.includes('sound') : true
+    if (!soundModeActive || !isEnabled || !audioContextRef.current) return
+
+    // Map our sound name to file path
+    const soundUrl = soundMap[soundName]
+    if (!soundUrl) {
+      console.warn(`Sound not mapped: ${soundName}`)
+      return
     }
 
-    const sound = sounds[soundName]
-    if (!sound) return
-
     try {
-      // Create oscillator
-      const oscillator = ctx.createOscillator()
-      const gainNode = ctx.createGain()
+      let audioBuffer = audioBufferCache.get(soundUrl)
       
-      // Set frequency
-      oscillator.frequency.setValueAtTime(sound.frequency, ctx.currentTime)
-      oscillator.type = 'sine'
+      // Load the sound if not cached
+      if (!audioBuffer) {
+        const response = await fetch(soundUrl)
+        const arrayBuffer = await response.arrayBuffer()
+        audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
+        audioBufferCache.set(soundUrl, audioBuffer)
+      }
       
-      // Set volume with fade out
-      const volume = sound.volume * globalVolumeRef.current
-      gainNode.gain.setValueAtTime(volume, ctx.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + sound.duration)
+      // Create and play the sound
+      const source = audioContextRef.current.createBufferSource()
+      const gainNode = audioContextRef.current.createGain()
       
-      // Connect nodes
-      oscillator.connect(gainNode)
-      gainNode.connect(ctx.destination)
+      source.buffer = audioBuffer
+      source.connect(gainNode)
+      gainNode.connect(audioContextRef.current.destination)
       
-      // Play sound
-      oscillator.start(ctx.currentTime)
-      oscillator.stop(ctx.currentTime + sound.duration)
+      gainNode.gain.value = globalVolumeRef.current
+      
+      source.start(0)
     } catch (error) {
       console.warn('Failed to play sound:', error)
     }
-  }, [isEnabled])
+  }, [isEnabled, modeSystem?.activeMinorModes])
 
   const setVolume = useCallback((volume: number) => {
     globalVolumeRef.current = Math.max(0, Math.min(1, volume))
+  }, [])
+
+  const setEnabled = useCallback((enabled: boolean) => {
+    setEnabledState(enabled)
   }, [])
 
   const value = {

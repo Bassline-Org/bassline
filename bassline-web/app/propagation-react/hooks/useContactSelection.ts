@@ -42,6 +42,7 @@ interface UseContactSelectionReturn {
 export function useContactSelection(): UseContactSelectionReturn {
   const { network, syncToReactFlow, selection, setSelection } = useNetworkContext()
   const { play: playInlineSound } = useSound('gadget/inline')
+  const { play: playExtractSound } = useSound('gadget/extract')
   
   // Get actual objects from selection IDs
   const selectedContacts = useMemo(() => {
@@ -170,17 +171,26 @@ export function useContactSelection(): UseContactSelectionReturn {
       return null
     }
     
+    // Calculate position based on selection bounds
+    const position = selectionBounds 
+      ? { 
+          x: selectionBounds.x + selectionBounds.width / 2, 
+          y: selectionBounds.y + selectionBounds.height + 50 // Place below selection
+        }
+      : { x: 400, y: 200 } // Fallback position
+    
     const operation = new ExtractToGadgetOperation()
     const result = operation.execute(
       network.currentGroup,
       selection,
       name,
-      { x: 400, y: 200 } // TODO: Calculate better position
+      position
     )
     
     if (result.success) {
       clearSelection()
       syncToReactFlow()
+      playExtractSound()
       
       // Find and return the newly created gadget
       return Array.from(network.currentGroup.subgroups.values())
@@ -188,7 +198,7 @@ export function useContactSelection(): UseContactSelectionReturn {
     }
     
     return null
-  }, [selection, network, clearSelection, syncToReactFlow])
+  }, [selection, network, clearSelection, syncToReactFlow, selectionBounds, playExtractSound])
   
   const inlineSelectedGadget = useCallback((): boolean => {
     if (selection.groups.size !== 1) return false

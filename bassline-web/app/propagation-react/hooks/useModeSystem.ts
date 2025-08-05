@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useNetworkContext } from '../contexts/NetworkContext'
 import { useContextSelection } from './useContextSelection'
 import { useModeSelection } from './useModeSelection'
+import { useSound } from '~/components/SoundSystem'
 import { 
   modeManager,
   createModeContext,
@@ -85,10 +86,12 @@ export interface UseModeSystemReturn {
 export function useModeSystem(): UseModeSystemReturn {
   const { network, syncToReactFlow } = useNetworkContext()
   const { selectContact, clearSelection } = useContextSelection()
+  const { play: playToolEnableSound } = useSound('ui/tool-enable')
+  const { play: playToolDisableSound } = useSound('ui/tool-disable')
   
   // Track current state
   const [currentMajorMode, setCurrentMajorMode] = useState<string | null>('edit')
-  const [activeMinorModes, setActiveMinorModes] = useState<string[]>([])
+  const [activeMinorModes, setActiveMinorModes] = useState<string[]>(['sound'])
   const [focus, setFocus] = useState<string | null>(null)
   const [interactionPoint, setInteractionPoint] = useState<InteractionPoint>(createDefaultInteractionPoint())
   const [viewState, setViewState] = useState<ViewState>(() => 
@@ -116,8 +119,13 @@ export function useModeSystem(): UseModeSystemReturn {
       ids.forEach(id => selectContact(id, false))
     },
     removeFromSelection: (ids: string[]) => {
-      // Need to implement in context selection
-      console.log('removeFromSelection not yet implemented', ids)
+      // TODO: Implement proper deselection
+      // For now, we'll clear and re-select everything except the removed IDs
+      const currentContactIds = Array.from(selection.contactIds)
+      const currentGroupIds = Array.from(selection.groupIds)
+      const newContactIds = currentContactIds.filter(id => !ids.includes(id))
+      const newGroupIds = currentGroupIds.filter(id => !ids.includes(id))
+      setSelection(newContactIds, newGroupIds)
     },
     clearSelection: () => clearSelection(),
     
@@ -130,8 +138,9 @@ export function useModeSystem(): UseModeSystemReturn {
       syncToReactFlow()
     },
     disconnect: (edgeId: string) => {
-      // Need to implement wire removal by ID
-      console.log('disconnect not yet implemented', edgeId)
+      // Edge IDs in React Flow are wire IDs
+      network.removeWire(edgeId)
+      syncToReactFlow()
     },
     setValue: (nodeId: string, value: any) => {
       const contact = network.currentGroup.contacts.get(nodeId)
@@ -208,8 +217,10 @@ export function useModeSystem(): UseModeSystemReturn {
     toggleMinorMode: (modeId: string) => {
       setActiveMinorModes(prev => {
         if (prev.includes(modeId)) {
+          playToolDisableSound()
           return prev.filter(id => id !== modeId)
         } else {
+          playToolEnableSound()
           return [...prev, modeId]
         }
       })
@@ -321,8 +332,10 @@ export function useModeSystem(): UseModeSystemReturn {
     toggleMinorMode: (modeId: string) => {
       setActiveMinorModes(prev => {
         if (prev.includes(modeId)) {
+          playToolDisableSound()
           return prev.filter(id => id !== modeId)
         } else {
+          playToolEnableSound()
           return [...prev, modeId]
         }
       })

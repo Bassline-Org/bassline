@@ -11,6 +11,8 @@ import { Toaster } from 'sonner';
 import type { Route } from "./+types/root";
 import "./app.css";
 
+// Preloading is now handled by the SoundSystemProvider
+
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -48,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               error: 'bg-white text-slate-900 border-red-200',
             }
           }}
-        />
+          />
         <ScrollRestoration />
         <Scripts />
       </body>

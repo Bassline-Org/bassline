@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { Button } from '~/components/ui/button'
 import { ChevronLeft, ChevronRight, Settings, Layers } from 'lucide-react'
-import { useContactSelection } from '~/propagation-react/hooks/useContactSelection'
 import { useContextSelection } from '~/propagation-react/hooks/useContextSelection'
 import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext'
 import { usePropertyPanelStack } from '~/propagation-react/contexts/PropertyPanelStackContext'
 import { PropertyPanelFrame } from './PropertyPanelFrame'
-import { ContactPropertySection, GroupPropertySection } from './PropertyPanelItem'
 import { cn } from '~/lib/utils'
-import { useURLState } from '~/propagation-react/hooks/useURLState'
 
 interface PropertyPanelProps {
   isVisible: boolean
@@ -19,14 +16,7 @@ interface PropertyPanelProps {
 export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: PropertyPanelProps) {
   const { selectedContacts, selectedGroups } = useContextSelection() // Use context selection
   const { setHighlightedNodeId } = useNetworkContext()
-  const { frames, currentFrame, pushFrame, popFrame, popToFrame, clearFrames } = usePropertyPanelStack()
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
-  const [focusedItemId, setFocusedItemId] = useState<string | null>(null)
-  const { urlState } = useURLState()
-  
-  // Check if we're in property mode from URL
-  const isPropertyMode = urlState.mode === 'property'
-  const nodeIdFromUrl = urlState.nodeId
+  const { frames, currentFrame, pushFrame, popToFrame, clearFrames } = usePropertyPanelStack()
   
   
   // Update base frame when selection changes
@@ -64,10 +54,8 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
           })
         }
       }
-    } else if (totalSelected === 0) {
-      // Clear frames when nothing selected
-      clearFrames()
     }
+    // Don't clear frames when nothing is selected - property panel can show mode-specific options
   }, [selectedContacts, selectedGroups, pushFrame, clearFrames])
 
   // Update highlighted node based on current frame
@@ -104,19 +92,6 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
     }
   }, [shouldFocus, frames, currentFrame, selectedContacts, selectedGroups, pushFrame])
 
-  const toggleExpanded = (itemId: string) => {
-    const newExpanded = new Set(expandedItems)
-    if (newExpanded.has(itemId)) {
-      newExpanded.delete(itemId)
-      if (focusedItemId === itemId) {
-        setFocusedItemId(null)
-      }
-    } else {
-      newExpanded.add(itemId)
-      setFocusedItemId(itemId)
-    }
-    setExpandedItems(newExpanded)
-  }
 
   if (!isVisible) {
     return (
@@ -164,7 +139,6 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
           <div className="relative h-full">
             {/* Render visible frames (max 3) */}
             {frames.slice(-3).map((frame, index) => {
-              const visibleDepth = Math.max(0, frames.length - 3) + index
               const isTop = index === frames.slice(-3).length - 1
               
               return (

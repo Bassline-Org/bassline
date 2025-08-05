@@ -11,73 +11,38 @@ export class SoundMode extends MinorModeBase {
   icon = '🔊'
   description = 'Audio feedback for actions'
   
-  // In real implementation, would use the actual sound system
-  private sounds = {
-    connect: 440, // Hz
-    disconnect: 220,
-    create: 523,
-    delete: 261,
-    move: 330,
-    select: 587
+  // Sound mappings to SoundSystem sound names
+  private soundMap = {
+    connect: 'connection/create',
+    disconnect: 'connection/delete',
+    create: 'node/create',
+    delete: 'node/delete',
+    move: 'node/select',
+    select: 'node/select',
+    enterGadget: 'gadget/enter',
+    exitGadget: 'gadget/exit',
+    createGadget: 'gadget/create',
+    deleteGadget: 'gadget/delete',
+    inlineGadget: 'gadget/inline'
   }
   
   onEnable(_context: ModeContext): void {
-    // Could play a "mode enabled" sound
-    this.playSound(this.sounds.select, 0.1)
+    // Mode enabled - sound system will handle playing sounds
+    // The sound system checks if this mode is active before playing
   }
   
   onDisable(_context: ModeContext): void {
-    // Could play a "mode disabled" sound
-    this.playSound(this.sounds.disconnect, 0.1)
+    // Mode disabled - sounds will stop playing automatically
   }
   
   afterCommand(command: Command, _result: any, _context: ModeContext): void {
-    // Play sounds based on command type
-    switch (command.type) {
-      case 'connect':
-        this.playSound(this.sounds.connect, 0.2)
-        break
-      case 'disconnect':
-        this.playSound(this.sounds.disconnect, 0.2)
-        break
-      case 'createNode':
-        this.playSound(this.sounds.create, 0.2)
-        break
-      case 'deleteNode':
-        this.playSound(this.sounds.delete, 0.2)
-        break
-      case 'moveNode':
-        // Debounce move sounds to avoid spam
-        this.playSound(this.sounds.move, 0.05)
-        break
-      case 'select':
-      case 'addToSelection':
-        this.playSound(this.sounds.select, 0.1)
-        break
-    }
+    // Sound playing is handled by the components themselves
+    // The SoundSystem checks if this mode is active
+    // This method is kept for potential future enhancements
   }
   
-  private playSound(frequency: number, duration: number): void {
-    // Simplified sound generation
-    // In real implementation would use the SoundSystem
-    if (typeof window === 'undefined' || !window.AudioContext) return
-    
-    try {
-      const audioContext = new AudioContext()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-      
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-      
-      oscillator.frequency.value = frequency
-      gainNode.gain.setValueAtTime(0.1, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration)
-      
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + duration)
-    } catch (e) {
-      // Ignore audio errors
-    }
-  }
+  // Note: The actual sound playing is handled by the SoundSystem
+  // which checks if this mode is active before playing any sounds.
+  // Components use the useSoundSystem hook to play sounds,
+  // and the SoundSystem automatically checks modeSystem.activeMinorModes
 }

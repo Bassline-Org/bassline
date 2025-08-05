@@ -22,10 +22,10 @@ export function useContextFrame() {
     // Context stack - deprecated, return minimal values
     contextStack: [],
     currentContext: null,
-    pushContext: () => console.warn('Context stack is deprecated'),
-    popContext: () => console.warn('Context stack is deprecated'),
+    pushContext: () => { /* deprecated - no-op */ },
+    popContext: () => { /* deprecated - no-op */ },
     
     // View state - deprecated
-    updateViewState: () => console.warn('View state is deprecated'),
+    updateViewState: () => { /* deprecated - no-op */ },
   }
 }

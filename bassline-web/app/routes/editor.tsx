@@ -39,7 +39,7 @@ import { ValenceModeEdge } from "~/components/edges/ValenceModeEdge";
 import type { GadgetTemplate } from "~/propagation-core/types/template";
 import type { Position } from "~/propagation-core";
 import { useNetworkContext } from "~/propagation-react/contexts/NetworkContext";
-import { SoundSystemProvider } from "~/components/SoundSystem";
+import { SoundSystemProvider, useSound } from "~/components/SoundSystem";
 import { StackDebugger } from "~/components/StackDebugger";
 import { ContextDebugger } from "~/components/ContextDebugger";
 import { MinorModesOverlay } from "~/components/MinorModesOverlay";
@@ -146,6 +146,7 @@ function Flow() {
   const { screenToFlowPosition } = useReactFlow();
   const loaderData = useLoaderData<typeof clientLoader>();
   const fetcher = useFetcher();
+  const { play: playPublishSound } = useSound('special/publish');
   
   // Mode system
   const modeSystem = useModeContext();
@@ -371,12 +372,14 @@ function Flow() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
+      // Play publish sound
+      playPublishSound();
       toast.success(`Saved: ${name}.json`, { duration: 2000 });
     } catch (error) {
       console.error('Failed to save bassline:', error);
       toast.error('Failed to save', { duration: 2000 });
     }
-  }, [network]);
+  }, [network, playPublishSound]);
 
   // Selection handlers
   const handleSelectAll = useCallback(() => {
@@ -633,6 +636,24 @@ function Flow() {
       // V for valence mode is now handled by the mode system
       // The ValenceMode minor mode handles the 'v' key
 
+      // C for contact
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "c") {
+        e.preventDefault();
+        handleAddContact();
+      }
+
+      // I for input boundary
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "i") {
+        e.preventDefault();
+        handleAddInputBoundary();
+      }
+
+      // O for output boundary  
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key === "o") {
+        e.preventDefault();
+        handleAddOutputBoundary();
+      }
+
       // Cmd/Ctrl+A for select all
       if ((e.metaKey || e.ctrlKey) && e.key === "a") {
         e.preventDefault();
@@ -670,6 +691,9 @@ function Flow() {
     toggleMode,
     handleSelectAll,
     handleDeselectAll,
+    handleAddContact,
+    handleAddInputBoundary,
+    handleAddOutputBoundary,
   ]);
 
   // Handle node drag with proximity connect
@@ -829,20 +853,6 @@ function Flow() {
             onToggleMinorMode={modeSystem.toggleMinorMode}
           />
           <div className="flex gap-2">
-            <Button
-              onClick={handleAddInputBoundary}
-              size="sm"
-              variant="outline"
-            >
-              Add Input Boundary
-            </Button>
-            <Button
-              onClick={handleAddOutputBoundary}
-              size="sm"
-              variant="outline"
-            >
-              Add Output Boundary
-            </Button>
             <Button 
               onClick={handleSaveBassline} 
               size="sm" 
@@ -895,20 +905,6 @@ function Flow() {
                   </Button>
                 </>
               )}
-              {(selection.contacts.size > 0 || selection.groups.size > 0) && currentMode !== 'valence' && (
-                <Button
-                  onClick={() => {
-                    // Convert Set values to array of IDs
-                    const selectedIds = [...Array.from(selection.contacts), ...Array.from(selection.groups)];
-                    enterValenceMode(selectedIds);
-                  }}
-                  size="sm"
-                  variant="default"
-                  title="Enter valence mode to connect selected items (V)"
-                >
-                  Valence Mode
-                </Button>
-              )}
               {selection.contacts.size > 0 && selection.groups.size === 0 && (
                 <Button
                   onClick={handleConvertToBoundary}
@@ -937,6 +933,9 @@ function Flow() {
               <div>T → Toggle properties</div>
               <div>L → Auto layout</div>
               <div>V → Valence mode (select first)</div>
+              <div>C → Add contact</div>
+              <div>I → Add input boundary</div>
+              <div>O → Add output boundary</div>
             </div>
           )}
         </Panel>
@@ -1050,13 +1049,13 @@ export default function Editor() {
         <PropertyPanelStackProvider>
           <ReactFlowProvider>
             <EditorStateProvider>
-              <ModeSystemProvider>
-                <ClientOnly>
-                  <SoundSystemProvider>
+              <ClientOnly>
+                <SoundSystemProvider>
+                  <ModeSystemProvider>
                     <Flow />
-                  </SoundSystemProvider>
-                </ClientOnly>
-              </ModeSystemProvider>
+                  </ModeSystemProvider>
+                </SoundSystemProvider>
+              </ClientOnly>
             </EditorStateProvider>
           </ReactFlowProvider>
         </PropertyPanelStackProvider>

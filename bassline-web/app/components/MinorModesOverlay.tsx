@@ -27,7 +27,9 @@ export function MinorModesOverlay() {
             "bg-gray-800/90 backdrop-blur text-white",
             "border border-gray-700",
             "text-sm font-medium",
-            "animate-in fade-in slide-in-from-right-2 duration-200"
+            "animate-in fade-in slide-in-from-right-2 duration-200",
+            // Add pulsing animation for sound mode
+            mode.id === 'sound' && "animate-pulse"
           )}
         >
           <span className="text-base">{mode.icon}</span>
@@ -35,6 +37,11 @@ export function MinorModesOverlay() {
           {mode.id === 'valence' && (
             <span className="text-xs text-gray-400 ml-1">
               Press V to exit
+            </span>
+          )}
+          {mode.id === 'sound' && (
+            <span className="text-xs text-gray-400 ml-1">
+              🎵 Active
             </span>
           )}
         </div>

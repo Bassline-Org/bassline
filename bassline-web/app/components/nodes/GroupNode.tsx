@@ -25,6 +25,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const { urlState } = useURLState();
   const fetcher = useFetcher();
   const { play: playConnectionSound } = useSound('connection/create');
+  const { play: playCelebrationSound } = useSound('special/celebrate');
   const modeSystem = useModeContext();
   
   // Get visual class from mode system
@@ -115,8 +116,14 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
       
       // Play connection sounds
       if (result.connectionCount) {
-        for (let i = 0; i < result.connectionCount; i++) {
-          setTimeout(() => playConnectionSound(), i * 50);
+        if (result.connectionCount > 3) {
+          // Play celebration sound for many connections
+          playCelebrationSound();
+        } else {
+          // Play individual connection sounds
+          for (let i = 0; i < result.connectionCount; i++) {
+            setTimeout(() => playConnectionSound(), i * 50);
+          }
         }
       }
     } else {
@@ -132,7 +139,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
       },
       { method: 'post' }
     );
-  }, [id, isValenceCompatible, selectedContacts, selectedGroups, network, syncToReactFlow, playConnectionSound, fetcher]);
+  }, [id, isValenceCompatible, selectedContacts, selectedGroups, network, syncToReactFlow, playConnectionSound, playCelebrationSound, fetcher]);
   
   // Define mode behaviors
   const modeBehaviors: Record<string, ModeBehavior> = {

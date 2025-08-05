@@ -33,12 +33,6 @@ export function useEditorSelection() {
   
   // Selection actions
   const selectContact = (contactId: string, exclusive = true) => {
-    console.log('[useEditorSelection] selectContact:', {
-      contactId,
-      exclusive,
-      timestamp: Date.now()
-    })
-    
     if (exclusive) {
       setSelection([contactId], [])
     } else {

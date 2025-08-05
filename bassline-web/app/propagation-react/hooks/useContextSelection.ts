@@ -9,28 +9,32 @@ export function useContextSelection() {
   const { network } = useNetworkContext()
   
   
-  // Get actual Contact and Group objects from IDs
+  // Get actual Contact and Group objects from IDs, preserving selection order
   const selectedContacts = useMemo(() => {
     const contacts: Contact[] = []
-    for (const id of selection.contactIds) {
+    // Use ordered arrays if available, fallback to set iteration
+    const orderedIds = (selection as any).orderedContactIds || Array.from(selection.contactIds)
+    for (const id of orderedIds) {
       const contact = network.currentGroup.contacts.get(id)
       if (contact) {
         contacts.push(contact)
       }
     }
     return contacts
-  }, [selection.contactIds, network.currentGroup])
+  }, [selection, network.currentGroup])
   
   const selectedGroups = useMemo(() => {
     const groups: ContactGroup[] = []
-    for (const id of selection.groupIds) {
+    // Use ordered arrays if available, fallback to set iteration
+    const orderedIds = (selection as any).orderedGroupIds || Array.from(selection.groupIds)
+    for (const id of orderedIds) {
       const group = network.currentGroup.subgroups.get(id)
       if (group) {
         groups.push(group)
       }
     }
     return groups
-  }, [selection.groupIds, network.currentGroup])
+  }, [selection, network.currentGroup])
   
   // Selection actions
   const selectContact = (contactId: string, exclusive = true) => {

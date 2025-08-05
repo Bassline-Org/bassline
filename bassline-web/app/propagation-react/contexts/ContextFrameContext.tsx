@@ -57,11 +57,6 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
   
   const [contextStack, setContextStack] = useState<ContextFrame[]>(() => {
     const initialContext = createContext(network.rootGroup.id)
-    console.log('[ContextFrameContext] Initial context created:', {
-      contextId: initialContext.id,
-      groupId: initialContext.groupId,
-      timestamp: Date.now()
-    })
     return [initialContext]
   })
   
@@ -89,18 +84,7 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
   
   // Selection management
   const setSelection = useCallback((contactIds: string[], groupIds: string[]) => {
-    console.log('[ContextFrameContext] setSelection called:', {
-      contactIds,
-      groupIds,
-      currentContext: !!currentContext,
-      currentContextId: currentContext?.id,
-      contextStackLength: contextStack.length,
-      timestamp: Date.now(),
-      stack: new Error().stack
-    })
-    
     if (!currentContext) {
-      console.error('[ContextFrameContext] No current context! Stack:', contextStack)
       return
     }
     
@@ -116,13 +100,6 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
         !groupIds.every(id => oldCtx.selection.groupIds.has(id))
       
       if (contactsChanged || groupsChanged) {
-        console.log('[ContextFrame] Selection changed:', {
-          before: { contacts: oldCtx.selection.contactIds.size, groups: oldCtx.selection.groupIds.size },
-          after: { contacts: contactIds.length, groups: groupIds.length },
-          contactIds,
-          groupIds
-        })
-        
         // Create a new context object to ensure React detects the change
         newStack[lastIndex] = {
           ...oldCtx,
@@ -191,10 +168,6 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
   }, [currentContext])
   
   const clearSelection = useCallback(() => {
-    console.log('[ContextFrameContext] clearSelection called:', {
-      timestamp: Date.now(),
-      stack: new Error().stack
-    })
     setSelection([], [])
   }, [setSelection])
   
@@ -267,16 +240,6 @@ export function ContextFrameProvider({ children }: ContextFrameProviderProps) {
   }, [network.currentGroup.id, currentContext, contextStack, createContext, pushContext])
   
   const value: ContextFrameContextValue = useMemo(() => {
-    console.log('[ContextFrameContext] Creating context value:', {
-      hasCurrentContext: !!currentContext,
-      currentContextId: currentContext?.id,
-      selectionSize: currentContext ? {
-        contacts: currentContext.selection.contactIds.size,
-        groups: currentContext.selection.groupIds.size
-      } : null,
-      timestamp: Date.now()
-    })
-    
     return {
       contextStack,
       currentContext,

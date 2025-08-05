@@ -20,7 +20,6 @@ export class ReadMode extends MajorModeBase {
   private inspectingNodeId: string | null = null
   
   onActivate(context: ModeContext): void {
-    console.log('[ReadMode] onActivate called')
     // Clear selection and annotations
     context.commands.clearSelection()
     context.annotations.clearAll()
