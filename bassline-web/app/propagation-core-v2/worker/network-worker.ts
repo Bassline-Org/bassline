@@ -5,6 +5,11 @@ console.log('[Worker] Network worker starting...')
 import { createImmediateScheduler } from '../schedulers/immediate'
 import { createBatchScheduler } from '../schedulers/batch'
 import { getPrimitiveGadget } from '../primitives'
+import { extractToGroup } from '../refactoring/operations/extract-to-group'
+import { inlineGroup } from '../refactoring/operations/inline-group'
+import { copyContacts } from '../refactoring/operations/copy-contacts'
+import { copyGroup } from '../refactoring/operations/copy-group'
+import { copySelection } from '../refactoring/operations/copy-selection'
 import type { 
   PropagationNetworkScheduler,
   Change,
@@ -135,6 +140,15 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       
       case 'ADD_GROUP': {
         const { parentId, group } = request.payload
+        
+        // If the group has a primitive ID, resolve it to the actual primitive
+        if ('primitiveId' in group && group.primitiveId) {
+          const primitive = getPrimitiveGadget(group.primitiveId)
+          if (primitive) {
+            group.primitive = primitive
+          }
+        }
+        
         const groupId = await scheduler.addGroup(parentId, group)
         response.data = { groupId }
         break
@@ -182,10 +196,10 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       
       case 'GET_STATE': {
         const { groupId } = request.payload
-        const state = await scheduler.getState(groupId)
+        const groupState = await scheduler.getState(groupId)
         
         // Remove primitive functions before serialization
-        const groupData: any = { ...state.group }
+        const groupData: any = { ...groupState.group }
         if (groupData.primitive) {
           // Only send the primitive ID, not the functions
           groupData.primitiveId = groupData.primitive.id
@@ -193,10 +207,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         }
         
         // Convert Maps to arrays for serialization
+        
         response.data = {
           group: groupData,
-          contacts: Array.from(state.contacts.entries()),
-          wires: Array.from(state.wires.entries())
+          contacts: Array.from(groupState.contacts.entries()),
+          wires: Array.from(groupState.wires.entries())
         }
         break
       }
@@ -215,10 +230,59 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         break
       }
       
+      case 'APPLY_REFACTORING': {
+        const { operation, params } = request.payload
+        console.log(`[Worker] Applying refactoring: ${operation}`, params)
+        
+        // Check if scheduler supports state import/export
+        const exportStateFn = scheduler.exportState?.bind(scheduler)
+        const importStateFn = scheduler.importState?.bind(scheduler)
+        
+        if (!exportStateFn || !importStateFn) {
+          throw new Error('Scheduler does not support state import/export')
+        }
+        
+        // Export current state
+        const currentState = await exportStateFn()
+        
+        // Apply the refactoring operation
+        let result
+        switch (operation) {
+          case 'extract-to-group':
+            result = extractToGroup(currentState, params)
+            break
+          case 'inline-group':
+            result = inlineGroup(currentState, params)
+            break
+          case 'copy-contacts':
+            result = copyContacts(currentState, params)
+            break
+          case 'copy-group':
+            result = copyGroup(currentState, params)
+            break
+          case 'copy-selection':
+            result = copySelection(currentState, params)
+            break
+          default:
+            throw new Error(`Unknown refactoring operation: ${operation}`)
+        }
+        
+        // Import the new state
+        await importStateFn(result.state)
+        
+        // Return the changes for UI updates
+        response.data = {
+          success: true,
+          changes: result.changes
+        }
+        break
+      }
+      
       default:
         throw new Error(`Unknown request type: ${request.type}`)
     }
   } catch (error) {
+    console.error(`[Worker] Error handling ${request.type}:`, error)
     response.type = 'error'
     response.error = error instanceof Error ? error.message : String(error)
   }

@@ -68,13 +68,23 @@ export function DemoContactNode({ id, data }: DemoContactNodeProps) {
     )
   }
   
+  // Check if this is a boundary contact in a primitive gadget
+  const isGadgetBoundary = contact.isBoundary && data.isGadget
+  
   return (
-    <div className="bg-white border-2 border-blue-300 rounded-lg p-3 min-w-32 shadow-sm">
+    <div className={`border-2 rounded-lg p-3 min-w-32 shadow-sm ${
+      isGadgetBoundary 
+        ? 'bg-purple-50 border-purple-400' 
+        : contact.blendMode === 'merge'
+        ? 'bg-green-50 border-green-400'
+        : 'bg-white border-blue-300'
+    }`}>
       <Handle type="target" position={Position.Left} />
       
       <div className="text-center">
         <div className="text-xs text-gray-500 mb-1">
           {contact.blendMode} | {contact.id.slice(0, 6)}
+          {isGadgetBoundary && ' | gadget'}
         </div>
         
         {isEditing ? (

@@ -35,7 +35,9 @@ export async function clientLoader() {
       contacts: groupState.contacts.size,
       wires: groupState.wires.size,
       contactsArray: Array.from(groupState.contacts.values()),
-      wiresArray: Array.from(groupState.wires.values())
+      wiresArray: Array.from(groupState.wires.values()),
+      group: groupState.group,
+      subgroupIds: groupState.group.subgroupIds
     })
     
     return {

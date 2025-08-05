@@ -35,30 +35,21 @@ describe('Primitive Gadget Propagation', () => {
     const rootState = await scheduler.getState('root')
     rootState.group.subgroupIds.push('add-gadget')
     
-    // Create boundary contacts for the gadget
-    const inputA = await scheduler.addContact('add-gadget', {
-      groupId: 'add-gadget',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input',
-      name: 'a'
+    // Get the auto-created boundary contacts
+    const gadgetState = await scheduler.getState('add-gadget')
+    let inputA: string | undefined
+    let inputB: string | undefined
+    let outputSum: string | undefined
+    
+    gadgetState.contacts.forEach((contact, id) => {
+      if (contact.isBoundary && contact.name === 'a') inputA = id
+      if (contact.isBoundary && contact.name === 'b') inputB = id
+      if (contact.isBoundary && contact.name === 'sum') outputSum = id
     })
     
-    const inputB = await scheduler.addContact('add-gadget', {
-      groupId: 'add-gadget',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input',
-      name: 'b'
-    })
-    
-    const outputSum = await scheduler.addContact('add-gadget', {
-      groupId: 'add-gadget',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'output',
-      name: 'sum'
-    })
+    if (!inputA || !inputB || !outputSum) {
+      throw new Error('Boundary contacts not found')
+    }
     
     // Create external contacts in root
     const sourceA = await scheduler.addContact('root', {
@@ -116,30 +107,21 @@ describe('Primitive Gadget Propagation', () => {
       primitive: multiplyGadget
     })
     
-    // Create boundary contacts
-    const inputA = await scheduler.addContact('multiply-gadget', {
-      groupId: 'multiply-gadget',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input',
-      name: 'a'
+    // Get the auto-created boundary contacts
+    const gadgetState = await scheduler.getState('multiply-gadget')
+    let inputA: string | undefined
+    let inputB: string | undefined
+    let outputProduct: string | undefined
+    
+    gadgetState.contacts.forEach((contact, id) => {
+      if (contact.isBoundary && contact.name === 'a') inputA = id
+      if (contact.isBoundary && contact.name === 'b') inputB = id
+      if (contact.isBoundary && contact.name === 'product') outputProduct = id
     })
     
-    const inputB = await scheduler.addContact('multiply-gadget', {
-      groupId: 'multiply-gadget',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input',
-      name: 'b'
-    })
-    
-    const outputProduct = await scheduler.addContact('multiply-gadget', {
-      groupId: 'multiply-gadget',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'output',
-      name: 'product'
-    })
+    if (!inputA || !inputB || !outputProduct) {
+      throw new Error('Boundary contacts not found')
+    }
     
     // Create source and result
     const sourceA = await scheduler.addContact('root', {
@@ -215,49 +197,37 @@ describe('Primitive Gadget Propagation', () => {
       primitive: addGadget
     })
     
-    // Create boundary contacts for first gadget
-    const add1_a = await scheduler.addContact('add1', {
-      groupId: 'add1',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input'
+    // Get the auto-created boundary contacts for first gadget
+    const add1State = await scheduler.getState('add1')
+    let add1_a: string | undefined
+    let add1_b: string | undefined
+    let add1_sum: string | undefined
+    
+    add1State.contacts.forEach((contact, id) => {
+      if (contact.isBoundary && contact.name === 'a') add1_a = id
+      if (contact.isBoundary && contact.name === 'b') add1_b = id
+      if (contact.isBoundary && contact.name === 'sum') add1_sum = id
     })
     
-    const add1_b = await scheduler.addContact('add1', {
-      groupId: 'add1',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input'
+    if (!add1_a || !add1_b || !add1_sum) {
+      throw new Error('Add1 boundary contacts not found')
+    }
+    
+    // Get the auto-created boundary contacts for second gadget
+    const add2State = await scheduler.getState('add2')
+    let add2_a: string | undefined
+    let add2_b: string | undefined
+    let add2_sum: string | undefined
+    
+    add2State.contacts.forEach((contact, id) => {
+      if (contact.isBoundary && contact.name === 'a') add2_a = id
+      if (contact.isBoundary && contact.name === 'b') add2_b = id
+      if (contact.isBoundary && contact.name === 'sum') add2_sum = id
     })
     
-    const add1_sum = await scheduler.addContact('add1', {
-      groupId: 'add1',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'output'
-    })
-    
-    // Create boundary contacts for second gadget
-    const add2_a = await scheduler.addContact('add2', {
-      groupId: 'add2',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input'
-    })
-    
-    const add2_b = await scheduler.addContact('add2', {
-      groupId: 'add2',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input'
-    })
-    
-    const add2_sum = await scheduler.addContact('add2', {
-      groupId: 'add2',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'output'
-    })
+    if (!add2_a || !add2_b || !add2_sum) {
+      throw new Error('Add2 boundary contacts not found')
+    }
     
     // Create sources
     const a = await scheduler.addContact('root', {
@@ -325,27 +295,21 @@ describe('Primitive Gadget Propagation', () => {
       primitive: gateGadget
     })
     
-    // Create boundary contacts
-    const gateValue = await scheduler.addContact('gate1', {
-      groupId: 'gate1',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input'
+    // Get the auto-created boundary contacts
+    const gateState = await scheduler.getState('gate1')
+    let gateValue: string | undefined
+    let gateCondition: string | undefined
+    let gateOutput: string | undefined
+    
+    gateState.contacts.forEach((contact, id) => {
+      if (contact.isBoundary && contact.name === 'value') gateValue = id
+      if (contact.isBoundary && contact.name === 'condition') gateCondition = id
+      if (contact.isBoundary && contact.name === 'output') gateOutput = id
     })
     
-    const gateCondition = await scheduler.addContact('gate1', {
-      groupId: 'gate1',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'input'
-    })
-    
-    const gateOutput = await scheduler.addContact('gate1', {
-      groupId: 'gate1',
-      blendMode: 'accept-last',
-      isBoundary: true,
-      boundaryDirection: 'output'
-    })
+    if (!gateValue || !gateCondition || !gateOutput) {
+      throw new Error('Gate boundary contacts not found')
+    }
     
     // Create sources
     const value = await scheduler.addContact('root', {

@@ -1,4 +1,5 @@
 import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
+import { grow } from '~/propagation-core-v2/mergeable'
 
 // Singleton instance
 let networkClient: NetworkClient | null = null
@@ -10,8 +11,22 @@ let networkClient: NetworkClient | null = null
 export function getNetworkClient(): NetworkClient {
   if (!networkClient) {
     networkClient = new NetworkClient({
-      onReady: () => {
+      onReady: async () => {
         console.log('Network client ready')
+        // Ensure root group exists
+        try {
+          await networkClient!.registerGroup({
+            id: 'root',
+            name: 'Root Group',
+            contactIds: [],
+            wireIds: [],
+            subgroupIds: [],
+            boundaryContactIds: []
+          })
+          console.log('Root group created')
+        } catch (e) {
+          console.log('Root group already exists')
+        }
       },
       onChanges: (changes) => {
         console.log('Network changes:', changes)
@@ -70,90 +85,58 @@ export async function initializeDemoNetwork(): Promise<string> {
     groupId: demoGroupId
   })
   
-  // Create an adder gadget
-  const adderGroupId = await client.addGroup(demoGroupId, {
-    name: 'Adder',
-    primitive: {
-      id: 'add',
-      // The primitive function is resolved in the worker
-    }
-  })
+  // For now, let's create a simpler demo without gadgets
+  // Just show basic propagation and merge behavior
   
-  // Create boundary contacts for the adder
-  const adderInput1 = await client.addContact(adderGroupId, {
-    content: 0,
+  // Create a contact that will propagate to others
+  const sourceContact = await client.addContact(demoGroupId, {
+    content: 10,
     blendMode: 'accept-last',
-    groupId: adderGroupId,
-    isBoundary: true
+    groupId: demoGroupId
   })
   
-  const adderInput2 = await client.addContact(adderGroupId, {
-    content: 0,
-    blendMode: 'accept-last',
-    groupId: adderGroupId,
-    isBoundary: true
-  })
-  
-  const adderOutput = await client.addContact(adderGroupId, {
-    content: 0,
-    blendMode: 'accept-last',
-    groupId: adderGroupId,
-    isBoundary: true
-  })
-  
-  // Create a multiplier gadget
-  const multiplierGroupId = await client.addGroup(demoGroupId, {
-    name: 'Multiplier',
-    primitive: {
-      id: 'multiply',
-    }
-  })
-  
-  // Create boundary contacts for the multiplier
-  const multInput1 = await client.addContact(multiplierGroupId, {
-    content: 0,
-    blendMode: 'accept-last',
-    groupId: multiplierGroupId,
-    isBoundary: true
-  })
-  
-  const multInput2 = await client.addContact(multiplierGroupId, {
-    content: 2,
-    blendMode: 'accept-last',
-    groupId: multiplierGroupId,
-    isBoundary: true
-  })
-  
-  const multOutput = await client.addContact(multiplierGroupId, {
-    content: 0,
-    blendMode: 'accept-last',
-    groupId: multiplierGroupId,
-    isBoundary: true
-  })
-  
-  // Create a contact with merge blend mode to demonstrate merging
-  const mergeContact = await client.addContact(demoGroupId, {
-    content: createGrowSet([10, 20]),
+  // Create a merge contact to demonstrate GrowSet merging
+  const mergeContact1 = await client.addContact(demoGroupId, {
+    content: grow.set([1, 2, 3]),
     blendMode: 'merge',
     groupId: demoGroupId
   })
   
+  const mergeContact2 = await client.addContact(demoGroupId, {
+    content: grow.set([3, 4, 5]),
+    blendMode: 'merge',
+    groupId: demoGroupId
+  })
+  
+  // Create contacts to demonstrate propagation
+  const targetContact1 = await client.addContact(demoGroupId, {
+    content: 0,
+    blendMode: 'accept-last',
+    groupId: demoGroupId
+  })
+  
+  const targetContact2 = await client.addContact(demoGroupId, {
+    content: 0,
+    blendMode: 'accept-last',
+    groupId: demoGroupId
+  })
+  
   // Wire up the network
-  // Connect inputs to adder
-  await client.connect(input1Id, adderInput1, 'directed')
-  await client.connect(input2Id, adderInput2, 'directed')
+  // Source propagates to targets
+  await client.connect(sourceContact, targetContact1, 'directed')
+  await client.connect(sourceContact, targetContact2, 'bidirectional')
   
-  // Connect adder output to multiplier input
-  await client.connect(adderOutput, multInput1, 'directed')
+  // Connect the merge contacts to demonstrate merge behavior
+  await client.connect(mergeContact1, mergeContact2, 'bidirectional')
   
-  // Also connect input1 to merge contact
-  await client.connect(input1Id, mergeContact, 'directed')
-  
-  // Connect multiplier output to merge contact
-  await client.connect(multOutput, mergeContact, 'directed')
+  // Connect source to one of the merge contacts
+  await client.connect(sourceContact, mergeContact1, 'directed')
   
   console.log('Demo network initialized with group:', demoGroupId)
-  console.log('Created contacts:', [contact1Id, contact2Id, contact3Id])
+  console.log('Created demo with:')
+  console.log('- Source contact:', sourceContact)
+  console.log('- Target contacts:', [targetContact1, targetContact2])
+  console.log('- Merge contacts:', [mergeContact1, mergeContact2])
   
   // Store the demo group ID to prevent re-initialization
   currentDemoGroupId = demoGroupId

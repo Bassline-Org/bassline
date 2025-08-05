@@ -42,16 +42,60 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
       const relevantChanges = changes.filter(change => {
         // Check if change affects this group
         switch (change.type) {
-          case 'contact-updated':
-          case 'contact-removed':
-          case 'wire-added':
-          case 'wire-removed':
-            const changeGroupId = (change.data as any).groupId
-            console.log(`[useGroupState] Change ${change.type} has groupId: ${changeGroupId}, looking for: ${groupId}`)
-            return changeGroupId === groupId
-          case 'group-updated':
-            return (change.data as any).groupId === groupId
+          case 'contact-added': {
+            // Data: { ...contact, groupId }
+            const data = change.data as { groupId: string }
+            console.log(`[useGroupState] Contact added in group ${data.groupId}, looking for: ${groupId}`)
+            return data.groupId === groupId
+          }
+          case 'contact-updated': {
+            // Data: { contactId, groupId, updates }
+            const data = change.data as { groupId: string }
+            console.log(`[useGroupState] Contact updated in group ${data.groupId}, looking for: ${groupId}`)
+            return data.groupId === groupId
+          }
+          case 'contact-removed': {
+            // Data: { contactId, groupId }
+            const data = change.data as { contactId: string; groupId: string }
+            console.log(`[useGroupState] Contact removed from group ${data.groupId}, looking for: ${groupId}`)
+            return data.groupId === groupId
+          }
+          case 'wire-added': {
+            // Data: { ...wire, groupId }
+            const data = change.data as { groupId: string }
+            console.log(`[useGroupState] Wire added in group ${data.groupId}, looking for: ${groupId}`)
+            return data.groupId === groupId
+          }
+          case 'wire-removed': {
+            // Data: { wireId, groupId }
+            const data = change.data as { wireId: string; groupId: string }
+            console.log(`[useGroupState] Wire removed from group ${data.groupId}, looking for: ${groupId}`)
+            return data.groupId === groupId
+          }
+          case 'group-updated': {
+            // Data: { groupId, group }
+            const data = change.data as { groupId: string }
+            console.log(`[useGroupState] Group updated: ${data.groupId}, looking for: ${groupId}`)
+            return data.groupId === groupId
+          }
+          case 'group-added': {
+            // Data: group object with parentId
+            const newGroup = change.data as Group
+            console.log(`[useGroupState] Group added with parentId: ${newGroup.parentId}, looking for: ${groupId}`)
+            // This is relevant if a subgroup was added to our group
+            return newGroup.parentId === groupId
+          }
+          case 'group-removed': {
+            // Data: { groupId }
+            const data = change.data as { groupId: string }
+            // Need to check if this was a subgroup of our group
+            // For now, we'll refresh if any group is removed to be safe
+            // TODO: Track parent-child relationships better
+            console.log(`[useGroupState] Group removed: ${data.groupId}`)
+            return true // Refresh to be safe
+          }
           default:
+            console.warn(`[useGroupState] Unknown change type: ${(change as any).type}`)
             return false
         }
       })
@@ -87,7 +131,7 @@ export function useContact(contactId: string, initialContact?: Contact) {
     if (!initialContact) {
       client.getContact(contactId)
         .then(contactData => {
-          setContact(contactData)
+          setContact(contactData || null)
           setLoading(false)
         })
         .catch(err => {
@@ -113,7 +157,7 @@ export function useContact(contactId: string, initialContact?: Contact) {
         } else {
           // Fallback: refetch contact data
           client.getContact(contactId)
-            .then(setContact)
+            .then(contactData => setContact(contactData || null))
             .catch(setError)
         }
       }
@@ -154,12 +198,18 @@ export function useGroupContacts(groupId: string, initialContacts?: Contact[]) {
     
     // Subscribe to contact changes in this group
     const unsubscribe = client.subscribe((changes: Change[]) => {
-      const groupChanges = changes.filter(change => 
-        (change.type === 'contact-updated' || 
-         change.type === 'contact-added' || 
-         change.type === 'contact-removed') &&
-        (change.data as any).groupId === groupId
-      )
+      const groupChanges = changes.filter(change => {
+        switch (change.type) {
+          case 'contact-added':
+          case 'contact-updated':
+          case 'contact-removed': {
+            const data = change.data as { groupId: string }
+            return data.groupId === groupId
+          }
+          default:
+            return false
+        }
+      })
       
       if (groupChanges.length > 0) {
         // Refresh contacts list

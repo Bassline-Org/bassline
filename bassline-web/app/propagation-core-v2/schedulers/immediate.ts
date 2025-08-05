@@ -46,12 +46,62 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
   
   return {
     async registerGroup(group) {
+      // Check if group already exists
+      if (state.groups.has(group.id)) {
+        console.log(`[Scheduler] Group ${group.id} already exists, skipping registration`)
+        return
+      }
+      
       const groupState: GroupState = {
         group,
         contacts: new Map(),
         wires: new Map()
       }
       state.groups.set(group.id, groupState)
+      
+      // If this is a primitive gadget, create boundary contacts
+      if (group.primitive) {
+        const primitive = group.primitive
+        console.log(`[Scheduler] Creating boundary contacts for primitive gadget ${primitive.id}`)
+        
+        // Create input boundary contacts
+        for (const inputName of primitive.inputs) {
+          const contactId = crypto.randomUUID()
+          const contact: Contact = {
+            id: contactId,
+            content: undefined,
+            blendMode: 'accept-last',
+            groupId: group.id,
+            isBoundary: true,
+            boundaryDirection: 'input',
+            name: inputName
+          }
+          groupState.contacts.set(contactId, contact)
+          group.contactIds.push(contactId)
+          group.boundaryContactIds.push(contactId)
+          
+          console.log(`[Scheduler] Created input boundary contact ${inputName} (${contactId})`)
+        }
+        
+        // Create output boundary contacts
+        for (const outputName of primitive.outputs) {
+          const contactId = crypto.randomUUID()
+          const contact: Contact = {
+            id: contactId,
+            content: undefined,
+            blendMode: 'accept-last',
+            groupId: group.id,
+            isBoundary: true,
+            boundaryDirection: 'output',
+            name: outputName
+          }
+          groupState.contacts.set(contactId, contact)
+          group.contactIds.push(contactId)
+          group.boundaryContactIds.push(contactId)
+          
+          console.log(`[Scheduler] Created output boundary contact ${outputName} (${contactId})`)
+        }
+      }
       
       // Set root group if this is the first
       if (!state.rootGroupId) {
@@ -201,8 +251,8 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       }
       
       notify([{
-        type: 'contact-updated',
-        data: { contactId, groupId, updates: contact },
+        type: 'contact-added',
+        data: { ...contact, groupId },
         timestamp: Date.now()
       }])
       
@@ -265,6 +315,13 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       // Add to parent's subgroups
       parentState.group.subgroupIds.push(groupId)
       
+      // Notify about parent group update
+      notify([{
+        type: 'group-updated',
+        data: { groupId: parentGroupId, group: parentState.group },
+        timestamp: Date.now()
+      }])
+      
       return groupId
     },
     
@@ -325,6 +382,67 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
     subscribe(callback) {
       subscribers.add(callback)
       return () => subscribers.delete(callback)
+    },
+    
+    // Export the entire network state
+    async exportState(): Promise<NetworkState> {
+      // Deep clone to prevent external mutations
+      const exportedGroups = new Map()
+      
+      state.groups.forEach((groupState, groupId) => {
+        const group = { ...groupState.group }
+        const contacts = new Map()
+        const wires = new Map()
+        
+        groupState.contacts.forEach((contact, contactId) => {
+          contacts.set(contactId, { ...contact })
+        })
+        
+        groupState.wires.forEach((wire, wireId) => {
+          wires.set(wireId, { ...wire })
+        })
+        
+        exportedGroups.set(groupId, { group, contacts, wires })
+      })
+      
+      return {
+        groups: exportedGroups,
+        currentGroupId: state.currentGroupId,
+        rootGroupId: state.rootGroupId
+      }
+    },
+    
+    // Import a complete network state
+    async importState(newState: NetworkState): Promise<void> {
+      // Clear existing state
+      state.groups.clear()
+      
+      // Import new state
+      newState.groups.forEach((groupState, groupId) => {
+        const group = { ...groupState.group }
+        const contacts = new Map()
+        const wires = new Map()
+        
+        groupState.contacts.forEach((contact, contactId) => {
+          contacts.set(contactId, { ...contact })
+        })
+        
+        groupState.wires.forEach((wire, wireId) => {
+          wires.set(wireId, { ...wire })
+        })
+        
+        state.groups.set(groupId, { group, contacts, wires })
+      })
+      
+      state.currentGroupId = newState.currentGroupId
+      state.rootGroupId = newState.rootGroupId
+      
+      // Notify all subscribers about the state change
+      notify([{
+        type: 'group-updated',
+        data: { groupId: state.rootGroupId, state: 'imported' },
+        timestamp: Date.now()
+      }])
     }
   }
 }

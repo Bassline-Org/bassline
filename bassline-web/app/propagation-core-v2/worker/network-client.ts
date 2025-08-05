@@ -46,7 +46,9 @@ export class NetworkClient implements PropagationNetworkScheduler {
           if (message.type === 'success') {
             pending.resolve(message.data)
           } else {
-            pending.reject(new Error(message.error || 'Unknown error'))
+            const error = new Error(message.error || 'Unknown error')
+            console.error(`[NetworkClient] Request failed:`, message)
+            pending.reject(error)
           }
         }
       } else {
@@ -127,7 +129,7 @@ export class NetworkClient implements PropagationNetworkScheduler {
     await this.sendRequest('REMOVE_CONTACT', { contactId })
   }
   
-  async addGroup(parentGroupId: string, group: Omit<Group, 'id' | 'parentId' | 'contactIds' | 'wireIds' | 'subgroupIds' | 'boundaryContactIds'>): Promise<string> {
+  async addGroup(parentGroupId: string, group: Omit<Group, 'id' | 'parentId' | 'contactIds' | 'wireIds' | 'subgroupIds' | 'boundaryContactIds'> & { primitiveId?: string }): Promise<string> {
     const result = await this.sendRequest('ADD_GROUP', { parentId: parentGroupId, group })
     return result.groupId
   }
@@ -138,12 +140,15 @@ export class NetworkClient implements PropagationNetworkScheduler {
   
   async getState(groupId: string): Promise<GroupState> {
     const result = await this.sendRequest('GET_STATE', { groupId })
+    
     // Convert arrays back to Maps
-    return {
+    const groupState = {
       group: result.group,
       contacts: new Map(result.contacts),
       wires: new Map(result.wires)
     }
+    
+    return groupState
   }
   
   async getContact(contactId: string): Promise<Contact | undefined> {
@@ -167,5 +172,11 @@ export class NetworkClient implements PropagationNetworkScheduler {
   
   terminate(): void {
     this.worker.terminate()
+  }
+  
+  // Refactoring operations
+  
+  async applyRefactoring(operation: string, params: any): Promise<any> {
+    return await this.sendRequest('APPLY_REFACTORING', { operation, params })
   }
 }

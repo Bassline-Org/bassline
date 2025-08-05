@@ -162,7 +162,7 @@ describe('createImmediateScheduler', () => {
     
     expect(subscriber).toHaveBeenCalledWith([
       expect.objectContaining({
-        type: 'contact-updated'
+        type: 'contact-added'
       })
     ])
     

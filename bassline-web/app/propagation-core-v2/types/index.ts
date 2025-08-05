@@ -90,7 +90,7 @@ export interface ContactUpdate {
 }
 
 export interface Change {
-  type: 'contact-updated' | 'wire-added' | 'wire-removed' | 'group-added' | 'group-removed'
+  type: 'contact-removed' | 'contact-updated' | 'wire-added' | 'wire-removed' | 'group-added' | 'group-removed' | 'group-updated' | 'contact-added'
   data: unknown
   timestamp: number
 }
@@ -131,6 +131,10 @@ export interface PropagationNetworkScheduler {
   
   // Subscribe to changes
   subscribe: (callback: (changes: Change[]) => void) => () => void
+  
+  // State import/export for refactoring operations
+  exportState?: () => Promise<NetworkState>
+  importState?: (state: NetworkState) => Promise<void>
 }
 
 // Remote group proxy for distributed scheduling

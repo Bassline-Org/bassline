@@ -115,14 +115,25 @@ export default function Home() {
         </p>
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* New v2 editor */}
+          <Link to="/editor-v2" className="block">
+            <div className="border border-green-200 rounded-lg p-6 hover:border-green-300 hover:shadow-lg transition-all bg-green-50">
+              <h2 className="text-xl font-semibold mb-2">Editor V2 (New!)</h2>
+              <p className="text-slate-600 mb-4">
+                Worker-based architecture with React Router data patterns
+              </p>
+              <Button variant="default">Try New Editor</Button>
+            </div>
+          </Link>
+          
           {/* Default editor */}
-          <Link to="/editor" className="block">
+          <Link to="/simple-editor" className="block">
             <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 hover:shadow-lg transition-all">
-              <h2 className="text-xl font-semibold mb-2">New Network</h2>
+              <h2 className="text-xl font-semibold mb-2">Simple Editor</h2>
               <p className="text-slate-600 mb-4">
                 Start with a blank canvas or the default example network
               </p>
-              <Button>Start Fresh</Button>
+              <Button variant="outline">Use Simple Editor</Button>
             </div>
           </Link>
           

@@ -20,7 +20,9 @@ export function SimpleNetworkFlow({ groupState, groupId }: SimpleNetworkFlowProp
     groupId,
     contacts: groupState.contacts.size,
     wires: groupState.wires.size,
-    contactsArray: Array.from(groupState.contacts.values())
+    contactsArray: Array.from(groupState.contacts.values()),
+    subgroups: groupState.group.subgroupIds,
+    isPrimitive: !!groupState.group.primitive
   })
   
   // Convert contacts to React Flow nodes
@@ -36,12 +38,13 @@ export function SimpleNetworkFlow({ groupState, groupId }: SimpleNetworkFlowProp
       },
       data: {
         contact,
-        groupId
+        groupId,
+        isGadget: !!groupState.group.primitive
       }
     }))
     console.log('Created initial nodes:', nodes)
     return nodes
-  }, [groupState.contacts, groupId])
+  }, [groupState.contacts, groupState.group.primitive, groupId])
   
   // Convert wires to React Flow edges
   const initialEdges: Edge[] = useMemo(() => {
@@ -72,12 +75,13 @@ export function SimpleNetworkFlow({ groupState, groupId }: SimpleNetworkFlowProp
         },
         data: {
           contact,
-          groupId
+          groupId,
+          isGadget: !!groupState.group.primitive
         }
       }))
       return newNodes
     })
-  }, [groupState.contacts, groupId, setNodes])
+  }, [groupState.contacts, groupState.group.primitive, groupId, setNodes])
   
   // Update edges when groupState changes
   useEffect(() => {
