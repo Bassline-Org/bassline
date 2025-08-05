@@ -93,11 +93,14 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       }
       
       // Notify subscribers
-      const changes: Change[] = result.changes.map(change => ({
-        type: 'contact-updated',
-        data: change,
-        timestamp: Date.now()
-      }))
+      const changes: Change[] = result.changes.map(change => {
+        const changeGroupId = findGroupForContact(change.contactId)
+        return {
+          type: 'contact-updated',
+          data: { ...change, groupId: changeGroupId },
+          timestamp: Date.now()
+        }
+      })
       
       notify(changes)
     },
@@ -152,7 +155,7 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       
       notify([{
         type: 'wire-added',
-        data: wire,
+        data: { ...wire, groupId },
         timestamp: Date.now()
       }])
       
@@ -160,14 +163,14 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
     },
     
     async disconnect(wireId) {
-      for (const groupState of state.groups.values()) {
+      for (const [groupId, groupState] of state.groups) {
         if (groupState.wires.has(wireId)) {
           groupState.wires.delete(wireId)
           groupState.group.wireIds = groupState.group.wireIds.filter(id => id !== wireId)
           
           notify([{
             type: 'wire-removed',
-            data: { wireId },
+            data: { wireId, groupId },
             timestamp: Date.now()
           }])
           
@@ -199,7 +202,7 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       
       notify([{
         type: 'contact-updated',
-        data: { contactId, updates: contact },
+        data: { contactId, groupId, updates: contact },
         timestamp: Date.now()
       }])
       
@@ -231,6 +234,13 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       for (const wireId of wiresToRemove) {
         await this.disconnect(wireId)
       }
+      
+      // Notify about the removal
+      notify([{
+        type: 'contact-removed',
+        data: { contactId, groupId },
+        timestamp: Date.now()
+      }])
     },
     
     async addGroup(parentGroupId, groupData) {

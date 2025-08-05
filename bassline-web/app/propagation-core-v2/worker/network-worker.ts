@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+console.log('[Worker] Network worker starting...')
+
 import { createImmediateScheduler } from '../schedulers/immediate'
 import { createBatchScheduler } from '../schedulers/batch'
 import { getPrimitiveGadget } from '../primitives'
@@ -67,6 +69,8 @@ setupSubscription()
 // Handle messages from main thread
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
   const request = event.data
+  console.log(`[Worker] Received ${request.type} request:`, request.payload)
+  
   const response: WorkerResponse = {
     id: request.id,
     type: 'success',
@@ -144,7 +148,9 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       
       case 'ADD_CONTACT': {
         const { groupId, contact } = request.payload
+        console.log(`[Worker] Adding contact to group ${groupId}:`, contact)
         const contactId = await scheduler.addContact(groupId, contact)
+        console.log(`[Worker] Contact added with ID:`, contactId)
         response.data = { contactId }
         break
       }
@@ -217,6 +223,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
     response.error = error instanceof Error ? error.message : String(error)
   }
   
+  console.log(`[Worker] Sending response:`, response)
   self.postMessage(response)
 }
 

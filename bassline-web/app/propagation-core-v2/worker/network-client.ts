@@ -39,6 +39,7 @@ export class NetworkClient implements PropagationNetworkScheduler {
       
       if ('id' in message) {
         // This is a response to a request
+        console.log(`[NetworkClient] Received response:`, message)
         const pending = this.pendingRequests.get(message.id)
         if (pending) {
           this.pendingRequests.delete(message.id)
@@ -50,8 +51,10 @@ export class NetworkClient implements PropagationNetworkScheduler {
         }
       } else {
         // This is a notification
+        console.log(`[NetworkClient] Received notification:`, message.type)
         switch (message.type) {
           case 'changes':
+            console.log(`[NetworkClient] Changes:`, message.data)
             this.notifySubscribers(message.data)
             break
           case 'ready':
@@ -70,6 +73,8 @@ export class NetworkClient implements PropagationNetworkScheduler {
   private async sendRequest(type: string, payload: any): Promise<any> {
     const id = crypto.randomUUID()
     const request: WorkerRequest = { id, type, payload }
+    
+    console.log(`[NetworkClient] Sending ${type} request:`, payload)
     
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { resolve, reject })
