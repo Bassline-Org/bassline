@@ -41,7 +41,7 @@ export function ContextMenu({ x, y, selectedNodes, nodes, groupId, onClose }: Co
   // Get selected contact nodes only (not groups)
   const selectedContactIds = selectedNodes.filter(nodeId => {
     const node = nodes.find(n => n.id === nodeId)
-    return node?.type === 'contact'
+    return node?.type === 'contact' || node?.type === 'slider'
   })
   
   // Get selected group nodes
@@ -113,7 +113,7 @@ export function ContextMenu({ x, y, selectedNodes, nodes, groupId, onClose }: Co
     selectedNodes.forEach(nodeId => {
       const node = nodes.find(n => n.id === nodeId)
       if (node) {
-        if (node.type === 'contact') {
+        if (node.type === 'contact' || node.type === 'slider') {
           submit({
             intent: 'delete-contact',
             contactId: nodeId

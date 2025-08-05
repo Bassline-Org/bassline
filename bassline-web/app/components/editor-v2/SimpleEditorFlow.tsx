@@ -24,6 +24,7 @@ import { Breadcrumbs } from './Breadcrumbs'
 import { PropertyPanel } from './PropertyPanel'
 import { ContextMenu } from './ContextMenu'
 import { useSubgroupData } from '~/hooks/useSubgroupData'
+import { useGroupWires } from '~/hooks/useGroupWires'
 import '@xyflow/react/dist/style.css'
 
 const nodeTypes = {
@@ -41,6 +42,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   const submit = useSubmit()
   const reactFlowInstance = useReactFlow()
   const subgroupData = useSubgroupData(groupState.group.subgroupIds)
+  const processedWires = useGroupWires(groupState, subgroupData)
   
   // Initialize React Flow state
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
@@ -81,6 +83,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
       }
     }
   }, [groupState.contacts, pendingNodeType, nodeViewMetadata])
+  
   
   // Update nodes when groupState changes
   useEffect(() => {
@@ -136,66 +139,8 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   
   // Update edges when wires change
   useEffect(() => {
-    const newEdges: Edge[] = []
-    console.log('[Edges] Starting edge update. Wires:', Array.from(groupState.wires.values()))
-    console.log('[Edges] Contacts:', Array.from(groupState.contacts.entries()).map(([id, c]) => ({ id, isBoundary: c.isBoundary })))
-    console.log('[Edges] Subgroups:', Array.from(subgroupData.entries()))
-    
-    groupState.wires.forEach((wire) => {
-      // For wires connecting to boundary contacts, we need to map them to the parent group node
-      let sourceNode = wire.fromId
-      let sourceHandle = undefined
-      let targetNode = wire.toId
-      let targetHandle = undefined
-      
-      // Check if source is a boundary contact
-      const sourceContact = groupState.contacts.get(wire.fromId)
-      console.log(`[Edges] Wire ${wire.id}: checking source ${wire.fromId}, isBoundary:`, sourceContact?.isBoundary)
-      
-      if (sourceContact?.isBoundary) {
-        // Find which subgroup this boundary contact belongs to
-        for (const subgroupId of groupState.group.subgroupIds) {
-          const subgroup = subgroupData.get(subgroupId)
-          console.log(`[Edges] Checking subgroup ${subgroupId} for boundary contact ${wire.fromId}`)
-          console.log(`[Edges] Subgroup boundary contacts:`, subgroup?.boundaryContacts)
-          
-          if (subgroup?.boundaryContacts?.some(bc => bc.id === wire.fromId)) {
-            sourceNode = subgroupId
-            sourceHandle = wire.fromId
-            console.log(`[Edges] Mapped source to gadget: ${subgroupId}, handle: ${wire.fromId}`)
-            break
-          }
-        }
-      }
-      
-      // Check if target is a boundary contact
-      const targetContact = groupState.contacts.get(wire.toId)
-      if (targetContact?.isBoundary) {
-        // Find which subgroup this boundary contact belongs to
-        for (const subgroupId of groupState.group.subgroupIds) {
-          const subgroup = subgroupData.get(subgroupId)
-          if (subgroup?.boundaryContacts?.some(bc => bc.id === wire.toId)) {
-            targetNode = subgroupId
-            targetHandle = wire.toId
-            break
-          }
-        }
-      }
-      
-      const edge = {
-        id: wire.id,
-        source: sourceNode,
-        sourceHandle,
-        target: targetNode,
-        targetHandle,
-        type: wire.type === 'directed' ? 'default' : 'straight',
-        animated: wire.type === 'directed',
-      }
-      console.log(`[Edges] Creating edge:`, edge)
-      newEdges.push(edge)
-    })
-    setEdges(newEdges)
-  }, [groupState.wires, groupState.contacts, groupState.group.subgroupIds, subgroupData])
+    setEdges(processedWires as Edge[])
+  }, [processedWires])
   
   // Handle node position changes
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
