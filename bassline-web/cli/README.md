@@ -18,14 +18,16 @@ npm link  # Makes 'bassline' command available globally
 Start a propagation network server that exposes an HTTP API:
 
 ```bash
-bassline start --port 3000 --name my-network
+bassline start --port 8455 --name my-network
 ```
 
-This starts a server with REST endpoints for interacting with the network:
+The default port is 8455 (BASS in l33tspeak). This starts a server with REST endpoints for interacting with the network:
 - `GET /state?groupId=<id>` - Get group state
 - `POST /contact` - Add a contact
 - `POST /connect` - Create a wire
 - `POST /update` - Update contact content
+
+See `openapi.yaml` for the full API specification.
 
 ### Run a Network from File
 
@@ -44,7 +46,7 @@ Options:
 Connect to a network server and interact with it:
 
 ```bash
-bassline connect http://localhost:3000 --interactive
+bassline connect http://localhost:8455 --interactive
 ```
 
 In interactive mode, you can use commands like:
