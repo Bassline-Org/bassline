@@ -2,144 +2,144 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🚨 IMPORTANT: Read Context Documentation First! 🚨
-
-**Before starting ANY work in this repository, you MUST read:**
-1. `bassline-web/context/implementation-journal.md` - Detailed implementation history, architecture decisions, and lessons learned
-2. `bassline-web/context/quick-reference.md` - Quick reference for current architecture and common patterns
-
-These files contain CRITICAL information about:
-- What has already been built and tested
-- Architecture decisions and why they were made
-- Common pitfalls that have been discovered and fixed
-- The current state of the implementation
-
-**Failing to read these will likely result in repeating past mistakes or breaking existing functionality.**
-
 ## Project Overview
 
-Bassline is a web frontend implementation for a visual programming environment based on propagation networks. This follows an existing Pharo Smalltalk implementation and represents the first dedicated web-based interface for the system.
+Bassline is a web-based visual programming environment built on propagation networks - a bidirectional constraint system that supports natural cycles and contradiction handling.
 
-## Technology Stack
+## Conceptual Model
 
-- **Backend/Framework**: React Router v7 (full-stack framework)
-- **Graph Visualization**: React Flow for visual node/edge editing
-- **UI Components**: shadcn/ui for consistent component library
-- **Language**: TypeScript (assumed with React Router v7)
+### Propagation Networks
+A propagation network is a graph where information flows bidirectionally between nodes. Unlike dataflow systems where data flows in one direction, propagation networks allow constraints to flow in any direction, finding consistent solutions across the entire network.
 
-## Core Concepts
+### Core Abstractions
 
-The system is built around:
-- **Contacts**: Information-carrying cells with content and blend modes
-- **ContactGroups**: Collections of contacts forming computational boundaries  
-- **ContactGroupWires**: Connections propagating information between contacts
-- **Boundary Contacts**: Interface contacts that create abstraction boundaries
+1. **Contacts**: The fundamental unit of computation
+   - Hold a single value (content)
+   - Have a blend mode that determines how to handle multiple incoming values
+   - Can be wired to other contacts to share information
+   - Changes propagate automatically through connected contacts
 
-Key differentiator: This is NOT a traditional dataflow system - it supports bidirectional constraint propagation with natural cycles.
+2. **Groups**: Hierarchical containers for organization and abstraction
+   - Contain contacts and other groups (recursive structure)
+   - Define computational boundaries
+   - Can have boundary contacts that serve as input/output interfaces
+   - Enable modular, reusable components
 
-## React Flow Integration
+3. **Gadgets**: Groups with computational behavior
+   - Regular groups just organize contacts
+   - Gadgets (via primitive gadgets) perform computation
+   - Have input and output boundary contacts
+   - Execute when inputs change and activation conditions are met
+   - Examples: add, multiply, string concat, logic gates
 
-When implementing with React Flow:
-- Map Contacts to React Flow nodes
-- Map ContactGroupWires to React Flow edges
-- Use custom node types for different Contact types (regular vs boundary)
-- Implement hierarchical navigation through nested React Flow instances
-- Consider using React Flow's subflows for ContactGroups
+4. **Wires**: Connections that propagate information
+   - Can be bidirectional (constraint) or directed (dataflow-like)
+   - Automatically propagate changes between connected contacts
+   - Support cycles without infinite loops (change detection)
 
-## Development Commands
+### Key Properties
+- **Bidirectional**: Information flows both ways through connections
+- **Constraint-based**: The network finds solutions that satisfy all constraints
+- **Hierarchical**: Groups can contain groups, enabling complex abstractions
+- **Live**: Changes propagate immediately (or in batches)
+- **Contradiction-aware**: Can detect and handle conflicting constraints
+
+## Current Architecture (v2)
+
+### Technology Stack
+- **Framework**: React Router v7 (SPA mode)
+- **Graph Visualization**: React Flow
+- **UI Components**: shadcn/ui
+- **Language**: TypeScript
+- **Propagation Engine**: Custom Worker-based implementation
+
+### Core Architecture Components
+
+1. **Propagation Core v2** (`app/propagation-core-v2/`)
+   - Pure functional/async propagation engine
+   - Worker thread execution for performance
+   - Pluggable scheduler system (immediate, batch)
+   - Primitive gadgets for computation
+
+2. **Simple Editor** (`app/routes/simple-editor.tsx`)
+   - Clean React implementation
+   - No manual state synchronization
+   - React Flow for visualization
+   - Mode system for different interaction patterns
+
+3. **Worker Architecture**
+   - `NetworkClient` - Main thread interface
+   - `network-worker.ts` - Worker thread implementation
+   - Async message passing for all operations
+   - Change notifications via subscriptions
+
+### Key Concepts
+
+- **Contacts**: Information-carrying nodes with content and blend modes (accept-last, merge)
+- **Groups**: Hierarchical containers that can be regular groups or primitive gadgets
+- **Wires**: Connections between contacts (bidirectional or directed)
+- **Boundary Contacts**: Input/output interfaces for groups
+- **Primitive Gadgets**: Built-in computational units (add, multiply, gate, etc.)
+
+**Important**: This is NOT a traditional dataflow system - it supports bidirectional constraint propagation with natural cycles.
+
+### Development Commands
 
 ```bash
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Run tests
-npm test
-
-# Type checking
-npm run typecheck
-
-# Linting
-npm run lint
+npm run dev       # Start development server
+npm test          # Run tests
+npm run typecheck # Type checking
+npm run lint      # Linting
 ```
 
-## Architecture Guidelines
+### Current Implementation Status
 
-1. **Routing Structure** (React Router v7):
-   - Use nested routes for the pager navigation model
-   - Each ContactGroup level gets its own route
-   - Implement breadcrumb navigation for hierarchy
+✅ **Completed**:
+- Functional/async propagation engine
+- Worker thread integration
+- Immediate and batch schedulers
+- Core primitive gadgets (math, string, logic, control, array)
+- Simple editor with React Flow
+- Property panels and mode system
+- Basic refactoring tools
 
-2. **Component Structure**:
-   - Use shadcn components for UI consistency
-   - Create custom React Flow node components for Contacts
-   - Implement edge components for ContactGroupWires
-   - Build boundary contact interfaces as special node types
+🚧 **In Progress**:
+- Worker-based propagation network
+- React Router integration
 
-3. **State Management**:
-   - Leverage React Router v7's data loading patterns
-   - Consider using React Flow's internal state for graph data
-   - Implement propagation logic separate from visualization
+📋 **Planned**:
+- Remove global state management
+- Undo/redo functionality
+- Distributed propagation support
 
-## Key Documentation
+### Key Design Decisions
 
-- `README.org`: Comprehensive technical specification and propagation network theory
-- `ClaudeSummary.md`: Implementation strategy and UI/UX plans
-- Existing Pharo implementation serves as reference for behavior and semantics
+1. **Functional over OOP**: Pure functions, immutable data, async operations
+2. **Worker Threads**: Propagation runs off main thread for performance
+3. **Scheduler Abstraction**: Pluggable scheduling strategies
+4. **No Global State**: All state flows through React Router loaders/actions (planned)
+5. **Primitive Gadgets**: Functions are resolved in Worker, only IDs cross thread boundary
 
-## React Hooks Architecture (NEW)
+### Testing
 
-As of the latest refactoring, the codebase now uses a clean hooks-based architecture:
+- Unit tests for propagation logic: `__tests__/propagation.test.ts`
+- Primitive gadget tests: `__tests__/primitives.test.ts`
+- Scheduler tests: `__tests__/*-scheduler.test.ts`
+- Worker test page: `/worker-test` route for manual testing
 
-### Core Hooks
+### Important Notes
 
-1. **NetworkContext** - Provides centralized state management
-   - Manages the propagation network instance
-   - Handles React Flow synchronization
-   - Stores selection state
-   - Auto-syncs on all mutations
+- Propagation only occurs when content actually changes (prevents infinite loops)
+- Primitive gadgets are directional - only execute on input changes
+- Batch scheduler processes updates in configurable chunks with delays
+- Worker state resets when switching schedulers (current limitation)
 
-2. **useContact(contactId)** - Access individual contacts
-   - Returns reactive contact state
-   - Provides mutation methods with auto-sync
-   - Handles null/undefined gracefully
+### Routes
 
-3. **useGroup(groupId)** - Manage groups/gadgets
-   - Full access to group operations
-   - Navigation, adding contacts, wiring
-   - Automatic UI updates
+- `/` - Home page
+- `/simple-editor` - Main editor interface
+- `/worker-test` - Worker performance testing page
 
-4. **useContactSelection()** - Enhanced selection management
-   - Returns actual Contact/Group objects, not just IDs
-   - Shared selection state via context
-   - Bulk operations (delete, extract, etc.)
-
-5. **useCurrentGroup()** - Current navigation context
-   - Access to visible entities
-   - Navigation methods
-   - Operations on current group
-
-### Key Patterns
-
-- **No manual syncToReactFlow()** - All hooks auto-sync
-- **No prop drilling** - Components get data directly from hooks
-- **Shared state via context** - Selection and network state are centralized
-- **Type-safe** - Full TypeScript support throughout
-
-### Example Usage
-
-```typescript
-// In a component
-function MyComponent() {
-  const { content, setContent } = useContact(contactId)
-  const { selectedContacts } = useContactSelection()
-  
-  // Direct access, no props needed
-  return <div onClick={() => setContent('new value')}>{content}</div>
-}
-```
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.

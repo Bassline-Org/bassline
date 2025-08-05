@@ -157,42 +157,36 @@ describe('propagateContent', () => {
   it('should handle merge blend mode with mergeable values', async () => {
     const state = createTestNetwork()
     
-    // Create mergeable value type
-    class MergeableSet {
-      constructor(public values: Set<string>) {}
-      
-      merge(other: MergeableSet): MergeableSet {
-        return new MergeableSet(new Set([...this.values, ...other.values]))
-      }
-    }
+    // Use new tagged collection system
+    const { grow } = await import('../mergeable')
     
     // Create contact with merge mode
-    const initial = new MergeableSet(new Set(['a', 'b']))
+    const initial = grow.set(['a', 'b'])
     addContact(state, 'A', initial, 'merge')
     
     // Update with new mergeable value
-    const additional = new MergeableSet(new Set(['c', 'd']))
+    const additional = grow.set(['c', 'd'])
     const result = await propagateContent(state, 'A', additional)
     
     expect(result.changes).toHaveLength(1)
-    const merged = result.changes[0].updates.content as MergeableSet
+    const merged = result.changes[0].updates.content as any
+    expect(merged._tag).toBe('GrowSet')
     expect(merged.values).toEqual(new Set(['a', 'b', 'c', 'd']))
   })
   
-  it('should fall back to accept-last for non-mergeable values in merge mode', async () => {
+  it('should create contradiction for non-mergeable values in merge mode', async () => {
     const state = createTestNetwork()
     
     // Create contact with merge mode but non-mergeable content
     addContact(state, 'A', 'string value', 'merge')
     
-    // Update with another non-mergeable value
+    // Update with another non-mergeable value (should create contradiction)
     const result = await propagateContent(state, 'A', 'new string')
     
     expect(result.changes).toHaveLength(1)
-    expect(result.changes[0]).toEqual({
-      contactId: 'A',
-      updates: { content: 'new string', lastContradiction: undefined }
-    })
+    expect(result.contradictions).toHaveLength(1)
+    expect(result.changes[0].updates.lastContradiction).toBeDefined()
+    expect(result.changes[0].updates.lastContradiction?.message).toBe('Values cannot be merged')
   })
   
   it('should not propagate when content is unchanged', async () => {

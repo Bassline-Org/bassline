@@ -5,10 +5,11 @@ import type {
   NetworkState, 
   PropagationTask, 
   ContactUpdate, 
-  Contradiction,
+  Contradiction as TypesContradiction,
   PropagationResult,
   Group
 } from '../types'
+import { mergeContent, Contradiction } from '../mergeable'
 
 // Pure function that calculates propagation changes
 export async function propagateContent(
@@ -19,7 +20,7 @@ export async function propagateContent(
 ): Promise<PropagationResult> {
   const startTime = performance.now()
   const changes: ContactUpdate[] = []
-  const contradictions: Array<{ contactId: string; contradiction: Contradiction }> = []
+  const contradictions: Array<{ contactId: string; contradiction: TypesContradiction }> = []
   const queue: PropagationTask[] = [{
     id: crypto.randomUUID(),
     groupId: findGroupForContact(state, sourceContactId) || '',
@@ -140,7 +141,7 @@ async function applyBlendMode(
   changed: boolean
   content?: unknown
   updates: Partial<Contact>
-  contradiction?: Contradiction
+  contradiction?: TypesContradiction
 }> {
   // No change if content is the same
   if (contact.content === newContent) {
@@ -163,34 +164,24 @@ async function applyBlendMode(
   
   // Merge mode
   if (contact.blendMode === 'merge') {
-    // Check if both values support merging
-    if (isMergeable(contact.content) && isMergeable(newContent)) {
-      try {
-        const merged = await mergeContent(contact.content, newContent)
-        return {
-          changed: true,
-          content: merged,
-          updates: { ...updates, content: merged }
-        }
-      } catch (error) {
-        // Merge failed - create contradiction
-        const contradiction: Contradiction = {
-          message: error instanceof Error ? error.message : 'Merge failed',
-          values: [contact.content, newContent],
-          timestamp: Date.now()
-        }
-        return {
-          changed: true,
-          contradiction,
-          updates: { ...updates, lastContradiction: contradiction }
-        }
-      }
-    } else {
-      // Can't merge non-mergeable types - fall back to accept-last
+    try {
+      const merged = await mergeContent(contact.content, newContent)
       return {
         changed: true,
-        content: newContent,
-        updates: { ...updates, content: newContent }
+        content: merged,
+        updates: { ...updates, content: merged }
+      }
+    } catch (error) {
+      // Merge failed - create contradiction in old format for compatibility
+      const contradiction: TypesContradiction = {
+        message: error instanceof Contradiction ? error.reason : (error instanceof Error ? error.message : 'Merge failed'),
+        values: [contact.content, newContent],
+        timestamp: Date.now()
+      }
+      return {
+        changed: true,
+        contradiction,
+        updates: { ...updates, lastContradiction: contradiction }
       }
     }
   }
@@ -198,7 +189,7 @@ async function applyBlendMode(
   return { changed: false, updates: {} }
 }
 
-// Check if a value supports merging
+// Legacy isMergeable function for backward compatibility
 function isMergeable(value: unknown): value is { merge: (other: unknown) => unknown } {
   return (
     value !== null &&
@@ -207,15 +198,6 @@ function isMergeable(value: unknown): value is { merge: (other: unknown) => unkn
     'merge' in value &&
     typeof (value as any).merge === 'function'
   )
-}
-
-// Merge two mergeable values
-async function mergeContent(a: unknown, b: unknown): Promise<unknown> {
-  if (isMergeable(a) && isMergeable(b)) {
-    // Could be async for complex merges
-    return a.merge(b)
-  }
-  throw new Error('Cannot merge non-mergeable values')
 }
 
 // Find which group contains a contact
