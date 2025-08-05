@@ -57,6 +57,7 @@ const soundMap: Record<string, string> = {
   'ui/layout': '/lbp-sounds/subeventcomplete.mp3',
   'ui/tool-enable': '/lbp-sounds/openpoppit.mp3',
   'ui/tool-disable': '/lbp-sounds/closepoppit.mp3',
+  'ui/place': '/lbp-sounds/guinotifyclose.mp3',
   
   // Special actions
   'special/achievement': '/lbp-sounds/collectallprizes.mp3',

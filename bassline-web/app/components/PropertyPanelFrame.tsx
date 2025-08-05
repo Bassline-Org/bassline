@@ -111,43 +111,40 @@ function SelectionFrameContent({
   targetIds: string[]
   shouldFocus?: React.MutableRefObject<boolean> 
 }) {
-  const { pushFrame } = usePropertyPanelStack()
   const { selectedContacts, selectedGroups } = useContextSelection()
   
   // Filter to only show items that are in targetIds
   const contacts = selectedContacts.filter(c => targetIds.includes(c.id))
   const groups = selectedGroups.filter(g => targetIds.includes(g.id))
   
-  const handleItemClick = (id: string, type: 'contact' | 'group', name: string) => {
-    pushFrame({
-      type,
-      targetId: id,
-      title: name
-    })
-  }
-  
   return (
-    <div className="space-y-2">
-      {contacts.map(contact => (
-        <button
-          key={contact.id}
-          className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-          onClick={() => handleItemClick(contact.id, 'contact', `Contact ${contact.id.slice(0, 8)}`)}
-        >
-          <div className="text-sm font-medium text-gray-200">Contact</div>
-          <div className="text-xs text-gray-400">{contact.id.slice(0, 16)}...</div>
-        </button>
+    <div className="space-y-4">
+      {/* Render all contact properties inline */}
+      {contacts.map((contact, index) => (
+        <div key={contact.id} className="space-y-2">
+          {index > 0 && <div className="border-t border-gray-700 pt-2" />}
+          <ContactPropertySection
+            contactId={contact.id}
+            isExpanded={true}
+            onToggle={() => {}}
+            isFocused={false}
+            hideToggle={true}
+          />
+        </div>
       ))}
       
-      {groups.map(group => (
-        <button
-          key={group.id}
-          className="w-full text-left p-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-          onClick={() => handleItemClick(group.id, 'group', group.name || `Gadget ${group.id.slice(0, 8)}`)}
-        >
-          <div className="text-sm font-medium text-gray-200">{group.name || 'Gadget'}</div>
-          <div className="text-xs text-gray-400">{group.id.slice(0, 16)}...</div>
-        </button>
+      {/* Render all group properties inline */}
+      {groups.map((group, index) => (
+        <div key={group.id} className="space-y-2">
+          {(contacts.length > 0 || index > 0) && <div className="border-t border-gray-700 pt-2" />}
+          <GroupPropertySection
+            groupId={group.id}
+            isExpanded={true}
+            onToggle={() => {}}
+            isFocused={false}
+            hideToggle={true}
+          />
+        </div>
       ))}
     </div>
   )

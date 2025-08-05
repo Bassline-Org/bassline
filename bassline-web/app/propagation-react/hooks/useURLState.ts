@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
+import { useSound } from '~/components/SoundSystem'
 
 export interface URLState {
   // Core parameters that should always be preserved
@@ -163,15 +164,17 @@ export function useURLState(): UseURLStateReturn {
  */
 export function useEditorModes() {
   const { urlState, pushState, clearMode } = useURLState()
-  
+  const { play: playToolEnableSound } = useSound('ui/tool-enable')
+  const { play: playToolDisableSound } = useSound('ui/tool-disable')
   
   const enterPropertyMode = useCallback((nodeId: string, focus = false) => {
+    playToolEnableSound()
     pushState({
       mode: 'property',
       nodeId,
       focus: focus ? 'true' : undefined
     })
-  }, [pushState])
+  }, [pushState, playToolEnableSound])
   
   const enterValenceMode = useCallback((selection: string[]) => {
     pushState({
@@ -181,8 +184,11 @@ export function useEditorModes() {
   }, [pushState])
   
   const exitMode = useCallback(() => {
+    if (urlState.mode) {
+      playToolDisableSound()
+    }
     clearMode()
-  }, [clearMode])
+  }, [clearMode, urlState.mode, playToolDisableSound])
   
   const toggleMode = useCallback((mode: 'property' | 'valence', data?: any) => {
     if (urlState.mode === mode) {

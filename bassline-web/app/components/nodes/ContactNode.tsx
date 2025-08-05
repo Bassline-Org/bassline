@@ -14,7 +14,7 @@ import { useContextFrame } from '~/propagation-react/hooks/useContextFrame';
 import { useModeContext } from '~/propagation-react/contexts/ModeContext';
 import { useContextSelection } from '~/propagation-react/hooks/useContextSelection';
 import { useSound } from '~/components/SoundSystem';
-import { toast } from 'sonner';
+import { useSoundToast } from '~/hooks/useSoundToast';
 
 export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id);
@@ -25,6 +25,7 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
   const modeSystem = useModeContext();
   const { selectedContacts, selectedGroups, clearSelection } = useContextSelection();
   const { play: playConnectionSound } = useSound('connection/create');
+  const { success: toastSuccess, error: toastError } = useSoundToast();
   
   // Get visual class from mode system
   const modeClassName = modeSystem.getNodeClassName(id);
@@ -66,10 +67,10 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
       clearSelection();
       modeSystem.toggleMinorMode('valence');
       
-      toast.success('Connected contacts', { duration: 2000 });
+      toastSuccess('Connected contacts', { duration: 2000 });
     } catch (error) {
       console.error('Failed to connect contacts:', error);
-      toast.error('Failed to connect contacts', { duration: 2000 });
+      toastError('Failed to connect contacts', { duration: 2000 });
     }
   }, [isValenceTarget, selectedContacts, id, network, syncToReactFlow, playConnectionSound, clearSelection, modeSystem]);
   

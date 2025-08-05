@@ -264,6 +264,12 @@ export function NetworkProvider({ children, initialNetwork, skipDefaultContent =
     syncToReactFlow()
   }, [appSettings.visual.showFatEdges, appSettings.visual.fatEdgeScale, syncToReactFlow])
   
+  // Effect 5: Clear highlighted node when selection is empty
+  useEffect(() => {
+    if (selection.contacts.size === 0 && selection.groups.size === 0 && highlightedNodeId !== null) {
+      setHighlightedNodeId(null)
+    }
+  }, [selection, highlightedNodeId])
   
   const value: NetworkContextValue = {
     network,

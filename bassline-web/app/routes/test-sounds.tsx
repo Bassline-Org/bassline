@@ -51,6 +51,7 @@ function TestSoundsContent() {
         { name: 'Layout', id: 'ui/layout' },
         { name: 'Tool Enable', id: 'ui/tool-enable' },
         { name: 'Tool Disable', id: 'ui/tool-disable' },
+        { name: 'Place Item', id: 'ui/place' },
       ]
     },
     {

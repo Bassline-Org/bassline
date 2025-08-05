@@ -105,6 +105,8 @@ export function EditorStateProvider({ children }: EditorStateProviderProps) {
   
   const clearSelection = useCallback(() => {
     setSelection([], [])
+    // Also clear focus when clearing selection
+    setFocusedNodeId(null)
   }, [setSelection])
   
   const setFocus = useCallback((nodeId: string | null) => {

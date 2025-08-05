@@ -27,6 +27,7 @@ export function usePropagationNetwork(
   const { play: playDeleteNodeSound } = useSound("node/delete");
   const { play: playDeleteGadgetSound } = useSound("gadget/delete");
   const { play: playDeleteConnectionSound } = useSound("connection/delete");
+  const { play: playSelectSound } = useSound("node/select");
   const { onContactDoubleClick } = options;
   
   // Use a single ref to track delete sound cooldown (shared between nodes and connections)
@@ -82,8 +83,13 @@ export function usePropagationNetwork(
       const contactIds = nodes.filter(n => n.type !== 'group').map(n => n.id);
       const groupIds = nodes.filter(n => n.type === 'group').map(n => n.id);
       setContextSelectionRef.current(contactIds, groupIds);
+      
+      // Play select sound if something was selected (but not on deselection)
+      if (nodes.length > 0) {
+        playSelectSound();
+      }
     },
-    [], // Empty deps to keep callback stable!
+    [playSelectSound], // Include playSelectSound in deps
   );
   
 

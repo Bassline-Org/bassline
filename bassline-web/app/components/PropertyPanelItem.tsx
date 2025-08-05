@@ -23,9 +23,10 @@ interface ContactPropertySectionProps {
   isExpanded: boolean
   onToggle: () => void
   isFocused: boolean
+  hideToggle?: boolean
 }
 
-export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocused }: ContactPropertySectionProps) {
+export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocused, hideToggle = false }: ContactPropertySectionProps) {
   const contactData = useContact(contactId)
   const [valueType, setValueType] = useState<ValueType>('string')
   const [tempValue, setTempValue] = useState<any>(null)
@@ -174,20 +175,33 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
       !isFocused && "opacity-80"
     )}>
       {/* Header */}
-      <button
-        onClick={onToggle}
-        className="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-600 rounded-t-lg transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-300" /> : <ChevronRight className="w-4 h-4 text-gray-300" />}
-          <span className="text-sm font-medium text-gray-100">
-            {contactData.isBoundary ? '🔌' : '⚪'} {contactData.name || `Contact ${contactId.slice(0, 8)}`}
+      {hideToggle ? (
+        <div className="w-full px-3 py-2 flex items-center justify-between bg-gray-600 rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-100">
+              {contactData.isBoundary ? '🔌' : '⚪'} {contactData.name || `Contact ${contactId.slice(0, 8)}`}
+            </span>
+          </div>
+          <span className="text-xs text-gray-400">
+            {contactData.isBoundary ? 'Boundary' : 'Contact'}
           </span>
         </div>
-        <span className="text-xs text-gray-400">
-          {contactData.isBoundary ? 'Boundary' : 'Contact'}
-        </span>
-      </button>
+      ) : (
+        <button
+          onClick={onToggle}
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-600 rounded-t-lg transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-300" /> : <ChevronRight className="w-4 h-4 text-gray-300" />}
+            <span className="text-sm font-medium text-gray-100">
+              {contactData.isBoundary ? '🔌' : '⚪'} {contactData.name || `Contact ${contactId.slice(0, 8)}`}
+            </span>
+          </div>
+          <span className="text-xs text-gray-400">
+            {contactData.isBoundary ? 'Boundary' : 'Contact'}
+          </span>
+        </button>
+      )}
 
       {/* Content */}
       {isExpanded && (
@@ -485,9 +499,10 @@ interface GroupPropertySectionProps {
   isExpanded: boolean
   onToggle: () => void
   isFocused: boolean
+  hideToggle?: boolean
 }
 
-export function GroupPropertySection({ groupId, isExpanded, onToggle, isFocused }: GroupPropertySectionProps) {
+export function GroupPropertySection({ groupId, isExpanded, onToggle, isFocused, hideToggle = false }: GroupPropertySectionProps) {
   const groupData = useGroup(groupId)
 
   if (!groupData.group) return null
@@ -499,20 +514,33 @@ export function GroupPropertySection({ groupId, isExpanded, onToggle, isFocused 
       !isFocused && "opacity-80"
     )}>
       {/* Header */}
-      <button
-        onClick={onToggle}
-        className="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-600 rounded-t-lg transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-300" /> : <ChevronRight className="w-4 h-4 text-gray-300" />}
-          <span className="text-sm font-medium text-gray-100">
-            📦 {groupData.name || `Gadget ${groupId.slice(0, 8)}`}
+      {hideToggle ? (
+        <div className="w-full px-3 py-2 flex items-center justify-between bg-gray-600 rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-100">
+              📦 {groupData.name || `Gadget ${groupId.slice(0, 8)}`}
+            </span>
+          </div>
+          <span className="text-xs text-gray-400">
+            {groupData.isPrimitive ? 'Primitive' : 'Gadget'}
           </span>
         </div>
-        <span className="text-xs text-gray-400">
-          {groupData.isPrimitive ? 'Primitive' : 'Gadget'}
-        </span>
-      </button>
+      ) : (
+        <button
+          onClick={onToggle}
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-gray-600 rounded-t-lg transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-300" /> : <ChevronRight className="w-4 h-4 text-gray-300" />}
+            <span className="text-sm font-medium text-gray-100">
+              📦 {groupData.name || `Gadget ${groupId.slice(0, 8)}`}
+            </span>
+          </div>
+          <span className="text-xs text-gray-400">
+            {groupData.isPrimitive ? 'Primitive' : 'Gadget'}
+          </span>
+        </button>
+      )}
 
       {/* Content */}
       {isExpanded && (

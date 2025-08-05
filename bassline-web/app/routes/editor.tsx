@@ -7,7 +7,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { toast } from "sonner";
+import { useSoundToast } from "~/hooks/useSoundToast";
 import { type ActionFunctionArgs, type LoaderFunctionArgs, useLoaderData, useFetcher } from "react-router";
 import { useURLState, useEditorModes, useNavigationState, useSelectionState } from "~/propagation-react/hooks/useURLState";
 
@@ -147,6 +147,7 @@ function Flow() {
   const loaderData = useLoaderData<typeof clientLoader>();
   const fetcher = useFetcher();
   const { play: playPublishSound } = useSound('special/publish');
+  const { toast, success: toastSuccess, error: toastError } = useSoundToast();
   
   // Mode system
   const modeSystem = useModeContext();
@@ -311,7 +312,7 @@ function Flow() {
           if (template) {
             palette.addToPalette(template);
             // Show toast for palette addition (important feedback)
-            toast.success(`Added "${name}" to palette`, { duration: 2000 });
+            toastSuccess(`Added "${name}" to palette`, { duration: 2000 });
           }
         }
       }
@@ -374,10 +375,10 @@ function Flow() {
       
       // Play publish sound
       playPublishSound();
-      toast.success(`Saved: ${name}.json`, { duration: 2000 });
+      toastSuccess(`Saved: ${name}.json`, { duration: 2000 });
     } catch (error) {
       console.error('Failed to save bassline:', error);
-      toast.error('Failed to save', { duration: 2000 });
+      toastError('Failed to save', { duration: 2000 });
     }
   }, [network, playPublishSound]);
 
@@ -511,6 +512,7 @@ function Flow() {
       // Also exit property mode if we're in it
       if (currentMode === 'property') {
         exitMode();
+        setHighlightedNodeId(null);
       }
     }
   }, [hasSelection]); // Only depend on hasSelection to avoid loops
@@ -563,9 +565,11 @@ function Flow() {
         if (currentMode !== 'normal') {
           // Exit any mode
           exitMode();
+          setHighlightedNodeId(null);
         } else if (propertyPanel.isVisible) {
           // If in normal mode and property panel is open, close it
           propertyPanel.toggleVisibility();
+          setHighlightedNodeId(null);
         }
       }
 
@@ -580,6 +584,7 @@ function Flow() {
         e.preventDefault();
         if (currentMode === 'property') {
           exitMode();
+          setHighlightedNodeId(null);
         } else {
           const selectedIds = [...selection.contacts, ...selection.groups];
           if (selectedIds.length > 0) {
@@ -613,7 +618,7 @@ function Flow() {
             enterPropertyMode(selectedIds[0]);
             // Removed toast for opening properties panel
           } else {
-            toast.error("Select a node first");
+            toastError("Select a node first", { duration: 2000 });
           }
         }
       }
@@ -895,7 +900,7 @@ function Flow() {
                       const template = saveAsTemplate(gadgetId);
                       if (template) {
                         palette.addToPalette(template);
-                        toast.success(`Added to palette`, { duration: 2000 });
+                        toastSuccess(`Added to palette`, { duration: 2000 });
                       }
                     }}
                     size="sm"
@@ -998,6 +1003,7 @@ function Flow() {
           onToggleVisibility={() => {
             if (currentMode === 'property') {
               exitMode();
+              setHighlightedNodeId(null);
             } else {
               const selectedIds = [...selection.contacts, ...selection.groups];
               if (selectedIds.length > 0) {
@@ -1039,7 +1045,7 @@ export default function Editor() {
   useEffect(() => {
     if (template && basslineName && !hasShownLoadedToast.current) {
       hasShownLoadedToast.current = true;
-      toast.success(`Loaded: ${basslineName}`, { duration: 2000 });
+      toastSuccess(`Loaded: ${basslineName}`, { duration: 2000 });
     }
   }, [template, basslineName]);
   
