@@ -43,6 +43,8 @@ export function useContactSelection(): UseContactSelectionReturn {
   const { network, syncToReactFlow, selection, setSelection } = useNetworkContext()
   const { play: playInlineSound } = useSound('gadget/inline')
   const { play: playExtractSound } = useSound('gadget/extract')
+  const { play: playBoundaryCreateSound } = useSound('ui/boundary-create')
+  const { play: playBoundaryRevertSound } = useSound('ui/boundary-revert')
   
   // Get actual objects from selection IDs
   const selectedContacts = useMemo(() => {
@@ -219,16 +221,50 @@ export function useContactSelection(): UseContactSelectionReturn {
   const convertSelectedToBoundary = useCallback((): boolean => {
     if (selection.contacts.size === 0) return false
     
+    // Check if we're converting to boundary or reverting
+    let hasNormalContacts = false
+    let hasBoundaryContacts = false
+    
+    for (const contactId of selection.contacts) {
+      const contact = network.currentGroup.contacts.get(contactId)
+      if (contact) {
+        if (contact.isBoundary) {
+          hasBoundaryContacts = true
+        } else {
+          hasNormalContacts = true
+        }
+      }
+    }
+    
+    // If we have boundary contacts, we're reverting them
+    if (hasBoundaryContacts && !hasNormalContacts) {
+      // Toggle boundary contacts back to normal
+      for (const contactId of selection.contacts) {
+        const contact = network.currentGroup.contacts.get(contactId)
+        if (contact && contact.isBoundary) {
+          network.currentGroup.boundaryContacts.delete(contactId)
+          contact.isBoundary = false
+          contact.boundaryDirection = undefined
+        }
+      }
+      playBoundaryRevertSound()
+      clearSelection()
+      syncToReactFlow()
+      return true
+    }
+    
+    // Otherwise, convert to boundary
     const operation = new ConvertToBoundaryOperation()
     const result = operation.execute(network.currentGroup, selection)
     
     if (result.success) {
+      playBoundaryCreateSound()
       clearSelection()
       syncToReactFlow()
     }
     
     return result.success
-  }, [selection, network, clearSelection, syncToReactFlow])
+  }, [selection, network, clearSelection, syncToReactFlow, playBoundaryCreateSound, playBoundaryRevertSound])
   
   // Check if selection has items
   const hasSelection = selection.contacts.size > 0 || 

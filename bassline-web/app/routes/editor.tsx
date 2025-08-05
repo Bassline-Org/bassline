@@ -147,7 +147,18 @@ function Flow() {
   const loaderData = useLoaderData<typeof clientLoader>();
   const fetcher = useFetcher();
   const { play: playPublishSound } = useSound('special/publish');
+  const { play: playToolEnableSound } = useSound('ui/tool-enable');
+  const { play: playToolDisableSound } = useSound('ui/tool-disable');
   const { toast, success: toastSuccess, error: toastError } = useSoundToast();
+  
+  // Show loaded toast when template is loaded
+  const hasShownLoadedToast = useRef(false);
+  useEffect(() => {
+    if (loaderData.template && loaderData.basslineName && !hasShownLoadedToast.current) {
+      hasShownLoadedToast.current = true;
+      toastSuccess(`Loaded: ${loaderData.basslineName}`, { duration: 2000 });
+    }
+  }, [loaderData.template, loaderData.basslineName, toastSuccess]);
   
   // Mode system
   const modeSystem = useModeContext();
@@ -237,6 +248,7 @@ function Flow() {
   const toggleGadgetMenu = useCallback(() => {
     if (showDreamsGadgetMenu) {
       setShowDreamsGadgetMenu(false);
+      playToolDisableSound();
       // Find and pop the gadget menu layer
       const gadgetLayer = uiStack.stack.find(item => item.type === 'gadgetMenu');
       if (gadgetLayer) {
@@ -244,6 +256,7 @@ function Flow() {
       }
     } else {
       setShowDreamsGadgetMenu(true);
+      playToolEnableSound();
       uiStack.push({
         type: 'gadgetMenu',
         onEscape: () => {
@@ -251,7 +264,7 @@ function Flow() {
         }
       });
     }
-  }, [showDreamsGadgetMenu, setShowDreamsGadgetMenu, uiStack]);
+  }, [showDreamsGadgetMenu, setShowDreamsGadgetMenu, uiStack, playToolEnableSound, playToolDisableSound]);
 
   const handleAddContact = useCallback(() => {
     const position = {
@@ -1039,15 +1052,6 @@ export default function Editor() {
     }
     return new PropagationNetwork();
   }, [template]);
-  
-  // Show loaded toast only on initial mount
-  const hasShownLoadedToast = useRef(false);
-  useEffect(() => {
-    if (template && basslineName && !hasShownLoadedToast.current) {
-      hasShownLoadedToast.current = true;
-      toastSuccess(`Loaded: ${basslineName}`, { duration: 2000 });
-    }
-  }, [template, basslineName]);
   
   return (
     <NetworkProvider initialNetwork={network} key={basslineName || 'default'} skipDefaultContent={!!template}>

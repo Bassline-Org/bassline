@@ -26,6 +26,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
   const fetcher = useFetcher();
   const { play: playConnectionSound } = useSound('connection/create');
   const { play: playCelebrationSound } = useSound('special/celebrate');
+  const { error: toastError } = useSoundToast();
   const modeSystem = useModeContext();
   
   // Get visual class from mode system
@@ -127,7 +128,7 @@ export const GroupNode = memo(({ id, selected }: NodeProps) => {
         }
       }
     } else {
-      toast.error(result.message || 'Failed to connect', { duration: 2000 });
+      toastError(result.message || 'Failed to connect', { duration: 2000 });
     }
     
     // Submit form to exit valence mode

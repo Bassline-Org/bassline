@@ -17,6 +17,7 @@ import {
 } from '~/components/ui/tooltip';
 import { getGadgetIcon } from '~/components/gadgets/gadget-icons';
 import type { Contact } from '~/propagation-core';
+import { motion } from 'framer-motion';
 
 const groupNodeVariants = cva(
   "transition-all shadow-md hover:shadow-lg nopan",
@@ -103,22 +104,38 @@ export const GroupNodeView = memo(({
   const PrimitiveIcon = isPrimitive ? getGadgetIcon(name) : null;
   
   return (
-    <TooltipProvider>
-      <Card 
-        className={cn(
-          groupNodeVariants({ 
-            nodeType, 
-            selected, 
-            interactive,
-            valenceCompatible: valenceCompatible && !valenceSource,
-            valenceSource,
-            highlighted,
-            dimmed
-          }), 
-          isPrimitive && "p-[5px]",
-          className
-        )}
-      >
+    <motion.div
+      initial={{ scale: 0, opacity: 0, rotateY: 90 }}
+      animate={{ 
+        scale: valenceCompatible ? [1, 1.02, 1] : (selected ? 1.05 : 1),
+        opacity: dimmed ? 0.3 : 1,
+        rotateY: 0
+      }}
+      whileHover={{ scale: selected ? 1.05 : 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{
+        scale: valenceCompatible ? { repeat: Infinity, duration: 2, ease: "easeInOut" } : { type: "spring", stiffness: 300, damping: 25 },
+        opacity: { duration: 0.2 },
+        rotateY: { type: "spring", stiffness: 260, damping: 20 }
+      }}
+      style={{ transformStyle: "preserve-3d" }}
+    >
+      <TooltipProvider>
+        <Card 
+          className={cn(
+            groupNodeVariants({ 
+              nodeType, 
+              selected, 
+              interactive,
+              valenceCompatible: valenceCompatible && !valenceSource,
+              valenceSource,
+              highlighted,
+              dimmed: false
+            }), 
+            isPrimitive && "p-[5px]",
+            className
+          )}
+        >
         {isPrimitive ? (
           // Primitive gadgets - just show icon
           <CardContent className="p-0 pb-0 flex items-center justify-center w-[40px] h-[40px]">
@@ -245,6 +262,7 @@ export const GroupNodeView = memo(({
         )}
       </Card>
     </TooltipProvider>
+    </motion.div>
   );
 });
 

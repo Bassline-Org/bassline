@@ -3,6 +3,7 @@ import { getBezierPath, EdgeLabelRenderer, BaseEdge } from '@xyflow/react'
 import type { EdgeProps } from '@xyflow/react'
 import { getValueThickness } from '~/propagation-core/utils/value-detection'
 import { useEditorModes } from '~/propagation-react/hooks/useURLState'
+import { motion } from 'framer-motion'
 
 export function FatEdge({
   id,
@@ -92,28 +93,39 @@ export function FatEdge({
       
       {/* Add subtle pattern overlay for fat edges */}
       {thickness >= 3 && (
-        <path
+        <motion.path
           d={edgePath}
           fill="none"
           stroke="rgba(255,255,255,0.2)"
           strokeWidth={strokeWidth * 0.4}
           strokeDasharray="2,4"
           strokeLinecap="round"
-          style={{
-            animation: 'dash 20s linear infinite',
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{
+            pathLength: { repeat: Infinity, duration: 2, ease: "linear" }
           }}
         />
       )}
       
       {/* Add inner glow for very fat values */}
       {thickness >= 4 && (
-        <path
+        <motion.path
           d={edgePath}
           fill="none"
           stroke="rgba(255,255,255,0.4)"
           strokeWidth={strokeWidth * 0.2}
           style={{
             filter: 'blur(2px)',
+          }}
+          animate={{
+            opacity: [0.2, 0.6, 0.2],
+            strokeWidth: [strokeWidth * 0.2, strokeWidth * 0.3, strokeWidth * 0.2]
+          }}
+          transition={{
+            repeat: Infinity,
+            duration: 3,
+            ease: "easeInOut"
           }}
         />
       )}

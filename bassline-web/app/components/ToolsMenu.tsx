@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import { useSound } from '~/components/SoundSystem'
 
 export interface ViewSettings {
   showInstructions: boolean
@@ -60,12 +61,14 @@ export function ToolsMenu({
   onSelectConnected
 }: ToolsMenuProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const { play: playSelectSound } = useSound('node/select', 0.2) // Quiet selection sound for UI toggles
   
   const toggleSetting = (key: keyof ViewSettings) => {
     onViewSettingsChange({
       ...viewSettings,
       [key]: !viewSettings[key]
     })
+    playSelectSound()
   }
   
   const ViewToggle = ({ 

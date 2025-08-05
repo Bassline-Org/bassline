@@ -10,6 +10,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '~/lib/utils';
 import { formatContentForDisplay, formatContentForTooltip } from '~/utils/content-display';
 import type { Contradiction } from '~/propagation-core';
+import { motion } from 'framer-motion';
 
 const nodeVariants = cva(
   "w-[60px] h-[40px] transition-all shadow-sm hover:shadow-md relative nopan",
@@ -78,20 +79,8 @@ export const ContactNodeView = memo(({
   const nodeType = isBoundary ? 'boundary' : 'contact';
   
   return (
-    <Card 
-      className={cn(
-        nodeVariants({ nodeType, selected, highlighted, dimmed }),
-        lastContradiction && "ring-2 ring-red-500",
-        valenceCompatible && "ring-2 ring-green-500 animate-pulse cursor-pointer",
-        valenceSource && "ring-2 ring-blue-500",
-        className
-      )}
-    >
-      {/* Left and right visual borders */}
-      <div className="absolute left-0 top-0 bottom-0 w-2 bg-muted/10" />
-      <div className="absolute right-0 top-0 bottom-0 w-2 bg-muted/10" />
-      
-      {/* Visible handles like group nodes */}
+    <>
+      {/* Visible handles outside motion wrapper for proper React Flow detection */}
       <Handle 
         type="target" 
         position={Position.Left}
@@ -114,6 +103,34 @@ export const ContactNodeView = memo(({
             : 'linear-gradient(135deg, var(--node-contact), color-mix(in oklch, var(--node-contact), white 20%))'
         }}
       />
+      
+      <motion.div
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ 
+          scale: valenceCompatible ? [1, 1.03, 1] : (selected ? 1.1 : 1), 
+          opacity: dimmed ? 0.3 : 1,
+          rotate: lastContradiction ? [0, -5, 5, -5, 5, 0] : 0
+        }}
+        whileHover={{ scale: selected ? 1.1 : 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        transition={{
+          scale: valenceCompatible ? { repeat: Infinity, duration: 1.5, ease: "easeInOut" } : { type: "spring", stiffness: 400, damping: 20 },
+          opacity: { duration: 0.2 },
+          rotate: { duration: 0.5, ease: "easeInOut" }
+        }}
+      >
+        <Card 
+          className={cn(
+            nodeVariants({ nodeType, selected, highlighted, dimmed: false }),
+            lastContradiction && "ring-2 ring-red-500",
+            valenceCompatible && "ring-2 ring-green-500 cursor-pointer",
+            valenceSource && "ring-2 ring-blue-500",
+            className
+          )}
+        >
+        {/* Left and right visual borders */}
+        <div className="absolute left-0 top-0 bottom-0 w-2 bg-muted/10" />
+        <div className="absolute right-0 top-0 bottom-0 w-2 bg-muted/10" />
       
       {/* Content */}
       <div className="absolute inset-0 flex items-center justify-center px-[10px]">
@@ -141,8 +158,10 @@ export const ContactNodeView = memo(({
         >
           {lastContradiction ? '⚠' : content !== undefined ? formatContentForDisplay(content) : '∅'}
         </div>
-      </div>
-    </Card>
+        </div>
+      </Card>
+      </motion.div>
+    </>
   );
 });
 

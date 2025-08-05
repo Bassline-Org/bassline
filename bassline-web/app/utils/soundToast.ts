@@ -9,30 +9,30 @@ export function initializeSoundToast(playSound: (soundName: string) => void) {
 }
 
 // Create a wrapper that plays sound with toasts
-export const toast = {
-  success: (message: string, options?: ExternalToast) => {
-    playSoundFunction?.('ui/toggle')
-    return sonnerToast.success(message, options)
-  },
-  
-  error: (message: string, options?: ExternalToast) => {
-    playSoundFunction?.('ui/error')
-    return sonnerToast.error(message, options)
-  },
-  
-  info: (message: string, options?: ExternalToast) => {
-    playSoundFunction?.('ui/toggle')
-    return sonnerToast.info(message, options)
-  },
-  
-  warning: (message: string, options?: ExternalToast) => {
-    playSoundFunction?.('ui/toggle')
-    return sonnerToast.warning(message, options)
-  },
-  
-  // Default toast
+export const toast = Object.assign(
   (message: string, options?: ExternalToast) => {
     playSoundFunction?.('ui/toggle')
     return sonnerToast(message, options)
+  },
+  {
+    success: (message: string, options?: ExternalToast) => {
+      playSoundFunction?.('ui/toggle')
+      return sonnerToast.success(message, options)
+    },
+    
+    error: (message: string, options?: ExternalToast) => {
+      playSoundFunction?.('ui/error')
+      return sonnerToast.error(message, options)
+    },
+    
+    info: (message: string, options?: ExternalToast) => {
+      playSoundFunction?.('ui/toggle')
+      return sonnerToast.info(message, options)
+    },
+    
+    warning: (message: string, options?: ExternalToast) => {
+      playSoundFunction?.('ui/toggle')
+      return sonnerToast.warning(message, options)
+    }
   }
-}
+)

@@ -34,7 +34,7 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
   const { network, syncToReactFlow, currentGroupId, appSettings } = useNetworkContext()
   const { navigateToGroup: urlNavigateToGroup, navigateToParent: urlNavigateToParent } = useNavigationState()
   const [currentGroup, setCurrentGroup] = useState(network.currentGroup)
-  const { play: playCreateSound } = useSound('node/create')
+  const { play: playPlaceSound } = useSound('ui/place')
   const { play: playCreateGadgetSound } = useSound('gadget/create')
   const { play: playConnectSound } = useSound('connection/create')
   const { play: playEnterGadgetSound } = useSound('gadget/enter')
@@ -105,17 +105,17 @@ export function useCurrentGroup(): UseCurrentGroupReturn {
   const addContact = useCallback((position: Position): Contact => {
     const contact = network.addContact(position, appSettings.propagation.defaultBlendMode)
     syncToReactFlow()
-    playCreateSound()
+    playPlaceSound()
     return contact
-  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, playCreateSound])
+  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, playPlaceSound])
   
   const addBoundaryContact = useCallback((position: Position, direction: 'input' | 'output', name?: string): Contact => {
     const blendMode = appSettings.propagation.defaultBoundaryBlendMode || appSettings.propagation.defaultBlendMode
     const contact = network.addBoundaryContact(position, direction, name, blendMode)
     syncToReactFlow()
-    playCreateSound()
+    playPlaceSound()
     return contact
-  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, appSettings.propagation.defaultBoundaryBlendMode, playCreateSound])
+  }, [network, syncToReactFlow, appSettings.propagation.defaultBlendMode, appSettings.propagation.defaultBoundaryBlendMode, playPlaceSound])
   
   const createSubgroup = useCallback((name: string, position?: Position): ContactGroup => {
     const group = network.createGroup(name)

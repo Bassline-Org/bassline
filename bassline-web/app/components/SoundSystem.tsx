@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useModeContext } from '~/propagation-react/contexts/ModeContext'
 
 interface SoundSystemContextValue {
-  playSound: (soundName: string) => void
+  playSound: (soundName: string, volumeOverride?: number) => void
   setVolume: (volume: number) => void
   setEnabled: (enabled: boolean) => void
   isEnabled: boolean
@@ -54,10 +54,12 @@ const soundMap: Record<string, string> = {
   'ui/toggle': '/lbp-sounds/guinotify.mp3',
   'ui/success': '/lbp-sounds/eventcomplete.mp3',
   'ui/error': '/lbp-sounds/eventfail.mp3',
-  'ui/layout': '/lbp-sounds/subeventcomplete.mp3',
+  'ui/layout': '/lbp-sounds/grabberspickup.mp3',
   'ui/tool-enable': '/lbp-sounds/openpoppit.mp3',
   'ui/tool-disable': '/lbp-sounds/closepoppit.mp3',
   'ui/place': '/lbp-sounds/guinotifyclose.mp3',
+  'ui/boundary-create': '/lbp-sounds/creatinatorgrab.mp3',
+  'ui/boundary-revert': '/lbp-sounds/creatinatordrop.mp3',
   
   // Special actions
   'special/achievement': '/lbp-sounds/collectallprizes.mp3',
@@ -152,7 +154,7 @@ export function SoundSystemProvider({
   }, [])
 
 
-  const playSound = useCallback(async (soundName: string) => {
+  const playSound = useCallback(async (soundName: string, volumeOverride?: number) => {
     // Check if sound mode is active (if mode system is available)
     const soundModeActive = modeSystem ? modeSystem.activeMinorModes.includes('sound') : true
     if (!soundModeActive || !isEnabled || !audioContextRef.current) return
@@ -183,7 +185,7 @@ export function SoundSystemProvider({
       source.connect(gainNode)
       gainNode.connect(audioContextRef.current.destination)
       
-      gainNode.gain.value = globalVolumeRef.current
+      gainNode.gain.value = volumeOverride !== undefined ? volumeOverride : globalVolumeRef.current
       
       source.start(0)
     } catch (error) {
@@ -214,10 +216,10 @@ export function SoundSystemProvider({
 }
 
 // Hook for easy sound playing
-export function useSound(soundName: string) {
+export function useSound(soundName: string, defaultVolume?: number) {
   const { playSound } = useSoundSystem()
   
   return {
-    play: useCallback(() => playSound(soundName), [playSound, soundName])
+    play: useCallback((volumeOverride?: number) => playSound(soundName, volumeOverride ?? defaultVolume), [playSound, soundName, defaultVolume])
   }
 }

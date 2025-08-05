@@ -27,11 +27,16 @@ export function usePropagationNetwork(
   const { play: playDeleteNodeSound } = useSound("node/delete");
   const { play: playDeleteGadgetSound } = useSound("gadget/delete");
   const { play: playDeleteConnectionSound } = useSound("connection/delete");
-  const { play: playSelectSound } = useSound("node/select");
+  const { play: playSelectSound } = useSound("node/select", 0.2); // Quieter selection sound
+  const { play: playPlaceSound } = useSound("ui/place");
   const { onContactDoubleClick } = options;
   
   // Use a single ref to track delete sound cooldown (shared between nodes and connections)
   const deleteSoundCooldownRef = useRef<boolean>(false);
+  
+  // Track selection sound state
+  const selectionSoundTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSelectionCountRef = useRef<number>(0);
   
   const { network, syncToReactFlow, nodes, edges, setNodes, setEdges, onNodesChange: rfOnNodesChange, onEdgesChange: rfOnEdgesChange } =
     useNetworkContext();
@@ -84,10 +89,31 @@ export function usePropagationNetwork(
       const groupIds = nodes.filter(n => n.type === 'group').map(n => n.id);
       setContextSelectionRef.current(contactIds, groupIds);
       
-      // Play select sound if something was selected (but not on deselection)
-      if (nodes.length > 0) {
-        playSelectSound();
+      // Play select sound with debouncing for drag selections
+      const currentSelectionCount = nodes.length;
+      
+      if (currentSelectionCount > 0) {
+        // Clear any existing timeout
+        if (selectionSoundTimeoutRef.current) {
+          clearTimeout(selectionSoundTimeoutRef.current);
+        }
+        
+        // If this is a new selection (not just adding to existing selection during drag)
+        if (lastSelectionCountRef.current === 0) {
+          // Play immediately for first selection
+          playSelectSound();
+        }
+        
+        // Set a timeout to play sound when drag selection stops changing
+        selectionSoundTimeoutRef.current = setTimeout(() => {
+          // Only play if we've added nodes (not just changed during drag)
+          if (currentSelectionCount > lastSelectionCountRef.current) {
+            playSelectSound();
+          }
+        }, 200); // 200ms debounce
       }
+      
+      lastSelectionCountRef.current = currentSelectionCount;
     },
     [playSelectSound], // Include playSelectSound in deps
   );
@@ -245,9 +271,10 @@ export function usePropagationNetwork(
     (template: GadgetTemplate, position: Position) => {
       const gadget = network.instantiateTemplate(template, position);
       syncToReactFlow();
+      playPlaceSound();
       return gadget;
     },
-    [network, syncToReactFlow],
+    [network, syncToReactFlow, playPlaceSound],
   );
 
   return {
