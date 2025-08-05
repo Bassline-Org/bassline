@@ -1,0 +1,94 @@
+{
+  "groups": {
+    "root": {
+      "id": "root",
+      "name": "Calculator Example",
+      "contactIds": ["input-a", "input-b", "result"],
+      "wireIds": ["w1", "w2", "w3"],
+      "subgroupIds": ["add-gadget"],
+      "boundaryContactIds": []
+    },
+    "add-gadget": {
+      "id": "add-gadget",
+      "name": "Add",
+      "primitiveId": "add",
+      "contactIds": ["add-a", "add-b", "add-sum"],
+      "wireIds": [],
+      "subgroupIds": [],
+      "boundaryContactIds": ["add-a", "add-b", "add-sum"]
+    }
+  },
+  "contacts": {
+    "input-a": {
+      "id": "input-a",
+      "content": 10,
+      "blendMode": "accept-last",
+      "groupId": "root",
+      "name": "Input A"
+    },
+    "input-b": {
+      "id": "input-b",
+      "content": 20,
+      "blendMode": "accept-last",
+      "groupId": "root",
+      "name": "Input B"
+    },
+    "result": {
+      "id": "result",
+      "content": null,
+      "blendMode": "accept-last",
+      "groupId": "root",
+      "name": "Result"
+    },
+    "add-a": {
+      "id": "add-a",
+      "content": null,
+      "blendMode": "accept-last",
+      "groupId": "add-gadget",
+      "isBoundary": true,
+      "boundaryDirection": "input",
+      "name": "a"
+    },
+    "add-b": {
+      "id": "add-b",
+      "content": null,
+      "blendMode": "accept-last",
+      "groupId": "add-gadget",
+      "isBoundary": true,
+      "boundaryDirection": "input",
+      "name": "b"
+    },
+    "add-sum": {
+      "id": "add-sum",
+      "content": null,
+      "blendMode": "accept-last",
+      "groupId": "add-gadget",
+      "isBoundary": true,
+      "boundaryDirection": "output",
+      "name": "sum"
+    }
+  },
+  "wires": {
+    "w1": {
+      "id": "w1",
+      "fromId": "input-a",
+      "toId": "add-a",
+      "type": "directed",
+      "groupId": "root"
+    },
+    "w2": {
+      "id": "w2",
+      "fromId": "input-b",
+      "toId": "add-b",
+      "type": "directed",
+      "groupId": "root"
+    },
+    "w3": {
+      "id": "w3",
+      "fromId": "add-sum",
+      "toId": "result",
+      "type": "directed",
+      "groupId": "add-gadget"
+    }
+  }
+}

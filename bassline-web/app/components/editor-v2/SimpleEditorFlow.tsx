@@ -23,6 +23,7 @@ import { GadgetPalette } from './GadgetPalette'
 import { Breadcrumbs } from './Breadcrumbs'
 import { PropertyPanel } from './PropertyPanel'
 import { ContextMenu } from './ContextMenu'
+import { ConnectionTypeDialog } from './ConnectionTypeDialog'
 import { useSubgroupData } from '~/hooks/useSubgroupData'
 import { useGroupWires } from '~/hooks/useGroupWires'
 import '@xyflow/react/dist/style.css'
@@ -64,6 +65,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+  const [pendingConnection, setPendingConnection] = useState<Connection | null>(null)
   
   // Track previous groupId to detect actual navigation
   const [previousGroupId, setPreviousGroupId] = useState(groupId)
@@ -199,21 +201,9 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   const onConnect = useCallback((params: Connection) => {
     if (!params.source || !params.target) return
     
-    // For gadget connections, use the handle ID which is the boundary contact ID
-    const sourceId = params.sourceHandle || params.source
-    const targetId = params.targetHandle || params.target
-    
-    submit({
-      intent: 'create-wire',
-      fromId: sourceId,
-      toId: targetId,
-      type: 'bidirectional'
-    }, {
-      method: 'post',
-      action: '/api/editor-v2/actions',
-      navigate: false
-    })
-  }, [submit])
+    // Show connection type dialog
+    setPendingConnection(params)
+  }, [])
   
   // Handle background click
   const onPaneClick = useCallback((event: React.MouseEvent) => {
@@ -508,6 +498,12 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
             onClose={() => setContextMenu(null)}
           />
         )}
+        
+        {/* Connection Type Dialog */}
+        <ConnectionTypeDialog
+          connection={pendingConnection}
+          onClose={() => setPendingConnection(null)}
+        />
       </div>
     </div>
   )
