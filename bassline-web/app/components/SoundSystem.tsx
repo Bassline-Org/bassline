@@ -1,6 +1,6 @@
 import { createContext, useContext, useRef, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useModeContext } from '~/propagation-react/contexts/ModeContext'
+import { useSoundContext } from '~/propagation-react/contexts/SoundContext'
 
 interface SoundSystemContextValue {
   playSound: (soundName: string, volumeOverride?: number) => void
@@ -90,14 +90,7 @@ export function SoundSystemProvider({
   const [isEnabled, setEnabledState] = useState(initialEnabled)
   const globalVolumeRef = useRef(globalVolume)
   const audioContextRef = useRef<AudioContext | null>(null)
-  
-  // Try to get mode context if available
-  let modeSystem: any = null
-  try {
-    modeSystem = useModeContext()
-  } catch (e) {
-    // Mode context not available - that's okay
-  }
+  const { soundEnabled } = useSoundContext()
 
   // Initialize audio context on first user interaction
   useEffect(() => {
@@ -155,9 +148,8 @@ export function SoundSystemProvider({
 
 
   const playSound = useCallback(async (soundName: string, volumeOverride?: number) => {
-    // Check if sound mode is active (if mode system is available)
-    const soundModeActive = modeSystem ? modeSystem.activeMinorModes.includes('sound') : true
-    if (!soundModeActive || !isEnabled || !audioContextRef.current) return
+    // Check if sound is enabled
+    if (!soundEnabled || !isEnabled || !audioContextRef.current) return
 
     // Map our sound name to file path
     const soundUrl = soundMap[soundName]
@@ -191,7 +183,7 @@ export function SoundSystemProvider({
     } catch (error) {
       console.warn('Failed to play sound:', error)
     }
-  }, [isEnabled, modeSystem?.activeMinorModes])
+  }, [isEnabled, soundEnabled])
 
   const setVolume = useCallback((volume: number) => {
     globalVolumeRef.current = Math.max(0, Math.min(1, volume))

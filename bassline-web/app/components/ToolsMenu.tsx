@@ -71,7 +71,7 @@ export function ToolsMenu({
     playSelectSound()
   }
   
-  const ViewToggle = ({ 
+  const ViewToggle = ({
     setting, 
     label, 
     icon: Icon,

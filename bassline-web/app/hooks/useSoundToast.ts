@@ -4,34 +4,36 @@ import { useSound } from '~/components/SoundSystem'
 import { useCallback } from 'react'
 
 export function useSoundToast() {
-  const { play: playNotifySound } = useSound('ui/toggle')
-  const { play: playErrorSound } = useSound('ui/error')
-  const { play: playSuccessSound } = useSound('ui/success')
+  // Toast sounds disabled for now - can re-enable later
+  // When re-enabling, use quieter volume: useSound('ui/toggle', 0.2)
+  // const { play: playNotifySound } = useSound('ui/toggle', 0.2)
+  // const { play: playErrorSound } = useSound('ui/error', 0.3)
+  // const { play: playSuccessSound } = useSound('ui/success', 0.3)
   
   const toast = useCallback((message: string, options?: ExternalToast) => {
-    playNotifySound()
+    // playNotifySound()
     return sonnerToast(message, options)
-  }, [playNotifySound])
+  }, [])
   
   const success = useCallback((message: string, options?: ExternalToast) => {
-    playSuccessSound()
+    // playSuccessSound()
     return sonnerToast.success(message, options)
-  }, [playSuccessSound])
+  }, [])
   
   const error = useCallback((message: string, options?: ExternalToast) => {
-    playErrorSound()
+    // playErrorSound()
     return sonnerToast.error(message, options)
-  }, [playErrorSound])
+  }, [])
   
   const info = useCallback((message: string, options?: ExternalToast) => {
-    playNotifySound()
+    // playNotifySound()
     return sonnerToast.info(message, options)
-  }, [playNotifySound])
+  }, [])
   
   const warning = useCallback((message: string, options?: ExternalToast) => {
-    playNotifySound()
+    // playNotifySound()
     return sonnerToast.warning(message, options)
-  }, [playNotifySound])
+  }, [])
   
   return {
     toast,

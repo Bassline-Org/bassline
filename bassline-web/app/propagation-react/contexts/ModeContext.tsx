@@ -1,26 +1,51 @@
-/**
- * React context for the mode system
- */
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
-import React, { createContext, useContext } from 'react'
-import { useModeSystem, type UseModeSystemReturn } from '../hooks/useModeSystem'
+export type Mode = 'normal' | 'valence' | 'copy'
 
-const ModeSystemContext = createContext<UseModeSystemReturn | null>(null)
-
-export function ModeSystemProvider({ children }: { children: React.ReactNode }) {
-  const modeSystem = useModeSystem()
-  
-  return (
-    <ModeSystemContext.Provider value={modeSystem}>
-      {children}
-    </ModeSystemContext.Provider>
-  )
+interface ModeContextValue {
+  currentMode: Mode
+  setMode: (mode: Mode) => void
+  exitMode: () => void
+  // Valence mode specific
+  valenceSourceIds: string[]
+  setValenceSources: (ids: string[]) => void
 }
 
+const ModeContext = createContext<ModeContextValue | null>(null)
+
 export function useModeContext() {
-  const context = useContext(ModeSystemContext)
+  const context = useContext(ModeContext)
   if (!context) {
-    throw new Error('useModeContext must be used within ModeSystemProvider')
+    throw new Error('useModeContext must be used within ModeProvider')
   }
   return context
+}
+
+export function ModeProvider({ children }: { children: ReactNode }) {
+  const [currentMode, setCurrentMode] = useState<Mode>('normal')
+  const [valenceSourceIds, setValenceSourceIds] = useState<string[]>([])
+  
+  const setMode = useCallback((mode: Mode) => {
+    setCurrentMode(mode)
+    if (mode !== 'valence') {
+      setValenceSourceIds([])
+    }
+  }, [])
+  
+  const exitMode = useCallback(() => {
+    setCurrentMode('normal')
+    setValenceSourceIds([])
+  }, [])
+  
+  return (
+    <ModeContext.Provider value={{
+      currentMode,
+      setMode,
+      exitMode,
+      valenceSourceIds,
+      setValenceSources: setValenceSourceIds
+    }}>
+      {children}
+    </ModeContext.Provider>
+  )
 }

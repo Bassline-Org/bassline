@@ -84,6 +84,7 @@ export const ContactNodeView = memo(({
       <Handle 
         type="target" 
         position={Position.Left}
+        isConnectable={true}
         className="!w-4 !h-4 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all !z-10"
         style={{ 
           left: '-8px',
@@ -95,6 +96,7 @@ export const ContactNodeView = memo(({
       <Handle 
         type="source" 
         position={Position.Right}
+        isConnectable={true}
         className="!w-4 !h-4 !rounded-sm !bg-gradient-to-br !from-background !to-muted !border !border-border !shadow-sm hover:!shadow-md !transition-all !z-10"
         style={{ 
           right: '-8px',

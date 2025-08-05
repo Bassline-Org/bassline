@@ -24,69 +24,96 @@ interface ContactPropertySectionProps {
   onToggle: () => void
   isFocused: boolean
   hideToggle?: boolean
+  onSetDirty?: (dirty: boolean) => void
+  onSetFocused?: (focused: boolean) => void
+  itemKey?: string
 }
 
-export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocused, hideToggle = false }: ContactPropertySectionProps) {
+export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocused, hideToggle = false, onSetDirty, onSetFocused, itemKey }: ContactPropertySectionProps) {
   const contactData = useContact(contactId)
   const [valueType, setValueType] = useState<ValueType>('string')
   const [tempValue, setTempValue] = useState<any>(null)
   const valueInputRef = useRef<HTMLInputElement>(null)
+  const [originalValue, setOriginalValue] = useState<any>(null)
+  const [hasValueChanged, setHasValueChanged] = useState(false)
+  const [localIsFocused, setLocalIsFocused] = useState(false)
+  
+  // Use a stable key for this component instance
+  const stableKey = itemKey || contactId
 
   // Detect value type from current content
   useEffect(() => {
     if (!contactData.contact) return
     
     const content = contactData.content
+    let value: any
+    
     if (content === undefined || content === null) {
       setValueType('string')
+      value = ''
     } else if (content instanceof Interval) {
       setValueType('interval')
-      setTempValue({ min: content.min, max: content.max })
+      value = { min: content.min, max: content.max }
     } else if (content instanceof Color) {
       setValueType('color')
-      setTempValue({ r: content.r, g: content.g, b: content.b })
+      value = { r: content.r, g: content.g, b: content.b }
     } else if (content instanceof Temperature) {
       setValueType('temperature')
-      setTempValue(content.celsius)
+      value = content.celsius
     } else if (content instanceof ConsensusBoolean) {
       setValueType('boolean')
-      setTempValue(content.value)
+      value = content.value
     } else if (content instanceof Point2D) {
       setValueType('point2d')
-      setTempValue({ x: content.x, y: content.y })
+      value = { x: content.x, y: content.y }
     } else if (content instanceof ExactString) {
       setValueType('exactString')
-      setTempValue(content.value)
+      value = content.value
     } else if (content instanceof SetValue) {
       setValueType('set')
-      setTempValue(content.toArray().join(', '))
+      value = content.toArray().join(', ')
     } else if (content instanceof Set) {
       setValueType('set')
-      setTempValue(Array.from(content).join(', '))
+      value = Array.from(content).join(', ')
     } else if (content instanceof Map) {
       setValueType('map')
       const pairs = Array.from(content.entries()).map(([k, v]) => `${k}:${v}`)
-      setTempValue(pairs.join(', '))
+      value = pairs.join(', ')
     } else if (content instanceof Date) {
       setValueType('date')
-      setTempValue(content.toISOString().split('T')[0])
+      value = content.toISOString().split('T')[0]
     } else if (Array.isArray(content)) {
       setValueType('array')
-      setTempValue(JSON.stringify(content))
+      value = JSON.stringify(content)
     } else if (typeof content === 'number') {
       setValueType('number')
-      setTempValue(content)
+      value = content
     } else if (typeof content === 'boolean') {
       setValueType('boolean')
-      setTempValue(content)
+      value = content
     } else if (typeof content === 'object' && content !== null) {
       setValueType('object')
-      setTempValue(JSON.stringify(content, null, 2))
+      value = JSON.stringify(content, null, 2)
     } else {
       setValueType('string')
-      setTempValue(String(content))
+      value = String(content)
     }
+    
+    setTempValue(value)
+    setOriginalValue(value)
+    setHasValueChanged(false)
+    onSetDirty?.(false)
   }, [contactData.contact, contactData.content])
+
+  // Check if value has changed
+  useEffect(() => {
+    const changed = JSON.stringify(tempValue) !== JSON.stringify(originalValue)
+    setHasValueChanged(changed)
+    // Only update dirty state if we have unsaved changes in the input fields
+    if (onSetDirty) {
+      onSetDirty(changed)
+    }
+  }, [tempValue, originalValue, onSetDirty])
 
   const applyValue = () => {
     if (!contactData.contact) return
@@ -164,6 +191,9 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
     }
     
     contactData.setContent(newValue)
+    setOriginalValue(tempValue)
+    setHasValueChanged(false)
+    onSetDirty?.(false)
   }
 
   if (!contactData.contact) return null
@@ -214,6 +244,7 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
               checked={contactData.blendMode === 'merge'}
               onCheckedChange={(checked) => {
                 contactData.setBlendMode(checked ? 'merge' : 'accept-last')
+                // Don't mark as dirty for immediate property changes
               }}
             />
           </div>
@@ -227,6 +258,7 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 checked={contactData.isBoundary}
                 onCheckedChange={(checked) => {
                   contactData.setBoundary(checked)
+                  // Don't mark as dirty for immediate property changes
                 }}
               />
             </div>
@@ -239,6 +271,7 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                   value={contactData.boundaryDirection || 'input'} 
                   onValueChange={(value: 'input' | 'output') => {
                     contactData.setBoundaryDirection(value)
+                    // Don't mark as dirty for immediate property changes
                   }}
                 >
                   <SelectTrigger>
@@ -289,6 +322,15 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 value={tempValue || ''}
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                onFocus={() => {
+                  setLocalIsFocused(true)
+                  onSetFocused?.(true)
+                }}
+                onBlur={() => {
+                  setLocalIsFocused(false)
+                  onSetFocused?.(false)
+                }}
+                key={`${stableKey}-number-input`}
               />
             )}
             
@@ -299,6 +341,14 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 value={tempValue || ''}
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                onFocus={() => {
+                  setLocalIsFocused(true)
+                  onSetFocused?.(true)
+                }}
+                onBlur={() => {
+                  setLocalIsFocused(false)
+                  onSetFocused?.(false)
+                }}
               />
             )}
             
@@ -320,6 +370,14 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 placeholder="comma-separated values"
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                onFocus={() => {
+                  setLocalIsFocused(true)
+                  onSetFocused?.(true)
+                }}
+                onBlur={() => {
+                  setLocalIsFocused(false)
+                  onSetFocused?.(false)
+                }}
               />
             )}
             
@@ -331,6 +389,14 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 placeholder="key:value, key:value"
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                onFocus={() => {
+                  setLocalIsFocused(true)
+                  onSetFocused?.(true)
+                }}
+                onBlur={() => {
+                  setLocalIsFocused(false)
+                  onSetFocused?.(false)
+                }}
               />
             )}
             
@@ -341,6 +407,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 placeholder="JSON array"
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && applyValue()}
+                onFocus={() => onSetFocused?.(true)}
+                onBlur={() => onSetFocused?.(false)}
                 className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md"
                 rows={3}
               />
@@ -353,6 +421,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 placeholder="JSON object"
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && applyValue()}
+                onFocus={() => onSetFocused?.(true)}
+                onBlur={() => onSetFocused?.(false)}
                 className="w-full px-3 py-2 text-sm bg-background border border-input rounded-md"
                 rows={4}
               />
@@ -365,6 +435,14 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 value={tempValue || ''}
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                onFocus={() => {
+                  setLocalIsFocused(true)
+                  onSetFocused?.(true)
+                }}
+                onBlur={() => {
+                  setLocalIsFocused(false)
+                  onSetFocused?.(false)
+                }}
               />
             )}
             
@@ -376,6 +454,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                   placeholder="min"
                   onChange={(e) => setTempValue({ ...tempValue, min: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  onFocus={() => onSetFocused?.(true)}
+                  onBlur={() => onSetFocused?.(false)}
                 />
                 <Input
                   type="number"
@@ -383,6 +463,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                   placeholder="max"
                   onChange={(e) => setTempValue({ ...tempValue, max: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  onFocus={() => onSetFocused?.(true)}
+                  onBlur={() => onSetFocused?.(false)}
                 />
               </div>
             )}
@@ -398,6 +480,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                     max="255"
                     onChange={(e) => setTempValue({ ...tempValue, r: e.target.value })}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={() => onSetFocused?.(true)}
+                    onBlur={() => onSetFocused?.(false)}
                   />
                   <Input
                     type="number"
@@ -407,6 +491,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                     max="255"
                     onChange={(e) => setTempValue({ ...tempValue, g: e.target.value })}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={() => onSetFocused?.(true)}
+                    onBlur={() => onSetFocused?.(false)}
                   />
                   <Input
                     type="number"
@@ -416,6 +502,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                     max="255"
                     onChange={(e) => setTempValue({ ...tempValue, b: e.target.value })}
                     onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                    onFocus={() => onSetFocused?.(true)}
+                    onBlur={() => onSetFocused?.(false)}
                   />
                 </div>
                 {tempValue && (
@@ -436,6 +524,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                   placeholder="celsius"
                   onChange={(e) => setTempValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  onFocus={() => onSetFocused?.(true)}
+                  onBlur={() => onSetFocused?.(false)}
                 />
                 <span className="text-sm text-gray-400">°C</span>
               </div>
@@ -449,6 +539,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                   placeholder="x"
                   onChange={(e) => setTempValue({ ...tempValue, x: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  onFocus={() => onSetFocused?.(true)}
+                  onBlur={() => onSetFocused?.(false)}
                 />
                 <Input
                   type="number"
@@ -456,6 +548,8 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                   placeholder="y"
                   onChange={(e) => setTempValue({ ...tempValue, y: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                  onFocus={() => onSetFocused?.(true)}
+                  onBlur={() => onSetFocused?.(false)}
                 />
               </div>
             )}
@@ -468,6 +562,14 @@ export function ContactPropertySection({ contactId, isExpanded, onToggle, isFocu
                 placeholder="exact string (no merge)"
                 onChange={(e) => setTempValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && applyValue()}
+                onFocus={() => {
+                  setLocalIsFocused(true)
+                  onSetFocused?.(true)
+                }}
+                onBlur={() => {
+                  setLocalIsFocused(false)
+                  onSetFocused?.(false)
+                }}
               />
             )}
           </div>
@@ -500,10 +602,34 @@ interface GroupPropertySectionProps {
   onToggle: () => void
   isFocused: boolean
   hideToggle?: boolean
+  onSetDirty?: (dirty: boolean) => void
+  onSetFocused?: (focused: boolean) => void
 }
 
-export function GroupPropertySection({ groupId, isExpanded, onToggle, isFocused, hideToggle = false }: GroupPropertySectionProps) {
+export function GroupPropertySection({ groupId, isExpanded, onToggle, isFocused, hideToggle = false, onSetDirty, onSetFocused }: GroupPropertySectionProps) {
   const groupData = useGroup(groupId)
+  const [originalName, setOriginalName] = useState('')
+  const [originalPosition, setOriginalPosition] = useState({ x: 0, y: 0 })
+  const [tempName, setTempName] = useState('')
+  const [tempPosition, setTempPosition] = useState({ x: 0, y: 0 })
+
+  // Initialize values when group data loads
+  useEffect(() => {
+    if (groupData.group) {
+      setOriginalName(groupData.name)
+      setTempName(groupData.name)
+      setOriginalPosition({ x: groupData.position.x, y: groupData.position.y })
+      setTempPosition({ x: groupData.position.x, y: groupData.position.y })
+    }
+  }, [groupData.group, groupData.name, groupData.position.x, groupData.position.y])
+
+  // Check if values have changed
+  useEffect(() => {
+    const nameChanged = tempName !== originalName
+    const positionChanged = tempPosition.x !== originalPosition.x || tempPosition.y !== originalPosition.y
+    const hasChanged = nameChanged || positionChanged
+    onSetDirty?.(hasChanged)
+  }, [tempName, tempPosition, originalName, originalPosition, onSetDirty])
 
   if (!groupData.group) return null
 
@@ -551,9 +677,25 @@ export function GroupPropertySection({ groupId, isExpanded, onToggle, isFocused,
             <Input
               id={`name-${groupId}`}
               type="text"
-              value={groupData.name}
-              onChange={(e) => groupData.rename(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+              value={tempName}
+              onChange={(e) => {
+                setTempName(e.target.value)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  groupData.rename(tempName)
+                  setOriginalName(tempName)
+                  e.currentTarget.blur()
+                }
+              }}
+              onBlur={() => {
+                if (tempName !== originalName) {
+                  groupData.rename(tempName)
+                  setOriginalName(tempName)
+                }
+                onSetFocused?.(false)
+              }}
+              onFocus={() => onSetFocused?.(true)}
             />
           </div>
           
@@ -600,16 +742,48 @@ export function GroupPropertySection({ groupId, isExpanded, onToggle, isFocused,
               <Input
                 type="number"
                 placeholder="X"
-                value={Math.round(groupData.position.x)}
-                onChange={(e) => groupData.setPosition({ ...groupData.position, x: Number(e.target.value) })}
-                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                value={Math.round(tempPosition.x)}
+                onChange={(e) => {
+                  setTempPosition({ ...tempPosition, x: Number(e.target.value) })
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    groupData.setPosition(tempPosition)
+                    setOriginalPosition(tempPosition)
+                    e.currentTarget.blur()
+                  }
+                }}
+                onBlur={() => {
+                  if (tempPosition.x !== originalPosition.x || tempPosition.y !== originalPosition.y) {
+                    groupData.setPosition(tempPosition)
+                    setOriginalPosition(tempPosition)
+                  }
+                  onSetFocused?.(false)
+                }}
+                onFocus={() => onSetFocused?.(true)}
               />
               <Input
                 type="number"
                 placeholder="Y"
-                value={Math.round(groupData.position.y)}
-                onChange={(e) => groupData.setPosition({ ...groupData.position, y: Number(e.target.value) })}
-                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                value={Math.round(tempPosition.y)}
+                onChange={(e) => {
+                  setTempPosition({ ...tempPosition, y: Number(e.target.value) })
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    groupData.setPosition(tempPosition)
+                    setOriginalPosition(tempPosition)
+                    e.currentTarget.blur()
+                  }
+                }}
+                onBlur={() => {
+                  if (tempPosition.x !== originalPosition.x || tempPosition.y !== originalPosition.y) {
+                    groupData.setPosition(tempPosition)
+                    setOriginalPosition(tempPosition)
+                  }
+                  onSetFocused?.(false)
+                }}
+                onFocus={() => onSetFocused?.(true)}
               />
             </div>
           </div>

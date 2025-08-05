@@ -15,6 +15,8 @@ interface PropertyPanelFrameProps {
   isTop: boolean
   visibleDepth: number // 0 for top, 1 for second, etc.
   onNavigateBack?: () => void
+  onSetDirty?: (dirty: boolean) => void
+  onSetFocused?: (focused: boolean) => void
   shouldFocus?: React.MutableRefObject<boolean>
 }
 
@@ -23,6 +25,8 @@ export function PropertyPanelFrame({
   isTop, 
   visibleDepth,
   onNavigateBack,
+  onSetDirty,
+  onSetFocused,
   shouldFocus 
 }: PropertyPanelFrameProps) {
   // Calculate visual properties based on depth
@@ -76,25 +80,31 @@ export function PropertyPanelFrame({
 
       {/* Frame Content */}
       <div className={cn(
-        "p-4 overflow-y-auto",
+        "p-4 overflow-y-auto scrollbar-hide",
         "max-h-[calc(100vh-200px)]",
         !isTop && "pointer-events-none" // Prevent interaction with non-top frames
       )}>
         {frame.type === 'selection' && frame.targetIds && (
           <SelectionFrameContent 
             targetIds={frame.targetIds} 
+            onSetDirty={isTop ? onSetDirty : undefined}
+            onSetFocused={isTop ? onSetFocused : undefined}
             shouldFocus={isTop ? shouldFocus : undefined}
           />
         )}
         {frame.type === 'contact' && frame.targetId && (
           <ContactFrameContent 
             contactId={frame.targetId} 
+            onSetDirty={isTop ? onSetDirty : undefined}
+            onSetFocused={isTop ? onSetFocused : undefined}
             shouldFocus={isTop ? shouldFocus : undefined}
           />
         )}
         {frame.type === 'group' && frame.targetId && (
           <GroupFrameContent 
             groupId={frame.targetId} 
+            onSetDirty={isTop ? onSetDirty : undefined}
+            onSetFocused={isTop ? onSetFocused : undefined}
             shouldFocus={isTop ? shouldFocus : undefined}
           />
         )}
@@ -106,43 +116,64 @@ export function PropertyPanelFrame({
 // Frame content components
 function SelectionFrameContent({ 
   targetIds, 
+  onSetDirty,
+  onSetFocused,
   shouldFocus 
 }: { 
   targetIds: string[]
+  onSetDirty?: (dirty: boolean) => void
+  onSetFocused?: (focused: boolean) => void
   shouldFocus?: React.MutableRefObject<boolean> 
 }) {
   const { selectedContacts, selectedGroups } = useContextSelection()
+  const [expandedItems, setExpandedItems] = React.useState<Set<string>>(new Set())
   
   // Filter to only show items that are in targetIds
   const contacts = selectedContacts.filter(c => targetIds.includes(c.id))
   const groups = selectedGroups.filter(g => targetIds.includes(g.id))
   
+  const toggleExpanded = (id: string) => {
+    setExpandedItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
+  
   return (
-    <div className="space-y-4">
-      {/* Render all contact properties inline */}
+    <div className="space-y-2">
+      {/* Render contact properties */}
       {contacts.map((contact, index) => (
-        <div key={contact.id} className="space-y-2">
-          {index > 0 && <div className="border-t border-gray-700 pt-2" />}
+        <div key={contact.id}>
+          {index > 0 && <div className="border-t border-gray-700 mt-2" />}
           <ContactPropertySection
             contactId={contact.id}
-            isExpanded={true}
-            onToggle={() => {}}
+            isExpanded={expandedItems.has(contact.id)}
+            onToggle={() => toggleExpanded(contact.id)}
             isFocused={false}
-            hideToggle={true}
+            hideToggle={false}
+            onSetDirty={onSetDirty}
+            onSetFocused={onSetFocused}
           />
         </div>
       ))}
       
-      {/* Render all group properties inline */}
+      {/* Render group properties */}
       {groups.map((group, index) => (
-        <div key={group.id} className="space-y-2">
-          {(contacts.length > 0 || index > 0) && <div className="border-t border-gray-700 pt-2" />}
+        <div key={group.id}>
+          {(contacts.length > 0 || index > 0) && <div className="border-t border-gray-700 mt-2" />}
           <GroupPropertySection
             groupId={group.id}
-            isExpanded={true}
-            onToggle={() => {}}
+            isExpanded={expandedItems.has(group.id)}
+            onToggle={() => toggleExpanded(group.id)}
             isFocused={false}
-            hideToggle={true}
+            hideToggle={false}
+            onSetDirty={onSetDirty}
+            onSetFocused={onSetFocused}
           />
         </div>
       ))}
@@ -152,9 +183,13 @@ function SelectionFrameContent({
 
 function ContactFrameContent({ 
   contactId, 
+  onSetDirty,
+  onSetFocused,
   shouldFocus 
 }: { 
   contactId: string
+  onSetDirty?: (dirty: boolean) => void
+  onSetFocused?: (focused: boolean) => void
   shouldFocus?: React.MutableRefObject<boolean> 
 }) {
   const contact = useContact(contactId)
@@ -167,15 +202,21 @@ function ContactFrameContent({
       isExpanded={true}
       onToggle={() => {}}
       isFocused={true}
+      onSetDirty={onSetDirty}
+      onSetFocused={onSetFocused}
     />
   )
 }
 
 function GroupFrameContent({ 
   groupId, 
+  onSetDirty,
+  onSetFocused,
   shouldFocus 
 }: { 
   groupId: string
+  onSetDirty?: (dirty: boolean) => void
+  onSetFocused?: (focused: boolean) => void
   shouldFocus?: React.MutableRefObject<boolean> 
 }) {
   const group = useGroup(groupId)
@@ -188,6 +229,8 @@ function GroupFrameContent({
       isExpanded={true}
       onToggle={() => {}}
       isFocused={true}
+      onSetDirty={onSetDirty}
+      onSetFocused={onSetFocused}
     />
   )
 }

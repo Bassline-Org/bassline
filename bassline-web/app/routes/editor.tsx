@@ -15,12 +15,13 @@ import { usePropagationNetwork } from "~/propagation-react/hooks/usePropagationN
 import { usePalette } from "~/propagation-react/hooks/usePalette";
 import { useProximityConnect } from "~/propagation-react/hooks/useProximityConnect";
 import { useViewSettings } from "~/propagation-react/hooks/useViewSettings";
-import { usePropertyPanel } from "~/propagation-react/hooks/usePropertyPanel";
+import { usePropertyPanelLogic } from "~/propagation-react/hooks/usePropertyPanelLogic";
 import { useLayout } from "~/propagation-react/hooks/useLayout";
 import { useValenceConnect } from "~/propagation-react/hooks/useValenceConnect";
 import { NetworkProvider } from "~/propagation-react/contexts/NetworkContext";
 import { UIStackProvider, useUIStack } from "~/propagation-react/contexts/UIStackContext";
 import { PropertyPanelStackProvider } from "~/propagation-react/contexts/PropertyPanelStackContext";
+import { SoundContextProvider } from "~/propagation-react/contexts/SoundContext";
 import { EditorStateProvider } from "~/propagation-react/contexts/EditorStateContext";
 import { useContextFrame } from "~/propagation-react/hooks/useContextFrame";
 import { ContactNode } from "~/components/nodes/ContactNode";
@@ -32,7 +33,7 @@ import { GadgetPalette } from "~/components/palette/GadgetPalette";
 import { InlineGadgetMenu } from "~/components/gadgets/InlineGadgetMenu";
 import { ToolsMenu } from "~/components/ToolsMenu";
 import { ClientOnly } from "~/components/ClientOnly";
-import { PropertyPanel } from "~/components/PropertyPanel";
+import { PropertyPanelContainer } from "~/components/PropertyPanelContainer";
 import { ConfigurationPanel } from "~/components/ConfigurationPanel";
 import { FatEdge } from "~/components/edges/FatEdge";
 import { ValenceModeEdge } from "~/components/edges/ValenceModeEdge";
@@ -181,7 +182,6 @@ function Flow() {
 
 
   const palette = usePalette();
-  const propertyPanel = usePropertyPanel();
   const { viewSettings, setViewSettings } = useViewSettings();
   const [showConfiguration, setShowConfiguration] = useState(false);
   const [showDreamsGadgetMenu, setShowDreamsGadgetMenu] = useState(false);
@@ -190,26 +190,6 @@ function Flow() {
   const uiStack = useUIStack();
   const { } = useContextFrame();
 
-  // UI Stack integration for property panel
-  const showPropertyPanel = useCallback((focusInput = false) => {
-    if (!propertyPanel.isVisible) {
-      propertyPanel.toggleVisibility();
-    }
-    
-    if (focusInput && highlightedNodeId) {
-      // Push property focus mode onto stack
-      uiStack.push({
-        type: 'propertyFocus',
-        data: { nodeId: highlightedNodeId },
-        onEscape: () => {
-          // Clear focus but keep panel open
-          setHighlightedNodeId(null);
-          // Removed toast for clearing property focus
-          return true; // Prevent default pop
-        }
-      });
-    }
-  }, [propertyPanel, uiStack, highlightedNodeId, setHighlightedNodeId, viewSettings.showShortcutHints]);
 
   const {
     nodes,
@@ -242,6 +222,16 @@ function Flow() {
 
   // Proximity connect hook
   const proximity = useProximityConnect(nodes, edges);
+  
+  // Property panel logic (must be after hasSelection is available)
+  const { propertyPanel, showPropertyPanel } = usePropertyPanelLogic({
+    currentMode,
+    urlState,
+    hasSelection,
+    highlightedNodeId,
+    exitMode,
+    setHighlightedNodeId
+  });
 
 
   // UI Stack integration for gadget menu
@@ -501,34 +491,6 @@ function Flow() {
     }
   }, [network.currentGroup.id]);
   
-  // Handle property mode from URL changes
-  useEffect(() => {
-    if (currentMode === 'property') {
-      // Show property panel when in property mode
-      if (!propertyPanel.isVisible) {
-        propertyPanel.show(urlState.nodeId ? true : false);
-      }
-    } else {
-      // Hide property panel when not in property mode
-      if (propertyPanel.isVisible) {
-        propertyPanel.hide();
-      }
-    }
-  }, [currentMode, urlState.nodeId, propertyPanel]);
-  
-  // Hide property panel when selection is empty
-  useEffect(() => {
-    if (!hasSelection) {
-      if (propertyPanel.isVisible) {
-        propertyPanel.hide();
-      }
-      // Also exit property mode if we're in it
-      if (currentMode === 'property') {
-        exitMode();
-        setHighlightedNodeId(null);
-      }
-    }
-  }, [hasSelection]); // Only depend on hasSelection to avoid loops
 
   // Show welcome toast on mount (if hints are enabled)
   useEffect(() => {
@@ -565,6 +527,13 @@ function Flow() {
         modeSystem.toggleMinorMode('valence');
         return;
       }
+      
+      // Global hotkey for sound mode toggle
+      if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        modeSystem.toggleMinorMode('sound');
+        return;
+      }
 
       // Tab + P to toggle palette (left hand: Tab with thumb, P with pinky)
       if (e.key === "Tab") {
@@ -580,9 +549,14 @@ function Flow() {
           exitMode();
           setHighlightedNodeId(null);
         } else if (propertyPanel.isVisible) {
-          // If in normal mode and property panel is open, close it
-          propertyPanel.toggleVisibility();
-          setHighlightedNodeId(null);
+          // If in normal mode and property panel is open, try to close it
+          const closed = propertyPanel.tryClose();
+          if (closed) {
+            setHighlightedNodeId(null);
+          } else {
+            // Panel is dirty/focused, show feedback
+            toastError('Save or cancel your changes first', { duration: 2000 });
+          }
         }
       }
 
@@ -837,6 +811,21 @@ function Flow() {
         onSelectionChange={onSelectionChange}
         onNodeDrag={handleNodeDrag}
         onNodeDragStop={handleNodeDragStop}
+        onNodeContextMenu={(event, node) => {
+          event.preventDefault();
+          // Enter property mode for the right-clicked node
+          enterPropertyMode(node.id);
+        }}
+        onPaneContextMenu={(event) => {
+          event.preventDefault();
+          // If we have a selection, enter property mode for the first selected item
+          if (hasSelection) {
+            const selectedIds = [...selection.contacts, ...selection.groups];
+            if (selectedIds.length > 0) {
+              enterPropertyMode(selectedIds[0]);
+            }
+          }
+        }}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         deleteKeyCode={["Delete", "Backspace"]}
@@ -1011,20 +1000,11 @@ function Flow() {
       </ClientOnly>
 
       <ClientOnly>
-        <PropertyPanel
-          isVisible={currentMode === 'property'}
-          onToggleVisibility={() => {
-            if (currentMode === 'property') {
-              exitMode();
-              setHighlightedNodeId(null);
-            } else {
-              const selectedIds = [...selection.contacts, ...selection.groups];
-              if (selectedIds.length > 0) {
-                enterPropertyMode(selectedIds[0]);
-              }
-            }
-          }}
-          shouldFocus={propertyPanel.shouldFocus}
+        <PropertyPanelContainer
+          currentMode={currentMode}
+          onEnterPropertyMode={enterPropertyMode}
+          onExitMode={exitMode}
+          setHighlightedNodeId={setHighlightedNodeId}
         />
       </ClientOnly>
 
@@ -1060,11 +1040,13 @@ export default function Editor() {
           <ReactFlowProvider>
             <EditorStateProvider>
               <ClientOnly>
-                <SoundSystemProvider>
-                  <ModeSystemProvider>
-                    <Flow />
-                  </ModeSystemProvider>
-                </SoundSystemProvider>
+                <SoundContextProvider>
+                  <SoundSystemProvider>
+                    <ModeSystemProvider>
+                      <Flow />
+                    </ModeSystemProvider>
+                  </SoundSystemProvider>
+                </SoundContextProvider>
               </ClientOnly>
             </EditorStateProvider>
           </ReactFlowProvider>

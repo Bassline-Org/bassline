@@ -7,8 +7,7 @@ import { memo, useCallback, useMemo } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { FlowNode, type ModeBehavior, type NodeDisplayConfig, type Selection } from '~/components/wrappers';
 import { ContactNodeView } from './ContactNodeView';
-import { useContact } from '~/propagation-react/hooks/useContact';
-import { useNetworkContext } from '~/propagation-react/contexts/NetworkContext';
+import { useContactState } from '~/propagation-react/hooks/useContactState';
 import { useEditorModes, useURLState } from '~/propagation-react/hooks/useURLState';
 import { useContextFrame } from '~/propagation-react/hooks/useContextFrame';
 import { useModeContext } from '~/propagation-react/contexts/ModeContext';
@@ -17,8 +16,7 @@ import { useSound } from '~/components/SoundSystem';
 import { useSoundToast } from '~/hooks/useSoundToast';
 
 export const ContactNode = memo(({ id, selected }: NodeProps) => {
-  const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContact(id);
-  const { highlightedNodeId, network, syncToReactFlow } = useNetworkContext();
+  const { content, blendMode, isBoundary, lastContradiction, setContent, setBlendMode } = useContactState(id);
   const { enterPropertyMode, currentMode } = useEditorModes();
   const { urlState } = useURLState();
   const { } = useContextFrame();
@@ -56,9 +54,8 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
     
     const sourceContact = selectedContacts[0];
     try {
-      // Create bidirectional connection between contacts
-      network.connect(sourceContact.id, id, 'bidirectional');
-      syncToReactFlow();
+      // TODO: Implement connection creation with new state system
+      // addWire(currentGroupId, { fromId: sourceContact.id, toId: id, type: 'bidirectional' })
       
       // Play connection sound
       playConnectionSound();
@@ -72,7 +69,7 @@ export const ContactNode = memo(({ id, selected }: NodeProps) => {
       console.error('Failed to connect contacts:', error);
       toastError('Failed to connect contacts', { duration: 2000 });
     }
-  }, [isValenceTarget, selectedContacts, id, network, syncToReactFlow, playConnectionSound, clearSelection, modeSystem]);
+  }, [isValenceTarget, selectedContacts, id, playConnectionSound, clearSelection, modeSystem]);
   
   // Define mode behaviors
   const modeBehaviors: Record<string, ModeBehavior> = {

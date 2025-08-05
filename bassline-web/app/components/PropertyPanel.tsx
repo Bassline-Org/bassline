@@ -9,11 +9,23 @@ import { cn } from '~/lib/utils'
 
 interface PropertyPanelProps {
   isVisible: boolean
+  isDirty?: boolean
+  isFocused?: boolean
   onToggleVisibility: () => void
+  onSetDirty?: (dirty: boolean) => void
+  onSetFocused?: (focused: boolean) => void
   shouldFocus: React.MutableRefObject<boolean>
 }
 
-export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: PropertyPanelProps) {
+export function PropertyPanel({ 
+  isVisible, 
+  isDirty,
+  isFocused,
+  onToggleVisibility, 
+  onSetDirty,
+  onSetFocused,
+  shouldFocus 
+}: PropertyPanelProps) {
   const { selectedContacts, selectedGroups } = useContextSelection() // Use context selection
   const { setHighlightedNodeId } = useNetworkContext()
   const { frames, currentFrame, pushFrame, popToFrame, clearFrames } = usePropertyPanelStack()
@@ -148,6 +160,8 @@ export function PropertyPanel({ isVisible, onToggleVisibility, shouldFocus }: Pr
                   isTop={isTop}
                   visibleDepth={frames.slice(-3).length - 1 - index}
                   onNavigateBack={() => popToFrame(frame.id)}
+                  onSetDirty={onSetDirty}
+                  onSetFocused={onSetFocused}
                   shouldFocus={shouldFocus}
                 />
               )
