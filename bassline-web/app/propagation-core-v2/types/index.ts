@@ -1,5 +1,9 @@
 // Core data types - pure data, no behavior
 
+import type { BasslineAttributes } from '../bassline/types'
+export type { BasslineAttributes } from '../bassline/types'
+export type { Bassline, GadgetDefinition, GadgetInterface, BasslineDependency, ConnectionConfig } from '../bassline/types'
+
 export interface Contact {
   id: string
   groupId: string
@@ -9,6 +13,8 @@ export interface Contact {
   boundaryDirection?: 'input' | 'output'
   lastContradiction?: Contradiction
   name?: string
+  // Bassline attributes for this contact
+  attributes?: BasslineAttributes
 }
 
 export interface Wire {
@@ -17,6 +23,8 @@ export interface Wire {
   fromId: string
   toId: string
   type: 'bidirectional' | 'directed'
+  // Bassline attributes for this wire
+  attributes?: BasslineAttributes
 }
 
 export interface Group {
@@ -31,6 +39,8 @@ export interface Group {
   location?: 'local' | { type: 'remote', url: string }
   // If present, this group behaves as a primitive gadget
   primitive?: PrimitiveGadget
+  // Bassline attributes for this group/gadget
+  attributes?: BasslineAttributes
 }
 
 export interface PrimitiveGadget {
