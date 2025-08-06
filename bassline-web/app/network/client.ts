@@ -1,5 +1,6 @@
 import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
 import { RemoteNetworkClient } from './remote-client'
+import { ClientWrapper } from './client-wrapper'
 import { getNetworkConfig } from '~/config/network-config'
 import { grow } from '~/propagation-core-v2/mergeable'
 
@@ -7,33 +8,34 @@ import { grow } from '~/propagation-core-v2/mergeable'
 export type { NetworkClient, NetworkMessage, GroupState } from '~/propagation-core-v2/worker/network-client'
 
 // Singleton instance
-let networkClient: NetworkClient | RemoteNetworkClient | null = null
+let networkClient: ClientWrapper | null = null
 
 /**
  * Get the singleton NetworkClient instance
  * Creates the client on first access
  */
-export function getNetworkClient(): NetworkClient | RemoteNetworkClient {
+export function getNetworkClient(): ClientWrapper {
   if (!networkClient) {
     const config = getNetworkConfig()
     
     if (config.mode === 'remote' && config.remoteUrl) {
       console.log('[NetworkClient] Creating remote network client:', config.remoteUrl)
-      networkClient = new RemoteNetworkClient(config.remoteUrl)
+      const remoteClient = new RemoteNetworkClient(config.remoteUrl)
       // Initialize the remote client
-      networkClient.initialize().then(() => {
+      remoteClient.initialize().then(() => {
         console.log('[NetworkClient] Remote client initialized')
       }).catch(error => {
         console.error('[NetworkClient] Failed to initialize remote client:', error)
       })
+      networkClient = new ClientWrapper(remoteClient)
     } else {
       console.log('[NetworkClient] Creating worker network client')
-      networkClient = new NetworkClient({
+      const workerClient = new NetworkClient({
         onReady: async () => {
           console.log('[NetworkClient] Worker client ready')
           // Ensure root group exists
           try {
-            await networkClient!.registerGroup({
+            await workerClient.registerGroup({
               id: 'root',
               name: 'Root Group',
               contactIds: [],
@@ -52,6 +54,7 @@ export function getNetworkClient(): NetworkClient | RemoteNetworkClient {
           // No need for global invalidation
         }
       })
+      networkClient = new ClientWrapper(workerClient)
     }
   }
   return networkClient

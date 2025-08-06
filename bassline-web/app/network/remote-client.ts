@@ -53,8 +53,14 @@ export class RemoteNetworkClient implements NetworkClient {
             console.log('[RemoteClient] Polling group:', groupId)
             const response = await fetch(`${this.serverUrl}/state?groupId=${groupId}`)
             if (response.ok) {
-              const state = await response.json()
+              const rawState = await response.json()
               console.log('[RemoteClient] Received state update for group:', groupId)
+              // Convert to our expected format with Maps
+              const state = {
+                group: rawState.group,
+                contacts: new Map(Object.entries(rawState.contacts || {})),
+                wires: new Map(Object.entries(rawState.wires || {}))
+              }
               // Simple change detection - in a real implementation we'd track versions
               handlers.forEach(handler => handler([{ type: 'state-update', data: state }]))
             } else {
@@ -218,6 +224,11 @@ export class RemoteNetworkClient implements NetworkClient {
     })
   }
   
+  async scheduleUpdate(contactId: string, content: any): Promise<void> {
+    // For remote client, scheduleUpdate is the same as updateContact
+    return this.updateContact(contactId, content)
+  }
+  
   async removeContact(contactId: string): Promise<void> {
     await this.sendMessage({
       type: 'REMOVE_CONTACT',
@@ -233,6 +244,11 @@ export class RemoteNetworkClient implements NetworkClient {
       wireType
     })
     return result.wireId
+  }
+  
+  async connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
+    // For compatibility with worker client interface
+    return this.addWire(fromId, toId, type)
   }
   
   async removeWire(wireId: string): Promise<void> {

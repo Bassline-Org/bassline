@@ -25,7 +25,7 @@ export async function startServer(options: { port: string; name: string }) {
     const server = http.createServer(async (req, res) => {
       res.setHeader('Content-Type', 'application/json')
       res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
       
       if (req.method === 'OPTIONS') {
@@ -44,8 +44,14 @@ export async function startServer(options: { port: string; name: string }) {
           if (url.pathname === '/state' && req.method === 'GET') {
             const groupId = url.searchParams.get('groupId') || 'root'
             const state = await network.getState(groupId)
+            // Convert Maps to objects for JSON serialization
+            const serializedState = {
+              group: state.group,
+              contacts: Object.fromEntries(state.contacts),
+              wires: Object.fromEntries(state.wires)
+            }
             res.writeHead(200)
-            res.end(JSON.stringify(state))
+            res.end(JSON.stringify(serializedState))
             
           } else if (url.pathname === '/groups' && req.method === 'GET') {
             const groups = await network.listGroups()

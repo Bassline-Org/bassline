@@ -70,7 +70,8 @@ export function useGroupWires(
     const unsubscribes: (() => void)[] = []
     
     for (const subgroupId of subgroupIds) {
-      const unsubscribe = client.subscribe((changes) => {
+      // Subscribe to changes for this specific subgroup
+      const unsubscribe = client.subscribe(subgroupId, (changes) => {
         // Check if any wire was added/removed in this subgroup
         const hasWireChange = changes.some(change => {
           if (change.type === 'wire-added' || change.type === 'wire-removed') {

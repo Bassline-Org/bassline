@@ -113,25 +113,30 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
       console.log(`[useGroupState] Found ${relevantChanges.length} relevant changes`)
       
       if (relevantChanges.length > 0) {
-        // Refresh group state when relevant changes occur
-        console.log(`[useGroupState] Fetching updated state for group ${groupId}`)
-        client.getState(groupId)
-          .then(newState => {
-            console.log(`[useGroupState] Got new state for group ${groupId}:`, newState)
-            setState(newState)
-          })
-          .catch(err => {
-            console.error(`[useGroupState] Error fetching state:`, err)
-            setError(err)
-          })
+        // Check if we have a state-update change with the full state
+        const stateUpdateChange = relevantChanges.find(c => c.type === 'state-update')
+        if (stateUpdateChange && stateUpdateChange.data) {
+          // Use the state directly from the change
+          console.log(`[useGroupState] Using state from state-update change for group ${groupId}`)
+          setState(stateUpdateChange.data)
+        } else {
+          // Refresh group state when other changes occur
+          console.log(`[useGroupState] Fetching updated state for group ${groupId}`)
+          client.getState(groupId)
+            .then(newState => {
+              console.log(`[useGroupState] Got new state for group ${groupId}:`, newState)
+              setState(newState)
+            })
+            .catch(err => {
+              console.error(`[useGroupState] Error fetching state:`, err)
+              setError(err)
+            })
+        }
       }
     }
     
-    // RemoteNetworkClient needs groupId as first parameter, NetworkClient doesn't
-    const isRemoteClient = 'serverUrl' in (client as any)
-    const unsubscribe = isRemoteClient
-      ? (client as any).subscribe(groupId, handleChanges)
-      : client.subscribe(handleChanges)
+    // ClientWrapper handles the differences between remote and worker clients
+    const unsubscribe = client.subscribe(groupId, handleChanges)
     
     return unsubscribe
   }, [groupId, initialState])
@@ -166,6 +171,7 @@ export function useContact(contactId: string, initialContact?: Contact) {
     }
     
     // Subscribe to changes for this specific contact
+    // For contact-specific subscriptions, we still need to pass the handler directly
     const unsubscribe = client.subscribe((changes: Change[]) => {
       const contactChange = changes.find(change => 
         change.type === 'contact-updated' && 
