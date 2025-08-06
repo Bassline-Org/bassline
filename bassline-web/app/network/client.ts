@@ -1,5 +1,6 @@
 import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
 import { RemoteNetworkClient } from './remote-client'
+import { WebSocketNetworkClient } from './websocket-client'
 import { ClientWrapper } from './client-wrapper'
 import { getNetworkConfig } from '~/config/network-config'
 import { grow } from '~/propagation-core-v2/mergeable'
@@ -19,15 +20,15 @@ export function getNetworkClient(): ClientWrapper {
     const config = getNetworkConfig()
     
     if (config.mode === 'remote' && config.remoteUrl) {
-      console.log('[NetworkClient] Creating remote network client:', config.remoteUrl)
-      const remoteClient = new RemoteNetworkClient(config.remoteUrl)
-      // Initialize the remote client
-      remoteClient.initialize().then(() => {
-        console.log('[NetworkClient] Remote client initialized')
+      console.log('[NetworkClient] Creating WebSocket network client:', config.remoteUrl)
+      const wsClient = new WebSocketNetworkClient(config.remoteUrl)
+      // Initialize the WebSocket client
+      wsClient.initialize().then(() => {
+        console.log('[NetworkClient] WebSocket client initialized')
       }).catch(error => {
-        console.error('[NetworkClient] Failed to initialize remote client:', error)
+        console.error('[NetworkClient] Failed to initialize WebSocket client:', error)
       })
-      networkClient = new ClientWrapper(remoteClient)
+      networkClient = new ClientWrapper(wsClient)
     } else {
       console.log('[NetworkClient] Creating worker network client')
       const workerClient = new NetworkClient({
