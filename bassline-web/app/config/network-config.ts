@@ -21,10 +21,25 @@ export function getNetworkConfig(): NetworkConfig {
     }
   }
   
-  // Check if we have a remote URL in the environment or URL params
+  // Check URL parameters for room sharing
   const urlParams = new URLSearchParams(window.location.search)
+  const roomCode = urlParams.get('room')
   const remoteUrl = urlParams.get('server')
+  const signalingUrl = urlParams.get('signal')
   
+  // If we have a room code, configure for WebRTC
+  if (roomCode) {
+    return {
+      mode: 'webrtc',
+      webrtc: {
+        roomCode,
+        signalingUrl: signalingUrl || 'ws://localhost:8081',
+        isHost: false // Joining via link means not host
+      }
+    }
+  }
+  
+  // If we have a remote URL, use remote mode
   if (remoteUrl) {
     return {
       mode: 'remote',

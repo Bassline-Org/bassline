@@ -11,14 +11,29 @@ export type { NetworkClient, NetworkMessage, GroupState } from '~/propagation-co
 
 // Singleton instance
 let networkClient: ClientWrapper | null = null
+let lastConfigKey: string | null = null
 
 /**
  * Get the singleton NetworkClient instance
- * Creates the client on first access
+ * Creates the client on first access or when config changes
  */
 export function getNetworkClient(): ClientWrapper {
+  const config = getNetworkConfig()
+  const configKey = JSON.stringify({
+    mode: config.mode,
+    remoteUrl: config.remoteUrl,
+    webrtc: config.webrtc
+  })
+  
+  // Check if config has changed
+  if (networkClient && lastConfigKey !== configKey) {
+    console.log('[NetworkClient] Config changed, resetting client')
+    networkClient.terminate()
+    networkClient = null
+  }
+  
   if (!networkClient) {
-    const config = getNetworkConfig()
+    lastConfigKey = configKey
     
     if (config.mode === 'webrtc' && config.webrtc) {
       console.log('[NetworkClient] Creating native WebRTC network client')
@@ -199,5 +214,6 @@ export function resetNetworkClient(): void {
     networkClient.terminate()
     networkClient = null
   }
+  lastConfigKey = null
   currentDemoGroupId = null
 }

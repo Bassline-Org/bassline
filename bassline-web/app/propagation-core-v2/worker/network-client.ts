@@ -7,6 +7,7 @@ import type {
   Change
 } from '../types'
 import type { WorkerRequest, WorkerResponse, WorkerNotification } from './network-worker'
+import { generateUUID } from '../../utils/id'
 
 export interface NetworkClientOptions {
   onChanges?: (changes: Change[]) => void
@@ -73,7 +74,7 @@ export class NetworkClient implements PropagationNetworkScheduler {
   }
   
   private async sendRequest(type: string, payload: any): Promise<any> {
-    const id = crypto.randomUUID()
+    const id = generateUUID()
     const request: WorkerRequest = { id, type, payload }
     
     console.log(`[NetworkClient] Sending ${type} request:`, payload)

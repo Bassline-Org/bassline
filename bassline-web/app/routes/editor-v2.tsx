@@ -3,9 +3,8 @@ import { useLoaderData, useParams } from "react-router";
 import { getNetworkClient } from "~/network/client";
 import { useGroupState } from "~/hooks/useWorkerData";
 import { SimpleEditorFlow } from "~/components/editor-v2/SimpleEditorFlow";
-import { NetworkModeSelector } from "~/components/NetworkModeSelector";
+import { TopToolbar } from "~/components/TopToolbar";
 import type { GroupState } from "~/propagation-core-v2/types";
-import { getNetworkConfig } from "~/config/network-config";
 import '@xyflow/react/dist/style.css';
 
 export const meta: MetaFunction = () => {
@@ -15,7 +14,34 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-export async function clientLoader({ params }: { params: { groupId?: string } }) {
+export async function clientLoader({ params, request }: { params: { groupId?: string }; request: Request }) {
+  // Parse URL params from the request
+  const url = new URL(request.url)
+  const roomCode = url.searchParams.get('room')
+  const serverUrl = url.searchParams.get('server')
+  const signalingUrl = url.searchParams.get('signal')
+  
+  // If we have URL params, save them to localStorage so getNetworkClient picks them up
+  if (roomCode || serverUrl) {
+    // Use the same host as the current page for signaling server
+    const defaultSignalingUrl = `ws://${url.hostname}:8081`
+    
+    const config = roomCode ? {
+      mode: 'webrtc' as const,
+      webrtc: {
+        roomCode,
+        signalingUrl: signalingUrl || defaultSignalingUrl,
+        isHost: false
+      }
+    } : {
+      mode: 'remote' as const,
+      remoteUrl: serverUrl
+    }
+    
+    localStorage.setItem('bassline-network-config', JSON.stringify(config))
+    console.log('[Editor] Saved network config from URL params:', config)
+  }
+  
   const client = getNetworkClient()
   const groupId = params.groupId || 'root'
   
@@ -111,9 +137,7 @@ export default function EditorV2() {
   
   return (
     <div className="relative h-screen">
-      <div className="absolute top-4 right-4 z-10">
-        <NetworkModeSelector />
-      </div>
+      <TopToolbar />
       <SimpleEditorFlow groupState={groupState} groupId={groupId} />
     </div>
   )

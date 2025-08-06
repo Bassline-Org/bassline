@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
-import { getNetworkConfig, saveNetworkConfig } from '~/config/network-config'
+import { useNetworkConfig, useSaveNetworkConfig } from '~/hooks/useNetworkConfig'
 import { useNavigate } from 'react-router'
 import { WebRTCRoomManager } from './WebRTCRoomManager'
 import { RadioGroup, RadioGroupItem } from './ui/radio-group'
@@ -10,7 +10,8 @@ import { Server, Wifi, HardDrive } from 'lucide-react'
 
 export function NetworkModeSelector() {
   const [editing, setEditing] = useState(false)
-  const config = getNetworkConfig()
+  const config = useNetworkConfig()
+  const saveNetworkConfig = useSaveNetworkConfig()
   const [selectedMode, setSelectedMode] = useState<'worker' | 'remote' | 'webrtc'>(config.mode)
   const [remoteUrl, setRemoteUrl] = useState(config.remoteUrl || 'http://localhost:8455')
   const [showWebRTC, setShowWebRTC] = useState(false)
@@ -21,12 +22,10 @@ export function NetworkModeSelector() {
         mode: 'remote',
         remoteUrl
       })
-      window.location.reload()
     } else if (selectedMode === 'worker') {
       saveNetworkConfig({
         mode: 'worker'
       })
-      window.location.reload()
     } else if (selectedMode === 'webrtc') {
       setShowWebRTC(true)
       setEditing(false)
@@ -42,7 +41,6 @@ export function NetworkModeSelector() {
       mode: 'webrtc',
       webrtc: webrtcConfig
     })
-    window.location.reload()
   }
   
   if (showWebRTC) {

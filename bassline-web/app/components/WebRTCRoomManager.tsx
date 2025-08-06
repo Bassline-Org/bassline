@@ -18,7 +18,7 @@ interface WebRTCRoomManagerProps {
 }
 
 export function WebRTCRoomManager({ 
-  signalingUrl = 'ws://localhost:8081',
+  signalingUrl = `ws://${window.location.hostname}:8081`,
   onConnect,
   onClose
 }: WebRTCRoomManagerProps) {

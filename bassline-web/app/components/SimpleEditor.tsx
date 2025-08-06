@@ -13,6 +13,7 @@ import { GadgetToolbar } from './GadgetToolbar'
 import { FloatingActions } from './FloatingActions'
 import { HelpOverlay } from './HelpOverlay'
 import { URLStateSync } from './URLStateSync'
+import { TopToolbar } from './TopToolbar'
 import { useModeHandlers } from './ModeHandler'
 import { useModeContext } from '~/propagation-react/contexts/ModeContext'
 
@@ -125,6 +126,7 @@ function SimpleEditorInner() {
     <div style={{ width: '100vw', height: '100vh', display: 'flex' }}>
       <div style={{ flex: 1, position: 'relative' }}>
         <BreadcrumbNav />
+        <TopToolbar />
         <ModeIndicator />
         <GadgetToolbar />
         <FloatingActions />
