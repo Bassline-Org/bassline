@@ -153,6 +153,133 @@ paths:
                   success:
                     type: boolean
                     default: true
+  
+  /groups:
+    get:
+      summary: List all groups
+      description: Returns a list of all groups in the network
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupSummary'
+    
+    post:
+      summary: Create group
+      description: Creates a new group or subgroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Name of the group
+                parentId:
+                  type: string
+                  description: ID of parent group (defaults to root)
+                primitiveId:
+                  type: string
+                  description: Primitive gadget type if creating a gadget
+      responses:
+        '200':
+          description: Group created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groupId:
+                    type: string
+                    description: ID of the created group
+  
+  /groups/{groupId}:
+    delete:
+      summary: Delete group
+      description: Removes a group and all its contents
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Group deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+  
+  /primitives:
+    get:
+      summary: List available primitives
+      description: Returns all available primitive gadget types
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PrimitiveInfo'
+  
+  /wire/{wireId}:
+    delete:
+      summary: Delete wire
+      description: Removes a wire connection
+      parameters:
+        - name: wireId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wire deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+  
+  /contact/{contactId}:
+    delete:
+      summary: Delete contact
+      description: Removes a contact
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Contact deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
 
 components:
   schemas:
@@ -243,3 +370,54 @@ components:
         error:
           type: string
           description: Error message
+    
+    GroupSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        parentId:
+          type: string
+        primitiveId:
+          type: string
+        contactCount:
+          type: integer
+        wireCount:
+          type: integer
+        subgroupCount:
+          type: integer
+    
+    PrimitiveInfo:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Primitive gadget ID
+        name:
+          type: string
+          description: Human-readable name
+        description:
+          type: string
+          description: What this primitive does
+        inputs:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+              required:
+                type: boolean
+        outputs:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string

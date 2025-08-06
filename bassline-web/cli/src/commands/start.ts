@@ -46,21 +46,59 @@ export async function startServer(options: { port: string; name: string }) {
             const state = await network.getState(groupId)
             res.writeHead(200)
             res.end(JSON.stringify(state))
+            
+          } else if (url.pathname === '/groups' && req.method === 'GET') {
+            const groups = await network.listGroups()
+            res.writeHead(200)
+            res.end(JSON.stringify(groups))
+            
+          } else if (url.pathname === '/groups' && req.method === 'POST') {
+            const { name, parentId, primitiveId } = JSON.parse(body)
+            const groupId = await network.createGroup(name, parentId, primitiveId)
+            res.writeHead(200)
+            res.end(JSON.stringify({ groupId }))
+            
+          } else if (url.pathname.match(/^\/groups\/[^\/]+$/) && req.method === 'DELETE') {
+            const groupId = url.pathname.split('/')[2]
+            await network.deleteGroup(groupId)
+            res.writeHead(200)
+            res.end(JSON.stringify({ success: true }))
+            
+          } else if (url.pathname === '/primitives' && req.method === 'GET') {
+            const primitives = await network.listPrimitives()
+            res.writeHead(200)
+            res.end(JSON.stringify(primitives))
+            
           } else if (url.pathname === '/contact' && req.method === 'POST') {
             const { groupId, contact } = JSON.parse(body)
             const contactId = await network.addContact(groupId, contact)
             res.writeHead(200)
             res.end(JSON.stringify({ contactId }))
+            
+          } else if (url.pathname.match(/^\/contact\/[^\/]+$/) && req.method === 'DELETE') {
+            const contactId = url.pathname.split('/')[2]
+            await network.deleteContact(contactId)
+            res.writeHead(200)
+            res.end(JSON.stringify({ success: true }))
+            
           } else if (url.pathname === '/connect' && req.method === 'POST') {
             const { fromId, toId, type } = JSON.parse(body)
             const wireId = await network.connect(fromId, toId, type)
             res.writeHead(200)
             res.end(JSON.stringify({ wireId }))
+            
+          } else if (url.pathname.match(/^\/wire\/[^\/]+$/) && req.method === 'DELETE') {
+            const wireId = url.pathname.split('/')[2]
+            await network.deleteWire(wireId)
+            res.writeHead(200)
+            res.end(JSON.stringify({ success: true }))
+            
           } else if (url.pathname === '/update' && req.method === 'POST') {
             const { contactId, content } = JSON.parse(body)
             await network.scheduleUpdate(contactId, content)
             res.writeHead(200)
             res.end(JSON.stringify({ success: true }))
+            
           } else {
             res.writeHead(404)
             res.end(JSON.stringify({ error: 'Not found' }))
@@ -78,8 +116,14 @@ export async function startServer(options: { port: string; name: string }) {
       console.log(chalk.gray(`API: http://localhost:${options.port}`))
       console.log(chalk.gray('\nEndpoints:'))
       console.log(chalk.gray('  GET  /state?groupId=<id>    - Get group state'))
+      console.log(chalk.gray('  GET  /groups               - List all groups'))
+      console.log(chalk.gray('  POST /groups               - Create new group'))
+      console.log(chalk.gray('  DELETE /groups/<id>        - Delete group'))
+      console.log(chalk.gray('  GET  /primitives           - List available primitives'))
       console.log(chalk.gray('  POST /contact              - Add contact'))
+      console.log(chalk.gray('  DELETE /contact/<id>       - Delete contact'))
       console.log(chalk.gray('  POST /connect              - Create wire'))
+      console.log(chalk.gray('  DELETE /wire/<id>          - Delete wire'))
       console.log(chalk.gray('  POST /update               - Update contact'))
       console.log(chalk.gray('\nPress Ctrl+C to stop'))
     })

@@ -1,39 +1,52 @@
 import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
+import { RemoteNetworkClient } from './remote-client'
+import { getNetworkConfig } from '~/config/network-config'
 import { grow } from '~/propagation-core-v2/mergeable'
 
+// Re-export types
+export type { NetworkClient, NetworkMessage, GroupState } from '~/propagation-core-v2/worker/network-client'
+
 // Singleton instance
-let networkClient: NetworkClient | null = null
+let networkClient: NetworkClient | RemoteNetworkClient | null = null
 
 /**
  * Get the singleton NetworkClient instance
  * Creates the client on first access
  */
-export function getNetworkClient(): NetworkClient {
+export function getNetworkClient(): NetworkClient | RemoteNetworkClient {
   if (!networkClient) {
-    networkClient = new NetworkClient({
-      onReady: async () => {
-        console.log('Network client ready')
-        // Ensure root group exists
-        try {
-          await networkClient!.registerGroup({
-            id: 'root',
-            name: 'Root Group',
-            contactIds: [],
-            wireIds: [],
-            subgroupIds: [],
-            boundaryContactIds: []
-          })
-          console.log('Root group created')
-        } catch (e) {
-          console.log('Root group already exists')
+    const config = getNetworkConfig()
+    
+    if (config.mode === 'remote' && config.remoteUrl) {
+      console.log('Creating remote network client:', config.remoteUrl)
+      networkClient = new RemoteNetworkClient(config.remoteUrl)
+    } else {
+      console.log('Creating worker network client')
+      networkClient = new NetworkClient({
+        onReady: async () => {
+          console.log('Network client ready')
+          // Ensure root group exists
+          try {
+            await networkClient!.registerGroup({
+              id: 'root',
+              name: 'Root Group',
+              contactIds: [],
+              wireIds: [],
+              subgroupIds: [],
+              boundaryContactIds: []
+            })
+            console.log('Root group created')
+          } catch (e) {
+            console.log('Root group already exists')
+          }
+        },
+        onChanges: (changes) => {
+          console.log('Network changes:', changes)
+          // Changes are handled by individual component subscriptions
+          // No need for global invalidation
         }
-      },
-      onChanges: (changes) => {
-        console.log('Network changes:', changes)
-        // Changes are handled by individual component subscriptions
-        // No need for global invalidation
-      }
-    })
+      })
+    }
   }
   return networkClient
 }

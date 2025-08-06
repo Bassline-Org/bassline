@@ -77,6 +77,34 @@ export class StandaloneNetwork extends EventEmitter {
     }
   }
 
+  async listGroups() {
+    return Promise.resolve(this.runtime.listGroups())
+  }
+
+  async createGroup(name: string, parentId?: string, primitiveId?: string) {
+    const groupId = this.runtime.createGroup(name, parentId, primitiveId)
+    return Promise.resolve(groupId)
+  }
+
+  async deleteGroup(groupId: string) {
+    this.runtime.deleteGroup(groupId)
+    return Promise.resolve()
+  }
+
+  async deleteContact(contactId: string) {
+    this.runtime.deleteContact(contactId)
+    return Promise.resolve()
+  }
+
+  async deleteWire(wireId: string) {
+    this.runtime.deleteWire(wireId)
+    return Promise.resolve()
+  }
+
+  async listPrimitives() {
+    return Promise.resolve(this.runtime.listPrimitives())
+  }
+
   async terminate() {
     if (this.changeInterval) {
       clearInterval(this.changeInterval)

@@ -32,7 +32,7 @@ program
 program
   .command('connect <url>')
   .description('Connect to a running network')
-  .option('-i, --interactive', 'interactive mode')
+  .option('--no-interactive', 'disable interactive mode')
   .action(connectToNetwork)
 
 program

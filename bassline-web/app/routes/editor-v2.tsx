@@ -3,7 +3,9 @@ import { useLoaderData, useParams } from "react-router";
 import { getNetworkClient } from "~/network/client";
 import { useGroupState } from "~/hooks/useWorkerData";
 import { SimpleEditorFlow } from "~/components/editor-v2/SimpleEditorFlow";
+import { NetworkModeSelector } from "~/components/NetworkModeSelector";
 import type { GroupState } from "~/propagation-core-v2/types";
+import { getNetworkConfig } from "~/config/network-config";
 import '@xyflow/react/dist/style.css';
 
 export const meta: MetaFunction = () => {
@@ -107,5 +109,12 @@ export default function EditorV2() {
     )
   }
   
-  return <SimpleEditorFlow groupState={groupState} groupId={groupId} />
+  return (
+    <div className="relative h-screen">
+      <div className="absolute top-4 right-4 z-10">
+        <NetworkModeSelector />
+      </div>
+      <SimpleEditorFlow groupState={groupState} groupId={groupId} />
+    </div>
+  )
 }

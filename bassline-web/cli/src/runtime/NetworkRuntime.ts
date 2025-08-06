@@ -218,6 +218,44 @@ export class NetworkRuntime extends EventEmitter {
           }
         }
         break
+        
+      case 'gate':
+        if (inputs.value !== null && inputs.gate !== null) {
+          if (inputs.gate) {
+            result = inputs.value
+            if (outputs.output) {
+              this.scheduleUpdate(outputs.output.id, result)
+            }
+          }
+        }
+        break
+        
+      case 'and':
+        if (inputs.a !== null && inputs.b !== null) {
+          result = inputs.a && inputs.b
+          if (outputs.result) {
+            this.scheduleUpdate(outputs.result.id, result)
+          }
+        }
+        break
+        
+      case 'or':
+        if (inputs.a !== null && inputs.b !== null) {
+          result = inputs.a || inputs.b
+          if (outputs.result) {
+            this.scheduleUpdate(outputs.result.id, result)
+          }
+        }
+        break
+        
+      case 'not':
+        if (inputs.input !== null) {
+          result = !inputs.input
+          if (outputs.result) {
+            this.scheduleUpdate(outputs.result.id, result)
+          }
+        }
+        break
     }
   }
   
@@ -317,5 +355,234 @@ export class NetworkRuntime extends EventEmitter {
     const changes = [...this.changes]
     this.changes = []
     return changes
+  }
+  
+  listGroups(): any[] {
+    const groups: any[] = []
+    this.groups.forEach(group => {
+      groups.push({
+        id: group.id,
+        name: group.name,
+        parentId: group.parentId,
+        primitiveId: group.primitiveId,
+        contactCount: group.contactIds.length,
+        wireCount: group.wireIds.length,
+        subgroupCount: group.subgroupIds.length
+      })
+    })
+    return groups
+  }
+  
+  createGroup(name: string, parentId: string = 'root', primitiveId?: string): string {
+    const groupId = generateId()
+    const group: Group = {
+      id: groupId,
+      name,
+      parentId,
+      primitiveId,
+      contactIds: [],
+      wireIds: [],
+      subgroupIds: [],
+      boundaryContactIds: []
+    }
+    
+    // If it's a primitive gadget, create boundary contacts
+    if (primitiveId) {
+      const primitiveInfo = this.getPrimitiveInfo(primitiveId)
+      if (primitiveInfo) {
+        // Create input boundary contacts
+        primitiveInfo.inputs.forEach((input: any) => {
+          const contactId = this.addContact(groupId, {
+            name: input.name,
+            isBoundary: true,
+            boundaryDirection: 'input'
+          })
+          group.boundaryContactIds.push(contactId)
+        })
+        
+        // Create output boundary contacts
+        primitiveInfo.outputs.forEach((output: any) => {
+          const contactId = this.addContact(groupId, {
+            name: output.name,
+            isBoundary: true,
+            boundaryDirection: 'output'
+          })
+          group.boundaryContactIds.push(contactId)
+        })
+      }
+    }
+    
+    this.groups.set(groupId, group)
+    
+    // Add to parent group
+    const parent = this.groups.get(parentId)
+    if (parent) {
+      parent.subgroupIds.push(groupId)
+    }
+    
+    this.addChange('group-created', { group, parentId })
+    return groupId
+  }
+  
+  deleteGroup(groupId: string) {
+    const group = this.groups.get(groupId)
+    if (!group) return
+    
+    // Remove from parent
+    if (group.parentId) {
+      const parent = this.groups.get(group.parentId)
+      if (parent) {
+        parent.subgroupIds = parent.subgroupIds.filter(id => id !== groupId)
+      }
+    }
+    
+    // Delete all contacts in group
+    group.contactIds.forEach(contactId => {
+      this.deleteContact(contactId)
+    })
+    
+    // Delete all wires in group
+    group.wireIds.forEach(wireId => {
+      this.deleteWire(wireId)
+    })
+    
+    // Recursively delete subgroups
+    group.subgroupIds.forEach(subgroupId => {
+      this.deleteGroup(subgroupId)
+    })
+    
+    this.groups.delete(groupId)
+    this.addChange('group-deleted', { groupId })
+  }
+  
+  deleteContact(contactId: string) {
+    const contact = this.contacts.get(contactId)
+    if (!contact) return
+    
+    // Remove from group
+    const group = this.groups.get(contact.groupId)
+    if (group) {
+      group.contactIds = group.contactIds.filter(id => id !== contactId)
+      group.boundaryContactIds = group.boundaryContactIds.filter(id => id !== contactId)
+    }
+    
+    // Delete connected wires
+    this.wires.forEach(wire => {
+      if (wire.fromId === contactId || wire.toId === contactId) {
+        this.deleteWire(wire.id)
+      }
+    })
+    
+    this.contacts.delete(contactId)
+    this.addChange('contact-deleted', { contactId })
+  }
+  
+  deleteWire(wireId: string) {
+    const wire = this.wires.get(wireId)
+    if (!wire) return
+    
+    // Remove from group
+    if (wire.groupId) {
+      const group = this.groups.get(wire.groupId)
+      if (group) {
+        group.wireIds = group.wireIds.filter(id => id !== wireId)
+      }
+    }
+    
+    this.wires.delete(wireId)
+    this.addChange('wire-deleted', { wireId })
+  }
+  
+  listPrimitives(): any[] {
+    return [
+      {
+        id: 'add',
+        name: 'Add',
+        description: 'Adds two numbers',
+        inputs: [
+          { name: 'a', type: 'number', required: true },
+          { name: 'b', type: 'number', required: true }
+        ],
+        outputs: [
+          { name: 'sum', type: 'number' }
+        ]
+      },
+      {
+        id: 'multiply',
+        name: 'Multiply',
+        description: 'Multiplies two numbers',
+        inputs: [
+          { name: 'a', type: 'number', required: true },
+          { name: 'b', type: 'number', required: true }
+        ],
+        outputs: [
+          { name: 'product', type: 'number' }
+        ]
+      },
+      {
+        id: 'concat',
+        name: 'String Concat',
+        description: 'Concatenates two strings',
+        inputs: [
+          { name: 'a', type: 'string', required: true },
+          { name: 'b', type: 'string', required: true }
+        ],
+        outputs: [
+          { name: 'result', type: 'string' }
+        ]
+      },
+      {
+        id: 'gate',
+        name: 'Gate',
+        description: 'Passes value when gate is truthy',
+        inputs: [
+          { name: 'value', type: 'any', required: true },
+          { name: 'gate', type: 'boolean', required: true }
+        ],
+        outputs: [
+          { name: 'output', type: 'any' }
+        ]
+      },
+      {
+        id: 'and',
+        name: 'AND Gate',
+        description: 'Logical AND operation',
+        inputs: [
+          { name: 'a', type: 'boolean', required: true },
+          { name: 'b', type: 'boolean', required: true }
+        ],
+        outputs: [
+          { name: 'result', type: 'boolean' }
+        ]
+      },
+      {
+        id: 'or',
+        name: 'OR Gate',
+        description: 'Logical OR operation',
+        inputs: [
+          { name: 'a', type: 'boolean', required: true },
+          { name: 'b', type: 'boolean', required: true }
+        ],
+        outputs: [
+          { name: 'result', type: 'boolean' }
+        ]
+      },
+      {
+        id: 'not',
+        name: 'NOT Gate',
+        description: 'Logical NOT operation',
+        inputs: [
+          { name: 'input', type: 'boolean', required: true }
+        ],
+        outputs: [
+          { name: 'result', type: 'boolean' }
+        ]
+      }
+    ]
+  }
+  
+  private getPrimitiveInfo(primitiveId: string): any {
+    const primitives = this.listPrimitives()
+    return primitives.find(p => p.id === primitiveId)
   }
 }
