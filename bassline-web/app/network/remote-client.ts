@@ -12,11 +12,16 @@ export class RemoteNetworkClient implements NetworkClient {
   }
   
   async initialize(scheduler: 'immediate' | 'batch' = 'immediate'): Promise<void> {
+    console.log('[RemoteClient] Initializing, testing connection to:', this.serverUrl)
+    
     // Test connection
     const response = await fetch(`${this.serverUrl}/state?groupId=root`)
     if (!response.ok) {
       throw new Error(`Failed to connect to server: ${response.statusText}`)
     }
+    
+    const data = await response.json()
+    console.log('[RemoteClient] Connection successful, root state:', data)
     
     // Start polling for changes (since we don't have WebSockets yet)
     this.startPolling()
@@ -39,31 +44,38 @@ export class RemoteNetworkClient implements NetworkClient {
   }
   
   private startPolling() {
+    console.log('[RemoteClient] Starting polling for subscriptions')
     this.pollInterval = setInterval(async () => {
       // Poll each subscribed group for changes
       for (const [groupId, handlers] of this.subscriptions.entries()) {
         if (handlers.length > 0) {
           try {
+            console.log('[RemoteClient] Polling group:', groupId)
             const response = await fetch(`${this.serverUrl}/state?groupId=${groupId}`)
             if (response.ok) {
               const state = await response.json()
+              console.log('[RemoteClient] Received state update for group:', groupId)
               // Simple change detection - in a real implementation we'd track versions
               handlers.forEach(handler => handler([{ type: 'state-update', data: state }]))
+            } else {
+              console.error('[RemoteClient] Failed to poll group:', groupId, response.statusText)
             }
           } catch (error) {
-            console.error('Polling error:', error)
+            console.error('[RemoteClient] Polling error:', error)
           }
         }
       }
-    }, 500) // Poll every 500ms
+    }, 1000) // Poll every 1 second for easier debugging
   }
   
   async getState(groupId: string): Promise<GroupState> {
+    console.log('[RemoteClient] Getting state for group:', groupId)
     const response = await fetch(`${this.serverUrl}/state?groupId=${groupId}`)
     if (!response.ok) {
       throw new Error(`Failed to get state: ${response.statusText}`)
     }
     const data = await response.json()
+    console.log('[RemoteClient] Got state for group:', groupId, data)
     
     // Convert to our expected format
     return {
@@ -244,6 +256,30 @@ export class RemoteNetworkClient implements NetworkClient {
       type: 'REMOVE_GROUP',
       groupId
     })
+  }
+  
+  // Compatibility methods for worker client interface
+  async getContact(contactId: string): Promise<any> {
+    // This would need a new API endpoint
+    throw new Error('getContact not yet implemented for remote client')
+  }
+  
+  async subscribeToBatch(groupIds: string[], handler: (groupId: string, contacts: any[]) => void): () => void {
+    // For now, just subscribe to each group individually
+    const unsubscribes = groupIds.map(groupId => 
+      this.subscribe(groupId, (changes) => {
+        // Extract contacts from state update
+        const stateUpdate = changes.find(c => c.type === 'state-update')
+        if (stateUpdate && stateUpdate.data.contacts) {
+          const contacts = Object.values(stateUpdate.data.contacts)
+          handler(groupId, contacts)
+        }
+      })
+    )
+    
+    return () => {
+      unsubscribes.forEach(unsub => unsub())
+    }
   }
   
   terminate(): void {

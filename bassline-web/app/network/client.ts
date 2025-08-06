@@ -18,13 +18,19 @@ export function getNetworkClient(): NetworkClient | RemoteNetworkClient {
     const config = getNetworkConfig()
     
     if (config.mode === 'remote' && config.remoteUrl) {
-      console.log('Creating remote network client:', config.remoteUrl)
+      console.log('[NetworkClient] Creating remote network client:', config.remoteUrl)
       networkClient = new RemoteNetworkClient(config.remoteUrl)
+      // Initialize the remote client
+      networkClient.initialize().then(() => {
+        console.log('[NetworkClient] Remote client initialized')
+      }).catch(error => {
+        console.error('[NetworkClient] Failed to initialize remote client:', error)
+      })
     } else {
-      console.log('Creating worker network client')
+      console.log('[NetworkClient] Creating worker network client')
       networkClient = new NetworkClient({
         onReady: async () => {
-          console.log('Network client ready')
+          console.log('[NetworkClient] Worker client ready')
           // Ensure root group exists
           try {
             await networkClient!.registerGroup({
@@ -35,13 +41,13 @@ export function getNetworkClient(): NetworkClient | RemoteNetworkClient {
               subgroupIds: [],
               boundaryContactIds: []
             })
-            console.log('Root group created')
+            console.log('[NetworkClient] Root group created')
           } catch (e) {
-            console.log('Root group already exists')
+            console.log('[NetworkClient] Root group already exists')
           }
         },
         onChanges: (changes) => {
-          console.log('Network changes:', changes)
+          console.log('[NetworkClient] Network changes:', changes)
           // Changes are handled by individual component subscriptions
           // No need for global invalidation
         }

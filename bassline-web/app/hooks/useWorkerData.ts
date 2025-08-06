@@ -26,18 +26,21 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
     setError(null)
     
     // Always fetch fresh data for the group
+    console.log(`[useGroupState] Initial fetch for group ${groupId}`)
     client.getState(groupId)
       .then(groupState => {
+        console.log(`[useGroupState] Initial state loaded for group ${groupId}:`, groupState)
         setState(groupState)
         setLoading(false)
       })
       .catch(err => {
+        console.error(`[useGroupState] Error loading initial state:`, err)
         setError(err)
         setLoading(false)
       })
     
     // Subscribe to changes that affect this group
-    const unsubscribe = client.subscribe((changes: Change[]) => {
+    const handleChanges = (changes: Array<Change | { type: 'state-update', data: any }>) => {
       console.log(`[useGroupState] Received changes for group ${groupId}:`, changes)
       
       const relevantChanges = changes.filter(change => {
@@ -95,6 +98,12 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
             console.log(`[useGroupState] Group removed: ${data.groupId}`)
             return true // Refresh to be safe
           }
+          case 'state-update': {
+            // This is from the remote client's polling
+            // Always relevant since we subscribed to this specific group
+            console.log(`[useGroupState] State update received for group ${groupId}`)
+            return true
+          }
           default:
             console.warn(`[useGroupState] Unknown change type: ${(change as any).type}`)
             return false
@@ -105,11 +114,24 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
       
       if (relevantChanges.length > 0) {
         // Refresh group state when relevant changes occur
+        console.log(`[useGroupState] Fetching updated state for group ${groupId}`)
         client.getState(groupId)
-          .then(setState)
-          .catch(setError)
+          .then(newState => {
+            console.log(`[useGroupState] Got new state for group ${groupId}:`, newState)
+            setState(newState)
+          })
+          .catch(err => {
+            console.error(`[useGroupState] Error fetching state:`, err)
+            setError(err)
+          })
       }
-    })
+    }
+    
+    // RemoteNetworkClient needs groupId as first parameter, NetworkClient doesn't
+    const isRemoteClient = 'serverUrl' in (client as any)
+    const unsubscribe = isRemoteClient
+      ? (client as any).subscribe(groupId, handleChanges)
+      : client.subscribe(handleChanges)
     
     return unsubscribe
   }, [groupId, initialState])
