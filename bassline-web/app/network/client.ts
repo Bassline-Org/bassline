@@ -22,13 +22,16 @@ export function getNetworkClient(): ClientWrapper {
     if (config.mode === 'remote' && config.remoteUrl) {
       console.log('[NetworkClient] Creating WebSocket network client:', config.remoteUrl)
       const wsClient = new WebSocketNetworkClient(config.remoteUrl)
-      // Initialize the WebSocket client
+      networkClient = new ClientWrapper(wsClient)
+      
+      // Initialize the WebSocket client asynchronously
+      console.log('[NetworkClient] Starting WebSocket initialization...')
       wsClient.initialize().then(() => {
         console.log('[NetworkClient] WebSocket client initialized')
       }).catch(error => {
         console.error('[NetworkClient] Failed to initialize WebSocket client:', error)
+        // Continue anyway - requests will be queued
       })
-      networkClient = new ClientWrapper(wsClient)
     } else {
       console.log('[NetworkClient] Creating worker network client')
       const workerClient = new NetworkClient({

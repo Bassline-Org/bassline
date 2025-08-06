@@ -8,5 +8,6 @@ export default [
   route("api/demo", "routes/api.demo.tsx"),
   route("editor-v2/:groupId?", "routes/editor-v2.tsx"),
   route("api/editor-v2/actions", "routes/api.editor-v2.actions.tsx"),
+  route("ws-test", "routes/ws-test.tsx"),
   // route("editor", "routes/editor.tsx") // Disabled - needs refactor
 ] satisfies RouteConfig;

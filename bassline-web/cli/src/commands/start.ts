@@ -127,10 +127,88 @@ export async function startServer(options: { port: string; name: string }) {
       console.log(chalk.blue('WebSocket client connected'))
       wsClients.set(ws, new Set())
       
-      ws.on('message', (data) => {
+      ws.on('message', async (data) => {
+        console.log(chalk.gray('[WebSocket] Received message:', data.toString()))
         try {
           const message = JSON.parse(data.toString())
           
+          // Handle request/response pattern
+          if (message.requestId) {
+            console.log(chalk.cyan(`[WebSocket] Request ${message.requestId}: ${message.type}`))
+            try {
+              let responseData: any
+              
+              switch (message.type) {
+                case 'get-state':
+                  const state = await network.getState(message.groupId || 'root')
+                  responseData = {
+                    group: state.group,
+                    contacts: Object.fromEntries(state.contacts),
+                    wires: Object.fromEntries(state.wires)
+                  }
+                  break
+                  
+                case 'add-contact':
+                  const contactId = await network.addContact(message.groupId, message.contact)
+                  responseData = { contactId }
+                  break
+                  
+                case 'update-contact':
+                  await network.scheduleUpdate(message.contactId, message.content)
+                  responseData = { success: true }
+                  break
+                  
+                case 'remove-contact':
+                  await network.deleteContact(message.contactId)
+                  responseData = { success: true }
+                  break
+                  
+                case 'add-wire':
+                  const wireId = await network.connect(message.fromId, message.toId, message.wireType)
+                  responseData = { wireId }
+                  break
+                  
+                case 'remove-wire':
+                  await network.deleteWire(message.wireId)
+                  responseData = { success: true }
+                  break
+                  
+                case 'add-group':
+                  const groupId = await network.createGroup(message.name, message.parentId, message.primitiveId)
+                  responseData = { groupId }
+                  break
+                  
+                case 'remove-group':
+                  await network.deleteGroup(message.groupId)
+                  responseData = { success: true }
+                  break
+                  
+                case 'list-groups':
+                  responseData = await network.listGroups()
+                  break
+                  
+                case 'list-primitives':
+                  responseData = await network.listPrimitives()
+                  break
+                  
+                default:
+                  throw new Error(`Unknown request type: ${message.type}`)
+              }
+              
+              ws.send(JSON.stringify({
+                requestId: message.requestId,
+                data: responseData
+              }))
+            } catch (error: any) {
+              ws.send(JSON.stringify({
+                requestId: message.requestId,
+                error: error.message
+              }))
+            }
+            return
+          }
+          
+          // Handle subscription messages
           switch (message.type) {
             case 'subscribe':
               // Subscribe to a specific group

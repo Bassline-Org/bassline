@@ -3,11 +3,12 @@ import type { NetworkClient, NetworkMessage, GroupState } from './client'
 import type { Change } from '~/propagation-core-v2/types'
 
 export class WebSocketNetworkClient implements NetworkClient {
-  private serverUrl: string
   private wsUrl: string
   private ws: WebSocket | null = null
   private subscriptions = new Map<string, Array<(changes: Change[]) => void>>()
-  private messageQueue: NetworkMessage[] = []
+  private messageQueue: Array<{ message: any; resolve: (value: any) => void; reject: (error: any) => void }> = []
+  private pendingRequests = new Map<string, { resolve: (value: any) => void; reject: (error: any) => void }>()
+  private requestId = 0
   private connected = false
   private reconnectTimeout: number | null = null
   private reconnectAttempts = 0
@@ -15,30 +16,44 @@ export class WebSocketNetworkClient implements NetworkClient {
   private reconnectDelay = 1000
   
   constructor(serverUrl: string) {
-    this.serverUrl = serverUrl
     // Convert HTTP URL to WebSocket URL
     this.wsUrl = serverUrl.replace(/^http/, 'ws')
+    console.log('[WebSocketClient] Constructor - Server URL:', serverUrl, '-> WS URL:', this.wsUrl)
   }
   
   async initialize(scheduler: 'immediate' | 'batch' = 'immediate'): Promise<void> {
     console.log('[WebSocketClient] Initializing, connecting to:', this.wsUrl)
     
-    return new Promise((resolve, reject) => {
-      this.connect()
-        .then(() => {
-          console.log('[WebSocketClient] Connected successfully')
-          resolve()
-        })
-        .catch(reject)
-    })
+    console.log('[WebSocketClient] About to call connectWebSocket()')
+    try {
+      await this.connectWebSocket()
+      console.log('[WebSocketClient] Connected successfully')
+    } catch (error) {
+      console.error('[WebSocketClient] Connection failed:', error)
+      throw error
+    }
   }
   
-  private async connect(): Promise<void> {
+  private async connectWebSocket(): Promise<void> {
+    console.log('[WebSocketClient] Connect method called')
     return new Promise((resolve, reject) => {
+      console.log('[WebSocketClient] Inside Promise constructor')
       try {
+        console.log('[WebSocketClient] Creating WebSocket connection to:', this.wsUrl)
         this.ws = new WebSocket(this.wsUrl)
+        console.log('[WebSocketClient] WebSocket object created:', this.ws)
+        
+        // Add connection timeout
+        const connectTimeout = setTimeout(() => {
+          if (!this.connected) {
+            console.log('[WebSocketClient] Connection timeout!')
+            this.ws?.close()
+            reject(new Error('WebSocket connection timeout'))
+          }
+        }, 5000) // 5 second timeout
         
         this.ws.onopen = () => {
+          clearTimeout(connectTimeout)
           console.log('[WebSocketClient] WebSocket connected')
           this.connected = true
           this.reconnectAttempts = 0
@@ -53,8 +68,13 @@ export class WebSocketNetworkClient implements NetworkClient {
           
           // Process any queued messages
           while (this.messageQueue.length > 0) {
-            const message = this.messageQueue.shift()!
-            this.sendMessage(message)
+            const item = this.messageQueue.shift()!
+            // Re-register the pending request
+            this.pendingRequests.set(item.message.requestId, {
+              resolve: item.resolve,
+              reject: item.reject
+            })
+            this.ws!.send(JSON.stringify(item.message))
           }
           
           resolve()
@@ -78,15 +98,33 @@ export class WebSocketNetworkClient implements NetworkClient {
         
         this.ws.onerror = (error) => {
           console.error('[WebSocketClient] WebSocket error:', error)
-          reject(error)
+          if (!this.connected) {
+            reject(new Error('Failed to connect to WebSocket'))
+          }
         }
       } catch (error) {
+        console.error('[WebSocketClient] Error creating WebSocket:', error)
         reject(error)
       }
     })
   }
   
   private handleServerMessage(message: any) {
+    // Check if this is a response to a request
+    if (message.requestId !== undefined) {
+      const pending = this.pendingRequests.get(message.requestId)
+      if (pending) {
+        this.pendingRequests.delete(message.requestId)
+        if (message.error) {
+          pending.reject(new Error(message.error))
+        } else {
+          pending.resolve(message.data)
+        }
+        return
+      }
+    }
+    
+    // Handle push messages
     switch (message.type) {
       case 'state-update':
         // Initial state or full state update
@@ -125,20 +163,61 @@ export class WebSocketNetworkClient implements NetworkClient {
     console.log(`[WebSocketClient] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
     
     this.reconnectTimeout = window.setTimeout(() => {
-      this.connect().catch(error => {
+      this.connectWebSocket().catch(error => {
         console.error('[WebSocketClient] Reconnection failed:', error)
       })
     }, delay)
   }
   
+  private async sendRequest(type: string, data: any): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const requestId = String(this.requestId++)
+      const message = {
+        type,
+        requestId,
+        ...data
+      }
+      
+      this.pendingRequests.set(requestId, { resolve, reject })
+      
+      if (this.connected && this.ws) {
+        this.ws.send(JSON.stringify(message))
+      } else {
+        // Queue the message
+        this.messageQueue.push({ message, resolve, reject })
+      }
+      
+      // Set timeout for request
+      setTimeout(() => {
+        if (this.pendingRequests.has(requestId)) {
+          this.pendingRequests.delete(requestId)
+          reject(new Error(`Request ${type} timed out`))
+        }
+      }, 30000) // 30 second timeout
+    })
+  }
+  
   async getState(groupId: string): Promise<GroupState> {
-    // Fallback to HTTP for immediate state queries
-    console.log('[WebSocketClient] Getting state via HTTP for group:', groupId)
-    const response = await fetch(`${this.serverUrl}/state?groupId=${groupId}`)
-    if (!response.ok) {
-      throw new Error(`Failed to get state: ${response.statusText}`)
+    console.log('[WebSocketClient] Getting state for group:', groupId)
+    
+    // If not connected yet, return empty state to allow UI to load
+    if (!this.connected && groupId === 'root') {
+      console.log('[WebSocketClient] Not connected yet, returning empty root state')
+      return {
+        group: {
+          id: 'root',
+          name: 'Root Group',
+          contactIds: [],
+          wireIds: [],
+          subgroupIds: [],
+          boundaryContactIds: []
+        },
+        contacts: new Map(),
+        wires: new Map()
+      }
     }
-    const data = await response.json()
+    
+    const data = await this.sendRequest('get-state', { groupId })
     
     // Convert to our expected format
     return {
@@ -185,72 +264,50 @@ export class WebSocketNetworkClient implements NetworkClient {
   }
   
   async sendMessage(message: NetworkMessage): Promise<any> {
-    // Use HTTP for all mutations
+    // Convert NetworkMessage types to WebSocket message types
     switch (message.type) {
       case 'ADD_CONTACT':
-        const addResponse = await fetch(`${this.serverUrl}/contact`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            groupId: message.groupId,
-            contact: message.contact
-          })
+        return this.sendRequest('add-contact', {
+          groupId: message.groupId,
+          contact: message.contact
         })
-        const { contactId } = await addResponse.json()
-        return { contactId }
         
       case 'UPDATE_CONTACT':
-        await fetch(`${this.serverUrl}/update`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contactId: message.contactId,
-            content: message.content
-          })
+        await this.sendRequest('update-contact', {
+          contactId: message.contactId,
+          content: message.content
         })
         return { success: true }
         
       case 'REMOVE_CONTACT':
-        await fetch(`${this.serverUrl}/contact/${message.contactId}`, {
-          method: 'DELETE'
+        await this.sendRequest('remove-contact', {
+          contactId: message.contactId
         })
         return { success: true }
         
       case 'ADD_WIRE':
-        const wireResponse = await fetch(`${this.serverUrl}/connect`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fromId: message.fromId,
-            toId: message.toId,
-            type: message.wireType || 'bidirectional'
-          })
+        return this.sendRequest('add-wire', {
+          fromId: message.fromId,
+          toId: message.toId,
+          wireType: message.wireType || 'bidirectional'
         })
-        const { wireId } = await wireResponse.json()
-        return { wireId }
         
       case 'REMOVE_WIRE':
-        await fetch(`${this.serverUrl}/wire/${message.wireId}`, {
-          method: 'DELETE'
+        await this.sendRequest('remove-wire', {
+          wireId: message.wireId
         })
         return { success: true }
         
       case 'ADD_GROUP':
-        const groupResponse = await fetch(`${this.serverUrl}/groups`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: message.group.name,
-            parentId: message.parentId,
-            primitiveId: message.group.primitiveId
-          })
+        return this.sendRequest('add-group', {
+          name: message.group.name,
+          parentId: message.parentId,
+          primitiveId: message.group.primitiveId
         })
-        const { groupId } = await groupResponse.json()
-        return { groupId }
         
       case 'REMOVE_GROUP':
-        await fetch(`${this.serverUrl}/groups/${message.groupId}`, {
-          method: 'DELETE'
+        await this.sendRequest('remove-group', {
+          groupId: message.groupId
         })
         return { success: true }
         
@@ -336,18 +393,15 @@ export class WebSocketNetworkClient implements NetworkClient {
   
   // Other compatibility methods
   async listGroups(): Promise<any[]> {
-    const response = await fetch(`${this.serverUrl}/groups`)
-    return response.json()
+    return this.sendRequest('list-groups', {})
   }
   
   async listPrimitives(): Promise<any[]> {
-    const response = await fetch(`${this.serverUrl}/primitives`)
-    return response.json()
+    return this.sendRequest('list-primitives', {})
   }
   
   async exportState(groupId?: string): Promise<any> {
-    const response = await fetch(`${this.serverUrl}/state?groupId=${groupId || 'root'}`)
-    return response.json()
+    return this.sendRequest('get-state', { groupId: groupId || 'root' })
   }
   
   async importState(state: any): Promise<void> {
