@@ -1,7 +1,12 @@
 // Network configuration for UI
 export interface NetworkConfig {
-  mode: 'worker' | 'remote'
+  mode: 'worker' | 'remote' | 'webrtc'
   remoteUrl?: string
+  webrtc?: {
+    signalingUrl: string
+    roomCode?: string
+    isHost?: boolean
+  }
 }
 
 // Load config from localStorage or environment

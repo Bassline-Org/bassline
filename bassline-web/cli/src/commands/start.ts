@@ -1,10 +1,13 @@
 import chalk from 'chalk'
 import ora from 'ora'
 import http from 'http'
+import https from 'https'
+import fs from 'fs'
+import os from 'os'
 import { WebSocketServer } from 'ws'
 import { StandaloneNetwork } from '../runtime/StandaloneNetwork.js'
 
-export async function startServer(options: { port: string; name: string }) {
+export async function startServer(options: { port: string; host?: string; name: string; ssl?: boolean; cert?: string; key?: string }) {
   const spinner = ora('Starting propagation network server...').start()
   
   try {
@@ -263,11 +266,39 @@ export async function startServer(options: { port: string; name: string }) {
       })
     })
     
-    server.listen(parseInt(options.port), () => {
-      spinner.succeed(chalk.green(`Network server running on port ${options.port}`))
+    const host = options.host || '0.0.0.0'  // Default to all interfaces
+    server.listen(parseInt(options.port), host, () => {
+      spinner.succeed(chalk.green(`Network server running on ${host}:${options.port}`))
       console.log(chalk.blue(`\nNetwork: ${options.name}`))
-      console.log(chalk.gray(`HTTP API: http://localhost:${options.port}`))
-      console.log(chalk.gray(`WebSocket: ws://localhost:${options.port}`))
+      
+      // Show connection URLs
+      if (host === '0.0.0.0') {
+        console.log(chalk.gray(`\nLocal connections:`))
+        console.log(chalk.gray(`  HTTP: http://localhost:${options.port}`))
+        console.log(chalk.gray(`  WebSocket: ws://localhost:${options.port}`))
+        
+        // Get local network IP
+        const interfaces = os.networkInterfaces()
+        const addresses: string[] = []
+        for (const name of Object.keys(interfaces)) {
+          for (const iface of interfaces[name]!) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+              addresses.push(iface.address)
+            }
+          }
+        }
+        
+        if (addresses.length > 0) {
+          console.log(chalk.gray(`\nNetwork connections (for other devices):`))
+          addresses.forEach(addr => {
+            console.log(chalk.yellow(`  HTTP: http://${addr}:${options.port}`))
+            console.log(chalk.yellow(`  WebSocket: ws://${addr}:${options.port}`))
+          })
+        }
+      } else {
+        console.log(chalk.gray(`HTTP API: http://${host}:${options.port}`))
+        console.log(chalk.gray(`WebSocket: ws://${host}:${options.port}`))
+      }
       console.log(chalk.gray('\nEndpoints:'))
       console.log(chalk.gray('  GET  /state?groupId=<id>    - Get group state'))
       console.log(chalk.gray('  GET  /groups               - List all groups'))

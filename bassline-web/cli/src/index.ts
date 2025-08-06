@@ -7,6 +7,7 @@ import { runNetwork } from './commands/run.js'
 import { connectToNetwork } from './commands/connect.js'
 import { exportNetwork } from './commands/export.js'
 import { importNetwork } from './commands/import.js'
+import { createSignalCommand } from './commands/signal.js'
 
 const program = new Command()
 
@@ -46,6 +47,9 @@ program
   .description('Import network state from file')
   .option('-m, --merge', 'merge with existing network')
   .action(importNetwork)
+
+// Add signal command for WebRTC
+program.addCommand(createSignalCommand())
 
 program.parse()
 

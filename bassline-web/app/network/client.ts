@@ -1,6 +1,7 @@
 import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
 import { RemoteNetworkClient } from './remote-client'
 import { WebSocketNetworkClient } from './websocket-client'
+import { NativeWebRTCClient } from './webrtc-native-client'
 import { ClientWrapper } from './client-wrapper'
 import { getNetworkConfig } from '~/config/network-config'
 import { grow } from '~/propagation-core-v2/mergeable'
@@ -19,7 +20,27 @@ export function getNetworkClient(): ClientWrapper {
   if (!networkClient) {
     const config = getNetworkConfig()
     
-    if (config.mode === 'remote' && config.remoteUrl) {
+    if (config.mode === 'webrtc' && config.webrtc) {
+      console.log('[NetworkClient] Creating native WebRTC network client')
+      const webrtcClient = new NativeWebRTCClient({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ],
+        signalingUrl: config.webrtc.signalingUrl,
+        roomCode: config.webrtc.roomCode,
+        isHost: config.webrtc.isHost
+      })
+      networkClient = new ClientWrapper(webrtcClient as any)
+      
+      // Initialize the WebRTC client asynchronously
+      console.log('[NetworkClient] Starting WebRTC initialization...')
+      webrtcClient.initialize().then(() => {
+        console.log('[NetworkClient] WebRTC client initialized')
+      }).catch(error => {
+        console.error('[NetworkClient] Failed to initialize WebRTC client:', error)
+      })
+    } else if (config.mode === 'remote' && config.remoteUrl) {
       console.log('[NetworkClient] Creating WebSocket network client:', config.remoteUrl)
       const wsClient = new WebSocketNetworkClient(config.remoteUrl)
       networkClient = new ClientWrapper(wsClient)

@@ -11,7 +11,8 @@ export class ClientWrapper {
   
   constructor(client: NetworkClient | RemoteNetworkClient) {
     this.client = client
-    this.isRemote = 'serverUrl' in client
+    // Check if this is a remote client (WebSocket or WebRTC)
+    this.isRemote = 'serverUrl' in client || 'config' in client
   }
   
   /**

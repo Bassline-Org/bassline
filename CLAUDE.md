@@ -139,6 +139,42 @@ npm run lint      # Linting
 - `/` - Home page
 - `/simple-editor` - Main editor interface
 - `/worker-test` - Worker performance testing page
+- `/editor-v2` - New editor with refactoring support
+
+## Network Architecture
+
+### Connection Modes
+Bassline supports multiple network connection modes:
+
+1. **Worker Mode** (Default)
+   - Runs entirely in the browser using Web Workers
+   - No external dependencies
+   - Single-user local editing
+
+2. **Remote Mode** (WebSocket)
+   - Connects to a Bassline server via WebSocket
+   - Real-time collaboration
+   - Server handles propagation logic
+   - CLI command: `bassline start --port 3003`
+
+3. **WebRTC Mode** (Planned - see WEBRTC_PLAN.md)
+   - Peer-to-peer connections between browsers
+   - No central server required for data
+   - Uses signaling server only for initial connection
+   - Direct, encrypted data channels between peers
+
+### CLI Tool
+The Bassline CLI (`cli/`) provides:
+- `bassline start` - Start a propagation network server
+- `bassline connect <url>` - Connect to a running network
+- `bassline run <file>` - Run a network from a file
+- `bassline export/import` - Save and load network states
+
+### Real-time Collaboration
+- WebSocket-based for server mode
+- Automatic state synchronization
+- Change broadcasting to all connected clients
+- Conflict resolution via last-write-wins
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
