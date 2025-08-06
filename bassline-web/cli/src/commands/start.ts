@@ -212,12 +212,13 @@ export async function startServer(options: { port: string; name: string }) {
           switch (message.type) {
             case 'subscribe':
               // Subscribe to a specific group
-              const groupIds = message.groupIds || [message.groupId || 'root']
+              const groupId = message.groupId || 'root'
+              console.log(chalk.green(`[WebSocket] Client subscribing to group: ${groupId}`))
               const subscriptions = wsClients.get(ws)!
-              groupIds.forEach((id: string) => subscriptions.add(id))
+              subscriptions.add(groupId);
               
-              // Send initial state for subscribed groups
-              groupIds.forEach(async (groupId: string) => {
+              // Send initial state for subscribed group
+              (async () => {
                 try {
                   const state = await network.getState(groupId)
                   const serializedState = {
@@ -225,6 +226,7 @@ export async function startServer(options: { port: string; name: string }) {
                     contacts: Object.fromEntries(state.contacts),
                     wires: Object.fromEntries(state.wires)
                   }
+                  console.log(chalk.blue(`[WebSocket] Sending initial state for group: ${groupId}`))
                   ws.send(JSON.stringify({
                     type: 'state-update',
                     groupId,
@@ -236,7 +238,7 @@ export async function startServer(options: { port: string; name: string }) {
                     error: error.message
                   }))
                 }
-              })
+              })()
               break
               
             case 'unsubscribe':
@@ -309,11 +311,14 @@ export async function startServer(options: { port: string; name: string }) {
           
           // If this client is subscribed to the affected group, send the change
           if (affectedGroupId && subscribedGroups.has(affectedGroupId)) {
+            console.log(chalk.magenta(`[WebSocket] Broadcasting ${change.type} to client for group: ${affectedGroupId}`))
             ws.send(JSON.stringify({
               type: 'change',
               groupId: affectedGroupId,
               change
             }))
+          } else if (affectedGroupId) {
+            console.log(chalk.gray(`[WebSocket] Client not subscribed to group ${affectedGroupId}, skipping broadcast`))
           }
         })
       })

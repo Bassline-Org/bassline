@@ -3,11 +3,13 @@ import type { NetworkClient, NetworkMessage, GroupState } from './client'
 import type { Change } from '~/propagation-core-v2/types'
 
 export class WebSocketNetworkClient implements NetworkClient {
+  public readonly serverUrl: string // Add this property for ClientWrapper detection
   private wsUrl: string
   private ws: WebSocket | null = null
   private subscriptions = new Map<string, Array<(changes: Change[]) => void>>()
   private messageQueue: Array<{ message: any; resolve: (value: any) => void; reject: (error: any) => void }> = []
   private pendingRequests = new Map<string, { resolve: (value: any) => void; reject: (error: any) => void }>()
+  private groupStates = new Map<string, any>()
   private requestId = 0
   private connected = false
   private reconnectTimeout: number | null = null
@@ -16,6 +18,7 @@ export class WebSocketNetworkClient implements NetworkClient {
   private reconnectDelay = 1000
   
   constructor(serverUrl: string) {
+    this.serverUrl = serverUrl
     // Convert HTTP URL to WebSocket URL
     this.wsUrl = serverUrl.replace(/^http/, 'ws')
     console.log('[WebSocketClient] Constructor - Server URL:', serverUrl, '-> WS URL:', this.wsUrl)
@@ -58,12 +61,15 @@ export class WebSocketNetworkClient implements NetworkClient {
           this.connected = true
           this.reconnectAttempts = 0
           
-          // Subscribe to all groups we're tracking
-          this.subscriptions.forEach((_, groupId) => {
-            this.ws!.send(JSON.stringify({
-              type: 'subscribe',
-              groupId
-            }))
+          // Subscribe to all groups that have active handlers
+          this.subscriptions.forEach((handlers, groupId) => {
+            if (handlers.length > 0) {
+              console.log('[WebSocketClient] Re-subscribing to group after reconnect:', groupId)
+              this.ws!.send(JSON.stringify({
+                type: 'subscribe',
+                groupId
+              }))
+            }
           })
           
           // Process any queued messages
@@ -127,21 +133,48 @@ export class WebSocketNetworkClient implements NetworkClient {
     // Handle push messages
     switch (message.type) {
       case 'state-update':
-        // Initial state or full state update
+        // Initial state or full state update (only sent once on subscribe)
         const handlers = this.subscriptions.get(message.groupId)
         if (handlers) {
+          // Store the initial state for this group
+          if (!this.groupStates) {
+            this.groupStates = new Map()
+          }
+          this.groupStates.set(message.groupId, message.state)
+          
+          // Convert to proper GroupState format with Maps
+          const groupState = {
+            group: message.state.group,
+            contacts: new Map(Object.entries(message.state.contacts || {})),
+            wires: new Map(Object.entries(message.state.wires || {}))
+          }
+          
           handlers.forEach(handler => handler([{
             type: 'state-update',
-            data: message.state
+            data: groupState
           }]))
         }
         break
         
       case 'change':
-        // Incremental change
+        // Incremental change - update our cached state and notify handlers
+        console.log('[WebSocketClient] Received change for group:', message.groupId, message.change)
         const changeHandlers = this.subscriptions.get(message.groupId)
         if (changeHandlers) {
+          console.log(`[WebSocketClient] Found ${changeHandlers.length} handlers for group ${message.groupId}`)
+          // Apply the change to our cached state if we have one
+          if (this.groupStates && this.groupStates.has(message.groupId)) {
+            console.log('[WebSocketClient] Updating cached state for group:', message.groupId)
+            this.applyChangeToState(message.groupId, message.change)
+            console.log('[WebSocketClient] Cached state after update:', this.groupStates.get(message.groupId))
+          } else {
+            console.log('[WebSocketClient] No cached state for group:', message.groupId)
+          }
+          
+          console.log('[WebSocketClient] Notifying handlers with change:', message.change)
           changeHandlers.forEach(handler => handler([message.change]))
+        } else {
+          console.log('[WebSocketClient] No handlers found for group:', message.groupId)
         }
         break
         
@@ -167,6 +200,73 @@ export class WebSocketNetworkClient implements NetworkClient {
         console.error('[WebSocketClient] Reconnection failed:', error)
       })
     }, delay)
+  }
+  
+  private applyChangeToState(groupId: string, change: Change) {
+    const state = this.groupStates.get(groupId)
+    if (!state) return
+    
+    switch (change.type) {
+      case 'contact-added':
+        if (!state.contacts) state.contacts = {}
+        const addData = change.data as any
+        state.contacts[addData.contact.id] = addData.contact
+        break
+        
+      case 'contact-updated':
+        if (state.contacts && (change.data as any).contactId) {
+          const data = change.data as any
+          if (data.contact) {
+            // Full contact provided
+            state.contacts[data.contactId] = data.contact
+          } else if (data.updates) {
+            // Just updates provided
+            state.contacts[data.contactId] = {
+              ...state.contacts[data.contactId],
+              ...data.updates
+            }
+          }
+          console.log(`[WebSocketClient] Updated cached contact ${data.contactId} in group ${groupId}`)
+        }
+        break
+        
+      case 'contact-removed':
+        if (state.contacts) {
+          const removeData = change.data as any
+          delete state.contacts[removeData.contactId]
+        }
+        break
+        
+      case 'wire-added':
+        if (!state.wires) state.wires = {}
+        const wireAddData = change.data as any
+        state.wires[wireAddData.wire.id] = wireAddData.wire
+        break
+        
+      case 'wire-removed':
+        if (state.wires) {
+          const wireRemoveData = change.data as any
+          delete state.wires[wireRemoveData.wireId]
+        }
+        break
+        
+      case 'group-added':
+        if (!state.group.subgroupIds) state.group.subgroupIds = []
+        const groupAddData = change.data as any
+        if (!state.group.subgroupIds.includes(groupAddData.group.id)) {
+          state.group.subgroupIds.push(groupAddData.group.id)
+        }
+        break
+        
+      case 'group-removed':
+        if (state.group.subgroupIds) {
+          const groupRemoveData = change.data as any
+          state.group.subgroupIds = state.group.subgroupIds.filter(
+            (id: string) => id !== groupRemoveData.groupId
+          )
+        }
+        break
+    }
   }
   
   private async sendRequest(type: string, data: any): Promise<any> {
@@ -197,8 +297,21 @@ export class WebSocketNetworkClient implements NetworkClient {
     })
   }
   
-  async getState(groupId: string): Promise<GroupState> {
-    console.log('[WebSocketClient] Getting state for group:', groupId)
+  async getState(groupId: string, forceRefresh = false): Promise<GroupState> {
+    console.log('[WebSocketClient] Getting state for group:', groupId, 'forceRefresh:', forceRefresh)
+    
+    // Check if we have cached state for this group (unless forcing refresh)
+    if (!forceRefresh && this.groupStates.has(groupId)) {
+      console.log('[WebSocketClient] Using cached state for group:', groupId)
+      const cachedState = this.groupStates.get(groupId)
+      const result = {
+        group: cachedState.group,
+        contacts: new Map(Object.entries(cachedState.contacts || {})),
+        wires: new Map(Object.entries(cachedState.wires || {}))
+      }
+      console.log('[WebSocketClient] Returning cached state with', result.contacts.size, 'contacts')
+      return result
+    }
     
     // If not connected yet, return empty state to allow UI to load
     if (!this.connected && groupId === 'root') {
@@ -219,6 +332,9 @@ export class WebSocketNetworkClient implements NetworkClient {
     
     const data = await this.sendRequest('get-state', { groupId })
     
+    // Cache the state
+    this.groupStates.set(groupId, data)
+    
     // Convert to our expected format
     return {
       group: data.group,
@@ -228,18 +344,32 @@ export class WebSocketNetworkClient implements NetworkClient {
   }
   
   subscribe(groupId: string, handler: (changes: Change[]) => void): () => void {
+    console.log('[WebSocketClient.subscribe] Called with groupId:', typeof groupId === 'string' ? groupId : 'NOT A STRING!', 'handler:', typeof handler)
+    
+    if (typeof groupId !== 'string') {
+      console.error('[WebSocketClient.subscribe] ERROR: groupId is not a string, it is:', groupId)
+      // Try to recover by using 'root' as default
+      groupId = 'root'
+    }
+    
     if (!this.subscriptions.has(groupId)) {
       this.subscriptions.set(groupId, [])
-      
-      // If connected, subscribe immediately
-      if (this.connected && this.ws) {
-        this.ws.send(JSON.stringify({
-          type: 'subscribe',
-          groupId
-        }))
-      }
     }
-    this.subscriptions.get(groupId)!.push(handler)
+    
+    const handlers = this.subscriptions.get(groupId)!
+    const isFirstHandler = handlers.length === 0
+    handlers.push(handler)
+    
+    // Subscribe on the server if this is the first handler for this group
+    if (isFirstHandler && this.connected && this.ws) {
+      console.log('[WebSocketClient] Subscribing to group:', groupId)
+      this.ws.send(JSON.stringify({
+        type: 'subscribe',
+        groupId
+      }))
+    }
+    
+    console.log(`[WebSocketClient] Added handler for group ${groupId}, total handlers: ${handlers.length}`)
     
     return () => {
       const handlers = this.subscriptions.get(groupId)
@@ -249,15 +379,24 @@ export class WebSocketNetworkClient implements NetworkClient {
           handlers.splice(index, 1)
         }
         
-        // If no more handlers, unsubscribe
+        console.log(`[WebSocketClient] Removed handler for group ${groupId}, remaining handlers: ${handlers.length}`)
+        
+        // Don't unsubscribe immediately - use a timeout to handle React's rapid mount/unmount cycles
         if (handlers.length === 0) {
-          this.subscriptions.delete(groupId)
-          if (this.connected && this.ws) {
-            this.ws.send(JSON.stringify({
-              type: 'unsubscribe',
-              groupId
-            }))
-          }
+          setTimeout(() => {
+            // Check again after timeout
+            const currentHandlers = this.subscriptions.get(groupId)
+            if (currentHandlers && currentHandlers.length === 0) {
+              console.log('[WebSocketClient] No handlers left for group:', groupId, '- unsubscribing')
+              this.subscriptions.delete(groupId)
+              if (this.connected && this.ws) {
+                this.ws.send(JSON.stringify({
+                  type: 'unsubscribe',
+                  groupId
+                }))
+              }
+            }
+          }, 100) // 100ms delay to handle React's double-render in dev mode
         }
       }
     }

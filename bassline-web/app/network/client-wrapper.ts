@@ -39,7 +39,8 @@ export class ClientWrapper {
       if (typeof handlerOrGroupId === 'function') {
         return this.client.subscribe(handlerOrGroupId)
       } else if (typeof handler === 'function') {
-        // GroupId provided but not needed for worker client
+        // GroupId provided but not needed for worker client  
+        // Just pass the handler, ignore the groupId
         return this.client.subscribe(handler)
       } else {
         throw new Error('Invalid arguments for worker client subscribe')

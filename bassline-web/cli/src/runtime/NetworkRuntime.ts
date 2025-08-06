@@ -105,7 +105,7 @@ export class NetworkRuntime extends EventEmitter {
       }
     }
     
-    this.addChange('wire-added', { wire })
+    this.addChange('wire-added', { wire, groupId: wire.groupId })
     
     // Trigger propagation
     this.propagate(fromId)
@@ -117,7 +117,7 @@ export class NetworkRuntime extends EventEmitter {
     const contact = this.contacts.get(contactId)
     if (contact && contact.content !== content) {
       contact.content = content
-      this.addChange('contact-updated', { contact })
+      this.addChange('contact-updated', { contact, contactId, groupId: contact.groupId, updates: { content } })
       this.propagate(contactId)
     }
   }
@@ -151,7 +151,7 @@ export class NetworkRuntime extends EventEmitter {
             // Simple propagation - just copy value
             if (targetContact.content !== currentContact.content) {
               targetContact.content = currentContact.content
-              this.addChange('contact-updated', { contact: targetContact })
+              this.addChange('contact-updated', { contact: targetContact, contactId: targetId, groupId: targetContact.groupId, updates: { content: targetContact.content } })
               queue.push(targetId)
             }
           }
@@ -452,7 +452,7 @@ export class NetworkRuntime extends EventEmitter {
     })
     
     this.groups.delete(groupId)
-    this.addChange('group-deleted', { groupId })
+    this.addChange('group-removed', { groupId })
   }
   
   deleteContact(contactId: string) {
@@ -474,7 +474,7 @@ export class NetworkRuntime extends EventEmitter {
     })
     
     this.contacts.delete(contactId)
-    this.addChange('contact-deleted', { contactId })
+    this.addChange('contact-removed', { contactId, groupId: contact.groupId })
   }
   
   deleteWire(wireId: string) {
@@ -490,7 +490,7 @@ export class NetworkRuntime extends EventEmitter {
     }
     
     this.wires.delete(wireId)
-    this.addChange('wire-deleted', { wireId })
+    this.addChange('wire-removed', { wireId, groupId: wire.groupId })
   }
   
   listPrimitives(): any[] {

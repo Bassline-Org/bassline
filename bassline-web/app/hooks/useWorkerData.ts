@@ -121,10 +121,12 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
           setState(stateUpdateChange.data)
         } else {
           // Refresh group state when other changes occur
-          console.log(`[useGroupState] Fetching updated state for group ${groupId}`)
+          console.log(`[useGroupState] Fetching updated state for group ${groupId} due to changes:`, relevantChanges)
           client.getState(groupId)
             .then(newState => {
               console.log(`[useGroupState] Got new state for group ${groupId}:`, newState)
+              console.log(`[useGroupState] Current state contacts:`, state?.contacts)
+              console.log(`[useGroupState] New state contacts:`, newState.contacts)
               setState(newState)
             })
             .catch(err => {
@@ -132,6 +134,8 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
               setError(err)
             })
         }
+      } else {
+        console.log(`[useGroupState] No relevant changes for group ${groupId}`)
       }
     }
     
