@@ -228,7 +228,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
         nodeType
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
       
@@ -257,7 +257,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
               parentGroupId: groupId
             }, {
               method: 'post',
-              action: '/api/editor-v2/actions',
+              action: '/api/editor/actions',
               navigate: false
             })
           }
@@ -278,7 +278,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
             groupId: selectedGroupIds[0]
           }, {
             method: 'post',
-            action: '/api/editor-v2/actions',
+            action: '/api/editor/actions',
             navigate: false
           })
         }
@@ -310,7 +310,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
             deep: 'true'
           }, {
             method: 'post',
-            action: '/api/editor-v2/actions',
+            action: '/api/editor/actions',
             navigate: false
           })
         }
@@ -330,7 +330,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
                   contactId: nodeId
                 }, {
                   method: 'post',
-                  action: '/api/editor-v2/actions',
+                  action: '/api/editor/actions',
                   navigate: false
                 })
                 // Clean up nodeViewMetadata
@@ -345,7 +345,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
                   groupId: nodeId
                 }, {
                   method: 'post',
-                  action: '/api/editor-v2/actions',
+                  action: '/api/editor/actions',
                   navigate: false
                 })
               }
@@ -359,7 +359,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
               wireId: edgeId
             }, {
               method: 'post',
-              action: '/api/editor-v2/actions',
+              action: '/api/editor/actions',
               navigate: false
             })
           })

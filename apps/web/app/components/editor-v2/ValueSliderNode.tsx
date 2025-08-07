@@ -43,7 +43,7 @@ export function ValueSliderNode({ data, selected }: NodeProps) {
       content: JSON.stringify(value)
     }, {
       method: 'post',
-      action: '/api/editor-v2/actions',
+      action: '/api/editor/actions',
       navigate: false
     })
   }, [contact.id, submit])
@@ -66,7 +66,7 @@ export function ValueSliderNode({ data, selected }: NodeProps) {
         content: JSON.stringify(clampedValue)
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     } else {

@@ -134,7 +134,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
       type: 'bidirectional'
     }, {
       method: 'post',
-      action: '/api/editor-v2/actions',
+      action: '/api/editor/actions',
       navigate: false
     })
   }, [submit])
@@ -167,7 +167,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
         tempId // Pass temp ID to action handler
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
       
@@ -192,7 +192,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
         tempId
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
       
@@ -212,7 +212,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
         wireId: edge.id
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     }
@@ -229,7 +229,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
         contactId: nodeId
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     } else if (node.type === 'group') {
@@ -238,7 +238,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
         groupId: nodeId
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     }
@@ -359,7 +359,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
                       const formData = new FormData(e.currentTarget)
                       submit(formData, {
                         method: 'post',
-                        action: '/api/editor-v2/actions',
+                        action: '/api/editor/actions',
                         navigate: false
                       })
                     }}

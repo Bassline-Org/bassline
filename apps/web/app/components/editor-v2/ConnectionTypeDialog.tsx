@@ -51,7 +51,7 @@ export function ConnectionTypeDialog({ connection, onClose }: ConnectionTypeDial
       type: selectedType
     }, {
       method: 'post',
-      action: '/api/editor-v2/actions',
+      action: '/api/editor/actions',
       navigate: false
     })
     

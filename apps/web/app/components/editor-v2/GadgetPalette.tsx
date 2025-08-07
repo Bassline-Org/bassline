@@ -32,7 +32,7 @@ export function GadgetPalette({ groupId, onGadgetSelect }: GadgetPaletteProps) {
       position: JSON.stringify({ x: 200, y: 200 }) // Default position
     }, {
       method: 'post',
-      action: '/api/editor-v2/actions',
+      action: '/api/editor/actions',
       navigate: false
     })
     

@@ -48,7 +48,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
         content: newContent
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     } catch {
@@ -59,7 +59,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
         content: JSON.stringify(newContent)
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     }

@@ -24,7 +24,7 @@ export const GroupNodeV2 = memo(({ data, selected }: NodeProps) => {
   const handleDoubleClick = useCallback(() => {
     // Only navigate into non-gadget groups
     if (!isGadget) {
-      navigate(`/editor-v2/${groupId}`)
+      navigate(`/editor/${groupId}`)
     }
   }, [groupId, navigate, isGadget])
   

@@ -40,3 +40,6 @@ export * from './storage/interface'
 // Serialization system
 export * from './serialization'
 export { serialize, deserialize } from './serialization'
+
+// Network types
+export * from './network-types'

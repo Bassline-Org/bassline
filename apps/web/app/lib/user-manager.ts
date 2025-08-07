@@ -132,26 +132,26 @@ export class UserManager {
               blendMode: 'accept-last' as const
             },
             {
-              id: 'twitter',
-              groupId: 'user-profile',
+              id: brand.contactId('twitter'),
+              groupId: brand.groupId('user-profile'),
               content: data?.twitter || '',
               blendMode: 'accept-last' as const
             },
             {
-              id: 'joined',
-              groupId: 'user-profile',
+              id: brand.contactId('joined'),
+              groupId: brand.groupId('user-profile'),
               content: new Date().toISOString(),
               blendMode: 'accept-last' as const
             },
             {
-              id: 'authored',
-              groupId: 'user-profile',
+              id: brand.contactId('authored'),
+              groupId: brand.groupId('user-profile'),
               content: [],  // Array of bassline names/IDs
               blendMode: 'merge' as const
             },
             {
-              id: 'starred',
-              groupId: 'user-profile',
+              id: brand.contactId('starred'),
+              groupId: brand.groupId('user-profile'),
               content: [],  // Array of starred basslines
               blendMode: 'merge' as const
             }
@@ -187,7 +187,7 @@ export class UserManager {
         : current.build.topology
       
       for (const [key, value] of Object.entries(updates)) {
-        const contact = topology.contacts.find((c: Contact) => c.id === key)
+        const contact = topology.contacts.find((c: Contact) => c.id === brand.contactId(key))
         if (contact) {
           contact.content = value
         }
@@ -217,7 +217,7 @@ export class UserManager {
       : current.build.topology
     
     const authoredContact = topology.contacts.find(
-      (c: Contact) => c.id === 'authored'
+      (c: Contact) => c.id === brand.contactId('authored')
     )
     
     if (authoredContact) {
@@ -255,7 +255,7 @@ export class UserManager {
     
     const contacts = topology?.contacts || []
     const getContactValue = (id: string, defaultValue: any = '') => {
-      const contact = contacts.find((c: Contact) => c.id === id)
+      const contact = contacts.find((c: Contact) => c.id === brand.contactId(id))
       return contact?.content || defaultValue
     }
     

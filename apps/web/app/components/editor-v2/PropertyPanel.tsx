@@ -72,7 +72,7 @@ export function PropertyPanel({ selectedNodes, nodes, onClose }: PropertyPanelPr
         content: content
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     } catch {
@@ -83,7 +83,7 @@ export function PropertyPanel({ selectedNodes, nodes, onClose }: PropertyPanelPr
         content: JSON.stringify(content)
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     }

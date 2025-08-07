@@ -13,18 +13,6 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/simple-editor": {
-    params: {};
-  };
-  "/worker-test": {
-    params: {};
-  };
-  "/demo": {
-    params: {};
-  };
-  "/api/demo": {
-    params: {};
-  };
   "/editor-v2/:groupId?": {
     params: {
       "groupId"?: string;
@@ -42,35 +30,16 @@ type Pages = {
   "/bassline-browser": {
     params: {};
   };
-  "/ws-test": {
-    params: {};
-  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/simple-editor" | "/worker-test" | "/demo" | "/api/demo" | "/editor-v2/:groupId?" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/bassline-browser" | "/ws-test";
+    page: "/" | "/editor-v2/:groupId?" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/bassline-browser";
   };
   "routes/home.tsx": {
     id: "routes/home";
     page: "/";
-  };
-  "routes/simple-editor.tsx": {
-    id: "routes/simple-editor";
-    page: "/simple-editor";
-  };
-  "routes/worker-test.tsx": {
-    id: "routes/worker-test";
-    page: "/worker-test";
-  };
-  "routes/demo.tsx": {
-    id: "routes/demo";
-    page: "/demo";
-  };
-  "routes/api.demo.tsx": {
-    id: "routes/api.demo";
-    page: "/api/demo";
   };
   "routes/editor-v2.tsx": {
     id: "routes/editor-v2";
@@ -91,9 +60,5 @@ type RouteFiles = {
   "routes/bassline-browser.tsx": {
     id: "routes/bassline-browser";
     page: "/bassline-browser";
-  };
-  "routes/ws-test.tsx": {
-    id: "routes/ws-test";
-    page: "/ws-test";
   };
 };

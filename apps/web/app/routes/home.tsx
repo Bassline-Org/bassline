@@ -116,7 +116,7 @@ export default function Home() {
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {/* New v2 editor */}
-          <Link to="/editor-v2" className="block">
+          <Link to="/editor" className="block">
             <div className="border border-green-200 rounded-lg p-6 hover:border-green-300 hover:shadow-lg transition-all bg-green-50">
               <h2 className="text-xl font-semibold mb-2">Editor V2 (New!)</h2>
               <p className="text-slate-600 mb-4">

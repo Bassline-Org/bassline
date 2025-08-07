@@ -53,9 +53,9 @@ export function Breadcrumbs({ currentGroupId }: BreadcrumbsProps) {
   
   const handleClick = useCallback((groupId: string) => {
     if (groupId === 'root') {
-      navigate('/editor-v2')
+      navigate('/editor')
     } else {
-      navigate(`/editor-v2/${groupId}`)
+      navigate(`/editor/${groupId}`)
     }
   }, [navigate])
   

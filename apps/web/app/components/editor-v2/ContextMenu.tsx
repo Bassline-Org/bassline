@@ -63,7 +63,7 @@ export function ContextMenu({ x, y, selectedNodes, nodes, groupId, onClose }: Co
       parentGroupId: groupId
     }, {
       method: 'post',
-      action: '/api/editor-v2/actions',
+      action: '/api/editor/actions',
       navigate: false
     })
     
@@ -80,7 +80,7 @@ export function ContextMenu({ x, y, selectedNodes, nodes, groupId, onClose }: Co
         groupId: selectedGroupIds[0]
       }, {
         method: 'post',
-        action: '/api/editor-v2/actions',
+        action: '/api/editor/actions',
         navigate: false
       })
     }
@@ -101,7 +101,7 @@ export function ContextMenu({ x, y, selectedNodes, nodes, groupId, onClose }: Co
       deep: 'true'
     }, {
       method: 'post',
-      action: '/api/editor-v2/actions',
+      action: '/api/editor/actions',
       navigate: false
     })
     
@@ -119,7 +119,7 @@ export function ContextMenu({ x, y, selectedNodes, nodes, groupId, onClose }: Co
             contactId: nodeId
           }, {
             method: 'post',
-            action: '/api/editor-v2/actions',
+            action: '/api/editor/actions',
             navigate: false
           })
         } else if (node.type === 'group') {
@@ -128,7 +128,7 @@ export function ContextMenu({ x, y, selectedNodes, nodes, groupId, onClose }: Co
             groupId: nodeId
           }, {
             method: 'post',
-            action: '/api/editor-v2/actions',
+            action: '/api/editor/actions',
             navigate: false
           })
         }
