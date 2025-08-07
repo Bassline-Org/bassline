@@ -6,6 +6,7 @@
 
 import type { Bassline } from '@bassline/bassline'
 import type { Contact } from '@bassline/core'
+import { brand } from '@bassline/core'
 
 export interface UserProfile extends Bassline {
   name: string  // @username format
@@ -101,32 +102,32 @@ export class UserManager {
         topology: {
           contacts: [
             {
-              id: 'displayName',
-              groupId: 'user-profile',  // Default group ID for user profile
+              id: brand.contactId('displayName'),
+              groupId: brand.groupId('user-profile'),  // Default group ID for user profile
               content: data?.displayName || username,
               blendMode: 'accept-last' as const
             },
             {
-              id: 'bio',
-              groupId: 'user-profile',
+              id: brand.contactId('bio'),
+              groupId: brand.groupId('user-profile'),
               content: data?.bio || '',
               blendMode: 'accept-last' as const
             },
             {
-              id: 'avatar',
-              groupId: 'user-profile',
+              id: brand.contactId('avatar'),
+              groupId: brand.groupId('user-profile'),
               content: data?.avatar || '',
               blendMode: 'accept-last' as const
             },
             {
-              id: 'website',
-              groupId: 'user-profile',
+              id: brand.contactId('website'),
+              groupId: brand.groupId('user-profile'),
               content: data?.website || '',
               blendMode: 'accept-last' as const
             },
             {
-              id: 'github',
-              groupId: 'user-profile',
+              id: brand.contactId('github'),
+              groupId: brand.groupId('user-profile'),
               content: data?.github || '',
               blendMode: 'accept-last' as const
             },

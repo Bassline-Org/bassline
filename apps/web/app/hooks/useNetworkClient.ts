@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNetworkConfig } from './useNetworkConfig'
-import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
+import { NetworkClient } from '~/network/network-client'
 import { RemoteNetworkClient } from '~/network/remote-client'
 import { WebSocketNetworkClient } from '~/network/websocket-client'
 import { NativeWebRTCClient } from '~/network/webrtc-native-client'

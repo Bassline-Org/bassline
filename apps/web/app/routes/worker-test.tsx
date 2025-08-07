@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
+import { NetworkClient } from '~/network/network-client'
 import type { Change } from '@bassline/core'
 
 export default function WorkerTest() {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useNetworkClient, useContact } from '../useWorkerData'
 import * as clientModule from '~/network/client'
+import { brand } from '@bassline/core'
 
 // Mock the NetworkClient
 const mockClient = {
@@ -41,10 +42,10 @@ describe('useWorkerData hooks', () => {
 
   describe('useContact', () => {
     const mockContact = {
-      id: 'contact-1',
+      id: brand.contactId('contact-1'),
       content: 'Hello World',
       blendMode: 'accept-last' as const,
-      groupId: 'group-1'
+      groupId: brand.groupId('group-1')
     }
 
     it('should use initial contact if provided', () => {

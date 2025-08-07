@@ -69,7 +69,7 @@ export function DemoContactNode({ id, data }: DemoContactNodeProps) {
   }
   
   // Check if this is a boundary contact in a primitive gadget
-  const isGadgetBoundary = contact.isBoundary && data.isGadget
+  const isGadgetBoundary = contact.isBoundary && (data as any).isGadget
   
   return (
     <div className={`border-2 rounded-lg p-3 min-w-32 shadow-sm ${

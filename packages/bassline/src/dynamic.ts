@@ -2,9 +2,9 @@
  * Dynamic bassline features - attributes and topology from contacts
  */
 
-import type { Group, Contact, GroupState } from '@bassline/core'
+import type { Group, Contact, GroupState, ContactId, PropagationNetworkScheduler } from '@bassline/core'
+import { brand } from '@bassline/core'
 import type { BasslineAttributes, Bassline } from './types'
-import type { PropagationNetworkScheduler } from '@bassline/core'
 
 /**
  * Check if a group has dynamic attributes enabled
@@ -52,12 +52,13 @@ export async function applyDynamicAttributes(
   let contact: Contact | undefined
   
   // Check boundary contacts first
-  if (group.boundaryContactIds.includes(contactId)) {
+  const cId = brand.contactId(contactId)
+  if (group.boundaryContactIds.includes(cId)) {
     contact = state.contacts.get(contactId)
   }
   
   // Check regular contacts if not found
-  if (!contact && group.contactIds.includes(contactId)) {
+  if (!contact && group.contactIds.includes(cId)) {
     contact = state.contacts.get(contactId)
   }
   
@@ -130,12 +131,13 @@ export async function buildDynamicTopology(
   let contact: Contact | undefined
   
   // Check boundary contacts first
-  if (group.boundaryContactIds.includes(contactId)) {
+  const cId = brand.contactId(contactId)
+  if (group.boundaryContactIds.includes(cId)) {
     contact = state.contacts.get(contactId)
   }
   
   // Check regular contacts if not found
-  if (!contact && group.contactIds.includes(contactId)) {
+  if (!contact && group.contactIds.includes(cId)) {
     contact = state.contacts.get(contactId)
   }
   

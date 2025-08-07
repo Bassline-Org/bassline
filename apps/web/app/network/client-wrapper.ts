@@ -1,4 +1,4 @@
-import type { NetworkClient } from '~/propagation-core-v2/worker/network-client'
+import type { NetworkClient } from './network-client'
 import type { RemoteNetworkClient } from './remote-client'
 import type { Change } from '@bassline/core'
 

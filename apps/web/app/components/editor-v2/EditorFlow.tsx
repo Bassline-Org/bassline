@@ -30,8 +30,8 @@ import { useNodePositions } from '~/hooks/useNodePositions'
 import '@xyflow/react/dist/style.css'
 
 const nodeTypes = {
-  contact: ContactNodeV2,
-  group: GroupNodeV2,
+  contact: ContactNodeV2 as any,
+  group: GroupNodeV2 as any,
 }
 
 interface EditorFlowProps {
@@ -350,7 +350,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
                 <label className="block text-sm font-medium mb-1">Type</label>
                 <div className="text-sm text-gray-600">{selectedNode.type}</div>
               </div>
-              {selectedNode.type === 'contact' && selectedNode.data.contact && (
+              {selectedNode.type === 'contact' && (selectedNode.data as any).contact && (
                 <div>
                   <label className="block text-sm font-medium mb-1">Content</label>
                   <form
@@ -369,7 +369,7 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
                     <input
                       type="text"
                       name="content"
-                      defaultValue={JSON.stringify(selectedNode.data.contact.content)}
+                      defaultValue={JSON.stringify((selectedNode.data as any).contact.content)}
                       className="w-full px-2 py-1 border rounded"
                       onBlur={(e) => e.currentTarget.form?.requestSubmit()}
                     />

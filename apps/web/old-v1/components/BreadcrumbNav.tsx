@@ -17,7 +17,7 @@ export function BreadcrumbNav() {
     if (!group) break
     
     breadcrumbs.unshift({ id: groupId, name: group.name })
-    groupId = group.parentId || null
+    groupId = group.parentId || ''
   }
   
   const handleNavigate = useCallback((groupId: string) => {

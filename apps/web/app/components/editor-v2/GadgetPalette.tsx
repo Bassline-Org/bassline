@@ -55,7 +55,7 @@ export function GadgetPalette({ groupId, onGadgetSelect }: GadgetPaletteProps) {
                 : 'bg-gray-100 hover:bg-gray-200'
             }`}
           >
-            {categoryIcons[category]} {category}
+            {categoryIcons[category as keyof typeof categoryIcons] || ''} {category}
           </button>
         ))}
       </div>
@@ -71,7 +71,7 @@ export function GadgetPalette({ groupId, onGadgetSelect }: GadgetPaletteProps) {
             <div className="font-medium">{gadget.name}</div>
             <div className="text-xs text-gray-500">{gadget.description}</div>
             <div className="text-xs text-gray-400 mt-1">
-              {gadget.inputs.map(i => i.name).join(', ')} → {gadget.outputs.map(o => o.name).join(', ')}
+              {gadget.inputs.join(', ')} → {gadget.outputs.join(', ')}
             </div>
           </button>
         ))}

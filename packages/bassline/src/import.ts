@@ -8,8 +8,12 @@ import type {
   Group, 
   Contact, 
   Wire,
-  PropagationNetworkScheduler
+  PropagationNetworkScheduler,
+  GroupId,
+  ContactId,
+  WireId
 } from '@bassline/core'
+import { brand } from '@bassline/core'
 import type { 
   Bassline,
   GadgetDefinition,
@@ -159,9 +163,9 @@ async function importTopology(
     })
     groupId = group
     result.groups.push({ 
-      id: group,
+      id: brand.groupId(group),
       name: 'imported-group',
-      parentId: parentGroupId,
+      parentId: brand.groupId(parentGroupId),
       contactIds: [],
       wireIds: [],
       subgroupIds: [],
@@ -183,8 +187,8 @@ async function importTopology(
       
       result.idMap.set(basslineId, actualId)
       result.contacts.push({
-        id: actualId,
-        groupId,
+        id: brand.contactId(actualId),
+        groupId: brand.groupId(groupId),
         blendMode: contactDef.blendMode || 'accept-last',
         isBoundary: contactDef.isBoundary,
         boundaryDirection: contactDef.boundaryDirection,
@@ -208,10 +212,10 @@ async function importTopology(
       )
       
       result.wires.push({
-        id: wireId,
-        groupId,
-        fromId,
-        toId,
+        id: brand.wireId(wireId),
+        groupId: brand.groupId(groupId),
+        fromId: brand.contactId(fromId),
+        toId: brand.contactId(toId),
         type: wireDef.type || 'bidirectional',
         attributes: wireDef.attributes,
       })
@@ -246,9 +250,9 @@ async function importGadget(
     })
     
     result.groups.push({
-      id: groupId,
+      id: brand.groupId(groupId),
       name: gadget.id,
-      parentId: parentGroupId,
+      parentId: brand.groupId(parentGroupId),
       contactIds: [],
       wireIds: [],
       subgroupIds: [],
@@ -295,7 +299,7 @@ async function importContact(
   options: ImportOptions
 ): Promise<string> {
   const contact: Omit<Contact, 'id'> = {
-    groupId,
+    groupId: brand.groupId(groupId),
     blendMode: contactDef.blendMode || 'accept-last',
     isBoundary: contactDef.isBoundary,
     boundaryDirection: contactDef.boundaryDirection,

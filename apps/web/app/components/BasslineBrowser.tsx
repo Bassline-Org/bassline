@@ -325,7 +325,7 @@ export function BasslineBrowser({ onImport, onPreview }: BasslineBrowserProps) {
                         <CardTitle className="text-lg flex items-center gap-2">
                           {bassline.name}
                           {bassline.verified && (
-                            <Shield className="h-4 w-4 text-blue-500" title="Verified" />
+                            <Shield className="h-4 w-4 text-blue-500" />
                           )}
                         </CardTitle>
                         <CardDescription className="text-xs mt-1">

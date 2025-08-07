@@ -14,8 +14,8 @@ interface SliderNodeData {
   step?: number
 }
 
-export function ValueSliderNode({ data, selected }: NodeProps<SliderNodeData>) {
-  const { contact, groupId, min = 0, max = 100, step = 1 } = data
+export function ValueSliderNode({ data, selected }: NodeProps) {
+  const { contact, groupId, min = 0, max = 100, step = 1 } = data as SliderNodeData
   const submit = useSubmit()
   
   // Parse current value
@@ -129,7 +129,7 @@ export function ValueSliderNode({ data, selected }: NodeProps<SliderNodeData>) {
         </div>
       </div>
       
-      <style jsx>{`
+      <style>{`
         .slider::-webkit-slider-thumb {
           appearance: none;
           width: 16px;

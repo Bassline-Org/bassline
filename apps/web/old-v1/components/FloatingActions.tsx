@@ -10,10 +10,10 @@ export function FloatingActions() {
   const { currentGroupId, selectedContactIds } = state
   const { playSound } = useSoundSystem()
   const toast = useSoundToast()
-  const { project } = useReactFlow()
+  const { screenToFlowPosition } = useReactFlow()
   
   const handleAddContact = useCallback((event: React.MouseEvent) => {
-    const position = project({ 
+    const position = screenToFlowPosition({ 
       x: window.innerWidth / 2 - 320, 
       y: window.innerHeight / 2 
     })
@@ -27,7 +27,7 @@ export function FloatingActions() {
     
     playSound('node/create')
     toast.success('Contact created')
-  }, [addContact, currentGroupId, project, playSound, toast])
+  }, [addContact, currentGroupId, screenToFlowPosition, playSound, toast])
   
   const handleAddBoundary = useCallback((event: React.MouseEvent) => {
     const position = project({ 
@@ -45,7 +45,7 @@ export function FloatingActions() {
     
     playSound('ui/boundary-create')
     toast.success('Boundary contact created')
-  }, [addContact, currentGroupId, project, playSound, toast])
+  }, [addContact, currentGroupId, screenToFlowPosition, playSound, toast])
   
   // Only show when nothing is selected
   if (selectedContactIds.length > 0) {

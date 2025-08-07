@@ -1,13 +1,12 @@
-import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
+import { NetworkClient } from './network-client'
 import { RemoteNetworkClient } from './remote-client'
 import { WebSocketNetworkClient } from './websocket-client'
 import { NativeWebRTCClient } from './webrtc-native-client'
 import { ClientWrapper } from './client-wrapper'
 import { getNetworkConfig } from '~/config/network-config'
-import { grow } from '~/propagation-core-v2/mergeable'
 
 // Re-export types
-export type { NetworkClient, NetworkMessage, GroupState } from '~/propagation-core-v2/worker/network-client'
+export type { NetworkClient, NetworkMessage, GroupState } from './network-client'
 
 // Singleton instance
 let networkClient: ClientWrapper | null = null

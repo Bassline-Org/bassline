@@ -8,7 +8,7 @@
  * - Security validation
  */
 
-import type { Bassline, BasslineAttributes, GadgetDefinition } from './types'
+import type { Bassline, BasslineAttributes, GadgetDefinition, BasslineDependency } from './types'
 
 export interface ValidationResult {
   valid: boolean
@@ -433,7 +433,7 @@ function validateInterface(
  * Validate dependencies
  */
 function validateDependencies(
-  deps: Record<string, string>,
+  deps: Record<string, string | BasslineDependency>,
   errors: ValidationError[],
   warnings: ValidationWarning[],
   opts: ValidationOptions
@@ -482,8 +482,9 @@ function validateSecurity(
   
   // Check for remote dependencies without HTTPS
   if (bassline.dependencies) {
-    for (const [name, url] of Object.entries(bassline.dependencies)) {
-      if (url.startsWith('http://')) {
+    for (const [name, dep] of Object.entries(bassline.dependencies)) {
+      const url = typeof dep === 'string' ? dep : dep.version
+      if (typeof url === 'string' && url.startsWith('http://')) {
         warnings.push({
           path: `dependencies.${name}`,
           message: 'Use HTTPS for remote dependencies',
@@ -502,7 +503,9 @@ function calculateComplexity(bassline: Bassline): number {
   
   // Count entities
   if (bassline.build?.topology) {
-    const topo = bassline.build.topology
+    const topo = typeof bassline.build.topology === 'function' 
+      ? bassline.build.topology() 
+      : bassline.build.topology
     complexity += (topo.contacts?.length || 0) * 1
     complexity += (topo.wires?.length || 0) * 2
     complexity += (topo.subgroups?.length || 0) * 10

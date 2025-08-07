@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { NetworkClient } from '~/propagation-core-v2/worker/network-client'
+import { NetworkClient } from '~/network/network-client'
 
 // Mock worker for testing
 class MockWorker {

@@ -5,6 +5,9 @@
 // Types
 export * from './types'
 
+// Re-export common utilities directly
+export { brand } from './types'
+
 // Utility functions
 export * from './utils'
 
@@ -33,3 +36,7 @@ export * from './primitives/array'
 
 // Storage interface
 export * from './storage/interface'
+
+// Serialization system
+export * from './serialization'
+export { serialize, deserialize } from './serialization'

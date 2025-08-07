@@ -4,14 +4,15 @@ import type { NodeProps } from '@xyflow/react'
 import { useSubmit } from 'react-router'
 import type { Contact } from '@bassline/core'
 
-interface ContactNodeData {
+export interface ContactNodeData {
   contact: Contact
   groupId: string
+  [key: string]: unknown // Allow additional properties for React Flow
 }
 
-export const ContactNodeV2 = memo<NodeProps<ContactNodeData>>(({ data, selected }) => {
+export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
   const submit = useSubmit()
-  const { contact, groupId } = data
+  const { contact, groupId } = data as ContactNodeData
   
   // Format content for display
   const formatContent = (content: unknown) => {

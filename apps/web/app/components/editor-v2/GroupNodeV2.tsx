@@ -3,7 +3,7 @@ import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
 import { useNavigate } from 'react-router'
 
-interface GroupNodeData {
+export interface GroupNodeData {
   groupId: string
   parentGroupId: string
   name: string
@@ -14,11 +14,12 @@ interface GroupNodeData {
     name: string
     boundaryDirection: 'input' | 'output'
   }>
+  [key: string]: unknown // Allow additional properties for React Flow
 }
 
-export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) => {
+export const GroupNodeV2 = memo(({ data, selected }: NodeProps) => {
   const navigate = useNavigate()
-  const { groupId, name, isGadget, primitiveId, boundaryContacts = [] } = data
+  const { groupId, name, isGadget, primitiveId, boundaryContacts = [] } = data as GroupNodeData
   
   const handleDoubleClick = useCallback(() => {
     // Only navigate into non-gadget groups
@@ -36,8 +37,8 @@ export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) =
   const handleColor = isGadget ? '!bg-orange-400' : '!bg-purple-400'
   
   // Separate boundary contacts by direction
-  const inputContacts = boundaryContacts.filter(c => c.boundaryDirection === 'input')
-  const outputContacts = boundaryContacts.filter(c => c.boundaryDirection === 'output')
+  const inputContacts = boundaryContacts.filter((c: any) => c.boundaryDirection === 'input')
+  const outputContacts = boundaryContacts.filter((c: any) => c.boundaryDirection === 'output')
   
   return (
     <div 
@@ -49,7 +50,7 @@ export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) =
       onDoubleClick={handleDoubleClick}
     >
       {/* Input handles for gadgets */}
-      {isGadget && inputContacts.map((contact, index) => (
+      {isGadget && inputContacts.map((contact: any, index: number) => (
         <Handle
           key={contact.id}
           id={contact.id}
@@ -80,7 +81,7 @@ export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) =
       {/* Show input/output labels for gadgets */}
       {isGadget && inputContacts.length > 0 && (
         <div className="absolute left-[-30px] top-1/2 -translate-y-1/2 text-xs text-gray-400">
-          {inputContacts.map((c, i) => (
+          {inputContacts.map((c: any, i: number) => (
             <div key={c.id} style={{ position: 'absolute', top: `${(i + 1) * (100 / (inputContacts.length + 1)) - 50}%` }}>
               {c.name}
             </div>
@@ -90,7 +91,7 @@ export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) =
       
       {isGadget && outputContacts.length > 0 && (
         <div className="absolute right-[-30px] top-1/2 -translate-y-1/2 text-xs text-gray-400">
-          {outputContacts.map((c, i) => (
+          {outputContacts.map((c: any, i: number) => (
             <div key={c.id} style={{ position: 'absolute', top: `${(i + 1) * (100 / (outputContacts.length + 1)) - 50}%` }}>
               {c.name}
             </div>
@@ -99,7 +100,7 @@ export const GroupNodeV2 = memo<NodeProps<GroupNodeData>>(({ data, selected }) =
       )}
       
       {/* Output handles for gadgets */}
-      {isGadget && outputContacts.map((contact, index) => (
+      {isGadget && outputContacts.map((contact: any, index: number) => (
         <Handle
           key={contact.id}
           id={contact.id}
