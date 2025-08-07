@@ -15,6 +15,11 @@ import type {
   GadgetDefinition,
   BasslineAttributes
 } from './types'
+import { 
+  hasDynamicAttributes,
+  hasDynamicTopology,
+  createDynamicMonitor 
+} from './dynamic'
 
 /**
  * Import options for controlling how basslines are instantiated
@@ -113,6 +118,22 @@ export async function importBassline(
   // Apply seeds if requested
   if (options.applySeeds && bassline.seeds) {
     await applySeeds(bassline.seeds, result.idMap, scheduler)
+  }
+
+  // Set up dynamic monitoring for groups with dynamic features
+  for (const group of result.groups) {
+    if (group.attributes) {
+      if (hasDynamicAttributes(group) || hasDynamicTopology(group)) {
+        // Start monitoring this group for dynamic changes
+        createDynamicMonitor(group.id, scheduler)
+        
+        if (result.warnings) {
+          result.warnings.push(`Group ${group.name || group.id} has dynamic features enabled`)
+        } else {
+          result.warnings = [`Group ${group.name || group.id} has dynamic features enabled`]
+        }
+      }
+    }
   }
 
   return result

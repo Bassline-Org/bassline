@@ -4,8 +4,13 @@ import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { ShareRoomButton } from './ShareRoomButton'
 import { WebRTCRoomManager } from './WebRTCRoomManager'
+import { BasslineExportWorkerButton } from './BasslineExportWorkerButton'
+import { BasslineImportWorkerButton } from './BasslineImportWorkerButton'
+import { BasslineBrowserButton } from './BasslineBrowserButton'
+import { P2PStatusIndicator } from './P2PStatusIndicator'
+import { CurrentUserIndicator } from './CurrentUserIndicator'
 import { RadioGroup, RadioGroupItem } from './ui/radio-group'
-import { Wifi, Save, Upload, Server, HardDrive, X } from 'lucide-react'
+import { Wifi, Server, HardDrive, X } from 'lucide-react'
 import { useNetworkConfig, useSaveNetworkConfig } from '~/hooks/useNetworkConfig'
 
 interface TopToolbarProps {
@@ -77,6 +82,11 @@ export function TopToolbar({ onNetworkClick }: TopToolbarProps = {}) {
   return (
     <>
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-background/95 backdrop-blur border rounded-lg shadow-sm p-2">
+        {/* User Indicator */}
+        <CurrentUserIndicator />
+        
+        <div className="w-px h-6 bg-border" />
+        
         {/* Connection Status */}
         <Button
           variant="outline"
@@ -88,28 +98,17 @@ export function TopToolbar({ onNetworkClick }: TopToolbarProps = {}) {
           <span className="text-xs font-medium">{getConnectionLabel()}</span>
         </Button>
         
+        {/* P2P Status Indicator */}
+        <P2PStatusIndicator />
+        
         {/* Share Room Button */}
         <ShareRoomButton />
         
-        {/* Save/Load Actions */}
+        {/* Import/Export Actions */}
         <div className="flex gap-1 border-l pl-2 ml-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Save network"
-            className="h-8 w-8 p-0"
-          >
-            <Save className="h-4 w-4" />
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            title="Load network"
-            className="h-8 w-8 p-0"
-          >
-            <Upload className="h-4 w-4" />
-          </Button>
+          <BasslineBrowserButton variant="icon" />
+          <BasslineExportWorkerButton variant="icon" />
+          <BasslineImportWorkerButton variant="icon" />
         </div>
       </div>
       
