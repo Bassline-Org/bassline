@@ -27,6 +27,7 @@
     "@types/node": "^20",
     "@types/pg": "^8.10.9",
     "node-pg-migrate": "^8.0.3",
+    "redis": "^5.8.0",
     "ts-node": "^10.9.2",
     "tsup": "^8.0.2",
     "tsx": "^4.7.0",
