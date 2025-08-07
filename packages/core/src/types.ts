@@ -1,19 +1,50 @@
 // Core data types - pure data, no behavior
 
+// ============================================================================
+// Utility Types
+// ============================================================================
+
+// Lazy evaluation pattern
+export type Lazy<T> = () => T
+export type MaybeLazy<T> = T | Lazy<T>
+
+// Result type for error handling
+export type Result<T, E = Error> = 
+  | { ok: true; value: T }
+  | { ok: false; error: E }
+
+// Branded types for type-safe IDs
+export type ContactId = string & { __brand: 'ContactId' }
+export type GroupId = string & { __brand: 'GroupId' }
+export type WireId = string & { __brand: 'WireId' }
+export type NetworkId = string & { __brand: 'NetworkId' }
+
+// Helper functions for branded types
+export const brand = {
+  contactId: (id: string): ContactId => id as ContactId,
+  groupId: (id: string): GroupId => id as GroupId,
+  wireId: (id: string): WireId => id as WireId,
+  networkId: (id: string): NetworkId => id as NetworkId,
+} as const
+
+// ============================================================================
+// Domain Types
+// ============================================================================
+
 // Bassline attributes will be defined by the bassline package
 export type BasslineAttributes = Record<string, any>
 
 export type BlendMode = 'accept-last' | 'merge';
-export type BounaryDirection = 'input' | 'output';
+export type BoundaryDirection = 'input' | 'output';
 export type WireType = 'bidirectional' | 'directed';
 
 export interface Contact {
-  id: string
-  groupId: string
+  id: ContactId
+  groupId: GroupId
   content?: unknown
   blendMode: BlendMode
   isBoundary?: boolean
-  boundaryDirection?: BounaryDirection
+  boundaryDirection?: BoundaryDirection
   lastContradiction?: Contradiction
   name?: string
   // Bassline attributes for this contact
@@ -21,10 +52,10 @@ export interface Contact {
 }
 
 export interface Wire {
-  id: string
-  groupId: string
-  fromId: string
-  toId: string
+  id: WireId
+  groupId: GroupId
+  fromId: ContactId
+  toId: ContactId
   type: WireType
   // Bassline attributes for this wire
   attributes?: BasslineAttributes
@@ -33,13 +64,13 @@ export interface Wire {
 export type GroupLocation = 'local' | { type: 'remote', url: string }
 
 export interface Group {
-  id: string
+  id: GroupId
   name: string
-  parentId?: string
-  contactIds: string[]
-  wireIds: string[]
-  subgroupIds: string[]
-  boundaryContactIds: string[]
+  parentId?: GroupId
+  contactIds: ContactId[]
+  wireIds: WireId[]
+  subgroupIds: GroupId[]
+  boundaryContactIds: ContactId[]
   // Group can be local or remote
   location?: GroupLocation
   // If present, this group behaves as a primitive gadget
@@ -74,6 +105,41 @@ export interface Contradiction {
   values: unknown[]
   timestamp: number
 }
+
+// ============================================================================
+// Operation Types (Tagged Unions)
+// ============================================================================
+
+// Wire creation variants
+export type WireCreation = 
+  | { kind: 'bidirectional'; from: ContactId; to: ContactId }
+  | { kind: 'directed'; from: ContactId; to: ContactId }
+  | { kind: 'constraint'; from: ContactId; to: ContactId; strength?: number }
+
+// Contact creation variants
+export type ContactCreation =
+  | { kind: 'simple'; blendMode: BlendMode; content?: unknown; name?: string }
+  | { kind: 'boundary'; direction: BoundaryDirection; content?: unknown; name?: string }
+  | { kind: 'dynamic'; resolver: Lazy<Contact> }
+
+// Group creation variants
+export type GroupCreation =
+  | { kind: 'normal'; name: string; attributes?: BasslineAttributes }
+  | { kind: 'primitive'; name: string; primitive: PrimitiveGadget }
+  | { kind: 'remote'; name: string; url: string }
+
+// Network events
+export type NetworkEvent =
+  | { type: 'contact.created'; contact: Contact; groupId: GroupId }
+  | { type: 'contact.updated'; before: Contact; after: Contact }
+  | { type: 'contact.deleted'; contactId: ContactId; groupId: GroupId }
+  | { type: 'wire.created'; wire: Wire; groupId: GroupId }
+  | { type: 'wire.deleted'; wireId: WireId; groupId: GroupId }
+  | { type: 'group.created'; group: Group; parentId?: GroupId }
+  | { type: 'group.deleted'; groupId: GroupId }
+  | { type: 'propagation.started'; fromId: ContactId }
+  | { type: 'propagation.completed'; changes: ContactUpdate[] }
+  | { type: 'propagation.failed'; error: Error }
 
 // State containers
 export interface GroupState {

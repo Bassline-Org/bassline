@@ -5,6 +5,12 @@
 // Types
 export * from './types'
 
+// Utility functions
+export * from './utils'
+
+// Fluent interfaces
+export * from './fluent'
+
 // Propagation engine
 export * from './propagation'
 

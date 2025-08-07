@@ -6,8 +6,12 @@ import type {
   Contact,
   Wire,
   Change,
-  PropagationTask
+  PropagationTask,
+  ContactId,
+  GroupId,
+  WireId
 } from '../types'
+import { brand } from '../types'
 import { propagateContent } from '../propagation'
 
 export function createImmediateScheduler(): PropagationNetworkScheduler {
@@ -66,9 +70,9 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
         
         // Create input boundary contacts
         for (const inputName of primitive.inputs) {
-          const contactId = crypto.randomUUID()
+          const cId = brand.contactId(crypto.randomUUID())
           const contact: Contact = {
-            id: contactId,
+            id: cId,
             content: undefined,
             blendMode: 'accept-last',
             groupId: group.id,
@@ -76,18 +80,18 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
             boundaryDirection: 'input',
             name: inputName
           }
-          groupState.contacts.set(contactId, contact)
-          group.contactIds.push(contactId)
-          group.boundaryContactIds.push(contactId)
+          groupState.contacts.set(cId, contact)
+          group.contactIds.push(cId)
+          group.boundaryContactIds.push(cId)
           
-          console.log(`[Scheduler] Created input boundary contact ${inputName} (${contactId})`)
+          console.log(`[Scheduler] Created input boundary contact ${inputName} (${cId})`)
         }
         
         // Create output boundary contacts
         for (const outputName of primitive.outputs) {
-          const contactId = crypto.randomUUID()
+          const cId = brand.contactId(crypto.randomUUID())
           const contact: Contact = {
-            id: contactId,
+            id: cId,
             content: undefined,
             blendMode: 'accept-last',
             groupId: group.id,
@@ -95,11 +99,11 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
             boundaryDirection: 'output',
             name: outputName
           }
-          groupState.contacts.set(contactId, contact)
-          group.contactIds.push(contactId)
-          group.boundaryContactIds.push(contactId)
+          groupState.contacts.set(cId, contact)
+          group.contactIds.push(cId)
+          group.boundaryContactIds.push(cId)
           
-          console.log(`[Scheduler] Created output boundary contact ${outputName} (${contactId})`)
+          console.log(`[Scheduler] Created output boundary contact ${outputName} (${cId})`)
         }
       }
       
@@ -177,20 +181,20 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
         throw new Error('Cannot connect contacts from different groups unless one is a boundary contact')
       }
       
-      const groupId = fromGroup || toGroup || ''
-      const wireId = crypto.randomUUID()
+      const gId = brand.groupId(fromGroup || toGroup || '')
+      const wId = brand.wireId(crypto.randomUUID())
       const wire: Wire = {
-        id: wireId,
-        groupId,
-        fromId,
-        toId,
+        id: wId,
+        groupId: gId,
+        fromId: brand.contactId(fromId),
+        toId: brand.contactId(toId),
         type
       }
       
-      const groupState = state.groups.get(groupId)
+      const groupState = state.groups.get(gId)
       if (groupState) {
-        groupState.wires.set(wireId, wire)
-        groupState.group.wireIds.push(wireId)
+        groupState.wires.set(wId, wire)
+        groupState.group.wireIds.push(wId)
       }
       
       // Propagate content if source has content
@@ -205,11 +209,11 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       
       notify([{
         type: 'wire-added',
-        data: { ...wire, groupId },
+        data: { ...wire, groupId: gId },
         timestamp: Date.now()
       }])
       
-      return wireId
+      return wId
     },
     
     async disconnect(wireId) {
@@ -230,33 +234,34 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       throw new Error(`Wire ${wireId} not found`)
     },
     
-    async addContact(groupId, contactData) {
-      const groupState = state.groups.get(groupId)
+    async addContact(groupIdStr, contactData) {
+      const gId = brand.groupId(groupIdStr)
+      const groupState = state.groups.get(gId)
       if (!groupState) {
-        throw new Error(`Group ${groupId} not found`)
+        throw new Error(`Group ${groupIdStr} not found`)
       }
       
-      const contactId = crypto.randomUUID()
+      const cId = brand.contactId(crypto.randomUUID())
       const contact: Contact = {
         ...contactData,
-        id: contactId,
-        groupId
+        id: cId,
+        groupId: gId
       }
       
-      groupState.contacts.set(contactId, contact)
-      groupState.group.contactIds.push(contactId)
+      groupState.contacts.set(cId, contact)
+      groupState.group.contactIds.push(cId)
       
       if (contact.isBoundary) {
-        groupState.group.boundaryContactIds.push(contactId)
+        groupState.group.boundaryContactIds.push(cId)
       }
       
       notify([{
         type: 'contact-added',
-        data: { ...contact, groupId },
+        data: { ...contact, groupId: gId },
         timestamp: Date.now()
       }])
       
-      return contactId
+      return cId
     },
     
     async removeContact(contactId) {
@@ -293,17 +298,18 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       }])
     },
     
-    async addGroup(parentGroupId, groupData) {
-      const parentState = state.groups.get(parentGroupId)
+    async addGroup(parentGroupIdStr, groupData) {
+      const parentGId = brand.groupId(parentGroupIdStr)
+      const parentState = state.groups.get(parentGId)
       if (!parentState) {
-        throw new Error(`Parent group ${parentGroupId} not found`)
+        throw new Error(`Parent group ${parentGroupIdStr} not found`)
       }
       
-      const groupId = crypto.randomUUID()
+      const gId = brand.groupId(crypto.randomUUID())
       const group: Group = {
         ...groupData,
-        id: groupId,
-        parentId: parentGroupId,
+        id: gId,
+        parentId: parentGId,
         contactIds: [],
         wireIds: [],
         subgroupIds: [],
@@ -313,16 +319,16 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       await this.registerGroup(group)
       
       // Add to parent's subgroups
-      parentState.group.subgroupIds.push(groupId)
+      parentState.group.subgroupIds.push(gId)
       
       // Notify about parent group update
       notify([{
         type: 'group-updated',
-        data: { groupId: parentGroupId, group: parentState.group },
+        data: { groupId: parentGId, group: parentState.group },
         timestamp: Date.now()
       }])
       
-      return groupId
+      return gId
     },
     
     async removeGroup(groupId) {
