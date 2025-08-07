@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events'
 import { NetworkRuntime, GroupState } from './NetworkRuntime.js'
+import { StorageBackedRuntime } from './StorageBackedRuntime.js'
 import type { NetworkStorage } from '@bassline/core'
 import { brand } from '@bassline/core'
 
@@ -15,14 +16,18 @@ export interface StandaloneNetworkOptions {
 }
 
 export class StandaloneNetwork extends EventEmitter {
-  private runtime: NetworkRuntime
+  private runtime: StorageBackedRuntime
   private subscriptionHandlers: ((changes: NetworkChange[]) => void)[] = []
   private changeInterval: NodeJS.Timeout | null = null
   private storage?: NetworkStorage
 
   constructor(options: StandaloneNetworkOptions = {}) {
     super()
-    this.runtime = new NetworkRuntime()
+    // Use StorageBackedRuntime if storage is provided
+    this.runtime = new StorageBackedRuntime({
+      storage: options.storage,
+      loadOnInit: true
+    })
     this.storage = options.storage
   }
 

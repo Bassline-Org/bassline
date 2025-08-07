@@ -1,5 +1,5 @@
 {
-  "name": "@bassline/storage-postgres",
+  "name": "@bassline/storage-remote",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
@@ -16,23 +16,18 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "migrate": "tsx src/run-migrations.ts"
+    "test": "vitest"
   },
   "dependencies": {
     "@bassline/core": "workspace:*",
-    "pg": "^8.11.3"
+    "ws": "^8.18.3"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/pg": "^8.10.9",
-    "node-pg-migrate": "^8.0.3",
-    "redis": "^5.8.0",
-    "ts-node": "^10.9.2",
+    "@types/ws": "^8.5.13",
     "tsup": "^8.0.2",
-    "tsx": "^4.7.0",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "@types/node": "^20"
   },
   "files": [
     "dist"

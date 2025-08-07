@@ -18,6 +18,11 @@ import type {
   NetworkId,
   GroupId,
   ContactId,
+  GroupState,
+  NetworkState,
+  SnapshotId,
+  SnapshotInfo,
+  QueryFilter,
   Serializable
 } from '@bassline/core'
 import { serialize, deserialize } from '@bassline/core'
@@ -36,7 +41,7 @@ interface FilesystemStorageConfig {
   }
 }
 
-export class FilesystemAppendOnlyStorage implements Partial<NetworkStorage> {
+export class FilesystemAppendOnlyStorage implements NetworkStorage {
   private basePath: string
   private config: FilesystemStorageConfig
   private versionCounters: Map<string, number> = new Map()
@@ -440,6 +445,410 @@ export class FilesystemAppendOnlyStorage implements Partial<NetworkStorage> {
     // Clear version counters
     this.versionCounters.clear()
     return { ok: true, value: undefined }
+  }
+
+  // Group Operations
+  async saveGroupState(
+    networkId: NetworkId,
+    groupId: GroupId,
+    state: GroupState
+  ): Promise<Result<void, StorageError>> {
+    try {
+      const groupPath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'groups',
+        groupId
+      )
+      await fs.mkdir(groupPath, { recursive: true })
+      
+      const statePath = path.join(groupPath, 'state.json')
+      const serialized = JSON.stringify(serialize.any(state), null, 2)
+      
+      // Atomic write
+      const tempPath = `${statePath}.tmp`
+      await fs.writeFile(tempPath, serialized, 'utf8')
+      await fs.rename(tempPath, statePath)
+      
+      return { ok: true, value: undefined }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async loadGroupState(
+    networkId: NetworkId,
+    groupId: GroupId
+  ): Promise<Result<GroupState | null, StorageError>> {
+    try {
+      const statePath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'groups',
+        groupId,
+        'state.json'
+      )
+      
+      const data = await fs.readFile(statePath, 'utf8')
+      const deserialized = deserialize.any(JSON.parse(data)) as GroupState
+      return { ok: true, value: deserialized }
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return { ok: true, value: null }
+      }
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async deleteGroup(
+    networkId: NetworkId,
+    groupId: GroupId
+  ): Promise<Result<void, StorageError>> {
+    try {
+      const groupPath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'groups',
+        groupId
+      )
+      await fs.rm(groupPath, { recursive: true, force: true })
+      return { ok: true, value: undefined }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  // Network Operations
+  async saveNetworkState(
+    networkId: NetworkId,
+    state: NetworkState
+  ): Promise<Result<void, StorageError>> {
+    try {
+      const networkPath = path.join(this.basePath, 'networks', networkId)
+      await fs.mkdir(networkPath, { recursive: true })
+      
+      const statePath = path.join(networkPath, 'network.json')
+      const serialized = JSON.stringify(serialize.any(state), null, 2)
+      
+      // Atomic write
+      const tempPath = `${statePath}.tmp`
+      await fs.writeFile(tempPath, serialized, 'utf8')
+      await fs.rename(tempPath, statePath)
+      
+      return { ok: true, value: undefined }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async loadNetworkState(
+    networkId: NetworkId
+  ): Promise<Result<NetworkState | null, StorageError>> {
+    try {
+      const statePath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'network.json'
+      )
+      
+      const data = await fs.readFile(statePath, 'utf8')
+      const deserialized = deserialize.any(JSON.parse(data)) as NetworkState
+      return { ok: true, value: deserialized }
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return { ok: true, value: null }
+      }
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async listNetworks(): Promise<Result<NetworkId[], StorageError>> {
+    try {
+      const networksPath = path.join(this.basePath, 'networks')
+      await fs.mkdir(networksPath, { recursive: true })
+      const networks = await fs.readdir(networksPath)
+      return { ok: true, value: networks as NetworkId[] }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async deleteNetwork(
+    networkId: NetworkId
+  ): Promise<Result<void, StorageError>> {
+    try {
+      const networkPath = path.join(this.basePath, 'networks', networkId)
+      await fs.rm(networkPath, { recursive: true, force: true })
+      return { ok: true, value: undefined }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async exists(
+    networkId: NetworkId
+  ): Promise<Result<boolean, StorageError>> {
+    try {
+      const networkPath = path.join(this.basePath, 'networks', networkId)
+      await fs.access(networkPath)
+      return { ok: true, value: true }
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return { ok: true, value: false }
+      }
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  // Query Operations
+  async queryGroups(
+    networkId: NetworkId,
+    _filter: QueryFilter
+  ): Promise<Result<GroupState[], StorageError>> {
+    try {
+      const groupsPath = path.join(this.basePath, 'networks', networkId, 'groups')
+      const groups: GroupState[] = []
+      
+      try {
+        const groupDirs = await fs.readdir(groupsPath)
+        for (const groupId of groupDirs) {
+          const result = await this.loadGroupState(networkId, groupId as GroupId)
+          if (result.ok && result.value) {
+            groups.push(result.value)
+          }
+        }
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') {
+          throw error
+        }
+      }
+      
+      return { ok: true, value: groups }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  // Snapshot Operations
+  async saveSnapshot(
+    networkId: NetworkId,
+    label?: string
+  ): Promise<Result<SnapshotId, StorageError>> {
+    try {
+      const snapshotId = `snapshot-${Date.now()}` as SnapshotId
+      const snapshotPath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'snapshots',
+        snapshotId
+      )
+      await fs.mkdir(snapshotPath, { recursive: true })
+      
+      // Load current network state
+      const networkResult = await this.loadNetworkState(networkId)
+      if (!networkResult.ok) return networkResult as Result<SnapshotId, StorageError>
+      
+      // Save snapshot metadata
+      const metadata: SnapshotInfo = {
+        id: snapshotId,
+        networkId,
+        label,
+        createdAt: new Date()
+      }
+      
+      await fs.writeFile(
+        path.join(snapshotPath, 'metadata.json'),
+        JSON.stringify(metadata, null, 2),
+        'utf8'
+      )
+      
+      // Copy network state
+      if (networkResult.value) {
+        await fs.writeFile(
+          path.join(snapshotPath, 'network.json'),
+          JSON.stringify(serialize.any(networkResult.value), null, 2),
+          'utf8'
+        )
+      }
+      
+      return { ok: true, value: snapshotId }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async loadSnapshot(
+    networkId: NetworkId,
+    snapshotId: SnapshotId
+  ): Promise<Result<NetworkState, StorageError>> {
+    try {
+      const snapshotPath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'snapshots',
+        snapshotId,
+        'network.json'
+      )
+      
+      const data = await fs.readFile(snapshotPath, 'utf8')
+      const deserialized = deserialize.any(JSON.parse(data)) as NetworkState
+      return { ok: true, value: deserialized }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: error.code === 'ENOENT' ? 'SNAPSHOT_NOT_FOUND' : 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async listSnapshots(
+    networkId: NetworkId
+  ): Promise<Result<SnapshotInfo[], StorageError>> {
+    try {
+      const snapshotsPath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'snapshots'
+      )
+      
+      const snapshots: SnapshotInfo[] = []
+      
+      try {
+        const snapshotDirs = await fs.readdir(snapshotsPath)
+        for (const snapshotId of snapshotDirs) {
+          const metadataPath = path.join(snapshotsPath, snapshotId, 'metadata.json')
+          try {
+            const data = await fs.readFile(metadataPath, 'utf8')
+            const metadata = JSON.parse(data) as SnapshotInfo
+            snapshots.push(metadata)
+          } catch {
+            // Skip invalid snapshots
+          }
+        }
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') {
+          throw error
+        }
+      }
+      
+      return { ok: true, value: snapshots }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
+  }
+
+  async deleteSnapshot(
+    networkId: NetworkId,
+    snapshotId: SnapshotId
+  ): Promise<Result<void, StorageError>> {
+    try {
+      const snapshotPath = path.join(
+        this.basePath,
+        'networks',
+        networkId,
+        'snapshots',
+        snapshotId
+      )
+      await fs.rm(snapshotPath, { recursive: true, force: true })
+      return { ok: true, value: undefined }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
   }
 }
 
