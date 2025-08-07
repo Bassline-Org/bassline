@@ -31,7 +31,29 @@ program
   .description('Start a propagation network server')
   .option('-p, --port <port>', 'port to listen on', '8455')
   .option('-n, --name <name>', 'network name', 'default')
-  .action(startServer)
+  .option('--storage <type>', 'storage backend (memory, postgres, filesystem)', 'memory')
+  .option('--storage-path <path>', 'filesystem storage path')
+  .option('--storage-db <database>', 'postgres database name')
+  .option('--storage-host <host>', 'postgres host')
+  .action(async (options) => {
+    // Prepare storage options based on type
+    let storageOptions: any = undefined
+    
+    if (options.storage === 'filesystem' && options.storagePath) {
+      storageOptions = { basePath: options.storagePath }
+    } else if (options.storage === 'postgres') {
+      storageOptions = {
+        database: options.storageDb || 'bassline',
+        host: options.storageHost || 'localhost'
+      }
+    }
+    
+    await startServer({
+      ...options,
+      storage: options.storage,
+      storageOptions
+    })
+  })
 
 program
   .command('run <file>')

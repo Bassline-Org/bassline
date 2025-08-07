@@ -6,13 +6,40 @@ import fs from 'fs'
 import os from 'os'
 import { WebSocketServer } from 'ws'
 import { StandaloneNetwork } from '../runtime/StandaloneNetwork.js'
+import type { NetworkStorage } from '@bassline/core'
 
-export async function startServer(options: { port: string; host?: string; name: string; ssl?: boolean; cert?: string; key?: string }) {
+export async function startServer(options: { 
+  port: string; 
+  host?: string; 
+  name: string; 
+  ssl?: boolean; 
+  cert?: string; 
+  key?: string;
+  storage?: 'memory' | 'postgres' | 'filesystem';
+  storageOptions?: any;
+}) {
   const spinner = ora('Starting propagation network server...').start()
   
   try {
-    // Create standalone network
-    const network = new StandaloneNetwork()
+    // Initialize storage based on configuration
+    let storage: NetworkStorage | undefined
+    
+    if (options.storage === 'postgres') {
+      spinner.text = 'Connecting to PostgreSQL...'
+      const { createAppendOnlyStorage } = await import('@bassline/storage-postgres')
+      storage = createAppendOnlyStorage(options.storageOptions || 'development') as unknown as NetworkStorage
+    } else if (options.storage === 'filesystem') {
+      spinner.text = 'Initializing filesystem storage...'
+      const { createFilesystemStorage } = await import('@bassline/storage-filesystem')
+      storage = createFilesystemStorage(options.storageOptions) as unknown as NetworkStorage
+    } else if (options.storage === 'memory') {
+      spinner.text = 'Using in-memory storage...'
+      const { createMemoryStorage } = await import('@bassline/storage-memory')
+      storage = createMemoryStorage() as unknown as NetworkStorage
+    }
+    
+    // Create standalone network with storage
+    const network = new StandaloneNetwork({ storage })
     await network.initialize('immediate')
     
     // Create root group

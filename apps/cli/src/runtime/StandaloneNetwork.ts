@@ -1,25 +1,45 @@
 import { EventEmitter } from 'events'
 import { NetworkRuntime, GroupState } from './NetworkRuntime.js'
+import type { NetworkStorage } from '@bassline/core'
+import { brand } from '@bassline/core'
 
 export interface NetworkChange {
   type: string
   data: any
 }
 
+export interface StandaloneNetworkOptions {
+  storage?: NetworkStorage
+  storageType?: 'memory' | 'postgres' | 'filesystem'
+  storageOptions?: any
+}
+
 export class StandaloneNetwork extends EventEmitter {
   private runtime: NetworkRuntime
   private subscriptionHandlers: ((changes: NetworkChange[]) => void)[] = []
   private changeInterval: NodeJS.Timeout | null = null
+  private storage?: NetworkStorage
 
-  constructor() {
+  constructor(options: StandaloneNetworkOptions = {}) {
     super()
     this.runtime = new NetworkRuntime()
+    this.storage = options.storage
   }
 
   async initialize(scheduler: 'immediate' | 'batch' = 'immediate') {
+    // Initialize storage if provided
+    if (this.storage && this.storage.initialize) {
+      await this.storage.initialize()
+    }
+    
     // Subscribe to runtime changes
     this.runtime.on('change', (change) => {
       this.emit('change', change)
+      
+      // Persist changes to storage if available
+      if (this.storage) {
+        this.persistChange(change)
+      }
     })
     
     // Poll for batched changes
@@ -32,6 +52,29 @@ export class StandaloneNetwork extends EventEmitter {
     }, 100)
     
     return Promise.resolve()
+  }
+  
+  private async persistChange(change: NetworkChange) {
+    if (!this.storage) return
+    
+    try {
+      // Persist different types of changes to storage
+      switch (change.type) {
+        case 'contact-updated':
+          if (this.storage.saveContactContent) {
+            await this.storage.saveContactContent(
+              'default-network', // We'll need to track network IDs
+              change.data.groupId,
+              change.data.contactId,
+              change.data.content
+            )
+          }
+          break
+        // Add more cases as needed
+      }
+    } catch (error) {
+      console.error('Failed to persist change:', error)
+    }
   }
 
   async registerGroup(group: any) {

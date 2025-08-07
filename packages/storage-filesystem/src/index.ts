@@ -1,567 +1,448 @@
 /**
- * Filesystem storage implementation for Bassline
+ * Filesystem Append-Only Storage for Propagation Networks
  * 
- * Provides persistent storage using the filesystem with strong domain types
- * and Result-based error handling
+ * Key innovations:
+ * - Each version is a separate file (true append-only)
+ * - Atomic writes using temp files + rename
+ * - Natural sharding through directory structure
+ * - Zero lock contention for parallel writes
  */
 
-import { promises as fs } from 'fs'
-import path from 'path'
+import * as fs from 'fs/promises'
+import * as path from 'path'
+// Removed unused imports - createReadStream, createWriteStream
 import type { 
   NetworkStorage, 
-  StorageConfig, 
   StorageError,
-  SnapshotInfo, 
-  QueryFilter,
-  GroupState,
-  NetworkState,
   Result,
   NetworkId,
   GroupId,
   ContactId,
-  SnapshotId,
   Serializable
 } from '@bassline/core'
-import { brand } from '@bassline/core'
+import { serialize, deserialize } from '@bassline/core'
 
-interface FilesystemStorageConfig extends StorageConfig {
-  options?: {
-    basePath?: string
-    compression?: boolean
-    encoding?: BufferEncoding
+interface FilesystemStorageConfig {
+  basePath?: string
+  compression?: 'none' | 'gzip'  // Future: compress old versions
+  versioning?: {
+    keepVersions?: number        // How many versions to keep
+    archiveOldVersions?: boolean // Move old versions to archive dir
+  }
+  performance?: {
+    useSymlinks?: boolean        // Use symlinks for 'latest' (faster reads)
+    bufferWrites?: boolean       // Buffer writes in memory before flushing
+    parallelism?: number         // Max parallel file operations
   }
 }
 
-export class FilesystemStorage implements NetworkStorage {
-  private readonly basePath: string
-  private readonly encoding: BufferEncoding
-  private readonly compression: boolean
+export class FilesystemAppendOnlyStorage implements Partial<NetworkStorage> {
+  private basePath: string
+  private config: FilesystemStorageConfig
+  private versionCounters: Map<string, number> = new Map()
   
-  constructor(config?: FilesystemStorageConfig) {
-    this.basePath = config?.options?.basePath || path.join(process.cwd(), '.bassline-storage')
-    this.encoding = config?.options?.encoding || 'utf-8'
-    this.compression = config?.options?.compression || false
+  constructor(config: FilesystemStorageConfig = {}) {
+    this.config = config
+    this.basePath = config.basePath || './bassline-data'
   }
   
-  // ============================================================================
-  // Helper Methods
-  // ============================================================================
-  
-  private networkPath(networkId: NetworkId): string {
-    return path.join(this.basePath, 'networks', networkId)
-  }
-  
-  private groupPath(networkId: NetworkId, groupId: GroupId): string {
-    return path.join(this.networkPath(networkId), 'groups', `${groupId}.json`)
-  }
-  
-  private contactPath(networkId: NetworkId, groupId: GroupId, contactId: ContactId): string {
-    return path.join(this.networkPath(networkId), 'contacts', groupId, `${contactId}.json`)
-  }
-  
-  private networkStatePath(networkId: NetworkId): string {
-    return path.join(this.networkPath(networkId), 'network.json')
-  }
-  
-  private snapshotPath(networkId: NetworkId, snapshotId: SnapshotId): string {
-    return path.join(this.networkPath(networkId), 'snapshots', `${snapshotId}.json`)
-  }
-  
-  private async ensureDirectory(dirPath: string): Promise<Result<void, StorageError>> {
+  /**
+   * Initialize storage directory structure
+   */
+  async initialize(): Promise<Result<void, StorageError>> {
     try {
-      await fs.mkdir(dirPath, { recursive: true })
+      await fs.mkdir(this.basePath, { recursive: true })
+      await fs.mkdir(path.join(this.basePath, 'networks'), { recursive: true })
       return { ok: true, value: undefined }
-    } catch (error) {
+    } catch (error: any) {
       return {
         ok: false,
         error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: `Failed to create directory: ${dirPath}`,
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
           details: error
         }
       }
     }
   }
   
-  private async writeFile<T>(
-    filePath: string, 
-    data: Serializable<T>
-  ): Promise<Result<void, StorageError>> {
-    try {
-      const dir = path.dirname(filePath)
-      const ensureDirResult = await this.ensureDirectory(dir)
-      if (!ensureDirResult.ok) return ensureDirResult
-      
-      const content = JSON.stringify(data, null, 2)
-      await fs.writeFile(filePath, content, this.encoding)
-      
-      return { ok: true, value: undefined }
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          code: 'STORAGE_SERIALIZATION_ERROR',
-          message: `Failed to write file: ${filePath}`,
-          details: error
-        }
-      }
-    }
+  /**
+   * Get the directory path for a contact
+   */
+  private getContactPath(networkId: NetworkId, groupId: GroupId, contactId: ContactId): string {
+    return path.join(
+      this.basePath,
+      'networks',
+      networkId,
+      'groups',
+      groupId,
+      'contacts',
+      contactId
+    )
   }
   
-  private async readFile<T>(filePath: string): Promise<Result<T | null, StorageError>> {
+  /**
+   * Get next version number for a contact
+   */
+  private async getNextVersion(networkId: NetworkId, groupId: GroupId, contactId: ContactId): Promise<number> {
+    const key = `${networkId}:${groupId}:${contactId}`
+    
+    // Check in-memory counter first
+    if (this.versionCounters.has(key)) {
+      const next = this.versionCounters.get(key)! + 1
+      this.versionCounters.set(key, next)
+      return next
+    }
+    
+    // Otherwise, check filesystem
+    const contactPath = this.getContactPath(networkId, groupId, contactId)
+    
     try {
-      const content = await fs.readFile(filePath, this.encoding)
-      const data = JSON.parse(content) as T
-      return { ok: true, value: data }
+      const files = await fs.readdir(contactPath)
+      const versionFiles = files.filter(f => f.match(/^v\d+\.json$/))
+      const maxVersion = versionFiles.reduce((max, file) => {
+        const version = parseInt(file.slice(1, -5), 10)
+        return Math.max(max, version)
+      }, 0)
+      
+      const next = maxVersion + 1
+      this.versionCounters.set(key, next)
+      return next
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        return { ok: true, value: null }
+        // Directory doesn't exist, this is version 1
+        this.versionCounters.set(key, 1)
+        return 1
       }
-      
-      return {
-        ok: false,
-        error: {
-          code: 'STORAGE_SERIALIZATION_ERROR',
-          message: `Failed to read file: ${filePath}`,
-          details: error
-        }
-      }
+      throw error
     }
   }
   
-  private async fileExists(filePath: string): Promise<boolean> {
-    try {
-      await fs.access(filePath)
-      return true
-    } catch {
-      return false
-    }
-  }
-  
-  // ============================================================================
-  // NetworkStorage Implementation
-  // ============================================================================
-  
-  // Contact Operations
+  /**
+   * Save contact content - APPEND ONLY, creates new version file
+   */
   async saveContactContent<T = unknown>(
     networkId: NetworkId, 
     groupId: GroupId, 
     contactId: ContactId, 
     content: Serializable<T>
   ): Promise<Result<void, StorageError>> {
-    const filePath = this.contactPath(networkId, groupId, contactId)
-    return this.writeFile(filePath, { content, updatedAt: new Date().toISOString() })
+    try {
+      const contactPath = this.getContactPath(networkId, groupId, contactId)
+      
+      // Ensure directory exists
+      await fs.mkdir(contactPath, { recursive: true })
+      
+      // Get next version number
+      const version = await this.getNextVersion(networkId, groupId, contactId)
+      const versionFile = `v${version.toString().padStart(8, '0')}.json`
+      const versionPath = path.join(contactPath, versionFile)
+      
+      // Serialize content
+      const serialized = JSON.stringify({
+        version,
+        timestamp: Date.now(),
+        content: serialize.any(content)
+      }, null, 2)
+      
+      // Atomic write: write to temp file, then rename
+      const tempPath = `${versionPath}.tmp`
+      await fs.writeFile(tempPath, serialized, 'utf8')
+      await fs.rename(tempPath, versionPath)
+      
+      // Update 'latest' symlink if configured
+      if (this.config.performance?.useSymlinks !== false) {
+        const latestPath = path.join(contactPath, 'latest')
+        
+        // Remove old symlink if exists
+        try {
+          await fs.unlink(latestPath)
+        } catch (e) {
+          // Ignore if doesn't exist
+        }
+        
+        // Create new symlink to latest version
+        await fs.symlink(versionFile, latestPath)
+      }
+      
+      // Cleanup old versions if configured
+      if (this.config.versioning?.keepVersions) {
+        await this.cleanupOldVersions(contactPath, version, this.config.versioning.keepVersions)
+      }
+      
+      return { ok: true, value: undefined }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
   }
   
+  /**
+   * Load latest contact content
+   */
   async loadContactContent<T = unknown>(
     networkId: NetworkId, 
     groupId: GroupId, 
     contactId: ContactId
   ): Promise<Result<T | null, StorageError>> {
-    const filePath = this.contactPath(networkId, groupId, contactId)
-    const result = await this.readFile<{ content: T; updatedAt: string }>(filePath)
-    
-    if (!result.ok) return result
-    if (result.value === null) return { ok: true, value: null }
-    
-    return { ok: true, value: result.value.content }
-  }
-  
-  // Group Operations  
-  async saveGroupState(
-    networkId: NetworkId, 
-    groupId: GroupId, 
-    state: GroupState
-  ): Promise<Result<void, StorageError>> {
-    const filePath = this.groupPath(networkId, groupId)
-    return this.writeFile(filePath, { ...state, updatedAt: new Date().toISOString() })
-  }
-  
-  async loadGroupState(
-    networkId: NetworkId, 
-    groupId: GroupId
-  ): Promise<Result<GroupState | null, StorageError>> {
-    const filePath = this.groupPath(networkId, groupId)
-    const result = await this.readFile<GroupState & { updatedAt: string }>(filePath)
-    
-    if (!result.ok) return result
-    if (result.value === null) return { ok: true, value: null }
-    
-    // Remove storage metadata
-    const { updatedAt, ...groupState } = result.value
-    return { ok: true, value: groupState as GroupState }
-  }
-  
-  async deleteGroup(
-    networkId: NetworkId, 
-    groupId: GroupId
-  ): Promise<Result<void, StorageError>> {
     try {
-      const filePath = this.groupPath(networkId, groupId)
-      await fs.unlink(filePath)
+      const contactPath = this.getContactPath(networkId, groupId, contactId)
       
-      // Also delete contact directory for this group
-      const contactDir = path.join(this.networkPath(networkId), 'contacts', groupId)
-      if (await this.fileExists(contactDir)) {
-        await fs.rm(contactDir, { recursive: true, force: true })
+      let targetPath: string | null
+      
+      // Try to use 'latest' symlink if available
+      if (this.config.performance?.useSymlinks !== false) {
+        const latestPath = path.join(contactPath, 'latest')
+        try {
+          await fs.access(latestPath)
+          targetPath = latestPath
+        } catch {
+          // Symlink doesn't exist, find latest version manually
+          targetPath = await this.findLatestVersion(contactPath)
+          if (!targetPath) return { ok: true, value: null }
+        }
+      } else {
+        targetPath = await this.findLatestVersion(contactPath)
+        if (!targetPath) return { ok: true, value: null }
       }
       
-      return { ok: true, value: undefined }
+      // targetPath should never be null here due to early returns
+      if (!targetPath) return { ok: true, value: null }
+      
+      // Read and deserialize
+      const data = await fs.readFile(targetPath, 'utf8')
+      const parsed = JSON.parse(data)
+      const deserialized = deserialize.any(parsed.content) as T
+      
+      return { ok: true, value: deserialized }
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        return { ok: true, value: undefined } // Already deleted
+        return { ok: true, value: null }
       }
-      
-      return {
-        ok: false,
-        error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: `Failed to delete group: ${groupId}`,
-          details: error
-        }
-      }
-    }
-  }
-  
-  // Network Operations
-  async saveNetworkState(
-    networkId: NetworkId, 
-    state: NetworkState
-  ): Promise<Result<void, StorageError>> {
-    const filePath = this.networkStatePath(networkId)
-    return this.writeFile(filePath, { ...state, updatedAt: new Date().toISOString() })
-  }
-  
-  async loadNetworkState(
-    networkId: NetworkId
-  ): Promise<Result<NetworkState | null, StorageError>> {
-    const filePath = this.networkStatePath(networkId)
-    const result = await this.readFile<NetworkState & { updatedAt: string }>(filePath)
-    
-    if (!result.ok) return result
-    if (result.value === null) return { ok: true, value: null }
-    
-    // Remove storage metadata
-    const { updatedAt, ...networkState } = result.value
-    return { ok: true, value: networkState as NetworkState }
-  }
-  
-  async listNetworks(): Promise<Result<NetworkId[], StorageError>> {
-    try {
-      const networksDir = path.join(this.basePath, 'networks')
-      
-      if (!(await this.fileExists(networksDir))) {
-        return { ok: true, value: [] }
-      }
-      
-      const entries = await fs.readdir(networksDir, { withFileTypes: true })
-      const networkIds = entries
-        .filter(entry => entry.isDirectory())
-        .map(entry => brand.networkId(entry.name))
-      
-      return { ok: true, value: networkIds }
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: 'Failed to list networks',
-          details: error
-        }
-      }
-    }
-  }
-  
-  async deleteNetwork(
-    networkId: NetworkId
-  ): Promise<Result<void, StorageError>> {
-    try {
-      const networkDir = this.networkPath(networkId)
-      if (await this.fileExists(networkDir)) {
-        await fs.rm(networkDir, { recursive: true, force: true })
-      }
-      return { ok: true, value: undefined }
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: `Failed to delete network: ${networkId}`,
-          details: error
-        }
-      }
-    }
-  }
-  
-  async exists(
-    networkId: NetworkId
-  ): Promise<Result<boolean, StorageError>> {
-    try {
-      const networkDir = this.networkPath(networkId)
-      const exists = await this.fileExists(networkDir)
-      return { ok: true, value: exists }
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: `Failed to check network existence: ${networkId}`,
-          details: error
-        }
-      }
-    }
-  }
-  
-  // Query Operations
-  async queryGroups(
-    networkId: NetworkId, 
-    filter: QueryFilter
-  ): Promise<Result<GroupState[], StorageError>> {
-    try {
-      const groupsDir = path.join(this.networkPath(networkId), 'groups')
-      
-      if (!(await this.fileExists(groupsDir))) {
-        return { ok: true, value: [] }
-      }
-      
-      const files = await fs.readdir(groupsDir)
-      const results: GroupState[] = []
-      
-      for (const file of files) {
-        if (!file.endsWith('.json')) continue
-        
-        const filePath = path.join(groupsDir, file)
-        const groupResult = await this.readFile<GroupState & { updatedAt: string }>(filePath)
-        
-        if (!groupResult.ok) continue
-        if (groupResult.value === null) continue
-        
-        const { updatedAt, ...groupState } = groupResult.value
-        const group = groupState as GroupState
-        
-        // Apply filters
-        let matches = true
-        
-        if (filter.attributes) {
-          for (const [key, value] of Object.entries(filter.attributes)) {
-            if (group.group.attributes?.[key] !== value) {
-              matches = false
-              break
-            }
-          }
-        }
-        
-        if (filter.author && matches) {
-          const author = group.group.attributes?.['bassline.author'] || 
-                        group.group.attributes?.author
-          if (author !== filter.author) {
-            matches = false
-          }
-        }
-        
-        if (filter.tags && matches) {
-          const tags = group.group.attributes?.['bassline.tags'] || 
-                      group.group.attributes?.tags || []
-          const tagSet = new Set(tags)
-          if (!filter.tags.every(tag => tagSet.has(tag))) {
-            matches = false
-          }
-        }
-        
-        if (filter.type && matches) {
-          const type = group.group.attributes?.['bassline.type'] || 
-                      group.group.attributes?.type
-          if (type !== filter.type) {
-            matches = false
-          }
-        }
-        
-        if (matches) {
-          results.push(group)
-        }
-      }
-      
-      return { ok: true, value: results }
-    } catch (error) {
-      return {
-        ok: false,
-        error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: `Failed to query groups in network: ${networkId}`,
-          details: error
-        }
-      }
-    }
-  }
-  
-  // Versioning & Snapshots
-  async saveSnapshot(
-    networkId: NetworkId, 
-    label?: string
-  ): Promise<Result<SnapshotId, StorageError>> {
-    try {
-      // Load current network state
-      const stateResult = await this.loadNetworkState(networkId)
-      if (!stateResult.ok) return stateResult
-      if (stateResult.value === null) {
-        return {
-          ok: false,
-          error: {
-            code: 'NETWORK_NOT_FOUND',
-            message: `Network ${networkId} not found`
-          }
-        }
-      }
-      
-      // Generate snapshot ID
-      const snapshotId = brand.snapshotId(`snapshot-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      
-      // Create snapshot
-      const snapshot = {
-        id: snapshotId,
-        networkId,
-        label,
-        state: stateResult.value,
-        createdAt: new Date().toISOString()
-      }
-      
-      // Save snapshot
-      const filePath = this.snapshotPath(networkId, snapshotId)
-      const writeResult = await this.writeFile(filePath, snapshot)
-      
-      if (!writeResult.ok) return writeResult
-      
-      return { ok: true, value: snapshotId }
-    } catch (error) {
       return {
         ok: false,
         error: {
           code: 'STORAGE_SERIALIZATION_ERROR',
-          message: `Failed to save snapshot for network: ${networkId}`,
+          message: error.message,
           details: error
         }
       }
     }
   }
   
-  async loadSnapshot(
-    networkId: NetworkId, 
-    snapshotId: SnapshotId
-  ): Promise<Result<NetworkState, StorageError>> {
-    const filePath = this.snapshotPath(networkId, snapshotId)
-    const result = await this.readFile<{
-      id: SnapshotId
-      networkId: NetworkId
-      state: NetworkState
-      createdAt: string
-      label?: string
-    }>(filePath)
-    
-    if (!result.ok) return result
-    if (result.value === null) {
-      return {
-        ok: false,
-        error: {
-          code: 'SNAPSHOT_NOT_FOUND',
-          message: `Snapshot ${snapshotId} not found for network ${networkId}`
-        }
-      }
+  /**
+   * Find the latest version file in a directory
+   */
+  private async findLatestVersion(contactPath: string): Promise<string | null> {
+    try {
+      const files = await fs.readdir(contactPath)
+      const versionFiles = files
+        .filter(f => f.match(/^v\d+\.json$/))
+        .sort((a, b) => b.localeCompare(a))  // Sort descending
+      
+      if (versionFiles.length === 0) return null
+      
+      return path.join(contactPath, versionFiles[0])
+    } catch {
+      return null
     }
-    
-    return { ok: true, value: result.value.state }
   }
   
-  async listSnapshots(
-    networkId: NetworkId
-  ): Promise<Result<SnapshotInfo[], StorageError>> {
+  /**
+   * Get version history for a contact
+   */
+  async getContactHistory(
+    networkId: NetworkId, 
+    groupId: GroupId, 
+    contactId: ContactId,
+    limit?: number
+  ): Promise<Result<Array<{ version: number, timestamp: number, content: any }>, StorageError>> {
     try {
-      const snapshotsDir = path.join(this.networkPath(networkId), 'snapshots')
+      const contactPath = this.getContactPath(networkId, groupId, contactId)
       
-      if (!(await this.fileExists(snapshotsDir))) {
-        return { ok: true, value: [] }
-      }
+      const files = await fs.readdir(contactPath)
+      const versionFiles = files
+        .filter(f => f.match(/^v\d+\.json$/))
+        .sort((a, b) => b.localeCompare(a))  // Sort descending
+        .slice(0, limit)
       
-      const files = await fs.readdir(snapshotsDir)
-      const results: SnapshotInfo[] = []
-      
-      for (const file of files) {
-        if (!file.endsWith('.json')) continue
-        
-        const filePath = path.join(snapshotsDir, file)
-        const snapshotResult = await this.readFile<{
-          id: SnapshotId
-          networkId: NetworkId
-          label?: string
-          createdAt: string
-          state: NetworkState
-        }>(filePath)
-        
-        if (!snapshotResult.ok || snapshotResult.value === null) continue
-        
-        const snapshot = snapshotResult.value
-        const stats = await fs.stat(filePath)
-        
-        results.push({
-          id: snapshot.id,
-          networkId: snapshot.networkId,
-          label: snapshot.label,
-          createdAt: new Date(snapshot.createdAt),
-          size: stats.size
+      const history = await Promise.all(
+        versionFiles.map(async (file) => {
+          const filePath = path.join(contactPath, file)
+          const data = await fs.readFile(filePath, 'utf8')
+          const parsed = JSON.parse(data)
+          return {
+            version: parsed.version,
+            timestamp: parsed.timestamp,
+            content: deserialize.any(parsed.content)
+          }
         })
-      }
+      )
       
-      // Sort by creation date (newest first)
-      results.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      
-      return { ok: true, value: results }
-    } catch (error) {
+      return { ok: true, value: history }
+    } catch (error: any) {
       return {
         ok: false,
         error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: `Failed to list snapshots for network: ${networkId}`,
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
           details: error
         }
       }
     }
   }
   
-  async deleteSnapshot(
-    networkId: NetworkId, 
-    snapshotId: SnapshotId
+  /**
+   * Cleanup old versions, keeping only the specified number
+   */
+  private async cleanupOldVersions(contactPath: string, _currentVersion: number, keepVersions: number): Promise<void> {
+    const files = await fs.readdir(contactPath)
+    const versionFiles = files
+      .filter(f => f.match(/^v\d+\.json$/))
+      .map(f => ({
+        file: f,
+        version: parseInt(f.slice(1, -5), 10)
+      }))
+      .sort((a, b) => b.version - a.version)  // Sort by version descending
+    
+    // Keep the latest N versions
+    const toDelete = versionFiles.slice(keepVersions)
+    
+    for (const { file } of toDelete) {
+      const filePath = path.join(contactPath, file)
+      
+      if (this.config.versioning?.archiveOldVersions) {
+        // Move to archive directory
+        const archivePath = path.join(contactPath, 'archive')
+        await fs.mkdir(archivePath, { recursive: true })
+        await fs.rename(filePath, path.join(archivePath, file))
+      } else {
+        // Delete old version
+        await fs.unlink(filePath)
+      }
+    }
+  }
+  
+  /**
+   * Stream-based batch append for high throughput
+   */
+  async batchAppend(
+    operations: Array<{
+      networkId: NetworkId
+      groupId: GroupId
+      contactId: ContactId
+      content: any
+    }>
   ): Promise<Result<void, StorageError>> {
+    // Use parallelism limit to avoid file descriptor exhaustion
+    const parallelism = this.config.performance?.parallelism || 10
+    
+    const chunks = []
+    for (let i = 0; i < operations.length; i += parallelism) {
+      chunks.push(operations.slice(i, i + parallelism))
+    }
+    
     try {
-      const filePath = this.snapshotPath(networkId, snapshotId)
-      await fs.unlink(filePath)
+      for (const chunk of chunks) {
+        await Promise.all(
+          chunk.map(op => 
+            this.saveContactContent(op.networkId, op.groupId, op.contactId, op.content)
+          )
+        )
+      }
+      
       return { ok: true, value: undefined }
     } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        return { ok: true, value: undefined } // Already deleted
-      }
-      
       return {
         ok: false,
         error: {
-          code: 'STORAGE_PERMISSION_ERROR',
-          message: `Failed to delete snapshot: ${snapshotId}`,
+          code: 'STORAGE_SERIALIZATION_ERROR',
+          message: error.message,
           details: error
         }
       }
     }
   }
   
-  // Lifecycle
-  async initialize(): Promise<Result<void, StorageError>> {
-    return this.ensureDirectory(this.basePath)
+  /**
+   * Get storage statistics
+   */
+  async getStats(): Promise<Result<any, StorageError>> {
+    try {
+      const stats = {
+        basePath: this.basePath,
+        networks: 0,
+        groups: 0,
+        contacts: 0,
+        totalVersions: 0,
+        totalSize: 0
+      }
+      
+      // Walk the directory structure
+      const networksPath = path.join(this.basePath, 'networks')
+      const networks = await fs.readdir(networksPath)
+      stats.networks = networks.length
+      
+      for (const network of networks) {
+        const groupsPath = path.join(networksPath, network, 'groups')
+        try {
+          const groups = await fs.readdir(groupsPath)
+          stats.groups += groups.length
+          
+          for (const group of groups) {
+            const contactsPath = path.join(groupsPath, group, 'contacts')
+            try {
+              const contacts = await fs.readdir(contactsPath)
+              stats.contacts += contacts.length
+              
+              for (const contact of contacts) {
+                const contactPath = path.join(contactsPath, contact)
+                const files = await fs.readdir(contactPath)
+                const versionFiles = files.filter(f => f.match(/^v\d+\.json$/))
+                stats.totalVersions += versionFiles.length
+                
+                // Calculate total size
+                for (const file of versionFiles) {
+                  const filePath = path.join(contactPath, file)
+                  const stat = await fs.stat(filePath)
+                  stats.totalSize += stat.size
+                }
+              }
+            } catch {
+              // No contacts
+            }
+          }
+        } catch {
+          // No groups
+        }
+      }
+      
+      return { ok: true, value: stats }
+    } catch (error: any) {
+      return {
+        ok: false,
+        error: {
+          code: 'STORAGE_CONNECTION_ERROR',
+          message: error.message,
+          details: error
+        }
+      }
+    }
   }
   
   async close(): Promise<Result<void, StorageError>> {
-    // Filesystem storage doesn't need explicit cleanup
+    // Clear version counters
+    this.versionCounters.clear()
     return { ok: true, value: undefined }
   }
 }
 
-// Factory function
-export function createFilesystemStorage(config?: FilesystemStorageConfig): NetworkStorage {
-  return new FilesystemStorage(config)
+export function createFilesystemStorage(config?: FilesystemStorageConfig) {
+  return new FilesystemAppendOnlyStorage(config)
 }

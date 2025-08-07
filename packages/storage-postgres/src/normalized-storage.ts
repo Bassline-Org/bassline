@@ -18,9 +18,10 @@ import type {
   NetworkId,
   GroupId,
   ContactId,
+  Group,
+  WireId,
   SnapshotId,
-  Serializable,
-  WireId
+  Serializable
 } from '@bassline/core'
 import { brand, serialize, deserialize } from '@bassline/core'
 
@@ -535,7 +536,7 @@ export class NormalizedPostgresStorage implements NetworkStorage {
         VALUES ($1, $2)
         ON CONFLICT (id) 
         DO UPDATE SET root_group_id = $2, updated_at = NOW()
-      `, [networkId, state.rootGroup])
+      `, [networkId, state.rootGroupId])
       
       // Save all groups
       for (const [groupId, groupState] of state.groups) {
