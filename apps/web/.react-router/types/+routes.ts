@@ -13,6 +13,14 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/editor/:groupId?": {
+    params: {
+      "groupId"?: string;
+    };
+  };
+  "/api/editor/actions": {
+    params: {};
+  };
   "/editor-v2/:groupId?": {
     params: {
       "groupId"?: string;
@@ -30,16 +38,39 @@ type Pages = {
   "/bassline-browser": {
     params: {};
   };
+  "/demo": {
+    params: {};
+  };
+  "/api/demo": {
+    params: {};
+  };
+  "/worker-test": {
+    params: {};
+  };
+  "/ws-test": {
+    params: {};
+  };
+  "/test-sounds": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/editor-v2/:groupId?" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/bassline-browser";
+    page: "/" | "/editor/:groupId?" | "/api/editor/actions" | "/editor-v2/:groupId?" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/bassline-browser" | "/demo" | "/api/demo" | "/worker-test" | "/ws-test" | "/test-sounds";
   };
   "routes/home.tsx": {
     id: "routes/home";
     page: "/";
+  };
+  "routes/editor.tsx": {
+    id: "routes/editor";
+    page: "/editor/:groupId?";
+  };
+  "routes/api.editor.actions.tsx": {
+    id: "routes/api.editor.actions";
+    page: "/api/editor/actions";
   };
   "routes/editor-v2.tsx": {
     id: "routes/editor-v2";
@@ -60,5 +91,25 @@ type RouteFiles = {
   "routes/bassline-browser.tsx": {
     id: "routes/bassline-browser";
     page: "/bassline-browser";
+  };
+  "routes/demo.tsx": {
+    id: "routes/demo";
+    page: "/demo";
+  };
+  "routes/api.demo.tsx": {
+    id: "routes/api.demo";
+    page: "/api/demo";
+  };
+  "routes/worker-test.tsx": {
+    id: "routes/worker-test";
+    page: "/worker-test";
+  };
+  "routes/ws-test.tsx": {
+    id: "routes/ws-test";
+    page: "/ws-test";
+  };
+  "routes/test-sounds.tsx": {
+    id: "routes/test-sounds";
+    page: "/test-sounds";
   };
 };

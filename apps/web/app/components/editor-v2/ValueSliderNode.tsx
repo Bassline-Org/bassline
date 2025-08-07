@@ -15,7 +15,8 @@ interface SliderNodeData {
 }
 
 export function ValueSliderNode({ data, selected }: NodeProps) {
-  const { contact, groupId, min = 0, max = 100, step = 1 } = data as SliderNodeData
+  const nodeData = data as unknown as SliderNodeData
+  const { contact, groupId, min = 0, max = 100, step = 1 } = nodeData
   const submit = useSubmit()
   
   // Parse current value

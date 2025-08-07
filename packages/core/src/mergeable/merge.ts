@@ -225,8 +225,12 @@ async function mergeGrowMaps<K, V>(a: GrowMap<K, V>, b: GrowMap<K, V>): Promise<
   for (const [key, valueB] of b.entries) {
     if (result.has(key)) {
       const valueA = result.get(key)
-      const merged = await mergeContent(valueA, valueB)
-      result.set(key, merged)
+      if (valueA !== undefined) {
+        const merged = await mergeContent(valueA, valueB) as V
+        result.set(key, merged)
+      } else {
+        result.set(key, valueB)
+      }
     } else {
       result.set(key, valueB)
     }

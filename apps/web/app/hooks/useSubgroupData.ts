@@ -45,7 +45,7 @@ export function useSubgroupData(subgroupIds: string[]): Map<string, SubgroupInfo
           newData.set(subgroupId, {
             id: subgroupId,
             name: group.name,
-            primitiveId: group.primitiveId,
+            primitiveId: group.primitive?.name,
             boundaryContacts
           })
         } catch (error) {

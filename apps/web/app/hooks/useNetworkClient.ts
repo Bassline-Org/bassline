@@ -5,6 +5,7 @@ import { RemoteNetworkClient } from '~/network/remote-client'
 import { WebSocketNetworkClient } from '~/network/websocket-client'
 import { NativeWebRTCClient } from '~/network/webrtc-native-client'
 import { ClientWrapper } from '~/network/client-wrapper'
+import { brand } from '@bassline/core'
 
 /**
  * Hook to get a properly configured network client based on URL params and config
@@ -71,7 +72,7 @@ export function useNetworkClient() {
           // Ensure root group exists
           try {
             await workerClient.registerGroup({
-              id: 'root',
+              id: brand.groupId('root'),
               name: 'Root Group',
               contactIds: [],
               wireIds: [],

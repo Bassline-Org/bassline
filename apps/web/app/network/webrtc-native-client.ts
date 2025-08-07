@@ -1,4 +1,4 @@
-import type { NetworkClient } from './client'
+import type { NetworkClient } from '@bassline/core'
 import type { Change, GroupState, Group, Contact } from '@bassline/core'
 import type { 
   P2PMessage, 
@@ -1342,6 +1342,86 @@ export class NativeWebRTCClient implements NetworkClient {
     await this.scheduleUpdate(toContactId, content)
   }
   
+  // NetworkClient interface methods
+  async request<T>(request: any): Promise<import('@bassline/core').Result<T, import('@bassline/core').NetworkError>> {
+    try {
+      // For WebRTC, we need to route requests through the appropriate handler
+      const result = await this.sendRequestToHost(request.type, request.data || {})
+      return { ok: true, value: result }
+    } catch (error) {
+      return { 
+        ok: false, 
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
+    }
+  }
+  
+  subscribe(handler: (notification: import('@bassline/core').NetworkNotification) => void): () => void {
+    // For NetworkClient interface, we'll subscribe to the root group by default
+    return this.subscribeToGroup('root', (changes) => {
+      // Convert changes to network notifications
+      changes.forEach(change => {
+        const notification: import('@bassline/core').NetworkNotification = {
+          type: 'changes',
+          changes: [change]
+        }
+        handler(notification)
+      })
+    })
+  }
+  
+  subscribeToGroup(groupId: string, handler: (changes: Change[]) => void): () => void {
+    if (!this.subscriptions.has(groupId)) {
+      this.subscriptions.set(groupId, [])
+    }
+    
+    const handlers = this.subscriptions.get(groupId)!
+    handlers.push(handler)
+    
+    return () => {
+      const handlers = this.subscriptions.get(groupId)
+      if (handlers) {
+        const index = handlers.indexOf(handler)
+        if (index !== -1) {
+          handlers.splice(index, 1)
+        }
+        if (handlers.length === 0) {
+          this.subscriptions.delete(groupId)
+        }
+      }
+    }
+  }
+  
+  async connect(): Promise<import('@bassline/core').Result<void, import('@bassline/core').NetworkError>> {
+    try {
+      await this.initialize()
+      return { ok: true, value: undefined }
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    this.terminate()
+  }
+  
+  isConnected(): boolean {
+    return this.state.connected
+  }
+  
+  getMode(): 'worker' | 'websocket' | 'webrtc' {
+    return 'webrtc'
+  }
+
   terminate(): void {
     this.peers.forEach(peer => {
       if (peer.dc) peer.dc.close()

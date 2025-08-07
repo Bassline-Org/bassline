@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { validateBassline, validateCompatibility } from '../propagation-core-v2/bassline/validation'
-import type { Bassline } from '../propagation-core-v2/bassline/types'
+import { validateBassline, validateCompatibility } from '@bassline/core'
+import type { Bassline } from '@bassline/core'
 
 describe('Bassline Validation', () => {
   describe('Schema Validation', () => {

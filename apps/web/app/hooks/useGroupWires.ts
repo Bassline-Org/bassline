@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getNetworkClient } from '~/network/client'
 import type { Wire, GroupState } from '@bassline/core'
+import { brand } from '@bassline/core'
 
 interface ProcessedWire {
   id: string
@@ -110,9 +111,9 @@ export function useGroupWires(
           (!fromContact && !toContact)) {
         return
       }
-      let sourceNode = wire.fromId
+      let sourceNode: string = wire.fromId
       let sourceHandle: string | undefined = undefined
-      let targetNode = wire.toId
+      let targetNode: string = wire.toId
       let targetHandle: string | undefined = undefined
       
       // Check if source is a boundary contact of any subgroup
@@ -157,9 +158,9 @@ export function useGroupWires(
     // Process wires from subgroups that connect to parent
     subgroupWires.forEach((wires, subgroupId) => {
       wires.forEach((wire) => {
-        let sourceNode = wire.fromId
+        let sourceNode = wire.fromId as string
         let sourceHandle: string | undefined = undefined
-        let targetNode = wire.toId
+        let targetNode = wire.toId as string
         let targetHandle: string | undefined = undefined
         
         // Check if source is in parent (regular contact) or subgroup (boundary)

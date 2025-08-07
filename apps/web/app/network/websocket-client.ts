@@ -1,9 +1,22 @@
 // WebSocket-enabled client for connecting to a remote Bassline server
-import type { NetworkClient, NetworkMessage, GroupState } from './client'
-import type { Change } from '@bassline/core'
+import type { 
+  GroupState, 
+  Change, 
+  Contact, 
+  Group, 
+  Wire,
+  ContactId,
+  GroupId,
+  WireId,
+  NetworkError,
+  Result,
+  NetworkNotification,
+  NetworkClient
+} from '@bassline/core'
+import { brand } from '@bassline/core'
 
 export class WebSocketNetworkClient implements NetworkClient {
-  public readonly serverUrl: string // Add this property for ClientWrapper detection
+  private _serverUrl: string
   private wsUrl: string
   private ws: WebSocket | null = null
   private subscriptions = new Map<string, Array<(changes: Change[]) => void>>()
@@ -17,11 +30,20 @@ export class WebSocketNetworkClient implements NetworkClient {
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
   
+  // Properties required by RemoteNetworkClient interface compatibility  
+  private pollInterval: NodeJS.Timeout | null = null
+  private lastChangeTimestamp = 0
+  
   constructor(serverUrl: string) {
-    this.serverUrl = serverUrl
+    this._serverUrl = serverUrl
     // Convert HTTP URL to WebSocket URL
     this.wsUrl = serverUrl.replace(/^http/, 'ws')
     console.log('[WebSocketClient] Constructor - Server URL:', serverUrl, '-> WS URL:', this.wsUrl)
+  }
+  
+  // Public getter for serverUrl to support ClientWrapper detection
+  get serverUrl(): string {
+    return this._serverUrl
   }
   
   async initialize(scheduler: 'immediate' | 'batch' = 'immediate'): Promise<void> {
@@ -343,7 +365,7 @@ export class WebSocketNetworkClient implements NetworkClient {
     }
   }
   
-  subscribe(groupId: string, handler: (changes: Change[]) => void): () => void {
+  subscribeToGroup(groupId: string, handler: (changes: Change[]) => void): () => void {
     console.log('[WebSocketClient.subscribe] Called with groupId:', typeof groupId === 'string' ? groupId : 'NOT A STRING!', 'handler:', typeof handler)
     
     if (typeof groupId !== 'string') {
@@ -402,7 +424,7 @@ export class WebSocketNetworkClient implements NetworkClient {
     }
   }
   
-  async sendMessage(message: NetworkMessage): Promise<any> {
+  async sendMessage(message: any): Promise<any> {
     // Convert NetworkMessage types to WebSocket message types
     switch (message.type) {
       case 'ADD_CONTACT':
@@ -441,7 +463,7 @@ export class WebSocketNetworkClient implements NetworkClient {
         return this.sendRequest('add-group', {
           name: message.group.name,
           parentId: message.parentId,
-          primitiveId: message.group.primitiveId
+          primitive: message.group.primitive
         })
         
       case 'REMOVE_GROUP':
@@ -557,7 +579,7 @@ export class WebSocketNetworkClient implements NetworkClient {
   
   async subscribeToBatch(groupIds: string[], handler: (groupId: string, contacts: any[]) => void): () => void {
     const unsubscribes = groupIds.map(groupId => 
-      this.subscribe(groupId, (changes) => {
+      this.subscribeToGroup(groupId, (changes) => {
         const stateUpdate = changes.find(c => c.type === 'state-update')
         if (stateUpdate && stateUpdate.data.contacts) {
           const contacts = Object.values(stateUpdate.data.contacts)
@@ -569,6 +591,69 @@ export class WebSocketNetworkClient implements NetworkClient {
     return () => {
       unsubscribes.forEach(unsub => unsub())
     }
+  }
+  
+  // Required by RemoteNetworkClient interface
+  startPolling(): void {
+    // WebSocket client doesn't need polling - it uses real-time connections
+    console.log('[WebSocketClient] startPolling called - no-op for WebSocket client')
+  }
+  
+  // NetworkClient interface methods
+  async request<T>(request: any): Promise<Result<T, NetworkError>> {
+    try {
+      const result = await this.sendRequest(request.type, request.data || {})
+      return { ok: true, value: result }
+    } catch (error) {
+      return { 
+        ok: false, 
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
+    }
+  }
+  
+  subscribe(handler: (notification: NetworkNotification) => void): () => void {
+    // For NetworkClient interface, we'll subscribe to the root group by default
+    return this.subscribeToGroup('root', (changes) => {
+      // Convert changes to network notifications
+      changes.forEach(change => {
+        const notification: NetworkNotification = {
+          type: 'changes',
+          changes: [change]
+        }
+        handler(notification)
+      })
+    })
+  }
+  
+  async connect(): Promise<Result<void, NetworkError>> {
+    try {
+      await this.initialize()
+      return { ok: true, value: undefined }
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    this.terminate()
+  }
+  
+  isConnected(): boolean {
+    return this.connected
+  }
+  
+  getMode(): 'worker' | 'websocket' | 'webrtc' {
+    return 'websocket'
   }
   
   terminate(): void {

@@ -16,6 +16,7 @@
   "scripts": {
     "dev": "pnpm --filter @bassline/web dev",
     "cli:dev": "pnpm --filter @bassline/cli dev",
+    "cli:init": "pnpm --filter @bassline/cli start init",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",

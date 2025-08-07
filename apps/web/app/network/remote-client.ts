@@ -1,5 +1,5 @@
 // Client for connecting to a remote Bassline server
-import type { NetworkClient, NetworkMessage, GroupState } from './client'
+import type { NetworkClient, GroupState, NetworkNotification } from '@bassline/core'
 
 export class RemoteNetworkClient implements NetworkClient {
   private serverUrl: string
@@ -91,24 +91,9 @@ export class RemoteNetworkClient implements NetworkClient {
     }
   }
   
-  subscribe(groupId: string, handler: (changes: any[]) => void): () => void {
-    if (!this.subscriptions.has(groupId)) {
-      this.subscriptions.set(groupId, [])
-    }
-    this.subscriptions.get(groupId)!.push(handler)
-    
-    return () => {
-      const handlers = this.subscriptions.get(groupId)
-      if (handlers) {
-        const index = handlers.indexOf(handler)
-        if (index !== -1) {
-          handlers.splice(index, 1)
-        }
-      }
-    }
-  }
+  // Old subscribe method - renamed to avoid conflicts
   
-  async sendMessage(message: NetworkMessage): Promise<any> {
+  async sendMessage(message: any): Promise<any> {
     switch (message.type) {
       case 'ADD_CONTACT':
         const addResponse = await fetch(`${this.serverUrl}/contact`, {
@@ -246,7 +231,7 @@ export class RemoteNetworkClient implements NetworkClient {
     return result.wireId
   }
   
-  async connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
+  async connectContacts(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
     // For compatibility with worker client interface
     return this.addWire(fromId, toId, type)
   }
@@ -280,10 +265,10 @@ export class RemoteNetworkClient implements NetworkClient {
     throw new Error('getContact not yet implemented for remote client')
   }
   
-  async subscribeToBatch(groupIds: string[], handler: (groupId: string, contacts: any[]) => void): () => void {
+  subscribeToBatch(groupIds: string[], handler: (groupId: string, contacts: any[]) => void): () => void {
     // For now, just subscribe to each group individually
     const unsubscribes = groupIds.map(groupId => 
-      this.subscribe(groupId, (changes) => {
+      this.subscribeToGroup(groupId, (changes) => {
         // Extract contacts from state update
         const stateUpdate = changes.find(c => c.type === 'state-update')
         if (stateUpdate && stateUpdate.data.contacts) {
@@ -298,6 +283,91 @@ export class RemoteNetworkClient implements NetworkClient {
     }
   }
   
+  // NetworkClient interface methods
+  async request<T>(request: any): Promise<import('@bassline/core').Result<T, import('@bassline/core').NetworkError>> {
+    try {
+      // For RemoteNetworkClient, we need to convert requests to HTTP calls
+      const response = await fetch(`${this.serverUrl}/api`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request)
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      const result = await response.json()
+      return { ok: true, value: result }
+    } catch (error) {
+      return { 
+        ok: false, 
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
+    }
+  }
+  
+  subscribe(handler: (notification: NetworkNotification) => void): () => void {
+    // For NetworkClient interface, we'll subscribe to the root group by default
+    return this.subscribeToGroup('root', (changes) => {
+      // Convert changes to network notifications
+      changes.forEach(change => {
+        const notification: NetworkNotification = {
+          type: 'changes',
+          changes: [change]
+        }
+        handler(notification)
+      })
+    })
+  }
+  
+  subscribeToGroup(groupId: string, handler: (changes: any[]) => void): () => void {
+    if (!this.subscriptions.has(groupId)) {
+      this.subscriptions.set(groupId, [])
+    }
+    this.subscriptions.get(groupId)!.push(handler)
+    
+    return () => {
+      const handlers = this.subscriptions.get(groupId)
+      if (handlers) {
+        const index = handlers.indexOf(handler)
+        if (index !== -1) {
+          handlers.splice(index, 1)
+        }
+      }
+    }
+  }
+  
+  async connect(): Promise<import('@bassline/core').Result<void, import('@bassline/core').NetworkError>> {
+    try {
+      await this.initialize()
+      return { ok: true, value: undefined }
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    this.terminate()
+  }
+  
+  isConnected(): boolean {
+    return true // RemoteNetworkClient is always considered connected if initialized
+  }
+  
+  getMode(): 'worker' | 'websocket' | 'webrtc' {
+    return 'websocket' // RemoteNetworkClient uses HTTP, but closest to websocket
+  }
+
   terminate(): void {
     if (this.pollInterval) {
       clearInterval(this.pollInterval)

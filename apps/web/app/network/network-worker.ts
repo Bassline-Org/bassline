@@ -9,27 +9,17 @@ import {
   createPriorityScheduler,
   allPrimitiveGadgets,
   type PropagationNetworkScheduler,
-  type Change
+  type Change,
+  type NetworkRequest,
+  type NetworkResponse,
+  type NetworkNotification,
+  type Result,
+  type NetworkError,
+  brand
 } from '@bassline/core'
 
-// Worker request/response types
-export interface WorkerRequest {
-  id: string
-  type: string
-  data?: any
-}
-
-export interface WorkerResponse {
-  id: string
-  type: 'success' | 'error'
-  data?: any
-  error?: string
-}
-
-export interface WorkerNotification {
-  type: 'changes' | 'ready'
-  changes?: Change[]
-}
+// Re-export types from core for backwards compatibility
+export type { NetworkRequest as WorkerRequest, NetworkResponse as WorkerResponse, NetworkNotification as WorkerNotification }
 
 // Current scheduler instance
 let scheduler: PropagationNetworkScheduler | null = null
@@ -44,7 +34,7 @@ async function initialize() {
   for (const gadget of allPrimitiveGadgets) {
     try {
       await scheduler.registerGroup({
-        id: gadget.id as any,
+        id: brand.groupId(gadget.id),
         name: gadget.name,
         contactIds: [],
         wireIds: [],
@@ -64,7 +54,7 @@ async function initialize() {
   })
   
   // Notify that worker is ready
-  self.postMessage({ type: 'ready' } as WorkerNotification)
+  self.postMessage({ type: 'ready' } as NetworkNotification)
 }
 
 // Batch change notifications for performance
@@ -78,19 +68,24 @@ function scheduleChangeNotification() {
       self.postMessage({ 
         type: 'changes', 
         changes 
-      } as WorkerNotification)
+      } as NetworkNotification)
     }
     changeTimer = null
   }, 10) as unknown as number
 }
 
 // Handle incoming requests
-async function handleRequest(request: WorkerRequest): Promise<WorkerResponse> {
+async function handleRequest(request: NetworkRequest): Promise<NetworkResponse> {
   if (!scheduler) {
     return {
       id: request.id,
-      type: 'error',
-      error: 'Scheduler not initialized'
+      result: {
+        ok: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Scheduler not initialized'
+        }
+      }
     }
   }
   
@@ -124,7 +119,7 @@ async function handleRequest(request: WorkerRequest): Promise<WorkerResponse> {
         result = await scheduler.connect(
           request.data.fromId,
           request.data.toId,
-          request.data.type
+          request.data.wireType
         )
         break
         
@@ -169,6 +164,15 @@ async function handleRequest(request: WorkerRequest): Promise<WorkerResponse> {
         result = await scheduler.getWire(request.data.wireId)
         break
         
+      case 'applyRefactoring':
+        // Handle refactoring operations
+        if ('applyRefactoring' in scheduler && typeof scheduler.applyRefactoring === 'function') {
+          result = await scheduler.applyRefactoring(request.data.operation, request.data.params)
+        } else {
+          throw new Error('Refactoring not supported by current scheduler')
+        }
+        break
+        
       case 'setScheduler':
         // Switch scheduler type
         const oldScheduler = scheduler
@@ -176,7 +180,7 @@ async function handleRequest(request: WorkerRequest): Promise<WorkerResponse> {
         
         // Export state from old scheduler
         let state = null
-        if (oldScheduler && 'exportState' in oldScheduler) {
+        if (oldScheduler && 'exportState' in oldScheduler && typeof oldScheduler.exportState === 'function') {
           state = await oldScheduler.exportState()
         }
         
@@ -199,8 +203,25 @@ async function handleRequest(request: WorkerRequest): Promise<WorkerResponse> {
         }
         
         // Import state to new scheduler
-        if (state && scheduler && 'importState' in scheduler) {
+        if (state && scheduler && 'importState' in scheduler && typeof scheduler.importState === 'function') {
           await scheduler.importState(state)
+        }
+        
+        // Re-register all primitive gadgets
+        for (const gadget of allPrimitiveGadgets) {
+          try {
+            await scheduler.registerGroup({
+              id: brand.groupId(gadget.id),
+              name: gadget.name,
+              contactIds: [],
+              wireIds: [],
+              subgroupIds: [],
+              boundaryContactIds: [],
+              primitive: gadget
+            })
+          } catch (error) {
+            console.warn(`Failed to register primitive gadget ${gadget.id}:`, error)
+          }
         }
         
         // Re-subscribe to changes
@@ -218,20 +239,27 @@ async function handleRequest(request: WorkerRequest): Promise<WorkerResponse> {
     
     return {
       id: request.id,
-      type: 'success',
-      data: result
+      result: {
+        ok: true,
+        value: result
+      }
     }
   } catch (error) {
     return {
       id: request.id,
-      type: 'error',
-      error: error instanceof Error ? error.message : String(error)
+      result: {
+        ok: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }
     }
   }
 }
 
 // Listen for messages from main thread
-self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
+self.onmessage = async (event: MessageEvent<NetworkRequest>) => {
   const response = await handleRequest(event.data)
   self.postMessage(response)
 }
@@ -241,6 +269,9 @@ initialize().catch((error) => {
   console.error('[Worker] Failed to initialize:', error)
   self.postMessage({ 
     type: 'error', 
-    error: error instanceof Error ? error.message : String(error) 
-  })
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: error instanceof Error ? error.message : String(error)
+    }
+  } as NetworkNotification)
 })

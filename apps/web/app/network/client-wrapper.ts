@@ -1,15 +1,29 @@
 import type { NetworkClient } from './network-client'
 import type { RemoteNetworkClient } from './remote-client'
-import type { Change } from '@bassline/core'
+import type { WebSocketNetworkClient } from './websocket-client'
+import type { NativeWebRTCClient } from './webrtc-native-client'
+import type { 
+  Change, 
+  Contact, 
+  Group, 
+  GroupState, 
+  ContactId, 
+  GroupId, 
+  WireId,
+  Result,
+  NetworkError
+} from '@bassline/core'
+import { brand } from '@bassline/core'
 
 /**
- * Wrapper that provides a consistent subscribe interface for both client types
+ * Wrapper that provides a consistent interface for all client types
+ * Uses strong domain types from @bassline/core
  */
 export class ClientWrapper {
-  private client: NetworkClient | RemoteNetworkClient
+  private client: NetworkClient | RemoteNetworkClient | WebSocketNetworkClient | NativeWebRTCClient
   private isRemote: boolean
   
-  constructor(client: NetworkClient | RemoteNetworkClient) {
+  constructor(client: NetworkClient | RemoteNetworkClient | WebSocketNetworkClient | NativeWebRTCClient) {
     this.client = client
     // Check if this is a remote client (WebSocket or WebRTC)
     this.isRemote = 'serverUrl' in client || 'config' in client
@@ -25,88 +39,117 @@ export class ClientWrapper {
     handler?: (changes: Change[]) => void
   ): () => void {
     if (this.isRemote) {
-      // Remote client: subscribe(groupId, handler)
+      // Remote client: use subscribeToGroup for group-specific subscriptions
       if (typeof handlerOrGroupId === 'string' && handler) {
-        return (this.client as RemoteNetworkClient).subscribe(handlerOrGroupId, handler)
+        return (this.client as RemoteNetworkClient).subscribeToGroup(handlerOrGroupId, handler)
       } else if (typeof handlerOrGroupId === 'function') {
         // No groupId provided, subscribe to root
         console.warn('[ClientWrapper] Remote client subscribe called without groupId, defaulting to root')
-        return (this.client as RemoteNetworkClient).subscribe('root', handlerOrGroupId)
+        return (this.client as RemoteNetworkClient).subscribeToGroup('root', handlerOrGroupId)
       } else {
         throw new Error('Invalid arguments for remote client subscribe')
       }
     } else {
       // Worker client: subscribe(handler)
       if (typeof handlerOrGroupId === 'function') {
-        return this.client.subscribe(handlerOrGroupId)
+        return (this.client as any).subscribeToChanges?.(handlerOrGroupId) ?? (() => {})
       } else if (typeof handler === 'function') {
         // GroupId provided but not needed for worker client  
         // Just pass the handler, ignore the groupId
-        return this.client.subscribe(handler)
+        return (this.client as any).subscribeToChanges?.(handler) ?? (() => {})
       } else {
         throw new Error('Invalid arguments for worker client subscribe')
       }
     }
   }
   
-  // Delegate all other methods to the underlying client
-  getState(groupId: string) {
-    return this.client.getState(groupId)
+  // Delegate methods with strong typing
+  async getState(groupId: string): Promise<GroupState> {
+    return this.client.getState(brand.groupId(groupId))
   }
   
-  scheduleUpdate(contactId: string, content: any) {
+  async scheduleUpdate(contactId: string, content: unknown): Promise<void> {
     return this.client.scheduleUpdate(contactId, content)
   }
   
-  connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional') {
-    return this.client.connect(fromId, toId, type)
+  async connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
+    // NetworkClient has connectContacts, others might have connect
+    if ('connectContacts' in this.client) {
+      const result = await (this.client as any).connectContacts(fromId, toId, type)
+      return typeof result === 'string' ? result : ''
+    } else {
+      const result = await (this.client as any).connect(fromId, toId, type)
+      return typeof result === 'string' ? result : ''
+    }
   }
   
-  addContact(groupId: string, contact: any) {
+  async addContact(groupId: string, contact: Omit<Contact, 'id'>): Promise<string> {
     return this.client.addContact(groupId, contact)
   }
   
-  removeContact(contactId: string) {
+  async removeContact(contactId: string): Promise<void> {
     return this.client.removeContact(contactId)
   }
   
-  addWire(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional') {
-    return this.client.addWire(fromId, toId, type)
+  // Wire methods - map to connect/disconnect
+  async addWire(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
+    return this.connect(fromId, toId, type)
   }
   
-  removeWire(wireId: string) {
-    return this.client.removeWire(wireId)
+  async removeWire(wireId: string): Promise<void> {
+    if ('disconnectContacts' in this.client) {
+      await (this.client as any).disconnectContacts(wireId)
+    } else if ('disconnect' in this.client) {
+      await this.client.disconnect(wireId)
+    } else {
+      throw new Error('Wire removal not supported by this client type')
+    }
   }
   
-  addGroup(parentId: string, group: any) {
+  async addGroup(parentId: string, group: Omit<Group, 'id' | 'parentId' | 'contactIds' | 'wireIds' | 'subgroupIds' | 'boundaryContactIds'>): Promise<string> {
     return this.client.addGroup(parentId, group)
   }
   
-  removeGroup(groupId: string) {
+  async removeGroup(groupId: string): Promise<void> {
     return this.client.removeGroup(groupId)
   }
   
-  registerGroup(group: any) {
+  async registerGroup(group: Group): Promise<void> {
     return this.client.registerGroup(group)
   }
   
-  applyRefactoring(refactoringType: string, params: any) {
-    return this.client.applyRefactoring(refactoringType, params)
-  }
-  
-  getContact(contactId: string) {
+  async getContact(contactId: string): Promise<Contact | undefined> {
     return this.client.getContact(contactId)
   }
   
-  exportState(groupId?: string) {
-    return this.client.exportState(groupId)
+  // Methods that might not exist on all clients
+  async applyRefactoring(refactoringType: string, params: any): Promise<any> {
+    if ('applyRefactoring' in this.client) {
+      return (this.client as any).applyRefactoring(refactoringType, params)
+    }
+    throw new Error('Refactoring not supported by this client type')
   }
   
-  importState(state: any) {
-    return this.client.importState(state)
+  async exportState(groupId?: string): Promise<any> {
+    if ('exportState' in this.client) {
+      return (this.client as any).exportState(groupId)
+    }
+    throw new Error('Export not supported by this client type')
   }
   
-  terminate() {
-    return this.client.terminate()
+  async importState(state: any): Promise<void> {
+    if ('importState' in this.client) {
+      return (this.client as any).importState(state)
+    }
+    throw new Error('Import not supported by this client type')
+  }
+  
+  async terminate(): Promise<void> {
+    if ('terminate' in this.client) {
+      return (this.client as any).terminate()
+    }
+    if ('disconnect' in this.client) {
+      return this.client.disconnect()
+    }
   }
 }

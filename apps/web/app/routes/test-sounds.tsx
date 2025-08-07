@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { SoundSystemProvider, useSoundSystem } from '~/components/SoundSystem'
+import { useSoundSystem } from '~/components/SoundSystem'
 import { Button } from '~/components/ui/button'
 
 function TestSoundsContent() {
-  const { playSound, setVolume, isEnabled, setEnabled } = useSoundSystem()
+  const { playSound } = useSoundSystem()
   const [volume, setVolumeState] = useState(0.5)
+  const [isEnabled, setEnabled] = useState(true)
   
   const soundCategories = [
     {
@@ -101,7 +102,7 @@ function TestSoundsContent() {
             onChange={(e) => {
               const newVolume = parseFloat(e.target.value)
               setVolumeState(newVolume)
-              setVolume(newVolume)
+              // setVolume not available in stub
             }}
             className="w-48"
           />
@@ -138,9 +139,5 @@ function TestSoundsContent() {
 }
 
 export default function TestSounds() {
-  return (
-    <SoundSystemProvider>
-      <TestSoundsContent />
-    </SoundSystemProvider>
-  )
+  return <TestSoundsContent />
 }

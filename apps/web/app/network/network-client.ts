@@ -1,193 +1,450 @@
 /**
- * Network Client - Interface to the propagation network worker
+ * Network Client V2 - Refactored with strong domain types
  */
 
 import type { 
-  PropagationNetworkScheduler,
   GroupState,
   Group,
   Contact,
   Wire,
-  Change
+  Change,
+  ContactId,
+  GroupId,
+  WireId,
+  NetworkRequest,
+  NetworkResponse,
+  NetworkNotification,
+  NetworkClient as INetworkClient,
+  NetworkMode,
+  NetworkError,
+  ConnectionState,
+  Result
 } from '@bassline/core'
+import { isResponse, isNotification } from '@bassline/core'
+import { brand } from '@bassline/core'
 
 export interface NetworkClientOptions {
   onChanges?: (changes: Change[]) => void
   onReady?: () => void
+  onError?: (error: NetworkError) => void
+  onStateChange?: (state: ConnectionState) => void
 }
 
-export interface WorkerRequest {
-  id: string
-  type: string
-  data?: any
-}
-
-export interface WorkerResponse {
-  id: string
-  type: 'success' | 'error'
-  data?: any
-  error?: string
-}
-
-export interface WorkerNotification {
-  type: 'changes' | 'ready'
-  changes?: Change[]
-}
-
-export type NetworkMessage = WorkerResponse | WorkerNotification
-
-export class NetworkClient implements PropagationNetworkScheduler {
+/**
+ * Worker-based NetworkClient implementation
+ * Implements INetworkClient interface and provides PropagationNetworkScheduler methods
+ */
+export class NetworkClient implements INetworkClient {
   private worker: Worker
   private pendingRequests = new Map<string, {
     resolve: (value: any) => void
-    reject: (error: Error) => void
+    reject: (error: NetworkError) => void
   }>()
-  private subscribers = new Set<(changes: Change[]) => void>()
+  private subscribers = new Set<(notification: NetworkNotification) => void>()
+  private changeSubscribers = new Set<(changes: Change[]) => void>()
+  private connectionState: ConnectionState = 'disconnected'
+  private options: NetworkClientOptions
   
   constructor(options: NetworkClientOptions = {}) {
+    this.options = options
+    
     // Create worker
     this.worker = new Worker(
       new URL('./network-worker.ts', import.meta.url),
       { type: 'module' }
     )
     
-    // Add external subscriber if provided
+    // Add external change subscriber if provided
     if (options.onChanges) {
-      this.subscribers.add(options.onChanges)
+      this.changeSubscribers.add(options.onChanges)
     }
     
-    // Handle messages from worker
-    this.worker.onmessage = (event: MessageEvent<NetworkMessage>) => {
-      const message = event.data
-      
-      if ('id' in message) {
-        // This is a response to a request
-        const pending = this.pendingRequests.get(message.id)
-        if (pending) {
-          this.pendingRequests.delete(message.id)
-          if (message.type === 'success') {
-            pending.resolve(message.data)
-          } else {
-            const error = new Error(message.error || 'Unknown error')
-            pending.reject(error)
-          }
-        }
-      } else {
-        // This is a notification
-        if (message.type === 'changes' && message.changes) {
-          this.notifySubscribers(message.changes)
-        } else if (message.type === 'ready' && options.onReady) {
-          options.onReady()
-        }
-      }
-    }
+    // Set up message handler
+    this.setupMessageHandler()
     
-    // Handle worker errors
+    // Set up error handler
     this.worker.onerror = (error) => {
       console.error('[NetworkClient] Worker error:', error)
+      this.handleError({
+        code: 'INTERNAL_ERROR',
+        message: 'Worker error',
+        details: error
+      })
+    }
+    
+    // Connect automatically
+    this.connect()
+  }
+  
+  private setupMessageHandler() {
+    this.worker.onmessage = (event: MessageEvent) => {
+      const message = event.data
+      
+      if (isResponse(message)) {
+        this.handleResponse(message)
+      } else if (isNotification(message)) {
+        this.handleNotification(message)
+      }
     }
   }
   
-  private generateId(): string {
-    return crypto.randomUUID()
+  private handleResponse(response: NetworkResponse) {
+    const pending = this.pendingRequests.get(response.id)
+    if (pending) {
+      this.pendingRequests.delete(response.id)
+      if (response.result.ok) {
+        pending.resolve(response.result.value)
+      } else {
+        pending.reject(response.result.error)
+      }
+    }
   }
   
-  private async sendRequest(type: string, data?: any): Promise<any> {
-    const id = this.generateId()
+  private handleNotification(notification: NetworkNotification) {
+    // Notify all subscribers
+    this.subscribers.forEach(handler => {
+      try {
+        handler(notification)
+      } catch (error) {
+        console.error('[NetworkClient] Subscriber error:', error)
+      }
+    })
     
-    return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve, reject })
+    // Handle specific notification types
+    switch (notification.type) {
+      case 'changes':
+        this.handleChanges(notification.changes)
+        break
+      case 'ready':
+        this.handleReady()
+        break
+      case 'error':
+        this.handleError(notification.error)
+        break
+      case 'stateChanged':
+        // Handle state change if needed
+        break
+    }
+  }
+  
+  private handleChanges(changes: Change[]) {
+    this.changeSubscribers.forEach(callback => {
+      try {
+        callback(changes)
+      } catch (error) {
+        console.error('[NetworkClient] Change subscriber error:', error)
+      }
+    })
+  }
+  
+  private handleReady() {
+    this.connectionState = 'connected'
+    this.options.onStateChange?.('connected')
+    this.options.onReady?.()
+  }
+  
+  private handleError(error: NetworkError) {
+    this.connectionState = 'error'
+    this.options.onStateChange?.('error')
+    this.options.onError?.(error)
+  }
+  
+  // INetworkClient implementation
+  
+  async request<T>(request: NetworkRequest): Promise<Result<T, NetworkError>> {
+    return new Promise((resolve) => {
+      const id = request.id || crypto.randomUUID()
       
-      const request: WorkerRequest = { id, type, data }
-      this.worker.postMessage(request)
+      this.pendingRequests.set(id, {
+        resolve: (value) => resolve({ ok: true, value }),
+        reject: (error) => resolve({ ok: false, error })
+      })
+      
+      this.worker.postMessage({ ...request, id })
       
       // Timeout after 30 seconds
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id)
-          reject(new Error(`Request ${type} timed out`))
+          resolve({
+            ok: false,
+            error: {
+              code: 'TIMEOUT',
+              message: `Request ${request.type} timed out`
+            }
+          })
         }
       }, 30000)
     })
   }
   
-  private notifySubscribers(changes: Change[]) {
-    this.subscribers.forEach(callback => {
-      try {
-        callback(changes)
-      } catch (error) {
-        console.error('[NetworkClient] Subscriber error:', error)
-      }
-    })
+  subscribe(handler: (notification: NetworkNotification) => void): () => void {
+    this.subscribers.add(handler)
+    return () => this.subscribers.delete(handler)
+  }
+  
+  subscribeToNotifications(handler: (notification: NetworkNotification) => void): () => void {
+    return this.subscribe(handler)
+  }
+  
+  async connect(): Promise<Result<void, NetworkError>> {
+    this.connectionState = 'connecting'
+    this.options.onStateChange?.('connecting')
+    
+    // Worker is always "connected" once created
+    // Wait for ready notification
+    return { ok: true, value: undefined }
+  }
+  
+  async disconnect(): Promise<void>
+  async disconnect(wireId: string): Promise<void>
+  async disconnect(wireId?: string): Promise<void> {
+    // If no wireId, this is disconnecting the client
+    if (wireId === undefined) {
+      this.connectionState = 'disconnected'
+      this.options.onStateChange?.('disconnected')
+      this.worker.terminate()
+    } else {
+      // Otherwise, this is disconnecting a wire
+      await this.disconnectContacts(wireId)
+    }
+  }
+  
+  isConnected(): boolean {
+    return this.connectionState === 'connected'
+  }
+  
+  getMode(): NetworkMode {
+    return 'worker'
   }
   
   // PropagationNetworkScheduler implementation
   
   async registerGroup(group: Group): Promise<void> {
-    await this.sendRequest('registerGroup', group)
+    const result = await this.request<void>({
+      type: 'registerGroup',
+      id: crypto.randomUUID(),
+      data: group
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
   }
   
   async scheduleUpdate(contactId: string, content: unknown): Promise<void> {
-    await this.sendRequest('scheduleUpdate', { contactId, content })
+    const result = await this.request<void>({
+      type: 'scheduleUpdate',
+      id: crypto.randomUUID(),
+      data: {
+        contactId: brand.contactId(contactId),
+        content
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
   }
   
   async schedulePropagation(fromContactId: string, toContactId: string, content: unknown): Promise<void> {
-    await this.sendRequest('schedulePropagation', { fromContactId, toContactId, content })
+    const result = await this.request<void>({
+      type: 'schedulePropagation',
+      id: crypto.randomUUID(),
+      data: {
+        fromContactId: brand.contactId(fromContactId),
+        toContactId: brand.contactId(toContactId),
+        content
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
   }
   
-  async connect(fromId: string, toId: string, type?: 'bidirectional' | 'directed'): Promise<string> {
-    return await this.sendRequest('connect', { fromId, toId, type })
+  async connectContacts(fromId: string, toId: string, type?: 'bidirectional' | 'directed'): Promise<string> {
+    const result = await this.request<WireId>({
+      type: 'connect',
+      id: crypto.randomUUID(),
+      data: {
+        fromId: brand.contactId(fromId),
+        toId: brand.contactId(toId),
+        wireType: type
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
   }
   
-  async disconnect(wireId: string): Promise<void> {
-    await this.sendRequest('disconnect', { wireId })
+  async disconnectContacts(wireId: string): Promise<void> {
+    const result = await this.request<void>({
+      type: 'disconnect',
+      id: crypto.randomUUID(),
+      data: {
+        wireId: brand.wireId(wireId)
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
   }
   
   async addContact(groupId: string, contact: Omit<Contact, 'id'>): Promise<string> {
-    return await this.sendRequest('addContact', { groupId, contact })
+    const result = await this.request<ContactId>({
+      type: 'addContact',
+      id: crypto.randomUUID(),
+      data: {
+        groupId: brand.groupId(groupId),
+        contact
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
   }
   
   async removeContact(contactId: string): Promise<void> {
-    await this.sendRequest('removeContact', { contactId })
+    const result = await this.request<void>({
+      type: 'removeContact',
+      id: crypto.randomUUID(),
+      data: {
+        contactId: brand.contactId(contactId)
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
   }
   
   async addGroup(parentGroupId: string, group: Omit<Group, 'id' | 'parentId' | 'contactIds' | 'wireIds' | 'subgroupIds' | 'boundaryContactIds'>): Promise<string> {
-    return await this.sendRequest('addGroup', { parentGroupId, group })
+    const result = await this.request<GroupId>({
+      type: 'addGroup',
+      id: crypto.randomUUID(),
+      data: {
+        parentGroupId: brand.groupId(parentGroupId),
+        group
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
   }
   
   async removeGroup(groupId: string): Promise<void> {
-    await this.sendRequest('removeGroup', { groupId })
+    const result = await this.request<void>({
+      type: 'removeGroup',
+      id: crypto.randomUUID(),
+      data: {
+        groupId: brand.groupId(groupId)
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
   }
   
   async getState(groupId: string): Promise<GroupState> {
-    return await this.sendRequest('getState', { groupId })
+    const result = await this.request<GroupState>({
+      type: 'getState',
+      id: crypto.randomUUID(),
+      data: {
+        groupId: brand.groupId(groupId)
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
   }
   
   async getContact(contactId: string): Promise<Contact | undefined> {
-    return await this.sendRequest('getContact', { contactId })
+    const result = await this.request<Contact | undefined>({
+      type: 'getContact',
+      id: crypto.randomUUID(),
+      data: {
+        contactId: brand.contactId(contactId)
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
   }
   
   async getWire(wireId: string): Promise<Wire | undefined> {
-    return await this.sendRequest('getWire', { wireId })
+    const result = await this.request<Wire | undefined>({
+      type: 'getWire',
+      id: crypto.randomUUID(),
+      data: {
+        wireId: brand.wireId(wireId)
+      }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
   }
   
-  subscribe(callback: (changes: Change[]) => void): () => void {
-    this.subscribers.add(callback)
-    return () => this.subscribers.delete(callback)
+  subscribeToChanges(callback: (changes: Change[]) => void): () => void {
+    this.changeSubscribers.add(callback)
+    return () => this.changeSubscribers.delete(callback)
   }
   
-  // Additional methods for network management
+  // Additional methods
   
   async setScheduler(scheduler: 'immediate' | 'batch' | 'animation-frame' | 'priority'): Promise<void> {
-    await this.sendRequest('setScheduler', { scheduler })
+    const result = await this.request<void>({
+      type: 'setScheduler',
+      id: crypto.randomUUID(),
+      data: { scheduler }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+  }
+  
+  async applyRefactoring(operation: string, params: any): Promise<any> {
+    const result = await this.request<any>({
+      type: 'applyRefactoring',
+      id: crypto.randomUUID(),
+      data: { operation, params }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
   }
   
   destroy() {
-    this.worker.terminate()
+    this.disconnect()
     this.pendingRequests.clear()
     this.subscribers.clear()
+    this.changeSubscribers.clear()
   }
 }
 
 // Re-export types
-export type { GroupState, Contact, Wire, Change } from '@bassline/core'
+export type { GroupState, Contact, Wire, Change, NetworkError, NetworkNotification } from '@bassline/core'

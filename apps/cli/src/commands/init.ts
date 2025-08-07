@@ -209,6 +209,22 @@ async function createDirectoryStructure(installPath: string) {
 async function createInstallationFiles(answers: InitAnswers) {
   const { installPath, includeExamples, storageBackends, transportLayers, typescript } = answers
   
+  // Detect if we're in development (CLI is running from bassline repo)
+  const isLocalDevelopment = process.cwd().includes('bassline') || process.env.BASSLINE_DEV === 'true'
+  
+  // Find the bassline repo root by walking up directories
+  let basslineRoot = null
+  if (isLocalDevelopment) {
+    let currentDir = process.cwd()
+    while (currentDir !== path.dirname(currentDir)) {
+      if (path.basename(currentDir) === 'bassline') {
+        basslineRoot = currentDir
+        break
+      }
+      currentDir = path.dirname(currentDir)
+    }
+  }
+  
   // Create package.json
   const packageJson = {
     name: 'bassline-user-installation',
@@ -219,12 +235,12 @@ async function createInstallationFiles(answers: InitAnswers) {
       dev: typescript ? 'tsx watch index.ts' : 'node --watch index.js',
       build: typescript ? 'tsc' : 'echo "No build needed"',
       test: 'vitest',
-      upgrade: 'npm update @bassline/core @bassline/installation'
+      upgrade: isLocalDevelopment ? 'echo "Using local development packages"' : 'npm update @bassline/core @bassline/installation'
     },
     dependencies: {
-      '@bassline/core': '^0.1.0',
-      '@bassline/installation': '^0.1.0',
-      '@bassline/storage-memory': '^0.1.0',
+      '@bassline/core': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/core` : '^0.1.0',
+      '@bassline/installation': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/installation` : '^0.1.0',
+      '@bassline/storage-memory': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/storage-memory` : '^0.1.0',
       tsx: typescript ? '^4.7.0' : undefined
     } as any,
     devDependencies: typescript ? {
@@ -240,7 +256,13 @@ async function createInstallationFiles(answers: InitAnswers) {
   for (const backend of storageBackends) {
     const option = STORAGE_OPTIONS.find(o => o.value === backend)
     if (option && 'package' in option && option.package) {
-      packageJson.dependencies[option.package] = '^0.1.0'
+      if (isLocalDevelopment && basslineRoot) {
+        // Convert package name to local path
+        const packageName = option.package.replace('@bassline/', '')
+        packageJson.dependencies[option.package] = `file:${basslineRoot}/packages/${packageName}`
+      } else {
+        packageJson.dependencies[option.package] = '^0.1.0'
+      }
     }
   }
   
@@ -248,7 +270,13 @@ async function createInstallationFiles(answers: InitAnswers) {
   for (const transport of transportLayers) {
     const option = TRANSPORT_OPTIONS.find(o => o.value === transport)
     if (option && 'package' in option && option.package) {
-      packageJson.dependencies[option.package] = '^0.1.0'
+      if (isLocalDevelopment && basslineRoot) {
+        // Convert package name to local path  
+        const packageName = option.package.replace('@bassline/', '')
+        packageJson.dependencies[option.package] = `file:${basslineRoot}/packages/${packageName}`
+      } else {
+        packageJson.dependencies[option.package] = '^0.1.0'
+      }
     }
   }
   

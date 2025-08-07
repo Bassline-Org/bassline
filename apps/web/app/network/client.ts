@@ -4,9 +4,10 @@ import { WebSocketNetworkClient } from './websocket-client'
 import { NativeWebRTCClient } from './webrtc-native-client'
 import { ClientWrapper } from './client-wrapper'
 import { getNetworkConfig } from '~/config/network-config'
+import { brand } from '@bassline/core'
 
 // Re-export types
-export type { NetworkClient, NetworkMessage, GroupState } from './network-client'
+export type { NetworkClient, GroupState } from './network-client'
 
 // Singleton instance
 let networkClient: ClientWrapper | null = null
@@ -75,7 +76,7 @@ export function getNetworkClient(): ClientWrapper {
           // Ensure root group exists
           try {
             await workerClient.registerGroup({
-              id: 'root',
+              id: brand.groupId('root'),
               name: 'Root Group',
               contactIds: [],
               wireIds: [],
@@ -117,7 +118,7 @@ export async function initializeDemoNetwork(): Promise<string> {
   try {
     // First, ensure the worker has a root group
     await client.registerGroup({
-      id: 'root',
+      id: brand.groupId('root'),
       name: 'Root Group',
       contactIds: [],
       wireIds: [],
@@ -137,13 +138,13 @@ export async function initializeDemoNetwork(): Promise<string> {
   const input1Id = await client.addContact(demoGroupId, {
     content: 5,
     blendMode: 'accept-last',
-    groupId: demoGroupId
+    groupId: brand.groupId(demoGroupId)
   })
   
   const input2Id = await client.addContact(demoGroupId, {
     content: 7,
     blendMode: 'accept-last',
-    groupId: demoGroupId
+    groupId: brand.groupId(demoGroupId)
   })
   
   // For now, let's create a simpler demo without gadgets
@@ -153,33 +154,33 @@ export async function initializeDemoNetwork(): Promise<string> {
   const sourceContact = await client.addContact(demoGroupId, {
     content: 10,
     blendMode: 'accept-last',
-    groupId: demoGroupId
+    groupId: brand.groupId(demoGroupId)
   })
   
-  // Create a merge contact to demonstrate GrowSet merging
+  // Create a merge contact to demonstrate merging behavior
   const mergeContact1 = await client.addContact(demoGroupId, {
-    content: grow.set([1, 2, 3]),
+    content: [1, 2, 3],
     blendMode: 'merge',
-    groupId: demoGroupId
+    groupId: brand.groupId(demoGroupId)
   })
   
   const mergeContact2 = await client.addContact(demoGroupId, {
-    content: grow.set([3, 4, 5]),
+    content: [3, 4, 5],
     blendMode: 'merge',
-    groupId: demoGroupId
+    groupId: brand.groupId(demoGroupId)
   })
   
   // Create contacts to demonstrate propagation
   const targetContact1 = await client.addContact(demoGroupId, {
     content: 0,
     blendMode: 'accept-last',
-    groupId: demoGroupId
+    groupId: brand.groupId(demoGroupId)
   })
   
   const targetContact2 = await client.addContact(demoGroupId, {
     content: 0,
     blendMode: 'accept-last',
-    groupId: demoGroupId
+    groupId: brand.groupId(demoGroupId)
   })
   
   // Wire up the network

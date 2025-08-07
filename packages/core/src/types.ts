@@ -224,3 +224,6 @@ export interface RemoteGroupProxy {
   scheduleUpdate: (contactId: string, content: unknown) => Promise<void>
   getState: () => Promise<GroupState>
 }
+
+// Re-export commonly used types
+export type { Serializable } from './serialization'

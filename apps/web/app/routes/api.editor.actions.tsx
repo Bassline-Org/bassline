@@ -173,7 +173,7 @@ export async function clientAction({ request }: { request: Request }) {
       case 'delete-wire': {
         const wireId = formData.get('wireId') as string
         
-        await client.disconnect(wireId)
+        await client.removeWire(wireId)
         
         return { 
           success: true, 

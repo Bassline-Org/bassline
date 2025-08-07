@@ -6,9 +6,8 @@ import {
   hasDynamicTopology,
   getDynamicTopologyContactId,
   buildDynamicTopology
-} from '../propagation-core-v2/bassline/dynamic'
-import type { Group, GroupState, Contact } from '../propagation-core-v2/types'
-import type { BasslineAttributes } from '../propagation-core-v2/bassline/types'
+} from '@bassline/core'
+import type { Group, GroupState, Contact, BasslineAttributes } from '@bassline/core'
 
 describe('Dynamic Bassline Features', () => {
   describe('Dynamic Attributes', () => {

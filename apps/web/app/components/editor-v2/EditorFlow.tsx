@@ -118,7 +118,9 @@ function EditorFlowInner({ groupState, groupId }: EditorFlowProps) {
     changes.forEach((change) => {
       if (change.type === 'position' && change.position && !change.dragging) {
         const positionChange = change as NodePositionChange
-        setPosition(positionChange.id, positionChange.position)
+        if (positionChange.position) {
+          setPosition(positionChange.id, positionChange.position)
+        }
       }
     })
   }, [onNodesChange, setPosition])
