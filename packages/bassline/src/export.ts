@@ -10,7 +10,7 @@ import type {
   Wire, 
   GroupState,
   NetworkState 
-} from '../types'
+} from '@bassline/core'
 import type { 
   Bassline, 
   GadgetDefinition,
@@ -62,17 +62,13 @@ export function exportGroupAsBassline(
 
   // Determine if this is a gadget (has boundary contacts)
   const boundaryContacts = Array.from(state.contacts.values())
-    .filter(c => c.isBoundary)
+    .filter(c => group.boundaryContactIds.includes(c.id))
   
   if (boundaryContacts.length > 0) {
     // Export as a gadget with interface
-    const inputs = boundaryContacts
-      .filter(c => c.boundaryDirection === 'input')
-      .map(c => c.id)
-    
-    const outputs = boundaryContacts
-      .filter(c => c.boundaryDirection === 'output')
-      .map(c => c.id)
+    // For now, treat all boundary contacts as both input and output
+    const inputs = boundaryContacts.map(c => c.id)
+    const outputs = boundaryContacts.map(c => c.id)
     
     bassline.interface = {
       inputs,

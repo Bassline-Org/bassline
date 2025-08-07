@@ -4,7 +4,7 @@
   "description": "Standalone Bassline propagation network server",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js"
   },

@@ -23,6 +23,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@bassline/installation':
+        specifier: workspace:*
+        version: link:../../packages/installation
       '@bassline/storage-memory':
         specifier: workspace:*
         version: link:../../packages/storage-memory
@@ -254,6 +257,25 @@ importers:
         version: 1.6.1(@types/node@20.19.9)
 
   packages/core:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.5
+        version: 20.19.9
+      tsup:
+        specifier: ^8.0.1
+        version: 8.5.0(typescript@5.9.2)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.2
+      vitest:
+        specifier: ^1.2.1
+        version: 1.6.1(@types/node@20.19.9)
+
+  packages/installation:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^20.11.5

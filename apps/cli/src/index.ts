@@ -8,6 +8,7 @@ import { connectToNetwork } from './commands/connect.js'
 import { exportNetwork } from './commands/export.js'
 import { importNetwork } from './commands/import.js'
 import { createSignalCommand } from './commands/signal.js'
+import { initCommand } from './commands/init.js'
 
 const program = new Command()
 
@@ -15,6 +16,15 @@ program
   .name('bassline')
   .description('CLI for managing Bassline propagation networks')
   .version('0.1.0')
+
+program
+  .command('init')
+  .description('Initialize a new Bassline installation')
+  .option('-p, --path <path>', 'installation directory')
+  .option('-f, --from <template>', 'install from template')
+  .option('-m, --minimal', 'minimal installation (no prompts)')
+  .option('--skip-install', 'skip npm install')
+  .action(initCommand)
 
 program
   .command('start')

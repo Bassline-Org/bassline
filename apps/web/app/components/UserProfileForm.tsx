@@ -9,7 +9,7 @@ import { useSoundToast } from '~/hooks/useSoundToast'
 import { serializeBassline, deserializeBassline } from '@bassline/bassline'
 import type { UserProfile } from '~/lib/user-manager'
 
-interface UserProfileFormProps {
+export interface UserProfileFormProps {
   onClose?: () => void
   isNewUser?: boolean
 }
@@ -117,9 +117,18 @@ export function UserProfileForm({ onClose, isNewUser = false }: UserProfileFormP
         authored: [],
         starred: []
       }
+      const topology = profile?.build?.topology;
+      let contacts;
+      if (typeof topology === 'function') {
+        contacts = topology().contacts;
+      } else {
+        if(!topology) {
+          throw new Error('No Topology!');
+        }
+        contacts = topology.contacts
+      }
       
-      if (profile.build?.topology?.contacts) {
-        const contacts = profile.build.topology.contacts
+      if (contacts) {
         const getContact = (id: string) => contacts.find(c => c.id === id)?.content || ''
         
         setUsername(profile.name.replace('@', ''))

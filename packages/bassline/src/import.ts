@@ -9,7 +9,7 @@ import type {
   Contact, 
   Wire,
   PropagationNetworkScheduler
-} from '../types'
+} from '@bassline/core'
 import type { 
   Bassline,
   GadgetDefinition,

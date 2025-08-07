@@ -47,7 +47,7 @@ export class MemoryStorage implements NetworkStorage {
       throw new Error(`Group ${groupId} not found in network ${networkId}`)
     }
     
-    const contact = group.group.contacts.get(contactId)
+    const contact = group.contacts.get(contactId)
     if (contact) {
       contact.content = content
       network.updatedAt = new Date()
@@ -61,7 +61,7 @@ export class MemoryStorage implements NetworkStorage {
     const group = network.groups.get(groupId)
     if (!group) return null
     
-    const contact = group.group.contacts.get(contactId)
+    const contact = group.contacts.get(contactId)
     return contact?.content ?? null
   }
   

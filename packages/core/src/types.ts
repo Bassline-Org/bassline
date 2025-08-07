@@ -1,16 +1,19 @@
 // Core data types - pure data, no behavior
 
-import type { BasslineAttributes } from '../bassline/types'
-export type { BasslineAttributes } from '../bassline/types'
-export type { Bassline, GadgetDefinition, GadgetInterface, BasslineDependency, ConnectionConfig } from '../bassline/types'
+// Bassline attributes will be defined by the bassline package
+export type BasslineAttributes = Record<string, any>
+
+export type BlendMode = 'accept-last' | 'merge';
+export type BounaryDirection = 'input' | 'output';
+export type WireType = 'bidirectional' | 'directed';
 
 export interface Contact {
   id: string
   groupId: string
   content?: unknown
-  blendMode: 'accept-last' | 'merge'
+  blendMode: BlendMode
   isBoundary?: boolean
-  boundaryDirection?: 'input' | 'output'
+  boundaryDirection?: BounaryDirection
   lastContradiction?: Contradiction
   name?: string
   // Bassline attributes for this contact
@@ -22,10 +25,12 @@ export interface Wire {
   groupId: string
   fromId: string
   toId: string
-  type: 'bidirectional' | 'directed'
+  type: WireType
   // Bassline attributes for this wire
   attributes?: BasslineAttributes
 }
+
+export type GroupLocation = 'local' | { type: 'remote', url: string }
 
 export interface Group {
   id: string
@@ -36,7 +41,7 @@ export interface Group {
   subgroupIds: string[]
   boundaryContactIds: string[]
   // Group can be local or remote
-  location?: 'local' | { type: 'remote', url: string }
+  location?: GroupLocation
   // If present, this group behaves as a primitive gadget
   primitive?: PrimitiveGadget
   // Bassline attributes for this group/gadget

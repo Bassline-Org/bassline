@@ -2,9 +2,9 @@
  * Dynamic bassline features - attributes and topology from contacts
  */
 
-import type { Group, Contact, GroupState } from '../types'
+import type { Group, Contact, GroupState } from '@bassline/core'
 import type { BasslineAttributes, Bassline } from './types'
-import type { PropagationNetworkScheduler } from '../scheduler'
+import type { PropagationNetworkScheduler } from '@bassline/core'
 
 /**
  * Check if a group has dynamic attributes enabled
@@ -175,7 +175,7 @@ export function createDynamicMonitor(
   let lastTopologyContent: any = null
   
   // Subscribe to changes
-  const unsubscribe = scheduler.subscribe(async (changes) => {
+  const unsubscribe = scheduler.subscribe(async (changes: any[]) => {
     // Get current group state
     const state = await scheduler.getState(groupId)
     if (!state) return
@@ -186,7 +186,7 @@ export function createDynamicMonitor(
     if (hasDynamicAttributes(group)) {
       const contactId = getDynamicAttributesContactId(group)
       if (contactId) {
-        const change = changes.find(c => c.contactId === contactId)
+        const change = changes.find((c: any) => c.contactId === contactId)
         if (change) {
           const contact = state.contacts.get(contactId)
           if (contact && contact.content !== lastAttributesContent) {
@@ -208,7 +208,7 @@ export function createDynamicMonitor(
     if (hasDynamicTopology(group)) {
       const contactId = getDynamicTopologyContactId(group)
       if (contactId) {
-        const change = changes.find(c => c.contactId === contactId)
+        const change = changes.find((c: any) => c.contactId === contactId)
         if (change) {
           const contact = state.contacts.get(contactId)
           if (contact && contact.content !== lastTopologyContent) {

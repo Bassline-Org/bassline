@@ -63,6 +63,7 @@ describe('Dynamic Bassline Features', () => {
     it('should apply dynamic attributes from contact content', async () => {
       const configContact: Contact = {
         id: '@config',
+        groupId: 'test',
         blendMode: 'accept-last',
         content: {
           'bassline.pure': true,
@@ -156,6 +157,7 @@ describe('Dynamic Bassline Features', () => {
     it('should build topology from contact content', async () => {
       const topologyContact: Contact = {
         id: '@network-definition',
+        groupId: 'test',
         blendMode: 'accept-last',
         content: {
           name: 'Dynamic Network',
@@ -220,6 +222,7 @@ describe('Dynamic Bassline Features', () => {
     it('should handle topology-only content', async () => {
       const topologyContact: Contact = {
         id: '@network-definition',
+        groupId: 'test',
         blendMode: 'accept-last',
         content: {
           contacts: [

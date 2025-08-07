@@ -6,7 +6,7 @@ import { Badge } from './ui/badge'
 // import { ScrollArea } from './ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import type { Bassline } from '@bassline/bassline'types'
+import type { Bassline } from '@bassline/bassline'
 
 // Mock data for demonstration
 const mockBasslines: BasslineItem[] = [

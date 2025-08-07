@@ -1,14 +1,14 @@
 {
-  "name": "@bassline/bassline",
+  "name": "@bassline/installation",
   "version": "0.1.0",
-  "description": "Bassline manifest handling and import/export",
+  "description": "User installation system for Bassline",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {

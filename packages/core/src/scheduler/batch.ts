@@ -78,7 +78,7 @@ export function createBatchScheduler(
 export function createAnimationFrameScheduler(): PropagationNetworkScheduler {
   const baseScheduler = createImmediateScheduler()
   let pendingUpdates: Array<{ contactId: string; content: unknown }> = []
-  let rafId: number | null = null
+  let rafId: number | NodeJS.Timeout | null = null
   
   async function processFrame() {
     const updates = [...pendingUpdates]
@@ -99,10 +99,10 @@ export function createAnimationFrameScheduler(): PropagationNetworkScheduler {
       if (!rafId && typeof requestAnimationFrame !== 'undefined') {
         rafId = requestAnimationFrame(() => {
           processFrame()
-        })
+        }) as unknown as number
       } else if (!rafId) {
         // Fallback for non-browser environments
-        setTimeout(processFrame, 16)
+        rafId = setTimeout(processFrame, 16)
       }
     }
   }

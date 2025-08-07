@@ -4,7 +4,8 @@
  * Manages user profiles as basslines stored in localStorage
  */
 
-import type { Bassline } from '@bassline/bassline'types'
+import type { Bassline } from '@bassline/bassline'
+import type { Contact } from '@bassline/core'
 
 export interface UserProfile extends Bassline {
   name: string  // @username format
@@ -101,48 +102,57 @@ export class UserManager {
           contacts: [
             {
               id: 'displayName',
+              groupId: 'user-profile',  // Default group ID for user profile
               content: data?.displayName || username,
-              blendMode: 'accept-last'
+              blendMode: 'accept-last' as const
             },
             {
               id: 'bio',
+              groupId: 'user-profile',
               content: data?.bio || '',
-              blendMode: 'accept-last'
+              blendMode: 'accept-last' as const
             },
             {
               id: 'avatar',
+              groupId: 'user-profile',
               content: data?.avatar || '',
-              blendMode: 'accept-last'
+              blendMode: 'accept-last' as const
             },
             {
               id: 'website',
+              groupId: 'user-profile',
               content: data?.website || '',
-              blendMode: 'accept-last'
+              blendMode: 'accept-last' as const
             },
             {
               id: 'github',
+              groupId: 'user-profile',
               content: data?.github || '',
-              blendMode: 'accept-last'
+              blendMode: 'accept-last' as const
             },
             {
               id: 'twitter',
+              groupId: 'user-profile',
               content: data?.twitter || '',
-              blendMode: 'accept-last'
+              blendMode: 'accept-last' as const
             },
             {
               id: 'joined',
+              groupId: 'user-profile',
               content: new Date().toISOString(),
-              blendMode: 'accept-last'
+              blendMode: 'accept-last' as const
             },
             {
               id: 'authored',
+              groupId: 'user-profile',
               content: [],  // Array of bassline names/IDs
-              blendMode: 'merge'
+              blendMode: 'merge' as const
             },
             {
               id: 'starred',
+              groupId: 'user-profile',
               content: [],  // Array of starred basslines
-              blendMode: 'merge'
+              blendMode: 'merge' as const
             }
           ],
           wires: []
@@ -170,9 +180,13 @@ export class UserManager {
     if (!current) return null
     
     // Find and update the relevant contacts
-    if (current.build?.topology?.contacts) {
+    if (current.build?.topology) {
+      const topology = typeof current.build.topology === 'function' 
+        ? current.build.topology() 
+        : current.build.topology
+      
       for (const [key, value] of Object.entries(updates)) {
-        const contact = current.build.topology.contacts.find(c => c.id === key)
+        const contact = topology.contacts.find((c: Contact) => c.id === key)
         if (contact) {
           contact.content = value
         }
@@ -195,8 +209,14 @@ export class UserManager {
     const current = this.getCurrentUser()
     if (!current) return
     
-    const authoredContact = current.build?.topology?.contacts?.find(
-      c => c.id === 'authored'
+    if (!current.build?.topology) return
+    
+    const topology = typeof current.build.topology === 'function' 
+      ? current.build.topology() 
+      : current.build.topology
+    
+    const authoredContact = topology.contacts.find(
+      (c: Contact) => c.id === 'authored'
     )
     
     if (authoredContact) {
@@ -226,9 +246,15 @@ export class UserManager {
     authored: string[]
     starred: string[]
   } {
-    const contacts = profile.build?.topology?.contacts || []
+    const topology = profile.build?.topology 
+      ? (typeof profile.build.topology === 'function' 
+          ? profile.build.topology() 
+          : profile.build.topology)
+      : null
+    
+    const contacts = topology?.contacts || []
     const getContactValue = (id: string, defaultValue: any = '') => {
-      const contact = contacts.find(c => c.id === id)
+      const contact = contacts.find((c: Contact) => c.id === id)
       return contact?.content || defaultValue
     }
     

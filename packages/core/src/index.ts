@@ -9,8 +9,13 @@ export * from './types'
 export * from './propagation'
 
 // Schedulers
-export { ImmediateScheduler } from './scheduler/immediate'
-export { BatchScheduler } from './scheduler/batch'
+export { createImmediateScheduler } from './scheduler/immediate'
+export { 
+  createBatchScheduler,
+  createAnimationFrameScheduler,
+  createPriorityScheduler,
+  type BatchSchedulerOptions 
+} from './scheduler/batch'
 
 // Primitives
 export * from './primitives/index'

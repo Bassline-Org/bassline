@@ -8,8 +8,8 @@ import type {
   Contradiction as TypesContradiction,
   PropagationResult,
   Group
-} from '../types'
-import { mergeContent, Contradiction } from '../mergeable'
+} from './types'
+import { mergeContent, Contradiction } from './mergeable'
 
 // Pure function that calculates propagation changes
 export async function propagateContent(

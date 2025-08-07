@@ -6,6 +6,10 @@
   "bin": {
     "bassline": "./dist/index.js"
   },
+  "exports": {
+    ".": "./dist/index.js",
+    "./runtime": "./dist/runtime/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
@@ -15,6 +19,7 @@
   "dependencies": {
     "@bassline/core": "workspace:*",
     "@bassline/bassline": "workspace:*",
+    "@bassline/installation": "workspace:*",
     "@bassline/storage-memory": "workspace:*",
     "@types/ws": "^8.18.1",
     "chalk": "^5.3.0",

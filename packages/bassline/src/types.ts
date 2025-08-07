@@ -5,7 +5,14 @@
  * Everything in the system is fundamentally a bassline with different attributes.
  */
 
-import type { Group, Contact, Wire, Topology } from '../types'
+import type { Group, Contact, Wire } from '@bassline/core'
+
+// Topology type (not in core)
+export interface Topology {
+  contacts: Contact[]
+  wires: Wire[]
+  groups?: Group[]
+}
 
 /**
  * Core bassline manifest structure
