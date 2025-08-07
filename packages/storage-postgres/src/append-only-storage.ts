@@ -9,7 +9,6 @@
 import { Pool, PoolClient } from 'pg'
 import type { 
   NetworkStorage, 
-  StorageConfig, 
   StorageError,
   Result,
   NetworkId,
@@ -18,45 +17,35 @@ import type {
   Serializable
 } from '@bassline/core'
 import { serialize, deserialize } from '@bassline/core'
-
-interface AppendOnlyConfig extends StorageConfig {
-  options?: {
-    connectionString?: string
-    database?: string
-    poolSize?: number
-  }
-  subsumption?: {
-    keepVersions?: number         // How many versions to keep (default: 1)
-    cleanupInterval?: number      // Cleanup interval in ms (default: 60000)
-    cleanupAge?: string          // How old subsumed values must be to delete (default: '1 hour')
-  }
-}
+import { StorageConfig, mergeConfig, presets } from './config'
 
 export class AppendOnlyPostgresStorage implements Partial<NetworkStorage> {
   private pool: Pool
   private cleanupTimer?: NodeJS.Timeout
-  private config: AppendOnlyConfig
+  private config: Required<StorageConfig>
+  private useUnlogged: boolean
   
-  constructor(config: AppendOnlyConfig = {}) {
-    this.config = config
+  constructor(config: StorageConfig = {}) {
+    this.config = mergeConfig(config)
+    this.useUnlogged = this.config.durability === 'performance'
     
     this.pool = new Pool({
-      connectionString: config.options?.connectionString,
-      database: config.options?.database || 'bassline_test',
-      max: config.options?.poolSize || 50,
+      connectionString: this.config.connectionString,
+      database: this.config.database || 'bassline_test',
+      max: this.config.poolSize,
       // Optimized for high-throughput inserts
       statement_timeout: 5000,
       idle_in_transaction_session_timeout: 10000
     })
     
     // Start cleanup timer if configured
-    if (config.subsumption?.cleanupInterval) {
+    if (this.config.cleanup.enabled && this.config.cleanup.interval) {
       this.startCleanupTimer()
     }
   }
   
   private startCleanupTimer() {
-    const interval = this.config.subsumption?.cleanupInterval || 60000
+    const interval = this.config.cleanup.interval
     this.cleanupTimer = setInterval(async () => {
       await this.cleanupSubsumed()
     }, interval)
@@ -97,19 +86,30 @@ export class AppendOnlyPostgresStorage implements Partial<NetworkStorage> {
     return this.withClient(async (client) => {
       const serialized = JSON.stringify(serialize.any(content))
       
-      // Use the append_contact_value function - zero locking!
+      // Apply session optimizations if configured
+      if (this.config.sessionOptimizations) {
+        const opts = this.config.sessionOptimizations
+        if (opts.synchronousCommit !== undefined) {
+          await client.query(`SET synchronous_commit = ${opts.synchronousCommit ? 'ON' : 'OFF'}`)
+        }
+        if (opts.workMem) {
+          await client.query(`SET work_mem = '${opts.workMem}'`)
+        }
+      }
+      
+      // Use the append_contact_value function with durability flag
       const result = await client.query(
-        'SELECT append_contact_value($1, $2, $3, $4) as version',
-        [networkId, groupId, contactId, serialized]
+        'SELECT append_contact_value($1, $2, $3, $4, $5, $6) as version',
+        [networkId, groupId, contactId, serialized, 'json', this.useUnlogged]
       )
       
       const version = result.rows[0].version
       
       // Optionally mark old versions as subsumed
-      if (this.config.subsumption?.keepVersions) {
+      if (this.config.cleanup.keepVersions) {
         await client.query(
           'SELECT mark_subsumed_values($1, $2, $3, $4)',
-          [networkId, groupId, contactId, this.config.subsumption.keepVersions]
+          [networkId, groupId, contactId, this.config.cleanup.keepVersions]
         )
       }
       
@@ -127,8 +127,8 @@ export class AppendOnlyPostgresStorage implements Partial<NetworkStorage> {
   ): Promise<Result<T | null, StorageError>> {
     return this.withClient(async (client) => {
       const result = await client.query(
-        'SELECT * FROM get_latest_value($1, $2, $3)',
-        [networkId, groupId, contactId]
+        'SELECT * FROM get_latest_value($1, $2, $3, $4)',
+        [networkId, groupId, contactId, this.useUnlogged]
       )
       
       if (result.rows.length === 0) {
@@ -157,82 +157,31 @@ export class AppendOnlyPostgresStorage implements Partial<NetworkStorage> {
     }>
   ): Promise<Result<void, StorageError>> {
     return this.withClient(async (client) => {
-      // Get version numbers in bulk
-      const versionResult = await client.query(
-        `SELECT nextval('bassline_version_seq') FROM generate_series(1, $1)`,
-        [operations.length]
-      )
-      
-      const versions = versionResult.rows.map(r => r.nextval)
-      
-      // Prepare bulk insert data
-      const valueRows: any[] = []
-      const versionRows: any[] = []
-      const propagationRows: any[] = []
-      
-      operations.forEach((op, i) => {
-        const version = versions[i]
-        const serialized = JSON.stringify(serialize.any(op.content))
-        
-        valueRows.push([
-          op.networkId,
-          op.groupId,
-          op.contactId,
-          version,
-          serialized,
-          'json'
-        ])
-        
-        versionRows.push([
-          op.networkId,
-          op.groupId,
-          op.contactId,
-          version
-        ])
-        
-        propagationRows.push([
-          op.networkId,
-          op.groupId,
-          op.contactId,
-          version
-        ])
-      })
-      
-      // Bulk insert values - single query!
-      if (valueRows.length > 0) {
-        const valueQuery = `
-          INSERT INTO bassline_contact_values 
-          (network_id, group_id, contact_id, version, content_value, content_type)
-          VALUES ${valueRows.map((_, i) => 
-            `($${i*6+1}, $${i*6+2}, $${i*6+3}, $${i*6+4}, $${i*6+5}, $${i*6+6})`
-          ).join(',')}
-        `
-        await client.query(valueQuery, valueRows.flat())
-        
-        // Update version trackers
-        const versionQuery = `
-          INSERT INTO bassline_contact_versions 
-          (network_id, group_id, contact_id, latest_version)
-          VALUES ${versionRows.map((_, i) => 
-            `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
-          ).join(',')}
-          ON CONFLICT (network_id, group_id, contact_id)
-          DO UPDATE SET 
-            latest_version = EXCLUDED.latest_version,
-            updated_at = NOW()
-        `
-        await client.query(versionQuery, versionRows.flat())
-        
-        // Log for propagation
-        const propagationQuery = `
-          INSERT INTO bassline_propagation_log 
-          (network_id, group_id, contact_id, version)
-          VALUES ${propagationRows.map((_, i) => 
-            `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4})`
-          ).join(',')}
-        `
-        await client.query(propagationQuery, propagationRows.flat())
+      // Apply session optimizations for batch operations
+      if (this.config.sessionOptimizations) {
+        const opts = this.config.sessionOptimizations
+        if (opts.synchronousCommit !== undefined) {
+          await client.query(`SET synchronous_commit = ${opts.synchronousCommit ? 'ON' : 'OFF'}`)
+        }
+        if (opts.workMem) {
+          await client.query(`SET work_mem = '${opts.workMem}'`)
+        }
       }
+      
+      // Prepare batch data for the SQL function
+      const batchData = operations.map(op => ({
+        network_id: op.networkId,
+        group_id: op.groupId,
+        contact_id: op.contactId,
+        content_value: JSON.stringify(serialize.any(op.content)),
+        content_type: 'json'
+      }))
+      
+      // Use the batch_append_values function with durability flag
+      await client.query(
+        'SELECT * FROM batch_append_values($1::jsonb[], $2)',
+        [batchData, this.useUnlogged]
+      )
     })
   }
   
@@ -366,7 +315,7 @@ export class AppendOnlyPostgresStorage implements Partial<NetworkStorage> {
    */
   async cleanupSubsumed(): Promise<Result<{ deletedValues: number, deletedCollections: number }, StorageError>> {
     return this.withClient(async (client) => {
-      const age = this.config.subsumption?.cleanupAge || '1 hour'
+      const age = this.config.cleanup.cleanupAge || '1 hour'
       const result = await client.query(
         'SELECT * FROM cleanup_subsumed_values($1::interval)',
         [age]
@@ -408,6 +357,10 @@ export class AppendOnlyPostgresStorage implements Partial<NetworkStorage> {
   }
 }
 
-export function createAppendOnlyStorage(config?: AppendOnlyConfig) {
+export function createAppendOnlyStorage(config?: StorageConfig | 'production' | 'development' | 'test') {
+  // Handle preset strings
+  if (typeof config === 'string') {
+    return new AppendOnlyPostgresStorage(presets[config])
+  }
   return new AppendOnlyPostgresStorage(config)
 }

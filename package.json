@@ -14,6 +14,7 @@
   },
   "packageManager": "pnpm@8.15.0",
   "scripts": {
+    "start": "pnpm --filter @bassline/web start",
     "dev": "pnpm --filter @bassline/web dev",
     "cli:dev": "pnpm --filter @bassline/cli dev",
     "cli:init": "pnpm --filter @bassline/cli start init",
