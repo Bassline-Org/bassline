@@ -959,7 +959,7 @@ export class NativeWebRTCClient implements NetworkClient {
     }
   }
   
-  subscribe(groupId: string, handler: (changes: Change[]) => void): () => void {
+  subscribeToGroup(groupId: string, handler: (changes: Change[]) => void): () => void {
     if (!this.subscriptions.has(groupId)) {
       this.subscriptions.set(groupId, [])
     }
@@ -1033,7 +1033,7 @@ export class NativeWebRTCClient implements NetworkClient {
     }
   }
   
-  async connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
+  async connectContacts(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
     const wireId = `wire-${Math.random().toString(36).substring(2, 11)}`
     
     let groupId: string | null = null
@@ -1268,7 +1268,7 @@ export class NativeWebRTCClient implements NetworkClient {
     }
   }
   
-  async disconnect(wireId: string): Promise<void> {
+  async disconnectContacts(wireId: string): Promise<void> {
     let groupId: string | null = null
     for (const [gId, state] of this.state.groupStates) {
       if (state.wires && state.wires[wireId]) {

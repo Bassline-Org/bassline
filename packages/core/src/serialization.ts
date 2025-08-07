@@ -2,7 +2,8 @@
 
 import type { 
   Contact, 
-  Group, 
+  Group,
+  GroupState, 
   Wire, 
   NetworkState, 
   Result,
@@ -72,9 +73,18 @@ export const serialize = {
     return JSON.stringify(wire, null, 2)
   },
   
-  networkState: (state: NetworkState): string => {
-    // Handle Map serialization
-    const serializable = {
+  groupState: (state: GroupState): any => {
+    // Handle Map serialization for GroupState - returns object for JSONB
+    return {
+      group: state.group,
+      contacts: Array.from(state.contacts.entries()),
+      wires: Array.from(state.wires.entries())
+    }
+  },
+  
+  networkState: (state: NetworkState): any => {
+    // Handle Map serialization - returns object for JSONB
+    return {
       ...state,
       groups: Array.from(state.groups.entries()).map(([id, groupState]) => ({
         id,
@@ -83,10 +93,17 @@ export const serialize = {
         wires: Array.from(groupState.wires.entries())
       }))
     }
-    return JSON.stringify(serializable, null, 2)
   },
   
-  // Generic serialization with type safety
+  // Generic serialization with type safety - returns object for JSONB
+  any: <T>(value: Serializable<T>): any => {
+    // Runtime validation
+    if (typeof value === 'function' || typeof value === 'symbol' || value === undefined) {
+      throw new Error(`Cannot serialize ${typeof value}`)
+    }
+    return value // Return as-is for JSONB
+  },
+  
   json: <T>(value: Serializable<T>): string => {
     // Runtime validation
     if (typeof value === 'function' || typeof value === 'symbol' || value === undefined) {
@@ -208,38 +225,46 @@ export const deserialize = {
     }
   },
   
-  networkState: (json: string): Result<NetworkState, Error> => {
-    try {
-      const obj = JSON.parse(json)
-      if (!obj.groups || !obj.currentGroupId || !obj.rootGroupId) {
-        return { ok: false, error: new Error('Invalid NetworkState: missing required fields') }
-      }
-      
-      // Reconstruct Map structures
-      const groups = new Map()
-      for (const groupData of obj.groups) {
-        const contacts = new Map(groupData.contacts)
-        const wires = new Map(groupData.wires)
-        groups.set(groupData.id, {
-          group: groupData.group,
-          contacts,
-          wires
-        })
-      }
-      
-      const state: NetworkState = {
-        groups,
-        currentGroupId: obj.currentGroupId,
-        rootGroupId: obj.rootGroupId
-      }
-      
-      return { ok: true, value: state }
-    } catch (error) {
-      return { ok: false, error: error as Error }
+  groupState: (obj: any): GroupState => {
+    // Reconstruct Map structures from JSONB object
+    const contacts = new Map<ContactId, Contact>(obj.contacts)
+    const wires = new Map<WireId, Wire>(obj.wires)
+    
+    return {
+      group: obj.group,
+      contacts,
+      wires
+    }
+  },
+  
+  networkState: (obj: any): NetworkState => {
+    // Reconstruct Map structures from JSONB object
+    const groups = new Map<GroupId, GroupState>()
+    for (const groupData of obj.groups) {
+      const contacts = new Map<ContactId, Contact>(groupData.contacts)
+      const wires = new Map<WireId, Wire>(groupData.wires)
+      groups.set(groupData.id as GroupId, {
+        group: groupData.group,
+        contacts,
+        wires
+      })
+    }
+    
+    return {
+      groups,
+      currentGroupId: obj.currentGroupId,
+      rootGroupId: obj.rootGroupId
     }
   },
   
   // Generic deserialization
+  any: <T>(jsonOrObj: string | any): T => {
+    if (typeof jsonOrObj === 'string') {
+      return JSON.parse(jsonOrObj) as T
+    }
+    return jsonOrObj as T
+  },
+  
   json: <T>(json: string): Result<T, Error> => {
     try {
       return { ok: true, value: JSON.parse(json) as T }
@@ -292,7 +317,14 @@ export function wireSerializer(): Serializer<Wire> {
 
 export function networkStateSerializer(): Serializer<NetworkState> {
   return {
-    serialize: serialize.networkState,
-    deserialize: deserialize.networkState
+    serialize: (state) => JSON.stringify(serialize.networkState(state)),
+    deserialize: (json) => {
+      try {
+        const obj = JSON.parse(json)
+        return { ok: true, value: deserialize.networkState(obj) }
+      } catch (error) {
+        return { ok: false, error: error as Error }
+      }
+    }
   }
 }

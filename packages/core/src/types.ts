@@ -18,6 +18,7 @@ export type ContactId = string & { __brand: 'ContactId' }
 export type GroupId = string & { __brand: 'GroupId' }
 export type WireId = string & { __brand: 'WireId' }
 export type NetworkId = string & { __brand: 'NetworkId' }
+export type SnapshotId = string & { __brand: 'SnapshotId' }
 
 // Helper functions for branded types
 export const brand = {
@@ -25,6 +26,7 @@ export const brand = {
   groupId: (id: string): GroupId => id as GroupId,
   wireId: (id: string): WireId => id as WireId,
   networkId: (id: string): NetworkId => id as NetworkId,
+  snapshotId: (id: string): SnapshotId => id as SnapshotId,
 } as const
 
 

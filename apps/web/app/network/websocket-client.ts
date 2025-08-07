@@ -525,7 +525,7 @@ export class WebSocketNetworkClient implements NetworkClient {
     return result.wireId
   }
   
-  async connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
+  async connectContacts(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
     return this.addWire(fromId, toId, type)
   }
   

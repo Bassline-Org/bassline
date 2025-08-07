@@ -4,21 +4,58 @@
  * Provides pluggable storage backends for persisting network state
  */
 
-import type { GroupState, NetworkState } from '../types'
+import type { 
+  GroupState, 
+  NetworkState, 
+  Result,
+  NetworkId,
+  GroupId,
+  ContactId,
+  SnapshotId,
+  Serializable
+} from '../types'
+
+// ============================================================================
+// Storage Domain Types
+// ============================================================================
+
+export type StorageErrorCode = 
+  | 'NETWORK_NOT_FOUND'
+  | 'GROUP_NOT_FOUND'
+  | 'CONTACT_NOT_FOUND'
+  | 'SNAPSHOT_NOT_FOUND'
+  | 'STORAGE_CONNECTION_ERROR'
+  | 'STORAGE_PERMISSION_ERROR'
+  | 'STORAGE_SERIALIZATION_ERROR'
+  | 'STORAGE_CORRUPTION_ERROR'
+
+export interface StorageError {
+  code: StorageErrorCode
+  message: string
+  details?: unknown
+}
 
 export interface SnapshotInfo {
-  id: string
-  networkId: string
+  id: SnapshotId
+  networkId: NetworkId
   label?: string
   createdAt: Date
   size?: number
 }
 
-export interface QueryFilter {
-  attributes?: Record<string, any>
+// Extensible query system with type safety
+export interface QueryFilter<T extends Record<string, unknown> = Record<string, unknown>> {
+  attributes?: Partial<T>
   author?: string
   tags?: string[]
   type?: string
+}
+
+// Storage operation context for extensibility
+export interface StorageOperationContext {
+  readonly timestamp: Date
+  readonly userId?: string
+  readonly metadata?: Record<string, Serializable<unknown>>
 }
 
 export interface StorageConfig {
@@ -53,41 +90,99 @@ export interface StorageConfig {
 }
 
 /**
- * Core storage interface for propagation networks
+ * Core storage interface for propagation networks with strong domain typing
  */
 export interface NetworkStorage {
   // Contact Operations
-  saveContactContent(networkId: string, groupId: string, contactId: string, content: any): Promise<void>
-  loadContactContent(networkId: string, groupId: string, contactId: string): Promise<any>
+  saveContactContent<T = unknown>(
+    networkId: NetworkId, 
+    groupId: GroupId, 
+    contactId: ContactId, 
+    content: Serializable<T>
+  ): Promise<Result<void, StorageError>>
+  
+  loadContactContent<T = unknown>(
+    networkId: NetworkId, 
+    groupId: GroupId, 
+    contactId: ContactId
+  ): Promise<Result<T | null, StorageError>>
   
   // Group Operations  
-  saveGroupState(networkId: string, groupId: string, state: GroupState): Promise<void>
-  loadGroupState(networkId: string, groupId: string): Promise<GroupState | null>
-  deleteGroup(networkId: string, groupId: string): Promise<void>
+  saveGroupState(
+    networkId: NetworkId, 
+    groupId: GroupId, 
+    state: GroupState
+  ): Promise<Result<void, StorageError>>
+  
+  loadGroupState(
+    networkId: NetworkId, 
+    groupId: GroupId
+  ): Promise<Result<GroupState | null, StorageError>>
+  
+  deleteGroup(
+    networkId: NetworkId, 
+    groupId: GroupId
+  ): Promise<Result<void, StorageError>>
   
   // Network Operations
-  saveNetworkState(networkId: string, state: NetworkState): Promise<void>
-  loadNetworkState(networkId: string): Promise<NetworkState | null>
-  listNetworks(): Promise<string[]>
-  deleteNetwork(networkId: string): Promise<void>
-  exists(networkId: string): Promise<boolean>
+  saveNetworkState(
+    networkId: NetworkId, 
+    state: NetworkState
+  ): Promise<Result<void, StorageError>>
+  
+  loadNetworkState(
+    networkId: NetworkId
+  ): Promise<Result<NetworkState | null, StorageError>>
+  
+  listNetworks(): Promise<Result<NetworkId[], StorageError>>
+  
+  deleteNetwork(
+    networkId: NetworkId
+  ): Promise<Result<void, StorageError>>
+  
+  exists(
+    networkId: NetworkId
+  ): Promise<Result<boolean, StorageError>>
   
   // Query Operations
-  queryGroups(networkId: string, filter: QueryFilter): Promise<GroupState[]>
+  queryGroups(
+    networkId: NetworkId, 
+    filter: QueryFilter
+  ): Promise<Result<GroupState[], StorageError>>
   
   // Versioning & Snapshots
-  saveSnapshot(networkId: string, label?: string): Promise<string>
-  loadSnapshot(networkId: string, snapshotId: string): Promise<NetworkState>
-  listSnapshots(networkId: string): Promise<SnapshotInfo[]>
-  deleteSnapshot(networkId: string, snapshotId: string): Promise<void>
+  saveSnapshot(
+    networkId: NetworkId, 
+    label?: string
+  ): Promise<Result<SnapshotId, StorageError>>
+  
+  loadSnapshot(
+    networkId: NetworkId, 
+    snapshotId: SnapshotId
+  ): Promise<Result<NetworkState, StorageError>>
+  
+  listSnapshots(
+    networkId: NetworkId
+  ): Promise<Result<SnapshotInfo[], StorageError>>
+  
+  deleteSnapshot(
+    networkId: NetworkId, 
+    snapshotId: SnapshotId
+  ): Promise<Result<void, StorageError>>
   
   // Federation/Replication (optional)
-  subscribe?(path: string, callback: (state: GroupState) => void): () => void
-  sync?(remote: NetworkStorage): Promise<void>
+  subscribe?(
+    path: string, 
+    callback: (state: GroupState) => void
+  ): Result<() => void, StorageError>
+  
+  sync?(
+    remote: NetworkStorage
+  ): Promise<Result<void, StorageError>>
   
   // Lifecycle
-  initialize?(): Promise<void>
-  close?(): Promise<void>
+  initialize?(): Promise<Result<void, StorageError>>
+  close?(): Promise<Result<void, StorageError>>
 }
 
 /**
