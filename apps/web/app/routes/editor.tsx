@@ -21,6 +21,11 @@ export async function clientLoader({ params, request }: { params: { groupId?: st
   const serverUrl = url.searchParams.get('server')
   const signalingUrl = url.searchParams.get('signal')
   
+  // Clear localStorage if no URL params (force default to local mode)
+  if (!roomCode && !serverUrl) {
+    localStorage.removeItem('bassline-network-config')
+  }
+  
   // If we have URL params, save them to localStorage so getNetworkClient picks them up
   if (roomCode || serverUrl) {
     // Use the same host as the current page for signaling server

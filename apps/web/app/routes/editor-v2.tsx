@@ -21,6 +21,11 @@ export async function clientLoader({ params, request }: { params: { groupId?: st
   const serverUrl = url.searchParams.get('server')
   const signalingUrl = url.searchParams.get('signal')
   
+  // Clear localStorage if no URL params (force default to local mode)
+  if (!roomCode && !serverUrl) {
+    localStorage.removeItem('bassline-network-config')
+  }
+  
   // If we have URL params, save them to localStorage so getNetworkClient picks them up
   if (roomCode || serverUrl) {
     // Use the same host as the current page for signaling server
@@ -102,6 +107,47 @@ export default function EditorV2() {
   // Expose network client globally for debugging
   if (typeof window !== 'undefined') {
     (window as any).getNetworkClient = getNetworkClient
+    
+    // Expose debugging utilities
+    (window as any).forceLocalMode = () => {
+      localStorage.removeItem('bassline-network-config')
+      location.reload()
+    }
+    
+    (window as any).forceRemoteMode = (url = 'http://localhost:8455') => {
+      localStorage.setItem('bassline-network-config', JSON.stringify({
+        mode: 'remote',
+        remoteUrl: url
+      }))
+      location.reload()
+    }
+    
+    // Expose primitive gadget testing utilities
+    (window as any).testPrimitiveGadgets = async () => {
+      const client = getNetworkClient()
+      console.log('Available primitive gadgets:', client.getPrimitiveGadgets())
+      
+      try {
+        const demo = await client.createPrimitiveGadgetDemo('root')
+        console.log('Created primitive gadget demo:', demo)
+        
+        // Test updating input to see if output changes
+        console.log('Testing primitive gadget execution...')
+        await client.updateContact(demo.inputId, 'root', 7)
+        console.log('Updated input to 7, output should now be 10 (7 + 3)')
+        
+        // Check output after a moment
+        setTimeout(async () => {
+          const outputContact = await client.getContact(demo.outputId)
+          console.log('Output contact value:', outputContact?.content)
+        }, 100)
+        
+        return demo
+      } catch (error) {
+        console.error('Error testing primitive gadgets:', error)
+        throw error
+      }
+    }
   }
   
   

@@ -77,13 +77,25 @@ export class UserspaceRuntime {
         
       case 'external-add-group':
         const groupId = brand.groupId(`group-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`)
+        
+        // Check if this is a primitive gadget
+        let primitive = undefined
+        if (input.group.primitiveId) {
+          const { getPrimitiveGadget } = await import('../primitives/index')
+          primitive = getPrimitiveGadget(input.group.primitiveId)
+          if (!primitive) {
+            throw new Error(`Unknown primitive gadget: ${input.group.primitiveId}`)
+          }
+        }
+        
         await this.registerGroup({
           id: groupId,
           name: input.group.name,
           contactIds: [],
           wireIds: [],
           subgroupIds: [],
-          boundaryContactIds: []
+          boundaryContactIds: [],
+          primitive
         })
         
         // If has parent, add to parent's subgroups

@@ -219,6 +219,24 @@ export class KernelClient {
   }
   
   /**
+   * Create a primitive gadget group
+   */
+  async createPrimitiveGadget(parentId: string, primitiveId: string): Promise<string> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('createPrimitiveGadget not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-add-group',
+        source: 'ui',
+        parentGroupId: brand.groupId(parentId),
+        group: { name: primitiveId, primitiveId }
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.id || result?.groupId || 'unknown'
+    }
+  }
+  
+  /**
    * Create a wire between contacts
    */
   async createWire(fromId: string, toId: string): Promise<string> {
@@ -234,6 +252,35 @@ export class KernelClient {
       const result = await this.bridge.sendOperation(input)
       return result?.id || result?.wireId || 'unknown'
     }
+  }
+  
+  /**
+   * Remove a wire
+   */
+  async removeWire(wireId: string): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      // Add removeWire method to remote bridge if needed
+      throw new Error('removeWire not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-remove-wire',
+        source: 'ui',
+        wireId: brand.wireId(wireId)
+      }
+      await this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
+   * Query wires in a group (from group query)
+   */
+  async getWires(groupId: string): Promise<any[]> {
+    const result = await this.queryGroup(groupId, {
+      includeWires: true,
+      includeContacts: false,
+      includeSubgroups: false
+    })
+    return result.wires || []
   }
   
   /**
@@ -326,6 +373,39 @@ export class KernelClient {
     return () => this.errorCallbacks.delete(callback)
   }
   
+  /**
+   * Compatibility methods for existing UI hooks
+   */
+  
+  /**
+   * Get contact data (compatibility method)
+   */
+  async getContact(contactId: string): Promise<any> {
+    return this.queryContact(contactId)
+  }
+  
+  /**
+   * Legacy subscribe method for compatibility with existing hooks
+   */
+  subscribeWithCallback(callbackOrGroupId: string | ((changes: ContactChange[]) => void), callback?: (changes: ContactChange[]) => void): () => void {
+    if (typeof callbackOrGroupId === 'function') {
+      // Called as subscribe(callback)
+      return this.onChanges(callbackOrGroupId)
+    } else {
+      // Called as subscribe(groupId, callback) 
+      const groupId = callbackOrGroupId
+      const changeCallback = callback!
+      
+      // Subscribe to the group using the base subscribe method
+      this.subscribe(groupId).catch(error => {
+        console.error('[KernelClient] Failed to subscribe to group:', error)
+      })
+      
+      // Return the change subscription
+      return this.onChanges(changeCallback)
+    }
+  }
+
   /**
    * Terminate the client
    */

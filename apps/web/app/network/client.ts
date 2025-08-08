@@ -1,21 +1,23 @@
 import { KernelClient } from './kernel-client'
+import { UIAdapter } from './ui-adapter'
 import { NativeWebRTCClient } from './webrtc-native-client'
 import { ClientWrapper } from './client-wrapper'
 import { getNetworkConfig } from '~/config/network-config'
 import type { ContactChange } from '@bassline/core'
+import { brand } from '@bassline/core'
 
 // Re-export types
 export type { GroupState } from '@bassline/core'
 
 // Singleton instance
-let kernelClient: KernelClient | null = null
+let uiAdapter: UIAdapter | null = null
 let lastConfigKey: string | null = null
 
 /**
- * Get the singleton KernelClient instance
+ * Get the singleton UIAdapter instance
  * Creates the client on first access or when config changes
  */
-export function getNetworkClient(): KernelClient {
+export function getNetworkClient(): UIAdapter {
   const config = getNetworkConfig()
   const configKey = JSON.stringify({
     mode: config.mode,
@@ -23,78 +25,83 @@ export function getNetworkClient(): KernelClient {
     webrtc: config.webrtc
   })
   
+  console.log('[NetworkClient] Using config:', config)
+  
   // Check if config has changed
-  if (kernelClient && lastConfigKey !== configKey) {
+  if (uiAdapter && lastConfigKey !== configKey) {
     console.log('[NetworkClient] Config changed, resetting client')
-    kernelClient.terminate()
-    kernelClient = null
+    uiAdapter.terminate()
+    uiAdapter = null
   }
   
-  if (!kernelClient) {
+  if (!uiAdapter) {
     lastConfigKey = configKey
     
     if (config.mode === 'webrtc' && config.webrtc) {
       // TODO: WebRTC support with kernel architecture
       throw new Error('WebRTC mode not yet supported with kernel architecture')
     } else if (config.mode === 'remote' && config.remoteUrl) {
-      console.log('[NetworkClient] Creating remote kernel client:', config.remoteUrl)
+      console.log('[NetworkClient] Creating remote UI adapter:', config.remoteUrl)
       
-      kernelClient = new KernelClient({
+      const kernelClient = new KernelClient({
         mode: 'remote',
         url: config.remoteUrl,
         onReady: () => {
           console.log('[NetworkClient] Remote kernel client ready')
         },
         onChanges: (changes: ContactChange[]) => {
-          console.log('[NetworkClient] Network changes:', changes)
-          // Changes are handled by individual component subscriptions
+          console.log('[NetworkClient] Kernel changes:', changes)
+          // Changes are handled by UIAdapter
         },
         onError: (error: Error) => {
           console.error('[NetworkClient] Kernel client error:', error)
         }
       })
       
+      uiAdapter = new UIAdapter({ kernelClient })
+      
       // Initialize asynchronously
-      kernelClient.initialize().then(() => {
-        console.log('[NetworkClient] Remote kernel client initialized')
+      uiAdapter.initialize().then(() => {
+        console.log('[NetworkClient] Remote UI adapter initialized')
       }).catch(error => {
-        console.error('[NetworkClient] Failed to initialize remote kernel client:', error)
+        console.error('[NetworkClient] Failed to initialize remote UI adapter:', error)
       })
     } else {
-      console.log('[NetworkClient] Creating local kernel client')
+      console.log('[NetworkClient] Creating local UI adapter')
       
-      kernelClient = new KernelClient({
+      const kernelClient = new KernelClient({
         mode: 'local',
         onReady: async () => {
           console.log('[NetworkClient] Local kernel client ready')
           
-          // Subscribe to root group for remote clients
-          if (kernelClient) {
-            try {
-              await kernelClient.subscribe('root')
-            } catch (e) {
-              console.log('[NetworkClient] Root subscription handled by kernel')
-            }
+          // Subscribe to root group for changes
+          try {
+            await kernelClient.subscribe('root')
+          } catch (e) {
+            console.log('[NetworkClient] Root subscription handled by kernel')
           }
         },
         onChanges: (changes: ContactChange[]) => {
-          console.log('[NetworkClient] Network changes:', changes)
+          console.log('[NetworkClient] Kernel changes:', changes)
+          // Changes are handled by UIAdapter
         },
         onError: (error: Error) => {
           console.error('[NetworkClient] Kernel client error:', error)
         }
       })
       
+      uiAdapter = new UIAdapter({ kernelClient })
+      
       // Initialize asynchronously
-      kernelClient.initialize().then(() => {
-        console.log('[NetworkClient] Local kernel client initialized')
+      uiAdapter.initialize().then(() => {
+        console.log('[NetworkClient] Local UI adapter initialized')
       }).catch(error => {
-        console.error('[NetworkClient] Failed to initialize local kernel client:', error)
+        console.error('[NetworkClient] Failed to initialize local UI adapter:', error)
       })
     }
   }
   
-  return kernelClient
+  return uiAdapter
 }
 
 // Track the current demo group ID to prevent re-initialization
@@ -207,9 +214,9 @@ export async function initializeDemoNetwork(): Promise<string> {
  * Reset the singleton (useful for testing)
  */
 export function resetNetworkClient(): void {
-  if (networkClient) {
-    networkClient.terminate()
-    networkClient = null
+  if (uiAdapter) {
+    uiAdapter.terminate()
+    uiAdapter = null
   }
   lastConfigKey = null
   currentDemoGroupId = null

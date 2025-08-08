@@ -139,7 +139,7 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
       }
     }
     
-    // ClientWrapper handles the differences between remote and worker clients
+    // Subscribe to group changes
     const unsubscribe = client.subscribe(groupId, handleChanges)
     
     return unsubscribe
@@ -175,7 +175,6 @@ export function useContact(contactId: string, initialContact?: Contact) {
     }
     
     // Subscribe to changes for this specific contact
-    // For contact-specific subscriptions, we still need to pass the handler directly
     const unsubscribe = client.subscribe((changes: Change[]) => {
       const contactChange = changes.find(change => 
         change.type === 'contact-updated' && 

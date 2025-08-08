@@ -122,26 +122,48 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             break
             
           case 'external-add-group':
+            // The runtime will handle this through receiveExternalInput
+            // But we need to get the group ID for the response
             const groupId = brand.groupId(`group-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`)
+            
+            // Check if this is a primitive gadget
+            let primitive = undefined
+            if (input.group.primitiveId) {
+              const { getPrimitiveGadget } = await import('@bassline/core')
+              primitive = getPrimitiveGadget(input.group.primitiveId)
+              if (!primitive) {
+                throw new Error(`Unknown primitive gadget: ${input.group.primitiveId}`)
+              }
+            }
+            
             await runtime.registerGroup({
               id: groupId,
               name: input.group.name,
               contactIds: [],
               wireIds: [],
               subgroupIds: [],
-              boundaryContactIds: []
+              boundaryContactIds: [],
+              primitive
             })
             
+            // Add to parent if specified
             if (input.parentGroupId) {
-              // TODO: Add to parent's subgroups
+              const parentState = await runtime.getState(input.parentGroupId)
+              if (parentState) {
+                parentState.group.subgroupIds.push(groupId)
+              }
             }
             
             result = { id: groupId, groupId }
             break
             
           case 'external-create-wire':
-            // TODO: Implement wire creation
-            result = { id: 'wire-todo' }
+            const wireId = await runtime.connect(
+              input.fromContactId, 
+              input.toContactId, 
+              'bidirectional'
+            )
+            result = { id: wireId, wireId }
             break
             
           case 'external-query-group':

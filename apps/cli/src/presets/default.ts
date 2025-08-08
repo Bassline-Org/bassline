@@ -5,7 +5,8 @@
 import chalk from 'chalk'
 import ora from 'ora'
 import { KernelNetwork } from '../kernel/kernel-network'
-import { MemoryStorageDriver, WebSocketServerBridgeDriver } from '@bassline/core'
+import { WebSocketServerBridgeDriver } from '@bassline/cli-drivers'
+import {MemoryStorageDriver } from "@bassline/core";
 import type { PresetConfig, PresetOptions } from './types'
 
 const preset: PresetConfig = {

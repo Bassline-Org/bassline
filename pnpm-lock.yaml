@@ -20,6 +20,12 @@ importers:
       '@bassline/bassline':
         specifier: workspace:*
         version: link:../../packages/bassline
+      '@bassline/browser-drivers':
+        specifier: workspace:*
+        version: link:../../packages/browser-drivers
+      '@bassline/cli-drivers':
+        specifier: workspace:*
+        version: link:../../packages/cli-drivers
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core

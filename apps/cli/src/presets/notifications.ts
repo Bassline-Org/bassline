@@ -8,9 +8,9 @@ import ora from 'ora'
 import { platform } from 'os'
 import { 
   MemoryStorageDriver,
-  IPCBridgeDriver,
   WebSocketBridgeDriver
 } from '@bassline/core'
+import { IPCBridgeDriver } from '@bassline/cli-drivers'
 import { KernelNetwork } from '../kernel/kernel-network'
 import type { PresetConfig } from './types'
 

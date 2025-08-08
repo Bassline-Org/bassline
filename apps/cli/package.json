@@ -21,6 +21,8 @@
     "@bassline/bassline": "workspace:*",
     "@bassline/installation": "workspace:*",
     "@bassline/storage-memory": "workspace:*",
+    "@bassline/cli-drivers": "workspace:*",
+    "@bassline/browser-drivers": "workspace:*",
     "@types/ws": "^8.18.1",
     "chalk": "^5.3.0",
     "commander": "^11.1.0",
