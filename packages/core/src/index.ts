@@ -46,3 +46,6 @@ export * from './network-types'
 
 // Error handling
 export * from './errors'
+
+// Kernel module
+export * from './kernel'
