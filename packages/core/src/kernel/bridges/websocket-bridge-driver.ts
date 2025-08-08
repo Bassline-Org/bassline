@@ -348,7 +348,7 @@ export class WebSocketBridgeDriver extends AbstractBridgeDriver {
         // Convert to ExternalInput and send to kernel
         if (message.data && this.inputHandler) {
           const input: ExternalInput = {
-            type: 'external-input',
+            type: 'external-contact-update',
             source: message.source || 'websocket',
             contactId: brand.contactId(message.data.contactId),
             groupId: brand.groupId(message.data.groupId),

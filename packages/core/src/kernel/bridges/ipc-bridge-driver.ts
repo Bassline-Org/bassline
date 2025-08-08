@@ -350,7 +350,7 @@ export class IPCBridgeDriver extends AbstractBridgeDriver {
         // Only convert to external input if we have a handler
         if (this.inputHandler) {
           const input: ExternalInput = {
-            type: 'external-input',
+            type: 'external-contact-update',
             source: 'ipc',
             contactId: brand.contactId(parsed.contactId),
             groupId: brand.groupId(parsed.groupId || 'default'),

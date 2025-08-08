@@ -1,21 +1,18 @@
 /**
- * Default preset - Basic in-memory propagation network with WebSocket
+ * Default preset - Basic in-memory network with WebSocket server
  */
 
 import chalk from 'chalk'
 import ora from 'ora'
-import { 
-  MemoryStorageDriver,
-  WebSocketBridgeDriver
-} from '@bassline/core'
 import { KernelNetwork } from '../kernel/kernel-network'
-import type { PresetConfig } from './types'
+import { MemoryStorageDriver, WebSocketServerBridgeDriver } from '@bassline/core'
+import type { PresetConfig, PresetOptions } from './types'
 
 const preset: PresetConfig = {
   name: 'default',
   description: 'Basic in-memory propagation network with WebSocket server',
   
-  async run(options) {
+  async run(options: PresetOptions) {
     const spinner = ora('Starting default network...').start()
     
     try {
@@ -30,27 +27,28 @@ const preset: PresetConfig = {
       await storage.initialize()
       await network.registerDriver('storage', storage)
       
-      // Add WebSocket bridge for remote connections
+      // Add WebSocket server bridge for remote connections
       spinner.text = 'Starting WebSocket server...'
-      const wsDriver = new WebSocketBridgeDriver({
-        url: `ws://localhost:${options.port || 8455}`,
-        room: 'default'
+      const port = options.port || 8455
+      const wsServer = new WebSocketServerBridgeDriver({
+        port,
+        host: '0.0.0.0'
       })
-      await network.registerDriver('websocket', wsDriver)
+      await network.registerDriver('websocket-server', wsServer)
       
       // Start the network
       await network.start()
       
-      spinner.succeed(chalk.green(`✅ Network running on port ${options.port || 8455}`))
+      spinner.succeed(chalk.green(`✅ Network running on port ${port}`))
       
-      console.log('\n' + chalk.blue('Network Configuration:'))
-      console.log(chalk.gray('  Storage:   ') + 'In-memory')
-      console.log(chalk.gray('  Transport: ') + `WebSocket (port ${options.port || 8455})`)
-      console.log(chalk.gray('  Room ID:   ') + 'default')
+      console.log('\n' + chalk.cyan('Network Configuration:'))
+      console.log(chalk.white('  Storage:   ') + 'In-memory')
+      console.log(chalk.white('  Transport: ') + `WebSocket Server (port ${port})`)
+      console.log(chalk.white('  Room ID:   ') + 'default')
       
       console.log('\n' + chalk.yellow('Connect with:'))
-      console.log(chalk.gray('  Web UI:  ') + `http://localhost:${options.port || 8455}`)
-      console.log(chalk.gray('  CLI:     ') + `bassline connect ws://localhost:${options.port || 8455}`)
+      console.log(chalk.white('  Web UI:  ') + `http://localhost:${port}`)
+      console.log(chalk.white('  CLI:     ') + `bassline connect ws://localhost:${port}`)
       
       // Handle graceful shutdown
       process.on('SIGINT', async () => {

@@ -57,6 +57,9 @@ export type { BridgeConfig, BridgeStats } from './bridge-driver'
 export { WebSocketBridgeDriver } from './bridges/websocket-bridge-driver'
 export type { WebSocketBridgeConfig } from './bridges/websocket-bridge-driver'
 
+export { WebSocketServerBridgeDriver } from './bridges/websocket-server-bridge-driver'
+export type { WebSocketServerBridgeConfig } from './bridges/websocket-server-bridge-driver'
+
 export { HTTPBridgeDriver } from './bridges/http-bridge-driver'
 export type { HTTPBridgeConfig } from './bridges/http-bridge-driver'
 

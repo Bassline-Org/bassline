@@ -413,7 +413,7 @@ export class HTTPBridgeDriver extends AbstractBridgeDriver {
     
     // Convert HTTP update to external input
     const input: ExternalInput = {
-      type: 'external-input',
+      type: 'external-contact-update',
       source: 'http',
       contactId: brand.contactId(update.contactId),
       groupId: brand.groupId(update.groupId),

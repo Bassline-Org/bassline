@@ -47,6 +47,9 @@ export class KernelNetwork extends EventEmitter {
     // Set up kernel to runtime connection
     this.kernel.setUserspaceHandler(this.runtime.receiveExternalInput.bind(this.runtime))
     
+    // The kernel already handles forwarding changes to bridge drivers
+    // via the runtime's emitToKernel -> kernel.handleChange -> all drivers
+    
     if (options.verbose) {
       this.setupLogging()
     }

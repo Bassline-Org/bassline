@@ -128,7 +128,7 @@ export class CLIBridgeDriver extends AbstractBridgeDriver {
           }
           
           const input: ExternalInput = {
-            type: 'external-input',
+            type: 'external-contact-update',
             source: this.id,
             contactId: brand.contactId(command.contactId),
             groupId: brand.groupId(command.groupId),

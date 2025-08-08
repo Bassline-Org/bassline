@@ -45,8 +45,181 @@ export class UserspaceRuntime {
    * This is called by the kernel when external systems provide new data
    */
   async receiveExternalInput(input: ExternalInput): Promise<void> {
-    // Convert external input to internal propagation
-    await this.scheduleUpdate(input.contactId, input.value)
+    switch (input.type) {
+      case 'external-contact-update':
+        // Convert external input to internal propagation
+        await this.scheduleUpdate(input.contactId, input.value)
+        break
+        
+      case 'external-add-contact':
+        const contactId = await this.addContact(input.groupId, {
+          content: input.contact.content,
+          blendMode: input.contact.blendMode
+        })
+        
+        // Get the created contact to emit its actual content
+        const createdContact = this.findContact(contactId)
+        
+        // Emit creation event back through kernel with actual content
+        this.emitToKernel({
+          type: 'contact-change',
+          contactId: brand.contactId(contactId),
+          groupId: input.groupId,
+          value: createdContact?.content || input.contact.content,
+          timestamp: Date.now()
+        })
+        break
+        
+      case 'external-remove-contact':
+        // TODO: Implement contact removal
+        console.log('[UserspaceRuntime] Contact removal not yet implemented:', input.contactId)
+        break
+        
+      case 'external-add-group':
+        const groupId = brand.groupId(`group-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`)
+        await this.registerGroup({
+          id: groupId,
+          name: input.group.name,
+          contactIds: [],
+          wireIds: [],
+          subgroupIds: [],
+          boundaryContactIds: []
+        })
+        
+        // If has parent, add to parent's subgroups
+        if (input.parentGroupId) {
+          const parentState = this.state.groups.get(input.parentGroupId)
+          if (parentState) {
+            parentState.group.subgroupIds.push(groupId)
+          }
+        }
+        
+        // Emit creation event
+        this.emitToKernel({
+          type: 'contact-change',
+          contactId: brand.contactId('system'),
+          groupId: groupId,
+          value: { created: true, id: groupId, name: input.group.name },
+          timestamp: Date.now()
+        })
+        break
+        
+      case 'external-remove-group':
+        // TODO: Implement group removal
+        console.log('[UserspaceRuntime] Group removal not yet implemented:', input.groupId)
+        break
+        
+      case 'external-create-wire':
+        // TODO: Implement wire creation
+        console.log('[UserspaceRuntime] Wire creation not yet implemented:', input.fromContactId, '->', input.toContactId)
+        break
+        
+      case 'external-remove-wire':
+        // TODO: Implement wire removal
+        console.log('[UserspaceRuntime] Wire removal not yet implemented:', input.wireId)
+        break
+        
+      case 'external-query-contact':
+        // Find and return contact value
+        const contact = this.findContact(input.contactId)
+        if (contact) {
+          // Emit result back through kernel
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: input.contactId,
+            groupId: brand.groupId(this.findGroupForContact(input.contactId) || 'unknown'),
+            value: {
+              type: 'query-result',
+              requestId: input.requestId,
+              contactId: input.contactId,
+              content: contact.content,
+              blendMode: contact.blendMode
+            },
+            timestamp: Date.now()
+          })
+        } else {
+          // Emit error
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: brand.groupId('system'),
+            value: {
+              type: 'query-error',
+              requestId: input.requestId,
+              error: `Contact ${input.contactId} not found`
+            },
+            timestamp: Date.now()
+          })
+        }
+        break
+        
+      case 'external-query-group':
+        // Get group state
+        const groupState = this.state.groups.get(input.groupId)
+        if (groupState) {
+          const result: any = {
+            type: 'query-result',
+            requestId: input.requestId,
+            groupId: input.groupId,
+            group: {
+              id: groupState.group.id,
+              name: groupState.group.name,
+              contactCount: groupState.contacts.size,
+              wireCount: groupState.wires.size,
+              subgroupCount: groupState.group.subgroupIds.length
+            }
+          }
+          
+          if (input.includeContacts) {
+            result.contacts = Array.from(groupState.contacts.entries()).map(([id, contact]) => ({
+              id,
+              content: contact.content,
+              blendMode: contact.blendMode
+            }))
+          }
+          
+          if (input.includeWires) {
+            result.wires = Array.from(groupState.wires.entries()).map(([id, wire]) => ({
+              id,
+              fromId: wire.fromId,
+              toId: wire.toId,
+              type: wire.type
+            }))
+          }
+          
+          if (input.includeSubgroups) {
+            result.subgroups = groupState.group.subgroupIds
+          }
+          
+          // Emit result back through kernel
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: input.groupId,
+            value: result,
+            timestamp: Date.now()
+          })
+        } else {
+          // Emit error
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: brand.groupId('system'),
+            value: {
+              type: 'query-error',
+              requestId: input.requestId,
+              error: `Group ${input.groupId} not found`
+            },
+            timestamp: Date.now()
+          })
+        }
+        break
+        
+      default:
+        // Exhaustive check
+        const exhaustiveCheck: never = input
+        throw new Error(`Unknown external input type: ${(exhaustiveCheck as any).type}`)
+    }
   }
   
   /**

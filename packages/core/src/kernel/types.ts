@@ -3,7 +3,7 @@
  * Defines the fundamental data structures for the kernel/userspace boundary
  */
 
-import type { ContactId, GroupId } from '../types'
+import type { ContactId, GroupId, WireId } from '../types'
 
 // ============================================================================
 // Kernel <-> Driver Communication Protocol
@@ -67,12 +67,144 @@ export class DriverError extends Error {
  * External input from driver to kernel
  * Drivers use this to send external changes into userspace
  */
-export interface ExternalInput {
-  readonly type: 'external-input'
+export type ExternalInput =
+  | ExternalContactUpdate
+  | ExternalAddContact
+  | ExternalRemoveContact
+  | ExternalAddGroup
+  | ExternalRemoveGroup
+  | ExternalCreateWire
+  | ExternalRemoveWire
+  | ExternalQueryContact
+  | ExternalQueryGroup
+
+/**
+ * Update a contact's value (original functionality)
+ */
+export interface ExternalContactUpdate {
+  readonly type: 'external-contact-update'
   readonly source: string  // Driver name that received this
   readonly contactId: ContactId
   readonly groupId: GroupId
   readonly value: unknown
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Add a new contact to a group
+ */
+export interface ExternalAddContact {
+  readonly type: 'external-add-contact'
+  readonly source: string
+  readonly groupId: GroupId
+  readonly contact: {
+    readonly content?: unknown
+    readonly blendMode?: 'accept-last' | 'merge'
+  }
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Remove a contact
+ */
+export interface ExternalRemoveContact {
+  readonly type: 'external-remove-contact'
+  readonly source: string
+  readonly contactId: ContactId
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Add a new group
+ */
+export interface ExternalAddGroup {
+  readonly type: 'external-add-group'
+  readonly source: string
+  readonly parentGroupId?: GroupId
+  readonly group: {
+    readonly name: string
+    readonly primitiveId?: string
+  }
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Remove a group
+ */
+export interface ExternalRemoveGroup {
+  readonly type: 'external-remove-group'
+  readonly source: string
+  readonly groupId: GroupId
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Create a wire between contacts
+ */
+export interface ExternalCreateWire {
+  readonly type: 'external-create-wire'
+  readonly source: string
+  readonly fromContactId: ContactId
+  readonly toContactId: ContactId
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Remove a wire
+ */
+export interface ExternalRemoveWire {
+  readonly type: 'external-remove-wire'
+  readonly source: string
+  readonly wireId: WireId
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Query a contact's value
+ */
+export interface ExternalQueryContact {
+  readonly type: 'external-query-contact'
+  readonly source: string
+  readonly contactId: ContactId
+  readonly requestId?: string  // To match response with request
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Query a group's structure and state
+ */
+export interface ExternalQueryGroup {
+  readonly type: 'external-query-group'
+  readonly source: string
+  readonly groupId: GroupId
+  readonly includeContacts?: boolean  // Include contact values
+  readonly includeWires?: boolean     // Include wire connections
+  readonly includeSubgroups?: boolean // Include subgroup info
+  readonly requestId?: string  // To match response with request
   readonly metadata?: {
     readonly timestamp?: number
     readonly [key: string]: unknown
