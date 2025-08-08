@@ -5,16 +5,7 @@
  * Includes retry logic, circuit breaker, and batch operations
  */
 
-import { AbstractBridgeDriver } from '../bridge-driver'
-import type {
-  ContactChange,
-  ExternalInput,
-  DriverCommand,
-  CommandResponse,
-} from '../types'
-import { DriverError } from '../types'
-import { brand } from '../../types'
-import type { ContactId, GroupId } from '../../types'
+import { AbstractBridgeDriver, type ContactChange, type ExternalInput, type DriverCommand, type CommandResponse, DriverError, brand, type ContactId, type GroupId } from '@bassline/core'
 
 export interface HTTPBridgeConfig {
   baseUrl: string

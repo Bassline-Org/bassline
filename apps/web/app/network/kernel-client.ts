@@ -1,0 +1,335 @@
+/**
+ * Kernel Client
+ * 
+ * Unified client interface that works with both local (worker) and remote (WebSocket) modes
+ * Provides the same API regardless of where the kernel is running
+ */
+
+import { 
+  Kernel,
+  type ExternalInput,
+  type ContactChange,
+  type GroupState,
+  brand
+} from '@bassline/core'
+import { BrowserWorkerBridgeDriver } from '@bassline/browser-drivers'
+import { RemoteWebSocketBridgeDriver } from '@bassline/remote-drivers'
+
+export interface KernelClientConfig {
+  mode: 'local' | 'remote'
+  url?: string
+  onChanges?: (changes: ContactChange[]) => void
+  onReady?: () => void
+  onError?: (error: Error) => void
+}
+
+/**
+ * Unified client for interacting with Bassline kernel
+ * Works with both local worker and remote server modes
+ */
+export class KernelClient {
+  private kernel: Kernel
+  private bridge: BrowserWorkerBridgeDriver | RemoteWebSocketBridgeDriver
+  private changeCallbacks = new Set<(changes: ContactChange[]) => void>()
+  private readyCallbacks = new Set<() => void>()
+  private errorCallbacks = new Set<(error: Error) => void>()
+  private config: KernelClientConfig
+  private isReady = false
+  
+  constructor(config: KernelClientConfig) {
+    this.config = config
+    this.kernel = new Kernel({ debug: true })
+    
+    // Add external callbacks if provided
+    if (config.onChanges) {
+      this.changeCallbacks.add(config.onChanges)
+    }
+    if (config.onReady) {
+      this.readyCallbacks.add(config.onReady)
+    }
+    if (config.onError) {
+      this.errorCallbacks.add(config.onError)
+    }
+    
+    // Create appropriate bridge based on mode
+    if (config.mode === 'local') {
+      this.bridge = this.createLocalBridge()
+    } else {
+      this.bridge = this.createRemoteBridge(config.url || 'ws://localhost:8455')
+    }
+    
+    // Set up event handlers
+    this.setupEventHandlers()
+    
+    // Register bridge with kernel
+    this.kernel.registerDriver(this.bridge).then(() => {
+      console.log('[KernelClient] Bridge registered')
+    }).catch(error => {
+      console.error('[KernelClient] Failed to register bridge:', error)
+      this.handleError(error)
+    })
+  }
+  
+  private createLocalBridge(): BrowserWorkerBridgeDriver {
+    // Create worker for local kernel
+    const worker = new Worker(
+      new URL('./kernel-worker.ts', import.meta.url),
+      { type: 'module' }
+    )
+    
+    return new BrowserWorkerBridgeDriver({ worker })
+  }
+  
+  private createRemoteBridge(url: string): RemoteWebSocketBridgeDriver {
+    return new RemoteWebSocketBridgeDriver({ url })
+  }
+  
+  private setupEventHandlers(): void {
+    // Listen for changes
+    this.bridge.on('change', (change: ContactChange) => {
+      this.changeCallbacks.forEach(cb => cb([change]))
+    })
+    
+    // Listen for ready event
+    this.bridge.on('ready', () => {
+      this.isReady = true
+      this.readyCallbacks.forEach(cb => cb())
+    })
+    
+    // Listen for errors
+    this.bridge.on('error', (error: Error) => {
+      this.handleError(error)
+    })
+    
+    // Listen for connection events (remote mode)
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      this.bridge.on('connected', () => {
+        console.log('[KernelClient] Connected to remote server')
+        this.isReady = true
+        this.readyCallbacks.forEach(cb => cb())
+      })
+      
+      this.bridge.on('disconnected', () => {
+        console.log('[KernelClient] Disconnected from remote server')
+        this.isReady = false
+      })
+    }
+  }
+  
+  private handleError(error: Error): void {
+    console.error('[KernelClient] Error:', error)
+    this.errorCallbacks.forEach(cb => cb(error))
+  }
+  
+  // ============================================================================
+  // Public API - Full Client Capabilities
+  // ============================================================================
+  
+  /**
+   * Check if client is ready
+   */
+  getIsReady(): boolean {
+    return this.isReady
+  }
+  
+  /**
+   * Initialize the client
+   */
+  async initialize(): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      // Start listening (connects to server)
+      await this.bridge.startListening()
+    } else {
+      // Worker initializes automatically
+    }
+  }
+  
+  /**
+   * Subscribe to a group for changes
+   */
+  async subscribe(groupId: string): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      await this.bridge.subscribe(groupId)
+    }
+    // Local mode gets all changes automatically
+  }
+  
+  /**
+   * Unsubscribe from a group
+   */
+  async unsubscribe(groupId: string): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      await this.bridge.unsubscribe(groupId)
+    }
+  }
+  
+  /**
+   * Add a contact to a group
+   */
+  async addContact(groupId: string, content: any): Promise<string> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      return this.bridge.addContact(groupId, content)
+    } else {
+      // Local mode - send through kernel
+      const input: ExternalInput = {
+        type: 'external-add-contact',
+        source: 'ui',
+        groupId: brand.groupId(groupId),
+        contact: { content }
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.id || result?.contactId || 'unknown'
+    }
+  }
+  
+  /**
+   * Update a contact's value
+   */
+  async updateContact(contactId: string, groupId: string, value: any): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      await this.bridge.updateContact(contactId, groupId, value)
+    } else {
+      const input: ExternalInput = {
+        type: 'external-contact-update',
+        source: 'ui',
+        contactId: brand.contactId(contactId),
+        groupId: brand.groupId(groupId),
+        value
+      }
+      await this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
+   * Create a new group
+   */
+  async createGroup(name: string, parentId?: string): Promise<string> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      return this.bridge.createGroup(name, parentId)
+    } else {
+      const input: ExternalInput = {
+        type: 'external-add-group',
+        source: 'ui',
+        parentGroupId: parentId ? brand.groupId(parentId) : undefined,
+        group: { name }
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.id || result?.groupId || 'unknown'
+    }
+  }
+  
+  /**
+   * Create a wire between contacts
+   */
+  async createWire(fromId: string, toId: string): Promise<string> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      return this.bridge.createWire(fromId, toId)
+    } else {
+      const input: ExternalInput = {
+        type: 'external-create-wire',
+        source: 'ui',
+        fromContactId: brand.contactId(fromId),
+        toContactId: brand.contactId(toId)
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.id || result?.wireId || 'unknown'
+    }
+  }
+  
+  /**
+   * Query a group's state
+   */
+  async queryGroup(groupId: string, options?: {
+    includeContacts?: boolean
+    includeWires?: boolean
+    includeSubgroups?: boolean
+  }): Promise<any> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      return this.bridge.queryGroup(groupId, options)
+    } else {
+      const input: ExternalInput = {
+        type: 'external-query-group',
+        source: 'ui',
+        groupId: brand.groupId(groupId),
+        includeContacts: options?.includeContacts,
+        includeWires: options?.includeWires,
+        includeSubgroups: options?.includeSubgroups
+      }
+      return this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
+   * Query a contact's value
+   */
+  async queryContact(contactId: string): Promise<any> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      return this.bridge.queryContact(contactId)
+    } else {
+      const input: ExternalInput = {
+        type: 'external-query-contact',
+        source: 'ui',
+        contactId: brand.contactId(contactId)
+      }
+      return this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
+   * Get the current state of a group (convenience method)
+   */
+  async getState(groupId: string): Promise<GroupState | null> {
+    try {
+      const result = await this.queryGroup(groupId, {
+        includeContacts: true,
+        includeWires: true,
+        includeSubgroups: true
+      })
+      
+      // Convert to GroupState format
+      return {
+        group: result.group,
+        contacts: new Map(result.contacts?.map((c: any) => [c.id, c]) || []),
+        wires: new Map(result.wires?.map((w: any) => [w.id, w]) || [])
+      }
+    } catch (error) {
+      console.error('[KernelClient] Failed to get state:', error)
+      return null
+    }
+  }
+  
+  /**
+   * Register a callback for changes
+   */
+  onChanges(callback: (changes: ContactChange[]) => void): () => void {
+    this.changeCallbacks.add(callback)
+    return () => this.changeCallbacks.delete(callback)
+  }
+  
+  /**
+   * Register a callback for ready event
+   */
+  onReady(callback: () => void): () => void {
+    this.readyCallbacks.add(callback)
+    // If already ready, call immediately
+    if (this.isReady) {
+      callback()
+    }
+    return () => this.readyCallbacks.delete(callback)
+  }
+  
+  /**
+   * Register a callback for errors
+   */
+  onError(callback: (error: Error) => void): () => void {
+    this.errorCallbacks.add(callback)
+    return () => this.errorCallbacks.delete(callback)
+  }
+  
+  /**
+   * Terminate the client
+   */
+  async terminate(): Promise<void> {
+    await this.kernel.shutdown()
+  }
+}

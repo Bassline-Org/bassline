@@ -1373,28 +1373,6 @@ export class NativeWebRTCClient implements NetworkClient {
     })
   }
   
-  subscribeToGroup(groupId: string, handler: (changes: Change[]) => void): () => void {
-    if (!this.subscriptions.has(groupId)) {
-      this.subscriptions.set(groupId, [])
-    }
-    
-    const handlers = this.subscriptions.get(groupId)!
-    handlers.push(handler)
-    
-    return () => {
-      const handlers = this.subscriptions.get(groupId)
-      if (handlers) {
-        const index = handlers.indexOf(handler)
-        if (index !== -1) {
-          handlers.splice(index, 1)
-        }
-        if (handlers.length === 0) {
-          this.subscriptions.delete(groupId)
-        }
-      }
-    }
-  }
-  
   async connect(): Promise<import('@bassline/core').Result<void, import('@bassline/core').NetworkError>> {
     try {
       await this.initialize()

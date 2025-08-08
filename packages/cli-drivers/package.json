@@ -1,0 +1,42 @@
+{
+  "name": "@bassline/cli-drivers",
+  "version": "1.0.0",
+  "description": "Bassline CLI drivers - Node.js bridge drivers for CLI and server environments",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "express": "^4.18.0",
+    "ws": "^8.0.0"
+  },
+  "peerDependencies": {},
+  "keywords": ["bassline", "cli", "node", "bridge", "websocket"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bassline-ai/bassline.git"
+  },
+  "license": "MIT"
+}

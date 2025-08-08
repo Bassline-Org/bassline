@@ -6,15 +6,7 @@
  * Supports JSON, line-delimited, and binary protocols
  */
 
-import { AbstractBridgeDriver } from '../bridge-driver'
-import type {
-  ContactChange,
-  ExternalInput,
-  DriverCommand,
-  CommandResponse,
-} from '../types'
-import { DriverError } from '../types'
-import { brand } from '../../types'
+import { AbstractBridgeDriver, type ContactChange, type ExternalInput, type DriverCommand, type CommandResponse, DriverError, brand } from '@bassline/core'
 import { spawn, ChildProcess } from 'child_process'
 import { Readable, Writable } from 'stream'
 import * as readline from 'readline'

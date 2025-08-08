@@ -14,7 +14,60 @@ import type {
 } from './types'
 import { DriverError, CommandError } from './types'
 import type { BridgeDriver } from './driver'
-import { EventEmitter } from 'events'
+// Browser-compatible EventEmitter
+class BrowserEventEmitter {
+  private listeners: Map<string, Function[]> = new Map()
+  
+  emit(event: string, ...args: any[]): boolean {
+    const handlers = this.listeners.get(event)
+    if (!handlers) return false
+    
+    handlers.forEach(handler => {
+      try {
+        handler(...args)
+      } catch (error) {
+        console.error(`Error in event handler for '${event}':`, error)
+      }
+    })
+    return true
+  }
+  
+  on(event: string, handler: Function): this {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, [])
+    }
+    this.listeners.get(event)!.push(handler)
+    return this
+  }
+  
+  off(event: string, handler: Function): this {
+    const handlers = this.listeners.get(event)
+    if (handlers) {
+      const index = handlers.indexOf(handler)
+      if (index !== -1) {
+        handlers.splice(index, 1)
+      }
+      if (handlers.length === 0) {
+        this.listeners.delete(event)
+      }
+    }
+    return this
+  }
+  
+  removeAllListeners(event?: string): this {
+    if (event) {
+      this.listeners.delete(event)
+    } else {
+      this.listeners.clear()
+    }
+    return this
+  }
+  
+  listenerCount(event: string): number {
+    const handlers = this.listeners.get(event)
+    return handlers ? handlers.length : 0
+  }
+}
 
 export interface BridgeConfig {
   id?: string
@@ -38,7 +91,7 @@ export interface BridgeStats {
  * Abstract base class for bridge drivers
  * Handles common patterns like input handling, event emission, and queue management
  */
-export abstract class AbstractBridgeDriver extends EventEmitter implements BridgeDriver {
+export abstract class AbstractBridgeDriver extends BrowserEventEmitter implements BridgeDriver {
   readonly id: string
   readonly name: string
   readonly version: string

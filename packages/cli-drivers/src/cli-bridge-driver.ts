@@ -3,16 +3,7 @@
  * Receives commands from CLI and sends them as external input to the kernel
  */
 
-import { AbstractBridgeDriver } from '../bridge-driver'
-import type {
-  ContactChange,
-  ExternalInput,
-  DriverCommand,
-  CommandResponse,
-} from '../types'
-import { CommandError } from '../types'
-import type { ContactId, GroupId } from '../../types'
-import { brand } from '../../types'
+import { AbstractBridgeDriver, type ContactChange, type ExternalInput, type DriverCommand, type CommandResponse, CommandError, type ContactId, type GroupId, brand } from '@bassline/core'
 
 export interface CLICommand {
   type: 'set-contact' | 'create-contact' | 'connect' | 'disconnect'
@@ -21,6 +12,12 @@ export interface CLICommand {
   value?: any
   fromId?: string
   toId?: string
+}
+
+export interface CLIBridgeConfig {
+  id?: string
+  autoProcessCommands?: boolean
+  processingInterval?: number
 }
 
 export class CLIBridgeDriver extends AbstractBridgeDriver {

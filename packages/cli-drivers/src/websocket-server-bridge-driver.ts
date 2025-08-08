@@ -5,14 +5,7 @@
  * Handles multiple client connections and broadcasts changes
  */
 
-import { AbstractBridgeDriver } from '../bridge-driver'
-import type {
-  ContactChange,
-  ExternalInput,
-  DriverCommand,
-  CommandResponse,
-} from '../types'
-import { DriverError } from '../types'
+import { AbstractBridgeDriver, type ContactChange, type ExternalInput, type DriverCommand, type CommandResponse, DriverError } from '@bassline/core'
 
 export interface WebSocketServerBridgeConfig {
   port: number

@@ -54,6 +54,7 @@ export type {
   INetworkError,
   NetworkErrorCode
 } from './network-types'
+export { isResponse, isNotification, isRequest } from './network-types'
 
 // Error handling (classes)
 export {

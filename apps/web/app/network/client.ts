@@ -1,23 +1,21 @@
-import { NetworkClient } from './network-client'
-import { RemoteNetworkClient } from './remote-client'
-import { WebSocketNetworkClient } from './websocket-client'
+import { KernelClient } from './kernel-client'
 import { NativeWebRTCClient } from './webrtc-native-client'
 import { ClientWrapper } from './client-wrapper'
 import { getNetworkConfig } from '~/config/network-config'
-import { brand } from '@bassline/core'
+import type { ContactChange } from '@bassline/core'
 
 // Re-export types
-export type { NetworkClient, GroupState } from './network-client'
+export type { GroupState } from '@bassline/core'
 
 // Singleton instance
-let networkClient: ClientWrapper | null = null
+let kernelClient: KernelClient | null = null
 let lastConfigKey: string | null = null
 
 /**
- * Get the singleton NetworkClient instance
+ * Get the singleton KernelClient instance
  * Creates the client on first access or when config changes
  */
-export function getNetworkClient(): ClientWrapper {
+export function getNetworkClient(): KernelClient {
   const config = getNetworkConfig()
   const configKey = JSON.stringify({
     mode: config.mode,
@@ -26,78 +24,77 @@ export function getNetworkClient(): ClientWrapper {
   })
   
   // Check if config has changed
-  if (networkClient && lastConfigKey !== configKey) {
+  if (kernelClient && lastConfigKey !== configKey) {
     console.log('[NetworkClient] Config changed, resetting client')
-    networkClient.terminate()
-    networkClient = null
+    kernelClient.terminate()
+    kernelClient = null
   }
   
-  if (!networkClient) {
+  if (!kernelClient) {
     lastConfigKey = configKey
     
     if (config.mode === 'webrtc' && config.webrtc) {
-      console.log('[NetworkClient] Creating native WebRTC network client')
-      const webrtcClient = new NativeWebRTCClient({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ],
-        signalingUrl: config.webrtc.signalingUrl,
-        roomCode: config.webrtc.roomCode,
-        isHost: config.webrtc.isHost
-      })
-      networkClient = new ClientWrapper(webrtcClient as any)
-      
-      // Initialize the WebRTC client asynchronously
-      console.log('[NetworkClient] Starting WebRTC initialization...')
-      webrtcClient.initialize().then(() => {
-        console.log('[NetworkClient] WebRTC client initialized')
-      }).catch(error => {
-        console.error('[NetworkClient] Failed to initialize WebRTC client:', error)
-      })
+      // TODO: WebRTC support with kernel architecture
+      throw new Error('WebRTC mode not yet supported with kernel architecture')
     } else if (config.mode === 'remote' && config.remoteUrl) {
-      console.log('[NetworkClient] Creating WebSocket network client:', config.remoteUrl)
-      const wsClient = new WebSocketNetworkClient(config.remoteUrl)
-      networkClient = new ClientWrapper(wsClient)
+      console.log('[NetworkClient] Creating remote kernel client:', config.remoteUrl)
       
-      // Initialize the WebSocket client asynchronously
-      console.log('[NetworkClient] Starting WebSocket initialization...')
-      wsClient.initialize().then(() => {
-        console.log('[NetworkClient] WebSocket client initialized')
-      }).catch(error => {
-        console.error('[NetworkClient] Failed to initialize WebSocket client:', error)
-        // Continue anyway - requests will be queued
-      })
-    } else {
-      console.log('[NetworkClient] Creating worker network client')
-      const workerClient = new NetworkClient({
-        onReady: async () => {
-          console.log('[NetworkClient] Worker client ready')
-          // Ensure root group exists
-          try {
-            await workerClient.registerGroup({
-              id: brand.groupId('root'),
-              name: 'Root Group',
-              contactIds: [],
-              wireIds: [],
-              subgroupIds: [],
-              boundaryContactIds: []
-            })
-            console.log('[NetworkClient] Root group created')
-          } catch (e) {
-            console.log('[NetworkClient] Root group already exists')
-          }
+      kernelClient = new KernelClient({
+        mode: 'remote',
+        url: config.remoteUrl,
+        onReady: () => {
+          console.log('[NetworkClient] Remote kernel client ready')
         },
-        onChanges: (changes) => {
+        onChanges: (changes: ContactChange[]) => {
           console.log('[NetworkClient] Network changes:', changes)
           // Changes are handled by individual component subscriptions
-          // No need for global invalidation
+        },
+        onError: (error: Error) => {
+          console.error('[NetworkClient] Kernel client error:', error)
         }
       })
-      networkClient = new ClientWrapper(workerClient)
+      
+      // Initialize asynchronously
+      kernelClient.initialize().then(() => {
+        console.log('[NetworkClient] Remote kernel client initialized')
+      }).catch(error => {
+        console.error('[NetworkClient] Failed to initialize remote kernel client:', error)
+      })
+    } else {
+      console.log('[NetworkClient] Creating local kernel client')
+      
+      kernelClient = new KernelClient({
+        mode: 'local',
+        onReady: async () => {
+          console.log('[NetworkClient] Local kernel client ready')
+          
+          // Subscribe to root group for remote clients
+          if (kernelClient) {
+            try {
+              await kernelClient.subscribe('root')
+            } catch (e) {
+              console.log('[NetworkClient] Root subscription handled by kernel')
+            }
+          }
+        },
+        onChanges: (changes: ContactChange[]) => {
+          console.log('[NetworkClient] Network changes:', changes)
+        },
+        onError: (error: Error) => {
+          console.error('[NetworkClient] Kernel client error:', error)
+        }
+      })
+      
+      // Initialize asynchronously
+      kernelClient.initialize().then(() => {
+        console.log('[NetworkClient] Local kernel client initialized')
+      }).catch(error => {
+        console.error('[NetworkClient] Failed to initialize local kernel client:', error)
+      })
     }
   }
-  return networkClient
+  
+  return kernelClient
 }
 
 // Track the current demo group ID to prevent re-initialization

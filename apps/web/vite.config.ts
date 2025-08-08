@@ -5,4 +5,16 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths()],
+  define: {
+    global: 'globalThis',
+  },
+  resolve: {
+    alias: {
+      // Polyfill Node.js modules for browser compatibility
+      'events': 'events'
+    }
+  },
+  optimizeDeps: {
+    include: ['events']
+  }
 });

@@ -53,20 +53,19 @@ export type { UserspaceRuntimeConfig } from './userspace-runtime'
 export { AbstractBridgeDriver } from './bridge-driver'
 export type { BridgeConfig, BridgeStats } from './bridge-driver'
 
-// Concrete Bridge Implementations
+// Concrete Bridge Implementations (browser-compatible only)
 export { WebSocketBridgeDriver } from './bridges/websocket-bridge-driver'
 export type { WebSocketBridgeConfig } from './bridges/websocket-bridge-driver'
 
-export { WebSocketServerBridgeDriver } from './bridges/websocket-server-bridge-driver'
-export type { WebSocketServerBridgeConfig } from './bridges/websocket-server-bridge-driver'
+// Note: Node.js-specific bridges moved to @bassline/cli-drivers:
+// - WebSocketServerBridgeDriver  
+// - HTTPBridgeDriver
+// - IPCBridgeDriver
+// - CLIBridgeDriver
 
-export { HTTPBridgeDriver } from './bridges/http-bridge-driver'
-export type { HTTPBridgeConfig } from './bridges/http-bridge-driver'
-
-export { IPCBridgeDriver } from './bridges/ipc-bridge-driver'
-export type { IPCBridgeConfig } from './bridges/ipc-bridge-driver'
-
-export { CLIBridgeDriver } from './drivers/cli-bridge-driver'
+// Note: Browser/Remote-specific bridges moved to separate packages:
+// - BrowserWorkerBridgeDriver -> @bassline/browser-drivers
+// - RemoteWebSocketBridgeDriver -> @bassline/remote-drivers
 
 // Storage Drivers
 export { MemoryStorageDriver } from './drivers/memory-storage-driver'
