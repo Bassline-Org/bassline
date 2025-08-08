@@ -38,6 +38,9 @@ export type {
   StorageCapabilities,
 } from './driver'
 
+// NetworkStorage base class
+export { NetworkStorage } from '../storage/interface'
+
 // Kernel
 export { Kernel } from './kernel'
 export type { KernelBassline } from './kernel'

@@ -17,6 +17,7 @@ if (!processId || !opsCount) {
 
 async function runWorker() {
   const storage = new SQLiteStorage({
+    type: 'memory',
     options: {
       dataDir: '/tmp/bassline-parallel-test',
       filename: `worker-${processId}.db`,
@@ -26,10 +27,7 @@ async function runWorker() {
     }
   })
   
-  const initResult = await storage.initialize()
-  if (!initResult.ok) {
-    throw new Error(`Failed to initialize: ${initResult.error.message}`)
-  }
+  await storage.initialize()
   
   const networkId = brand.networkId(`network-${processId}`)
   const groupId = brand.groupId(`group-${processId}`)
@@ -39,16 +37,12 @@ async function runWorker() {
   // Perform operations
   for (let i = 0; i < opsCount; i++) {
     const contactId = brand.contactId(`contact-${i}`)
-    const result = await storage.saveContactContent(
+    await storage.saveContactContent(
       networkId,
       groupId,
       contactId,
       { value: Math.random(), timestamp: Date.now(), process: processId }
     )
-    
-    if (!result.ok) {
-      throw new Error(`Failed to save contact: ${result.error.message}`)
-    }
   }
   
   const duration = Date.now() - startTime

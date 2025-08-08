@@ -12,7 +12,6 @@ import Database from 'better-sqlite3'
 import { join } from 'path'
 import { mkdirSync, existsSync } from 'fs'
 import type { 
-  NetworkStorage, 
   StorageConfig, 
   IStorageError,
   StorageErrorCode,
@@ -22,16 +21,13 @@ import type {
   NetworkId,
   GroupId,
   ContactId,
+  SnapshotId,
   Serializable,
   Contact,
   Wire,
-  StorageDriver,
-  ContactChange,
-  DriverResponse,
-  DriverCommand,
-  CommandResponse
+  StorageCapabilities,
 } from '@bassline/core'
-import { brand, DriverError } from '@bassline/core'
+import { NetworkStorage, brand, DriverError } from '@bassline/core'
 
 export interface SQLiteStorageOptions {
   dataDir?: string
@@ -47,7 +43,10 @@ export interface SQLiteStorageOptions {
   tempStore?: 'DEFAULT' | 'FILE' | 'MEMORY' // Where to store temporary tables
 }
 
-export class SQLiteStorage implements NetworkStorage, StorageDriver {
+export class SQLiteStorage extends NetworkStorage {
+  sync?(remote: NetworkStorage): Promise<void> {
+    throw new Error('Method not implemented.')
+  }
   readonly id: string
   readonly name: string = 'sqlite-storage'
   readonly version: string = '1.0.0'
@@ -55,10 +54,10 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
   private databases: Map<string, Database.Database> = new Map()
   private options: SQLiteStorageOptions
   private dataDir: string
-  private eventHandlers: Map<string, Set<(data: any) => void>> = new Map()
   private defaultNetworkId: string = 'default'
   
-  constructor(config?: StorageConfig & { networkId?: string }) {
+  constructor(config?: StorageConfig & { networkId?: string, options?: SQLiteStorageOptions }) {
+    super()
     this.id = `sqlite-storage-${Date.now()}`
     this.defaultNetworkId = config?.networkId || 'default'
     this.options = {
@@ -215,82 +214,8 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
   }
   
   // ============================================================================
-  // StorageDriver Interface
+  // NetworkStorage Domain Methods
   // ============================================================================
-  
-  async save(networkId: string, groupId: string, contactId: string, content: any): Promise<void> {
-    const db = this.getDatabase(brand.networkId(networkId))
-    
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO contacts (network_id, group_id, contact_id, content, updated_at)
-      VALUES (?, ?, ?, ?, unixepoch())
-    `)
-    
-    stmt.run(networkId, groupId, contactId, JSON.stringify(content))
-    
-    this.emitEvent('contact:saved', { networkId, groupId, contactId, content })
-  }
-  
-  async load(networkId: string, groupId: string, contactId: string): Promise<any | null> {
-    const db = this.getDatabase(brand.networkId(networkId))
-    
-    const stmt = db.prepare(`
-      SELECT content FROM contacts 
-      WHERE network_id = ? AND group_id = ? AND contact_id = ?
-    `)
-    
-    const row = stmt.get(networkId, groupId, contactId) as any
-    return row ? JSON.parse(row.content) : null
-  }
-  
-  async delete(networkId: string, groupId: string, contactId: string): Promise<void> {
-    const db = this.getDatabase(brand.networkId(networkId))
-    
-    const stmt = db.prepare(`
-      DELETE FROM contacts 
-      WHERE network_id = ? AND group_id = ? AND contact_id = ?
-    `)
-    
-    stmt.run(networkId, groupId, contactId)
-    
-    this.emitEvent('contact:deleted', { networkId, groupId, contactId })
-  }
-  
-  async saveGroup(networkId: string, groupId: string, groupData: any): Promise<void> {
-    const result = await this.saveGroupState(
-      brand.networkId(networkId),
-      brand.groupId(groupId),
-      groupData as GroupState
-    )
-    
-    if (!result.ok) {
-      throw new Error(result.error.message)
-    }
-  }
-  
-  async loadGroup(groupId: string): Promise<any | null> {
-    const result = await this.loadGroupState(
-      brand.networkId(this.defaultNetworkId),
-      brand.groupId(groupId)
-    )
-    
-    return result.ok ? result.value : null
-  }
-  
-  on(event: string, handler: (data: any) => void): void {
-    if (!this.eventHandlers.has(event)) {
-      this.eventHandlers.set(event, new Set())
-    }
-    this.eventHandlers.get(event)!.add(handler)
-  }
-  
-  off(event: string, handler: (data: any) => void): void {
-    this.eventHandlers.get(event)?.delete(handler)
-  }
-  
-  private emitEvent(event: string, data: any): void {
-    this.eventHandlers.get(event)?.forEach(handler => handler(data))
-  }
   
   // ============================================================================
   // NetworkStorage Interface
@@ -301,7 +226,7 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
     groupId: GroupId, 
     contactId: ContactId, 
     content: Serializable<T>
-  ): Promise<Result<void, IStorageError>> {
+  ): Promise<void> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -311,10 +236,11 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       `)
       
       stmt.run(networkId, groupId, contactId, JSON.stringify(content))
-      
-      return { ok: true, value: undefined }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to save contact content: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
@@ -322,7 +248,7 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
     networkId: NetworkId, 
     groupId: GroupId, 
     contactId: ContactId
-  ): Promise<Result<T | null, IStorageError>> {
+  ): Promise<T | null> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -332,11 +258,12 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       `)
       
       const row = stmt.get(networkId, groupId, contactId) as any
-      const content = row ? JSON.parse(row.content) as T : null
-      
-      return { ok: true, value: content }
+      return row ? JSON.parse(row.content) as T : null
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to load contact content: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
@@ -344,7 +271,7 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
     networkId: NetworkId, 
     groupId: GroupId, 
     state: GroupState
-  ): Promise<Result<void, IStorageError>> {
+  ): Promise<void> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -417,18 +344,18 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       })
       
       transaction()
-      
-      return { ok: true, value: undefined }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to save group state: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
   async loadGroupState(
     networkId: NetworkId, 
     groupId: GroupId
-  ): Promise<Result<GroupState | null, IStorageError>> {
-    try {
+  ): Promise<GroupState | null> {
       const db = this.getDatabase(networkId)
       
       // Load group metadata
@@ -438,7 +365,7 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       const groupRow = groupStmt.get(networkId, groupId) as any
       
       if (!groupRow) {
-        return { ok: true, value: null }
+        return null
       }
       
       // Load contacts
@@ -475,8 +402,6 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       }
       
       return {
-        ok: true,
-        value: {
           group: {
             id: groupId,
             name: groupRow.name,
@@ -488,16 +413,12 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
           contacts,
           wires
         }
-      }
-    } catch (error: any) {
-      return this.handleError(error)
-    }
   }
   
   async deleteGroup(
     networkId: NetworkId, 
     groupId: GroupId
-  ): Promise<Result<void, IStorageError>> {
+  ): Promise<void> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -517,16 +438,18 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       
       transaction()
       
-      return { ok: true, value: undefined }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to delete group: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
   async saveNetworkState(
     networkId: NetworkId, 
     state: NetworkState
-  ): Promise<Result<void, IStorageError>> {
+  ): Promise<void> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -537,15 +460,17 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       
       stmt.run(networkId, state.rootGroupId, state.currentGroupId)
       
-      return { ok: true, value: undefined }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to save network state: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
   async loadNetworkState(
     networkId: NetworkId
-  ): Promise<Result<NetworkState | null, IStorageError>> {
+  ): Promise<NetworkState | null> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -555,7 +480,7 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       const networkRow = networkStmt.get(networkId) as any
       
       if (!networkRow) {
-        return { ok: true, value: null }
+        return null
       }
       
       // Load all groups
@@ -565,35 +490,39 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       const groupRows = groupsStmt.all(networkId) as any[]
       
       const groups = new Map()
-      for (const row of groupRows) {
-        const groupState = await this.loadGroupState(networkId, row.group_id)
-        if (groupState.ok && groupState.value) {
-          groups.set(row.group_id, groupState.value)
+      const groupStates = await Promise.all(
+        groupRows.map(row => this.loadGroupState(networkId, row.group_id))
+      )
+      
+      for (let i = 0; i < groupRows.length; i++) {
+        const groupState = groupStates[i]
+        if (groupState) {
+          groups.set(groupRows[i].group_id, groupState)
         }
       }
       
       return {
-        ok: true,
-        value: {
           networkId,
           groups,
           wires: new Map(),
           currentGroupId: networkRow.current_group_id,
           rootGroupId: networkRow.root_group_id
-        } as NetworkState
-      }
+      } as NetworkState
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to load network state: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
-  async listNetworks(): Promise<Result<NetworkId[], IStorageError>> {
+  async listNetworks(): Promise<NetworkId[]> {
     try {
       if (this.options.mode === 'single') {
         const db = this.getDatabase(brand.networkId('main'))
         const stmt = db.prepare('SELECT id FROM networks ORDER BY updated_at DESC')
         const rows = stmt.all() as any[]
-        return { ok: true, value: rows.map(r => brand.networkId(r.id)) }
+        return rows.map(r => brand.networkId(r.id))
       } else {
         // In sharded mode, list all .db files
         const { readdirSync } = await import('fs')
@@ -601,14 +530,17 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
         const networkIds = files
           .filter(f => f.endsWith('.db'))
           .map(f => brand.networkId(f.replace('.db', '')))
-        return { ok: true, value: networkIds }
+        return networkIds
       }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to list networks: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
-  async deleteNetwork(networkId: NetworkId): Promise<Result<void, IStorageError>> {
+  async deleteNetwork(networkId: NetworkId): Promise<void> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -638,57 +570,70 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
         }
       }
       
-      return { ok: true, value: undefined }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to delete network: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
-  async exists(networkId: NetworkId): Promise<Result<boolean, IStorageError>> {
+  async exists(networkId: NetworkId): Promise<boolean> {
     try {
       if (this.options.mode === 'single') {
         const db = this.getDatabase(networkId)
         const stmt = db.prepare('SELECT 1 FROM networks WHERE id = ? LIMIT 1')
         const row = stmt.get(networkId)
-        return { ok: true, value: !!row }
+        return !!row
       } else {
         const { existsSync } = await import('fs')
         const filename = join(this.dataDir, `${networkId}.db`)
-        return { ok: true, value: existsSync(filename) }
+        return existsSync(filename)
       }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to check network existence: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
   // Stub implementations for missing interface methods
-  async queryGroups(networkId: NetworkId, filter: any): Promise<Result<GroupState[], IStorageError>> {
-    return { ok: true, value: [] }
+  async queryGroups(networkId: NetworkId, filter: any): Promise<GroupState[]> {
+    return []
   }
   
-  async saveSnapshot(networkId: NetworkId, label?: string): Promise<Result<any, IStorageError>> {
+  async saveSnapshot(networkId: NetworkId, label?: string): Promise<SnapshotId> {
     try {
       const db = this.getDatabase(networkId)
       const snapshotId = brand.snapshotId(`snapshot-${Date.now()}`)
       
       // Load full network state
       const networkState = await this.loadNetworkState(networkId)
-      if (!networkState.ok) return networkState
+      if (!networkState) {
+        throw new DriverError(
+          `Failed to load network state for snapshot: network ${networkId} not found`,
+          { fatal: false }
+        )
+      }
       
       const stmt = db.prepare(`
         INSERT INTO snapshots (network_id, snapshot_id, label, snapshot_data)
         VALUES (?, ?, ?, ?)
       `)
       
-      stmt.run(networkId, snapshotId, label || null, JSON.stringify(networkState.value))
+      stmt.run(networkId, snapshotId, label || null, JSON.stringify(networkState))
       
-      return { ok: true, value: snapshotId }
+      return snapshotId
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to save snapshot: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
-  async loadSnapshot(networkId: NetworkId, snapshotId: any): Promise<Result<NetworkState, IStorageError>> {
+  async loadSnapshot(networkId: NetworkId, snapshotId: SnapshotId): Promise<NetworkState> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -699,16 +644,25 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       
       const row = stmt.get(networkId, snapshotId) as any
       if (!row) {
-        return { ok: false, error: { code: 'SNAPSHOT_NOT_FOUND' as StorageErrorCode, message: 'Snapshot not found' } }
+        throw new DriverError(
+          'Snapshot not found',
+          { fatal: false }
+        )
       }
       
-      return { ok: true, value: JSON.parse(row.snapshot_data) }
+      return JSON.parse(row.snapshot_data)
     } catch (error: any) {
-      return this.handleError(error)
+      if (error instanceof DriverError) {
+        throw error
+      }
+      throw new DriverError(
+        `Failed to load snapshot: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
-  async listSnapshots(networkId: NetworkId): Promise<Result<any[], IStorageError>> {
+  async listSnapshots(networkId: NetworkId): Promise<Array<{ id: SnapshotId; label?: string; createdAt: Date }>> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -721,13 +675,20 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       
       const rows = stmt.all(networkId) as any[]
       
-      return { ok: true, value: rows }
+      return rows.map(row => ({
+        id: row.snapshot_id,
+        label: row.label,
+        createdAt: new Date(row.created_at * 1000)
+      }))
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to list snapshots: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
-  async deleteSnapshot(networkId: NetworkId, snapshotId: any): Promise<Result<void, IStorageError>> {
+  async deleteSnapshot(networkId: NetworkId, snapshotId: SnapshotId): Promise<void> {
     try {
       const db = this.getDatabase(networkId)
       
@@ -738,95 +699,47 @@ export class SQLiteStorage implements NetworkStorage, StorageDriver {
       
       stmt.run(networkId, snapshotId)
       
-      return { ok: true, value: undefined }
     } catch (error: any) {
-      return this.handleError(error)
+      throw new DriverError(
+        `Failed to delete snapshot: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
     }
   }
   
-  async initialize(): Promise<Result<void, IStorageError>> {
+  async initialize(): Promise<void> {
     // SQLite doesn't need explicit initialization
-    return { ok: true, value: undefined }
   }
   
-  async close(): Promise<Result<void, IStorageError>> {
+  async close(): Promise<void> {
     try {
       for (const db of this.databases.values()) {
         db.close()
       }
       this.databases.clear()
-      return { ok: true, value: undefined }
     } catch (error: any) {
-      return this.handleError(error)
-    }
-  }
-  
-  private handleError(error: any): Result<never, IStorageError> {
-    return {
-      ok: false,
-      error: {
-        code: 'STORAGE_CONNECTION_ERROR' as StorageErrorCode,
-        message: error.message || 'Unknown SQLite error',
-        details: error
-      }
+      throw new DriverError(
+        `Failed to close SQLite databases: ${error.message}`,
+        { fatal: true, originalError: error }
+      )
     }
   }
 
   // ============================================================================
-  // StorageDriver interface implementation
+  // Abstract method implementations for NetworkStorage
   // ============================================================================
   
-  getCapabilities() {
+  getDefaultNetworkId(): NetworkId {
+    return brand.networkId(this.defaultNetworkId)
+  }
+  
+  getCapabilities(): StorageCapabilities {
     return {
       supportsBatching: true,
       supportsTransactions: true,
       supportsStreaming: false,
       maxBatchSize: 10000,
       persistent: this.options.mode !== 'memory'
-    }
-  }
-  
-  async handleChange(change: ContactChange): Promise<DriverResponse> {
-    try {
-      // Store the change
-      await this.saveContactContent(
-        brand.networkId(this.defaultNetworkId),
-        brand.groupId(change.groupId),
-        brand.contactId(change.contactId),
-        change.value
-      )
-      
-      return {
-        status: 'success' as const,
-        metadata: { driverId: this.id }
-      }
-    } catch (error: any) {
-      throw new DriverError(error.message || 'Failed to handle change', { fatal: false })
-    }
-  }
-  
-  async handleCommand(command: DriverCommand): Promise<CommandResponse> {
-    switch (command.type) {
-      case 'initialize':
-        const initResult = await this.initialize()
-        if (!initResult.ok) {
-          throw new Error(`Failed to initialize: ${initResult.error.message}`)
-        }
-        return { status: 'success' as const }
-        
-      case 'shutdown':
-        const closeResult = await this.close()
-        if (!closeResult.ok) {
-          throw new Error(`Failed to shutdown: ${closeResult.error.message}`)
-        }
-        return { status: 'success' as const }
-        
-      case 'health-check':
-        await this.isHealthy()
-        return { status: 'success' as const }
-        
-      default:
-        throw new Error(`Unknown command type: ${(command as any).type}`)
     }
   }
   
