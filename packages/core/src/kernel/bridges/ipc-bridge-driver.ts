@@ -510,17 +510,68 @@ export class IPCBridgeDriver extends AbstractBridgeDriver {
     // Otherwise write to process stdin
     if (this.process && this.process.stdin && !this.process.killed) {
       return new Promise((resolve, reject) => {
-        this.process!.stdin!.write(data, (error) => {
-          if (error) {
+        // Check if stdin is writable before attempting to write
+        if (!this.process!.stdin!.writable) {
+          this.queueMessage(data)
+          resolve()
+          return
+        }
+        
+        try {
+          const writeCallback = (error: any) => {
+            if (error) {
+              // EPIPE error means the process has closed stdin
+              if (error.code === 'EPIPE') {
+                this.queueMessage(data)
+                resolve() // Don't reject, just queue
+              } else {
+                this.queueMessage(data)
+                reject(new DriverError(
+                  `Failed to write to process: ${error.message}`,
+                  { fatal: false, originalError: error }
+                ))
+              }
+            } else {
+              resolve()
+            }
+          }
+          
+          // Add error handler for synchronous EPIPE errors
+          const errorHandler = (error: any) => {
+            if (error.code === 'EPIPE') {
+              this.queueMessage(data)
+              // Remove the error handler to prevent duplicate handling
+              this.process!.stdin!.removeListener('error', errorHandler)
+            }
+          }
+          
+          this.process!.stdin!.once('error', errorHandler)
+          const result = this.process!.stdin!.write(data, writeCallback)
+          
+          // If write returns false, the stream is not ready
+          if (!result) {
+            // Wait for drain event before resolving
+            this.process!.stdin!.once('drain', () => {
+              this.process!.stdin!.removeListener('error', errorHandler)
+              resolve()
+            })
+          } else {
+            // Write succeeded immediately
+            this.process!.stdin!.removeListener('error', errorHandler)
+          }
+        } catch (error: any) {
+          // Catch synchronous errors (like EPIPE)
+          if (error.code === 'EPIPE') {
+            this.queueMessage(data)
+            resolve()
+          } else {
             this.queueMessage(data)
             reject(new DriverError(
               `Failed to write to process: ${error.message}`,
               { fatal: false, originalError: error }
             ))
-          } else {
-            resolve()
           }
-        })
+        }
       })
     } else {
       // Queue for later
