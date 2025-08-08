@@ -89,7 +89,7 @@ export class HTTPBridgeDriver extends AbstractBridgeDriver {
       circuitBreakerResetTime: config.circuitBreakerResetTime ?? 60000,
       batchSize: config.batchSize ?? 100,
       batchDelay: config.batchDelay ?? 100,
-      id: config.id
+      id: config.id || 'http-bridge'
     }
   }
   
@@ -204,7 +204,10 @@ export class HTTPBridgeDriver extends AbstractBridgeDriver {
         }
         
       default:
-        return { status: 'error', error: `Unknown command: ${(command as any).type}` }
+        throw new DriverError(
+          `Unknown command: ${(command as any).type}`,
+          { fatal: false }
+        )
     }
   }
   
@@ -245,7 +248,7 @@ export class HTTPBridgeDriver extends AbstractBridgeDriver {
       
       const httpResponse: HTTPResponse = {
         status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
+        headers: Object.fromEntries(response.headers as any),
         body
       }
       

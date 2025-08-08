@@ -48,7 +48,7 @@ export class CLIBridgeDriver extends AbstractBridgeDriver {
   
   protected async onStopListening(): Promise<void> {
     if (this.processingTimer) {
-      clearInterval(this.processingTimer)
+      clearInterval(this.processingTimer as any)
       this.processingTimer = undefined
     }
   }

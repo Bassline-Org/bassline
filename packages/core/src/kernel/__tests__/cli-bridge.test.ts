@@ -245,11 +245,11 @@ describe('CLI Bridge Driver', () => {
   describe('Bridge Lifecycle', () => {
     it('should handle start and stop listening', async () => {
       // Initially should be listening (started by kernel registration)
-      expect(cliDriver.getStats().isListening).toBe(true)
+      expect((await cliDriver.getStats()).isListening).toBe(true)
       
       // Stop listening
       await cliDriver.stopListening()
-      expect(cliDriver.getStats().isListening).toBe(false)
+      expect((await cliDriver.getStats()).isListening).toBe(false)
       
       // Commands should fail when not listening
       await expect(cliDriver.sendCommand({
@@ -261,7 +261,7 @@ describe('CLI Bridge Driver', () => {
       
       // Start listening again
       await cliDriver.startListening()
-      expect(cliDriver.getStats().isListening).toBe(true)
+      expect((await cliDriver.getStats()).isListening).toBe(true)
       
       // Commands should work again
       await expect(cliDriver.sendCommand({
@@ -288,14 +288,14 @@ describe('CLI Bridge Driver', () => {
         value: 2
       })
       
-      expect(cliDriver.getStats().queueLength).toBeGreaterThan(0)
+      expect((await cliDriver.getStats()).queueLength).toBeGreaterThan(0)
       
       // Shutdown the kernel (which should shutdown all drivers)
       await kernel.shutdown()
       
       // Driver should be stopped and queue cleared
-      expect(cliDriver.getStats().isListening).toBe(false)
-      expect(cliDriver.getStats().queueLength).toBe(0)
+      expect((await cliDriver.getStats()).isListening).toBe(false)
+      expect((await cliDriver.getStats()).queueLength).toBe(0)
     })
   })
   

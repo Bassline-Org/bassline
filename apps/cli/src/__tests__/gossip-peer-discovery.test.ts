@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { GossipLayer } from '../runtime/GossipLayer.js'
+import { GossipLayer } from '../runtime/GossipLayer'
 import { createMemoryStorage } from '@bassline/storage-memory'
 
 describe('Gossip peer discovery', () => {

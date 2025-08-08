@@ -4,6 +4,7 @@
  */
 
 import { NetworkStorage } from '../../storage/interface'
+import type { QueryFilter } from '../../storage/interface'
 import type { StorageCapabilities } from '../driver'
 import type { 
   GroupState, 
@@ -390,6 +391,75 @@ export class MemoryStorageDriver extends NetworkStorage {
     } catch (error: any) {
       throw new DriverError(
         `Failed to delete snapshot: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
+    }
+  }
+  
+  // ============================================================================
+  // Optional NetworkStorage Methods
+  // ============================================================================
+  
+  async queryGroups(
+    networkId: NetworkId,
+    filter: QueryFilter
+  ): Promise<GroupState[]> {
+    try {
+      const storage = this.ensureNetwork(networkId)
+      const groups = Array.from(storage.groups.values())
+      
+      // Apply filters
+      return groups.filter(groupState => {
+        const groupAttrs = groupState.group.attributes
+        
+        if (filter.attributes) {
+          // Check if group attributes match filter
+          for (const [key, value] of Object.entries(filter.attributes)) {
+            if (groupAttrs?.[key] !== value) {
+              return false
+            }
+          }
+        }
+        
+        if (filter.author && groupAttrs?.['author'] !== filter.author) {
+          return false
+        }
+        
+        if (filter.type && groupAttrs?.['type'] !== filter.type) {
+          return false
+        }
+        
+        if (filter.tags && filter.tags.length > 0) {
+          const groupTags = groupAttrs?.['tags'] as string[] | undefined
+          if (!groupTags || !filter.tags.every(tag => groupTags.includes(tag))) {
+            return false
+          }
+        }
+        
+        return true
+      })
+    } catch (error: any) {
+      throw new DriverError(
+        `Failed to query groups: ${error.message}`,
+        { fatal: false, originalError: error }
+      )
+    }
+  }
+  
+  async sync(remote: NetworkStorage): Promise<void> {
+    // Memory storage sync - just copy all data from remote
+    try {
+      const networks = await remote.listNetworks()
+      
+      for (const networkId of networks) {
+        const state = await remote.loadNetworkState(networkId)
+        if (state) {
+          await this.saveNetworkState(networkId, state)
+        }
+      }
+    } catch (error: any) {
+      throw new DriverError(
+        `Failed to sync with remote storage: ${error.message}`,
         { fatal: false, originalError: error }
       )
     }

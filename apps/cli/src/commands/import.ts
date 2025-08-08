@@ -1,22 +1,29 @@
 import chalk from 'chalk'
 import ora from 'ora'
-import fs from 'fs/promises'
-import path from 'path'
-import { StandaloneNetwork } from '../runtime/StandaloneNetwork.js'
+import { readFile } from 'fs/promises'
+import { resolve } from 'path'
+import { KernelNetwork } from '../kernel/kernel-network'
+import { MemoryStorageDriver } from '@bassline/core'
 
 export async function importNetwork(file: string, options: { merge: boolean }) {
   const spinner = ora('Reading network file...').start()
   
   try {
     // Read file
-    const filePath = path.resolve(file)
-    const content = await fs.readFile(filePath, 'utf-8')
+    const filePath = resolve(file)
+    const content = await readFile(filePath, 'utf-8')
     const networkData = JSON.parse(content)
     
     spinner.text = 'Initializing network...'
     
-    // Create network
-    const network = new StandaloneNetwork()
+    // Create kernel-based network
+    const network = new KernelNetwork()
+    
+    // Register memory storage driver
+    const storage = new MemoryStorageDriver()
+    await network.registerDriver('storage', storage)
+    
+    // Initialize network
     await network.initialize()
     
     spinner.text = 'Importing network state...'
@@ -38,7 +45,7 @@ export async function importNetwork(file: string, options: { merge: boolean }) {
       console.log(chalk.gray(`  Wires: ${Object.keys(networkData.wires).length}`))
     }
     
-    await network.terminate()
+    await network.shutdown()
     
   } catch (error) {
     spinner.fail(chalk.red('Failed to import network'))

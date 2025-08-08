@@ -28,6 +28,8 @@ export interface BridgeStats {
   queueLength: number
   processed: number
   failed: number
+  pending: number
+  uptime: number
   lastProcessed?: Date
   lastError?: string
 }
@@ -44,18 +46,22 @@ export abstract class AbstractBridgeDriver extends EventEmitter implements Bridg
   protected inputHandler?: (input: ExternalInput) => Promise<void>
   protected isListening = false
   protected stats: BridgeStats
+  protected startTime: number
   
   constructor(config: BridgeConfig) {
     super()
     this.id = config.id || `${config.name}-${Date.now()}`
     this.name = config.name
     this.version = config.version
+    this.startTime = Date.now()
     
     this.stats = {
       isListening: false,
       queueLength: 0,
       processed: 0,
-      failed: 0
+      failed: 0,
+      pending: 0,
+      uptime: 0
     }
     
     if (config.autoStart) {
@@ -132,7 +138,7 @@ export abstract class AbstractBridgeDriver extends EventEmitter implements Bridg
         contactId: change.contactId,
         groupId: change.groupId,
         value: change.value,
-        metadata: change.metadata
+        timestamp: change.timestamp
       })
       
       return { 
@@ -206,8 +212,11 @@ export abstract class AbstractBridgeDriver extends EventEmitter implements Bridg
   /**
    * Get driver statistics
    */
-  getStats(): BridgeStats {
-    return { ...this.stats }
+  async getStats(): Promise<BridgeStats> {
+    return { 
+      ...this.stats,
+      uptime: Date.now() - this.startTime
+    }
   }
   
   // ============================================================================
@@ -257,6 +266,7 @@ export abstract class AbstractBridgeDriver extends EventEmitter implements Bridg
    */
   protected updateQueueLength(length: number): void {
     this.stats.queueLength = length
+    this.stats.pending = length // Queue length represents pending items
   }
   
   // ============================================================================

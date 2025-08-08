@@ -2,13 +2,13 @@
 
 import { Command } from 'commander'
 import chalk from 'chalk'
-import { startServer } from './commands/start.js'
-import { runNetwork } from './commands/run.js'
-import { connectToNetwork } from './commands/connect.js'
-import { exportNetwork } from './commands/export.js'
-import { importNetwork } from './commands/import.js'
-import { createSignalCommand } from './commands/signal.js'
-import { initCommand } from './commands/init.js'
+import { startCommand } from './commands/start-new'
+import { runNetwork } from './commands/run'
+import { connectToNetwork } from './commands/connect'
+import { exportNetwork } from './commands/export'
+import { importNetwork } from './commands/import'
+import { createSignalCommand } from './commands/signal'
+import { initCommand } from './commands/init'
 
 const program = new Command()
 
@@ -29,30 +29,28 @@ program
 program
   .command('start')
   .description('Start a propagation network server')
+  .option('--preset <name>', 'preset configuration to use', 'default')
   .option('-p, --port <port>', 'port to listen on', '8455')
   .option('-n, --name <name>', 'network name', 'default')
+  .option('--list-presets', 'list available presets')
+  .option('-v, --verbose', 'verbose output')
+  // Unix pipes options
+  .option('--jq <filter>', 'jq filter for JSON processing (unix-pipes preset)')
+  .option('--sed <script>', 'sed script for text transformation (unix-pipes preset)')
+  .option('--awk <script>', 'awk script for processing (unix-pipes preset)')
+  .option('--transform <command>', 'custom transform command (unix-pipes preset)')
+  .option('--protocol <type>', 'protocol for IPC: json, line, binary (unix-pipes preset)')
+  // Notification options
+  .option('--filter <pattern>', 'filter notifications by pattern (notifications preset)')
+  .option('--sound <name>', 'notification sound (macOS only)')
+  // Legacy storage options (for backward compatibility)
   .option('--storage <type>', 'storage backend (memory, postgres, filesystem)', 'memory')
   .option('--storage-path <path>', 'filesystem storage path')
   .option('--storage-db <database>', 'postgres database name')
   .option('--storage-host <host>', 'postgres host')
   .action(async (options) => {
-    // Prepare storage options based on type
-    let storageOptions: any = undefined
-    
-    if (options.storage === 'filesystem' && options.storagePath) {
-      storageOptions = { basePath: options.storagePath }
-    } else if (options.storage === 'postgres') {
-      storageOptions = {
-        database: options.storageDb || 'bassline',
-        host: options.storageHost || 'localhost'
-      }
-    }
-    
-    await startServer({
-      ...options,
-      storage: options.storage,
-      storageOptions
-    })
+    // Use new preset-based start command
+    await startCommand(options)
   })
 
 program

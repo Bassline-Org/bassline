@@ -5,12 +5,12 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { BasslineNetwork } from '../bassline/BasslineNetwork.js'
+import { BasslineNetwork } from '../bassline/BasslineNetwork'
 import { createPostgresStorage } from '@bassline/storage-postgres'
 import { createMemoryStorage } from '@bassline/storage-memory'
 import { brand } from '@bassline/core'
 import { Pool } from 'pg'
-import type { Bassline } from '../bassline/types.js'
+import type { Bassline } from '../bassline/types'
 
 describe('Simple Bassline Network', () => {
   let pool: Pool

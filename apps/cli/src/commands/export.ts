@@ -1,15 +1,22 @@
 import chalk from 'chalk'
 import ora from 'ora'
-import fs from 'fs/promises'
-import path from 'path'
-import { StandaloneNetwork } from '../runtime/StandaloneNetwork.js'
+import { writeFile } from 'fs/promises'
+import { resolve } from 'path'
+import { KernelNetwork } from '../kernel/kernel-network'
+import { MemoryStorageDriver } from '@bassline/core'
 
 export async function exportNetwork(file: string, options: { group: string }) {
   const spinner = ora('Connecting to network...').start()
   
   try {
     // For now, create a test network - in real usage this would connect to an existing one
-    const network = new StandaloneNetwork()
+    const network = new KernelNetwork()
+    
+    // Register memory storage driver
+    const storage = new MemoryStorageDriver()
+    await network.registerDriver('storage', storage)
+    
+    // Initialize network
     await network.initialize()
     
     spinner.text = 'Exporting network state...'
@@ -18,8 +25,8 @@ export async function exportNetwork(file: string, options: { group: string }) {
     const state = await network.exportState(options.group)
     
     // Write to file
-    const filePath = path.resolve(file)
-    await fs.writeFile(filePath, JSON.stringify(state, null, 2))
+    const filePath = resolve(file)
+    await writeFile(filePath, JSON.stringify(state, null, 2))
     
     spinner.succeed(chalk.green(`Network exported to ${file}`))
     
@@ -36,7 +43,7 @@ export async function exportNetwork(file: string, options: { group: string }) {
       console.log(chalk.gray(`  Wires: ${Object.keys(state.wires).length}`))
     }
     
-    await network.terminate()
+    await network.shutdown()
     
   } catch (error) {
     spinner.fail(chalk.red('Failed to export network'))

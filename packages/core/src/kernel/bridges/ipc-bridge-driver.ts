@@ -80,7 +80,7 @@ export class IPCBridgeDriver extends AbstractBridgeDriver {
   
   constructor(config: IPCBridgeConfig) {
     super({
-      id: config.id,
+      id: config.id || 'ipc-bridge',
       name: 'ipc-bridge',
       version: '1.0.0'
     })
@@ -102,7 +102,7 @@ export class IPCBridgeDriver extends AbstractBridgeDriver {
       stdin: config.stdin,
       stdout: config.stdout,
       stderr: config.stderr,
-      id: config.id
+      id: config.id || 'ipc-bridge'
     }
   }
   
@@ -170,7 +170,10 @@ export class IPCBridgeDriver extends AbstractBridgeDriver {
         }
         
       default:
-        return { status: 'error', error: `Unknown command: ${(command as any).type}` }
+        throw new DriverError(
+          `Unknown command: ${(command as any).type}`,
+          { fatal: false }
+        )
     }
   }
   

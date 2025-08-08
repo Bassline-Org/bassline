@@ -1,22 +1,29 @@
 import chalk from 'chalk'
 import ora from 'ora'
-import fs from 'fs/promises'
-import path from 'path'
-import { StandaloneNetwork } from '../runtime/StandaloneNetwork.js'
+import { readFile, watch } from 'fs/promises'
+import { resolve } from 'path'
+import { KernelNetwork } from '../kernel/kernel-network'
+import { MemoryStorageDriver } from '@bassline/core'
 
 export async function runNetwork(file: string, options: { watch: boolean; scheduler: string }) {
   const spinner = ora('Loading network file...').start()
   
   try {
     // Read network file
-    const filePath = path.resolve(file)
-    const content = await fs.readFile(filePath, 'utf-8')
+    const filePath = resolve(file)
+    const content = await readFile(filePath, 'utf-8')
     const networkData = JSON.parse(content)
     
     spinner.text = 'Initializing network...'
     
-    // Create network
-    const network = new StandaloneNetwork()
+    // Create kernel-based network with memory storage
+    const network = new KernelNetwork()
+    
+    // Register memory storage driver
+    const storage = new MemoryStorageDriver()
+    await network.registerDriver('storage', storage)
+    
+    // Initialize with specified scheduler
     await network.initialize(options.scheduler as 'immediate' | 'batch')
     
     // Import network state
@@ -38,7 +45,7 @@ export async function runNetwork(file: string, options: { watch: boolean; schedu
       console.log(chalk.gray(`\nWatching ${file} for changes...`))
       
       let reloadTimeout: NodeJS.Timeout | null = null
-      const watcher = fs.watch(filePath)
+      const watcher = watch(filePath)
       
       for await (const event of watcher) {
         if (event.eventType === 'change') {
@@ -46,7 +53,7 @@ export async function runNetwork(file: string, options: { watch: boolean; schedu
           reloadTimeout = setTimeout(async () => {
             console.log(chalk.yellow('\nFile changed, reloading...'))
             try {
-              const newContent = await fs.readFile(filePath, 'utf-8')
+              const newContent = await readFile(filePath, 'utf-8')
               const newData = JSON.parse(newContent)
               await network.importState(newData)
               console.log(chalk.green('Network reloaded'))
@@ -63,7 +70,7 @@ export async function runNetwork(file: string, options: { watch: boolean; schedu
     // Handle shutdown
     process.on('SIGINT', async () => {
       console.log(chalk.yellow('\nShutting down...'))
-      await network.terminate()
+      await network.shutdown()
       process.exit(0)
     })
     

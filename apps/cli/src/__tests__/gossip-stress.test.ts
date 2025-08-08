@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { GossipLayer } from '../runtime/GossipLayer.js'
+import { GossipLayer } from '../runtime/GossipLayer'
 import { createFilesystemStorage } from '@bassline/storage-filesystem'
 import { createMemoryStorage } from '@bassline/storage-memory'
 import * as fs from 'fs/promises'

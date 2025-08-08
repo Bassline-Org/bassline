@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { BasslineNetwork } from '../bassline/BasslineNetwork.js'
-import { BasslineGossip } from '../bassline/BasslineGossip.js'
+import { BasslineNetwork } from '../bassline/BasslineNetwork'
+import { BasslineGossip } from '../bassline/BasslineGossip'
 import { createMemoryStorage } from '@bassline/storage-memory'
 import { brand } from '@bassline/core'
-import type { Bassline, GroupSpec, ContactSpec, WireSpec } from '../bassline/types.js'
+import type { Bassline, GroupSpec, ContactSpec, WireSpec } from '../bassline/types'
 
 describe('Bassline Network Convergence', () => {
   let nodes: BasslineNetwork[] = []

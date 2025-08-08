@@ -60,26 +60,26 @@ export class WebSocketBridgeDriver extends AbstractBridgeDriver {
   
   constructor(config: WebSocketBridgeConfig) {
     super({
-      id: config.id,
+      id: config.id || 'websocket-bridge',
       name: 'websocket-bridge',
       version: '1.0.0'
     })
     
     this.config = {
       url: config.url,
-      room: config.room,
+      room: config.room || 'default',
       reconnect: config.reconnect ?? true,
       reconnectDelay: config.reconnectDelay ?? 1000,
       maxReconnectDelay: config.maxReconnectDelay ?? 30000,
       reconnectDecay: config.reconnectDecay ?? 1.5,
       heartbeatInterval: config.heartbeatInterval ?? 30000,
       queueSize: config.queueSize ?? 1000,
-      protocols: config.protocols,
+      protocols: config.protocols ?? [],
       headers: config.headers ?? {},
-      id: config.id
+      id: config.id || 'websocket-bridge'
     }
     
-    this.room = config.room
+    this.room = config.room || 'default'
   }
   
   // ============================================================================
@@ -119,10 +119,11 @@ export class WebSocketBridgeDriver extends AbstractBridgeDriver {
         }
         
         // Set up close handler
-        const existingHandler = this.ws.onclose
-        this.ws.onclose = (event) => {
+        const ws = this.ws
+        const existingHandler = ws.onclose
+        ws.onclose = (event) => {
           if (existingHandler) {
-            existingHandler.call(this.ws, event)
+            existingHandler.call(ws, event)
           }
           onClose()
         }
@@ -210,7 +211,10 @@ export class WebSocketBridgeDriver extends AbstractBridgeDriver {
         }
         
       default:
-        return { status: 'error', error: `Unknown command: ${(command as any).type}` }
+        throw new DriverError(
+          `Unknown command: ${(command as any).type}`,
+          { fatal: false }
+        )
     }
   }
   
@@ -235,13 +239,13 @@ export class WebSocketBridgeDriver extends AbstractBridgeDriver {
       if (isNode) {
         // Node.js environment - use ws package
         const WebSocketImpl = await import('ws').then(m => m.default)
-        this.ws = new WebSocketImpl(this.config.url, {
-          protocols: this.config.protocols,
+        const protocols = Array.isArray(this.config.protocols) ? this.config.protocols : (this.config.protocols ? [this.config.protocols] : undefined)
+        this.ws = new WebSocketImpl(this.config.url, protocols, {
           headers: this.config.headers
         }) as any
       } else {
         // Browser environment
-        this.ws = new WebSocket(this.config.url, this.config.protocols)
+        this.ws = new WebSocket(this.config.url, this.config.protocols as string | string[])
       }
       
       this.setupEventHandlers()
@@ -314,8 +318,8 @@ export class WebSocketBridgeDriver extends AbstractBridgeDriver {
       
       // Attempt reconnection if configured and not explicitly closed
       if (this.config.reconnect && 
-          this.connectionState !== ConnectionState.CLOSING &&
-          this.connectionState !== ConnectionState.CLOSED &&
+          (this.connectionState === ConnectionState.DISCONNECTED ||
+           this.connectionState === ConnectionState.CONNECTED) &&
           !event.wasClean) {
         this.scheduleReconnect()
       }

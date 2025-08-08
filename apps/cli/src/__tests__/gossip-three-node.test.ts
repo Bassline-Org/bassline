@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { GossipLayer } from '../runtime/GossipLayer.js'
+import { GossipLayer } from '../runtime/GossipLayer'
 import { createPostgresStorage } from '@bassline/storage-postgres'
 import { createFilesystemStorage } from '@bassline/storage-filesystem'
 import { createRemoteWebSocketStorage } from '@bassline/storage-remote'

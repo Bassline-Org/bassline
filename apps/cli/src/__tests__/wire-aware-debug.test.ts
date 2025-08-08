@@ -5,7 +5,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { brand } from '@bassline/core'
-import type { Bassline } from '../bassline/types.js'
+import type { Bassline } from '../bassline/types'
 
 describe('Wire-aware convergence debugging', () => {
   

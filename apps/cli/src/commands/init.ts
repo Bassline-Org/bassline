@@ -320,11 +320,13 @@ async function createInstallationFiles(answers: InitAnswers) {
   
   // Create bin wrapper
   const binContent = `#!/usr/bin/env ${typescript ? 'tsx' : 'node'}
-import { CLI } from '@bassline/cli/runtime'
-import installation from '../index.${typescript ? 'ts' : 'js'}'
+// Bassline CLI wrapper
+// This would typically import the bassline CLI and run with your configuration
+import { execSync } from 'child_process'
 
-const cli = new CLI(installation)
-cli.run(process.argv)
+// For now, just proxy to the global bassline command
+const args = process.argv.slice(2).join(' ')
+execSync(\`bassline \${args}\`, { stdio: 'inherit' })
 `
   
   const binPath = path.join(installPath, 'bin', 'bassline')

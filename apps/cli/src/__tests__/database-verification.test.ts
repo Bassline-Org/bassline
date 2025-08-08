@@ -4,11 +4,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { BasslineNetwork } from '../bassline/BasslineNetwork.js'
-import { BasslineGossip } from '../bassline/BasslineGossip.js'
+import { BasslineNetwork } from '../bassline/BasslineNetwork'
+import { BasslineGossip } from '../bassline/BasslineGossip'
 import { createPostgresStorage } from '@bassline/storage-postgres'
 import { brand } from '@bassline/core'
-import type { Bassline } from '../bassline/types.js'
+import type { Bassline } from '../bassline/types'
 import { Pool } from 'pg'
 
 describe('Database Verification', () => {
