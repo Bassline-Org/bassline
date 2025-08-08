@@ -3,18 +3,16 @@
  * Receives commands from CLI and sends them as external input to the kernel
  */
 
+import { AbstractBridgeDriver } from '../bridge-driver'
 import type {
   ContactChange,
-  DriverResponse,
+  ExternalInput,
   DriverCommand,
   CommandResponse,
-  ExternalInput,
 } from '../types'
-import { DriverError, CommandError } from '../types'
-import type { BridgeDriver } from '../driver'
+import { CommandError } from '../types'
 import type { ContactId, GroupId } from '../../types'
 import { brand } from '../../types'
-import { EventEmitter } from 'events'
 
 export interface CLICommand {
   type: 'set-contact' | 'create-contact' | 'connect' | 'disconnect'
@@ -25,118 +23,70 @@ export interface CLICommand {
   toId?: string
 }
 
-export class CLIBridgeDriver extends EventEmitter implements BridgeDriver {
-  readonly id: string
-  readonly name: string = 'cli-bridge'
-  readonly version: string = '1.0.0'
-  
-  private inputHandler?: (input: ExternalInput) => Promise<void>
-  private isListening = false
+export class CLIBridgeDriver extends AbstractBridgeDriver {
   private commandQueue: CLICommand[] = []
   private processingTimer?: NodeJS.Timer
   
   constructor(options: { id?: string } = {}) {
-    super()
-    this.id = options.id || `cli-bridge-${Date.now()}`
+    super({
+      id: options.id,
+      name: 'cli-bridge',
+      version: '1.0.0'
+    })
   }
   
-  /**
-   * Register the kernel's input handler
-   */
-  setInputHandler(handler: (input: ExternalInput) => Promise<void>): void {
-    this.inputHandler = handler
-  }
+  // ============================================================================
+  // AbstractBridgeDriver Implementation
+  // ============================================================================
   
-  /**
-   * Start listening for CLI commands
-   */
-  async startListening(): Promise<void> {
-    if (this.isListening) {
-      return
-    }
-    
-    this.isListening = true
-    
+  protected async onStartListening(): Promise<void> {
     // Start processing queued commands
     this.processingTimer = setInterval(() => {
       this.processCommandQueue()
     }, 10)
   }
   
-  /**
-   * Stop listening for CLI commands
-   */
-  async stopListening(): Promise<void> {
-    this.isListening = false
-    
+  protected async onStopListening(): Promise<void> {
     if (this.processingTimer) {
       clearInterval(this.processingTimer)
       this.processingTimer = undefined
     }
   }
   
-  /**
-   * Handle a change from the kernel (we don't need to do anything with these)
-   */
-  async handleChange(change: ContactChange): Promise<DriverResponse> {
-    // Bridge drivers typically don't need to handle changes from userspace
-    // They're primarily for external input INTO the system
-    // But we could emit events here if we wanted to notify CLI of changes
-    
-    this.emit('contact-changed', {
-      contactId: change.contactId,
-      groupId: change.groupId,
-      value: change.value
-    })
-    
-    return { status: 'success' }
+  protected async onHandleChange(change: ContactChange): Promise<void> {
+    // CLI bridge doesn't need to do anything special with changes
+    // The base class already emits the 'contact-changed' event
   }
   
-  /**
-   * Handle commands from the kernel
-   */
-  async handleCommand(command: DriverCommand): Promise<CommandResponse> {
-    try {
-      switch (command.type) {
-        case 'initialize':
-          // Nothing special to initialize for CLI bridge
-          return { status: 'success' }
-          
-        case 'shutdown':
-          await this.stopListening()
-          this.commandQueue = []
-          return { status: 'success' }
-          
-        case 'health-check':
-          return { 
-            status: 'success', 
-            data: { 
-              healthy: true,
-              isListening: this.isListening,
-              queueLength: this.commandQueue.length
-            } 
-          }
-          
-        default:
-          throw new CommandError(
-            `Unknown command: ${(command as any).type}`,
-            { canContinue: true }
-          )
-      }
-    } catch (error) {
-      if (error instanceof CommandError) {
-        throw error
-      }
-      throw new CommandError(
-        `Unexpected error handling command: ${command.type}`,
-        { canContinue: false, originalError: error as Error }
-      )
+  protected async onInitialize(): Promise<void> {
+    // Nothing special to initialize for CLI bridge
+  }
+  
+  protected async onShutdown(force: boolean): Promise<void> {
+    // Clear the command queue on shutdown
+    this.commandQueue = []
+    this.updateQueueLength(0)
+  }
+  
+  protected async onHealthCheck(): Promise<boolean> {
+    // CLI bridge is healthy if the timer is running when listening
+    if (this.isListening) {
+      return !!this.processingTimer
     }
+    return true
   }
   
-  async isHealthy(): Promise<boolean> {
-    return this.isListening
+  protected async onHandleCommand(command: DriverCommand): Promise<CommandResponse> {
+    // CLI bridge doesn't have any custom commands
+    throw new CommandError(
+      `Unknown command: ${(command as any).type}`,
+      { canContinue: true }
+    )
   }
+  
+  // ============================================================================
+  // CLI-Specific Public Methods
+  // ============================================================================
   
   /**
    * Public method for CLI to send commands
@@ -149,19 +99,26 @@ export class CLIBridgeDriver extends EventEmitter implements BridgeDriver {
     
     // Queue the command for processing
     this.commandQueue.push(command)
+    this.updateQueueLength(this.commandQueue.length)
   }
+  
+  // ============================================================================
+  // Private Methods
+  // ============================================================================
   
   /**
    * Process queued commands and send them to the kernel
    */
   private async processCommandQueue(): Promise<void> {
-    if (!this.inputHandler || this.commandQueue.length === 0) {
+    if (this.commandQueue.length === 0) {
       return
     }
     
     // Process one command at a time
     const command = this.commandQueue.shift()
     if (!command) return
+    
+    this.updateQueueLength(this.commandQueue.length)
     
     try {
       switch (command.type) {
@@ -182,7 +139,7 @@ export class CLIBridgeDriver extends EventEmitter implements BridgeDriver {
             }
           }
           
-          await this.inputHandler(input)
+          await this.sendInput(input)
           
           // Emit event for CLI feedback
           this.emit('command-processed', {
@@ -216,17 +173,6 @@ export class CLIBridgeDriver extends EventEmitter implements BridgeDriver {
         command: command.type,
         error: error instanceof Error ? error.message : String(error)
       })
-    }
-  }
-  
-  /**
-   * Get statistics about the bridge
-   */
-  getStats() {
-    return {
-      isListening: this.isListening,
-      queueLength: this.commandQueue.length,
-      hasInputHandler: !!this.inputHandler
     }
   }
 }
