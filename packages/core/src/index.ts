@@ -35,17 +35,40 @@ export * from './primitives/control'
 export * from './primitives/array'
 
 // Storage interface
-export * from './storage/interface'
+export type {
+  NetworkStorage,
+  StorageConfig,
+  StorageErrorCode,
+  IStorageError
+} from './storage/interface'
+
+// Storage Driver from kernel
+export type { StorageDriver } from './kernel/driver'
 
 // Serialization system
 export * from './serialization'
 export { serialize, deserialize } from './serialization'
 
 // Network types
-export * from './network-types'
+export type {
+  INetworkError,
+  NetworkErrorCode
+} from './network-types'
 
-// Error handling
-export * from './errors'
+// Error handling (classes)
+export {
+  BasslineError,
+  StorageError,
+  NetworkError,
+  ValidationError,
+  DatabaseError,
+  ConnectionError,
+  TimeoutError,
+  isBasslineError,
+  isStorageError,
+  ensureError,
+  wrapError
+} from './errors'
 
 // Kernel module
 export * from './kernel'

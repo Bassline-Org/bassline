@@ -179,10 +179,10 @@ export interface ExportStateRequest {
 // Response type - success or error
 export interface NetworkResponse<T = any> {
   id: string
-  result: Result<T, NetworkError>
+  result: Result<T, INetworkError>
 }
 
-export interface NetworkError {
+export interface INetworkError {
   code: NetworkErrorCode
   message: string
   details?: unknown
@@ -221,7 +221,7 @@ export interface ReadyNotification {
 
 export interface ErrorNotification {
   type: 'error'
-  error: NetworkError
+  error: INetworkError
 }
 
 export interface StateChangedNotification {
@@ -250,13 +250,13 @@ export interface PeerDisconnectedNotification {
 
 export interface NetworkClient {
   // Send a request and wait for response
-  request<T>(request: NetworkRequest): Promise<Result<T, NetworkError>>
+  request<T>(request: NetworkRequest): Promise<Result<T, INetworkError>>
   
   // Subscribe to notifications
   subscribe(handler: (notification: NetworkNotification) => void): () => void
   
   // Connection management
-  connect(): Promise<Result<void, NetworkError>>
+  connect(): Promise<Result<void, INetworkError>>
   disconnect(): Promise<void>
   isConnected(): boolean
   
@@ -291,7 +291,7 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'err
 
 export interface ConnectionStatus {
   state: ConnectionState
-  error?: NetworkError
+  error?: INetworkError
   lastConnected?: Date
   reconnectAttempts?: number
 }
