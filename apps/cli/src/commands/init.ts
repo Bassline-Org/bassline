@@ -21,7 +21,6 @@ interface InitAnswers {
   installPath: string
   includeExamples: boolean
   storageBackends: string[]
-  transportLayers: string[]
   typescript: boolean
   addToPath: boolean
 }
@@ -30,12 +29,8 @@ const STORAGE_OPTIONS = [
   { name: 'Memory (included)', value: 'memory', included: true },
   { name: 'PostgreSQL', value: 'postgres', package: '@bassline/storage-postgres' },
   { name: 'Filesystem', value: 'filesystem', package: '@bassline/storage-filesystem' },
-]
-
-const TRANSPORT_OPTIONS = [
-  { name: 'Local (included)', value: 'local', included: true },
-  { name: 'WebSocket', value: 'websocket', package: '@bassline/transport-websocket' },
-  { name: 'WebRTC', value: 'webrtc', package: '@bassline/transport-webrtc' },
+  { name: 'SQLite', value: 'sqlite', package: '@bassline/storage-sqlite' },
+  { name: 'Remote', value: 'remote', package: '@bassline/storage-remote' },
 ]
 
 export async function initCommand(options: InitOptions) {
@@ -68,7 +63,6 @@ export async function initCommand(options: InitOptions) {
       installPath: options.path || existingPath,
       includeExamples: false,
       storageBackends: ['memory'],
-      transportLayers: ['local'],
       typescript: true,
       addToPath: true
     }
@@ -78,7 +72,6 @@ export async function initCommand(options: InitOptions) {
       installPath: options.path || existingPath,
       includeExamples: false,
       storageBackends: ['memory'],
-      transportLayers: ['local'],
       typescript: true,
       addToPath: true
     }
@@ -110,13 +103,6 @@ export async function initCommand(options: InitOptions) {
         message: 'Select storage backends:',
         choices: STORAGE_OPTIONS,
         default: ['memory']
-      },
-      {
-        type: 'checkbox',
-        name: 'transportLayers',
-        message: 'Select transport layers:',
-        choices: TRANSPORT_OPTIONS,
-        default: ['local']
       },
       {
         type: 'confirm',
@@ -173,8 +159,8 @@ export async function initCommand(options: InitOptions) {
     console.log(chalk.green.bold('\n✨ Installation complete!\n'))
     console.log('Next steps:')
     console.log(chalk.cyan('  cd ' + answers.installPath))
-    console.log(chalk.cyan('  npm run dev     # Start development mode'))
-    console.log(chalk.cyan('  bassline --help # See available commands'))
+    console.log(chalk.cyan('  npm start       # Start a Bassline server'))
+    console.log(chalk.cyan('  ./bin/bassline --help # See available commands'))
     
     if (answers.addToPath) {
       console.log(chalk.yellow('\n⚠️  Restart your terminal or run:'))
@@ -194,11 +180,9 @@ async function createDirectoryStructure(installPath: string) {
     path.join(installPath, 'bin'),
     path.join(installPath, 'plugins'),
     path.join(installPath, 'plugins/storage'),
-    path.join(installPath, 'plugins/transport'),
     path.join(installPath, 'plugins/gadgets'),
     path.join(installPath, 'basslines'),
     path.join(installPath, 'networks'),
-    path.join(installPath, 'daemon'),
   ]
   
   for (const dir of dirs) {
@@ -207,7 +191,7 @@ async function createDirectoryStructure(installPath: string) {
 }
 
 async function createInstallationFiles(answers: InitAnswers) {
-  const { installPath, includeExamples, storageBackends, transportLayers, typescript } = answers
+  const { installPath, includeExamples, storageBackends, typescript } = answers
   
   // Detect if we're in development (CLI is running from bassline repo)
   const isLocalDevelopment = process.cwd().includes('bassline') || process.env.BASSLINE_DEV === 'true'
@@ -229,18 +213,20 @@ async function createInstallationFiles(answers: InitAnswers) {
   const packageJson = {
     name: 'bassline-user-installation',
     version: '1.0.0',
-    type: 'module',
     private: true,
     scripts: {
+      'start': 'bassline start',
+      'start:server': 'bassline start --preset default',
+      'start:pipes': 'bassline start --preset unix-pipes',
       dev: typescript ? 'tsx watch index.ts' : 'node --watch index.js',
       build: typescript ? 'tsc' : 'echo "No build needed"',
-      test: 'vitest',
-      upgrade: isLocalDevelopment ? 'echo "Using local development packages"' : 'npm update @bassline/core @bassline/installation'
+      test: 'vitest'
     },
     dependencies: {
-      '@bassline/core': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/core` : '^0.1.0',
-      '@bassline/installation': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/installation` : '^0.1.0',
-      '@bassline/storage-memory': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/storage-memory` : '^0.1.0',
+      '@bassline/core': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/core` : 'latest',
+      '@bassline/bassline': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/bassline` : 'latest',
+      '@bassline/storage-memory': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/packages/storage-memory` : 'latest',
+      '@bassline/cli': isLocalDevelopment && basslineRoot ? `file:${basslineRoot}/apps/cli` : 'latest',
       tsx: typescript ? '^4.7.0' : undefined
     } as any,
     devDependencies: typescript ? {
@@ -261,21 +247,7 @@ async function createInstallationFiles(answers: InitAnswers) {
         const packageName = option.package.replace('@bassline/', '')
         packageJson.dependencies[option.package] = `file:${basslineRoot}/packages/${packageName}`
       } else {
-        packageJson.dependencies[option.package] = '^0.1.0'
-      }
-    }
-  }
-  
-  // Add selected transport layers
-  for (const transport of transportLayers) {
-    const option = TRANSPORT_OPTIONS.find(o => o.value === transport)
-    if (option && 'package' in option && option.package) {
-      if (isLocalDevelopment && basslineRoot) {
-        // Convert package name to local path  
-        const packageName = option.package.replace('@bassline/', '')
-        packageJson.dependencies[option.package] = `file:${basslineRoot}/packages/${packageName}`
-      } else {
-        packageJson.dependencies[option.package] = '^0.1.0'
+        packageJson.dependencies[option.package] = 'latest'
       }
     }
   }
@@ -290,9 +262,9 @@ async function createInstallationFiles(answers: InitAnswers) {
     const tsconfig = {
       compilerOptions: {
         target: 'ES2022',
-        module: 'ESNext',
+        module: 'commonjs',
         lib: ['ES2022'],
-        moduleResolution: 'bundler',
+        moduleResolution: 'node',
         esModuleInterop: true,
         skipLibCheck: true,
         forceConsistentCasingInFileNames: true,
@@ -312,21 +284,30 @@ async function createInstallationFiles(answers: InitAnswers) {
   }
   
   // Create main index file
-  const indexContent = generateIndexFile(storageBackends, transportLayers, typescript, includeExamples)
+  const indexContent = generateIndexFile(storageBackends, typescript, includeExamples)
   await fs.writeFile(
     path.join(installPath, typescript ? 'index.ts' : 'index.js'),
     indexContent
   )
   
-  // Create bin wrapper
-  const binContent = `#!/usr/bin/env ${typescript ? 'tsx' : 'node'}
+  // Create bin wrapper that uses the local CLI installation
+  const binContent = `#!/usr/bin/env node
 // Bassline CLI wrapper
-// This would typically import the bassline CLI and run with your configuration
-import { execSync } from 'child_process'
+const { spawn } = require('child_process')
+const path = require('path')
 
-// For now, just proxy to the global bassline command
-const args = process.argv.slice(2).join(' ')
-execSync(\`bassline \${args}\`, { stdio: 'inherit' })
+// Find the CLI binary
+const cliBin = path.join(__dirname, '..', 'node_modules', '@bassline', 'cli', 'dist', 'index.js')
+
+// Pass through all arguments
+const child = spawn('node', [cliBin, ...process.argv.slice(2)], {
+  stdio: 'inherit',
+  env: { ...process.env, BASSLINE_HOME: path.dirname(__dirname) }
+})
+
+child.on('exit', (code) => {
+  process.exit(code || 0)
+})
 `
   
   const binPath = path.join(installPath, 'bin', 'bassline')
@@ -341,52 +322,43 @@ execSync(\`bassline \${args}\`, { stdio: 'inherit' })
 
 function generateIndexFile(
   storageBackends: string[],
-  transportLayers: string[],
   typescript: boolean,
   includeExamples: boolean
 ): string {
   const imports = typescript ? `
-import { BasslineInstallation } from '@bassline/installation'
-import type { StorageFactory, TransportFactory } from '@bassline/installation'
+// Example Bassline configuration file
+// This demonstrates how to configure storage backends and network presets
+import type { StorageDriver } from '@bassline/core/kernel'
 ` : `
-import { BasslineInstallation } from '@bassline/installation'
+// Example Bassline configuration file
+// This demonstrates how to configure storage backends and network presets
 `
   
   const storageConfig = storageBackends.map(backend => {
     if (backend === 'memory') {
       return `    memory: async () => {
-      const { createMemoryStorage } = await import('@bassline/storage-memory')
-      return createMemoryStorage
+      const { MemoryStorageDriver } = await import('@bassline/storage-memory')
+      return new MemoryStorageDriver()
     }`
     } else if (backend === 'postgres') {
       return `    postgres: async () => {
-      const { createPostgresStorage } = await import('@bassline/storage-postgres')
-      return createPostgresStorage
+      const { PostgresStorageDriver } = await import('@bassline/storage-postgres')
+      return new PostgresStorageDriver()
     }`
     } else if (backend === 'filesystem') {
       return `    filesystem: async () => {
-      const { createFilesystemStorage } = await import('@bassline/storage-filesystem')
-      return createFilesystemStorage
+      const { FilesystemStorageDriver } = await import('@bassline/storage-filesystem')
+      return new FilesystemStorageDriver()
     }`
-    }
-    return ''
-  }).filter(Boolean).join(',\n')
-  
-  const transportConfig = transportLayers.map(transport => {
-    if (transport === 'local') {
-      return `    local: async () => {
-      const { LocalTransport } = await import('@bassline/core')
-      return LocalTransport
+    } else if (backend === 'sqlite') {
+      return `    sqlite: async () => {
+      const { SqliteStorageDriver } = await import('@bassline/storage-sqlite')
+      return new SqliteStorageDriver()
     }`
-    } else if (transport === 'websocket') {
-      return `    websocket: async () => {
-      const { WebSocketTransport } = await import('@bassline/transport-websocket')
-      return WebSocketTransport
-    }`
-    } else if (transport === 'webrtc') {
-      return `    webrtc: async () => {
-      const { WebRTCTransport } = await import('@bassline/transport-webrtc')
-      return WebRTCTransport
+    } else if (backend === 'remote') {
+      return `    remote: async () => {
+      const { RemoteStorageDriver } = await import('@bassline/storage-remote')
+      return new RemoteStorageDriver()
     }`
     }
     return ''
@@ -402,42 +374,40 @@ import { BasslineInstallation } from '@bassline/installation'
   return `/**
  * Bassline User Installation Configuration
  * 
- * This file defines your personalized Bassline environment.
- * Add storage backends, transport layers, and basslines as needed.
+ * This file can be used to:
+ * - Configure custom storage backends
+ * - Define network presets
+ * - Add custom gadgets and primitives
+ * 
+ * To start a server: bassline start
+ * To run a network from file: bassline run <file>
+ * To connect to a remote network: bassline connect <url>
  */
 ${imports}
 
-export default new BasslineInstallation({
-  // Storage backends
-  storage: {
+// Example: Custom storage configuration
+export const customStorage = {
 ${storageConfig}
-  },
-  
-  // Transport layers
-  transports: {
-${transportConfig}
-  },
-  
-  // Pre-installed basslines
-${basslinesConfig}
-  
-  // Default configurations
-  defaults: {
-    storage: '${storageBackends[0] || 'memory'}',
-    transport: '${transportLayers[0] || 'local'}',
-    scheduler: 'immediate'
-  },
-  
-  // Lifecycle hooks (optional)
-  hooks: {
-    beforeNetworkStart: async (network) => {
-      console.log(\`Starting network: \${network.id}\`)
+}
+
+// Example: Network configuration${includeExamples ? `
+export const mathNetwork = {
+  name: 'math-example',
+  storage: '${storageBackends[0] || 'memory'}',
+  gadgets: [
+    {
+      name: 'double',
+      primitive: async ({ value }) => ({ result: value * 2 })
     },
-    afterNetworkStart: async (network) => {
-      console.log(\`Network started: \${network.id}\`)
+    {
+      name: 'square',  
+      primitive: async ({ value }) => ({ result: value * value })
     }
-  }
-})
+  ]
+}` : ''}
+
+// The CLI will use the configuration from ~/.bassline/config.json
+// Or you can specify options via command line flags
 `
 }
 
@@ -449,9 +419,9 @@ async function createExampleFiles(installPath: string, typescript: boolean) {
  * Example custom storage backend
  */
 
-${typescript ? "import type { NetworkStorage } from '@bassline/core'" : ''}
+${typescript ? "import type { StorageDriver } from '@bassline/core/kernel'" : ''}
 
-export class CustomStorage${typescript ? ' implements NetworkStorage' : ''} {
+export class CustomStorage${typescript ? ' implements StorageDriver' : ''} {
   async saveContactContent(networkId, groupId, contactId, content) {
     console.log('Saving:', { networkId, groupId, contactId, content })
   }

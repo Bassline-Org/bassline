@@ -2,7 +2,6 @@
   "name": "@bassline/cli",
   "version": "0.1.0",
   "description": "CLI tool for running and managing Bassline propagation networks",
-  "type": "module",
   "bin": {
     "bassline": "./dist/index.js"
   },

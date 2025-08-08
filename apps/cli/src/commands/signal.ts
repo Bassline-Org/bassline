@@ -38,7 +38,7 @@ export function createSignalCommand() {
         
         console.log(`[Signal] Peer connected: ${peerId}`)
         
-        ws.on('message', (data: WebSocket.Data) => {
+        ws.on('message', (data) => {
           try {
             const message = JSON.parse(data.toString())
             handleMessage(connection, message, rooms, connections)

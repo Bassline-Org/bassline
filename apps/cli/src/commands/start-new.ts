@@ -9,7 +9,7 @@ import type { PresetOptions } from '../presets/types'
 export async function startCommand(options: any) {
   // If --list-presets flag is set, show available presets
   if (options.listPresets) {
-    console.log(chalk.blue.bold('\n🎵 Available Bassline Presets:\n'))
+    console.log(chalk.cyan.bold('\n🎵 Available Bassline Presets:\n'))
     
     const presets = listPresets()
     // Remove duplicates (aliases)
@@ -22,12 +22,12 @@ export async function startCommand(options: any) {
     })
     
     for (const preset of unique) {
-      console.log(chalk.cyan(`  ${preset.name.padEnd(15)}`), chalk.gray(preset.description))
+      console.log(chalk.cyan(`  ${preset.name.padEnd(15)}`), chalk.white(preset.description))
     }
     
     console.log('\n' + chalk.yellow('Usage:'))
-    console.log(chalk.gray('  bassline start --preset <name> [options]'))
-    console.log(chalk.gray('  bassline start                 # Uses default preset'))
+    console.log(chalk.white('  bassline start --preset <name> [options]'))
+    console.log(chalk.white('  bassline start                 # Uses default preset'))
     return
   }
   
@@ -43,19 +43,19 @@ export async function startCommand(options: any) {
     const seen = new Set<string>()
     for (const p of presets) {
       if (!seen.has(p.description)) {
-        console.log(chalk.gray(`  - ${p.name}`))
+        console.log(chalk.white(`  - ${p.name}`))
         seen.add(p.description)
       }
     }
     
-    console.log('\n' + chalk.gray('Use --list-presets to see descriptions'))
+    console.log('\n' + chalk.white('Use --list-presets to see descriptions'))
     process.exit(1)
   }
   
   // Show what preset we're using
-  console.log(chalk.blue.bold('\n🎵 Bassline Network'))
-  console.log(chalk.gray(`Using preset: ${chalk.cyan(preset.name)}`))
-  console.log(chalk.gray(`Description: ${preset.description}\n`))
+  console.log(chalk.cyan.bold('\n🎵 Bassline Network'))
+  console.log(chalk.white(`Using preset: ${chalk.cyan(preset.name)}`))
+  console.log(chalk.white(`Description: ${preset.description}\n`))
   
   // Convert old options to new format
   const presetOptions: PresetOptions = {
