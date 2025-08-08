@@ -1,8 +1,8 @@
 /**
  * Bassline Gossip Protocol
  * 
- * Topology-aware gossip that uses Bassline structure to guide synchronization.
- * Prioritizes wire relationships and detects/heals partitions automatically.
+ * Parallel, change-driven propagation following natural Bassline topology.
+ * Only syncs when content changes, using wire relationships for routing.
  */
 
 import { EventEmitter } from 'events'
@@ -23,7 +23,6 @@ interface GossipConfig {
   peerId: string
   bassline: Bassline
   network: BasslineNetwork
-  syncInterval?: number
   heartbeatInterval?: number
 }
 
@@ -32,44 +31,58 @@ export class BasslineGossip extends EventEmitter {
   private server?: WebSocketServer
   private peers = new Map<string, BasslinePeer>()
   
-  // Wire health tracking
-  private wireHealth = new Map<string, WireHealthInfo>()
-  private brokenWires = new Set<string>()
+  // Change-driven sync tracking
+  private peerSubscriptions = new Map<string, Set<string>>() // peer -> contacts they want
+  private contactHashes = new Map<string, string>() // track content changes
+  private wireConnections = new Map<string, Set<string>>() // wire -> interested peers
   
-  // Sync prioritization
-  private syncQueue: SyncTask[] = []
-  private syncInProgress = false
+  // Health tracking (keep for connection management)
+  private brokenWires = new Set<string>()
+  private wireHealth = new Map<string, WireHealthInfo>()
   
   constructor(config: GossipConfig) {
     super()
     this.config = {
-      syncInterval: 5000,
-      heartbeatInterval: 10000,
+      heartbeatInterval: 30000, // Longer heartbeat, less frequent
       ...config
     }
     
-    // Initialize wire health tracking
-    this.initializeWireHealth()
+    // Initialize wire-to-peer mappings
+    this.initializeWireConnections()
   }
   
   /**
    * Start the gossip server
    */
   async start(): Promise<void> {
-    // Start WebSocket server
-    this.server = new WebSocketServer({ port: this.config.port })
-    
-    this.server.on('connection', (ws, req) => {
-      const peerId = req.headers['x-peer-id'] as string || 'unknown'
-      this.handleIncomingPeer(ws, peerId)
+    return new Promise((resolve, reject) => {
+      // Start WebSocket server
+      this.server = new WebSocketServer({ port: this.config.port })
+      
+      this.server.on('connection', (ws, req) => {
+        const peerId = req.headers['x-peer-id'] as string || 'unknown'
+        this.handleIncomingPeer(ws, peerId)
+      })
+      
+      this.server.on('listening', () => {
+        console.log(`[BasslineGossip] Server listening on port ${this.config.port}`)
+        
+        // Only start heartbeat - no periodic sync needed
+        this.startHeartbeat()
+        
+        // Listen for contact changes from the network
+        this.config.network.on('contact.updated', (event) => {
+          this.onContactUpdated(event.contactId, event.content)
+        })
+        
+        resolve()
+      })
+      
+      this.server.on('error', (err) => {
+        console.error(`[BasslineGossip] Server error on port ${this.config.port}:`, err)
+        reject(err)
+      })
     })
-    
-    console.log(`[BasslineGossip] Server listening on port ${this.config.port}`)
-    
-    // Start sync and heartbeat timers
-    this.startPeriodicSync()
-    this.startHeartbeat()
-    this.startWireHealthCheck()
   }
   
   /**
@@ -151,11 +164,7 @@ export class BasslineGossip extends EventEmitter {
     // 2. Share ownership information
     await this.shareOwnership(peer)
     
-    // 3. Check for partition healing
-    this.checkPartitionHealing(peer)
-    
-    // 4. Start wire-aware sync
-    this.scheduleWireSync(peer)
+    // Note: Subscriptions and initial state will be set up when we receive their ownership
     
     this.emit('peer.connected', peer)
   }
@@ -207,6 +216,8 @@ export class BasslineGossip extends EventEmitter {
       }
     }
     
+    console.log(`[BasslineGossip] Sharing ownership with ${peer.id}: ${ownedGroups.length} groups, ${ownedContacts.length} contacts`)
+    
     this.sendToPeer(peer, {
       type: 'group-ownership',
       groups: ownedGroups,
@@ -249,130 +260,123 @@ export class BasslineGossip extends EventEmitter {
   }
   
   /**
-   * Schedule wire-aware synchronization
+   * Set up wire-based subscriptions for a peer
    */
-  private scheduleWireSync(peer: BasslinePeer): void {
-    // Find wires connecting us to this peer
-    const relevantWires: WireSpec[] = []
+  private setupWireSubscriptions(peer: BasslinePeer): void {
+    const subscriptions = new Set<string>()
     
+    // Get the groups we own vs the groups they own
+    const ourGroups = this.config.network['localGroups'] as Set<string>
+    const theirGroups = peer.ownedGroups
+    
+    // Find contacts this peer should receive based on wire topology
     for (const [wireId, wire] of this.config.bassline.topology.wires) {
-      const weHaveFrom = this.hasContact(wire.fromId)
-      const weHaveTo = this.hasContact(wire.toId)
-      const theyHaveFrom = peer.ownedContacts.has(wire.fromId)
-      const theyHaveTo = peer.ownedContacts.has(wire.toId)
+      const fromContact = this.config.bassline.topology.contacts.get(wire.fromId)
+      const toContact = this.config.bassline.topology.contacts.get(wire.toId)
       
-      // This wire connects us
-      if ((weHaveFrom && theyHaveTo) || (weHaveTo && theyHaveFrom)) {
-        relevantWires.push(wire)
+      if (!fromContact || !toContact) continue
+      
+      const weOwnFrom = ourGroups.has(fromContact.groupId)
+      const weOwnTo = ourGroups.has(toContact.groupId)
+      const theyOwnFrom = theirGroups.has(fromContact.groupId)
+      const theyOwnTo = theirGroups.has(toContact.groupId)
+      
+      // If we own the source and they own the destination, they need updates from us
+      if (weOwnFrom && theyOwnTo) {
+        subscriptions.add(wire.fromId)
+      }
+      // If we own the destination and they own the source, we might send them updates
+      if (weOwnTo && theyOwnFrom) {
+        subscriptions.add(wire.toId)
       }
     }
     
-    // Sort by priority
-    relevantWires.sort((a, b) => (b.priority || 0) - (a.priority || 0))
-    
-    // Schedule sync tasks
-    for (const wire of relevantWires) {
-      this.syncQueue.push({
-        type: 'wire',
-        wireId: wire.id,
-        peer: peer.id,
-        priority: wire.priority || 1
-      })
-    }
-    
-    // Process queue
-    this.processSync()
+    this.peerSubscriptions.set(peer.id, subscriptions)
+    console.log(`[BasslineGossip] Peer ${peer.id} subscribed to ${subscriptions.size} contacts based on group ownership`)
   }
   
   /**
-   * Process sync queue
+   * Send initial state for contacts a peer needs (one-time on connection)
    */
-  private async processSync(): Promise<void> {
-    if (this.syncInProgress || this.syncQueue.length === 0) return
+  private async sendInitialState(peer: BasslinePeer): Promise<void> {
+    const subscriptions = this.peerSubscriptions.get(peer.id)
+    if (!subscriptions) return
     
-    this.syncInProgress = true
+    const initialUpdates: any[] = []
     
-    // Sort by priority
-    this.syncQueue.sort((a, b) => b.priority - a.priority)
-    
-    // Process top task
-    const task = this.syncQueue.shift()!
-    
-    try {
-      if (task.type === 'wire') {
-        await this.syncWire(task.wireId, task.peer)
-      } else if (task.type === 'contact') {
-        await this.syncContact(task.contactId, task.peer)
+    for (const contactId of subscriptions) {
+      const content = await this.getContent(contactId)
+      if (content !== null) {
+        const hash = this.hashContent(content)
+        this.contactHashes.set(contactId, hash)
+        
+        initialUpdates.push({
+          contactId,
+          content,
+          hash
+        })
       }
-    } catch (error) {
-      console.error('[BasslineGossip] Sync error:', error)
     }
     
-    this.syncInProgress = false
-    
-    // Process next
-    if (this.syncQueue.length > 0) {
-      setTimeout(() => this.processSync(), 100)
-    }
-  }
-  
-  /**
-   * Sync a wire between peers
-   */
-  private async syncWire(wireId: string, peerId: string): Promise<void> {
-    const wire = this.config.bassline.topology.wires.get(wireId)
-    if (!wire) return
-    
-    const peer = this.peers.get(peerId)
-    if (!peer) return
-    
-    // Get content for both ends
-    const fromContent = await this.getContent(wire.fromId)
-    const toContent = await this.getContent(wire.toId)
-    
-    // Send wire sync command
-    this.sendToPeer(peer, {
-      type: 'wire-sync',
-      wireId,
-      fromContent,
-      toContent
-    })
-    
-    // Update wire health
-    this.updateWireHealth(wireId, true)
-  }
-  
-  /**
-   * Sync a specific contact
-   */
-  private async syncContact(contactId: string, peerId: string): Promise<void> {
-    const peer = this.peers.get(peerId)
-    if (!peer) return
-    
-    const content = await this.getContent(contactId)
-    if (content !== null) {
+    if (initialUpdates.length > 0) {
       this.sendToPeer(peer, {
-        type: 'content-update',
-        contactId,
-        content,
-        hash: this.hashContent(content)
+        type: 'initial-state',
+        updates: initialUpdates
       })
+      console.log(`[BasslineGossip] Sent initial state: ${initialUpdates.length} contacts to ${peer.id}`)
     }
   }
   
   /**
-   * Initialize wire health tracking
+   * Handle contact update from local network - this is the main sync trigger
    */
-  private initializeWireHealth(): void {
-    for (const [wireId, wire] of this.config.bassline.topology.wires) {
-      this.wireHealth.set(wireId, {
-        wireId,
-        health: 1.0,
-        lastSuccessfulSync: Date.now(),
-        failureCount: 0,
-        required: wire.required || false
-      })
+  private async onContactUpdated(contactId: string, content: any): Promise<void> {
+    const newHash = this.hashContent(content)
+    const oldHash = this.contactHashes.get(contactId)
+    
+    // Only propagate if content actually changed
+    if (newHash === oldHash) return
+    
+    this.contactHashes.set(contactId, newHash)
+    
+    // Find all peers who are subscribed to this contact
+    const interestedPeers: BasslinePeer[] = []
+    
+    for (const [peerId, subscriptions] of this.peerSubscriptions) {
+      if (subscriptions.has(contactId)) {
+        const peer = this.peers.get(peerId)
+        if (peer) interestedPeers.push(peer)
+      }
     }
+    
+    // Send update to all interested peers in parallel
+    await Promise.all(interestedPeers.map(peer => 
+      this.sendContactUpdate(peer, contactId, content, newHash)
+    ))
+    
+    if (interestedPeers.length > 0) {
+      console.log(`[BasslineGossip] Propagated ${contactId} to ${interestedPeers.length} peers`)
+    }
+  }
+  
+  /**
+   * Send a contact update to a specific peer
+   */
+  private async sendContactUpdate(peer: BasslinePeer, contactId: string, content: any, hash: string): Promise<void> {
+    this.sendToPeer(peer, {
+      type: 'content-update',
+      contactId,
+      content,
+      hash
+    })
+  }
+  
+  /**
+   * Initialize wire-to-peer connection mappings
+   */
+  private initializeWireConnections(): void {
+    // This will be populated as peers connect and we learn their ownership
+    console.log(`[BasslineGossip] Initialized wire connections for ${this.config.bassline.topology.wires.size} wires`)
   }
   
   /**
@@ -451,32 +455,19 @@ export class BasslineGossip extends EventEmitter {
       const wire = this.config.bassline.topology.wires.get(wireId)
       if (!wire) continue
       
-      // Add high-priority sync tasks
+      // Request immediate sync for contacts involved in this wire
       for (const peer of this.peers.values()) {
         if (peer.ownedContacts.has(wire.fromId) || peer.ownedContacts.has(wire.toId)) {
-          this.syncQueue.unshift({
-            type: 'wire',
-            wireId,
-            peer: peer.id,
-            priority: 100  // High priority
+          this.sendCommand(peer, {
+            type: 'sync-request',
+            contacts: [wire.fromId, wire.toId]
           })
         }
       }
     }
-    
-    this.processSync()
   }
   
-  // Periodic tasks
-  
-  private startPeriodicSync(): void {
-    setInterval(() => {
-      // Sync based on wire priority
-      for (const peer of this.peers.values()) {
-        this.scheduleWireSync(peer)
-      }
-    }, this.config.syncInterval!)
-  }
+  // Connection management only - no periodic sync needed
   
   private startHeartbeat(): void {
     setInterval(() => {
@@ -495,22 +486,6 @@ export class BasslineGossip extends EventEmitter {
     }, this.config.heartbeatInterval!)
   }
   
-  private startWireHealthCheck(): void {
-    setInterval(() => {
-      this.detectBrokenWires()
-      
-      // Report health status
-      const totalWires = this.wireHealth.size
-      const healthyWires = Array.from(this.wireHealth.values())
-        .filter(w => w.health > 0.7).length
-      
-      console.log(`[BasslineGossip] Wire health: ${healthyWires}/${totalWires} healthy`)
-      
-      if (this.brokenWires.size > 0) {
-        console.log(`[BasslineGossip] Broken wires: ${Array.from(this.brokenWires).join(', ')}`)
-      }
-    }, 10000)  // Every 10 seconds
-  }
   
   // Helper methods
   
@@ -547,6 +522,10 @@ export class BasslineGossip extends EventEmitter {
     }
   }
   
+  private sendCommand(peer: BasslinePeer, message: any): void {
+    this.sendToPeer(peer, message)
+  }
+  
   private broadcast(message: any): void {
     for (const peer of this.peers.values()) {
       this.sendToPeer(peer, message)
@@ -555,8 +534,70 @@ export class BasslineGossip extends EventEmitter {
   
   private handleMessage(peer: BasslinePeer, message: any): void {
     peer.lastSeen = Date.now()
-    // Forward to network for handling
-    this.config.network['handleCommand'](peer, message)
+    
+    switch (message.type) {
+      case 'group-ownership':
+        this.handleGroupOwnership(peer, message)
+        break
+      
+      case 'initial-state':
+        this.handleInitialState(peer, message)
+        break
+      
+      case 'content-update':
+        this.handleContentUpdate(peer, message)
+        break
+        
+      case 'heartbeat':
+        // Just update lastSeen (already done above)
+        break
+        
+      default:
+        // Forward other message types to network for handling
+        this.config.network['handleCommand']?.(peer, message)
+    }
+  }
+  
+  private handleGroupOwnership(peer: BasslinePeer, message: any): void {
+    // Update peer's ownership info
+    message.groups.forEach((g: string) => peer.ownedGroups.add(g))
+    message.contacts.forEach((c: string) => peer.ownedContacts.add(c))
+    
+    console.log(`[BasslineGossip] Received ownership from ${peer.id}: ${message.groups.length} groups, ${message.contacts.length} contacts`)
+    
+    // Now that we have their ownership info, set up subscriptions
+    this.setupWireSubscriptions(peer)
+    
+    // Send initial state for contacts they need
+    this.sendInitialState(peer)
+  }
+  
+  private handleInitialState(peer: BasslinePeer, message: any): void {
+    // Handle batch of initial state updates
+    for (const update of message.updates) {
+      this.applyRemoteUpdate(update.contactId, update.content, update.hash)
+    }
+    console.log(`[BasslineGossip] Received initial state: ${message.updates.length} contacts from ${peer.id}`)
+  }
+  
+  private handleContentUpdate(peer: BasslinePeer, message: any): void {
+    this.applyRemoteUpdate(message.contactId, message.content, message.hash)
+  }
+  
+  private applyRemoteUpdate(contactId: string, content: any, hash: string): void {
+    const currentHash = this.contactHashes.get(contactId)
+    
+    // Only apply if this is actually new content
+    if (currentHash === hash) return
+    
+    // Update our local content and hash tracking
+    this.contactHashes.set(contactId, hash)
+    this.config.network['localContent'].set(contactId, content)
+    
+    // Trigger local propagation without re-broadcasting
+    this.config.network['runtime'].scheduleUpdate(contactId, content)
+    
+    console.log(`[BasslineGossip] Applied remote update: ${contactId}`)
   }
   
   private updateWireHealthOnDisconnect(peer: BasslinePeer): void {
@@ -577,8 +618,12 @@ export class BasslineGossip extends EventEmitter {
       peer.connection?.close()
     }
     
-    // Close server
-    this.server?.close()
+    // Close server and wait for it to finish
+    if (this.server) {
+      await new Promise<void>((resolve) => {
+        this.server!.close(() => resolve())
+      })
+    }
     
     this.removeAllListeners()
   }

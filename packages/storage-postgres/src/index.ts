@@ -24,7 +24,14 @@ import type {
   SnapshotId,
   Serializable
 } from '@bassline/core'
-import { brand, serialize, deserialize } from '@bassline/core'
+import { 
+  brand, 
+  serialize, 
+  deserialize,
+  DatabaseError,
+  StorageError,
+  ValidationError
+} from '@bassline/core'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -91,13 +98,20 @@ export class PostgresStorage implements NetworkStorage {
     let client: PoolClient | null = null
     
     try {
+      console.log('[PostgreSQL] Attempting to get pool connection...')
       client = await this.pool.connect()
+      console.log('[PostgreSQL] Got pool connection')
       const result = await operation(client)
+      console.log('[PostgreSQL] Operation completed successfully')
       return { ok: true, value: result }
     } catch (error: any) {
+      console.error('[PostgreSQL] Error in withClient:', error.message)
       return this.handleError(error)
     } finally {
-      client?.release()
+      if (client) {
+        console.log('[PostgreSQL] Releasing pool connection')
+        client.release()
+      }
     }
   }
   
@@ -118,6 +132,11 @@ export class PostgresStorage implements NetworkStorage {
   }
   
   private handleError(error: any): Result<never, StorageError> {
+    // Log the error loudly but return Result for proper error handling
+    console.error('[PostgreSQL] DATABASE ERROR:', error.message || error)
+    console.error('[PostgreSQL] Error code:', error.code)
+    console.error('[PostgreSQL] Stack:', error.stack)
+    
     // PostgreSQL specific error handling
     if (error.code === '23503') { // Foreign key violation
       return {
@@ -184,16 +203,39 @@ export class PostgresStorage implements NetworkStorage {
     contactId: ContactId, 
     content: Serializable<T>
   ): Promise<Result<void, StorageError>> {
+    console.log(`[PostgreSQL] saveContactContent called for ${networkId}/${groupId}/${contactId}`)
+    console.log(`[PostgreSQL] Content to save:`, JSON.stringify(content).slice(0, 100))
+    
     return this.withClient(async (client) => {
+      console.log(`[PostgreSQL] Got database client for ${contactId}`)
       // Check content size limit
       const serializedContent = serialize.any(content)
       const contentSize = Buffer.byteLength(JSON.stringify(serializedContent))
       
       if (contentSize > this.limits.maxContactContentBytes) {
-        throw new Error(
-          `Contact content size (${contentSize} bytes) exceeds limit (${this.limits.maxContactContentBytes} bytes)`
+        throw new ValidationError(
+          `Contact content size (${contentSize} bytes) exceeds limit (${this.limits.maxContactContentBytes} bytes)`,
+          'content',
+          contentSize
         )
       }
+      
+      // Ensure network exists (auto-create if needed for parallel updates)
+      await client.query(`
+        INSERT INTO bassline_networks (id, name, description)
+        VALUES ($1, $1, 'Auto-created network')
+        ON CONFLICT (id) DO NOTHING
+      `, [networkId])
+      
+      // Ensure group exists (auto-create if needed for parallel updates)
+      await client.query(`
+        INSERT INTO bassline_groups (
+          network_id, group_id, name, group_type, 
+          primitive_type, inputs, outputs
+        )
+        VALUES ($1, $2, $2, 'standard', NULL, '[]'::jsonb, '[]'::jsonb)
+        ON CONFLICT (network_id, group_id) DO NOTHING
+      `, [networkId, groupId])
       
       // Check group contact limit for new contacts
       const existingContact = await client.query(`
@@ -208,18 +250,44 @@ export class PostgresStorage implements NetworkStorage {
         `, [networkId, groupId])
         
         if (parseInt(contactCount.rows[0].count) >= this.limits.maxContactsPerGroup) {
-          throw new Error(
-            `Group contact limit (${this.limits.maxContactsPerGroup}) exceeded`
+          throw new ValidationError(
+            `Group contact limit (${this.limits.maxContactsPerGroup}) exceeded`,
+            'contactCount',
+            parseInt(contactCount.rows[0].count)
           )
         }
       }
       
-      await client.query(`
+      console.log(`[PostgreSQL] About to INSERT/UPDATE contact ${contactId}`)
+      console.log(`[PostgreSQL] Parameters:`, { contactId, networkId, groupId, contentLength: JSON.stringify(serializedContent).length })
+      
+      const result = await client.query(`
         INSERT INTO bassline_contacts (contact_id, network_id, group_id, content)
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (network_id, group_id, contact_id) 
         DO UPDATE SET content = $4, updated_at = NOW()
+        RETURNING contact_id
       `, [contactId, networkId, groupId, serializedContent])
+      
+      console.log(`[PostgreSQL] Query result for ${contactId}:`, result.rows.length, 'rows')
+      
+      if (!result.rows.length) {
+        throw new DatabaseError(
+          `Failed to save contact ${contactId} to network ${networkId} group ${groupId}`,
+          'INSERT INTO bassline_contacts',
+          [contactId, networkId, groupId, serializedContent]
+        )
+      }
+      
+      console.log(`[PostgreSQL] Successfully saved contact ${contactId} to database`)
+      
+      // Verify it was actually saved
+      const verifyResult = await client.query(`
+        SELECT contact_id FROM bassline_contacts 
+        WHERE network_id = $1 AND group_id = $2 AND contact_id = $3
+      `, [networkId, groupId, contactId])
+      
+      console.log(`[PostgreSQL] Verification for ${contactId}: found ${verifyResult.rows.length} rows`)
     })
   }
   
@@ -249,36 +317,78 @@ export class PostgresStorage implements NetworkStorage {
     state: GroupState
   ): Promise<Result<void, StorageError>> {
     return this.withTransaction(async (client) => {
-      // Create a copy of state without contacts for storage
-      const { contacts, ...stateWithoutContacts } = state
-      const groupMetadata = {
-        ...stateWithoutContacts,
-        contactIds: Array.from(contacts.keys()) // Store just the IDs for reference
-      }
+      // Extract group metadata from state
+      const group = state.group
+      const contacts = state.contacts
+      const boundaryContactIds = group.boundaryContactIds || []
       
-      // Save group metadata (without full contact data)
+      // Save group metadata to normalized table
       await client.query(`
-        INSERT INTO bassline_groups (network_id, group_id, state)
-        VALUES ($1, $2, $3)
+        INSERT INTO bassline_groups (
+          network_id, group_id, name, description, group_type, 
+          boundary_contact_ids, attributes
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (network_id, group_id) 
-        DO UPDATE SET state = $3, updated_at = NOW()
-      `, [networkId, groupId, serialize.any(groupMetadata)])
+        DO UPDATE SET 
+          name = $3, 
+          description = $4, 
+          group_type = $5,
+          boundary_contact_ids = $6, 
+          attributes = $7, 
+          updated_at = NOW()
+      `, [
+        networkId, 
+        groupId, 
+        group.name || null,
+        null, // description - not in current Group type
+        'regular', // group_type - default for now
+        boundaryContactIds,
+        serialize.any({}) // attributes - empty for now
+      ])
       
       // Delete contacts that are no longer in the group
-      await client.query(`
-        DELETE FROM bassline_contacts 
-        WHERE network_id = $1 AND group_id = $2 
-        AND contact_id != ALL($3::text[])
-      `, [networkId, groupId, Array.from(contacts.keys())])
+      const contactIds = Array.from(contacts.keys())
+      if (contactIds.length > 0) {
+        await client.query(`
+          DELETE FROM bassline_contacts 
+          WHERE network_id = $1 AND group_id = $2 
+          AND contact_id != ALL($3::text[])
+        `, [networkId, groupId, contactIds])
+      } else {
+        // Delete all contacts if no contacts in the new state
+        await client.query(`
+          DELETE FROM bassline_contacts 
+          WHERE network_id = $1 AND group_id = $2
+        `, [networkId, groupId])
+      }
       
-      // Save individual contacts to the contacts table
+      // Save individual contacts to the normalized contacts table
       for (const [contactId, contact] of contacts) {
         await client.query(`
-          INSERT INTO bassline_contacts (contact_id, network_id, group_id, content)
-          VALUES ($1, $2, $3, $4)
+          INSERT INTO bassline_contacts (
+            network_id, group_id, contact_id, name, blend_mode,
+            is_boundary, boundary_direction, content
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
           ON CONFLICT (network_id, group_id, contact_id) 
-          DO UPDATE SET content = $4, updated_at = NOW()
-        `, [contactId, networkId, groupId, serialize.any(contact.content)])
+          DO UPDATE SET 
+            name = $4,
+            blend_mode = $5,
+            is_boundary = $6,
+            boundary_direction = $7,
+            content = $8, 
+            updated_at = NOW()
+        `, [
+          networkId, 
+          groupId, 
+          contactId, 
+          contact.name || null,
+          contact.blendMode || 'accept-last',
+          contact.isBoundary || false,
+          contact.boundaryDirection || null,
+          serialize.any(contact.content)
+        ])
       }
     })
   }
@@ -288,9 +398,12 @@ export class PostgresStorage implements NetworkStorage {
     groupId: GroupId
   ): Promise<Result<GroupState | null, StorageError>> {
     return this.withClient(async (client) => {
-      // Load group metadata
+      // Load group metadata from normalized table
       const groupResult = await client.query(`
-        SELECT state FROM bassline_groups 
+        SELECT 
+          name, description, group_type, boundary_contact_ids, attributes,
+          created_at, updated_at
+        FROM bassline_groups 
         WHERE network_id = $1 AND group_id = $2
       `, [networkId, groupId])
       
@@ -298,29 +411,66 @@ export class PostgresStorage implements NetworkStorage {
         return null
       }
       
-      const groupMetadata = groupResult.rows[0].state
+      const groupRow = groupResult.rows[0]
       
-      // Load all contacts for this group
+      // Load all contacts for this group from normalized table
       const contactsResult = await client.query(`
-        SELECT contact_id, content 
+        SELECT 
+          contact_id, name, blend_mode, is_boundary, boundary_direction, 
+          content, content_hash, created_at, updated_at
         FROM bassline_contacts 
         WHERE network_id = $1 AND group_id = $2
+        ORDER BY contact_id
       `, [networkId, groupId])
       
-      // Reconstruct the full group state
+      // Reconstruct contacts map
       const contacts = new Map()
       for (const row of contactsResult.rows) {
         contacts.set(row.contact_id, {
-          content: deserialize.any(row.content)
+          id: row.contact_id,
+          name: row.name,
+          blendMode: row.blend_mode,
+          isBoundary: row.is_boundary,
+          boundaryDirection: row.boundary_direction,
+          content: deserialize.any(row.content),
+          groupId: groupId // Add groupId for consistency
         })
       }
       
-      // Remove contactIds from metadata and add actual contacts
-      const { contactIds, ...stateWithoutIds } = groupMetadata
+      // Load wires that involve this group
+      const wiresResult = await client.query(`
+        SELECT 
+          wire_id, from_contact_id, from_group_id, to_contact_id, to_group_id,
+          wire_type, priority, attributes
+        FROM bassline_wires 
+        WHERE network_id = $1 AND (from_group_id = $2 OR to_group_id = $2)
+        ORDER BY wire_id
+      `, [networkId, groupId])
       
+      const wires = new Map()
+      for (const row of wiresResult.rows) {
+        wires.set(row.wire_id, {
+          id: row.wire_id,
+          fromId: row.from_contact_id,
+          toId: row.to_contact_id,
+          type: row.wire_type,
+          priority: row.priority,
+          groupId: row.from_group_id === groupId ? row.from_group_id : row.to_group_id
+        })
+      }
+      
+      // Reconstruct GroupState format
       return {
-        ...stateWithoutIds,
-        contacts
+        group: {
+          id: groupId,
+          name: groupRow.name,
+          contactIds: Array.from(contacts.keys()),
+          wireIds: Array.from(wires.keys()),
+          subgroupIds: [], // TODO: implement subgroups if needed
+          boundaryContactIds: groupRow.boundary_contact_ids || []
+        },
+        contacts,
+        wires
       } as GroupState
     })
   }
@@ -350,12 +500,22 @@ export class PostgresStorage implements NetworkStorage {
     state: NetworkState
   ): Promise<Result<void, StorageError>> {
     return this.withClient(async (client) => {
+      // Save basic network record (no complex state blob needed)
       await client.query(`
-        INSERT INTO bassline_networks (id, state)
-        VALUES ($1, $2)
+        INSERT INTO bassline_networks (id, name, description, attributes)
+        VALUES ($1, $2, $3, $4)
         ON CONFLICT (id) 
-        DO UPDATE SET state = $2, updated_at = NOW()
-      `, [networkId, serialize.networkState(state)])
+        DO UPDATE SET 
+          name = $2,
+          description = $3,
+          attributes = $4,
+          updated_at = NOW()
+      `, [
+        networkId, 
+        null, // name - not in current NetworkState
+        null, // description - not in current NetworkState  
+        serialize.any({}) // attributes - empty for now
+      ])
     })
   }
   
@@ -363,16 +523,61 @@ export class PostgresStorage implements NetworkStorage {
     networkId: NetworkId
   ): Promise<Result<NetworkState | null, StorageError>> {
     return this.withClient(async (client) => {
-      const result = await client.query(`
-        SELECT state FROM bassline_networks 
+      // Check if network exists
+      const networkResult = await client.query(`
+        SELECT id, name, description, attributes FROM bassline_networks 
         WHERE id = $1
       `, [networkId])
       
-      if (result.rows.length === 0) {
+      if (networkResult.rows.length === 0) {
         return null
       }
       
-      return deserialize.networkState(result.rows[0].state)
+      // Load all groups for this network
+      const groupsResult = await client.query(`
+        SELECT group_id FROM bassline_groups 
+        WHERE network_id = $1
+        ORDER BY group_id
+      `, [networkId])
+      
+      // Build groups map by loading each group state
+      const groups = new Map()
+      for (const groupRow of groupsResult.rows) {
+        const groupState = await this.loadGroupState(networkId, brand.groupId(groupRow.group_id))
+        if (groupState.ok && groupState.value) {
+          groups.set(groupRow.group_id, groupState.value)
+        }
+      }
+      
+      // Load all wires for this network 
+      const wiresResult = await client.query(`
+        SELECT 
+          wire_id, from_contact_id, from_group_id, to_contact_id, to_group_id,
+          wire_type, priority, attributes
+        FROM bassline_wires 
+        WHERE network_id = $1
+        ORDER BY wire_id
+      `, [networkId])
+      
+      const wires = new Map()
+      for (const row of wiresResult.rows) {
+        wires.set(row.wire_id, {
+          id: row.wire_id,
+          fromId: row.from_contact_id,
+          toId: row.to_contact_id,
+          type: row.wire_type,
+          priority: row.priority
+        })
+      }
+      
+      // Return NetworkState format
+      return {
+        networkId,
+        groups,
+        wires,
+        currentGroupId: 'root', // Default
+        rootGroupId: 'root' // Default
+      } as NetworkState
     })
   }
   
@@ -410,25 +615,25 @@ export class PostgresStorage implements NetworkStorage {
     })
   }
   
-  // Query Operations with advanced PostgreSQL features
+  // Query Operations with normalized schema
   async queryGroups(
     networkId: NetworkId, 
     filter: QueryFilter
   ): Promise<Result<GroupState[], StorageError>> {
     return this.withClient(async (client) => {
       let query = `
-        SELECT state 
+        SELECT group_id
         FROM bassline_groups 
         WHERE network_id = $1
       `
       const params: any[] = [networkId]
       let paramIndex = 2
       
-      // Build dynamic WHERE clauses using PostgreSQL JSONB operators
+      // Build dynamic WHERE clauses using normalized columns and JSONB attributes
       if (filter.attributes && Object.keys(filter.attributes).length > 0) {
         const attributeConditions = Object.entries(filter.attributes).map(([key, value]) => {
           params.push(key, JSON.stringify(value))
-          return `state->'group'->'attributes'->$${paramIndex++} = $${paramIndex++}::jsonb`
+          return `attributes->$${paramIndex++} = $${paramIndex++}::jsonb`
         })
         query += ` AND (${attributeConditions.join(' AND ')})`
       }
@@ -436,8 +641,8 @@ export class PostgresStorage implements NetworkStorage {
       if (filter.author) {
         params.push(filter.author)
         query += ` AND (
-          state->'group'->'attributes'->>'bassline.author' = $${paramIndex} OR
-          state->'group'->'attributes'->>'author' = $${paramIndex}
+          attributes->>'bassline.author' = $${paramIndex} OR
+          attributes->>'author' = $${paramIndex}
         )`
         paramIndex++
       }
@@ -445,8 +650,9 @@ export class PostgresStorage implements NetworkStorage {
       if (filter.type) {
         params.push(filter.type)
         query += ` AND (
-          state->'group'->'attributes'->>'bassline.type' = $${paramIndex} OR
-          state->'group'->'attributes'->>'type' = $${paramIndex}
+          group_type = $${paramIndex} OR
+          attributes->>'bassline.type' = $${paramIndex} OR
+          attributes->>'type' = $${paramIndex}
         )`
         paramIndex++
       }
@@ -454,8 +660,8 @@ export class PostgresStorage implements NetworkStorage {
       if (filter.tags && filter.tags.length > 0) {
         params.push(filter.tags)
         query += ` AND (
-          state->'group'->'attributes'->'bassline.tags' ?| $${paramIndex}::text[] OR
-          state->'group'->'attributes'->'tags' ?| $${paramIndex}::text[]
+          attributes->'bassline.tags' ?| $${paramIndex}::text[] OR
+          attributes->'tags' ?| $${paramIndex}::text[]
         )`
         paramIndex++
       }
@@ -463,7 +669,17 @@ export class PostgresStorage implements NetworkStorage {
       query += ` ORDER BY updated_at DESC`
       
       const result = await client.query(query, params)
-      return result.rows.map(row => deserialize.groupState(row.state))
+      
+      // Load full group states for matching groups
+      const groupStates: GroupState[] = []
+      for (const row of result.rows) {
+        const groupState = await this.loadGroupState(networkId, brand.groupId(row.group_id))
+        if (groupState.ok && groupState.value) {
+          groupStates.push(groupState.value)
+        }
+      }
+      
+      return groupStates
     })
   }
   
@@ -473,20 +689,21 @@ export class PostgresStorage implements NetworkStorage {
     label?: string
   ): Promise<Result<SnapshotId, StorageError>> {
     return this.withTransaction(async (client) => {
-      // Load current network state
-      const stateResult = await client.query(`
-        SELECT state FROM bassline_networks WHERE id = $1
-      `, [networkId])
-      
-      if (stateResult.rows.length === 0) {
-        throw new Error(`Network ${networkId} not found`)
+      // Load current network state (reconstruct from normalized tables)
+      const networkState = await this.loadNetworkState(networkId)
+      if (!networkState.ok || !networkState.value) {
+        throw new ValidationError(
+          `Network ${networkId} not found`,
+          'networkId',
+          networkId
+        )
       }
       
-      const state = stateResult.rows[0].state // Already an object from JSONB
+      const state = serialize.networkState(networkState.value) // Serialize for snapshot
       const snapshotId = brand.snapshotId(`snapshot-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       
       await client.query(`
-        INSERT INTO bassline_snapshots (snapshot_id, network_id, label, state)
+        INSERT INTO bassline_snapshots (snapshot_id, network_id, label, snapshot_data)
         VALUES ($1, $2, $3, $4)
       `, [snapshotId, networkId, label, state])
       
@@ -500,7 +717,7 @@ export class PostgresStorage implements NetworkStorage {
   ): Promise<Result<NetworkState, StorageError>> {
     try {
       const result = await this.pool.query(`
-        SELECT state FROM bassline_snapshots 
+        SELECT snapshot_data FROM bassline_snapshots 
         WHERE network_id = $1 AND snapshot_id = $2
       `, [networkId, snapshotId])
       
@@ -516,7 +733,7 @@ export class PostgresStorage implements NetworkStorage {
       
       return { 
         ok: true, 
-        value: deserialize.networkState(result.rows[0].state)
+        value: deserialize.networkState(result.rows[0].snapshot_data)
       }
     } catch (error: any) {
       return this.handleError(error)
@@ -529,7 +746,7 @@ export class PostgresStorage implements NetworkStorage {
     return this.withClient(async (client) => {
       const result = await client.query(`
         SELECT snapshot_id, network_id, label, created_at, 
-               pg_column_size(state) as size_bytes
+               pg_column_size(snapshot_data) as size_bytes
         FROM bassline_snapshots 
         WHERE network_id = $1
         ORDER BY created_at DESC
@@ -582,7 +799,11 @@ export class PostgresStorage implements NetworkStorage {
       `, [networkId])
       
       if (result.rows.length === 0) {
-        throw new Error(`Network ${networkId} not found`)
+        throw new ValidationError(
+          `Network ${networkId} not found`,
+          'networkId',
+          networkId
+        )
       }
       
       const row = result.rows[0]
@@ -606,20 +827,33 @@ export class PostgresStorage implements NetworkStorage {
   ): Promise<Result<GroupState[], StorageError>> {
     return this.withClient(async (client) => {
       const result = await client.query(`
-        SELECT state,
-               ts_rank(to_tsvector('english', state->'group'->>'name' || ' ' || 
-                                  COALESCE(state->'group'->'attributes'->>'description', '')), 
+        SELECT group_id,
+               ts_rank(to_tsvector('english', 
+                                  COALESCE(name, '') || ' ' || 
+                                  COALESCE(description, '') || ' ' ||
+                                  COALESCE(attributes->>'description', '')), 
                       plainto_tsquery('english', $2)) as rank
         FROM bassline_groups 
         WHERE network_id = $1 
-          AND to_tsvector('english', state->'group'->>'name' || ' ' || 
-                                    COALESCE(state->'group'->'attributes'->>'description', '')) 
+          AND to_tsvector('english', 
+                         COALESCE(name, '') || ' ' || 
+                         COALESCE(description, '') || ' ' ||
+                         COALESCE(attributes->>'description', '')) 
               @@ plainto_tsquery('english', $2)
         ORDER BY rank DESC, updated_at DESC
         LIMIT 100
       `, [networkId, searchQuery])
       
-      return result.rows.map(row => deserialize.groupState(row.state))
+      // Load full group states for search results
+      const groupStates: GroupState[] = []
+      for (const row of result.rows) {
+        const groupState = await this.loadGroupState(networkId, brand.groupId(row.group_id))
+        if (groupState.ok && groupState.value) {
+          groupStates.push(groupState.value)
+        }
+      }
+      
+      return groupStates
     })
   }
   
@@ -642,11 +876,11 @@ export class PostgresStorage implements NetworkStorage {
       `, [networkId])
       const groupCount = parseInt(groupCountResult.rows[0].count)
       
-      // Get total size (approximate)
+      // Get total size (approximate) 
       const sizeResult = await client.query(`
         SELECT 
           COALESCE(SUM(pg_column_size(content)), 0) as contact_size,
-          COALESCE(SUM(pg_column_size(state)), 0) as group_size
+          COALESCE(SUM(pg_column_size(attributes)), 0) as group_size
         FROM bassline_contacts c
         FULL OUTER JOIN bassline_groups g ON c.network_id = g.network_id
         WHERE COALESCE(c.network_id, g.network_id) = $1

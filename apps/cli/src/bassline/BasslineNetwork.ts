@@ -9,7 +9,8 @@ import { EventEmitter } from 'events'
 import { WebSocket } from 'ws'
 import { createHash } from 'crypto'
 import { NetworkRuntime } from '../runtime/NetworkRuntime.js'
-import type { NetworkStorage } from '@bassline/core'
+import { StorageBackedRuntime } from '../runtime/StorageBackedRuntime.js'
+import type { NetworkStorage, NetworkState } from '@bassline/core'
 import type {
   Bassline,
   BasslineNode,
@@ -55,7 +56,9 @@ export class BasslineNetwork extends EventEmitter {
       ...config
     }
     
+    // Create runtime - will be replaced with proper StorageBackedRuntime in joinNetwork if needed
     this.runtime = new NetworkRuntime()
+    
     this.storage = config.storage
   }
   
@@ -91,6 +94,16 @@ export class BasslineNetwork extends EventEmitter {
   async joinNetwork(bassline: Bassline, groupsToRun?: string[]): Promise<void> {
     this.bassline = bassline
     
+    // Replace runtime with StorageBackedRuntime if storage is provided
+    if (this.storage) {
+      console.log(`[BasslineNetwork] Creating StorageBackedRuntime for network ${bassline.id}`)
+      this.runtime = new StorageBackedRuntime({
+        storage: this.storage,
+        networkId: bassline.id,
+        loadOnInit: false // Don't load on init, let topology get set up first
+      })
+    }
+    
     // Determine which groups to run
     if (groupsToRun) {
       groupsToRun.forEach(g => this.localGroups.add(g))
@@ -100,6 +113,28 @@ export class BasslineNetwork extends EventEmitter {
     
     // Load topology into runtime
     await this.loadTopology()
+    
+    // Initialize network in storage if using StorageBackedRuntime
+    if (this.storage && this.runtime instanceof StorageBackedRuntime) {
+      console.log(`[BasslineNetwork] Saving initial network state to storage`)
+      try {
+        const exportedState = this.runtime.exportState()
+        
+        // Convert plain objects to Maps for storage compatibility
+        const networkState = {
+          networkId: bassline.id,
+          groups: new Map(Object.entries(exportedState.groups || {})),
+          wires: new Map(Object.entries(exportedState.wires || {})),
+          currentGroupId: 'root',
+          rootGroupId: 'root'
+        }
+        
+        await this.storage.saveNetworkState(bassline.id as any, networkState as any)
+        console.log(`[BasslineNetwork] Network state saved successfully`)
+      } catch (error) {
+        console.error(`[BasslineNetwork] Failed to save network state:`, error)
+      }
+    }
     
     // Connect to endpoints for remote groups
     await this.connectToEndpoints()
@@ -564,16 +599,23 @@ export class BasslineNetwork extends EventEmitter {
    * Update a contact's content
    */
   async updateContact(contactId: string, content: any): Promise<void> {
+    const oldContent = this.localContent.get(contactId)
+    
+    // Only update if content actually changed
+    if (JSON.stringify(oldContent) === JSON.stringify(content)) return
+    
+    // StorageBackedRuntime.scheduleUpdate() will handle both local updates and storage persistence
+    console.log(`[BasslineNetwork] Updating contact ${contactId} with content:`, JSON.stringify(content).substring(0, 100))
+    
+    // Check if contact exists in runtime
+    const runtimeContact = (this.runtime as any).contacts?.get(contactId)
+    console.log(`[BasslineNetwork] Runtime contact exists: ${!!runtimeContact}`)
+    
     this.runtime.scheduleUpdate(contactId, content)
     this.localContent.set(contactId, content)
     
-    // Broadcast update
-    this.broadcast({
-      type: 'content-update',
-      contactId,
-      content,
-      hash: createHash('sha256').update(JSON.stringify(content)).digest('hex')
-    })
+    // Emit change event for gossip layer
+    this.emit('contact.updated', { contactId, content, oldContent })
   }
   
   /**
@@ -586,6 +628,15 @@ export class BasslineNetwork extends EventEmitter {
     const hasContent = this.localContent.size
     
     return (hasContent / totalContacts) * 100
+  }
+  
+  /**
+   * Wait for all pending storage operations to complete
+   */
+  async waitForPendingOperations(): Promise<void> {
+    if (this.runtime && 'waitForPendingOperations' in this.runtime) {
+      await (this.runtime as any).waitForPendingOperations()
+    }
   }
   
   /**

@@ -78,7 +78,9 @@ describe('Simple Bassline Network', () => {
       peerId: 'node1',
       endpoint: { url: 'ws://localhost:8901', peerId: 'node1' },
       storage: createPostgresStorage({ 
-        database: 'bassline_test',
+        options: {
+          database: 'bassline_test'
+        },
         durability: 'performance'
       })
     })
@@ -189,7 +191,9 @@ describe('Simple Bassline Network', () => {
       peerId: 'node3',
       endpoint: { url: 'ws://localhost:8903', peerId: 'node3' },
       storage: createPostgresStorage({ 
-        database: 'bassline_test',
+        options: {
+          database: 'bassline_test'
+        },
         durability: 'performance'
       })
     })

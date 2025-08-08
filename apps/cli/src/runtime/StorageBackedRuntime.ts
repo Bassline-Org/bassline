@@ -7,7 +7,12 @@ import { EventEmitter } from 'events'
 import { createHash } from 'crypto'
 import { NetworkRuntime, GroupState } from './NetworkRuntime.js'
 import type { NetworkStorage, NetworkId, GroupId, ContactId, Result } from '@bassline/core'
-import { brand } from '@bassline/core'
+import { 
+  brand, 
+  StorageError, 
+  DatabaseError, 
+  wrapError 
+} from '@bassline/core'
 
 export interface StorageConfig {
   networkId?: string
@@ -21,10 +26,13 @@ export class StorageBackedRuntime extends NetworkRuntime {
   private contentHashes = new Map<string, string>() // contactId -> hash
   private isDirty = false
   private saveTimer?: NodeJS.Timeout
+  private ensuredGroups = new Set<string>() // Groups we've already ensured exist in storage
+  private pendingOperations: Promise<any>[] = [] // Track all pending storage operations
   
   constructor(config: StorageConfig = {}) {
     super()
     this.storage = config.storage
+    console.log(`[StorageBackedRuntime] Created with storage:`, this.storage ? 'YES' : 'NO')
     this.networkId = brand.networkId(config.networkId || 'default')
     
     if (config.loadOnInit && this.storage) {
@@ -106,7 +114,9 @@ export class StorageBackedRuntime extends NetworkRuntime {
         }
       }
     } catch (error) {
-      console.error('Failed to load from storage:', error)
+      console.error('[StorageBackedRuntime] CRITICAL: Failed to load from storage:', error)
+      // Re-throw to crash loudly instead of silently continuing
+      throw wrapError(error, 'STORAGE_LOAD_ERROR', { networkId: this.networkId })
     }
   }
   
@@ -156,7 +166,9 @@ export class StorageBackedRuntime extends NetworkRuntime {
       await this.storage.saveNetworkState(this.networkId, networkState)
       this.isDirty = false
     } catch (error) {
-      console.error('Failed to save to storage:', error)
+      console.error('[StorageBackedRuntime] CRITICAL: Failed to save to storage:', error)
+      // Re-throw to crash loudly
+      throw wrapError(error, 'STORAGE_SAVE_ERROR', { networkId: this.networkId })
     }
   }
   
@@ -201,17 +213,162 @@ export class StorageBackedRuntime extends NetworkRuntime {
     this.scheduleSave()
     
     // Also save individual contact immediately if storage supports it
+    console.log(`[StorageBackedRuntime] Checking storage for contact ${contactId}:`, 
+      'storage:', !!this.storage,
+      'saveContactContent:', !!(this.storage && this.storage.saveContactContent))
     if (this.storage && this.storage.saveContactContent) {
       const contact = this.contacts.get(contactId)
+      console.log(`[StorageBackedRuntime] Contact ${contactId} found:`, !!contact, contact?.groupId)
       if (contact) {
         const groupId = brand.groupId(contact.groupId)
-        this.storage.saveContactContent(
-          this.networkId,
-          groupId,
-          brand.contactId(contactId),
-          content
-        ).catch(err => console.error('Failed to save contact:', err))
+        
+        // Ensure group exists before saving contact (PostgreSQL foreign key requirement)
+        const savePromise = this.ensureGroupExists(contact.groupId).then(async () => {
+          console.log(`[StorageBackedRuntime] Group ${contact.groupId} ensured, now saving contact ${contactId}`)
+          if (this.storage && this.storage.saveContactContent) {
+            console.log(`[StorageBackedRuntime] Calling saveContactContent for ${contactId}`)
+            const result = await this.storage.saveContactContent(
+              this.networkId,
+              groupId,
+              brand.contactId(contactId),
+              content
+            )
+            
+            // Check if the save actually succeeded
+            if (!result.ok) {
+              throw new StorageError(
+                `Failed to save contact ${contactId}: ${result.error.message}`,
+                'SAVE_CONTACT',
+                { contactId, groupId, networkId: this.networkId, error: result.error }
+              )
+            }
+            
+            return result
+          }
+        }).catch(err => {
+          console.error(`[StorageBackedRuntime] CRITICAL ERROR saving contact ${contactId}:`, err)
+          console.error('Stack trace:', err.stack)
+          // Re-throw wrapped error to ensure it crashes loudly
+          throw wrapError(err, 'STORAGE_SAVE_ERROR', { contactId, groupId })
+        })
+        
+        // Track this pending operation
+        this.pendingOperations.push(savePromise)
       }
+    }
+  }
+  
+  /**
+   * Wait for all pending storage operations to complete
+   */
+  async waitForPendingOperations(): Promise<void> {
+    if (this.pendingOperations.length > 0) {
+      console.log(`[StorageBackedRuntime] Waiting for ${this.pendingOperations.length} pending operations...`)
+      try {
+        const results = await Promise.allSettled(this.pendingOperations)
+        
+        // Check for any failures
+        const failures = results.filter(r => r.status === 'rejected')
+        if (failures.length > 0) {
+          console.error(`[StorageBackedRuntime] ${failures.length} operations failed:`)
+          failures.forEach((f, i) => {
+            if (f.status === 'rejected') {
+              console.error(`  Operation ${i}: ${f.reason}`)
+            }
+          })
+          
+          // Throw the first error to crash loudly
+          const firstFailure = failures[0] as PromiseRejectedResult
+          throw new StorageError(
+            `${failures.length} storage operations failed`,
+            'PENDING_OPERATIONS_FAILED',
+            { failureCount: failures.length, firstError: firstFailure.reason }
+          )
+        }
+        
+        this.pendingOperations = [] // Clear after all complete
+        console.log(`[StorageBackedRuntime] All ${results.length} operations completed successfully`)
+      } catch (error) {
+        console.error(`[StorageBackedRuntime] CRITICAL: Error waiting for pending operations:`, error)
+        throw wrapError(error, 'WAIT_OPERATIONS_ERROR', { count: this.pendingOperations.length })
+      }
+    }
+  }
+  
+  /**
+   * Ensure both network and group exist in storage before saving contacts to them
+   */
+  private async ensureGroupExists(groupId: string): Promise<void> {
+    console.log(`[StorageBackedRuntime] ensureGroupExists ${groupId}:`,
+      'storage:', !!this.storage,
+      'saveGroupState:', !!(this.storage && this.storage.saveGroupState),
+      'alreadyEnsured:', this.ensuredGroups.has(groupId))
+    if (!this.storage || !this.storage.saveGroupState || this.ensuredGroups.has(groupId)) {
+      console.log(`[StorageBackedRuntime] ensureGroupExists returning early for ${groupId}`)
+      return // Already ensured or no storage
+    }
+    
+    console.log(`[StorageBackedRuntime] Actually ensuring group ${groupId} exists...`)
+    
+    const group = this.groups.get(groupId)
+    if (!group) {
+      console.warn(`[StorageBackedRuntime] Group ${groupId} not found in runtime`)
+      return
+    }
+    
+    try {
+      console.log(`[StorageBackedRuntime] Saving network state for ${this.networkId}`)
+      // First ensure network record exists (required for foreign key)
+      if (this.storage.saveNetworkState) {
+        const networkResult = await this.storage.saveNetworkState(this.networkId, {
+          networkId: this.networkId,
+          groups: new Map(),
+          wires: new Map(),
+          currentGroupId: 'root',
+          rootGroupId: 'root'
+        } as any)
+        console.log(`[StorageBackedRuntime] Network save result:`, networkResult.ok)
+        if (!networkResult.ok) {
+          throw new StorageError(
+            `Failed to save network ${this.networkId}: ${networkResult.error.message}`,
+            'SAVE_NETWORK',
+            { networkId: this.networkId, error: networkResult.error }
+          )
+        }
+      }
+      
+      console.log(`[StorageBackedRuntime] Now saving group state for ${groupId}`)
+      // Then create the group
+      const groupState = {
+        group,
+        contacts: new Map(), // Will be filled by individual contact saves
+        wires: new Map()
+      }
+      
+      const result = await this.storage.saveGroupState(
+        this.networkId,
+        brand.groupId(groupId),
+        groupState as any
+      )
+      
+      console.log(`[StorageBackedRuntime] saveGroupState result for ${groupId}:`, result.ok)
+      
+      if (result.ok) {
+        this.ensuredGroups.add(groupId)
+        console.log(`[StorageBackedRuntime] Successfully ensured group ${groupId} exists in storage`)
+      } else {
+        // Throw error instead of just logging
+        throw new StorageError(
+          `Failed to ensure group ${groupId}: ${result.error.message}`,
+          'ENSURE_GROUP',
+          { groupId, networkId: this.networkId, error: result.error }
+        )
+      }
+    } catch (error) {
+      console.error(`[StorageBackedRuntime] CRITICAL: Error ensuring group ${groupId}:`, error)
+      console.error('Stack trace:', (error as any).stack)
+      // Re-throw to crash loudly
+      throw wrapError(error, 'GROUP_ENSURE_ERROR', { groupId, networkId: this.networkId })
     }
   }
   

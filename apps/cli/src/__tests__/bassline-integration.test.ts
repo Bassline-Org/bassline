@@ -69,7 +69,9 @@ describe('Bassline Integration with PostgreSQL', () => {
       id: 'node1-postgres',
       port: 9101,
       storage: createPostgresStorage({ 
-        database: 'bassline_test',
+        options: {
+          database: 'bassline_test'
+        },
         durability: 'performance'
       }),
       syncInterval: 1000,
@@ -263,7 +265,9 @@ describe('Bassline Integration with PostgreSQL', () => {
       id: 'nodeA',
       port: 9201,
       storage: createPostgresStorage({ 
-        database: 'bassline_test',
+        options: {
+          database: 'bassline_test'
+        },
         durability: 'performance'
       }),
       syncInterval: 500

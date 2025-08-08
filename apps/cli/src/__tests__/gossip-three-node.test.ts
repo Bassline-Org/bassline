@@ -36,7 +36,9 @@ describe('Three-node gossip with different storage backends', () => {
       id: 'node1',
       port: 8001,
       storage: createPostgresStorage({ 
-        database: 'bassline_test',
+        options: {
+          database: 'bassline_test'
+        },
         durability: 'performance' // Use unlogged for speed
       }),
       syncInterval: 500 // Much faster sync for testing (0.5 seconds)

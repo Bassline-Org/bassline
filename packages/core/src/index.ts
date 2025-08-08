@@ -43,3 +43,6 @@ export { serialize, deserialize } from './serialization'
 
 // Network types
 export * from './network-types'
+
+// Error handling
+export * from './errors'
