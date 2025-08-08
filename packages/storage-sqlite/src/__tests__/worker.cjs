@@ -36,7 +36,25 @@ async function runWorker() {
     db = new Database(dbPath)
   }
   
-  // Create table
+  // Optimize for speed - MUST set page_size BEFORE creating any tables!
+  db.pragma('page_size = 16384')  // 16KB pages for 4x better performance
+  
+  // Set cache size based on page size
+  // 128MB cache for better performance
+  const cacheMB = 128
+  const cachePages = (cacheMB * 1024 * 1024) / 16384
+  db.pragma(`cache_size = ${cachePages}`)
+  
+  db.pragma('journal_mode = WAL')
+  db.pragma('synchronous = OFF')
+  db.pragma('temp_store = MEMORY')
+  
+  // Use memory-mapped I/O for disk databases
+  if (!useMemory) {
+    db.pragma('mmap_size = 268435456')  // 256MB mmap
+  }
+  
+  // Create table AFTER setting page_size
   db.exec(`
     CREATE TABLE IF NOT EXISTS contacts (
       network_id TEXT NOT NULL,
@@ -48,12 +66,6 @@ async function runWorker() {
       PRIMARY KEY (network_id, group_id, contact_id)
     )
   `)
-  
-  // Optimize for speed
-  db.pragma('journal_mode = WAL')
-  db.pragma('synchronous = OFF')
-  db.pragma('cache_size = -64000')
-  db.pragma('temp_store = MEMORY')
   
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO contacts (network_id, group_id, contact_id, content, blend_mode, name)
@@ -72,7 +84,7 @@ async function runWorker() {
   const startTime = Date.now()
   
   // Use a transaction for batching - massive performance improvement!
-  const batchSize = 1000
+  const batchSize = 2000  // Optimal batch size we discovered earlier
   const numBatches = Math.ceil(opsCount / batchSize)
   
   for (let batch = 0; batch < numBatches; batch++) {

@@ -67,7 +67,7 @@ export class SQLiteStorage extends NetworkStorage {
       cacheSize: -64000, // 64MB cache
       mmap: 256 * 1024 * 1024, // 256MB mmap
       busyTimeout: 5000,
-      pageSize: 4096, // Default page size
+      pageSize: 16384, // 16KB pages for better performance
       tempStore: 'MEMORY', // Keep temp tables in memory
       memoryShared: false,
       ...config?.options

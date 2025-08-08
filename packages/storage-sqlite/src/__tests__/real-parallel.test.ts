@@ -331,10 +331,7 @@ describe('Real Parallel Process Performance', { timeout: 60000 }, () => {
       }
     } as any)
     
-    const initResult = await singleStorage.initialize()
-    if (!initResult.ok) {
-      throw new Error(`Failed to initialize: ${initResult.error.message}`)
-    }
+    await singleStorage.initialize()
     
     const networkId = brand.networkId('single-network')
     const groupId = brand.groupId('single-group')
