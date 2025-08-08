@@ -18,12 +18,13 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist node_modules"
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.11.5",
+    "@types/ws": "^8.18.1",
     "tsup": "^8.0.1",
     "typescript": "^5.3.3",
-    "vitest": "^1.2.1"
+    "vitest": "^1.2.1",
+    "ws": "^8.18.3"
   },
   "publishConfig": {
     "access": "public"

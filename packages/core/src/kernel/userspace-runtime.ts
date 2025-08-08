@@ -252,7 +252,8 @@ export class UserspaceRuntime {
       throw new Error(`Group ${groupIdStr} not found`)
     }
     
-    const cId = brand.contactId(crypto.randomUUID())
+    // Use provided ID or generate a new one
+    const cId = contactData.id ? brand.contactId(contactData.id) : brand.contactId(crypto.randomUUID())
     const contact: Contact = {
       blendMode: 'accept-last' as BlendMode,
       content: undefined,
