@@ -24,36 +24,50 @@ Bassline CLI is a distributed propagation network implementation that supports:
 - **Wires**: Connections between contacts for data flow
 - **Gossip**: Peer-to-peer protocol for content synchronization
 
+### Kernel/Userspace Architecture
+The system uses a kernel/userspace separation similar to operating systems:
+- **Kernel Bassline**: Stateless, contains driver gadgets and primitives
+- **Userspace Basslines**: User-created propagation networks
+- **Drivers**: Special gadgets that handle side effects (storage, networking, UI)
+
 ## Current Architecture
 
-### Layer Structure
+### Kernel/Userspace Model
 
 ```
-┌─────────────────────────────────────┐
-│     BasslineNetwork (Top Layer)     │
-│  - Distributed network management   │
-│  - Peer communication & gossip      │
-│  - Group ownership & routing        │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│  StorageBackedRuntime (Middle)      │
-│  - Extends NetworkRuntime           │
-│  - Persistence coordination         │
-│  - Content hashing & dirty tracking │
-│  - Promise/operation queue          │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│   NetworkStorage Interface (Base)   │
-│  - Abstract storage operations      │
-│  - Result<T, Error> pattern        │
-│  - Multiple implementations:        │
-│    • PostgreSQL (primary)          │
-│    • Memory (testing)              │
-│    • Filesystem (experimental)     │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│           USERSPACE BASSLINES                   │
+│  - User-created propagation networks            │
+│  - Pure contacts, wires, and gadgets           │
+│  - No knowledge of storage or networking       │
+└────────────────────┬────────────────────────────┘
+                     │ Changes flow through
+┌────────────────────▼────────────────────────────┐
+│           KERNEL BASSLINE (Stateless)           │
+│                                                  │
+│  ┌──────────────────────────────────────────┐  │
+│  │          DRIVER GADGETS                  │  │
+│  │  • Storage Drivers (PostgreSQL, Memory)  │  │
+│  │  • Bridge Drivers (WebSocket, UI, CLI)   │  │
+│  │  • Compound Drivers (multi-target)       │  │
+│  └──────────────────────────────────────────┘  │
+│                                                  │
+│  ┌──────────────────────────────────────────┐  │
+│  │          PRIMITIVE GADGETS               │  │
+│  │  • Math (add, multiply, subtract)        │  │
+│  │  • String (concat, split)                │  │
+│  │  • Logic (and, or, not)                  │  │
+│  │  • Control (gate, switch)                │  │
+│  └──────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────┘
 ```
+
+### Key Architectural Principles
+
+1. **Everything is a Gadget**: Even infrastructure (storage, networking) are gadgets in kernel space
+2. **Kernel is Stateless**: The kernel bassline doesn't persist itself, only routes changes
+3. **Orthogonal Concerns**: Storage and networking are independent, pluggable drivers
+4. **No Special Cases**: UI is just another driver, same as WebSocket or CLI
 
 ### Data Flow
 
@@ -72,49 +86,101 @@ Bassline CLI is a distributed propagation network implementation that supports:
 6. Result may succeed or fail silently
 ```
 
-#### Storage Interface Pattern
+#### Desired Flow (Kernel/Driver Model)
 ```typescript
-interface NetworkStorage {
-  saveContactContent(...): Promise<Result<void, StorageError>>
-  loadContactContent(...): Promise<Result<T | null, StorageError>>
-  // All methods return Result<T, Error> - never throw
+1. Userspace: Contact changes value
+   ↓
+2. Kernel: Receives change notification
+   ↓
+3. Kernel: Routes to all relevant drivers
+   ├─→ StorageDriver.handleChange(contactId, value)
+   ├─→ WebSocketDriver.handleChange(contactId, value)  
+   └─→ UIDriver.handleChange(contactId, value)
+   ↓
+4. Each driver handles according to its purpose
+   • Storage persists to database
+   • WebSocket broadcasts to peers
+   • UI updates display
+```
+
+#### Driver Interface Pattern
+```typescript
+interface Driver {
+  // Handle changes from userspace
+  handleChange(contactId: string, value: any): void | { backpressure: boolean }
+  
+  // Handle external input (for bridge drivers)
+  handleExternalInput?(input: any): void
+  
+  // Lifecycle
+  initialize?(): Promise<void>
+  shutdown?(): Promise<void>
+}
+
+// Example: Storage Driver
+class PostgreSQLDriver implements Driver {
+  handleChange(contactId: string, value: any) {
+    // PostgreSQL-specific logic (foreign keys, transactions, etc.)
+    // This is where ensureGroupExists belongs - not in runtime!
+    this.ensureGroupExists(contactId)
+    this.saveContact(contactId, value)
+  }
+}
+
+// Example: Compound Driver
+class CompoundStorageDriver implements Driver {
+  constructor(private drivers: Driver[]) {}
+  
+  handleChange(contactId: string, value: any) {
+    // Forward to all sub-drivers
+    this.drivers.forEach(d => d.handleChange(contactId, value))
+  }
 }
 ```
 
 ### Key Components
 
-#### 1. BasslineNetwork (`/apps/cli/src/bassline/BasslineNetwork.ts`)
+#### 1. Kernel Bassline (Proposed)
 - **Responsibilities**:
-  - Manage network topology from Bassline spec
-  - Handle peer connections and gossip protocol
-  - Route updates to appropriate groups
-  - Track ownership and content distribution
+  - Route changes between userspace and drivers
+  - Provide primitive gadgets for computation
+  - Manage driver lifecycle
+  - Handle backpressure and flow control
 
-- **Key Methods**:
-  - `joinNetwork(bassline, groups)` - Initialize node with topology
-  - `updateContact(contactId, content)` - Propagate content updates
-  - `connectToPeer(endpoint)` - Establish peer connections
-  - `handleGossip(peerId, contacts)` - Process incoming gossip
+- **Components**:
+  - **Storage Drivers**: PostgreSQL, Memory, Filesystem, Compound
+  - **Bridge Drivers**: WebSocket, UI, CLI, REST API
+  - **Primitives**: Math, String, Logic, Control gadgets
 
-#### 2. StorageBackedRuntime (`/apps/cli/src/runtime/StorageBackedRuntime.ts`)
-- **Responsibilities**:
-  - Bridge between network operations and storage
-  - Manage pending storage operations
-  - Track content hashes for deduplication
-  - Handle dirty state and deferred saves
+#### 2. Driver Gadgets
 
-- **Key State**:
-  - `pendingOperations: Promise<any>[]` - Queue of storage operations
-  - `ensuredGroups: Set<string>` - Cache of initialized groups
-  - `contentHashes: Map<string, string>` - Content deduplication
-  - `isDirty: boolean` - Tracks unsaved changes
+**Storage Drivers**:
+- Handle persistence of network state
+- Each driver manages its own requirements (e.g., PostgreSQL handles foreign keys)
+- Can be composed using CompoundDriver pattern
 
-#### 3. PostgreSQL Storage (`/packages/storage-postgres/src/index.ts`)
-- **Responsibilities**:
-  - Implement NetworkStorage interface for PostgreSQL
-  - Manage connection pooling
-  - Handle transactions and error recovery
-  - Enforce foreign key constraints
+**Bridge Drivers**:
+- Connect userspace to external world
+- UI Driver: React components ↔ Propagation network
+- WebSocket Driver: Remote peers ↔ Propagation network
+- CLI Driver: Terminal commands ↔ Propagation network
+
+**Key Insight**: The UI is not special - it's just another bridge driver, same as WebSocket or CLI.
+
+#### 3. Current Implementation Issues
+
+**BasslineNetwork** (`/apps/cli/src/bassline/BasslineNetwork.ts`):
+- Currently tries to handle both runtime and networking
+- Should be split into runtime + WebSocketDriver
+
+**StorageBackedRuntime** (`/apps/cli/src/runtime/StorageBackedRuntime.ts`):
+- Mixes runtime concerns with storage concerns
+- `ensureGroupExists` belongs in PostgreSQL driver, not runtime
+- Fire-and-forget promises cause silent failures
+
+**PostgreSQL Storage** (`/packages/storage-postgres/src/index.ts`):
+- Correctly handles its own requirements
+- But integration point (StorageBackedRuntime) is broken
 
 - **Database Schema**:
   ```sql
@@ -211,7 +277,28 @@ if (!result.ok) {
 
 ## Architectural Decisions
 
-### Decision 1: Error Handling Strategy
+### Decision 1: Kernel/Userspace Separation
+
+**Options**:
+
+1. **Traditional Layered Architecture**
+   - ✅ Familiar pattern
+   - ❌ Tight coupling between layers
+   - ❌ Special cases for infrastructure
+
+2. **Everything as Userspace Gadgets**
+   - ✅ Conceptually pure
+   - ❌ Meta-propagation complexity
+   - ❌ Who stores the storage gadget?
+
+3. **Kernel/Userspace Model** ⭐ **CHOSEN**
+   - ✅ Clean separation of concerns
+   - ✅ Everything is gadgets (even infrastructure)
+   - ✅ Avoids meta-propagation issues
+   - ✅ Familiar OS metaphor
+   - ❌ Requires careful boundary definition
+
+### Decision 2: Error Handling Strategy
 
 **Options**:
 
@@ -233,7 +320,7 @@ if (!result.ok) {
    - ✅ Idiomatic internally
    - ❌ Requires clear documentation
 
-### Decision 2: Async Operation Management
+### Decision 3: Async Operation Management
 
 **Options**:
 
@@ -255,7 +342,7 @@ if (!result.ok) {
    - ❌ Complex debugging
    - ❌ Potential message loss
 
-### Decision 3: Storage Architecture
+### Decision 4: Storage Architecture
 
 **Options**:
 
@@ -278,7 +365,96 @@ if (!result.ok) {
 
 ## Proposed Solutions
 
-### Solution 1: Fix Immediate Storage Issues (Quick Win)
+### Solution 1: Implement Kernel/Driver Architecture
+
+**Kernel Bassline Structure**:
+```typescript
+class KernelBassline {
+  // Stateless - doesn't persist itself
+  private drivers: Map<string, Driver> = new Map()
+  private primitives: Map<string, PrimitiveGadget> = new Map()
+  
+  constructor() {
+    // Initialize default drivers
+    this.drivers.set('storage', new MemoryDriver())
+    this.drivers.set('bridge', new LocalBridge())
+  }
+  
+  // Configure drivers (e.g., for production)
+  configureDriver(name: string, driver: Driver) {
+    this.drivers.set(name, driver)
+  }
+  
+  // Route changes from userspace to drivers
+  handleUserChange(contactId: string, value: any) {
+    for (const driver of this.drivers.values()) {
+      const result = driver.handleChange(contactId, value)
+      if (result?.backpressure) {
+        // Handle backpressure
+        return { backpressure: true }
+      }
+    }
+  }
+  
+  // Route external input to userspace
+  handleExternalInput(source: string, contactId: string, value: any) {
+    this.userRuntime.updateContact(contactId, value)
+  }
+}
+```
+
+**Example Driver Implementations**:
+
+```typescript
+// PostgreSQL Driver - handles its own requirements
+class PostgreSQLDriver implements Driver {
+  private ensuredGroups = new Set<string>()
+  
+  async handleChange(contactId: string, value: any) {
+    // PostgreSQL needs groups to exist first
+    await this.ensureGroupExists(contactId)
+    await this.saveContact(contactId, value)
+  }
+  
+  private async ensureGroupExists(contactId: string) {
+    // This belongs HERE, not in runtime!
+    const groupId = this.getGroupId(contactId)
+    if (!this.ensuredGroups.has(groupId)) {
+      await this.db.query(`
+        INSERT INTO groups (id) VALUES ($1)
+        ON CONFLICT DO NOTHING
+      `, [groupId])
+      this.ensuredGroups.add(groupId)
+    }
+  }
+}
+
+// Compound Driver for redundancy
+class CompoundDriver implements Driver {
+  constructor(private drivers: Driver[]) {}
+  
+  handleChange(contactId: string, value: any) {
+    const results = this.drivers.map(d => d.handleChange(contactId, value))
+    // Could wait for all, or just fire-and-forget
+    return results.find(r => r?.backpressure)
+  }
+}
+
+// UI Bridge Driver
+class UIBridgeDriver implements Driver {
+  handleChange(contactId: string, value: any) {
+    // Update React state
+    this.setState({ [contactId]: value })
+  }
+  
+  handleExternalInput(action: UIAction) {
+    // User clicked button, update contact
+    this.kernel.handleExternalInput('ui', action.contactId, action.value)
+  }
+}
+```
+
+### Solution 2: Fix Immediate Storage Issues (Quick Win)
 
 **Changes Required**:
 
@@ -313,18 +489,50 @@ private async ensureGroupExists(groupId: string): Promise<void> {
 }
 ```
 
-3. **Check storage results**:
+3. **Move storage concerns to driver**:
 ```typescript
-const result = await this.storage.saveContactContent(...)
-if (!result.ok) {
-  throw new DatabaseError(
-    `Failed to save contact: ${result.error.message}`,
-    result.error
-  )
+// Remove from runtime:
+// ❌ this.ensureGroupExists(groupId)
+
+// Add to PostgreSQL driver:
+class PostgreSQLDriver {
+  async handleChange(contactId: string, value: any) {
+    // ✅ Driver handles its own requirements
+    await this.ensureGroupExists(contactId)
+    await this.saveContact(contactId, value)
+  }
 }
 ```
 
-### Solution 2: Implement Proper Queue System
+### Solution 3: Configuration Examples
+
+**Development Configuration**:
+```typescript
+const kernel = new KernelBassline()
+kernel.configureDriver('storage', new MemoryDriver())
+kernel.configureDriver('bridge', new LocalBridge())
+```
+
+**Production Configuration**:
+```typescript
+const kernel = new KernelBassline()
+
+// Compound storage for cache + persistence
+kernel.configureDriver('storage', new CompoundDriver([
+  new MemoryCacheDriver(),
+  new PostgreSQLDriver({ pool: 20 }),
+  new S3BackupDriver({ bucket: 'bassline-backup' })
+]))
+
+// Multiple bridges for different interfaces
+kernel.configureDriver('bridge', new CompoundDriver([
+  new WebSocketBridge({ port: 3003 }),
+  new UIBridge(),
+  new RESTAPIBridge({ port: 8080 })
+]))
+```
+
+### Solution 4: Implement Proper Queue System
 
 **New Component: StorageQueue**:
 
@@ -373,7 +581,7 @@ class StorageQueue {
 }
 ```
 
-### Solution 3: Add Comprehensive Monitoring
+### Solution 5: Add Comprehensive Monitoring
 
 **Metrics to Track**:
 - Storage operation latency (p50, p95, p99)
@@ -406,29 +614,30 @@ class StorageMetrics {
 
 ## Implementation Roadmap
 
-### Phase 1: Critical Fixes (1-2 days)
-- [ ] Fix fire-and-forget promises in StorageBackedRuntime
-- [ ] Add proper error checking for storage Results
-- [ ] Implement group deduplication to prevent race conditions
-- [ ] Add integration test to verify persistence
+### Phase 1: Kernel Architecture (2-3 days)
+- [ ] Create KernelBassline class
+- [ ] Define Driver interface
+- [ ] Implement basic MemoryDriver and LocalBridge
+- [ ] Refactor runtime to remove storage concerns
 
-### Phase 2: Queue Implementation (3-5 days)
-- [ ] Design WriteOperation types
-- [ ] Implement StorageQueue with batching
-- [ ] Add retry logic with exponential backoff
-- [ ] Create queue metrics and monitoring
+### Phase 2: Driver Implementations (3-5 days)
+- [ ] Create PostgreSQLDriver with proper error handling
+- [ ] Move `ensureGroupExists` to PostgreSQL driver
+- [ ] Implement CompoundDriver for composition
+- [ ] Create WebSocketBridge driver
+- [ ] Create UIBridge driver
 
-### Phase 3: Performance Optimization (1 week)
-- [ ] Implement write-through cache
-- [ ] Add database connection pooling optimization
-- [ ] Move hashing to worker thread
-- [ ] Add database indexes for common queries
+### Phase 3: Migration & Testing (1 week)
+- [ ] Migrate existing code to kernel/driver model
+- [ ] Fix fire-and-forget promises
+- [ ] Add comprehensive integration tests
+- [ ] Verify database persistence actually works
 
-### Phase 4: Testing & Documentation (Ongoing)
-- [ ] Create comprehensive integration tests
-- [ ] Add performance benchmarks
-- [ ] Document error handling patterns
-- [ ] Create troubleshooting guide
+### Phase 4: Advanced Features (Future)
+- [ ] Implement backpressure handling
+- [ ] Add queue-based batching to drivers
+- [ ] Create monitoring dashboard
+- [ ] Document driver development guide
 
 ## Testing Strategy
 
@@ -460,20 +669,25 @@ describe('Storage Integration', () => {
 
 ## Open Questions
 
-1. **Should we use transactions for all operations or just batches?**
+1. **How should primitives be represented in the kernel?**
+   - Currently in flux, will revisit later
+   - Need to balance between kernel complexity and userspace flexibility
+
+2. **Should drivers be async or sync?**
+   - Sync is simpler but may block
+   - Async allows better parallelism but adds complexity
+
+3. **How do we handle driver initialization order?**
+   - Some drivers may depend on others
+   - Need clear lifecycle management
+
+4. **What's the migration path to meta-propagation?**
+   - Kernel model works now but may want full meta-propagation later
+   - How do we ensure smooth transition?
+
+5. **Should compound drivers wait for all sub-drivers?**
+   - Options: Wait for all, wait for first, fire-and-forget
    - Trade-off: Consistency vs Performance
-
-2. **How should we handle storage migration when schema changes?**
-   - Options: Versioned migrations, backward compatibility, blue-green deployment
-
-3. **Should we implement circuit breakers for storage failures?**
-   - Prevents cascade failures but adds complexity
-
-4. **What's the right balance between memory cache and database hits?**
-   - Trade-off: Memory usage vs Latency
-
-5. **Should we support multiple storage backends simultaneously?**
-   - Use case: Migration, redundancy, different storage for different data types
 
 ## Appendix
 
@@ -507,6 +721,17 @@ packages/
 - [README.md](../README.md) - CLI usage documentation
 - [PRODUCTION_READY.md](../../packages/storage-postgres/PRODUCTION_READY.md) - PostgreSQL storage details
 
+## Summary
+
+The kernel/userspace architecture provides:
+1. **Clean separation** between propagation logic and infrastructure
+2. **Everything as gadgets** - even storage and networking
+3. **Orthogonal concerns** - storage and bridges are independent
+4. **No special cases** - UI is just another bridge driver
+5. **Extensibility** - Easy to add new drivers or compose existing ones
+
+The key insight: By moving infrastructure concerns (like `ensureGroupExists`) into drivers where they belong, we achieve true orthogonality and fix our storage issues.
+
 ---
 
-*This is a living document. Last updated: 2025-01-08*
+*This is a living document. Last updated: 2025-08-07*
