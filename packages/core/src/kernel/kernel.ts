@@ -60,6 +60,7 @@ export class Kernel {
   private readonly storageDrivers = new Set<string>()
   private userspaceHandler?: (input: ExternalInput) => Promise<void>
   private readonly bassline: KernelBassline
+  private readonly pendingOperations = new Set<Promise<void>>()
   
   constructor(bassline: KernelBassline = {}) {
     // Store the bassline with defaults
@@ -168,10 +169,27 @@ export class Kernel {
   /**
    * Handle a change from userspace
    * Routes to all registered drivers
+   * Returns immediately while processing happens asynchronously
    * 
    * @throws {KernelError} If failFast is true and any driver fails
    */
   async handleChange(change: ContactChange): Promise<void> {
+    // Create promise for this operation
+    const promise = this.processChange(change)
+      .finally(() => {
+        this.pendingOperations.delete(promise)
+      })
+    
+    this.pendingOperations.add(promise)
+    
+    // Don't await - return immediately to avoid blocking userspace
+    return
+  }
+  
+  /**
+   * Actually process the change (internal method)
+   */
+  private async processChange(change: ContactChange): Promise<void> {
     const errors: Array<{ driverId: string; error: DriverError }> = []
     
     // Check preconditions for storage drivers
@@ -297,9 +315,27 @@ export class Kernel {
   }
   
   /**
+   * Check if kernel has pending work
+   */
+  hasPendingWork(): boolean {
+    return this.pendingOperations.size > 0
+  }
+  
+  /**
+   * Wait for all pending operations to complete
+   * Useful for testing and shutdown
+   */
+  async waitForCompletion(): Promise<void> {
+    await Promise.all(this.pendingOperations)
+  }
+  
+  /**
    * Shutdown the kernel and all drivers
    */
   async shutdown(): Promise<void> {
+    // Wait for any pending operations to complete first
+    await this.waitForCompletion()
+    
     const driverIds = Array.from(this.drivers.keys())
     
     for (const driverId of driverIds) {

@@ -41,3 +41,7 @@ export type {
 // Kernel
 export { Kernel } from './kernel'
 export type { KernelBassline } from './kernel'
+
+// Userspace Runtime
+export { UserspaceRuntime } from './userspace-runtime'
+export type { UserspaceRuntimeConfig } from './userspace-runtime'
