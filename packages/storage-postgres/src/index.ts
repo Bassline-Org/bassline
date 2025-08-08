@@ -25,13 +25,23 @@ import type {
   Serializable
 } from '@bassline/core'
 import { 
-  brand, 
-  serialize, 
-  deserialize,
-  DatabaseError,
-  StorageError,
-  ValidationError
+  brand
 } from '@bassline/core'
+
+// Define errors locally since they're not exported from core
+class DatabaseError extends Error {
+  constructor(message: string, query: string, params: any[]) {
+    super(message)
+    this.name = 'DatabaseError'
+  }
+}
+
+class ValidationError extends Error {
+  constructor(message: string, field: string, value: any) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -209,8 +219,7 @@ export class PostgresStorage implements NetworkStorage {
     return this.withClient(async (client) => {
       console.log(`[PostgreSQL] Got database client for ${contactId}`)
       // Check content size limit
-      const serializedContent = serialize.any(content)
-      const contentSize = Buffer.byteLength(JSON.stringify(serializedContent))
+      const contentSize = Buffer.byteLength(JSON.stringify(content))
       
       if (contentSize > this.limits.maxContactContentBytes) {
         throw new ValidationError(
@@ -231,9 +240,9 @@ export class PostgresStorage implements NetworkStorage {
       await client.query(`
         INSERT INTO bassline_groups (
           network_id, group_id, name, group_type, 
-          primitive_type, inputs, outputs
+          boundary_contact_ids, attributes
         )
-        VALUES ($1, $2, $2, 'standard', NULL, '[]'::jsonb, '[]'::jsonb)
+        VALUES ($1, $2, $2, 'standard', ARRAY[]::text[], '{}'::jsonb)
         ON CONFLICT (network_id, group_id) DO NOTHING
       `, [networkId, groupId])
       
@@ -259,15 +268,19 @@ export class PostgresStorage implements NetworkStorage {
       }
       
       console.log(`[PostgreSQL] About to INSERT/UPDATE contact ${contactId}`)
-      console.log(`[PostgreSQL] Parameters:`, { contactId, networkId, groupId, contentLength: JSON.stringify(serializedContent).length })
+      console.log(`[PostgreSQL] Parameters:`, { contactId, networkId, groupId, contentLength: contentSize })
+      console.log(`[PostgreSQL] Content type:`, typeof content, 'Value:', content)
+      
+      // jsonb columns need proper JSON, so strings need to be wrapped
+      const jsonContent = content
       
       const result = await client.query(`
         INSERT INTO bassline_contacts (contact_id, network_id, group_id, content)
-        VALUES ($1, $2, $3, $4)
+        VALUES ($1, $2, $3, $4::jsonb)
         ON CONFLICT (network_id, group_id, contact_id) 
-        DO UPDATE SET content = $4, updated_at = NOW()
+        DO UPDATE SET content = $4::jsonb, updated_at = NOW()
         RETURNING contact_id
-      `, [contactId, networkId, groupId, serializedContent])
+      `, [contactId, networkId, groupId, JSON.stringify(jsonContent)]) // Always stringify for jsonb
       
       console.log(`[PostgreSQL] Query result for ${contactId}:`, result.rows.length, 'rows')
       
@@ -306,7 +319,8 @@ export class PostgresStorage implements NetworkStorage {
         return null
       }
       
-      return deserialize.any(result.rows[0].content) as T
+      // PostgreSQL jsonb columns automatically return parsed objects
+      return result.rows[0].content as T
     })
   }
   
@@ -344,7 +358,7 @@ export class PostgresStorage implements NetworkStorage {
         null, // description - not in current Group type
         'regular', // group_type - default for now
         boundaryContactIds,
-        serialize.any({}) // attributes - empty for now
+        {} // attributes - empty object (jsonb column)
       ])
       
       // Delete contacts that are no longer in the group
@@ -387,7 +401,7 @@ export class PostgresStorage implements NetworkStorage {
           contact.blendMode || 'accept-last',
           contact.isBoundary || false,
           contact.boundaryDirection || null,
-          serialize.any(contact.content)
+          contact.content // Direct value for jsonb column
         ])
       }
     })
@@ -432,7 +446,7 @@ export class PostgresStorage implements NetworkStorage {
           blendMode: row.blend_mode,
           isBoundary: row.is_boundary,
           boundaryDirection: row.boundary_direction,
-          content: deserialize.any(row.content),
+          content: row.content, // jsonb columns auto-parse
           groupId: groupId // Add groupId for consistency
         })
       }
@@ -514,7 +528,7 @@ export class PostgresStorage implements NetworkStorage {
         networkId, 
         null, // name - not in current NetworkState
         null, // description - not in current NetworkState  
-        serialize.any({}) // attributes - empty for now
+        {} // attributes - empty object (jsonb column)
       ])
     })
   }
@@ -699,7 +713,7 @@ export class PostgresStorage implements NetworkStorage {
         )
       }
       
-      const state = serialize.networkState(networkState.value) // Serialize for snapshot
+      const state = networkState.value // Direct value for jsonb column
       const snapshotId = brand.snapshotId(`snapshot-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       
       await client.query(`
@@ -733,7 +747,7 @@ export class PostgresStorage implements NetworkStorage {
       
       return { 
         ok: true, 
-        value: deserialize.networkState(result.rows[0].snapshot_data)
+        value: result.rows[0].snapshot_data // jsonb columns auto-parse
       }
     } catch (error: any) {
       return this.handleError(error)
@@ -952,3 +966,7 @@ export class PostgresStorage implements NetworkStorage {
 export function createPostgresStorage(config?: PostgresStorageConfig): NetworkStorage {
   return new PostgresStorage(config)
 }
+
+// Export the storage driver
+export { PostgresStorageDriver } from './postgres-storage-driver.js'
+export type { PostgresDriverConfig } from './postgres-storage-driver.js'
