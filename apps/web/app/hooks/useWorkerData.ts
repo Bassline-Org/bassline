@@ -120,19 +120,72 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
           console.log(`[useGroupState] Using state from state-update change for group ${groupId}`)
           setState(stateUpdateChange.data)
         } else {
-          // Refresh group state when other changes occur
-          console.log(`[useGroupState] Fetching updated state for group ${groupId} due to changes:`, relevantChanges)
-          client.getState(groupId)
-            .then(newState => {
-              console.log(`[useGroupState] Got new state for group ${groupId}:`, newState)
-              console.log(`[useGroupState] Current state contacts:`, state?.contacts)
-              console.log(`[useGroupState] New state contacts:`, newState.contacts)
-              setState(newState)
-            })
-            .catch(err => {
-              console.error(`[useGroupState] Error fetching state:`, err)
-              setError(err)
-            })
+          // Apply incremental updates instead of full refetch
+          console.log(`[useGroupState] Applying incremental updates for group ${groupId}:`, relevantChanges)
+          
+          setState(currentState => {
+            if (!currentState) return currentState
+            
+            // Create a new state object with selective updates
+            let newState = { ...currentState }
+            let needsFullRefetch = false
+            
+            for (const change of relevantChanges) {
+              console.log(`[useGroupState] Processing change:`, change.type, change.data)
+              
+              switch (change.type) {
+                case 'contact-updated': {
+                  const { contactId, value } = change.data as { contactId: string, value: any, groupId: string }
+                  
+                  // Update contact in-place if it exists
+                  if (currentState.contacts instanceof Map) {
+                    const existingContact = currentState.contacts.get(contactId)
+                    if (existingContact) {
+                      const newContacts = new Map(currentState.contacts)
+                      newContacts.set(contactId, { ...existingContact, content: value })
+                      newState = { ...newState, contacts: newContacts }
+                      console.log(`[useGroupState] Updated contact ${contactId} content to:`, value)
+                    } else {
+                      needsFullRefetch = true // Contact not found, need full state
+                    }
+                  } else {
+                    needsFullRefetch = true // Unexpected contacts format
+                  }
+                  break
+                }
+                
+                case 'contact-added':
+                case 'contact-removed':
+                case 'wire-added':
+                case 'wire-removed':
+                case 'group-added':
+                case 'group-removed':
+                case 'group-updated': {
+                  // Structural changes require full refetch for now
+                  needsFullRefetch = true
+                  console.log(`[useGroupState] Structural change detected:`, change.type)
+                  break
+                }
+              }
+            }
+            
+            // If any structural changes occurred, fall back to full refetch
+            if (needsFullRefetch) {
+              console.log(`[useGroupState] Structural changes detected, performing full refetch for group ${groupId}`)
+              client.getState(groupId)
+                .then(fullState => {
+                  console.log(`[useGroupState] Full state refreshed for group ${groupId}`)
+                  setState(fullState)
+                })
+                .catch(err => {
+                  console.error(`[useGroupState] Error fetching full state:`, err)
+                  setError(err)
+                })
+              return currentState // Keep current state until full fetch completes
+            }
+            
+            return newState
+          })
         }
       } else {
         console.log(`[useGroupState] No relevant changes for group ${groupId}`)

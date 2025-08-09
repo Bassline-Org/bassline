@@ -232,6 +232,76 @@ async function handleRequest(request: NetworkRequest): Promise<NetworkResponse> 
         
         result = undefined
         break
+
+      case 'listPrimitives':
+        // Return primitive IDs synchronously from allPrimitiveGadgets
+        result = allPrimitiveGadgets.map(gadget => gadget.id)
+        break
+
+      case 'listPrimitiveInfo':
+        // Return primitive info synchronously from allPrimitiveGadgets
+        result = allPrimitiveGadgets.map(gadget => ({
+          qualifiedName: gadget.id,
+          id: gadget.id,
+          name: gadget.name,
+          inputs: gadget.inputs,
+          outputs: gadget.outputs,
+          category: gadget.category,
+          description: gadget.description,
+          isPure: gadget.isPure
+        }))
+        break
+
+      case 'getPrimitiveInfo':
+        // Find specific primitive info synchronously
+        const targetGadget = allPrimitiveGadgets.find(g => g.id === request.data.qualifiedName)
+        if (targetGadget) {
+          result = {
+            qualifiedName: targetGadget.id,
+            id: targetGadget.id,
+            name: targetGadget.name,
+            inputs: targetGadget.inputs,
+            outputs: targetGadget.outputs,
+            category: targetGadget.category,
+            description: targetGadget.description,
+            isPure: targetGadget.isPure
+          }
+        } else {
+          throw new Error(`Primitive not found: ${request.data.qualifiedName}`)
+        }
+        break
+
+      case 'listSchedulers':
+        // Return available scheduler types
+        result = ['immediate', 'batch', 'animation-frame', 'priority']
+        break
+
+      case 'getSchedulerInfo':
+        // Return info for specific scheduler
+        const schedulerId = request.data.schedulerId
+        const schedulerInfo = {
+          id: schedulerId,
+          name: schedulerId.charAt(0).toUpperCase() + schedulerId.slice(1) + ' Scheduler',
+          description: `${schedulerId} execution scheduler`
+        }
+        
+        switch (schedulerId) {
+          case 'immediate':
+            schedulerInfo.description = 'Executes propagation immediately on each change'
+            break
+          case 'batch':
+            schedulerInfo.description = 'Batches changes and executes in chunks'
+            break
+          case 'animation-frame':
+            schedulerInfo.description = 'Executes propagation on animation frames'
+            break
+          case 'priority':
+            schedulerInfo.description = 'Priority-based execution scheduler'
+            break
+        }
+        
+        result = schedulerInfo
+        break
         
       default:
         throw new Error(`Unknown request type: ${request.type}`)
@@ -256,6 +326,13 @@ async function handleRequest(request: NetworkRequest): Promise<NetworkResponse> 
       }
     }
   }
+}
+
+// Helper function to send external input to kernel
+async function sendExternalInput(input: any): Promise<void> {
+  // This is a placeholder - in a real implementation, this would send the input
+  // to the kernel via the userspace runtime. For now, we'll just log it.
+  console.log('[NetworkWorker] Would send external input to kernel:', input)
 }
 
 // Listen for messages from main thread

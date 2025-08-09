@@ -295,6 +295,11 @@ export class NetworkClient implements INetworkClient {
     }
   }
   
+  // Alias for removeWire (API compatibility)
+  async removeWire(wireId: string): Promise<void> {
+    return this.disconnectContacts(wireId)
+  }
+  
   async addContact(groupId: string, contact: Omit<Contact, 'id'>): Promise<string> {
     const result = await this.request<ContactId>({
       type: 'addContact',
@@ -429,6 +434,78 @@ export class NetworkClient implements INetworkClient {
       type: 'applyRefactoring',
       id: crypto.randomUUID(),
       data: { operation, params }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
+  }
+
+  // Primitive management methods
+  async listPrimitives(): Promise<string[]> {
+    const result = await this.request<string[]>({
+      type: 'listPrimitives',
+      id: crypto.randomUUID(),
+      data: {}
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
+  }
+
+  async listPrimitiveInfo(): Promise<any[]> {
+    const result = await this.request<any[]>({
+      type: 'listPrimitiveInfo',
+      id: crypto.randomUUID(),
+      data: {}
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
+  }
+
+  async getPrimitiveInfo(qualifiedName: string): Promise<any> {
+    const result = await this.request<any>({
+      type: 'getPrimitiveInfo',
+      id: crypto.randomUUID(),
+      data: { qualifiedName }
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
+  }
+
+  // Scheduler management methods
+  async listSchedulers(): Promise<string[]> {
+    const result = await this.request<string[]>({
+      type: 'listSchedulers',
+      id: crypto.randomUUID(),
+      data: {}
+    })
+    
+    if (!result.ok) {
+      throw new Error(result.error.message)
+    }
+    
+    return result.value
+  }
+
+  async getSchedulerInfo(schedulerId: string): Promise<any> {
+    const result = await this.request<any>({
+      type: 'getSchedulerInfo',
+      id: crypto.randomUUID(),
+      data: { schedulerId }
     })
     
     if (!result.ok) {

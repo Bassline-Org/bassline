@@ -44,6 +44,14 @@ export function ConnectionTypeDialog({ connection, onClose }: ConnectionTypeDial
     const sourceId = connection.sourceHandle || connection.source
     const targetId = connection.targetHandle || connection.target
     
+    console.log('[ConnectionTypeDialog] Creating connection:', {
+      raw: connection,
+      sourceId,
+      targetId,
+      hasSourceHandle: !!connection.sourceHandle,
+      hasTargetHandle: !!connection.targetHandle
+    })
+    
     submit({
       intent: 'create-wire',
       fromId: sourceId,

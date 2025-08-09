@@ -19,7 +19,7 @@ import type { GroupState } from '@bassline/core'
 import { ContactNodeV2 } from './ContactNodeV2'
 import { GroupNodeV2 } from './GroupNodeV2'
 import { ValueSliderNode } from './ValueSliderNode'
-import { GadgetPalette } from './GadgetPalette'
+import { KernelGadgetPalette } from './KernelGadgetPalette'
 import { Breadcrumbs } from './Breadcrumbs'
 import { PropertyPanel } from './PropertyPanel'
 import { ContextMenu } from './ContextMenu'
@@ -111,29 +111,41 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   }, [groupState.contacts, pendingNodeType, nodeViewMetadata])
   
   
-  // Update nodes when groupState changes
-  useEffect(() => {
-    setNodes(currentNodes => {
-      // Create a map of existing nodes for efficient lookup
-      const existingNodesMap = new Map(currentNodes.map(n => [n.id, n]))
-      const newNodes: Node[] = []
-      const seenNodeIds = new Set<string>()
-      
-      // Add/update contact nodes
-      if (groupState.contacts instanceof Map) {
-        let newContactIndex = 0
-        groupState.contacts.forEach((contact) => {
-          if (contact && contact.id) {
-            seenNodeIds.add(contact.id)
-            const existingNode = existingNodesMap.get(contact.id)
-            const metadata = nodeViewMetadata.get(contact.id)
-            const nodeType = metadata?.viewComponent || 'contact'
-            
-            // Only increment index for new nodes
-            if (!existingNode) {
-              newContactIndex++
-            }
-            
+  // Memoized nodes creation with stable references
+  const memoizedNodes = useMemo(() => {
+    const currentNodes = nodes
+    const existingNodesMap = new Map(currentNodes.map(n => [n.id, n]))
+    const newNodes: Node[] = []
+    
+    // Add/update contact nodes
+    if (groupState.contacts instanceof Map) {
+      let newContactIndex = 0
+      groupState.contacts.forEach((contact) => {
+        if (contact && contact.id) {
+          const existingNode = existingNodesMap.get(contact.id)
+          const metadata = nodeViewMetadata.get(contact.id)
+          const nodeType = metadata?.viewComponent || 'contact'
+          
+          // Only increment index for truly new nodes (not in existing nodes)
+          if (!existingNode) {
+            newContactIndex++
+          }
+          
+          // Create stable node reference - reuse existing node if data unchanged
+          const nodeData = { contact, groupId }
+          const existingData = existingNode?.data
+          
+          // Check if we can reuse existing node (same data structure)
+          if (existingNode && 
+              existingNode.type === nodeType &&
+              existingData?.contact?.id === contact.id &&
+              existingData?.contact?.content === contact.content &&
+              existingData?.contact?.blendMode === contact.blendMode &&
+              existingData?.groupId === groupId) {
+            // Reuse existing node completely for stability
+            newNodes.push(existingNode)
+          } else {
+            // Create new node or update existing with preserved position
             newNodes.push({
               id: contact.id,
               type: nodeType,
@@ -141,28 +153,42 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
                 x: 100 + ((newContactIndex - 1) * 150), 
                 y: 100 + (Math.floor((newContactIndex - 1) / 4) * 150) 
               },
-              data: {
-                contact,
-                groupId,
-              },
+              data: nodeData,
             })
           }
-        })
-      }
-      
-      // Add/update subgroup nodes (including gadgets)
-      let newGroupIndex = 0
-      groupState.group.subgroupIds.forEach((subgroupId) => {
-        if (subgroupId) {
-          seenNodeIds.add(subgroupId)
-          const existingNode = existingNodesMap.get(subgroupId)
-          const subgroup = subgroupData.get(subgroupId)
-          
-          // Only increment index for new nodes
-          if (!existingNode) {
-            newGroupIndex++
-          }
-          
+        }
+      })
+    }
+    
+    // Add/update subgroup nodes (including gadgets)
+    let newGroupIndex = 0
+    groupState.group.subgroupIds.forEach((subgroupId) => {
+      if (subgroupId) {
+        const existingNode = existingNodesMap.get(subgroupId)
+        const subgroup = subgroupData.get(subgroupId)
+        
+        // Only increment index for truly new nodes
+        if (!existingNode) {
+          newGroupIndex++
+        }
+        
+        const nodeData = {
+          groupId: subgroupId,
+          parentGroupId: groupId,
+          name: subgroup?.name || `Group ${subgroupId.slice(0, 8)}`,
+          isGadget: !!subgroup?.primitiveId,
+          primitiveId: subgroup?.primitiveId,
+          boundaryContacts: subgroup?.boundaryContacts || []
+        }
+        
+        // Check if we can reuse existing group node
+        if (existingNode && 
+            existingNode.type === 'group' &&
+            JSON.stringify(existingNode.data) === JSON.stringify(nodeData)) {
+          // Reuse existing node for stability
+          newNodes.push(existingNode)
+        } else {
+          // Create new node or update existing with preserved position
           newNodes.push({
             id: subgroupId,
             type: 'group',
@@ -170,22 +196,19 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
               x: 300 + ((newGroupIndex - 1) * 200), 
               y: 300 + (Math.floor((newGroupIndex - 1) / 3) * 200)
             },
-            data: {
-              groupId: subgroupId,
-              parentGroupId: groupId,
-              name: subgroup?.name || `Group ${subgroupId.slice(0, 8)}`,
-              isGadget: !!subgroup?.primitiveId,
-              primitiveId: subgroup?.primitiveId,
-              boundaryContacts: subgroup?.boundaryContacts || []
-            },
+            data: nodeData,
           })
         }
-      })
-      
-      // Preserve positions of nodes that still exist
-      return newNodes
+      }
     })
-  }, [groupState, groupId, subgroupData, nodeViewMetadata])
+    
+    return newNodes
+  }, [groupState.contacts, groupState.group.subgroupIds, subgroupData, nodeViewMetadata, groupId])
+
+  // Update React Flow nodes only when memoized nodes actually change
+  useEffect(() => {
+    setNodes(memoizedNodes)
+  }, [memoizedNodes])
   
   // Update edges when wires change
   useEffect(() => {
@@ -196,6 +219,22 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     onNodesChange(changes)
   }, [onNodesChange])
+  
+  // Handle gadget placement from palette
+  const handleGadgetPlace = useCallback((qualifiedName: string, position: { x: number, y: number }) => {
+    submit({
+      intent: 'create-primitive-gadget',
+      groupId,
+      qualifiedName,
+      position: JSON.stringify(position)
+    }, {
+      method: 'post',
+      action: '/api/editor/actions',
+      navigate: false
+    })
+    
+    setShowGadgetPalette(false)
+  }, [submit, groupId])
   
   // Handle edge connections
   const onConnect = useCallback((params: Connection) => {
@@ -471,9 +510,9 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
         {/* Gadget Palette */}
         {showGadgetPalette && (
           <div className="absolute right-4 top-4 z-10">
-            <GadgetPalette 
+            <KernelGadgetPalette 
               groupId={groupId} 
-              onGadgetSelect={() => setShowGadgetPalette(false)}
+              onGadgetPlace={handleGadgetPlace}
             />
           </div>
         )}

@@ -74,6 +74,15 @@ export class UserspaceRuntime {
     
     // Create primitive instance
     const primitive = this.primitiveLoader.createPrimitive(qualifiedName)
+    console.log(`[UserspaceRuntime.createPrimitiveGadget] Created primitive instance:`, {
+      qualifiedName,
+      primitive: {
+        id: primitive.id,
+        name: primitive.name,
+        inputs: primitive.inputs,
+        outputs: primitive.outputs
+      }
+    })
     
     // Generate unique group ID for this gadget
     const gadgetGroupId = brand.groupId(crypto.randomUUID())
@@ -81,7 +90,8 @@ export class UserspaceRuntime {
     // Store the active primitive instance
     this.activePrimitives.set(gadgetGroupId, primitive)
     
-    // Register as a group with the primitive attached
+    // Register as a group with primitive metadata (not the actual instance)
+    // The actual primitive instance is kept in activePrimitives Map
     await this.registerGroup({
       id: gadgetGroupId,
       name: primitive.name,
@@ -89,7 +99,14 @@ export class UserspaceRuntime {
       wireIds: [],
       subgroupIds: [],
       boundaryContactIds: [],
-      primitive,
+      primitive: {
+        id: primitive.id,
+        name: primitive.name,
+        inputs: primitive.inputs,
+        outputs: primitive.outputs,
+        category: primitive.category
+        // Don't include execute function - it can't be serialized
+      } as any,
       parentId: parentGroupId
     })
     
@@ -386,6 +403,116 @@ export class UserspaceRuntime {
           }
         }
         break
+
+      case 'external-list-primitive-info':
+        if (this.primitiveLoader) {
+          const primitiveInfo = this.primitiveLoader.listPrimitiveInfo()
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: brand.groupId('system'),
+            value: { 
+              type: 'list-primitive-info-success', 
+              source: input.source,
+              primitiveInfo 
+            },
+            timestamp: Date.now()
+          })
+        }
+        break
+
+      case 'external-get-primitive-info':
+        if (this.primitiveLoader) {
+          const primitiveInfo = this.primitiveLoader.getPrimitiveInfo(input.qualifiedName)
+          if (primitiveInfo) {
+            this.emitToKernel({
+              type: 'contact-change',
+              contactId: brand.contactId('system'),
+              groupId: brand.groupId('system'),
+              value: { 
+                type: 'get-primitive-info-success', 
+                source: input.source,
+                primitiveInfo
+              },
+              timestamp: Date.now()
+            })
+          } else {
+            this.emitToKernel({
+              type: 'contact-change',
+              contactId: brand.contactId('system'),
+              groupId: brand.groupId('system'),
+              value: { 
+                type: 'get-primitive-info-error', 
+                source: input.source, 
+                error: `Primitive not found: ${input.qualifiedName}` 
+              },
+              timestamp: Date.now()
+            })
+          }
+        }
+        break
+
+      case 'external-list-schedulers':
+        if (this.schedulerDriver) {
+          const schedulers = this.schedulerDriver.listSchedulers()
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: brand.groupId('system'),
+            value: { 
+              type: 'list-schedulers-success', 
+              source: input.source,
+              schedulers 
+            },
+            timestamp: Date.now()
+          })
+        }
+        break
+
+      case 'external-get-scheduler-info':
+        if (this.schedulerDriver) {
+          try {
+            const schedulerInfo = this.schedulerDriver.getSchedulerInfo(input.schedulerId)
+            if (schedulerInfo) {
+              this.emitToKernel({
+                type: 'contact-change',
+                contactId: brand.contactId('system'),
+                groupId: brand.groupId('system'),
+                value: { 
+                  type: 'get-scheduler-info-success', 
+                  source: input.source,
+                  schedulerInfo 
+                },
+                timestamp: Date.now()
+              })
+            } else {
+              this.emitToKernel({
+                type: 'contact-change',
+                contactId: brand.contactId('system'),
+                groupId: brand.groupId('system'),
+                value: { 
+                  type: 'get-scheduler-info-error', 
+                  source: input.source, 
+                  error: `Scheduler not found: ${input.schedulerId}` 
+                },
+                timestamp: Date.now()
+              })
+            }
+          } catch (error) {
+            this.emitToKernel({
+              type: 'contact-change',
+              contactId: brand.contactId('system'),
+              groupId: brand.groupId('system'),
+              value: { 
+                type: 'get-scheduler-info-error', 
+                source: input.source, 
+                error: (error as Error).message 
+              },
+              timestamp: Date.now()
+            })
+          }
+        }
+        break
         
       default:
         // Exhaustive check
@@ -463,6 +590,17 @@ export class UserspaceRuntime {
    * Register a new group in the propagation network
    */
   async registerGroup(group: Group): Promise<void> {
+    console.log(`[UserspaceRuntime.registerGroup] Registering group:`, {
+      id: group.id,
+      name: group.name,
+      hasPrimitive: !!group.primitive,
+      primitive: group.primitive ? {
+        id: group.primitive.id,
+        inputs: group.primitive.inputs,
+        outputs: group.primitive.outputs
+      } : null
+    })
+    
     // Check if group already exists
     if (this.state.groups.has(group.id)) {
       console.log(`[UserspaceRuntime] Group ${group.id} already exists, skipping registration`)
@@ -478,8 +616,17 @@ export class UserspaceRuntime {
     
     // If this is a primitive gadget, create boundary contacts
     if (group.primitive) {
-      const primitive = group.primitive
-      console.log(`[UserspaceRuntime] Creating boundary contacts for primitive gadget ${primitive.id}`)
+      // Get the actual primitive instance if available, or use the metadata
+      const primitiveMetadata = group.primitive
+      const primitiveInstance = this.activePrimitives.get(group.id)
+      const primitive = primitiveInstance || primitiveMetadata
+      
+      console.log(`[UserspaceRuntime] Creating boundary contacts for primitive gadget ${primitive.id}`, {
+        hasMetadata: !!primitiveMetadata,
+        hasInstance: !!primitiveInstance,
+        inputs: primitive.inputs,
+        outputs: primitive.outputs
+      })
       
       // Create input boundary contacts
       for (const inputName of primitive.inputs) {

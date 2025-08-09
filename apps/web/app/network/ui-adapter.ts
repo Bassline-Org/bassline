@@ -61,8 +61,8 @@ export class UIAdapter {
   /**
    * Add a contact and emit contact-added change
    */
-  async addContact(groupId: string, content: any): Promise<string> {
-    const contactId = await this.kernelClient.addContact(groupId, content)
+  async addContact(groupId: string, contactData: Omit<Contact, 'id'>): Promise<string> {
+    const contactId = await this.kernelClient.addContact(groupId, contactData)
     
     // Emit UI-level change event
     const change: Change = {
@@ -70,7 +70,7 @@ export class UIAdapter {
       data: {
         contactId,
         groupId,
-        content,
+        content: contactData.content,
         timestamp: Date.now()
       },
       timestamp: Date.now()
@@ -246,8 +246,16 @@ export class UIAdapter {
     )
     
     // Create regular contacts to test with
-    const inputId = await this.addContact(parentGroupId, 5)
-    const outputId = await this.addContact(parentGroupId, 0)
+    const inputId = await this.addContact(parentGroupId, {
+      content: 5,
+      blendMode: 'accept-last',
+      groupId: brand.groupId(parentGroupId)
+    })
+    const outputId = await this.addContact(parentGroupId, {
+      content: 0,
+      blendMode: 'accept-last',
+      groupId: brand.groupId(parentGroupId)
+    })
     
     // Wire up the demo:
     // inputContact -> gadget input 'a' 
@@ -365,6 +373,34 @@ export class UIAdapter {
   
   onError(callback: (error: Error) => void): () => void {
     return this.kernelClient.onError(callback)
+  }
+  
+  // ============================================================================
+  // Primitive Management
+  // ============================================================================
+  
+  async listPrimitives(): Promise<string[]> {
+    return this.kernelClient.listPrimitives()
+  }
+  
+  async listPrimitiveInfo(): Promise<any[]> {
+    return this.kernelClient.listPrimitiveInfo()
+  }
+  
+  async getPrimitiveInfo(qualifiedName: string): Promise<any> {
+    return this.kernelClient.getPrimitiveInfo(qualifiedName)
+  }
+  
+  // ============================================================================
+  // Scheduler Management  
+  // ============================================================================
+  
+  async listSchedulers(): Promise<string[]> {
+    return this.kernelClient.listSchedulers()
+  }
+  
+  async getSchedulerInfo(schedulerId: string): Promise<any> {
+    return this.kernelClient.getSchedulerInfo(schedulerId)
   }
   
   // ============================================================================

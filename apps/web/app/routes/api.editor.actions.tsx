@@ -38,8 +38,9 @@ export async function clientAction({ request }: { request: Request }) {
       case 'update-contact': {
         const contactId = formData.get('contactId') as string
         const content = JSON.parse(formData.get('content') as string)
+        const groupId = formData.get('groupId') as string || 'root' // Default to root if not provided
         
-        await client.scheduleUpdate(contactId, content)
+        await client.updateContact(contactId, groupId, content)
         
         return { 
           success: true, 
@@ -181,24 +182,21 @@ export async function clientAction({ request }: { request: Request }) {
         }
       }
       
-      // Primitive gadget operations
+      // Primitive gadget operations (legacy - redirect to new handler)
       case 'create-gadget': {
         const groupId = formData.get('groupId') as string
         const gadgetType = formData.get('gadgetType') as string
         const position = formData.get('position') ? JSON.parse(formData.get('position') as string) : { x: 200, y: 200 }
         
-        console.log('[EditorAction] Creating gadget:', { groupId, gadgetType, position })
+        console.log('[EditorAction] Creating gadget (legacy):', { groupId, gadgetType, position })
         
-        // Create a display name for the gadget
-        const gadgetName = gadgetType.charAt(0).toUpperCase() + gadgetType.slice(1)
+        // Convert to qualified name for the new system
+        const qualifiedName = gadgetType.includes('/') ? gadgetType : `@bassline/core/${gadgetType}`
         
-        // Register the gadget group with the primitive
-        const result = await client.addGroup(groupId, {
-          name: gadgetName,
-          primitiveId: gadgetType
-        })
+        // Use the proper primitive gadget creation
+        const result = await client.createPrimitiveGadget(groupId, gadgetType)
         
-        console.log('[EditorAction] Gadget group created:', result, 'in parent:', groupId)
+        console.log('[EditorAction] Primitive gadget created:', result, 'in parent:', groupId)
         
         // Position is handled in UI state
         
@@ -206,6 +204,27 @@ export async function clientAction({ request }: { request: Request }) {
           success: true, 
           groupId: result,
           message: 'Gadget created successfully' 
+        }
+      }
+      
+      case 'create-primitive-gadget': {
+        const groupId = formData.get('groupId') as string
+        const qualifiedName = formData.get('qualifiedName') as string
+        const position = formData.get('position') ? JSON.parse(formData.get('position') as string) : { x: 200, y: 200 }
+        
+        console.log('[EditorAction] Creating primitive gadget:', { groupId, qualifiedName, position })
+        
+        // Create the gadget using kernel-based primitive system
+        const result = await client.createPrimitiveGadgetV2(qualifiedName, groupId)
+        
+        console.log('[EditorAction] Primitive gadget created:', result, 'in parent:', groupId)
+        
+        // Position is handled in UI state
+        
+        return { 
+          success: true, 
+          groupId: result,
+          message: 'Primitive gadget created successfully' 
         }
       }
       

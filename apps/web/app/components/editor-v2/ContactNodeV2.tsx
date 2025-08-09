@@ -18,8 +18,12 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
   const formatContent = (content: unknown) => {
     if (typeof content === 'string') {
       return content
+    } else if (typeof content === 'number') {
+      return String(content)
     } else if (content === null || content === undefined) {
       return ''
+    } else if (Array.isArray(content)) {
+      return content.join(', ')
     } else {
       return JSON.stringify(content)
     }
@@ -45,6 +49,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
       submit({
         intent: 'update-contact',
         contactId: contact.id,
+        groupId: groupId,
         content: newContent
       }, {
         method: 'post',
@@ -56,6 +61,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
       submit({
         intent: 'update-contact',
         contactId: contact.id,
+        groupId: groupId,
         content: JSON.stringify(newContent)
       }, {
         method: 'post',
@@ -63,7 +69,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
         navigate: false
       })
     }
-  }, [contact.id, submit, inputValue])
+  }, [contact.id, groupId, submit, inputValue])
   
   return (
     <div 

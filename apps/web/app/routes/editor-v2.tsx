@@ -122,6 +122,74 @@ export default function EditorV2() {
       location.reload()
     }
     
+    // Debug connection issues
+    (window as any).debugConnection = async () => {
+      console.log('=== Connection Debug Test ===')
+      
+      try {
+        const client = getNetworkClient()
+        
+        // 1. Create a simple contact
+        console.log('1. Creating test contact...')
+        const contactId = await client.addContact('root', {
+          content: 42,
+          blendMode: 'accept-last',
+          groupId: 'root'
+        })
+        console.log('   Contact created:', contactId)
+        
+        // 2. Create a primitive gadget (add gadget)
+        console.log('2. Creating add gadget...')
+        const addGadgetId = await client.createPrimitiveGadget('root', 'add')
+        console.log('   Add gadget created:', addGadgetId)
+        
+        // 3. Get the gadget state to see boundary contacts
+        console.log('3. Getting gadget state...')
+        const gadgetState = await client.getState(addGadgetId)
+        console.log('   Gadget state:', gadgetState)
+        const boundaryContacts = Array.from(gadgetState.contacts.values()).filter(c => c.isBoundary)
+        console.log('   Boundary contacts:', boundaryContacts)
+        console.log('   Group boundaryContactIds:', gadgetState.group.boundaryContactIds)
+        
+        // 4. Try to connect the contact to the gadget's first input
+        const inputContacts = Array.from(gadgetState.contacts.values()).filter(c => c.isBoundary && c.boundaryDirection === 'input')
+        if (inputContacts.length > 0) {
+          const inputContactId = inputContacts[0].id
+          console.log('4. Attempting connection...')
+          console.log('   From:', contactId)
+          console.log('   To:', inputContactId)
+          
+          try {
+            const wireId = await client.connect(contactId, inputContactId, 'bidirectional')
+            console.log('   ✅ Connection successful! Wire ID:', wireId)
+          } catch (connectionError) {
+            console.error('   ❌ Connection failed:', connectionError.message)
+            
+            // Debug: Check if both contacts can be found individually
+            console.log('   Debugging contact lookup...')
+            try {
+              const fromContact = await client.getContact(contactId)
+              console.log('   From contact lookup:', fromContact ? '✅ Found' : '❌ Not found')
+            } catch (e) {
+              console.log('   From contact lookup: ❌ Error:', e.message)
+            }
+            
+            try {
+              const toContact = await client.getContact(inputContactId)
+              console.log('   To contact lookup:', toContact ? '✅ Found' : '❌ Not found')
+            } catch (e) {
+              console.log('   To contact lookup: ❌ Error:', e.message)
+            }
+          }
+        } else {
+          console.log('   ❌ No input contacts found in gadget')
+        }
+        
+      } catch (error) {
+        console.error('Debug test failed:', error)
+      }
+    }
+
     // Expose primitive gadget testing utilities
     (window as any).testPrimitiveGadgets = async () => {
       const client = getNetworkClient()

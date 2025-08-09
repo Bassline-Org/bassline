@@ -38,8 +38,9 @@ export async function clientAction({ request }: { request: Request }) {
       case 'update-contact': {
         const contactId = formData.get('contactId') as string
         const content = JSON.parse(formData.get('content') as string)
+        const groupId = formData.get('groupId') as string || 'root'
         
-        await client.scheduleUpdate(contactId, content)
+        await client.updateContact(contactId, groupId, content)
         
         return { 
           success: true, 

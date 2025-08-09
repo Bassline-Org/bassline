@@ -183,7 +183,11 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
                 Array.from(state.contacts.entries()).map(([id, contact]) => ({
                   id,
                   content: contact.content,
-                  blendMode: contact.blendMode
+                  blendMode: contact.blendMode,
+                  isBoundary: contact.isBoundary,
+                  boundaryDirection: contact.boundaryDirection,
+                  name: contact.name,
+                  groupId: contact.groupId
                 })) : undefined,
               wires: input.includeWires ?
                 Array.from(state.wires.entries()).map(([id, wire]) => ({
@@ -212,10 +216,25 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             
           case 'external-create-primitive-gadget':
             // Create primitive gadget through runtime
+            console.log(`[KernelWorker] Creating primitive gadget:`, {
+              qualifiedName: input.qualifiedName,
+              parentGroupId: input.parentGroupId
+            })
             const gadgetId = await runtime.createPrimitiveGadget(
               input.qualifiedName,
               input.parentGroupId
             )
+            console.log(`[KernelWorker] Primitive gadget created:`, gadgetId)
+            
+            // Debug: Check the created gadget state
+            const createdState = await runtime.getState(gadgetId)
+            console.log(`[KernelWorker] Created gadget state:`, {
+              groupId: gadgetId,
+              boundaryContactIds: createdState.group.boundaryContactIds,
+              totalContacts: createdState.contacts.size,
+              boundaryContacts: Array.from(createdState.contacts.values()).filter(c => c.isBoundary)
+            })
+            
             result = { id: gadgetId, groupId: gadgetId }
             break
             
@@ -239,6 +258,62 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             }
             schedulerDriver.activateScheduler(input.schedulerId, input.config)
             result = { success: true }
+            break
+            
+          case 'external-list-primitive-info':
+            // List detailed primitive information
+            const infoLoader = kernel.getPrimitiveLoader()
+            if (!infoLoader) {
+              throw new Error('Primitive loader not initialized')
+            }
+            result = { 
+              primitiveInfo: infoLoader.listPrimitiveInfo(),
+              requestId: input.requestId
+            }
+            break
+            
+          case 'external-get-primitive-info':
+            // Get specific primitive information
+            const getInfoLoader = kernel.getPrimitiveLoader()
+            if (!getInfoLoader) {
+              throw new Error('Primitive loader not initialized')
+            }
+            const primitiveInfo = getInfoLoader.getPrimitiveInfo(input.qualifiedName)
+            if (!primitiveInfo) {
+              throw new Error(`Primitive not found: ${input.qualifiedName}`)
+            }
+            result = { 
+              primitiveInfo,
+              requestId: input.requestId
+            }
+            break
+            
+          case 'external-list-schedulers':
+            // List available schedulers
+            const listSchedulerDriver = kernel.getSchedulerDriver()
+            if (!listSchedulerDriver) {
+              throw new Error('Scheduler driver not initialized')
+            }
+            result = { 
+              schedulers: listSchedulerDriver.listSchedulers(),
+              requestId: input.requestId
+            }
+            break
+            
+          case 'external-get-scheduler-info':
+            // Get specific scheduler information
+            const getSchedulerDriver = kernel.getSchedulerDriver()
+            if (!getSchedulerDriver) {
+              throw new Error('Scheduler driver not initialized')
+            }
+            const schedulerInfo = getSchedulerDriver.getSchedulerInfo(input.schedulerId)
+            if (!schedulerInfo) {
+              throw new Error(`Scheduler not found: ${input.schedulerId}`)
+            }
+            result = { 
+              schedulerInfo,
+              requestId: input.requestId
+            }
             break
             
           default:

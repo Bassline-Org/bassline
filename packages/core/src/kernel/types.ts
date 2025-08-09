@@ -84,9 +84,13 @@ export type ExternalInput =
   // Primitive Management Commands
   | ExternalLoadPrimitive
   | ExternalCreatePrimitiveGadget
-  | ExternalListPrimitives  
+  | ExternalListPrimitives
+  | ExternalListPrimitiveInfo
+  | ExternalGetPrimitiveInfo
   // Scheduler Management Commands
   | ExternalSetScheduler
+  | ExternalListSchedulers
+  | ExternalGetSchedulerInfo
 
 /**
  * Update a contact's value (original functionality)
@@ -274,6 +278,60 @@ export interface ExternalSetScheduler {
 export interface ExternalListPrimitives {
   readonly type: 'external-list-primitives'
   readonly source: string
+  readonly requestId?: string
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Get detailed information about a specific primitive
+ */
+export interface ExternalGetPrimitiveInfo {
+  readonly type: 'external-get-primitive-info'
+  readonly source: string
+  readonly qualifiedName: string  // e.g., "@bassline/core/add"
+  readonly requestId?: string
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * List all available primitive info (detailed)
+ */
+export interface ExternalListPrimitiveInfo {
+  readonly type: 'external-list-primitive-info'
+  readonly source: string
+  readonly requestId?: string
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * List available schedulers
+ */
+export interface ExternalListSchedulers {
+  readonly type: 'external-list-schedulers'
+  readonly source: string
+  readonly requestId?: string
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Get detailed information about a specific scheduler
+ */
+export interface ExternalGetSchedulerInfo {
+  readonly type: 'external-get-scheduler-info'
+  readonly source: string
+  readonly schedulerId: string
   readonly requestId?: string
   readonly metadata?: {
     readonly timestamp?: number

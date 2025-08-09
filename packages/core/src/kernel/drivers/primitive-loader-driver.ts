@@ -25,6 +25,8 @@ export interface PrimitiveInfo {
   inputs: string[]
   outputs: string[]
   category?: string
+  description?: string
+  isPure?: boolean
 }
 
 export class PrimitiveLoaderDriver implements Driver {
@@ -115,7 +117,9 @@ export class PrimitiveLoaderDriver implements Driver {
               name: instance.name,
               inputs: instance.inputs,
               outputs: instance.outputs,
-              category: instance.category
+              category: instance.category,
+              description: instance.description,
+              isPure: instance.isPure
             })
             
             registeredCount++

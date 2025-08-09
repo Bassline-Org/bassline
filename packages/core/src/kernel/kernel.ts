@@ -181,6 +181,14 @@ export class Kernel {
     this.runtime = runtime
     // Also set the handler for backwards compatibility
     this.setUserspaceHandler(runtime.receiveExternalInput.bind(runtime))
+    
+    // If system drivers are already initialized, pass them to the runtime
+    if (this.primitiveLoader) {
+      runtime.setPrimitiveLoader(this.primitiveLoader)
+    }
+    if (this.schedulerDriver) {
+      runtime.setSchedulerDriver(this.schedulerDriver)
+    }
   }
   
   /**

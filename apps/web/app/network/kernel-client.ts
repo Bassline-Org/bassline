@@ -166,16 +166,16 @@ export class KernelClient {
   /**
    * Add a contact to a group
    */
-  async addContact(groupId: string, content: any): Promise<string> {
+  async addContact(groupId: string, contactData: Omit<Contact, 'id'>): Promise<string> {
     if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
-      return this.bridge.addContact(groupId, content)
+      return this.bridge.addContact(groupId, contactData)
     } else {
       // Local mode - send through kernel
       const input: ExternalInput = {
         type: 'external-add-contact',
         source: 'ui',
         groupId: brand.groupId(groupId),
-        contact: { content }
+        contact: contactData
       }
       const result = await this.bridge.sendOperation(input)
       return result?.id || result?.contactId || 'unknown'
@@ -290,6 +290,76 @@ export class KernelClient {
       }
       const result = await this.bridge.sendOperation(input)
       return result?.primitives || []
+    }
+  }
+
+  /**
+   * List detailed primitive information
+   */
+  async listPrimitiveInfo(): Promise<any[]> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('listPrimitiveInfo not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-list-primitive-info',
+        source: 'ui',
+        requestId: `list-info-${Date.now()}`
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.primitiveInfo || []
+    }
+  }
+
+  /**
+   * Get information for a specific primitive
+   */
+  async getPrimitiveInfo(qualifiedName: string): Promise<any> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('getPrimitiveInfo not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-get-primitive-info',
+        source: 'ui',
+        qualifiedName,
+        requestId: `get-info-${Date.now()}`
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.primitiveInfo
+    }
+  }
+
+  /**
+   * List available schedulers
+   */
+  async listSchedulers(): Promise<string[]> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('listSchedulers not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-list-schedulers',
+        source: 'ui',
+        requestId: `list-schedulers-${Date.now()}`
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.schedulers || []
+    }
+  }
+
+  /**
+   * Get information for a specific scheduler
+   */
+  async getSchedulerInfo(schedulerId: string): Promise<any> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('getSchedulerInfo not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-get-scheduler-info',
+        source: 'ui',
+        schedulerId,
+        requestId: `get-scheduler-${Date.now()}`
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.schedulerInfo
     }
   }
   

@@ -51,6 +51,11 @@ export type NetworkRequest =
   | SetSchedulerRequest
   | ImportStateRequest
   | ExportStateRequest
+  | ListPrimitivesRequest
+  | ListPrimitiveInfoRequest
+  | GetPrimitiveInfoRequest
+  | ListSchedulersRequest
+  | GetSchedulerInfoRequest
 
 // Individual request types
 export interface RegisterGroupRequest {
@@ -262,6 +267,42 @@ export interface NetworkClient {
   
   // Get current mode
   getMode(): NetworkMode
+}
+
+// Primitive management requests
+export interface ListPrimitivesRequest {
+  type: 'listPrimitives'
+  id: string
+  data: {}
+}
+
+export interface ListPrimitiveInfoRequest {
+  type: 'listPrimitiveInfo' 
+  id: string
+  data: {}
+}
+
+export interface GetPrimitiveInfoRequest {
+  type: 'getPrimitiveInfo'
+  id: string
+  data: {
+    qualifiedName: string
+  }
+}
+
+// Scheduler management requests
+export interface ListSchedulersRequest {
+  type: 'listSchedulers'
+  id: string
+  data: {}
+}
+
+export interface GetSchedulerInfoRequest {
+  type: 'getSchedulerInfo'
+  id: string
+  data: {
+    schedulerId: string
+  }
 }
 
 // ============================================================================

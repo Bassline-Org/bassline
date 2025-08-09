@@ -21,6 +21,11 @@ export const GroupNodeV2 = memo(({ data, selected }: NodeProps) => {
   const navigate = useNavigate()
   const { groupId, name, isGadget, primitiveId, boundaryContacts = [] } = data as GroupNodeData
   
+  // Debug log for boundary contacts
+  if (isGadget) {
+    console.log(`[GroupNodeV2] Gadget ${name} (${groupId}) boundary contacts:`, boundaryContacts)
+  }
+  
   const handleDoubleClick = useCallback(() => {
     // Only navigate into non-gadget groups
     if (!isGadget) {
