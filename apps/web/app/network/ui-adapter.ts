@@ -7,7 +7,7 @@
  */
 
 import type { ContactChange, Change, GroupState, Contact, Group, PrimitiveGadget } from '@bassline/core'
-import { brand, allPrimitiveGadgets, getPrimitiveGadget } from '@bassline/core'
+import { brand } from '@bassline/core'
 import { KernelClient } from './kernel-client'
 
 export interface UIAdapterConfig {
@@ -156,24 +156,29 @@ export class UIAdapter {
   }
   
   /**
-   * Create a primitive gadget group
+   * Create a primitive gadget group (legacy compatibility)
    */
   async createPrimitiveGadget(parentGroupId: string, primitiveId: string): Promise<string> {
-    const primitive = getPrimitiveGadget(primitiveId)
-    if (!primitive) {
-      throw new Error(`Unknown primitive gadget: ${primitiveId}`)
-    }
-    
-    // Create the primitive gadget group
-    const gadgetGroupId = await this.kernelClient.createPrimitiveGadget(parentGroupId, primitiveId)
+    // Use new modular system with qualified names
+    // For backwards compatibility, assume core primitives
+    const qualifiedName = primitiveId.includes('/') ? primitiveId : `@bassline/core/${primitiveId}`
+    return this.createPrimitiveGadgetV2(qualifiedName, parentGroupId)
+  }
+  
+  /**
+   * Create a primitive gadget using the new modular system
+   */
+  async createPrimitiveGadgetV2(qualifiedName: string, parentGroupId?: string): Promise<string> {
+    // Create the primitive gadget group using new system
+    const gadgetGroupId = await this.kernelClient.createPrimitiveGadgetV2(qualifiedName, parentGroupId)
     
     // Emit UI-level change event
     const change: Change = {
       type: 'gadget-added',
       data: {
         id: gadgetGroupId,
-        primitiveId,
-        name: primitive.name,
+        primitiveId: qualifiedName,
+        name: qualifiedName.split('/').pop() || qualifiedName,
         parentId: parentGroupId,
         timestamp: Date.now()
       },
@@ -185,17 +190,38 @@ export class UIAdapter {
   }
   
   /**
-   * Get all available primitive gadgets
+   * Load a primitive module
    */
-  getPrimitiveGadgets(): PrimitiveGadget[] {
-    return allPrimitiveGadgets
+  async loadPrimitiveModule(moduleSource: {
+    type: 'npm' | 'file' | 'url'
+    package?: string
+    path?: string
+    url?: string
+    namespace: string
+  }): Promise<void> {
+    await this.kernelClient.loadPrimitiveModule(moduleSource)
   }
   
   /**
-   * Get primitive gadgets by category
+   * Get all available primitive gadgets (new modular system)
    */
-  getPrimitiveGadgetsByCategory(category: string): PrimitiveGadget[] {
-    return allPrimitiveGadgets.filter(gadget => gadget.category === category)
+  async getPrimitiveGadgets(): Promise<string[]> {
+    return this.kernelClient.listPrimitives()
+  }
+  
+  /**
+   * Get primitive gadgets by namespace
+   */
+  async getPrimitiveGadgetsByNamespace(namespace: string): Promise<string[]> {
+    const allPrimitives = await this.kernelClient.listPrimitives()
+    return allPrimitives.filter(name => name.startsWith(namespace))
+  }
+  
+  /**
+   * Set the active scheduler
+   */
+  async setScheduler(schedulerId: string, config?: any): Promise<void> {
+    await this.kernelClient.setScheduler(schedulerId, config)
   }
   
   /**

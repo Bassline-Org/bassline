@@ -14,6 +14,9 @@ import type {
 } from './types'
 import { KernelError, DriverError, CommandError } from './types'
 import type { Driver, BridgeDriver, StorageDriver } from './driver'
+import { PrimitiveLoaderDriver } from './drivers/primitive-loader-driver'
+import { SchedulerDriver } from './drivers/scheduler-driver'
+import { UserspaceRuntime } from './userspace-runtime'
 
 /**
  * KernelBassline - The manifest/blueprint for a kernel
@@ -61,6 +64,11 @@ export class Kernel {
   private userspaceHandler?: (input: ExternalInput) => Promise<void>
   private readonly bassline: KernelBassline
   private readonly pendingOperations = new Set<Promise<void>>()
+  
+  // New: Core system drivers
+  private primitiveLoader?: PrimitiveLoaderDriver
+  private schedulerDriver?: SchedulerDriver
+  private runtime?: UserspaceRuntime
   
   constructor(bassline: KernelBassline = {}) {
     // Store the bassline with defaults
@@ -164,6 +172,73 @@ export class Kernel {
    */
   setUserspaceHandler(handler: (input: ExternalInput) => Promise<void>): void {
     this.userspaceHandler = handler
+  }
+  
+  /**
+   * Set the userspace runtime (for new modular system)
+   */
+  setUserspaceRuntime(runtime: UserspaceRuntime): void {
+    this.runtime = runtime
+    // Also set the handler for backwards compatibility
+    this.setUserspaceHandler(runtime.receiveExternalInput.bind(runtime))
+  }
+  
+  /**
+   * Initialize core system drivers
+   */
+  async initializeSystemDrivers(): Promise<void> {
+    // Initialize primitive loader
+    this.primitiveLoader = new PrimitiveLoaderDriver()
+    await this.primitiveLoader.initialize()
+    
+    // Load core primitives
+    await this.primitiveLoader.loadModule({
+      type: 'builtin',
+      module: () => import('../primitives/core-module'),
+      namespace: '@bassline/core'
+    })
+    
+    // Initialize scheduler driver
+    this.schedulerDriver = new SchedulerDriver()
+    await this.schedulerDriver.initialize()
+    
+    // Load core schedulers
+    const schedulerModule = await import('../scheduler/core-module')
+    for (const [name, factory] of Object.entries(schedulerModule)) {
+      if (typeof factory === 'function') {
+        // Register each scheduler factory
+        this.schedulerDriver.registerScheduler(name, factory as () => any)
+      }
+    }
+    
+    // Wire to runtime if available
+    if (this.runtime) {
+      this.runtime.setPrimitiveLoader(this.primitiveLoader)
+      this.runtime.setSchedulerDriver(this.schedulerDriver)
+    }
+    
+    // Set default scheduler
+    this.schedulerDriver.activateScheduler('immediate')
+    
+    if (this.bassline.debug) {
+      console.log('[Kernel] System drivers initialized')
+      console.log('[Kernel] Loaded primitives:', this.primitiveLoader.listPrimitives())
+      console.log('[Kernel] Available schedulers:', this.schedulerDriver.listSchedulers())
+    }
+  }
+  
+  /**
+   * Get the primitive loader driver
+   */
+  getPrimitiveLoader(): PrimitiveLoaderDriver | undefined {
+    return this.primitiveLoader
+  }
+  
+  /**
+   * Get the scheduler driver
+   */
+  getSchedulerDriver(): SchedulerDriver | undefined {
+    return this.schedulerDriver
   }
   
   /**

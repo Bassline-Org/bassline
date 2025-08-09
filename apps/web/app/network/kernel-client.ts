@@ -219,7 +219,7 @@ export class KernelClient {
   }
   
   /**
-   * Create a primitive gadget group
+   * Create a primitive gadget group (legacy compatibility)
    */
   async createPrimitiveGadget(parentId: string, primitiveId: string): Promise<string> {
     if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
@@ -233,6 +233,80 @@ export class KernelClient {
       }
       const result = await this.bridge.sendOperation(input)
       return result?.id || result?.groupId || 'unknown'
+    }
+  }
+  
+  /**
+   * Load a primitive module (new modular system)
+   */
+  async loadPrimitiveModule(moduleSource: {
+    type: 'npm' | 'file' | 'url'
+    package?: string
+    path?: string
+    url?: string
+    namespace: string
+  }): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('loadPrimitiveModule not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-load-primitive',
+        source: 'ui',
+        moduleSource
+      }
+      await this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
+   * Create a primitive gadget using qualified name (new modular system)
+   */
+  async createPrimitiveGadgetV2(qualifiedName: string, parentId?: string): Promise<string> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('createPrimitiveGadgetV2 not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-create-primitive-gadget',
+        source: 'ui',
+        qualifiedName,
+        parentGroupId: parentId ? brand.groupId(parentId) : undefined
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.id || result?.groupId || 'unknown'
+    }
+  }
+  
+  /**
+   * List available primitives
+   */
+  async listPrimitives(): Promise<string[]> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('listPrimitives not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-list-primitives',
+        source: 'ui',
+        requestId: `list-${Date.now()}`
+      }
+      const result = await this.bridge.sendOperation(input)
+      return result?.primitives || []
+    }
+  }
+  
+  /**
+   * Set the active scheduler
+   */
+  async setScheduler(schedulerId: string, config?: any): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('setScheduler not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-set-scheduler',
+        source: 'ui',
+        schedulerId,
+        config
+      }
+      await this.bridge.sendOperation(input)
     }
   }
   

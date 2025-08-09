@@ -35,6 +35,12 @@ async function initialize() {
   if (initialized) return
   
   try {
+    // Initialize system drivers (primitive loader, scheduler driver)
+    await kernel.initializeSystemDrivers()
+    
+    // Connect runtime to kernel for new modular system
+    kernel.setUserspaceRuntime(runtime)
+    
     // Register storage driver
     await kernel.registerDriver(storage)
     
@@ -192,6 +198,47 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           case 'external-query-contact':
             // TODO: Implement contact query
             result = { content: null }
+            break
+            
+          case 'external-load-primitive':
+            // Load primitive module through kernel
+            const primitiveLoader = kernel.getPrimitiveLoader()
+            if (!primitiveLoader) {
+              throw new Error('Primitive loader not initialized')
+            }
+            await primitiveLoader.loadModule(input.moduleSource)
+            result = { success: true }
+            break
+            
+          case 'external-create-primitive-gadget':
+            // Create primitive gadget through runtime
+            const gadgetId = await runtime.createPrimitiveGadget(
+              input.qualifiedName,
+              input.parentGroupId
+            )
+            result = { id: gadgetId, groupId: gadgetId }
+            break
+            
+          case 'external-list-primitives':
+            // List available primitives
+            const loader = kernel.getPrimitiveLoader()
+            if (!loader) {
+              throw new Error('Primitive loader not initialized')
+            }
+            result = { 
+              primitives: loader.listPrimitives(),
+              requestId: input.requestId
+            }
+            break
+            
+          case 'external-set-scheduler':
+            // Set active scheduler
+            const schedulerDriver = kernel.getSchedulerDriver()
+            if (!schedulerDriver) {
+              throw new Error('Scheduler driver not initialized')
+            }
+            schedulerDriver.activateScheduler(input.schedulerId, input.config)
+            result = { success: true }
             break
             
           default:

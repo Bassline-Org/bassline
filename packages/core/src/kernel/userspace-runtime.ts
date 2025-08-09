@@ -11,12 +11,16 @@ import type {
   Contact,
   Wire,
   Change,
-  BlendMode
+  BlendMode,
+  PrimitiveGadget,
+  Scheduler
 } from '../types'
 import { brand } from '../types'
 import { propagateContent } from '../propagation'
 import type { Kernel } from './kernel'
 import type { ContactChange, ExternalInput } from './types'
+import type { PrimitiveLoaderDriver } from './drivers/primitive-loader-driver'
+import type { SchedulerDriver } from './drivers/scheduler-driver'
 
 export interface UserspaceRuntimeConfig {
   kernel: Kernel
@@ -33,11 +37,70 @@ export class UserspaceRuntime {
   private subscribers = new Set<(changes: Change[]) => void>()
   private kernel: Kernel
   
+  // New: Modular system drivers
+  private primitiveLoader?: PrimitiveLoaderDriver
+  private schedulerDriver?: SchedulerDriver
+  private activePrimitives = new Map<string, PrimitiveGadget>()
+  
   constructor(config: UserspaceRuntimeConfig) {
     this.kernel = config.kernel
     
     // Register with kernel to receive external input
     this.kernel.setUserspaceHandler(this.receiveExternalInput.bind(this))
+  }
+  
+  /**
+   * Set the primitive loader driver
+   */
+  setPrimitiveLoader(loader: PrimitiveLoaderDriver): void {
+    this.primitiveLoader = loader
+  }
+  
+  /**
+   * Set the scheduler driver
+   */
+  setSchedulerDriver(driver: SchedulerDriver): void {
+    this.schedulerDriver = driver
+  }
+  
+  /**
+   * Create a primitive gadget instance
+   */
+  async createPrimitiveGadget(qualifiedName: string, parentGroupId?: string): Promise<string> {
+    if (!this.primitiveLoader) {
+      throw new Error('No primitive loader driver configured')
+    }
+    
+    // Create primitive instance
+    const primitive = this.primitiveLoader.createPrimitive(qualifiedName)
+    
+    // Generate unique group ID for this gadget
+    const gadgetGroupId = brand.groupId(`gadget-${qualifiedName.replace('/', '-')}-${Date.now()}`)
+    
+    // Store the active primitive instance
+    this.activePrimitives.set(gadgetGroupId, primitive)
+    
+    // Register as a group with the primitive attached
+    await this.registerGroup({
+      id: gadgetGroupId,
+      name: primitive.name,
+      contactIds: [],
+      wireIds: [],
+      subgroupIds: [],
+      boundaryContactIds: [],
+      primitive,
+      parentId: parentGroupId
+    })
+    
+    // Add to parent group if specified
+    if (parentGroupId) {
+      const parentState = this.state.groups.get(parentGroupId)
+      if (parentState) {
+        parentState.group.subgroupIds.push(gadgetGroupId)
+      }
+    }
+    
+    return gadgetGroupId
   }
   
   /**
@@ -78,13 +141,20 @@ export class UserspaceRuntime {
       case 'external-add-group':
         const groupId = brand.groupId(`group-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`)
         
-        // Check if this is a primitive gadget
+        // Check if this is a primitive gadget using the new system
         let primitive = undefined
         if (input.group.primitiveId) {
-          const { getPrimitiveGadget } = await import('../primitives/index')
-          primitive = getPrimitiveGadget(input.group.primitiveId)
-          if (!primitive) {
-            throw new Error(`Unknown primitive gadget: ${input.group.primitiveId}`)
+          // If we have a primitive loader, use it
+          if (this.primitiveLoader) {
+            primitive = this.primitiveLoader.createPrimitive(input.group.primitiveId)
+            this.activePrimitives.set(groupId, primitive)
+          } else {
+            // Fallback to old system for backwards compatibility
+            const { getPrimitiveGadget } = await import('../primitives/index')
+            primitive = getPrimitiveGadget(input.group.primitiveId)
+            if (!primitive) {
+              throw new Error(`Unknown primitive gadget: ${input.group.primitiveId}`)
+            }
           }
         }
         

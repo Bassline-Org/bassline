@@ -68,15 +68,25 @@ export class DriverError extends Error {
  * Drivers use this to send external changes into userspace
  */
 export type ExternalInput =
+  // Contact Commands
   | ExternalContactUpdate
   | ExternalAddContact
   | ExternalRemoveContact
+  // Group Commands
   | ExternalAddGroup
   | ExternalRemoveGroup
+  // Wire Commands
   | ExternalCreateWire
   | ExternalRemoveWire
+  // Query Commands
   | ExternalQueryContact
   | ExternalQueryGroup
+  // Primitive Management Commands
+  | ExternalLoadPrimitive
+  | ExternalCreatePrimitiveGadget
+  | ExternalListPrimitives  
+  // Scheduler Management Commands
+  | ExternalSetScheduler
 
 /**
  * Update a contact's value (original functionality)
@@ -205,6 +215,66 @@ export interface ExternalQueryGroup {
   readonly includeWires?: boolean     // Include wire connections
   readonly includeSubgroups?: boolean // Include subgroup info
   readonly requestId?: string  // To match response with request
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Load a primitive module
+ */
+export interface ExternalLoadPrimitive {
+  readonly type: 'external-load-primitive'
+  readonly source: string
+  readonly moduleSource: {
+    readonly type: 'npm' | 'file' | 'url'
+    readonly package?: string
+    readonly path?: string
+    readonly url?: string
+    readonly namespace: string
+  }
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Create a primitive gadget instance
+ */
+export interface ExternalCreatePrimitiveGadget {
+  readonly type: 'external-create-primitive-gadget'
+  readonly source: string
+  readonly qualifiedName: string  // e.g., "@bassline/core/add"
+  readonly parentGroupId?: GroupId
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * Set the active scheduler
+ */
+export interface ExternalSetScheduler {
+  readonly type: 'external-set-scheduler'
+  readonly source: string
+  readonly schedulerId: string
+  readonly config?: unknown
+  readonly metadata?: {
+    readonly timestamp?: number
+    readonly [key: string]: unknown
+  }
+}
+
+/**
+ * List available primitives
+ */
+export interface ExternalListPrimitives {
+  readonly type: 'external-list-primitives'
+  readonly source: string
+  readonly requestId?: string
   readonly metadata?: {
     readonly timestamp?: number
     readonly [key: string]: unknown
