@@ -206,6 +206,13 @@ export class Kernel {
       namespace: '@bassline/core'
     })
     
+    // TODO: Load additional primitive modules
+    // The impure gadgets (slurp, spit) have Node.js dependencies and can't run in browser
+    // Need to either:
+    // 1. Create browser-compatible versions
+    // 2. Run them server-side only
+    // 3. Use conditional loading based on environment
+    
     // Initialize scheduler driver
     this.schedulerDriver = new SchedulerDriver()
     await this.schedulerDriver.initialize()

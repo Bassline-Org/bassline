@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { useSubmit } from 'react-router'
+import { useFetcher } from 'react-router'
 
 interface SliderNodeData {
   contact: {
@@ -17,7 +17,7 @@ interface SliderNodeData {
 export function ValueSliderNode({ data, selected }: NodeProps) {
   const nodeData = data as unknown as SliderNodeData
   const { contact, groupId, min = 0, max = 100, step = 1 } = nodeData
-  const submit = useSubmit()
+  const fetcher = useFetcher()
   
   // Parse current value
   const currentValue = typeof contact.content === 'number' ? contact.content : 0
@@ -38,7 +38,7 @@ export function ValueSliderNode({ data, selected }: NodeProps) {
     setDisplayValue(value.toString())
     
     // Update contact content
-    submit({
+    fetcher.submit({
       intent: 'update-contact',
       contactId: contact.id,
       content: JSON.stringify(value)
@@ -61,7 +61,7 @@ export function ValueSliderNode({ data, selected }: NodeProps) {
       setSliderValue(clampedValue)
       setDisplayValue(clampedValue.toString())
       
-      submit({
+      fetcher.submit({
         intent: 'update-contact',
         contactId: contact.id,
         content: JSON.stringify(clampedValue)

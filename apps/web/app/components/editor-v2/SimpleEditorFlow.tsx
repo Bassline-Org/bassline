@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState, useEffect } from 'react'
-import { useSubmit } from 'react-router'
+import { useCallback, useMemo, useState, useEffect, useRef, memo } from 'react'
+import { useFetcher } from 'react-router'
 import {
   ReactFlow,
   Background,
@@ -16,7 +16,7 @@ import type {
   NodeChange,
 } from '@xyflow/react'
 import type { GroupState } from '@bassline/core'
-import { ContactNodeV2 } from './ContactNodeV2'
+import { ContactNodeV2, type ContactNodeData } from './ContactNodeV2'
 import { GroupNodeV2 } from './GroupNodeV2'
 import { ValueSliderNode } from './ValueSliderNode'
 import { KernelGadgetPalette } from './KernelGadgetPalette'
@@ -39,8 +39,8 @@ interface SimpleEditorFlowProps {
   groupId: string
 }
 
-function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
-  const submit = useSubmit()
+const SimpleEditorFlowInner = memo(function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
+  const fetcher = useFetcher()
   const reactFlowInstance = useReactFlow()
   const subgroupData = useSubgroupData(groupState.group.subgroupIds)
   const processedWires = useGroupWires(groupState, subgroupData)
@@ -81,6 +81,9 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
       setSelectedEdges([])
       setPendingNodeType(null)
       setPreviousGroupId(groupId)
+      nodePositionsRef.current.clear() // Clear position cache for new group
+      newContactCountRef.current = 0 // Reset counters for new group
+      newGroupCountRef.current = 0
       
       // Reset React Flow view
       if (reactFlowInstance) {
@@ -111,130 +114,173 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
   }, [groupState.contacts, pendingNodeType, nodeViewMetadata])
   
   
-  // Memoized nodes creation with stable references
-  const memoizedNodes = useMemo(() => {
-    const currentNodes = nodes
-    const existingNodesMap = new Map(currentNodes.map(n => [n.id, n]))
-    const newNodes: Node[] = []
-    
-    // Add/update contact nodes
-    if (groupState.contacts instanceof Map) {
-      let newContactIndex = 0
-      groupState.contacts.forEach((contact) => {
-        if (contact && contact.id) {
-          const existingNode = existingNodesMap.get(contact.id)
-          const metadata = nodeViewMetadata.get(contact.id)
-          const nodeType = metadata?.viewComponent || 'contact'
+  // Store node positions separately to prevent circular dependencies
+  const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map())
+  const newContactCountRef = useRef(0)
+  const newGroupCountRef = useRef(0)
+  
+  // Smart update effect that only updates changed nodes
+  useEffect(() => {
+    setNodes(currentNodes => {
+      const existingNodeMap = new Map(currentNodes.map(n => [n.id, n]))
+      const updatedNodeIds = new Set<string>()
+      const resultNodes: Node[] = []
+      
+      // Process contacts - only update if data changed
+      if (groupState.contacts instanceof Map) {
+        groupState.contacts.forEach((contact) => {
+          if (contact && contact.id) {
+            updatedNodeIds.add(contact.id)
+            const existingNode = existingNodeMap.get(contact.id)
+            const metadata = nodeViewMetadata.get(contact.id)
+            const nodeType = metadata?.viewComponent || 'contact'
+            
+            // Check if node data actually changed
+            const existingData = existingNode?.data as ContactNodeData | undefined
+            if (existingNode && 
+                existingNode.type === nodeType &&
+                existingData?.contact?.content === contact.content &&
+                existingData?.contact?.blendMode === contact.blendMode &&
+                existingData?.groupId === groupId) {
+              // Reuse existing node completely - no changes
+              resultNodes.push(existingNode)
+            } else if (existingNode) {
+              // Existing node needs data update - preserve everything else
+              resultNodes.push({
+                ...existingNode,
+                type: nodeType, // In case type changed (slider <-> contact)
+                data: { contact, groupId }
+              })
+            } else {
+              // Completely new node
+              let position = nodePositionsRef.current.get(contact.id)
+              if (!position) {
+                position = { 
+                  x: 100 + (newContactCountRef.current * 150), 
+                  y: 100 + (Math.floor(newContactCountRef.current / 4) * 150) 
+                }
+                newContactCountRef.current++
+                nodePositionsRef.current.set(contact.id, position)
+              }
+              
+              resultNodes.push({
+                id: contact.id,
+                type: nodeType,
+                position,
+                data: { contact, groupId }
+              })
+            }
+          }
+        })
+      }
+      
+      // Process subgroups - only update if data changed
+      groupState.group.subgroupIds.forEach((subgroupId) => {
+        if (subgroupId) {
+          updatedNodeIds.add(subgroupId)
+          const existingNode = existingNodeMap.get(subgroupId)
+          const subgroup = subgroupData.get(subgroupId)
           
-          // Only increment index for truly new nodes (not in existing nodes)
-          if (!existingNode) {
-            newContactIndex++
+          const nodeData = {
+            groupId: subgroupId,
+            parentGroupId: groupId,
+            name: subgroup?.name || `Group ${subgroupId.slice(0, 8)}`,
+            isGadget: !!subgroup?.primitiveId,
+            primitiveId: subgroup?.primitiveId,
+            boundaryContacts: subgroup?.boundaryContacts || []
           }
           
-          // Create stable node reference - reuse existing node if data unchanged
-          const nodeData = { contact, groupId }
-          const existingData = existingNode?.data
-          
-          // Check if we can reuse existing node (same data structure)
+          // Check if node data actually changed
           if (existingNode && 
-              existingNode.type === nodeType &&
-              existingData?.contact?.id === contact.id &&
-              existingData?.contact?.content === contact.content &&
-              existingData?.contact?.blendMode === contact.blendMode &&
-              existingData?.groupId === groupId) {
-            // Reuse existing node completely for stability
-            newNodes.push(existingNode)
+              existingNode.type === 'group' &&
+              JSON.stringify(existingNode.data) === JSON.stringify(nodeData)) {
+            // Reuse existing node completely - no changes
+            resultNodes.push(existingNode)
+          } else if (existingNode) {
+            // Existing node needs data update - preserve everything else
+            resultNodes.push({
+              ...existingNode,
+              data: nodeData
+            })
           } else {
-            // Create new node or update existing with preserved position
-            newNodes.push({
-              id: contact.id,
-              type: nodeType,
-              position: existingNode?.position || { 
-                x: 100 + ((newContactIndex - 1) * 150), 
-                y: 100 + (Math.floor((newContactIndex - 1) / 4) * 150) 
-              },
-              data: nodeData,
+            // Completely new node
+            let position = nodePositionsRef.current.get(subgroupId)
+            if (!position) {
+              position = { 
+                x: 300 + (newGroupCountRef.current * 200), 
+                y: 300 + (Math.floor(newGroupCountRef.current / 3) * 200)
+              }
+              newGroupCountRef.current++
+              nodePositionsRef.current.set(subgroupId, position)
+            }
+            
+            resultNodes.push({
+              id: subgroupId,
+              type: 'group',
+              position,
+              data: nodeData
             })
           }
         }
       })
-    }
-    
-    // Add/update subgroup nodes (including gadgets)
-    let newGroupIndex = 0
-    groupState.group.subgroupIds.forEach((subgroupId) => {
-      if (subgroupId) {
-        const existingNode = existingNodesMap.get(subgroupId)
-        const subgroup = subgroupData.get(subgroupId)
-        
-        // Only increment index for truly new nodes
-        if (!existingNode) {
-          newGroupIndex++
+      
+      // Keep any nodes that are no longer in the state (shouldn't happen, but safety)
+      currentNodes.forEach(node => {
+        if (!updatedNodeIds.has(node.id)) {
+          console.warn(`Node ${node.id} not found in state, removing`)
+          nodePositionsRef.current.delete(node.id)
         }
-        
-        const nodeData = {
-          groupId: subgroupId,
-          parentGroupId: groupId,
-          name: subgroup?.name || `Group ${subgroupId.slice(0, 8)}`,
-          isGadget: !!subgroup?.primitiveId,
-          primitiveId: subgroup?.primitiveId,
-          boundaryContacts: subgroup?.boundaryContacts || []
-        }
-        
-        // Check if we can reuse existing group node
-        if (existingNode && 
-            existingNode.type === 'group' &&
-            JSON.stringify(existingNode.data) === JSON.stringify(nodeData)) {
-          // Reuse existing node for stability
-          newNodes.push(existingNode)
-        } else {
-          // Create new node or update existing with preserved position
-          newNodes.push({
-            id: subgroupId,
-            type: 'group',
-            position: existingNode?.position || { 
-              x: 300 + ((newGroupIndex - 1) * 200), 
-              y: 300 + (Math.floor((newGroupIndex - 1) / 3) * 200)
-            },
-            data: nodeData,
-          })
+      })
+      
+      return resultNodes
+    })
+  }, [groupState.contacts, groupState.group.subgroupIds, subgroupData, nodeViewMetadata, groupId])
+  
+  // Update edges when wires change - use callback for stability
+  useEffect(() => {
+    setEdges(currentEdges => {
+      // Quick check if wires are the same
+      if (currentEdges.length === processedWires.length) {
+        const currentIds = new Set(currentEdges.map(e => e.id))
+        const newIds = new Set(processedWires.map(w => w.id))
+        const allSame = processedWires.every(w => currentIds.has(w.id)) && 
+                        currentEdges.every(e => newIds.has(e.id))
+        if (allSame) {
+          // No changes, return current edges to prevent re-render
+          return currentEdges
         }
       }
+      return processedWires as Edge[]
     })
-    
-    return newNodes
-  }, [groupState.contacts, groupState.group.subgroupIds, subgroupData, nodeViewMetadata, groupId])
-
-  // Update React Flow nodes only when memoized nodes actually change
-  useEffect(() => {
-    setNodes(memoizedNodes)
-  }, [memoizedNodes])
-  
-  // Update edges when wires change
-  useEffect(() => {
-    setEdges(processedWires as Edge[])
   }, [processedWires])
   
   // Handle node position changes
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    // Update position cache for moved nodes
+    changes.forEach(change => {
+      if (change.type === 'position' && change.position) {
+        nodePositionsRef.current.set(change.id, change.position)
+      } else if (change.type === 'remove') {
+        nodePositionsRef.current.delete(change.id)
+      }
+    })
     onNodesChange(changes)
   }, [onNodesChange])
   
   // Handle gadget placement from palette
   const handleGadgetPlace = useCallback((qualifiedName: string, position: { x: number, y: number }) => {
-    submit({
+    fetcher.submit({
       intent: 'create-primitive-gadget',
       groupId,
       qualifiedName,
       position: JSON.stringify(position)
     }, {
       method: 'post',
-      action: '/api/editor/actions',
-      navigate: false
+      action: '/api/editor/actions'
     })
     
     setShowGadgetPalette(false)
-  }, [submit, groupId])
+  }, [fetcher, groupId])
   
   // Handle edge connections
   const onConnect = useCallback((params: Connection) => {
@@ -258,7 +304,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
       // Set pending node type before creating
       setPendingNodeType({ content: defaultContent, type: nodeType })
       
-      submit({
+      fetcher.submit({
         intent: 'add-contact',
         groupId,
         content: JSON.stringify(defaultContent),
@@ -267,13 +313,12 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
         nodeType
       }, {
         method: 'post',
-        action: '/api/editor/actions',
-        navigate: false
+        action: '/api/editor/actions'
       })
       
       setMode('select')
     }
-  }, [mode, reactFlowInstance, submit, groupId])
+  }, [mode, reactFlowInstance, fetcher, groupId])
   
   // Handle keyboard events
   useEffect(() => {
@@ -289,15 +334,14 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
         if (selectedContactIds.length > 0) {
           const groupName = prompt('Enter group name:', 'New Group')
           if (groupName) {
-            submit({
+            fetcher.submit({
               intent: 'extract-to-group',
               contactIds: JSON.stringify(selectedContactIds),
               groupName,
               parentGroupId: groupId
             }, {
               method: 'post',
-              action: '/api/editor/actions',
-              navigate: false
+              action: '/api/editor/actions'
             })
           }
         }
@@ -312,13 +356,12 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
         })
         
         if (selectedGroupIds.length === 1) {
-          submit({
+          fetcher.submit({
             intent: 'inline-group',
             groupId: selectedGroupIds[0]
           }, {
             method: 'post',
-            action: '/api/editor/actions',
-            navigate: false
+            action: '/api/editor/actions'
           })
         }
       }
@@ -340,7 +383,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
         
         if (selectedContactIds.length > 0 || selectedGroupIds.length > 0) {
           // Use unified copy-selection for any combination
-          submit({
+          fetcher.submit({
             intent: 'copy-selection',
             contactIds: JSON.stringify(selectedContactIds),
             groupIds: JSON.stringify(selectedGroupIds),
@@ -349,8 +392,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
             deep: 'true'
           }, {
             method: 'post',
-            action: '/api/editor/actions',
-            navigate: false
+            action: '/api/editor/actions'
           })
         }
       }
@@ -364,13 +406,12 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
             const node = nodes.find(n => n.id === nodeId)
             if (node) {
               if (node.type === 'contact' || node.type === 'slider') {
-                submit({
+                fetcher.submit({
                   intent: 'delete-contact',
                   contactId: nodeId
                 }, {
                   method: 'post',
-                  action: '/api/editor/actions',
-                  navigate: false
+                  action: '/api/editor/actions'
                 })
                 // Clean up nodeViewMetadata
                 setNodeViewMetadata(prev => {
@@ -379,13 +420,12 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
                   return next
                 })
               } else if (node.type === 'group') {
-                submit({
+                fetcher.submit({
                   intent: 'delete-group',
                   groupId: nodeId
                 }, {
                   method: 'post',
-                  action: '/api/editor/actions',
-                  navigate: false
+                  action: '/api/editor/actions'
                 })
               }
             }
@@ -393,13 +433,12 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
           
           // Delete selected edges
           selectedEdges.forEach(edgeId => {
-            submit({
+            fetcher.submit({
               intent: 'delete-wire',
               wireId: edgeId
             }, {
               method: 'post',
-              action: '/api/editor/actions',
-              navigate: false
+              action: '/api/editor/actions'
             })
           })
           
@@ -412,7 +451,7 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedNodes, selectedEdges, nodes, submit, groupId])
+  }, [selectedNodes, selectedEdges, nodes, fetcher, groupId])
   
   // Handle selection changes
   const onSelectionChange = useCallback((params: { nodes: Node[]; edges: Edge[] }) => {
@@ -546,7 +585,38 @@ function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
       </div>
     </div>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render on structural changes
+  
+  // Different group? Always re-render
+  if (prevProps.groupId !== nextProps.groupId) {
+    return false // false means "props are different, do re-render"
+  }
+  
+  const prevState = prevProps.groupState
+  const nextState = nextProps.groupState
+  
+  // Check structural changes only (not content changes)
+  const contactsSame = prevState.contacts.size === nextState.contacts.size
+  const wiresSame = prevState.wires.size === nextState.wires.size
+  const subgroupsSame = 
+    prevState.group.subgroupIds.length === nextState.group.subgroupIds.length &&
+    prevState.group.subgroupIds.every((id, i) => id === nextState.group.subgroupIds[i])
+  
+  // Return true if nothing structural changed (prevents re-render)
+  // Return false if something structural changed (triggers re-render)
+  const shouldSkipRender = contactsSame && wiresSame && subgroupsSame
+  
+  if (!shouldSkipRender) {
+    console.log('[SimpleEditorFlow] Re-rendering due to structural change:', {
+      contactsSame,
+      wiresSame,
+      subgroupsSame
+    })
+  }
+  
+  return shouldSkipRender
+})
 
 export function SimpleEditorFlow(props: SimpleEditorFlowProps) {
   return (

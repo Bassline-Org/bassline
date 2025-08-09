@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useSubmit } from 'react-router'
+import { useFetcher } from 'react-router'
 
 interface ConnectionTypeDialogProps {
   connection: {
@@ -13,7 +13,7 @@ interface ConnectionTypeDialogProps {
 
 export function ConnectionTypeDialog({ connection, onClose }: ConnectionTypeDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
-  const submit = useSubmit()
+  const fetcher = useFetcher()
   const [selectedType, setSelectedType] = useState<'bidirectional' | 'directed'>('bidirectional')
   
   useEffect(() => {
@@ -52,7 +52,7 @@ export function ConnectionTypeDialog({ connection, onClose }: ConnectionTypeDial
       hasTargetHandle: !!connection.targetHandle
     })
     
-    submit({
+    fetcher.submit({
       intent: 'create-wire',
       fromId: sourceId,
       toId: targetId,

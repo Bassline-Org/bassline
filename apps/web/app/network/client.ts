@@ -25,7 +25,8 @@ export function getNetworkClient(): UIAdapter {
     webrtc: config.webrtc
   })
   
-  console.log('[NetworkClient] Using config:', config)
+  // Only log on actual initialization, not every call
+  // console.log('[NetworkClient] Using config:', config)
   
   // Check if config has changed
   if (uiAdapter && lastConfigKey !== configKey) {
@@ -50,7 +51,7 @@ export function getNetworkClient(): UIAdapter {
           console.log('[NetworkClient] Remote kernel client ready')
         },
         onChanges: (changes: ContactChange[]) => {
-          console.log('[NetworkClient] Kernel changes:', changes)
+          // console.log('[NetworkClient] Kernel changes:', changes)
           // Changes are handled by UIAdapter
         },
         onError: (error: Error) => {
@@ -82,7 +83,7 @@ export function getNetworkClient(): UIAdapter {
           }
         },
         onChanges: (changes: ContactChange[]) => {
-          console.log('[NetworkClient] Kernel changes:', changes)
+          // console.log('[NetworkClient] Kernel changes:', changes)
           // Changes are handled by UIAdapter
         },
         onError: (error: Error) => {

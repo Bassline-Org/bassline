@@ -89,6 +89,13 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
             // This is relevant if a subgroup was added to our group
             return newGroup.parentId === groupId
           }
+          case 'gadget-added': {
+            // Data: gadget object with parentId
+            const newGadget = change.data as any
+            console.log(`[useGroupState] Gadget added with parentId: ${newGadget.parentId}, looking for: ${groupId}`)
+            // This is relevant if a gadget was added to our group
+            return newGadget.parentId === groupId
+          }
           case 'group-removed': {
             // Data: { groupId }
             const data = change.data as { groupId: string }
@@ -154,14 +161,95 @@ export function useGroupState(groupId: string, initialState?: GroupState) {
                   break
                 }
                 
-                case 'contact-added':
+                case 'contact-added': {
+                  // Add new contact to state without full refetch
+                  const contactData = change.data as any
+                  if (currentState.contacts instanceof Map && contactData.contactId) {
+                    const newContacts = new Map(currentState.contacts)
+                    // Create a minimal contact object - the next update will fill in details
+                    newContacts.set(contactData.contactId, {
+                      id: contactData.contactId,
+                      content: contactData.content ?? '',
+                      blendMode: contactData.blendMode ?? 'accept-last',
+                      groupId: contactData.groupId,
+                      isBoundary: false
+                    } as Contact)
+                    newState = { ...newState, contacts: newContacts }
+                    console.log(`[useGroupState] Added contact ${contactData.contactId} without full refetch`)
+                  } else {
+                    needsFullRefetch = true
+                  }
+                  break
+                }
+                
+                case 'wire-added': {
+                  // Add new wire to state without full refetch
+                  const wireData = change.data as any
+                  if (currentState.wires instanceof Map && wireData.id) {
+                    const newWires = new Map(currentState.wires)
+                    newWires.set(wireData.id, {
+                      id: wireData.id,
+                      fromId: wireData.fromId,
+                      toId: wireData.toId,
+                      type: wireData.type ?? 'bidirectional'
+                    })
+                    newState = { ...newState, wires: newWires }
+                    console.log(`[useGroupState] Added wire ${wireData.id} without full refetch`)
+                  } else {
+                    needsFullRefetch = true
+                  }
+                  break
+                }
+                
+                case 'group-added': {
+                  // Add new subgroup to state without full refetch
+                  const groupData = change.data as any
+                  if (groupData.id && groupData.parentId === groupId) {
+                    const newSubgroupIds = [...currentState.group.subgroupIds]
+                    if (!newSubgroupIds.includes(groupData.id)) {
+                      newSubgroupIds.push(groupData.id)
+                      newState = {
+                        ...newState,
+                        group: {
+                          ...currentState.group,
+                          subgroupIds: newSubgroupIds
+                        }
+                      }
+                      console.log(`[useGroupState] Added subgroup ${groupData.id} without full refetch`)
+                    }
+                  } else {
+                    needsFullRefetch = true
+                  }
+                  break
+                }
+                
+                case 'gadget-added': {
+                  // Handle gadget addition like group-added
+                  const gadgetData = change.data as any
+                  if (gadgetData.id && gadgetData.parentId === groupId) {
+                    const newSubgroupIds = [...currentState.group.subgroupIds]
+                    if (!newSubgroupIds.includes(gadgetData.id)) {
+                      newSubgroupIds.push(gadgetData.id)
+                      newState = {
+                        ...newState,
+                        group: {
+                          ...currentState.group,
+                          subgroupIds: newSubgroupIds
+                        }
+                      }
+                      console.log(`[useGroupState] Added gadget ${gadgetData.id} without full refetch`)
+                    }
+                  } else {
+                    needsFullRefetch = true
+                  }
+                  break
+                }
+                
                 case 'contact-removed':
-                case 'wire-added':
                 case 'wire-removed':
-                case 'group-added':
                 case 'group-removed':
                 case 'group-updated': {
-                  // Structural changes require full refetch for now
+                  // These still require full refetch for now
                   needsFullRefetch = true
                   console.log(`[useGroupState] Structural change detected:`, change.type)
                   break

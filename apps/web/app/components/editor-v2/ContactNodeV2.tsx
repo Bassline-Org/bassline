@@ -1,7 +1,7 @@
 import { memo, useCallback, useState, useEffect } from 'react'
 import { Handle, Position } from '@xyflow/react'
 import type { NodeProps } from '@xyflow/react'
-import { useSubmit } from 'react-router'
+import { useFetcher } from 'react-router'
 import type { Contact } from '@bassline/core'
 
 export interface ContactNodeData {
@@ -11,7 +11,7 @@ export interface ContactNodeData {
 }
 
 export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
-  const submit = useSubmit()
+  const fetcher = useFetcher()
   const { contact, groupId } = data as ContactNodeData
   
   // Format content for display
@@ -46,7 +46,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
     try {
       // Try to parse as JSON first
       const parsed = JSON.parse(newContent)
-      submit({
+      fetcher.submit({
         intent: 'update-contact',
         contactId: contact.id,
         groupId: groupId,
@@ -58,7 +58,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
       })
     } catch {
       // If not valid JSON, save as string
-      submit({
+      fetcher.submit({
         intent: 'update-contact',
         contactId: contact.id,
         groupId: groupId,
@@ -69,7 +69,7 @@ export const ContactNodeV2 = memo(({ data, selected }: NodeProps) => {
         navigate: false
       })
     }
-  }, [contact.id, groupId, submit, inputValue])
+  }, [contact.id, groupId, fetcher, inputValue])
   
   return (
     <div 
