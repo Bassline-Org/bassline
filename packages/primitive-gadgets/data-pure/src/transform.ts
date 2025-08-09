@@ -17,12 +17,12 @@ export function jsonParse(): PrimitiveGadget {
       
       try {
         const data = JSON.parse(String(text))
-        return new Map([
+        return new Map<string, unknown>([
           ['data', data],
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['data', null],
           ['error', error instanceof Error ? error.message : String(error)]
         ])
@@ -47,12 +47,12 @@ export function jsonStringify(): PrimitiveGadget {
       
       try {
         const text = JSON.stringify(data, null, indent || 0)
-        return new Map([
+        return new Map<string, unknown>([
           ['text', text],
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['text', null],
           ['error', error instanceof Error ? error.message : String(error)]
         ])
@@ -86,18 +86,18 @@ export function csvParse(): PrimitiveGadget {
         })
         
         if (result.errors.length > 0) {
-          return new Map([
+          return new Map<string, unknown>([
             ['data', result.data],
             ['error', result.errors.map(e => e.message).join('; ')]
           ])
         }
         
-        return new Map([
+        return new Map<string, unknown>([
           ['data', result.data],
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['data', null],
           ['error', error instanceof Error ? error.message : String(error)]
         ])
@@ -128,12 +128,12 @@ export function csvStringify(): PrimitiveGadget {
           header: includeHeaders
         })
         
-        return new Map([
+        return new Map<string, unknown>([
           ['text', csv],
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['text', null],
           ['error', error instanceof Error ? error.message : String(error)]
         ])
@@ -159,12 +159,12 @@ export function yamlParse(): PrimitiveGadget {
         const yaml = await import('js-yaml')
         const data = yaml.load(text)
         
-        return new Map([
+        return new Map<string, unknown>([
           ['data', data],
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['data', null],
           ['error', error instanceof Error ? error.message : String(error)]
         ])
@@ -193,12 +193,12 @@ export function yamlStringify(): PrimitiveGadget {
           indent
         })
         
-        return new Map([
+        return new Map<string, unknown>([
           ['text', text],
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['text', null],
           ['error', error instanceof Error ? error.message : String(error)]
         ])
@@ -229,7 +229,7 @@ export function base64Encode(): PrimitiveGadget {
         encoded = Buffer.from(JSON.stringify(data)).toString('base64')
       }
       
-      return new Map([['encoded', encoded]])
+      return new Map<string, unknown>([['encoded', encoded]])
     },
     description: 'Encodes data to Base64',
     category: 'data',
@@ -265,12 +265,12 @@ export function base64Decode(): PrimitiveGadget {
             break
         }
         
-        return new Map([
+        return new Map<string, unknown>([
           ['data', data],
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['data', null],
           ['error', error instanceof Error ? error.message : String(error)]
         ])

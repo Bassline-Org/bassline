@@ -22,12 +22,12 @@ export function validateSchema(): PrimitiveGadget {
         const validate = ajv.compile(schema as any)
         const valid = validate(data)
         
-        return new Map([
+        return new Map<string, unknown>([
           ['valid', valid],
           ['errors', validate.errors || []]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['valid', false],
           ['errors', [{ message: error instanceof Error ? error.message : String(error) }]]
         ])
@@ -54,7 +54,7 @@ export function validateEmail(): PrimitiveGadget {
       
       const valid = emailRegex.test(email)
       
-      return new Map([
+      return new Map<string, unknown>([
         ['valid', valid],
         ['error', valid ? null : 'Invalid email format']
       ])
@@ -78,7 +78,7 @@ export function validateUrl(): PrimitiveGadget {
       try {
         const parsed = new URL(url)
         
-        return new Map([
+        return new Map<string, unknown>([
           ['valid', true],
           ['parsed', {
             protocol: parsed.protocol,
@@ -91,7 +91,7 @@ export function validateUrl(): PrimitiveGadget {
           ['error', null]
         ])
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['valid', false],
           ['parsed', null],
           ['error', 'Invalid URL format']
@@ -126,7 +126,7 @@ export function validatePhone(): PrimitiveGadget {
       
       const pattern = patterns[country]
       if (!pattern) {
-        return new Map([
+        return new Map<string, unknown>([
           ['valid', false],
           ['formatted', null],
           ['error', `Unsupported country code: ${country}`]
@@ -135,7 +135,7 @@ export function validatePhone(): PrimitiveGadget {
       
       const valid = pattern.test(phone.replace(/\s/g, ''))
       
-      return new Map([
+      return new Map<string, unknown>([
         ['valid', valid],
         ['formatted', valid ? phone.replace(/\D/g, '') : null],
         ['error', valid ? null : 'Invalid phone number format']
@@ -164,20 +164,20 @@ export function validateRegex(): PrimitiveGadget {
         const match = text.match(regex)
         
         if (match) {
-          return new Map([
+          return new Map<string, unknown>([
             ['matches', true],
             ['groups', match.groups || match.slice(1)],
             ['error', null]
           ])
         } else {
-          return new Map([
+          return new Map<string, unknown>([
             ['matches', false],
             ['groups', null],
             ['error', null]
           ])
         }
       } catch (error) {
-        return new Map([
+        return new Map<string, unknown>([
           ['matches', false],
           ['groups', null],
           ['error', error instanceof Error ? error.message : String(error)]
@@ -206,7 +206,7 @@ export function validateRange(): PrimitiveGadget {
       let clamped = value
       
       if (typeof value !== 'number') {
-        return new Map([
+        return new Map<string, unknown>([
           ['valid', false],
           ['clamped', null]
         ])
@@ -222,7 +222,7 @@ export function validateRange(): PrimitiveGadget {
         clamped = max
       }
       
-      return new Map([
+      return new Map<string, unknown>([
         ['valid', valid],
         ['clamped', clamped]
       ])
