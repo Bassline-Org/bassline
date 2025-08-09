@@ -4,6 +4,7 @@
  */
 
 import type { PrimitiveGadget } from '@bassline/core'
+import Ajv from 'ajv'
 
 export function validateSchema(): PrimitiveGadget {
   return {
@@ -17,7 +18,6 @@ export function validateSchema(): PrimitiveGadget {
       const schema = inputs.get('schema')
       
       try {
-        const Ajv = (await import('ajv')).default
         const ajv = new Ajv({ allErrors: true })
         const validate = ajv.compile(schema as any)
         const valid = validate(data)

@@ -69,3 +69,6 @@ export type { WebSocketBridgeConfig } from './bridges/websocket-bridge-driver'
 
 // Storage Drivers
 export { MemoryStorageDriver } from './drivers/memory-storage-driver'
+
+// Primitive Loader Driver
+export { PrimitiveLoaderDriver } from './drivers/primitive-loader-driver'

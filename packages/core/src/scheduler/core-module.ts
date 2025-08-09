@@ -27,7 +27,7 @@ function adaptScheduler(
       
       schedule(task) {
         // Convert PropagationTask to scheduler update
-        networkScheduler.scheduleUpdate(task.contactId, task.content, task.priority)
+        networkScheduler.scheduleUpdate(task.contactId, task.content)
       },
       
       async flush() {

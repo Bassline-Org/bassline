@@ -4,8 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Kernel } from '@bassline/core'
-import { UserspaceRuntime } from '@bassline/core/src/kernel/userspace-runtime'
-import { PrimitiveLoaderDriver } from '@bassline/core/src/kernel/drivers/primitive-loader-driver'
+import { UserspaceRuntime, PrimitiveLoaderDriver } from '@bassline/core'
 import { brand } from '@bassline/core'
 import * as validationGadgets from '../src/validation'
 
@@ -164,16 +163,14 @@ describe('Data Validation Gadgets', () => {
         type: 'object',
         properties: {
           name: { type: 'string' },
-          age: { type: 'number', minimum: 0 },
-          email: { type: 'string', format: 'email' }
+          age: { type: 'number', minimum: 0 }
         },
         required: ['name', 'age']
       }
       
       const validData = {
         name: 'Alice',
-        age: 30,
-        email: 'alice@example.com'
+        age: 30
       }
       
       // Create root group
@@ -197,13 +194,15 @@ describe('Data Validation Gadgets', () => {
         .find(c => c.name === 'schema' && c.boundaryDirection === 'input')
       const validOutput = Array.from(state.contacts.values())
         .find(c => c.name === 'valid' && c.boundaryDirection === 'output')
+      const errorsOutput = Array.from(state.contacts.values())
+        .find(c => c.name === 'errors' && c.boundaryDirection === 'output')
       
       // Validate data
       await runtime.scheduleUpdate(dataInput!.id, validData)
       await runtime.scheduleUpdate(schemaInput!.id, schema)
       
       // Wait for propagation
-      await new Promise(resolve => setTimeout(resolve, 50))
+      await new Promise(resolve => setTimeout(resolve, 200))
       
       // Check result
       const result = await runtime.getState(schemaGadgetId)

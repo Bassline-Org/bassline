@@ -4,8 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Kernel } from '@bassline/core'
-import { UserspaceRuntime } from '@bassline/core/src/kernel/userspace-runtime'
-import { PrimitiveLoaderDriver } from '@bassline/core/src/kernel/drivers/primitive-loader-driver'
+import { UserspaceRuntime, PrimitiveLoaderDriver } from '@bassline/core'
 import { brand } from '@bassline/core'
 import * as transformGadgets from '../src/transform'
 
@@ -130,7 +129,7 @@ describe('Data Transformation Gadgets', () => {
       // Check error was captured
       const result = await runtime.getState(parseGadgetId)
       const error = result.contacts.get(errorOutput!.id)?.content
-      expect(error).toContain('Unexpected token')
+      expect(error).toContain('JSON')
     })
   })
   

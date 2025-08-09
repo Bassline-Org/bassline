@@ -4,8 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Kernel } from '@bassline/core'
-import { UserspaceRuntime } from '@bassline/core/src/kernel/userspace-runtime'
-import { PrimitiveLoaderDriver } from '@bassline/core/src/kernel/drivers/primitive-loader-driver'
+import { UserspaceRuntime, PrimitiveLoaderDriver } from '@bassline/core'
 import { brand } from '@bassline/core'
 import * as timerGadgets from '../src/timer'
 import * as dateGadgets from '../src/date'

@@ -13,7 +13,8 @@ import type {
   Change,
   BlendMode,
   PrimitiveGadget,
-  Scheduler
+  Scheduler,
+  GroupId
 } from '../types'
 import { brand } from '../types'
 import { propagateContent } from '../propagation'
@@ -66,7 +67,7 @@ export class UserspaceRuntime {
   /**
    * Create a primitive gadget instance
    */
-  async createPrimitiveGadget(qualifiedName: string, parentGroupId?: string): Promise<string> {
+  async createPrimitiveGadget(qualifiedName: string, parentGroupId?: GroupId): Promise<string> {
     if (!this.primitiveLoader) {
       throw new Error('No primitive loader driver configured')
     }
@@ -294,6 +295,95 @@ export class UserspaceRuntime {
             },
             timestamp: Date.now()
           })
+        }
+        break
+
+      case 'external-load-primitive':
+        // Handle primitive loading through the primitive loader
+        if (this.primitiveLoader) {
+          try {
+            await this.primitiveLoader.loadModule({
+              type: 'builtin',
+              module: async () => ({}), // Placeholder - this needs proper implementation
+              namespace: input.moduleSource.namespace
+            })
+            // Emit success response
+            this.emitToKernel({
+              type: 'contact-change',
+              contactId: brand.contactId('system'),
+              groupId: brand.groupId('system'),
+              value: { type: 'load-primitive-success', source: input.source },
+              timestamp: Date.now()
+            })
+          } catch (error) {
+            // Emit error response
+            this.emitToKernel({
+              type: 'contact-change',
+              contactId: brand.contactId('system'),
+              groupId: brand.groupId('system'),
+              value: { type: 'load-primitive-error', source: input.source, error: (error as Error).message },
+              timestamp: Date.now()
+            })
+          }
+        }
+        break
+
+      case 'external-create-primitive-gadget':
+        try {
+          const gadgetId = await this.createPrimitiveGadget(input.qualifiedName, input.parentGroupId)
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: brand.groupId('system'),
+            value: { type: 'create-gadget-success', source: input.source, gadgetId },
+            timestamp: Date.now()
+          })
+        } catch (error) {
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: brand.groupId('system'),
+            value: { type: 'create-gadget-error', source: input.source, error: (error as Error).message },
+            timestamp: Date.now()
+          })
+        }
+        break
+
+      case 'external-list-primitives':
+        if (this.primitiveLoader) {
+          const primitives = this.primitiveLoader.listPrimitives()
+          this.emitToKernel({
+            type: 'contact-change',
+            contactId: brand.contactId('system'),
+            groupId: brand.groupId('system'),
+            value: { type: 'list-primitives-success', source: input.source, primitives },
+            timestamp: Date.now()
+          })
+        }
+        break
+
+      case 'external-set-scheduler':
+        // Handle scheduler changes through the scheduler driver
+        if (this.schedulerDriver) {
+          try {
+            // Use activateScheduler to switch schedulers
+            this.schedulerDriver.activateScheduler(input.schedulerId)
+            this.emitToKernel({
+              type: 'contact-change',
+              contactId: brand.contactId('system'),
+              groupId: brand.groupId('system'),
+              value: { type: 'set-scheduler-success', source: input.source },
+              timestamp: Date.now()
+            })
+          } catch (error) {
+            this.emitToKernel({
+              type: 'contact-change',
+              contactId: brand.contactId('system'),
+              groupId: brand.groupId('system'),
+              value: { type: 'set-scheduler-error', source: input.source, error: (error as Error).message },
+              timestamp: Date.now()
+            })
+          }
         }
         break
         

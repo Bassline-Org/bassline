@@ -230,3 +230,4 @@ export interface RemoteGroupProxy {
 
 // Re-export commonly used types
 export type { Serializable } from './serialization'
+export type { Scheduler } from './kernel/drivers/scheduler-driver'

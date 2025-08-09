@@ -10,6 +10,9 @@ import type {
   CommandResponse,
   ExternalInput,
 } from './types'
+
+// Re-export for driver implementations
+export type { DriverResponse } from './types'
 import type { GroupState } from '../types'
 
 /**
