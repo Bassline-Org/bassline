@@ -7,7 +7,8 @@ import type {
   ContactUpdate, 
   Contradiction as TypesContradiction,
   PropagationResult,
-  Group
+  Group,
+  PrimitiveGadget
 } from './types'
 import { mergeContent, Contradiction } from './mergeable'
 
@@ -16,7 +17,8 @@ export async function propagateContent(
   state: NetworkState,
   sourceContactId: string,
   newContent: unknown,
-  sourceId?: string
+  sourceId?: string,
+  activePrimitives?: Map<string, PrimitiveGadget>
 ): Promise<PropagationResult> {
   const startTime = performance.now()
   const changes: ContactUpdate[] = []
@@ -69,7 +71,7 @@ export async function propagateContent(
           groupState.contacts.set(task.contactId, updatedContact)
           
           // NOW check if this contact update triggers a primitive gadget
-          const gadgetResult = await checkAndExecutePrimitiveGadget(state, updatedContact)
+          const gadgetResult = await checkAndExecutePrimitiveGadget(state, updatedContact, activePrimitives)
           if (gadgetResult) {
             // Apply the gadget output updates and queue further propagation
             for (const outputUpdate of gadgetResult) {
@@ -272,7 +274,8 @@ function getConnectedContacts(
 // Check if a contact update should trigger a primitive gadget execution
 async function checkAndExecutePrimitiveGadget(
   state: NetworkState,
-  contact: Contact
+  contact: Contact,
+  activePrimitives?: Map<string, PrimitiveGadget>
 ): Promise<Array<{ contactId: string; groupId: string; content: unknown }> | null> {
   // Only process boundary input contacts
   if (!contact.isBoundary || contact.boundaryDirection !== 'input') {
@@ -285,7 +288,15 @@ async function checkAndExecutePrimitiveGadget(
     return null
   }
   
-  const primitive = groupState.group.primitive
+  // Get the actual primitive from activePrimitives Map, not the metadata
+  const primitiveMetadata = groupState.group.primitive
+  const primitive = activePrimitives?.get(contact.groupId) || primitiveMetadata
+  
+  // If we don't have the executable primitive, we can't execute
+  if (!primitive || typeof primitive.activation !== 'function') {
+    console.warn(`[Propagation] No executable primitive found for group ${contact.groupId}`)
+    return null
+  }
   
   // Get all boundary contacts, separated by direction
   const inputContacts: Contact[] = []

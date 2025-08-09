@@ -531,8 +531,8 @@ export class UserspaceRuntime {
       throw new Error(`Contact ${contactId} not found`)
     }
     
-    // Run propagation immediately (synchronous)
-    const result = await propagateContent(this.state, contactId, content)
+    // Run propagation immediately (synchronous), passing activePrimitives
+    const result = await propagateContent(this.state, contactId, content, undefined, this.activePrimitives)
     
     // Apply changes to internal state
     const changes: Change[] = []
