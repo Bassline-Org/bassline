@@ -1,0 +1,30 @@
+{
+  "name": "@bassline/gadgets-data-pure",
+  "version": "0.1.0",
+  "description": "Pure data transformation primitive gadgets for Bassline",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "ajv": "^8.12.0",
+    "js-yaml": "^4.1.0",
+    "papaparse": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/papaparse": "^5.3.14",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.2",
+    "vitest": "^1.0.4"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "license": "MIT"
+}
