@@ -15,7 +15,8 @@ export function first(): PrimitiveGadget {
       return new Map([['result', array[0]]])
     },
     description: 'Gets first element of array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -32,7 +33,8 @@ export function last(): PrimitiveGadget {
       return new Map([['result', array[array.length - 1]]])
     },
     description: 'Gets last element of array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -51,7 +53,8 @@ export function nth(): PrimitiveGadget {
       return new Map([['result', array[index]]])
     },
     description: 'Gets nth element of array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -68,7 +71,8 @@ export function arraySize(): PrimitiveGadget {
       return new Map([['size', array.length]])
     },
     description: 'Gets array length',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -87,7 +91,8 @@ export function append(): PrimitiveGadget {
       return new Map([['result', [...array, value]]])
     },
     description: 'Appends value to array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -106,7 +111,8 @@ export function prepend(): PrimitiveGadget {
       return new Map([['result', [value, ...array]]])
     },
     description: 'Prepends value to array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -120,10 +126,11 @@ export function reverse(): PrimitiveGadget {
       inputs.has('array') && Array.isArray(inputs.get('array')),
     body: async (inputs) => {
       const array = inputs.get('array') as unknown[]
-      return new Map([['result', [...array].reverse()])
+      return new Map([['result', [...array].reverse()]])
     },
     description: 'Reverses array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -145,7 +152,8 @@ export function slice(): PrimitiveGadget {
       return new Map([['result', array.slice(start, end)]])
     },
     description: 'Slices array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 
@@ -167,7 +175,8 @@ export function filterEmpty(): PrimitiveGadget {
       return new Map([['result', filtered]])
     },
     description: 'Removes empty values from array',
-    category: 'array'
+    category: 'array',
+    isPure: true
   }
 }
 

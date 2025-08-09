@@ -100,7 +100,8 @@ export interface PrimitiveGadget {
   
   // Metadata
   description?: string
-  category?: 'math' | 'string' | 'array' | 'logic' | 'control' | 'custom'
+  category?: 'math' | 'string' | 'array' | 'logic' | 'control' | 'custom' | 'io' | 'data' | 'time'
+  isPure?: boolean  // Whether this gadget has side effects (false = impure/has side effects)
 }
 
 export interface Contradiction {

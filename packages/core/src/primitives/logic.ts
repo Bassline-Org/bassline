@@ -16,7 +16,8 @@ export function and(): PrimitiveGadget {
       return new Map([['result', a && b]])
     },
     description: 'Logical AND operation',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -34,7 +35,8 @@ export function or(): PrimitiveGadget {
       return new Map([['result', a || b]])
     },
     description: 'Logical OR operation',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -51,7 +53,8 @@ export function not(): PrimitiveGadget {
       return new Map([['result', !value]])
     },
     description: 'Logical NOT operation',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -69,7 +72,8 @@ export function equals(): PrimitiveGadget {
       return new Map([['result', a === b]])
     },
     description: 'Tests equality',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -87,7 +91,8 @@ export function notEquals(): PrimitiveGadget {
       return new Map([['result', a !== b]])
     },
     description: 'Tests inequality',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -107,7 +112,8 @@ export function greaterThan(): PrimitiveGadget {
       return new Map([['result', a > b]])
     },
     description: 'Tests if a > b',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -127,7 +133,8 @@ export function lessThan(): PrimitiveGadget {
       return new Map([['result', a < b]])
     },
     description: 'Tests if a < b',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -147,7 +154,8 @@ export function greaterOrEqual(): PrimitiveGadget {
       return new Map([['result', a >= b]])
     },
     description: 'Tests if a >= b',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -167,7 +175,8 @@ export function lessOrEqual(): PrimitiveGadget {
       return new Map([['result', a <= b]])
     },
     description: 'Tests if a <= b',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 
@@ -185,7 +194,8 @@ export function xor(): PrimitiveGadget {
       return new Map([['result', a !== b]])
     },
     description: 'Logical XOR operation',
-    category: 'logic'
+    category: 'logic',
+    isPure: true
   }
 }
 

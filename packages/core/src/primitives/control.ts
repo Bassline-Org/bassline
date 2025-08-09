@@ -19,7 +19,8 @@ export function gate(): PrimitiveGadget {
       return new Map()
     },
     description: 'Passes value through when condition is true',
-    category: 'control'
+    category: 'control',
+    isPure: true
   }
 }
 
@@ -40,7 +41,8 @@ export function switchGadget(): PrimitiveGadget {
       return new Map([['result', result]])
     },
     description: 'Selects between two values based on condition',
-    category: 'control'
+    category: 'control',
+    isPure: true
   }
 }
 
@@ -63,7 +65,8 @@ export function demux(): PrimitiveGadget {
       }
     },
     description: 'Routes value to one of two outputs',
-    category: 'control'
+    category: 'control',
+    isPure: true
   }
 }
 
@@ -84,7 +87,8 @@ export function mux(): PrimitiveGadget {
       return new Map([['result', result]])
     },
     description: 'Selects one of two inputs',
-    category: 'control'
+    category: 'control',
+    isPure: true
   }
 }
 
@@ -107,7 +111,8 @@ export function latch(): PrimitiveGadget {
       return new Map()
     },
     description: 'Latches value when enabled',
-    category: 'control'
+    category: 'control',
+    isPure: false
   }
 }
 
@@ -132,7 +137,8 @@ export function delay(): PrimitiveGadget {
       return new Map([['output', value]])
     },
     description: 'Delays value propagation',
-    category: 'control'
+    category: 'control',
+    isPure: false
   }
 }
 

@@ -18,7 +18,8 @@ export function add(): PrimitiveGadget {
       return new Map([['sum', a + b]])
     },
     description: 'Adds two numbers',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -38,7 +39,8 @@ export function subtract(): PrimitiveGadget {
       return new Map([['difference', a - b]])
     },
     description: 'Subtracts b from a',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -58,7 +60,8 @@ export function multiply(): PrimitiveGadget {
       return new Map([['product', a * b]])
     },
     description: 'Multiplies two numbers',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -79,7 +82,8 @@ export function divide(): PrimitiveGadget {
       return new Map([['quotient', a / b]])
     },
     description: 'Divides a by b',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -99,7 +103,8 @@ export function power(): PrimitiveGadget {
       return new Map([['result', Math.pow(base, exponent)]])
     },
     description: 'Raises base to the power of exponent',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -118,7 +123,8 @@ export function sqrt(): PrimitiveGadget {
       return new Map([['result', Math.sqrt(value)]])
     },
     description: 'Calculates square root',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -136,7 +142,8 @@ export function abs(): PrimitiveGadget {
       return new Map([['result', Math.abs(value)]])
     },
     description: 'Returns absolute value',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -156,7 +163,8 @@ export function min(): PrimitiveGadget {
       return new Map([['min', Math.min(a, b)]])
     },
     description: 'Returns the minimum of two numbers',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 
@@ -176,7 +184,8 @@ export function max(): PrimitiveGadget {
       return new Map([['max', Math.max(a, b)]])
     },
     description: 'Returns the maximum of two numbers',
-    category: 'math'
+    category: 'math',
+    isPure: true
   }
 }
 

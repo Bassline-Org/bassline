@@ -16,7 +16,8 @@ export function concat(): PrimitiveGadget {
       return new Map([['result', a + b]])
     },
     description: 'Concatenates two strings',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
@@ -33,7 +34,8 @@ export function length(): PrimitiveGadget {
       return new Map([['length', value.length]])
     },
     description: 'Returns string length',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
@@ -53,7 +55,8 @@ export function substring(): PrimitiveGadget {
       return new Map([['result', str.substring(start, end)]])
     },
     description: 'Extracts substring',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
@@ -70,7 +73,8 @@ export function toUpper(): PrimitiveGadget {
       return new Map([['result', value.toUpperCase()]])
     },
     description: 'Converts to uppercase',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
@@ -87,7 +91,8 @@ export function toLower(): PrimitiveGadget {
       return new Map([['result', value.toLowerCase()]])
     },
     description: 'Converts to lowercase',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
@@ -104,7 +109,8 @@ export function trim(): PrimitiveGadget {
       return new Map([['result', value.trim()]])
     },
     description: 'Removes whitespace from both ends',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
@@ -122,7 +128,8 @@ export function split(): PrimitiveGadget {
       return new Map([['result', str.split(separator)]])
     },
     description: 'Splits string into array',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
@@ -140,7 +147,29 @@ export function join(): PrimitiveGadget {
       return new Map([['result', array.join(separator)]])
     },
     description: 'Joins array into string',
-    category: 'string'
+    category: 'string',
+    isPure: true
   }
 }
 
+// Legacy export for backwards compatibility (will be removed)
+export const stringGadgets = [
+  concat(),
+  length(),
+  substring(),
+  toUpper(),
+  toLower(),
+  trim(),
+  split(),
+  join()
+]
+
+// Legacy named exports for backwards compatibility
+export const concatGadget = concat()
+export const lengthGadget = length()
+export const substringGadget = substring()
+export const toUpperGadget = toUpper()
+export const toLowerGadget = toLower()
+export const trimGadget = trim()
+export const splitGadget = split()
+export const joinGadget = join()
