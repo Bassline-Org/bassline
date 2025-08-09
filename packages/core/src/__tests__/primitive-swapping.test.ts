@@ -23,8 +23,18 @@ describe('Primitive Swapping', () => {
     await kernel.initializeSystemDrivers()
     kernel.setUserspaceRuntime(runtime)
     
+    // Get the primitive loader from kernel
     primitiveLoader = kernel.getPrimitiveLoader()!
     expect(primitiveLoader).toBeDefined()
+    
+    // Wire the primitive loader to runtime
+    runtime.setPrimitiveLoader(primitiveLoader)
+    
+    // Also set the scheduler driver
+    const schedulerDriver = kernel.getSchedulerDriver()
+    if (schedulerDriver) {
+      runtime.setSchedulerDriver(schedulerDriver)
+    }
   })
   
   describe('Basic arithmetic network with swappable operations', () => {
@@ -374,7 +384,12 @@ describe('Primitive Swapping', () => {
         await runtime.scheduleUpdate(inputA!.id, 1)
         await runtime.scheduleUpdate(inputB!.id, 1)
         
-        return output?.content
+        // Get the updated state after propagation
+        const updatedState = await runtime.getState(gadgetId)
+        const updatedOutput = Array.from(updatedState.contacts.values())
+          .find(c => c.name === 'sum' && c.boundaryDirection === 'output')
+        
+        return updatedOutput?.content
       }
       
       // Each should return its namespace-specific value
@@ -428,7 +443,13 @@ describe('Primitive Swapping', () => {
         .find(c => c.name === 'result' && c.boundaryDirection === 'output')
       
       await runtime.scheduleUpdate(input1!.id, 5)
-      expect(output1?.content).toBe(10) // 5 * 2 = 10
+      
+      // Get updated state after propagation
+      const updatedState1 = await runtime.getState(gadget1)
+      const updatedOutput1 = Array.from(updatedState1.contacts.values())
+        .find(c => c.name === 'result' && c.boundaryDirection === 'output')
+      
+      expect(updatedOutput1?.content).toBe(10) // 5 * 2 = 10
       
       // Hot-swap: Load new implementation (triple instead of double)
       await primitiveLoader.loadModule({
@@ -462,11 +483,23 @@ describe('Primitive Swapping', () => {
         .find(c => c.name === 'result' && c.boundaryDirection === 'output')
       
       await runtime.scheduleUpdate(input2!.id, 5)
-      expect(output2?.content).toBe(15) // 5 * 3 = 15
+      
+      // Get updated state after propagation
+      const updatedState2 = await runtime.getState(gadget2)
+      const updatedOutput2 = Array.from(updatedState2.contacts.values())
+        .find(c => c.name === 'result' && c.boundaryDirection === 'output')
+      
+      expect(updatedOutput2?.content).toBe(15) // 5 * 3 = 15
       
       // Original gadget still uses old behavior
       await runtime.scheduleUpdate(input1!.id, 7)
-      expect(output1?.content).toBe(14) // 7 * 2 = 14
+      
+      // Get updated state after propagation
+      const finalState1 = await runtime.getState(gadget1)
+      const finalOutput1 = Array.from(finalState1.contacts.values())
+        .find(c => c.name === 'result' && c.boundaryDirection === 'output')
+      
+      expect(finalOutput1?.content).toBe(14) // 7 * 2 = 14
     })
   })
 })

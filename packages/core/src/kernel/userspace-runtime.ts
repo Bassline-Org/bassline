@@ -75,7 +75,7 @@ export class UserspaceRuntime {
     const primitive = this.primitiveLoader.createPrimitive(qualifiedName)
     
     // Generate unique group ID for this gadget
-    const gadgetGroupId = brand.groupId(`gadget-${qualifiedName.replace('/', '-')}-${Date.now()}`)
+    const gadgetGroupId = brand.groupId(crypto.randomUUID())
     
     // Store the active primitive instance
     this.activePrimitives.set(gadgetGroupId, primitive)
