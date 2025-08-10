@@ -102,6 +102,55 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
           y: 300 
         }
         
+        // Extract boundary contacts for gadgets
+        const inputContacts: Array<{id: string, name: string}> = []
+        const outputContacts: Array<{id: string, name: string}> = []
+        
+        if (subgroupData?.contacts instanceof Map) {
+          // Debug: log gadget structure
+          if (subgroupData?.group?.primitive) {
+            console.log('[GroupEditor] Primitive gadget contacts:', {
+              primitiveId: subgroupData.group.primitive.id,
+              contacts: Array.from(subgroupData.contacts.entries()).map(([id, c]) => ({
+                id,
+                isBoundary: c.isBoundary,
+                content: c.content
+              }))
+            })
+          }
+          
+          subgroupData.contacts.forEach((contact, contactId) => {
+            if (contact.isBoundary) {
+              // For primitive gadgets, determine if it's input or output based on the primitive's definition
+              // For now, we'll use a simple heuristic: contacts with certain naming patterns
+              const contactName = contactId.split('-').pop() || contactId
+              
+              // Check if this is part of primitive gadget's inputs/outputs
+              if (subgroupData?.group?.primitive) {
+                // Get primitive info to determine input/output
+                const primitiveId = subgroupData.group.primitive.id
+                
+                // Common input patterns
+                if (contactName.match(/^(in|input|a|b|x|y|value|source|from)/i)) {
+                  inputContacts.push({ id: contactId, name: contactName })
+                }
+                // Common output patterns
+                else if (contactName.match(/^(out|output|result|sum|product|to)/i)) {
+                  outputContacts.push({ id: contactId, name: contactName })
+                }
+                // Default: treat as input
+                else {
+                  inputContacts.push({ id: contactId, name: contactName })
+                }
+              } else {
+                // For regular groups, all boundary contacts are treated as bidirectional
+                // We'll show them as both input and output
+                inputContacts.push({ id: contactId, name: contactName })
+              }
+            }
+          })
+        }
+        
         nodes.push({
           id: subgroupId,
           type: 'group',
@@ -111,8 +160,8 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
             name: subgroupData?.group?.name || `Group ${subgroupId.slice(0, 8)}`,
             isGadget: !!subgroupData?.group?.primitive,
             primitiveId: subgroupData?.group?.primitive?.id,
-            inputContacts: [],  // TODO: Extract boundary contacts
-            outputContacts: []  // TODO: Extract boundary contacts
+            inputContacts,
+            outputContacts
           }
         })
       }
@@ -178,7 +227,8 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
     case 'add-gadget': {
       const qualifiedName = formData.get('qualifiedName') as string
       const position = JSON.parse(formData.get('position') as string)
-      const gadgetId = await client.createPrimitiveGadget(groupId, qualifiedName)
+      // Use the V2 method with correct parameter order
+      const gadgetId = await client.createPrimitiveGadgetV2(qualifiedName, groupId)
       // Cache the position for this new gadget
       const positionCache = nodePositionCache.get(groupId)
       if (positionCache) {
@@ -206,6 +256,14 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
       return { success: true }
     }
     
+    case 'update-contact': {
+      const contactId = formData.get('contactId') as string
+      const groupId = formData.get('groupId') as string
+      const value = JSON.parse(formData.get('value') as string)
+      await client.updateContact(contactId, groupId, value)
+      return { success: true }
+    }
+    
     default:
       return { error: 'Unknown intent' }
   }
@@ -217,6 +275,8 @@ export default function GroupEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [showGadgetPalette, setShowGadgetPalette] = useState(false)
+  const [selectedNodes, setSelectedNodes] = useState<string[]>([])
+  const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const revalidator = useRevalidator()
   const fetcher = useFetcher()
   const navigate = useNavigate()
@@ -276,11 +336,17 @@ export default function GroupEditor() {
   // Handle connections
   const onConnect = useCallback((params: Connection) => {
     console.log('[GroupEditor] Creating connection:', params)
+    
+    // For connections to/from gadgets, use the handle ID if provided
+    // The handle ID is the boundary contact ID for gadget nodes
+    const sourceId = params.sourceHandle || params.source!
+    const targetId = params.targetHandle || params.target!
+    
     fetcher.submit(
       {
         intent: 'connect',
-        source: params.source!,
-        target: params.target!
+        source: sourceId,
+        target: targetId
       },
       { method: 'post' }
     )
@@ -334,8 +400,65 @@ export default function GroupEditor() {
     )
   }, [fetcher])
   
+  // Handle selection changes
+  const onSelectionChange = useCallback((params: { nodes: Node[], edges: Edge[] }) => {
+    console.log('[GroupEditor] Selection changed:', params.nodes.length, 'nodes,', params.edges.length, 'edges')
+    setSelectedNodes(params.nodes.map(n => n.id))
+    setSelectedEdges(params.edges.map(e => e.id))
+  }, [])
+  
+  // Handle keyboard shortcuts
+  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    // Delete selected nodes and edges
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      console.log('[GroupEditor] Delete key pressed, deleting', selectedNodes.length, 'nodes and', selectedEdges.length, 'edges')
+      
+      // Delete selected nodes
+      selectedNodes.forEach(nodeId => {
+        fetcher.submit(
+          { intent: 'delete-node', nodeId },
+          { method: 'post' }
+        )
+      })
+      
+      // Delete selected edges
+      selectedEdges.forEach(edgeId => {
+        fetcher.submit(
+          { intent: 'delete-edge', edgeId },
+          { method: 'post' }
+        )
+      })
+    }
+    
+    // Group selected nodes (Cmd+G)
+    if (event.metaKey && event.key === 'g') {
+      event.preventDefault()
+      if (selectedNodes.length > 0) {
+        console.log('[GroupEditor] Cmd+G pressed, grouping', selectedNodes.length, 'nodes')
+        // TODO: Implement grouping via refactoring system
+      }
+    }
+    
+    // Duplicate selected nodes (Cmd+D)
+    if (event.metaKey && event.key === 'd') {
+      event.preventDefault()
+      if (selectedNodes.length > 0) {
+        console.log('[GroupEditor] Cmd+D pressed, duplicating', selectedNodes.length, 'nodes')
+        // TODO: Implement duplication
+      }
+    }
+    
+    // Select all (Cmd+A)
+    if (event.metaKey && event.key === 'a') {
+      event.preventDefault()
+      console.log('[GroupEditor] Cmd+A pressed, selecting all nodes')
+      // React Flow handles this internally when multiSelectable is true
+    }
+  }, [selectedNodes, selectedEdges, fetcher])
+  
   return (
-    <div className="h-full w-full relative">
+    <div className="h-full w-full relative" onKeyDown={handleKeyDown} tabIndex={0}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -345,7 +468,9 @@ export default function GroupEditor() {
         onNodesDelete={onNodesDelete}
         onEdgesDelete={onEdgesDelete}
         onNodeDoubleClick={onNodeDoubleClick}
+        onSelectionChange={onSelectionChange}
         nodeTypes={nodeTypes}
+        selectNodesOnDrag={false}
         fitView
       >
         <Background />

@@ -20,7 +20,9 @@ export interface ContactNodeData {
 
 export const StyledContactNode = memo(({ id, data, selected }: NodeProps) => {
   const fetcher = useFetcher()
-  const { content, blendMode = 'accept-last', isBoundary = false, groupId } = data as ContactNodeData
+  const { content, blendMode = 'accept-last', isBoundary = false, contactId, groupId } = data as ContactNodeData
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
   
   // Format content for display
   const formatContent = (value: unknown) => {
@@ -42,8 +44,62 @@ export const StyledContactNode = memo(({ id, data, selected }: NodeProps) => {
     return String(value)
   }
   
+  // Get raw content for editing
+  const getRawContent = (value: unknown) => {
+    if (value === undefined || value === null) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    return JSON.stringify(value)
+  }
+  
   const displayContent = formatContent(content)
   const tooltipContent = formatTooltip(content)
+  
+  // Handle starting edit
+  const handleStartEdit = useCallback(() => {
+    setIsEditing(true)
+    setEditValue(getRawContent(content))
+  }, [content])
+  
+  // Handle save edit
+  const handleSaveEdit = useCallback(() => {
+    if (!contactId || !groupId) return
+    
+    // Parse the value based on content
+    let parsedValue: any = editValue
+    
+    // Try to parse as JSON first
+    if (editValue.startsWith('{') || editValue.startsWith('[')) {
+      try {
+        parsedValue = JSON.parse(editValue)
+      } catch (e) {
+        // Keep as string if JSON parse fails
+      }
+    } else if (editValue === 'true' || editValue === 'false') {
+      parsedValue = editValue === 'true'
+    } else if (!isNaN(Number(editValue)) && editValue !== '') {
+      parsedValue = Number(editValue)
+    }
+    
+    // Submit update to network
+    fetcher.submit(
+      {
+        intent: 'update-contact',
+        contactId,
+        groupId,
+        value: JSON.stringify(parsedValue)
+      },
+      { method: 'post' }
+    )
+    
+    setIsEditing(false)
+  }, [editValue, contactId, groupId, fetcher])
+  
+  // Handle cancel edit
+  const handleCancelEdit = useCallback(() => {
+    setIsEditing(false)
+    setEditValue('')
+  }, [])
   
   // Node type for styling
   const nodeType = isBoundary ? 'boundary' : 'contact'
@@ -109,21 +165,42 @@ export const StyledContactNode = memo(({ id, data, selected }: NodeProps) => {
             )}
             
             {/* Main content */}
-            <div 
-              className={cn(
-                "text-[9px] leading-[1.1] font-mono text-center break-all select-none overflow-hidden",
-                "max-h-[32px]",
-                content === undefined ? 'text-muted-foreground' : 'text-foreground'
-              )}
-              style={{
-                display: '-webkit-box',
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: 'vertical',
-                wordBreak: 'break-word'
-              }}
-            >
-              {displayContent}
-            </div>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleSaveEdit}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter') {
+                    handleSaveEdit()
+                  } else if (e.key === 'Escape') {
+                    handleCancelEdit()
+                  }
+                }}
+                className="w-full h-[24px] px-1 text-[9px] font-mono text-center bg-background border rounded"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <div 
+                className={cn(
+                  "text-[9px] leading-[1.1] font-mono text-center break-all select-none overflow-hidden cursor-text",
+                  "max-h-[32px]",
+                  content === undefined ? 'text-muted-foreground' : 'text-foreground'
+                )}
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
+                  wordBreak: 'break-word'
+                }}
+                onDoubleClick={handleStartEdit}
+              >
+                {displayContent}
+              </div>
+            )}
           </div>
         </div>
       </motion.div>
