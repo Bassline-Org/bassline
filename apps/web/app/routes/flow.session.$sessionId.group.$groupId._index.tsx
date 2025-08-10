@@ -27,7 +27,6 @@ const nodePositionCache = new Map<string, Map<string, { x: number, y: number }>>
 
 // Load initial state from network for this specific group
 export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
-  console.log('[GroupEditor] Loading state for group:', params.groupId)
   
   const sessionId = params.sessionId!
   const groupId = params.groupId!
@@ -46,17 +45,24 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
   }
   const positionCache = nodePositionCache.get(groupId)!
   
-  // Load primitives for gadget palette
+  // Load primitives for gadget palette and create a map for quick lookup
   let primitives = []
+  const primitiveMap = new Map<string, any>()
   try {
     primitives = await client.listPrimitiveInfo?.() || []
+    // Create a map for quick lookup by qualified name
+    primitives.forEach((p: any) => {
+      primitiveMap.set(p.qualifiedName, p)
+    })
   } catch (e) {
     console.warn('[GroupEditor] Could not load primitives:', e)
   }
   
   try {
     const state = await client.getState(groupId)
-    console.log('[GroupEditor] Loaded state for group:', groupId, state)
+    
+    // Store subgroup data to avoid loading twice
+    const subgroupDataCache = new Map<string, any>()
     
     // Map contacts to nodes
     const nodes: Node[] = []
@@ -92,6 +98,8 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
         let subgroupData = null
         try {
           subgroupData = await client.getState(subgroupId)
+          // Cache it for edge mapping
+          subgroupDataCache.set(subgroupId, subgroupData)
         } catch (e) {
           console.warn(`[GroupEditor] Could not load subgroup ${subgroupId}`)
         }
@@ -107,49 +115,78 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
         const outputContacts: Array<{id: string, name: string}> = []
         
         if (subgroupData?.contacts instanceof Map) {
-          // Debug: log gadget structure
+          // For primitive gadgets, get the primitive info to know exact inputs/outputs
+          let primitiveInfo = null
           if (subgroupData?.group?.primitive) {
-            console.log('[GroupEditor] Primitive gadget contacts:', {
-              primitiveId: subgroupData.group.primitive.id,
-              contacts: Array.from(subgroupData.contacts.entries()).map(([id, c]) => ({
-                id,
-                isBoundary: c.isBoundary,
-                content: c.content
-              }))
-            })
+            const primitiveId = subgroupData.group.primitive.id
+            // Try to find the primitive info - it might be stored with or without namespace
+            primitiveInfo = primitiveMap.get(primitiveId) || 
+                           primitiveMap.get(`@bassline/core/${primitiveId}`) ||
+                           Array.from(primitiveMap.values()).find(p => p.id === primitiveId || p.qualifiedName.endsWith(`/${primitiveId}`))
+            
+            // Only log if we didn't find the primitive info
+            if (!primitiveInfo) {
+              console.warn('[GroupEditor] Primitive info not found for:', primitiveId)
+            }
           }
           
-          subgroupData.contacts.forEach((contact, contactId) => {
-            if (contact.isBoundary) {
-              // For primitive gadgets, determine if it's input or output based on the primitive's definition
-              // For now, we'll use a simple heuristic: contacts with certain naming patterns
-              const contactName = contactId.split('-').pop() || contactId
-              
-              // Check if this is part of primitive gadget's inputs/outputs
-              if (subgroupData?.group?.primitive) {
-                // Get primitive info to determine input/output
-                const primitiveId = subgroupData.group.primitive.id
-                
-                // Common input patterns
-                if (contactName.match(/^(in|input|a|b|x|y|value|source|from)/i)) {
-                  inputContacts.push({ id: contactId, name: contactName })
+          // For primitive gadgets with known info, we'll map contacts by order
+          if (primitiveInfo && subgroupData?.group?.primitive) {
+            // Get all boundary contacts
+            const boundaryContacts = Array.from(subgroupData.contacts.entries())
+              .filter(([_, contact]) => contact.isBoundary)
+              .map(([id, contact]) => ({ id, contact }))
+            
+            // Map inputs and outputs based on primitive definition order
+            // The kernel creates contacts in order: inputs first, then outputs
+            let contactIndex = 0
+            
+            // Map input contacts
+            if (primitiveInfo.inputs) {
+              for (const inputName of primitiveInfo.inputs) {
+                if (contactIndex < boundaryContacts.length) {
+                  const { id } = boundaryContacts[contactIndex]
+                  inputContacts.push({ id, name: inputName })
+                  contactIndex++
                 }
-                // Common output patterns
-                else if (contactName.match(/^(out|output|result|sum|product|to)/i)) {
-                  outputContacts.push({ id: contactId, name: contactName })
-                }
-                // Default: treat as input
-                else {
-                  inputContacts.push({ id: contactId, name: contactName })
-                }
-              } else {
-                // For regular groups, all boundary contacts are treated as bidirectional
-                // We'll show them as both input and output
-                inputContacts.push({ id: contactId, name: contactName })
               }
             }
-          })
+            
+            // Map output contacts
+            if (primitiveInfo.outputs) {
+              for (const outputName of primitiveInfo.outputs) {
+                if (contactIndex < boundaryContacts.length) {
+                  const { id } = boundaryContacts[contactIndex]
+                  outputContacts.push({ id, name: outputName })
+                  contactIndex++
+                }
+              }
+            }
+          } else {
+            // Fallback for non-primitive groups or when primitive info is not found
+            subgroupData.contacts.forEach((contact, contactId) => {
+              if (contact.isBoundary) {
+                const contactName = contactId.split('-').pop() || contactId
+                
+                if (subgroupData?.group?.primitive) {
+                  // Primitive without info - use pattern matching
+                  if (contactName.match(/^(in|input|a|b|x|y|value|source|from)/i)) {
+                    inputContacts.push({ id: contactId, name: contactName })
+                  } else if (contactName.match(/^(out|output|result|sum|product|to)/i)) {
+                    outputContacts.push({ id: contactId, name: contactName })
+                  } else {
+                    inputContacts.push({ id: contactId, name: contactName })
+                  }
+                } else {
+                  // Regular groups - bidirectional
+                  inputContacts.push({ id: contactId, name: contactName })
+                  outputContacts.push({ id: contactId, name: contactName })
+                }
+              }
+            })
+          }
         }
+        
         
         nodes.push({
           id: subgroupId,
@@ -170,20 +207,82 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
     // Map wires to edges
     const edges: Edge[] = []
     if (state.wires instanceof Map) {
+      
+      // Create a map of boundary contact IDs to their parent group/gadget
+      const boundaryContactToGroup = new Map<string, string>()
+      
+      // Map boundary contacts from cached subgroup data
+      subgroupDataCache.forEach((subgroupData, subgroupId) => {
+        if (subgroupData?.contacts instanceof Map) {
+          subgroupData.contacts.forEach((contact, contactId) => {
+            if (contact.isBoundary) {
+              boundaryContactToGroup.set(contactId, subgroupId)
+            }
+          })
+        }
+      })
+      
+      
       state.wires.forEach((wire, id) => {
-        edges.push({
+        // Check if either end is a boundary contact of a gadget
+        let sourceGroup = boundaryContactToGroup.get(wire.fromId)
+        let targetGroup = boundaryContactToGroup.get(wire.toId)
+        
+        // Fallback: Check if the contact belongs to any gadget node we've created
+        // This handles cases where the wire exists but we haven't mapped the boundary contact
+        if (!sourceGroup || !targetGroup) {
+          for (const node of nodes) {
+            if (node.type === 'group' && node.data.isGadget) {
+              const { inputContacts = [], outputContacts = [] } = node.data
+              
+              // Check if wire.fromId is one of this gadget's contacts
+              if (!sourceGroup) {
+                const isOutput = outputContacts.some(c => c.id === wire.fromId)
+                const isInput = inputContacts.some(c => c.id === wire.fromId)
+                if (isOutput || isInput) {
+                  sourceGroup = node.id
+                }
+              }
+              
+              // Check if wire.toId is one of this gadget's contacts  
+              if (!targetGroup) {
+                const isInput = inputContacts.some(c => c.id === wire.toId)
+                const isOutput = outputContacts.some(c => c.id === wire.toId)
+                if (isInput || isOutput) {
+                  targetGroup = node.id
+                }
+              }
+              
+              // Stop searching if we found both
+              if (sourceGroup && targetGroup) break
+            }
+          }
+        }
+        
+        const edge: Edge = {
           id,
-          source: wire.fromId,
-          target: wire.toId,
+          source: sourceGroup || wire.fromId,  // Use group ID if it's a boundary contact
+          target: targetGroup || wire.toId,    // Use group ID if it's a boundary contact
           type: wire.type === 'directed' ? 'straight' : 'default'
-        })
+        }
+        
+        // Add handle IDs for connections to gadget boundary contacts
+        if (sourceGroup) {
+          edge.sourceHandle = wire.fromId  // The boundary contact ID
+        }
+        if (targetGroup) {
+          edge.targetHandle = wire.toId    // The boundary contact ID
+        }
+        
+        
+        edges.push(edge)
       })
     }
     
-    return { nodes, edges, primitives }
+    return { nodes, edges, primitives, primitiveMap: Array.from(primitiveMap.entries()) }
   } catch (error) {
     console.error('[GroupEditor] Error loading state:', error)
-    return { nodes: [], edges: [], primitives }
+    return { nodes: [], edges: [], primitives: [], primitiveMap: [] }
   }
 }
 
@@ -200,13 +299,13 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
     return { error: 'No client found' }
   }
   
-  console.log('[GroupEditor] Action:', intent, 'for group:', groupId)
   
   switch (intent) {
     case 'connect': {
       const source = formData.get('source') as string
       const target = formData.get('target') as string
       await client.connect(source, target, 'bidirectional')
+      
       return { success: true }
     }
     
@@ -281,7 +380,6 @@ export default function GroupEditor() {
   const fetcher = useFetcher()
   const navigate = useNavigate()
   
-  console.log('[GroupEditor] Rendering for group:', context.groupId, 'with', nodes.length, 'nodes and', edges.length, 'edges')
   
   // Get client from context
   const client = context.client || (window as any).__BASSLINE_SESSIONS__?.get(context.sessionId)?.client
@@ -290,22 +388,18 @@ export default function GroupEditor() {
   useEffect(() => {
     if (!client || !context.groupId) return
     
-    console.log('[GroupEditor] Setting up subscription for group:', context.groupId)
     const unsubscribe = client.subscribe(context.groupId, (changes: any[]) => {
-      console.log('[GroupEditor] Network changes detected in group:', context.groupId, changes.length, 'changes')
-      // Revalidate to get fresh data
+      // Revalidate to get fresh data when network changes
       revalidator.revalidate()
     })
     
     return () => {
-      console.log('[GroupEditor] Cleaning up subscription for group:', context.groupId)
       unsubscribe()
     }
   }, [client, context.groupId, revalidator])
   
   // Update local state when loader data changes, but preserve positions
   useEffect(() => {
-    console.log('[GroupEditor] Loader data changed, merging with existing positions')
     setNodes(currentNodes => {
       // Create a map of current node positions
       const positionMap = new Map(currentNodes.map(n => [n.id, n.position]))
@@ -335,8 +429,6 @@ export default function GroupEditor() {
   
   // Handle connections
   const onConnect = useCallback((params: Connection) => {
-    console.log('[GroupEditor] Creating connection:', params)
-    
     // For connections to/from gadgets, use the handle ID if provided
     // The handle ID is the boundary contact ID for gadget nodes
     const sourceId = params.sourceHandle || params.source!
@@ -382,14 +474,12 @@ export default function GroupEditor() {
   const onNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
     if (node.type === 'group') {
       const groupId = node.data.groupId || node.id
-      console.log('[GroupEditor] Navigating into group:', groupId)
       navigate(`/flow/session/${context.sessionId}/group/${groupId}`)
     }
   }, [navigate, context.sessionId])
   
   // Handle gadget placement
   const handleGadgetPlace = useCallback((qualifiedName: string, position: { x: number, y: number }) => {
-    console.log('[GroupEditor] Placing gadget:', qualifiedName, 'at', position)
     fetcher.submit(
       {
         intent: 'add-gadget',
@@ -402,7 +492,6 @@ export default function GroupEditor() {
   
   // Handle selection changes
   const onSelectionChange = useCallback((params: { nodes: Node[], edges: Edge[] }) => {
-    console.log('[GroupEditor] Selection changed:', params.nodes.length, 'nodes,', params.edges.length, 'edges')
     setSelectedNodes(params.nodes.map(n => n.id))
     setSelectedEdges(params.edges.map(e => e.id))
   }, [])
@@ -412,7 +501,6 @@ export default function GroupEditor() {
     // Delete selected nodes and edges
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
-      console.log('[GroupEditor] Delete key pressed, deleting', selectedNodes.length, 'nodes and', selectedEdges.length, 'edges')
       
       // Delete selected nodes
       selectedNodes.forEach(nodeId => {
@@ -435,7 +523,6 @@ export default function GroupEditor() {
     if (event.metaKey && event.key === 'g') {
       event.preventDefault()
       if (selectedNodes.length > 0) {
-        console.log('[GroupEditor] Cmd+G pressed, grouping', selectedNodes.length, 'nodes')
         // TODO: Implement grouping via refactoring system
       }
     }
@@ -444,7 +531,6 @@ export default function GroupEditor() {
     if (event.metaKey && event.key === 'd') {
       event.preventDefault()
       if (selectedNodes.length > 0) {
-        console.log('[GroupEditor] Cmd+D pressed, duplicating', selectedNodes.length, 'nodes')
         // TODO: Implement duplication
       }
     }
@@ -452,7 +538,6 @@ export default function GroupEditor() {
     // Select all (Cmd+A)
     if (event.metaKey && event.key === 'a') {
       event.preventDefault()
-      console.log('[GroupEditor] Cmd+A pressed, selecting all nodes')
       // React Flow handles this internally when multiSelectable is true
     }
   }, [selectedNodes, selectedEdges, fetcher])

@@ -699,7 +699,30 @@ export class UserspaceRuntime {
       throw new Error('Cannot connect contacts from different groups unless one is a boundary contact')
     }
     
-    const gId = brand.groupId(fromGroup || toGroup || '')
+    // When boundary contacts are involved, create the wire in the parent group
+    // (the group that doesn't contain the boundary contact)
+    let gId: GroupId
+    if (fromContact.isBoundary && !toContact.isBoundary) {
+      // fromContact is boundary, use toGroup (parent group)
+      gId = brand.groupId(toGroup || '')
+    } else if (!fromContact.isBoundary && toContact.isBoundary) {
+      // toContact is boundary, use fromGroup (parent group)
+      gId = brand.groupId(fromGroup || '')
+    } else if (fromContact.isBoundary && toContact.isBoundary) {
+      // Both are boundary contacts - this is connecting two gadgets
+      // Find the common parent group
+      const fromParent = this.findParentGroupForBoundaryContact(fromId)
+      const toParent = this.findParentGroupForBoundaryContact(toId)
+      if (fromParent === toParent && fromParent) {
+        gId = brand.groupId(fromParent)
+      } else {
+        // Fallback to one of the groups
+        gId = brand.groupId(fromGroup || toGroup || '')
+      }
+    } else {
+      // Neither is boundary, use the shared group
+      gId = brand.groupId(fromGroup || toGroup || '')
+    }
     const wId = brand.wireId(crypto.randomUUID())
     const wire: Wire = {
       id: wId,
@@ -831,6 +854,20 @@ export class UserspaceRuntime {
   private findGroupForContact(contactId: string): string | undefined {
     for (const [groupId, groupState] of this.state.groups) {
       if (groupState.contacts.has(contactId)) {
+        return groupId
+      }
+    }
+    return undefined
+  }
+  
+  private findParentGroupForBoundaryContact(contactId: string): string | undefined {
+    // First find which group owns this boundary contact
+    const ownerGroup = this.findGroupForContact(contactId)
+    if (!ownerGroup) return undefined
+    
+    // Now find which group contains this group as a subgroup
+    for (const [groupId, groupState] of this.state.groups) {
+      if (groupState.group.subgroupIds.includes(brand.groupId(ownerGroup))) {
         return groupId
       }
     }
