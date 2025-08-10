@@ -152,8 +152,16 @@ export class UserspaceRuntime {
         break
         
       case 'external-remove-contact':
-        // TODO: Implement contact removal
-        console.log('[UserspaceRuntime] Contact removal not yet implemented:', input.contactId)
+        await this.removeContact(input.contactId)
+        
+        // Emit removal event back through kernel
+        this.emitToKernel({
+          type: 'contact-change',
+          contactId: input.contactId,
+          groupId: brand.groupId(this.findGroupForContact(input.contactId) || 'unknown'),
+          value: null,  // null indicates deletion
+          timestamp: Date.now()
+        })
         break
         
       case 'external-add-group':
@@ -205,18 +213,46 @@ export class UserspaceRuntime {
         break
         
       case 'external-remove-group':
-        // TODO: Implement group removal
-        console.log('[UserspaceRuntime] Group removal not yet implemented:', input.groupId)
+        await this.removeGroup(input.groupId)
+        
+        // Emit removal event back through kernel
+        this.emitToKernel({
+          type: 'contact-change',
+          contactId: brand.contactId('system'),
+          groupId: input.groupId,
+          value: { removed: true, id: input.groupId },
+          timestamp: Date.now()
+        })
         break
         
       case 'external-create-wire':
-        // TODO: Implement wire creation
-        console.log('[UserspaceRuntime] Wire creation not yet implemented:', input.fromContactId, '->', input.toContactId)
+        const wireId = await this.connect(
+          input.fromContactId,
+          input.toContactId,
+          'bidirectional'  // Default to bidirectional for now
+        )
+        
+        // Emit creation event back through kernel
+        this.emitToKernel({
+          type: 'contact-change',
+          contactId: brand.contactId('system'),
+          groupId: brand.groupId('system'),
+          value: { wireCreated: true, id: wireId, from: input.fromContactId, to: input.toContactId },
+          timestamp: Date.now()
+        })
         break
         
       case 'external-remove-wire':
-        // TODO: Implement wire removal
-        console.log('[UserspaceRuntime] Wire removal not yet implemented:', input.wireId)
+        await this.removeWire(input.wireId)
+        
+        // Emit removal event back through kernel
+        this.emitToKernel({
+          type: 'contact-change',
+          contactId: brand.contactId('system'),
+          groupId: brand.groupId('system'),
+          value: { wireRemoved: true, id: input.wireId },
+          timestamp: Date.now()
+        })
         break
         
       case 'external-query-contact':

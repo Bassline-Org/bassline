@@ -1,366 +1,350 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { HistoryDriver } from '../history-driver'
-import type { ContactChange } from '../../types'
-import type { Kernel } from '../../kernel'
-import { brand } from '../../../types'
+import type { ExternalInput } from '../../types'
 
 describe('HistoryDriver', () => {
-  let history: HistoryDriver
-  let mockKernel: Kernel
+  let driver: HistoryDriver
+  let capturedInputs: ExternalInput[]
   
   beforeEach(() => {
-    history = new HistoryDriver('test-history', {
-      maxHistorySize: 10,
-      captureInterval: 50
-    })
+    driver = new HistoryDriver('test-history')
+    capturedInputs = []
     
-    mockKernel = {
-      handleChange: vi.fn().mockResolvedValue({ status: 'accepted' })
-    } as any
-    
-    history.setKernel(mockKernel)
-  })
-  
-  describe('initialization', () => {
-    it('should create with config', () => {
-      expect(history.id).toBe('test-history')
-      expect(history.name).toBe('history-driver')
-      expect(history.version).toBe('1.0.0')
-    })
-    
-    it('should auto-generate id if not provided', () => {
-      const auto = new HistoryDriver()
-      expect(auto.id).toMatch(/^history-\d+$/)
+    // Set up a mock input handler that captures emitted operations
+    driver.setInputHandler(async (input) => {
+      capturedInputs.push(input)
     })
   })
   
-  describe('handleChange', () => {
-    it('should record changes in history', async () => {
-      const change1: ContactChange = {
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'first',
-        timestamp: Date.now()
-      }
-      
-      const change2: ContactChange = {
-        type: 'contact-change',
-        contactId: brand.contactId('contact-2'),
-        groupId: brand.groupId('group-1'),
-        value: 'second',
-        timestamp: Date.now()
-      }
-      
-      await history.handleChange(change1)
-      await history.handleChange(change2)
-      
-      // Check via get-history command
-      const result = await history.handleCommand({ type: 'get-history' })
-      expect(result.status).toBe('success')
-      expect(result.data).toMatchObject({
-        history: expect.arrayContaining([
-          expect.objectContaining({ description: expect.any(String) }),
-          expect.objectContaining({ description: expect.any(String) })
-        ]),
-        currentIndex: 1,
-        canUndo: true,
-        canRedo: false
+  describe('record()', () => {
+    it('should record operations performed in callback', async () => {
+      const result = await driver.record('Test action', async () => {
+        // Simulate some operations
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'group1',
+          contact: { content: 'Hello', blendMode: 'accept-last' }
+        } as ExternalInput)
+        
+        return 'done'
       })
+      
+      expect(result).toBe('done')
+      
+      // Check that we can undo
+      const undoResult = await driver.handleCommand({ type: 'undo' })
+      expect(undoResult.status).toBe('success')
+      expect(undoResult.data?.undone).toBe('Test action')
     })
     
-    it('should coalesce rapid changes to same contact', async () => {
-      const change1: ContactChange = {
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'first',
-        timestamp: Date.now()
-      }
-      
-      const change2: ContactChange = {
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'), // Same contact
-        groupId: brand.groupId('group-1'),
-        value: 'second',
-        timestamp: Date.now() + 10 // Within coalesce interval (50ms)
-      }
-      
-      await history.handleChange(change1)
-      await history.handleChange(change2)
-      
-      const result = await history.handleCommand({ type: 'get-history' })
-      expect(result.data.history).toHaveLength(1) // Coalesced into one entry
-    })
-    
-    it('should not coalesce changes to different contacts', async () => {
-      const change1: ContactChange = {
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'first',
-        timestamp: Date.now()
-      }
-      
-      const change2: ContactChange = {
-        type: 'contact-change',
-        contactId: brand.contactId('contact-2'), // Different contact
-        groupId: brand.groupId('group-1'),
-        value: 'second',
-        timestamp: Date.now() + 10
-      }
-      
-      await history.handleChange(change1)
-      await history.handleChange(change2)
-      
-      const result = await history.handleCommand({ type: 'get-history' })
-      expect(result.data.history).toHaveLength(2) // Not coalesced
-    })
-    
-    it('should respect max history size', async () => {
-      const maxSize = 5
-      const smallHistory = new HistoryDriver('small', { maxHistorySize: maxSize })
-      
-      // Add more than max
-      for (let i = 0; i < 10; i++) {
-        await smallHistory.handleChange({
-          type: 'contact-change',
-          contactId: brand.contactId(`contact-${i}`),
-          groupId: brand.groupId('group-1'),
-          value: `value-${i}`,
-          timestamp: Date.now() + i * 100 // Prevent coalescing
+    it('should not record nested operations', async () => {
+      await driver.record('Outer action', async () => {
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'group1',
+          contact: { content: 'First' }
+        } as ExternalInput)
+        
+        // Nested record should not create a separate history entry
+        await driver.record('Inner action', async () => {
+          driver.trackOperation({
+            type: 'external-add-contact',
+            source: 'test',
+            groupId: 'group1',
+            contact: { content: 'Second' }
+          } as ExternalInput)
         })
-      }
-      
-      const result = await smallHistory.handleCommand({ type: 'get-history' })
-      expect(result.data.history).toHaveLength(maxSize)
-    })
-  })
-  
-  describe('undo', () => {
-    beforeEach(async () => {
-      // Set up some history - storing previous values
-      const contactId = brand.contactId('contact-1')
-      
-      // First change (no previous value)
-      await history.handleChange({
-        type: 'contact-change',
-        contactId,
-        groupId: brand.groupId('group-1'),
-        value: 'first',
-        timestamp: Date.now()
       })
       
-      // Store first value as previous for next change
-      history.storePreviousValue(contactId, 'first')
-      
-      // Wait to avoid coalescing
-      await new Promise(resolve => setTimeout(resolve, 60))
-      
-      // Second change
-      await history.handleChange({
-        type: 'contact-change',
-        contactId,
-        groupId: brand.groupId('group-1'),
-        value: 'second',
-        timestamp: Date.now()
-      })
+      // Should only have one history entry
+      const status = await driver.handleCommand({ type: 'get-history' })
+      expect(status.data?.history).toHaveLength(1)
     })
     
-    it('should undo last change', async () => {
-      const result = await history.handleCommand({ type: 'undo' })
-      
-      expect(result.status).toBe('success')
-      expect(result.data).toMatchObject({
-        undone: expect.any(String),
-        canUndo: true, // After undoing to index 0, we can still undo the first change
-        canRedo: true
+    it('should not record when nothing happens in callback', async () => {
+      await driver.record('Empty action', async () => {
+        // Do nothing
       })
       
-      // Should have called kernel with inverse operation
-      expect(mockKernel.handleChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          contactId: brand.contactId('contact-1'),
-          value: 'first' // Previous value
-        })
-      )
-    })
-    
-    it('should throw when nothing to undo', async () => {
-      // Clear history
-      await history.handleCommand({ type: 'clear-history' })
-      
-      await expect(history.handleCommand({ type: 'undo' }))
+      // Should have no history, so undo should throw
+      await expect(driver.handleCommand({ type: 'undo' }))
         .rejects.toThrow('Nothing to undo')
     })
-    
-    it('should throw when kernel not set', async () => {
-      const noKernelHistory = new HistoryDriver()
-      await noKernelHistory.handleChange({
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'test',
-        timestamp: Date.now()
-      })
-      
-      await expect(noKernelHistory.handleCommand({ type: 'undo' }))
-        .rejects.toThrow('Kernel not set')
-    })
   })
   
-  describe('redo', () => {
-    beforeEach(async () => {
-      // Set up history and undo once
-      await history.handleChange({
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'first',
-        timestamp: Date.now()
+  describe('undo/redo', () => {
+    it('should undo contact additions', async () => {
+      await driver.record('Add contact', async () => {
+        const input: ExternalInput = {
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'group1',
+          contact: { content: 'Test Contact' },
+          resultId: 'contact123' // Store the ID for inverse
+        } as any
+        driver.trackOperation(input)
       })
       
-      await history.handleChange({
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'second',
-        timestamp: Date.now() + 100
-      })
+      capturedInputs = [] // Clear
       
-      await history.handleCommand({ type: 'undo' })
+      // Undo should emit remove-contact
+      await driver.handleCommand({ type: 'undo' })
+      
+      expect(capturedInputs).toHaveLength(1)
+      expect(capturedInputs[0].type).toBe('external-remove-contact')
+      expect((capturedInputs[0] as any).contactId).toBe('contact123')
     })
     
-    it('should redo undone change', async () => {
-      const result = await history.handleCommand({ type: 'redo' })
-      
-      expect(result.status).toBe('success')
-      expect(result.data).toMatchObject({
-        redone: expect.any(String),
-        canUndo: true,
-        canRedo: false
+    it('should undo contact updates with previous value', async () => {
+      await driver.record('Update contact', async () => {
+        const input: ExternalInput = {
+          type: 'external-contact-update',
+          source: 'test',
+          contactId: 'contact1',
+          groupId: 'group1',
+          value: 'New Value',
+          previousValue: 'Old Value' // Store for inverse
+        } as any
+        driver.trackOperation(input)
       })
       
-      // Should reapply the original change
-      expect(mockKernel.handleChange).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          value: 'second'
-        })
-      )
+      capturedInputs = []
+      
+      // Undo should restore previous value
+      await driver.handleCommand({ type: 'undo' })
+      
+      expect(capturedInputs).toHaveLength(1)
+      expect(capturedInputs[0].type).toBe('external-contact-update')
+      expect((capturedInputs[0] as any).value).toBe('Old Value')
     })
     
-    it('should throw when nothing to redo', async () => {
-      // Redo once (should work)
-      await history.handleCommand({ type: 'redo' })
-      
-      // Try to redo again (should fail)
-      await expect(history.handleCommand({ type: 'redo' }))
-        .rejects.toThrow('Nothing to redo')
-    })
-  })
-  
-  describe('storePreviousValue', () => {
-    it('should use stored value for accurate undo', async () => {
-      const contactId = brand.contactId('contact-1')
-      
-      // Store original value
-      history.storePreviousValue(contactId, 'original')
-      
-      // Make a change
-      await history.handleChange({
-        type: 'contact-change',
-        contactId,
-        groupId: brand.groupId('group-1'),
-        value: 'new',
-        timestamp: Date.now()
+    it('should undo contact removals', async () => {
+      await driver.record('Remove contact', async () => {
+        const input: ExternalInput = {
+          type: 'external-remove-contact',
+          source: 'test',
+          contactId: 'contact1',
+          // Store data needed to recreate
+          groupId: 'group1',
+          contact: { content: 'Deleted Contact', blendMode: 'accept-last' }
+        } as any
+        driver.trackOperation(input)
       })
       
-      // Undo should restore original value
-      await history.handleCommand({ type: 'undo' })
+      capturedInputs = []
       
-      expect(mockKernel.handleChange).toHaveBeenCalledWith(
-        expect.objectContaining({
-          value: 'original'
-        })
-      )
-    })
-  })
-  
-  describe('clear-history', () => {
-    it('should clear all history', async () => {
-      // Add some history
-      await history.handleChange({
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'test',
-        timestamp: Date.now()
-      })
+      // Undo should re-add the contact
+      await driver.handleCommand({ type: 'undo' })
       
-      // Clear it
-      const result = await history.handleCommand({ type: 'clear-history' })
-      expect(result.status).toBe('success')
-      
-      // Check it's gone
-      const historyResult = await history.handleCommand({ type: 'get-history' })
-      expect(historyResult.data.history).toHaveLength(0)
-      expect(historyResult.data.canUndo).toBe(false)
-      expect(historyResult.data.canRedo).toBe(false)
-    })
-  })
-  
-  describe('getStats', () => {
-    it('should return statistics', async () => {
-      // Do some operations
-      await history.handleChange({
-        type: 'contact-change',
-        contactId: brand.contactId('contact-1'),
-        groupId: brand.groupId('group-1'),
-        value: 'test',
-        timestamp: Date.now()
-      })
-      
-      await history.handleCommand({ type: 'undo' })
-      await history.handleCommand({ type: 'redo' })
-      
-      const stats = await history.getStats()
-      
-      expect(stats).toMatchObject({
-        processed: 1,
-        failed: 0,
-        pending: 0,
-        custom: expect.objectContaining({
-          historySize: 1,
-          undoCount: 1,
-          redoCount: 1
-        })
-      })
-    })
-  })
-  
-  describe('isHealthy', () => {
-    it('should return true when within limits', async () => {
-      const healthy = await history.isHealthy()
-      expect(healthy).toBe(true)
+      expect(capturedInputs).toHaveLength(1)
+      expect(capturedInputs[0].type).toBe('external-add-contact')
+      expect((capturedInputs[0] as any).groupId).toBe('group1')
+      expect((capturedInputs[0] as any).contact.content).toBe('Deleted Contact')
     })
     
-    it('should return false when exceeding buffer', async () => {
-      const tinyHistory = new HistoryDriver('tiny', { maxHistorySize: 2 })
+    it('should apply operations in reverse order for undo', async () => {
+      await driver.record('Multiple operations', async () => {
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'group1',
+          contact: { content: 'First' },
+          resultId: 'contact1'
+        } as any)
+        
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'group1',
+          contact: { content: 'Second' },
+          resultId: 'contact2'
+        } as any)
+      })
       
-      // Fill beyond buffer (2x max size)
+      capturedInputs = []
+      
+      // Undo should apply inverses in reverse order
+      await driver.handleCommand({ type: 'undo' })
+      
+      expect(capturedInputs).toHaveLength(2)
+      expect((capturedInputs[0] as any).contactId).toBe('contact2') // Second removed first
+      expect((capturedInputs[1] as any).contactId).toBe('contact1') // First removed second
+    })
+    
+    it('should redo by replaying original operations', async () => {
+      await driver.record('Add contact', async () => {
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'group1',
+          contact: { content: 'Test' },
+          resultId: 'contact1'
+        } as any)
+      })
+      
+      // Undo
+      await driver.handleCommand({ type: 'undo' })
+      capturedInputs = []
+      
+      // Redo should replay the original operation
+      await driver.handleCommand({ type: 'redo' })
+      
+      expect(capturedInputs).toHaveLength(1)
+      expect(capturedInputs[0].type).toBe('external-add-contact')
+      expect((capturedInputs[0] as any).contact.content).toBe('Test')
+    })
+    
+    it('should handle wire operations', async () => {
+      await driver.record('Create wire', async () => {
+        driver.trackOperation({
+          type: 'external-create-wire',
+          source: 'test',
+          fromContactId: 'contact1',
+          toContactId: 'contact2',
+          resultId: 'wire123'
+        } as any)
+      })
+      
+      capturedInputs = []
+      
+      // Undo should remove the wire
+      await driver.handleCommand({ type: 'undo' })
+      
+      expect(capturedInputs).toHaveLength(1)
+      expect(capturedInputs[0].type).toBe('external-remove-wire')
+      expect((capturedInputs[0] as any).wireId).toBe('wire123')
+    })
+  })
+  
+  describe('canUndo/canRedo', () => {
+    it('should track undo/redo availability', async () => {
+      expect(driver.canUndo()).toBe(false)
+      expect(driver.canRedo()).toBe(false)
+      
+      await driver.record('Action 1', async () => {
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'g1',
+          contact: {}
+        } as ExternalInput)
+      })
+      
+      expect(driver.canUndo()).toBe(true)
+      expect(driver.canRedo()).toBe(false)
+      
+      await driver.handleCommand({ type: 'undo' })
+      
+      expect(driver.canUndo()).toBe(false)
+      expect(driver.canRedo()).toBe(true)
+      
+      await driver.handleCommand({ type: 'redo' })
+      
+      expect(driver.canUndo()).toBe(true)
+      expect(driver.canRedo()).toBe(false)
+    })
+    
+    it('should NOT truncate future history when recording after undo (non-destructive)', async () => {
+      // Record two actions
+      await driver.record('Action 1', async () => {
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'g1',
+          contact: { content: '1' }
+        } as ExternalInput)
+      })
+      
+      await driver.record('Action 2', async () => {
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'g1',
+          contact: { content: '2' }
+        } as ExternalInput)
+      })
+      
+      // currentIndex should be 1 (pointing at second action)
+      expect(driver.canUndo()).toBe(true)
+      
+      // Undo once - currentIndex becomes 0
+      await driver.handleCommand({ type: 'undo' })
+      expect(driver.canRedo()).toBe(true)
+      
+      // Record new action - should insert after current position without truncating
+      await driver.record('Action 3', async () => {
+        console.log('About to track Action 3')
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'g1',
+          contact: { content: '3' }
+        } as ExternalInput)
+        console.log('Tracked Action 3')
+      })
+      
+      // History should now be [Action 1, Action 3, Action 2], currentIndex = 1
+      // We can still redo to Action 2 (non-destructive history)
+      expect(driver.canRedo()).toBe(true)
+      expect(driver.canUndo()).toBe(true)
+      
+      // Verify history was NOT truncated - all actions preserved
+      const status = await driver.handleCommand({ type: 'get-history' })
+      expect(status.data?.history).toHaveLength(3)
+      expect(status.data?.history[0].description).toBe('Action 1')
+      expect(status.data?.history[1].description).toBe('Action 3')
+      expect(status.data?.history[2].description).toBe('Action 2')
+      
+      // We should be able to redo to get to Action 2
+      await driver.handleCommand({ type: 'redo' })
+      expect(driver.canUndo()).toBe(true)
+      
+      // Verify we're now at Action 2
+      const finalStatus = await driver.handleCommand({ type: 'get-history' })
+      expect(finalStatus.data?.currentIndex).toBe(2)
+    })
+  })
+  
+  describe('history management', () => {
+    it('should respect max history size', async () => {
+      const smallDriver = new HistoryDriver('test', { maxHistorySize: 3 })
+      smallDriver.setInputHandler(async () => {})
+      
+      // Record 5 actions
       for (let i = 0; i < 5; i++) {
-        await tinyHistory.handleChange({
-          type: 'contact-change',
-          contactId: brand.contactId(`contact-${i}`),
-          groupId: brand.groupId('group-1'),
-          value: `value-${i}`,
-          timestamp: Date.now() + i * 100
+        await smallDriver.record(`Action ${i}`, async () => {
+          smallDriver.trackOperation({
+            type: 'external-add-contact',
+            source: 'test',
+            groupId: 'g1',
+            contact: { content: `${i}` }
+          } as ExternalInput)
         })
       }
       
-      // Should still be healthy because it enforces max size
-      const healthy = await tinyHistory.isHealthy()
-      expect(healthy).toBe(true)
+      // Should only keep last 3
+      const status = await smallDriver.handleCommand({ type: 'get-history' })
+      expect(status.data?.history).toHaveLength(3)
+      expect(status.data?.history[0].description).toBe('Action 2')
+    })
+    
+    it('should clear history on command', async () => {
+      await driver.record('Action', async () => {
+        driver.trackOperation({
+          type: 'external-add-contact',
+          source: 'test',
+          groupId: 'g1',
+          contact: {}
+        } as ExternalInput)
+      })
+      
+      expect(driver.canUndo()).toBe(true)
+      
+      await driver.handleCommand({ type: 'clear-history' })
+      
+      expect(driver.canUndo()).toBe(false)
     })
   })
 })

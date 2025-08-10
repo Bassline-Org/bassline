@@ -551,6 +551,38 @@ export class KernelClient {
   }
   
   /**
+   * Record a series of operations as a single undoable action
+   * The callback can perform any number of operations that will be grouped together
+   */
+  async record<T>(description: string, callback: () => Promise<T>): Promise<T> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      // For remote mode, just execute without recording for now
+      console.warn('[KernelClient] Record not yet implemented for remote mode, executing without recording')
+      return await callback()
+    }
+    
+    // Use simple recording flags in the worker
+    const workerBridge = this.bridge as BrowserWorkerBridgeDriver
+    
+    // Start recording in the worker
+    await workerBridge.sendCommand({ type: 'start-recording', data: { description } })
+    
+    try {
+      // Execute the callback - operations will be tracked
+      const result = await callback()
+      
+      // Stop recording 
+      await workerBridge.sendCommand({ type: 'stop-recording' })
+      
+      return result
+    } catch (error) {
+      // Stop recording on error
+      await workerBridge.sendCommand({ type: 'stop-recording' })
+      throw error
+    }
+  }
+  
+  /**
    * Get the current state of a group (convenience method)
    */
   async getState(groupId: string): Promise<GroupState | null> {

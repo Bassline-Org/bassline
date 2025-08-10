@@ -546,4 +546,12 @@ export class UIAdapter {
   }> {
     return this.kernelClient.getHistoryStatus()
   }
+  
+  /**
+   * Record a series of operations as a single undoable action
+   * The callback can perform any number of operations that will be grouped together
+   */
+  async record<T>(description: string, callback: () => Promise<T>): Promise<T> {
+    return this.kernelClient.record(description, callback)
+  }
 }

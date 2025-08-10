@@ -51,6 +51,10 @@ compoundDriver.setHistoryDriver(historyDriver)
 // Track initialization
 let initialized = false
 
+// Track if we're currently recording for the HistoryDriver
+let isRecordingForHistory = false
+let recordingDescription = ''
+
 // Initialize kernel
 async function initialize() {
   if (initialized) return
@@ -140,16 +144,34 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
               content: input.contact.content,
               blendMode: input.contact.blendMode
             })
+            
+            // Track operation for history only if we're recording
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              // Store the result ID so we can compute the inverse
+              const trackableInput = {
+                ...input,
+                resultId: contactId
+              }
+              historyDriver.trackOperation(trackableInput as ExternalInput)
+            }
+            
             result = { id: contactId, contactId }
             break
             
           case 'external-contact-update':
             // Store the current value before updating for history tracking
-            const currentState = await runtime.getState(input.groupId)
-            if (currentState) {
-              const contact = currentState.contacts.get(input.contactId)
-              if (contact && historyDriver) {
-                historyDriver.storePreviousValue(input.contactId, contact.content)
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              const currentState = await runtime.getState(input.groupId)
+              if (currentState) {
+                const contact = currentState.contacts.get(input.contactId)
+                if (contact) {
+                  // Store previous value in the input for computing inverse
+                  const trackableInput = {
+                    ...input,
+                    previousValue: contact.content
+                  }
+                  historyDriver.trackOperation(trackableInput as ExternalInput)
+                }
               }
             }
             
@@ -190,6 +212,16 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
               }
             }
             
+            // Track operation for history only if we're recording
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              // Store the result ID and group data for inverse
+              const trackableInput = {
+                ...input,
+                resultId: groupId
+              }
+              historyDriver.trackOperation(trackableInput as ExternalInput)
+            }
+            
             result = { id: groupId, groupId }
             break
             
@@ -199,20 +231,177 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
               input.toContactId, 
               'bidirectional'
             )
+            
+            // Track operation for history only if we're recording
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              // Store the result ID and connection data for inverse
+              const trackableInput = {
+                ...input,
+                resultId: wireId
+              }
+              historyDriver.trackOperation(trackableInput as ExternalInput)
+            }
+            
             result = { id: wireId, wireId }
             break
             
           case 'external-remove-wire':
+            // Get wire data before removing for history
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              // Find the wire to store its connection data
+              let foundWire: any | undefined
+              
+              // Check all groups for the wire
+              for (const [groupId, groupState] of await runtime.exportState().then(s => s.groups)) {
+                const wire = groupState.wires.get(input.wireId)
+                if (wire) {
+                  foundWire = wire
+                  break
+                }
+              }
+              
+              if (foundWire) {
+                try {
+                  // Debug: Log the structure of foundWire
+                  console.log('[KernelWorker] Found wire structure:', JSON.stringify({
+                    wireId: input.wireId,
+                    hasFromId: 'fromId' in foundWire,
+                    hasToId: 'toId' in foundWire,
+                    keys: Object.keys(foundWire)
+                  }));
+                  
+                  // Store data needed for inverse (recreating the wire)
+                  // Access properties safely
+                  const fromContactId = foundWire.fromId || foundWire.from || foundWire.fromContactId;
+                  const toContactId = foundWire.toId || foundWire.to || foundWire.toContactId;
+                  
+                  if (fromContactId && toContactId) {
+                    const trackableInput = {
+                      ...input,
+                      fromContactId: fromContactId,
+                      toContactId: toContactId
+                    }
+                    historyDriver.trackOperation(trackableInput as ExternalInput);
+                  } else {
+                    console.warn('[KernelWorker] Wire missing from/to IDs:', foundWire);
+                  }
+                } catch (error) {
+                  console.error('[KernelWorker] Error accessing wire properties:', error, foundWire);
+                }
+              }
+            }
+            
             await runtime.removeWire(input.wireId)
             result = { success: true }
             break
             
           case 'external-remove-contact':
+            // Get the contact data before removing for history
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              // Find the group containing this contact
+              let foundGroupId: string | undefined
+              let foundContact: any | undefined
+              
+              // Check root group and all subgroups
+              const checkGroup = async (groupId: string) => {
+                const state = await runtime.getState(groupId)
+                if (state) {
+                  const contact = state.contacts.get(input.contactId)
+                  if (contact) {
+                    foundGroupId = groupId
+                    foundContact = {
+                      content: contact.content,
+                      blendMode: contact.blendMode,
+                      name: contact.name
+                    }
+                    return true
+                  }
+                  // Check subgroups
+                  for (const subgroupId of state.group.subgroupIds) {
+                    if (await checkGroup(subgroupId)) return true
+                  }
+                }
+                return false
+              }
+              
+              await checkGroup('root')
+              
+              if (foundGroupId && foundContact) {
+                try {
+                  // Store data needed for inverse
+                  // Create a new object to avoid modifying the original input
+                  const trackableInput = {
+                    ...input,
+                    groupId: foundGroupId,
+                    contact: foundContact
+                  }
+                  historyDriver.trackOperation(trackableInput as ExternalInput)
+                } catch (error) {
+                  console.error('[KernelWorker] Error storing contact removal data:', error, {
+                    foundGroupId,
+                    foundGroupIdType: typeof foundGroupId,
+                    foundContact
+                  })
+                }
+              }
+            }
+            
             await runtime.removeContact(input.contactId)
             result = { success: true }
             break
             
           case 'external-remove-group':
+            // Get group data before removing for history
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              try {
+                const groupState = await runtime.getState(input.groupId)
+                if (groupState) {
+                  // Store data needed for inverse (recreating the group)
+                  let parentGroupId: string | undefined
+                  const connectedWires: Array<{wireId: string, fromId: string, toId: string}> = []
+                  
+                  // Find parent group and connected wires
+                  const exportedState = await runtime.exportState()
+                  for (const [parentId, parentState] of exportedState.groups) {
+                    if (parentState.group.subgroupIds.includes(brand.groupId(input.groupId))) {
+                      parentGroupId = parentId
+                    }
+                    
+                    // Find wires connected to this group's boundary contacts
+                    if (parentState.wires) {
+                      for (const [wireId, wire] of parentState.wires) {
+                        // Check if wire is connected to any boundary contact of the group being removed
+                        const boundaryIds = Array.from(groupState.contacts.entries())
+                          .filter(([_, contact]) => contact.isBoundary)
+                          .map(([id]) => id)
+                        
+                        if (boundaryIds.includes(wire.fromId) || boundaryIds.includes(wire.toId)) {
+                          connectedWires.push({
+                            wireId,
+                            fromId: wire.fromId,
+                            toId: wire.toId
+                          })
+                        }
+                      }
+                    }
+                  }
+                  
+                  const trackableInput = {
+                    ...input,
+                    group: {
+                      name: groupState.group.name,
+                      primitiveId: groupState.group.primitive?.id
+                    },
+                    parentGroupId,
+                    connectedWires  // Store connected wires for restoration
+                  }
+                  historyDriver.trackOperation(trackableInput as ExternalInput)
+                }
+              } catch (error) {
+                console.warn('[KernelWorker] Error tracking group removal:', error)
+              }
+            }
+            
             await runtime.removeGroup(input.groupId)
             result = { success: true }
             break
@@ -270,6 +459,16 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
               input.parentGroupId
             )
             console.log(`[KernelWorker] Primitive gadget created:`, gadgetId)
+            
+            // Track operation for history only if we're recording
+            if (historyDriver && input.source !== 'history-driver' && isRecordingForHistory) {
+              // Store the result ID and other data for inverse
+              const trackableInput = {
+                ...input,
+                resultId: gadgetId
+              }
+              historyDriver.trackOperation(trackableInput as ExternalInput)
+            }
             
             // Debug: Check the created gadget state
             const createdState = await runtime.getState(gadgetId)
@@ -402,10 +601,42 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         let result: CommandResponse
         
         // Route commands through compound driver
-        if (command.type === 'undo' || command.type === 'redo') {
+        if (command.type === 'undo' || command.type === 'redo' || command.type === 'get-history') {
           result = await compoundDriver.handleCommand(command)
+        } else if (command.type === 'start-recording') {
+          // Start recording for history - use the HistoryDriver's record() method
+          recordingDescription = command.data?.description || 'Unnamed action'
+          
+          // Start a new recording session
+          historyDriver.record(recordingDescription, async () => {
+            // Mark that we're recording
+            isRecordingForHistory = true
+            
+            // Return a promise that will be resolved when stop-recording is called
+            return new Promise((resolve) => {
+              // Store the resolve function to be called later
+              (historyDriver as any).__recordingResolver = resolve
+            })
+          }).then(() => {
+            // Recording completed
+            isRecordingForHistory = false
+          }).catch((error) => {
+            // Recording failed
+            isRecordingForHistory = false
+            console.error('[KernelWorker] Recording failed:', error)
+          })
+          
+          result = { status: 'success' }
+        } else if (command.type === 'stop-recording') {
+          // Stop recording and commit to history
+          if ((historyDriver as any).__recordingResolver) {
+            (historyDriver as any).__recordingResolver(true)
+            delete (historyDriver as any).__recordingResolver
+          }
+          isRecordingForHistory = false
+          result = { status: 'success' }
         } else {
-          // Other commands can be handled directly
+          // Other commands can be handled directly  
           result = { status: 'success' }
         }
         

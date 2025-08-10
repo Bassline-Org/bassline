@@ -312,17 +312,27 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
     case 'connect': {
       const source = formData.get('source') as string
       const target = formData.get('target') as string
-      await client.connect(source, target, 'bidirectional')
+      
+      // Record this operation for undo/redo
+      await client.record('Connect nodes', async () => {
+        await client.connect(source, target, 'bidirectional')
+      })
       
       return { success: true }
     }
     
     case 'add-contact': {
       const position = JSON.parse(formData.get('position') as string)
-      const contactId = await client.addContact(groupId, {
-        content: '',
-        blendMode: 'accept-last'
+      
+      // Record this operation for undo/redo
+      const contactId = await client.record('Add contact', async () => {
+        const id = await client.addContact(groupId, {
+          content: '',
+          blendMode: 'accept-last'
+        })
+        return id
       })
+      
       // Cache the position for this new contact
       const positionCache = nodePositionCache.get(groupId)
       if (positionCache) {
@@ -334,8 +344,14 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
     case 'add-gadget': {
       const qualifiedName = formData.get('qualifiedName') as string
       const position = JSON.parse(formData.get('position') as string)
-      // Use the V2 method with correct parameter order
-      const gadgetId = await client.createPrimitiveGadgetV2(qualifiedName, groupId)
+      
+      // Record this operation for undo/redo
+      const gadgetId = await client.record(`Add ${qualifiedName} gadget`, async () => {
+        // Use the V2 method with correct parameter order
+        const id = await client.createPrimitiveGadgetV2(qualifiedName, groupId)
+        return id
+      })
+      
       // Cache the position for this new gadget
       const positionCache = nodePositionCache.get(groupId)
       if (positionCache) {
@@ -348,44 +364,80 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
       const nodeId = formData.get('nodeId') as string
       const nodeType = formData.get('nodeType') as string
       
-      if (nodeType === 'contact') {
-        await client.removeContact(nodeId)
-      } else if (nodeType === 'group') {
-        await client.removeGroup(nodeId)
+      try {
+        // Record this operation for undo/redo
+        await client.record(`Delete ${nodeType}`, async () => {
+          if (nodeType === 'contact') {
+            await client.removeContact(nodeId)
+          } else if (nodeType === 'group') {
+            await client.removeGroup(nodeId)
+          }
+        })
+        return { success: true }
+      } catch (error) {
+        // Node might not exist (e.g., already deleted or ID mismatch)
+        console.warn(`[GroupEditor] ${nodeType} ${nodeId} not found or already deleted:`, error)
+        // Return success anyway to update the UI
+        return { success: true }
       }
-      return { success: true }
     }
     
     case 'delete-edge': {
       const edgeId = formData.get('edgeId') as string
-      await client.removeWire(edgeId)
-      return { success: true }
+      
+      try {
+        // Record this operation for undo/redo
+        await client.record('Delete wire', async () => {
+          await client.removeWire(edgeId)
+        })
+        return { success: true }
+      } catch (error) {
+        // Wire might not exist (e.g., already deleted or ID mismatch)
+        console.warn(`[GroupEditor] Wire ${edgeId} not found or already deleted:`, error)
+        // Return success anyway to update the UI
+        return { success: true }
+      }
     }
     
     case 'update-contact': {
       const contactId = formData.get('contactId') as string
       const groupId = formData.get('groupId') as string
       const value = JSON.parse(formData.get('value') as string)
-      await client.updateContact(contactId, groupId, value)
+      
+      // Record this operation for undo/redo
+      await client.record('Update contact value', async () => {
+        await client.updateContact(contactId, groupId, value)
+      })
+      
       return { success: true }
     }
     
     case 'extract-to-group': {
       const contactIds = JSON.parse(formData.get('contactIds') as string) as string[]
       const groupName = formData.get('groupName') as string
-      await client.applyRefactoring('extract-to-group', {
-        contactIds,
-        groupName,
-        parentGroupId: groupId
+      
+      // Record this operation for undo/redo
+      await client.record(`Extract to group: ${groupName}`, async () => {
+        await client.applyRefactoring('extract-to-group', {
+          contactIds,
+          groupName,
+          parentGroupId: groupId
+        })
       })
+      
       return { success: true }
     }
     
     case 'inline-group': {
       const groupIdToInline = formData.get('groupId') as string
-      await client.applyRefactoring('inline-group', {
-        groupId: groupIdToInline
+      
+      // Record this operation for undo/redo
+      await client.record('Inline group', async () => {
+        await client.applyRefactoring('inline-group', {
+          groupId: groupIdToInline
+        })
       })
+      
       return { success: true }
     }
     
@@ -581,29 +633,9 @@ export default function GroupEditor() {
       return
     }
     
-    // Delete selected nodes and edges
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      event.preventDefault()
-      
-      // Delete selected nodes
-      selectedNodes.forEach(nodeId => {
-        const node = nodes.find(n => n.id === nodeId)
-        if (node) {
-          fetcher.submit(
-            { intent: 'delete-node', nodeId, nodeType: node.type },
-            { method: 'post' }
-          )
-        }
-      })
-      
-      // Delete selected edges
-      selectedEdges.forEach(edgeId => {
-        fetcher.submit(
-          { intent: 'delete-edge', edgeId },
-          { method: 'post' }
-        )
-      })
-    }
+    // Delete key handling is done by React Flow internally
+    // via onNodesDelete and onEdgesDelete callbacks
+    // We don't need to handle it here to avoid duplicate deletions
     
     // Group selected nodes (Cmd+G)
     if (event.metaKey && event.key === 'g') {

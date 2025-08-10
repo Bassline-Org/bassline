@@ -1,8 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useOutletContext, useLoaderData, useRevalidator } from 'react-router'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
+import { ScrollArea } from '~/components/ui/scroll-area'
+import { Undo2, Redo2, History } from 'lucide-react'
 import type { ClientLoaderFunctionArgs } from 'react-router'
 import { listSessions } from '~/lib/session-manager'
 
@@ -72,6 +74,13 @@ export default function FlowGroupDebug() {
   const context = useOutletContext<{ sessionId: string; groupId: string; sessionType: string; createdAt: string; client: any }>()
   const debugData = useLoaderData<typeof clientLoader>()
   const revalidator = useRevalidator()
+  const [historyStatus, setHistoryStatus] = useState<{ canUndo: boolean; canRedo: boolean; history: any[] }>({
+    canUndo: false,
+    canRedo: false,
+    history: []
+  })
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [loadingAction, setLoadingAction] = useState<'undo' | 'redo' | 'refresh' | 'jump' | null>(null)
   
   console.log('[FlowGroupDebug] Debug view rendered:', {
     sessionId: context.sessionId,
@@ -82,6 +91,81 @@ export default function FlowGroupDebug() {
   // Get client from context or window
   const client = context.client || (window as any).__BASSLINE_SESSIONS__?.get(context.sessionId)?.client
   
+  // Fetch history status
+  const fetchHistoryStatus = async () => {
+    if (!client) return
+    try {
+      const status = await client.getHistoryStatus()
+      setHistoryStatus(status)
+    } catch (error) {
+      console.error('[FlowGroupDebug] Error fetching history status:', error)
+    }
+  }
+  
+  // Handle undo
+  const handleUndo = async () => {
+    if (!client || isLoadingHistory) return
+    setIsLoadingHistory(true)
+    try {
+      const result = await client.undo()
+      console.log('[FlowGroupDebug] Undo result:', result)
+      await fetchHistoryStatus()
+      revalidator.revalidate()
+    } catch (error) {
+      console.error('[FlowGroupDebug] Error during undo:', error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+  
+  // Handle redo
+  const handleRedo = async () => {
+    if (!client || isLoadingHistory) return
+    setIsLoadingHistory(true)
+    try {
+      const result = await client.redo()
+      console.log('[FlowGroupDebug] Redo result:', result)
+      await fetchHistoryStatus()
+      revalidator.revalidate()
+    } catch (error) {
+      console.error('[FlowGroupDebug] Error during redo:', error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+  
+  // Handle selective undo of a specific action
+  const handleSelectiveUndo = async (targetIndex: number) => {
+    if (!client || isLoadingHistory) return
+    setIsLoadingHistory(true)
+    try {
+      // For now, we'll jump to that point in history
+      // In the future, we could implement true selective undo
+      // that only undoes that specific operation
+      const currentIdx = historyStatus.currentIndex ?? -1
+      const steps = targetIndex - currentIdx
+      
+      if (steps < 0) {
+        // Need to undo to get to this point
+        for (let i = 0; i < Math.abs(steps); i++) {
+          await client.undo()
+        }
+      } else if (steps > 0) {
+        // Need to redo to get to this point
+        for (let i = 0; i < steps; i++) {
+          await client.redo()
+        }
+      }
+      
+      await fetchHistoryStatus()
+      revalidator.revalidate()
+    } catch (error) {
+      console.error('[FlowGroupDebug] Error in selective undo:', error)
+    } finally {
+      setLoadingAction(null)
+    }
+  }
+  
   // Subscribe to network changes for real-time updates for this group
   useEffect(() => {
     if (!client || !context.groupId) return
@@ -91,6 +175,8 @@ export default function FlowGroupDebug() {
       console.log('[FlowGroupDebug] Network changes detected in group:', context.groupId, ':', changes.length, 'changes')
       // Revalidate to get fresh stats
       revalidator.revalidate()
+      // Also refresh history status
+      fetchHistoryStatus()
     })
     
     return () => {
@@ -98,6 +184,11 @@ export default function FlowGroupDebug() {
       unsubscribe()
     }
   }, [client, context.groupId, revalidator])
+  
+  // Fetch history status on mount
+  useEffect(() => {
+    fetchHistoryStatus()
+  }, [client])
   
   return (
     <div className="h-full p-4 bg-gradient-to-br from-slate-50 to-slate-100 overflow-auto">
@@ -203,6 +294,114 @@ export default function FlowGroupDebug() {
               <p className="text-sm text-muted-foreground">
                 Logs will appear here as the network processes events
               </p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        {/* History Pane */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  History
+                </CardTitle>
+                <CardDescription>
+                  Undo/redo operations and history timeline
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleUndo}
+                  disabled={!historyStatus.canUndo || loadingAction === 'undo'}
+                >
+                  <Undo2 className="h-4 w-4 mr-1" />
+                  {loadingAction === 'undo' ? 'Undoing...' : 'Undo'}
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={handleRedo}
+                  disabled={!historyStatus.canRedo || loadingAction === 'redo'}
+                >
+                  <Redo2 className="h-4 w-4 mr-1" />
+                  {loadingAction === 'redo' ? 'Redoing...' : 'Redo'}
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    setLoadingAction('refresh')
+                    fetchHistoryStatus().finally(() => setLoadingAction(null))
+                  }}
+                  disabled={loadingAction === 'refresh'}
+                >
+                  {loadingAction === 'refresh' ? 'Loading...' : 'Refresh'}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px] w-full">
+              <div className="space-y-2">
+                {historyStatus.history && historyStatus.history.length > 0 ? (
+                  historyStatus.history.map((entry, index) => {
+                    const isCurrent = index === historyStatus.currentIndex
+                    const isFuture = index > (historyStatus.currentIndex ?? -1)
+                    
+                    return (
+                      <div
+                        key={index}
+                        className={`
+                          flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all
+                          ${isCurrent ? 'bg-blue-50 border border-blue-200' : 
+                            isFuture ? 'bg-gray-50 opacity-50' : 'bg-slate-50 hover:bg-slate-100'}
+                        `}
+                        onClick={() => !isCurrent && handleSelectiveUndo(index)}
+                      >
+                        <div className="flex-shrink-0">
+                          <div className={`
+                            w-2 h-2 rounded-full
+                            ${isCurrent ? 'bg-blue-500' : 
+                              isFuture ? 'bg-gray-300' : 'bg-green-500'}
+                          `} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">
+                            {entry.description}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(entry.timestamp).toLocaleTimeString()}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 text-xs">
+                          {isCurrent && (
+                            <Badge variant="default" className="text-xs">Current</Badge>
+                          )}
+                          {isFuture && (
+                            <Badge variant="secondary" className="text-xs">Future</Badge>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-muted-foreground">
+                      No history available yet. Operations will appear here as you make changes.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+            <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Total: {historyStatus.history?.length || 0} operations</span>
+              <span>
+                Position: {(historyStatus.currentIndex ?? -1) + 1} / {historyStatus.history?.length || 0}
+              </span>
             </div>
           </CardContent>
         </Card>
