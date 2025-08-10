@@ -10,13 +10,15 @@ export default function FlowExperiment() {
   const handleStartLocalSession = () => {
     const sessionId = `local-${Date.now()}`
     console.log('[FlowExperiment] Starting local session:', sessionId)
-    navigate(`/flow/session/${sessionId}/editor`)
+    // Navigate to session which will redirect to /group/root
+    navigate(`/flow/session/${sessionId}`)
   }
   
   const handleStartRemoteSession = () => {
     const sessionId = `remote-${Date.now()}`
     console.log('[FlowExperiment] Starting remote session:', sessionId)
-    navigate(`/flow/session/${sessionId}/editor`)
+    // Navigate to session which will redirect to /group/root
+    navigate(`/flow/session/${sessionId}`)
   }
   
   return (
@@ -70,7 +72,7 @@ export default function FlowExperiment() {
           
           <div className="text-center text-sm text-muted-foreground">
             <p>Session IDs will be generated automatically</p>
-            <p className="mt-1">Navigate to: /flow/session/[session-id]</p>
+            <p className="mt-1">Sessions start at: /flow/session/[session-id]/group/root</p>
           </div>
         </CardContent>
       </Card>

@@ -13,22 +13,25 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/flow/session/:sessionId/group/:groupId": {
+    params: {
+      "sessionId": string;
+      "groupId": string;
+    };
+  };
+  "/flow/session/:sessionId/group/:groupId/properties": {
+    params: {
+      "sessionId": string;
+      "groupId": string;
+    };
+  };
+  "/flow/session/:sessionId/group/:groupId/debug": {
+    params: {
+      "sessionId": string;
+      "groupId": string;
+    };
+  };
   "/flow/session/:sessionId": {
-    params: {
-      "sessionId": string;
-    };
-  };
-  "/flow/session/:sessionId/properties": {
-    params: {
-      "sessionId": string;
-    };
-  };
-  "/flow/session/:sessionId/editor": {
-    params: {
-      "sessionId": string;
-    };
-  };
-  "/flow/session/:sessionId/debug": {
     params: {
       "sessionId": string;
     };
@@ -89,27 +92,27 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId" | "/flow/session/:sessionId/properties" | "/flow/session/:sessionId/editor" | "/flow/session/:sessionId/debug" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/bassline-browser" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/editor-main" | "/test-sounds" | "/worker-test" | "/editor-v2" | "/api/demo" | "/ws-test" | "/editor" | "/demo" | "/home";
+    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/bassline-browser" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/editor-main" | "/test-sounds" | "/worker-test" | "/editor-v2" | "/api/demo" | "/ws-test" | "/editor" | "/demo" | "/home";
   };
-  "routes/flow.session.$sessionId.tsx": {
-    id: "routes/flow.session.$sessionId";
-    page: "/flow/session/:sessionId" | "/flow/session/:sessionId/properties" | "/flow/session/:sessionId/editor" | "/flow/session/:sessionId/debug";
+  "routes/flow.session.$sessionId.group.$groupId.tsx": {
+    id: "routes/flow.session.$sessionId.group.$groupId";
+    page: "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug";
   };
-  "routes/flow.session.$sessionId.properties.tsx": {
-    id: "routes/flow.session.$sessionId.properties";
-    page: "/flow/session/:sessionId/properties";
+  "routes/flow.session.$sessionId.group.$groupId.properties.tsx": {
+    id: "routes/flow.session.$sessionId.group.$groupId.properties";
+    page: "/flow/session/:sessionId/group/:groupId/properties";
+  };
+  "routes/flow.session.$sessionId.group.$groupId._index.tsx": {
+    id: "routes/flow.session.$sessionId.group.$groupId._index";
+    page: "/flow/session/:sessionId/group/:groupId";
+  };
+  "routes/flow.session.$sessionId.group.$groupId.debug.tsx": {
+    id: "routes/flow.session.$sessionId.group.$groupId.debug";
+    page: "/flow/session/:sessionId/group/:groupId/debug";
   };
   "routes/flow.session.$sessionId._index.tsx": {
     id: "routes/flow.session.$sessionId._index";
     page: "/flow/session/:sessionId";
-  };
-  "routes/flow.session.$sessionId.editor.tsx": {
-    id: "routes/flow.session.$sessionId.editor";
-    page: "/flow/session/:sessionId/editor";
-  };
-  "routes/flow.session.$sessionId.debug.tsx": {
-    id: "routes/flow.session.$sessionId.debug";
-    page: "/flow/session/:sessionId/debug";
   };
   "routes/api.editor-v2.actions.tsx": {
     id: "routes/api.editor-v2.actions";

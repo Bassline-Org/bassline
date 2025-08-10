@@ -1,21 +1,20 @@
-import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { redirect } from 'react-router'
+import type { ClientLoaderFunctionArgs } from 'react-router'
 
-// This index route redirects to the editor by default
+// Redirect from session to the root group
+export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
+  const sessionId = params.sessionId!
+  console.log('[FlowSession] Redirecting to root group for session:', sessionId)
+  
+  // Redirect to the root group
+  return redirect(`/flow/session/${sessionId}/group/root`)
+}
+
 export default function FlowSessionIndex() {
-  const navigate = useNavigate()
-  const params = useParams()
-  
-  console.log('[FlowSessionIndex] Index route rendered, redirecting to editor')
-  
-  useEffect(() => {
-    // Redirect to editor as the default view
-    navigate(`/flow/session/${params.sessionId}/editor`, { replace: true })
-  }, [navigate, params.sessionId])
-  
+  // This component will never render due to the redirect
   return (
     <div className="flex items-center justify-center h-full">
-      <div className="text-muted-foreground">Redirecting to editor...</div>
+      <div className="text-muted-foreground">Redirecting to root group...</div>
     </div>
   )
 }

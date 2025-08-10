@@ -5,48 +5,89 @@ import type { ClientLoaderFunctionArgs } from 'react-router'
 import { getOrCreateSession } from '~/lib/session-manager'
 import '@xyflow/react/dist/style.css'
 
-// Loader that will eventually hold the network client
+// Loader that fetches the specific group state
 export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
   const sessionId = params.sessionId!
-  console.log('[FlowSession] Loader called for session:', sessionId)
+  const groupId = params.groupId!
+  
+  console.log('[FlowGroup] Loader called for group:', groupId, 'in session:', sessionId)
   
   // Get or create session (ensures single initialization)
   const session = await getOrCreateSession(sessionId)
   
-  console.log('[FlowSession] Session state:', {
-    id: session.id,
-    status: session.status,
-    isNew: session.createdAt.getTime() > Date.now() - 1000
-  })
+  // Fetch the specific group state
+  let groupState = null
+  let error = null
+  
+  if (session.client) {
+    try {
+      groupState = await session.client.getState(groupId)
+      console.log('[FlowGroup] Loaded group state for:', groupId)
+    } catch (e) {
+      console.error('[FlowGroup] Error loading group state:', e)
+      error = e instanceof Error ? e.message : 'Failed to load group'
+    }
+  }
   
   return {
     sessionId: session.id,
+    groupId,
     sessionType: session.type,
     createdAt: session.createdAt.toISOString(),
     status: session.status,
-    client: session.client, // Now this is the actual UIAdapter instance!
-    error: session.error?.message
+    client: session.client,
+    groupState,
+    error: error || session.error?.message
   }
 }
 
-
-export default function FlowSessionLayout() {
+export default function FlowGroupLayout() {
   const params = useParams()
   const loaderData = useLoaderData<typeof clientLoader>()
   const location = useLocation()
   
-  console.log('[FlowSession] Layout rendered:', {
+  console.log('[FlowGroup] Layout rendered:', {
     sessionId: params.sessionId,
-    loaderData,
+    groupId: params.groupId,
+    hasGroupState: !!loaderData.groupState,
     pathname: location.pathname
   })
   
   // Extract the current tab from the pathname
-  const currentTab = location.pathname.split('/').pop() || 'editor'
+  const pathSegments = location.pathname.split('/')
+  const currentTab = pathSegments[pathSegments.length - 1] === params.groupId ? 'editor' : pathSegments[pathSegments.length - 1]
+  
+  // Build breadcrumb path
+  const buildBreadcrumbs = () => {
+    const crumbs = []
+    
+    // Always start with root
+    crumbs.push(
+      <Link 
+        key="root"
+        to={`/flow/session/${params.sessionId}/group/root`}
+        className={`text-sm ${params.groupId === 'root' ? 'font-semibold' : 'text-muted-foreground hover:text-foreground'}`}
+      >
+        Root
+      </Link>
+    )
+    
+    // TODO: Add parent groups when we have group hierarchy
+    if (params.groupId !== 'root' && loaderData.groupState?.group) {
+      crumbs.push(
+        <span key="separator" className="text-muted-foreground mx-1">/</span>,
+        <span key="current" className="text-sm font-semibold">
+          {loaderData.groupState.group.name || params.groupId}
+        </span>
+      )
+    }
+    
+    return crumbs
+  }
   
   return (
     <div className="h-screen flex flex-col bg-slate-50">
-      {/* Header with session info and navigation */}
+      {/* Header with session/group info and navigation */}
       <div className="border-b bg-white shadow-sm">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
@@ -54,13 +95,12 @@ export default function FlowSessionLayout() {
               <Link to="/flow-experiment" className="text-sm text-muted-foreground hover:text-foreground">
                 ← Back to Flow Experiment
               </Link>
-              <div className="text-sm">
-                <span className="font-medium">Session:</span>{' '}
-                <code className="px-2 py-1 bg-slate-100 rounded">{params.sessionId}</code>
-                <span className="ml-3 text-muted-foreground">
-                  Type: <span className="font-medium">{loaderData?.sessionType}</span>
-                </span>
+              <div className="flex items-center gap-1">
+                {buildBreadcrumbs()}
               </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Session: <code className="px-2 py-1 bg-slate-100 rounded">{params.sessionId?.slice(0, 8)}</code>
             </div>
           </div>
           
@@ -69,17 +109,17 @@ export default function FlowSessionLayout() {
             <Tabs value={currentTab}>
               <TabsList>
                 <TabsTrigger value="editor" asChild>
-                  <Link to={`/flow/session/${params.sessionId}/editor`}>
+                  <Link to={`/flow/session/${params.sessionId}/group/${params.groupId}`}>
                     Editor
                   </Link>
                 </TabsTrigger>
                 <TabsTrigger value="properties" asChild>
-                  <Link to={`/flow/session/${params.sessionId}/properties`}>
+                  <Link to={`/flow/session/${params.sessionId}/group/${params.groupId}/properties`}>
                     Properties
                   </Link>
                 </TabsTrigger>
                 <TabsTrigger value="debug" asChild>
-                  <Link to={`/flow/session/${params.sessionId}/debug`}>
+                  <Link to={`/flow/session/${params.sessionId}/group/${params.groupId}/debug`}>
                     Debug
                   </Link>
                 </TabsTrigger>
@@ -91,9 +131,22 @@ export default function FlowSessionLayout() {
       
       {/* Child route content */}
       <div className="flex-1 overflow-hidden">
-        <ReactFlowProvider>
-          <Outlet context={{ sessionId: params.sessionId, ...loaderData }} />
-        </ReactFlowProvider>
+        {loaderData.error ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-red-600 bg-red-50 p-4 rounded-lg">
+              <div className="font-semibold">Error loading group</div>
+              <div className="text-sm mt-1">{loaderData.error}</div>
+            </div>
+          </div>
+        ) : (
+          <ReactFlowProvider>
+            <Outlet context={{ 
+              sessionId: params.sessionId, 
+              groupId: params.groupId,
+              ...loaderData 
+            }} />
+          </ReactFlowProvider>
+        )}
       </div>
       
       {/* Status bar */}
@@ -119,9 +172,11 @@ export default function FlowSessionLayout() {
                 {loaderData?.client ? '✅ Connected' : '⏳ Connecting...'}
               </span>
             </div>
-            {loaderData?.error && (
-              <div className="text-red-600">
-                Error: {loaderData.error}
+            {loaderData?.groupState && (
+              <div>
+                Contacts: <span className="font-medium">
+                  {loaderData.groupState.contacts?.size || 0}
+                </span>
               </div>
             )}
           </div>

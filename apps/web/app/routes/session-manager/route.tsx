@@ -36,7 +36,8 @@ export default function SessionManager() {
   
   const handleResume = (sessionId: string) => {
     console.log('[SessionManager] Resuming session:', sessionId)
-    navigate(`/flow/session/${sessionId}/editor`)
+    // Navigate to session which redirects to /group/root
+    navigate(`/flow/session/${sessionId}`)
   }
   
   const handleDelete = (sessionId: string) => {
@@ -61,8 +62,12 @@ export default function SessionManager() {
               <Button variant="outline" asChild>
                 <Link to="/flow-experiment">← Back to Flow Experiment</Link>
               </Button>
-              <Button asChild>
-                <Link to="/flow-experiment">+ New Session</Link>
+              <Button onClick={() => {
+                const sessionId = `local-${Date.now()}`
+                console.log('[SessionManager] Creating new session:', sessionId)
+                navigate(`/flow/session/${sessionId}`)
+              }}>
+                + New Session
               </Button>
             </div>
           </div>
@@ -142,8 +147,12 @@ export default function SessionManager() {
               <p className="text-muted-foreground mb-6">
                 Start a new propagation network session to begin working with Bassline.
               </p>
-              <Button size="lg" asChild>
-                <Link to="/flow-experiment">Start Your First Session</Link>
+              <Button size="lg" onClick={() => {
+                const sessionId = `local-${Date.now()}`
+                console.log('[SessionManager] Creating first session:', sessionId)
+                navigate(`/flow/session/${sessionId}`)
+              }}>
+                Start Your First Session
               </Button>
             </div>
           </Card>
