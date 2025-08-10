@@ -7,6 +7,7 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { Toaster } from 'sonner';
+import { useSessionProtection } from './hooks/useSessionProtection';
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -60,6 +61,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  // Protect against losing active sessions on page refresh
+  const { hasActiveSessions, sessionCount } = useSessionProtection();
+  
+  // Log protection status for debugging
+  if (hasActiveSessions) {
+    console.log(`[App] Session protection active - ${sessionCount} active session(s)`)
+  }
+  
   return <Outlet />;
 }
 

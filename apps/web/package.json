@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@bassline/bassline": "workspace:*",
-    "@bassline/core": "workspace:*",
     "@bassline/browser-drivers": "workspace:*",
+    "@bassline/core": "workspace:*",
     "@bassline/remote-drivers": "workspace:*",
     "@bassline/storage-memory": "workspace:*",
     "@dagrejs/dagre": "^1.1.5",
@@ -29,6 +29,7 @@
     "@radix-ui/react-switch": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.7",
+    "@react-router/fs-routes": "^7.8.0",
     "@react-router/node": "^7.7.1",
     "@react-router/serve": "^7.7.1",
     "@xyflow/react": "^12.8.2",
