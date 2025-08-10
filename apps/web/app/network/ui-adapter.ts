@@ -509,4 +509,41 @@ export class UIAdapter {
       }
     })
   }
+  
+  // ============================================================================
+  // Undo/Redo Support
+  // ============================================================================
+  
+  /**
+   * Undo the last operation
+   */
+  async undo(): Promise<{
+    undone?: string
+    canUndo: boolean
+    canRedo: boolean
+  }> {
+    return this.kernelClient.undo()
+  }
+  
+  /**
+   * Redo the last undone operation
+   */
+  async redo(): Promise<{
+    redone?: string
+    canUndo: boolean
+    canRedo: boolean
+  }> {
+    return this.kernelClient.redo()
+  }
+  
+  /**
+   * Get the history status
+   */
+  async getHistoryStatus(): Promise<{
+    canUndo: boolean
+    canRedo: boolean
+    history?: any[]
+  }> {
+    return this.kernelClient.getHistoryStatus()
+  }
 }

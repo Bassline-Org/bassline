@@ -1,7 +1,7 @@
 // Example usage of the type-safe serialization system
 
 import { serialize, deserialize, createSerializer } from './serialization'
-import type { Contact, Group, Serializable } from './types'
+import type { Contact, Group, GroupId, Serializable } from './types'
 import { brand } from './types'
 
 // ============================================================================
@@ -100,14 +100,12 @@ const networkState = {
 }
 
 const stateJson = serialize.networkState(networkState)
-const stateResult = deserialize.networkState(stateJson)
+const deserializedState = deserialize.networkState(stateJson)
 
-if (stateResult.ok) {
-  console.log('Successfully deserialized network state')
-  // The Maps are properly reconstructed
-  const group = stateResult.value.groups.get('group-1')
-  console.log('Group name:', group?.group.name)
-}
+console.log('Successfully deserialized network state')
+// The Maps are properly reconstructed
+const group = deserializedState.groups.get('group-1' as GroupId)
+console.log('Group name:', group?.group.name)
 
 // ============================================================================
 // Validation Examples

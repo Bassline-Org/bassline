@@ -9,8 +9,11 @@ import {
   Kernel, 
   UserspaceRuntime, 
   MemoryStorageDriver,
+  CompoundDriver,
+  HistoryDriver,
   brand,
-  type ExternalInput 
+  type ExternalInput,
+  type CommandResponse 
 } from '@bassline/core'
 
 // Worker message types matching BrowserWorkerBridgeDriver
@@ -24,8 +27,26 @@ interface WorkerMessage {
 const kernel = new Kernel({ debug: true })
 const runtime = new UserspaceRuntime({ kernel })
 
+// Create compound driver with sub-drivers
+const compoundDriver = new CompoundDriver('main-compound')
+
 // Add memory storage driver
 const storage = new MemoryStorageDriver()
+compoundDriver.setStorageDriver(storage)
+
+// Add history driver for undo/redo
+const historyDriver = new HistoryDriver('main-history', {
+  maxHistorySize: 100,
+  captureInterval: 100
+})
+
+// Set up input handler to route ExternalInput through runtime
+historyDriver.setInputHandler(async (input) => {
+  console.log('[KernelWorker] HistoryDriver emitting ExternalInput:', input)
+  await runtime.receiveExternalInput(input)
+})
+
+compoundDriver.setHistoryDriver(historyDriver)
 
 // Track initialization
 let initialized = false
@@ -41,8 +62,8 @@ async function initialize() {
     // Connect runtime to kernel for new modular system
     kernel.setUserspaceRuntime(runtime)
     
-    // Register storage driver
-    await kernel.registerDriver(storage)
+    // Register compound driver (which includes storage)
+    await kernel.registerDriver(compoundDriver.asDriver())
     
     // Create root group
     try {
@@ -123,6 +144,15 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             break
             
           case 'external-contact-update':
+            // Store the current value before updating for history tracking
+            const currentState = await runtime.getState(input.groupId)
+            if (currentState) {
+              const contact = currentState.contacts.get(input.contactId)
+              if (contact && historyDriver) {
+                historyDriver.storePreviousValue(input.contactId, contact.content)
+              }
+            }
+            
             await runtime.scheduleUpdate(input.contactId, input.value)
             result = { success: true }
             break
@@ -362,13 +392,35 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
       break
       
     case 'command':
-      // Handle driver commands
-      // For now, just return success
-      self.postMessage({
-        type: 'response',
-        requestId: message.requestId,
-        data: { status: 'success' }
-      } as WorkerMessage)
+      // Handle driver commands (undo/redo, etc)
+      if (!initialized) {
+        await initialize()
+      }
+      
+      try {
+        const command = message.data
+        let result: CommandResponse
+        
+        // Route commands through compound driver
+        if (command.type === 'undo' || command.type === 'redo') {
+          result = await compoundDriver.handleCommand(command)
+        } else {
+          // Other commands can be handled directly
+          result = { status: 'success' }
+        }
+        
+        self.postMessage({
+          type: 'response',
+          requestId: message.requestId,
+          data: result
+        } as WorkerMessage)
+      } catch (error) {
+        self.postMessage({
+          type: 'error',
+          requestId: message.requestId,
+          error: error instanceof Error ? error.message : 'Command failed'
+        } as WorkerMessage)
+      }
       break
       
     default:

@@ -318,7 +318,7 @@ export class BasslineInstallation {
     
     // Delete from storage
     if (network.storage.deleteNetwork) {
-      await network.storage.deleteNetwork(id)
+      await network.storage.deleteNetwork(network.id)
     }
     
     // Remove from map

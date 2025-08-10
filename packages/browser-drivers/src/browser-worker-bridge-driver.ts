@@ -207,6 +207,34 @@ export class BrowserWorkerBridgeDriver extends AbstractBridgeDriver {
   }
   
   /**
+   * Send a command from UI to kernel in worker
+   */
+  async sendCommand(command: any): Promise<any> {
+    const requestId = `cmd-${++this.requestCounter}`
+    
+    return new Promise((resolve, reject) => {
+      this.pendingRequests.set(requestId, {
+        resolve,
+        reject
+      })
+      
+      this.worker.postMessage({
+        type: 'command',
+        data: command,
+        requestId
+      } as WorkerMessage)
+      
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        if (this.pendingRequests.has(requestId)) {
+          this.pendingRequests.delete(requestId)
+          reject(new Error('Command timeout'))
+        }
+      }, 5000)
+    })
+  }
+  
+  /**
    * Subscribe to a group for changes
    */
   async subscribe(groupId: string): Promise<void> {

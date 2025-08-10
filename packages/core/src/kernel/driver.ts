@@ -162,3 +162,18 @@ export interface DriverStats {
   readonly uptime: number
   readonly custom?: Record<string, unknown>
 }
+
+// Export driver implementations
+export { CompoundDriver } from './drivers/compound-driver'
+export type { 
+  CompoundDriverCommand, 
+  ExtendedDriver, 
+  UndoCommand, 
+  RedoCommand,
+  GetHistoryCommand,
+  ClearHistoryCommand,
+  ClearCacheCommand
+} from './drivers/compound-driver'
+
+export { HistoryDriver } from './drivers/history-driver'
+export type { HistoryDriverConfig } from './drivers/history-driver'

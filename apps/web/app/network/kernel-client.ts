@@ -10,7 +10,8 @@ import {
   type ExternalInput,
   type ContactChange,
   type GroupState,
-  brand
+  brand,
+  type Contact
 } from '@bassline/core'
 import { BrowserWorkerBridgeDriver } from '@bassline/browser-drivers'
 import { RemoteWebSocketBridgeDriver } from '@bassline/remote-drivers'
@@ -495,6 +496,57 @@ export class KernelClient {
         contactId: brand.contactId(contactId)
       }
       return this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
+   * Undo the last operation
+   */
+  async undo(): Promise<{
+    undone?: string
+    canUndo: boolean
+    canRedo: boolean
+  }> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('Undo not yet implemented for remote mode')
+    } else {
+      const workerBridge = this.bridge as BrowserWorkerBridgeDriver
+      const result = await workerBridge.sendCommand({ type: 'undo' })
+      return result?.data || { canUndo: false, canRedo: false }
+    }
+  }
+  
+  /**
+   * Redo the last undone operation
+   */
+  async redo(): Promise<{
+    redone?: string
+    canUndo: boolean
+    canRedo: boolean
+  }> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('Redo not yet implemented for remote mode')
+    } else {
+      const workerBridge = this.bridge as BrowserWorkerBridgeDriver
+      const result = await workerBridge.sendCommand({ type: 'redo' })
+      return result?.data || { canUndo: false, canRedo: false }
+    }
+  }
+  
+  /**
+   * Get the history status
+   */
+  async getHistoryStatus(): Promise<{
+    canUndo: boolean
+    canRedo: boolean
+    history?: any[]
+  }> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('History status not yet implemented for remote mode')
+    } else {
+      const workerBridge = this.bridge as BrowserWorkerBridgeDriver
+      const result = await workerBridge.sendCommand({ type: 'get-history' })
+      return result?.data || { canUndo: false, canRedo: false }
     }
   }
   

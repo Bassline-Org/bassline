@@ -264,6 +264,13 @@ export class Kernel {
    * @throws {KernelError} If failFast is true and any driver fails
    */
   async handleChange(change: ContactChange): Promise<void> {
+    console.log('[Kernel] handleChange called:', {
+      contactId: change.contactId,
+      value: change.value,
+      driverCount: this.drivers.size,
+      storageDriverCount: this.storageDrivers.size
+    })
+    
     // Create promise for this operation
     const promise = this.processChange(change)
       .finally(() => {

@@ -541,7 +541,7 @@ export default function GroupEditor() {
   }, [])
   
   // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback(async (event: React.KeyboardEvent) => {
     // Don't handle shortcuts if user is typing in an input field
     const target = event.target as HTMLElement
     if (
@@ -550,6 +550,34 @@ export default function GroupEditor() {
       target.tagName === 'SELECT' ||
       target.contentEditable === 'true'
     ) {
+      return
+    }
+    
+    // Undo (Cmd+Z)
+    if (event.metaKey && event.key === 'z' && !event.shiftKey) {
+      event.preventDefault()
+      try {
+        const result = await context.client.undo()
+        console.log('[GroupEditor] Undo:', result)
+        // Reload to reflect changes
+        revalidator.revalidate()
+      } catch (error) {
+        console.error('[GroupEditor] Undo failed:', error)
+      }
+      return
+    }
+    
+    // Redo (Cmd+Shift+Z)
+    if (event.metaKey && event.shiftKey && event.key === 'z') {
+      event.preventDefault()
+      try {
+        const result = await context.client.redo()
+        console.log('[GroupEditor] Redo:', result)
+        // Reload to reflect changes
+        revalidator.revalidate()
+      } catch (error) {
+        console.error('[GroupEditor] Redo failed:', error)
+      }
       return
     }
     
@@ -613,7 +641,7 @@ export default function GroupEditor() {
       event.preventDefault()
       // React Flow handles this internally when multiSelectable is true
     }
-  }, [selectedNodes, selectedEdges, fetcher])
+  }, [selectedNodes, selectedEdges, fetcher, context.client, revalidator, nodes])
   
   return (
     <div className="h-full w-full relative" onKeyDown={handleKeyDown} onContextMenu={handleContextMenu} tabIndex={0}>
