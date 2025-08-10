@@ -1,79 +1,236 @@
-import { useOutletContext, useLoaderData } from 'react-router'
-import { Card } from '~/components/ui/card'
-import { Button } from '~/components/ui/button'
-import type { ClientLoaderFunctionArgs } from 'react-router'
+import { useEffect, useCallback } from 'react'
+import { useOutletContext, useLoaderData, useFetcher, useRevalidator } from 'react-router'
+import { 
+  ReactFlow, 
+  Background, 
+  Controls,
+  useNodesState,
+  useEdgesState,
+  type Connection,
+  type Node,
+  type Edge
+} from '@xyflow/react'
+import type { ClientLoaderFunctionArgs, ClientActionFunctionArgs } from 'react-router'
+import { ContactNode } from '~/components/flow-editor/ContactNode'
 
-// Editor-specific loader (can load additional data if needed)
+// Custom node types
+const nodeTypes = {
+  contact: ContactNode
+}
+
+// Load initial state from network
 export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
-  console.log('[FlowSessionEditor] Loader called for editor view:', params.sessionId)
+  console.log('[Editor] Loading state for session:', params.sessionId)
   
-  // Editor-specific data loading can happen here
-  // This loader runs IN ADDITION to the parent loader
-  return {
-    editorConfig: {
-      gridSize: 20,
-      snapToGrid: true,
-      theme: 'light'
+  // Get session from parent context would be better, but for now...
+  const sessionId = params.sessionId!
+  // For now, we'll access the client directly from the window
+  // In production, this should come from the session manager
+  const client = (window as any).__BASSLINE_SESSIONS__?.get(sessionId)?.client
+  
+  if (!client) {
+    console.error('[Editor] No client found for session:', sessionId)
+    return { nodes: [], edges: [] }
+  }
+  
+  try {
+    const state = await client.getState('root')
+    console.log('[Editor] Loaded state:', state)
+    
+    // Simple mapping from contacts to nodes
+    const nodes: Node[] = []
+    if (state.contacts instanceof Map) {
+      state.contacts.forEach((contact, id) => {
+        nodes.push({
+          id,
+          type: 'contact',
+          position: { x: Math.random() * 500, y: Math.random() * 500 }, // Random for now
+          data: { 
+            content: contact.content || '',
+            blendMode: contact.blendMode
+          }
+        })
+      })
     }
+    
+    // Simple mapping from wires to edges
+    const edges: Edge[] = []
+    if (state.wires instanceof Map) {
+      state.wires.forEach((wire, id) => {
+        edges.push({
+          id,
+          source: wire.fromId,
+          target: wire.toId,
+          type: wire.type === 'directed' ? 'straight' : 'default'
+        })
+      })
+    }
+    
+    return { nodes, edges }
+  } catch (error) {
+    console.error('[Editor] Error loading state:', error)
+    return { nodes: [], edges: [] }
   }
 }
 
-
-export default function FlowSessionEditor() {
-  const context = useOutletContext<{ sessionId: string; sessionType: string }>()
-  const editorData = useLoaderData<typeof clientLoader>()
+// Handle network mutations
+export async function clientAction({ request, params }: ClientActionFunctionArgs) {
+  const formData = await request.formData()
+  const intent = formData.get('intent') as string
+  const sessionId = params.sessionId!
   
-  console.log('[FlowSessionEditor] Editor rendered:', {
-    context,
-    editorData
-  })
+  // Get client
+  const client = (window as any).__BASSLINE_SESSIONS__?.get(sessionId)?.client
+  if (!client) {
+    return { error: 'No client found' }
+  }
+  
+  console.log('[Editor] Action:', intent)
+  
+  switch (intent) {
+    case 'connect': {
+      const source = formData.get('source') as string
+      const target = formData.get('target') as string
+      await client.connect(source, target, 'bidirectional')
+      return { success: true }
+    }
+    
+    case 'add-contact': {
+      const position = JSON.parse(formData.get('position') as string)
+      const contactId = await client.addContact('root', {
+        content: '',
+        blendMode: 'accept-last'
+      })
+      // Position will be handled by React Flow
+      return { success: true, contactId }
+    }
+    
+    case 'delete-node': {
+      const nodeId = formData.get('nodeId') as string
+      await client.removeContact(nodeId)
+      return { success: true }
+    }
+    
+    case 'delete-edge': {
+      const edgeId = formData.get('edgeId') as string
+      await client.removeWire(edgeId)
+      return { success: true }
+    }
+    
+    default:
+      return { error: 'Unknown intent' }
+  }
+}
+
+export default function Editor() {
+  const { nodes: initialNodes, edges: initialEdges } = useLoaderData<typeof clientLoader>()
+  const context = useOutletContext<{ sessionId: string; client: any }>()
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const revalidator = useRevalidator()
+  const fetcher = useFetcher()
+  
+  console.log('[Editor] Rendering with', nodes.length, 'nodes and', edges.length, 'edges')
+  
+  // Get client from context
+  const client = context.client || (window as any).__BASSLINE_SESSIONS__?.get(context.sessionId)?.client
+  
+  // Subscribe to network changes
+  useEffect(() => {
+    if (!client) return
+    
+    console.log('[Editor] Setting up subscription')
+    const unsubscribe = client.subscribe('root', (changes: any[]) => {
+      console.log('[Editor] Network changes detected:', changes.length, 'changes')
+      // Revalidate to get fresh data
+      revalidator.revalidate()
+    })
+    
+    return () => {
+      console.log('[Editor] Cleaning up subscription')
+      unsubscribe()
+    }
+  }, [client, revalidator])
+  
+  // Update local state when loader data changes
+  useEffect(() => {
+    console.log('[Editor] Loader data changed, updating nodes and edges')
+    setNodes(initialNodes)
+    setEdges(initialEdges)
+  }, [initialNodes, initialEdges, setNodes, setEdges])
+  
+  // Handle connections
+  const onConnect = useCallback((params: Connection) => {
+    console.log('[Editor] Creating connection:', params)
+    fetcher.submit(
+      {
+        intent: 'connect',
+        source: params.source!,
+        target: params.target!
+      },
+      { method: 'post' }
+    )
+  }, [fetcher])
+  
+  // Handle node deletion
+  const onNodesDelete = useCallback((nodesToDelete: Node[]) => {
+    nodesToDelete.forEach(node => {
+      fetcher.submit(
+        {
+          intent: 'delete-node',
+          nodeId: node.id
+        },
+        { method: 'post' }
+      )
+    })
+  }, [fetcher])
+  
+  // Handle edge deletion
+  const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
+    edgesToDelete.forEach(edge => {
+      fetcher.submit(
+        {
+          intent: 'delete-edge',
+          edgeId: edge.id
+        },
+        { method: 'post' }
+      )
+    })
+  }, [fetcher])
   
   return (
-    <div className="h-full p-4 bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="h-full flex flex-col gap-4">
-        {/* Toolbar */}
-        <Card className="p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline">Add Contact</Button>
-              <Button size="sm" variant="outline">Add Group</Button>
-              <Button size="sm" variant="outline">Add Gadget</Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="ghost">Undo</Button>
-              <Button size="sm" variant="ghost">Redo</Button>
-              <Button size="sm" variant="ghost">Export</Button>
-            </div>
-          </div>
-        </Card>
-        
-        {/* Main editor area */}
-        <Card className="flex-1 p-0 overflow-hidden">
-          <div className="h-full flex items-center justify-center bg-white rounded-lg">
-            <div className="text-center space-y-4">
-              <div className="text-6xl">🎨</div>
-              <h2 className="text-2xl font-semibold">Flow Editor</h2>
-              <p className="text-muted-foreground max-w-md">
-                This is where the React Flow editor will be integrated.
-                The network client will be accessible from the parent route.
-              </p>
-              <div className="pt-4 space-y-2 text-sm text-left inline-block">
-                <div><strong>Session ID:</strong> <code className="px-2 py-1 bg-slate-100 rounded">{context.sessionId}</code></div>
-                <div><strong>Session Type:</strong> {context.sessionType}</div>
-                <div><strong>Grid Size:</strong> {editorData?.editorConfig?.gridSize}px</div>
-                <div><strong>Snap to Grid:</strong> {editorData?.editorConfig?.snapToGrid ? 'Yes' : 'No'}</div>
-              </div>
-            </div>
-          </div>
-        </Card>
-        
-        {/* Status bar */}
-        <Card className="p-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div>Ready</div>
-            <div>0 nodes · 0 edges · Zoom: 100%</div>
-          </div>
-        </Card>
+    <div className="h-full w-full relative">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodesDelete={onNodesDelete}
+        onEdgesDelete={onEdgesDelete}
+        nodeTypes={nodeTypes}
+        fitView
+      >
+        <Background />
+        <Controls />
+      </ReactFlow>
+      
+      {/* Toolbar */}
+      <div className="absolute top-4 left-4 z-10 flex gap-2">
+        <button
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded shadow-lg transition-colors"
+          onClick={() => {
+            fetcher.submit(
+              {
+                intent: 'add-contact',
+                position: JSON.stringify({ x: 250, y: 250 })
+              },
+              { method: 'post' }
+            )
+          }}
+        >
+          Add Contact
+        </button>
       </div>
     </div>
   )

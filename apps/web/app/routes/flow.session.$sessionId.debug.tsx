@@ -1,4 +1,5 @@
-import { useOutletContext, useLoaderData } from 'react-router'
+import { useEffect } from 'react'
+import { useOutletContext, useLoaderData, useRevalidator } from 'react-router'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
@@ -12,19 +13,49 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
   // Get all active sessions for debugging
   const allSessions = listSessions()
   
-  // Simulate loading debug data
+  // Get the client for this session to read actual network state
+  const sessionId = params.sessionId!
+  const client = (window as any).__BASSLINE_SESSIONS__?.get(sessionId)?.client
+  
+  let stats = {
+    totalNodes: 0,
+    totalEdges: 0,
+    propagationCycles: 0,
+    lastPropagationTime: null as number | null,
+  }
+  
+  // If client exists, fetch real network state
+  if (client) {
+    try {
+      const state = await client.getState('root')
+      console.log('[FlowSessionDebug] Fetched network state:', state)
+      
+      // Count actual contacts
+      if (state.contacts instanceof Map) {
+        stats.totalNodes = state.contacts.size
+      }
+      
+      // Count actual wires
+      if (state.wires instanceof Map) {
+        stats.totalEdges = state.wires.size
+      }
+      
+      // Add subgroups to node count
+      if (state.group && Array.isArray(state.group.subgroupIds)) {
+        stats.totalNodes += state.group.subgroupIds.length
+      }
+    } catch (error) {
+      console.error('[FlowSessionDebug] Error fetching network state:', error)
+    }
+  }
+  
   return {
     logs: [
       { timestamp: new Date().toISOString(), level: 'info', message: 'Session initialized' },
       { timestamp: new Date().toISOString(), level: 'debug', message: 'Network client created' },
       { timestamp: new Date().toISOString(), level: 'info', message: 'Connected to propagation network' },
     ],
-    stats: {
-      totalNodes: 0,
-      totalEdges: 0,
-      propagationCycles: 0,
-      lastPropagationTime: null,
-    },
+    stats,
     allSessions: allSessions.map(s => ({
       id: s.id,
       type: s.type,
@@ -37,13 +68,34 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
 
 
 export default function FlowSessionDebug() {
-  const context = useOutletContext<{ sessionId: string; sessionType: string; createdAt: string }>()
+  const context = useOutletContext<{ sessionId: string; sessionType: string; createdAt: string; client: any }>()
   const debugData = useLoaderData<typeof clientLoader>()
+  const revalidator = useRevalidator()
   
   console.log('[FlowSessionDebug] Debug view rendered:', {
     context,
     debugData
   })
+  
+  // Get client from context or window
+  const client = context.client || (window as any).__BASSLINE_SESSIONS__?.get(context.sessionId)?.client
+  
+  // Subscribe to network changes for real-time updates
+  useEffect(() => {
+    if (!client) return
+    
+    console.log('[FlowSessionDebug] Setting up subscription for real-time updates')
+    const unsubscribe = client.subscribe('root', (changes: any[]) => {
+      console.log('[FlowSessionDebug] Network changes detected:', changes.length, 'changes')
+      // Revalidate to get fresh stats
+      revalidator.revalidate()
+    })
+    
+    return () => {
+      console.log('[FlowSessionDebug] Cleaning up subscription')
+      unsubscribe()
+    }
+  }, [client, revalidator])
   
   return (
     <div className="h-full p-4 bg-gradient-to-br from-slate-50 to-slate-100 overflow-auto">

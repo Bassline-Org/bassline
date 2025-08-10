@@ -1,7 +1,9 @@
 import { Outlet, useParams, useLoaderData, Link, useLocation } from 'react-router'
+import { ReactFlowProvider } from '@xyflow/react'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { ClientLoaderFunctionArgs } from 'react-router'
 import { getOrCreateSession } from '~/lib/session-manager'
+import '@xyflow/react/dist/style.css'
 
 // Loader that will eventually hold the network client
 export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
@@ -89,7 +91,9 @@ export default function FlowSessionLayout() {
       
       {/* Child route content */}
       <div className="flex-1 overflow-hidden">
-        <Outlet context={{ sessionId: params.sessionId, ...loaderData }} />
+        <ReactFlowProvider>
+          <Outlet context={{ sessionId: params.sessionId, ...loaderData }} />
+        </ReactFlowProvider>
       </div>
       
       {/* Status bar */}

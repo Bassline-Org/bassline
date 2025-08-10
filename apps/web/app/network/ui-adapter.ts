@@ -89,6 +89,26 @@ export class UIAdapter {
   }
   
   /**
+   * Remove a contact
+   */
+  async removeContact(contactId: string): Promise<void> {
+    // For now, we don't have a direct kernel method for this
+    // We'll need to implement it properly in the kernel
+    console.warn('[UIAdapter] removeContact not yet implemented in kernel')
+    
+    // Emit a change event so UI updates
+    const change: Change = {
+      type: 'contact-removed' as any,
+      data: {
+        contactId,
+        timestamp: Date.now()
+      },
+      timestamp: Date.now()
+    }
+    this.emitChanges([change])
+  }
+  
+  /**
    * Create a group and emit group-added change
    */
   async createGroup(name: string, parentId?: string): Promise<string> {
@@ -165,6 +185,25 @@ export class UIAdapter {
     
     this.emitChanges([change])
     return wireId
+  }
+  
+  /**
+   * Remove a wire
+   */
+  async removeWire(wireId: string): Promise<void> {
+    await this.kernelClient.removeWire(wireId)
+    
+    // Emit UI-level change event
+    const change: Change = {
+      type: 'wire-removed' as any,
+      data: {
+        wireId,
+        timestamp: Date.now()
+      },
+      timestamp: Date.now()
+    }
+    
+    this.emitChanges([change])
   }
   
   /**
