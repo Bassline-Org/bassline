@@ -317,3 +317,8 @@ body {
     stroke-dashoffset: -60;
   }
 }
+
+/* React Flow node overrides */
+.react-flow__node {
+  padding: 0 !important;
+}

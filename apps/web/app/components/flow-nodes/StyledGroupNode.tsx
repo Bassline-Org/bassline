@@ -67,7 +67,8 @@ export const StyledGroupNode = memo(({ id, data, selected }: NodeProps) => {
       }}
       style={{ 
         transformStyle: "preserve-3d",
-        ...(isGadget ? { width: 60, height: 60 } : {})
+        width: '100%',
+        height: '100%'
       }}
       onDoubleClick={handleDoubleClick}
     >
@@ -75,7 +76,7 @@ export const StyledGroupNode = memo(({ id, data, selected }: NodeProps) => {
         className={cn(
           "transition-all shadow-md hover:shadow-lg rounded-lg",
           nodeType === 'primitive' 
-            ? 'node-gradient-primitive node-border-primitive w-fit' 
+            ? 'node-gradient-primitive node-border-primitive w-full h-full flex items-center justify-center' 
             : 'node-gradient-group node-border-group min-w-[200px]',
           selected && (nodeType === 'primitive' ? 'ring-2 node-ring-primitive' : 'ring-2 node-ring-group'),
           !isGadget && 'cursor-pointer'
@@ -83,9 +84,7 @@ export const StyledGroupNode = memo(({ id, data, selected }: NodeProps) => {
       >
         {isGadget ? (
           // Primitive gadgets - compact icon view
-          <div className="p-[5px] flex items-center justify-center w-[50px] h-[50px]">
-            <div className="text-2xl">⚡</div>
-          </div>
+          <div className="text-2xl">⚡</div>
         ) : (
           // Regular groups - full card view
           <>
@@ -155,38 +154,50 @@ export const StyledGroupNode = memo(({ id, data, selected }: NodeProps) => {
         {isGadget && (
           <>
             {/* Input handles */}
-            {inputContacts.map((contact, index) => (
-              <Handle
-                key={contact.id}
-                type="target"
-                position={Position.Left}
-                id={contact.id}
-                className="!w-5 !h-5 !rounded-sm !border !border-border !shadow-sm hover:!shadow-md !transition-all"
-                style={{ 
-                  left: '-10px',
-                  top: `${15 + index * 20}px`,
-                  background: 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))'
-                }}
-                title={contact.name || `in${index + 1}`}
-              />
-            ))}
+            {inputContacts.map((contact, index) => {
+              const totalInputs = inputContacts.length;
+              const spacing = totalInputs === 1 ? 0 : 40 / (totalInputs - 1);
+              const topPos = totalInputs === 1 ? 30 : 10 + index * spacing;
+              
+              return (
+                <Handle
+                  key={contact.id}
+                  type="target"
+                  position={Position.Left}
+                  id={contact.id}
+                  className="!w-5 !h-5 !rounded-sm !border !border-border !shadow-sm hover:!shadow-md !transition-all"
+                  style={{ 
+                    left: '-10px',
+                    top: `${topPos}px`,
+                    background: 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))'
+                  }}
+                  title={contact.name || `in${index + 1}`}
+                />
+              );
+            })}
             
             {/* Output handles */}
-            {outputContacts.map((contact, index) => (
-              <Handle
-                key={contact.id}
-                type="source"
-                position={Position.Right}
-                id={contact.id}
-                className="!w-5 !h-5 !rounded-sm !border !border-border !shadow-sm hover:!shadow-md !transition-all"
-                style={{ 
-                  right: '-10px',
-                  top: `${15 + index * 20}px`,
-                  background: 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))'
-                }}
-                title={contact.name || `out${index + 1}`}
-              />
-            ))}
+            {outputContacts.map((contact, index) => {
+              const totalOutputs = outputContacts.length;
+              const spacing = totalOutputs === 1 ? 0 : 40 / (totalOutputs - 1);
+              const topPos = totalOutputs === 1 ? 30 : 10 + index * spacing;
+              
+              return (
+                <Handle
+                  key={contact.id}
+                  type="source"
+                  position={Position.Right}
+                  id={contact.id}
+                  className="!w-5 !h-5 !rounded-sm !border !border-border !shadow-sm hover:!shadow-md !transition-all"
+                  style={{ 
+                    right: '-10px',
+                    top: `${topPos}px`,
+                    background: 'linear-gradient(135deg, var(--node-primitive), color-mix(in oklch, var(--node-primitive), white 20%))'
+                  }}
+                  title={contact.name || `out${index + 1}`}
+                />
+              );
+            })}
           </>
         )}
       </div>
