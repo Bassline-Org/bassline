@@ -201,7 +201,13 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
             primitiveId: subgroupData?.group?.primitive?.id,
             inputContacts,
             outputContacts
-          }
+          },
+          // Set explicit dimensions for gadgets to override React Flow defaults
+          ...(subgroupData?.group?.primitive ? { 
+            style: { width: 60, height: 60 },
+            width: 60,
+            height: 60
+          } : {})
         })
       }
     }
@@ -420,19 +426,28 @@ export default function GroupEditor() {
     }
   }, [client, context.groupId, revalidator])
   
-  // Update local state when loader data changes, but preserve positions
+  // Update local state when loader data changes, but preserve positions and selection
   useEffect(() => {
     setNodes(currentNodes => {
-      // Create a map of current node positions
+      // Create maps of current node state we want to preserve
       const positionMap = new Map(currentNodes.map(n => [n.id, n.position]))
+      const selectedMap = new Map(currentNodes.map(n => [n.id, n.selected]))
       
-      // Update nodes with new data but keep positions
+      // Update nodes with new data but keep positions and selection
       return initialNodes.map(node => ({
         ...node,
-        position: positionMap.get(node.id) || node.position
+        position: positionMap.get(node.id) || node.position,
+        selected: selectedMap.get(node.id) || false
       }))
     })
-    setEdges(initialEdges)
+    setEdges(currentEdges => {
+      // Also preserve edge selection
+      const selectedMap = new Map(currentEdges.map(e => [e.id, e.selected]))
+      return initialEdges.map(edge => ({
+        ...edge,
+        selected: selectedMap.get(edge.id) || false
+      }))
+    })
   }, [initialNodes, initialEdges, setNodes, setEdges])
   
   // Handle node position changes - cache them

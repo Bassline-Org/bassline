@@ -65,7 +65,10 @@ export const StyledGroupNode = memo(({ id, data, selected }: NodeProps) => {
         opacity: { duration: 0.2 },
         rotateY: { type: "spring", stiffness: 260, damping: 20 }
       }}
-      style={{ transformStyle: "preserve-3d" }}
+      style={{ 
+        transformStyle: "preserve-3d",
+        ...(isGadget ? { width: 60, height: 60 } : {})
+      }}
       onDoubleClick={handleDoubleClick}
     >
       <div 

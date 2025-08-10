@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useFetcher } from 'react-router'
 import { X, ChevronRight } from 'lucide-react'
+import { NumberEditor } from './property-editors/NumberEditor'
+import { BooleanEditor } from './property-editors/BooleanEditor'
+import { StringEditor } from './property-editors/StringEditor'
+import { ArrayEditor } from './property-editors/ArrayEditor'
+import { ObjectEditor } from './property-editors/ObjectEditor'
 
 interface PropertiesPanelProps {
   selectedNodes: string[]
@@ -22,8 +27,12 @@ export function PropertiesPanel({
   onToggleVisibility
 }: PropertiesPanelProps) {
   const fetcher = useFetcher()
-  const [editingValue, setEditingValue] = useState<string>('')
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
+  const [editingValue, setEditingValue] = useState<any>(null)
   const [editingBlendMode, setEditingBlendMode] = useState<string>('accept-last')
+  
+  // Get the node being edited (persists until a new node is selected)
+  const editingNode = editingNodeId ? nodes.find(n => n.id === editingNodeId) : null
   
   // Get selected node if only one is selected
   const selectedNode = selectedNodes.length === 1 
@@ -35,38 +44,163 @@ export function PropertiesPanel({
     ? edges.find(e => e.id === selectedEdges[0])
     : null
     
-  // Update editing values when selection changes
+  // Update editing node when selection changes to a different single node
   useEffect(() => {
-    if (selectedNode?.type === 'contact') {
-      setEditingValue(JSON.stringify(selectedNode.data.content || ''))
-      setEditingBlendMode(selectedNode.data.blendMode || 'accept-last')
+    // Don't update if we're in the middle of a form submission
+    if (fetcher.state !== 'idle') {
+      return
     }
-  }, [selectedNode])
-  
-  const handleUpdateContact = () => {
-    if (selectedNode?.type === 'contact') {
-      let parsedValue: any = editingValue
-      try {
-        parsedValue = JSON.parse(editingValue)
-      } catch {
-        // If parsing fails, treat as string
-        parsedValue = editingValue
+    
+    if (selectedNode && selectedNode.id !== editingNodeId) {
+      setEditingNodeId(selectedNode.id)
+      if (selectedNode.type === 'contact') {
+        setEditingValue(selectedNode.data.content ?? '')
+        setEditingBlendMode(selectedNode.data.blendMode || 'accept-last')
       }
-      
+    } else if (selectedNodes.length === 0) {
+      // Clear editing when nothing is selected
+      setEditingNodeId(null)
+    }
+  }, [selectedNode, selectedNodes.length, editingNodeId, fetcher.state])
+  
+  // Update the editing node's data when it changes (e.g., from network updates)
+  useEffect(() => {
+    if (editingNode?.type === 'contact' && editingNode.data.content !== editingValue) {
+      // Only update if the content actually changed from external source
+      // This prevents overwriting user edits
+    }
+  }, [editingNode])
+  
+  const handleUpdateContact = (newValue: any) => {
+    if (editingNode?.type === 'contact') {
+      setEditingValue(newValue)
       fetcher.submit(
         {
           intent: 'update-contact',
-          contactId: selectedNode.data.contactId || selectedNode.id,
-          groupId: selectedNode.data.groupId || groupId,
-          value: JSON.stringify(parsedValue)
+          contactId: editingNode.data.contactId || editingNode.id,
+          groupId: editingNode.data.groupId || groupId,
+          value: JSON.stringify(newValue)
         },
         { method: 'post' }
       )
     }
   }
   
+  const handleTypeChange = (newType: string) => {
+    if (editingNode?.type === 'contact') {
+      // Convert the current value to the new type
+      let convertedValue: any = editingValue
+      
+      switch (newType) {
+        case 'number':
+          convertedValue = Number(editingValue) || 0
+          break
+        case 'boolean':
+          convertedValue = Boolean(editingValue)
+          break
+        case 'string':
+          convertedValue = String(editingValue)
+          break
+        case 'array':
+          convertedValue = Array.isArray(editingValue) ? editingValue : []
+          break
+        case 'object':
+          convertedValue = typeof editingValue === 'object' && !Array.isArray(editingValue) 
+            ? editingValue 
+            : {}
+          break
+        case 'null':
+          convertedValue = null
+          break
+      }
+      
+      setEditingValue(convertedValue)
+      handleUpdateContact(convertedValue)
+      
+      // TODO: Also save the valueType preference on the node
+    }
+  }
+  
+  // Determine the type of the content for selecting the right editor
+  const getContentType = (value: any): string => {
+    if (editingNode?.data?.valueType) {
+      return editingNode.data.valueType
+    }
+    if (value === null || value === undefined) return 'null'
+    if (typeof value === 'boolean') return 'boolean'
+    if (typeof value === 'number') return 'number'
+    if (typeof value === 'string') return 'string'
+    if (Array.isArray(value)) return 'array'
+    if (typeof value === 'object') return 'object'
+    return 'unknown'
+  }
+  
+  const renderValueEditor = () => {
+    const type = getContentType(editingValue)
+    
+    switch (type) {
+      case 'number':
+        return (
+          <NumberEditor
+            value={editingValue as number}
+            onChange={handleUpdateContact}
+          />
+        )
+      case 'boolean':
+        return (
+          <BooleanEditor
+            value={editingValue as boolean}
+            onChange={handleUpdateContact}
+          />
+        )
+      case 'string':
+        return (
+          <StringEditor
+            value={editingValue as string}
+            onChange={handleUpdateContact}
+            multiline={editingValue.length > 50}
+          />
+        )
+      case 'array':
+        return (
+          <ArrayEditor
+            value={editingValue as any[]}
+            onChange={handleUpdateContact}
+          />
+        )
+      case 'object':
+        return (
+          <ObjectEditor
+            value={editingValue as Record<string, any>}
+            onChange={handleUpdateContact}
+          />
+        )
+      case 'null':
+        return (
+          <div className="text-sm text-gray-500 italic">null</div>
+        )
+      default:
+        return (
+          <textarea
+            value={JSON.stringify(editingValue, null, 2)}
+            onChange={(e) => {
+              try {
+                const parsed = JSON.parse(e.target.value)
+                handleUpdateContact(parsed)
+              } catch {
+                // Invalid JSON, don't update
+              }
+            }}
+            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 font-mono"
+            rows={3}
+            placeholder="Enter JSON..."
+          />
+        )
+    }
+  }
+  
   const handleUpdateBlendMode = () => {
-    if (selectedNode?.type === 'contact') {
+    if (editingNode?.type === 'contact') {
       // TODO: Add blend mode update support
       console.log('Update blend mode to:', editingBlendMode)
     }
@@ -105,28 +239,43 @@ export function PropertiesPanel({
           
           {/* Content */}
           <div className="p-3">
-            {selectedNode?.type === 'contact' && (
+            {editingNode?.type === 'contact' && (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Contact ID
                   </label>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                    {selectedNode.id.slice(0, 8)}...
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                      {editingNode.id.slice(0, 8)}...
+                    </div>
+                    {editingNodeId !== selectedNode?.id && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400">
+                        (editing)
+                      </span>
+                    )}
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Content
-                  </label>
-                  <textarea
-                    value={editingValue}
-                    onChange={(e) => setEditingValue(e.target.value)}
-                    onBlur={handleUpdateContact}
-                    className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
-                    rows={3}
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium">
+                      Content
+                    </label>
+                    <select
+                      value={getContentType(editingValue)}
+                      onChange={(e) => handleTypeChange(e.target.value)}
+                      className="text-xs px-1 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                    >
+                      <option value="string">String</option>
+                      <option value="number">Number</option>
+                      <option value="boolean">Boolean</option>
+                      <option value="array">Array</option>
+                      <option value="object">Object</option>
+                      <option value="null">Null</option>
+                    </select>
+                  </div>
+                  {renderValueEditor()}
                 </div>
                 
                 <div>
@@ -145,7 +294,7 @@ export function PropertiesPanel({
                   </select>
                 </div>
                 
-                {selectedNode.data.isBoundary && (
+                {editingNode.data.isBoundary && (
                   <div className="text-sm text-blue-600 dark:text-blue-400">
                     ⚡ Boundary Contact
                   </div>
