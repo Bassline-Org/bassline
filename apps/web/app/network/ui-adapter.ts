@@ -139,6 +139,17 @@ export class UIAdapter {
   async createWire(fromId: string, toId: string): Promise<string> {
     const wireId = await this.kernelClient.createWire(fromId, toId)
     
+    // Try to find the groupId from the contacts
+    let groupId: string | undefined
+    try {
+      const fromContact = await this.kernelClient.queryContact(fromId)
+      if (fromContact && fromContact.groupId) {
+        groupId = fromContact.groupId
+      }
+    } catch (e) {
+      // Contact might be in a different group or not found
+    }
+    
     // Emit UI-level change event
     const change: Change = {
       type: 'wire-added',
@@ -146,6 +157,7 @@ export class UIAdapter {
         id: wireId,
         fromId,
         toId,
+        groupId, // Include groupId if we found it
         timestamp: Date.now()
       },
       timestamp: Date.now()
@@ -408,6 +420,38 @@ export class UIAdapter {
   // ============================================================================
   
   private emitChanges(changes: Change[]): void {
+    // Emit to global listeners
     this.changeCallbacks.forEach(callback => callback(changes))
+    
+    // Emit to group-specific listeners
+    changes.forEach(change => {
+      let groupId: string | undefined
+      
+      // Extract groupId from change data based on change type
+      switch (change.type) {
+        case 'contact-added':
+        case 'contact-updated':
+        case 'contact-removed':
+        case 'wire-added':
+        case 'wire-removed':
+          groupId = (change.data as any).groupId
+          break
+        case 'group-added':
+        case 'gadget-added':
+          groupId = (change.data as any).parentId
+          break
+        case 'group-updated':
+        case 'group-removed':
+          groupId = (change.data as any).groupId
+          break
+      }
+      
+      if (groupId) {
+        const groupCallbacks = this.groupSubscriptions.get(groupId)
+        if (groupCallbacks) {
+          groupCallbacks.forEach(callback => callback([change]))
+        }
+      }
+    })
   }
 }

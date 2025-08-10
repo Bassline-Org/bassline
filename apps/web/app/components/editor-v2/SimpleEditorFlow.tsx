@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useEffect, useRef, memo } from 'react'
+import { useCallback, useState, useEffect, useRef } from 'react'
 import { useFetcher } from 'react-router'
 import {
   ReactFlow,
@@ -39,9 +39,13 @@ interface SimpleEditorFlowProps {
   groupId: string
 }
 
-const SimpleEditorFlowInner = memo(function SimpleEditorFlowInner({ groupState, groupId }: SimpleEditorFlowProps) {
+function SimpleEditorFlowInner({ groupState: initialGroupState, groupId }: SimpleEditorFlowProps) {
   const fetcher = useFetcher()
   const reactFlowInstance = useReactFlow()
+  
+  // Use the groupState directly from props (will be updated by parent subscription)
+  const groupState = initialGroupState
+  
   const subgroupData = useSubgroupData(groupState.group.subgroupIds)
   const processedWires = useGroupWires(groupState, subgroupData)
   
@@ -585,38 +589,7 @@ const SimpleEditorFlowInner = memo(function SimpleEditorFlowInner({ groupState, 
       </div>
     </div>
   )
-}, (prevProps, nextProps) => {
-  // Custom comparison - only re-render on structural changes
-  
-  // Different group? Always re-render
-  if (prevProps.groupId !== nextProps.groupId) {
-    return false // false means "props are different, do re-render"
-  }
-  
-  const prevState = prevProps.groupState
-  const nextState = nextProps.groupState
-  
-  // Check structural changes only (not content changes)
-  const contactsSame = prevState.contacts.size === nextState.contacts.size
-  const wiresSame = prevState.wires.size === nextState.wires.size
-  const subgroupsSame = 
-    prevState.group.subgroupIds.length === nextState.group.subgroupIds.length &&
-    prevState.group.subgroupIds.every((id, i) => id === nextState.group.subgroupIds[i])
-  
-  // Return true if nothing structural changed (prevents re-render)
-  // Return false if something structural changed (triggers re-render)
-  const shouldSkipRender = contactsSame && wiresSame && subgroupsSame
-  
-  if (!shouldSkipRender) {
-    console.log('[SimpleEditorFlow] Re-rendering due to structural change:', {
-      contactsSame,
-      wiresSame,
-      subgroupsSame
-    })
-  }
-  
-  return shouldSkipRender
-})
+}
 
 export function SimpleEditorFlow(props: SimpleEditorFlowProps) {
   return (

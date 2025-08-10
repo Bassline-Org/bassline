@@ -98,11 +98,12 @@ export default function EditorV2() {
   const { groupId, initialGroupState } = useLoaderData<typeof clientLoader>()
   const params = useParams()
   
-  // Subscribe to real-time group state updates
-  const { state: groupState, loading, error } = useGroupState(
-    groupId, 
-    initialGroupState as GroupState
-  )
+  console.log('[EditorV2] Rendering, groupId:', groupId)
+  
+  // Just use initial state - don't subscribe to updates (SimpleEditorFlow handles that)
+  const groupState = initialGroupState as GroupState
+  
+  console.log('[EditorV2] groupState contacts size:', groupState?.contacts?.size)
   
   // Expose network client globally for debugging
   if (typeof window !== 'undefined') {
@@ -219,7 +220,8 @@ export default function EditorV2() {
   }
   
   
-  if (loading) {
+  // Loading is handled by React Router, groupState should always be available from loader
+  if (!groupState) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
@@ -230,29 +232,46 @@ export default function EditorV2() {
     )
   }
   
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-red-50">
-        <div className="text-center">
-          <div className="text-red-600 text-xl mb-2">Error Loading Editor</div>
-          <div className="text-red-500">{error.message}</div>
-        </div>
-      </div>
-    )
-  }
-  
-  if (!groupState) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-gray-500">No group state available</div>
-      </div>
-    )
-  }
-  
   return (
     <div className="relative h-screen">
       <TopToolbar />
       <SimpleEditorFlow groupState={groupState} groupId={groupId} />
     </div>
   )
+}
+
+export function shouldRevalidate({ 
+  currentParams, 
+  nextParams,
+  currentUrl,
+  nextUrl,
+  formMethod,
+  formAction,
+  defaultShouldRevalidate 
+}: any) {
+  console.log('[shouldRevalidate] Called with:', {
+    currentParams,
+    nextParams,
+    formMethod,
+    formAction,
+    currentUrl: currentUrl?.toString(),
+    nextUrl: nextUrl?.toString(),
+    defaultShouldRevalidate
+  })
+  
+  // Different group? Must reload
+  if (currentParams?.groupId !== nextParams?.groupId) {
+    console.log('[shouldRevalidate] Different group, revalidating')
+    return true
+  }
+  
+  // If this is from our action submission, don't revalidate
+  if (formAction?.includes('/api/editor/actions')) {
+    console.log('[shouldRevalidate] Skipping revalidation for action')
+    return false
+  }
+  
+  // For anything else, don't revalidate
+  console.log('[shouldRevalidate] Skipping revalidation')
+  return false
 }

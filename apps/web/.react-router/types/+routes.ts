@@ -64,8 +64,12 @@ type RouteFiles = {
     id: "routes/home";
     page: "/";
   };
-  "routes/editor.tsx": {
-    id: "routes/editor";
+  "routes/editor-layout.tsx": {
+    id: "routes/editor-layout";
+    page: "/editor/:groupId?";
+  };
+  "routes/editor-main.tsx": {
+    id: "routes/editor-main";
     page: "/editor/:groupId?";
   };
   "routes/api.editor.actions.tsx": {
