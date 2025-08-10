@@ -15,6 +15,8 @@ import type { ClientLoaderFunctionArgs, ClientActionFunctionArgs } from 'react-r
 import { StyledContactNode } from '~/components/flow-nodes/StyledContactNode'
 import { StyledGroupNode } from '~/components/flow-nodes/StyledGroupNode'
 import { GadgetPalette } from '~/components/flow-nodes/GadgetPalette'
+import { ContextMenu } from '~/components/flow-nodes/ContextMenu'
+import { PropertiesPanel } from '~/components/flow-nodes/PropertiesPanel'
 
 // Custom node types
 const nodeTypes = {
@@ -338,13 +340,12 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
     
     case 'delete-node': {
       const nodeId = formData.get('nodeId') as string
-      // Check if it's a contact or a group
-      const state = await client.getState(groupId)
-      if (state.contacts.has(nodeId)) {
+      const nodeType = formData.get('nodeType') as string
+      
+      if (nodeType === 'contact') {
         await client.removeContact(nodeId)
-      } else if (state.group.subgroupIds.includes(nodeId)) {
-        // TODO: Implement removeGroup in client
-        console.warn('[GroupEditor] Group deletion not yet implemented')
+      } else if (nodeType === 'group') {
+        await client.removeGroup(nodeId)
       }
       return { success: true }
     }
@@ -363,6 +364,25 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
       return { success: true }
     }
     
+    case 'extract-to-group': {
+      const contactIds = JSON.parse(formData.get('contactIds') as string) as string[]
+      const groupName = formData.get('groupName') as string
+      await client.applyRefactoring('extract-to-group', {
+        contactIds,
+        groupName,
+        parentGroupId: groupId
+      })
+      return { success: true }
+    }
+    
+    case 'inline-group': {
+      const groupIdToInline = formData.get('groupId') as string
+      await client.applyRefactoring('inline-group', {
+        groupId: groupIdToInline
+      })
+      return { success: true }
+    }
+    
     default:
       return { error: 'Unknown intent' }
   }
@@ -374,8 +394,10 @@ export default function GroupEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [showGadgetPalette, setShowGadgetPalette] = useState(false)
+  const [showPropertiesPanel, setShowPropertiesPanel] = useState(true)
   const [selectedNodes, setSelectedNodes] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   const revalidator = useRevalidator()
   const fetcher = useFetcher()
   const navigate = useNavigate()
@@ -450,7 +472,8 @@ export default function GroupEditor() {
       fetcher.submit(
         {
           intent: 'delete-node',
-          nodeId: node.id
+          nodeId: node.id,
+          nodeType: node.type
         },
         { method: 'post' }
       )
@@ -496,18 +519,38 @@ export default function GroupEditor() {
     setSelectedEdges(params.edges.map(e => e.id))
   }, [])
   
+  // Handle right-click for context menu
+  const handleContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault()
+    setContextMenu({ x: event.clientX, y: event.clientY })
+  }, [])
+  
   // Handle keyboard shortcuts
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
+    // Don't handle shortcuts if user is typing in an input field
+    const target = event.target as HTMLElement
+    if (
+      target.tagName === 'INPUT' || 
+      target.tagName === 'TEXTAREA' || 
+      target.tagName === 'SELECT' ||
+      target.contentEditable === 'true'
+    ) {
+      return
+    }
+    
     // Delete selected nodes and edges
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
       
       // Delete selected nodes
       selectedNodes.forEach(nodeId => {
-        fetcher.submit(
-          { intent: 'delete-node', nodeId },
-          { method: 'post' }
-        )
+        const node = nodes.find(n => n.id === nodeId)
+        if (node) {
+          fetcher.submit(
+            { intent: 'delete-node', nodeId, nodeType: node.type },
+            { method: 'post' }
+          )
+        }
       })
       
       // Delete selected edges
@@ -523,7 +566,22 @@ export default function GroupEditor() {
     if (event.metaKey && event.key === 'g') {
       event.preventDefault()
       if (selectedNodes.length > 0) {
-        // TODO: Implement grouping via refactoring system
+        // Extract selected contacts to a new group
+        const contactIds = selectedNodes.filter(nodeId => {
+          const node = nodes.find(n => n.id === nodeId)
+          return node?.type === 'contact'
+        })
+        
+        if (contactIds.length > 0) {
+          fetcher.submit(
+            { 
+              intent: 'extract-to-group',
+              contactIds: JSON.stringify(contactIds),
+              groupName: `Group ${Date.now().toString(36)}`
+            },
+            { method: 'post' }
+          )
+        }
       }
     }
     
@@ -543,7 +601,7 @@ export default function GroupEditor() {
   }, [selectedNodes, selectedEdges, fetcher])
   
   return (
-    <div className="h-full w-full relative" onKeyDown={handleKeyDown} tabIndex={0}>
+    <div className="h-full w-full relative" onKeyDown={handleKeyDown} onContextMenu={handleContextMenu} tabIndex={0}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -611,6 +669,29 @@ export default function GroupEditor() {
         loading={false}
         error={null}
       />
+      
+      {/* Properties Panel */}
+      <PropertiesPanel
+        selectedNodes={selectedNodes}
+        selectedEdges={selectedEdges}
+        nodes={nodes}
+        edges={edges}
+        groupId={context.groupId}
+        isVisible={showPropertiesPanel}
+        onToggleVisibility={() => setShowPropertiesPanel(!showPropertiesPanel)}
+      />
+      
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          selectedNodes={selectedNodes}
+          selectedEdges={selectedEdges}
+          nodes={nodes}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }

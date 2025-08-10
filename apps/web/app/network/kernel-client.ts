@@ -416,6 +416,38 @@ export class KernelClient {
   }
   
   /**
+   * Remove a contact
+   */
+  async removeContact(contactId: string): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('removeContact not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-remove-contact',
+        source: 'ui',
+        contactId: brand.contactId(contactId)
+      }
+      await this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
+   * Remove a group
+   */
+  async removeGroup(groupId: string): Promise<void> {
+    if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
+      throw new Error('removeGroup not yet implemented for remote mode')
+    } else {
+      const input: ExternalInput = {
+        type: 'external-remove-group',
+        source: 'ui',
+        groupId: brand.groupId(groupId)
+      }
+      await this.bridge.sendOperation(input)
+    }
+  }
+  
+  /**
    * Query wires in a group (from group query)
    */
   async getWires(groupId: string): Promise<any[]> {

@@ -172,6 +172,21 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
             result = { id: wireId, wireId }
             break
             
+          case 'external-remove-wire':
+            await runtime.removeWire(input.wireId)
+            result = { success: true }
+            break
+            
+          case 'external-remove-contact':
+            await runtime.removeContact(input.contactId)
+            result = { success: true }
+            break
+            
+          case 'external-remove-group':
+            await runtime.removeGroup(input.groupId)
+            result = { success: true }
+            break
+            
           case 'external-query-group':
             const state = await runtime.getState(input.groupId)
             result = {

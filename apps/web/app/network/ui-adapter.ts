@@ -92,9 +92,7 @@ export class UIAdapter {
    * Remove a contact
    */
   async removeContact(contactId: string): Promise<void> {
-    // For now, we don't have a direct kernel method for this
-    // We'll need to implement it properly in the kernel
-    console.warn('[UIAdapter] removeContact not yet implemented in kernel')
+    await this.kernelClient.removeContact(contactId)
     
     // Emit a change event so UI updates
     const change: Change = {
@@ -147,6 +145,24 @@ export class UIAdapter {
       // Group doesn't exist, create it
       await this.createGroup(groupData.name, groupData.parentId)
     }
+  }
+  
+  /**
+   * Remove a group
+   */
+  async removeGroup(groupId: string): Promise<void> {
+    await this.kernelClient.removeGroup(groupId)
+    
+    // Emit UI-level change event
+    const change: Change = {
+      type: 'group-removed' as any,
+      data: {
+        groupId,
+        timestamp: Date.now()
+      },
+      timestamp: Date.now()
+    }
+    this.emitChanges([change])
   }
   
   async connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {

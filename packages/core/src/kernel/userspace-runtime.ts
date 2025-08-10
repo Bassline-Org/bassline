@@ -681,6 +681,162 @@ export class UserspaceRuntime {
   }
   
   /**
+   * Remove a contact from a group
+   */
+  async removeContact(contactId: string): Promise<void> {
+    const groupId = this.findGroupForContact(contactId)
+    if (!groupId) {
+      throw new Error(`Contact ${contactId} not found`)
+    }
+    
+    const groupState = this.state.groups.get(groupId)
+    if (!groupState) {
+      throw new Error(`Group ${groupId} not found`)
+    }
+    
+    // Remove any wires connected to this contact
+    const wiresToRemove: string[] = []
+    groupState.wires.forEach((wire, wireId) => {
+      if (wire.fromId === contactId || wire.toId === contactId) {
+        wiresToRemove.push(wireId)
+      }
+    })
+    
+    // Remove the wires
+    for (const wireId of wiresToRemove) {
+      await this.removeWire(wireId)
+    }
+    
+    // Remove the contact
+    groupState.contacts.delete(contactId)
+    const contactIndex = groupState.group.contactIds.indexOf(brand.contactId(contactId))
+    if (contactIndex !== -1) {
+      groupState.group.contactIds.splice(contactIndex, 1)
+    }
+    
+    // Notify subscribers
+    this.notifySubscribers([{
+      type: 'contact-removed' as any,
+      data: {
+        contactId,
+        groupId,
+        timestamp: Date.now()
+      },
+      timestamp: Date.now()
+    }])
+  }
+  
+  /**
+   * Remove a wire
+   */
+  async removeWire(wireId: string): Promise<void> {
+    // Find the wire in any group
+    let foundGroupId: string | undefined
+    let foundWire: Wire | undefined
+    
+    for (const [groupId, groupState] of this.state.groups) {
+      const wire = groupState.wires.get(wireId)
+      if (wire) {
+        foundGroupId = groupId
+        foundWire = wire
+        break
+      }
+    }
+    
+    if (!foundGroupId || !foundWire) {
+      throw new Error(`Wire ${wireId} not found`)
+    }
+    
+    const groupState = this.state.groups.get(foundGroupId)
+    if (groupState) {
+      groupState.wires.delete(wireId)
+      const wireIndex = groupState.group.wireIds.indexOf(brand.wireId(wireId))
+      if (wireIndex !== -1) {
+        groupState.group.wireIds.splice(wireIndex, 1)
+      }
+    }
+    
+    // Notify subscribers
+    this.notifySubscribers([{
+      type: 'wire-removed' as any,
+      data: {
+        wireId,
+        groupId: foundGroupId,
+        timestamp: Date.now()
+      },
+      timestamp: Date.now()
+    }])
+  }
+  
+  /**
+   * Remove a subgroup from its parent
+   */
+  async removeGroup(groupId: string): Promise<void> {
+    const groupState = this.state.groups.get(groupId)
+    if (!groupState) {
+      throw new Error(`Group ${groupId} not found`)
+    }
+    
+    // Find parent group
+    let parentGroupId: string | undefined
+    for (const [gId, gState] of this.state.groups) {
+      if (gState.group.subgroupIds.includes(brand.groupId(groupId))) {
+        parentGroupId = gId
+        break
+      }
+    }
+    
+    if (!parentGroupId) {
+      throw new Error(`Cannot remove root group or orphaned group ${groupId}`)
+    }
+    
+    const parentState = this.state.groups.get(parentGroupId)
+    if (parentState) {
+      // Remove any wires connected to boundary contacts of this group
+      const boundaryContactIds = Array.from(groupState.contacts.entries())
+        .filter(([_, contact]) => contact.isBoundary)
+        .map(([id]) => id)
+      
+      const wiresToRemove: string[] = []
+      parentState.wires.forEach((wire, wireId) => {
+        if (boundaryContactIds.includes(wire.fromId) || boundaryContactIds.includes(wire.toId)) {
+          wiresToRemove.push(wireId)
+        }
+      })
+      
+      for (const wireId of wiresToRemove) {
+        await this.removeWire(wireId)
+      }
+      
+      // Remove from parent's subgroup list
+      const subgroupIndex = parentState.group.subgroupIds.indexOf(brand.groupId(groupId))
+      if (subgroupIndex !== -1) {
+        parentState.group.subgroupIds.splice(subgroupIndex, 1)
+      }
+    }
+    
+    // Recursively remove all subgroups
+    const subgroupIds = [...groupState.group.subgroupIds]
+    for (const subgroupId of subgroupIds) {
+      await this.removeGroup(subgroupId)
+    }
+    
+    // Remove the group from state
+    this.state.groups.delete(groupId)
+    
+    // Notify subscribers
+    this.notifySubscribers([{
+      type: 'group-removed' as any,
+      data: {
+        groupId,
+        parentGroupId,
+        timestamp: Date.now()
+      },
+      timestamp: Date.now()
+    }])
+  }
+  
+  /**
    * Connect two contacts with a wire
    */
   async connect(fromId: string, toId: string, type: 'bidirectional' | 'directed' = 'bidirectional'): Promise<string> {
