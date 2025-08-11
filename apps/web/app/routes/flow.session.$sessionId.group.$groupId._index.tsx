@@ -17,6 +17,7 @@ import { StyledGroupNode } from '~/components/flow-nodes/StyledGroupNode'
 import { GadgetPalette } from '~/components/flow-nodes/GadgetPalette'
 import { ContextMenu } from '~/components/flow-nodes/ContextMenu'
 import { PropertiesPanel } from '~/components/flow-nodes/PropertiesPanel'
+import { FlowBreadcrumbs } from '~/components/flow-nodes/FlowBreadcrumbs'
 
 // Custom node types
 const nodeTypes = {
@@ -38,7 +39,16 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
   
   if (!client) {
     console.error('[GroupEditor] No client found for session:', sessionId)
-    return { nodes: [], edges: [], primitives: [] }
+    return { 
+      nodes: [], 
+      edges: [], 
+      primitives: [],
+      currentGroup: {
+        id: groupId,
+        name: groupId === 'root' ? 'Root' : `Group ${groupId.slice(0, 8)}`,
+        parentId: null
+      }
+    }
   }
   
   // Get or create position cache for this group
@@ -287,10 +297,34 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
       })
     }
     
-    return { nodes, edges, primitives, primitiveMap: Array.from(primitiveMap.entries()) }
+    // Get parent group info for navigation
+    const parentGroupId = state.group.parentId || (groupId !== 'root' ? 'root' : null)
+    const groupName = state.group.name || (groupId === 'root' ? 'Root' : `Group ${groupId.slice(0, 8)}`)
+    
+    return { 
+      nodes, 
+      edges, 
+      primitives, 
+      primitiveMap: Array.from(primitiveMap.entries()),
+      currentGroup: {
+        id: groupId,
+        name: groupName,
+        parentId: parentGroupId
+      }
+    }
   } catch (error) {
     console.error('[GroupEditor] Error loading state:', error)
-    return { nodes: [], edges: [], primitives: [], primitiveMap: [] }
+    return { 
+      nodes: [], 
+      edges: [], 
+      primitives: [], 
+      primitiveMap: [],
+      currentGroup: {
+        id: groupId,
+        name: groupId === 'root' ? 'Root' : `Group ${groupId.slice(0, 8)}`,
+        parentId: null
+      }
+    }
   }
 }
 
@@ -418,11 +452,104 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
       
       // Record this operation for undo/redo
       await client.record(`Extract to group: ${groupName}`, async () => {
-        await client.applyRefactoring('extract-to-group', {
-          contactIds,
-          groupName,
-          parentGroupId: groupId
-        })
+        // Create new group
+        const newGroupId = await client.createGroup(groupName, groupId)
+        
+        // Move selected contacts to the new group
+        for (const contactId of contactIds) {
+          try {
+            // Get contact data before removing
+            const contact = await client.getContact(contactId)
+            if (contact) {
+              // Create a clean copy without the id
+              const contactCopy = { ...contact }
+              delete contactCopy.id
+              
+              // Add contact to new group
+              await client.addContact(newGroupId, contactCopy)
+              // Remove from current group
+              await client.removeContact(contactId)
+            }
+          } catch (error) {
+            console.error(`[GroupEditor] Failed to move contact ${contactId} to group:`, error)
+          }
+        }
+      })
+      
+      return { success: true }
+    }
+    
+    case 'duplicate-nodes': {
+      const contactIds = JSON.parse(formData.get('contactIds') as string) as string[]
+      const groupIds = JSON.parse(formData.get('groupIds') as string) as string[]
+      
+      // Record this operation for undo/redo
+      await client.record('Duplicate nodes', async () => {
+        const positionCache = nodePositionCache.get(groupId)
+        const DUPLICATE_OFFSET = { x: 50, y: 50 } // Offset for duplicates
+        const duplicatedItems: string[] = []
+        
+        // Duplicate contacts
+        for (const contactId of contactIds) {
+          try {
+            const originalState = await client.getState(groupId)
+            const contact = originalState.contacts.get(contactId)
+            if (contact) {
+              // Create duplicate with modified name
+              const duplicateContact = {
+                ...contact,
+                name: `${contact.name} Copy`,
+                // Remove id so a new one is generated
+              }
+              delete (duplicateContact as any).id
+              
+              const newContactId = await client.addContact(groupId, duplicateContact)
+              duplicatedItems.push(`contact ${newContactId}`)
+              
+              // Set position with offset if we have a position cache
+              if (positionCache && positionCache.has(contactId)) {
+                const originalPos = positionCache.get(contactId)!
+                positionCache.set(newContactId, {
+                  x: originalPos.x + DUPLICATE_OFFSET.x,
+                  y: originalPos.y + DUPLICATE_OFFSET.y
+                })
+              }
+            }
+          } catch (error) {
+            console.error(`[GroupEditor] Failed to duplicate contact ${contactId}:`, error)
+          }
+        }
+        
+        // Duplicate groups (subgroups)
+        for (const subgroupId of groupIds) {
+          try {
+            // For now, we'll create a simple group copy
+            // TODO: Could implement deep copy of group contents in the future
+            const subgroupState = await client.getState(subgroupId)
+            if (subgroupState) {
+              const duplicateGroup = {
+                name: `${subgroupState.group.name} Copy`,
+                primitive: subgroupState.group.primitive
+              }
+              
+              const newGroupId = await client.addGroup(groupId, duplicateGroup)
+              duplicatedItems.push(`group ${newGroupId}`)
+              
+              // Set position with offset if we have a position cache
+              if (positionCache && positionCache.has(subgroupId)) {
+                const originalPos = positionCache.get(subgroupId)!
+                positionCache.set(newGroupId, {
+                  x: originalPos.x + DUPLICATE_OFFSET.x,
+                  y: originalPos.y + DUPLICATE_OFFSET.y
+                })
+              }
+            }
+          } catch (error) {
+            console.error(`[GroupEditor] Failed to duplicate group ${subgroupId}:`, error)
+          }
+        }
+        
+        console.log(`[GroupEditor] Successfully duplicated: ${duplicatedItems.join(', ')}`)
       })
       
       return { success: true }
@@ -433,9 +560,26 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
       
       // Record this operation for undo/redo
       await client.record('Inline group', async () => {
-        await client.applyRefactoring('inline-group', {
-          groupId: groupIdToInline
-        })
+        // Get the group state to inline
+        const groupToInline = await client.getState(groupIdToInline)
+        if (groupToInline) {
+          // Move all contacts from the group being inlined to the parent group
+          for (const [contactId, contact] of groupToInline.contacts) {
+            try {
+              // Create a clean copy without the id
+              const contactCopy = { ...contact }
+              delete contactCopy.id
+              
+              await client.addContact(groupId, contactCopy)
+              await client.removeContact(contactId)
+            } catch (error) {
+              console.error(`[GroupEditor] Failed to move contact ${contactId} during inline:`, error)
+            }
+          }
+          
+          // Remove the now-empty group
+          await client.removeGroup(groupIdToInline)
+        }
       })
       
       return { success: true }
@@ -447,7 +591,7 @@ export async function clientAction({ request, params }: ClientActionFunctionArgs
 }
 
 export default function GroupEditor() {
-  const { nodes: initialNodes, edges: initialEdges, primitives } = useLoaderData<typeof clientLoader>()
+  const { nodes: initialNodes, edges: initialEdges, primitives, currentGroup } = useLoaderData<typeof clientLoader>()
   const context = useOutletContext<{ sessionId: string; groupId: string; client: any }>()
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -664,7 +808,31 @@ export default function GroupEditor() {
     if (event.metaKey && event.key === 'd') {
       event.preventDefault()
       if (selectedNodes.length > 0) {
-        // TODO: Implement duplication
+        // Separate contacts and groups for duplication
+        const contactIds = selectedNodes.filter(nodeId => {
+          const node = nodes.find(n => n.id === nodeId)
+          return node?.type === 'contact'
+        })
+        
+        const groupIds = selectedNodes.filter(nodeId => {
+          const node = nodes.find(n => n.id === nodeId)
+          return node?.type === 'group'
+        })
+        
+        console.log(`[GroupEditor] Duplicating ${contactIds.length} contacts and ${groupIds.length} groups`)
+        
+        if (contactIds.length > 0 || groupIds.length > 0) {
+          fetcher.submit(
+            { 
+              intent: 'duplicate-nodes',
+              contactIds: JSON.stringify(contactIds),
+              groupIds: JSON.stringify(groupIds)
+            },
+            { method: 'post' }
+          )
+        } else {
+          console.log('[GroupEditor] No duplicatable nodes selected')
+        }
       }
     }
     
@@ -677,6 +845,14 @@ export default function GroupEditor() {
   
   return (
     <div className="h-full w-full relative" onKeyDown={handleKeyDown} onContextMenu={handleContextMenu} tabIndex={0}>
+      {/* Breadcrumbs Navigation */}
+      <div className="absolute top-4 left-4 z-10">
+        <FlowBreadcrumbs 
+          currentGroupId={context.groupId}
+          sessionId={context.sessionId}
+          client={context.client}
+        />
+      </div>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -726,8 +902,8 @@ export default function GroupEditor() {
           <button
             className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded shadow-lg transition-colors"
             onClick={() => {
-              // TODO: Navigate to parent group once we track hierarchy
-              navigate(`/flow/session/${context.sessionId}/group/root`)
+              const parentId = currentGroup?.parentId || 'root'
+              navigate(`/flow/session/${context.sessionId}/group/${parentId}`)
             }}
           >
             ← Exit Group

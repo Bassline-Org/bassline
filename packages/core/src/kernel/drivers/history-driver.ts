@@ -251,6 +251,27 @@ export class HistoryDriver implements ExtendedDriver<CompoundDriverCommand> {
     return inverses
   }
   
+  /**
+   * Clean an operation for replay by removing stale metadata
+   * This ensures redo operations don't rely on old result IDs
+   */
+  private cleanOperationForReplay(input: ExternalInput): ExternalInput {
+    // Create a copy without metadata that might be stale
+    const cleanInput = { ...input }
+    
+    // Remove result IDs and other replay metadata
+    delete (cleanInput as any).resultId
+    delete (cleanInput as any).previousValue
+    delete (cleanInput as any).fromContactId 
+    delete (cleanInput as any).toContactId
+    delete (cleanInput as any).connectedWires
+    delete (cleanInput as any).contact
+    delete (cleanInput as any).group
+    delete (cleanInput as any).parentGroupId
+    
+    return cleanInput
+  }
+  
   async handleChange(change: ContactChange): Promise<DriverResponse> {
     // We don't record individual changes anymore
     // Operations are tracked via trackOperation() during record()
@@ -372,9 +393,11 @@ export class HistoryDriver implements ExtendedDriver<CompoundDriverCommand> {
       // Set flag to prevent recording
       this.isApplyingHistory = true
       
-      // Re-apply the original operations
+      // Re-apply the original operations, but clean them of stale metadata
       for (const op of entry.operations) {
-        await this.inputHandler(op)
+        // Create a clean version of the operation without result IDs or other metadata
+        const cleanOp = this.cleanOperationForReplay(op)
+        await this.inputHandler(cleanOp)
       }
       
       this.stats.redoCount++
