@@ -143,17 +143,13 @@ export class Runtime extends CrossPlatformEventEmitter {
         const boundaryId = this.findBoundaryContact(group, outputName)
         if (boundaryId) {
           const contact = this.context.bassline.contacts.get(boundaryId)
-          if (contact?.properties?.blendMode === 'last') {
-            // Stream contact
-            if (Array.isArray(value)) {
-              for (const item of value) {
-                this.sendStream(boundaryId, item)
-              }
-            } else {
-              this.sendStream(boundaryId, value)
+          // For stream contacts with arrays, send each item separately
+          if (contact?.properties?.blendMode === 'last' && Array.isArray(value)) {
+            for (const item of value) {
+              this.setValue(boundaryId, item)
             }
           } else {
-            // Value contact
+            // Single value or non-stream contact
             this.setValue(boundaryId, value)
           }
         }
@@ -535,72 +531,6 @@ export class Runtime extends CrossPlatformEventEmitter {
     }
   }
   
-  /**
-   * Apply structure changes for dynamic gadgets.
-   * This allows injecting and removing network structures dynamically.
-   */
-  applyStructureChanges(changes: {
-    contactsToAdd: Map<ContactId, ReifiedContact>
-    wiresToAdd: Map<WireId, ReifiedWire>
-    groupsToAdd: Map<GroupId, ReifiedGroup>
-    mappingWiresToAdd: Map<WireId, ReifiedWire>
-    contactsToRemove: Set<ContactId>
-    wiresToRemove: Set<WireId>
-    groupsToRemove: Set<GroupId>
-  }): void {
-    // Remove structures first
-    for (const groupId of changes.groupsToRemove) {
-      this.context.bassline.groups.delete(groupId)
-    }
-    
-    for (const wireId of changes.wiresToRemove) {
-      this.context.bassline.wires.delete(wireId)
-    }
-    
-    for (const contactId of changes.contactsToRemove) {
-      this.context.bassline.contacts.delete(contactId)
-      this.context.values.delete(contactId)
-    }
-    
-    // Add new structures
-    for (const [contactId, contact] of changes.contactsToAdd) {
-      this.context.bassline.contacts.set(contactId, contact)
-      if (contact.content !== undefined) {
-        this.context.values.set(contactId, contact.content)
-      }
-    }
-    
-    for (const [groupId, group] of changes.groupsToAdd) {
-      this.context.bassline.groups.set(groupId, group)
-      // Register BasslineGadget if needed
-      if (group.primitiveType === 'bassline') {
-        const basslineGadget = this.createBasslineGadgetForGroup(groupId)
-        this.context.primitives.set(`bassline-${groupId}`, basslineGadget)
-        group.primitiveType = `bassline-${groupId}`
-      }
-    }
-    
-    for (const [wireId, wire] of changes.wiresToAdd) {
-      this.context.bassline.wires.set(wireId, wire)
-    }
-    
-    for (const [wireId, wire] of changes.mappingWiresToAdd) {
-      this.context.bassline.wires.set(wireId, wire)
-    }
-    
-    // Trigger propagation for any new wires connecting existing values
-    for (const [, wire] of [...changes.wiresToAdd, ...changes.mappingWiresToAdd]) {
-      const fromValue = this.context.values.get(wire.fromId)
-      if (fromValue !== undefined) {
-        this.propagationQueue.push([wire.toId, fromValue, wire.fromId])
-      }
-    }
-    
-    // Process any pending propagation
-    if (this.propagationQueue.length > 0) {
-      this.processPropagationQueue()
-    }
-  }
   
   /**
    * Subscribe to propagation events.
@@ -914,39 +844,5 @@ export class Runtime extends CrossPlatformEventEmitter {
   // Stream Support
   // ==========================================================================
   
-  /**
-   * Send a value through a stream contact (blendMode: 'last').
-   * Each value triggers downstream propagation.
-   */
-  sendStream(contactId: ContactId, value: any): void {
-    const contact = this.context.bassline.contacts.get(contactId)
-    if (!contact) {
-      throw new Error(`Contact ${contactId} not found`)
-    }
-    
-    if (contact.properties?.blendMode !== 'last') {
-      throw new Error(`Contact ${contactId} is not a stream (blendMode must be 'last')`)
-    }
-    
-    // Stream contacts always propagate with latest value
-    // Pass undefined for fromContactId to indicate external source
-    this.propagateValue(contactId, value, undefined)
-    this.processPropagationQueue()
-  }
   
-  /**
-   * Start collecting events into the event stream.
-   */
-  startEventCollection(): void {
-    this.context.eventStream = []
-  }
-  
-  /**
-   * Stop collecting events and return the collected stream.
-   */
-  stopEventCollection(): PropagationEvent[] {
-    const events = this.context.eventStream || []
-    this.context.eventStream = undefined
-    return events
-  }
 }

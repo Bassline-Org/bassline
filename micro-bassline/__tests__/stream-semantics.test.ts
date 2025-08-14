@@ -246,9 +246,9 @@ describe('Stream vs Value Semantics', () => {
       const runtime = new Runtime(bassline)
       
       // Send stream values
-      runtime.sendStream('stream', 1)
-      runtime.sendStream('stream', 2)
-      runtime.sendStream('stream', 3)
+      runtime.setValue('stream', 1)
+      runtime.setValue('stream', 2)
+      runtime.setValue('stream', 3)
       
       // Value contact should have last value
       expect(runtime.getValue('value')).toBe(3)

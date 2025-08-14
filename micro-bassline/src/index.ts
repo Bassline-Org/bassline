@@ -87,22 +87,6 @@ export {
   createGlobalBasslineGadget
 } from './bassline-gadget'
 
-// Dynamic bassline gadget for recursion
-export {
-  createDynamicBasslineGadget,
-  createSelfModifyingBasslineGadget,
-  type DynamicBasslineConfig
-} from './dynamic-bassline-gadget'
-
-// Example scheduler circuits
-export {
-  createImmediateScheduler,
-  createBatchScheduler,
-  createPriorityScheduler,
-  createFilteringScheduler,
-  createComposedScheduler,
-  wireSchedulerToNetwork
-} from './scheduler-circuits'
 
 // Convenience type aliases for common patterns
 import { ReifiedContact, ReifiedWire, ReifiedGroup } from './types'

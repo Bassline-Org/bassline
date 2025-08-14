@@ -367,7 +367,6 @@ describe('Edge Cases and Correctness', () => {
         ])
       }
       
-      // Import the comparison function (would need to export it from dynamic-bassline-gadget)
       // For now, we'll just test that the structures are handled correctly
       expect(bassline1).not.toBe(bassline2)
       expect(bassline1).not.toBe(bassline3)

@@ -202,9 +202,9 @@ async function runExample() {
   console.log('\n=== Stream Contact Behavior ===')
   console.log('Sending multiple values to log-input (stream contact)...')
   
-  runtime.sendStream('log-input', { event: 1 })
-  runtime.sendStream('log-input', { event: 2 })
-  runtime.sendStream('log-input', { event: 3 })
+  runtime.setValue('log-input', { event: 1 })
+  runtime.setValue('log-input', { event: 2 })
+  runtime.setValue('log-input', { event: 3 })
   
   console.log('Each value triggers independently (no merging)')
   
