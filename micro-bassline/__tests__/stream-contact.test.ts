@@ -157,7 +157,7 @@ describe('contact', () => {
       
       expect(g.getContact('c1')).toBe(contact1)
       expect(g.getContact('c2')).toBe(contact2)
-      expect(g.boundaryContacts.has('c2')).toBe(true)
+      expect(g.getBoundaryContacts().has('c2')).toBe(true)
     })
     
     it('should emit events to group stream', () => {

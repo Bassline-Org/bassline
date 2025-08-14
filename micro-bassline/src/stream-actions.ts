@@ -33,7 +33,20 @@ export const createContact = (
 ): Action => ({
   type: 'createContact',
   data: { contactId, groupId, properties },
-  apply: (rt) => rt.createContact(contactId, groupId, properties?.blendMode || 'merge', properties)
+  apply: (rt) => {
+    const contact = rt.createContact(contactId, groupId, properties?.blendMode || 'merge', properties)
+    
+    // If this contact is in a child group, update parent's structure
+    if (groupId) {
+      const group = rt.groups.get(groupId)
+      if (group?.parentId) {
+        // Update parent's structure contact
+        rt.updateStructureContact(group.parentId)
+      }
+    }
+    
+    return contact
+  }
 })
 
 export const deleteContact = (contactId: ContactId): Action => ({
@@ -43,11 +56,26 @@ export const deleteContact = (contactId: ContactId): Action => ({
     const contact = rt['contacts'].get(contactId)
     if (!contact) return
     
+    // Track which parent groups need structure updates
+    const parentsToUpdate = new Set<string>()
+    
     for (const group of rt['groups'].values()) {
-      group.contacts.delete(contactId)
-      group.boundaryContacts.delete(contactId)
+      if (group.contacts.has(contactId)) {
+        group.contacts.delete(contactId)
+        
+        // If this group has a parent, mark it for structure update
+        if (group.parentId) {
+          parentsToUpdate.add(group.parentId)
+        }
+      }
     }
+    
     rt['contacts'].delete(contactId)
+    
+    // Update all affected parent structures
+    for (const parentId of parentsToUpdate) {
+      rt.updateStructureContact(parentId)
+    }
   }
 })
 
@@ -59,13 +87,45 @@ export const createWire = (
 ): Action => ({
   type: 'createWire',
   data: { wireId, fromId, toId, bidirectional },
-  apply: (rt) => rt.createWire(wireId, fromId, toId, bidirectional)
+  apply: (rt) => {
+    rt.createWire(wireId, fromId, toId, bidirectional)
+    
+    // Update structure if wire connects children of same parent
+    const fromContact = rt.contacts.get(fromId)
+    const toContact = rt.contacts.get(toId)
+    if (fromContact?.groupId && toContact?.groupId) {
+      const fromGroup = rt.groups.get(fromContact.groupId)
+      const toGroup = rt.groups.get(toContact.groupId)
+      
+      // If both contacts are in child groups of the same parent
+      if (fromGroup?.parentId && fromGroup.parentId === toGroup?.parentId) {
+        rt.updateStructureContact(fromGroup.parentId)
+      }
+    }
+  }
 })
 
 export const deleteWire = (wireId: WireId): Action => ({
   type: 'deleteWire',
   data: { wireId },
-  apply: (rt) => rt['wires'].delete(wireId)
+  apply: (rt) => {
+    const wire = rt['wires'].get(wireId)
+    if (!wire) return
+    
+    rt['wires'].delete(wireId)
+    
+    // Update structure if wire was between children
+    const fromContact = rt.contacts.get(wire.from)
+    const toContact = rt.contacts.get(wire.to)
+    if (fromContact?.groupId && toContact?.groupId) {
+      const fromGroup = rt.groups.get(fromContact.groupId)
+      const toGroup = rt.groups.get(toContact.groupId)
+      
+      if (fromGroup?.parentId && fromGroup.parentId === toGroup?.parentId) {
+        rt.updateStructureContact(fromGroup.parentId)
+      }
+    }
+  }
 })
 
 export const createGroup = (
@@ -75,7 +135,7 @@ export const createGroup = (
 ): Action => ({
   type: 'createGroup',
   data: { groupId, parentId, properties },
-  apply: (rt) => rt.createGroup(groupId, properties?.primitiveType, properties)
+  apply: (rt) => rt.createGroup(groupId, properties?.primitiveType, properties, parentId)
 })
 
 export const deleteGroup = (groupId: GroupId): Action => ({
@@ -85,10 +145,17 @@ export const deleteGroup = (groupId: GroupId): Action => ({
     const group = rt['groups'].get(groupId)
     if (!group) return
     
+    const parentId = group.parentId
+    
     for (const contactId of group.contacts.keys()) {
       deleteContact(contactId).apply(rt)
     }
     rt['groups'].delete(groupId)
+    
+    // Update parent's structure contact if this was a child
+    if (parentId) {
+      rt.updateStructureContact(parentId)
+    }
   }
 })
 

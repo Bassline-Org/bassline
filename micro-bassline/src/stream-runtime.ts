@@ -24,7 +24,7 @@ export interface Runtime {
   eventStream: Stream<any>
   
   // Methods
-  createGroup(groupId: GroupId, primitiveType?: string, properties?: Properties): Group
+  createGroup(groupId: GroupId, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group
   createContact(contactId: ContactId, groupId?: GroupId, blendMode?: BlendMode, properties?: Properties): Contact
   createWire(wireId: WireId, fromId: ContactId, toId: ContactId, bidirectional?: boolean): void
   setValue(contactId: ContactId, value: any): void
@@ -32,6 +32,7 @@ export interface Runtime {
   applyAction(action: any): void
   getBassline(): Bassline
   waitForConvergence(): Promise<void>
+  updateStructureContact(groupId: GroupId): void
 }
 
 /**
@@ -47,8 +48,8 @@ export function runtime(
   const eventStream = stream<any>()
   const primitivesMap = primitives ? new Map(Object.entries(primitives)) : new Map()
   
-  const createGroup = (groupId: GroupId, primitiveType?: string, properties?: Properties): Group => {
-    const g = group(groupId)
+  const createGroup = (groupId: GroupId, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group => {
+    const g = group(groupId, parentId, properties)
     groups.set(groupId, g)
     
     // Connect group events
@@ -61,7 +62,8 @@ export function runtime(
       groupId,
       {
         isSystemContact: true,
-        readOnlyFromInside: true
+        readOnlyFromInside: true,
+        isBoundary: true  // Properties is always a boundary contact
       }
     )
     contacts.set(propertiesContact.id, propertiesContact)
@@ -72,19 +74,18 @@ export function runtime(
     if (primitiveType && primitivesMap.has(primitiveType)) {
       const config = primitivesMap.get(primitiveType)!
       
-      // Create boundary contacts
+      // Create boundary contacts for inputs
       for (const inputName of config.inputs) {
-        const c = contact(inputName, 'merge', groupId)
+        const c = contact(inputName, 'merge', groupId, { isBoundary: true })
         contacts.set(inputName, c)
         g.contacts.set(inputName, c)
-        g.boundaryContacts.add(inputName)
       }
       
+      // Create boundary contacts for outputs
       for (const outputName of config.outputs) {
-        const c = contact(outputName, 'merge', groupId)
+        const c = contact(outputName, 'merge', groupId, { isBoundary: true })
         contacts.set(outputName, c)
         g.contacts.set(outputName, c)
-        g.boundaryContacts.add(outputName)
       }
       
       // Apply gadget behavior
@@ -103,6 +104,11 @@ export function runtime(
       mgpContact.onValueChange(value => {
         if (Array.isArray(value)) applyAction(value)
       })
+    }
+    
+    // Update parent's structure contact if this is a child group
+    if (parentId) {
+      updateStructureContact(parentId)
     }
     
     return g
@@ -169,12 +175,29 @@ export function runtime(
       }
     )
     
-    // Initialize structure contact with empty structure
+    // Initialize structure contact with current children structure
     if (type === 'structure') {
-      c.setValue({
-        contacts: new Map(),
-        wires: new Map(),
-        groups: new Map()
+      const g = groups.get(groupId)
+      const includeInternals = g?.properties?.['expose-internals'] || false
+      c.setValue(getChildrenStructure(groupId, includeInternals))
+    }
+    
+    // Setup dynamics forwarding
+    if (type === 'dynamics') {
+      // Subscribe to event stream and forward child events
+      eventStream.subscribe(event => {
+        // Forward events from child groups
+        if (event[0] === 'valueChanged') {
+          const contactId = event[1]
+          const contact = contacts.get(contactId)
+          if (contact?.groupId) {
+            const contactGroup = groups.get(contact.groupId)
+            if (contactGroup?.parentId === groupId) {
+              // This is a child event, forward it
+              c.setValue(event)
+            }
+          }
+        }
       })
     }
     
@@ -215,7 +238,7 @@ export function runtime(
     for (const [id, g] of groups) {
       result.groups.set(id, {
         contactIds: new Set(g.contacts.keys()),
-        boundaryContactIds: g.boundaryContacts,
+        boundaryContactIds: g.getBoundaryContacts(),
         properties: {}
       })
     }
@@ -234,6 +257,62 @@ export function runtime(
   const waitForConvergence = async (): Promise<void> => {
     // Streams handle convergence naturally
     return new Promise(resolve => setTimeout(resolve, 0))
+  }
+  
+  const getChildrenStructure = (groupId: GroupId, includeInternals = false): Bassline => {
+    const children: Bassline = {
+      contacts: new Map(),
+      wires: new Map(),
+      groups: new Map()
+    }
+    
+    // Find all child groups
+    for (const [id, g] of groups) {
+      if (g.parentId === groupId) {
+        // Add child group
+        children.groups.set(id, {
+          contactIds: new Set(g.contacts.keys()),
+          boundaryContactIds: g.getBoundaryContacts(),
+          parentId: g.parentId,
+          properties: g.properties || {}
+        })
+        
+        // Add child's contacts (filtered by includeInternals)
+        const boundaryContacts = g.getBoundaryContacts()
+        for (const [contactId, contact] of g.contacts) {
+          if (includeInternals || boundaryContacts.has(contactId)) {
+            children.contacts.set(contactId, {
+              content: contact.getValue(),
+              groupId: id,
+              properties: contact.properties
+            })
+          }
+        }
+      }
+    }
+    
+    // Add wires between children's contacts
+    for (const [wireId, wire] of wires) {
+      if (children.contacts.has(wire.from) && children.contacts.has(wire.to)) {
+        children.wires.set(wireId, {
+          fromId: wire.from,
+          toId: wire.to,
+          properties: { bidirectional: wire.bidirectional }
+        })
+      }
+    }
+    
+    return children
+  }
+  
+  const updateStructureContact = (groupId: GroupId) => {
+    const structureContactId = `${groupId}:children:structure`
+    const structureContact = contacts.get(structureContactId)
+    if (structureContact) {
+      const g = groups.get(groupId)
+      const includeInternals = g?.properties?.['expose-internals'] || false
+      structureContact.setValue(getChildrenStructure(groupId, includeInternals))
+    }
   }
   
   // Load initial bassline if provided
@@ -267,7 +346,8 @@ export function runtime(
     getValue,
     applyAction,
     getBassline,
-    waitForConvergence
+    waitForConvergence,
+    updateStructureContact
   }
   
   return self
@@ -280,9 +360,9 @@ export function example() {
   const rt = runtime()
   
   // Create a simple network
-  const g1 = rt.createGroup('group1')
-  const c1 = rt.createContact('input', 'group1')
-  const c2 = rt.createContact('output', 'group1')
+  rt.createGroup('group1')
+  rt.createContact('input', 'group1')
+  rt.createContact('output', 'group1')
   
   rt.createWire('w1', 'input', 'output')
   rt.setValue('input', 42)

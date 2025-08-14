@@ -8,7 +8,8 @@ export interface Stream<T> {
   write(value: T): void
   pipe(target: Stream<T> | ((value: T) => void)): Stream<T>
   filter(predicate: (value: T) => boolean): Stream<T>
-  transform<U>(fn: (value: T) => U): Stream<U>
+  transform<U>(fn: (value: T) => U | Promise<U>): Stream<U>
+  transformAsync<U>(fn: (value: T) => Promise<U>): Stream<U>
   subscribe(handler: (value: T) => void): () => void
   tee(): [Stream<T>, Stream<T>]
 }
@@ -42,11 +43,35 @@ export function stream<T>(): Stream<T> {
     return output
   }
   
-  const transform = <U>(fn: (value: T) => U): Stream<U> => {
+  const transform = <U>(fn: (value: T) => U | Promise<U>): Stream<U> => {
     const output = stream<U>()
     pipe(value => {
       const result = fn(value)
-      if (result != null) output.write(result)
+      if (result instanceof Promise) {
+        // For promises, write the resolved value to output
+        result.then(
+          resolved => {
+            if (resolved != null) output.write(resolved)
+          },
+          err => console.error('Transform error:', err)
+        )
+      } else {
+        // For sync values, write immediately
+        if (result != null) output.write(result)
+      }
+    })
+    return output
+  }
+  
+  const transformAsync = <U>(fn: (value: T) => Promise<U>): Stream<U> => {
+    const output = stream<U>()
+    pipe(value => {
+      fn(value).then(
+        result => {
+          if (result != null) output.write(result)
+        },
+        err => console.error('Async transform error:', err)
+      )
     })
     return output
   }
@@ -66,7 +91,7 @@ export function stream<T>(): Stream<T> {
     return [a, b]
   }
   
-  const self: Stream<T> = { write, pipe, filter, transform, subscribe, tee }
+  const self: Stream<T> = { write, pipe, filter, transform, transformAsync, subscribe, tee }
   return self
 }
 

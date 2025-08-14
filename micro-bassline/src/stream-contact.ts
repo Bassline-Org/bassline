@@ -105,9 +105,11 @@ export function contact(
  */
 export interface Group {
   id: string
+  parentId?: string
   contacts: Map<ContactId, Contact>
-  boundaryContacts: Set<ContactId>
+  getBoundaryContacts(): Set<ContactId>
   eventStream: Stream<any>
+  properties?: Record<string, any>
   createContact(id: ContactId, blendMode?: BlendMode, isBoundary?: boolean, properties?: Record<string, any>): Contact
   getContact(id: ContactId): Contact | undefined
 }
@@ -115,23 +117,20 @@ export interface Group {
 /**
  * Create a group
  */
-export function group(id: string): Group {
+export function group(id: string, parentId?: string, properties?: Record<string, any>): Group {
   const contacts = new Map<ContactId, Contact>()
-  const boundaryContacts = new Set<ContactId>()
   const eventStream = stream<any>()
   
   const createContact = (
     contactId: ContactId,
     blendMode: BlendMode = 'merge',
     isBoundary = false,
-    properties: Record<string, any> = {}
+    contactProperties: Record<string, any> = {}
   ): Contact => {
-    const c = contact(contactId, blendMode, id, properties)
+    // Add isBoundary to the contact's properties
+    const props = { ...contactProperties, isBoundary }
+    const c = contact(contactId, blendMode, id, props)
     contacts.set(contactId, c)
-    
-    if (isBoundary) {
-      boundaryContacts.add(contactId)
-    }
     
     // Connect to group event stream
     c.stream.pipe(value => {
@@ -147,11 +146,23 @@ export function group(id: string): Group {
   
   const getContact = (id: ContactId) => contacts.get(id)
   
+  const getBoundaryContacts = (): Set<ContactId> => {
+    const boundaries = new Set<ContactId>()
+    for (const [contactId, c] of contacts) {
+      if (c.properties.isBoundary) {
+        boundaries.add(contactId)
+      }
+    }
+    return boundaries
+  }
+  
   return {
     id,
+    parentId,
     contacts,
-    boundaryContacts,
+    getBoundaryContacts,
     eventStream,
+    properties,
     createContact,
     getContact
   }
