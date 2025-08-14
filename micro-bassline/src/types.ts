@@ -351,11 +351,34 @@ export function valuesEqual(a: any, b: any): boolean {
   if (a == null || b == null) return a === b
   if (typeof a !== typeof b) return false
   
+  // Fast path: if objects have structureHash, compare those
+  if (a?.structureHash && b?.structureHash) {
+    return a.structureHash === b.structureHash
+  }
+  
   // Handle arrays
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false
     for (let i = 0; i < a.length; i++) {
       if (!valuesEqual(a[i], b[i])) return false
+    }
+    return true
+  }
+  
+  // Handle Maps
+  if (a instanceof Map && b instanceof Map) {
+    if (a.size !== b.size) return false
+    for (const [key, value] of a) {
+      if (!b.has(key) || !valuesEqual(value, b.get(key))) return false
+    }
+    return true
+  }
+  
+  // Handle Sets
+  if (a instanceof Set && b instanceof Set) {
+    if (a.size !== b.size) return false
+    for (const value of a) {
+      if (!b.has(value)) return false
     }
     return true
   }

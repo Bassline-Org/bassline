@@ -1,89 +1,62 @@
 /**
- * Micro-Bassline: The Unified Propagation Network Model
+ * Micro-Bassline: Stream-based Propagation Networks
  * 
- * A clean implementation of propagation networks with:
- * - Unified stream/value semantics via blend modes
- * - Meta-propagation through BasslineGadget
- * - Schedulers as circuits, not machinery
- * - Properties for universal configuration
+ * A functional implementation of propagation networks with:
+ * - Stream-based architecture for natural data flow
+ * - Async support for real-world operations
+ * - Meta-Group Protocol (MGP) for hierarchical networks
+ * - Computed boundaries instead of manual state
  */
 
 // Core types
-export {
-  // Structure
-  Bassline,
-  ReifiedContact,
-  ReifiedWire,
-  ReifiedGroup,
-  ContactId,
-  WireId,
-  GroupId,
-  Properties,
-  
-  // Behavior
-  BlendMode,
-  PropagationEvent,
-  Action,
-  ActionSet,
-  
-  // Gadgets
-  PrimitiveGadget,
-  RuntimeContext,
-  
-  // Mergeable types
-  Grow,
-  Shrink,
-  Mergeable,
-  
-  // Errors
-  Contradiction,
-  
-  // Helper functions
-  isMergeable,
-  mergeValues,
-  valuesEqual
-} from './types'
+export * from './types'
 
-// Runtime engine
+// Stream infrastructure
+export { 
+  stream, 
+  Stream, 
+  merge, 
+  guards 
+} from './micro-stream'
+
+// Contacts and Groups
+export { 
+  contact, 
+  Contact, 
+  group, 
+  Group, 
+  gadget, 
+  GadgetConfig 
+} from './stream-contact'
+
+// Runtime
+export { 
+  runtime, 
+  Runtime 
+} from './stream-runtime'
+
+// Actions
 export {
-  Runtime,
-  GetBasslineOptions
-} from './runtime'
+  setValue,
+  createContact,
+  deleteContact,
+  createWire,
+  deleteWire,
+  createGroup,
+  deleteGroup,
+  updateProperties,
+  fromArray,
+  applyAll,
+  // Action interface is already exported from types
+} from './stream-actions'
 
 // Primitive gadgets
 export {
-  // Math
-  add,
-  multiply,
-  subtract,
-  divide,
-  
-  // Logic
-  and,
-  or,
-  not,
-  gate,
-  
-  // String
-  concat,
-  split,
-  
-  // Stream processing
-  filterEvents,
-  eventsToActions,
-  
-  // Comparison
-  equals,
-  greaterThan,
-  lessThan,
-  
-  // Registry
-  getPrimitives
-} from './primitives'
-
-
-// Convenience type aliases for common patterns
-import { ReifiedContact, ReifiedWire, ReifiedGroup } from './types'
-export type Contact = ReifiedContact
-export type Wire = ReifiedWire
-export type Group = ReifiedGroup
+  mathPrimitives,
+  stringPrimitives,
+  logicPrimitives,
+  controlPrimitives,
+  arrayPrimitives,
+  defaultPrimitives,
+  getStreamPrimitives
+} from './stream-primitives'

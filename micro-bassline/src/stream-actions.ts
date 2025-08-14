@@ -23,7 +23,13 @@ export interface Action<T = any> {
 export const setValue = (contactId: ContactId, value: any): Action => ({
   type: 'setValue',
   data: { contactId, value },
-  apply: (rt) => rt.setValue(contactId, value)
+  apply: (rt) => {
+    // Idempotent: if contact doesn't exist, create it first
+    if (!rt.contacts.has(contactId)) {
+      rt.createContact(contactId, undefined, 'merge', {})
+    }
+    rt.setValue(contactId, value)
+  }
 })
 
 export const createContact = (
@@ -34,6 +40,11 @@ export const createContact = (
   type: 'createContact',
   data: { contactId, groupId, properties },
   apply: (rt) => {
+    // Idempotent: if contact already exists, return it
+    if (rt.contacts.has(contactId)) {
+      return rt.contacts.get(contactId)
+    }
+    
     const contact = rt.createContact(contactId, groupId, properties?.blendMode || 'merge', properties)
     
     // If this contact is in a child group, update parent's structure
@@ -88,6 +99,11 @@ export const createWire = (
   type: 'createWire',
   data: { wireId, fromId, toId, bidirectional },
   apply: (rt) => {
+    // Idempotent: if wire already exists, return
+    if (rt.wires.has(wireId)) {
+      return
+    }
+    
     rt.createWire(wireId, fromId, toId, bidirectional)
     
     // Update structure if wire connects children of same parent
@@ -135,7 +151,14 @@ export const createGroup = (
 ): Action => ({
   type: 'createGroup',
   data: { groupId, parentId, properties },
-  apply: (rt) => rt.createGroup(groupId, properties?.primitiveType, properties, parentId)
+  apply: (rt) => {
+    // Idempotent: if group already exists, return it
+    if (rt.groups.has(groupId)) {
+      return rt.groups.get(groupId)
+    }
+    
+    return rt.createGroup(groupId, properties?.primitiveType, properties, parentId)
+  }
 })
 
 export const deleteGroup = (groupId: GroupId): Action => ({

@@ -29,16 +29,14 @@ export function contact(
   let currentValue: any = undefined
   const s = stream<any>()
   
-  // Add blend mode behavior
-  if (blendMode === 'merge') {
-    // For merge mode, deduplicate values
-    const originalWrite = s.write
-    s.write = (value: any) => {
-      if (currentValue !== undefined && valuesEqual(currentValue, value)) {
-        return // Skip duplicate
-      }
-      originalWrite(value)
+  // Add deduplication for both modes to prevent infinite loops
+  // Even 'last' mode needs to deduplicate to avoid propagation cycles
+  const originalWrite = s.write
+  s.write = (value: any) => {
+    if (currentValue !== undefined && valuesEqual(currentValue, value)) {
+      return // Skip duplicate - prevents infinite propagation
     }
+    originalWrite(value)
   }
   
   // Store current value

@@ -31,7 +31,6 @@ export interface Runtime {
   getValue(contactId: ContactId): any
   applyAction(action: any): void
   getBassline(): Bassline
-  waitForConvergence(): Promise<void>
   updateStructureContact(groupId: GroupId): void
 }
 
@@ -47,6 +46,10 @@ export function runtime(
   const wires = new Map<WireId, { from: ContactId, to: ContactId, bidirectional: boolean }>()
   const eventStream = stream<any>()
   const primitivesMap = primitives ? new Map(Object.entries(primitives)) : new Map()
+  
+  // Track which groups have dirty structure contacts
+  const dirtyStructures = new Set<GroupId>()
+  const structureCache = new Map<GroupId, any>()
   
   const createGroup = (groupId: GroupId, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group => {
     const g = group(groupId, parentId, properties)
@@ -125,7 +128,13 @@ export function runtime(
     
     if (groupId) {
       const g = groups.get(groupId)
-      if (g) g.contacts.set(contactId, c)
+      if (g) {
+        g.contacts.set(contactId, c)
+        // Update parent's structure contact when adding a contact
+        if (g.parentId) {
+          updateStructureContact(g.parentId)
+        }
+      }
     }
     
     c.onValueChange(value => {
@@ -151,6 +160,18 @@ export function runtime(
     from.wireTo(to, bidirectional)
     wires.set(wireId, { from: fromId, to: toId, bidirectional })
     eventStream.write(['propagating', fromId, toId, from.getValue()])
+    
+    // Update structure if wire connects contacts in child groups
+    const fromGroup = from.groupId ? groups.get(from.groupId) : null
+    const toGroup = to.groupId ? groups.get(to.groupId) : null
+    const parentGroups = new Set<GroupId>()
+    
+    if (fromGroup?.parentId) parentGroups.add(fromGroup.parentId)
+    if (toGroup?.parentId) parentGroups.add(toGroup.parentId)
+    
+    for (const parentId of parentGroups) {
+      updateStructureContact(parentId)
+    }
   }
   
   const setValue = (contactId: ContactId, value: any): void => {
@@ -175,25 +196,63 @@ export function runtime(
       }
     )
     
-    // Initialize structure contact with current children structure
+    // Initialize structure contact with lazy computation
     if (type === 'structure') {
-      const g = groups.get(groupId)
-      const includeInternals = g?.properties?.['expose-internals'] || false
-      c.setValue(getChildrenStructure(groupId, includeInternals))
+      // Store original methods
+      const originalGetValue = c.getValue
+      const originalSetValue = c.setValue
+      
+      // Override getValue to compute structure on-demand
+      c.getValue = () => {
+        if (dirtyStructures.has(groupId)) {
+          // Compute structure now
+          const g = groups.get(groupId)
+          const includeInternals = g?.properties?.['expose-internals'] || false
+          const structure = getChildrenStructure(groupId, includeInternals)
+          
+          // Cache it
+          structureCache.set(groupId, structure)
+          dirtyStructures.delete(groupId)
+          
+          // Store in contact without triggering notifications
+          ;(c as any).currentValue = structure
+        }
+        
+        // Return cached value or current value
+        return structureCache.get(groupId) || originalGetValue()
+      }
+      
+      // Override setValue to update cache
+      c.setValue = (value: any) => {
+        structureCache.set(groupId, value)
+        dirtyStructures.delete(groupId)
+        originalSetValue(value)
+      }
+      
+      // Mark as dirty initially to compute on first read
+      dirtyStructures.add(groupId)
     }
     
     // Setup dynamics forwarding
     if (type === 'dynamics') {
-      // Subscribe to event stream and forward child events
+      // Helper to check if a group is a descendant of the parent
+      const isDescendantOf = (childId: GroupId, parentId: GroupId): boolean => {
+        const child = groups.get(childId)
+        if (!child) return false
+        if (child.parentId === parentId) return true
+        if (child.parentId) return isDescendantOf(child.parentId, parentId)
+        return false
+      }
+      
+      // Subscribe to event stream and forward descendant events
       eventStream.subscribe(event => {
-        // Forward events from child groups
+        // Forward events from descendant groups
         if (event[0] === 'valueChanged') {
           const contactId = event[1]
           const contact = contacts.get(contactId)
           if (contact?.groupId) {
-            const contactGroup = groups.get(contact.groupId)
-            if (contactGroup?.parentId === groupId) {
-              // This is a child event, forward it
+            // Check if this contact belongs to a descendant group
+            if (isDescendantOf(contact.groupId, groupId)) {
               c.setValue(event)
             }
           }
@@ -254,44 +313,77 @@ export function runtime(
     return result
   }
   
-  const waitForConvergence = async (): Promise<void> => {
-    // Streams handle convergence naturally
-    return new Promise(resolve => setTimeout(resolve, 0))
+  
+  // Simple hash function for structure comparison
+  const hashStructure = (structure: Bassline): string => {
+    // Create a sorted string representation of the structure
+    const parts: string[] = []
+    
+    // Hash groups
+    const groupIds = Array.from(structure.groups.keys()).sort()
+    for (const id of groupIds) {
+      const g = structure.groups.get(id)!
+      parts.push(`g:${id}:${g.parentId || ''}`)
+    }
+    
+    // Hash contacts  
+    const contactIds = Array.from(structure.contacts.keys()).sort()
+    for (const id of contactIds) {
+      const c = structure.contacts.get(id)!
+      parts.push(`c:${id}:${c.groupId || ''}`)
+    }
+    
+    // Hash wires
+    const wireIds = Array.from(structure.wires.keys()).sort()
+    for (const id of wireIds) {
+      const w = structure.wires.get(id)!
+      parts.push(`w:${id}:${w.fromId}:${w.toId}`)
+    }
+    
+    return parts.join('|')
   }
   
-  const getChildrenStructure = (groupId: GroupId, includeInternals = false): Bassline => {
+  const getChildrenStructure = (groupId: GroupId, includeInternals = false): Bassline & { structureHash?: string } => {
     const children: Bassline = {
       contacts: new Map(),
       wires: new Map(),
       groups: new Map()
     }
     
-    // Find all child groups
-    for (const [id, g] of groups) {
-      if (g.parentId === groupId) {
-        // Add child group
-        children.groups.set(id, {
-          contactIds: new Set(g.contacts.keys()),
-          boundaryContactIds: g.getBoundaryContacts(),
-          parentId: g.parentId,
-          properties: g.properties || {}
-        })
-        
-        // Add child's contacts (filtered by includeInternals)
-        const boundaryContacts = g.getBoundaryContacts()
-        for (const [contactId, contact] of g.contacts) {
-          if (includeInternals || boundaryContacts.has(contactId)) {
-            children.contacts.set(contactId, {
-              content: contact.getValue(),
-              groupId: id,
-              properties: contact.properties
-            })
+    // Recursively find all descendant groups
+    const addGroupAndDescendants = (parentId: GroupId) => {
+      for (const [id, g] of groups) {
+        if (g.parentId === parentId) {
+          // Add this group
+          children.groups.set(id, {
+            contactIds: new Set(g.contacts.keys()),
+            boundaryContactIds: g.getBoundaryContacts(),
+            parentId: g.parentId,
+            properties: g.properties || {}
+          })
+          
+          // Add this group's contacts (filtered by includeInternals)
+          const boundaryContacts = g.getBoundaryContacts()
+          for (const [contactId, contact] of g.contacts) {
+            if (includeInternals || boundaryContacts.has(contactId)) {
+              children.contacts.set(contactId, {
+                // Structure only - no content values
+                groupId: id,
+                properties: contact.properties
+              })
+            }
           }
+          
+          // Recursively add descendants
+          addGroupAndDescendants(id)
         }
       }
     }
     
-    // Add wires between children's contacts
+    // Start recursive traversal from the given groupId
+    addGroupAndDescendants(groupId)
+    
+    // Add wires between all descendant contacts
     for (const [wireId, wire] of wires) {
       if (children.contacts.has(wire.from) && children.contacts.has(wire.to)) {
         children.wires.set(wireId, {
@@ -302,18 +394,30 @@ export function runtime(
       }
     }
     
-    return children
+    // Add a hash for fast comparison
+    ;(children as any).structureHash = hashStructure(children)
+    
+    return children as Bassline & { structureHash?: string }
   }
   
-  const updateStructureContact = (groupId: GroupId) => {
+  const markStructureDirty = (groupId: GroupId) => {
+    // Mark this group's structure as dirty
+    dirtyStructures.add(groupId)
+    structureCache.delete(groupId)
+    
+    // Check if anyone is listening to the structure contact
     const structureContactId = `${groupId}:children:structure`
     const structureContact = contacts.get(structureContactId)
     if (structureContact) {
-      const g = groups.get(groupId)
-      const includeInternals = g?.properties?.['expose-internals'] || false
-      structureContact.setValue(getChildrenStructure(groupId, includeInternals))
+      // Always compute and notify for now to fix the test
+      // TODO: Optimize this to only compute when there are subscribers
+      const newStructure = structureContact.getValue() // This triggers lazy computation
+      // The getValue already cached it, just write to stream to notify subscribers
+      structureContact.stream.write(newStructure)
     }
   }
+  
+  const updateStructureContact = markStructureDirty // Alias for compatibility
   
   // Load initial bassline if provided
   if (bassline) {
@@ -346,7 +450,6 @@ export function runtime(
     getValue,
     applyAction,
     getBassline,
-    waitForConvergence,
     updateStructureContact
   }
   

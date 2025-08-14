@@ -44,18 +44,21 @@ describe('contact', () => {
       expect(handler).toHaveBeenCalledTimes(1)
     })
     
-    it('should pass all values in last mode', () => {
+    it('should deduplicate even in last mode to prevent cycles', () => {
       const c = contact('test', 'last')
       const handler = vi.fn()
       
       c.onValueChange(handler)
       
       c.setValue(42)
-      c.setValue(42)  // Same value
-      c.setValue(42)  // Same value again
+      c.setValue(42)  // Same value - should be deduplicated
+      c.setValue(43)  // Different value
+      c.setValue(43)  // Same as previous - should be deduplicated
       
-      // Should trigger every time
-      expect(handler).toHaveBeenCalledTimes(3)
+      // Should only trigger for actual changes
+      expect(handler).toHaveBeenCalledTimes(2)
+      expect(handler).toHaveBeenNthCalledWith(1, 42)
+      expect(handler).toHaveBeenNthCalledWith(2, 43)
     })
   })
   

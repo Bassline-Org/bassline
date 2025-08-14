@@ -204,8 +204,6 @@ describe('Complete MGP Support', () => {
       rt.setValue('test', 'value1')
       rt.setValue('test', 'value2')
       
-      await rt.waitForConvergence()
-      
       // Should have forwarded the value change events
       expect(events.length).toBeGreaterThan(0)
       expect(events.some(e => e[0] === 'valueChanged' && e[1] === 'test')).toBe(true)
@@ -228,8 +226,6 @@ describe('Complete MGP Support', () => {
       rt.createContact('test', 'sibling', 'last')
       
       rt.setValue('test', 'value1')
-      
-      await rt.waitForConvergence()
       
       // Should not have forwarded sibling events
       expect(events.filter(e => e[1] === 'test').length).toBe(0)
