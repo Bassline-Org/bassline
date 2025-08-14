@@ -27,7 +27,6 @@ import {
   CrossPlatformEventEmitter
 } from './event-emitter'
 import { getPrimitives } from './primitives'
-import { createBasslineGadget } from './bassline-gadget'
 
 // ============================================================================
 // Runtime Types
@@ -65,9 +64,6 @@ export class Runtime extends CrossPlatformEventEmitter {
       primitives: primitives || defaultPrimitives,
       eventStream: []
     }
-    
-    // Register BasslineGadgets for groups that need them
-    this.registerBasslineGadgets()
     
     // Set up primitive request handler
     this.setupPrimitiveHandler()
@@ -164,77 +160,6 @@ export class Runtime extends CrossPlatformEventEmitter {
     return getPrimitives()
   }
   
-  private registerBasslineGadgets(): void {
-    // For each group with primitiveType 'bassline', create and register a BasslineGadget
-    for (const [groupId, group] of this.context.bassline.groups) {
-      if (group.primitiveType === 'bassline') {
-        const basslineGadget = this.createBasslineGadgetForGroup(groupId)
-        this.context.primitives.set(`bassline-${groupId}`, basslineGadget)
-        // Update the group to reference the specific instance
-        group.primitiveType = `bassline-${groupId}`
-      }
-    }
-  }
-  
-  private createBasslineGadgetForGroup(groupId: GroupId): PrimitiveGadget {
-    
-    // Find the events output contact for this group
-    const findEventsContact = (): ContactId | undefined => {
-      const group = this.context.bassline.groups.get(groupId)
-      if (!group) return undefined
-      
-      for (const boundaryId of group.boundaryContactIds) {
-        const contact = this.context.bassline.contacts.get(boundaryId)
-        if (contact?.properties?.name === 'events') {
-          return boundaryId
-        }
-      }
-      return undefined
-    }
-    
-    return createBasslineGadget(
-      // Get bassline for this group
-      () => this.getBassline({ groupId }),
-      
-      // Apply actions
-      (actionSet: ActionSet) => this.applyActions(actionSet),
-      
-      // Group ID
-      groupId,
-      
-      // Event emitter
-      (listener: (event: PropagationEvent) => void) => {
-        return this.onEvent(listener)
-      },
-      
-      // Check if events output is wired
-      () => {
-        const eventsContactId = findEventsContact()
-        if (!eventsContactId) return false
-        
-        // Check if this contact has any outgoing wires
-        for (const [, wire] of this.context.bassline.wires) {
-          if (wire.fromId === eventsContactId) return true
-        }
-        return false
-      },
-      
-      // Push event directly to stream contact
-      (event: PropagationEvent) => {
-        const eventsContactId = findEventsContact()
-        if (eventsContactId) {
-          // Queue the event as a propagation task
-          // This ensures events flow through the network immediately
-          this.propagationQueue.push([eventsContactId, event, undefined])
-          
-          // Process the queue if not already processing
-          if (!this.isProcessing) {
-            this.processPropagationQueue()
-          }
-        }
-      }
-    )
-  }
   
   // ==========================================================================
   // Public API

@@ -3,8 +3,8 @@
  * 
  * This demonstrates:
  * 1. Creating a simple network with an add gadget
- * 2. Adding a BasslineGadget to observe the network
- * 3. Wiring the event stream to a logger
+ * 2. Setting up event monitoring
+ * 3. Wiring contacts to demonstrate propagation
  * 4. Showing how changes propagate and generate events
  */
 
@@ -47,21 +47,6 @@ function createExampleNetwork(): Bassline {
       }
     }],
     
-    // BasslineGadget outputs
-    ['structure', {
-      groupId: 'monitor',
-      properties: { 
-        name: 'structure',
-        blendMode: 'merge'  // Value contact
-      }
-    }],
-    ['events', {
-      groupId: 'monitor',
-      properties: { 
-        name: 'events',
-        blendMode: 'last'  // Stream contact!
-      }
-    }],
     
     // Logger input (stream contact)
     ['log-input', {
@@ -82,15 +67,6 @@ function createExampleNetwork(): Bassline {
       properties: {}
     }],
     
-    // BasslineGadget for monitoring
-    ['monitor', {
-      contactIds: new Set(['structure', 'events']),
-      boundaryContactIds: new Set(['structure', 'events']),
-      primitiveType: 'bassline',  // Will be registered by Runtime
-      properties: {
-        'allow-mutation': false  // Read-only monitoring
-      }
-    }],
     
     // Logger group (just for organization)
     ['logger', {
@@ -100,16 +76,7 @@ function createExampleNetwork(): Bassline {
     }]
   ])
   
-  const wires = new Map<string, ReifiedWire>([
-    // Wire events output to logger
-    ['events-to-logger', {
-      fromId: 'events',
-      toId: 'log-input',
-      properties: {
-        bidirectional: false  // Events flow one way
-      }
-    }]
-  ])
+  const wires = new Map<string, ReifiedWire>([])
   
   return {
     contacts,
@@ -186,14 +153,12 @@ async function runExample() {
   console.log(`  sum = ${newSumValue}`)
   console.log()
   
-  // Get the current structure from the BasslineGadget
-  const structure = runtime.getValue('structure')
-  if (structure) {
-    console.log('📸 BasslineGadget structure output:')
-    console.log(`  ${structure.contacts.size} contacts`)
-    console.log(`  ${structure.wires.size} wires`)
-    console.log(`  ${structure.groups.size} groups`)
-  }
+  // Get the current structure snapshot directly from runtime
+  const structure = runtime.getBassline()
+  console.log('📸 Network structure snapshot:')
+  console.log(`  ${structure.contacts.size} contacts`)
+  console.log(`  ${structure.wires.size} wires`)
+  console.log(`  ${structure.groups.size} groups`)
   
   console.log()
   console.log(`Total events captured: ${eventLog.length}`)

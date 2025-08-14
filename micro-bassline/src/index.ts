@@ -81,12 +81,6 @@ export {
   getPrimitives
 } from './primitives'
 
-// Meta-propagation gadget
-export {
-  createBasslineGadget,
-  createGlobalBasslineGadget
-} from './bassline-gadget'
-
 
 // Convenience type aliases for common patterns
 import { ReifiedContact, ReifiedWire, ReifiedGroup } from './types'
