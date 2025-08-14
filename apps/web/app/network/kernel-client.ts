@@ -205,6 +205,7 @@ export class KernelClient {
    * Create a new group
    */
   async createGroup(name: string, parentId?: string): Promise<string> {
+    console.log('[KernelClient] createGroup called with name:', name, 'parentId:', parentId)
     if (this.bridge instanceof RemoteWebSocketBridgeDriver) {
       return this.bridge.createGroup(name, parentId)
     } else {
@@ -214,8 +215,11 @@ export class KernelClient {
         parentGroupId: parentId ? brand.groupId(parentId) : undefined,
         group: { name }
       }
+      console.log('[KernelClient] Sending external-add-group with parentGroupId:', input.parentGroupId)
       const result = await this.bridge.sendOperation(input)
-      return result?.id || result?.groupId || 'unknown'
+      const groupId = result?.id || result?.groupId || 'unknown'
+      console.log('[KernelClient] Created group with id:', groupId)
+      return groupId
     }
   }
   

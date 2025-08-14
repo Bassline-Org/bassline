@@ -56,6 +56,8 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
         return
       }
       
+      console.log(`[Scheduler] Registering group ${group.id} with parentId:`, group.parentId)
+      
       const groupState: GroupState = {
         group,
         contacts: new Map(),
@@ -299,6 +301,7 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
     },
     
     async addGroup(parentGroupIdStr, groupData) {
+      console.log('[Scheduler] addGroup called with parentGroupIdStr:', parentGroupIdStr, 'groupData:', groupData)
       const parentGId = brand.groupId(parentGroupIdStr)
       const parentState = state.groups.get(parentGId)
       if (!parentState) {
@@ -315,6 +318,7 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
         subgroupIds: [],
         boundaryContactIds: []
       }
+      console.log('[Scheduler] Created group with parentId:', group.parentId)
       
       await this.registerGroup(group)
       
@@ -370,6 +374,7 @@ export function createImmediateScheduler(): PropagationNetworkScheduler {
       if (!groupState) {
         throw new Error(`Group ${groupId} not found`)
       }
+      console.log('[Scheduler] getState for group', groupId, '- parentId:', groupState.group.parentId)
       return groupState
     },
     

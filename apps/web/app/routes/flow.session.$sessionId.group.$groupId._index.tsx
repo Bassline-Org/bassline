@@ -72,6 +72,7 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
   
   try {
     const state = await client.getState(groupId)
+    console.log('[GroupEditor Loader] Group state for', groupId, ':', state?.group)
     
     // Store subgroup data to avoid loading twice
     const subgroupDataCache = new Map<string, any>()
@@ -298,8 +299,10 @@ export async function clientLoader({ params }: ClientLoaderFunctionArgs) {
     }
     
     // Get parent group info for navigation
+    console.log('[GroupEditor Loader] state.group.parentId:', state.group.parentId)
     const parentGroupId = state.group.parentId || (groupId !== 'root' ? 'root' : null)
     const groupName = state.group.name || (groupId === 'root' ? 'Root' : `Group ${groupId.slice(0, 8)}`)
+    console.log('[GroupEditor Loader] Computed parentGroupId:', parentGroupId)
     
     return { 
       nodes, 
