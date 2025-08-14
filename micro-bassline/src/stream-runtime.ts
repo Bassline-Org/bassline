@@ -118,12 +118,12 @@ export function runtime(
   
   const createContact = (
     contactId: ContactId,
-    groupId?: GroupId,
+    groupId: GroupId,
     blendMode: BlendMode = 'merge',
     properties?: Properties
   ): Contact => {
     // All contacts must be namespaced to their group
-    const qualifiedId = groupId ? `${groupId}:${contactId}` : contactId
+    const qualifiedId = `${groupId}:${contactId}`
     
     // If contact already exists, return it (idempotent)
     const existing = contacts.get(qualifiedId)
@@ -134,14 +134,12 @@ export function runtime(
     const c = contact(qualifiedId, blendMode, groupId, properties || {})
     contacts.set(qualifiedId, c)
     
-    if (groupId) {
-      const g = groups.get(groupId)
-      if (g) {
-        g.contacts.set(qualifiedId, c)
-        // Update parent's structure contact when adding a contact
-        if (g.parentId) {
-          updateStructureContact(g.parentId)
-        }
+    const g = groups.get(groupId)
+    if (g) {
+      g.contacts.set(qualifiedId, c)
+      // Update parent's structure contact when adding a contact
+      if (g.parentId) {
+        updateStructureContact(g.parentId)
       }
     }
     
@@ -436,11 +434,13 @@ export function runtime(
       createGroup(id, g.primitiveType, g.properties)
     }
     
-    // Create contacts
+    // Create contacts (only those with a groupId)
     for (const [id, c] of bassline.contacts) {
-      createContact(id, c.groupId, c.properties?.blendMode || 'merge', c.properties)
-      if (c.content !== undefined && c.groupId) {
-        setValue(c.groupId, id, c.content)
+      if (c.groupId) {
+        createContact(id, c.groupId, c.properties?.blendMode || 'merge', c.properties)
+        if (c.content !== undefined) {
+          setValue(c.groupId, id, c.content)
+        }
       }
     }
     

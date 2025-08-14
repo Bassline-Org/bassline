@@ -195,25 +195,9 @@ export const updateProperties = (entityId: string, properties: Properties): Acti
     
     const group = rt['groups'].get(entityId)
     if (group) {
-      // Handle MGP opt-in changes
-      if ('expose-structure' in properties) {
-        properties['expose-structure']
-          ? rt['createMGPStructureContact'](entityId)
-          : rt['contacts'].delete(`${entityId}:children:structure`)
-      }
-      
-      if ('expose-dynamics' in properties) {
-        properties['expose-dynamics']
-          ? rt['createMGPDynamicsContact'](entityId)
-          : rt['contacts'].delete(`${entityId}:children:dynamics`)
-      }
-      
-      if ('allow-meta-mutation' in properties) {
-        const shouldCreate = properties['allow-meta-mutation'] && !properties['distributed-mode']
-        shouldCreate
-          ? rt['createMGPActionsContact'](entityId)
-          : rt['contacts'].delete(`${entityId}:children:actions`)
-      }
+      // Note: MGP contacts can only be created during group creation,
+      // not dynamically enabled/disabled after the fact
+      // TODO: Consider supporting dynamic MGP contact creation in the future
     }
   }
 })

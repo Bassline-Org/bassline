@@ -49,9 +49,7 @@ export function exportGroup(runtime: Runtime, groupId: string): ExportedGroup {
       // Extract local contact ID from qualified ID
       // Format: "groupId:contactId" where contactId can contain colons  
       const groupPrefix = `${contact.groupId}:`
-      const localContactId = qualifiedContactId.startsWith(groupPrefix) 
-        ? qualifiedContactId.slice(groupPrefix.length)
-        : qualifiedContactId
+      const localContactId = qualifiedContactId.slice(groupPrefix.length)
       
       // Add contact to structure (without content) using local ID
       structure.contacts.set(localContactId, {
@@ -85,8 +83,8 @@ export function exportGroup(runtime: Runtime, groupId: string): ExportedGroup {
     if (fromContact && toContact) {
       const fromPrefix = `${fromContact.groupId}:`
       const toPrefix = `${toContact.groupId}:`
-      const fromLocalId = wire.from.startsWith(fromPrefix) ? wire.from.slice(fromPrefix.length) : wire.from
-      const toLocalId = wire.to.startsWith(toPrefix) ? wire.to.slice(toPrefix.length) : wire.to
+      const fromLocalId = wire.from.slice(fromPrefix.length)
+      const toLocalId = wire.to.slice(toPrefix.length)
     
       // Only include wires where both contacts are in our exported structure
       if (structure.contacts.has(fromLocalId) && structure.contacts.has(toLocalId)) {
@@ -127,6 +125,12 @@ export function importGroup(
   
   // Second pass: Create all contacts
   for (const [localContactId, contact] of structure.contacts) {
+    // Validate that the group exists before creating contact
+    if (!contact.groupId || !runtime.groups.has(contact.groupId)) {
+      console.warn(`Skipping contact ${localContactId}: group ${contact.groupId} not found`)
+      continue
+    }
+    
     runtime.createContact(
       localContactId,
       contact.groupId,
@@ -237,9 +241,7 @@ export function exportRuntime(runtime: Runtime): ExportedGroup {
   for (const [qualifiedContactId, contact] of runtime.contacts) {
     // Extract local contact ID
     const groupPrefix = `${contact.groupId}:`
-    const localContactId = qualifiedContactId.startsWith(groupPrefix) 
-      ? qualifiedContactId.slice(groupPrefix.length)
-      : qualifiedContactId
+    const localContactId = qualifiedContactId.slice(groupPrefix.length)
     
     structure.contacts.set(localContactId, {
       groupId: contact.groupId,
@@ -254,8 +256,8 @@ export function exportRuntime(runtime: Runtime): ExportedGroup {
     if (fromContact && toContact) {
       const fromPrefix = `${fromContact.groupId}:`
       const toPrefix = `${toContact.groupId}:`
-      const fromLocalId = wire.from.startsWith(fromPrefix) ? wire.from.slice(fromPrefix.length) : wire.from
-      const toLocalId = wire.to.startsWith(toPrefix) ? wire.to.slice(toPrefix.length) : wire.to
+      const fromLocalId = wire.from.slice(fromPrefix.length)
+      const toLocalId = wire.to.slice(toPrefix.length)
     
       structure.wires.set(wireId, {
         fromId: fromLocalId,
@@ -279,9 +281,7 @@ export function exportRuntime(runtime: Runtime): ExportedGroup {
   for (const [qualifiedContactId, contact] of runtime.contacts) {
     // Extract local contact ID
     const groupPrefix = `${contact.groupId}:`
-    const localContactId = qualifiedContactId.startsWith(groupPrefix) 
-      ? qualifiedContactId.slice(groupPrefix.length)
-      : qualifiedContactId
+    const localContactId = qualifiedContactId.slice(groupPrefix.length)
     
     const value = contact.getValue()
     if (value !== undefined) {
