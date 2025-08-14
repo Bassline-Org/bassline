@@ -281,6 +281,8 @@ export class Runtime extends CrossPlatformEventEmitter {
           const group = this.context.bassline.groups.get(groupId)
           if (group) {
             group.contactIds.add(contactId)
+            // Update parent's structure contact if it exists
+            this.updateParentStructure(groupId)
           }
         }
         break
@@ -288,6 +290,9 @@ export class Runtime extends CrossPlatformEventEmitter {
       
       case 'deleteContact': {
         const [, contactId] = action
+        const contact = this.context.bassline.contacts.get(contactId)
+        const contactGroupId = contact?.groupId
+        
         this.context.bassline.contacts.delete(contactId)
         this.context.values.delete(contactId)
         
@@ -302,6 +307,11 @@ export class Runtime extends CrossPlatformEventEmitter {
           if (wire.fromId === contactId || wire.toId === contactId) {
             this.context.bassline.wires.delete(wireId)
           }
+        }
+        
+        // Update parent's structure contact if needed
+        if (contactGroupId) {
+          this.updateParentStructure(contactGroupId)
         }
         break
       }
@@ -399,6 +409,14 @@ export class Runtime extends CrossPlatformEventEmitter {
         // Initialize the properties value
         this.context.values.set(propertiesContactId, defaultProperties || {})
         
+        // Check if we should create MGP contacts based on initial properties
+        this.updateMGPContacts(groupId, group)
+        
+        // Update parent's structure contact if this is a child group
+        if (parentId) {
+          this.updateParentStructure(groupId)
+        }
+        
         break
       }
       
@@ -434,7 +452,11 @@ export class Runtime extends CrossPlatformEventEmitter {
         // Try as group
         const group = this.context.bassline.groups.get(entityId)
         if (group) {
-          group.properties = { ...group.properties, ...properties }
+          const oldProperties = group.properties || {}
+          group.properties = { ...oldProperties, ...properties }
+          
+          // Check if MGP flags changed and update MGP contacts accordingly
+          this.updateMGPContacts(entityId, group)
           return
         }
         
@@ -634,6 +656,29 @@ export class Runtime extends CrossPlatformEventEmitter {
       this.emitEvent(['valueChanged', contactId, currentValue, newValue])
     }
     
+    // Check if this is an actions contact that should process the value as an action
+    if (contactId.endsWith(':children:actions')) {
+      const groupIdMatch = contactId.match(/^(.+):children:actions$/)
+      if (groupIdMatch) {
+        const parentGroupId = groupIdMatch[1]
+        const parentGroup = this.context.bassline.groups.get(parentGroupId)
+        if (parentGroup?.properties?.['allow-meta-mutation'] && !parentGroup?.properties?.['distributed-mode']) {
+          // Process the value as an action or action set
+          try {
+            if (Array.isArray(newValue) && newValue.length > 0 && Array.isArray(newValue[0])) {
+              // It's an ActionSet (array of actions)
+              this.applyActions({ actions: newValue })
+            } else if (Array.isArray(newValue) && newValue.length > 0) {
+              // It's a single Action
+              this.applyAction(newValue as Action)
+            }
+          } catch (error) {
+            console.warn(`Failed to process action on ${contactId}:`, error)
+          }
+        }
+      }
+    }
+    
     // Update stored value
     this.context.values.set(contactId, newValue)
     
@@ -761,8 +806,269 @@ export class Runtime extends CrossPlatformEventEmitter {
       this.context.eventStream.push(event)
     }
     
+    // Forward to parent's dynamics stream if applicable
+    this.forwardToDynamicsStream(event)
+    
     // Emit using our cross-platform event system
     this.emit('propagation', event)
+  }
+  
+  /**
+   * Forward events to parent group's dynamics stream if enabled.
+   */
+  private forwardToDynamicsStream(event: PropagationEvent): void {
+    // Get the contact or group that triggered this event
+    let sourceGroupId: GroupId | undefined
+    
+    if (event[0] === 'valueChanged' || event[0] === 'propagating') {
+      const contactId = event[1] as ContactId
+      const contact = this.context.bassline.contacts.get(contactId)
+      sourceGroupId = contact?.groupId
+    } else if (event[0] === 'gadgetActivated' || event[0] === 'primitive-requested' || event[0] === 'primitive-executed') {
+      sourceGroupId = event[1] as GroupId
+    }
+    
+    if (!sourceGroupId) return
+    
+    // Find the parent group
+    const sourceGroup = this.context.bassline.groups.get(sourceGroupId)
+    if (!sourceGroup?.parentId) return
+    
+    const parentGroup = this.context.bassline.groups.get(sourceGroup.parentId)
+    if (!parentGroup?.properties?.['expose-dynamics']) return
+    
+    // Check if dynamics contact exists
+    const dynamicsContactId = `${sourceGroup.parentId}:children:dynamics`
+    if (!this.context.bassline.contacts.has(dynamicsContactId)) return
+    
+    // Convert event to dynamics event format
+    let dynamicsEvent: any
+    if (event[0] === 'gadgetActivated') {
+      dynamicsEvent = ['gadget-fired', event[1], event[2], event[3]]
+    } else if (event[0] === 'propagating') {
+      dynamicsEvent = ['value-propagated', event[1], event[2], event[3]]
+    } else if (event[0] === 'converged') {
+      dynamicsEvent = ['convergence', Date.now()]
+    } else if (event[0] === 'contradiction') {
+      dynamicsEvent = ['contradiction', event[1], event[2], event[3]]
+    } else {
+      // Forward other events as-is
+      dynamicsEvent = event
+    }
+    
+    // Queue the dynamics event for propagation
+    this.propagationQueue.push([dynamicsContactId, dynamicsEvent, undefined])
+    
+    // Process immediately if not already processing
+    if (!this.isProcessing) {
+      this.processPropagationQueue()
+    }
+  }
+  
+  /**
+   * Update the parent group's structure contact when children change.
+   */
+  private updateParentStructure(childGroupId: GroupId): void {
+    const childGroup = this.context.bassline.groups.get(childGroupId)
+    if (!childGroup?.parentId) return
+    
+    const parentGroup = this.context.bassline.groups.get(childGroup.parentId)
+    if (!parentGroup?.properties?.['expose-structure']) return
+    
+    const structureContactId = `${childGroup.parentId}:children:structure`
+    const structureContact = this.context.bassline.contacts.get(structureContactId)
+    if (!structureContact) return
+    
+    // Update the structure value
+    const newStructure = this.getChildrenStructure(childGroup.parentId, parentGroup.properties['expose-internals'])
+    
+    // Queue the update for proper propagation through wires
+    this.propagationQueue.push([structureContactId, newStructure, undefined])
+    
+    // Process immediately if not already processing
+    if (!this.isProcessing) {
+      this.processPropagationQueue()
+    }
+  }
+  
+  // ==========================================================================
+  // MGP (Meta-Group Protocol) Support
+  // ===========================================================================
+  
+  /**
+   * Update MGP contacts based on group properties.
+   * Creates or removes MGP contacts based on opt-in flags.
+   */
+  private updateMGPContacts(groupId: GroupId, group: ReifiedGroup): void {
+    const props = group.properties || {}
+    
+    // Structure contact
+    const structureContactId = `${groupId}:children:structure`
+    if (props['expose-structure']) {
+      // Create structure contact if it doesn't exist
+      if (!this.context.bassline.contacts.has(structureContactId)) {
+        const structureContact: ReifiedContact = {
+          content: this.getChildrenStructure(groupId, props['expose-internals']),
+          groupId,
+          properties: {
+            blendMode: 'last',  // Use 'last' since we replace the entire structure
+            isSystemContact: true,
+            isMGPContact: true,
+            name: 'children:structure'
+          }
+        }
+        this.context.bassline.contacts.set(structureContactId, structureContact)
+        group.contactIds.add(structureContactId)
+        group.boundaryContactIds.add(structureContactId)
+        this.context.values.set(structureContactId, structureContact.content)
+      }
+    } else {
+      // Remove structure contact if it exists
+      if (this.context.bassline.contacts.has(structureContactId)) {
+        this.applyAction(['deleteContact', structureContactId])
+      }
+    }
+    
+    // Dynamics stream contact
+    const dynamicsContactId = `${groupId}:children:dynamics`
+    if (props['expose-dynamics']) {
+      // Create dynamics contact if it doesn't exist
+      if (!this.context.bassline.contacts.has(dynamicsContactId)) {
+        const dynamicsContact: ReifiedContact = {
+          groupId,
+          properties: {
+            blendMode: 'last',  // Stream contact!
+            isSystemContact: true,
+            isMGPContact: true,
+            name: 'children:dynamics'
+          }
+        }
+        this.context.bassline.contacts.set(dynamicsContactId, dynamicsContact)
+        group.contactIds.add(dynamicsContactId)
+        group.boundaryContactIds.add(dynamicsContactId)
+        
+        // Set up event forwarding for child events
+        this.setupDynamicsForwarding(groupId)
+      }
+    } else {
+      // Remove dynamics contact if it exists
+      if (this.context.bassline.contacts.has(dynamicsContactId)) {
+        this.applyAction(['deleteContact', dynamicsContactId])
+      }
+    }
+    
+    // Actions contact (DANGEROUS!)
+    const actionsContactId = `${groupId}:children:actions`
+    if (props['allow-meta-mutation'] && !props['distributed-mode']) {
+      // Create actions contact if it doesn't exist
+      if (!this.context.bassline.contacts.has(actionsContactId)) {
+        const actionsContact: ReifiedContact = {
+          groupId,
+          properties: {
+            blendMode: 'last',  // Stream contact for actions
+            isSystemContact: true,
+            isMGPContact: true,
+            isDangerous: true,
+            name: 'children:actions'
+          }
+        }
+        this.context.bassline.contacts.set(actionsContactId, actionsContact)
+        group.contactIds.add(actionsContactId)
+        group.boundaryContactIds.add(actionsContactId)
+        
+        // Set up action processing
+        this.setupActionsProcessing(groupId)
+      }
+    } else {
+      // Remove actions contact if it exists
+      if (this.context.bassline.contacts.has(actionsContactId)) {
+        this.applyAction(['deleteContact', actionsContactId])
+      }
+    }
+  }
+  
+  /**
+   * Get the structure of a group's children.
+   */
+  private getChildrenStructure(groupId: GroupId, includeInternals: boolean = false): Bassline {
+    const group = this.context.bassline.groups.get(groupId)
+    if (!group) return { contacts: new Map(), wires: new Map(), groups: new Map() }
+    
+    const structure: Bassline = {
+      contacts: new Map(),
+      wires: new Map(),
+      groups: new Map()
+    }
+    
+    // Find all child groups
+    for (const [childId, childGroup] of this.context.bassline.groups) {
+      if (childGroup.parentId === groupId) {
+        // Add the child group
+        structure.groups.set(childId, {
+          parentId: childGroup.parentId,
+          contactIds: new Set(childGroup.contactIds),
+          boundaryContactIds: new Set(childGroup.boundaryContactIds),
+          primitiveType: childGroup.primitiveType,
+          properties: childGroup.properties
+        })
+        
+        // Add all contacts from this child group
+        for (const contactId of childGroup.contactIds) {
+          const contact = this.context.bassline.contacts.get(contactId)
+          if (contact) {
+            // Include boundary contacts always, internals only if requested
+            const isBoundary = childGroup.boundaryContactIds.has(contactId)
+            if (isBoundary || includeInternals) {
+              structure.contacts.set(contactId, {
+                content: this.context.values.get(contactId),
+                groupId: contact.groupId,
+                properties: contact.properties
+              })
+            }
+          }
+        }
+      }
+    }
+    
+    // Add wires connecting these contacts
+    for (const [wireId, wire] of this.context.bassline.wires) {
+      if (structure.contacts.has(wire.fromId) || structure.contacts.has(wire.toId)) {
+        structure.wires.set(wireId, { ...wire })
+      }
+    }
+    
+    return structure
+  }
+  
+  /**
+   * Set up event forwarding for dynamics stream.
+   */
+  private setupDynamicsForwarding(groupId: GroupId): void {
+    // This will forward child events to the dynamics contact
+    // We'll implement this by checking group parentage in emitEvent
+    // For now, just mark that this group has dynamics enabled
+    const group = this.context.bassline.groups.get(groupId)
+    if (group && !group.properties) {
+      group.properties = {}
+    }
+    if (group?.properties) {
+      group.properties._dynamicsEnabled = true
+    }
+  }
+  
+  /**
+   * Set up action processing for the actions contact.
+   */
+  private setupActionsProcessing(groupId: GroupId): void {
+    // When the actions contact receives a value, process it as an action
+    // This is handled in propagateValue when we detect it's an actions contact
+    const group = this.context.bassline.groups.get(groupId)
+    if (group && !group.properties) {
+      group.properties = {}
+    }
+    if (group?.properties) {
+      group.properties._actionsEnabled = true
+    }
   }
   
   // ==========================================================================
