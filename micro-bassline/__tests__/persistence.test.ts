@@ -53,17 +53,17 @@ describe('Persistence with Structure/Data Separation', () => {
       // Export the group
       const exported = exportGroup(rt, 'my-component')
       
-      // Verify structure
+      // Verify structure uses local IDs
       expect(exported.structure.groups.has('my-component')).toBe(true)
-      expect(exported.structure.contacts.has('my-component:input')).toBe(true)
-      expect(exported.structure.contacts.has('my-component:output')).toBe(true)
-      expect(exported.structure.contacts.has('my-component:internal')).toBe(true)
+      expect(exported.structure.contacts.has('input')).toBe(true)
+      expect(exported.structure.contacts.has('output')).toBe(true)
+      expect(exported.structure.contacts.has('internal')).toBe(true)
       expect(exported.structure.wires.has('w1')).toBe(true)
       
-      // Verify data is separate
-      expect(exported.data).toContainEqual(['my-component:input', 42])
-      expect(exported.data).toContainEqual(['my-component:output', 42]) // Propagated value
-      expect(exported.data).toContainEqual(['my-component:internal', 'hidden'])
+      // Verify data uses local IDs too
+      expect(exported.data).toContainEqual(['input', 42])
+      expect(exported.data).toContainEqual(['output', 42]) // Propagated value
+      expect(exported.data).toContainEqual(['internal', 'hidden'])
       
       // Import into a new runtime
       const rt2 = runtime()
@@ -88,9 +88,9 @@ describe('Persistence with Structure/Data Separation', () => {
       rt.createContact('c-contact', 'child')
       rt.createContact('gc-contact', 'grandchild')
       
-      rt.setValue('parent:p-contact', 'parent-value')
-      rt.setValue('child:c-contact', 'child-value')
-      rt.setValue('grandchild:gc-contact', 'grandchild-value')
+      rt.setValue('parent', 'p-contact', 'parent-value')
+      rt.setValue('child', 'c-contact', 'child-value')
+      rt.setValue('grandchild', 'gc-contact', 'grandchild-value')
       
       // Export the parent (should include all descendants)
       const exported = exportGroup(rt, 'parent')
@@ -101,10 +101,10 @@ describe('Persistence with Structure/Data Separation', () => {
       expect(exported.structure.groups.has('child')).toBe(true)
       expect(exported.structure.groups.has('grandchild')).toBe(true)
       
-      // Verify all data is included
-      expect(exported.data).toContainEqual(['parent:p-contact', 'parent-value'])
-      expect(exported.data).toContainEqual(['child:c-contact', 'child-value'])
-      expect(exported.data).toContainEqual(['grandchild:gc-contact', 'grandchild-value'])
+      // Verify all data uses local IDs
+      expect(exported.data).toContainEqual(['p-contact', 'parent-value'])
+      expect(exported.data).toContainEqual(['c-contact', 'child-value'])
+      expect(exported.data).toContainEqual(['gc-contact', 'grandchild-value'])
       
       // Import into new runtime
       const rt2 = runtime()
@@ -118,7 +118,7 @@ describe('Persistence with Structure/Data Separation', () => {
       expect(grandchild?.parentId).toBe('child')
       
       // Verify values
-      expect(rt2.getValue('grandchild:gc-contact')).toBe('grandchild-value')
+      expect(rt2.getValue('grandchild', 'gc-contact')).toBe('grandchild-value')
     })
     
     it('should mount a group under a different parent', () => {
@@ -129,7 +129,7 @@ describe('Persistence with Structure/Data Separation', () => {
       rt.createContact('comp-input', 'component', 'merge', { isBoundary: true })
       rt.createContact('comp-output', 'component', 'merge', { isBoundary: true })
       rt.createWire('comp-wire', 'component:comp-input', 'component:comp-output')
-      rt.setValue('component:comp-input', 'test-value')
+      rt.setValue('component', 'comp-input', 'test-value')
       
       const exported = exportGroup(rt, 'component')
       
@@ -145,11 +145,11 @@ describe('Persistence with Structure/Data Separation', () => {
       expect(component?.parentId).toBe('container')
       
       // Verify functionality still works
-      expect(rt2.getValue('component:comp-output')).toBe('test-value')
+      expect(rt2.getValue('component', 'comp-output')).toBe('test-value')
       
       // Update value and verify propagation
-      rt2.setValue('component:comp-input', 'new-value')
-      expect(rt2.getValue('component:comp-output')).toBe('new-value')
+      rt2.setValue('component', 'comp-input', 'new-value')
+      expect(rt2.getValue('component', 'comp-output')).toBe('new-value')
     })
   })
   
@@ -166,16 +166,16 @@ describe('Persistence with Structure/Data Separation', () => {
       console.log('All contacts:', Array.from(rt.contacts.keys()))
       
       // Set values on the gadget's input contacts (now namespaced)
-      rt.setValue('adder:a', 3) 
-      rt.setValue('adder:b', 4)
+      rt.setValue('adder', 'a', 3) 
+      rt.setValue('adder', 'b', 4)
       
       console.log('After setting values:')
-      console.log('adder:a =', rt.getValue('adder:a'))
-      console.log('adder:b =', rt.getValue('adder:b'))
-      console.log('adder:sum =', rt.getValue('adder:sum'))
+      console.log('adder:a =', rt.getValue('adder', 'a'))
+      console.log('adder:b =', rt.getValue('adder', 'b'))
+      console.log('adder:sum =', rt.getValue('adder', 'sum'))
       
       // Verify computation works
-      expect(rt.getValue('adder:sum')).toBe(7) // 3 + 4
+      expect(rt.getValue('adder', 'sum')).toBe(7) // 3 + 4
       
       // Export the calculator
       const exported = exportGroup(rt, 'calculator')
@@ -189,13 +189,13 @@ describe('Persistence with Structure/Data Separation', () => {
       importGroup(rt2, exported)
       
       // Verify gadgets work in new runtime
-      expect(rt2.getValue('adder:sum')).toBe(7)
-      expect(rt2.getValue('adder:a')).toBe(3)
-      expect(rt2.getValue('adder:b')).toBe(4)
+      expect(rt2.getValue('adder', 'sum')).toBe(7)
+      expect(rt2.getValue('adder', 'a')).toBe(3)
+      expect(rt2.getValue('adder', 'b')).toBe(4)
       
       // Test with new values
-      rt2.setValue('adder:a', 5)
-      expect(rt2.getValue('adder:sum')).toBe(9) // 5 + 4
+      rt2.setValue('adder', 'a', 5)
+      expect(rt2.getValue('adder', 'sum')).toBe(9) // 5 + 4
     })
   })
   
@@ -206,7 +206,7 @@ describe('Persistence with Structure/Data Separation', () => {
       // Create a component
       rt.createGroup('saved-component')
       rt.createContact('data', 'saved-component')
-      rt.setValue('data', { complex: { nested: 'value' } })
+      rt.setValue('saved-component', 'data', { complex: { nested: 'value' } })
       
       const exported = exportGroup(rt, 'saved-component')
       
@@ -221,7 +221,7 @@ describe('Persistence with Structure/Data Separation', () => {
       importGroup(rt2, loaded)
       
       // Verify
-      expect(rt2.getValue('data')).toEqual({ complex: { nested: 'value' } })
+      expect(rt2.getValue('saved-component', 'data')).toEqual({ complex: { nested: 'value' } })
     })
     
     it('should handle special values in JSON', async () => {
@@ -234,11 +234,11 @@ describe('Persistence with Structure/Data Separation', () => {
       rt.createContact('false-val', 'special-values')
       rt.createContact('empty-val', 'special-values')
       
-      rt.setValue('null-val', null)
-      rt.setValue('undefined-val', undefined)
-      rt.setValue('zero-val', 0)
-      rt.setValue('false-val', false)
-      rt.setValue('empty-val', '')
+      rt.setValue('special-values', 'null-val', null)
+      rt.setValue('special-values', 'undefined-val', undefined)
+      rt.setValue('special-values', 'zero-val', 0)
+      rt.setValue('special-values', 'false-val', false)
+      rt.setValue('special-values', 'empty-val', '')
       
       const exported = exportGroup(rt, 'special-values')
       
@@ -249,11 +249,11 @@ describe('Persistence with Structure/Data Separation', () => {
       const rt2 = runtime()
       importGroup(rt2, parsed)
       
-      expect(rt2.getValue('null-val')).toBe(null)
-      expect(rt2.getValue('undefined-val')).toBe(undefined)
-      expect(rt2.getValue('zero-val')).toBe(0)
-      expect(rt2.getValue('false-val')).toBe(false)
-      expect(rt2.getValue('empty-val')).toBe('')
+      expect(rt2.getValue('special-values', 'null-val')).toBe(null)
+      expect(rt2.getValue('special-values', 'undefined-val')).toBe(undefined)
+      expect(rt2.getValue('special-values', 'zero-val')).toBe(0)
+      expect(rt2.getValue('special-values', 'false-val')).toBe(false)
+      expect(rt2.getValue('special-values', 'empty-val')).toBe('')
     })
   })
   
@@ -268,8 +268,8 @@ describe('Persistence with Structure/Data Separation', () => {
       rt.createContact('r1-contact', 'root1')
       rt.createContact('r2-contact', 'root2')
       
-      rt.setValue('r1-contact', 'value1')
-      rt.setValue('r2-contact', 'value2')
+      rt.setValue('root1', 'r1-contact', 'value1')
+      rt.setValue('root2', 'r2-contact', 'value2')
       
       // Export entire runtime
       const exported = exportRuntime(rt)
@@ -282,8 +282,8 @@ describe('Persistence with Structure/Data Separation', () => {
       const rt2 = runtime()
       importGroup(rt2, exported)
       
-      expect(rt2.getValue('r1-contact')).toBe('value1')
-      expect(rt2.getValue('r2-contact')).toBe('value2')
+      expect(rt2.getValue('root1', 'r1-contact')).toBe('value1')
+      expect(rt2.getValue('root2', 'r2-contact')).toBe('value2')
     })
     
     it('should export single root runtime efficiently', () => {
@@ -295,7 +295,7 @@ describe('Persistence with Structure/Data Separation', () => {
       rt.createGroup('module2', undefined, {}, 'app')
       
       rt.createContact('m1-data', 'module1')
-      rt.setValue('m1-data', 'module1-data')
+      rt.setValue('module1', 'm1-data', 'module1-data')
       
       // Export runtime (should detect single root)
       const exported = exportRuntime(rt)
@@ -318,7 +318,7 @@ describe('Persistence with Structure/Data Separation', () => {
       rt.createContact('increment', 'counter', 'merge', { isBoundary: true })
       
       // Simple increment logic (would normally be a gadget)
-      rt.setValue('count', 0)
+      rt.setValue('counter', 'count', 0)
       
       // Export the counter
       const counterExport = exportGroup(rt, 'counter')
@@ -336,7 +336,7 @@ describe('Persistence with Structure/Data Separation', () => {
       
       const counter = rt2.groups.get('counter')
       expect(counter?.parentId).toBe('app')
-      expect(rt2.getValue('count')).toBe(0)
+      expect(rt2.getValue('counter', 'count')).toBe(0)
     })
   })
   
@@ -352,15 +352,16 @@ describe('Persistence with Structure/Data Separation', () => {
       
       rt.createGroup('child', undefined, {}, 'mgp-group')
       rt.createContact('child-data', 'child')
-      rt.setValue('child-data', 'test')
+      rt.setValue('child', 'child-data', 'test')
       
       // Export the MGP group
       const exported = exportGroup(rt, 'mgp-group')
       
-      // The MGP contacts themselves should be in the structure
-      expect(exported.structure.contacts.has('mgp-group:children:structure')).toBe(true)
-      expect(exported.structure.contacts.has('mgp-group:children:dynamics')).toBe(true)
-      expect(exported.structure.contacts.has('mgp-group:children:actions')).toBe(true)
+      
+      // The MGP contacts themselves should be in the structure (using local IDs)
+      expect(exported.structure.contacts.has('children:structure')).toBe(true)
+      expect(exported.structure.contacts.has('children:dynamics')).toBe(true)
+      expect(exported.structure.contacts.has('children:actions')).toBe(true)
       
       // Import and verify MGP functionality
       const rt2 = runtime()
@@ -372,7 +373,7 @@ describe('Persistence with Structure/Data Separation', () => {
       expect(rt2.contacts.has('mgp-group:children:actions')).toBe(true)
       
       // Child data should be preserved
-      expect(rt2.getValue('child-data')).toBe('test')
+      expect(rt2.getValue('child', 'child-data')).toBe('test')
     })
   })
 })

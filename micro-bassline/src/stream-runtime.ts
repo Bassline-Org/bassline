@@ -7,6 +7,7 @@
 import { stream, Stream, guards } from './micro-stream'
 import { contact, Contact, group, Group, gadget, GadgetConfig } from './stream-contact'
 import { fromArray } from './stream-actions'
+import { generateUUID } from './uuid'
 import {
   Bassline,
   ContactId,
@@ -24,12 +25,10 @@ export interface Runtime {
   eventStream: Stream<any>
   
   // Methods
-  createGroup(groupId: GroupId, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group
+  createGroup(groupId: GroupId | undefined, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group
   createContact(contactId: ContactId, groupId?: GroupId, blendMode?: BlendMode, properties?: Properties): Contact
   createWire(wireId: WireId, fromId: ContactId, toId: ContactId, bidirectional?: boolean): void
-  setValue(contactId: ContactId, value: any): void
   setValue(groupId: GroupId, contactId: ContactId, value: any): void
-  getValue(contactId: ContactId): any
   getValue(groupId: GroupId, contactId: ContactId): any
   applyAction(action: any): void
   getBassline(): Bassline
@@ -53,11 +52,13 @@ export function runtime(
   const dirtyStructures = new Set<GroupId>()
   const structureCache = new Map<GroupId, any>()
   
-  const createGroup = (groupId: GroupId, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group => {
+  const createGroup = (groupId: GroupId | undefined, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group => {
+    // Generate UUID if no groupId provided
+    const actualGroupId = groupId || generateUUID()
     // Store primitive type in properties if provided
     const extendedProperties = primitiveType ? { ...properties, primitiveType } : properties
-    const g = group(groupId, parentId, extendedProperties)
-    groups.set(groupId, g)
+    const g = group(actualGroupId, parentId, extendedProperties)
+    groups.set(actualGroupId, g)
     
     // Connect group events
     g.eventStream.pipe(eventStream)
@@ -65,7 +66,7 @@ export function runtime(
     // Create properties contact
     const propertiesContact = createContact(
       'properties',
-      groupId,
+      actualGroupId,
       'merge',
       {
         isSystemContact: true,
@@ -81,12 +82,12 @@ export function runtime(
       
       // Create boundary contacts for inputs
       for (const inputName of config.inputs) {
-        createContact(inputName, groupId, 'merge', { isBoundary: true })
+        createContact(inputName, actualGroupId, 'merge', { isBoundary: true })
       }
       
       // Create boundary contacts for outputs
       for (const outputName of config.outputs) {
-        createContact(outputName, groupId, 'merge', { isBoundary: true })
+        createContact(outputName, actualGroupId, 'merge', { isBoundary: true })
       }
       
       // Apply gadget behavior
@@ -95,13 +96,13 @@ export function runtime(
     
     // Create MGP contacts if opted in
     if (properties?.['expose-structure']) {
-      createMGPContact(groupId, 'structure', 'last')
+      createMGPContact(actualGroupId, 'structure', 'last')
     }
     if (properties?.['expose-dynamics']) {
-      createMGPContact(groupId, 'dynamics', 'last')
+      createMGPContact(actualGroupId, 'dynamics', 'last')
     }
     if (properties?.['allow-meta-mutation'] && !properties?.['distributed-mode']) {
-      const mgpContact = createMGPContact(groupId, 'actions', 'last')
+      const mgpContact = createMGPContact(actualGroupId, 'actions', 'last')
       mgpContact.onValueChange(value => {
         if (Array.isArray(value)) applyAction(value)
       })
@@ -123,6 +124,13 @@ export function runtime(
   ): Contact => {
     // All contacts must be namespaced to their group
     const qualifiedId = groupId ? `${groupId}:${contactId}` : contactId
+    
+    // If contact already exists, return it (idempotent)
+    const existing = contacts.get(qualifiedId)
+    if (existing) {
+      return existing
+    }
+    
     const c = contact(qualifiedId, blendMode, groupId, properties || {})
     contacts.set(qualifiedId, c)
     
@@ -174,39 +182,16 @@ export function runtime(
     }
   }
   
-  function setValue(contactId: ContactId, value: any): void
-  function setValue(groupId: GroupId, contactId: ContactId, value: any): void
-  function setValue(contactIdOrGroupId: ContactId, contactIdOrValue: any, value?: any): void {
-    if (value !== undefined) {
-      // Three-parameter form: setValue(groupId, contactId, value)
-      const groupId = contactIdOrGroupId as GroupId
-      const contactId = contactIdOrValue as ContactId
-      const qualifiedId = `${groupId}:${contactId}`
-      const c = contacts.get(qualifiedId)
-      if (!c) throw new Error(`Contact ${qualifiedId} not found`)
-      c.setValue(value)
-    } else {
-      // Two-parameter form: setValue(contactId, value)
-      const contactId = contactIdOrGroupId as ContactId
-      const c = contacts.get(contactId)
-      if (!c) throw new Error(`Contact ${contactId} not found`)
-      c.setValue(contactIdOrValue)
-    }
+  const setValue = (groupId: GroupId, contactId: ContactId, value: any): void => {
+    const qualifiedId = `${groupId}:${contactId}`
+    const c = contacts.get(qualifiedId)
+    if (!c) throw new Error(`Contact ${qualifiedId} not found`)
+    c.setValue(value)
   }
   
-  function getValue(contactId: ContactId): any
-  function getValue(groupId: GroupId, contactId: ContactId): any
-  function getValue(contactIdOrGroupId: ContactId, contactId?: ContactId): any {
-    if (contactId !== undefined) {
-      // Two-parameter form: getValue(groupId, contactId)
-      const groupId = contactIdOrGroupId as GroupId
-      const qualifiedId = `${groupId}:${contactId}`
-      return contacts.get(qualifiedId)?.getValue()
-    } else {
-      // One-parameter form: getValue(contactId)
-      const contactId = contactIdOrGroupId as ContactId
-      return contacts.get(contactId)?.getValue()
-    }
+  const getValue = (groupId: GroupId, contactId: ContactId): any => {
+    const qualifiedId = `${groupId}:${contactId}`
+    return contacts.get(qualifiedId)?.getValue()
   }
   
   const createMGPContact = (groupId: GroupId, type: string, blendMode: BlendMode): Contact => {
@@ -454,7 +439,9 @@ export function runtime(
     // Create contacts
     for (const [id, c] of bassline.contacts) {
       createContact(id, c.groupId, c.properties?.blendMode || 'merge', c.properties)
-      if (c.content !== undefined) setValue(id, c.content)
+      if (c.content !== undefined && c.groupId) {
+        setValue(c.groupId, id, c.content)
+      }
     }
     
     // Create wires
@@ -492,8 +479,8 @@ export function example() {
   rt.createContact('input', 'group1')
   rt.createContact('output', 'group1')
   
-  rt.createWire('w1', 'input', 'output')
-  rt.setValue('input', 42)
+  rt.createWire('w1', 'group1:input', 'group1:output')
+  rt.setValue('group1', 'input', 42)
   
-  console.log(rt.getValue('output')) // 42
+  console.log(rt.getValue('group1', 'output')) // 42
 }

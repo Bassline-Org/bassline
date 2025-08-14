@@ -45,9 +45,16 @@ export function exportGroup(runtime: Runtime, groupId: string): ExportedGroup {
     })
     
     // Add group's contacts to structure and collect their values
-    for (const [contactId, contact] of group.contacts) {
-      // Add contact to structure (without content)
-      structure.contacts.set(contactId, {
+    for (const [qualifiedContactId, contact] of group.contacts) {
+      // Extract local contact ID from qualified ID
+      // Format: "groupId:contactId" where contactId can contain colons  
+      const groupPrefix = `${contact.groupId}:`
+      const localContactId = qualifiedContactId.startsWith(groupPrefix) 
+        ? qualifiedContactId.slice(groupPrefix.length)
+        : qualifiedContactId
+      
+      // Add contact to structure (without content) using local ID
+      structure.contacts.set(localContactId, {
         groupId: contact.groupId,
         properties: contact.properties
       })
@@ -55,7 +62,7 @@ export function exportGroup(runtime: Runtime, groupId: string): ExportedGroup {
       // Collect contact's value if it has one
       const value = contact.getValue()
       if (value !== undefined) {
-        data.push([contactId, value])
+        data.push([localContactId, value])
       }
     }
     
@@ -72,12 +79,23 @@ export function exportGroup(runtime: Runtime, groupId: string): ExportedGroup {
   
   // Collect all wires that connect contacts within our structure
   for (const [wireId, wire] of runtime.wires) {
-    if (structure.contacts.has(wire.from) && structure.contacts.has(wire.to)) {
-      structure.wires.set(wireId, {
-        fromId: wire.from,
-        toId: wire.to,
-        properties: { bidirectional: wire.bidirectional }
-      })
+    // Convert qualified IDs back to local IDs
+    const fromContact = runtime.contacts.get(wire.from)
+    const toContact = runtime.contacts.get(wire.to)
+    if (fromContact && toContact) {
+      const fromPrefix = `${fromContact.groupId}:`
+      const toPrefix = `${toContact.groupId}:`
+      const fromLocalId = wire.from.startsWith(fromPrefix) ? wire.from.slice(fromPrefix.length) : wire.from
+      const toLocalId = wire.to.startsWith(toPrefix) ? wire.to.slice(toPrefix.length) : wire.to
+    
+      // Only include wires where both contacts are in our exported structure
+      if (structure.contacts.has(fromLocalId) && structure.contacts.has(toLocalId)) {
+        structure.wires.set(wireId, {
+          fromId: fromLocalId,
+          toId: toLocalId,
+          properties: { bidirectional: wire.bidirectional }
+        })
+      }
     }
   }
   
@@ -108,33 +126,44 @@ export function importGroup(
   }
   
   // Second pass: Create all contacts
-  for (const [contactId, contact] of structure.contacts) {
-    if (!runtime.contacts.has(contactId)) {
-      runtime.createContact(
-        contactId,
-        contact.groupId,
-        contact.properties?.blendMode || 'merge',
-        contact.properties
-      )
-    }
+  for (const [localContactId, contact] of structure.contacts) {
+    runtime.createContact(
+      localContactId,
+      contact.groupId,
+      contact.properties?.blendMode || 'merge',
+      contact.properties
+    )
   }
   
   // Third pass: Create all wires
   for (const [wireId, wire] of structure.wires) {
     if (!runtime.wires.has(wireId)) {
-      runtime.createWire(
-        wireId,
-        wire.fromId,
-        wire.toId,
-        wire.properties?.bidirectional !== false
-      )
+      // Find the groupIds for the from and to contacts
+      const fromContact = structure.contacts.get(wire.fromId)
+      const toContact = structure.contacts.get(wire.toId)
+      
+      if (fromContact && toContact && fromContact.groupId && toContact.groupId) {
+        // Runtime internally uses qualified IDs, but we construct them here
+        const qualifiedFromId = `${fromContact.groupId}:${wire.fromId}`
+        const qualifiedToId = `${toContact.groupId}:${wire.toId}`
+        
+        runtime.createWire(
+          wireId,
+          qualifiedFromId,
+          qualifiedToId,
+          wire.properties?.bidirectional !== false
+        )
+      }
     }
   }
   
   // Fourth pass: Set all values
-  for (const [contactId, value] of data) {
-    if (runtime.contacts.has(contactId)) {
-      runtime.setValue(contactId, value)
+  for (const [localContactId, value] of data) {
+    // Find the contact by local ID and get its group
+    const contact = structure.contacts.get(localContactId)
+    
+    if (contact && contact.groupId) {
+      runtime.setValue(contact.groupId, localContactId, value)
     }
   }
 }
@@ -205,19 +234,35 @@ export function exportRuntime(runtime: Runtime): ExportedGroup {
   }
   
   // Convert runtime format to Bassline format
-  for (const [contactId, contact] of runtime.contacts) {
-    structure.contacts.set(contactId, {
+  for (const [qualifiedContactId, contact] of runtime.contacts) {
+    // Extract local contact ID
+    const groupPrefix = `${contact.groupId}:`
+    const localContactId = qualifiedContactId.startsWith(groupPrefix) 
+      ? qualifiedContactId.slice(groupPrefix.length)
+      : qualifiedContactId
+    
+    structure.contacts.set(localContactId, {
       groupId: contact.groupId,
       properties: contact.properties
     })
   }
   
   for (const [wireId, wire] of runtime.wires) {
-    structure.wires.set(wireId, {
-      fromId: wire.from,
-      toId: wire.to,
-      properties: { bidirectional: wire.bidirectional }
-    })
+    // Extract local IDs from qualified IDs
+    const fromContact = runtime.contacts.get(wire.from)
+    const toContact = runtime.contacts.get(wire.to)
+    if (fromContact && toContact) {
+      const fromPrefix = `${fromContact.groupId}:`
+      const toPrefix = `${toContact.groupId}:`
+      const fromLocalId = wire.from.startsWith(fromPrefix) ? wire.from.slice(fromPrefix.length) : wire.from
+      const toLocalId = wire.to.startsWith(toPrefix) ? wire.to.slice(toPrefix.length) : wire.to
+    
+      structure.wires.set(wireId, {
+        fromId: fromLocalId,
+        toId: toLocalId,
+        properties: { bidirectional: wire.bidirectional }
+      })
+    }
   }
   
   for (const [groupId, group] of runtime.groups) {
@@ -231,10 +276,16 @@ export function exportRuntime(runtime: Runtime): ExportedGroup {
   }
   
   const data: Array<[ContactId, any]> = []
-  for (const [contactId, contact] of runtime.contacts) {
+  for (const [qualifiedContactId, contact] of runtime.contacts) {
+    // Extract local contact ID
+    const groupPrefix = `${contact.groupId}:`
+    const localContactId = qualifiedContactId.startsWith(groupPrefix) 
+      ? qualifiedContactId.slice(groupPrefix.length)
+      : qualifiedContactId
+    
     const value = contact.getValue()
     if (value !== undefined) {
-      data.push([contactId, value])
+      data.push([localContactId, value])
     }
   }
   

@@ -20,15 +20,16 @@ export interface Action<T = any> {
  * Action factory functions - much more concise than classes
  */
 
-export const setValue = (contactId: ContactId, value: any): Action => ({
+export const setValue = (groupId: GroupId, contactId: ContactId, value: any): Action => ({
   type: 'setValue',
-  data: { contactId, value },
+  data: { groupId, contactId, value },
   apply: (rt) => {
-    // Idempotent: if contact doesn't exist, create it first
-    if (!rt.contacts.has(contactId)) {
-      rt.createContact(contactId, undefined, 'merge', {})
+    // Ensure the contact exists
+    const qualifiedId = `${groupId}:${contactId}`
+    if (!rt.contacts.has(qualifiedId)) {
+      rt.createContact(contactId, groupId, 'merge', {})
     }
-    rt.setValue(contactId, value)
+    rt.setValue(groupId, contactId, value)
   }
 })
 
@@ -224,7 +225,7 @@ export const fromArray = (arr: any[]): Action => {
   const [type, ...args] = arr
   
   switch (type) {
-    case 'setValue': return setValue(args[0], args[1])
+    case 'setValue': return setValue(args[0], args[1], args[2])
     case 'createContact': return createContact(args[0], args[1], args[2])
     case 'deleteContact': return deleteContact(args[0])
     case 'createWire': return createWire(args[0], args[1], args[2], args[3]?.bidirectional !== false)

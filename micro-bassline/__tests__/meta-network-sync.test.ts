@@ -34,14 +34,17 @@ describe('Meta-Network Synchronization', () => {
       dynamics1.onValueChange(event => {
         // Convert dynamics events to actions
         if (Array.isArray(event) && event[0] === 'valueChanged') {
-          // Create a mirroring action in network2
           const contactId = event[1]
           const newValue = event[3]
           
-          // Check if this is a child contact
-          if (contactId && !contactId.includes(':')) {
-            actions2.setValue(['createContact', contactId, 'target-group', { blendMode: 'merge' }])
-            actions2.setValue(['setValue', contactId, newValue])
+          // Check if this is a child contact (skip MGP system contacts)
+          if (contactId && !contactId.includes('children:')) {
+            // Extract the local contact name and group from the qualified ID
+            const [sourceGroupId, contactName] = contactId.split(':')
+            // Send actions to the actions contact (it will apply them automatically)
+            actions2.setValue(['createGroup', sourceGroupId, 'target-group', {}])
+            actions2.setValue(['createContact', contactName, sourceGroupId, { blendMode: 'merge' }])  
+            actions2.setValue(['setValue', sourceGroupId, contactName, newValue])
           }
         }
       })
@@ -49,10 +52,10 @@ describe('Meta-Network Synchronization', () => {
       // Test: Create contacts in network1's child group
       network1.createGroup('child1', undefined, {}, 'source-group')
       network1.createContact('test-contact', 'child1', 'merge')
-      network1.setValue('test-contact', 'hello')
+      network1.setValue('child1', 'test-contact', 'hello')
       
       // Verify network2 has the mirrored contact
-      expect(network2.getValue('test-contact')).toBe('hello')
+      expect(network2.getValue('child1', 'test-contact')).toBe('hello')
     })
     
     it('should handle bidirectional sync between networks', async () => {
@@ -89,9 +92,11 @@ describe('Meta-Network Synchronization', () => {
             const contactId = event[1]
             const newValue = event[3]
             
-            if (contactId && !contactId.includes(':')) {
-              actions2.setValue(['createContact', contactId, 'group2', { blendMode: 'merge' }])
-              actions2.setValue(['setValue', contactId, newValue])
+            if (contactId && !contactId.includes('children:')) {
+              const [sourceGroupId, contactName] = contactId.split(':')
+              actions2.setValue(['createGroup', sourceGroupId, 'group2', {}])
+              actions2.setValue(['createContact', contactName, sourceGroupId, { blendMode: 'merge' }])
+              actions2.setValue(['setValue', sourceGroupId, contactName, newValue])
             }
           }
         }
@@ -106,9 +111,11 @@ describe('Meta-Network Synchronization', () => {
             const contactId = event[1]
             const newValue = event[3]
             
-            if (contactId && !contactId.includes(':')) {
-              actions1.setValue(['createContact', contactId, 'group1', { blendMode: 'merge' }])
-              actions1.setValue(['setValue', contactId, newValue])
+            if (contactId && !contactId.includes('children:')) {
+              const [sourceGroupId, contactName] = contactId.split(':')
+              actions1.setValue(['createGroup', sourceGroupId, 'group1', {}])
+              actions1.setValue(['createContact', contactName, sourceGroupId, { blendMode: 'merge' }])
+              actions1.setValue(['setValue', sourceGroupId, contactName, newValue])
             }
           }
         }
@@ -117,16 +124,16 @@ describe('Meta-Network Synchronization', () => {
       // Test: Changes in network1
       network1.createGroup('child1', undefined, {}, 'group1')
       network1.createContact('contact1', 'child1')
-      network1.setValue('contact1', 'from-network1')
+      network1.setValue('child1', 'contact1', 'from-network1')
       
-      expect(network2.getValue('contact1')).toBe('from-network1')
+      expect(network2.getValue('child1', 'contact1')).toBe('from-network1')
       
       // Test: Changes in network2
       network2.createGroup('child2', undefined, {}, 'group2')
       network2.createContact('contact2', 'child2')
-      network2.setValue('contact2', 'from-network2')
+      network2.setValue('child2', 'contact2', 'from-network2')
       
-      expect(network1.getValue('contact2')).toBe('from-network2')
+      expect(network1.getValue('child2', 'contact2')).toBe('from-network2')
     })
   })
   
@@ -147,9 +154,11 @@ describe('Meta-Network Synchronization', () => {
         if (Array.isArray(event) && event[0] === 'valueChanged') {
           const contactId = event[1]
           const value = event[3]
-          if (contactId && !contactId.includes(':')) {
-            actions.setValue(['createContact', contactId, 'target', { blendMode: 'last' }])
-            actions.setValue(['setValue', contactId, value])
+          if (contactId && !contactId.includes('children:')) {
+            const [sourceGroupId, contactName] = contactId.split(':')
+            actions.setValue(['createGroup', sourceGroupId, 'target', {}])
+            actions.setValue(['createContact', contactName, sourceGroupId, { blendMode: 'last' }])
+            actions.setValue(['setValue', sourceGroupId, contactName, value])
           }
         }
       })
@@ -162,11 +171,11 @@ describe('Meta-Network Synchronization', () => {
       const values = []
       for (let i = 0; i < 100; i++) {
         values.push(`value-${i}`)
-        network1.setValue('rapid', `value-${i}`)
+        network1.setValue('child', 'rapid', `value-${i}`)
       }
       
-      // Network2 should have the final value
-      expect(network2.getValue('rapid')).toBe('value-99')
+      // Network2 should have the final value in the mirrored child group
+      expect(network2.getValue('child', 'rapid')).toBe('value-99')
     })
     
     it('should handle network partitions and reconnections', async () => {
@@ -187,9 +196,11 @@ describe('Meta-Network Synchronization', () => {
         if (Array.isArray(event) && event[0] === 'valueChanged') {
           const contactId = event[1]
           const value = event[3]
-          if (contactId && !contactId.includes(':')) {
-            actions.setValue(['createContact', contactId, 'target', { blendMode: 'merge' }])
-            actions.setValue(['setValue', contactId, value])
+          if (contactId && !contactId.includes('children:')) {
+            const [sourceGroupId, contactName] = contactId.split(':')
+            actions.setValue(['createGroup', sourceGroupId, 'target', {}])
+            actions.setValue(['createContact', contactName, sourceGroupId, { blendMode: 'merge' }])
+            actions.setValue(['setValue', sourceGroupId, contactName, value])
           }
         }
       })
@@ -197,23 +208,23 @@ describe('Meta-Network Synchronization', () => {
       // Create and update while connected
       network1.createGroup('child', undefined, {}, 'source')
       network1.createContact('test', 'child')
-      network1.setValue('test', 'initial')
+      network1.setValue('child', 'test', 'initial')
       
-      expect(network2.getValue('test')).toBe('initial')
+      expect(network2.getValue('child', 'test')).toBe('initial')
       
       // Simulate partition
       connected = false
-      network1.setValue('test', 'during-partition')
+      network1.setValue('child', 'test', 'during-partition')
       
       // Network2 shouldn't see the update
-      expect(network2.getValue('test')).toBe('initial')
+      expect(network2.getValue('child', 'test')).toBe('initial')
       
       // Reconnect and sync
       connected = true
-      network1.setValue('test', 'after-reconnect')
+      network1.setValue('child', 'test', 'after-reconnect')
       
       // Should sync again
-      expect(network2.getValue('test')).toBe('after-reconnect')
+      expect(network2.getValue('child', 'test')).toBe('after-reconnect')
     })
     
     it('should handle conflicting updates from multiple sources', async () => {
@@ -240,9 +251,11 @@ describe('Meta-Network Synchronization', () => {
             if (Array.isArray(event) && event[0] === 'valueChanged') {
               const contactId = event[1]
               const value = event[3]
-              if (contactId && !contactId.includes(':')) {
-                actions.setValue(['createContact', contactId, targetName, { blendMode: 'merge' }])
-                actions.setValue(['setValue', contactId, value])
+              if (contactId && !contactId.includes('children:')) {
+                const [sourceGroupId, contactName] = contactId.split(':')
+                actions.setValue(['createGroup', sourceGroupId, targetName, {}])
+                actions.setValue(['createContact', contactName, sourceGroupId, { blendMode: 'merge' }])
+                actions.setValue(['setValue', sourceGroupId, contactName, value])
               }
             }
           })
@@ -264,17 +277,17 @@ describe('Meta-Network Synchronization', () => {
       network3.createContact('shared', 'child3', 'last')
       
       // Set different values rapidly
-      network1.setValue('shared', 'from-net1')
-      network2.setValue('shared', 'from-net2')
-      network3.setValue('shared', 'from-net3')
+      network1.setValue('child1', 'shared', 'from-net1')
+      network2.setValue('child2', 'shared', 'from-net2')
+      network3.setValue('child3', 'shared', 'from-net3')
       
       // All propagation is synchronous with streams
       
       // In a last-write-wins scenario, all should eventually converge
       // (though the exact value depends on timing)
-      const value1 = network1.getValue('shared')
-      const value2 = network2.getValue('shared')
-      const value3 = network3.getValue('shared')
+      const value1 = network1.getValue('child1', 'shared')
+      const value2 = network2.getValue('child2', 'shared')
+      const value3 = network3.getValue('child3', 'shared')
       
       console.log(`Network convergence: net1=${value1}, net2=${value2}, net3=${value3}`)
       
@@ -337,8 +350,11 @@ describe('Meta-Network Synchronization', () => {
         if (Array.isArray(event) && event[0] === 'valueChanged') {
           const contactId = event[1]
           const newValue = event[3]
-          // Forward value changes as setValue actions
-          actions2.setValue(['setValue', contactId, newValue])
+          if (contactId && !contactId.includes('children:')) {
+            const [sourceGroupId, contactName] = contactId.split(':')
+            // Forward value changes as setValue actions
+            actions2.setValue(['setValue', sourceGroupId, contactName, newValue])
+          }
         }
       })
       
@@ -353,18 +369,18 @@ describe('Meta-Network Synchronization', () => {
       network1.createContact('gc', 'grandchild', 'merge', { isBoundary: true })
       
       // Set values after structure is created
-      network1.setValue('c1', 'value1')
-      network1.setValue('c2', 'value2')
-      network1.setValue('gc', 'grandvalue')
+      network1.setValue('child1', 'c1', 'value1')
+      network1.setValue('child2', 'c2', 'value2')
+      network1.setValue('grandchild', 'gc', 'grandvalue')
       
       // Verify structure was mirrored (now includes all descendants)
       expect(network2.groups.has('child1')).toBe(true)
       expect(network2.groups.has('child2')).toBe(true)
       expect(network2.groups.has('grandchild')).toBe(true)
       
-      expect(network2.getValue('c1')).toBe('value1')
-      expect(network2.getValue('c2')).toBe('value2')
-      expect(network2.getValue('gc')).toBe('grandvalue')
+      expect(network2.getValue('child1', 'c1')).toBe('value1')
+      expect(network2.getValue('child2', 'c2')).toBe('value2')
+      expect(network2.getValue('grandchild', 'gc')).toBe('grandvalue')
     })
   })
 })

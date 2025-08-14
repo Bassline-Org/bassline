@@ -12,14 +12,15 @@ describe('Performance Stress Tests', () => {
       const rt = runtime()
       const startTime = Date.now()
       
-      // Create 1000 contacts
+      // Create a group and 1000 contacts
+      rt.createGroup('perf-test')
       for (let i = 0; i < 1000; i++) {
-        rt.createContact(`contact-${i}`)
+        rt.createContact(`contact-${i}`, 'perf-test')
       }
       
       // Wire them in a chain
       for (let i = 0; i < 999; i++) {
-        rt.createWire(`wire-${i}`, `contact-${i}`, `contact-${i + 1}`, false)
+        rt.createWire(`wire-${i}`, `perf-test:contact-${i}`, `perf-test:contact-${i + 1}`, false)
       }
       
       const setupTime = Date.now() - startTime
@@ -27,10 +28,10 @@ describe('Performance Stress Tests', () => {
       
       // Test propagation speed
       const propagateStart = Date.now()
-      rt.setValue('contact-0', 'test-value')
+      rt.setValue('perf-test', 'contact-0', 'test-value')
       
       // Check that value propagated to the end
-      expect(rt.getValue('contact-999')).toBe('test-value')
+      expect(rt.getValue('perf-test', 'contact-999')).toBe('test-value')
       
       const propagateTime = Date.now() - propagateStart
       expect(propagateTime).toBeLessThan(100) // Should propagate in under 100ms
@@ -69,7 +70,7 @@ describe('Performance Stress Tests', () => {
       
       // Now test reading the structure (this will trigger computation)
       const readStart = Date.now()
-      const rootStructure = rt.getValue('group-0:children:structure')
+      const rootStructure = rt.getValue('group-0', 'children:structure')
       const readTime = Date.now() - readStart
       console.log(`Structure computation time: ${readTime}ms`)
       
@@ -81,12 +82,13 @@ describe('Performance Stress Tests', () => {
       const rt = runtime()
       
       // Create a simple network
-      rt.createContact('source', undefined, 'last') // Use 'last' to stream all values
-      rt.createContact('sink')
-      rt.createWire('w1', 'source', 'sink', false)
+      rt.createGroup('perf')
+      rt.createContact('source', 'perf', 'last') // Use 'last' to stream all values
+      rt.createContact('sink', 'perf')
+      rt.createWire('w1', 'perf:source', 'perf:sink', false)
       
       const values: any[] = []
-      const sinkContact = rt.contacts.get('sink')!
+      const sinkContact = rt.contacts.get('perf:sink')!
       sinkContact.onValueChange(v => values.push(v))
       
       const updateCount = 1000
@@ -94,7 +96,7 @@ describe('Performance Stress Tests', () => {
       
       // Rapid fire updates
       for (let i = 0; i < updateCount; i++) {
-        rt.setValue('source', i)
+        rt.setValue('perf', 'source', i)
       }
       
       //await rt.waitForConvergence()
@@ -170,17 +172,18 @@ describe('Performance Stress Tests', () => {
       const rt = runtime()
       
       // Create source that will trigger async operations
-      rt.createContact('source', undefined, 'last')
+      rt.createGroup('async-test')
+      rt.createContact('source', 'async-test', 'last')
       
       // Create contacts with async transforms
       const asyncContacts = 10
       const results: number[] = []
       
       for (let i = 0; i < asyncContacts; i++) {
-        rt.createContact(`async-${i}`)
+        rt.createContact(`async-${i}`, 'async-test')
         
         // Wire source to trigger async operations
-        rt.contacts.get('source')!.stream
+        rt.contacts.get('async-test:source')!.stream
           .transformAsync(async (value: any) => {
             // Simulate async work
             await new Promise(resolve => setTimeout(resolve, Math.random() * 10))
@@ -193,7 +196,7 @@ describe('Performance Stress Tests', () => {
       
       // Trigger many async operations
       for (let i = 0; i < 100; i++) {
-        rt.setValue('source', i)
+        rt.setValue('async-test', 'source', i)
       }
       
       // Wait for all async operations

@@ -12,35 +12,38 @@ describe('StreamRuntime', () => {
     it('should create and manage contacts', () => {
       const rt = runtime()
       
-      rt.createContact('test', undefined, 'merge')
-      rt.setValue('test', 42)
+      rt.createGroup('default')
+      rt.createContact('test', 'default', 'merge')
+      rt.setValue('default', 'test', 42)
       
-      expect(rt.getValue('test')).toBe(42)
+      expect(rt.getValue('default', 'test')).toBe(42)
     })
     
     it('should create and wire contacts', () => {
       const rt = runtime()
       
-      rt.createContact('a', undefined, 'merge')
-      rt.createContact('b', undefined, 'merge')
-      rt.createWire('w1', 'a', 'b', false)
+      rt.createGroup('default')
+      rt.createContact('a', 'default', 'merge')
+      rt.createContact('b', 'default', 'merge')
+      rt.createWire('w1', 'default:a', 'default:b', false)
       
-      rt.setValue('a', 100)
-      expect(rt.getValue('b')).toBe(100)
+      rt.setValue('default', 'a', 100)
+      expect(rt.getValue('default', 'b')).toBe(100)
     })
     
     it('should support bidirectional wiring', () => {
       const rt = runtime()
       
-      rt.createContact('a', undefined, 'merge')
-      rt.createContact('b', undefined, 'merge')
-      rt.createWire('w1', 'a', 'b', true)
+      rt.createGroup('default')
+      rt.createContact('a', 'default', 'merge')
+      rt.createContact('b', 'default', 'merge')
+      rt.createWire('w1', 'default:a', 'default:b', true)
       
-      rt.setValue('a', 1)
-      expect(rt.getValue('b')).toBe(1)
+      rt.setValue('default', 'a', 1)
+      expect(rt.getValue('default', 'b')).toBe(1)
       
-      rt.setValue('b', 2)
-      expect(rt.getValue('a')).toBe(2)
+      rt.setValue('default', 'b', 2)
+      expect(rt.getValue('default', 'a')).toBe(2)
     })
   })
   
@@ -51,7 +54,7 @@ describe('StreamRuntime', () => {
       rt.createGroup('test-group')
       
       // Properties contact should be auto-created
-      expect(rt.getValue('test-group:properties')).toBeDefined()
+      expect(rt.getValue('test-group', 'properties')).toBeDefined()
     })
     
     it('should execute primitive gadgets', () => {
@@ -61,46 +64,49 @@ describe('StreamRuntime', () => {
       rt.createGroup('adder', 'add')
       
       // The primitive setup should have created namespaced contacts
-      rt.setValue('adder:a', 5)
-      rt.setValue('adder:b', 3)
+      rt.setValue('adder', 'a', 5)
+      rt.setValue('adder', 'b', 3)
       
       // Gadget should execute synchronously
-      expect(rt.getValue('adder:sum')).toBe(8)
+      expect(rt.getValue('adder', 'sum')).toBe(8)
     })
   })
   
   describe('Actions', () => {
     it('should apply setValue actions', () => {
       const rt = runtime()
-      rt.createContact('test')
+      rt.createGroup('default')
+      rt.createContact('test', 'default')
       
-      rt.applyAction(['setValue', 'test', 42])
-      expect(rt.getValue('test')).toBe(42)
+      rt.applyAction(['setValue', 'default', 'test', 42])
+      expect(rt.getValue('default', 'test')).toBe(42)
     })
     
     it('should apply createContact actions', () => {
       const rt = runtime()
       
-      rt.applyAction(['createContact', 'new-contact', undefined, {
+      rt.createGroup('default')
+      rt.applyAction(['createContact', 'new-contact', 'default', {
         blendMode: 'last'
       }])
       
-      rt.setValue('new-contact', 'hello')
-      expect(rt.getValue('new-contact')).toBe('hello')
+      rt.setValue('default', 'new-contact', 'hello')
+      expect(rt.getValue('default', 'new-contact')).toBe('hello')
     })
     
     it('should apply createWire actions', () => {
       const rt = runtime()
       
-      rt.createContact('a')
-      rt.createContact('b')
+      rt.createGroup('default')
+      rt.createContact('a', 'default')
+      rt.createContact('b', 'default')
       
-      rt.applyAction(['createWire', 'w1', 'a', 'b', {
+      rt.applyAction(['createWire', 'w1', 'default:a', 'default:b', {
         bidirectional: false
       }])
       
-      rt.setValue('a', 100)
-      expect(rt.getValue('b')).toBe(100)
+      rt.setValue('default', 'a', 100)
+      expect(rt.getValue('default', 'b')).toBe(100)
     })
     
     it('should apply createGroup actions', () => {
@@ -110,7 +116,7 @@ describe('StreamRuntime', () => {
         defaultProperties: { test: true }
       }])
       
-      expect(rt.getValue('new-group:properties')).toEqual({ test: true })
+      expect(rt.getValue('new-group', 'properties')).toEqual({ test: true })
     })
   })
   
@@ -121,13 +127,14 @@ describe('StreamRuntime', () => {
       
       rt.eventStream.subscribe(event => events.push(event))
       
-      rt.createContact('test')
-      rt.setValue('test', 42)
+      rt.createGroup('default')
+      rt.createContact('test', 'default')
+      rt.setValue('default', 'test', 42)
       
-      // Should have a valueChanged event
-      const valueChanged = events.find(e => e[0] === 'valueChanged')
+      // Should have a valueChanged event (skip the properties contact events)
+      const valueChanged = events.find(e => e[0] === 'valueChanged' && e[1] === 'default:test')
       expect(valueChanged).toBeDefined()
-      expect(valueChanged[1]).toBe('test')
+      expect(valueChanged[1]).toBe('default:test')
       expect(valueChanged[3]).toBe(42)
     })
   })
@@ -136,15 +143,15 @@ describe('StreamRuntime', () => {
     it('should load an existing Bassline structure', () => {
       const bassline: Bassline = {
         contacts: new Map([
-          ['c1', { content: 10, properties: { blendMode: 'merge' } }],
-          ['c2', { content: 20, properties: { blendMode: 'last' } }]
+          ['c1', { content: 10, groupId: 'g1', properties: { blendMode: 'merge' } }],
+          ['c2', { content: 20, groupId: 'g1', properties: { blendMode: 'last' } }]
         ]),
         wires: new Map([
-          ['w1', { fromId: 'c1', toId: 'c2' }]
+          ['w1', { fromId: 'g1:c1', toId: 'g1:c2' }]
         ]),
         groups: new Map([
           ['g1', {
-            contactIds: new Set(['c1', 'c2']),
+            contactIds: new Set(['g1:c1', 'g1:c2']),
             boundaryContactIds: new Set(),
             properties: {}
           }]
@@ -153,12 +160,12 @@ describe('StreamRuntime', () => {
       
       const rt = runtime(bassline)
       
-      expect(rt.getValue('c1')).toBe(10)
-      expect(rt.getValue('c2')).toBe(20)
+      expect(rt.getValue('g1', 'c1')).toBe(10)
+      expect(rt.getValue('g1', 'c2')).toBe(20)
       
       // Test that wire works
-      rt.setValue('c1', 30)
-      expect(rt.getValue('c2')).toBe(30)
+      rt.setValue('g1', 'c1', 30)
+      expect(rt.getValue('g1', 'c2')).toBe(30)
     })
   })
   
@@ -171,7 +178,7 @@ describe('StreamRuntime', () => {
       })
       
       // Structure contact should exist
-      const structure = rt.getValue('parent:children:structure')
+      const structure = rt.getValue('parent', 'children:structure')
       expect(structure).toBeDefined()
       expect(structure.groups).toBeDefined()
     })
