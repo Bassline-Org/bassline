@@ -70,7 +70,7 @@ describe('Performance Stress Tests', () => {
       
       // Now test reading the structure (this will trigger computation)
       const readStart = Date.now()
-      const rootStructure = rt.getValue('group-0', 'children:structure')
+      const rootStructure = rt.getValue('group-0', 'structure')
       const readTime = Date.now() - readStart
       console.log(`Structure computation time: ${readTime}ms`)
       

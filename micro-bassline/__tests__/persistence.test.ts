@@ -359,18 +359,18 @@ describe('Persistence with Structure/Data Separation', () => {
       
       
       // The MGP contacts themselves should be in the structure (using local IDs)
-      expect(exported.structure.contacts.has('children:structure')).toBe(true)
-      expect(exported.structure.contacts.has('children:dynamics')).toBe(true)
-      expect(exported.structure.contacts.has('children:actions')).toBe(true)
+      expect(exported.structure.contacts.has('structure')).toBe(true)
+      expect(exported.structure.contacts.has('dynamics')).toBe(true)
+      expect(exported.structure.contacts.has('actions')).toBe(true)
       
       // Import and verify MGP functionality
       const rt2 = runtime()
       importGroup(rt2, exported)
       
       // MGP contacts should be recreated
-      expect(rt2.contacts.has('mgp-group:children:structure')).toBe(true)
-      expect(rt2.contacts.has('mgp-group:children:dynamics')).toBe(true)
-      expect(rt2.contacts.has('mgp-group:children:actions')).toBe(true)
+      expect(rt2.contacts.has('mgp-group:structure')).toBe(true)
+      expect(rt2.contacts.has('mgp-group:dynamics')).toBe(true)
+      expect(rt2.contacts.has('mgp-group:actions')).toBe(true)
       
       // Child data should be preserved
       expect(rt2.getValue('child', 'child-data')).toBe('test')

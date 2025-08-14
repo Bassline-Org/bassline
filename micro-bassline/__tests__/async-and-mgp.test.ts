@@ -105,7 +105,7 @@ describe('Complete MGP Support', () => {
       })
       
       // Get initial structure
-      const initialStructure = rt.getValue('parent', 'children:structure')
+      const initialStructure = rt.getValue('parent', 'structure')
       expect(initialStructure).toBeDefined()
       expect(initialStructure.groups.size).toBe(0)
       
@@ -113,7 +113,7 @@ describe('Complete MGP Support', () => {
       rt.createGroup('child1', undefined, {}, 'parent')
       
       // Structure should update
-      const updatedStructure = rt.getValue('parent', 'children:structure')
+      const updatedStructure = rt.getValue('parent', 'structure')
       expect(updatedStructure.groups.size).toBe(1)
       expect(updatedStructure.groups.has('child1')).toBe(true)
     })
@@ -143,7 +143,7 @@ describe('Complete MGP Support', () => {
       }])
       
       // Structure should only include boundary contact
-      const structure = rt.getValue('parent', 'children:structure')
+      const structure = rt.getValue('parent', 'structure')
       expect(structure.contacts.has('child:boundary')).toBe(true)
       expect(structure.contacts.has('child:internal')).toBe(false)
       expect(structure.contacts.has('child:properties')).toBe(true) // properties is always boundary
@@ -172,7 +172,7 @@ describe('Complete MGP Support', () => {
       }])
       
       // Structure should include all contacts
-      const structure = rt.getValue('parent', 'children:structure')
+      const structure = rt.getValue('parent', 'structure')
       expect(structure.contacts.has('child:boundary')).toBe(true)
       expect(structure.contacts.has('child:internal')).toBe(true)
       expect(structure.contacts.has('child:properties')).toBe(true)
@@ -190,7 +190,7 @@ describe('Complete MGP Support', () => {
       })
       
       // Monitor dynamics contact
-      const dynamicsContact = rt.contacts.get('parent:children:dynamics')
+      const dynamicsContact = rt.contacts.get('parent:dynamics')
       expect(dynamicsContact).toBeDefined()
       
       dynamicsContact!.onValueChange(value => {
@@ -218,7 +218,7 @@ describe('Complete MGP Support', () => {
         'expose-dynamics': true
       })
       
-      const dynamicsContact = rt.contacts.get('parent:children:dynamics')!
+      const dynamicsContact = rt.contacts.get('parent:dynamics')!
       dynamicsContact.onValueChange(value => events.push(value))
       
       // Create a sibling group (not a child)
@@ -242,7 +242,7 @@ describe('Complete MGP Support', () => {
       })
       
       // Send an action to create a child
-      rt.setValue('parent', 'children:actions', ['createGroup', 'dynamic-child', 'parent', {}])
+      rt.setValue('parent', 'actions', ['createGroup', 'dynamic-child', 'parent', {}])
       
       // Child should now exist
       const child = rt.groups.get('dynamic-child')
@@ -260,7 +260,7 @@ describe('Complete MGP Support', () => {
       })
       
       // Actions contact should not exist
-      expect(rt.getValue('parent', 'children:actions')).toBeUndefined()
+      expect(rt.contacts.get('parent:actions')).toBeUndefined()
     })
   })
 })

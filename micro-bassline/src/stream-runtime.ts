@@ -52,6 +52,10 @@ export function runtime(
   const dirtyStructures = new Set<GroupId>()
   const structureCache = new Map<GroupId, any>()
   
+  // Track MGP states and cleanup functions
+  const mgpStates = new Map<GroupId, Set<string>>() // groupId -> Set of enabled MGP types
+  const mgpCleanups = new Map<string, () => void>() // `${groupId}:${type}` -> cleanup function
+  
   const createGroup = (groupId: GroupId | undefined, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group => {
     // Generate UUID if no groupId provided
     const actualGroupId = groupId || generateUUID()
@@ -94,19 +98,63 @@ export function runtime(
       gadget(config)(g)
     }
     
-    // Create MGP contacts if opted in
+    // Track initial MGP states
+    const initialStates = new Set<string>()
+    
+    // Create initial MGP contacts if opted in
     if (properties?.['expose-structure']) {
       createMGPContact(actualGroupId, 'structure', 'last')
+      initialStates.add('structure')
     }
     if (properties?.['expose-dynamics']) {
-      createMGPContact(actualGroupId, 'dynamics', 'last')
+      const cleanup = createMGPContact(actualGroupId, 'dynamics', 'last')
+      if (cleanup) mgpCleanups.set(`${actualGroupId}:dynamics`, cleanup)
+      initialStates.add('dynamics')
     }
     if (properties?.['allow-meta-mutation'] && !properties?.['distributed-mode']) {
-      const mgpContact = createMGPContact(actualGroupId, 'actions', 'last')
-      mgpContact.onValueChange(value => {
-        if (Array.isArray(value)) applyAction(value)
-      })
+      const cleanup = createMGPContact(actualGroupId, 'actions', 'last')
+      if (cleanup) mgpCleanups.set(`${actualGroupId}:actions`, cleanup)
+      initialStates.add('actions')
     }
+    
+    mgpStates.set(actualGroupId, initialStates)
+    
+    // Monitor properties for dynamic MGP contact management
+    propertiesContact.onValueChange((newProps: any) => {
+      const currentStates = mgpStates.get(actualGroupId) || new Set()
+      
+      // Handle structure contact
+      if (newProps['expose-structure'] && !currentStates.has('structure')) {
+        createMGPContact(actualGroupId, 'structure', 'last')
+        currentStates.add('structure')
+      } else if (!newProps['expose-structure'] && currentStates.has('structure')) {
+        deleteContactAndWires(`${actualGroupId}:structure`)
+        currentStates.delete('structure')
+      }
+      
+      // Handle dynamics contact
+      if (newProps['expose-dynamics'] && !currentStates.has('dynamics')) {
+        const cleanup = createMGPContact(actualGroupId, 'dynamics', 'last')
+        if (cleanup) mgpCleanups.set(`${actualGroupId}:dynamics`, cleanup)
+        currentStates.add('dynamics')
+      } else if (!newProps['expose-dynamics'] && currentStates.has('dynamics')) {
+        deleteContactAndWires(`${actualGroupId}:dynamics`)
+        currentStates.delete('dynamics')
+      }
+      
+      // Handle actions contact (also check distributed-mode)
+      const shouldHaveActions = newProps['allow-meta-mutation'] && !newProps['distributed-mode']
+      if (shouldHaveActions && !currentStates.has('actions')) {
+        const cleanup = createMGPContact(actualGroupId, 'actions', 'last')
+        if (cleanup) mgpCleanups.set(`${actualGroupId}:actions`, cleanup)
+        currentStates.add('actions')
+      } else if (!shouldHaveActions && currentStates.has('actions')) {
+        deleteContactAndWires(`${actualGroupId}:actions`)
+        currentStates.delete('actions')
+      }
+      
+      mgpStates.set(actualGroupId, currentStates)
+    })
     
     // Update parent's structure contact if this is a child group
     if (parentId) {
@@ -192,17 +240,20 @@ export function runtime(
     return contacts.get(qualifiedId)?.getValue()
   }
   
-  const createMGPContact = (groupId: GroupId, type: string, blendMode: BlendMode): Contact => {
+  const createMGPContact = (groupId: GroupId, type: string, blendMode: BlendMode): (() => void) | undefined => {
     const c = createContact(
-      `children:${type}`,
+      type,  // Just 'structure', 'dynamics', or 'actions'
       groupId,
       blendMode,
       {
         isSystemContact: true,
         isMGPContact: true,
-        isDangerous: type === 'actions'
+        isDangerous: type === 'actions',
+        isBoundary: true  // MGP contacts are boundary contacts
       }
     )
+    
+    let cleanup: (() => void) | undefined
     
     // Initialize structure contact with lazy computation
     if (type === 'structure') {
@@ -253,7 +304,7 @@ export function runtime(
       }
       
       // Subscribe to event stream and forward descendant events
-      eventStream.subscribe(event => {
+      cleanup = eventStream.subscribe(event => {
         // Forward events from descendant groups
         if (event[0] === 'valueChanged') {
           const contactId = event[1]
@@ -268,7 +319,52 @@ export function runtime(
       })
     }
     
-    return c
+    // Setup actions handling
+    if (type === 'actions') {
+      cleanup = c.onValueChange(value => {
+        if (Array.isArray(value)) applyAction(value)
+      })
+    }
+    
+    return cleanup
+  }
+  
+  const deleteContactAndWires = (qualifiedId: ContactId): void => {
+    // Find and delete all wires connected to this contact
+    const wiresToDelete: WireId[] = []
+    for (const [wireId, wire] of wires) {
+      if (wire.from === qualifiedId || wire.to === qualifiedId) {
+        wiresToDelete.push(wireId)
+      }
+    }
+    
+    for (const wireId of wiresToDelete) {
+      wires.delete(wireId)
+    }
+    
+    // Clean up any event subscriptions
+    const cleanupKey = qualifiedId  // Already in format: ${groupId}:${type}
+    const cleanup = mgpCleanups.get(cleanupKey)
+    if (cleanup) {
+      cleanup()
+      mgpCleanups.delete(cleanupKey)
+    }
+    
+    // Delete the contact from runtime
+    contacts.delete(qualifiedId)
+    
+    // Delete from group's contact list
+    const [groupId] = qualifiedId.split(':')
+    const group = groups.get(groupId)
+    if (group) {
+      group.contacts.delete(qualifiedId)
+    }
+    
+    // Clear structure cache if this was a structure contact
+    if (qualifiedId.endsWith(':structure')) {
+      structureCache.delete(groupId)
+      dirtyStructures.delete(groupId)
+    }
   }
   
   const applyAction = (action: any): void => {
@@ -414,7 +510,7 @@ export function runtime(
     structureCache.delete(groupId)
     
     // Check if anyone is listening to the structure contact
-    const structureContactId = `${groupId}:children:structure`
+    const structureContactId = `${groupId}:structure`
     const structureContact = contacts.get(structureContactId)
     if (structureContact) {
       // Always compute and notify for now to fix the test

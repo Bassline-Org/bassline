@@ -27,8 +27,8 @@ describe('Meta-Network Synchronization', () => {
       })
       
       // Bridge: Connect dynamics from network1 to actions in network2
-      const dynamics1 = network1.contacts.get('source-group:children:dynamics')!
-      const actions2 = network2.contacts.get('target-group:children:actions')!
+      const dynamics1 = network1.contacts.get('source-group:dynamics')!
+      const actions2 = network2.contacts.get('target-group:actions')!
       
       // Forward events from network1 to network2 as actions
       dynamics1.onValueChange(event => {
@@ -74,10 +74,10 @@ describe('Meta-Network Synchronization', () => {
       })
       
       // Set up bidirectional bridge
-      const dynamics1 = network1.contacts.get('group1:children:dynamics')!
-      const actions1 = network1.contacts.get('group1:children:actions')!
-      const dynamics2 = network2.contacts.get('group2:children:dynamics')!
-      const actions2 = network2.contacts.get('group2:children:actions')!
+      const dynamics1 = network1.contacts.get('group1:dynamics')!
+      const actions1 = network1.contacts.get('group1:actions')!
+      const dynamics2 = network2.contacts.get('group2:dynamics')!
+      const actions2 = network2.contacts.get('group2:actions')!
       
       // Track what we've already synced to prevent loops
       const synced1to2 = new Set<string>()
@@ -146,8 +146,8 @@ describe('Meta-Network Synchronization', () => {
       network1.createGroup('source', undefined, { 'expose-dynamics': true })
       network2.createGroup('target', undefined, { 'allow-meta-mutation': true })
       
-      const dynamics = network1.contacts.get('source:children:dynamics')!
-      const actions = network2.contacts.get('target:children:actions')!
+      const dynamics = network1.contacts.get('source:dynamics')!
+      const actions = network2.contacts.get('target:actions')!
       
       // Simple forwarding
       dynamics.onValueChange(event => {
@@ -185,8 +185,8 @@ describe('Meta-Network Synchronization', () => {
       network1.createGroup('source', undefined, { 'expose-dynamics': true })
       network2.createGroup('target', undefined, { 'allow-meta-mutation': true })
       
-      const dynamics = network1.contacts.get('source:children:dynamics')!
-      const actions = network2.contacts.get('target:children:actions')!
+      const dynamics = network1.contacts.get('source:dynamics')!
+      const actions = network2.contacts.get('target:actions')!
       
       // Simulate connection that can be broken
       let connected = true
@@ -243,8 +243,8 @@ describe('Meta-Network Synchronization', () => {
       
       // Helper to connect two networks
       const connectNetworks = (source: any, sourceName: string, target: any, targetName: string) => {
-        const dynamics = source.contacts.get(`${sourceName}:children:dynamics`)
-        const actions = target.contacts.get(`${targetName}:children:actions`)
+        const dynamics = source.contacts.get(`${sourceName}:dynamics`)
+        const actions = target.contacts.get(`${targetName}:actions`)
         
         if (dynamics && actions) {
           dynamics.onValueChange((event: any) => {
@@ -313,9 +313,9 @@ describe('Meta-Network Synchronization', () => {
         'allow-meta-mutation': true
       })
       
-      const structure1 = network1.contacts.get('root:children:structure')!
-      const dynamics1 = network1.contacts.get('root:children:dynamics')!
-      const actions2 = network2.contacts.get('mirror:children:actions')!
+      const structure1 = network1.contacts.get('root:structure')!
+      const dynamics1 = network1.contacts.get('root:dynamics')!
+      const actions2 = network2.contacts.get('mirror:actions')!
       
       // Sync structure changes
       structure1.onValueChange(structure => {

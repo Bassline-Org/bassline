@@ -178,7 +178,7 @@ describe('StreamRuntime', () => {
       })
       
       // Structure contact should exist
-      const structure = rt.getValue('parent', 'children:structure')
+      const structure = rt.getValue('parent', 'structure')
       expect(structure).toBeDefined()
       expect(structure.groups).toBeDefined()
     })
@@ -189,9 +189,85 @@ describe('StreamRuntime', () => {
       rt.createGroup('parent')
       
       // MGP contacts should not exist
-      expect(rt.getValue('parent:children:structure')).toBeUndefined()
-      expect(rt.getValue('parent:children:dynamics')).toBeUndefined()
-      expect(rt.getValue('parent:children:actions')).toBeUndefined()
+      expect(rt.contacts.get('parent:structure')).toBeUndefined()
+      expect(rt.contacts.get('parent:dynamics')).toBeUndefined()
+      expect(rt.contacts.get('parent:actions')).toBeUndefined()
+    })
+    
+    it('should dynamically create MGP contacts when properties change', () => {
+      const rt = runtime()
+      
+      // Create group without MGP contacts
+      rt.createGroup('parent')
+      expect(rt.contacts.get('parent:structure')).toBeUndefined()
+      
+      // Enable structure via properties
+      rt.setValue('parent', 'properties', { 'expose-structure': true })
+      
+      // Structure contact should now exist
+      expect(rt.contacts.get('parent:structure')).toBeDefined()
+      const structure = rt.getValue('parent', 'structure')
+      expect(structure).toBeDefined()
+    })
+    
+    it('should delete MGP contacts and wires when properties are disabled', () => {
+      const rt = runtime()
+      
+      // Create group with MGP contacts
+      rt.createGroup('parent', undefined, {
+        'expose-structure': true,
+        'expose-dynamics': true,
+        'allow-meta-mutation': true
+      })
+      
+      // Verify they exist
+      expect(rt.contacts.get('parent:structure')).toBeDefined()
+      expect(rt.contacts.get('parent:dynamics')).toBeDefined()
+      expect(rt.contacts.get('parent:actions')).toBeDefined()
+      
+      // Create a wire to the structure contact
+      rt.createGroup('consumer')
+      rt.createContact('input', 'consumer')
+      rt.createWire('wire1', 'parent:structure', 'consumer:input', false)
+      expect(rt.wires.has('wire1')).toBe(true)
+      
+      // Disable structure via properties
+      rt.setValue('parent', 'properties', {
+        'expose-structure': false,
+        'expose-dynamics': true,
+        'allow-meta-mutation': true
+      })
+      
+      // Structure contact and its wire should be deleted
+      expect(rt.contacts.get('parent:structure')).toBeUndefined()
+      expect(rt.wires.has('wire1')).toBe(false)
+      
+      // Other contacts should still exist
+      expect(rt.contacts.get('parent:dynamics')).toBeDefined()
+      expect(rt.contacts.get('parent:actions')).toBeDefined()
+    })
+    
+    it('should handle re-enabling MGP contacts', () => {
+      const rt = runtime()
+      
+      // Create with structure enabled
+      rt.createGroup('parent', undefined, {
+        'expose-structure': true
+      })
+      
+      const firstContact = rt.contacts.get('parent:structure')
+      expect(firstContact).toBeDefined()
+      
+      // Disable and re-enable
+      rt.setValue('parent', 'properties', { 'expose-structure': false })
+      expect(rt.contacts.get('parent:structure')).toBeUndefined()
+      
+      rt.setValue('parent', 'properties', { 'expose-structure': true })
+      const secondContact = rt.contacts.get('parent:structure')
+      expect(secondContact).toBeDefined()
+      
+      // Should be a new contact instance
+      expect(secondContact).not.toBe(firstContact)
     })
   })
 })
