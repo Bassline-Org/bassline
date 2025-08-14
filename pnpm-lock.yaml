@@ -20,12 +20,6 @@ importers:
       '@bassline/bassline':
         specifier: workspace:*
         version: link:../../packages/bassline
-      '@bassline/browser-drivers':
-        specifier: workspace:*
-        version: link:../../packages/browser-drivers
-      '@bassline/cli-drivers':
-        specifier: workspace:*
-        version: link:../../packages/cli-drivers
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -121,15 +115,9 @@ importers:
       '@bassline/bassline':
         specifier: workspace:*
         version: link:../../packages/bassline
-      '@bassline/browser-drivers':
-        specifier: workspace:*
-        version: link:../../packages/browser-drivers
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@bassline/remote-drivers':
-        specifier: workspace:*
-        version: link:../../packages/remote-drivers
       '@bassline/storage-memory':
         specifier: workspace:*
         version: link:../../packages/storage-memory
@@ -205,6 +193,9 @@ importers:
       lucide-react:
         specifier: ^0.535.0
         version: 0.535.0(react@19.1.1)
+      micro-bassline:
+        specifier: workspace:*
+        version: link:../../micro-bassline
       react:
         specifier: ^19.1.0
         version: 19.1.1
@@ -273,6 +264,21 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(jsdom@26.1.0)
 
+  micro-bassline:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.9
+      tsx:
+        specifier: ^4.0.0
+        version: 4.20.3
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.2
+      vitest:
+        specifier: ^1.0.0
+        version: 1.6.1(@types/node@20.19.9)
+
   packages/bassline:
     dependencies:
       '@bassline/core':
@@ -291,44 +297,6 @@ importers:
       vitest:
         specifier: ^1.2.1
         version: 1.6.1(@types/node@20.19.9)
-
-  packages/browser-drivers:
-    dependencies:
-      '@bassline/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      tsup:
-        specifier: ^8.0.0
-        version: 8.5.0(tsx@4.20.3)(typescript@5.9.2)
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.2
-
-  packages/cli-drivers:
-    dependencies:
-      '@bassline/core':
-        specifier: workspace:*
-        version: link:../core
-      express:
-        specifier: ^4.18.0
-        version: 4.21.2
-      ws:
-        specifier: ^8.0.0
-        version: 8.18.3
-    devDependencies:
-      '@types/node':
-        specifier: ^20.0.0
-        version: 20.19.9
-      '@types/ws':
-        specifier: ^8.0.0
-        version: 8.18.1
-      tsup:
-        specifier: ^8.0.0
-        version: 8.5.0(tsx@4.20.3)(typescript@5.9.2)
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.2
 
   packages/core:
     devDependencies:
@@ -462,19 +430,6 @@ importers:
       vitest:
         specifier: ^1.0.4
         version: 1.6.1(@types/node@20.19.9)
-
-  packages/remote-drivers:
-    dependencies:
-      '@bassline/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      tsup:
-        specifier: ^8.0.0
-        version: 8.5.0(tsx@4.20.3)(typescript@5.9.2)
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.2
 
   packages/storage-filesystem:
     dependencies:

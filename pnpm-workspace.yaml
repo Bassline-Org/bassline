@@ -2,3 +2,4 @@ packages:
   - 'packages/*'
   - 'apps/*'
   - 'packages/primitive-gadgets/*'
+  - 'micro-bassline'

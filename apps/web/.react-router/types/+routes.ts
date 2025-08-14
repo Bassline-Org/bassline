@@ -48,6 +48,9 @@ type Pages = {
   "/api/editor/actions": {
     params: {};
   };
+  "/test-worker-simple": {
+    params: {};
+  };
   "/bassline-browser": {
     params: {};
   };
@@ -58,6 +61,9 @@ type Pages = {
     params: {};
   };
   "/editor-layout": {
+    params: {};
+  };
+  "/simple-editor": {
     params: {};
   };
   "/editor-main": {
@@ -92,7 +98,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/bassline-browser" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/editor-main" | "/test-sounds" | "/worker-test" | "/editor-v2" | "/api/demo" | "/ws-test" | "/editor" | "/demo" | "/home";
+    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/simple-editor" | "/editor-main" | "/test-sounds" | "/worker-test" | "/editor-v2" | "/api/demo" | "/ws-test" | "/editor" | "/demo" | "/home";
   };
   "routes/flow.session.$sessionId.group.$groupId.tsx": {
     id: "routes/flow.session.$sessionId.group.$groupId";
@@ -130,6 +136,10 @@ type RouteFiles = {
     id: "routes/api.editor.actions";
     page: "/api/editor/actions";
   };
+  "routes/test-worker-simple.tsx": {
+    id: "routes/test-worker-simple";
+    page: "/test-worker-simple";
+  };
   "routes/bassline-browser.tsx": {
     id: "routes/bassline-browser";
     page: "/bassline-browser";
@@ -145,6 +155,10 @@ type RouteFiles = {
   "routes/editor-layout.tsx": {
     id: "routes/editor-layout";
     page: "/editor-layout";
+  };
+  "routes/simple-editor.tsx": {
+    id: "routes/simple-editor";
+    page: "/simple-editor";
   };
   "routes/editor-main.tsx": {
     id: "routes/editor-main";
