@@ -60,12 +60,12 @@ describe('StreamRuntime', () => {
       // Create an add gadget group - this should auto-create contacts
       rt.createGroup('adder', 'add')
       
-      // The primitive setup should have created a, b, and sum contacts
-      rt.setValue('a', 5)
-      rt.setValue('b', 3)
+      // The primitive setup should have created namespaced contacts
+      rt.setValue('adder:a', 5)
+      rt.setValue('adder:b', 3)
       
       // Gadget should execute synchronously
-      expect(rt.getValue('sum')).toBe(8)
+      expect(rt.getValue('adder:sum')).toBe(8)
     })
   })
   

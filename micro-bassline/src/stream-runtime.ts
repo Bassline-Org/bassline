@@ -28,7 +28,9 @@ export interface Runtime {
   createContact(contactId: ContactId, groupId?: GroupId, blendMode?: BlendMode, properties?: Properties): Contact
   createWire(wireId: WireId, fromId: ContactId, toId: ContactId, bidirectional?: boolean): void
   setValue(contactId: ContactId, value: any): void
+  setValue(groupId: GroupId, contactId: ContactId, value: any): void
   getValue(contactId: ContactId): any
+  getValue(groupId: GroupId, contactId: ContactId): any
   applyAction(action: any): void
   getBassline(): Bassline
   updateStructureContact(groupId: GroupId): void
@@ -52,25 +54,25 @@ export function runtime(
   const structureCache = new Map<GroupId, any>()
   
   const createGroup = (groupId: GroupId, primitiveType?: string, properties?: Properties, parentId?: GroupId): Group => {
-    const g = group(groupId, parentId, properties)
+    // Store primitive type in properties if provided
+    const extendedProperties = primitiveType ? { ...properties, primitiveType } : properties
+    const g = group(groupId, parentId, extendedProperties)
     groups.set(groupId, g)
     
     // Connect group events
     g.eventStream.pipe(eventStream)
     
     // Create properties contact
-    const propertiesContact = contact(
-      `${groupId}:properties`,
-      'merge',
+    const propertiesContact = createContact(
+      'properties',
       groupId,
+      'merge',
       {
         isSystemContact: true,
         readOnlyFromInside: true,
         isBoundary: true  // Properties is always a boundary contact
       }
     )
-    contacts.set(propertiesContact.id, propertiesContact)
-    g.contacts.set(propertiesContact.id, propertiesContact)
     propertiesContact.setValue(properties?.defaultProperties || {})
     
     // Setup primitive if specified
@@ -79,16 +81,12 @@ export function runtime(
       
       // Create boundary contacts for inputs
       for (const inputName of config.inputs) {
-        const c = contact(inputName, 'merge', groupId, { isBoundary: true })
-        contacts.set(inputName, c)
-        g.contacts.set(inputName, c)
+        createContact(inputName, groupId, 'merge', { isBoundary: true })
       }
       
       // Create boundary contacts for outputs
       for (const outputName of config.outputs) {
-        const c = contact(outputName, 'merge', groupId, { isBoundary: true })
-        contacts.set(outputName, c)
-        g.contacts.set(outputName, c)
+        createContact(outputName, groupId, 'merge', { isBoundary: true })
       }
       
       // Apply gadget behavior
@@ -123,13 +121,15 @@ export function runtime(
     blendMode: BlendMode = 'merge',
     properties?: Properties
   ): Contact => {
-    const c = contact(contactId, blendMode, groupId, properties || {})
-    contacts.set(contactId, c)
+    // All contacts must be namespaced to their group
+    const qualifiedId = groupId ? `${groupId}:${contactId}` : contactId
+    const c = contact(qualifiedId, blendMode, groupId, properties || {})
+    contacts.set(qualifiedId, c)
     
     if (groupId) {
       const g = groups.get(groupId)
       if (g) {
-        g.contacts.set(contactId, c)
+        g.contacts.set(qualifiedId, c)
         // Update parent's structure contact when adding a contact
         if (g.parentId) {
           updateStructureContact(g.parentId)
@@ -138,7 +138,7 @@ export function runtime(
     }
     
     c.onValueChange(value => {
-      eventStream.write(['valueChanged', contactId, c.getValue(), value])
+      eventStream.write(['valueChanged', qualifiedId, c.getValue(), value])
     })
     
     return c
@@ -174,19 +174,44 @@ export function runtime(
     }
   }
   
-  const setValue = (contactId: ContactId, value: any): void => {
-    const c = contacts.get(contactId)
-    if (!c) throw new Error(`Contact ${contactId} not found`)
-    c.setValue(value)
+  function setValue(contactId: ContactId, value: any): void
+  function setValue(groupId: GroupId, contactId: ContactId, value: any): void
+  function setValue(contactIdOrGroupId: ContactId, contactIdOrValue: any, value?: any): void {
+    if (value !== undefined) {
+      // Three-parameter form: setValue(groupId, contactId, value)
+      const groupId = contactIdOrGroupId as GroupId
+      const contactId = contactIdOrValue as ContactId
+      const qualifiedId = `${groupId}:${contactId}`
+      const c = contacts.get(qualifiedId)
+      if (!c) throw new Error(`Contact ${qualifiedId} not found`)
+      c.setValue(value)
+    } else {
+      // Two-parameter form: setValue(contactId, value)
+      const contactId = contactIdOrGroupId as ContactId
+      const c = contacts.get(contactId)
+      if (!c) throw new Error(`Contact ${contactId} not found`)
+      c.setValue(contactIdOrValue)
+    }
   }
   
-  const getValue = (contactId: ContactId): any => {
-    return contacts.get(contactId)?.getValue()
+  function getValue(contactId: ContactId): any
+  function getValue(groupId: GroupId, contactId: ContactId): any
+  function getValue(contactIdOrGroupId: ContactId, contactId?: ContactId): any {
+    if (contactId !== undefined) {
+      // Two-parameter form: getValue(groupId, contactId)
+      const groupId = contactIdOrGroupId as GroupId
+      const qualifiedId = `${groupId}:${contactId}`
+      return contacts.get(qualifiedId)?.getValue()
+    } else {
+      // One-parameter form: getValue(contactId)
+      const contactId = contactIdOrGroupId as ContactId
+      return contacts.get(contactId)?.getValue()
+    }
   }
   
   const createMGPContact = (groupId: GroupId, type: string, blendMode: BlendMode): Contact => {
     const c = createContact(
-      `${groupId}:children:${type}`,
+      `children:${type}`,
       groupId,
       blendMode,
       {

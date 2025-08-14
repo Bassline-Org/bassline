@@ -158,9 +158,9 @@ describe('contact', () => {
       const contact1 = g.createContact('c1', 'merge')
       const contact2 = g.createContact('c2', 'last', true)  // boundary
       
-      expect(g.getContact('c1')).toBe(contact1)
-      expect(g.getContact('c2')).toBe(contact2)
-      expect(g.getBoundaryContacts().has('c2')).toBe(true)
+      expect(g.getContact('test-group:c1')).toBe(contact1)
+      expect(g.getContact('test-group:c2')).toBe(contact2)
+      expect(g.getBoundaryContacts().has('test-group:c2')).toBe(true)
     })
     
     it('should emit events to group stream', () => {
@@ -174,7 +174,7 @@ describe('contact', () => {
       
       expect(handler).toHaveBeenCalledWith({
         type: 'valueChanged',
-        contactId: 'test',
+        contactId: 'test-group:test',
         value: 42
       })
     })

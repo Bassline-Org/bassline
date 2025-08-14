@@ -127,14 +127,16 @@ export function group(id: string, parentId?: string, properties?: Record<string,
   ): Contact => {
     // Add isBoundary to the contact's properties
     const props = { ...contactProperties, isBoundary }
-    const c = contact(contactId, blendMode, id, props)
-    contacts.set(contactId, c)
+    // All contacts are namespaced to their group
+    const qualifiedId = `${id}:${contactId}`
+    const c = contact(qualifiedId, blendMode, id, props)
+    contacts.set(qualifiedId, c)
     
     // Connect to group event stream
     c.stream.pipe(value => {
       eventStream.write({
         type: 'valueChanged',
-        contactId,
+        contactId: qualifiedId,
         value
       })
     })
@@ -196,7 +198,9 @@ export function gadget(config: GadgetConfig): (g: Group) => void {
       // Execute and write to outputs
       const outputs = config.execute(inputs)
       for (const outputName of config.outputs) {
-        const c = g.getContact(outputName)
+        // All contacts are namespaced to their group
+        const qualifiedId = `${g.id}:${outputName}`
+        const c = g.getContact(qualifiedId)
         if (c && outputs[outputName] !== undefined) {
           c.setValue(outputs[outputName])
         }
@@ -205,7 +209,10 @@ export function gadget(config: GadgetConfig): (g: Group) => void {
     
     // Subscribe to each input
     for (const inputName of config.inputs) {
-      const c = g.getContact(inputName)
+      // All contacts are namespaced to their group
+      const qualifiedId = `${g.id}:${inputName}`
+      const c = g.getContact(qualifiedId)
+      
       if (c) {
         // Initialize with current value if any
         const currentValue = c.getValue()

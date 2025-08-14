@@ -124,8 +124,7 @@ describe('Performance Stress Tests', () => {
       
       // Chain them together
       for (let i = 0; i < gadgetCount - 1; i++) {
-        rt.createWire(`chain-${i}`, `sum`, `a`, false)
-        // Need to properly wire between gadget outputs and inputs
+        rt.createWire(`chain-${i}`, `adder-${i}:sum`, `adder-${i + 1}:a`, false)
       }
       
       const setupTime = Date.now() - startTime
