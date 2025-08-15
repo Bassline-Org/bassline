@@ -273,7 +273,7 @@ export function runtime(
           structureCache.set(groupId, structure)
           dirtyStructures.delete(groupId)
           
-          // Store in contact without triggering notifications
+          // Update the contact's internal value directly to avoid triggering streams
           ;(c as any).currentValue = structure
         }
         
@@ -505,6 +505,7 @@ export function runtime(
   }
   
   const markStructureDirty = (groupId: GroupId) => {
+    console.log(`[Runtime] Marking structure dirty for group: ${groupId}`)
     // Mark this group's structure as dirty
     dirtyStructures.add(groupId)
     structureCache.delete(groupId)
@@ -512,6 +513,7 @@ export function runtime(
     // Check if anyone is listening to the structure contact
     const structureContactId = `${groupId}:structure`
     const structureContact = contacts.get(structureContactId)
+    console.log(`[Runtime] Structure contact exists for ${groupId}:`, !!structureContact)
     if (structureContact) {
       // Always compute and notify for now to fix the test
       // TODO: Optimize this to only compute when there are subscribers

@@ -13,7 +13,17 @@ const nodeTypes = {
 }
 
 export default function SimpleEditor() {
-  const { structure, dynamics, isReady, sendAction, ping } = useNetworkBridge()
+  const { 
+    structure, 
+    dynamics, 
+    isReady, 
+    sendAction, 
+    ping,
+    activeProjectId,
+    projects,
+    createProject,
+    switchProject 
+  } = useNetworkBridge()
   const [nodeId, setNodeId] = useState(1)
   
   // Convert structure to React Flow nodes
@@ -53,8 +63,8 @@ export default function SimpleEditor() {
     const contactName = `contact-${nodeId}`
     setNodeId(nodeId + 1)
     
-    // Send create action to network
-    sendAction(['createContact', contactName, 'app', { blendMode: 'merge' }])
+    // Send create action to network (worker will route to active project)
+    sendAction(['createContact', contactName, undefined, { blendMode: 'merge' }])
   }
   
   // Handle creating a wire between contacts
@@ -75,6 +85,10 @@ export default function SimpleEditor() {
     <div className="h-screen flex flex-col">
       {/* Toolbar */}
       <div className="bg-gray-100 border-b p-4 flex gap-4 items-center">
+        <div className="text-sm font-medium">
+          Project: <span className="font-bold">{activeProjectId}</span>
+        </div>
+        
         <button
           onClick={handleAddContact}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"

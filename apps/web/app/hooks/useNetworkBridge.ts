@@ -24,15 +24,18 @@ let sharedWorkerRefCount = 0
 
 export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
   const { 
-    currentGroupId = 'root',
+    currentGroupId = 'project-default',  // Default to project, not root
     autoSave = true,
     autoSaveInterval = 5000
   } = options
   
   const [structure, setStructure] = useState<NetworkStructure | null>(null)
+  const [contactValues, setContactValues] = useState<Map<string, any>>(new Map())
+  const [activeProjectId, setActiveProjectId] = useState<string>('project-default')
+  const [currentViewGroupId, setCurrentViewGroupId] = useState<string>('project-default')
   const [isReady, setIsReady] = useState(false)
   const [dynamics, setDynamics] = useState<any[]>([])
-  const [navigationPath, setNavigationPath] = useState<string[]>(['root'])
+  const [navigationPath, setNavigationPath] = useState<string[]>(['project-default'])
   const workerRef = useRef<Worker | null>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -79,11 +82,18 @@ export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
           break
           
         case 'structure':
-          console.log('[NetworkBridge] Structure update')
-          setStructure(value)
+          console.log('[NetworkBridge] Structure update:', value)
+          // Convert arrays back to Maps with proper typing
+          const reconstructed: NetworkStructure | null = value ? {
+            contacts: new Map<string, any>(value.contacts || []),
+            groups: new Map<string, any>(value.groups || []),
+            wires: new Map<string, any>(value.wires || [])
+          } : null
+          console.log('[NetworkBridge] Reconstructed structure:', reconstructed)
+          setStructure(reconstructed)
           
           // Auto-save to localStorage
-          if (autoSave) {
+          if (autoSave && value) {
             localStorage.setItem('bassline-network-state', JSON.stringify(value))
           }
           break
@@ -91,6 +101,21 @@ export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
         case 'dynamics':
           console.log('[NetworkBridge] Dynamics event:', event)
           setDynamics(prev => [...prev, event])
+          
+          // Extract values from valueChanged events
+          if (Array.isArray(event) && event[0] === 'valueChanged') {
+            const [, contactId, oldValue, newValue] = event
+            setContactValues(prev => {
+              const updated = new Map(prev)
+              updated.set(contactId, newValue)
+              return updated
+            })
+          }
+          break
+          
+        case 'activeProjectChanged':
+          console.log('[NetworkBridge] Active project changed:', e.data.projectId)
+          setActiveProjectId(e.data.projectId)
           break
           
         case 'pong':
@@ -140,65 +165,47 @@ export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
     }
   }, [autoSave])
   
-  // Send action to network - scoped to current group by default
+  // Send action to network - actions are handled by worker which routes to active project
   const sendAction = useCallback((action: any) => {
     if (!workerRef.current) {
       console.warn('[NetworkBridge] Worker not initialized')
       return
     }
     
-    // If action is for a contact/wire and doesn't have a full path, scope to current group
-    if (Array.isArray(action)) {
-      const [actionType, ...args] = action
-      
-      // Auto-scope contact/wire operations to current group
-      if (actionType === 'createContact' || actionType === 'setValue') {
-        const [contactId, ...rest] = args
-        // If contactId doesn't contain ':', add current group prefix
-        if (!contactId.includes(':')) {
-          action = [actionType, `${currentGroupId}:${contactId}`, ...rest]
-        }
-      } else if (actionType === 'createWire') {
-        const [wireId, fromId, toId, ...rest] = args
-        // Auto-prefix contact IDs if needed
-        const scopedFromId = fromId.includes(':') ? fromId : `${currentGroupId}:${fromId}`
-        const scopedToId = toId.includes(':') ? toId : `${currentGroupId}:${toId}`
-        action = [actionType, wireId, scopedFromId, scopedToId, ...rest]
-      } else if (actionType === 'createGroup' && args.length >= 1) {
-        const [groupId, ...rest] = args
-        // Default parent to current group if not specified
-        if (rest.length === 0 || rest[0] === undefined) {
-          action = [actionType, groupId, undefined, {}, currentGroupId]
-        }
-      }
-    }
-    
+    // Worker will handle routing to the active project
     console.log('[NetworkBridge] Sending action:', action)
     workerRef.current.postMessage({
       type: 'action',
       action: action
     })
-  }, [currentGroupId])
+  }, [])
   
   // Navigation functions
   const enterGroup = useCallback((groupId: string) => {
+    setCurrentViewGroupId(groupId)
     setNavigationPath(prev => [...prev, groupId])
   }, [])
   
   const exitGroup = useCallback(() => {
-    setNavigationPath(prev => prev.length > 1 ? prev.slice(0, -1) : prev)
+    setNavigationPath(prev => {
+      const newPath = prev.length > 1 ? prev.slice(0, -1) : prev
+      setCurrentViewGroupId(newPath[newPath.length - 1])
+      return newPath
+    })
   }, [])
   
   const navigateToGroup = useCallback((path: string[]) => {
-    setNavigationPath(path.length > 0 ? path : ['root'])
-  }, [])
+    const newPath = path.length > 0 ? path : [activeProjectId]
+    setNavigationPath(newPath)
+    setCurrentViewGroupId(newPath[newPath.length - 1])
+  }, [activeProjectId])
   
   // Get current group from navigation path
   const currentGroup = useMemo(() => {
-    return navigationPath[navigationPath.length - 1] || 'root'
-  }, [navigationPath])
+    return navigationPath[navigationPath.length - 1] || activeProjectId
+  }, [navigationPath, activeProjectId])
   
-  // Filter structure to show only current group's contents
+  // Filter structure to show only active project's contents
   const filteredStructure = useMemo(() => {
     if (!structure) return null
     
@@ -208,31 +215,36 @@ export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
       wires: new Map()
     }
     
-    // Filter contacts that belong to current group
+    // Filter contacts that belong to active project
     structure.contacts.forEach((contact, id) => {
-      if (id.startsWith(`${currentGroupId}:`)) {
-        filtered.contacts.set(id, contact)
+      if (id.startsWith(`${activeProjectId}:`)) {
+        // Merge structure with values from dynamics
+        const enrichedContact = {
+          ...contact,
+          content: contactValues.get(id)
+        }
+        filtered.contacts.set(id, enrichedContact)
       }
     })
     
-    // Filter subgroups of current group
+    // Filter subgroups of active project
     structure.groups.forEach((group, id) => {
-      if (group.parentId === currentGroupId) {
+      if (group.parentId === activeProjectId) {
         filtered.groups.set(id, group)
       }
     })
     
-    // Filter wires that connect contacts in current group
+    // Filter wires that connect contacts in active project
     structure.wires.forEach((wire, id) => {
       const fromGroup = wire.fromId.split(':')[0]
       const toGroup = wire.toId.split(':')[0]
-      if (fromGroup === currentGroupId || toGroup === currentGroupId) {
+      if (fromGroup === activeProjectId || toGroup === activeProjectId) {
         filtered.wires.set(id, wire)
       }
     })
     
     return filtered
-  }, [structure, currentGroupId])
+  }, [structure, activeProjectId, contactValues])
   
   // Create a project (subgroup of root)
   const createProject = useCallback((name: string) => {
@@ -282,10 +294,22 @@ export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
     setNavigationPath(['root'])
   }, [])
   
+  // Switch active project
+  const switchProject = useCallback((projectId: string) => {
+    if (!workerRef.current) return
+    workerRef.current.postMessage({
+      type: 'setActiveProject',
+      projectId
+    })
+    setActiveProjectId(projectId)
+    setNavigationPath([projectId])
+  }, [])
+  
   return {
     // Core data
     structure: filteredStructure,
     fullStructure: structure,
+    contactValues,
     dynamics,
     isReady,
     
@@ -296,7 +320,8 @@ export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
     
     // Navigation
     currentGroup,
-    currentGroupId,
+    currentGroupId: activeProjectId,
+    activeProjectId,
     navigationPath,
     enterGroup,
     exitGroup,
@@ -305,6 +330,7 @@ export function useNetworkBridge(options: NetworkBridgeOptions = {}) {
     // Projects
     projects,
     createProject,
-    deleteProject
+    deleteProject,
+    switchProject
   }
 }
