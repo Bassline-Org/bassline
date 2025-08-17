@@ -3,3 +3,4 @@ packages:
   - 'apps/*'
   - 'packages/primitive-gadgets/*'
   - 'micro-bassline'
+  - 'femto-bassline'

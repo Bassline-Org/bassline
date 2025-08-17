@@ -1,7 +1,3 @@
-Got it — here’s the **final markdown document** with the **aspect system** fully integrated. I’ve emphasized how aspects enable opt-in extensibility, how they compose safely, and how they tie directly into your meta-propagation vision.
-
----
-
 # Propagation System Architecture
 
 This document outlines the core concepts of the system, including **gadgets, boards, binders, wires, slots, aspects, and weavers**. It also explains the **data ownership model** and how the **aspect system** enables safe, opt-in extensions without breaking the recursion or purity of propagation.
