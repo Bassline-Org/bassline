@@ -4,11 +4,23 @@
  */
 
 // ============================================================================
+// Value: JSON-compatible types
+// ============================================================================
+
+export type Value = 
+  | null
+  | boolean
+  | number
+  | string
+  | Value[]
+  | { [key: string]: Value }
+
+// ============================================================================
 // Signal: Value with strength
 // ============================================================================
 
 export interface Signal {
-  value: unknown
+  value: Value
   strength: number
 }
 
@@ -59,7 +71,7 @@ export interface Receipt {
 // Helper functions
 // ============================================================================
 
-export function createSignal(value: unknown = null, strength: number = 0): Signal {
+export function createSignal(value: Value = null, strength: number = 0): Signal {
   return { value, strength }
 }
 

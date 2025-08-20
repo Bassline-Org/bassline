@@ -32,6 +32,25 @@ export function propagate(contact: Contact, signal: Signal): void {
     // Gather all input signals
     const inputs = gatherInputs(gadget)
     
+    // For primitive gadgets, only compute if all inputs have values
+    if (gadget.primitive) {
+      let allInputsReady = true
+      for (const [name, inputSignal] of inputs) {
+        // Skip output contacts
+        if (name === 'output' || name.includes('output')) continue
+        
+        // Check if input has a real value (not null and has strength)
+        if (inputSignal.value === null || inputSignal.strength === 0) {
+          allInputsReady = false
+          break
+        }
+      }
+      
+      if (!allInputsReady) {
+        return // Don't compute yet, wait for all inputs
+      }
+    }
+    
     // Compute outputs
     const outputs = gadget.compute(inputs)
     
@@ -61,11 +80,8 @@ function gatherInputs(gadget: Gadget): Map<string, Signal> {
   const inputs = new Map<string, Signal>()
   
   for (const [name, contact] of gadget.contacts) {
-    // Only gather contacts that have sources (are inputs)
-    // or explicitly marked as inputs by convention
-    if (contact.sources.size > 0 || name.includes('input') || name === 'a' || name === 'b') {
-      inputs.set(name, contact.signal)
-    }
+    // For primitive gadgets, gather the signal's value not the signal itself
+    inputs.set(name, contact.signal)
   }
   
   return inputs

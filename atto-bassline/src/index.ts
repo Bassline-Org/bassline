@@ -8,7 +8,8 @@ export type {
   Signal,
   Contact,
   Gadget,
-  Receipt
+  Receipt,
+  Value
 } from './types'
 
 export {

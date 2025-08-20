@@ -104,8 +104,10 @@ export function createPrimitiveGadget(
     for (const [name, signal] of inputs) {
       if (inputNames.includes(name)) {
         values.set(name, signal.value)
-        minStrength = Math.min(minStrength, signal.strength)
-        hasInputs = true
+        if (signal.strength > 0) {  // Only count inputs with actual strength
+          minStrength = Math.min(minStrength, signal.strength)
+          hasInputs = true
+        }
       }
     }
     
