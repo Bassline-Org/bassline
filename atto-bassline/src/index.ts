@@ -78,3 +78,22 @@ export {
   getTotalAmplification,
   clearReceipts
 } from './receipts'
+
+// Dynamic gadgets and spawners
+export {
+  createDynamicGadget,
+  interpretTemplate,
+  type DynamicGadgetSpec,
+  type BehaviorSpec,
+  type ComputeSpec,
+  type TemplateSignal,
+  type InstanceSignal
+} from './dynamic'
+
+export {
+  createSpawner,
+  createConditionalSpawner,
+  createEvolver,
+  createIterator,
+  createGarbageCollector
+} from './spawner'

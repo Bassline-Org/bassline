@@ -4,7 +4,7 @@
   "description": "Ultra-minimal strength-based propagation network",
   "main": "index.ts",
   "scripts": {
-    "test": "tsx test.ts"
+    "test": "npx vitest run"
   },
   "devDependencies": {
     "tsx": "^3.12.0",
