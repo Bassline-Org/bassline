@@ -1,0 +1,13 @@
+{
+  "name": "atto-bassline",
+  "version": "1.0.0",
+  "description": "Ultra-minimal strength-based propagation network",
+  "main": "index.ts",
+  "scripts": {
+    "test": "tsx test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^3.12.0",
+    "typescript": "^5.0.0"
+  }
+}
