@@ -1,8 +1,11 @@
 # Atto-Bassline System Specification
 
+Version: 2.0.0  
+Status: Complete with Boot System
+
 ## Overview
 
-Atto-Bassline is an ultra-minimal strength-based signal propagation network. It models computation as signals flowing through a network of gadgets, where each signal carries both a value and a strength representing confidence or refinement level.
+Atto-Bassline is an ultra-minimal strength-based signal propagation network with strict conservation and halting guarantees. It models computation as signals flowing through a network of gadgets, where each signal carries both a value and a strength representing confidence or refinement level.
 
 ## Core Concepts
 
@@ -83,25 +86,36 @@ Wires are dumb connections between contacts. They simply forward signals without
 
 ## Propagation Rules
 
-### Argmax with Hysteresis
+### Strict Argmax (>)
 
-When multiple signals arrive at a contact, the strongest one wins:
+Signals propagate ONLY on strictly increasing strength to guarantee halting:
 
 ```typescript
-const HYSTERESIS_UNITS = 100  // 0.01 in decimal
-
-if (newSignal.strength > currentSignal.strength + HYSTERESIS_UNITS) {
+// Strict > semantics (no hysteresis)
+if (newSignal.strength > currentSignal.strength) {
   currentSignal = newSignal
+} else if (newSignal.strength === currentSignal.strength) {
+  if (newSignal.value !== currentSignal.value) {
+    // Equal strength, different values = contradiction
+    currentSignal = {
+      value: { tag: 'contradiction', value: 'Conflict detected' },
+      strength: newSignal.strength
+    }
+  }
+  // Equal strength, same value = no propagation
 }
 ```
 
-The hysteresis margin (100 units = 0.01) prevents oscillation when signals have nearly equal strength.
+**Key Properties:**
+- Halting guaranteed (finite strength space)
+- Contradiction detection for equal-strength conflicts
+- No oscillation possible
 
-**Important:** When testing gadgets that need multiple inputs, ensure each signal has increasing strength to overcome hysteresis:
+**Important:** When testing gadgets that need multiple inputs, ensure each signal has strictly increasing strength:
 ```typescript
 propagate(input1, signal(value1, 1.0))    // 10000 units
-propagate(input2, signal(value2, 1.02))   // 10200 units (overcomes hysteresis)
-propagate(input3, signal(value3, 1.04))   // 10400 units
+propagate(input2, signal(value2, 1.1))    // 11000 units (must be strictly greater)
+propagate(input3, signal(value3, 1.2))    // 12000 units
 ```
 
 ### Computation Timing
@@ -249,6 +263,56 @@ interface Receipt {
 }
 ```
 
+## Boot System
+
+### Boot Scripts
+
+Networks initialize via auditable boot scripts that establish authority and initial gain:
+
+```json
+{
+  "version": "1.0",
+  "bootstrap": {
+    "userControl": {
+      "id": "user-socket",
+      "initialGain": 100000,
+      "authority": "root"
+    },
+    "primitives": {
+      "source": "builtin",
+      "allowed": ["add", "multiply", "transistor", "spawner"],
+      "denied": ["dangerous-op"]
+    },
+    "initialGadgets": [
+      {
+        "id": "main-minter",
+        "type": "gainMinter",
+        "gain": 10000,
+        "authority": "mint"
+      }
+    ]
+  },
+  "policy": {
+    "gainConservation": "strict",
+    "propagationSemantics": "argmax-strict"
+  }
+}
+```
+
+### Bootstrap vs Runtime
+
+**Bootstrap Phase (one-time):**
+- Creates user control socket with initial gain
+- Establishes minting authorities
+- Loads primitives and policies
+- Generates receipts for audit
+
+**Runtime Phase (normal operation):**
+- Strict gain conservation
+- Only authorized gadgets can mint
+- All operations generate receipts
+- No gain creation without authority
+
 ## Gain Allocation Model
 
 ### Local Gain Pools
@@ -264,10 +328,11 @@ interface Gadget {
 
 ### Gain Principles
 
-1. **Monotonic Growth**: Gain can only be added, never removed
-2. **Local Consumption**: Each gadget manages its own gain pool
-3. **Gated Minting**: Gain creation requires validation signal
-4. **No Automatic Propagation**: Adding gain doesn't trigger recomputation unless the gadget was gain-limited
+1. **Conservation**: Gain is conserved during runtime (no creation from thin air)
+2. **Authority**: Only bootstrap or authorized minters can create gain
+3. **Local Consumption**: Each gadget manages its own gain pool
+4. **Auditable**: All gain operations generate receipts
+5. **No Automatic Propagation**: Adding gain doesn't trigger recomputation unless the gadget was gain-limited
 
 ### Propagation on Gain Change
 
