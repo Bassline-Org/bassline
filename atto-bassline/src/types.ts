@@ -21,7 +21,7 @@ export type Value =
 
 export interface Signal {
   value: Value
-  strength: number
+  strength: number  // Integer strength in units (10000 = 1.0)
 }
 
 // ============================================================================
@@ -53,6 +53,9 @@ export interface Gadget {
   
   // Mark primitive gadgets that destroy information
   primitive?: boolean
+  
+  // Local gain pool for amplification (in strength units)
+  gainPool: number
 }
 
 // ============================================================================
@@ -72,7 +75,18 @@ export interface Receipt {
 // ============================================================================
 
 export function createSignal(value: Value = null, strength: number = 0): Signal {
+  // strength is already in integer units
   return { value, strength }
+}
+
+/**
+ * Create a signal with decimal strength (convenience function)
+ * @param value The signal value
+ * @param strength Decimal strength (0.0 to 1.0+), will be converted to units
+ */
+export function signal(value: Value = null, strength: number = 0): Signal {
+  const units = Math.round(strength * 10000)  // Convert to integer units
+  return { value, strength: units }
 }
 
 export function createContact(
@@ -97,7 +111,8 @@ export function createGadget(id: string, parent?: Gadget): Gadget {
   const gadget: Gadget = {
     id,
     contacts: new Map(),
-    gadgets: new Map()
+    gadgets: new Map(),
+    gainPool: 0  // Start with no gain
   }
   
   if (parent) {

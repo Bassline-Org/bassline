@@ -14,11 +14,29 @@ export type {
 
 export {
   createSignal,
+  signal,  // Convenience function with decimal strength
   createContact,
   createGadget,
   wire,
   unwire
 } from './types'
+
+// Strength utilities
+export {
+  STRENGTH_BASE,
+  MAX_STRENGTH,
+  KILL_SIGNAL,
+  HYSTERESIS_UNITS,
+  toUnits,
+  fromUnits,
+  formatStrength,
+  adjustStrength,
+  STRENGTH_ZERO,
+  STRENGTH_QUARTER,
+  STRENGTH_HALF,
+  STRENGTH_FULL,
+  STRENGTH_DOUBLE
+} from './strength'
 
 // Propagation engine
 export {
@@ -32,7 +50,7 @@ export {
 // Special gadgets
 export {
   createTransistor,
-  createModulator,
+  createGainMinter,
   createPrimitiveGadget
 } from './gadgets'
 

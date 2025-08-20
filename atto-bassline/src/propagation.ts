@@ -3,12 +3,13 @@
  */
 
 import { Signal, Contact, Gadget } from './types'
+import { HYSTERESIS_UNITS, overcomesHysteresis } from './strength'
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
-export const HYSTERESIS = 0.01  // Prevent oscillation for near-equal strengths
+export const HYSTERESIS = HYSTERESIS_UNITS  // In strength units (100 = 0.01)
 
 // ============================================================================
 // Core propagation
@@ -19,7 +20,7 @@ export const HYSTERESIS = 0.01  // Prevent oscillation for near-equal strengths
  */
 export function propagate(contact: Contact, signal: Signal): void {
   // Argmax with hysteresis: only update if new signal is stronger
-  if (signal.strength <= contact.signal.strength + HYSTERESIS) {
+  if (!overcomesHysteresis(signal.strength, contact.signal.strength)) {
     return  // No change, signal not strong enough
   }
   
@@ -36,8 +37,11 @@ export function propagate(contact: Contact, signal: Signal): void {
     if (gadget.primitive) {
       let allInputsReady = true
       for (const [name, inputSignal] of inputs) {
+        // Get the actual contact to check direction
+        const inputContact = gadget.contacts.get(name)
+        
         // Skip output contacts
-        if (name === 'output' || name.includes('output')) continue
+        if (inputContact?.direction === 'output') continue
         
         // Check if input has a real value (not null and has strength)
         if (inputSignal.value === null || inputSignal.strength === 0) {
@@ -54,12 +58,20 @@ export function propagate(contact: Contact, signal: Signal): void {
     // Compute outputs
     const outputs = gadget.compute(inputs)
     
-    // Propagate outputs
+    // Propagate outputs (force update for computed outputs)
     for (const [name, outputSignal] of outputs) {
       const outputContact = gadget.contacts.get(name)
       if (outputContact) {
-        // Recursively propagate from this output
-        propagate(outputContact, outputSignal)
+        // For computed outputs, always update (no hysteresis check)
+        outputContact.signal = outputSignal
+        
+        // Forward to targets
+        for (const targetRef of outputContact.targets) {
+          const target = targetRef.deref()
+          if (target) {
+            propagate(target, outputSignal)
+          }
+        }
       }
     }
   }

@@ -12,10 +12,17 @@ Every piece of information is a signal with two components:
 
 ```typescript
 interface Signal {
-  value: Value      // The actual data
-  strength: number  // Confidence/refinement level (0.0 to 1.0+)
+  value: Value      // The actual data (JSON-compatible)
+  strength: number  // Integer strength in units (10000 = 1.0)
 }
 ```
+
+**Integer Strength System:**
+- Uses integers to avoid floating point errors
+- 1 STRENGTH = 10000 units (like Ethereum's wei)
+- 10000 units = 1.0 (100%)
+- 100 units = 0.01 (1%) 
+- 1 unit = 0.0001 (0.01%)
 
 **Strength represents:**
 - Confidence in the value
@@ -23,7 +30,21 @@ interface Signal {
 - Trust in the source
 - Priority in conflict resolution
 
-### 2. Gadgets
+### 2. Values
+
+Values are JSON-compatible types with support for tagged values:
+
+```typescript
+type Value = 
+  | null
+  | boolean
+  | number
+  | string
+  | Value[]                    // Arrays
+  | { [key: string]: Value }   // Objects (including tagged values)
+```
+
+### 3. Gadgets
 
 Gadgets are the fundamental processing units:
 
@@ -33,12 +54,14 @@ interface Gadget {
   contacts: Map<string, Contact>  // Connection points
   gadgets: Map<string, Gadget>    // Sub-gadgets
   compute?: Function               // Optional computation
+  primitive?: boolean              // Marks primitive gadgets
+  parent?: WeakRef<Gadget>        // Optional parent reference
 }
 ```
 
-**Gadgets are always active** - they respond immediately when signals arrive at their contacts.
+**Gadgets are always active** - they respond when ALL required inputs have values.
 
-### 3. Contacts
+### 4. Contacts
 
 Contacts are connection points on gadgets:
 
@@ -49,10 +72,12 @@ interface Contact {
   gadget: WeakRef<Gadget>         // Owning gadget
   sources: Set<WeakRef<Contact>>  // Input connections
   targets: Set<WeakRef<Contact>>  // Output connections
+  direction: 'input' | 'output'
+  boundary: boolean
 }
 ```
 
-### 4. Wires
+### 5. Wires
 
 Wires are dumb connections between contacts. They simply forward signals without modification. All signal manipulation happens in gadgets.
 
@@ -62,48 +87,68 @@ Wires are dumb connections between contacts. They simply forward signals without
 
 When multiple signals arrive at a contact, the strongest one wins:
 
-```
-if (newSignal.strength > currentSignal.strength + HYSTERESIS) {
+```typescript
+const HYSTERESIS_UNITS = 100  // 0.01 in decimal
+
+if (newSignal.strength > currentSignal.strength + HYSTERESIS_UNITS) {
   currentSignal = newSignal
 }
 ```
 
-The hysteresis margin (δ = 0.01) prevents oscillation when signals have nearly equal strength.
+The hysteresis margin (100 units = 0.01) prevents oscillation when signals have nearly equal strength.
+
+**Important:** When testing gadgets that need multiple inputs, ensure each signal has increasing strength to overcome hysteresis:
+```typescript
+propagate(input1, signal(value1, 1.0))    // 10000 units
+propagate(input2, signal(value2, 1.02))   // 10200 units (overcomes hysteresis)
+propagate(input3, signal(value3, 1.04))   // 10400 units
+```
+
+### Computation Timing
+
+**Critical Rule:** Primitive gadgets only compute when ALL inputs have non-null values with non-zero strength.
+
+```typescript
+// For primitive gadgets, check all inputs are ready:
+for (const [name, signal] of inputs) {
+  if (signal.value === null || signal.strength === 0) {
+    return // Don't compute yet
+  }
+}
+```
+
+This prevents partial computations and ensures gadgets see complete input sets.
 
 ### Information Loss Principle
 
 Primitive gadgets that destroy information (like addition) output the **minimum** strength of their inputs:
 
-```
-add(a: 0.9, b: 0.4) → output: 0.4
+```typescript
+add(a: 9000 units, b: 4000 units) → output: 4000 units
 ```
 
 This ensures confidence naturally decreases through computation chains.
 
 ## Type System
 
-### Value Types
-
-Values are JSON-compatible:
-
-```typescript
-type Value = 
-  | null
-  | boolean
-  | number
-  | string
-  | Value[]                    // Arrays
-  | { [key: string]: Value }   // Objects
-```
-
 ### Tagged Values
 
 Complex types use tagged values:
 
 ```typescript
-{tag: "interval", value: {min: 3, max: 7}}
+interface Tagged<T = any> {
+  tag: string
+  value: T
+}
+```
+
+Common tagged types:
+```typescript
+{tag: "interval", value: [3, 7]}  // Intervals as pairs
 {tag: "complex", value: {real: 3, imag: 4}}
 {tag: "contradiction", value: {reason: "...", sources: [...]}}
+{tag: "some", value: 42}  // Option type
+{tag: "none", value: null}
 ```
 
 ### Contradictions
@@ -123,33 +168,72 @@ Type errors produce contradiction values that flow through the network:
 
 Contradictions have strength like any signal - strong contradictions overpower weak valid signals.
 
+### Serialization
+
+The system provides human-readable serialization:
+
+```typescript
+stringify(value: Value): string
+parse(str: string): Value
+```
+
+**Stringify examples:**
+- Numbers/strings/booleans: `"42"`, `"hello"`, `"true"`
+- Arrays: `"[1, 2, 3]"`
+- Objects: `"{a: 1, b: 2}"`
+- Contradictions: `"<contradiction: Type error>"`
+- Options: `"Some(42)"`, `"None"`
+- Tagged values: `"<interval: [3, 7]>"`
+
 ## Special Gadgets
 
 ### 1. Transistor
 
-Attenuates signal strength by a control factor:
+Linearly adjusts signal strength by a control value:
 
 ```
-Input (strength: 0.8) × Control (0.5) → Output (strength: 0.4)
+# Attenuation (control < 0, always allowed)
+Input (strength: 8000) + Control (-3000) → Output (strength: 5000)
+
+# Pass-through (control = 0)
+Input (strength: 5000) + Control (0) → Output (strength: 5000)
+
+# Amplification (control > 0, requires gain)
+Input (strength: 4000) + Control (+3000) → Output (strength: 7000)
+  Consumes: 3000 units from gain pool
+
+# Kill signal (control = KILL_SIGNAL)
+Input (strength: 9000) + Control (KILL) → Output (strength: 0)
 ```
+
+**Control semantics:**
+- `KILL_SIGNAL`: Instant mute to 0
+- Negative: Reduce strength (free, reduces entropy)
+- Zero: Pass through unchanged
+- Positive: Boost strength (requires gain from pool)
 
 Used for:
 - Trust-based attenuation
-- Signal decay over distance
+- Signal amplification when validated
+- Gradual path drowning (competitive amplification)
 - Priority adjustment
 
-### 2. Modulator
+### 2. GainMinter
 
-Boosts signal strength (requires receipts for audit):
+Mints gain to target gadgets when validated:
 
+```typescript
+Inputs:
+  amount: 2.0         // How much gain to mint
+  validator: true     // Must be true to mint
+  target: "gadget-id" // Target gadget ID
+
+Outputs:
+  success: true/false
+  receipt: Receipt object
 ```
-Input (strength: 0.3) + Boost (0.4) → Output (strength: 0.7)
-```
 
-Used for:
-- Amplifying trusted sources
-- Injecting external evidence
-- Overriding weak signals
+**Important:** Minting gain does NOT trigger propagation unless the target was previously limited by insufficient gain.
 
 ### 3. Receipts
 
@@ -165,24 +249,66 @@ interface Receipt {
 }
 ```
 
+## Gain Allocation Model
+
+### Local Gain Pools
+
+Each gadget has a local `gainPool` that represents its capacity to amplify signals:
+
+```typescript
+interface Gadget {
+  gainPool: number  // Available gain for amplification
+  // ... other fields
+}
+```
+
+### Gain Principles
+
+1. **Monotonic Growth**: Gain can only be added, never removed
+2. **Local Consumption**: Each gadget manages its own gain pool
+3. **Gated Minting**: Gain creation requires validation signal
+4. **No Automatic Propagation**: Adding gain doesn't trigger recomputation unless the gadget was gain-limited
+
+### Propagation on Gain Change
+
+A transistor only recomputes when gain is added IF:
+1. It has current input and control signals
+2. The control value is > 1.0 (requesting amplification)
+3. The previous computation was limited by insufficient gain
+
+This prevents unnecessary propagation cascades when gain is pre-allocated for future use.
+
+### Linear Adjustment Model
+
+The system uses additive strength adjustment:
+- **Transistors** = Linear adjusters (add/subtract strength)
+- **Negative control** = Attenuation (always allowed, reduces entropy)
+- **Positive control** = Amplification (requires gain allocation)
+- **Competition** = Highest strength wins (argmax)
+- **Kill signal** = Emergency mute to 0
+
+**Key principle**: Reducing signal strength is free (entropy reduction), but boosting requires earned/allocated gain.
+
 ## Operations Reference
 
 ### Type Predicates
 
-| Gadget | Description | Inputs | Output |
-|--------|-------------|--------|---------|
-| `numberP` | Check if value is number | value | boolean |
-| `stringP` | Check if value is string | value | boolean |
-| `booleanP` | Check if value is boolean | value | boolean |
-| `nullP` | Check if value is null | value | boolean |
-| `arrayP` | Check if value is array | value | boolean |
-| `objectP` | Check if value is object | value | boolean |
-| `tagP` | Check for specific tag | value | boolean |
-| `contradictionP` | Check if contradiction | value | boolean |
-| `emptyP` | Check if list is empty | value | boolean |
-| `pairP` | Check if 2-element array | value | boolean |
+| Gadget | Description | Inputs | Output | Notes |
+|--------|-------------|--------|---------|-------|
+| `numberP` | Check if value is number | value | boolean | |
+| `stringP` | Check if value is string | value | boolean | |
+| `booleanP` | Check if value is boolean | value | boolean | |
+| `nullP` | Check if value is null | value | boolean | |
+| `arrayP` | Check if value is array | value | boolean | |
+| `objectP` | Check if value is object | value | boolean | Not array or null |
+| `tagP` | Check for specific tag | value | boolean | |
+| `contradictionP` | Check if contradiction | value | boolean | |
+| `emptyP` | Check if list is empty | value | boolean | |
+| `pairP` | Check if 2-element array | value | boolean | |
 
 ### Safe Arithmetic
+
+All safe operations output contradictions on type errors and use MIN strength:
 
 | Gadget | Description | Inputs | Output |
 |--------|-------------|--------|---------|
@@ -193,18 +319,18 @@ interface Receipt {
 
 ### List Operations
 
-| Gadget | Description | Inputs | Output |
-|--------|-------------|--------|---------|
-| `car` | First element | list | element |
-| `cdr` | Rest of list | list | list |
-| `cons` | Prepend element | head, tail | list |
-| `length` | List length | list | number |
-| `pair` | Create 2-element list | first, second | [first, second] |
-| `append` | Concatenate lists | a, b | combined list |
-| `reverse` | Reverse list | list | reversed list |
-| `nth` | Get nth element | list, n | element |
-| `take` | Take first n | n, list | list |
-| `drop` | Drop first n | n, list | list |
+| Gadget | Description | Inputs | Output | Notes |
+|--------|-------------|--------|---------|-------|
+| `car` | First element | list | element | Error if empty |
+| `cdr` | Rest of list | list | list | Error if empty |
+| `cons` | Prepend element | head, tail | list | |
+| `length` | List length | list | number | |
+| `pair` | Create 2-element list | first, second | [first, second] | |
+| `append` | Concatenate lists | a, b | combined list | |
+| `reverse` | Reverse list | list | reversed list | |
+| `nth` | Get nth element | list, n | element | 0-indexed |
+| `take` | Take first n | n, list | list | |
+| `drop` | Drop first n | n, list | list | |
 
 ### String Operations
 
@@ -230,10 +356,79 @@ Intervals are represented as pairs `[min, max]`:
 | `intervalAdd` | Add intervals | a, b | [min_sum, max_sum] |
 | `intervalMultiply` | Multiply intervals | a, b | [min_prod, max_prod] |
 
+### Gain System Examples
+
+#### Gradual Path Drowning
+```typescript
+// Two competing paths
+pathA → transistorA → merger
+pathB → transistorB → merger
+
+// Allocate gain to pathB
+transistorB.gainPool = 10000  // 1.0 worth of gain
+
+// Boost B and/or attenuate A
+transistorB.control = +3000  // Boost B
+transistorA.control = -2000  // Reduce A (free)
+// B's signal stronger, wins via argmax
+```
+
+#### Earned Amplification
+```typescript
+// Performance-based gain allocation
+performance → threshold → validator
+validator → gainMinter.validator
+constant(0.5) → gainMinter.amount
+
+// Transistor earns gain when performance exceeds threshold
+// Can then amplify future signals
+```
+
+## Lessons Learned
+
+### 1. Propagation Timing is Critical
+
+**Problem:** Primitive gadgets were computing with partial inputs, leading to contradictions.
+
+**Solution:** Only compute when ALL inputs have values with non-zero strength. This ensures gadgets see complete input sets.
+
+### 2. Hysteresis Requires Careful Testing
+
+**Problem:** Tests showed predicates "always returning true" because subsequent signals couldn't overcome hysteresis.
+
+**Solution:** Use increasing strengths in tests to ensure signals propagate:
+```typescript
+signal1: strength 1.0
+signal2: strength 1.2  // Overcomes hysteresis
+signal3: strength 1.4  // Continues to overcome
+```
+
+### 3. Object Serialization Matters
+
+**Problem:** Complex values showed as `[object Object]` in outputs.
+
+**Solution:** Implement proper `stringify()` function that handles:
+- Tagged values with special formats
+- Recursive serialization
+- Human-readable contradiction messages
+
+### 4. WeakRefs Prevent Memory Leaks
+
+Using `WeakRef` for gadget/contact references allows garbage collection of disconnected components without manual cleanup.
+
+### 5. Type Safety Through Values
+
+Instead of complex type systems, we use:
+- Tagged values for complex types
+- Predicates as gadgets for type checking
+- Contradictions as first-class error values
+
+This keeps the core simple while enabling sophisticated type checking in userspace.
+
 ## Design Principles
 
 1. **Everything is a signal** - All data flows as signals with strength
-2. **Gadgets are always active** - Immediate response to inputs
+2. **Gadgets wait for complete inputs** - No partial computations
 3. **Wires are dumb** - No logic in connections
 4. **Types are values** - Type information is data, not metadata
 5. **Contradictions flow** - Errors are first-class values
@@ -279,20 +474,36 @@ riskyOp → resolver → output
 fallback ↗
 ```
 
+### Working with Intervals
+
+```typescript
+// Intervals are just pairs
+const interval1 = [2, 4]  // min: 2, max: 4
+const interval2 = [3, 7]  // min: 3, max: 7
+
+// Interval arithmetic
+intervalAdd(interval1, interval2) → [5, 11]
+```
+
 ## Implementation Stats
 
 - **Core engine**: ~250 lines
-- **Type system**: ~400 lines
-- **Total**: <1000 lines
+- **Type system**: ~400 lines  
+- **Tagged values**: ~200 lines
+- **Safe primitives**: ~350 lines
+- **List operations**: ~280 lines
+- **Total**: <1500 lines
 
 The entire system is designed to be hackable, extensible, and comprehensible.
 
 ## Future Directions
 
+- **List decomposition**: Emit list elements as separate signals with decreasing strength
 - **Distributed consensus** via strength voting
-- **Visual editor** integration
+- **Visual editor** integration with React Flow
 - **Persistence layer** for network states
 - **WebRTC/WebSocket** gadgets for networking
 - **Constraint solving** via bidirectional gadgets
+- **Domain-specific gadgets**: Intervals, matrices, graphs
 
 The strength-based model enables sophisticated behaviors through simple composition!
