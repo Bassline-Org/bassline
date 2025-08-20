@@ -193,6 +193,14 @@ export function createDynamicGadget(id: string, spec: DynamicGadgetSpec): Gadget
   
   // LATE: Behavior bound via compute
   gadget.compute = (inputs: Map<string, Signal>) => {
+    // Check for validator binding (store for persistence)
+    if (spec.bindings?.validator) {
+      const validatorSignal = inputs.get(spec.bindings.validator)
+      if (validatorSignal?.value) {
+        (gadget as any).__boundValidator = validatorSignal.value
+      }
+    }
+    
     // Check for behavior binding
     if (spec.bindings?.behavior) {
       const behaviorSignal = inputs.get(spec.bindings.behavior)
@@ -263,13 +271,19 @@ function validateBehavior(
 ): boolean {
   const spec = (gadget as any).__spec as DynamicGadgetSpec
   
-  // Check for validator input
-  if (spec.bindings?.validator) {
+  // Check for validator (bound or in current inputs)
+  let validator = (gadget as any).__boundValidator
+  
+  if (!validator && spec.bindings?.validator) {
     const validatorSignal = inputs.get(spec.bindings.validator)
     if (validatorSignal?.value) {
-      // Run validator
-      return runValidator(behavior, validatorSignal.value)
+      validator = validatorSignal.value
     }
+  }
+  
+  if (validator) {
+    // Run validator
+    return runValidator(behavior, validator)
   }
   
   // No validator - accept by default

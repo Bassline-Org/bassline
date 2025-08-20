@@ -48,19 +48,75 @@ describe('Core Propagation', () => {
       expect(contact.signal.strength).toBe(8000)
     })
     
-    it('should respect hysteresis threshold', () => {
+    it('should only propagate on strictly stronger signals', () => {
+      const gadget = createGadget('test')
+      const contact = createContact('c1', gadget)
+      
+      propagate(contact, signal('first', 0.5))
+      expect(contact.signal.value).toBe('first')
+      
+      // Same strength, same value = no change
+      propagate(contact, signal('first', 0.5))
+      expect(contact.signal.value).toBe('first')
+      
+      // Strictly stronger = update
+      propagate(contact, signal('stronger', 0.6))
+      expect(contact.signal.value).toBe('stronger')
+      
+      // Weaker = no update
+      propagate(contact, signal('weaker', 0.4))
+      expect(contact.signal.value).toBe('stronger')
+    })
+    
+    it('should detect contradictions on equal strength', () => {
       const gadget = createGadget('test')
       const contact = createContact('c1', gadget)
       
       propagate(contact, signal('first', 0.5))
       
-      // Signal within hysteresis (0.5 + 0.01 = 0.51)
-      propagate(contact, signal('close', 0.505))
-      expect(contact.signal.value).toBe('first')
+      // Equal strength with different value = contradiction
+      propagate(contact, signal('different', 0.5))
+      expect((contact.signal.value as any).tag).toBe('contradiction')
+      expect(contact.signal.strength).toBe(5000)
       
-      // Signal beyond hysteresis
-      propagate(contact, signal('beyond', 0.52))
-      expect(contact.signal.value).toBe('beyond')
+      // Stronger signal should replace contradiction
+      propagate(contact, signal('stronger', 0.6))
+      expect(contact.signal.value).toBe('stronger')
+      
+      // Equal strength with same value = no change
+      propagate(contact, signal('stronger', 0.6))
+      expect(contact.signal.value).toBe('stronger')
+      
+      // Weaker signal should not update
+      propagate(contact, signal('weaker', 0.4))
+      expect(contact.signal.value).toBe('stronger')
+    })
+    
+    it('should propagate contradictions through wires', () => {
+      const gadget = createGadget('test')
+      const source1 = createContact('s1', gadget, signal('a', 0.5), 'output')
+      const source2 = createContact('s2', gadget, signal('b', 0.5), 'output')
+      const target = createContact('target', gadget, signal(null, 0.1), 'input')
+      
+      gadget.contacts.set('s1', source1)
+      gadget.contacts.set('s2', source2)
+      gadget.contacts.set('target', target)
+      
+      wire(source1, target)
+      wire(source2, target)
+      
+      // First signal establishes value
+      propagate(source1, signal('a', 0.5))
+      propagate(target, signal('a', 0.5))
+      expect(target.signal.value).toBe('a')
+      
+      // Second signal with same strength but different value = contradiction
+      propagate(source2, signal('b', 0.5))
+      propagate(target, signal('b', 0.5))
+      
+      const targetValue = target.signal.value as any
+      expect(targetValue.tag).toBe('contradiction')
+      expect(target.signal.strength).toBe(5000)
     })
   })
   

@@ -30,9 +30,10 @@ export const MAX_STRENGTH = STRENGTH_BASE * 10
 export const KILL_SIGNAL = Number.MIN_SAFE_INTEGER
 
 /**
- * Hysteresis in strength units (0.01 = 100 units)
+ * Hysteresis in strength units (0 = no hysteresis by default)
+ * Users can implement hysteresis in userspace if needed
  */
-export const HYSTERESIS_UNITS = 100
+export const HYSTERESIS_UNITS = 0
 
 // ============================================================================
 // Conversion functions
@@ -85,10 +86,11 @@ export function minStrength(...strengths: number[]): number {
 }
 
 /**
- * Check if new strength overcomes hysteresis
+ * Check if new signal should replace current signal
+ * Uses > semantics for proper halting
  */
-export function overcomesHysteresis(newStrength: number, currentStrength: number): boolean {
-  return newStrength > currentStrength + HYSTERESIS_UNITS
+export function shouldPropagate(newStrength: number, currentStrength: number): boolean {
+  return newStrength > currentStrength
 }
 
 // ============================================================================

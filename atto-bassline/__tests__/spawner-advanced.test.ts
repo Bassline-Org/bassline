@@ -10,6 +10,7 @@ import {
   createIterator,
   createGarbageCollector,
   createConditionalSpawner,
+  provideSpawnerGain,
   signal,
   propagate,
   createGadget,
@@ -443,6 +444,7 @@ describe('Advanced Spawner Tests', () => {
   describe('Receipt Generation', () => {
     it('should generate receipts for spawning', () => {
       const spawner = createSpawner('receipt-spawner')
+      provideSpawnerGain(spawner, 500, 'test')
       
       const template: TemplateSignal = {
         tag: 'template',
@@ -464,7 +466,9 @@ describe('Advanced Spawner Tests', () => {
       const receipts = getAllReceipts()
       expect(receipts.length).toBeGreaterThan(0)
       
-      const spawnReceipt = receipts.find(r => r.gadgetId === 'receipt-spawner')
+      const spawnReceipt = receipts.find(r => 
+        r.gadgetId === 'receipt-spawner' && r.reason.includes('Spawned')
+      )
       expect(spawnReceipt).toBeDefined()
       expect(spawnReceipt?.amount).toBe(500)
       expect(spawnReceipt?.reason).toContain('Spawned')

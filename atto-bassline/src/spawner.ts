@@ -18,10 +18,12 @@ import { createReceipt } from './receipts'
  */
 export function createSpawner(id: string): Gadget {
   const spawner = createGadget(id)
+  // No default gain - spawners create structure freely, gain affects signal strength only
   
-  // Track spawned instances
+  // Track spawned instances and usage
   const instances = new Map<string, InstanceSignal>()
   let generation = 0
+  let hasBeenUsed = false  // Track if spawner has ever consumed gain
   
   // Create contacts
   spawner.contacts.set('template', createContact('template', spawner, undefined, 'input'))
@@ -60,10 +62,19 @@ export function createSpawner(id: string): Gadget {
       
       // Configure initial strength and gain
       const initialStrength = inputs.get('initialStrength')?.value as number ?? 100
-      const initialGain = inputs.get('initialGain')?.value as number ?? 100
+      const requestedGain = inputs.get('initialGain')?.value as number ?? 100
       
-      // New gadgets start weak (safety by default)
-      newGadget.gainPool = initialGain
+      // Structure creation is always allowed, gain only affects signal strength
+      // Gain must come from spawner's pool - no creation from thin air
+      let actualGain = 0
+      if (requestedGain > 0 && spawner.gainPool > 0) {
+        // Transfer gain from spawner to spawned gadget
+        actualGain = Math.min(requestedGain, spawner.gainPool)
+        spawner.gainPool -= actualGain
+        hasBeenUsed = true
+      }
+      // If spawner has no gain, spawned gadget gets 0 gain (but still exists)
+      newGadget.gainPool = actualGain
       
       // Set weak initial strength on all outputs
       for (const contact of newGadget.contacts.values()) {
@@ -94,13 +105,13 @@ export function createSpawner(id: string): Gadget {
       // Create receipt
       createReceipt(
         id,
-        initialGain,
-        `Spawned ${instanceId} with ${initialGain} gain`
+        actualGain,
+        `Spawned ${instanceId} with ${actualGain} gain`
       )
       
       // Output the instance
       return new Map([
-        ['instance', { value: instance, strength: 1000 }],  // Instance ref starts weak
+        ['instance', signal(instance, 0.1)],  // Instance ref starts weak
         ['error', signal(null, 0)],
         ['count', signal(instances.size, 1.0)]
       ])
@@ -115,6 +126,14 @@ export function createSpawner(id: string): Gadget {
   }
   
   return spawner
+}
+
+/**
+ * Provides initial gain to a spawner with proper receipt tracking
+ */
+export function provideSpawnerGain(spawner: Gadget, amount: number, source: string = 'system'): void {
+  spawner.gainPool += amount
+  createReceipt(spawner.id, amount, `Initial gain allocation from ${source}`)
 }
 
 // ============================================================================
@@ -191,6 +210,7 @@ export function createConditionalSpawner(id: string): Gadget {
  */
 export function createEvolver(id: string): Gadget {
   const evolver = createGadget(id)
+  // Evolver transfers gain between gadgets, doesn't need its own
   
   evolver.contacts.set('old', createContact('old', evolver, undefined, 'input'))
   evolver.contacts.set('new', createContact('new', evolver, undefined, 'input'))
@@ -204,7 +224,7 @@ export function createEvolver(id: string): Gadget {
     const oldSignal = inputs.get('old')?.value as InstanceSignal
     const newSignal = inputs.get('new')?.value as InstanceSignal
     const rate = inputs.get('rate')?.value as number ?? 100
-    const threshold = inputs.get('threshold')?.value as number ?? 100
+    const threshold = inputs.get('threshold')?.value as number ?? 0  // Default threshold allows full transfer
     
     if (!oldSignal || !newSignal) {
       return new Map([
@@ -221,15 +241,29 @@ export function createEvolver(id: string): Gadget {
       ])
     }
     
+    // Check for self-evolution (same gadget)
+    if (oldGadget === newGadget) {
+      return new Map([
+        ['status', signal({ 
+          oldGain: oldGadget.gainPool,
+          newGain: newGadget.gainPool,
+          transferred: 0
+        }, 1.0)],
+        ['complete', signal(false, 1.0)]
+      ])
+    }
+    
     // Transfer gain gradually
     let transferred = 0
-    if (oldGadget.gainPool > threshold) {
+    if (oldGadget.gainPool >= threshold && rate > 0) {
       const amount = Math.min(rate, oldGadget.gainPool - threshold)
-      oldGadget.gainPool -= amount
-      newGadget.gainPool += amount
-      transferred = amount
-      
-      createReceipt(id, amount, `Evolution transfer from ${oldSignal.value.id} to ${newSignal.value.id}`)
+      if (amount > 0) {
+        oldGadget.gainPool -= amount
+        newGadget.gainPool += amount
+        transferred = amount
+        
+        createReceipt(id, amount, `Evolution transfer from ${oldSignal.value.id} to ${newSignal.value.id}`)
+      }
     }
     
     // Transfer output strength (if contacts exist)
@@ -274,6 +308,7 @@ export function createEvolver(id: string): Gadget {
  */
 export function createIterator(id: string): Gadget {
   const iterator = createGadget(id)
+  // No default gain - structure creation is free
   
   iterator.contacts.set('template', createContact('template', iterator, undefined, 'input'))
   iterator.contacts.set('count', createContact('count', iterator, undefined, 'input'))

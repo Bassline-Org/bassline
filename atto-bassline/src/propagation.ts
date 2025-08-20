@@ -3,7 +3,7 @@
  */
 
 import { Signal, Contact, Gadget } from './types'
-import { HYSTERESIS_UNITS, overcomesHysteresis } from './strength'
+import { HYSTERESIS_UNITS, shouldPropagate } from './strength'
 
 // ============================================================================
 // Configuration
@@ -16,16 +16,37 @@ export const HYSTERESIS = HYSTERESIS_UNITS  // In strength units (100 = 0.01)
 // ============================================================================
 
 /**
- * Propagate a signal to a contact using argmax with hysteresis
+ * Propagate a signal to a contact using argmax with contradiction detection
  */
 export function propagate(contact: Contact, signal: Signal): void {
-  // Argmax with hysteresis: only update if new signal is stronger
-  if (!overcomesHysteresis(signal.strength, contact.signal.strength)) {
-    return  // No change, signal not strong enough
+  // Cap infinite or invalid strength values
+  const cappedSignal = {
+    value: signal.value,
+    strength: isFinite(signal.strength) ? Math.min(signal.strength, 100000) : 10000
   }
   
-  // Update the contact's signal
-  contact.signal = signal
+  // Compare strengths
+  if (cappedSignal.strength > contact.signal.strength) {
+    // Stronger signal wins
+    contact.signal = cappedSignal
+  } else if (signal.strength === contact.signal.strength) {
+    // Equal strength - check for contradiction
+    if (signal.value !== contact.signal.value) {
+      // Different values at same strength = contradiction
+      contact.signal = {
+        value: { 
+          tag: 'contradiction', 
+          value: `Conflict: ${JSON.stringify(contact.signal.value)} vs ${JSON.stringify(signal.value)}` 
+        },
+        strength: signal.strength
+      }
+    }
+    // Same value, same strength = no change (already there)
+    return
+  } else {
+    // Weaker signal - ignore
+    return
+  }
   
   // Check if this contact belongs to a gadget that needs to compute
   const gadget = contact.gadget.deref()

@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   createDynamicGadget,
   createSpawner,
+  provideSpawnerGain,
   createEvolver,
   createTransistor,
   signal,
@@ -227,6 +228,7 @@ describe('Integration Tests', () => {
     it('should allow spawners to spawn spawners in a chain', () => {
       // Create initial spawner
       const spawner1 = createSpawner('spawner1')
+      provideSpawnerGain(spawner1, 200, 'test')
       
       // Template for a spawner
       const spawnerTemplate: TemplateSignal = {

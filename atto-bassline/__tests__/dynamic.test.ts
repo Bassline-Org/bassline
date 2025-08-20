@@ -8,6 +8,7 @@ import {
   createSpawner,
   createEvolver,
   createIterator,
+  provideSpawnerGain,
   interpretTemplate,
   signal,
   propagate,
@@ -182,8 +183,10 @@ describe('Dynamic Gadgets', () => {
       ])
       
       const outputs = spawner.compute!(inputs)
-      const instance = outputs.get('instance')?.value as InstanceSignal
+      const instanceSignal = outputs.get('instance')
+      expect(instanceSignal).toBeDefined()
       
+      const instance = instanceSignal?.value as InstanceSignal
       expect(instance).toBeDefined()
       expect(instance.tag).toBe('instance')
       expect(instance.value.generation).toBe(1)
@@ -194,6 +197,7 @@ describe('Dynamic Gadgets', () => {
     
     it('should start spawned gadgets with low strength', () => {
       const spawner = createSpawner('spawner2')
+      provideSpawnerGain(spawner, 100, 'test')
       
       const template: TemplateSignal = {
         tag: 'template',

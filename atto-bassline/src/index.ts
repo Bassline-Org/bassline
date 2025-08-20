@@ -43,8 +43,7 @@ export {
   propagate,
   setContacts,
   findReachable,
-  cleanDeadRefs,
-  HYSTERESIS
+  cleanDeadRefs
 } from './propagation'
 
 // Special gadgets
@@ -95,5 +94,15 @@ export {
   createConditionalSpawner,
   createEvolver,
   createIterator,
-  createGarbageCollector
+  createGarbageCollector,
+  provideSpawnerGain
 } from './spawner'
+
+// Boot system
+export {
+  bootNetwork,
+  loadBootScript,
+  createTestBootScript,
+  type BootScript,
+  type Network
+} from './boot'
