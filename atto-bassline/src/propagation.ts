@@ -19,10 +19,22 @@ export const HYSTERESIS = HYSTERESIS_UNITS  // In strength units (100 = 0.01)
  * Propagate a signal to a contact using argmax with contradiction detection
  */
 export function propagate(contact: Contact, signal: Signal): void {
+  // If we're in a transaction, batch this update instead of executing immediately
+  if (isInTransaction) {
+    pendingUpdates.push([contact, signal])
+    return
+  }
+  if (!contact) {
+    return
+  }
+  
+  // Check if the contact's gadget is still alive
+  const gadgetCheck = contact.gadget?.deref()
+  
   // Cap infinite or invalid strength values
   const cappedSignal = {
     value: signal.value,
-    strength: isFinite(signal.strength) ? Math.min(signal.strength, 100000) : 10000
+    strength: isFinite(signal.strength) ? Math.min(signal.strength, 10000000) : 10000  // Raised cap to 10M
   }
   
   // Compare strengths
@@ -33,6 +45,7 @@ export function propagate(contact: Contact, signal: Signal): void {
     // Equal strength - check for contradiction
     if (signal.value !== contact.signal.value) {
       // Different values at same strength = contradiction
+      // Contradiction detected
       contact.signal = {
         value: { 
           tag: 'contradiction', 
@@ -49,30 +62,46 @@ export function propagate(contact: Contact, signal: Signal): void {
   }
   
   // Check if this contact belongs to a gadget that needs to compute
+  // BUT only if this is an INPUT contact (outputs shouldn't trigger compute)
   const gadget = contact.gadget.deref()
-  if (gadget?.compute) {
+  if (gadget?.compute && contact.direction === 'input') {
     // Gather all input signals
     const inputs = gatherInputs(gadget)
     
     // For primitive gadgets, only compute if all inputs have values
+    // EXCEPT for trigger-based gadgets - they can compute if trigger is set
     if (gadget.primitive) {
-      let allInputsReady = true
-      for (const [name, inputSignal] of inputs) {
-        // Get the actual contact to check direction
-        const inputContact = gadget.contacts.get(name)
-        
-        // Skip output contacts
-        if (inputContact?.direction === 'output') continue
-        
-        // Check if input has a real value (not null and has strength)
-        if (inputSignal.value === null || inputSignal.strength === 0) {
-          allInputsReady = false
-          break
-        }
-      }
+      // Check if this is a trigger-based gadget (has a 'trigger' input)
+      const triggerInput = inputs.get('trigger')
+      const isTriggerBased = triggerInput !== undefined
       
-      if (!allInputsReady) {
-        return // Don't compute yet, wait for all inputs
+      if (isTriggerBased) {
+        // For trigger-based gadgets, only compute when trigger is true
+        // Other inputs can use defaults if not set
+        if (!triggerInput || triggerInput.value !== true) {
+          return // Don't compute unless triggered
+        }
+        // If triggered, compute regardless of other input states
+      } else {
+        // For non-trigger gadgets, require all inputs to have values
+        let allInputsReady = true
+        for (const [name, inputSignal] of inputs) {
+          // Get the actual contact to check direction
+          const inputContact = gadget.contacts.get(name)
+          
+          // Skip output contacts
+          if (inputContact?.direction === 'output') continue
+          
+          // Check if input has a real value (not null and has strength)
+          if (inputSignal.value === null || inputSignal.strength === 0) {
+            allInputsReady = false
+            break
+          }
+        }
+        
+        if (!allInputsReady) {
+          return // Don't compute yet, wait for all inputs
+        }
       }
     }
     
@@ -121,15 +150,79 @@ function gatherInputs(gadget: Gadget): Map<string, Signal> {
 }
 
 // ============================================================================
-// Batch propagation
+// Batch propagation and transactions
 // ============================================================================
+
+// Transaction state
+let isInTransaction = false
+let pendingUpdates: Array<[Contact, Signal]> = []
+
+/**
+ * Start a transaction - all propagations will be batched until commit
+ */
+export function beginTransaction(): void {
+  isInTransaction = true
+  pendingUpdates = []
+}
+
+/**
+ * Commit the current transaction - execute all batched propagations
+ */
+export function commitTransaction(): void {
+  if (!isInTransaction) return
+  
+  isInTransaction = false
+  const updates = [...pendingUpdates]
+  pendingUpdates = []
+  
+  // Execute all updates in sequence
+  for (const [contact, signal] of updates) {
+    propagate(contact, signal)
+  }
+}
+
+/**
+ * Rollback the current transaction - discard all batched propagations
+ */
+export function rollbackTransaction(): void {
+  isInTransaction = false
+  pendingUpdates = []
+}
+
+/**
+ * Execute a function within a transaction
+ */
+export function withTransaction<T>(fn: () => T): T {
+  beginTransaction()
+  try {
+    const result = fn()
+    commitTransaction()
+    return result
+  } catch (error) {
+    rollbackTransaction()
+    throw error
+  }
+}
+
+/**
+ * Check if currently in a transaction
+ */
+export function inTransaction(): boolean {
+  return isInTransaction
+}
 
 /**
  * Set multiple contacts at once, useful for initialization
  */
 export function setContacts(updates: Array<[Contact, Signal]>): void {
-  for (const [contact, signal] of updates) {
-    propagate(contact, signal)
+  if (isInTransaction) {
+    // If in transaction, batch all updates
+    pendingUpdates.push(...updates)
+  } else {
+    // Otherwise propagate immediately
+    for (const [contact, signal] of updates) {
+      propagate(contact, signal)
+    }
   }
 }
 

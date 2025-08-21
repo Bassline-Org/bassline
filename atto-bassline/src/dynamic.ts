@@ -407,7 +407,7 @@ function evaluateExpression(
       if (a && b && typeof a.value === 'number' && typeof b.value === 'number') {
         return {
           value: a.value + b.value,
-          strength: Math.min(a.strength, b.strength)
+          strength: Math.floor((a.strength + b.strength) / 2)
         }
       }
       return { value: null, strength: 0 }

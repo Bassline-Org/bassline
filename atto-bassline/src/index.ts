@@ -18,7 +18,8 @@ export {
   createContact,
   createGadget,
   wire,
-  unwire
+  unwire,
+  calculatePrimitiveOutputStrength
 } from './types'
 
 // Strength utilities
@@ -43,7 +44,12 @@ export {
   propagate,
   setContacts,
   findReachable,
-  cleanDeadRefs
+  cleanDeadRefs,
+  beginTransaction,
+  commitTransaction,
+  rollbackTransaction,
+  withTransaction,
+  inTransaction
 } from './propagation'
 
 // Special gadgets
@@ -106,3 +112,41 @@ export {
   type BootScript,
   type Network
 } from './boot'
+
+// Stream interfaces
+export {
+  EventEmitter,
+  createReader,
+  createWriter,
+  createBiStream,
+  createBufferedReader,
+  type Reader,
+  type Writer,
+  type BiStream,
+  type BufferedReader
+} from './streams'
+
+// React hooks
+export {
+  NetworkProvider,
+  useGadget,
+  useContact,
+  useContactValue,
+  useContactWriter,
+  useContactBinding,
+  useBiStream,
+  useBufferedSignals,
+  useAutoWire,
+  useManagedStream,
+  useTransaction,
+  useDebouncedTransaction
+} from './react-streams.tsx'
+
+// Audio gadgets
+export {
+  createAudioOutput,
+  createOscillator,
+  createEnvelope,
+  createMixer,
+  resumeAudioContext
+} from './audio-streams'

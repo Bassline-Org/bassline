@@ -2,7 +2,7 @@
  * Special gadgets for strength manipulation
  */
 
-import { Gadget, Signal, Value, createGadget, createContact, createSignal } from './types'
+import { Gadget, Signal, Value, createGadget, createContact, createSignal, calculatePrimitiveOutputStrength } from './types'
 import { createReceipt } from './receipts'
 import { KILL_SIGNAL, adjustStrength } from './strength'
 
@@ -168,7 +168,7 @@ export function createGainMinter(id: string): Gadget {
 }
 
 // ============================================================================
-// Helper for creating primitive gadgets with MIN strength
+// Helper for creating primitive gadgets with averaged strength
 // ============================================================================
 
 export function createPrimitiveGadget(
@@ -180,18 +180,16 @@ export function createPrimitiveGadget(
   const gadget = createGadget(id)
   gadget.primitive = true
   
-  // Define compute function with MIN strength principle
+  // Define compute function with average strength principle
   gadget.compute = (inputs) => {
-    // Extract values and find minimum strength
+    // Extract values for computation
     const values = new Map<string, unknown>()
-    let minStrength = Number.MAX_SAFE_INTEGER
     let hasInputs = false
     
     for (const [name, signal] of inputs) {
       if (inputNames.includes(name)) {
         values.set(name, signal.value)
         if (signal.strength > 0) {  // Only count inputs with actual strength
-          minStrength = Math.min(minStrength, signal.strength)
           hasInputs = true
         }
       }
@@ -209,11 +207,14 @@ export function createPrimitiveGadget(
     // Compute new value
     const outputValue = computeValue(values)
     
-    // Output uses MINIMUM strength (information loss principle)
+    // Use standard primitive output strength calculation
+    const outputStrength = calculatePrimitiveOutputStrength(inputs, gadget)
+    
+    // Create outputs with averaged strength
     const outputs = new Map<string, Signal>()
     outputs.set(outputNames[0], {
       value: outputValue as Value,
-      strength: minStrength
+      strength: outputStrength
     })
     
     return outputs

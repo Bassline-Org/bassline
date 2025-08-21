@@ -89,6 +89,30 @@ export function signal(value: Value = null, strength: number = 0): Signal {
   return { value, strength: units }
 }
 
+/**
+ * Calculate output strength for primitive gadgets
+ * Returns the average of all input strengths (excludes outputs)
+ */
+export function calculatePrimitiveOutputStrength(inputs: Map<string, Signal>, gadget?: Gadget): number {
+  const inputStrengths: number[] = []
+  
+  // If gadget is provided, filter to only input contacts
+  if (gadget) {
+    for (const [name, signal] of inputs) {
+      const contact = gadget.contacts.get(name)
+      if (contact?.direction === 'input') {
+        inputStrengths.push(signal.strength)
+      }
+    }
+  } else {
+    // Fallback: use all signals (for backwards compatibility)
+    inputStrengths.push(...Array.from(inputs.values()).map(s => s.strength))
+  }
+  
+  if (inputStrengths.length === 0) return 0
+  return Math.floor(inputStrengths.reduce((sum, s) => sum + s, 0) / inputStrengths.length)
+}
+
 export function createContact(
   id: string, 
   gadget: Gadget, 
@@ -96,7 +120,7 @@ export function createContact(
   direction: 'input' | 'output' = 'input',
   boundary: boolean = false
 ): Contact {
-  return {
+  const contact = {
     id,
     direction,
     boundary,
@@ -105,6 +129,8 @@ export function createContact(
     sources: new Set(),
     targets: new Set()
   }
+  
+  return contact
 }
 
 export function createGadget(id: string, parent?: Gadget): Gadget {
@@ -127,6 +153,12 @@ export function createGadget(id: string, parent?: Gadget): Gadget {
 // ============================================================================
 
 export function wire(from: Contact, to: Contact): void {
+  if (!from) {
+    throw new Error('Cannot wire: source contact is null/undefined')
+  }
+  if (!to) {
+    throw new Error('Cannot wire: target contact is null/undefined')
+  }
   from.targets.add(new WeakRef(to))
   to.sources.add(new WeakRef(from))
 }

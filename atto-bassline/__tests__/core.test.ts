@@ -219,7 +219,7 @@ describe('Core Propagation', () => {
       expect(output.signal.value).toBe(8)  // Now computed
     })
     
-    it('should use MIN strength for outputs', () => {
+    it('should use AVERAGE strength for outputs', () => {
       const adder = createAdder('test-add')
       const a = adder.contacts.get('a')!
       const b = adder.contacts.get('b')!
@@ -229,7 +229,7 @@ describe('Core Propagation', () => {
       propagate(b, signal(5, 0.4))   // 4000 units
       
       expect(output.signal.value).toBe(15)
-      expect(output.signal.strength).toBe(4000)  // MIN(9000, 4000)
+      expect(output.signal.strength).toBe(6500)  // AVERAGE(9000, 4000) = 6500
     })
   })
   
