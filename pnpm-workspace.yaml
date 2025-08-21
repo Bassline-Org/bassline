@@ -4,3 +4,4 @@ packages:
   - 'packages/primitive-gadgets/*'
   - 'micro-bassline'
   - 'femto-bassline'
+  - 'atto-bassline'

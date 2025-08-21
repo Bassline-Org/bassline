@@ -26,12 +26,14 @@ interface NetworkContextValue {
   gadgets: Map<string, Gadget>
   templates: Map<string, Template>
   connections: Array<{ from: string, to: string }>
+  gadgetRegistry: Map<string, Gadget> // Persistent registry of gadgets by ID
 }
 
 const NetworkContext = createContext<NetworkContextValue>({
   gadgets: new Map(),
   templates: new Map(),
-  connections: []
+  connections: [],
+  gadgetRegistry: new Map()
 })
 
 export function NetworkProvider({ 
@@ -44,7 +46,8 @@ export function NetworkProvider({
   const [network] = useState<NetworkContextValue>({
     gadgets: new Map(),
     templates: initialTemplates,
-    connections: []
+    connections: [],
+    gadgetRegistry: new Map()
   })
   
   return (
@@ -64,7 +67,8 @@ export function NetworkProvider({
  */
 export function useTemplate<T extends Template>(
   template: T,
-  params?: Record<string, any>
+  params?: Record<string, any>,
+  stableId?: string // Optional stable ID for persistence
 ): {
   gadget: Gadget
   inputs: Map<string, Contact>
@@ -72,10 +76,18 @@ export function useTemplate<T extends Template>(
 } {
   const network = useContext(NetworkContext)
   const paramsRef = useRef(params)
+  const hasInitialized = useRef(false)
   
   const [gadget] = useState(() => {
-    // Create unique ID for this component instance
-    const id = `component-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    // If we have a stable ID, check if gadget already exists in registry
+    if (stableId && network.gadgetRegistry.has(stableId)) {
+      const existing = network.gadgetRegistry.get(stableId)!
+      network.gadgets.set(existing.id, existing)
+      return existing
+    }
+    
+    // Create ID - use stable ID if provided, otherwise generate unique one
+    const id = stableId || `component-${Date.now()}-${Math.random().toString(36).slice(2)}`
     
     // Instantiate the template
     const instance = instantiate(template, id)
@@ -93,6 +105,11 @@ export function useTemplate<T extends Template>(
     // Register with network
     network.gadgets.set(id, instance)
     
+    // If stable ID provided, also register in persistent registry
+    if (stableId) {
+      network.gadgetRegistry.set(stableId, instance)
+    }
+    
     return instance
   })
   
@@ -103,6 +120,8 @@ export function useTemplate<T extends Template>(
   useEffect(() => {
     return () => {
       network.gadgets.delete(gadget.id)
+      // Don't remove from registry if it has a stable ID (for persistence)
+      // The registry keeps gadgets alive across component unmounts
       // TODO: Unwire connections
     }
   }, [gadget.id, network])
@@ -134,11 +153,27 @@ export function useTemplate<T extends Template>(
  * Create a React binding to a gadget contact
  * Provides useState-like API with automatic propagation
  */
+interface UseContactOptions {
+  optimistic?: boolean // Update UI immediately, propagate async
+  debounce?: number // Debounce delay in ms (0 = no debounce)
+  pollInterval?: number // How often to poll for changes
+}
+
 export function useContact<T = any>(
   gadget: Gadget | null,
-  contactName: string
+  contactName: string,
+  options: UseContactOptions = {}
 ): [T | null, (value: T) => void, number] {
+  const { 
+    optimistic = true, 
+    debounce = 0,  // No debounce by default
+    pollInterval = 16  // 60fps by default for responsive UI
+  } = options
+  
   const strengthRef = useRef(10000) // Start with base strength
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const optimisticValueRef = useRef<T | null>(null)
+  const hasOptimisticUpdate = useRef(false)
   
   // Subscribe to contact changes
   const subscribe = useCallback((callback: () => void) => {
@@ -160,11 +195,11 @@ export function useContact<T = any>(
       }
     }
     
-    // Poll for changes but less frequently to avoid infinite loops
-    const interval = setInterval(checkForChanges, 100) // Reduced from 16ms to 100ms
+    // Poll for changes at configured interval
+    const interval = setInterval(checkForChanges, pollInterval)
     
     return () => clearInterval(interval)
-  }, [gadget, contactName])
+  }, [gadget, contactName, pollInterval])
   
   // Cache for snapshot to avoid infinite loops
   const snapshotCache = useRef<{ value: T | null, strength: number }>({ value: null, strength: 0 })
@@ -174,19 +209,30 @@ export function useContact<T = any>(
     if (!gadget) return snapshotCache.current
     const contact = gadget.contacts.get(contactName)
     
-    const newSnapshot = {
-      value: contact?.signal.value as T || null,
-      strength: contact?.signal.strength || 0
+    // If we have an optimistic update, use that value
+    const currentValue = (optimistic && hasOptimisticUpdate.current) 
+      ? optimisticValueRef.current
+      : (contact?.signal.value as T || null)
+    
+    const currentStrength = contact?.signal.strength || 0
+    
+    // Check if we need to update the cache
+    if (snapshotCache.current.value !== currentValue || 
+        snapshotCache.current.strength !== currentStrength) {
+      // Create new object only when values change
+      snapshotCache.current = {
+        value: currentValue,
+        strength: currentStrength
+      }
+      // Clear optimistic update when real value catches up
+      if (hasOptimisticUpdate.current && contact?.signal.value === optimisticValueRef.current) {
+        hasOptimisticUpdate.current = false
+      }
     }
     
-    // Only update cache if values actually changed
-    if (snapshotCache.current.value !== newSnapshot.value || 
-        snapshotCache.current.strength !== newSnapshot.strength) {
-      snapshotCache.current = newSnapshot
-    }
-    
+    // Always return the same cached object reference unless values changed
     return snapshotCache.current
-  }, [gadget, contactName])
+  }, [gadget, contactName, optimistic])
   
   // Server snapshot for SSR
   const getServerSnapshot = useCallback(() => ({ value: null, strength: 0 }), [])
@@ -194,7 +240,7 @@ export function useContact<T = any>(
   // Use React's external store hook
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   
-  // Setter with monotonic strength
+  // Setter with monotonic strength and optional debouncing
   const setValue = useCallback((newValue: T) => {
     if (!gadget) return
     
@@ -202,14 +248,46 @@ export function useContact<T = any>(
     if (!contact) return
     
     // Don't propagate if value hasn't changed
-    if (contact.signal.value === newValue) return
+    if (contact.signal.value === newValue && !hasOptimisticUpdate.current) return
     
-    // Increment strength for each write
-    strengthRef.current += 1
+    // Apply optimistic update immediately
+    if (optimistic) {
+      optimisticValueRef.current = newValue
+      hasOptimisticUpdate.current = true
+      // Don't modify cache directly - let getSnapshot handle it
+    }
     
-    // Propagate the new value
-    propagate(contact, signal(newValue as any, strengthRef.current / 10000))
-  }, [gadget, contactName])
+    // Clear existing debounce timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    
+    const doPropagation = () => {
+      // Increment strength for each write
+      strengthRef.current += 1
+      
+      // Propagate the new value
+      propagate(contact, signal(newValue as any, strengthRef.current / 10000))
+      debounceTimerRef.current = null
+    }
+    
+    // If no debounce, propagate immediately
+    if (debounce === 0) {
+      doPropagation()
+    } else {
+      // Debounce the actual propagation
+      debounceTimerRef.current = setTimeout(doPropagation, debounce)
+    }
+  }, [gadget, contactName, optimistic, debounce])
+  
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [])
   
   return [snapshot.value, setValue, snapshot.strength]
 }
