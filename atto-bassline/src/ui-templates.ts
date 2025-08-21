@@ -119,10 +119,11 @@ export const ToggleTemplate = primitive(
       label: { type: 'string', default: '' }
     },
     outputs: {
+      'checked-out': { type: 'boolean' },
       toggled: { type: 'boolean' } // Emits when toggled
     }
   },
-  ({ checked }) => ({ toggled: checked }),
+  ({ checked }) => ({ 'checked-out': checked, toggled: checked }),
   'Toggle/Checkbox UI component'
 )
 

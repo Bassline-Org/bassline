@@ -8,8 +8,12 @@ import { NetworkProvider, useWiring, useTemplateBuilder, useTemplate, useContact
 import { Button, Slider, TextField, Panel, Toggle, Select } from './react-components'
 import { ColorPickerTemplate, RangeSliderTemplate, FormFieldTemplate, PanelTemplate, ToggleTemplate, SelectTemplate } from './ui-templates'
 import { SliderTemplate, TextFieldTemplate, Multiply } from './templates-v2'
-import { signal, propagate } from './propagation'
+// Removed propagate and signal imports - using useContact setters instead
 import type { Gadget } from './types'
+import { Connectable } from './connectable'
+import { ConnectionVisualizer } from './connection-visualizer'
+import { useConnectionManager } from './use-connection-manager'
+import { InspectorButton } from './gadget-inspector'
 
 // ============================================================================
 // Color Picker Component (composed from templates)
@@ -33,6 +37,16 @@ function ColorPicker() {
   const [red, setRed] = useContact<number>(redSlider.gadget, 'value')
   const [green, setGreen] = useContact<number>(greenSlider.gadget, 'value')
   const [blue, setBlue] = useContact<number>(blueSlider.gadget, 'value')
+  
+  // Test output contacts from compute function
+  const [redOut] = useContact<number>(redSlider.gadget, 'value-out')
+  const [greenOut] = useContact<number>(greenSlider.gadget, 'value-out')
+  const [blueOut] = useContact<number>(blueSlider.gadget, 'value-out')
+  
+  // Test normalized values from compute function
+  const [redNorm] = useContact<number>(redSlider.gadget, 'normalizedValue')
+  const [greenNorm] = useContact<number>(greenSlider.gadget, 'normalizedValue')
+  const [blueNorm] = useContact<number>(blueSlider.gadget, 'normalizedValue')
   
   // Compute the color values directly
   const redVal = Math.floor(red || 0)
@@ -100,6 +114,13 @@ function ColorPicker() {
         }}
       >
         {hex}
+      </div>
+      
+      {/* Debug: Show value-out contacts */}
+      <div style={{ fontSize: '12px', color: '#666', fontFamily: 'monospace' }}>
+        Debug - value-out contacts:<br/>
+        Red: {redOut} | Green: {greenOut} | Blue: {blueOut}<br/>
+        Normalized: {redNorm?.toFixed(2)} | {greenNorm?.toFixed(2)} | {blueNorm?.toFixed(2)}
       </div>
     </div>
   )
@@ -432,6 +453,290 @@ function TemplateBuilderDemo() {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+// Safe value renderer that handles contradictions
+function renderValue(value: any): string {
+  if (value === null || value === undefined) return 'null'
+  if (typeof value === 'object' && value.tag === 'contradiction') {
+    return 'CONFLICT'
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  return String(value)
+}
+
+// ============================================================================
+// Dynamic Wiring Demo
+// ============================================================================
+
+function DynamicWiringDemo() {
+  const manager = useConnectionManager()
+  
+  // Create various gadgets with stable IDs
+  const slider1 = useTemplate(SliderTemplate, { value: 25, min: 0, max: 100 }, 'dyn-slider-1')
+  const slider2 = useTemplate(SliderTemplate, { value: 50, min: 0, max: 100 }, 'dyn-slider-2')
+  const slider3 = useTemplate(SliderTemplate, { value: 75, min: 0, max: 255 }, 'dyn-slider-3')
+  
+  const textField1 = useTemplate(TextFieldTemplate, { text: 'Hello' }, 'dyn-text-1')
+  const textField2 = useTemplate(TextFieldTemplate, { text: 'World' }, 'dyn-text-2')
+  
+  const toggle1 = useTemplate(ToggleTemplate, { checked: false, label: 'Enable' }, 'dyn-toggle-1')
+  const toggle2 = useTemplate(ToggleTemplate, { checked: true, label: 'Active' }, 'dyn-toggle-2')
+  
+  // Use contacts to get values and setters
+  const [slider1Value, setSlider1Value] = useContact<number>(slider1.gadget, 'value')
+  const [slider2Value, setSlider2Value] = useContact<number>(slider2.gadget, 'value')
+  const [slider3Value, setSlider3Value] = useContact<number>(slider3.gadget, 'value')
+  const [text1Value, setText1Value] = useContact<string>(textField1.gadget, 'text')
+  const [text2Value, setText2Value] = useContact<string>(textField2.gadget, 'text')
+  const [toggle1Value, setToggle1Value] = useContact<boolean>(toggle1.gadget, 'checked')
+  const [toggle2Value, setToggle2Value] = useContact<boolean>(toggle2.gadget, 'checked')
+  
+  return (
+    <ConnectionVisualizer manager={manager}>
+      <div style={{ padding: '20px' }}>
+        <div style={{ marginBottom: '20px', padding: '15px', background: '#f5f5f5', borderRadius: '8px' }}>
+          <h3 style={{ margin: '0 0 10px 0' }}>Dynamic Wiring Playground</h3>
+          <p style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#666' }}>
+            Right-click any component to start connecting. Connect outputs to inputs to flow data between components!
+          </p>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <Button 
+              text={manager.connectionMode ? "❌ Exit Connection Mode" : "🔗 Enter Connection Mode"}
+              onClicked={() => {
+                console.log('Button clicked, current mode:', manager.connectionMode, 'setting to:', !manager.connectionMode)
+                manager.setConnectionMode(!manager.connectionMode)
+              }}
+            />
+            <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+              Debug: mode={String(manager.connectionMode)}
+            </div>
+            <div style={{ 
+              padding: '8px 16px', 
+              background: manager.connectionMode ? '#ff9800' : '#fff', 
+              borderRadius: '4px', 
+              fontSize: '14px',
+              color: manager.connectionMode ? '#fff' : '#000'
+            }}>
+              Status: <strong>{manager.connectionStatus}</strong>
+            </div>
+            <div style={{ padding: '8px 16px', background: '#fff', borderRadius: '4px', fontSize: '14px' }}>
+              Connections: <strong>{manager.activeConnections.length}</strong>
+            </div>
+            {manager.connectionMode && (
+              <div style={{ 
+                padding: '8px 16px', 
+                background: '#4caf50', 
+                color: 'white',
+                borderRadius: '4px', 
+                fontSize: '14px',
+                fontWeight: 'bold'
+              }}>
+                👆 Right-click components to connect them!
+              </div>
+            )}
+            <InspectorButton gadget={manager.gadget} title="Connection Manager" />
+            <button
+              onClick={() => {
+                const win = window as any
+                const registry = win.__gadgetRegistry as Map<string, any>
+                console.log('=== GADGET REGISTRY DEBUG ===')
+                if (registry) {
+                  console.log(`Total gadgets: ${registry.size}`)
+                  Array.from(registry.entries()).forEach(([id, gadget]) => {
+                    console.log(`${id}:`, gadget)
+                  })
+                } else {
+                  console.log('No registry found')
+                }
+              }}
+              style={{
+                padding: '4px 8px',
+                fontSize: '11px',
+                border: '1px solid #ccc',
+                borderRadius: '4px',
+                background: '#f0f0f0',
+                cursor: 'pointer',
+                marginLeft: '8px'
+              }}
+            >
+              🐛 Debug Registry
+            </button>
+          </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+          {/* Sliders */}
+          <div style={{ padding: '15px', background: '#fff', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Slider 1 (0-100)</h4>
+              <InspectorButton gadget={slider1.gadget} title="Slider 1" />
+            </div>
+            <Connectable gadget={slider1.gadget} manager={manager}>
+              <input
+                type="range"
+                value={slider1Value || 0}
+                min={0}
+                max={100}
+                onChange={(e) => setSlider1Value(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <div>Value: {typeof slider1Value === 'object' && slider1Value?.tag === 'contradiction' ? 'CONFLICT' : slider1Value || 0}</div>
+            </Connectable>
+          </div>
+          
+          <div style={{ padding: '15px', background: '#fff', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Slider 2 (0-100)</h4>
+              <InspectorButton gadget={slider2.gadget} title="Slider 2" />
+            </div>
+            <Connectable gadget={slider2.gadget} manager={manager}>
+              <input
+                type="range"
+                value={slider2Value || 0}
+                min={0}
+                max={100}
+                onChange={(e) => setSlider2Value(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <div>Value: {typeof slider2Value === 'object' && slider2Value?.tag === 'contradiction' ? 'CONFLICT' : slider2Value || 0}</div>
+            </Connectable>
+          </div>
+          
+          <div style={{ padding: '15px', background: '#fff', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Slider 3 (0-255)</h4>
+              <InspectorButton gadget={slider3.gadget} title="Slider 3" />
+            </div>
+            <Connectable gadget={slider3.gadget} manager={manager}>
+              <input
+                type="range"
+                value={slider3Value || 0}
+                min={0}
+                max={255}
+                onChange={(e) => setSlider3Value(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+              <div>Value: {typeof slider3Value === 'object' && slider3Value?.tag === 'contradiction' ? 'CONFLICT' : slider3Value || 0}</div>
+            </Connectable>
+          </div>
+          
+          {/* Text Fields */}
+          <div style={{ padding: '15px', background: '#fff', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Text Field 1</h4>
+              <InspectorButton gadget={textField1.gadget} title="Text Field 1" />
+            </div>
+            <Connectable gadget={textField1.gadget} manager={manager}>
+              <input
+                type="text"
+                value={text1Value || ''}
+                onChange={(e) => setText1Value(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>Length: {typeof text1Value === 'string' ? text1Value.length : 0}</div>
+            </Connectable>
+          </div>
+          
+          <div style={{ padding: '15px', background: '#fff', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Text Field 2</h4>
+              <InspectorButton gadget={textField2.gadget} title="Text Field 2" />
+            </div>
+            <Connectable gadget={textField2.gadget} manager={manager}>
+              <input
+                type="text"
+                value={text2Value || ''}
+                onChange={(e) => setText2Value(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+              />
+              <div style={{ fontSize: '12px', marginTop: '4px' }}>Length: {typeof text2Value === 'string' ? text2Value.length : 0}</div>
+            </Connectable>
+          </div>
+          
+          {/* Toggles */}
+          <div style={{ padding: '15px', background: '#fff', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Toggle 1</h4>
+              <InspectorButton gadget={toggle1.gadget} title="Toggle 1" />
+            </div>
+            <Connectable gadget={toggle1.gadget} manager={manager}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={toggle1Value || false}
+                  onChange={(e) => setToggle1Value(e.target.checked)}
+                />
+                Enable ({toggle1Value ? 'ON' : 'OFF'})
+              </label>
+            </Connectable>
+          </div>
+          
+          <div style={{ padding: '15px', background: '#fff', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ margin: 0 }}>Toggle 2</h4>
+              <InspectorButton gadget={toggle2.gadget} title="Toggle 2" />
+            </div>
+            <Connectable gadget={toggle2.gadget} manager={manager}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={toggle2Value || false}
+                  onChange={(e) => setToggle2Value(e.target.checked)}
+                />
+                Active ({toggle2Value ? 'ON' : 'OFF'})
+              </label>
+            </Connectable>
+          </div>
+          
+          {/* Display Panel */}
+          <div style={{ 
+            padding: '15px', 
+            background: '#fff', 
+            borderRadius: '8px',
+            gridColumn: 'span 2'
+          }}>
+            <h4>Connection Info</h4>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              <p><strong>Active Connections:</strong></p>
+              {manager.activeConnections.length === 0 ? (
+                <p>No connections yet. Right-click components to connect them!</p>
+              ) : (
+                <ul style={{ margin: '10px 0', paddingLeft: '20px' }}>
+                  {manager.activeConnections.map(conn => (
+                    <li key={conn.id}>
+                      {conn.from.gadgetId}.{conn.from.contactName} → {conn.to.gadgetId}.{conn.to.contactName}
+                      <button
+                        onClick={() => manager.deleteConnection(conn.id)}
+                        style={{
+                          marginLeft: '10px',
+                          padding: '2px 6px',
+                          fontSize: '11px',
+                          background: '#f44336',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '3px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </ConnectionVisualizer>
+  )
+}
+
+// ============================================================================
 // Main Demo App
 // ============================================================================
 
@@ -467,6 +772,11 @@ export function DemoApp() {
             onClicked={() => setActiveDemo('builder')}
             style={{ background: activeDemo === 'builder' ? '#007bff' : '#fff', color: activeDemo === 'builder' ? '#fff' : '#000' }}
           />
+          <Button 
+            text="Dynamic Wiring" 
+            onClicked={() => setActiveDemo('dynamic')}
+            style={{ background: activeDemo === 'dynamic' ? '#007bff' : '#fff', color: activeDemo === 'dynamic' ? '#fff' : '#000' }}
+          />
         </div>
         
         <div style={{ minHeight: '500px' }}>
@@ -478,6 +788,7 @@ export function DemoApp() {
           )}
           {activeDemo === 'wired' && <WiredComponentsDemo />}
           {activeDemo === 'builder' && <TemplateBuilderDemo />}
+          {activeDemo === 'dynamic' && <DynamicWiringDemo />}
         </div>
       </div>
     </NetworkProvider>

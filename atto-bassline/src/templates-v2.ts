@@ -82,6 +82,8 @@ export function instantiate(template: Template, id: string): Gadget {
     
     // Set compute function
     gadget.compute = (inputSignals) => {
+      console.log('Gadget', gadget.id, 'compute called with inputs:', Array.from(inputSignals.entries()))
+      
       const inputs: Record<string, any> = {}
       for (const [name] of Object.entries(prim.contacts.inputs || {})) {
         inputs[name] = inputSignals.get(name)?.value
@@ -101,10 +103,15 @@ export function instantiate(template: Template, id: string): Gadget {
         }
       }
       
+      console.log('Gadget', gadget.id, 'computed outputs:', Array.from(outputSignals.entries()))
       return outputSignals
     }
     
     gadget.primitive = true
+    
+    // Primitive gadgets use compute functions to generate outputs, not simple wiring
+    console.log('Template instantiation for primitive gadget', id, 'with compute function')
+    
     return gadget
   }
   
@@ -368,13 +375,21 @@ export const SliderTemplate = primitive(
       enabled: { type: 'boolean', default: true }
     },
     outputs: {
+      'value-out': { type: 'number' },
       isDragging: { type: 'boolean' },
       normalizedValue: { type: 'number' }
     }
   },
-  ({ value, min, max }) => ({
-    normalizedValue: (value - min) / (max - min)
-  }),
+  ({ value, min, max }) => {
+    console.log('SliderTemplate compute called with inputs:', { value, min, max })
+    const result = {
+      'value-out': value,
+      isDragging: false, // Could be computed based on interaction state
+      normalizedValue: (value - min) / (max - min)
+    }
+    console.log('SliderTemplate compute returning:', result)
+    return result
+  },
   'Slider UI component'
 )
 
@@ -388,6 +403,7 @@ export const TextFieldTemplate = primitive(
       validation: { type: 'string', default: '.*' }
     },
     outputs: {
+      'text-out': { type: 'string' },
       isFocused: { type: 'boolean' },
       isValid: { type: 'boolean' },
       length: { type: 'number' }
@@ -396,6 +412,7 @@ export const TextFieldTemplate = primitive(
   ({ text, validation }) => {
     const regex = new RegExp(validation)
     return {
+      'text-out': text,
       isValid: regex.test(text),
       length: text.length
     }

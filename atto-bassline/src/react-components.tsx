@@ -33,6 +33,15 @@ export function Button({ text = 'Button', enabled = true, style = {}, onClicked 
   const [clicked, setClicked] = useContact<boolean>(gadget, 'clicked')
   const [clickCount, setClickCount] = useContact<number>(gadget, 'clickCount')
   
+  // Sync props to gadget state when they change
+  React.useEffect(() => {
+    setText(text)
+  }, [text, setText])
+  
+  React.useEffect(() => {
+    setEnabled(enabled)
+  }, [enabled, setEnabled])
+  
   const handleClick = () => {
     if (!isEnabled) return
     

@@ -52,6 +52,8 @@ function safeStringify(value: any): string {
  * Propagate a signal to a contact using argmax with contradiction detection
  */
 export function propagate(contact: Contact, signal: Signal): void {
+  console.log('propagate() called for contact:', contact.id, 'with signal:', signal, 'targets:', contact.targets.size)
+  
   // If we're in a transaction, batch this update instead of executing immediately
   if (isInTransaction) {
     pendingUpdates.push([contact, signal])
@@ -63,6 +65,7 @@ export function propagate(contact: Contact, signal: Signal): void {
   
   // Check if the contact's gadget is still alive
   const gadgetCheck = contact.gadget?.deref()
+  console.log('Gadget check passed, proceeding with propagation')
   
   // Cap infinite or invalid strength values
   const cappedSignal = {
@@ -70,10 +73,14 @@ export function propagate(contact: Contact, signal: Signal): void {
     strength: isFinite(signal.strength) ? Math.min(signal.strength, 10000000) : 10000  // Raised cap to 10M
   }
   
+  console.log('Signal capped, comparing strengths. New:', cappedSignal.strength, 'vs Current:', contact.signal.strength)
+  
   // Compare strengths
   if (cappedSignal.strength > contact.signal.strength) {
+    console.log('New signal is stronger, updating contact')
     // Stronger signal wins
     contact.signal = cappedSignal
+    console.log('Contact signal updated, checking for gadget computation')
   } else if (signal.strength === contact.signal.strength) {
     // Equal strength - check for contradiction
     if (signal.value !== contact.signal.value) {
@@ -159,10 +166,13 @@ export function propagate(contact: Contact, signal: Signal): void {
     }
   }
   
+  console.log('About to forward to targets. Contact has', contact.targets.size, 'targets')
+  
   // Forward to all target contacts (dumb wire behavior)
   for (const targetRef of contact.targets) {
     const target = targetRef.deref()
     if (target) {
+      console.log('Wire forwarding from', contact.id, 'to', target.id, 'with signal:', signal)
       propagate(target, signal)
     }
   }
