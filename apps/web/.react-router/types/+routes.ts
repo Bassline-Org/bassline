@@ -75,6 +75,12 @@ type Pages = {
   "/worker-test": {
     params: {};
   };
+  "/atto-audio": {
+    params: {};
+  };
+  "/atto-demo": {
+    params: {};
+  };
   "/editor-v2": {
     params: {};
   };
@@ -98,7 +104,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/simple-editor" | "/editor-main" | "/test-sounds" | "/worker-test" | "/editor-v2" | "/api/demo" | "/ws-test" | "/editor" | "/demo" | "/home";
+    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/simple-editor" | "/editor-main" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/ws-test" | "/editor" | "/demo" | "/home";
   };
   "routes/flow.session.$sessionId.group.$groupId.tsx": {
     id: "routes/flow.session.$sessionId.group.$groupId";
@@ -171,6 +177,14 @@ type RouteFiles = {
   "routes/worker-test.tsx": {
     id: "routes/worker-test";
     page: "/worker-test";
+  };
+  "routes/atto-audio.tsx": {
+    id: "routes/atto-audio";
+    page: "/atto-audio";
+  };
+  "routes/atto-demo.tsx": {
+    id: "routes/atto-demo";
+    page: "/atto-demo";
   };
   "routes/editor-v2.tsx": {
     id: "routes/editor-v2";

@@ -12,6 +12,39 @@ import { HYSTERESIS_UNITS, shouldPropagate } from './strength'
 export const HYSTERESIS = HYSTERESIS_UNITS  // In strength units (100 = 0.01)
 
 // ============================================================================
+// Utilities
+// ============================================================================
+
+/**
+ * Safe stringify for debugging - handles circular references
+ */
+function safeStringify(value: any): string {
+  try {
+    // Try to stringify simple values
+    if (value === null || value === undefined) return String(value)
+    if (typeof value === 'string') return value
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+    
+    // For objects, just show the type/constructor name
+    if (typeof value === 'object') {
+      if (value.constructor && value.constructor.name) {
+        return `[${value.constructor.name}]`
+      }
+      return '[Object]'
+    }
+    
+    // For functions
+    if (typeof value === 'function') {
+      return '[Function]'
+    }
+    
+    return String(value)
+  } catch {
+    return '[Unstringifiable]'
+  }
+}
+
+// ============================================================================
 // Core propagation
 // ============================================================================
 
@@ -49,7 +82,7 @@ export function propagate(contact: Contact, signal: Signal): void {
       contact.signal = {
         value: { 
           tag: 'contradiction', 
-          value: `Conflict: ${JSON.stringify(contact.signal.value)} vs ${JSON.stringify(signal.value)}` 
+          value: `Conflict: ${safeStringify(contact.signal.value)} vs ${safeStringify(signal.value)}` 
         },
         strength: signal.strength
       }

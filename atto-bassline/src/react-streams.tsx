@@ -50,12 +50,9 @@ export function useContact<T = any>(gadget: Gadget | null, contactName: string):
     let lastValue = contact.signal.value
     let lastStrength = contact.signal.strength
     
-    console.log(`[useContact] Starting subscription for ${gadget.id}:${contactName} with initial value:`, lastValue)
-    
     const checkForChanges = () => {
       const currentSignal = contact.signal
       if (currentSignal.value !== lastValue || currentSignal.strength !== lastStrength) {
-        console.log(`[useContact] Change detected for ${gadget.id}:${contactName}: ${lastValue} -> ${currentSignal.value}`)
         lastValue = currentSignal.value
         lastStrength = currentSignal.strength
         callback()
@@ -91,13 +88,8 @@ export function useContact<T = any>(gadget: Gadget | null, contactName: string):
     // Always increment strength for monotonic updates
     strengthRef.current += 1
     
-    console.log(`[useContact] Writing ${newValue} to ${gadget.id}:${contactName} with strength ${strengthRef.current}`)
-    
     // Write directly to the contact
     propagate(contact, createSignal(newValue, strengthRef.current))
-    
-    // Debug: check if the contact was actually updated
-    console.log(`[useContact] After write, contact value is:`, contact.signal.value, 'strength:', contact.signal.strength)
   }, [gadget, contactName])
   
   return [value, setValue]

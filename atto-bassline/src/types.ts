@@ -120,14 +120,14 @@ export function createContact(
   direction: 'input' | 'output' = 'input',
   boundary: boolean = false
 ): Contact {
-  const contact = {
+  const contact: Contact = {
     id,
     direction,
     boundary,
     signal: initialSignal || createSignal(),
     gadget: new WeakRef(gadget),
-    sources: new Set(),
-    targets: new Set()
+    sources: new Set<WeakRef<Contact>>(),
+    targets: new Set<WeakRef<Contact>>()
   }
   
   return contact
