@@ -70,7 +70,7 @@ export function propagate(contact: Contact, signal: Signal): void {
   // Cap infinite or invalid strength values
   const cappedSignal = {
     value: signal.value,
-    strength: isFinite(signal.strength) ? Math.min(signal.strength, 10000000) : 10000  // Raised cap to 10M
+    strength: isFinite(signal.strength) ? Math.min(signal.strength, 1000000000) : 10000  // Raised cap to 1B
   }
   
   console.log('Signal capped, comparing strengths. New:', cappedSignal.strength, 'vs Current:', contact.signal.strength)
@@ -134,12 +134,14 @@ export function propagate(contact: Contact, signal: Signal): void {
           
           // Check if input has a real value (not null and has strength)
           if (inputSignal.value === null || inputSignal.strength === 0) {
+            console.log(`Input ${name} not ready:`, inputSignal.value, 'strength:', inputSignal.strength)
             allInputsReady = false
             break
           }
         }
         
         if (!allInputsReady) {
+          console.log('Not all inputs ready for gadget', gadget.id, '- skipping compute')
           return // Don't compute yet, wait for all inputs
         }
       }

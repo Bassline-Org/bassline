@@ -45,7 +45,9 @@ export interface Template {
  */
 export interface PrimitiveTemplate extends Template {
   primitive: {
-    compute: (inputs: Record<string, any>) => Record<string, any>
+    compute: (inputs: Record<string, any>, state: any) => { outputs: Record<string, any>, state?: any }
+    activate?: (inputs: Record<string, any>) => boolean
+    initialState?: () => any
   }
   // Primitives have contacts but no components
   contacts: {
@@ -70,7 +72,10 @@ export function instantiate(template: Template, id: string): Gadget {
     
     // Create input contacts
     for (const [name, def] of Object.entries(prim.contacts.inputs || {})) {
-      const contact = createContact(name, gadget, signal(def.default ?? null, 0), 'input')
+      // Give default values a strength so gadgets can compute
+      const defaultValue = def.default ?? null
+      const strength = defaultValue !== null ? 1 : 0  // Use decimal strength (1.0 = 10000 units)
+      const contact = createContact(name, gadget, signal(defaultValue, strength), 'input')
       gadget.contacts.set(name, contact)
     }
     
@@ -79,6 +84,9 @@ export function instantiate(template: Template, id: string): Gadget {
       const contact = createContact(name, gadget, signal(null, 0), 'output')
       gadget.contacts.set(name, contact)
     }
+    
+    // Initialize state if needed
+    let gadgetState = prim.primitive.initialState ? prim.primitive.initialState() : undefined
     
     // Set compute function
     gadget.compute = (inputSignals) => {
@@ -89,10 +97,21 @@ export function instantiate(template: Template, id: string): Gadget {
         inputs[name] = inputSignals.get(name)?.value
       }
       
-      const outputs = prim.primitive.compute(inputs)
+      // Check activation condition
+      if (prim.primitive.activate && !prim.primitive.activate(inputs)) {
+        console.log('Gadget', gadget.id, 'not activated, skipping compute')
+        return new Map()
+      }
+      
+      const result = prim.primitive.compute(inputs, gadgetState)
+      
+      // Update state if returned
+      if (result.state !== undefined) {
+        gadgetState = result.state
+      }
       
       const outputSignals = new Map<string, Signal>()
-      for (const [name, value] of Object.entries(outputs)) {
+      for (const [name, value] of Object.entries(result.outputs)) {
         if (value !== undefined) {
           // Average input strengths for output
           const strengths = Array.from(inputSignals.values()).map(s => s.strength)
@@ -297,6 +316,57 @@ export function tap(main: Template, side: Template): Template {
 // Primitive Template Helpers
 // ============================================================================
 
+// ============================================================================
+// Activation Function Helpers
+// ============================================================================
+
+/**
+ * Require specific inputs to have non-null values
+ */
+export function require(inputNames: string[]): (inputs: Record<string, any>) => boolean {
+  return (inputs) => {
+    for (const name of inputNames) {
+      if (inputs[name] === null || inputs[name] === undefined || inputs[name] === '') {
+        return false
+      }
+    }
+    return true
+  }
+}
+
+/**
+ * Require any of the specified inputs to have changed (for edge-triggered behavior)
+ */
+export function onAny(inputNames: string[]): (inputs: Record<string, any>) => boolean {
+  return (inputs) => {
+    for (const name of inputNames) {
+      if (inputs[name]) return true
+    }
+    return false
+  }
+}
+
+/**
+ * Always activate (useful for overriding default)
+ */
+export function always(): (inputs: Record<string, any>) => boolean {
+  return () => true
+}
+
+/**
+ * Require all inputs to be non-null (default behavior)
+ */
+export function requireAll(inputNames: string[]): (inputs: Record<string, any>) => boolean {
+  return (inputs) => {
+    for (const name of inputNames) {
+      if (inputs[name] === null || inputs[name] === undefined) {
+        return false
+      }
+    }
+    return true
+  }
+}
+
 /**
  * Create a primitive template from a compute function
  */
@@ -305,11 +375,32 @@ export function primitive(
     inputs: Record<string, { type: string, default?: any }>
     outputs: Record<string, { type: string }>
   },
-  compute: (inputs: Record<string, any>) => Record<string, any>,
-  description?: string
+  compute: (inputs: Record<string, any>, state?: any) => Record<string, any> | { outputs: Record<string, any>, state?: any },
+  description?: string,
+  options?: {
+    activate?: (inputs: Record<string, any>) => boolean
+    initialState?: () => any
+  }
 ): PrimitiveTemplate {
+  // Normalize compute function to always return { outputs, state }
+  const normalizedCompute = (inputs: Record<string, any>, state: any) => {
+    const result = compute(inputs, state)
+    if ('outputs' in result) {
+      return result
+    } else {
+      return { outputs: result }
+    }
+  }
+  
+  // Default activation: require all inputs to be non-null
+  const defaultActivate = requireAll(Object.keys(contacts.inputs))
+  
   return {
-    primitive: { compute },
+    primitive: { 
+      compute: normalizedCompute,
+      activate: options?.activate || defaultActivate,
+      initialState: options?.initialState
+    },
     contacts,
     description
   }
@@ -329,7 +420,7 @@ export const Add = primitive(
       result: { type: 'number' }
     }
   },
-  ({ a, b }) => ({ result: a + b }),
+  ({ a, b }) => ({ result: (a ?? 0) + (b ?? 0) }),
   'Add two numbers'
 )
 
@@ -343,7 +434,7 @@ export const Multiply = primitive(
       result: { type: 'number' }
     }
   },
-  ({ a, b }) => ({ result: a * b }),
+  ({ a, b }) => ({ result: (a ?? 1) * (b ?? 1) }),
   'Multiply two numbers'
 )
 
@@ -418,4 +509,77 @@ export const TextFieldTemplate = primitive(
     }
   },
   'Text field UI component'
+)
+
+// ============================================================================
+// Control Flow Primitives
+// ============================================================================
+
+export const SelectorTemplate = primitive(
+  {
+    inputs: {
+      trigger: { type: 'boolean', default: false },
+      reset: { type: 'boolean', default: false },
+      length: { type: 'number', default: 8 },
+      setValue: { type: 'number', default: null },
+    },
+    outputs: {
+      currentIndex: { type: 'number' },
+      output0: { type: 'boolean' },
+      output1: { type: 'boolean' },
+      output2: { type: 'boolean' },
+      output3: { type: 'boolean' },
+      output4: { type: 'boolean' },
+      output5: { type: 'boolean' },
+      output6: { type: 'boolean' },
+      output7: { type: 'boolean' },
+      output8: { type: 'boolean' },
+      output9: { type: 'boolean' },
+      output10: { type: 'boolean' },
+      output11: { type: 'boolean' },
+      output12: { type: 'boolean' },
+      output13: { type: 'boolean' },
+      output14: { type: 'boolean' },
+      output15: { type: 'boolean' },
+    }
+  },
+  (inputs, state) => {
+    let currentIndex = state?.currentIndex ?? 0
+    let triggered = false
+    
+    // Handle reset
+    if (inputs.reset) {
+      currentIndex = 0
+    }
+    // Handle direct value setting
+    else if (inputs.setValue !== null && typeof inputs.setValue === 'number') {
+      currentIndex = Math.floor(inputs.setValue) % Math.max(1, inputs.length || 8)
+    }
+    // Handle trigger to increment
+    else if (inputs.trigger) {
+      currentIndex = (currentIndex + 1) % Math.max(1, inputs.length || 8)
+      triggered = true
+    }
+    
+    // Create outputs - only the current index gets the trigger
+    const outputs: Record<string, any> = {
+      currentIndex: currentIndex
+    }
+    
+    // Set all outputs to false, except the current one if triggered
+    for (let i = 0; i < 16; i++) {
+      outputs[`output${i}`] = triggered && i === currentIndex
+    }
+    
+    return {
+      outputs,
+      state: { currentIndex }
+    }
+  },
+  'Selector/demultiplexer - routes trigger to selected output',
+  {
+    // Activate on any of these inputs changing
+    activate: onAny(['trigger', 'reset', 'setValue']),
+    initialState: () => ({ currentIndex: 0 })
+  }
 )

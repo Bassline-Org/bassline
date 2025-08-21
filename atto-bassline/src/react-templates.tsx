@@ -268,7 +268,7 @@ export function useContact<T = any>(
       
       // Propagate the new value
       console.log('Propagating to contact:', contactName, 'with value:', newValue, 'on gadget:', gadget.id)
-      propagate(contact, signal(newValue as any, strengthRef.current / 10000))
+      propagate(contact, signal(newValue as any, strengthRef.current))
       debounceTimerRef.current = null
     }
     
