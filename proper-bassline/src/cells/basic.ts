@@ -6,7 +6,7 @@
  */
 
 import { Cell } from '../cell'
-import { LatticeValue, Connection, num, bool, array, nil, getValue, isNumber, isBool, isArray, isDict, dict, ordinalValue, getOrdinal} from '../types'
+import { LatticeValue, Connection, num, bool, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal} from '../types'
 
 // Max lattice for numbers (idempotent: max(a,a) = a)
 export class MaxCell extends Cell {
@@ -73,7 +73,7 @@ export class OrdinalCell extends Cell {
     
     // Include current value if it's an ordinal dict
     const current = this.outputs.get('default')
-    if (current && isDict(current) && current.value.ordinal && current.value.value) {
+    if (current && isDict(current) && current.value.has("ordinal") && current.value.has("value")) {
       values.push(current)
     }
     
@@ -89,8 +89,7 @@ export class OrdinalCell extends Cell {
   latticeOp(...values: LatticeValue[]): LatticeValue {
     const dicts = values
       .filter(isDict)
-      .filter(d => d.value.ordinal && d.value.value)
-      .map(v => v.value);
+      .filter(d => d.value.has("ordinal") && d.value.has("value"))
     
     if (dicts.length === 0) return nil()
     
@@ -99,18 +98,18 @@ export class OrdinalCell extends Cell {
     let maxDict = dicts[0]
     
     for (const d of dicts) {
-      const ordinal = d.ordinal
-      if (isNumber(ordinal) && ordinal.value > maxOrdinal) {
+      const ordinal = d.value.get("ordinal")
+      if (ordinal && isNumber(ordinal) && ordinal.value > maxOrdinal) {
         maxOrdinal = ordinal.value
         maxDict = d
       }
     }
     
     // Return the entire dict (preserves ordinal for future merges)
-    return dict({ 
-      ordinal: maxDict.ordinal!, 
-      value: maxDict.value!
-    })
+    const result = new Map<string, LatticeValue>()
+    result.set("ordinal", maxDict.value.get("ordinal")!)
+    result.set("value", maxDict.value.get("value")!)
+    return dict(result)
   }
 }
 
@@ -150,29 +149,22 @@ export class AndCell extends Cell {
   }
 }
 
-// Union lattice for arrays (treats arrays as sets - deduplicates)
+// Union lattice for sets (idempotent: A ∪ A = A)
 export class UnionCell extends Cell {
   latticeOp(...values: LatticeValue[]): LatticeValue {
-    const arrays = values
-      .filter(isArray)
+    const sets = values
+      .filter(isSet)
       .map(v => v.value)
     
-    if (arrays.length === 0) return nil()
+    if (sets.length === 0) return nil()
     
-    // Use JSON.stringify for deep equality when deduplicating
-    const seen = new Set<string>()
-    const result: LatticeValue[] = []
-    
-    for (const arr of arrays) {
-      for (const item of arr) {
-        const key = JSON.stringify(item)
-        if (!seen.has(key)) {
-          seen.add(key)
-          result.push(item)
-        }
+    const result = new Set<LatticeValue>()
+    for (const s of sets) {
+      for (const item of s) {
+        result.add(item)
       }
     }
-    return array(result)
+    return set(result)
   }
 }
 
