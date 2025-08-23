@@ -1,6 +1,6 @@
 /**
  * React integration for proper-bassline
- * Provides hooks and components for using the new Cell/Function model in React
+ * Components ARE gadgets in the propagation network
  */
 
 import { 
@@ -18,7 +18,7 @@ import { Network } from './network'
 import { Cell } from './cell'
 import { FunctionGadget } from './function'
 import type { Gadget, LatticeValue } from './types'
-import { nil } from './types'
+import { nil, ordinalValue, getMapValue } from './types'
 
 // ============================================================================
 // Network Context
@@ -26,7 +26,6 @@ import { nil } from './types'
 
 interface NetworkContextValue {
   network: Network
-  subscriptions: Map<string, Set<() => void>>
 }
 
 const NetworkContext = createContext<NetworkContextValue | null>(null)
@@ -39,8 +38,7 @@ export function NetworkProvider({
   network?: Network
 }) {
   const [contextValue] = useState<NetworkContextValue>(() => ({
-    network: network || new Network('main'),
-    subscriptions: new Map()
+    network: network || new Network('main')
   }))
   
   return (
@@ -55,126 +53,148 @@ export function NetworkProvider({
 // ============================================================================
 
 /**
- * Create and manage a gadget's lifecycle in React
+ * Create a gadget that lives in the network
+ * The component using this hook IS a gadget
  */
 export function useGadget<T extends Gadget>(
   createGadget: () => T,
-  deps: React.DependencyList = []
+  stableId?: string
 ): T {
   const context = useContext(NetworkContext)
   if (!context) throw new Error('useGadget must be used within NetworkProvider')
   
   const [gadget] = useState<T>(() => {
+    // Generate ID - use stable ID if provided
+    const id = stableId || `component-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    
+    // Check if gadget already exists (for stable IDs)
+    if (stableId) {
+      for (const g of context.network.gadgets) {
+        if (g.id === stableId) {
+          return g as T
+        }
+      }
+    }
+    
+    // Create new gadget
     const g = createGadget()
     context.network.add(g)
     return g
   })
   
-  // Re-create if deps change
-  useEffect(() => {
-    if (deps.length > 0) {
-      // Remove old gadget
-      context.network.gadgets.delete(gadget)
-      
-      // Create and add new one
-      const newGadget = createGadget()
-      context.network.add(newGadget)
-      
-      // Note: This would need state update to work properly
-      // For now, deps should be empty for stable gadgets
-    }
-  }, deps)
-  
-  // Cleanup on unmount
+  // Cleanup on unmount (only if not using stable ID)
   useEffect(() => {
     return () => {
-      context.network.gadgets.delete(gadget)
+      if (!stableId) {
+        context.network.gadgets.delete(gadget)
+      }
     }
-  }, [gadget, context.network])
+  }, [gadget, context.network, stableId])
   
   return gadget
 }
 
 // ============================================================================
-// useGadgetOutput Hook
+// useCell Hook
 // ============================================================================
 
 /**
- * Subscribe to a gadget's output and re-render on changes
+ * Create a React binding to a Cell
+ * Provides useState-like API with automatic propagation
  */
-export function useGadgetOutput<T = LatticeValue>(
-  gadget: Gadget | null,
+export function useCell<T = any>(
+  cell: Cell | null,
   outputName: string = 'default'
-): T | null {
+): [T | null, (value: T) => void] {
   const context = useContext(NetworkContext)
-  if (!context) throw new Error('useGadgetOutput must be used within NetworkProvider')
+  if (!context) throw new Error('useCell must be used within NetworkProvider')
   
   const [, forceUpdate] = useState({})
+  const lastValueRef = useRef<LatticeValue | null>(null)
+  const ordinalRef = useRef(0)
   
   // Subscribe to changes
-  useEffect(() => {
-    if (!gadget) return
+  const subscribe = useCallback((callback: () => void) => {
+    if (!cell) return () => {}
     
-    const gadgetId = gadget.id
-    const subscription = () => forceUpdate({})
-    
-    // Add to subscription map
-    if (!context.subscriptions.has(gadgetId)) {
-      context.subscriptions.set(gadgetId, new Set())
-    }
-    context.subscriptions.get(gadgetId)!.add(subscription)
-    
-    // Poll for changes (simple approach for now)
+    // Poll for changes
     const interval = setInterval(() => {
-      // Check if output changed
-      subscription()
+      const currentValue = cell.outputs.get(outputName)
+      if (currentValue !== lastValueRef.current) {
+        lastValueRef.current = currentValue || null
+        callback()
+      }
     }, 16) // 60fps
     
-    return () => {
-      clearInterval(interval)
-      context.subscriptions.get(gadgetId)?.delete(subscription)
-    }
-  }, [gadget, outputName, context])
+    return () => clearInterval(interval)
+  }, [cell, outputName])
   
-  if (!gadget) return null
+  // Get current value - extract from ordinal map if present
+  const getSnapshot = useCallback((): LatticeValue | null => {
+    if (!cell) return null
+    const output = cell.outputs.get(outputName) || null
+    // If it's an ordinal map, extract the value
+    return getMapValue(output) || output
+  }, [cell, outputName])
   
-  const output = gadget.outputs.get(outputName)
-  return output as T
+  // Server snapshot for SSR
+  const getServerSnapshot = useCallback(() => null, [])
+  
+  // Use React's external store hook
+  const value = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  
+  // Setter that creates ordinal-tagged values
+  const setValue = useCallback((newValue: T) => {
+    if (!cell) return
+    
+    // Create ordinal-tagged value
+    const ordinalVal = ordinalValue(++ordinalRef.current, newValue as any)
+    
+    // Set it directly on the cell
+    cell.setOutput(outputName, ordinalVal)
+    
+    // Trigger computation
+    cell.compute()
+    
+    // Propagate through the network
+    context.network.propagate()
+  }, [cell, outputName, context])
+  
+  return [value as T | null, setValue]
 }
 
 // ============================================================================
-// useGadgetInput Hook
+// useFunction Hook
 // ============================================================================
 
 /**
- * Set input on a gadget and trigger propagation
+ * Get output from a Function gadget
+ * Functions don't have setters - they compute from inputs
  */
-export function useGadgetInput(
-  gadget: Gadget | null,
-  inputName?: string
-): (value: LatticeValue) => void {
-  const context = useContext(NetworkContext)
-  if (!context) throw new Error('useGadgetInput must be used within NetworkProvider')
+export function useFunctionOutput<T = any>(
+  func: FunctionGadget | null,
+  outputName: string = 'default'
+): T | null {
+  const [, forceUpdate] = useState({})
+  const lastValueRef = useRef<LatticeValue | null>(null)
   
-  return useCallback((value: LatticeValue) => {
-    if (!gadget) return
+  // Poll for changes
+  useEffect(() => {
+    if (!func) return
     
-    if (gadget instanceof Cell) {
-      // For cells, we need to create a temporary source
-      // This is a bit hacky - in real use you'd wire from another gadget
-      console.warn('Setting input directly on Cell - consider wiring from another gadget')
-    } else if (gadget instanceof FunctionGadget && inputName) {
-      // For functions, we can set named inputs
-      // But really they should be wired too
-      console.warn('Setting input directly on Function - consider wiring from another gadget')
-    }
+    const interval = setInterval(() => {
+      const currentValue = func.outputs.get(outputName)
+      if (currentValue !== lastValueRef.current) {
+        lastValueRef.current = currentValue || null
+        forceUpdate({})
+      }
+    }, 16) // 60fps
     
-    // Set the output (which will be read by connected gadgets)
-    gadget.setOutput(inputName || 'default', value)
-    
-    // Trigger propagation
-    context.network.propagate()
-  }, [gadget, inputName, context])
+    return () => clearInterval(interval)
+  }, [func, outputName])
+  
+  if (!func) return null
+  return func.outputs.get(outputName) as T | null
 }
 
 // ============================================================================
@@ -232,47 +252,17 @@ export function useWiring(
 }
 
 // ============================================================================
-// useCellBuilder Hook
+// useNetwork Hook
 // ============================================================================
 
 /**
- * Build cells with chainable API in React
+ * Get the current network from context
+ * Networks are gadgets too!
  */
-export function useCellBuilder<T extends Cell>(
-  CellClass: new (id: string) => T,
-  sources: Gadget[] = []
-): T {
-  const gadget = useGadget(() => {
-    const cell = new CellClass(`cell-${Date.now()}`)
-    if (sources.length > 0) {
-      cell.from(...sources)
-    }
-    return cell
-  }, []) // Empty deps for now
-  
-  return gadget
-}
-
-// ============================================================================
-// useFunctionBuilder Hook
-// ============================================================================
-
-/**
- * Build functions with connection object API in React
- */
-export function useFunctionBuilder<T extends FunctionGadget>(
-  FunctionClass: new (id: string) => T,
-  inputs: Record<string, Gadget> = {}
-): T {
-  const gadget = useGadget(() => {
-    const func = new FunctionClass(`func-${Date.now()}`)
-    if (Object.keys(inputs).length > 0) {
-      func.connect(inputs)
-    }
-    return func
-  }, []) // Empty deps for now
-  
-  return gadget
+export function useNetwork(): Network {
+  const context = useContext(NetworkContext)
+  if (!context) throw new Error('useNetwork must be used within NetworkProvider')
+  return context.network
 }
 
 // ============================================================================

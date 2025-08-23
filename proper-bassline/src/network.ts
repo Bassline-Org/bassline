@@ -6,7 +6,8 @@
  */
 
 import { Cell } from './cell'
-import { Gadget, LatticeValue } from './types'
+import { Gadget } from './gadget'
+import { LatticeValue } from './types'
 
 export class Network extends Cell {
   gadgets: Set<Gadget> = new Set()  // Strong references to prevent GC (includes child networks!)
@@ -54,59 +55,25 @@ export class Network extends Cell {
     }
   }
   
-  // Override compute to propagate through the network
+  // Override compute for compatibility
   compute(): void {
-    this.propagate()
-    // Network's output is a summary of its state
+    // With new propagation protocol, we don't need centralized propagation
+    // Just update our output summary
     this.setOutput("default", { 
       type: "string", 
       value: `network[${this.gadgets.size} gadgets]` 
-    })
+    }, false)  // Don't auto-emit to avoid loops
   }
   
-  // Propagate until fixpoint
-  propagate(maxIterations: number = 100): number {
-    let iterations = 0
-    let changed = true
-    
-    // Keep track of previous outputs to detect changes
-    const previousOutputs = new Map<string, any>()
-    
-    // Initialize previous outputs for all gadgets
+  // Start propagation by computing all gadgets once
+  // The new protocol handles propagation automatically
+  propagate(): void {
+    // Just compute each gadget once to kick off propagation
+    // The accept/emit protocol will handle the rest
     for (const gadget of this.gadgets) {
-      const key = `${gadget.id}:default`
-      const output = gadget.getOutput("default")
-      previousOutputs.set(key, JSON.stringify(output))
+      if (gadget === this) continue  // Skip ourselves
+      gadget.compute()
     }
-    
-    while (changed && iterations < maxIterations) {
-      changed = false
-      iterations++
-      
-      // Compute all gadgets (including child networks which are also gadgets!)
-      for (const gadget of this.gadgets) {
-        // Skip computing ourselves to avoid infinite recursion
-        if (gadget === this) continue
-        
-        gadget.compute()
-        
-        // Check if output changed
-        const key = `${gadget.id}:default`
-        const currentOutput = JSON.stringify(gadget.getOutput("default"))
-        const previousOutput = previousOutputs.get(key)
-        
-        if (currentOutput !== previousOutput) {
-          changed = true
-          previousOutputs.set(key, currentOutput)
-        }
-      }
-    }
-    
-    if (iterations >= maxIterations) {
-      console.warn(`Network ${this.id} did not converge after ${maxIterations} iterations`)
-    }
-    
-    return iterations
   }
   
   // Merge another network into this one (true UNION - flattens everything)

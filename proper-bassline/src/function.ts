@@ -8,11 +8,13 @@
  * Uses WeakRefs for connections to prevent memory leaks.
  */
 
-import { Gadget, Connection, LatticeValue, nil } from './types'
+import { Gadget } from './gadget'
+import { Connection, LatticeValue, nil } from './types'
 
 export abstract class FunctionGadget extends Gadget {
   inputs: Map<string, Connection> = new Map()
   inputNames: string[]
+  currentValues: Map<string, LatticeValue> = new Map()
   
   // The function to apply - takes named arguments
   abstract fn(args: Record<string, LatticeValue>): LatticeValue
@@ -20,6 +22,30 @@ export abstract class FunctionGadget extends Gadget {
   constructor(id: string, inputNames: string[]) {
     super(id)
     this.inputNames = inputNames
+  }
+  
+  /**
+   * Accept information from upstream
+   * Functions store values and compute when ready
+   */
+  accept(value: LatticeValue, source: Gadget, inputName?: string): void {
+    if (!inputName) {
+      console.warn(`Function ${this.id} received value without input name`)
+      return
+    }
+    
+    // Store the value
+    this.currentValues.set(inputName, value)
+    
+    // Check if we have all inputs to compute
+    if (this.hasAllValues()) {
+      this.computeFunction()
+    }
+  }
+  
+  // Check if we have values for all inputs
+  private hasAllValues(): boolean {
+    return this.inputNames.every(name => this.currentValues.has(name))
   }
   
   // Connect from a source gadget to a named input (only ONE connection per input!)
@@ -37,6 +63,12 @@ export abstract class FunctionGadget extends Gadget {
       source: new WeakRef(source),
       outputName
     })
+    
+    // Register for downstream emissions
+    source.addDownstream(this, inputName)
+    
+    // Pull initial value
+    this.accept(source.getOutput(outputName), source, inputName)
   }
   
   // Connect multiple inputs at once (ergonomic!)
@@ -52,10 +84,24 @@ export abstract class FunctionGadget extends Gadget {
     this.inputs.delete(inputName)
   }
   
-  // Compute by applying function to named inputs
+  // Private method to compute function
+  private computeFunction(): void {
+    // Build args from current values
+    const args: Record<string, LatticeValue> = {}
+    for (const name of this.inputNames) {
+      args[name] = this.currentValues.get(name) ?? nil()
+    }
+    
+    // Apply function
+    const result = this.fn(args)
+    
+    // Set output (will auto-emit if changed)
+    this.setOutput("default", result)
+  }
+  
+  // Legacy compute for compatibility
   compute(): void {
     // Collect all input values by name
-    const args: Record<string, LatticeValue> = {}
     const deadInputs: string[] = []
     
     for (const name of this.inputNames) {
@@ -63,15 +109,15 @@ export abstract class FunctionGadget extends Gadget {
       if (conn) {
         const source = conn.source.deref()
         if (source) {
-          args[name] = source.getOutput(conn.outputName)
+          this.currentValues.set(name, source.getOutput(conn.outputName))
         } else {
           // Source was garbage collected
           deadInputs.push(name)
-          args[name] = nil()
+          this.currentValues.set(name, nil())
         }
       } else {
         // Missing input = null
-        args[name] = nil()
+        this.currentValues.set(name, nil())
       }
     }
     
@@ -80,11 +126,10 @@ export abstract class FunctionGadget extends Gadget {
       this.inputs.delete(name)
     }
     
-    // Apply function
-    const result = this.fn(args)
-    
-    // Set output
-    this.setOutput("default", result)
+    // Compute if we have all values
+    if (this.hasAllValues()) {
+      this.computeFunction()
+    }
   }
   
   // Check if all required inputs are connected and alive

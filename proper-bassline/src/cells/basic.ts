@@ -6,7 +6,7 @@
  */
 
 import { Cell } from '../cell'
-import { LatticeValue, num, bool, set, nil, getValue, isNumber, isBool, isSet } from '../types'
+import { LatticeValue, Connection, num, bool, array, nil, getValue, isNumber, isBool, isArray, isDict, dict, ordinalValue, getOrdinal} from '../types'
 
 // Max lattice for numbers (idempotent: max(a,a) = a)
 export class MaxCell extends Cell {
@@ -17,6 +17,100 @@ export class MaxCell extends Cell {
     
     if (numbers.length === 0) return nil()
     return num(Math.max(...numbers))
+  }
+}
+
+// Ordinal Lattice for sequences of inputs, like user input etc  
+export class OrdinalCell extends Cell {
+  private userOrdinal = 0
+  
+  // Override setOutput to only emit when ordinal increases
+  protected setOutput(name: string, value: LatticeValue, autoEmit: boolean = true): void {
+    const current = this.outputs.get(name) || nil()
+    const currentOrdinal = getOrdinal(current) || -1
+    const newOrdinal = getOrdinal(value) || -1
+    
+    // Only update if ordinal increased (moved up in lattice)
+    if (newOrdinal > currentOrdinal) {
+      super.setOutput(name, value, autoEmit)
+    }
+  }
+  
+  /**
+   * UI convenience method for user input with auto-incrementing ordinal
+   * Wraps the value in an ordinal map and sends through accept
+   */
+  userInput(value: LatticeValue): void {
+    // Get current ordinal and increment from there
+    const current = this.outputs.get('default') || nil()
+    const currentOrdinal = getOrdinal(current) || 0
+    this.userOrdinal = Math.max(this.userOrdinal, currentOrdinal)
+    
+    const ordinalVal = ordinalValue(++this.userOrdinal, value)
+    // Just use accept - it will handle the latticeOp
+    this.accept(ordinalVal, this)
+  }
+  
+  // Override compute to preserve current value when no inputs
+  compute(): void {
+    // Collect values from all live connections
+    const values: LatticeValue[] = []
+    const deadConnections: Connection[] = []
+    
+    for (const conn of this.inputs) {
+      const source = conn.source.deref()
+      if (source) {
+        values.push(source.getOutput(conn.outputName))
+      } else {
+        deadConnections.push(conn)
+      }
+    }
+    
+    // Clean up dead connections
+    for (const conn of deadConnections) {
+      this.inputs.delete(conn)
+    }
+    
+    // Include current value if it's an ordinal dict
+    const current = this.outputs.get('default')
+    if (current && isDict(current) && current.value.ordinal && current.value.value) {
+      values.push(current)
+    }
+    
+    // Apply lattice operation
+    if (values.length === 0) {
+      this.setOutput("default", nil())
+    } else {
+      // Always use latticeOp to handle merging
+      this.setOutput("default", this.latticeOp(...values))
+    }
+  }
+  
+  latticeOp(...values: LatticeValue[]): LatticeValue {
+    const dicts = values
+      .filter(isDict)
+      .filter(d => d.value.ordinal && d.value.value)
+      .map(v => v.value);
+    
+    if (dicts.length === 0) return nil()
+    
+    // Find the dict with the highest ordinal - this is "last write wins"
+    let maxOrdinal = -Infinity
+    let maxDict = dicts[0]
+    
+    for (const d of dicts) {
+      const ordinal = d.ordinal
+      if (isNumber(ordinal) && ordinal.value > maxOrdinal) {
+        maxOrdinal = ordinal.value
+        maxDict = d
+      }
+    }
+    
+    // Return the entire dict (preserves ordinal for future merges)
+    return dict({ 
+      ordinal: maxDict.ordinal!, 
+      value: maxDict.value!
+    })
   }
 }
 
@@ -56,22 +150,29 @@ export class AndCell extends Cell {
   }
 }
 
-// Union lattice for sets (idempotent: A ∪ A = A)
+// Union lattice for arrays (treats arrays as sets - deduplicates)
 export class UnionCell extends Cell {
   latticeOp(...values: LatticeValue[]): LatticeValue {
-    const sets = values
-      .filter(isSet)
+    const arrays = values
+      .filter(isArray)
       .map(v => v.value)
     
-    if (sets.length === 0) return nil()
+    if (arrays.length === 0) return nil()
     
-    const result = new Set<LatticeValue>()
-    for (const s of sets) {
-      for (const item of s) {
-        result.add(item)
+    // Use JSON.stringify for deep equality when deduplicating
+    const seen = new Set<string>()
+    const result: LatticeValue[] = []
+    
+    for (const arr of arrays) {
+      for (const item of arr) {
+        const key = JSON.stringify(item)
+        if (!seen.has(key)) {
+          seen.add(key)
+          result.push(item)
+        }
       }
     }
-    return set(result)
+    return array(result)
   }
 }
 

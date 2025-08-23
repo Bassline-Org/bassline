@@ -8,7 +8,8 @@
  * Uses WeakRefs for connections to prevent memory leaks.
  */
 
-import { Gadget, Connection, LatticeValue, nil } from './types'
+import { Gadget } from './gadget'
+import { Connection, LatticeValue, nil } from './types'
 
 export abstract class Cell extends Gadget {
   // Multiple inputs allowed (many-to-one)
@@ -19,6 +20,19 @@ export abstract class Cell extends Gadget {
   
   // The lattice join operation - must be ACI
   abstract latticeOp(...values: LatticeValue[]): LatticeValue
+  
+  /**
+   * Accept information from upstream
+   * Cells join all inputs via latticeOp
+   */
+  accept(value: LatticeValue, source: Gadget, inputName?: string): void {
+    // Join the incoming value with current output
+    const current = this.outputs.get('default')
+    const result = current ? this.latticeOp(current, value) : value
+    
+    // Set the result (will auto-emit if changed)
+    this.setOutput('default', result)
+  }
   
   // Mark this cell as a boundary (monotonic - can't be undone)
   makeBoundary(): void {
@@ -36,6 +50,12 @@ export abstract class Cell extends Gadget {
       source: new WeakRef(source),
       outputName
     })
+    
+    // Register for downstream emissions
+    source.addDownstream(this)
+    
+    // Pull initial value - source should eagerly send its current value
+    this.accept(source.getOutput(outputName), source)
   }
   
   // Chainable version that returns this
@@ -58,8 +78,8 @@ export abstract class Cell extends Gadget {
     }
   }
   
-  // Compute by applying lattice join to all inputs
-  compute(): void {
+  // Private method to compute with all inputs
+  private computeWithInputs(): void {
     // Collect values from all live connections
     const values: LatticeValue[] = []
     const deadConnections: Connection[] = []
@@ -81,13 +101,22 @@ export abstract class Cell extends Gadget {
     }
     
     // Apply lattice operation
+    let result: LatticeValue
     if (values.length === 0) {
-      this.setOutput("default", nil())
+      result = nil()
     } else if (values.length === 1) {
-      this.setOutput("default", values[0])
+      result = values[0]
     } else {
-      this.setOutput("default", this.latticeOp(...values))
+      result = this.latticeOp(...values)
     }
+    
+    // Set output (will auto-emit if changed)
+    this.setOutput("default", result)
+  }
+  
+  // Legacy compute for compatibility
+  compute(): void {
+    this.computeWithInputs()
   }
   
   // Get all live sources (for debugging)
