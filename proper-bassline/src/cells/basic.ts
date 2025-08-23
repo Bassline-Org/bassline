@@ -197,3 +197,54 @@ export class LatestCell extends Cell {
     return latest ?? nil()
   }
 }
+
+// SetCell - Grow-only set with automatic deduplication
+// Uses union operation as the lattice operation
+export class SetCell extends Cell {
+  latticeOp(...values: LatticeValue[]): LatticeValue {
+    const sets = values.filter(isSet)
+    
+    if (sets.length === 0) return set(new Set())
+    
+    // Union all sets together
+    const result = new Set<LatticeValue>()
+    for (const s of sets) {
+      for (const item of s.value) {
+        result.add(item)
+      }
+    }
+    
+    return set(result)
+  }
+  
+  // Convenience method to add items to the set
+  add(item: LatticeValue): void {
+    const current = this.getOutput() || set(new Set())
+    if (!isSet(current)) return
+    
+    const newSet = new Set(current.value)
+    newSet.add(item)
+    this.accept(set(newSet), this)
+  }
+  
+  // Convenience method to check if set contains item
+  has(item: LatticeValue): boolean {
+    const current = this.getOutput()
+    if (!current || !isSet(current)) return false
+    
+    // Check for deep equality
+    for (const existing of current.value) {
+      if (JSON.stringify(existing) === JSON.stringify(item)) {
+        return true
+      }
+    }
+    return false
+  }
+  
+  // Get size of the set
+  get size(): number {
+    const current = this.getOutput()
+    if (!current || !isSet(current)) return 0
+    return current.value.size
+  }
+}

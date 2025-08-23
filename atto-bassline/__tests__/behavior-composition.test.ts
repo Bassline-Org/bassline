@@ -155,11 +155,11 @@ describe('Behavior Composition', () => {
       
       const outputs = gadget.compute!(new Map([
         ['__behavior', signal(behavior, 1.0)],
-        ['source', signal('data', 0.8)]
+        ['source', signal('data', 80)]
       ]))
       
       expect(outputs.get('dest')?.value).toBe('data')
-      expect(outputs.get('dest')?.strength).toBe(8000)
+      expect(outputs.get('dest')?.weight).toBe(80)
     })
   })
   
@@ -273,7 +273,7 @@ describe('Behavior Composition', () => {
       
       const outputs = gadget.compute!(new Map([
         ['__behavior', signal(behavior, 1.0)],
-        ['templateIn', signal(template1, 0.5)]
+        ['templateIn', signal(template1, 50)]
       ]))
       
       const outTemplate = outputs.get('templateOut')?.value as TemplateSignal
@@ -422,8 +422,8 @@ describe('Behavior Composition', () => {
       
       // No behavior bound
       const outputs = gadget.compute!(new Map([
-        ['input', signal('data', 0.5)],
-        ['other', signal('ignored', 0.5)]
+        ['input', signal('data', 50)],
+        ['other', signal('ignored', 50)]
       ]))
       
       // Should not forward (no matching output name)
