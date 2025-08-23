@@ -45,6 +45,9 @@ type Pages = {
   "/api/bassline/import": {
     params: {};
   };
+  "/programmable-editor": {
+    params: {};
+  };
   "/api/editor/actions": {
     params: {};
   };
@@ -64,6 +67,12 @@ type Pages = {
     params: {};
   };
   "/editor-layout": {
+    params: {};
+  };
+  "/function-demo": {
+    params: {};
+  };
+  "/proper-editor": {
     params: {};
   };
   "/simple-editor": {
@@ -113,7 +122,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/simple-editor" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
+    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/programmable-editor" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/function-demo" | "/proper-editor" | "/simple-editor" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
   };
   "routes/flow.session.$sessionId.group.$groupId.tsx": {
     id: "routes/flow.session.$sessionId.group.$groupId";
@@ -147,6 +156,10 @@ type RouteFiles = {
     id: "routes/api.bassline.import";
     page: "/api/bassline/import";
   };
+  "routes/programmable-editor.tsx": {
+    id: "routes/programmable-editor";
+    page: "/programmable-editor";
+  };
   "routes/api.editor.actions.tsx": {
     id: "routes/api.editor.actions";
     page: "/api/editor/actions";
@@ -174,6 +187,14 @@ type RouteFiles = {
   "routes/editor-layout.tsx": {
     id: "routes/editor-layout";
     page: "/editor-layout";
+  };
+  "routes/function-demo.tsx": {
+    id: "routes/function-demo";
+    page: "/function-demo";
+  };
+  "routes/proper-editor.tsx": {
+    id: "routes/proper-editor";
+    page: "/proper-editor";
   };
   "routes/simple-editor.tsx": {
     id: "routes/simple-editor";

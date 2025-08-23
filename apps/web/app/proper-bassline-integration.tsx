@@ -1,6 +1,6 @@
 /**
  * Integration module for proper-bassline with React
- * Re-exports all the React hooks and components from proper-bassline
+ * Re-exports all the React hooks and components from proper-bassline-react
  */
 
 export {
@@ -12,4 +12,4 @@ export {
   useFunctionOutput,
   useWiring,
   useImport
-} from 'proper-bassline/src/react-integration'
+} from 'proper-bassline-react'
