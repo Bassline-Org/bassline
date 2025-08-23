@@ -8,9 +8,12 @@
 import { Cell } from './cell'
 import { Gadget } from './gadget'
 import { LatticeValue } from './types'
+import { OrdinalCell } from './cells/basic'
 
 export class Network extends Cell {
   gadgets: Set<Gadget> = new Set()  // Strong references to prevent GC (includes child networks!)
+  children: Map<string, Network> = new Map()  // Child networks by name for namespacing
+  parent: WeakRef<Network> | null = null  // Weak ref to parent to avoid circular references
   
   constructor(id: string = "network") {
     super(id)
@@ -84,10 +87,48 @@ export class Network extends Cell {
     }
   }
   
-  // Add a child network (explicit nesting - just add it as a gadget!)
+  // Add a child network (explicit nesting for namespacing)
   addChildNetwork(child: Network): void {
-    // Networks are gadgets, so just add it
+    // Networks are gadgets, so add it
     this.gadgets.add(child)
+    // Also track in children map for easy lookup
+    this.children.set(child.id, child)
+    child.parent = new WeakRef(this)
+  }
+  
+  // Get a gadget by path (e.g., "auth/user" or just "user")
+  getByPath(path: string): Gadget | null {
+    const parts = path.split('/')
+    
+    if (parts.length === 1) {
+      // Local lookup
+      for (const gadget of this.gadgets) {
+        if (gadget.id === parts[0]) return gadget
+      }
+      return null
+    }
+    
+    // Nested lookup
+    const [networkName, ...rest] = parts
+    const child = this.children.get(networkName)
+    if (!child) return null
+    
+    return child.getByPath(rest.join('/'))
+  }
+  
+  // Get full path of this network
+  getFullPath(): string {
+    const parts: string[] = [this.id]
+    let currentRef = this.parent
+    
+    while (currentRef) {
+      const current = currentRef.deref()
+      if (!current) break  // Parent was garbage collected
+      parts.unshift(current.id)
+      currentRef = current.parent
+    }
+    
+    return parts.join('/')
   }
   
   // Get all boundary cells in this network
@@ -106,6 +147,24 @@ export class Network extends Cell {
   addBoundary(cell: Cell): void {
     cell.makeBoundary()
     this.addGadget(cell)
+  }
+  
+  // Helper for importing: create local cell wired to external
+  import(localName: string, externalGadget: Gadget): Cell {
+    // Import is just creating a local cell wired to external
+    // Using OrdinalCell for now, could be configurable
+    const local = new OrdinalCell(localName)
+    local.from(externalGadget)
+    this.add(local)
+    return local
+  }
+  
+  // Helper for creating an exports namespace
+  createExports(...gadgets: Gadget[]): Network {
+    const exports = new Network("exports")
+    exports.add(...gadgets)
+    this.addChildNetwork(exports)
+    return exports
   }
   
   // Debug helper

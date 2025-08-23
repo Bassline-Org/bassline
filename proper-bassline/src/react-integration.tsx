@@ -1,24 +1,24 @@
 /**
  * React integration for proper-bassline
- * Components ARE gadgets in the propagation network
+ * Gadgets as state management layer
  */
 
 import { 
-  useSyncExternalStore, 
   useCallback, 
   useRef, 
   useEffect, 
   useState, 
   useContext, 
   createContext,
-  useMemo,
   type ReactNode 
 } from 'react'
 import { Network } from './network'
 import { Cell } from './cell'
+import { OrdinalCell } from './cells/basic'
 import { FunctionGadget } from './function'
-import type { Gadget, LatticeValue } from './types'
-import { nil, ordinalValue, getMapValue } from './types'
+import type { Gadget } from './gadget'
+import type { LatticeValue } from './types'
+import { getMapValue } from './types'
 
 // ============================================================================
 // Network Context
@@ -29,6 +29,8 @@ interface NetworkContextValue {
 }
 
 const NetworkContext = createContext<NetworkContextValue | null>(null)
+
+export { NetworkContext }
 
 export function NetworkProvider({ 
   children,
@@ -49,36 +51,112 @@ export function NetworkProvider({
 }
 
 // ============================================================================
-// useGadget Hook
+// useNetwork Hook
+// ============================================================================
+
+/**
+ * Get the current network from context
+ */
+export function useNetwork(): Network {
+  const context = useContext(NetworkContext)
+  if (!context) throw new Error('useNetwork must be used within NetworkProvider')
+  return context.network
+}
+
+// ============================================================================
+// useCell Hook - Primary state management hook
+// ============================================================================
+
+/**
+ * React binding to a Cell - like useState but backed by a gadget
+ * Uses the accept/emit protocol for updates
+ */
+export function useCell<T = any>(
+  cell: Cell | null
+): [T | null, (value: T) => void] {
+  const [, forceUpdate] = useState({})
+  const mountedRef = useRef(true)
+  
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  
+  // Subscribe to changes via the propagation protocol
+  useEffect(() => {
+    if (!cell) return
+    
+    // Create a temporary gadget to receive updates
+    const receiver = {
+      id: `react-receiver-${Math.random()}`,
+      accept: () => {
+        if (mountedRef.current) {
+          forceUpdate({})
+        }
+      }
+    } as any
+    
+    // Register as downstream
+    cell.addDownstream(receiver)
+    
+    return () => {
+      cell.removeDownstream(receiver)
+    }
+  }, [cell])
+  
+  // Get current value
+  const value = cell ? cell.getOutput() : null
+  
+  // For OrdinalCell, extract the value from the ordinal map
+  const extracted = value ? (getMapValue(value) ?? value) : null
+  
+  // Get the actual JS value from the LatticeValue wrapper
+  // Special handling for sets - keep them as sets
+  const extractedValue = extracted ? 
+    (extracted.type === 'set' ? extracted.value : (extracted as any).value) : 
+    null
+  
+  // Setter function
+  const setValue = useCallback((newValue: T) => {
+    if (!cell) return
+    
+    // Special handling for OrdinalCell
+    if (cell instanceof OrdinalCell) {
+      // Use the userInput method for OrdinalCell
+      cell.userInput(newValue as any)
+    } else {
+      // For other cells, use accept
+      cell.accept(newValue as any, cell)
+    }
+  }, [cell])
+  
+  return [extractedValue as T | null, setValue]
+}
+
+// ============================================================================
+// useGadget Hook - Create gadgets that live in the network
 // ============================================================================
 
 /**
  * Create a gadget that lives in the network
- * The component using this hook IS a gadget
+ * Optionally provide a stable ID for persistence across re-renders
  */
 export function useGadget<T extends Gadget>(
   createGadget: () => T,
   stableId?: string
 ): T {
-  const context = useContext(NetworkContext)
-  if (!context) throw new Error('useGadget must be used within NetworkProvider')
+  const network = useNetwork()
   
   const [gadget] = useState<T>(() => {
-    // Generate ID - use stable ID if provided
-    const id = stableId || `component-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    
     // Check if gadget already exists (for stable IDs)
     if (stableId) {
-      for (const g of context.network.gadgets) {
-        if (g.id === stableId) {
-          return g as T
-        }
-      }
+      const existing = network.getByPath(stableId)
+      if (existing) return existing as T
     }
     
     // Create new gadget
     const g = createGadget()
-    context.network.add(g)
+    network.add(g)
     return g
   })
   
@@ -86,119 +164,66 @@ export function useGadget<T extends Gadget>(
   useEffect(() => {
     return () => {
       if (!stableId) {
-        context.network.gadgets.delete(gadget)
+        network.gadgets.delete(gadget)
       }
     }
-  }, [gadget, context.network, stableId])
+  }, [gadget, network, stableId])
   
   return gadget
 }
 
 // ============================================================================
-// useCell Hook
+// useFunction Hook - Get output from a function gadget
 // ============================================================================
 
 /**
- * Create a React binding to a Cell
- * Provides useState-like API with automatic propagation
- */
-export function useCell<T = any>(
-  cell: Cell | null,
-  outputName: string = 'default'
-): [T | null, (value: T) => void] {
-  const context = useContext(NetworkContext)
-  if (!context) throw new Error('useCell must be used within NetworkProvider')
-  
-  const [, forceUpdate] = useState({})
-  const lastValueRef = useRef<LatticeValue | null>(null)
-  const ordinalRef = useRef(0)
-  
-  // Subscribe to changes
-  const subscribe = useCallback((callback: () => void) => {
-    if (!cell) return () => {}
-    
-    // Poll for changes
-    const interval = setInterval(() => {
-      const currentValue = cell.outputs.get(outputName)
-      if (currentValue !== lastValueRef.current) {
-        lastValueRef.current = currentValue || null
-        callback()
-      }
-    }, 16) // 60fps
-    
-    return () => clearInterval(interval)
-  }, [cell, outputName])
-  
-  // Get current value - extract from ordinal map if present
-  const getSnapshot = useCallback((): LatticeValue | null => {
-    if (!cell) return null
-    const output = cell.outputs.get(outputName) || null
-    // If it's an ordinal map, extract the value
-    return getMapValue(output) || output
-  }, [cell, outputName])
-  
-  // Server snapshot for SSR
-  const getServerSnapshot = useCallback(() => null, [])
-  
-  // Use React's external store hook
-  const value = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-  
-  // Setter that creates ordinal-tagged values
-  const setValue = useCallback((newValue: T) => {
-    if (!cell) return
-    
-    // Create ordinal-tagged value
-    const ordinalVal = ordinalValue(++ordinalRef.current, newValue as any)
-    
-    // Set it directly on the cell
-    cell.setOutput(outputName, ordinalVal)
-    
-    // Trigger computation
-    cell.compute()
-    
-    // Propagate through the network
-    context.network.propagate()
-  }, [cell, outputName, context])
-  
-  return [value as T | null, setValue]
-}
-
-// ============================================================================
-// useFunction Hook
-// ============================================================================
-
-/**
- * Get output from a Function gadget
- * Functions don't have setters - they compute from inputs
+ * Subscribe to a function gadget's output
  */
 export function useFunctionOutput<T = any>(
-  func: FunctionGadget | null,
-  outputName: string = 'default'
+  func: FunctionGadget | null
 ): T | null {
   const [, forceUpdate] = useState({})
-  const lastValueRef = useRef<LatticeValue | null>(null)
+  const mountedRef = useRef(true)
   
-  // Poll for changes
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  
+  // Subscribe to changes
   useEffect(() => {
     if (!func) return
     
-    const interval = setInterval(() => {
-      const currentValue = func.outputs.get(outputName)
-      if (currentValue !== lastValueRef.current) {
-        lastValueRef.current = currentValue || null
-        forceUpdate({})
+    // Create a temporary gadget to receive updates
+    const receiver = {
+      id: `react-function-receiver-${Math.random()}`,
+      accept: () => {
+        if (mountedRef.current) {
+          forceUpdate({})
+        }
       }
-    }, 16) // 60fps
+    } as any
     
-    return () => clearInterval(interval)
-  }, [func, outputName])
+    // Register as downstream
+    func.addDownstream(receiver)
+    
+    return () => {
+      func.removeDownstream(receiver)
+    }
+  }, [func])
   
   if (!func) return null
-  return func.outputs.get(outputName) as T | null
+  const value = func.getOutput()
+  
+  // Extract from ordinal map if needed
+  const extracted = getMapValue(value) ?? value
+  
+  // Get the actual JS value from the LatticeValue wrapper
+  return extracted ? (extracted as any).value : null
 }
 
 // ============================================================================
-// useWiring Hook
+// useWiring Hook - Declarative wiring
 // ============================================================================
 
 /**
@@ -212,9 +237,6 @@ export function useWiring(
     toInput?: string
   }>
 ) {
-  const context = useContext(NetworkContext)
-  if (!context) throw new Error('useWiring must be used within NetworkProvider')
-  
   useEffect(() => {
     const established: Array<() => void> = []
     
@@ -227,20 +249,16 @@ export function useWiring(
         // Wire to a Cell (many-to-one)
         conn.to.connectFrom(conn.from, outputName)
         established.push(() => {
-          // Disconnect logic would go here
-          // For now, we don't have a disconnect method
+          // TODO: Add disconnect method to Cell
         })
       } else if (conn.to instanceof FunctionGadget && conn.toInput) {
         // Wire to a Function input
         conn.to.connectFrom(conn.toInput, conn.from, outputName)
         established.push(() => {
-          // Disconnect logic
+          // TODO: Add disconnect method to FunctionGadget
         })
       }
     }
-    
-    // Trigger propagation after wiring
-    context.network.propagate()
     
     return () => {
       // Cleanup connections
@@ -248,35 +266,30 @@ export function useWiring(
         cleanup()
       }
     }
-  }, [connections, context])
+  }, [connections])
 }
 
 // ============================================================================
-// useNetwork Hook
+// useImport Hook - Import gadgets with aliasing
 // ============================================================================
 
 /**
- * Get the current network from context
- * Networks are gadgets too!
+ * Import an external gadget into the current network with a local name
  */
-export function useNetwork(): Network {
-  const context = useContext(NetworkContext)
-  if (!context) throw new Error('useNetwork must be used within NetworkProvider')
-  return context.network
-}
-
-// ============================================================================
-// usePropagate Hook
-// ============================================================================
-
-/**
- * Get a propagate function for manual triggering
- */
-export function usePropagate(): () => void {
-  const context = useContext(NetworkContext)
-  if (!context) throw new Error('usePropagate must be used within NetworkProvider')
+export function useImport<T extends Gadget>(
+  localName: string,
+  externalGadget: T
+): Cell {
+  const network = useNetwork()
   
-  return useCallback(() => {
-    context.network.propagate()
-  }, [context])
+  const [local] = useState(() => {
+    // Check if already imported
+    const existing = network.getByPath(localName)
+    if (existing instanceof Cell) return existing
+    
+    // Create import (alias via wiring)
+    return network.import(localName, externalGadget)
+  })
+  
+  return local
 }
