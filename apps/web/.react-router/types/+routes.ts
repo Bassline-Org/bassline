@@ -54,6 +54,9 @@ type Pages = {
   "/bassline-browser": {
     params: {};
   };
+  "/proper-demo-cool": {
+    params: {};
+  };
   "/flow-experiment": {
     params: {};
   };
@@ -67,6 +70,9 @@ type Pages = {
     params: {};
   };
   "/editor-main": {
+    params: {};
+  };
+  "/proper-demo": {
     params: {};
   };
   "/test-sounds": {
@@ -107,7 +113,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/simple-editor" | "/editor-main" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
+    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/simple-editor" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
   };
   "routes/flow.session.$sessionId.group.$groupId.tsx": {
     id: "routes/flow.session.$sessionId.group.$groupId";
@@ -153,6 +159,10 @@ type RouteFiles = {
     id: "routes/bassline-browser";
     page: "/bassline-browser";
   };
+  "routes/proper-demo-cool.tsx": {
+    id: "routes/proper-demo-cool";
+    page: "/proper-demo-cool";
+  };
   "routes/flow-experiment.tsx": {
     id: "routes/flow-experiment";
     page: "/flow-experiment";
@@ -172,6 +182,10 @@ type RouteFiles = {
   "routes/editor-main.tsx": {
     id: "routes/editor-main";
     page: "/editor-main";
+  };
+  "routes/proper-demo.tsx": {
+    id: "routes/proper-demo";
+    page: "/proper-demo";
   };
   "routes/test-sounds.tsx": {
     id: "routes/test-sounds";
