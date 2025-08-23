@@ -13,6 +13,8 @@ export type LatticeValue =
   | { type: "array", value: LatticeValue[] }  // Ordered collection
   | { type: "set", value: Set<LatticeValue> }  // Unordered, unique items
   | { type: "dict", value: Map<string, LatticeValue> }  // Key-value map
+  | { type: "object", value: any }  // Arbitrary JS objects
+  | { type: "function", value: Function }  // Executable functions
   | { type: "null" }
   | { type: "contradiction", conflicts: Set<LatticeValue> }
 
@@ -24,6 +26,9 @@ export type SerializedLatticeValue =
   | { type: "array", value: SerializedLatticeValue[] }
   | { type: "set", value: SerializedLatticeValue[] }  // Set as array
   | { type: "dict", value: Record<string, SerializedLatticeValue> }  // Map as object
+  | { type: "object-ref", className?: string, id?: string }  // Reference to object
+  | { type: "function-ref", name: string }  // Reference to function by name
+  | { type: "function-src", source: string }  // Function source code
   | { type: "null" }
   | { type: "contradiction", conflicts: SerializedLatticeValue[] }
 
@@ -33,6 +38,8 @@ export const num = (value: number): LatticeValue => ({ type: "number", value })
 export const str = (value: string): LatticeValue => ({ type: "string", value })
 export const array = (value: LatticeValue[]): LatticeValue => ({ type: "array", value })
 export const nil = (): LatticeValue => ({ type: "null" })
+export const obj = (value: any): LatticeValue => ({ type: "object", value })
+export const fn = (value: Function): LatticeValue => ({ type: "function", value })
 
 // Set constructor with deduplication
 export const set = (items: LatticeValue[] | Set<LatticeValue>): LatticeValue => {
@@ -77,6 +84,10 @@ export const isSet = (v: LatticeValue | null): v is { type: "set", value: Set<La
   v !== null && v.type === "set"
 export const isDict = (v: LatticeValue | null): v is { type: "dict", value: Map<string, LatticeValue> } => 
   v !== null && v.type === "dict"
+export const isObject = (v: LatticeValue | null): v is { type: "object", value: any } => 
+  v !== null && v.type === "object"
+export const isFunction = (v: LatticeValue | null): v is { type: "function", value: Function } => 
+  v !== null && v.type === "function"
 export const isNull = (v: LatticeValue | null): v is { type: "null" } => 
   v !== null && v.type === "null"
 
@@ -105,6 +116,22 @@ export function serialize(value: LatticeValue): SerializedLatticeValue {
       }
       return { type: "dict", value: obj }
     }
+    
+    case "object":
+      // For objects, we'll serialize as a reference
+      // Could be enhanced to include className or other metadata
+      return { 
+        type: "object-ref", 
+        className: value.value?.constructor?.name,
+        id: value.value?.id
+      }
+    
+    case "function":
+      // For functions, serialize by name or source
+      return {
+        type: "function-ref",
+        name: value.value.name || "anonymous"
+      }
     
     case "contradiction":
       return { type: "contradiction", conflicts: Array.from(value.conflicts).map(serialize) }
@@ -136,6 +163,21 @@ export function deserialize(value: SerializedLatticeValue): LatticeValue {
       }
       return { type: "dict", value: map }
     }
+    
+    case "object-ref":
+      // For now, deserialize as null - could be enhanced with a registry
+      // In the future, could look up object by className/id
+      return nil()
+    
+    case "function-ref":
+      // For now, deserialize as null - could be enhanced with a function registry
+      // In the future, could look up function by name
+      return nil()
+    
+    case "function-src":
+      // Could eval the source, but that's dangerous
+      // For now, return nil
+      return nil()
     
     case "contradiction":
       return { type: "contradiction", conflicts: new Set(value.conflicts.map(deserialize)) }
@@ -172,6 +214,8 @@ export function getValue(lv: LatticeValue): any {
     case "array": return lv.value
     case "set": return lv.value
     case "dict": return lv.value
+    case "object": return lv.value
+    case "function": return lv.value
     case "null": return null
     case "contradiction": return lv.conflicts
     default: throw new Error(`Invalid value type: ${lv}`)

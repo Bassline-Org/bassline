@@ -6,7 +6,7 @@
  * - emit: send information downstream
  */
 
-import { LatticeValue, nil } from './types'
+import { LatticeValue, nil, serialize, SerializedLatticeValue } from './types'
 
 // Connection info for downstream tracking
 export interface DownstreamConnection {
@@ -119,5 +119,32 @@ export abstract class Gadget {
   compute(): void {
     // Default: no-op
     // Subclasses can override for compatibility
+  }
+  
+  /**
+   * Serialize this gadget to a JSON-compatible format
+   * Subclasses should override to include their specific data
+   */
+  serialize(): any {
+    const outputs: Record<string, SerializedLatticeValue> = {}
+    for (const [name, value] of this.outputs) {
+      outputs[name] = serialize(value)
+    }
+    
+    return {
+      type: 'gadget',
+      id: this.id,
+      className: this.constructor.name,
+      outputs
+    }
+  }
+  
+  /**
+   * Deserialize a gadget from JSON
+   * Subclasses should override to handle their specific data
+   * The registry parameter allows access to other gadget types
+   */
+  static deserialize(data: any, registry?: any): Gadget {
+    throw new Error(`Deserialize not implemented for ${data.className}`)
   }
 }

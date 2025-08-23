@@ -9,7 +9,7 @@
  */
 
 import { Gadget } from './gadget'
-import { Connection, LatticeValue, nil } from './types'
+import { Connection, LatticeValue, nil, serialize } from './types'
 
 export abstract class FunctionGadget extends Gadget {
   inputs: Map<string, Connection> = new Map()
@@ -140,5 +140,34 @@ export abstract class FunctionGadget extends Gadget {
       const source = conn.source.deref()
       return source !== undefined
     })
+  }
+  
+  // Serialize function to JSON
+  serialize(): any {
+    const base = super.serialize()
+    
+    // Add function-specific data
+    base.type = 'function'
+    base.inputNames = this.inputNames
+    
+    // Serialize connections (as IDs)
+    base.inputs = {}
+    for (const [name, conn] of this.inputs) {
+      const source = conn.source.deref()
+      if (source) {
+        base.inputs[name] = {
+          sourceId: source.id,
+          outputName: conn.outputName
+        }
+      }
+    }
+    
+    // Store current values
+    base.currentValues = {}
+    for (const [name, value] of this.currentValues) {
+      base.currentValues[name] = value ? serialize(value) : null
+    }
+    
+    return base
   }
 }

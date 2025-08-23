@@ -6,7 +6,7 @@
  */
 
 import { Cell } from '../cell'
-import { LatticeValue, Connection, num, bool, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal} from '../types'
+import { LatticeValue, Connection, num, bool, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal, deserialize as deserializeLattice} from '../types'
 
 // Max lattice for numbers (idempotent: max(a,a) = a)
 export class MaxCell extends Cell {
@@ -17,6 +17,10 @@ export class MaxCell extends Cell {
     
     if (numbers.length === 0) return nil()
     return num(Math.max(...numbers))
+  }
+  
+  static deserialize(data: any, registry: any): MaxCell {
+    return registry.deserializeCell(data, MaxCell)
   }
 }
 
@@ -111,6 +115,15 @@ export class OrdinalCell extends Cell {
     result.set("value", maxDict.value.get("value")!)
     return dict(result)
   }
+  
+  static deserialize(data: any, registry: any): OrdinalCell {
+    const cell = registry.deserializeCell(data, OrdinalCell)
+    // Restore userOrdinal if present
+    if (data.userOrdinal !== undefined) {
+      cell.userOrdinal = data.userOrdinal
+    }
+    return cell
+  }
 }
 
 // Min lattice for numbers (idempotent: min(a,a) = a)
@@ -122,6 +135,10 @@ export class MinCell extends Cell {
     
     if (numbers.length === 0) return nil()
     return num(Math.min(...numbers))
+  }
+  
+  static deserialize(data: any, registry: any): MinCell {
+    return registry.deserializeCell(data, MinCell)
   }
 }
 
@@ -246,5 +263,9 @@ export class SetCell extends Cell {
     const current = this.getOutput()
     if (!current || !isSet(current)) return 0
     return current.value.size
+  }
+  
+  static deserialize(data: any, registry: any): SetCell {
+    return registry.deserializeCell(data, SetCell)
   }
 }

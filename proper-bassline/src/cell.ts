@@ -128,4 +128,27 @@ export abstract class Cell extends Gadget {
     }
     return sources
   }
+  
+  // Serialize cell to JSON
+  serialize(): any {
+    const base = super.serialize()
+    
+    // Add cell-specific data
+    base.type = 'cell'
+    base.boundary = this.boundary
+    
+    // Serialize connections (as IDs since we can't serialize WeakRefs)
+    base.inputs = []
+    for (const conn of this.inputs) {
+      const source = conn.source.deref()
+      if (source) {
+        base.inputs.push({
+          sourceId: source.id,
+          outputName: conn.outputName
+        })
+      }
+    }
+    
+    return base
+  }
 }

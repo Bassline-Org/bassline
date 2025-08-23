@@ -88,4 +88,32 @@ export class VisualNode extends Network {
       collapsed: this.collapsed
     }
   }
+  
+  // Serialize visual node to JSON
+  serialize(): any {
+    const base = super.serialize()
+    
+    // Visual properties are just cells in the network, 
+    // they'll be serialized as part of the gadgets array
+    // Just need to note which cells are visual properties
+    base.visualProperties = {
+      positionId: this.position.id,
+      sizeId: this.size.id,
+      selectedId: this.selected.id,
+      collapsedId: this.collapsed.id
+    }
+    
+    // Note content gadget if exists
+    if (this.content) {
+      base.contentId = this.content.id
+    }
+    
+    return base
+  }
+  
+  // Deserialize visual node from JSON
+  static deserialize(data: any, registry: any): VisualNode {
+    // Let the registry handle it
+    return registry.deserializeNetwork(data)
+  }
 }

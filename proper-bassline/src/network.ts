@@ -188,4 +188,39 @@ export class Network extends Cell {
     
     console.log(`${indent}===================`)
   }
+  
+  // Serialize network to JSON
+  serialize(): any {
+    const base = super.serialize()
+    
+    // Add network-specific data
+    base.type = 'network'
+    
+    // Serialize all gadgets
+    base.gadgets = []
+    for (const gadget of this.gadgets) {
+      if (gadget === this) continue  // Don't serialize ourselves recursively
+      base.gadgets.push(gadget.serialize())
+    }
+    
+    // Serialize child networks (for easy lookup)
+    base.children = {}
+    for (const [name, child] of this.children) {
+      base.children[name] = child.id
+    }
+    
+    // Note parent ID if exists
+    const parent = this.parent?.deref()
+    if (parent) {
+      base.parentId = parent.id
+    }
+    
+    return base
+  }
+  
+  // Deserialize a network from JSON
+  static deserialize(data: any, registry: any): Network {
+    // Let the registry handle it since it knows about gadget types
+    return registry.deserializeNetwork(data)
+  }
 }
