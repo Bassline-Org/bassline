@@ -40,9 +40,8 @@ export function NodeRenderer({
     e.preventDefault()
     e.stopPropagation()
     
-    // Select the node
+    // Select the node (let parent handle the actual selection state)
     onSelect?.(node.id)
-    setSelected(dict({ value: true }))
     
     // Start dragging
     setIsDragging(true)
@@ -52,7 +51,7 @@ export function NodeRenderer({
       nodeX: x,
       nodeY: y
     }
-  }, [x, y, node.id, onSelect, setSelected])
+  }, [x, y, node.id, onSelect])
   
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return

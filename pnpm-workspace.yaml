@@ -6,3 +6,4 @@ packages:
   - 'femto-bassline'
   - 'atto-bassline'
   - 'proper-bassline'
+  - 'proper-bassline-react'

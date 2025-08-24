@@ -53,5 +53,10 @@ export {
   NetworkContext,
   NetworkProvider,
   useNetwork,
-  useCell
+  useCell,
+  useGadget
 } from './react-integration'
+
+// Registry and editor gadgets
+export { GadgetRegistryGadget, type GadgetTypeInfo } from './gadget-registry'
+export { EditorGadget } from './editor-gadget'

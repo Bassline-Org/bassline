@@ -202,6 +202,9 @@ importers:
       proper-bassline:
         specifier: workspace:*
         version: link:../../proper-bassline
+      proper-bassline-react:
+        specifier: workspace:*
+        version: link:../../proper-bassline-react
       react:
         specifier: ^19.1.0
         version: 19.1.1
@@ -642,6 +645,28 @@ importers:
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.19.9)
+
+  proper-bassline-react:
+    dependencies:
+      proper-bassline:
+        specifier: workspace:*
+        version: link:../proper-bassline
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.1.1
+      react-dom:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.1.1(react@19.1.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.1.9
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.1.7(@types/react@19.1.9)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.2
 
 packages:
 
