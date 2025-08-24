@@ -4,27 +4,32 @@
  * Implements the core propagation protocol:
  * - accept: receive information from upstream
  * - emit: send information downstream
+ * 
+ * Now also implements GadgetBase interface for the new metamodel
  */
 
 import { LatticeValue, nil, serialize, SerializedLatticeValue } from './types'
-
-// Connection info for downstream tracking
-export interface DownstreamConnection {
-  gadget: WeakRef<Gadget>
-  inputName?: string  // For Functions that have named inputs
-}
+import type { GadgetBase, Connection } from './gadget-base'
 
 /**
  * Base class for all gadgets (Cells, Functions, Networks)
  * Provides the fundamental propagation protocol
+ * Implements GadgetBase for the unified metamodel
  */
-export abstract class Gadget {
+export abstract class Gadget implements GadgetBase {
   id: string
+  type: string
   outputs: Map<string, LatticeValue> = new Map()
-  downstream: Set<DownstreamConnection> = new Set()
+  downstream: Set<Connection> = new Set()
+  upstream: Set<Connection> = new Set()
+  parent?: GadgetBase
+  
+  // Metadata for querying and reflection
+  private metadata: Record<string, any> = {}
   
   constructor(id: string) {
     this.id = id
+    this.type = this.constructor.name
   }
   
   /**
@@ -43,7 +48,7 @@ export abstract class Gadget {
     const value = this.getOutput(outputName)
     
     // Clean up dead references while emitting
-    const deadConnections: DownstreamConnection[] = []
+    const deadConnections: Connection[] = []
     
     for (const conn of this.downstream) {
       const target = conn.gadget.deref()
@@ -67,7 +72,7 @@ export abstract class Gadget {
    * @param target The gadget to receive emissions
    * @param inputName Optional input name for Functions
    */
-  addDownstream(target: Gadget, inputName?: string): void {
+  addDownstream(target: GadgetBase, inputName?: string): void {
     this.downstream.add({
       gadget: new WeakRef(target),
       inputName
@@ -77,12 +82,38 @@ export abstract class Gadget {
   /**
    * Remove a downstream connection
    */
-  removeDownstream(target: Gadget): void {
+  removeDownstream(target: GadgetBase): void {
     // Find and remove the connection
     for (const conn of this.downstream) {
       const gadget = conn.gadget.deref()
       if (gadget === target) {
         this.downstream.delete(conn)
+        break
+      }
+    }
+  }
+  
+  /**
+   * Add an upstream gadget
+   * @param source The gadget that sends values to this gadget
+   * @param outputName Optional output name for named outputs
+   */
+  addUpstream(source: GadgetBase, outputName?: string): void {
+    this.upstream.add({
+      gadget: new WeakRef(source),
+      outputName
+    })
+  }
+  
+  /**
+   * Remove an upstream gadget
+   */
+  removeUpstream(source: GadgetBase): void {
+    // Find and remove the connection
+    for (const conn of this.upstream) {
+      const gadget = conn.gadget.deref()
+      if (gadget === source) {
+        this.upstream.delete(conn)
         break
       }
     }
@@ -122,6 +153,20 @@ export abstract class Gadget {
   }
   
   /**
+   * Get metadata (for GadgetBase interface)
+   */
+  getMetadata(): Record<string, any> {
+    return { ...this.metadata }
+  }
+  
+  /**
+   * Set metadata (for GadgetBase interface)
+   */
+  setMetadata(key: string, value: any): void {
+    this.metadata[key] = value
+  }
+  
+  /**
    * Serialize this gadget to a JSON-compatible format
    * Subclasses should override to include their specific data
    */
@@ -135,12 +180,23 @@ export abstract class Gadget {
       type: 'gadget',
       id: this.id,
       className: this.constructor.name,
-      outputs
+      outputs,
+      metadata: this.metadata
     }
   }
   
   /**
-   * Deserialize a gadget from JSON
+   * Deserialize from data (for GadgetBase interface)
+   */
+  deserialize(data: any): void {
+    // Subclasses should override to restore their state
+    if (data.metadata) {
+      this.metadata = data.metadata
+    }
+  }
+  
+  /**
+   * Static deserialize a gadget from JSON
    * Subclasses should override to handle their specific data
    * The registry parameter allows access to other gadget types
    */

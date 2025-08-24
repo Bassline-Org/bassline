@@ -3,17 +3,26 @@
  * 
  * Networks are themselves semi-lattices that only grow (union operation).
  * Multiple networks can be merged together.
+ * 
+ * Networks implement the Container interface, making them queryable.
+ * This is a key distinction: Networks can be searched, Cells/Functions cannot.
  */
 
 import { Cell } from './cell'
 import { Gadget } from './gadget'
 import { LatticeValue } from './types'
 import { OrdinalCell } from './cells/basic'
+import type { GadgetBase, Container } from './gadget-base'
+import { Query, query } from './query'
+import { NetworkValue } from './network-value'
 
-export class Network extends Cell {
+export class Network extends Cell implements Container {
   gadgets: Set<Gadget> = new Set()  // Strong references to prevent GC (includes child networks!)
-  children: Map<string, Network> = new Map()  // Child networks by name for namespacing
+  children: Set<GadgetBase> = new Set()  // All child gadgets for Container interface
   parent: WeakRef<Network> | null = null  // Weak ref to parent to avoid circular references
+  
+  // For Container interface - we'll keep the Map for named lookups
+  private childNetworks: Map<string, Network> = new Map()  // Child networks by name for namespacing
   
   constructor(id: string = "network") {
     super(id)
@@ -29,14 +38,28 @@ export class Network extends Cell {
   // Add a gadget to the network (holds strong reference)
   addGadget(gadget: Gadget): void {
     this.gadgets.add(gadget)
+    this.children.add(gadget as GadgetBase)  // Also add to children for Container interface
   }
   
-  // Add multiple gadgets at once
-  add(...gadgets: Gadget[]): this {
+  // Add multiple gadgets at once (implements Container.add)
+  add(...gadgets: GadgetBase[]): this {
     for (const gadget of gadgets) {
-      this.addGadget(gadget)
+      if (gadget instanceof Gadget) {
+        this.addGadget(gadget)
+      } else {
+        // For non-Gadget GadgetBase, just add to children
+        this.children.add(gadget)
+      }
     }
     return this
+  }
+  
+  // Remove a gadget (implements Container.remove)
+  remove(gadget: GadgetBase): boolean {
+    if (gadget instanceof Gadget) {
+      this.gadgets.delete(gadget)
+    }
+    return this.children.delete(gadget)
   }
   
   // Helper to connect gadgets (no more wires!)
@@ -91,9 +114,35 @@ export class Network extends Cell {
   addChildNetwork(child: Network): void {
     // Networks are gadgets, so add it
     this.gadgets.add(child)
-    // Also track in children map for easy lookup
-    this.children.set(child.id, child)
+    this.children.add(child as GadgetBase)
+    // Also track in childNetworks map for easy lookup
+    this.childNetworks.set(child.id, child)
     child.parent = new WeakRef(this)
+  }
+  
+  // ============================================================================
+  // Query Implementation (Container interface)
+  // ============================================================================
+  
+  /**
+   * Query this network for gadgets matching a selector
+   * This is what makes Networks special - they can be searched
+   * 
+   * @example
+   * network.query("Cell")              // All cells
+   * network.query("#myId")             // Gadget with id "myId"
+   * network.query("Cell[value>5]")     // Cells with value > 5
+   * network.query("Network > Cell")    // Direct child cells
+   */
+  query(selector: string): Set<GadgetBase> {
+    return new Query(this as Container).select(selector).execute()
+  }
+  
+  /**
+   * Convert this network to a NetworkValue so it can be passed as a value
+   */
+  asValue(): NetworkValue {
+    return new NetworkValue(this)
   }
   
   // Get a gadget by path (e.g., "auth/user" or just "user")
@@ -110,7 +159,7 @@ export class Network extends Cell {
     
     // Nested lookup
     const [networkName, ...rest] = parts
-    const child = this.children.get(networkName)
+    const child = this.childNetworks.get(networkName)
     if (!child) return null
     
     return child.getByPath(rest.join('/'))
@@ -204,9 +253,9 @@ export class Network extends Cell {
     }
     
     // Serialize child networks (for easy lookup)
-    base.children = {}
-    for (const [name, child] of this.children) {
-      base.children[name] = child.id
+    base.childNetworks = {}
+    for (const [name, child] of this.childNetworks) {
+      base.childNetworks[name] = child.id
     }
     
     // Note parent ID if exists

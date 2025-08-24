@@ -8,6 +8,12 @@ export { Cell } from './cell'
 export { FunctionGadget } from './function'
 export { Network } from './network'
 
+// Core metamodel
+export type { GadgetBase, Container } from './gadget-base'
+export { isGadgetBase, isContainer } from './gadget-base'
+export { NetworkValue, isNetworkValue, getNetwork, networkValue } from './network-value'
+export { Query, query } from './query'
+
 // Basic cells
 export { 
   MaxCell, 
@@ -60,3 +66,11 @@ export {
 // Registry and editor gadgets
 export { GadgetRegistryGadget, type GadgetTypeInfo } from './gadget-registry'
 export { EditorGadget } from './editor-gadget'
+
+// Value helpers
+export { extractValue, getGadgetValue } from './value-helpers'
+
+// Visual gadgets
+export { VisualGadget } from './visual-gadget'
+export type { Point, Size, Rect, StyleMap } from './visual-gadget'
+export { RectGadget, TextGadget, PathGadget, GroupGadget } from './visuals'

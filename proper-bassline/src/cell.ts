@@ -51,8 +51,11 @@ export abstract class Cell extends Gadget {
       outputName
     })
     
-    // Register for downstream emissions
+    // Register for downstream emissions (source will send to us)
     source.addDownstream(this)
+    
+    // Register as upstream (we receive from source)
+    this.addUpstream(source, outputName)
     
     // Pull initial value - source should eagerly send its current value
     this.accept(source.getOutput(outputName), source)
@@ -68,7 +71,7 @@ export abstract class Cell extends Gadget {
   
   // Disconnect from a source
   disconnectFrom(source: Gadget, outputName: string = "default"): void {
-    // Find and remove the connection
+    // Find and remove the connection from inputs
     for (const conn of this.inputs) {
       const src = conn.source.deref()
       if (src === source && conn.outputName === outputName) {
@@ -76,6 +79,12 @@ export abstract class Cell extends Gadget {
         break
       }
     }
+    
+    // Remove from upstream tracking
+    this.removeUpstream(source)
+    
+    // Remove from source's downstream
+    source.removeDownstream(this)
   }
   
   // Private method to compute with all inputs
