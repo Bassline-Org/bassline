@@ -23,9 +23,9 @@ import type { Point, Size } from '../../proper-bassline/src/visual-gadget'
 // Types
 // ============================================================================
 
-interface BaseVisualProps {
+interface BaseVisualProps<T extends VisualGadget = VisualGadget> {
   id?: string
-  gadget?: VisualGadget  // Use existing gadget, or create new one
+  gadget?: T  // Use existing gadget, or create new one
   position?: Point
   size?: Size
   visible?: boolean
@@ -39,7 +39,7 @@ interface BaseVisualProps {
 // RectGadget React Component
 // ============================================================================
 
-interface RectGadgetProps extends BaseVisualProps {
+interface RectGadgetProps extends BaseVisualProps<RectGadget> {
   color?: string
   borderRadius?: number
   borderWidth?: number
@@ -240,7 +240,7 @@ function ConnectedRectGadget({
 // TextGadget React Component
 // ============================================================================
 
-interface TextGadgetProps extends BaseVisualProps {
+interface TextGadgetProps extends BaseVisualProps<TextGadget> {
   text?: string
   fontSize?: number
   fontFamily?: string
@@ -470,7 +470,7 @@ function ConnectedTextGadget({
 // GroupGadget React Component
 // ============================================================================
 
-interface GroupGadgetProps extends BaseVisualProps {
+interface GroupGadgetProps extends BaseVisualProps<GroupGadget> {
   transform?: string
 }
 

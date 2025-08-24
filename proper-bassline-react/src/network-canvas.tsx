@@ -176,8 +176,8 @@ export function ViewCanvas({
     return viewGadget
   }, `canvas-view-${network.id}`)
   
-  // Subscribe to the projection container
-  const [projectionOutput] = useCell(view.projection.results)
+  // Subscribe to the view results
+  const [projectionOutput] = useCell(view.results)
   
   // Force updates when view parameters change
   useEffect(() => {

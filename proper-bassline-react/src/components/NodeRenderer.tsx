@@ -5,7 +5,7 @@
 import React, { useCallback, useRef, useState, useEffect } from 'react'
 import { useCell } from '../hooks'
 import type { VisualNode } from 'proper-bassline/src/visual-node'
-import { dict, num } from 'proper-bassline/src/types'
+import { dict, num, bool } from 'proper-bassline/src/types'
 
 interface NodeRendererProps {
   node: VisualNode
@@ -115,7 +115,7 @@ export function NodeRenderer({
           className="text-gray-500 hover:text-gray-700 text-xs"
           onClick={(e) => {
             e.stopPropagation()
-            setCollapsed(dict({ value: !collapsed }))
+            setCollapsed(bool(!collapsed))
           }}
         >
           {collapsed ? '▶' : '▼'}
