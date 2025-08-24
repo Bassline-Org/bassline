@@ -43,6 +43,9 @@ export type StyleMap = Record<string, any>
  * Extends Network so visual gadgets can contain other gadgets
  */
 export class VisualGadget extends Network {
+  // Type for query system
+  type = 'VisualGadget'
+  
   // Visual properties as cells - can be wired!
   position: OrdinalCell
   size: OrdinalCell

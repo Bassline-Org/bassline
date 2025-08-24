@@ -7,6 +7,8 @@ import { OrdinalCell } from '../cells/basic'
 import { num, str } from '../types'
 
 export class TextGadget extends VisualGadget {
+  type = 'TextGadget'
+  
   // Text-specific properties
   text: OrdinalCell
   fontSize: OrdinalCell

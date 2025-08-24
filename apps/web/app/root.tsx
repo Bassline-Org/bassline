@@ -7,6 +7,8 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { Toaster } from 'sonner';
+import { NetworkProvider } from "../../../proper-bassline-react/src/hooks";
+import { Network } from "../../../proper-bassline/src/network";
 import type { Route } from "./+types/root";
 import "./app.css";
 import "./styles/scrollbar.css";
@@ -59,7 +61,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  // Create a root-level network for the entire application
+  const rootNetwork = new Network('app-root')
+  
+  return (
+    <NetworkProvider network={rootNetwork}>
+      <Outlet />
+    </NetworkProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

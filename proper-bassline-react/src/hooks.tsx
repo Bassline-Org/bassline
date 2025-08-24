@@ -111,10 +111,23 @@ export function useCell<T = any>(
   const extracted = value ? (getMapValue(value) ?? value) : null
   
   // Get the actual JS value from the LatticeValue wrapper
-  // Special handling for sets - keep them as sets
-  const extractedValue = extracted ? 
-    (extracted.type === 'set' ? extracted.value : (extracted as any).value) : 
-    null
+  // Special handling for different types
+  let extractedValue = null
+  if (extracted) {
+    if (extracted.type === 'set') {
+      extractedValue = extracted.value
+    } else if (extracted.type === 'dict') {
+      // Convert Map to plain object
+      const map = extracted.value as Map<string, any>
+      const obj: any = {}
+      for (const [key, val] of map) {
+        obj[key] = val?.value !== undefined ? val.value : val
+      }
+      extractedValue = obj
+    } else {
+      extractedValue = (extracted as any).value
+    }
+  }
   
   // Setter function
   const setValue = useCallback((newValue: T) => {

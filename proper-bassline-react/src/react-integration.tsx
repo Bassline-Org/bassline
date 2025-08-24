@@ -12,13 +12,13 @@ import {
   createContext,
   type ReactNode 
 } from 'react'
-import { Network } from './network'
-import { Cell } from './cell'
-import { OrdinalCell } from './cells/basic'
-import { FunctionGadget } from './function'
-import type { Gadget } from './gadget'
-import type { LatticeValue } from './types'
-import { getMapValue } from './types'
+import { Network } from '../../proper-bassline/src/network'
+import { Cell } from '../../proper-bassline/src/cell'
+import { OrdinalCell } from '../../proper-bassline/src/cells/basic'
+import { FunctionGadget } from '../../proper-bassline/src/function'
+import type { Gadget } from '../../proper-bassline/src/gadget'
+import type { LatticeValue } from '../../proper-bassline/src/types'
+import { getMapValue } from '../../proper-bassline/src/types'
 
 // ============================================================================
 // Network Context

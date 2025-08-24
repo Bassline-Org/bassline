@@ -7,6 +7,8 @@ import { OrdinalCell } from '../cells/basic'
 import { num, str, dict } from '../types'
 
 export class RectGadget extends VisualGadget {
+  type = 'RectGadget'
+  
   // Rectangle-specific properties
   borderRadius: OrdinalCell
   borderWidth: OrdinalCell

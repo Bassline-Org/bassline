@@ -78,6 +78,9 @@ type Pages = {
   "/simple-editor": {
     params: {};
   };
+  "/canvas-test": {
+    params: {};
+  };
   "/editor-main": {
     params: {};
   };
@@ -122,7 +125,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/programmable-editor" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/function-demo" | "/proper-editor" | "/simple-editor" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
+    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/programmable-editor" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/function-demo" | "/proper-editor" | "/simple-editor" | "/canvas-test" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
   };
   "routes/flow.session.$sessionId.group.$groupId.tsx": {
     id: "routes/flow.session.$sessionId.group.$groupId";
@@ -199,6 +202,10 @@ type RouteFiles = {
   "routes/simple-editor.tsx": {
     id: "routes/simple-editor";
     page: "/simple-editor";
+  };
+  "routes/canvas-test.tsx": {
+    id: "routes/canvas-test";
+    page: "/canvas-test";
   };
   "routes/editor-main.tsx": {
     id: "routes/editor-main";

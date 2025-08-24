@@ -55,14 +55,7 @@ export {
   getMapValue
 } from './types'
 
-// React integration
-export { 
-  NetworkContext,
-  NetworkProvider,
-  useNetwork,
-  useCell,
-  useGadget
-} from './react-integration'
+// React integration moved to proper-bassline-react package
 
 // Registry and editor gadgets
 export { GadgetRegistryGadget, type GadgetTypeInfo } from './gadget-registry'
