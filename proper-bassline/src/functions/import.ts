@@ -6,7 +6,7 @@
  */
 
 import { FunctionGadget } from '../function'
-import { LatticeValue, nil, obj, str, isString } from '../types'
+import { LatticeValue, nil, obj, str, num, bool, isString } from '../types'
 
 export class ImportModule extends FunctionGadget {
   private loadingCache: Map<string, Promise<any>> = new Map()
@@ -16,7 +16,20 @@ export class ImportModule extends FunctionGadget {
     super(id, ['url'])
   }
   
-  async fn(args: Record<string, LatticeValue>): Promise<LatticeValue> {
+  fn(args: Record<string, LatticeValue>): LatticeValue {
+    // Handle async operation synchronously by returning promise result
+    const promise = this.handleModuleLoad(args)
+    
+    // For now, return a pending value and handle async separately
+    promise.then(result => {
+      this.setOutput('default', result)
+      this.emit()
+    })
+    
+    return str('loading...')
+  }
+  
+  private async handleModuleLoad(args: Record<string, LatticeValue>): Promise<LatticeValue> {
     const urlValue = args.url
     
     // Handle ordinal values from OrdinalCell
@@ -50,7 +63,7 @@ export class ImportModule extends FunctionGadget {
     }
     
     // Start loading
-    const loadPromise = this.loadModule(url)
+    const loadPromise = this.loadModuleFromUrl(url)
     this.loadingCache.set(url, loadPromise)
     
     try {
@@ -63,7 +76,7 @@ export class ImportModule extends FunctionGadget {
     }
   }
   
-  private async loadModule(url: string): Promise<any> {
+  private async loadModuleFromUrl(url: string): Promise<any> {
     console.log(`ImportModule: Loading ${url}...`)
     
     // Handle different URL types
@@ -191,11 +204,11 @@ export class DynamicFunction extends FunctionGadget {
       if (result === null || result === undefined) {
         return nil()
       } else if (typeof result === 'number') {
-        return { type: 'number', value: result }
+        return num(result)
       } else if (typeof result === 'string') {
-        return { type: 'string', value: result }
+        return str(result)
       } else if (typeof result === 'boolean') {
-        return { type: 'bool', value: result }
+        return bool(result)
       } else {
         return obj(result)
       }
@@ -283,11 +296,11 @@ export class ModuleFunction extends FunctionGadget {
       if (result === null || result === undefined) {
         return nil()
       } else if (typeof result === 'number') {
-        return { type: 'number', value: result }
+        return num(result)
       } else if (typeof result === 'string') {
-        return { type: 'string', value: result }
+        return str(result)
       } else if (typeof result === 'boolean') {
-        return { type: 'bool', value: result }
+        return bool(result)
       } else {
         return obj(result)
       }

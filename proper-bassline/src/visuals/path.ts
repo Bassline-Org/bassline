@@ -4,7 +4,7 @@
 
 import { VisualGadget } from '../visual-gadget'
 import { OrdinalCell } from '../cells/basic'
-import { num, str, array } from '../types'
+import { num, str, array, dict } from '../types'
 import type { Point } from '../visual-gadget'
 
 export class PathGadget extends VisualGadget {
@@ -55,13 +55,10 @@ export class PathGadget extends VisualGadget {
   
   // Convenience setters
   setPoints(points: Point[]): this {
-    const pointValues = points.map(p => ({
-      type: 'dict' as const,
-      value: new Map([
-        ['x', num(p.x)],
-        ['y', num(p.y)]
-      ])
-    }))
+    const pointValues = points.map(p => dict(new Map([
+      ['x', num(p.x)],
+      ['y', num(p.y)]
+    ])))
     this.points.userInput(array(pointValues))
     return this
   }

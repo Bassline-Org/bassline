@@ -10,7 +10,7 @@
 
 import { Cell } from './cell'
 import { Gadget } from './gadget'
-import { LatticeValue } from './types'
+import { LatticeValue, str } from './types'
 import { OrdinalCell } from './cells/basic'
 import type { GadgetBase, Container } from './gadget-base'
 import { Query, query } from './query'
@@ -19,7 +19,7 @@ import { NetworkValue } from './network-value'
 export class Network extends Cell implements Container {
   gadgets: Set<Gadget> = new Set()  // Strong references to prevent GC (includes child networks!)
   children: Set<GadgetBase> = new Set()  // All child gadgets for Container interface
-  parent: WeakRef<Network> | null = null  // Weak ref to parent to avoid circular references
+  parent?: GadgetBase  // Parent gadget if nested
   
   // For Container interface - we'll keep the Map for named lookups
   private childNetworks: Map<string, Network> = new Map()  // Child networks by name for namespacing
@@ -32,13 +32,13 @@ export class Network extends Cell implements Container {
   latticeOp(): LatticeValue {
     // Networks merge by combining their gadgets
     // For simplicity, we'll return a summary
-    return { type: "string", value: `network-${this.id}[${this.gadgets.size} gadgets]` }
+    return str(`network-${this.id}[${this.gadgets.size} gadgets]`)
   }
   
   // Add a gadget to the network (holds strong reference)
   addGadget(gadget: Gadget): void {
     this.gadgets.add(gadget)
-    this.children.add(gadget as GadgetBase)  // Also add to children for Container interface
+    this.children.add(gadget)  // Also add to children for Container interface
   }
   
   // Add multiple gadgets at once (implements Container.add)
@@ -85,10 +85,7 @@ export class Network extends Cell implements Container {
   compute(): void {
     // With new propagation protocol, we don't need centralized propagation
     // Just update our output summary
-    this.setOutput("default", { 
-      type: "string", 
-      value: `network[${this.gadgets.size} gadgets]` 
-    }, false)  // Don't auto-emit to avoid loops
+    this.setOutput("default", str(`network[${this.gadgets.size} gadgets]`), false)  // Don't auto-emit to avoid loops
   }
   
   // Start propagation by computing all gadgets once
@@ -97,7 +94,7 @@ export class Network extends Cell implements Container {
     // Just compute each gadget once to kick off propagation
     // The accept/emit protocol will handle the rest
     for (const gadget of this.gadgets) {
-      if (gadget === this) continue  // Skip ourselves
+      if (gadget === (this as Gadget)) continue  // Skip ourselves
       gadget.compute()
     }
   }
@@ -135,7 +132,7 @@ export class Network extends Cell implements Container {
    * network.query("Network > Cell")    // Direct child cells
    */
   query(selector: string): Set<GadgetBase> {
-    return new Query(this as Container).select(selector).execute()
+    return new Query(this as unknown as Container).select(selector).execute()
   }
   
   /**
@@ -223,7 +220,7 @@ export class Network extends Cell implements Container {
     
     // Print all gadgets
     for (const gadget of this.gadgets) {
-      if (gadget === this) continue  // Don't print ourselves
+      if (gadget === (this as Gadget)) continue  // Don't print ourselves
       
       if (gadget instanceof Network) {
         // Child network - recurse with indentation
@@ -248,7 +245,7 @@ export class Network extends Cell implements Container {
     // Serialize all gadgets
     base.gadgets = []
     for (const gadget of this.gadgets) {
-      if (gadget === this) continue  // Don't serialize ourselves recursively
+      if (gadget === (this as Gadget)) continue  // Don't serialize ourselves recursively
       base.gadgets.push(gadget.serialize())
     }
     

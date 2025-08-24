@@ -10,6 +10,7 @@
 
 import { Gadget } from './gadget'
 import { Connection, LatticeValue, nil, serialize } from './types'
+import type { GadgetBase } from './gadget-base'
 
 export abstract class FunctionGadget extends Gadget {
   inputs: Map<string, Connection> = new Map()
@@ -28,7 +29,7 @@ export abstract class FunctionGadget extends Gadget {
    * Accept information from upstream
    * Functions store values and compute when ready
    */
-  accept(value: LatticeValue, source: Gadget, inputName?: string): void {
+  accept(value: LatticeValue, source: GadgetBase, inputName?: string): void {
     if (!inputName) {
       console.warn(`Function ${this.id} received value without input name`)
       return

@@ -36,7 +36,7 @@ export class QueryGadget extends FunctionGadget {
     }
     
     if (!network || selectorValue?.type !== 'string') {
-      return makeSet(new Set())
+      return makeSet(new Set<LatticeValue>())
     }
     
     // Just call query on the network!

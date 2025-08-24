@@ -3,7 +3,7 @@
  */
 
 import { Affordance, type InputEvent } from '../affordance'
-import { str, bool } from '../types'
+import { str, bool, num } from '../types'
 import type { LatticeValue } from '../types'
 import type { Cell } from '../cell'
 
@@ -21,7 +21,7 @@ export class TypeAffordance extends Affordance {
     
     // Additional outputs
     this.setOutput('active', bool(false))
-    this.setOutput('cursor', { type: 'number', value: this.cursorPosition })
+    this.setOutput('cursor', num(this.cursorPosition))
   }
   
   protected handleSpecificInput(event: InputEvent): boolean {
@@ -67,25 +67,25 @@ export class TypeAffordance extends Affordance {
       case 'ArrowLeft':
         if (this.cursorPosition > 0) {
           this.cursorPosition--
-          this.setOutput('cursor', { type: 'number', value: this.cursorPosition })
+          this.setOutput('cursor', num(this.cursorPosition))
         }
         break
         
       case 'ArrowRight':
         if (this.cursorPosition < this.text.length) {
           this.cursorPosition++
-          this.setOutput('cursor', { type: 'number', value: this.cursorPosition })
+          this.setOutput('cursor', num(this.cursorPosition))
         }
         break
         
       case 'Home':
         this.cursorPosition = 0
-        this.setOutput('cursor', { type: 'number', value: this.cursorPosition })
+        this.setOutput('cursor', num(this.cursorPosition))
         break
         
       case 'End':
         this.cursorPosition = this.text.length
-        this.setOutput('cursor', { type: 'number', value: this.cursorPosition })
+        this.setOutput('cursor', num(this.cursorPosition))
         break
         
       case 'Escape':
@@ -110,7 +110,7 @@ export class TypeAffordance extends Affordance {
     
     if (changed) {
       this.emitValue(str(this.text))
-      this.setOutput('cursor', { type: 'number', value: this.cursorPosition })
+      this.setOutput('cursor', num(this.cursorPosition))
     }
     
     return true
@@ -131,7 +131,7 @@ export class TypeAffordance extends Affordance {
     this.text = text
     this.cursorPosition = text.length
     this.emitValue(str(text))
-    this.setOutput('cursor', { type: 'number', value: this.cursorPosition })
+    this.setOutput('cursor', num(this.cursorPosition))
   }
   
   /**

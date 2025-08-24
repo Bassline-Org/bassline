@@ -5,18 +5,88 @@
  * Serialization protocol converts to/from JSON-compatible forms.
  */
 
-// Runtime type - uses native JS structures for efficiency
-export type LatticeValue = 
-  | { type: "bool", value: boolean }
-  | { type: "number", value: number }
-  | { type: "string", value: string }
-  | { type: "array", value: LatticeValue[] }  // Ordered collection
-  | { type: "set", value: Set<LatticeValue> }  // Unordered, unique items
-  | { type: "dict", value: Map<string, LatticeValue> }  // Key-value map
-  | { type: "object", value: any }  // Arbitrary JS objects
-  | { type: "function", value: Function }  // Executable functions
-  | { type: "null" }
-  | { type: "contradiction", conflicts: Set<LatticeValue> }
+// Base class for all lattice values - generic over the actual value type
+export abstract class LatticeValue<T = any> {
+  constructor(public readonly value: T) {}
+  abstract get type(): string
+  abstract serialize(): SerializedLatticeValue
+}
+
+// Simple primitive types
+export class LatticeNumber extends LatticeValue<number> {
+  get type(): 'number' { return 'number' }
+  serialize(): SerializedLatticeValue { return { type: 'number', value: this.value } }
+}
+
+export class LatticeString extends LatticeValue<string> {
+  get type(): 'string' { return 'string' }
+  serialize(): SerializedLatticeValue { return { type: 'string', value: this.value } }
+}
+
+export class LatticeBool extends LatticeValue<boolean> {
+  get type(): 'bool' { return 'bool' }
+  serialize(): SerializedLatticeValue { return { type: 'bool', value: this.value } }
+}
+
+export class LatticeNull extends LatticeValue<null> {
+  constructor() { super(null) }
+  get type(): 'null' { return 'null' }
+  serialize(): SerializedLatticeValue { return { type: 'null' } }
+}
+
+// Compound types - T extends LatticeValue for proper nesting
+export class LatticeArray<T extends LatticeValue = LatticeValue> extends LatticeValue<T[]> {
+  get type(): 'array' { return 'array' }
+  serialize(): SerializedLatticeValue { 
+    return { type: 'array', value: this.value.map(v => v.serialize()) }
+  }
+}
+
+export class LatticeSet<T extends LatticeValue = LatticeValue> extends LatticeValue<Set<T>> {
+  get type(): 'set' { return 'set' }
+  serialize(): SerializedLatticeValue { 
+    return { type: 'set', value: Array.from(this.value).map(v => v.serialize()) }
+  }
+}
+
+export class LatticeDict<V extends LatticeValue = LatticeValue> extends LatticeValue<Map<string, V>> {
+  get type(): 'dict' { return 'dict' }
+  serialize(): SerializedLatticeValue {
+    const obj: Record<string, SerializedLatticeValue> = {}
+    for (const [k, v] of this.value) {
+      obj[k] = v.serialize()
+    }
+    return { type: 'dict', value: obj }
+  }
+}
+
+// Function type
+export class LatticeFunction extends LatticeValue<Function> {
+  get type(): 'function' { return 'function' }
+  serialize(): SerializedLatticeValue {
+    return { type: 'function-ref', name: this.value.name || 'anonymous' }
+  }
+}
+
+// Contradiction type
+export class LatticeContradiction extends LatticeValue<Set<LatticeValue>> {
+  get type(): 'contradiction' { return 'contradiction' }
+  serialize(): SerializedLatticeValue {
+    return { type: 'contradiction', conflicts: Array.from(this.value).map(v => v.serialize()) }
+  }
+}
+
+// Dynamic object type for anything else
+export class LatticeObject extends LatticeValue<any> {
+  get type(): 'object' { return 'object' }
+  serialize(): SerializedLatticeValue { 
+    return { 
+      type: 'object-ref', 
+      className: this.value?.constructor?.name,
+      id: this.value?.id
+    }
+  }
+}
 
 // Serialized type - JSON-compatible representation
 export type SerializedLatticeValue = 
@@ -32,136 +102,99 @@ export type SerializedLatticeValue =
   | { type: "null" }
   | { type: "contradiction", conflicts: SerializedLatticeValue[] }
 
-// Helper constructors (runtime types)
-export const bool = (value: boolean): LatticeValue => ({ type: "bool", value })
-export const num = (value: number): LatticeValue => ({ type: "number", value })
-export const str = (value: string): LatticeValue => ({ type: "string", value })
-export const array = (value: LatticeValue[]): LatticeValue => ({ type: "array", value })
-export const nil = (): LatticeValue => ({ type: "null" })
-export const obj = (value: any): LatticeValue => ({ type: "object", value })
-export const fn = (value: Function): LatticeValue => ({ type: "function", value })
+// Helper constructors - now return class instances
+export const bool = (value: boolean) => new LatticeBool(value)
+export const num = (value: number) => new LatticeNumber(value)
+export const str = (value: string) => new LatticeString(value)
+export const array = <T extends LatticeValue>(items: T[]) => new LatticeArray(items)
+export const nil = () => new LatticeNull()
+export const obj = (value: any) => new LatticeObject(value)
+export const fn = (value: Function) => new LatticeFunction(value)
 
 // Set constructor with deduplication
-export const set = (items: LatticeValue[] | Set<LatticeValue>): LatticeValue => {
+export const set = <T extends LatticeValue>(items: Set<T> | T[]): LatticeSet<T> => {
   if (items instanceof Set) {
-    return { type: "set", value: items }
+    return new LatticeSet(items)
   }
   // Deduplicate using JSON.stringify for deep equality
-  const seen = new Map<string, LatticeValue>()
+  const seen = new Map<string, T>()
   for (const item of items) {
-    const key = JSON.stringify(serialize(item))
+    const key = JSON.stringify(item.serialize())
     if (!seen.has(key)) {
       seen.set(key, item)
     }
   }
-  return { type: "set", value: new Set(seen.values()) }
+  return new LatticeSet(new Set(seen.values()))
 }
 
 // Dict constructor
-export const dict = (entries: Record<string, LatticeValue> | Map<string, LatticeValue>): LatticeValue => {
+export const dict = <V extends LatticeValue>(entries: Map<string, V> | Record<string, V>): LatticeDict<V> => {
   if (entries instanceof Map) {
-    return { type: "dict", value: entries }
+    return new LatticeDict(entries)
   }
-  return { type: "dict", value: new Map(Object.entries(entries)) }
+  return new LatticeDict(new Map(Object.entries(entries)))
 }
 
 // Contradiction constructor
-export const contradiction = (conflicts: LatticeValue[] | Set<LatticeValue>): LatticeValue => ({
-  type: "contradiction",
-  conflicts: conflicts instanceof Set ? conflicts : new Set(conflicts)
-})
+export const contradiction = (conflicts: Set<LatticeValue> | LatticeValue[]): LatticeContradiction => {
+  return new LatticeContradiction(conflicts instanceof Set ? conflicts : new Set(conflicts))
+}
 
-// Type guards for runtime types
-export const isNumber = (v: LatticeValue | null): v is { type: "number", value: number } => 
-  v !== null && v.type === "number"
-export const isBool = (v: LatticeValue | null): v is { type: "bool", value: boolean } => 
-  v !== null && v.type === "bool"
-export const isString = (v: LatticeValue | null): v is { type: "string", value: string } => 
-  v !== null && v.type === "string"
-export const isArray = (v: LatticeValue | null): v is { type: "array", value: LatticeValue[] } => 
-  v !== null && v.type === "array"
-export const isSet = (v: LatticeValue | null): v is { type: "set", value: Set<LatticeValue> } => 
-  v !== null && v.type === "set"
-export const isDict = (v: LatticeValue | null): v is { type: "dict", value: Map<string, LatticeValue> } => 
-  v !== null && v.type === "dict"
-export const isObject = (v: LatticeValue | null): v is { type: "object", value: any } => 
-  v !== null && v.type === "object"
-export const isFunction = (v: LatticeValue | null): v is { type: "function", value: Function } => 
-  v !== null && v.type === "function"
-export const isNull = (v: LatticeValue | null): v is { type: "null" } => 
-  v !== null && v.type === "null"
+// Type guards using instanceof
+export const isNumber = (v: LatticeValue | null): v is LatticeNumber => 
+  v !== null && v instanceof LatticeNumber
+export const isBool = (v: LatticeValue | null): v is LatticeBool => 
+  v !== null && v instanceof LatticeBool
+export const isString = (v: LatticeValue | null): v is LatticeString => 
+  v !== null && v instanceof LatticeString
+export const isArray = (v: LatticeValue | null): v is LatticeArray => 
+  v !== null && v instanceof LatticeArray
+export const isSet = (v: LatticeValue | null): v is LatticeSet => 
+  v !== null && v instanceof LatticeSet
+export const isDict = (v: LatticeValue | null): v is LatticeDict => 
+  v !== null && v instanceof LatticeDict
+export const isObject = (v: LatticeValue | null): v is LatticeObject => 
+  v !== null && v instanceof LatticeObject
+export const isFunction = (v: LatticeValue | null): v is LatticeFunction => 
+  v !== null && v instanceof LatticeFunction
+export const isNull = (v: LatticeValue | null): v is LatticeNull => 
+  v !== null && v instanceof LatticeNull
 
 // Legacy alias
 export const isMap = isDict
 
-// Serialization protocol
+// Serialization protocol - now just calls the serialize method
 export function serialize(value: LatticeValue): SerializedLatticeValue {
-  switch (value.type) {
-    case "bool":
-    case "number":
-    case "string":
-    case "null":
-      return value as SerializedLatticeValue
-    
-    case "array":
-      return { type: "array", value: value.value.map(serialize) }
-    
-    case "set":
-      return { type: "set", value: Array.from(value.value).map(serialize) }
-    
-    case "dict": {
-      const obj: Record<string, SerializedLatticeValue> = {}
-      for (const [k, v] of value.value) {
-        obj[k] = serialize(v)
-      }
-      return { type: "dict", value: obj }
-    }
-    
-    case "object":
-      // For objects, we'll serialize as a reference
-      // Could be enhanced to include className or other metadata
-      return { 
-        type: "object-ref", 
-        className: value.value?.constructor?.name,
-        id: value.value?.id
-      }
-    
-    case "function":
-      // For functions, serialize by name or source
-      return {
-        type: "function-ref",
-        name: value.value.name || "anonymous"
-      }
-    
-    case "contradiction":
-      return { type: "contradiction", conflicts: Array.from(value.conflicts).map(serialize) }
-    
-    default:
-      throw new Error(`Unknown type: ${(value as any).type}`)
-  }
+  return value.serialize()
 }
 
 // Deserialization protocol
 export function deserialize(value: SerializedLatticeValue): LatticeValue {
   switch (value.type) {
     case "bool":
+      return new LatticeBool(value.value)
+    
     case "number":
+      return new LatticeNumber(value.value)
+    
     case "string":
+      return new LatticeString(value.value)
+    
     case "null":
-      return value as LatticeValue
+      return new LatticeNull()
     
     case "array":
-      return { type: "array", value: value.value.map(deserialize) }
+      return new LatticeArray(value.value.map(deserialize))
     
     case "set":
-      return { type: "set", value: new Set(value.value.map(deserialize)) }
+      return new LatticeSet(new Set(value.value.map(deserialize)))
     
     case "dict": {
       const map = new Map<string, LatticeValue>()
       for (const [k, v] of Object.entries(value.value)) {
         map.set(k, deserialize(v))
       }
-      return { type: "dict", value: map }
+      return new LatticeDict(map)
     }
     
     case "object-ref":
@@ -180,7 +213,7 @@ export function deserialize(value: SerializedLatticeValue): LatticeValue {
       return nil()
     
     case "contradiction":
-      return { type: "contradiction", conflicts: new Set(value.conflicts.map(deserialize)) }
+      return new LatticeContradiction(new Set(value.conflicts.map(deserialize)))
     
     default:
       throw new Error(`Unknown type: ${(value as any).type}`)
@@ -188,8 +221,8 @@ export function deserialize(value: SerializedLatticeValue): LatticeValue {
 }
 
 // Helper functions for ordinal values (using dict)
-export const ordinalValue = (ord: number, val: LatticeValue): LatticeValue => 
-  dict({ ordinal: num(ord), value: val })
+export const ordinalValue = (ord: number, val: LatticeValue): LatticeDict => 
+  dict(new Map([['ordinal', num(ord)], ['value', val]]))
 
 export const getOrdinal = (d: LatticeValue): number | null => {
   if (!isDict(d)) return null
@@ -207,19 +240,9 @@ export const getMapValue = (d: LatticeValue): LatticeValue | null => getDictValu
 
 // Extract raw value for operations
 export function getValue(lv: LatticeValue): any {
-  switch (lv.type) {
-    case "bool": return lv.value
-    case "number": return lv.value
-    case "string": return lv.value
-    case "array": return lv.value
-    case "set": return lv.value
-    case "dict": return lv.value
-    case "object": return lv.value
-    case "function": return lv.value
-    case "null": return null
-    case "contradiction": return lv.conflicts
-    default: throw new Error(`Invalid value type: ${lv}`)
-  }
+  if (lv instanceof LatticeNull) return null
+  if (lv instanceof LatticeContradiction) return lv.value // Set of conflicts
+  return lv.value
 }
 
 // Forward declaration - Gadget is now in gadget.ts

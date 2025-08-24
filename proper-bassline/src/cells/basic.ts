@@ -5,18 +5,19 @@
  * They can handle any number of inputs from multiple writers.
  */
 
-import { Cell } from '../cell'
-import { LatticeValue, Connection, num, bool, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal, deserialize as deserializeLattice} from '../types'
+import { Cell, TypedCell } from '../cell'
+import { LatticeValue, LatticeNumber, LatticeBool, LatticeSet, Connection, num, bool, str, obj, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal, deserialize as deserializeLattice} from '../types'
 
 // Max lattice for numbers (idempotent: max(a,a) = a)
-export class MaxCell extends Cell {
+export class MaxCell extends TypedCell<number> {
+  wrap(value: number): LatticeValue {
+    return num(value)
+  }
+  
   latticeOp(...values: LatticeValue[]): LatticeValue {
-    const numbers = values
-      .filter(isNumber)
-      .map(v => v.value)  // TypeScript knows it's a number!
-    
+    const numbers = values.filter(isNumber)
     if (numbers.length === 0) return nil()
-    return num(Math.max(...numbers))
+    return num(Math.max(...numbers.map(n => n.value)))
   }
   
   static deserialize(data: any, registry: any): MaxCell {
@@ -25,7 +26,7 @@ export class MaxCell extends Cell {
 }
 
 // Ordinal Lattice for sequences of inputs, like user input etc  
-export class OrdinalCell extends Cell {
+export class OrdinalCell<T = any> extends TypedCell<T> {
   private userOrdinal = 0
   
   // Override setOutput to only emit when ordinal increases
@@ -41,16 +42,59 @@ export class OrdinalCell extends Cell {
   }
   
   /**
+   * Wrap a value into a LatticeValue with auto-conversion
+   */
+  wrap(value: T): LatticeValue {
+    // Auto-wrap based on type
+    let wrapped: LatticeValue
+    if (typeof value === 'number') wrapped = num(value as any)
+    else if (typeof value === 'string') wrapped = str(value as any)
+    else if (typeof value === 'boolean') wrapped = bool(value as any)
+    else if (value instanceof LatticeValue) wrapped = value as any  // Already wrapped!
+    else wrapped = obj(value)  // Fallback to LatticeObject
+    
+    // Wrap in ordinal dict
+    return ordinalValue(++this.userOrdinal, wrapped)
+  }
+  
+  /**
+   * Get the typed value from the ordinal cell
+   */
+  getValue(): T | null {
+    const output = this.getOutput()
+    if (!output || !isDict(output)) return null
+    const innerValue = output.value.get('value')
+    if (!innerValue) return null
+    
+    // If T is LatticeValue, return it directly
+    if (innerValue instanceof LatticeValue) {
+      return innerValue as any as T
+    }
+    return (innerValue as any).value as T
+  }
+  
+  /**
    * UI convenience method for user input with auto-incrementing ordinal
    * Wraps the value in an ordinal map and sends through accept
    */
-  userInput(value: LatticeValue): void {
+  userInput(value: T | LatticeValue): void {
     // Get current ordinal and increment from there
     const current = this.outputs.get('default') || nil()
     const currentOrdinal = getOrdinal(current) || 0
     this.userOrdinal = Math.max(this.userOrdinal, currentOrdinal)
     
-    const ordinalVal = ordinalValue(++this.userOrdinal, value)
+    // Handle both raw values and LatticeValues
+    let wrapped: LatticeValue
+    if (value instanceof LatticeValue) {
+      wrapped = value
+    } else {
+      // Use the wrap method to convert T to LatticeValue
+      this.userOrdinal--  // Decrement because wrap will increment
+      wrapped = this.wrap(value).value.get('value') as LatticeValue
+      this.userOrdinal++  // Re-increment for the ordinal wrapping
+    }
+    
+    const ordinalVal = ordinalValue(++this.userOrdinal, wrapped)
     // Just use accept - it will handle the latticeOp
     this.accept(ordinalVal, this)
   }
@@ -127,14 +171,15 @@ export class OrdinalCell extends Cell {
 }
 
 // Min lattice for numbers (idempotent: min(a,a) = a)
-export class MinCell extends Cell {
+export class MinCell extends TypedCell<number> {
+  wrap(value: number): LatticeValue {
+    return num(value)
+  }
+  
   latticeOp(...values: LatticeValue[]): LatticeValue {
-    const numbers = values
-      .filter(isNumber)
-      .map(v => v.value)
-    
+    const numbers = values.filter(isNumber)
     if (numbers.length === 0) return nil()
-    return num(Math.min(...numbers))
+    return num(Math.min(...numbers.map(n => n.value)))
   }
   
   static deserialize(data: any, registry: any): MinCell {
@@ -143,26 +188,28 @@ export class MinCell extends Cell {
 }
 
 // OR lattice for booleans (idempotent: a ∨ a = a)
-export class OrCell extends Cell {
+export class OrCell extends TypedCell<boolean> {
+  wrap(value: boolean): LatticeValue {
+    return bool(value)
+  }
+  
   latticeOp(...values: LatticeValue[]): LatticeValue {
-    const bools = values
-      .filter(isBool)
-      .map(v => v.value)
-    
+    const bools = values.filter(isBool)
     if (bools.length === 0) return nil()
-    return bool(bools.some(b => b))
+    return bool(bools.some(b => b.value))
   }
 }
 
 // AND lattice for booleans (idempotent: a ∧ a = a)
-export class AndCell extends Cell {
+export class AndCell extends TypedCell<boolean> {
+  wrap(value: boolean): LatticeValue {
+    return bool(value)
+  }
+  
   latticeOp(...values: LatticeValue[]): LatticeValue {
-    const bools = values
-      .filter(isBool)
-      .map(v => v.value)
-    
+    const bools = values.filter(isBool)
     if (bools.length === 0) return nil()
-    return bool(bools.every(b => b))
+    return bool(bools.every(b => b.value))
   }
 }
 
@@ -217,11 +264,15 @@ export class LatestCell extends Cell {
 
 // SetCell - Grow-only set with automatic deduplication
 // Uses union operation as the lattice operation
-export class SetCell extends Cell {
+export class SetCell extends TypedCell<Set<LatticeValue>> {
+  wrap(value: Set<LatticeValue>): LatticeValue {
+    return set(value)
+  }
+  
   latticeOp(...values: LatticeValue[]): LatticeValue {
     const sets = values.filter(isSet)
     
-    if (sets.length === 0) return set(new Set())
+    if (sets.length === 0) return set(new Set<LatticeValue>())
     
     // Union all sets together
     const result = new Set<LatticeValue>()
@@ -236,7 +287,7 @@ export class SetCell extends Cell {
   
   // Convenience method to add items to the set
   add(item: LatticeValue): void {
-    const current = this.getOutput() || set(new Set())
+    const current = this.getOutput()
     if (!isSet(current)) return
     
     const newSet = new Set(current.value)
@@ -251,7 +302,7 @@ export class SetCell extends Cell {
     
     // Check for deep equality
     for (const existing of current.value) {
-      if (JSON.stringify(existing) === JSON.stringify(item)) {
+      if (JSON.stringify(existing.serialize()) === JSON.stringify(item.serialize())) {
         return true
       }
     }

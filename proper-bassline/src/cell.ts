@@ -10,6 +10,7 @@
 
 import { Gadget } from './gadget'
 import { Connection, LatticeValue, nil } from './types'
+import type { GadgetBase } from './gadget-base'
 
 export abstract class Cell extends Gadget {
   // Multiple inputs allowed (many-to-one)
@@ -25,7 +26,7 @@ export abstract class Cell extends Gadget {
    * Accept information from upstream
    * Cells join all inputs via latticeOp
    */
-  accept(value: LatticeValue, source: Gadget, inputName?: string): void {
+  accept(value: LatticeValue, source: GadgetBase, inputName?: string): void {
     // Join the incoming value with current output
     const current = this.outputs.get('default')
     const result = current ? this.latticeOp(current, value) : value
@@ -45,7 +46,7 @@ export abstract class Cell extends Gadget {
   }
   
   // Connect from another gadget (creates WeakRef)
-  connectFrom(source: Gadget, outputName: string = "default"): void {
+  connectFrom(source: GadgetBase, outputName: string = "default"): void {
     this.inputs.add({
       source: new WeakRef(source),
       outputName
@@ -62,7 +63,7 @@ export abstract class Cell extends Gadget {
   }
   
   // Chainable version that returns this
-  from(...sources: Gadget[]): this {
+  from(...sources: GadgetBase[]): this {
     for (const source of sources) {
       this.connectFrom(source)
     }
@@ -70,7 +71,7 @@ export abstract class Cell extends Gadget {
   }
   
   // Disconnect from a source
-  disconnectFrom(source: Gadget, outputName: string = "default"): void {
+  disconnectFrom(source: GadgetBase, outputName: string = "default"): void {
     // Find and remove the connection from inputs
     for (const conn of this.inputs) {
       const src = conn.source.deref()
@@ -129,8 +130,8 @@ export abstract class Cell extends Gadget {
   }
   
   // Get all live sources (for debugging)
-  getLiveSources(): Gadget[] {
-    const sources: Gadget[] = []
+  getLiveSources(): GadgetBase[] {
+    const sources: GadgetBase[] = []
     for (const conn of this.inputs) {
       const source = conn.source.deref()
       if (source) sources.push(source)
@@ -160,4 +161,39 @@ export abstract class Cell extends Gadget {
     
     return base
   }
+}
+
+/**
+ * TypedCell - Base class for cells with known input/output types
+ * 
+ * Provides type-safe setValue/getValue methods for cells that work
+ * with specific types (e.g., MaxCell works with numbers).
+ */
+export abstract class TypedCell<T> extends Cell {
+  /**
+   * Type-safe setter for the cell's value
+   */
+  setValue(value: T): void {
+    const latticeValue = this.wrap(value)
+    this.accept(latticeValue, this)
+  }
+  
+  /**
+   * Type-safe getter for the cell's value
+   */
+  getValue(): T | null {
+    const output = this.getOutput()
+    if (!output) return null
+    
+    // For LatticeValue instances, extract the value
+    if (output && typeof output === 'object' && 'value' in output) {
+      return output.value as T
+    }
+    return output as T
+  }
+  
+  /**
+   * Subclasses define how to wrap their type into a LatticeValue
+   */
+  abstract wrap(value: T): LatticeValue
 }

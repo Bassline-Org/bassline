@@ -41,14 +41,16 @@ export interface GadgetBase {
   /**
    * Accept a value from another gadget
    * This is how gadgets receive information
+   * @param inputName Optional input name for Functions with named inputs
    */
-  accept(value: LatticeValue, from: GadgetBase): void
+  accept(value: LatticeValue, from: GadgetBase, inputName?: string): void
   
   /**
    * Emit a value to downstream gadgets
    * This is how gadgets send information
+   * @param outputName Optional output name (default: "default")
    */
-  emit(value: LatticeValue): void
+  emit(outputName?: string): void
   
   /**
    * Gadgets that send values to this gadget
@@ -62,8 +64,9 @@ export interface GadgetBase {
   
   /**
    * Get the current output value
+   * @param name Output name (default: "default")
    */
-  getOutput(): LatticeValue | null
+  getOutput(name?: string): LatticeValue
   
   // ============================================================================
   // Connection Management
@@ -71,8 +74,9 @@ export interface GadgetBase {
   
   /**
    * Add a downstream gadget
+   * @param inputName Optional input name for Functions
    */
-  addDownstream(gadget: GadgetBase): void
+  addDownstream(gadget: GadgetBase, inputName?: string): void
   
   /**
    * Remove a downstream gadget
@@ -81,8 +85,9 @@ export interface GadgetBase {
   
   /**
    * Add an upstream gadget
+   * @param outputName Optional output name for named outputs
    */
-  addUpstream(gadget: GadgetBase): void
+  addUpstream(gadget: GadgetBase, outputName?: string): void
   
   /**
    * Remove an upstream gadget
@@ -169,7 +174,7 @@ export interface Container extends GadgetBase {
  */
 export function isContainer(obj: any): obj is Container {
   return isGadgetBase(obj) && 
-    obj.children instanceof Set &&
-    typeof obj.add === 'function' &&
-    typeof obj.query === 'function'
+    'children' in obj && obj.children instanceof Set &&
+    'add' in obj && typeof obj.add === 'function' &&
+    'query' in obj && typeof obj.query === 'function'
 }

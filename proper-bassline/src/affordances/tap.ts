@@ -3,7 +3,7 @@
  */
 
 import { Affordance, type InputEvent } from '../affordance'
-import { bool } from '../types'
+import { bool, num } from '../types'
 import type { LatticeValue } from '../types'
 import type { Cell } from '../cell'
 
@@ -36,7 +36,7 @@ export class TapAffordance extends Affordance {
     this.emitValue(bool(true))
     
     // Also emit tap count for double/triple tap detection
-    this.setOutput('tapCount', { type: 'number', value: this.tapCount })
+    this.setOutput('tapCount', num(this.tapCount))
     
     // Reset to false after a short delay (simulating a pulse)
     setTimeout(() => {

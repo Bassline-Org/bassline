@@ -6,15 +6,15 @@
  * integration between React and the propagation system.
  */
 
-import React, { useEffect, useRef, CSSProperties } from 'react'
+import React, { useEffect, useRef, type CSSProperties } from 'react'
 import { NetworkContext, useNetwork, useGadget, useCell } from './hooks'
 import { 
   RectGadget, 
   TextGadget, 
   PathGadget, 
-  GroupGadget,
-  VisualGadget 
+  GroupGadget
 } from '../../proper-bassline/src/visuals'
+import { VisualGadget } from '../../proper-bassline/src/visual-gadget'
 import { getGadgetValue } from '../../proper-bassline/src/value-helpers'
 import { num, str, dict, bool } from '../../proper-bassline/src/types'
 import type { Point, Size } from '../../proper-bassline/src/visual-gadget'

@@ -13,7 +13,7 @@ import {
   type ReactNode 
 } from 'react'
 import { Network } from 'proper-bassline/src/network'
-import { Cell } from 'proper-bassline/src/cell'
+import { Cell, TypedCell } from 'proper-bassline/src/cell'
 import { OrdinalCell } from 'proper-bassline/src/cells/basic'
 import { FunctionGadget } from 'proper-bassline/src/function'
 import type { Gadget } from 'proper-bassline/src/gadget'
@@ -305,4 +305,57 @@ export function useImport<T extends Gadget>(
   })
   
   return local
+}
+
+// ============================================================================
+// useTypedCell Hook - Type-safe version for TypedCell
+// ============================================================================
+
+/**
+ * Type-safe hook for TypedCell instances
+ * Provides properly typed getValue/setValue methods
+ */
+export function useTypedCell<T>(
+  cell: TypedCell<T> | null
+): [T | null, (value: T) => void] {
+  const [, forceUpdate] = useState({})
+  const mountedRef = useRef(true)
+  
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+  
+  // Subscribe to changes
+  useEffect(() => {
+    if (!cell) return
+    
+    // Create a temporary gadget to receive updates
+    const receiver = {
+      id: `react-typed-receiver-${Math.random()}`,
+      accept: () => {
+        if (mountedRef.current) {
+          forceUpdate({})
+        }
+      }
+    } as any
+    
+    // Register as downstream
+    cell.addDownstream(receiver)
+    
+    return () => {
+      cell.removeDownstream(receiver)
+    }
+  }, [cell])
+  
+  // Get typed value
+  const value = cell ? cell.getValue() : null
+  
+  // Setter function
+  const setValue = useCallback((newValue: T) => {
+    if (!cell) return
+    cell.setValue(newValue)
+  }, [cell])
+  
+  return [value, setValue]
 }

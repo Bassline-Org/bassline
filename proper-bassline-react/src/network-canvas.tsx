@@ -5,7 +5,7 @@
  * Takes a propagation network and renders all visual gadgets as React components.
  */
 
-import React, { useEffect, useState, useMemo, CSSProperties } from 'react'
+import React, { useEffect, useState, useMemo, type CSSProperties } from 'react'
 import { Network } from '../../proper-bassline/src/network'
 import { VisualGadget } from '../../proper-bassline/src/visual-gadget'
 import { ViewGadget } from '../../proper-bassline/src/view-gadget'
@@ -167,7 +167,7 @@ export function ViewCanvas({
   className = ''
 }: ViewCanvasProps) {
   // Create a ViewGadget to handle querying and projection
-  const view = useGadget(() => {
+  const view = useGadget<ViewGadget>(() => {
     const viewGadget = new ViewGadget('canvas-view')
     viewGadget.observeNetwork(network)
     viewGadget.setSelector(selector)
