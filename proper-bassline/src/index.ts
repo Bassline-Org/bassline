@@ -36,6 +36,7 @@ export {
   num,
   str,
   set,
+  dict,
   map,
   contradiction,
   
@@ -74,3 +75,24 @@ export { extractValue, getGadgetValue } from './value-helpers'
 export { VisualGadget } from './visual-gadget'
 export type { Point, Size, Rect, StyleMap } from './visual-gadget'
 export { RectGadget, TextGadget, PathGadget, GroupGadget } from './visuals'
+
+// Affordances
+export { Affordance } from './affordance'
+export type { InputEvent } from './affordance'
+export { 
+  TapAffordance, 
+  DragAffordance, 
+  HoverAffordance, 
+  TypeAffordance, 
+  DropAffordance 
+} from './affordances'
+
+// Query and View gadgets
+export { QueryGadget } from './query-gadget'
+export { ProjectionGadget } from './projection-gadget'
+export { 
+  ViewGadget,
+  createListView,
+  createGridView,
+  createTreeView
+} from './view-gadget'

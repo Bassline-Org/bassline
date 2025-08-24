@@ -5,12 +5,11 @@
  * and queried even when they're values rather than direct references.
  */
 
-import { LatticeValue } from './types'
+import { LatticeValue, obj } from './types'
 import type { Network } from './network'
 import type { GadgetBase } from './gadget-base'
 
-export class NetworkValue implements LatticeValue {
-  readonly type = 'network' as const
+export class NetworkValue {
   readonly value: Network
   
   constructor(network: Network) {
@@ -126,8 +125,12 @@ export class NetworkValue implements LatticeValue {
 /**
  * Type guard for NetworkValue
  */
-export function isNetworkValue(value: any): value is NetworkValue {
-  return value && value.type === 'network' && value.value
+export function isNetworkValue(value: any): value is LatticeValue {
+  if (!value) return false
+  if (value.type === 'object' && value.value instanceof NetworkValue) {
+    return true
+  }
+  return false
 }
 
 /**
@@ -135,8 +138,8 @@ export function isNetworkValue(value: any): value is NetworkValue {
  */
 export function getNetwork(value: LatticeValue | null): Network | null {
   if (!value) return null
-  if (isNetworkValue(value)) {
-    return value.value
+  if (value.type === 'object' && value.value instanceof NetworkValue) {
+    return value.value.value
   }
   return null
 }
@@ -144,6 +147,6 @@ export function getNetwork(value: LatticeValue | null): Network | null {
 /**
  * Create a NetworkValue from a Network
  */
-export function networkValue(network: Network): NetworkValue {
-  return new NetworkValue(network)
+export function networkValue(network: Network): LatticeValue {
+  return obj(new NetworkValue(network))
 }
