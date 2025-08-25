@@ -71,6 +71,23 @@ export function NetworkCanvas({
   const visualGadgets = useMemo(() => {
     const gadgetSet = new Set<VisualGadget>()
     
+    // Helper function to recursively find visual gadgets
+    const findVisualGadgets = (container: Network) => {
+      if (!container || !container.children) {
+        console.warn('NetworkCanvas: Invalid container or no children', container)
+        return
+      }
+      for (const child of container.children) {
+        if (child instanceof VisualGadget) {
+          gadgetSet.add(child)
+        }
+        // If it's a Network, recursively search within it
+        if (child instanceof Network) {
+          findVisualGadgets(child)
+        }
+      }
+    }
+    
     console.log('Query results type:', typeof queryResults, queryResults)
     if (queryResults) {
       console.log('Query results instanceof Set:', queryResults instanceof Set)
@@ -88,16 +105,16 @@ export function NetworkCanvas({
           if (gadget instanceof VisualGadget) {
             gadgetSet.add(gadget)
           }
+          // If it's a Network, recursively find visual gadgets within it
+          if (gadget instanceof Network) {
+            findVisualGadgets(gadget)
+          }
         }
       }
     } else {
-      // Fallback: directly query the network
+      // Fallback: directly query the network and recursively find visual gadgets
       console.log('Fallback: directly querying network')
-      for (const gadget of network.gadgets) {
-        if (gadget instanceof VisualGadget) {
-          gadgetSet.add(gadget)
-        }
-      }
+      findVisualGadgets(network)
     }
     
     console.log('NetworkCanvas visual gadgets:', gadgetSet.size, 'from network with', network.gadgets.size, 'total gadgets')

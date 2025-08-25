@@ -50,6 +50,8 @@ export class OrdinalCell<T = any> extends TypedCell<T> {
     if (typeof value === 'number') wrapped = num(value as any)
     else if (typeof value === 'string') wrapped = str(value as any)
     else if (typeof value === 'boolean') wrapped = bool(value as any)
+    else if (value instanceof Set) wrapped = set(value as any)  // Handle Set specifically
+    else if (Array.isArray(value)) wrapped = array(value as any)  // Handle Array specifically
     else if (value instanceof LatticeValue) wrapped = value as any  // Already wrapped!
     else wrapped = obj(value)  // Fallback to LatticeObject
     

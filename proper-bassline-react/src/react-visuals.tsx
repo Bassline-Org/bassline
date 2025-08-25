@@ -565,6 +565,14 @@ function ConnectedGroupGadget({
       data-gadget-id={gadget.id}
       data-connected="true"
     >
+      {/* Render visual children from the gadget's network */}
+      {Array.from(gadget.children).map(child => {
+        if (child instanceof VisualGadget) {
+          return <VisualGadgetRenderer key={child.id} gadget={child} />
+        }
+        return null
+      })}
+      {/* Also render React children if provided */}
       {children}
     </div>
   )

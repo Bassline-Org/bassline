@@ -66,6 +66,9 @@ type Pages = {
   "/session-manager": {
     params: {};
   };
+  "/list-view-demo": {
+    params: {};
+  };
   "/editor-layout": {
     params: {};
   };
@@ -125,7 +128,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/programmable-editor" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/editor-layout" | "/function-demo" | "/proper-editor" | "/simple-editor" | "/canvas-test" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
+    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/programmable-editor" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/list-view-demo" | "/editor-layout" | "/function-demo" | "/proper-editor" | "/simple-editor" | "/canvas-test" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
   };
   "routes/flow.session.$sessionId.group.$groupId.tsx": {
     id: "routes/flow.session.$sessionId.group.$groupId";
@@ -186,6 +189,10 @@ type RouteFiles = {
   "routes/session-manager/route.tsx": {
     id: "routes/session-manager";
     page: "/session-manager";
+  };
+  "routes/list-view-demo.tsx": {
+    id: "routes/list-view-demo";
+    page: "/list-view-demo";
   };
   "routes/editor-layout.tsx": {
     id: "routes/editor-layout";
