@@ -16,23 +16,13 @@
   "scripts": {
     "start": "pnpm --filter @bassline/web start",
     "dev": "pnpm --filter @bassline/web dev",
-    "cli:dev": "pnpm --filter @bassline/cli dev",
-    "cli:init": "pnpm --filter @bassline/cli start init",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
-    "clean": "pnpm -r clean && rm -rf node_modules",
-    "cli": "pnpm --filter @bassline/cli start"
+    "clean": "pnpm -r clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "@eslint/js": "^9.34.0",
     "@types/node": "^20.11.5",
-    "@typescript-eslint/eslint-plugin": "^8.40.0",
-    "@typescript-eslint/parser": "^8.40.0",
-    "eslint": "^9.34.0",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^5.2.0",
     "typescript": "^5.3.3"
   }
 }
