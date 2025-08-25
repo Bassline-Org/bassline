@@ -9,7 +9,6 @@ import { NetworkCanvas } from './network-canvas'
 import { Network } from '../../proper-bassline/src/network'
 import { OrdinalCell } from '../../proper-bassline/src/cells/basic'
 import { obj, num, str } from '../../proper-bassline/src/types'
-import type { GroupGadget } from '../../proper-bassline/src/visual-gadgets'
 
 interface GraphViewProps {
   network?: Network
@@ -125,13 +124,11 @@ export function GraphViewComponent({
   // Get the output
   const outputValue = useFunctionOutput<any>(graphView)
   
-  // Extract the GroupGadget from the output
-  let outputContainer: GroupGadget | null = null
+  // Extract the Network/GroupGadget from the output
+  let outputContainer: Network | null = null
   if (outputValue) {
     if (outputValue.type === 'object' && outputValue.value) {
       outputContainer = outputValue.value
-    } else if (outputValue instanceof GroupGadget) {
-      outputContainer = outputValue
     }
   }
   

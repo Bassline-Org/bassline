@@ -74,7 +74,7 @@ export class ProjectionGadget extends FunctionGadget {
     }
     
     // Return reference to container
-    return dict(new Map([
+    return dict(new Map<string, LatticeValue>([
       ['container', str(this.container.id)],
       ['count', num(this.container.gadgets.size)]
     ]))

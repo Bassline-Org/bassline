@@ -70,7 +70,7 @@ export class EditorGadget extends Network {
     // Set defaults
     this.viewPosition.userInput(obj({ x: 0, y: 0, zoom: 1 }))
     this.editMode.userInput(str('select'))
-    this.nodePositions.userInput(dict(new Map()))
+    this.nodePositions.userInput(dict(new Map<string, LatticeValue>()))
     this.gridSize.userInput(num(20))
     this.snapToGrid.userInput(obj(true))
     this.showMinimap.userInput(obj(false))
@@ -160,9 +160,9 @@ export class EditorGadget extends Network {
     if (current?.type === 'dict') {
       const newMap = new Map(current.value)
       newMap.set(nodeId, obj({ x, y }))
-      this.nodePositions.userInput(dict(newMap))
+      this.nodePositions.userInput(dict(newMap as Map<string, LatticeValue>))
     } else {
-      const newMap = new Map()
+      const newMap = new Map<string, LatticeValue>()
       newMap.set(nodeId, obj({ x, y }))
       this.nodePositions.userInput(dict(newMap))
     }
@@ -225,6 +225,7 @@ export class EditorGadget extends Network {
       )
       
       // Store in clipboard
+      // @ts-ignore - UnionCell doesn't have userInput yet
       this.clipboard.userInput(obj({
         nodes: copiedNodes,
         edges: copiedEdges

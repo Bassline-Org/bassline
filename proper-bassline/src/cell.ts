@@ -9,7 +9,8 @@
  */
 
 import { Gadget } from './gadget'
-import { Connection, LatticeValue, nil } from './types'
+import type { Connection } from './types'
+import { LatticeValue, nil } from './types'
 import type { GadgetBase } from './gadget-base'
 
 export abstract class Cell extends Gadget {

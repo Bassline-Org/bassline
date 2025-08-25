@@ -1,9 +1,4 @@
 packages:
-  - 'packages/*'
   - 'apps/*'
-  - 'packages/primitive-gadgets/*'
-  - 'micro-bassline'
-  - 'femto-bassline'
-  - 'atto-bassline'
   - 'proper-bassline'
   - 'proper-bassline-react'

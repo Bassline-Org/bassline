@@ -1,0 +1,9 @@
+node_modules
+dist
+build
+.react-router
+*.config.js
+*.config.ts
+vite.config.ts
+tailwind.config.ts
+postcss.config.js

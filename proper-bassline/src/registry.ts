@@ -115,6 +115,7 @@ export class GadgetRegistry {
     // Restore output values
     if (data.outputs && data.outputs.default) {
       const value = deserializeLattice(data.outputs.default)
+      // @ts-ignore - protected method
       cell.setOutput('default', value, false)  // Don't emit during deserialization
     }
     
@@ -200,6 +201,7 @@ export class GadgetRegistry {
     if (data.outputs) {
       for (const [name, value] of Object.entries(data.outputs)) {
         const latticeValue = deserializeLattice(value as any)
+        // @ts-ignore - protected method
         func.setOutput(name, latticeValue, false)
       }
     }
@@ -225,7 +227,7 @@ export class GadgetRegistry {
     // For cells
     if (data.inputs && Array.isArray(data.inputs)) {
       for (const input of data.inputs) {
-        const source = gadgetMap.get(input.sourceId)
+        const source = gadgetMap.get((input as any).sourceId)
         if (source && 'connectFrom' in target) {
           (target as Cell).connectFrom(source, input.outputName || 'default')
         }
@@ -235,9 +237,9 @@ export class GadgetRegistry {
     // For functions (named inputs)
     if (data.inputs && typeof data.inputs === 'object' && !Array.isArray(data.inputs)) {
       for (const [inputName, input] of Object.entries(data.inputs as any)) {
-        const source = gadgetMap.get(input.sourceId)
+        const source = gadgetMap.get((input as any).sourceId)
         if (source && 'connectFrom' in target) {
-          (target as any).connectFrom(inputName, source, input.outputName || 'default')
+          (target as any).connectFrom(inputName, source, (input as any).outputName || 'default')
         }
       }
     }

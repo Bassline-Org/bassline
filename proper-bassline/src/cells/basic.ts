@@ -6,7 +6,8 @@
  */
 
 import { Cell, TypedCell } from '../cell'
-import { LatticeValue, LatticeNumber, LatticeBool, LatticeSet, Connection, num, bool, str, obj, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal, deserialize as deserializeLattice} from '../types'
+import type { Connection } from '../types'
+import { LatticeValue, LatticeNumber, LatticeBool, LatticeSet, num, bool, str, obj, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal, deserialize as deserializeLattice} from '../types'
 
 // Max lattice for numbers (idempotent: max(a,a) = a)
 export class MaxCell extends TypedCell<number> {

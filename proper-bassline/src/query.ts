@@ -303,8 +303,8 @@ export class Query {
     const traverse = (gadget: GadgetBase, d: number) => {
       if (d <= 0) return
       gadget.upstream.forEach(up => {
-        result.add(up)
-        traverse(up, d - 1)
+        result.add(up as unknown as GadgetBase)
+        traverse(up as unknown as GadgetBase, d - 1)
       })
     }
     
@@ -324,8 +324,8 @@ export class Query {
     const traverse = (gadget: GadgetBase, d: number) => {
       if (d <= 0) return
       gadget.downstream.forEach(down => {
-        result.add(down)
-        traverse(down, d - 1)
+        result.add(down as unknown as GadgetBase)
+        traverse(down as unknown as GadgetBase, d - 1)
       })
     }
     
@@ -341,8 +341,8 @@ export class Query {
     const result = new Set<GadgetBase>()
     
     this.gadgets.forEach(g => {
-      g.upstream.forEach(up => result.add(up))
-      g.downstream.forEach(down => result.add(down))
+      g.upstream.forEach(up => result.add(up as unknown as GadgetBase))
+      g.downstream.forEach(down => result.add(down as unknown as GadgetBase))
     })
     
     this.gadgets = result

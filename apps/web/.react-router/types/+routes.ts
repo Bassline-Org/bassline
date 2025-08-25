@@ -13,111 +13,22 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/flow/session/:sessionId/group/:groupId": {
-    params: {
-      "sessionId": string;
-      "groupId": string;
-    };
-  };
-  "/flow/session/:sessionId/group/:groupId/properties": {
-    params: {
-      "sessionId": string;
-      "groupId": string;
-    };
-  };
-  "/flow/session/:sessionId/group/:groupId/debug": {
-    params: {
-      "sessionId": string;
-      "groupId": string;
-    };
-  };
-  "/flow/session/:sessionId": {
-    params: {
-      "sessionId": string;
-    };
-  };
-  "/api/editor-v2/actions": {
-    params: {};
-  };
-  "/api/bassline/export": {
-    params: {};
-  };
-  "/api/bassline/import": {
-    params: {};
-  };
-  "/programmable-editor": {
-    params: {};
-  };
-  "/api/editor/actions": {
-    params: {};
-  };
-  "/test-worker-simple": {
-    params: {};
-  };
-  "/bassline-browser": {
-    params: {};
-  };
   "/proper-demo-cool": {
     params: {};
   };
-  "/flow-experiment": {
-    params: {};
-  };
-  "/session-manager": {
+  "/inspector-demo": {
     params: {};
   };
   "/list-view-demo": {
     params: {};
   };
-  "/editor-layout": {
-    params: {};
-  };
-  "/function-demo": {
-    params: {};
-  };
-  "/proper-editor": {
+  "/tree-view-demo": {
     params: {};
   };
   "/simple-editor": {
     params: {};
   };
-  "/canvas-test": {
-    params: {};
-  };
-  "/editor-main": {
-    params: {};
-  };
   "/proper-demo": {
-    params: {};
-  };
-  "/test-sounds": {
-    params: {};
-  };
-  "/worker-test": {
-    params: {};
-  };
-  "/atto-audio": {
-    params: {};
-  };
-  "/atto-demo": {
-    params: {};
-  };
-  "/editor-v2": {
-    params: {};
-  };
-  "/api/demo": {
-    params: {};
-  };
-  "/desktop": {
-    params: {};
-  };
-  "/ws-test": {
-    params: {};
-  };
-  "/editor": {
-    params: {};
-  };
-  "/demo": {
     params: {};
   };
   "/home": {
@@ -128,139 +39,31 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug" | "/flow/session/:sessionId" | "/api/editor-v2/actions" | "/api/bassline/export" | "/api/bassline/import" | "/programmable-editor" | "/api/editor/actions" | "/test-worker-simple" | "/bassline-browser" | "/proper-demo-cool" | "/flow-experiment" | "/session-manager" | "/list-view-demo" | "/editor-layout" | "/function-demo" | "/proper-editor" | "/simple-editor" | "/canvas-test" | "/editor-main" | "/proper-demo" | "/test-sounds" | "/worker-test" | "/atto-audio" | "/atto-demo" | "/editor-v2" | "/api/demo" | "/desktop" | "/ws-test" | "/editor" | "/demo" | "/home";
-  };
-  "routes/flow.session.$sessionId.group.$groupId.tsx": {
-    id: "routes/flow.session.$sessionId.group.$groupId";
-    page: "/flow/session/:sessionId/group/:groupId" | "/flow/session/:sessionId/group/:groupId/properties" | "/flow/session/:sessionId/group/:groupId/debug";
-  };
-  "routes/flow.session.$sessionId.group.$groupId.properties.tsx": {
-    id: "routes/flow.session.$sessionId.group.$groupId.properties";
-    page: "/flow/session/:sessionId/group/:groupId/properties";
-  };
-  "routes/flow.session.$sessionId.group.$groupId._index.tsx": {
-    id: "routes/flow.session.$sessionId.group.$groupId._index";
-    page: "/flow/session/:sessionId/group/:groupId";
-  };
-  "routes/flow.session.$sessionId.group.$groupId.debug.tsx": {
-    id: "routes/flow.session.$sessionId.group.$groupId.debug";
-    page: "/flow/session/:sessionId/group/:groupId/debug";
-  };
-  "routes/flow.session.$sessionId._index.tsx": {
-    id: "routes/flow.session.$sessionId._index";
-    page: "/flow/session/:sessionId";
-  };
-  "routes/api.editor-v2.actions.tsx": {
-    id: "routes/api.editor-v2.actions";
-    page: "/api/editor-v2/actions";
-  };
-  "routes/api.bassline.export.ts": {
-    id: "routes/api.bassline.export";
-    page: "/api/bassline/export";
-  };
-  "routes/api.bassline.import.ts": {
-    id: "routes/api.bassline.import";
-    page: "/api/bassline/import";
-  };
-  "routes/programmable-editor.tsx": {
-    id: "routes/programmable-editor";
-    page: "/programmable-editor";
-  };
-  "routes/api.editor.actions.tsx": {
-    id: "routes/api.editor.actions";
-    page: "/api/editor/actions";
-  };
-  "routes/test-worker-simple.tsx": {
-    id: "routes/test-worker-simple";
-    page: "/test-worker-simple";
-  };
-  "routes/bassline-browser.tsx": {
-    id: "routes/bassline-browser";
-    page: "/bassline-browser";
+    page: "/" | "/proper-demo-cool" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/simple-editor" | "/proper-demo" | "/home";
   };
   "routes/proper-demo-cool.tsx": {
     id: "routes/proper-demo-cool";
     page: "/proper-demo-cool";
   };
-  "routes/flow-experiment.tsx": {
-    id: "routes/flow-experiment";
-    page: "/flow-experiment";
-  };
-  "routes/session-manager/route.tsx": {
-    id: "routes/session-manager";
-    page: "/session-manager";
+  "routes/inspector-demo.tsx": {
+    id: "routes/inspector-demo";
+    page: "/inspector-demo";
   };
   "routes/list-view-demo.tsx": {
     id: "routes/list-view-demo";
     page: "/list-view-demo";
   };
-  "routes/editor-layout.tsx": {
-    id: "routes/editor-layout";
-    page: "/editor-layout";
-  };
-  "routes/function-demo.tsx": {
-    id: "routes/function-demo";
-    page: "/function-demo";
-  };
-  "routes/proper-editor.tsx": {
-    id: "routes/proper-editor";
-    page: "/proper-editor";
+  "routes/tree-view-demo.tsx": {
+    id: "routes/tree-view-demo";
+    page: "/tree-view-demo";
   };
   "routes/simple-editor.tsx": {
     id: "routes/simple-editor";
     page: "/simple-editor";
   };
-  "routes/canvas-test.tsx": {
-    id: "routes/canvas-test";
-    page: "/canvas-test";
-  };
-  "routes/editor-main.tsx": {
-    id: "routes/editor-main";
-    page: "/editor-main";
-  };
   "routes/proper-demo.tsx": {
     id: "routes/proper-demo";
     page: "/proper-demo";
-  };
-  "routes/test-sounds.tsx": {
-    id: "routes/test-sounds";
-    page: "/test-sounds";
-  };
-  "routes/worker-test.tsx": {
-    id: "routes/worker-test";
-    page: "/worker-test";
-  };
-  "routes/atto-audio.tsx": {
-    id: "routes/atto-audio";
-    page: "/atto-audio";
-  };
-  "routes/atto-demo.tsx": {
-    id: "routes/atto-demo";
-    page: "/atto-demo";
-  };
-  "routes/editor-v2.tsx": {
-    id: "routes/editor-v2";
-    page: "/editor-v2";
-  };
-  "routes/api.demo.tsx": {
-    id: "routes/api.demo";
-    page: "/api/demo";
-  };
-  "routes/desktop.tsx": {
-    id: "routes/desktop";
-    page: "/desktop";
-  };
-  "routes/ws-test.tsx": {
-    id: "routes/ws-test";
-    page: "/ws-test";
-  };
-  "routes/editor.tsx": {
-    id: "routes/editor";
-    page: "/editor";
-  };
-  "routes/demo.tsx": {
-    id: "routes/demo";
-    page: "/demo";
   };
   "routes/home.tsx": {
     id: "routes/home";

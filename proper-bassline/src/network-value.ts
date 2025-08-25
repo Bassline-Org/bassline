@@ -85,7 +85,7 @@ export class NetworkValue {
     if (typeof gadget === 'string') {
       return this.getByPath(gadget) !== null
     }
-    return this.value.gadgets.has(gadget)
+    return this.value.gadgets.has(gadget as any)
   }
   
   /**

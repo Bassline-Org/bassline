@@ -1,183 +1,116 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with the Bassline codebase.
 
 ## Project Overview
 
-Bassline is a web-based visual programming environment built on propagation networks - a bidirectional constraint system that supports natural cycles and contradiction handling.
+Bassline is a propagation network system where computation flows through a graph of connected gadgets. The core innovation is that UI elements themselves are gadgets in the network - "UI IS computation."
 
-## Conceptual Model
+## Architecture
+
+### Core Packages
+
+1. **proper-bassline** - The propagation network engine
+   - Cells: Value holders with lattice operations
+   - Functions: Fixed-arity computation gadgets
+   - Networks: Containers that hold gadgets
+   - Visual Gadgets: UI elements as gadgets
+   - Types: Lattice-based type system
+
+2. **proper-bassline-react** - React integration
+   - Hooks for using gadgets in React
+   - NetworkCanvas for rendering visual gadgets
+
+3. **apps/web** - React Router demo application
+   - File-based routing
+   - Example implementations showing proper-bassline usage
+
+## Key Concepts
 
 ### Propagation Networks
-A propagation network is a graph where information flows bidirectionally between nodes. Unlike dataflow systems where data flows in one direction, propagation networks allow constraints to flow in any direction, finding consistent solutions across the entire network.
-
-### Core Abstractions
-
-1. **Contacts**: The fundamental unit of computation
-   - Hold a single value (content)
-   - Have a blend mode that determines how to handle multiple incoming values
-   - Can be wired to other contacts to share information
-   - Changes propagate automatically through connected contacts
-
-2. **Groups**: Hierarchical containers for organization and abstraction
-   - Contain contacts and other groups (recursive structure)
-   - Define computational boundaries
-   - Can have boundary contacts that serve as input/output interfaces
-   - Enable modular, reusable components
-
-3. **Gadgets**: Groups with computational behavior
-   - Regular groups just organize contacts
-   - Gadgets (via primitive gadgets) perform computation
-   - Have input and output boundary contacts
-   - Execute when inputs change and activation conditions are met
-   - Examples: add, multiply, string concat, logic gates
-
-4. **Wires**: Connections that propagate information
-   - Can be bidirectional (constraint) or directed (dataflow-like)
-   - Automatically propagate changes between connected contacts
-   - Support cycles without infinite loops (change detection)
-
-### Key Properties
 - **Bidirectional**: Information flows both ways through connections
-- **Constraint-based**: The network finds solutions that satisfy all constraints
-- **Hierarchical**: Groups can contain groups, enabling complex abstractions
-- **Live**: Changes propagate immediately (or in batches)
-- **Contradiction-aware**: Can detect and handle conflicting constraints
+- **Automatic**: Changes propagate automatically when values change
+- **Stable**: System converges when no more changes propagate
+- **Reflective**: Networks can contain networks, gadgets can create gadgets
 
-## Current Architecture (v2)
+### Everything is a Gadget
+- UI elements are VisualGadgets
+- Tools are gadgets
+- Even the canvas is a ViewGadget
+- No React state - all state lives in cells
 
-### Technology Stack
-- **Framework**: React Router v7 (SPA mode)
-- **Graph Visualization**: React Flow
-- **UI Components**: shadcn/ui
-- **Language**: TypeScript
-- **Propagation Engine**: Custom Worker-based implementation
+### Development Philosophy
+1. **UI as Computation**: Every visual element is part of the propagation network
+2. **No Manual State Management**: The network handles all state propagation
+3. **Live Programming**: Changes to the network immediately affect the UI
+4. **Extensible**: Users can create new gadgets while using the system
 
-### Core Architecture Components
+## Current Focus
 
-1. **Propagation Core v2** (`app/propagation-core-v2/`)
-   - Pure functional/async propagation engine
-   - Worker thread execution for performance
-   - Pluggable scheduler system (immediate, batch)
-   - Primitive gadgets for computation
+Building an infinite canvas editor where users can:
+- Create and wire gadgets visually
+- See propagation happening in real-time
+- Build complex systems through direct manipulation
+- Extend the system with custom gadgets
 
-2. **Simple Editor** (`app/routes/simple-editor.tsx`)
-   - Clean React implementation
-   - No manual state synchronization
-   - React Flow for visualization
-   - Mode system for different interaction patterns
+## Important Patterns
 
-3. **Worker Architecture**
-   - `NetworkClient` - Main thread interface
-   - `network-worker.ts` - Worker thread implementation
-   - Async message passing for all operations
-   - Change notifications via subscriptions
-
-### Key Concepts
-
-- **Contacts**: Information-carrying nodes with content and blend modes (accept-last, merge)
-- **Groups**: Hierarchical containers that can be regular groups or primitive gadgets
-- **Wires**: Connections between contacts (bidirectional or directed)
-- **Boundary Contacts**: Input/output interfaces for groups
-- **Primitive Gadgets**: Built-in computational units (add, multiply, gate, etc.)
-
-**Important**: This is NOT a traditional dataflow system - it supports bidirectional constraint propagation with natural cycles.
-
-### Development Commands
-
-```bash
-npm run dev       # Start development server
-npm test          # Run tests
-npm run typecheck # Type checking
-npm run lint      # Linting
+### Creating and Using Cells
+```typescript
+const cell = new OrdinalCell('my-cell')
+cell.userInput(value)  // Use userInput for ordinal cells
 ```
 
-### Current Implementation Status
+### Using FunctionGadgets
+FunctionGadgets need to be wired to input cells. They compute automatically when inputs change:
 
-✅ **Completed**:
-- Functional/async propagation engine
-- Worker thread integration
-- Immediate and batch schedulers
-- Core primitive gadgets (math, string, logic, control, array)
-- Simple editor with React Flow
-- Property panels and mode system
-- Basic refactoring tools
+```typescript
+// Create a function gadget
+const adder = new AddFunction('my-adder')
 
-🚧 **In Progress**:
-- Worker-based propagation network
-- React Router integration
+// Create input cells
+const a = new OrdinalCell('a')
+const b = new OrdinalCell('b')
 
-📋 **Planned**:
-- Remove global state management
-- Undo/redo functionality
-- Distributed propagation support
+// Wire inputs to the function
+adder.connectFrom('a', a)  // Connect named input 'a' to cell a
+adder.connectFrom('b', b)  // Connect named input 'b' to cell b
 
-### Key Design Decisions
+// Set values in cells - function computes automatically
+a.userInput(num(5))
+b.userInput(num(3))
 
-1. **Functional over OOP**: Pure functions, immutable data, async operations
-2. **Worker Threads**: Propagation runs off main thread for performance
-3. **Scheduler Abstraction**: Pluggable scheduling strategies
-4. **No Global State**: All state flows through React Router loaders/actions (planned)
-5. **Primitive Gadgets**: Functions are resolved in Worker, only IDs cross thread boundary
+// Get the output
+const result = adder.getOutput()  // Will be num(8)
+```
 
-### Testing
+### Using in React
+```typescript
+const network = useNetwork()
 
-- Unit tests for propagation logic: `__tests__/propagation.test.ts`
-- Primitive gadget tests: `__tests__/primitives.test.ts`
-- Scheduler tests: `__tests__/*-scheduler.test.ts`
-- Worker test page: `/worker-test` route for manual testing
+// Create gadgets that persist across renders
+const gadget = useGadget(() => {
+  const g = new MyGadget()
+  network.add(g)  // Add to network
+  return g
+})
 
-### Important Notes
+// Get function output that updates when it changes
+const output = useFunctionOutput(gadget)
+```
 
-- Propagation only occurs when content actually changes (prevents infinite loops)
-- Primitive gadgets are directional - only execute on input changes
-- Batch scheduler processes updates in configurable chunks with delays
-- Worker state resets when switching schedulers (current limitation)
+### Connecting ViewGadgets
+See the working examples in:
+- `app/routes/list-view-demo.tsx` - Shows how to wire QueryGadget to ListView
+- `app/routes/inspector-demo.tsx` - Shows how to wire gadgets for inspection
+- `app/routes/proper-demo.tsx` - General proper-bassline patterns
 
-### Routes
+## What NOT to Do
+- Don't use React useState for application state
+- Don't manually call compute() on FunctionGadgets (they auto-compute)
+- Don't pass values directly to FunctionGadgets (wire them to cells)
+- Don't create cycles in directed wires (bidirectional is fine)
+- Don't mix old micro/femto/atto code with proper-bassline
 
-- `/` - Home page
-- `/simple-editor` - Main editor interface
-- `/worker-test` - Worker performance testing page
-- `/editor-v2` - New editor with refactoring support
-
-## Network Architecture
-
-### Connection Modes
-Bassline supports multiple network connection modes:
-
-1. **Worker Mode** (Default)
-   - Runs entirely in the browser using Web Workers
-   - No external dependencies
-   - Single-user local editing
-
-2. **Remote Mode** (WebSocket)
-   - Connects to a Bassline server via WebSocket
-   - Real-time collaboration
-   - Server handles propagation logic
-   - CLI command: `bassline start --port 3003`
-
-3. **WebRTC Mode** (Planned - see WEBRTC_PLAN.md)
-   - Peer-to-peer connections between browsers
-   - No central server required for data
-   - Uses signaling server only for initial connection
-   - Direct, encrypted data channels between peers
-
-### CLI Tool
-The Bassline CLI (`cli/`) provides:
-- `bassline start` - Start a propagation network server
-- `bassline connect <url>` - Connect to a running network
-- `bassline run <file>` - Run a network from a file
-- `bassline export/import` - Save and load network states
-
-### Real-time Collaboration
-- WebSocket-based for server mode
-- Automatic state synchronization
-- Change broadcasting to all connected clients
-- Conflict resolution via last-write-wins
-
-# important-instruction-reminders
-Do what has been asked; nothing more, nothing less.
-NEVER create files unless they're absolutely necessary for achieving your goal.
-ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+## Next Steps
+The goal is to build a clean, extensible infinite canvas editor that showcases the power of propagation networks where the UI itself is the computational graph.

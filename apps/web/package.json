@@ -11,11 +11,6 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "@bassline/bassline": "workspace:*",
-    "@bassline/core": "workspace:*",
-    "@bassline/storage-memory": "workspace:*",
-    "micro-bassline": "workspace:*",
-    "atto-bassline": "workspace:*",
     "proper-bassline": "workspace:*",
     "proper-bassline-react": "workspace:*",
     "@dagrejs/dagre": "^1.1.5",

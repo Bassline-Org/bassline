@@ -8,7 +8,9 @@
     "example": "npx ts-node example.ts",
     "test": "vitest",
     "dev": "vite",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

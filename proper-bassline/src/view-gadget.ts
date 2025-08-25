@@ -24,7 +24,7 @@ export class ViewGadget extends Network {
   layoutParams: OrdinalCell
   
   // Function gadgets
-  query: QueryGadget
+  queryGadget: QueryGadget
   projection: ProjectionGadget
   
   // Output cell
@@ -43,21 +43,21 @@ export class ViewGadget extends Network {
     // Set defaults
     this.selector.userInput(str('*'))
     this.layoutType.userInput(str('list'))
-    this.layoutParams.userInput(dict(new Map([
+    this.layoutParams.userInput(dict(new Map<string, LatticeValue>([
       ['spacing', num(10)],
       ['orientation', str('vertical')]
     ])))
     
     // Create function gadgets
-    this.query = new QueryGadget(`${id}-query`)
+    this.queryGadget = new QueryGadget(`${id}-query`)
     this.projection = new ProjectionGadget(`${id}-projection`)
     
     // Wire query inputs
-    this.query.connectFrom('network', this.networkInput)
-    this.query.connectFrom('selector', this.selector)
+    this.queryGadget.connectFrom('network', this.networkInput)
+    this.queryGadget.connectFrom('selector', this.selector)
     
     // Wire projection inputs
-    this.projection.connectFrom('results', this.query)
+    this.projection.connectFrom('results', this.queryGadget)
     this.projection.connectFrom('layout', this.layoutType)
     this.projection.connectFrom('params', this.layoutParams)
     
@@ -71,7 +71,7 @@ export class ViewGadget extends Network {
       this.layoutType,
       this.layoutParams,
       this.results,
-      this.query,
+      this.queryGadget,
       this.projection
     )
     

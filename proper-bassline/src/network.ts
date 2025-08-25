@@ -19,7 +19,7 @@ import { NetworkValue } from './network-value'
 export class Network extends Cell implements Container {
   gadgets: Set<Gadget> = new Set()  // Strong references to prevent GC (includes child networks!)
   children: Set<GadgetBase> = new Set()  // All child gadgets for Container interface
-  parent?: GadgetBase  // Parent gadget if nested
+  declare parent?: GadgetBase  // Parent gadget if nested
   
   // For Container interface - we'll keep the Map for named lookups
   private childNetworks: Map<string, Network> = new Map()  // Child networks by name for namespacing
@@ -111,10 +111,10 @@ export class Network extends Cell implements Container {
   addChildNetwork(child: Network): void {
     // Networks are gadgets, so add it
     this.gadgets.add(child)
-    this.children.add(child as GadgetBase)
+    this.children.add(child as GadgetBase);
     // Also track in childNetworks map for easy lookup
-    this.childNetworks.set(child.id, child)
-    child.parent = new WeakRef(this)
+    this.childNetworks.set(child.id, child);
+    (child as any).parent = new WeakRef(this as any)
   }
   
   // ============================================================================
@@ -168,7 +168,7 @@ export class Network extends Cell implements Container {
     let currentRef = this.parent
     
     while (currentRef) {
-      const current = currentRef.deref()
+      const current = (currentRef as any).deref()
       if (!current) break  // Parent was garbage collected
       parts.unshift(current.id)
       currentRef = current.parent
@@ -256,7 +256,7 @@ export class Network extends Cell implements Container {
     }
     
     // Note parent ID if exists
-    const parent = this.parent?.deref()
+    const parent = (this.parent as any)?.deref()
     if (parent) {
       base.parentId = parent.id
     }

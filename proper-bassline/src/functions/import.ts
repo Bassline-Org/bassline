@@ -134,9 +134,10 @@ export class ImportModule extends FunctionGadget {
       args[name] = this.currentValues.get(name) ?? nil()
     }
     
-    // Execute async function
-    ;(this.fn(args) as Promise<LatticeValue>).then(result => {
+    // For ImportModule, we call handleModuleLoad directly
+    this.handleModuleLoad(args).then(result => {
       this.setOutput('default', result)
+      this.emit()
     }).catch(error => {
       console.error('ImportModule error:', error)
       this.setOutput('default', nil())

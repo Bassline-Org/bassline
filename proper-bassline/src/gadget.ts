@@ -8,7 +8,8 @@
  * Now also implements GadgetBase interface for the new metamodel
  */
 
-import { LatticeValue, nil, serialize, SerializedLatticeValue } from './types'
+import type { SerializedLatticeValue } from './types'
+import { LatticeValue, nil, serialize } from './types'
 import type { GadgetBase, Connection } from './gadget-base'
 
 /**

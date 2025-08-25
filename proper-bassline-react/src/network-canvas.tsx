@@ -27,6 +27,7 @@ interface NetworkCanvasProps {
   style?: CSSProperties
   className?: string
   children?: React.ReactNode
+  onCanvasClick?: (position: { x: number; y: number }) => void
 }
 
 // ============================================================================
