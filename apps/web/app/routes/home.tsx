@@ -115,14 +115,25 @@ export default function Home() {
         </p>
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Konva Canvas */}
+          <Link to="/canvas" className="block">
+            <div className="border border-purple-200 rounded-lg p-6 hover:border-purple-300 hover:shadow-lg transition-all bg-purple-50">
+              <h2 className="text-xl font-semibold mb-2">Infinite Canvas (New!)</h2>
+              <p className="text-slate-600 mb-4">
+                Konva-powered semantic zoom with visual gadgets
+              </p>
+              <Button variant="default">Open Canvas</Button>
+            </div>
+          </Link>
+          
           {/* New v2 editor */}
           <Link to="/editor" className="block">
             <div className="border border-green-200 rounded-lg p-6 hover:border-green-300 hover:shadow-lg transition-all bg-green-50">
-              <h2 className="text-xl font-semibold mb-2">Editor V2 (New!)</h2>
+              <h2 className="text-xl font-semibold mb-2">Editor V2</h2>
               <p className="text-slate-600 mb-4">
                 Worker-based architecture with React Router data patterns
               </p>
-              <Button variant="default">Try New Editor</Button>
+              <Button variant="default">Try Editor V2</Button>
             </div>
           </Link>
           

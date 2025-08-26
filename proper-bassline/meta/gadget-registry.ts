@@ -5,17 +5,17 @@
  * It maintains a registry of constructors and templates.
  */
 
-import { Network } from './network'
-import { OrdinalCell } from './cells/basic'
-import { obj, dict, array, str, nil } from './types'
-import type { LatticeValue } from './types'
-import { Gadget } from './gadget'
+import { Network } from '../src/network'
+import { OrdinalCell } from '../src/cells/basic'
+import { obj, dict, array, str, nil } from '../src/types'
+import type { LatticeValue } from '../src/types'
+import { Gadget } from '../src/gadget'
 
 // Import all the gadget types we want to register
-import { MaxCell, MinCell, SetCell, OrCell, AndCell, UnionCell, LatestCell } from './cells/basic'
-import { AddFunction, MultiplyFunction, SubtractFunction, DivideFunction, EqualFunction, GreaterThanFunction } from './functions/basic'
-import { ExtractValue, ExtractOrdinal } from './functions/extract'
-import { NestFunction } from './functions/nest'
+import { MaxCell, MinCell, SetCell, OrCell, AndCell, UnionCell, LatestCell } from '../src/cells/basic'
+import { AddFunction, MultiplyFunction, SubtractFunction, DivideFunction, EqualFunction, GreaterThanFunction } from '../src/functions/basic'
+import { ExtractValue, ExtractOrdinal } from '../src/functions/extract'
+import { NestFunction } from '../src/functions/nest'
 
 // Type for gadget constructor info
 export interface GadgetTypeInfo {

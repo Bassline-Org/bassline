@@ -9,38 +9,36 @@
  */
 
 import { FunctionGadget } from './function'
-import { getNetwork } from './network-value'
-import { str, set as makeSet } from './types'
-import type { LatticeValue } from './types'
+import { Network } from './network'
+import { str, set as makeSet } from './lattice-types'
+import { LatticeBox, LatticeString, LatticeValue } from './lattice-types'
 
 /**
  * QueryGadget - Executes queries on networks
  */
-export class QueryGadget extends FunctionGadget {
+type QueryGadgetArgs = {
+  network: LatticeBox<Network>,
+  selector: LatticeString
+}
+
+export class QueryGadget extends FunctionGadget<QueryGadgetArgs> {
   constructor(id: string = 'query') {
     super(id, ['network', 'selector'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
+  fn(args: QueryGadgetArgs): LatticeValue {
     // Extract the actual network from OrdinalCell's output (which is a dict)
-    let networkValue = args.network
-    if (networkValue?.type === 'dict' && networkValue.value.has('value')) {
-      networkValue = networkValue.value.get('value') || networkValue
-    }
-    const network = getNetwork(networkValue)
+    let networkValue = args.network.value
     
     // Extract the actual selector from OrdinalCell's output
-    let selectorValue = args.selector
-    if (selectorValue?.type === 'dict' && selectorValue.value.has('value')) {
-      selectorValue = selectorValue.value.get('value') || selectorValue
-    }
+    let selectorValue = args.selector.value
     
-    if (!network || selectorValue?.type !== 'string') {
+    if (!networkValue || typeof selectorValue !== 'string') {
       return makeSet(new Set<LatticeValue>())
     }
     
     // Just call query on the network!
-    const results = network.query(selectorValue.value)
+    const results = networkValue.query(selectorValue)
     
     // Convert gadgets to IDs since gadgets can't be values
     const resultIds = Array.from(results).map(g => str(g.id))

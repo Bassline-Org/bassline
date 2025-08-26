@@ -2,7 +2,7 @@
  * DropAffordance - Handles drag and drop operations
  */
 
-import { Affordance, type InputEvent } from '../affordance'
+import { Affordance, type InputEvent } from '../meta/affordance'
 import { bool, dict, str, num } from '../types'
 import type { LatticeValue } from '../types'
 import type { Cell } from '../cell'

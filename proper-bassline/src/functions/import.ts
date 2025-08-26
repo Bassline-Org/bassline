@@ -6,9 +6,9 @@
  */
 
 import { FunctionGadget } from '../function'
-import { LatticeValue, nil, obj, str, num, bool, isString } from '../types'
+import { LatticeValue, nil, obj, str, num, bool, isString } from '../lattice-types'
 
-export class ImportModule extends FunctionGadget {
+export class ImportModule extends FunctionGadget<{url: LatticeValue}> {
   private loadingCache: Map<string, Promise<any>> = new Map()
   private moduleCache: Map<string, any> = new Map()
   
@@ -30,7 +30,7 @@ export class ImportModule extends FunctionGadget {
   }
   
   private async handleModuleLoad(args: Record<string, LatticeValue>): Promise<LatticeValue> {
-    const urlValue = args.url
+    const urlValue = args['url']
     
     // Handle ordinal values from OrdinalCell
     let actualUrl = urlValue
@@ -151,14 +151,14 @@ export class ImportModule extends FunctionGadget {
  * Accepts a function and an input value, applies the function to the input.
  * The function can be loaded from ImportModule or created elsewhere.
  */
-export class DynamicFunction extends FunctionGadget {
+export class DynamicFunction extends FunctionGadget<{function: LatticeValue, input: LatticeValue}> {
   constructor(id: string) {
     super(id, ['function', 'input'])
   }
   
   fn(args: Record<string, LatticeValue>): LatticeValue {
-    const funcValue = args.function
-    const inputValue = args.input
+    const funcValue = args['function']
+    const inputValue = args['input']
     
     if (!funcValue) return nil()
     
@@ -225,15 +225,15 @@ export class DynamicFunction extends FunctionGadget {
  * 
  * Takes a module and a function name, calls that function with the input.
  */
-export class ModuleFunction extends FunctionGadget {
+export class ModuleFunction extends FunctionGadget<{module: LatticeValue, functionName: LatticeValue, input: LatticeValue}> {
   constructor(id: string) {
     super(id, ['module', 'functionName', 'input'])
   }
   
   fn(args: Record<string, LatticeValue>): LatticeValue {
-    const moduleValue = args.module
-    const nameValue = args.functionName
-    const inputValue = args.input
+    const moduleValue = args['module']
+    const nameValue = args['functionName']
+    const inputValue = args['input']
     
     if (!moduleValue || !nameValue) return nil()
     

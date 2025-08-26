@@ -8,18 +8,19 @@
  */
 
 import { FunctionGadget } from '../function'
-import { LatticeValue, str } from '../types'
+import { LatticeValue, str } from '../lattice-types'
 import { Network } from '../network'
 
-export class NestFunction extends FunctionGadget {
+type NestFunctionArgs = {parent: LatticeValue<Network>, child: LatticeValue<Network>}
+export class NestFunction extends FunctionGadget<NestFunctionArgs> {
   constructor(id: string) {
     super(id, ['parent', 'child'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
+  fn(args: NestFunctionArgs): LatticeValue {
     // In a real implementation, this would actually nest networks
     // For now, just return a description
-    return str(`nested[parent=${args.parent.type}, child=${args.child.type}]`)
+    return str(`nested[parent=${args['parent'].type}, child=${args['child'].type}]`)
   }
   
   // Special method to actually perform nesting on Network objects

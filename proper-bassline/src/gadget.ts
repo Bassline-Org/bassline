@@ -8,9 +8,10 @@
  * Now also implements GadgetBase interface for the new metamodel
  */
 
-import type { SerializedLatticeValue } from './types'
-import { LatticeValue, nil, serialize } from './types'
+import type { SerializedLatticeValue } from './lattice-types'
+import { LatticeValue, nil } from './lattice-types'
 import type { GadgetBase, Connection } from './gadget-base'
+import { BasslineEngine } from './engine'
 
 /**
  * Base class for all gadgets (Cells, Functions, Networks)
@@ -23,14 +24,18 @@ export abstract class Gadget implements GadgetBase {
   outputs: Map<string, LatticeValue> = new Map()
   downstream: Set<Connection> = new Set()
   upstream: Set<Connection> = new Set()
+  engine?: WeakRef<BasslineEngine>
   parent?: GadgetBase
-  
+  // A hook for when a value is emitted, useful for integrating with other systems such as the UI without manually connecting taps to each gadget
+  onEmit: (outputName: string) => void
+
   // Metadata for querying and reflection
   private metadata: Record<string, any> = {}
   
-  constructor(id: string) {
+  constructor(id: string, onEmit?: (outputName: string) => void) {
     this.id = id
     this.type = this.constructor.name
+    this.onEmit = onEmit ?? (() => {})
   }
   
   /**
@@ -42,11 +47,28 @@ export abstract class Gadget implements GadgetBase {
   abstract accept(value: LatticeValue, source: Gadget, inputName?: string): void
   
   /**
+   * Report accept to engine if available
+   */
+  protected reportAccept(value: LatticeValue, source: Gadget, inputName?: string): void {
+    const engine = this.engine?.deref()
+    if (engine && 'trackAccept' in engine) {
+      (engine as any).trackAccept(this.id, source.id, inputName, value)
+    }
+  }
+  
+  /**
    * Emit current output to all downstream gadgets
    * @param outputName The output to emit (default: "default")
    */
   emit(outputName: string = "default"): void {
     const value = this.getOutput(outputName)
+    this.onEmit(outputName)
+    
+    // Report to engine if available
+    const engine = this.engine?.deref()
+    if (engine && 'trackEmit' in engine) {
+      (engine as any).trackEmit(this.id, outputName, value)
+    }
     
     // Clean up dead references while emitting
     const deadConnections: Connection[] = []
@@ -78,6 +100,12 @@ export abstract class Gadget implements GadgetBase {
       gadget: new WeakRef(target),
       inputName
     })
+    
+    // Report to engine if available
+    const engine = this.engine?.deref()
+    if (engine && 'trackConnect' in engine) {
+      (engine as any).trackConnect(this.id, target.id, undefined, inputName)
+    }
   }
   
   /**
@@ -89,6 +117,12 @@ export abstract class Gadget implements GadgetBase {
       const gadget = conn.gadget.deref()
       if (gadget === target) {
         this.downstream.delete(conn)
+        
+        // Report to engine if available
+        const engine = this.engine?.deref()
+        if (engine && 'trackDisconnect' in engine) {
+          (engine as any).trackDisconnect(this.id, target.id)
+        }
         break
       }
     }
@@ -174,7 +208,7 @@ export abstract class Gadget implements GadgetBase {
   serialize(): any {
     const outputs: Record<string, SerializedLatticeValue> = {}
     for (const [name, value] of this.outputs) {
-      outputs[name] = serialize(value)
+      outputs[name] = value.serialize()
     }
     
     return {

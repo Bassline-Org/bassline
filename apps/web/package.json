@@ -11,8 +11,6 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
-    "proper-bassline": "workspace:*",
-    "proper-bassline-react": "workspace:*",
     "@dagrejs/dagre": "^1.1.5",
     "@radix-ui/react-context-menu": "^2.2.15",
     "@radix-ui/react-dialog": "^1.1.14",
@@ -36,9 +34,13 @@
     "framer-motion": "^12.23.12",
     "howler": "^2.2.4",
     "isbot": "^5.1.27",
+    "konva": "^9.3.22",
     "lucide-react": "^0.535.0",
+    "proper-bassline": "workspace:*",
+    "proper-bassline-react": "workspace:*",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-konva": "^19.0.7",
     "react-router": "^7.7.1",
     "react-sounds": "^1.0.25",
     "rollup-plugin-node-polyfills": "^0.2.1",

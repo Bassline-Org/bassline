@@ -7,11 +7,12 @@ export { Gadget } from './gadget'
 export { Cell } from './cell'
 export { FunctionGadget } from './function'
 export { Network } from './network'
+export { BasslineEngine } from './engine'
+export type { PropagationEvent, PropagationListener } from './engine'
 
 // Core metamodel
 export type { GadgetBase, Container } from './gadget-base'
 export { isGadgetBase, isContainer } from './gadget-base'
-export { NetworkValue, isNetworkValue, getNetwork, networkValue } from './network-value'
 export { Query, query } from './query'
 
 // Basic cells
@@ -46,46 +47,16 @@ export {
   isString,
   isSet,
   isNull,
-  isMap,
+  isDict,
   
   // Utilities
   getValue,
-  ordinalValue,
   getOrdinal,
-  getMapValue
-} from './types'
-
-// React integration moved to proper-bassline-react package
-
-// Registry and editor gadgets
-export { GadgetRegistryGadget, type GadgetTypeInfo } from './gadget-registry'
-export { EditorGadget } from './editor-gadget'
+  getDictValue
+} from './lattice-types'
 
 // Value helpers
 export { extractValue, getGadgetValue } from './value-helpers'
 
-// Visual gadgets
-export { VisualGadget } from './visual-gadget'
-export type { Point, Size, Rect, StyleMap } from './visual-gadget'
-export { RectGadget, TextGadget, PathGadget, GroupGadget } from './visuals'
-
-// Affordances
-export { Affordance } from './affordance'
-export type { InputEvent } from './affordance'
-export { 
-  TapAffordance, 
-  DragAffordance, 
-  HoverAffordance, 
-  TypeAffordance, 
-  DropAffordance 
-} from './affordances'
-
 // Query and View gadgets
 export { QueryGadget } from './query-gadget'
-export { ProjectionGadget } from './projection-gadget'
-export { 
-  ViewGadget,
-  createListView,
-  createGridView,
-  createTreeView
-} from './view-gadget'

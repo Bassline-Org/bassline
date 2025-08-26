@@ -40,6 +40,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/**/*", "example.ts", "proper-demo.tsx"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*", "example.ts", "proper-demo.tsx", "meta/affordances", "meta/visuals", "meta/affordance.ts", "meta/gadget-registry.ts", "meta/views", "meta/visual-gadget.ts", "meta/view-gadget.ts", "meta/visual-node.ts", "meta/projection-gadget.ts"],
+  "exclude": ["node_modules", "dist", "meta"]
 }

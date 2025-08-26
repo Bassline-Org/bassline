@@ -4,10 +4,10 @@
 
 import React, { useEffect, useRef, type CSSProperties } from 'react'
 import { useGadget, useFunctionOutput } from './hooks'
-import { InspectorView } from '../../proper-bassline/src/views/inspector-view'
+import { InspectorView } from 'proper-bassline/meta/views/inspector-view'
 import { NetworkCanvas } from './network-canvas'
 import { OrdinalCell } from '../../proper-bassline/src/cells/basic'
-import { obj, num } from '../../proper-bassline/src/types'
+import { obj, num } from 'proper-bassline/src/lattice-types'
 import type { Gadget } from '../../proper-bassline/src/gadget'
 import type { Network } from '../../proper-bassline/src/network'
 

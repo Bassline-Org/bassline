@@ -4,11 +4,11 @@
 
 import React, { useEffect, useRef, type CSSProperties } from 'react'
 import { useGadget, useFunctionOutput, useNetwork } from './hooks'
-import { GraphView, InteractiveGraphView } from '../../proper-bassline/src/views/graph-view'
+import { GraphView, InteractiveGraphView } from 'proper-bassline/meta/views/graph-view'
 import { NetworkCanvas } from './network-canvas'
 import { Network } from '../../proper-bassline/src/network'
 import { OrdinalCell } from '../../proper-bassline/src/cells/basic'
-import { obj, num, str } from '../../proper-bassline/src/types'
+import { obj, num, str } from 'proper-bassline/src/lattice-types'
 
 interface GraphViewProps {
   network?: Network

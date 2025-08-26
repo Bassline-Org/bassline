@@ -5,10 +5,10 @@
  * allowing them to participate in the propagation system.
  */
 
-import { Network } from './network'
-import { OrdinalCell } from './cells/basic'
-import type { Gadget } from './gadget'
-import { dict, num, bool } from './types'
+import { Network } from '../src/network'
+import { OrdinalCell } from '../src/cells/basic'
+import type { Gadget } from '../src/gadget'
+import { dict, num, bool } from '../src/lattice-types'
 
 export class VisualNode extends Network {
   // Visual properties as cells

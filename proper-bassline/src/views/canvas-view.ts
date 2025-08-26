@@ -5,14 +5,14 @@
  * visual editing capabilities. Everything is a gadget!
  */
 
-import { ViewGadget } from '../view-gadget'
-import { Network } from '../network'
+import { ViewGadget } from '../../meta/view-gadget'
+import { Network } from '../../src/network'
 import { GroupGadget } from '../visuals/group'
 import { RectGadget } from '../visuals/rect'
 import { TextGadget } from '../visuals/text'
-import { VisualGadget } from '../visual-gadget'
-import { LatticeValue, nil, obj, num, str, set, dict } from '../types'
-import { OrdinalCell } from '../cells/basic'
+import { VisualGadget } from '../../meta/visual-gadget'
+import { LatticeValue, nil, obj, num, str, set, dict } from '../lattice-types'
+import { OrdinalCell } from '../../src/cells/basic'
 
 export class CanvasView extends ViewGadget {
   // Canvas properties

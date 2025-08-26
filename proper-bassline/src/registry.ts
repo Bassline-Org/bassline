@@ -9,10 +9,10 @@ import { Gadget } from './gadget'
 import { Cell } from './cell'
 import { Network } from './network'
 import { OrdinalCell, MaxCell, MinCell, SetCell } from './cells/basic'
-import { VisualNode } from './visual-node'
+import { VisualNode } from '../meta/visual-node'
 import { FunctionGadget } from './function'
 import { ExtractValue, ExtractOrdinal } from './functions/extract'
-import { deserialize as deserializeLattice } from './types'
+import { deserialize as deserializeLattice } from './lattice-types'
 
 // Type for gadget constructors
 export type GadgetConstructor = {

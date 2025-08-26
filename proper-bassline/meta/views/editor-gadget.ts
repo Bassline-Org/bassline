@@ -5,11 +5,11 @@
  * enabling bidirectional control between UI and network.
  */
 
-import { Network } from './network'
-import { OrdinalCell, UnionCell } from './cells/basic'
-import { FunctionGadget } from './function'
-import { Gadget } from './gadget'
-import { str, num, dict, set as setVal, obj, nil, LatticeValue } from './types'
+import { Network } from '../../src/network'
+import { OrdinalCell, UnionCell } from '../../src/cells/basic'
+import { FunctionGadget } from '../../src/function'
+import { Gadget } from '../../src/gadget'
+import { str, num, dict, set as setVal, obj, nil, LatticeValue } from '../../src/types'
 
 export interface ViewPosition {
   x: number

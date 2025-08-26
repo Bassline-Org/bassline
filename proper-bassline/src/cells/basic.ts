@@ -6,8 +6,16 @@
  */
 
 import { Cell, TypedCell } from '../cell'
-import type { Connection } from '../types'
-import { LatticeValue, LatticeNumber, LatticeBool, LatticeSet, num, bool, str, obj, array, set, nil, getValue, isNumber, isBool, isArray, isSet, isDict, dict, ordinalValue, getOrdinal, deserialize as deserializeLattice} from '../types'
+import type { Connection } from '../lattice-types'
+import { LatticeValue, LatticeNumber, LatticeBool, LatticeSet, LatticeDict, num, bool, str, set, nil, getValue, isNumber, isBool, isSet, isDict, dict, getOrdinal, deserialize as deserializeLattice} from '../lattice-types'
+
+// Helper to create ordinal-tagged values
+function ordinalValue(ordinal: number, value: LatticeValue): LatticeDict {
+  const map = new Map<string, LatticeValue>()
+  map.set('ordinal', num(ordinal))
+  map.set('value', value)
+  return dict(map)
+}
 
 // Max lattice for numbers (idempotent: max(a,a) = a)
 export class MaxCell extends TypedCell<number> {
@@ -52,9 +60,9 @@ export class OrdinalCell<T = any> extends TypedCell<T> {
     else if (typeof value === 'string') wrapped = str(value as any)
     else if (typeof value === 'boolean') wrapped = bool(value as any)
     else if (value instanceof Set) wrapped = set(value as any)  // Handle Set specifically
-    else if (Array.isArray(value)) wrapped = array(value as any)  // Handle Array specifically
+    else if (Array.isArray(value)) wrapped = set(new Set(value as any))  // Convert Array to Set
     else if (value instanceof LatticeValue) wrapped = value as any  // Already wrapped!
-    else wrapped = obj(value)  // Fallback to LatticeObject
+    else wrapped = dict(new Map())  // Fallback to empty dict for now
     
     // Wrap in ordinal dict
     return ordinalValue(++this.userOrdinal, wrapped)

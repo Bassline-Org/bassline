@@ -5,13 +5,13 @@
  * simple FunctionGadgets through the propagation network.
  */
 
-import { Network } from './network'
-import { OrdinalCell } from './cells/basic'
-import { QueryGadget } from './query-gadget'
+import { Network } from '../src/network'
+import { OrdinalCell } from '../src/cells/basic'
+import { QueryGadget } from '../src/query-gadget'
 import { ProjectionGadget } from './projection-gadget'
-import { networkValue } from './network-value'
-import { str, num, dict } from './types'
-import type { LatticeValue } from './types'
+import { networkValue } from '../src/network-value'
+import { str, num, dict } from '../src/lattice-types'
+import type { LatticeValue } from '../src/lattice-types'
 
 /**
  * ViewGadget - A network that wires together query and projection

@@ -17,8 +17,8 @@ import { Cell, TypedCell } from 'proper-bassline/src/cell'
 import { OrdinalCell } from 'proper-bassline/src/cells/basic'
 import { FunctionGadget } from 'proper-bassline/src/function'
 import type { Gadget } from 'proper-bassline/src/gadget'
-import type { LatticeValue } from 'proper-bassline/src/types'
-import { getMapValue } from 'proper-bassline/src/types'
+import type { LatticeValue } from 'proper-bassline/src/lattice-types'
+import { getMapValue } from 'proper-bassline/src/lattice-types'
 
 // ============================================================================
 // Network Context
@@ -108,7 +108,11 @@ export function useCell<T = any>(
   const value = cell ? cell.getOutput() : null
   
   // For OrdinalCell, extract the value from the ordinal map
-  const extracted = value ? (getMapValue(value) ?? value) : null
+  let extracted = value
+  if (cell instanceof OrdinalCell && value) {
+    // OrdinalCell wraps values in {ordinal: number, value: actual}
+    extracted = getMapValue(value)
+  }
   
   // Get the actual JS value from the LatticeValue wrapper
   // Special handling for different types
@@ -121,9 +125,16 @@ export function useCell<T = any>(
       const map = extracted.value as Map<string, any>
       const obj: any = {}
       for (const [key, val] of map) {
-        obj[key] = val?.value !== undefined ? val.value : val
+        // Recursively extract values
+        if (val && typeof val === 'object' && 'value' in val) {
+          obj[key] = val.value
+        } else {
+          obj[key] = val
+        }
       }
       extractedValue = obj
+    } else if (extracted.type === 'number' || extracted.type === 'string' || extracted.type === 'boolean') {
+      extractedValue = extracted.value
     } else {
       extractedValue = (extracted as any).value
     }

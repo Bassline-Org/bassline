@@ -14,10 +14,10 @@ import {
   PathGadget, 
   GroupGadget
 } from '../../proper-bassline/src/visuals'
-import { VisualGadget } from '../../proper-bassline/src/visual-gadget'
+import { VisualGadget } from 'proper-bassline/meta/visual-gadget'
 import { getGadgetValue } from '../../proper-bassline/src/value-helpers'
-import { num, str, dict, bool } from '../../proper-bassline/src/types'
-import type { Point, Size } from '../../proper-bassline/src/visual-gadget'
+import { num, str, dict, bool } from 'proper-bassline/src/lattice-types'
+import type { Point, Size } from 'proper-bassline/meta/visual-gadget'
 
 // ============================================================================
 // Types

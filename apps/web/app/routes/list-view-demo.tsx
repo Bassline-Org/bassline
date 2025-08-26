@@ -8,7 +8,7 @@ import { ListViewComponent, SelectableListViewComponent } from '../../../../prop
 import { GraphViewComponent } from '../../../../proper-bassline-react/src/graph-view'
 import { Network } from '../../../../proper-bassline/src/network'
 import { OrdinalCell, MaxCell, SetCell } from '../../../../proper-bassline/src/cells/basic'
-import { str, num, LatticeValue, isSet } from '../../../../proper-bassline/src/types'
+import { str, num, LatticeValue, isSet } from 'proper-bassline/src/lattice-types'
 import { QueryGadget } from '../../../../proper-bassline/src/query-gadget'
 import { networkValue } from '../../../../proper-bassline/src/network-value'
 

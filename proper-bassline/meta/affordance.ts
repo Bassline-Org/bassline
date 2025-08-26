@@ -5,12 +5,12 @@
  * They detect interactions and emit values that can be wired to any cell.
  */
 
-import { Cell } from './cell'
-import { OrdinalCell } from './cells/basic'
-import { bool, num, dict } from './types'
-import type { LatticeValue } from './types'
+import { Cell } from '../src/cell'
+import { OrdinalCell } from '../src/cells/basic'
+import { bool, num, dict } from '../src/types'
+import type { LatticeValue } from '../src/types'
 import type { Point, Rect } from './visual-gadget'
-import { getGadgetValue } from './value-helpers'
+import { getGadgetValue } from '../src/value-helpers'
 
 /**
  * Input event types that affordances can handle

@@ -59,6 +59,31 @@ This codebase uses TypeScript's strict mode with additional checks for maximum t
 3. **Live Programming**: Changes to the network immediately affect the UI
 4. **Extensible**: Users can create new gadgets while using the system
 
+## Semantic Zoom Canvas
+
+The editor uses semantic zoom on an infinite canvas:
+
+### Zoom Levels
+- **0.1-0.3x**: Dot with label (overview mode)
+- **0.3-0.6x**: Compact box showing name and value
+- **0.6-1.5x**: Normal view with input/output ports
+- **1.5-3x**: Detailed view with metadata and labels
+- **3x+**: Internal view - see inside networks
+
+### Canvas Principles
+1. **One infinite space** - No modals or separate views, everything on one canvas
+2. **Zoom = Detail** - Zoom level determines what you see and can interact with
+3. **Continuous navigation** - Zoom into networks to see/edit internals
+4. **Unique instances** - Each gadget is unique, no shared definitions
+5. **Bottom panel** - Tools panel that will become a gadget itself
+
+### Interaction Model
+- **Pan**: Shift+drag or middle mouse button
+- **Zoom**: Scroll wheel, zooms toward cursor
+- **Create**: Drag from bottom panel palette
+- **Connect**: Drag from output port to input port
+- **Select**: Click or drag rectangle
+
 ## Type-Safe Patterns
 
 ### Working with LatticeValues

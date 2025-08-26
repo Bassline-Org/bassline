@@ -10,11 +10,10 @@
 
 import { Cell } from './cell'
 import { Gadget } from './gadget'
-import { LatticeValue, str } from './types'
+import { LatticeBox, LatticeValue, str } from './lattice-types'
 import { OrdinalCell } from './cells/basic'
 import type { GadgetBase, Container } from './gadget-base'
 import { Query, query } from './query'
-import { NetworkValue } from './network-value'
 
 export class Network extends Cell implements Container {
   gadgets: Set<Gadget> = new Set()  // Strong references to prevent GC (includes child networks!)
@@ -39,6 +38,31 @@ export class Network extends Cell implements Container {
   addGadget(gadget: Gadget): void {
     this.gadgets.add(gadget)
     this.children.add(gadget)  // Also add to children for Container interface
+    
+    // If we have an engine reference, propagate it to the gadget
+    const engine = this.engine?.deref()
+    if (engine && this.engine) {
+      gadget.engine = this.engine
+      
+      // If it's a network, recursively set engine on all its gadgets
+      if (gadget instanceof Network) {
+        this.propagateEngineToNetwork(gadget)
+      }
+    }
+  }
+  
+  // Helper to recursively propagate engine reference to a network's gadgets
+  private propagateEngineToNetwork(network: Network): void {
+    const engine = this.engine?.deref()
+    if (!engine || !this.engine) return
+    
+    for (const gadget of network.gadgets) {
+      gadget.engine = this.engine
+      
+      if (gadget instanceof Network) {
+        this.propagateEngineToNetwork(gadget)
+      }
+    }
   }
   
   // Add multiple gadgets at once (implements Container.add)
@@ -138,8 +162,8 @@ export class Network extends Cell implements Container {
   /**
    * Convert this network to a NetworkValue so it can be passed as a value
    */
-  asValue(): NetworkValue {
-    return new NetworkValue(this)
+  asValue(): LatticeBox<Network> {
+    return new LatticeBox(this)
   }
   
   // Get a gadget by path (e.g., "auth/user" or just "user")

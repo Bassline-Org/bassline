@@ -5,14 +5,14 @@
  * Perfect for displaying network hierarchies, file systems, etc.
  */
 
-import { FunctionGadget } from '../function'
+import { FunctionGadget } from '../../src/function'
 import { GroupGadget } from '../visuals/group'
 import { TextGadget } from '../visuals/text'
 import { RectGadget } from '../visuals/rect'
 import { PathGadget } from '../visuals/path'
-import { LatticeValue, nil, obj, num, str, bool, dict, array, isDict, isArray } from '../types'
-import { Network } from '../network'
-import type { Gadget } from '../gadget'
+import { LatticeValue, nil, obj, num, str, bool, dict, array, isDict, isArray } from '../lattice-types'
+import { Network } from '../../src/network'
+import type { Gadget } from '../../src/gadget'
 
 interface TreeNode {
   id: string

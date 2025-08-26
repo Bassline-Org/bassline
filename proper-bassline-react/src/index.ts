@@ -39,6 +39,9 @@ export {
   InteractiveCanvas
 } from './network-canvas'
 
+// Export Rete.js integration
+export { ReteNetworkEditor } from './rete/ReteNetworkEditor'
+
 // Re-export commonly used types from proper-bassline for convenience
 export type { 
   Gadget,

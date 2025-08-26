@@ -7,12 +7,12 @@
 
 import React, { useEffect, useState, useMemo, type CSSProperties } from 'react'
 import { Network } from '../../proper-bassline/src/network'
-import { VisualGadget } from '../../proper-bassline/src/visual-gadget'
-import { ViewGadget } from '../../proper-bassline/src/view-gadget'
+import { VisualGadget } from 'proper-bassline/meta/visual-gadget'
+import { ViewGadget } from 'proper-bassline/meta/view-gadget'
 import { QueryGadget } from '../../proper-bassline/src/query-gadget'
 import { OrdinalCell } from '../../proper-bassline/src/cells/basic'
 import { networkValue } from '../../proper-bassline/src/network-value'
-import { str } from '../../proper-bassline/src/types'
+import { str } from 'proper-bassline/src/lattice-types'
 import { useGadget, useCell, useFunctionOutput } from './hooks'
 import { VisualGadgetRenderer } from './react-visuals'
 

@@ -16,8 +16,8 @@ import {
   DropAffordance 
 } from '../../proper-bassline/src/affordances'
 import type { Cell } from '../../proper-bassline/src/cell'
-import type { InputEvent } from '../../proper-bassline/src/affordance'
-import { bool, num, dict, str } from '../../proper-bassline/src/types'
+import type { InputEvent } from 'proper-bassline/src/meta/affordance'
+import { bool, num, dict, str } from 'proper-bassline/src/lattice-types'
 
 // ============================================================================
 // Types

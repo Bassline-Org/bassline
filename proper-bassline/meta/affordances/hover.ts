@@ -2,7 +2,7 @@
  * HoverAffordance - Detects mouse hover and emits boolean state
  */
 
-import { Affordance, type InputEvent } from '../affordance'
+import { Affordance, type InputEvent } from '../meta/affordance'
 import { bool, dict, num } from '../types'
 import type { LatticeValue } from '../types'
 import type { Cell } from '../cell'

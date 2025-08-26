@@ -3,19 +3,19 @@
  */
 
 import { FunctionGadget } from '../function'
-import { LatticeValue, nil, isDict, getMapValue } from '../types'
+import { LatticeValue, nil, isDict, getMapValue, LatticeDict } from '../lattice-types'
 
 /**
  * ExtractValue - Extracts the 'value' field from ordinal dicts
  * Useful for connecting OrdinalCells to gadgets that expect raw values
  */
-export class ExtractValue extends FunctionGadget {
+export class ExtractValue extends FunctionGadget<{input: LatticeDict}> {
   constructor(id: string) {
     super(id, ['input'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
-    const input = args.input
+  fn(args: {input: LatticeDict}): LatticeValue {
+    const input = args['input']
     if (!input) return nil()
     
     // If it's a dict with a 'value' field, extract it
@@ -35,13 +35,13 @@ export class ExtractValue extends FunctionGadget {
 /**
  * ExtractOrdinal - Extracts the 'ordinal' field from ordinal dicts
  */
-export class ExtractOrdinal extends FunctionGadget {
+export class ExtractOrdinal extends FunctionGadget<{input: LatticeDict}> {
   constructor(id: string) {
     super(id, ['input'])
   }
   
   fn(args: Record<string, LatticeValue>): LatticeValue {
-    const input = args.input
+    const input = args['input']
     if (!input) return nil()
     
     // If it's a dict with an 'ordinal' field, extract it

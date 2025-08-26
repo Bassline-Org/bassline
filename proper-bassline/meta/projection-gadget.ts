@@ -9,11 +9,11 @@
  * Outputs a reference to the container with visual gadgets
  */
 
-import { FunctionGadget } from './function'
+import { FunctionGadget } from '../src/function'
 import { GroupGadget, RectGadget, TextGadget } from './visuals'
-import { getGadgetValue } from './value-helpers'
-import { str, dict, num } from './types'
-import type { LatticeValue } from './types'
+import { getGadgetValue } from '../src/value-helpers'
+import { str, dict, num } from '../src/lattice-types'
+import type { LatticeValue } from '../src/lattice-types'
 
 /**
  * ProjectionGadget - Generates visual layouts from query results

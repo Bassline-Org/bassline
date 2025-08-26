@@ -4,11 +4,11 @@
 
 import React, { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react'
 import { useGadget, useFunctionOutput, useNetwork } from './hooks'
-import { TreeView, InteractiveTreeView } from '../../proper-bassline/src/views/tree-view'
+import { TreeView, InteractiveTreeView } from 'proper-bassline/meta/views/tree-view'
 import { NetworkCanvas } from './network-canvas'
 import { OrdinalCell } from '../../proper-bassline/src/cells/basic'
-import { obj, num, str, set } from '../../proper-bassline/src/types'
-import type { LatticeValue } from '../../proper-bassline/src/types'
+import { obj, num, str, set } from 'proper-bassline/src/lattice-types'
+import type { LatticeValue } from 'proper-bassline/src/lattice-types'
 import type { Network } from '../../proper-bassline/src/network'
 
 interface TreeViewProps {

@@ -9,7 +9,7 @@ import { GraphViewComponent } from '../../../../proper-bassline-react/src/graph-
 import { Network } from '../../../../proper-bassline/src/network'
 import { OrdinalCell, MaxCell, SetCell } from '../../../../proper-bassline/src/cells/basic'
 import { AddFunction, MultiplyFunction } from '../../../../proper-bassline/src/functions/basic'
-import { str, num } from '../../../../proper-bassline/src/types'
+import { str, num } from 'proper-bassline/src/lattice-types'
 import type { Gadget } from '../../../../proper-bassline/src/gadget'
 
 function InspectorDemoContent() {

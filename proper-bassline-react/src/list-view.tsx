@@ -4,11 +4,11 @@
 
 import React, { useEffect, useMemo, useRef, type CSSProperties } from 'react'
 import { useGadget, useFunctionOutput, useTypedCell } from './hooks'
-import { ListView, SelectableListView } from '../../proper-bassline/src/views/list-view'
+import { ListView, SelectableListView } from 'proper-bassline/meta/views/list-view'
 import { NetworkCanvas } from './network-canvas'
 import { Network } from '../../proper-bassline/src/network'
 import { OrdinalCell } from '../../proper-bassline/src/cells/basic'
-import { set as makeSet, str, num, LatticeValue } from '../../proper-bassline/src/types'
+import { set as makeSet, str, num, LatticeValue } from 'proper-bassline/src/lattice-types'
 
 interface ListViewProps {
   items: LatticeValue[]

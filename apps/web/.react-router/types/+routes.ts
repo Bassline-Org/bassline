@@ -16,6 +16,9 @@ type Pages = {
   "/proper-demo-cool": {
     params: {};
   };
+  "/rete-engine-test": {
+    params: {};
+  };
   "/inspector-demo": {
     params: {};
   };
@@ -25,10 +28,25 @@ type Pages = {
   "/tree-view-demo": {
     params: {};
   };
-  "/simple-editor": {
+  "/test-viewport": {
+    params: {};
+  };
+  "/rete-builder": {
     params: {};
   };
   "/proper-demo": {
+    params: {};
+  };
+  "/rete-simple": {
+    params: {};
+  };
+  "/konva-test": {
+    params: {};
+  };
+  "/rete-demo": {
+    params: {};
+  };
+  "/canvas": {
     params: {};
   };
   "/home": {
@@ -39,11 +57,15 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/proper-demo-cool" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/simple-editor" | "/proper-demo" | "/home";
+    page: "/" | "/proper-demo-cool" | "/rete-engine-test" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/rete-builder" | "/proper-demo" | "/rete-simple" | "/konva-test" | "/rete-demo" | "/canvas" | "/home";
   };
   "routes/proper-demo-cool.tsx": {
     id: "routes/proper-demo-cool";
     page: "/proper-demo-cool";
+  };
+  "routes/rete-engine-test.tsx": {
+    id: "routes/rete-engine-test";
+    page: "/rete-engine-test";
   };
   "routes/inspector-demo.tsx": {
     id: "routes/inspector-demo";
@@ -57,13 +79,33 @@ type RouteFiles = {
     id: "routes/tree-view-demo";
     page: "/tree-view-demo";
   };
-  "routes/simple-editor.tsx": {
-    id: "routes/simple-editor";
-    page: "/simple-editor";
+  "routes/test-viewport.tsx": {
+    id: "routes/test-viewport";
+    page: "/test-viewport";
+  };
+  "routes/rete-builder.tsx": {
+    id: "routes/rete-builder";
+    page: "/rete-builder";
   };
   "routes/proper-demo.tsx": {
     id: "routes/proper-demo";
     page: "/proper-demo";
+  };
+  "routes/rete-simple.tsx": {
+    id: "routes/rete-simple";
+    page: "/rete-simple";
+  };
+  "routes/konva-test.tsx": {
+    id: "routes/konva-test";
+    page: "/konva-test";
+  };
+  "routes/rete-demo.tsx": {
+    id: "routes/rete-demo";
+    page: "/rete-demo";
+  };
+  "routes/canvas.tsx": {
+    id: "routes/canvas";
+    page: "/canvas";
   };
   "routes/home.tsx": {
     id: "routes/home";

@@ -37,7 +37,7 @@
  */
 
 import type { GadgetBase, Container } from './gadget-base'
-import type { LatticeValue } from './types'
+import type { LatticeValue } from './lattice-types'
 
 /**
  * Query builder for finding gadgets in networks
@@ -454,7 +454,7 @@ export class Query {
     this.gadgets = new Set(
       Array.from(this.gadgets).filter(g => {
         const meta = g.getMetadata()
-        const pos = meta.position || meta.bounds
+        const pos = meta['position'] || meta['bounds']
         if (!pos) return false
         
         return pos.x >= bounds.x && 
@@ -473,7 +473,7 @@ export class Query {
     this.gadgets = new Set(
       Array.from(this.gadgets).filter(g => {
         const meta = g.getMetadata()
-        const pos = meta.position || meta.bounds
+        const pos = meta['position'] || meta['bounds']
         if (!pos) return false
         
         const dx = pos.x - point.x

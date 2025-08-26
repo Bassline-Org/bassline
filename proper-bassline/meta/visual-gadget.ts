@@ -6,11 +6,11 @@
  * This is the foundation of "UI as computation."
  */
 
-import { Network } from './network'
-import { OrdinalCell } from './cells/basic'
-import { dict, num, bool, str } from './types'
-import type { LatticeValue } from './types'
-import { getGadgetValue } from './value-helpers'
+import { Network } from '../src/network'
+import { OrdinalCell } from '../src/cells/basic'
+import { dict, num, bool, str } from '../src/lattice-types'
+import type { LatticeValue } from '../src/lattice-types'
+import { getGadgetValue } from '../src/value-helpers'
 
 /**
  * Point in 2D space

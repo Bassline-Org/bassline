@@ -3,7 +3,7 @@
  * Especially useful for OrdinalCell which stores values in a Map
  */
 
-import type { LatticeValue } from './types'
+import type { LatticeValue } from './lattice-types'
 
 /**
  * Extract the actual JavaScript value from a LatticeValue

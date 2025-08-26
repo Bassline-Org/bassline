@@ -5,7 +5,7 @@
  * Gadgets are the fundamental units of computation and UI in the system.
  */
 
-import type { LatticeValue } from './types'
+import type { LatticeValue } from './lattice-types'
 import type { Gadget } from './gadget'
 
 /**
@@ -14,8 +14,8 @@ import type { Gadget } from './gadget'
  */
 export interface Connection {
   gadget: WeakRef<GadgetBase>
-  outputName?: string  // For named outputs
-  inputName?: string   // For named inputs (e.g., Functions)
+  outputName?: string | undefined  // For named outputs
+  inputName?: string | undefined   // For named inputs (e.g., Functions)
 }
 
 export interface GadgetBase {
@@ -93,20 +93,6 @@ export interface GadgetBase {
    * Remove an upstream gadget
    */
   removeUpstream(gadget: GadgetBase): void
-  
-  // ============================================================================
-  // Serialization
-  // ============================================================================
-  
-  /**
-   * Serialize this gadget to a plain object
-   */
-  serialize(): any
-  
-  /**
-   * Deserialize from a plain object
-   */
-  deserialize(data: any): void
   
   // ============================================================================
   // Metadata (for querying and reflection)

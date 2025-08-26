@@ -5,14 +5,14 @@
  * Useful for debugging and understanding network flow.
  */
 
-import { FunctionGadget } from '../function'
-import { Network } from '../network'
+import { FunctionGadget } from '../../src/function'
+import { Network } from '../../src/network'
 import { GroupGadget } from '../visuals/group'
 import { TextGadget } from '../visuals/text'
 import { RectGadget } from '../visuals/rect'
-import { LatticeValue, nil, obj, num, str, LatticeObject } from '../types'
-import type { Gadget } from '../gadget'
-import type { Cell } from '../cell'
+import { LatticeValue, nil, obj, num, str, LatticeObject } from '../lattice-types'
+import type { Gadget } from '../../src/gadget'
+import type { Cell } from '../../src/cell'
 
 interface NodePosition {
   x: number

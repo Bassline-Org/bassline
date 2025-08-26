@@ -11,10 +11,10 @@
  * - A Network containing positioned visual gadgets
  */
 
-import { FunctionGadget } from '../function'
-import { Network } from '../network'
+import { FunctionGadget } from '../../src/function'
+import { Network } from '../../src/network'
 import { RectGadget, TextGadget, GroupGadget } from '../visuals'
-import { VisualGadget } from '../visual-gadget'
+import { VisualGadget } from '../../meta/visual-gadget'
 import { 
   LatticeValue, 
   LatticeSet,
@@ -29,8 +29,8 @@ import {
   set as makeSet,
   dict,
   obj
-} from '../types'
-import { OrdinalCell } from '../cells/basic'
+} from '../lattice-types'
+import { OrdinalCell } from '../../src/cells/basic'
 
 export class ListView extends FunctionGadget {
   // Keep the output container for rendered items

@@ -5,18 +5,20 @@
  * They require exact wiring with named inputs.
  */
 
-import { FunctionGadget } from '../function'
-import { LatticeValue, num, bool, nil, getValue } from '../types'
+import { FunctionGadget, FunctionGadgetArgs } from '../function'
+import { LatticeValue, num, bool, nil, getValue, LatticeNumber, LatticeBool } from '../lattice-types'
 
 // Addition - NOT idempotent (a + a ≠ a)
-export class AddFunction extends FunctionGadget {
+type NumericFunctionArgs = {a: LatticeNumber, b: LatticeNumber}
+
+export class AddFunction extends FunctionGadget<NumericFunctionArgs> {
   constructor(id: string) {
     super(id, ['a', 'b'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
-    const a = args.a
-    const b = args.b
+  fn(args: NumericFunctionArgs): LatticeValue {
+    const a = args['a']
+    const b = args['b']
     
     if (a.type !== "number" || b.type !== "number") return nil()
     return num(getValue(a) + getValue(b))
@@ -24,14 +26,14 @@ export class AddFunction extends FunctionGadget {
 }
 
 // Multiplication - NOT idempotent (a * a ≠ a)
-export class MultiplyFunction extends FunctionGadget {
+export class MultiplyFunction extends FunctionGadget<NumericFunctionArgs> {
   constructor(id: string) {
     super(id, ['a', 'b'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
-    const a = args.a
-    const b = args.b
+  fn(args: NumericFunctionArgs): LatticeValue {
+    const a = args['a']
+    const b = args['b']
     
     if (a.type !== "number" || b.type !== "number") return nil()
     return num(getValue(a) * getValue(b))
@@ -39,14 +41,15 @@ export class MultiplyFunction extends FunctionGadget {
 }
 
 // Subtraction - NOT commutative or idempotent
-export class SubtractFunction extends FunctionGadget {
+type SubtractiveFunctionArgs = {minuend: LatticeNumber, subtrahend: LatticeNumber}
+export class SubtractFunction extends FunctionGadget<SubtractiveFunctionArgs> {
   constructor(id: string) {
     super(id, ['minuend', 'subtrahend'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
-    const minuend = args.minuend
-    const subtrahend = args.subtrahend
+  fn(args: SubtractiveFunctionArgs): LatticeValue {
+    const minuend = args['minuend']
+    const subtrahend = args['subtrahend']
     
     if (minuend.type !== "number" || subtrahend.type !== "number") return nil()
     return num(getValue(minuend) - getValue(subtrahend))
@@ -54,14 +57,15 @@ export class SubtractFunction extends FunctionGadget {
 }
 
 // Division - NOT commutative or idempotent
-export class DivideFunction extends FunctionGadget {
+type DivisiveFunctionArgs = {dividend: LatticeNumber, divisor: LatticeNumber}
+export class DivideFunction extends FunctionGadget<DivisiveFunctionArgs> {
   constructor(id: string) {
     super(id, ['dividend', 'divisor'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
-    const dividend = args.dividend
-    const divisor = args.divisor
+  fn(args: DivisiveFunctionArgs): LatticeValue {
+    const dividend = args['dividend']
+    const divisor = args['divisor']
     
     if (dividend.type !== "number" || divisor.type !== "number") return nil()
     
@@ -73,14 +77,15 @@ export class DivideFunction extends FunctionGadget {
 }
 
 // Gate - forwards value only if control is true
-export class GateFunction extends FunctionGadget {
+type GateFunctionArgs = {control: LatticeBool, value: LatticeValue}
+export class GateFunction extends FunctionGadget<GateFunctionArgs> {
   constructor(id: string) {
     super(id, ['control', 'value'])
   }
   
   fn(args: Record<string, LatticeValue>): LatticeValue {
-    const control = args.control
-    const value = args.value
+    const control = args['control']
+    const value = args['value']
     
     if (control.type !== "bool") return nil()
     
@@ -90,14 +95,15 @@ export class GateFunction extends FunctionGadget {
 }
 
 // Equality test
-export class EqualFunction extends FunctionGadget {
+type EqualityFunctionArgs = {left: LatticeValue, right: LatticeValue}
+export class EqualFunction extends FunctionGadget<EqualityFunctionArgs> {
   constructor(id: string) {
     super(id, ['left', 'right'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
-    const left = args.left
-    const right = args.right
+  fn(args: EqualityFunctionArgs): LatticeValue {
+    const left = args['left']
+    const right = args['right']
     
     // Type must match
     if (left.type !== right.type) return bool(false)
@@ -117,14 +123,15 @@ export class EqualFunction extends FunctionGadget {
 }
 
 // Greater than comparison
-export class GreaterThanFunction extends FunctionGadget {
+type GreaterThanFunctionArgs = {left: LatticeNumber, right: LatticeNumber}
+export class GreaterThanFunction extends FunctionGadget<GreaterThanFunctionArgs> {
   constructor(id: string) {
     super(id, ['left', 'right'])
   }
   
-  fn(args: Record<string, LatticeValue>): LatticeValue {
-    const left = args.left
-    const right = args.right
+  fn(args: GreaterThanFunctionArgs): LatticeValue {
+    const left = args['left']
+    const right = args['right']
     
     if (left.type !== "number" || right.type !== "number") return nil()
     return bool(getValue(left) > getValue(right))

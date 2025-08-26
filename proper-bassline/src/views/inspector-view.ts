@@ -5,13 +5,13 @@
  * Properties are immediately reflected in the network.
  */
 
-import { FunctionGadget } from '../function'
+import { FunctionGadget } from '../../src/function'
 import { GroupGadget } from '../visuals/group'
 import { TextGadget } from '../visuals/text'
 import { RectGadget } from '../visuals/rect'
-import { LatticeValue, nil, obj, str, num, bool, dict, LatticeDict } from '../types'
-import type { Gadget } from '../gadget'
-import type { Cell } from '../cell'
+import { LatticeValue, nil, obj, str, num, bool, dict, LatticeDict } from '../lattice-types'
+import type { Gadget } from '../../src/gadget'
+import type { Cell } from '../../src/cell'
 
 export class InspectorView extends FunctionGadget {
   constructor(id: string) {

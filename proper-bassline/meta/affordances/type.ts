@@ -2,7 +2,7 @@
  * TypeAffordance - Captures keyboard input and emits text
  */
 
-import { Affordance, type InputEvent } from '../affordance'
+import { Affordance, type InputEvent } from '../meta/affordance'
 import { str, bool, num } from '../types'
 import type { LatticeValue } from '../types'
 import type { Cell } from '../cell'

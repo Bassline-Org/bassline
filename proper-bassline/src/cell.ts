@@ -9,8 +9,8 @@
  */
 
 import { Gadget } from './gadget'
-import type { Connection } from './types'
-import { LatticeValue, nil } from './types'
+import type { Connection } from './lattice-types'
+import { LatticeValue, nil } from './lattice-types'
 import type { GadgetBase } from './gadget-base'
 
 export abstract class Cell extends Gadget {
@@ -28,6 +28,9 @@ export abstract class Cell extends Gadget {
    * Cells join all inputs via latticeOp
    */
   accept(value: LatticeValue, source: GadgetBase, inputName?: string): void {
+    // Report to engine if available (from Gadget base class)
+    this.reportAccept(value, source as Gadget, inputName)
+    
     // Join the incoming value with current output
     const current = this.outputs.get('default')
     const result = current ? this.latticeOp(current, value) : value

@@ -9,17 +9,18 @@
  */
 
 import { Gadget } from './gadget'
-import type { Connection } from './types'
-import { LatticeValue, nil, serialize } from './types'
+import type { Connection } from './lattice-types'
+import { LatticeValue, nil } from './lattice-types'
 import type { GadgetBase } from './gadget-base'
 
-export abstract class FunctionGadget extends Gadget {
+export type FunctionGadgetArgs = Record<string, LatticeValue>
+
+export abstract class FunctionGadget<T extends FunctionGadgetArgs = FunctionGadgetArgs> extends Gadget {
   inputs: Map<string, Connection> = new Map()
   inputNames: string[]
   currentValues: Map<string, LatticeValue> = new Map()
-  
   // The function to apply - takes named arguments
-  abstract fn(args: Record<string, LatticeValue>): LatticeValue
+  abstract fn(args: T): LatticeValue
   
   constructor(id: string, inputNames: string[]) {
     super(id)
@@ -35,6 +36,9 @@ export abstract class FunctionGadget extends Gadget {
       console.warn(`Function ${this.id} received value without input name`)
       return
     }
+    
+    // Report to engine if available (from Gadget base class)
+    this.reportAccept(value, source as Gadget, inputName)
     
     // Store the value
     this.currentValues.set(inputName, value)
@@ -89,49 +93,16 @@ export abstract class FunctionGadget extends Gadget {
   // Private method to compute function
   private computeFunction(): void {
     // Build args from current values
-    const args: Record<string, LatticeValue> = {}
+    const args: FunctionGadgetArgs = {}
     for (const name of this.inputNames) {
       args[name] = this.currentValues.get(name) ?? nil()
     }
     
     // Apply function
-    const result = this.fn(args)
+    const result = this.fn(args as T)
     
     // Set output (will auto-emit if changed)
     this.setOutput("default", result)
-  }
-  
-  // Legacy compute for compatibility
-  compute(): void {
-    // Collect all input values by name
-    const deadInputs: string[] = []
-    
-    for (const name of this.inputNames) {
-      const conn = this.inputs.get(name)
-      if (conn) {
-        const source = conn.source.deref()
-        if (source) {
-          this.currentValues.set(name, source.getOutput(conn.outputName))
-        } else {
-          // Source was garbage collected
-          deadInputs.push(name)
-          this.currentValues.set(name, nil())
-        }
-      } else {
-        // Missing input = null
-        this.currentValues.set(name, nil())
-      }
-    }
-    
-    // Clean up dead connections
-    for (const name of deadInputs) {
-      this.inputs.delete(name)
-    }
-    
-    // Compute if we have all values
-    if (this.hasAllValues()) {
-      this.computeFunction()
-    }
   }
   
   // Check if all required inputs are connected and alive
@@ -167,7 +138,7 @@ export abstract class FunctionGadget extends Gadget {
     // Store current values
     base.currentValues = {}
     for (const [name, value] of this.currentValues) {
-      base.currentValues[name] = value ? serialize(value) : null
+      base.currentValues[name] = value.serialize()
     }
     
     return base

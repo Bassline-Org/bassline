@@ -8,8 +8,8 @@ import { TreeViewComponent } from '../../../../proper-bassline-react/src/tree-vi
 import { Network } from '../../../../proper-bassline/src/network'
 import { OrdinalCell } from '../../../../proper-bassline/src/cells/basic'
 import { AddFunction, MultiplyFunction } from '../../../../proper-bassline/src/functions/basic'
-import { str, num, dict, array, set, obj } from '../../../../proper-bassline/src/types'
-import type { LatticeValue } from '../../../../proper-bassline/src/types'
+import { str, num, dict, array, set, obj } from 'proper-bassline/src/lattice-types'
+import type { LatticeValue } from 'proper-bassline/src/lattice-types'
 
 function TreeViewDemoContent() {
   const network = useNetwork()

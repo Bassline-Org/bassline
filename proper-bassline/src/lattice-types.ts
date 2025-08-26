@@ -3,90 +3,94 @@
  * 
  * Runtime types use native JS structures (Set, Map) for efficiency.
  * Serialization protocol converts to/from JSON-compatible forms.
- */
+  */
 
 // Base class for all lattice values - generic over the actual value type
 export abstract class LatticeValue<T = any> {
-  constructor(public readonly value: T) {}
-  abstract get type(): string
-  abstract serialize(): SerializedLatticeValue
+  constructor(public readonly value: T, public readonly type: LatticeValueTypes) {
+    if (value instanceof LatticeValue) {
+      throw new Error(`Cannot wrap a LatticeValue: ${value.type}`)
+    }
+  }
+  serialize(): SerializedLatticeValue {
+    return { type: this.type, value: this.value } as SerializedLatticeValue
+  }
+  abstract prettyPrint(): string
 }
 
 // Simple primitive types
 export class LatticeNumber extends LatticeValue<number> {
-  get type(): 'number' { return 'number' }
-  serialize(): SerializedLatticeValue { return { type: 'number', value: this.value } }
+  constructor(value: number) { super(value, 'number') }
+  prettyPrint(): string { return String(this.value) }
 }
 
 export class LatticeString extends LatticeValue<string> {
-  get type(): 'string' { return 'string' }
-  serialize(): SerializedLatticeValue { return { type: 'string', value: this.value } }
+  constructor(value: string) { super(value, 'string') }
+  prettyPrint(): string { return `"${this.value}"` }
 }
 
 export class LatticeBool extends LatticeValue<boolean> {
-  get type(): 'bool' { return 'bool' }
-  serialize(): SerializedLatticeValue { return { type: 'bool', value: this.value } }
+  constructor(value: boolean) { super(value, 'bool') }
+  prettyPrint(): string { return this.value ? 'true' : 'false' }
 }
 
 export class LatticeNull extends LatticeValue<null> {
-  constructor() { super(null) }
-  get type(): 'null' { return 'null' }
-  serialize(): SerializedLatticeValue { return { type: 'null' } }
+  constructor() { super(null, 'null') }
+  prettyPrint(): string { return 'nil' }
 }
 
 // Compound types - T extends LatticeValue for proper nesting
 export class LatticeArray<T extends LatticeValue = LatticeValue> extends LatticeValue<T[]> {
-  get type(): 'array' { return 'array' }
-  serialize(): SerializedLatticeValue { 
-    return { type: 'array', value: this.value.map(v => v.serialize()) }
+  constructor(value: T[]) { super(value, 'array') }
+  prettyPrint(): string {
+    const items = this.value.map(v => v.prettyPrint()).join(', ')
+    return `[${items}]`
   }
 }
 
 export class LatticeSet<T extends LatticeValue = LatticeValue> extends LatticeValue<Set<T>> {
-  get type(): 'set' { return 'set' }
-  serialize(): SerializedLatticeValue { 
-    return { type: 'set', value: Array.from(this.value).map(v => v.serialize()) }
+  constructor(value: Set<T>) { super(value, 'set') }
+  prettyPrint(): string {
+    const items = Array.from(this.value).map(v => v.prettyPrint()).join(', ')
+    return `{${items}}`
   }
 }
 
 export class LatticeDict<V extends LatticeValue = LatticeValue> extends LatticeValue<Map<string, V>> {
-  get type(): 'dict' { return 'dict' }
-  serialize(): SerializedLatticeValue {
-    const obj: Record<string, SerializedLatticeValue> = {}
+  constructor(value: Map<string, V>) { super(value, 'dict') }
+  prettyPrint(): string {
+    const entries: string[] = []
     for (const [k, v] of this.value) {
-      obj[k] = v.serialize()
+      entries.push(`${k}: ${v.prettyPrint()}`)
     }
-    return { type: 'dict', value: obj }
+    return `{${entries.join(', ')}}`
   }
 }
 
-// Function type
-export class LatticeFunction extends LatticeValue<Function> {
-  get type(): 'function' { return 'function' }
-  serialize(): SerializedLatticeValue {
-    return { type: 'function-ref', name: this.value.name || 'anonymous' }
+
+// Dynamic object type for host language objects
+export class LatticeBox<T = any> extends LatticeValue<T> {
+  id: string
+  constructor(value: T, id: string = generateRandomId()) { super(value, 'box'); this.id = id }
+  prettyPrint(): string {
+    const id = this.id || generateRandomId()
+    return `box-${id}`
   }
 }
 
 // Contradiction type
 export class LatticeContradiction extends LatticeValue<Set<LatticeValue>> {
-  get type(): 'contradiction' { return 'contradiction' }
-  serialize(): SerializedLatticeValue {
-    return { type: 'contradiction', conflicts: Array.from(this.value).map(v => v.serialize()) }
+  constructor(value: Set<LatticeValue>) { super(value, 'contradiction') }
+  prettyPrint(): string {
+    const conflicts = Array.from(this.value).map(v => v.prettyPrint()).join(' vs ')
+    return `⊥(${conflicts})`
   }
 }
 
-// Dynamic object type for anything else
-export class LatticeObject extends LatticeValue<any> {
-  get type(): 'object' { return 'object' }
-  serialize(): SerializedLatticeValue { 
-    return { 
-      type: 'object-ref', 
-      className: this.value?.constructor?.name,
-      id: this.value?.id
-    }
-  }
-}
+
+export type BoxId = string
+
+export type LatticeValueTypes = "bool" | "number" | "string" | "array" | "set" | "dict" | "null" | "contradiction" | "box"
 
 // Serialized type - JSON-compatible representation
 export type SerializedLatticeValue = 
@@ -96,11 +100,9 @@ export type SerializedLatticeValue =
   | { type: "array", value: SerializedLatticeValue[] }
   | { type: "set", value: SerializedLatticeValue[] }  // Set as array
   | { type: "dict", value: Record<string, SerializedLatticeValue> }  // Map as object
-  | { type: "object-ref", className?: string, id?: string }  // Reference to object
-  | { type: "function-ref", name: string }  // Reference to function by name
-  | { type: "function-src", source: string }  // Function source code
   | { type: "null" }
   | { type: "contradiction", conflicts: SerializedLatticeValue[] }
+  | { type: "box", value: BoxId }
 
 // Helper constructors - now return class instances
 export const bool = (value: boolean) => new LatticeBool(value)
@@ -108,8 +110,7 @@ export const num = (value: number) => new LatticeNumber(value)
 export const str = (value: string) => new LatticeString(value)
 export const array = <T extends LatticeValue>(items: T[]) => new LatticeArray(items)
 export const nil = () => new LatticeNull()
-export const obj = (value: any) => new LatticeObject(value)
-export const fn = (value: Function) => new LatticeFunction(value)
+export const box = <T = any>(value: T, id: string) => new LatticeBox(value, id)
 
 // Set constructor with deduplication
 export const set = <T extends LatticeValue>(items: Set<T> | T[]): LatticeSet<T> => {
@@ -153,19 +154,40 @@ export const isSet = (v: LatticeValue | null): v is LatticeSet =>
   v !== null && v instanceof LatticeSet
 export const isDict = (v: LatticeValue | null): v is LatticeDict => 
   v !== null && v instanceof LatticeDict
-export const isObject = (v: LatticeValue | null): v is LatticeObject => 
-  v !== null && v instanceof LatticeObject
-export const isFunction = (v: LatticeValue | null): v is LatticeFunction => 
-  v !== null && v instanceof LatticeFunction
+export const isBox = (v: LatticeValue | null): v is LatticeBox => 
+  v !== null && v instanceof LatticeBox
 export const isNull = (v: LatticeValue | null): v is LatticeNull => 
   v !== null && v instanceof LatticeNull
 
-// Legacy alias
-export const isMap = isDict
-
-// Serialization protocol - now just calls the serialize method
-export function serialize(value: LatticeValue): SerializedLatticeValue {
-  return value.serialize()
+// Pretty printing helper
+export function prettyPrint(value: LatticeValue | null | undefined | any): string {
+  if (!value) return 'nil'
+  
+  // Handle LatticeValue instances
+  if (value && typeof value === 'object' && typeof value.prettyPrint === 'function') {
+    return value.prettyPrint()
+  }
+  
+  // Handle OrdinalCell's dict structure (has ordinal and value keys)
+  if (value && typeof value === 'object' && value.type === 'dict' && value.value instanceof Map) {
+    const map = value.value as Map<string, any>
+    if (map.has('ordinal') && map.has('value')) {
+      // Extract the wrapped value and pretty print it
+      const innerValue = map.get('value')
+      return prettyPrint(innerValue)
+    }
+  }
+  
+  // Fallback to JSON for plain objects
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return String(value)
+    }
+  }
+  
+  return String(value)
 }
 
 // Deserialization protocol
@@ -197,20 +219,8 @@ export function deserialize(value: SerializedLatticeValue): LatticeValue {
       return new LatticeDict(map)
     }
     
-    case "object-ref":
-      // For now, deserialize as null - could be enhanced with a registry
-      // In the future, could look up object by className/id
-      return nil()
-    
-    case "function-ref":
-      // For now, deserialize as null - could be enhanced with a function registry
-      // In the future, could look up function by name
-      return nil()
-    
-    case "function-src":
-      // Could eval the source, but that's dangerous
-      // For now, return nil
-      return nil()
+    case "box":
+      return new LatticeBox(value.value)
     
     case "contradiction":
       return new LatticeContradiction(new Set(value.conflicts.map(deserialize)))
@@ -219,10 +229,6 @@ export function deserialize(value: SerializedLatticeValue): LatticeValue {
       throw new Error(`Unknown type: ${(value as any).type}`)
   }
 }
-
-// Helper functions for ordinal values (using dict)
-export const ordinalValue = (ord: number, val: LatticeValue): LatticeDict => 
-  dict(new Map([['ordinal', num(ord)], ['value', val]]))
 
 export const getOrdinal = (d: LatticeValue): number | null => {
   if (!isDict(d)) return null
@@ -256,3 +262,7 @@ export interface Connection {
 
 // Compatibility layer - allow plain objects to be used where Maps are expected
 export const map = dict  // Alias for backward compatibility
+
+function generateRandomId(): string {
+  return Math.random().toString(36).substring(2, 15)
+}

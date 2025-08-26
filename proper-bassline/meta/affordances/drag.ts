@@ -2,7 +2,7 @@
  * DragAffordance - Detects drag gestures and emits position deltas
  */
 
-import { Affordance, type InputEvent } from '../affordance'
+import { Affordance, type InputEvent } from '../meta/affordance'
 import { dict, num, bool } from '../types'
 import type { LatticeValue } from '../types'
 import type { Cell } from '../cell'
