@@ -5,6 +5,8 @@ import { LatticeValue } from "proper-bassline/src/lattice-types"
 import type { Connection as GadgetConnection } from "proper-bassline/src/gadget-base"
 import type { Gadget } from "proper-bassline/src/gadget"
 import { ClassicPreset, type BaseSchemes, type GetSchemes } from "rete"
+import { CustomControl } from "./components/CustomControl"
+import { InputControl } from "./components/InputControl"
 
 const cellSocket = new ClassicPreset.Socket("cellSocket");
 const functionSocket = new ClassicPreset.Socket("functionSocket");
@@ -29,9 +31,20 @@ export class CellNode extends GadgetNode<Cell> {
     this.addOutput('output', new ClassicPreset.Output(cellSocket, 'Output', true))
     // Add input socket (cells can have multiple connections)
     this.addInput('input', new ClassicPreset.Input(cellSocket, 'Input', true))
-    // If the cell is an OrdinalCell, add a control
+    
+    // If the cell is an OrdinalCell, add an input control
     if (this.gadget instanceof OrdinalCell) {
-        this.addControl('value', new CellControl(this.gadget))
+        console.log('[CellNode] Adding InputControl for OrdinalCell:', this.gadget.id)
+        const control = new CustomControl(InputControl, {
+            cell: this.gadget,
+            onValueChange: () => {
+                // Trigger update when value changes
+                this.currentValue = this.gadget.getOutput()
+                console.log('[CellNode] Value changed:', this.currentValue)
+            }
+        })
+        this.addControl('input', control)
+        console.log('[CellNode] Control added:', control)
     }
     
     // Store current value
@@ -55,23 +68,17 @@ export class FunctionNode<T extends FunctionGadgetArgs = FunctionGadgetArgs> ext
         for(const [input, _] of fn.inputs) {
             this.addInput(input, new ClassicPreset.Input(functionSocket, input, false))
         }
-        for(const [output, _] of fn.outputs) {
-            this.addOutput(output, new ClassicPreset.Output(functionSocket, output, true))
-        }
+        // Functions use 'output' socket like cells for consistency
+        this.addOutput('output', new ClassicPreset.Output(functionSocket, 'Output', true))
     }
 }
 
-export class CellControl<T = LatticeValue> extends ClassicPreset.Control {
-    cell: OrdinalCell<T>
-    constructor(cell: OrdinalCell<T>) {
+// Legacy CellControl - kept for compatibility
+export class CellControl extends ClassicPreset.Control {
+    cell: Cell
+    constructor(cell: Cell) {
         super()
         this.cell = cell
-    }
-    set value(value: T) {
-        this.cell.setValue(value)
-    }
-    get value(): T | null {
-        return this.cell.getValue() || null
     }
 }
 

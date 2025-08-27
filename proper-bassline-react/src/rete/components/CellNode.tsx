@@ -11,7 +11,7 @@
 import { ClassicPreset } from 'rete'
 import type { Cell, TypedCell } from 'proper-bassline/src/cell'
 import { OrdinalCell, MaxCell, MinCell, UnionCell } from 'proper-bassline/src/cells/basic'
-import type { LatticeValue } from 'proper-bassline/src/types'
+import type { LatticeValue } from 'proper-bassline/src/lattice-types'
 import { CellControl } from './CustomControl'
 
 export const VALUE_SOCKET = 'valueSocket'
@@ -25,9 +25,9 @@ export class CellNode extends ClassicPreset.Node {
     this.cell = cell
     
     // Add output socket
-    this.addOutput('output', new ClassicPreset.Output(new ValueSocket(), 'Output', true))
+    this.addOutput('output', new ClassicPreset.Output(new ValueSocket(), 'output', true))
     // Add input socket (cells can have multiple connections)
-    this.addInput('input', new ClassicPreset.Input(new ValueSocket(), 'Input', true))
+    this.addInput('input', new ClassicPreset.Input(new ValueSocket(), 'input', true))
     
     // Store current value
     this.currentValue = this.cell.getOutput()
@@ -75,7 +75,7 @@ export class ValueControl extends ClassicPreset.Control {
         return String(value.value)
       case 'string':
         return `"${value.value}"`
-      case 'boolean':
+      case 'bool':
         return value.value ? 'true' : 'false'
       case 'set':
         const items = Array.from(value.value as Set<any>)

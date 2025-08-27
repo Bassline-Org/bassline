@@ -34,8 +34,11 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
   // Subscription cleanup function
   private unsubscribe: (() => void) | null = null
   
-  // Flag to prevent multiple syncs
+  // Synchronization flags
   private hasSynced = false
+  private isSyncing = false // Prevent re-entrant sync operations
+  private isInternalUpdate = false // Distinguish programmatic updates
+  private existingConnections = new Set<string>() // Track existing connections
   
   constructor(
     engine: BasslineEngine,
@@ -67,10 +70,17 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
    * Create Rete nodes for existing gadgets in the engine
    */
   private async syncExistingGadgets() {
+    if (this.isSyncing) {
+      console.log('[PropagationPlugin] Already syncing, skipping')
+      return
+    }
+    
     console.log('[PropagationPlugin] Syncing existing gadgets from engine')
+    this.isSyncing = true
     
     // Wait a bit to ensure editor is ready
     setTimeout(async () => {
+      try {
       let yPosition = 100
       
       for (const gadget of this.engine.gadgets) {
@@ -116,18 +126,29 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
               const targetNode = this.editor.getNode(targetNodeId)
               
               if (sourceNode && targetNode) {
-                // Create Rete connection
-                const connection = new ClassicPreset.Connection(
-                  sourceNode,
-                  'output',
-                  targetNode,
-                  conn.inputName || 'input'
-                ) as any
-                await this.editor.addConnection(connection)
+                // Check if connection already exists
+                const connectionKey = `${sourceNodeId}->${targetNodeId}:${conn.inputName || 'input'}`
+                if (!this.existingConnections.has(connectionKey)) {
+                  this.existingConnections.add(connectionKey)
+                  
+                  // Create Rete connection - all nodes use 'output' socket
+                  this.isInternalUpdate = true
+                  const connection = new ClassicPreset.Connection(
+                    sourceNode,
+                    'output',
+                    targetNode,
+                    conn.inputName || 'input'
+                  ) as any
+                  await this.editor.addConnection(connection)
+                  this.isInternalUpdate = false
+                }
               }
             }
           }
         }
+      }
+      } finally {
+        this.isSyncing = false
       }
     }, 100)
   }
@@ -171,6 +192,20 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
       this.emit({ type: 'valueChanged', gadgetId: event.gadgetId, value: event.value })
       // Update the node in Rete
       this.updateNodeValue(nodeId)
+      
+      // Also update controls if they exist
+      const node = this.editor.getNode(nodeId)
+      if (node && this.area) {
+        const controls = node.controls
+        if (controls) {
+          for (const [, control] of Object.entries(controls)) {
+            // Trigger control update by updating the area
+            if (control && 'id' in control) {
+              this.area.update('control', control.id)
+            }
+          }
+        }
+      }
     }
   }
   
@@ -254,6 +289,11 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
       }
       
       if (context.type === 'connectioncreate') {
+        // Skip if this is an internal update (programmatic)
+        if (this.isInternalUpdate) {
+          return context
+        }
+        
         const connection = context.data
         const sourceNode = this.editor.getNode(connection.source)
         const targetNode = this.editor.getNode(connection.target)
@@ -262,7 +302,7 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
           const sourceGadgetId = (sourceNode as any).gadgetId
           const targetGadgetId = (targetNode as any).gadgetId
           
-          console.log('[PropagationPlugin] Creating connection:', sourceGadgetId, '->', targetGadgetId)
+          console.log('[PropagationPlugin] User created connection:', sourceGadgetId, '->', targetGadgetId)
           
           if (sourceGadgetId && targetGadgetId) {
             const sourceGadget = this.findGadget(sourceGadgetId)
@@ -285,6 +325,17 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
               }
               
               if (!alreadyConnected) {
+                // Track this connection to prevent duplicates
+                const connectionKey = `${sourceGadgetId}->${targetGadgetId}:${connection.targetInput || 'input'}`
+                
+                // Check if we've already processed this connection
+                if (this.existingConnections.has(connectionKey)) {
+                  console.log('[PropagationPlugin] Connection already exists in our tracking, skipping')
+                  return context
+                }
+                
+                this.existingConnections.add(connectionKey)
+                
                 // Wire gadgets based on type
                 if (targetGadget instanceof Cell) {
                   console.log('[PropagationPlugin] Connecting Cell', targetGadgetId, 'from', sourceGadgetId)
@@ -293,23 +344,10 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
                   const inputKey = connection.targetInput || 'input'
                   console.log('[PropagationPlugin] Connecting Function', targetGadgetId, 'input', inputKey, 'from', sourceGadgetId)
                   targetGadget.connectFrom(inputKey, sourceGadget, connection.sourceOutput || 'default')
-                  
-                  // Check if function has all inputs to compute
-                  const hasAll = targetGadget.inputNames.every(name => 
-                    targetGadget.inputs.has(name)
-                  )
-                  console.log('[PropagationPlugin] Function has all inputs:', hasAll)
                 }
                 
-                // Trigger computation from source
-                console.log('[PropagationPlugin] Triggering computation after connection')
-                sourceGadget.compute()
-                sourceGadget.emit()
-                
-                // If target is a function with all inputs, compute it too
-                if (targetGadget instanceof FunctionGadget) {
-                  targetGadget.compute()
-                }
+                // Don't manually trigger computation - let the propagation network handle it
+                // The network will automatically propagate values when connections are made
                 
                 this.emit({ 
                   type: 'connectionAdded', 
@@ -326,6 +364,11 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
       }
       
       if (context.type === 'connectionremove') {
+        // Skip if this is an internal update
+        if (this.isInternalUpdate) {
+          return context
+        }
+        
         const connection = context.data
         const sourceNode = this.editor.getNode(connection.source)
         const targetNode = this.editor.getNode(connection.target)
@@ -333,6 +376,10 @@ export class PropagationNetworkPlugin<Schemes extends BasslineSchemes> extends S
         if (sourceNode && targetNode) {
           const sourceGadgetId = (sourceNode as any).gadgetId
           const targetGadgetId = (targetNode as any).gadgetId
+          
+          // Remove from our tracking
+          const connectionKey = `${sourceGadgetId}->${targetGadgetId}:${connection.targetInput || 'input'}`
+          this.existingConnections.delete(connectionKey)
           
           if (sourceGadgetId && targetGadgetId) {
             const sourceGadget = this.findGadget(sourceGadgetId)

@@ -10,7 +10,7 @@
 
 import { ClassicPreset } from 'rete'
 import type { FunctionGadget } from 'proper-bassline/src/function'
-import type { LatticeValue } from 'proper-bassline/src/types'
+import type { LatticeValue } from 'proper-bassline/src/lattice-types'
 import { ValueSocket, ValueControl } from './CellNode'
 import { ReactControl } from './CustomControl'
 import { ValueDisplay } from './ValueDisplay'
@@ -77,7 +77,7 @@ export class FunctionValueControl extends ValueControl {
         return String(value.value)
       case 'string':
         return `"${value.value}"`
-      case 'boolean':
+      case 'bool':
         return value.value ? 'true' : 'false'
       case 'set':
         const items = Array.from(value.value as Set<any>)

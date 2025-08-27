@@ -2,10 +2,10 @@
  * InputControl - React component for user input in OrdinalCell nodes
  */
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { OrdinalCell } from 'proper-bassline/src/cells/basic'
-import { num, str, bool, prettyPrint } from 'proper-bassline/src/types'
-import type { LatticeValue } from 'proper-bassline/src/types'
+import { num, str, bool, prettyPrint } from 'proper-bassline/src/lattice-types'
+import type { LatticeValue } from 'proper-bassline/src/lattice-types'
 
 interface InputControlProps {
   cell: OrdinalCell

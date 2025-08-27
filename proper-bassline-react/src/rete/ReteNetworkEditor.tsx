@@ -25,6 +25,8 @@ import { AddFunction, MultiplyFunction } from 'proper-bassline/src/functions/bas
 
 import { PropagationNetworkPlugin } from './plugins/PropagationNetworkPlugin'
 import { CellNode, FunctionNode, type BasslineSchemes, type Node } from './nodes'
+import { CustomControl } from './components/CustomControl'
+import { InputControl } from './components/InputControl'
 
 interface ReteNetworkEditorProps {
   engine: BasslineEngine
@@ -45,7 +47,24 @@ export const createEditor = (engine: BasslineEngine) => async (el: HTMLElement) 
   // Set area plugin on propagation plugin
   propagationPlugin.setArea(areaPlugin)
 
-  render.addPreset(ReactPresets.classic.setup<BasslineSchemes, ReactArea2D<BasslineSchemes>>())
+  render.addPreset(ReactPresets.classic.setup<BasslineSchemes, ReactArea2D<BasslineSchemes>>({
+    customize: {
+      control(context) {
+        console.log('[ReteEditor] Control customize called:', context.payload)
+        // Handle CustomControl instances
+        if (context.payload instanceof CustomControl) {
+          console.log('[ReteEditor] Rendering CustomControl with component:', context.payload.component.name)
+          return () => {
+            const Component = context.payload.component
+            return <Component {...context.payload.props} />
+          }
+        }
+        // Default to classic control
+        console.log('[ReteEditor] Using default classic control')
+        return ReactPresets.classic.Control
+      }
+    }
+  }))
   
   // Setup connections
   connectionPlugin.addPreset(ConnectionPresets.classic.setup())

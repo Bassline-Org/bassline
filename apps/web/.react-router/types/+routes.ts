@@ -19,6 +19,9 @@ type Pages = {
   "/rete-engine-test": {
     params: {};
   };
+  "/dead-editor-v2": {
+    params: {};
+  };
   "/inspector-demo": {
     params: {};
   };
@@ -32,6 +35,9 @@ type Pages = {
     params: {};
   };
   "/rete-builder": {
+    params: {};
+  };
+  "/dead-editor": {
     params: {};
   };
   "/proper-demo": {
@@ -57,7 +63,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/proper-demo-cool" | "/rete-engine-test" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/rete-builder" | "/proper-demo" | "/rete-simple" | "/konva-test" | "/rete-demo" | "/canvas" | "/home";
+    page: "/" | "/proper-demo-cool" | "/rete-engine-test" | "/dead-editor-v2" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/rete-builder" | "/dead-editor" | "/proper-demo" | "/rete-simple" | "/konva-test" | "/rete-demo" | "/canvas" | "/home";
   };
   "routes/proper-demo-cool.tsx": {
     id: "routes/proper-demo-cool";
@@ -66,6 +72,10 @@ type RouteFiles = {
   "routes/rete-engine-test.tsx": {
     id: "routes/rete-engine-test";
     page: "/rete-engine-test";
+  };
+  "routes/dead-editor-v2.tsx": {
+    id: "routes/dead-editor-v2";
+    page: "/dead-editor-v2";
   };
   "routes/inspector-demo.tsx": {
     id: "routes/inspector-demo";
@@ -86,6 +96,10 @@ type RouteFiles = {
   "routes/rete-builder.tsx": {
     id: "routes/rete-builder";
     page: "/rete-builder";
+  };
+  "routes/dead-editor.tsx": {
+    id: "routes/dead-editor";
+    page: "/dead-editor";
   };
   "routes/proper-demo.tsx": {
     id: "routes/proper-demo";
