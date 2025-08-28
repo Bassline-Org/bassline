@@ -13,6 +13,9 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/port-graph-editor": {
+    params: {};
+  };
   "/proper-demo-cool": {
     params: {};
   };
@@ -63,7 +66,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/proper-demo-cool" | "/rete-engine-test" | "/dead-editor-v2" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/rete-builder" | "/dead-editor" | "/proper-demo" | "/rete-simple" | "/konva-test" | "/rete-demo" | "/canvas" | "/home";
+    page: "/" | "/port-graph-editor" | "/proper-demo-cool" | "/rete-engine-test" | "/dead-editor-v2" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/rete-builder" | "/dead-editor" | "/proper-demo" | "/rete-simple" | "/konva-test" | "/rete-demo" | "/canvas" | "/home";
+  };
+  "routes/port-graph-editor.tsx": {
+    id: "routes/port-graph-editor";
+    page: "/port-graph-editor";
   };
   "routes/proper-demo-cool.tsx": {
     id: "routes/proper-demo-cool";

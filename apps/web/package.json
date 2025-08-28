@@ -36,6 +36,7 @@
     "isbot": "^5.1.27",
     "konva": "^9.3.22",
     "lucide-react": "^0.535.0",
+    "port-graphs": "workspace:*",
     "proper-bassline": "workspace:*",
     "proper-bassline-react": "workspace:*",
     "react": "^19.1.0",
@@ -43,6 +44,10 @@
     "react-konva": "^19.0.7",
     "react-router": "^7.7.1",
     "react-sounds": "^1.0.25",
+    "rete": "^2.0.0",
+    "rete-area-plugin": "^2.0.0",
+    "rete-connection-plugin": "^2.0.0",
+    "rete-react-plugin": "^2.0.0",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1"

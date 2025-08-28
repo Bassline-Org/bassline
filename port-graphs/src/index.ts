@@ -1,5 +1,7 @@
-import { DefaultRecord, GraphId, GadgetRecord, PortRecord, ConnectionRecord, FreePortRecord, GadgetId, GadgetPortRecord } from "./types"
-export { DefaultRecord, GraphId, GadgetRecord, PortRecord, ConnectionRecord, FreePortRecord, GadgetId, GadgetPortRecord }
+import { DefaultRecord, GraphId, GadgetRecord, PortRecord, ConnectionRecord, FreePortRecord, GadgetId, GadgetPortRecord, PortId, ConnectionId, DefaultRecordType } from "./types"
+
+// Re-export all types
+export { type DefaultRecord, type GraphId, type GadgetRecord, type PortRecord, type ConnectionRecord, type FreePortRecord, type GadgetId, type GadgetPortRecord, type PortId, type ConnectionId, type DefaultRecordType }
 
 export class PortGraph<RecordType extends DefaultRecord = DefaultRecord> {
   public records: Record<string, RecordType> = {}
