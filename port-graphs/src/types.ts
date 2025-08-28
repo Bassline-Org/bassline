@@ -23,15 +23,16 @@ export interface GadgetRecord extends DefaultRecord<'gadget'> {
 
 export type PortDirection = 'input' | 'output' | 'bidirectional'
 export type PortPosition = 'top' | 'bottom' | 'left' | 'right'
-export interface PortRecord extends DefaultRecord<'port'> {
+export interface PortRecord<ValueType extends JsonValue = JsonValue> extends DefaultRecord<'port'> {
     name: PortId,
+    portName: string,
     type: string,
     direction: PortDirection,
     position: PortPosition,
     // NOTE: Stub for "static types" for cells & functions
     //Mode?: 'pass-through' | 'trigger'
     gadget: GadgetId | null,
-    currentValue: JsonValue | null,
+    currentValue: ValueType | null,
 }
 
 export interface FreePortRecord extends PortRecord {

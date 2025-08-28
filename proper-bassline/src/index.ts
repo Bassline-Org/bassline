@@ -60,3 +60,6 @@ export { extractValue, getGadgetValue } from './value-helpers'
 
 // Query and View gadgets
 export { QueryGadget } from './query-gadget'
+
+// Port-graph interpreter
+export { PortGraphInterpreter, PRIMITIVES } from './interpreter'
