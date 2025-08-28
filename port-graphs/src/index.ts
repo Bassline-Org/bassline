@@ -52,10 +52,50 @@ export class PortGraph<RecordType extends DefaultRecord = DefaultRecord> {
   }
 
   validateLadder(gadgetId: GadgetId, ladderId: GraphId): boolean {
-      const gadgetPorts = new Set(this.getGadgetPorts(gadgetId).map(record => record.name))
+      const gadgetPorts = this.getGadgetPorts(gadgetId)
       const ladderGraph = this.getLadder(ladderId)
-      const ladderInterface = new Set(ladderGraph.interface.map(record => record.name))
-      return gadgetPorts.size === ladderInterface.size && (gadgetPorts.difference(ladderInterface).size === 0)
+      const ladderInterface = ladderGraph.interface
+      
+      if (gadgetPorts.length !== ladderInterface.length) return false
+      
+      // Check semantic properties match exactly
+      const gadgetPortsMap = new Map(gadgetPorts.map(p => [p.name, p]))
+      const interfacePortsMap = new Map(ladderInterface.map(p => [p.name, p]))
+      
+      // All gadget ports must have matching interface ports with same semantic properties
+      for (const [name, gadgetPort] of gadgetPortsMap) {
+          const interfacePort = interfacePortsMap.get(name)
+          if (!interfacePort) return false
+          if (gadgetPort.type !== interfacePort.type) return false
+          if (gadgetPort.direction !== interfacePort.direction) return false
+      }
+      
+      return true
+  }
+  
+  flatten(): Record<GraphId, Record<string, DefaultRecord>> {
+      const result: Record<GraphId, Record<string, DefaultRecord>> = {}
+      const visited = new Set<GraphId>()
+      
+      const collectGraph = (graphId: GraphId) => {
+          if (visited.has(graphId)) return
+          visited.add(graphId)
+          
+          const graph = this.registry.getGraph(graphId)
+          if (!graph) return
+          
+          result[graphId] = { ...graph.records } as Record<string, DefaultRecord>
+          
+          // Recursively collect all ladder graphs
+          for (const gadget of graph.gadgetRecords) {
+              if (gadget.ladder) {
+                  collectGraph(gadget.ladder)
+              }
+          }
+      }
+      
+      collectGraph(this.id)
+      return result
   }
 }
 

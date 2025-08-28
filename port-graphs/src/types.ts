@@ -20,11 +20,15 @@ export interface GadgetRecord extends DefaultRecord<'gadget'> {
     ladder: GraphId | null,
 }
 
+export type PortDirection = 'input' | 'output' | 'bidirectional'
+export type PortPosition = 'top' | 'bottom' | 'left' | 'right'
 export interface PortRecord extends DefaultRecord<'port'> {
     name: PortId,
     type: string,
-    direction: 'input' | 'output' | 'bidirectional',
-    position: 'top' | 'bottom' | 'left' | 'right',
+    direction: PortDirection,
+    position: PortPosition,
+    // NOTE: Stub for "static types" for cells & functions
+    //Mode?: 'pass-through' | 'trigger'
     gadget: GadgetId | null,
     currentValue: JsonValue | null,
 }
