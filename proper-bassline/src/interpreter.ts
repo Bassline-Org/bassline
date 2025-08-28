@@ -6,7 +6,7 @@
  */
 
 import { GraphId, GraphRegistry, PortGraph, PortRecord } from 'port-graphs'
-import { JsonValue, PortId } from 'port-graphs/src/types'
+import { JsonValue, PortId, GadgetRecord, GadgetId } from 'port-graphs/src/types'
 
 // Core types
 type PortMap = Record<string, PortRecord>
@@ -21,32 +21,57 @@ export type CellFn<T extends JsonValue> = (current: T, incoming: T) => T
 export type GadgetFn<In extends PrimitiveInputs = PrimitiveInputs, Out extends PrimitiveOutputs = PrimitiveOutputs> = (inputs: In) => Out
 
 
+// Port remapping configuration
+export type PortMapping<In, Out> = {
+  inputs?: Partial<Record<keyof In, string>>
+  outputs?: Partial<Record<keyof Out, string>>
+}
+
 // Combinator: Convert a GadgetFn into a Primitive
 export function gadget<In extends PrimitiveInputs, Out extends PrimitiveOutputs>(
-  fn: GadgetFn<In, Out>
+  fn: GadgetFn<In, Out>,
+  portMap?: PortMapping<In, Out>
 ): Primitive {
   return (inputs: PortMap, outputs: PortMap) => {
-    // Extract values from input ports
+    // Build input values with optional remapping
     const inputValues = {} as In
-    let hasAllRequiredInputs = true
     
+    if (portMap?.inputs) {
+      // Map custom port names to function parameters
+      for (const [paramName, portName] of Object.entries(portMap.inputs)) {
+        const port = inputs[portName as string]
+        if (port) {
+          inputValues[paramName as keyof In] = port.currentValue as In[keyof In]
+        }
+      }
+    }
+    
+    // Direct mapping for unmapped parameters
     for (const [portName, port] of Object.entries(inputs)) {
-      const value = port?.currentValue
-      if (value !== null && value !== undefined) {
-        inputValues[portName as keyof In] = value as In[keyof In]
-      } else {
-        // If any input is null/undefined, check if function can handle it
-        inputValues[portName as keyof In] = value as In[keyof In]
+      if (!portMap?.inputs || !Object.values(portMap.inputs).includes(portName)) {
+        inputValues[portName as keyof In] = port?.currentValue as In[keyof In]
       }
     }
     
     // Run the function
     const outputValues = fn(inputValues)
     
-    // Write to output ports
-    for (const [portName, value] of Object.entries(outputValues)) {
-      if (outputs[portName]) {
-        outputs[portName].currentValue = value
+    // Write to output ports with optional remapping
+    if (portMap?.outputs) {
+      for (const [resultKey, portName] of Object.entries(portMap.outputs)) {
+        const port = outputs[portName as string]
+        if (port && resultKey in outputValues) {
+          port.currentValue = outputValues[resultKey as keyof Out]
+        }
+      }
+    }
+    
+    // Direct mapping for unmapped outputs
+    for (const [resultKey, value] of Object.entries(outputValues)) {
+      if (!portMap?.outputs || !portMap.outputs[resultKey as keyof Out]) {
+        if (outputs[resultKey]) {
+          outputs[resultKey].currentValue = value
+        }
       }
     }
   }
@@ -71,100 +96,107 @@ export function cell<T extends JsonValue>(
 }
 
 
-// Helper: Create a GadgetFn with null checking
-export function primitiveFn<In extends PrimitiveInputs, Out extends PrimitiveOutputs>(
-  shouldRun: (inputs: In) => boolean,
-  body: (inputs: In) => Out
-): GadgetFn<In, Out> {
-  return (inputs: In) => {
-    if (shouldRun(inputs)) {
-      return body(inputs)
-    } else {
-      return {} as Out
+// Pure function definitions - no double wrapping!
+const add = ({a, b}: {a: number, b: number}) => {
+  if (a === null || a === undefined || b === null || b === undefined) return {}
+  return { result: a + b }
+}
+
+const multiply = ({a, b}: {a: number, b: number}) => {
+  if (a === null || a === undefined || b === null || b === undefined) return {}
+  return { result: a * b }
+}
+
+const subtract = ({minuend, subtrahend}: {minuend: number, subtrahend: number}) => {
+  if (minuend === null || minuend === undefined || subtrahend === null || subtrahend === undefined) return {}
+  return { result: minuend - subtrahend }
+}
+
+const divide = ({dividend, divisor}: {dividend: number, divisor: number}) => {
+  if (dividend === null || dividend === undefined || divisor === null || divisor === undefined || divisor === 0) return {}
+  return { result: dividend / divisor }
+}
+
+const negate = ({value}: {value: number}) => {
+  if (value === null || value === undefined) return {}
+  return { result: -value }
+}
+
+const equal = ({a, b}: {a: JsonValue, b: JsonValue}) => {
+  return { result: a === b }
+}
+
+const greaterThan = ({a, b}: {a: number, b: number}) => {
+  if (a === null || a === undefined || b === null || b === undefined) return {}
+  return { result: a > b }
+}
+
+const lessThan = ({a, b}: {a: number, b: number}) => {
+  if (a === null || a === undefined || b === null || b === undefined) return {}
+  return { result: a < b }
+}
+
+const gate = ({condition, value}: {condition: JsonValue, value: JsonValue}) => {
+  return { result: condition ? value : null }
+}
+
+// Cell reducer functions - pure and simple
+const maxCell = (current: number, incoming: number) => 
+  Math.max(current ?? -Infinity, incoming)
+
+const minCell = (current: number, incoming: number) => 
+  Math.min(current ?? Infinity, incoming)
+
+type OrdinalValue = { ordinal: number, value: JsonValue }
+
+const ordinalCell = (current: OrdinalValue | null, incoming: OrdinalValue | null): OrdinalValue | null => {
+  if (incoming && typeof incoming === 'object' && 'ordinal' in incoming) {
+    if (!current || !(typeof current === 'object' && 'ordinal' in current) || 
+        incoming.ordinal > current.ordinal) {
+      return incoming
     }
+  }
+  return current
+}
+
+const unionCell = (current: JsonValue[] | null, incoming: JsonValue): JsonValue[] => {
+  const currentSet = Array.isArray(current) ? current : []
+  
+  if (Array.isArray(incoming)) {
+    // If incoming is an array, union all elements
+    const union = new Set([...currentSet, ...incoming])
+    return Array.from(union)
+  } else {
+    // If incoming is a single value, add it to the set
+    const union = new Set([...currentSet, incoming])
+    return Array.from(union)
   }
 }
 
-export function handleNulls(inputs: PrimitiveInputs): boolean {
-  return Object.values(inputs).every(input => (input !== null && input !== undefined))
-}
-
-// Helper: Create a binary operation
-export function binaryOp(fn: (a: number, b: number) => number): GadgetFn<{a: number, b: number}, {result: number}> {
-  return primitiveFn(handleNulls, ({a, b}: {a: number, b: number}) => ({ result: fn(a, b) }))
-}
-
-// Numeric operations as GadgetFns
-export const numeric = {
-  add: binaryOp((a, b) => a + b),
-  multiply: binaryOp((a, b) => a * b),
-  subtract: primitiveFn(handleNulls, ({minuend, subtrahend}: {minuend: number, subtrahend: number}) => 
-    ({ result: minuend - subtrahend })
-  ),
-  divide: primitiveFn(
-    (inputs: {dividend: number, divisor: number}) => 
-      inputs.dividend !== null && inputs.dividend !== undefined &&
-      inputs.divisor !== null && inputs.divisor !== undefined && 
-      inputs.divisor !== 0,
-    ({dividend, divisor}) => ({ result: dividend / divisor })
-  ),
-  negate: primitiveFn(handleNulls, ({value}: {value: number}) => 
-    ({ result: -value })
-  ),
-}
 
 
-
-// Primitive registry using combinators
+// Primitive registry - clean and simple
 const PRIMITIVES: Record<string, Primitive> = {
   // Arithmetic
-  'Add': gadget(numeric.add),
-  'Multiply': gadget(numeric.multiply),
-  'Subtract': gadget(numeric.subtract),
-  'Divide': gadget(numeric.divide),
-  'Negate': gadget(numeric.negate),
+  'Add': gadget(add),
+  'Multiply': gadget(multiply),
+  'Subtract': gadget(subtract),
+  'Divide': gadget(divide),
+  'Negate': gadget(negate),
   
   // Lattice cells
-  'MaxCell': cell((current: number, incoming: number) => 
-    Math.max(current ?? -Infinity, incoming), -Infinity
-  ),
-  
-  'MinCell': cell((current: number, incoming: number) => 
-    Math.min(current ?? Infinity, incoming), Infinity
-  ),
-  
-  'OrdinalCell': cell((current: any, incoming: any) => {
-    if (incoming && typeof incoming === 'object' && 'ordinal' in incoming) {
-      if (!current || !(typeof current === 'object' && 'ordinal' in current) || 
-          incoming.ordinal > current.ordinal) {
-        return incoming
-      }
-    }
-    return current
-  }),
-  
-  'UnionCell': cell((current: JsonValue[], incoming: JsonValue[]) => {
-    if (!Array.isArray(current)) current = []
-    if (!Array.isArray(incoming)) return current
-    
-    const union = new Set([...current, ...incoming])
-    return Array.from(union)
-  }, []),
+  'MaxCell': cell(maxCell, -Infinity),
+  'MinCell': cell(minCell, Infinity),
+  'OrdinalCell': cell(ordinalCell),
+  'UnionCell': cell(unionCell, []),
   
   // Comparison
-  'Equal': gadget(primitiveFn(
-    ({a, b}: {a: JsonValue, b: JsonValue}) => a !== null && a !== undefined && b !== null && b !== undefined,
-    ({a, b}) => ({ result: a === b })
-  )),
-  
-  'GreaterThan': gadget(binaryOp((a, b) => a > b ? 1 : 0)),
-  'LessThan': gadget(binaryOp((a, b) => a < b ? 1 : 0)),
+  'Equal': gadget(equal),
+  'GreaterThan': gadget(greaterThan),
+  'LessThan': gadget(lessThan),
   
   // Control flow
-  'Gate': gadget(primitiveFn(
-    ({condition, value}: {condition: JsonValue, value: JsonValue}) => true,
-    ({condition, value}) => ({ result: condition ? value : null })
-  )),
+  'Gate': gadget(gate),
 }
 
 export class PortGraphInterpreter {
@@ -175,7 +207,7 @@ export class PortGraphInterpreter {
     const gadget = graph.records[gadgetId]
     if (!gadget || gadget.recordType !== 'gadget') return
     
-    const gadgetRecord = gadget as any  // Cast to GadgetRecord
+    const gadgetRecord = gadget as GadgetRecord
     if (!gadgetRecord.primitiveName) return
     
     const primitive = PRIMITIVES[gadgetRecord.primitiveName]
@@ -185,15 +217,16 @@ export class PortGraphInterpreter {
     }
     
     // Get all ports for this gadget
-    const ports = graph.getGadgetPorts(gadgetId as any)
+    const ports = graph.getGadgetPorts(gadgetId as GadgetId)
     
     // Build named input and output maps using portName field
     const inputs: PortMap = {}
     const outputs: PortMap = {}
     
     for (const port of ports) {
-      // Use portName field or extract from port ID
-      const portName = (port as any).portName || port.name.split('-').pop() || 'value'
+      // Use portName field for the human-readable name
+      const portRecord = port as PortRecord & { portName?: string }
+      const portName = portRecord.portName || 'value'
       
       if (port.direction === 'input') {
         // Update input port with value from connected source

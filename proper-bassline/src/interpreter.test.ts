@@ -29,6 +29,7 @@ describe('PortGraphInterpreter', () => {
       const portA: PortRecord = {
         name: 'port-add1-a' as PortId,
         recordType: 'port',
+        portName: 'a',
         type: 'number',
         direction: 'input',
         position: 'left',
@@ -38,6 +39,7 @@ describe('PortGraphInterpreter', () => {
       const portB: PortRecord = {
         name: 'port-add1-b' as PortId,
         recordType: 'port',
+        portName: 'b',
         type: 'number',
         direction: 'input',
         position: 'left',
@@ -47,6 +49,7 @@ describe('PortGraphInterpreter', () => {
       const portResult: PortRecord = {
         name: 'port-add1-result' as PortId,
         recordType: 'port',
+        portName: 'result',
         type: 'number',
         direction: 'output',
         position: 'right',
@@ -61,6 +64,7 @@ describe('PortGraphInterpreter', () => {
       const sourceA: PortRecord = {
         name: 'port-source-a' as PortId,
         recordType: 'port',
+        portName: 'sourceA',
         type: 'number',
         direction: 'output',
         position: 'right',
@@ -70,6 +74,7 @@ describe('PortGraphInterpreter', () => {
       const sourceB: PortRecord = {
         name: 'port-source-b' as PortId,
         recordType: 'port',
+        portName: 'sourceB',
         type: 'number',
         direction: 'output',
         position: 'right',
@@ -373,6 +378,7 @@ describe('PortGraphInterpreter', () => {
       const addPortA: PortRecord = {
         name: 'port-add-a' as PortId,
         recordType: 'port',
+        portName: 'a',
         type: 'number',
         direction: 'input',
         position: 'left',
@@ -382,6 +388,7 @@ describe('PortGraphInterpreter', () => {
       const addPortB: PortRecord = {
         name: 'port-add-b' as PortId,
         recordType: 'port',
+        portName: 'b',
         type: 'number',
         direction: 'input',
         position: 'left',
@@ -391,6 +398,7 @@ describe('PortGraphInterpreter', () => {
       const addPortResult: PortRecord = {
         name: 'port-add-result' as PortId,
         recordType: 'port',
+        portName: 'result',
         type: 'number',
         direction: 'output',
         position: 'right',
@@ -414,6 +422,7 @@ describe('PortGraphInterpreter', () => {
       const mulPortA: PortRecord = {
         name: 'port-mul-a' as PortId,
         recordType: 'port',
+        portName: 'a',
         type: 'number',
         direction: 'input',
         position: 'left',
@@ -423,6 +432,7 @@ describe('PortGraphInterpreter', () => {
       const mulPortB: PortRecord = {
         name: 'port-mul-b' as PortId,
         recordType: 'port',
+        portName: 'b',
         type: 'number',
         direction: 'input',
         position: 'left',
@@ -432,6 +442,7 @@ describe('PortGraphInterpreter', () => {
       const mulPortResult: PortRecord = {
         name: 'port-mul-result' as PortId,
         recordType: 'port',
+        portName: 'result',
         type: 'number',
         direction: 'output',
         position: 'right',
