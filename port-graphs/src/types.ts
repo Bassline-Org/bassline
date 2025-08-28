@@ -16,7 +16,8 @@ export interface DefaultRecord<T extends DefaultRecordType = DefaultRecordType> 
 
 export interface GadgetRecord extends DefaultRecord<'gadget'> {
     name: GadgetId,
-    type: string,
+    type: 'cell' | 'function',
+    primitiveName?: string,  // e.g., 'Add', 'Multiply', 'MaxCell', 'OrdinalCell'
     ladder: GraphId | null,
 }
 

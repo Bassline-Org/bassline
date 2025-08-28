@@ -7,7 +7,6 @@ import { AreaPlugin, AreaExtensions } from 'rete-area-plugin'
 import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin'
 import { Presets as ReactPresets } from 'rete-react-plugin'
 import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin'
-import { getDOMSocketPosition } from 'rete-render-utils'
 import { GraphRegistry, PortGraph } from 'port-graphs'
 import type { GadgetRecord, PortRecord, ConnectionRecord, GraphId, PortId, GadgetId, ConnectionId } from 'port-graphs'
 import { CustomPortGraphNode, CustomSocket } from '../components/CustomPortGraphNode'
@@ -18,15 +17,19 @@ const portSocket = new ClassicPreset.Socket('port')
 // Node class for visualizing gadgets with dimensions for auto-arrange
 class GadgetNode extends ClassicPreset.Node {
   gadgetId!: GadgetId
-  gadgetType: string = 'function'
+  gadgetType: 'cell' | 'function' = 'function'
+  primitiveName?: string
   hasLadder: boolean = false
   width = 180
   height = 120
   
-  constructor(gadgetId: GadgetId, label: string, type: string = 'function') {
+  constructor(gadgetId: GadgetId, label: string, type: 'cell' | 'function' = 'function', primitiveName?: string) {
     super(label)
     this.gadgetId = gadgetId
     this.gadgetType = type
+    if (primitiveName) {
+      this.primitiveName = primitiveName
+    }
   }
   
   // Calculate height based on number of ports
@@ -38,10 +41,8 @@ class GadgetNode extends ClassicPreset.Node {
     // Base height + height per port pair
     this.height = Math.max(120, 60 + (maxPorts * 35))
     
-    // Wider for certain types
-    if (this.gadgetType === 'aggregator' || this.gadgetType === 'splitter') {
-      this.width = 200
-    } else if (this.gadgetType === 'function' && (inputCount > 2 || outputCount > 2)) {
+    // Wider for functions with many ports
+    if (this.gadgetType === 'function' && (inputCount > 2 || outputCount > 2)) {
       this.width = 200
     }
   }
@@ -74,60 +75,28 @@ const createPortGraphEditor = (
   area.use(render)
   area.use(arrange)
   
-  // Configure socket position watcher for centered ports
-  const socketPositionWatcher = getDOMSocketPosition({
-    offset({ x, y }, nodeId, side, key) {
-      // Get the node to calculate port positioning
-      const node = editor.getNode(nodeId) as GadgetNode | undefined
-      if (!node) return { x, y }
-      
-      // Count ports on this side
-      const ports = side === 'input' ? node.inputs : node.outputs
-      const portCount = Object.keys(ports).length
-      const portKeys = Object.keys(ports)
-      const portIndex = portKeys.indexOf(key)
-      
-      if (portIndex === -1) return { x, y }
-      
-      // Calculate vertical centering
-      const nodeHeight = node.height || 120
-      const spacing = nodeHeight / (portCount + 1)
-      const yOffset = spacing * (portIndex + 1) - (nodeHeight / 2)
-      
-      return {
-        x: x + (side === 'input' ? -8 : 8), // Move slightly outside node
-        y: yOffset
-      }
-    }
-  })
-  
   // Add presets for rendering and arranging
   connection.addPreset(ConnectionPresets.classic.setup())
   render.addPreset(ReactPresets.classic.setup({
     customize: {
       node(context) {
         const node = context.payload as GadgetNode
-        // Return a component function that renders our custom node
-        return (props: any) => {
-          const selected = selector.entities.has(node.id)
-          return CustomPortGraphNode({
-            ...props,
-            data: {
-              ...props.data,
-              gadgetType: node.gadgetType,
-              width: node.width,
-              height: node.height,
-              hasLadder: node.hasLadder,
-              selected: selected
-            }
-          })
-        }
+        return (props: any) => CustomPortGraphNode({
+          ...props,
+          data: {
+            ...props.data,
+            gadgetType: node.gadgetType,
+            primitiveName: node.primitiveName,
+            width: node.width,
+            height: node.height,
+            hasLadder: node.hasLadder
+          }
+        })
       },
       socket() {
         return CustomSocket
       }
-    },
-    socketPositionWatcher
+    }
   }))
   arrange.addPreset(ArrangePresets.classic.setup())
   
@@ -186,7 +155,8 @@ const createPortGraphEditor = (
       const gadget: GadgetRecord = {
         name: node.gadgetId,
         recordType: 'gadget',
-        type: node.gadgetType || 'function',
+        type: node.gadgetType as 'cell' | 'function',
+        ...(node.primitiveName && { primitiveName: node.primitiveName }),
         ladder: null
       }
       currentGraph.addGadget(gadget as any)
@@ -313,7 +283,7 @@ const createPortGraphEditor = (
         const interfaceNode = new GadgetNode(
           `interface-${port.name}` as GadgetId,
           `🔌 ${portLabel}`,
-          'interface'
+          'cell'  // Use 'cell' as type for interface ports
         )
         interfaceNode.width = 140
         interfaceNode.height = 80
@@ -344,7 +314,7 @@ const createPortGraphEditor = (
       const labelParts = gadget.name.split('_')
       const label = labelParts.length > 1 ? labelParts.slice(0, -1).join('_') : gadget.name
       
-      const node = new GadgetNode(gadget.name, label, gadget.type)
+      const node = new GadgetNode(gadget.name, label, gadget.type, gadget.primitiveName)
       node.hasLadder = !!gadget.ladder
       
       // Add ports based on port records
@@ -451,9 +421,10 @@ export default function PortGraphEditor() {
   const [templateDescription, setTemplateDescription] = useState('')
   const [layoutAlgorithm, setLayoutAlgorithm] = useState('layered')
   const [selectedNodeCount, setSelectedNodeCount] = useState(0)
-  const [gadgetType, setGadgetType] = useState('function')
-  const [functionInputs, setFunctionInputs] = useState(2)
-  const [functionOutputs, setFunctionOutputs] = useState(1)
+  const [selectedPrimitive] = useState<{type: 'cell' | 'function', name: string}>({
+    type: 'cell',
+    name: 'OrdinalCell'
+  })
   
   // Initialize with main graph and load templates
   useEffect(() => {
@@ -564,84 +535,54 @@ export default function PortGraphEditor() {
     }
   }
   
-  // Add new gadget with dynamic ports based on type
-  const addGadget = async () => {
+  // Add new gadget with dynamic ports based on primitive
+  const addGadget = async (primitive?: {type: 'cell' | 'function', name: string}) => {
     if (!editor) return
+    
+    // Use provided primitive or fall back to selected state
+    const primitiveToUse = primitive || selectedPrimitive
     
     const timestamp = Date.now().toString().slice(-6)
     const id = `gadget-${Date.now()}` as GadgetId
     
-    // Create meaningful labels based on type
-    let label = ''
-    switch (gadgetType) {
-      case 'cell':
-        label = `Cell_${timestamp}`
-        break
-      case 'function':
-        label = `Fn(${functionInputs}→${functionOutputs})_${timestamp}`
-        break
-      case 'aggregator':
-        label = `Aggregate_${timestamp}`
-        break
-      case 'splitter':
-        label = `Split_${timestamp}`
-        break
-      case 'passthrough':
-        label = `Pass_${timestamp}`
-        break
-      default:
-        label = `${gadgetType}_${timestamp}`
-    }
+    // Create label with primitive name
+    const label = `${primitiveToUse.name}_${timestamp}`
     
-    const node = new GadgetNode(id, label, gadgetType)
+    const node = new GadgetNode(id, label, primitiveToUse.type, primitiveToUse.name)
     
-    // Add ports based on gadget type
-    switch (gadgetType) {
-      case 'cell':
-        // Cells have multiple inputs, one output
-        node.addInput('in1', new ClassicPreset.Input(portSocket, 'In 1'))
-        node.addInput('in2', new ClassicPreset.Input(portSocket, 'In 2'))
-        node.addOutput('out', new ClassicPreset.Output(portSocket, 'Output'))
-        break
-        
-      case 'function':
-        // Functions have configurable inputs/outputs
-        for (let i = 0; i < functionInputs; i++) {
-          const portName = String.fromCharCode(97 + i) // a, b, c...
-          node.addInput(portName, new ClassicPreset.Input(portSocket, portName.toUpperCase()))
-        }
-        for (let i = 0; i < functionOutputs; i++) {
-          const portName = functionOutputs === 1 ? 'result' : `out${i + 1}`
-          node.addOutput(portName, new ClassicPreset.Output(portSocket, portName))
-        }
-        break
-        
-      case 'aggregator':
-        // Aggregators have many inputs, one output
-        for (let i = 1; i <= 4; i++) {
-          node.addInput(`in${i}`, new ClassicPreset.Input(portSocket, `In ${i}`))
-        }
-        node.addOutput('aggregate', new ClassicPreset.Output(portSocket, 'Aggregate'))
-        break
-        
-      case 'splitter':
-        // Splitters have one input, many outputs
-        node.addInput('input', new ClassicPreset.Input(portSocket, 'Input'))
-        for (let i = 1; i <= 3; i++) {
-          node.addOutput(`out${i}`, new ClassicPreset.Output(portSocket, `Out ${i}`))
-        }
-        break
-        
-      case 'passthrough':
-        // Pass-through has bidirectional ports
-        node.addInput('in', new ClassicPreset.Input(portSocket, 'In'))
-        node.addOutput('out', new ClassicPreset.Output(portSocket, 'Out'))
-        break
-        
-      default:
-        // Default: simple input/output
-        node.addInput('in', new ClassicPreset.Input(portSocket, 'Input'))
-        node.addOutput('out', new ClassicPreset.Output(portSocket, 'Output'))
+    // Add ports based on primitive type
+    if (primitiveToUse.type === 'cell') {
+      // Cells have multiple inputs, one output
+      node.addInput('in1', new ClassicPreset.Input(portSocket, 'In 1'))
+      node.addInput('in2', new ClassicPreset.Input(portSocket, 'In 2'))
+      node.addOutput('value', new ClassicPreset.Output(portSocket, 'Value'))
+    } else {
+      // Functions - ports based on primitive name
+      switch (primitiveToUse.name) {
+        case 'Add':
+        case 'Multiply':
+        case 'Subtract':
+        case 'Divide':
+        case 'Equal':
+        case 'GreaterThan':
+          // Binary operations
+          node.addInput('a', new ClassicPreset.Input(portSocket, 'A'))
+          node.addInput('b', new ClassicPreset.Input(portSocket, 'B'))
+          node.addOutput('result', new ClassicPreset.Output(portSocket, 'Result'))
+          break
+          
+        case 'Gate':
+          // Conditional pass-through
+          node.addInput('value', new ClassicPreset.Input(portSocket, 'Value'))
+          node.addInput('condition', new ClassicPreset.Input(portSocket, 'Condition'))
+          node.addOutput('result', new ClassicPreset.Output(portSocket, 'Result'))
+          break
+          
+        default:
+          // Default function: simple input/output
+          node.addInput('input', new ClassicPreset.Input(portSocket, 'Input'))
+          node.addOutput('output', new ClassicPreset.Output(portSocket, 'Output'))
+      }
     }
     
     // Update node size based on ports
@@ -965,53 +906,78 @@ export default function PortGraphEditor() {
         </div>
         
         {/* Gadget Creation */}
-        <div className="border rounded p-2 space-y-2 mb-4">
+        <div className="border rounded p-2 space-y-2 mb-4 max-h-96 overflow-y-auto">
           <label className="block text-sm font-medium">Create Gadget</label>
-          <select
-            value={gadgetType}
-            onChange={(e) => setGadgetType(e.target.value)}
-            className="w-full px-2 py-1 border rounded text-sm"
-          >
-            <option value="cell">Cell (merge)</option>
-            <option value="function">Function</option>
-            <option value="aggregator">Aggregator</option>
-            <option value="splitter">Splitter</option>
-            <option value="passthrough">Pass-through</option>
-          </select>
           
-          {gadgetType === 'function' && (
-            <div className="space-y-2">
-              <div>
-                <label className="text-xs">Inputs ({functionInputs})</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="6"
-                  value={functionInputs}
-                  onChange={(e) => setFunctionInputs(parseInt(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-              <div>
-                <label className="text-xs">Outputs ({functionOutputs})</label>
-                <input
-                  type="range"
-                  min="1"
-                  max="4"
-                  value={functionOutputs}
-                  onChange={(e) => setFunctionOutputs(parseInt(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-            </div>
-          )}
+          {/* Cell primitives */}
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-purple-600">Cells:</div>
+            <button
+              onClick={() => addGadget({type: 'cell', name: 'OrdinalCell'})}
+              className="w-full px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded text-sm text-left"
+            >
+              OrdinalCell
+            </button>
+            <button
+              onClick={() => addGadget({type: 'cell', name: 'MaxCell'})}
+              className="w-full px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded text-sm text-left"
+            >
+              MaxCell
+            </button>
+            <button
+              onClick={() => addGadget({type: 'cell', name: 'MinCell'})}
+              className="w-full px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded text-sm text-left"
+            >
+              MinCell
+            </button>
+          </div>
           
-          <button
-            onClick={addGadget}
-            className="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Add {gadgetType}
-          </button>
+          {/* Function primitives */}
+          <div className="space-y-1">
+            <div className="text-xs font-semibold text-green-600">Functions:</div>
+            <button
+              onClick={() => addGadget({type: 'function', name: 'Add'})}
+              className="w-full px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm text-left"
+            >
+              Add (a + b)
+            </button>
+            <button
+              onClick={() => addGadget({type: 'function', name: 'Multiply'})}
+              className="w-full px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm text-left"
+            >
+              Multiply (a × b)
+            </button>
+            <button
+              onClick={() => addGadget({type: 'function', name: 'Subtract'})}
+              className="w-full px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm text-left"
+            >
+              Subtract (a - b)
+            </button>
+            <button
+              onClick={() => addGadget({type: 'function', name: 'Divide'})}
+              className="w-full px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm text-left"
+            >
+              Divide (a ÷ b)
+            </button>
+            <button
+              onClick={() => addGadget({type: 'function', name: 'Gate'})}
+              className="w-full px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm text-left"
+            >
+              Gate (conditional)
+            </button>
+            <button
+              onClick={() => addGadget({type: 'function', name: 'Equal'})}
+              className="w-full px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm text-left"
+            >
+              Equal (a == b)
+            </button>
+            <button
+              onClick={() => addGadget({type: 'function', name: 'GreaterThan'})}
+              className="w-full px-2 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded text-sm text-left"
+            >
+              GreaterThan (a &gt; b)
+            </button>
+          </div>
         </div>
         
         {/* Actions */}
