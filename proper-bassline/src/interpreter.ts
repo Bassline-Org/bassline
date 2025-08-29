@@ -14,7 +14,7 @@ export type PrimitiveInputs = Record<string, JsonValue>
 export type PrimitiveOutputs = Record<string, JsonValue>
 
 // A Primitive is just a function that operates on port maps
-export type Primitive = (inputs: PortMap, outputs: PortMap) => void
+export type Primitive = (inputs: PortMap, outputs: PortMap, interpreter?: PortGraphInterpreter, graph?: PortGraph) => void
 
 // Similar to a reducer fn
 export type CellFn<T extends JsonValue> = (current: T, incoming: T) => T
@@ -27,19 +27,23 @@ export type PortMapping<In, Out> = {
   outputs?: Partial<Record<keyof Out, string>>
 }
 
-// Combinator: Convert a GadgetFn into a Primitive
+// Combinator: Convert a GadgetFn into a Primitive  
 export function gadget<In extends PrimitiveInputs, Out extends PrimitiveOutputs>(
   fn: GadgetFn<In, Out>,
   portMap?: PortMapping<In, Out>
 ): Primitive {
-  return (inputs: PortMap, outputs: PortMap) => {
+  return (inputs: PortMap, outputs: PortMap, interpreter?: PortGraphInterpreter, graph?: PortGraph) => {
     // Build input values with optional remapping
     const inputValues = {} as In
     
     if (portMap?.inputs) {
       // Map custom port names to function parameters
       for (const [paramName, portName] of Object.entries(portMap.inputs)) {
-        const port = inputs[portName as string]
+        if (!portName) {
+          console.warn(`Port mapping for ${paramName} is undefined`)
+          continue
+        }
+        const port = inputs[portName]
         if (port) {
           inputValues[paramName as keyof In] = port.currentValue as In[keyof In]
         }
@@ -56,21 +60,24 @@ export function gadget<In extends PrimitiveInputs, Out extends PrimitiveOutputs>
     // Run the function
     const outputValues = fn(inputValues)
     
-    // Write to output ports with optional remapping
-    if (portMap?.outputs) {
-      for (const [resultKey, portName] of Object.entries(portMap.outputs)) {
-        const port = outputs[portName as string]
-        if (port && resultKey in outputValues) {
-          port.currentValue = outputValues[resultKey as keyof Out]
+    // Write to output ports using setPortValue for equality checking
+    if (interpreter && graph) {
+      if (portMap?.outputs) {
+        for (const [resultKey, portName] of Object.entries(portMap.outputs)) {
+          const port = outputs[portName as string]
+          if (port && resultKey in outputValues) {
+            interpreter.setPortValue(graph.id, port.name, outputValues[resultKey as keyof Out])
+          }
         }
       }
-    }
-    
-    // Direct mapping for unmapped outputs
-    for (const [resultKey, value] of Object.entries(outputValues)) {
-      if (!portMap?.outputs || !portMap.outputs[resultKey as keyof Out]) {
-        if (outputs[resultKey]) {
-          outputs[resultKey].currentValue = value
+      
+      // Direct mapping for unmapped outputs
+      for (const [resultKey, value] of Object.entries(outputValues)) {
+        if (!portMap?.outputs || !portMap.outputs[resultKey as keyof Out]) {
+          const port = outputs[resultKey]
+          if (port) {
+            interpreter.setPortValue(graph.id, port.name, value)
+          }
         }
       }
     }
@@ -82,14 +89,14 @@ export function cell<T extends JsonValue>(
   reducer: CellFn<T>,
   seed?: T
 ): Primitive {
-  return (inputs: PortMap, outputs: PortMap) => {
+  return (inputs: PortMap, outputs: PortMap, interpreter?: PortGraphInterpreter, graph?: PortGraph) => {
     const incoming = inputs['value']?.currentValue as T
     const current = outputs['value']?.currentValue as T
     
     if (incoming !== null && incoming !== undefined) {
       const newValue = reducer(current ?? seed ?? (null as any), incoming)
-      if (outputs['value']) {
-        outputs['value'].currentValue = newValue
+      if (newValue !== current && (interpreter && graph)) {
+        interpreter.setPortValue(graph.id, outputs['value'].name, newValue)
       }
     }
   }
@@ -203,21 +210,29 @@ export class PortGraphInterpreter {
   constructor(private registry: GraphRegistry) {}
   
   // Run a gadget
-  runGadget(graph: PortGraph, gadgetId: string) {
+  private runGadget(graph: PortGraph, gadgetId: GadgetId) {
+    console.log('Running gadget: ', gadgetId)
     const gadget = graph.records[gadgetId]
-    if (!gadget || gadget.recordType !== 'gadget') return
+    if (!gadget || gadget.recordType !== 'gadget') {
+      console.warn(`Gadget ${gadgetId} not found`)
+      return
+    }
     
     const gadgetRecord = gadget as GadgetRecord
-    if (!gadgetRecord.primitiveName) return
+    if (!gadgetRecord.primitiveName) {
+      console.warn(`Gadget ${gadgetId} has no primitive name`)
+      return
+    }
     
     const primitive = PRIMITIVES[gadgetRecord.primitiveName]
+    console.log('Primitive: ', primitive)
     if (!primitive) {
       console.warn(`Unknown primitive: ${gadgetRecord.primitiveName}`)
       return
     }
     
     // Get all ports for this gadget
-    const ports = graph.getGadgetPorts(gadgetId as GadgetId)
+    const ports = graph.getGadgetPorts(gadgetId)
     
     // Build named input and output maps using portName field
     const inputs: PortMap = {}
@@ -225,61 +240,46 @@ export class PortGraphInterpreter {
     
     for (const port of ports) {
       // Use portName field for the human-readable name
-      const portRecord = port as PortRecord & { portName?: string }
-      const portName = portRecord.portName || 'value'
+      const portRecord = port
+      const portName = portRecord.portName
       
       if (port.direction === 'input') {
-        // Update input port with value from connected source
-        const connection = graph.connectionRecords.find(c => c.target === port.name)
-        if (connection) {
-          const sourcePort = graph.records[connection.source] as PortRecord
-          if (sourcePort) {
-            port.currentValue = sourcePort.currentValue
-          }
-        }
-        // Input port keeps its currentValue if not connected
         inputs[portName] = port
       } else {
         outputs[portName] = port
       }
     }
-    
-    // Just call the primitive - it's a function!
-    primitive(inputs, outputs)
-    
-    // Propagate from output ports
-    for (const port of Object.values(outputs)) {
-      this.propagateFromPort(graph, port.name)
-    }
-  }
-  
-  // When a port value changes, trigger connected gadgets
-  propagateFromPort(graph: PortGraph, portId: string) {
-    const connections = graph.connectionRecords.filter(c => c.source === portId)
-    
-    for (const conn of connections) {
-      const targetPort = graph.records[conn.target] as PortRecord
-      if (targetPort?.gadget) {
-        this.runGadget(graph, targetPort.gadget)
-      }
-    }
+    // Run the primitive - pass interpreter and graph for setPortValue
+    primitive(inputs, outputs, this, graph)
   }
   
   // Set a value on a port and trigger propagation
-  setPortValue(graphId: GraphId, portId: string, value: any) {
+  setPortValue(graphId: GraphId, portId: PortId, value: JsonValue) {
     const graph = this.registry.getGraph(graphId)
-    if (!graph) return
+    if (!graph) {
+      console.warn('Graph not found', graphId)
+    }
     
-    const port = graph.records[portId] as PortRecord
+    const port = graph.getPortRecord(portId)
     if (port) {
+      if (port.currentValue === value) {
+        console.log('Port value not changed', portId, value)
+        return
+      }
+      console.log(`Setting port value: ${portId} = ${value} from ${port.currentValue}`)
       port.currentValue = value
       
       // If this port belongs to a gadget, run it
       if (port.gadget) {
+        console.log('Running gadget', port.gadget)
         this.runGadget(graph, port.gadget)
       } else {
-        // Free port - just propagate
-        this.propagateFromPort(graph, portId)
+        console.log('Propagating from port', portId, value)
+        const connections = graph.getEdgeRecords().filter(c => c.source === portId)
+    
+        for (const conn of connections) {
+          this.setPortValue(graph.id, conn.target, value)
+        }
       }
     }
   }
