@@ -1,48 +1,112 @@
-import { DefaultRecord, GraphId, GadgetRecord, PortRecord, ConnectionRecord, FreePortRecord, GadgetId, GadgetPortRecord, PortId, ConnectionId, DefaultRecordType } from "./types"
+import { DefaultRecord, GraphId, GadgetRecord, PortRecord, ConnectionRecord, FreePortRecord, GadgetId, GadgetPortRecord, PortId, ConnectionId, DefaultRecordType, PortDirection, JsonValue } from "./types"
 
 // Re-export all types
 export { type DefaultRecord, type GraphId, type GadgetRecord, type PortRecord, type ConnectionRecord, type FreePortRecord, type GadgetId, type GadgetPortRecord, type PortId, type ConnectionId, type DefaultRecordType }
 
-export class PortGraph<RecordType extends DefaultRecord = DefaultRecord> {
-  public records: Record<string, RecordType> = {}
+export class PortGraph {
+  public records: Record<string, DefaultRecord> = {}
   constructor(public registry: GraphRegistry, public id: GraphId) {}
-  addGadget(gadget: GadgetRecord & RecordType): GadgetRecord {
+
+  addGadget(inputs: {name: GadgetId, primitiveName: string, ladder: GraphId | null}) {
+    const gadget: GadgetRecord = {
+      ...inputs,
+      recordType: 'gadget',
+      type: 'function',
+    }
+    this.addGadgetRecord(gadget)
+    return gadget
+  }
+
+  addCell(inputs: {name: GadgetId, primitiveName: string, ladder?: GraphId | null}) {
+    const cell: GadgetRecord = {
+      ...inputs,
+      recordType: 'gadget',
+      ladder: inputs.ladder || null,
+      type: 'cell',
+    }
+    this.addGadgetRecord(cell)
+    return cell
+  }
+
+  addPort(inputs: {name: PortId, portName: string, type: string, direction: PortDirection, gadget: GadgetId, currentValue?: JsonValue}) {
+    const port: PortRecord = {
+      ...inputs,
+      recordType: 'port',
+      position: 'top',
+      currentValue: inputs.currentValue || null,
+    }
+    this.addPortRecord(port)
+    return port
+  }
+  addEdge(inputs: {name: ConnectionId, source: PortId, target: PortId}) {
+    const edge: ConnectionRecord = {
+      ...inputs,
+      recordType: 'connection',
+    }
+    this.addEdgeRecord(edge)
+    return edge
+  }
+
+  private addGadgetRecord(gadget: GadgetRecord): GadgetRecord {
       this.records[gadget.name] = gadget
       return gadget
   }
-  addPort(port: PortRecord & RecordType): PortRecord {
+  private addPortRecord(port: PortRecord): PortRecord {
       this.records[port.name] = port
       return port
   }
-  addEdge(edge: ConnectionRecord & RecordType): ConnectionRecord {
+  private addEdgeRecord(edge: ConnectionRecord): ConnectionRecord {
       this.records[edge.name] = edge
       return edge
   }
 
   // Queries
-  get portRecords(): (PortRecord & RecordType)[] {
-      return Object.values(this.records).filter(record => record.recordType === 'port') as (PortRecord & RecordType)[]
+  private getPortRecords(): PortRecord[] {
+    return Object.values(this.records).filter(record => record.recordType === 'port') as PortRecord[]
   }
-  get gadgetRecords(): (GadgetRecord & RecordType)[] {
-      return Object.values(this.records).filter(record => record.recordType === 'gadget') as (GadgetRecord & RecordType)[]
+  private getGadgetRecords(): GadgetRecord[] {
+    return Object.values(this.records).filter(record => record.recordType === 'gadget') as GadgetRecord[]
   }
-  get connectionRecords(): (ConnectionRecord & RecordType)[] {
-      return Object.values(this.records).filter(record => record.recordType === 'connection') as (ConnectionRecord & RecordType)[]
-  }
-  get ladders(): (GraphId | null)[] {
-      return this.gadgetRecords.map(record => record.ladder)
-  }
-  get interface(): (FreePortRecord & RecordType)[] {
-      const connectedPorts = new Set(this.connectionRecords.flatMap(record => [record.source, record.target]));
-      return this.portRecords.filter(record => !connectedPorts.has(record.name)) as (FreePortRecord & RecordType)[]
+  private getConnectionRecords(): ConnectionRecord[] {
+    return Object.values(this.records).filter(record => record.recordType === 'connection') as ConnectionRecord[]
   }
 
-  getGadgetPorts(name: GadgetId): (GadgetPortRecord & RecordType)[] {
-      const gadget = this.records[name] as GadgetRecord & RecordType
+  getPortRecord(name: PortId): PortRecord {
+    const port = this.records[name]
+    if(!port || port.recordType !== 'port') {
+      throw new Error(`Port ${name} not found`)
+    }
+    return port as PortRecord
+  }
+
+  getGadgetRecord(name: GadgetId): GadgetRecord {
+    const gadget = this.records[name]
+    if(!gadget || gadget.recordType !== 'gadget') {
+      throw new Error(`Gadget ${name} not found`)
+    }
+    return gadget as GadgetRecord
+  }
+  getConnectionRecord(name: ConnectionId): ConnectionRecord {
+    const connection = this.records[name]
+    if(!connection || connection.recordType !== 'connection') {
+      throw new Error(`Connection ${name} not found`)
+    }
+    return connection as ConnectionRecord
+  }
+  getLadders(): (GraphId | null)[] {
+    return this.getGadgetRecords().filter(record => record.ladder).map((record: GadgetRecord) => record.ladder)
+  }
+  get interface(): (FreePortRecord)[] {
+      const connectedPorts = new Set(this.getConnectionRecords().flatMap(record => [record.source, record.target]));
+      return this.getPortRecords().filter(record => !connectedPorts.has(record.name)) as (FreePortRecord)[]
+  }
+
+  getGadgetPorts(name: GadgetId): (GadgetPortRecord)[] {
+      const gadget = this.getGadgetRecord(name)
       if(!gadget) {
           throw new Error(`Gadget ${name} not found`)
       }
-      return this.portRecords.filter(record => record.gadget === name) as (GadgetPortRecord & RecordType)[]
+      return this.getPortRecords().filter(record => record.gadget === name) as GadgetPortRecord[]
   }
 
   getLadder(id: GraphId): PortGraph {
@@ -86,10 +150,10 @@ export class PortGraph<RecordType extends DefaultRecord = DefaultRecord> {
           const graph = this.registry.getGraph(graphId)
           if (!graph) return
           
-          result[graphId] = { ...graph.records } as Record<string, DefaultRecord>
+          result[graphId] = { ...graph.records }
           
           // Recursively collect all ladder graphs
-          for (const gadget of graph.gadgetRecords) {
+          for (const gadget of graph.getGadgetRecords()) {
               if (gadget.ladder) {
                   collectGraph(gadget.ladder)
               }

@@ -9,22 +9,24 @@ export type GadgetId = `gadget-${string}`
 export type ConnectionId = `connection-${string}`
 
 export type DefaultRecordType = 'gadget' | 'port' | 'connection'
-export interface DefaultRecord<T extends DefaultRecordType = DefaultRecordType> {
+export interface DefaultRecord {
     name: string,
-    recordType: T,
+    recordType: DefaultRecordType,
 }
 
-export interface GadgetRecord extends DefaultRecord<'gadget'> {
+export interface GadgetRecord extends DefaultRecord {
     name: GadgetId,
+    recordType: 'gadget',
     type: 'cell' | 'function',
-    primitiveName?: string,  // e.g., 'Add', 'Multiply', 'MaxCell', 'OrdinalCell'
+    primitiveName: string | null,  // e.g., 'Add', 'Multiply', 'MaxCell', 'OrdinalCell'
     ladder: GraphId | null,
 }
 
 export type PortDirection = 'input' | 'output' | 'bidirectional'
 export type PortPosition = 'top' | 'bottom' | 'left' | 'right'
-export interface PortRecord<ValueType extends JsonValue = JsonValue> extends DefaultRecord<'port'> {
+export interface PortRecord<ValueType extends JsonValue = JsonValue> extends DefaultRecord {
     name: PortId,
+    recordType: 'port',
     portName: string,
     type: string,
     direction: PortDirection,
@@ -43,8 +45,9 @@ export interface GadgetPortRecord extends PortRecord {
     gadget: GadgetId,
 }
 
-export interface ConnectionRecord extends DefaultRecord<'connection'> {
+export interface ConnectionRecord extends DefaultRecord {
     name: ConnectionId,
+    recordType: 'connection',
     source: PortId,
     target: PortId,
 }
