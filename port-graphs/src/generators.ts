@@ -1,56 +1,37 @@
 // Simple propagation network leveraging MAIC properties
 import { PortId, JsonValue, GadgetId, ConnectionId } from "./types"
+import { defaultCellFunctions } from "./default-cell-functions"
+import { defaultPropagatorFunctions } from "./default-propagator-functions"
 
 // Network container class - manages objects, not IDs
 class Network {
-    private ports = new Map<PortId, Port<JsonValue>>()
-    private cells = new Map<GadgetId, Cell<JsonValue>>()
-    private propagators = new Map<GadgetId, Propagator>()
+    private gadgets = new Map<GadgetId, Gadget>()
     private connections = new Map<ConnectionId, { source: Port<JsonValue>, target: Port<JsonValue> }>()
     private cellFunctionRegistry = new Map<string, (current: JsonValue | undefined, incoming: JsonValue) => JsonValue>()
     private propagatorFunctionRegistry = new Map<string, (...args: JsonValue[]) => JsonValue>()
     public attributes: Record<string, unknown> = {}
     
-    constructor(attributes: Record<string, unknown> = {}) {
+    constructor(
+        attributes: Record<string, unknown> = {},
+        cellFunctions: Array<{ name: string, fn: (current: JsonValue | undefined, incoming: JsonValue) => JsonValue }> = [],
+        propagatorFunctions: Array<{ name: string, fn: (...args: JsonValue[]) => JsonValue }> = []
+    ) {
         this.attributes = attributes
-        // Register some default cell functions
-        this.registerCellFunction('max', (current: JsonValue | undefined, incoming: JsonValue) => {
-            if (typeof current === 'number' && typeof incoming === 'number') {
-                return current === undefined ? incoming : Math.max(current, incoming)
-            }
-            return incoming
-        })
-        this.registerCellFunction('min', (current: JsonValue | undefined, incoming: JsonValue) => {
-            if (typeof current === 'number' && typeof incoming === 'number') {
-                return current === undefined ? incoming : Math.min(current, incoming)
-            }
-            return incoming
+        this.loadDefaultFunctions(cellFunctions, propagatorFunctions)
+    }
+    
+    private loadDefaultFunctions(
+        cellFunctions: Array<{ name: string, fn: (current: JsonValue | undefined, incoming: JsonValue) => JsonValue }>,
+        propagatorFunctions: Array<{ name: string, fn: (...args: JsonValue[]) => JsonValue }>
+    ): void {
+        // Load cell functions
+        cellFunctions.forEach(({ name, fn }) => {
+            this.registerCellFunction(name, fn)
         })
         
-        // Register some default propagator functions
-        this.registerPropagatorFunction('add', (a: JsonValue, b: JsonValue) => {
-            if (typeof a === 'number' && typeof b === 'number') {
-                return a + b
-            }
-            return 0
-        })
-        this.registerPropagatorFunction('multiply', (a: JsonValue, b: JsonValue) => {
-            if (typeof a === 'number' && typeof b === 'number') {
-                return a * b
-            }
-            return 0
-        })
-        this.registerPropagatorFunction('or', (a: JsonValue, b: JsonValue) => {
-            if (typeof a === 'boolean' && typeof b === 'boolean') {
-                return a || b
-            }
-            return false
-        })
-        this.registerPropagatorFunction('and', (a: JsonValue, b: JsonValue) => {
-            if (typeof a === 'boolean' && typeof b === 'boolean') {
-                return a && b
-            }
-            return false
+        // Load propagator functions
+        propagatorFunctions.forEach(({ name, fn }) => {
+            this.registerPropagatorFunction(name, fn)
         })
     }
     
@@ -71,46 +52,42 @@ class Network {
         return this.propagatorFunctionRegistry.get(name)
     }
     
-    addPort(port: Port<JsonValue>): void {
-        this.ports.set(port.getId(), port)
-    }
-    
-    addCell(cell: Cell<JsonValue>, gadgetId: GadgetId): void {
-        this.cells.set(gadgetId, cell)
-        cell.attributes['gadgetId'] = gadgetId
-        this.addPort(cell.getOutputPort())
-    }
-    
-    addPropagator(propagator: Propagator, gadgetId: GadgetId): void {
-        this.propagators.set(gadgetId, propagator)
-        propagator.attributes['gadgetId'] = gadgetId
-        this.addPort(propagator.getOutputPort())
-        propagator.getInputPorts().forEach(port => this.addPort(port))
-    }
-    
-    getPort(portId: PortId): Port<JsonValue> | undefined {
-        return this.ports.get(portId)
+    // Simple add method - no ID management needed
+    add(gadget: Gadget): void {
+        this.gadgets.set(gadget.id, gadget)
     }
     
     // Connect ports directly - no ID lookup needed
-    connect(sourcePort: Port<JsonValue>, targetPort: Port<JsonValue>, connectionId?: ConnectionId): void {
-        const id = connectionId || `connection-${sourcePort.getId()}-${targetPort.getId()}` as ConnectionId
+    connect(sourcePort: Port<JsonValue>, targetPort: Port<JsonValue>): void {
+        const id = `connection-${sourcePort.id}-${targetPort.id}` as ConnectionId
         this.connections.set(id, { source: sourcePort, target: targetPort })
         sourcePort.connect(targetPort)
     }
     
+    // Get all gadgets of a specific type
+    getGadgets<T extends Gadget>(type: new (...args: any[]) => T): T[] {
+        return Array.from(this.gadgets.values()).filter(g => g instanceof type) as T[]
+    }
+    
+    // Helper to find ports across all gadgets
+    findPort(portId: PortId): Port<JsonValue> | undefined {
+        for (const gadget of this.gadgets.values()) {
+            if (gadget.hasPort(portId)) {
+                return gadget.getPort(portId)
+            }
+        }
+        return undefined
+    }
+    
     // Serialization
-    static fromRecord(record: Record<string, unknown>): Network {
-        const network = new Network(record['attributes'] as Record<string, unknown>)
+    static fromRecord(
+        record: Record<string, unknown>,
+        cellFunctions: Array<{ name: string, fn: (current: JsonValue | undefined, incoming: JsonValue) => JsonValue }> = [],
+        propagatorFunctions: Array<{ name: string, fn: (...args: JsonValue[]) => JsonValue }> = []
+    ): Network {
+        const network = new Network(record['attributes'] as Record<string, unknown>, cellFunctions, propagatorFunctions)
         
-        // Create ports first
-        const ports = record['ports'] as Array<Record<string, unknown>> || []
-        ports.forEach((portRecord) => {
-            const port = Port.fromRecord(portRecord)
-            network.addPort(port)
-        })
-        
-        // Create gadgets (cells and propagators)
+        // Create gadgets first (they'll create their own ports)
         const gadgets = record['gadgets'] as Array<Record<string, unknown>> || []
         gadgets.forEach((gadgetRecord) => {
             if (gadgetRecord['type'] === 'cell') {
@@ -123,51 +100,66 @@ class Network {
         // Create connections
         const connections = record['connections'] as Array<Record<string, unknown>> || []
         connections.forEach((connRecord) => {
-            const sourcePort = network.getPort(connRecord['source'] as PortId)
-            const targetPort = network.getPort(connRecord['target'] as PortId)
+            const sourcePort = network.findPort(connRecord['source'] as PortId)
+            const targetPort = network.findPort(connRecord['target'] as PortId)
             if (sourcePort && targetPort) {
-                network.connect(sourcePort, targetPort, connRecord['name'] as ConnectionId)
+                network.connect(sourcePort, targetPort)
             }
         })
         
         return network
     }
     
-    toRecord(): any {
+    // Convenience method to create a Network with default functions
+    static withDefaults(attributes: Record<string, unknown> = {}): Network {
+        return new Network(attributes, defaultCellFunctions, defaultPropagatorFunctions)
+    }
+    
+    toRecord(): Record<string, unknown> {
         return {
-            ports: Array.from(this.ports.values()).map(port => port.toRecord()),
-            gadgets: [
-                ...Array.from(this.cells.values()).map(cell => cell.toRecord()),
-                ...Array.from(this.propagators.values()).map(prop => prop.toRecord())
-            ],
+            gadgets: Array.from(this.gadgets.values()).map(gadget => gadget.toRecord()),
             connections: Array.from(this.connections.entries()).map(([id, conn]) => ({
                 name: id,
                 recordType: 'connection' as const,
-                source: conn.source.getId(),
-                target: conn.target.getId()
+                source: conn.source.id,
+                target: conn.target.id
             })),
             attributes: this.attributes
         }
     }
     
     destroy(): void {
-        this.cells.forEach(cell => cell.destroy())
-        this.propagators.forEach(prop => prop.destroy())
-        this.ports.forEach(port => port.destroy())
-        this.cells.clear()
-        this.propagators.clear()
-        this.ports.clear()
+        this.gadgets.forEach(gadget => gadget.destroy())
+        this.gadgets.clear()
         this.connections.clear()
     }
 }
 
+// Base class for all gadgets
+abstract class Gadget {
+    public readonly id: GadgetId
+    public attributes: Record<string, unknown> = {}
+    
+    constructor(name: string, attributes: Record<string, unknown> = {}) {
+        this.id = `gadget-${name}` as GadgetId
+        this.attributes = { ...attributes, name }
+    }
+    
+    abstract hasPort(portId: PortId): boolean
+    abstract getPort(portId: PortId): Port<JsonValue> | undefined
+    abstract destroy(): void
+    abstract toRecord(): Record<string, unknown>
+}
+
 class Port<T = JsonValue> {
+    public readonly id: PortId
     private value: T | undefined
     private listeners = new Set<(value: T) => void>()
     public attributes: Record<string, unknown> = {}
     
-    constructor(private portId: PortId, attributes: Record<string, unknown> = {}) {
-        this.attributes = attributes
+    constructor(name: string, attributes: Record<string, unknown> = {}) {
+        this.id = `port-${name}` as PortId
+        this.attributes = { ...attributes, name }
     }
     
     setValue(value: T): void {
@@ -195,51 +187,59 @@ class Port<T = JsonValue> {
         this.value = undefined
     }
     
-    // Getter for portId to avoid private access issues
-    getId(): PortId { return this.portId }
-    
     // Serialization
-    static fromRecord(record: any): Port<JsonValue> {
-        const port = new Port(record.name, record.attributes || {})
-        if (record.currentValue !== null) {
-            port.setValue(record.currentValue)
+    static fromRecord(record: Record<string, unknown>): Port<JsonValue> {
+        const port = new Port(record['name'] as string, record['attributes'] as Record<string, unknown>)
+        if (record['currentValue'] !== null) {
+            port.setValue(record['currentValue'] as JsonValue)
         }
         return port
     }
     
-    toRecord(): any {
+    toRecord(): Record<string, unknown> {
         return {
-            name: this.portId,
+            name: this.attributes['name'] as string,
             recordType: 'port',
-            portName: (this.attributes['portName'] as string) || 'port',
+            portName: this.attributes['name'] as string,
             type: (this.attributes['type'] as string) || 'any',
             direction: (this.attributes['direction'] as 'input' | 'output' | 'bidirectional') || 'bidirectional',
             position: (this.attributes['position'] as 'top' | 'bottom' | 'left' | 'right') || 'top',
-            gadget: (this.attributes['gadget'] as GadgetId | null) || null,
+            gadget: this.attributes['gadget'] as GadgetId | null || null,
             currentValue: this.value as JsonValue,
             attributes: this.attributes
         }
     }
 }
 
-class Cell<T = JsonValue> {
+class Cell<T = JsonValue> extends Gadget {
     private value: T | undefined
     private unsubs: (() => void)[] = []
-    public attributes: Record<string, unknown> = {}
+    private outputPort: Port<JsonValue>
     
     constructor(
+        name: string,
         private mergeFn: (current: T | undefined, incoming: T) => T,
-        private outputPort: Port<T>,
+        initialValue?: T,
         attributes: Record<string, unknown> = {}
     ) {
-        this.attributes = attributes
+        super(name, { ...attributes, type: 'cell' })
+        this.outputPort = new Port<JsonValue>(`${name}-output`, { 
+            ...attributes, 
+            direction: 'output', 
+            gadget: this.id,
+            type: 'cell'
+        })
+        if (initialValue !== undefined) {
+            this.value = initialValue
+            this.outputPort.setValue(initialValue as JsonValue)
+        }
     }
     
     accept(incoming: T): void {
         const newValue = this.mergeFn(this.value, incoming)
         if (newValue !== this.value) {
             this.value = newValue
-            this.outputPort.setValue(newValue)
+            this.outputPort.setValue(newValue as JsonValue)
         }
     }
     
@@ -249,12 +249,21 @@ class Cell<T = JsonValue> {
         return unsub
     }
     
-    getOutputPort(): Port<T> { return this.outputPort }
+    getOutputPort(): Port<JsonValue> { return this.outputPort }
+    
+    hasPort(portId: PortId): boolean {
+        return this.outputPort.id === portId
+    }
+    
+    getPort(portId: PortId): Port<JsonValue> | undefined {
+        return this.hasPort(portId) ? this.outputPort : undefined
+    }
     
     destroy(): void {
         this.unsubs.forEach(unsub => unsub())
         this.unsubs = []
         this.value = undefined
+        this.outputPort.destroy()
     }
     
     // Serialization
@@ -265,40 +274,63 @@ class Cell<T = JsonValue> {
             throw new Error(`Unknown primitive function: ${primitiveFn}`)
         }
         
-        const outputPort = network.getPort(record['outputPortId'] as PortId) || 
-                          new Port(record['outputPortId'] as PortId, { direction: 'output', gadget: record['name'] })
-        
-        const cell = new Cell(mergeFn, outputPort, record['attributes'] as Record<string, unknown>)
-        network.addCell(cell, record['name'] as GadgetId)
+        const cell = new Cell(
+            record['name'] as string,
+            mergeFn,
+            record['initialValue'] as JsonValue,
+            record['attributes'] as Record<string, unknown>
+        )
+        network.add(cell)
         return cell
     }
     
-    toRecord(): any {
+    toRecord(): Record<string, unknown> {
         return {
-            name: (this.attributes['gadgetId'] as GadgetId) || 'gadget-unknown' as GadgetId,
+            name: this.attributes['name'] as string,
             recordType: 'gadget',
             type: 'cell',
             primitiveName: (this.attributes['primitiveName'] as string) || 'unknown',
             ladder: (this.attributes['ladder'] as string | null) || null,
-            outputPortId: this.outputPort.getId(),
+            initialValue: this.value,
             attributes: this.attributes
         }
     }
 }
 
-class Propagator {
+class Propagator extends Gadget {
     private boundInputs = new Set<number>()
     private unsubs: (() => void)[] = []
-    public attributes: Record<string, unknown> = {}
+    private inputPorts: Port<JsonValue>[] = []
+    private outputPort: Port<JsonValue>
     
     constructor(
-        private inputPorts: Port<JsonValue>[],
+        name: string,
         private computeFn: (...args: JsonValue[]) => JsonValue,
-        private outputPort: Port<JsonValue>,
+        inputCount: number,
         attributes: Record<string, unknown> = {}
     ) {
-        this.attributes = attributes
-        inputPorts.forEach((port, index) => {
+        super(name, { ...attributes, type: 'function' })
+        
+        // Create input ports
+        for (let i = 0; i < inputCount; i++) {
+            this.inputPorts.push(new Port(`${name}-input-${i}`, { 
+                ...attributes, 
+                direction: 'input', 
+                gadget: this.id,
+                type: 'function'
+            }))
+        }
+        
+        // Create output port
+        this.outputPort = new Port(`${name}-output`, { 
+            ...attributes, 
+            direction: 'output', 
+            gadget: this.id,
+            type: 'function'
+        })
+        
+        // Subscribe to input changes
+        this.inputPorts.forEach((port, index) => {
             const unsub = port.subscribe(value => this.onInput(index, value))
             this.unsubs.push(unsub)
         })
@@ -317,139 +349,158 @@ class Propagator {
     getInputPorts(): Port<JsonValue>[] { return [...this.inputPorts] }
     getOutputPort(): Port<JsonValue> { return this.outputPort }
     
+    hasPort(portId: PortId): boolean {
+        return this.inputPorts.some(p => p.id === portId) || this.outputPort.id === portId
+    }
+    
+    getPort(portId: PortId): Port<JsonValue> | undefined {
+        const inputPort = this.inputPorts.find(p => p.id === portId)
+        if (inputPort) return inputPort
+        if (this.outputPort.id === portId) return this.outputPort
+        return undefined
+    }
+    
     destroy(): void {
         this.unsubs.forEach(unsub => unsub())
         this.unsubs = []
         this.boundInputs.clear()
+        this.inputPorts.forEach(port => port.destroy())
+        this.outputPort.destroy()
     }
     
     // Serialization
-    static fromRecord(record: any, network: Network): Propagator {
-        const primitiveFn = record.primitiveName
+    static fromRecord(record: Record<string, unknown>, network: Network): Propagator {
+        const primitiveFn = record['primitiveName'] as string
         const computeFn = network.getPropagatorFunction(primitiveFn)
         if (!computeFn) {
             throw new Error(`Unknown primitive function: ${primitiveFn}`)
         }
         
-        const inputPorts = record.inputPortIds.map((id: PortId) => 
-            network.getPort(id) || new Port(id, { direction: 'input', gadget: record.name }))
-        const outputPort = network.getPort(record.outputPortId) || 
-                          new Port(record.outputPortId, { direction: 'output', gadget: record.name })
-        
-        const propagator = new Propagator(inputPorts, computeFn, outputPort, record.attributes)
-        network.addPropagator(propagator, record.name)
+        const inputCount = (record['inputCount'] as number) || 2
+        const propagator = new Propagator(
+            record['name'] as string,
+            computeFn,
+            inputCount,
+            record['attributes'] as Record<string, unknown>
+        )
+        network.add(propagator)
         return propagator
     }
     
-    toRecord(): any {
+    toRecord(): Record<string, unknown> {
         return {
-            name: (this.attributes['gadgetId'] as GadgetId) || 'gadget-unknown' as GadgetId,
+            name: this.attributes['name'] as string,
             recordType: 'gadget',
             type: 'function',
             primitiveName: (this.attributes['primitiveName'] as string) || 'unknown',
             ladder: (this.attributes['ladder'] as string | null) || null,
-            inputPortIds: this.inputPorts.map(p => p.getId()),
-            outputPortId: this.outputPort.getId(),
+            inputCount: this.inputPorts.length,
             attributes: this.attributes
         }
     }
 }
 
-// Factory functions - work with objects, create ports automatically
-function createCell<T extends JsonValue>(
-    mergeFn: (current: T | undefined, incoming: T) => T,
-    outputPortId: PortId,
-    attributes: Record<string, unknown> = {}
-): Cell<T> {
-    const outputPort = new Port<T>(outputPortId, { ...attributes, direction: 'output' })
-    return new Cell(mergeFn, outputPort, attributes)
-}
-
-function createPropagator(
-    inputPortIds: PortId[],
-    computeFn: (...args: JsonValue[]) => JsonValue,
-    outputPortId: PortId,
-    attributes: Record<string, unknown> = {}
-): Propagator {
-    const inputPorts = inputPortIds.map(id => new Port(id, { ...attributes, direction: 'input' }))
-    const outputPort = new Port(outputPortId, { ...attributes, direction: 'output' })
-    return new Propagator(inputPorts, computeFn, outputPort, attributes)
-}
-
-// Common factories - now just need port IDs
-function createAdder(inputPortIds: [PortId, PortId], outputPortId: PortId, attributes: Record<string, unknown> = {}): Propagator {
-    return createPropagator(inputPortIds, (a: JsonValue, b: JsonValue) => {
-        if (typeof a === 'number' && typeof b === 'number') {
-            return a + b
-        }
-        return 0
-    }, outputPortId, { 
-        ...attributes, 
-        primitiveName: 'add',
-        type: 'function'
-    })
-}
-
-function createMaxCell(outputPortId: PortId, attributes: Record<string, unknown> = {}): Cell<JsonValue> {
-    return createCell((current: JsonValue | undefined, incoming: JsonValue) => {
+// Clean factory functions - just name + optional initial value
+function createMaxCell(name: string, initialValue?: number): Cell<JsonValue> {
+    return new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
         if (typeof current === 'number' && typeof incoming === 'number') {
             return current === undefined ? incoming : Math.max(current, incoming)
         }
         return incoming
-    }, outputPortId, {
-        ...attributes,
-        primitiveName: 'max',
-        type: 'cell'
-    })
+    }, initialValue, { primitiveName: 'max' })
 }
 
-// Example usage - working with objects directly
-console.log('=== Testing Object-Based System with Function Registry ===')
+function createUnionCell(name: string, initialValue: JsonValue[] = []): Cell<JsonValue> {
+    return new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
+        if (Array.isArray(current) && Array.isArray(incoming)) {
+            return [...new Set([...current, ...incoming])]
+        }
+        return incoming
+    }, initialValue, { primitiveName: 'union' })
+}
 
-// Create a simple network
-const network = new Network({ name: 'test-network' })
+function createAdder(name: string): Propagator {
+    return new Propagator(name, (a: JsonValue, b: JsonValue) => {
+        if (typeof a === 'number' && typeof b === 'number') {
+            return a + b
+        }
+        return 0
+    }, 2, { primitiveName: 'add' })
+}
 
-// Register custom functions if needed
-network.registerPropagatorFunction('customAdd', (a: JsonValue, b: JsonValue) => {
-    if (typeof a === 'number' && typeof b === 'number') {
-        return a + b + 1 // Custom behavior
-    }
-    return 0
-})
+function createMultiplier(name: string): Propagator {
+    return new Propagator(name, (a: JsonValue, b: JsonValue) => {
+        if (typeof a === 'number' && typeof b === 'number') {
+            return a * b
+        }
+        return 0
+    }, 2, { primitiveName: 'multiply' })
+}
 
-const maxCell = createMaxCell('port-result' as PortId, { description: 'Max accumulator' })
-const adder = createAdder(['port-a' as PortId, 'port-b' as PortId], 'port-sum' as PortId, { description: 'Addition function' })
+// Example usage - much cleaner and more fluent
+console.log('=== Testing Clean, Fluent System ===')
 
-network.addCell(maxCell, 'gadget-max' as GadgetId)
-network.addPropagator(adder, 'gadget-adder' as GadgetId)
+// Create a simple network with default functions
+const network = Network.withDefaults({ name: 'test-network' })
 
-// Test the network - working with ports directly
-const externalInput = new Port<JsonValue>('external' as PortId, { direction: 'input', type: 'number' })
-network.addPort(externalInput)
+// Create gadgets - just name + optional initial value
+const maxCell = createMaxCell('max-accumulator', 0)
+const unionCell = createUnionCell('set-union', ['initial'])
+const adder = createAdder('addition-function')
+const multiplier = createMultiplier('multiplication-function')
 
-// Connect objects directly - no ID lookup needed
+// Add them to the network - no ID management needed
+network.add(maxCell)
+network.add(unionCell)
+network.add(adder)
+network.add(multiplier)
+
+// Create external inputs
+const externalInput = new Port<JsonValue>('external-input', { direction: 'input', type: 'number' })
+const arrayInput = new Port<JsonValue>('array-input', { direction: 'input', type: 'array' })
+
+// Connect everything - working with ports directly
 maxCell.connectInput(externalInput)
+unionCell.connectInput(arrayInput)
+
+// Connect to propagator inputs
 const firstInputPort = adder.getInputPorts()[0]
-if (firstInputPort) {
+const secondInputPort = adder.getInputPorts()[1]
+if (firstInputPort && secondInputPort) {
     network.connect(externalInput, firstInputPort)
+    network.connect(externalInput, secondInputPort)
 }
 
+// Test propagation
 externalInput.setValue(5)
 console.log('Max after 5:', maxCell.getOutputPort().getValue())
+
+externalInput.setValue(8)
+console.log('Max after 8:', maxCell.getOutputPort().getValue())
+
+externalInput.setValue(3)
+console.log('Max after 3 (should still be 8):', maxCell.getOutputPort().getValue())
+
+// Test array union
+arrayInput.setValue(['a', 'b'])
+console.log('Union after [a,b]:', unionCell.getOutputPort().getValue())
+
+arrayInput.setValue(['b', 'c'])
+console.log('Union after [b,c]:', unionCell.getOutputPort().getValue())
 
 // Serialize to record format
 const networkRecord = network.toRecord()
 console.log('Serialized network:', JSON.stringify(networkRecord, null, 2))
 
 // Deserialize back to object format
-const reconstructedNetwork = Network.fromRecord(networkRecord)
-console.log('Reconstructed network ports:', reconstructedNetwork.toRecord().ports.length)
+const reconstructedNetwork = Network.fromRecord(networkRecord, defaultCellFunctions, defaultPropagatorFunctions)
+console.log('Reconstructed network gadgets:', reconstructedNetwork.getGadgets(Cell).length + reconstructedNetwork.getGadgets(Propagator).length)
 
 // Test the reconstructed network
-const newExternalInput = reconstructedNetwork.getPort('external' as PortId)
+const newExternalInput = reconstructedNetwork.findPort('port-external-input' as PortId)
 if (newExternalInput) {
     newExternalInput.setValue(10)
-    const newMaxCell = Array.from(reconstructedNetwork['cells'].values())[0]
+    const newMaxCell = reconstructedNetwork.getGadgets(Cell)[0]
     if (newMaxCell) {
         console.log('Reconstructed max after 10:', newMaxCell.getOutputPort().getValue())
     }
@@ -459,6 +510,6 @@ if (newExternalInput) {
 network.destroy()
 reconstructedNetwork.destroy()
 
-console.log('Object-based system with function registry test completed!')
+console.log('Clean, fluent system test completed!')
 
 
