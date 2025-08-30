@@ -1,10 +1,10 @@
 // Simple propagation network leveraging MAIC properties
-import { PortId, JsonValue, GadgetId, ConnectionId } from "./types"
+import { PortId, JsonValue, GadgetId, ConnectionId, PortRecord } from "./types"
 import { defaultCellFunctions } from "./default-cell-functions"
 import { defaultPropagatorFunctions } from "./default-propagator-functions"
 
-// Network container class - manages objects, not IDs
-class Network {
+// Network container class
+export class Network {
     private gadgets = new Map<GadgetId, Gadget>()
     private connections = new Map<ConnectionId, { source: Port<JsonValue>, target: Port<JsonValue> }>()
     private cellFunctionRegistry = new Map<string, (current: JsonValue | undefined, incoming: JsonValue) => JsonValue>()
@@ -55,6 +55,70 @@ class Network {
     // Simple add method - no ID management needed
     add(gadget: Gadget): void {
         this.gadgets.set(gadget.id, gadget)
+    }
+    
+    // Get a factory for creating gadgets
+    factory(): NetworkFactory {
+        return new NetworkFactory(this)
+    }
+    
+    // Factory methods for better ergonomics
+    createInputCell(name: string, initialValue?: JsonValue): Cell<JsonValue> {
+        const cell = new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => incoming, initialValue, { 
+            primitiveName: 'input',
+            type: 'input-cell'
+        })
+        this.add(cell)
+        return cell
+    }
+    
+    createMaxCell(name: string, initialValue?: number): Cell<JsonValue> {
+        const cell = new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
+            if (typeof current === 'number' && typeof incoming === 'number') {
+                return current === undefined ? incoming : Math.max(current, incoming)
+            }
+            return incoming
+        }, initialValue, { primitiveName: 'max' })
+        this.add(cell)
+        return cell
+    }
+    
+    createUnionCell(name: string, initialValue: JsonValue[] = []): Cell<JsonValue> {
+        const cell = new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
+            if (Array.isArray(current) && Array.isArray(incoming)) {
+                return [...new Set([...current, ...incoming])]
+            }
+            return incoming
+        }, initialValue, { primitiveName: 'union' })
+        this.add(cell)
+        return cell
+    }
+    
+    createAdder(name: string): Propagator {
+        const propagator = new Propagator(name, (a: JsonValue, b: JsonValue) => {
+            if (typeof a === 'number' && typeof b === 'number') {
+                return a + b
+            }
+            return 0
+        }, 2, { primitiveName: 'add' })
+        this.add(propagator)
+        return propagator
+    }
+    
+    createMultiplier(name: string): Propagator {
+        const propagator = new Propagator(name, (a: JsonValue, b: JsonValue) => {
+            if (typeof a === 'number' && typeof b === 'number') {
+                return a * b
+            }
+            return 0
+        }, 2, { primitiveName: 'multiply' })
+        this.add(propagator)
+        return propagator
+    }
+    
+    // Create a free port for external connections
+    createPort(name: string, attributes: Record<string, unknown> = {}): Port<JsonValue> {
+        return new Port(name, attributes)
     }
     
     // Connect ports directly - no ID lookup needed
@@ -135,8 +199,73 @@ class Network {
     }
 }
 
+// Clean factory class - handles all gadget creation
+export class NetworkFactory {
+    constructor(private network: Network) {}
+    
+    // Cell factories
+    createInputCell(name: string, initialValue?: JsonValue): Cell<JsonValue> {
+        const cell = new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => incoming, initialValue, { 
+            primitiveName: 'input',
+            type: 'input-cell'
+        })
+        this.network.add(cell)
+        return cell
+    }
+    
+    createMaxCell(name: string, initialValue?: number): Cell<JsonValue> {
+        const cell = new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
+            if (typeof current === 'number' && typeof incoming === 'number') {
+                return current === undefined ? incoming : Math.max(current, incoming)
+            }
+            return incoming
+        }, initialValue, { primitiveName: 'max' })
+        this.network.add(cell)
+        return cell
+    }
+    
+    createUnionCell(name: string, initialValue: JsonValue[] = []): Cell<JsonValue> {
+        const cell = new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
+            if (Array.isArray(current) && Array.isArray(incoming)) {
+                return [...new Set([...current, ...incoming])]
+            }
+            return incoming
+        }, initialValue, { primitiveName: 'union' })
+        this.network.add(cell)
+        return cell
+    }
+    
+    // Propagator factories
+    createAdder(name: string): Propagator {
+        const propagator = new Propagator(name, (a: JsonValue, b: JsonValue) => {
+            if (typeof a === 'number' && typeof b === 'number') {
+                return a + b
+            }
+            return 0
+        }, 2, { primitiveName: 'add' })
+        this.network.add(propagator)
+        return propagator
+    }
+    
+    createMultiplier(name: string): Propagator {
+        const propagator = new Propagator(name, (a: JsonValue, b: JsonValue) => {
+            if (typeof a === 'number' && typeof b === 'number') {
+                return a * b
+            }
+            return 0
+        }, 2, { primitiveName: 'multiply' })
+        this.network.add(propagator)
+        return propagator
+    }
+    
+    // Utility factories
+    createPort(name: string, attributes: Record<string, unknown> = {}): Port<JsonValue> {
+        return new Port(name, attributes)
+    }
+}
+
 // Base class for all gadgets
-abstract class Gadget {
+export abstract class Gadget {
     public readonly id: GadgetId
     public attributes: Record<string, unknown> = {}
     
@@ -151,7 +280,7 @@ abstract class Gadget {
     abstract toRecord(): Record<string, unknown>
 }
 
-class Port<T = JsonValue> {
+export class Port<T = JsonValue> {
     public readonly id: PortId
     private value: T | undefined
     private listeners = new Set<(value: T) => void>()
@@ -196,9 +325,9 @@ class Port<T = JsonValue> {
         return port
     }
     
-    toRecord(): Record<string, unknown> {
+    toRecord(): PortRecord {
         return {
-            name: this.attributes['name'] as string,
+            name: this.id,
             recordType: 'port',
             portName: this.attributes['name'] as string,
             type: (this.attributes['type'] as string) || 'any',
@@ -206,15 +335,15 @@ class Port<T = JsonValue> {
             position: (this.attributes['position'] as 'top' | 'bottom' | 'left' | 'right') || 'top',
             gadget: this.attributes['gadget'] as GadgetId | null || null,
             currentValue: this.value as JsonValue,
-            attributes: this.attributes
         }
     }
 }
 
-class Cell<T = JsonValue> extends Gadget {
+export class Cell<T = JsonValue> extends Gadget {
     private value: T | undefined
     private unsubs: (() => void)[] = []
     private outputPort: Port<JsonValue>
+    private inputPort: Port<JsonValue>
     
     constructor(
         name: string,
@@ -223,16 +352,31 @@ class Cell<T = JsonValue> extends Gadget {
         attributes: Record<string, unknown> = {}
     ) {
         super(name, { ...attributes, type: 'cell' })
+        
+        // Create input port
+        this.inputPort = new Port<JsonValue>(`${name}-input`, { 
+            ...attributes, 
+            direction: 'input', 
+            gadget: this.id,
+            type: 'cell'
+        })
+        
+        // Create output port
         this.outputPort = new Port<JsonValue>(`${name}-output`, { 
             ...attributes, 
             direction: 'output', 
             gadget: this.id,
             type: 'cell'
         })
+        
         if (initialValue !== undefined) {
             this.value = initialValue
             this.outputPort.setValue(initialValue as JsonValue)
         }
+        
+        // Subscribe to input changes
+        const unsub = this.inputPort.subscribe(value => this.accept(value as T))
+        this.unsubs.push(unsub)
     }
     
     accept(incoming: T): void {
@@ -243,26 +387,34 @@ class Cell<T = JsonValue> extends Gadget {
         }
     }
     
+    setValue(value: T): void {
+        this.accept(value)
+    }
+    
     connectInput(inputPort: Port<T>): () => void {
         const unsub = inputPort.subscribe(value => this.accept(value))
         this.unsubs.push(unsub)
         return unsub
     }
     
+    getInputPort(): Port<JsonValue> { return this.inputPort }
     getOutputPort(): Port<JsonValue> { return this.outputPort }
     
     hasPort(portId: PortId): boolean {
-        return this.outputPort.id === portId
+        return this.inputPort.id === portId || this.outputPort.id === portId
     }
     
     getPort(portId: PortId): Port<JsonValue> | undefined {
-        return this.hasPort(portId) ? this.outputPort : undefined
+        if (this.inputPort.id === portId) return this.inputPort
+        if (this.outputPort.id === portId) return this.outputPort
+        return undefined
     }
     
     destroy(): void {
         this.unsubs.forEach(unsub => unsub())
         this.unsubs = []
         this.value = undefined
+        this.inputPort.destroy()
         this.outputPort.destroy()
     }
     
@@ -297,7 +449,7 @@ class Cell<T = JsonValue> extends Gadget {
     }
 }
 
-class Propagator extends Gadget {
+export class Propagator extends Gadget {
     private boundInputs = new Set<number>()
     private unsubs: (() => void)[] = []
     private inputPorts: Port<JsonValue>[] = []
@@ -347,6 +499,9 @@ class Propagator extends Gadget {
     }
     
     getInputPorts(): Port<JsonValue>[] { return [...this.inputPorts] }
+    getInputPort(index: number): Port<JsonValue> | undefined { 
+        return this.inputPorts[index] 
+    }
     getOutputPort(): Port<JsonValue> { return this.outputPort }
     
     hasPort(portId: PortId): boolean {
@@ -401,7 +556,7 @@ class Propagator extends Gadget {
 }
 
 // Clean factory functions - just name + optional initial value
-function createMaxCell(name: string, initialValue?: number): Cell<JsonValue> {
+export function createMaxCell(name: string, initialValue?: number): Cell<JsonValue> {
     return new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
         if (typeof current === 'number' && typeof incoming === 'number') {
             return current === undefined ? incoming : Math.max(current, incoming)
@@ -410,7 +565,7 @@ function createMaxCell(name: string, initialValue?: number): Cell<JsonValue> {
     }, initialValue, { primitiveName: 'max' })
 }
 
-function createUnionCell(name: string, initialValue: JsonValue[] = []): Cell<JsonValue> {
+export function createUnionCell(name: string, initialValue: JsonValue[] = []): Cell<JsonValue> {
     return new Cell(name, (current: JsonValue | undefined, incoming: JsonValue) => {
         if (Array.isArray(current) && Array.isArray(incoming)) {
             return [...new Set([...current, ...incoming])]
@@ -419,7 +574,7 @@ function createUnionCell(name: string, initialValue: JsonValue[] = []): Cell<Jso
     }, initialValue, { primitiveName: 'union' })
 }
 
-function createAdder(name: string): Propagator {
+export function createAdder(name: string): Propagator {
     return new Propagator(name, (a: JsonValue, b: JsonValue) => {
         if (typeof a === 'number' && typeof b === 'number') {
             return a + b
@@ -428,7 +583,7 @@ function createAdder(name: string): Propagator {
     }, 2, { primitiveName: 'add' })
 }
 
-function createMultiplier(name: string): Propagator {
+export function createMultiplier(name: string): Propagator {
     return new Propagator(name, (a: JsonValue, b: JsonValue) => {
         if (typeof a === 'number' && typeof b === 'number') {
             return a * b
