@@ -35,13 +35,15 @@ export class Port {
     // Accept a value (triggers propagation)
     accept(value: Term) {
         this.value = value
-
         if (this.direction === 'output') {
             // Output ports propagate to all connected input ports
             this.propagate(value)
         } else {
-            // Input ports trigger gadget handler
-            this.gadget.receive(this.name, value)
+            // Input ports trigger gadget handler directly
+            const handler = this.gadget.getInputHandler(this.name)
+            if (handler) {
+                handler(this.gadget, value)
+            }
         }
     }
 
@@ -73,24 +75,11 @@ export class Port {
     getConnections(): ConnectionPath[] {
         return Array.from(this.connections)
     }
-
-    // Check if this port can accept more connections
-    canAcceptConnection(): boolean {
-        if (this.connectionLimit === null) {
-            return true // Unlimited
-        }
-        return this.connections.size < this.connectionLimit
-    }
-
-    // Get the connection limit for this port
-    getConnectionLimit(): number | null {
-        return this.connectionLimit
-    }
 }
 
 export class Gadget {
     private ports = new Map<string, Port>()
-    private inputHandlers = new Map<string, InputHandler>()
+    protected inputHandlers = new Map<string, InputHandler>()
 
     constructor(
         public readonly id: string,
@@ -123,9 +112,6 @@ export class Gadget {
                     const [name, value, attributes] = args as [string, Term, Attributes?]
                     const port = new Port(name, 'input', this, this.network, value || Nothing, attributes || {})
                     this.ports.set(name, port)
-                    if (value && value !== Nothing) {
-                        port.accept(value)
-                    }
                     break
                 }
                 case 'add-output-port': {
@@ -156,6 +142,16 @@ export class Gadget {
                     }
                     break
                 }
+                case 'batch': {
+                    const commands = args[0] as Term[]
+                    for (const command of commands) {
+                        this.processControl(command)
+                    }
+                    break
+                }
+                default: {
+                    throw new Error(`Unknown control command: ${String(command)}`)
+                }
             }
         }
     }
@@ -177,9 +173,9 @@ export class Gadget {
         return this.ports.get(portName)
     }
 
-    // Get all ports
-    getPorts(): Port[] {
-        return Array.from(this.ports.values())
+    // Get input handler for a port
+    getInputHandler(portName: string): InputHandler | undefined {
+        return this.inputHandlers.get(portName)
     }
 }
 
@@ -211,10 +207,5 @@ export class Network {
     // Get gadget by ID
     getGadget(id: string): Gadget | undefined {
         return this.gadgets.get(id)
-    }
-
-    // Get all gadgets
-    getGadgets(): Gadget[] {
-        return Array.from(this.gadgets.values())
     }
 }
