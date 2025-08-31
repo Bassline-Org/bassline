@@ -78,7 +78,7 @@ export class Port {
 }
 
 export class Gadget {
-    private ports = new Map<string, Port>()
+    protected ports = new Map<string, Port>()
     protected inputHandlers = new Map<string, InputHandler>()
 
     constructor(
@@ -191,6 +191,82 @@ export class Cell extends Gadget {
             const result = mergeFn(currentValue, value)
             self.emit('value-out', result)
         }]])
+    }
+}
+
+export class FunctionGadget extends Gadget {
+    private inputValues = new Map<string, Term>()
+    private fn: (inputs: Record<string, Term>) => Term
+
+    constructor(
+        id: string, 
+        network: Network, 
+        config: {
+            inputs: string[]
+            outputs: string[]
+            fn: (inputs: Record<string, Term>) => Term
+        }
+    ) {
+        super(id, network)
+        this.fn = config.fn
+
+        // Auto-setup via batch control terms
+        const setupCommands: Term[] = [
+            // Create all input ports
+            ...config.inputs.map(name => ['add-input-port', name] as Term),
+            // Create all output ports  
+            ...config.outputs.map(name => ['add-output-port', name] as Term),
+            // Set up auto-trigger handler for each input
+            ...config.inputs.map(name => ['set-input-handler', name, ['opaque', (_self: Gadget, value: Term) => {
+                this.handleInputUpdate(name, value)
+            }]] as Term)
+        ]
+        this.receive('control', ['batch', setupCommands])
+    }
+
+    private handleInputUpdate(portName: string, value: Term) {
+        // Store the input value
+        this.inputValues.set(portName, value)
+        
+        // Check if all inputs have values
+        if (this.allInputsReady()) {
+            // Execute the function with all input values
+            const inputs = Object.fromEntries(this.inputValues)
+            const result = this.fn(inputs)
+            
+            // Emit result to first output port (assuming single output for now)
+            const outputPortNames = this.getOutputPortNames()
+            if (outputPortNames.length > 0) {
+                const firstOutput = outputPortNames[0]
+                if (firstOutput) {
+                    this.emit(firstOutput, result)
+                }
+            }
+        }
+    }
+
+    private allInputsReady(): boolean {
+        // Check if all input ports have values
+        const inputPortNames = this.getInputPortNames()
+        for (const name of inputPortNames) {
+            if (!this.inputValues.has(name)) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private getInputPortNames(): string[] {
+        return Array.from(this.ports.entries())
+            .filter(([_, port]) => port.direction === 'input')
+            .map(([name, _]) => name)
+            .filter(name => name !== 'control')
+    }
+
+    private getOutputPortNames(): string[] {
+        return Array.from(this.ports.entries())
+            .filter(([_, port]) => port.direction === 'output')
+            .map(([name, _]) => name)
     }
 }
 
