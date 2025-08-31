@@ -48,7 +48,7 @@ export class Port {
     }
 
     // Propagate value to all connected ports
-    private propagate(value: Term) {
+    public propagate(value: Term) {
         const outputs = new Map<string, string[]>()
         for (const connection of this.connections) {
             const [targetGadgetId, targetPortName] = connection
@@ -139,6 +139,20 @@ export class Gadget {
                     const source = this.ports.get(sourcePort)
                     if (source) {
                         source.connectTo(targetPath)
+                    }
+                    break
+                }
+                case 'connect-and-sync': {
+                    const [sourcePort, targetPath] = args as [string, ConnectionPath]
+                    const source = this.ports.get(sourcePort)
+                    if (source) {
+                        // Connect the ports
+                        source.connectTo(targetPath)
+                        
+                        // Forward current value if it's not Nothing
+                        if (source.value !== Nothing) {
+                            source.propagate(source.value)
+                        }
                     }
                     break
                 }

@@ -18,7 +18,11 @@
     "dev": "tsc --watch",
     "test": "vitest --run"
   },
-  "keywords": ["graph", "ports", "dataflow"],
+  "keywords": [
+    "graph",
+    "ports",
+    "dataflow"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.0.0",
