@@ -34,15 +34,18 @@ export class Port {
 
     // Accept a value (triggers propagation)
     accept(value: Term) {
-        this.value = value
-        if (this.direction === 'output') {
-            // Output ports propagate to all connected input ports
-            this.propagate(value)
-        } else {
-            // Input ports trigger gadget handler directly
-            const handler = this.gadget.getInputHandler(this.name)
-            if (handler) {
-                handler(this.gadget, value)
+        // Only propagate if the value actually changed
+        if (this.value !== value) {
+            this.value = value
+            if (this.direction === 'output') {
+                // Output ports propagate to all connected input ports
+                this.propagate(value)
+            } else {
+                // Input ports trigger gadget handler directly
+                const handler = this.gadget.getInputHandler(this.name)
+                if (handler) {
+                    handler(this.gadget, value)
+                }
             }
         }
     }
@@ -87,6 +90,7 @@ export class Gadget {
         public readonly attributes: Attributes = {}
     ) {
         // All gadgets get a control port
+        this.network.addGadget(this)
         this.ports.set('control', new Port('control', 'input', this, network))
     }
 

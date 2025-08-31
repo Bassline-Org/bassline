@@ -1,4 +1,7 @@
 import { DefaultRecord, GraphId, GadgetRecord, PortRecord, ConnectionRecord, FreePortRecord, GadgetId, GadgetPortRecord, PortId, ConnectionId, DefaultRecordType, PortDirection, JsonValue } from "./types"
+import { Gadget, Cell, FunctionGadget } from "./gadgets"
+import { Nothing } from "./terms"
+export { Gadget, Cell, FunctionGadget, Nothing }
 
 // Re-export all types
 export { type DefaultRecord, type GraphId, type GadgetRecord, type PortRecord, type ConnectionRecord, type FreePortRecord, type GadgetId, type GadgetPortRecord, type PortId, type ConnectionId, type DefaultRecordType }
