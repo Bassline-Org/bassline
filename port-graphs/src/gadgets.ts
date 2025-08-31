@@ -270,6 +270,69 @@ export class FunctionGadget extends Gadget {
     }
 }
 
+export class BehaviorCell extends Cell {
+    private behaviors = new Map<string, Term[]>()
+
+    constructor(id: string, network: Network, attributes: Attributes = {}) {
+        super(id, network, attributes, (_current, incoming) => incoming)
+        
+        // Set up behavior management ports
+        this.receive('control', ['batch', [
+            ['add-input-port', 'define-behavior'],
+            ['add-input-port', 'load-behavior'],
+            ['add-output-port', 'behavior-defined'],
+            ['add-output-port', 'behavior-loaded']
+        ]])
+        
+        // Set up handlers
+        this.receive('control', ['set-input-handler', 'define-behavior', ['opaque', (_self: Gadget, value: Term) => {
+            this.defineBehavior(value)
+        }]])
+        
+        this.receive('control', ['set-input-handler', 'load-behavior', ['opaque', (_self: Gadget, value: Term) => {
+            this.loadBehavior(value)
+        }]])
+    }
+
+    private defineBehavior(behaviorSpec: Term) {
+        if (Array.isArray(behaviorSpec) && behaviorSpec.length >= 2) {
+            const [behaviorName, commands] = behaviorSpec as [string, Term[]]
+            this.behaviors.set(behaviorName, commands)
+            this.emit('behavior-defined', behaviorName)
+            console.log(`📝 Behavior '${behaviorName}' defined with ${commands.length} commands`)
+        }
+    }
+
+    private loadBehavior(loadSpec: Term) {
+        if (Array.isArray(loadSpec) && loadSpec.length >= 2) {
+            const [behaviorName, targetGadgetId] = loadSpec as [string, string]
+            const behavior = this.behaviors.get(behaviorName)
+            
+            if (behavior) {
+                const targetGadget = this.network.getGadget(targetGadgetId)
+                if (targetGadget) {
+                    // Load the behavior into the target gadget
+                    targetGadget.receive('control', ['batch', behavior])
+                    this.emit('behavior-loaded', [behaviorName, targetGadgetId])
+                    console.log(`🚀 Behavior '${behaviorName}' loaded into '${targetGadgetId}'`)
+                } else {
+                    console.log(`❌ Target gadget '${targetGadgetId}' not found`)
+                }
+            } else {
+                console.log(`❌ Behavior '${behaviorName}' not found`)
+            }
+        }
+    }
+
+    getBehavior(behaviorName: string): Term[] | undefined {
+        return this.behaviors.get(behaviorName)
+    }
+
+    listBehaviors(): string[] {
+        return Array.from(this.behaviors.keys())
+    }
+}
+
 // Network just manages gadgets and provides lookup
 export class Network {
     private gadgets = new Map<string, Gadget>()
