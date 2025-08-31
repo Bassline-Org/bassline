@@ -123,7 +123,7 @@ export const hasKeyValue = (key: string, value: Term): TermPredicate =>
     isObject,
     (term: Term) => {
       const obj = term as { [key: string]: Term }
-      return key in obj && obj[key] === value
+      return key in obj && obj[key] !== undefined && obj[key] === value
     }
   )
 
@@ -134,7 +134,7 @@ export const objectStructure = (keyPredicates: Array<{ key: string; predicate: T
     (term: Term) => {
       const obj = term as { [key: string]: Term }
       return keyPredicates.every(({ key, predicate }) => 
-        key in obj && predicate(obj[key])
+        key in obj && obj[key] !== undefined && predicate(obj[key]!)
       )
     }
   )
@@ -167,7 +167,13 @@ export const objectValues = (...valuePredicates: TermPredicate[]): TermPredicate
       const obj = term as { [key: string]: Term }
       const values = Object.values(obj)
       return valuePredicates.every((pred, index) => 
-        index < values.length && pred(values[index])
+        index < values.length && pred(values[index]!)
       )
     }
   )
+
+// Check if term is null
+export const isNull = (term: Term): boolean => term === null
+
+// Check if term is null or undefined
+export const isNullOrUndefined = (term: Term): boolean => term === null || term === undefined

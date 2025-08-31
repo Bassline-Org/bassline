@@ -3,7 +3,7 @@
 // ================================
 
 // Simple, flexible term type that works with our combinator system
-export type Term = string | number | boolean | symbol | Term[] | { [key: string]: Term } | Function
+export type Term = string | number | boolean | symbol | null | Term[] | { [key: string]: Term } | Function
 
 // Common symbols used throughout the system
 export const Nothing = Symbol('Nothing')

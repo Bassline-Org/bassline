@@ -9,7 +9,7 @@
 export * from './predicates'
 
 // Export combinators
-export { or, and, not, nor, pipe, when, compose, composeMany, id, constant } from './combinators'
+export { or, and, not, nor, pipe, when, compose, composeMany, id, constant, zod, zodPredicate } from './combinators'
 
 // ================================
 // Convenience exports
@@ -17,7 +17,7 @@ export { or, and, not, nor, pipe, when, compose, composeMany, id, constant } fro
 
 import { 
   or, and, not, nor, pipe, when, compose, composeMany,
-  id, constant
+  id, constant, zod, zodPredicate
 } from './combinators'
 
 import {
@@ -25,55 +25,31 @@ import {
   hasTag, isTagged, hasLength, hasMinLength,
   eq, ne, gt, lt, gte, lte, inRange,
   startsWith, hasStructure, sequence,
-  isDefined
+
+  hasKeys, hasKeyValue, objectStructure, hasMinKeys, hasExactKeys, objectValues,
+  isNull
 } from './predicates'
 
 // Main export object for easy access
 export const P = {
   // Logical combinators
-  or,
-  and, 
-  not,
-  nor,
-  
+  or, and, not, nor,
   // Transformation combinators
-  pipe,
-  when,
-  
+  pipe, when,
   // Composition helpers
-  compose,
-  composeMany,
-  
+  compose, composeMany,
+  // Zod integration
+  zod, zodPredicate,
   // Type predicates
-  isString,
-  isNumber,
-  isBoolean,
-  isSymbol,
-  isArray,
-  isObject,
-  isDefined,
-  
+  isString, isNumber, isBoolean, isSymbol, isArray, isObject, isNull,
   // Structural predicates
-  hasTag,
-  isTagged,
-  hasLength,
-  hasMinLength,
-  
-  // Structural matching combinators
-  startsWith,
-  hasStructure,
-  sequence,
-  
+  hasTag, isTagged, hasLength, hasMinLength,
+  // Structural matching combinators (added)
+  startsWith, hasStructure, sequence,
+  // Object predicates (added)
+  hasKeys, hasKeyValue, objectStructure, hasMinKeys, hasExactKeys, objectValues,
   // Comparison predicates
-  eq,
-  ne,
-  gt,
-  lt,
-  gte,
-  lte,
-  inRange,
-  
+  eq, ne, gt, lt, gte, lte, inRange,
   // Utilities
-  id,
-  constant,
+  id, constant,
 }

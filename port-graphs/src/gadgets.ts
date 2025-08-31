@@ -1,5 +1,15 @@
 import type { Attributes, PortDirection, ConnectionPath } from './gadget-types'
 import { Nothing, Term } from './terms'
+import { P } from './combinators'
+import {
+  SetInterfaceSchema,
+  SetInputHandlerSchema,
+  SetConnectionLimitSchema,
+  ConnectSchema,
+  ConnectAndSyncSchema,
+  BatchSchema,
+  type GadgetInterface
+} from './schemas'
 
 // Re-export Nothing for convenience
 export { Nothing }
@@ -10,15 +20,13 @@ export type InputHandler = (self: Gadget, value: Term) => void
 // Command Predicates
 // ================================
 
-// Import our combinators
-import { P } from './combinators'
-// Define predicates for each command type
-const isSetInterface = P.startsWith(P.eq('setInterface'), P.hasMinLength(2))
-const isSetInputHandler = P.startsWith(P.eq('set-input-handler'), P.hasMinLength(3))
-const isSetConnectionLimit = P.startsWith(P.eq('set-connection-limit'), P.hasLength(3))
-const isConnect = P.startsWith(P.eq('connect'), P.hasLength(3))
-const isConnectAndSync = P.startsWith(P.eq('connect-and-sync'), P.hasLength(3))
-const isBatch = P.startsWith(P.eq('batch'), P.hasMinLength(2))
+// Use Zod schemas for clean validation
+const isSetInterface = P.zodPredicate(SetInterfaceSchema)
+const isSetInputHandler = P.zodPredicate(SetInputHandlerSchema)
+const isSetConnectionLimit = P.zodPredicate(SetConnectionLimitSchema)
+const isConnect = P.zodPredicate(ConnectSchema)
+const isConnectAndSync = P.zodPredicate(ConnectAndSyncSchema)
+const isBatch = P.zodPredicate(BatchSchema)
 
 // Ports belong to the network and handle their own propagation
 export class Port {
@@ -100,6 +108,7 @@ export class Port {
 export class Gadget {
     protected ports = new Map<string, Port>()
     protected inputHandlers = new Map<string, InputHandler>()
+    protected interface?: GadgetInterface // Store the interface definition
 
     constructor(
         public readonly id: string,
@@ -129,38 +138,50 @@ export class Gadget {
             throw new Error(`Invalid control term: ${JSON.stringify(term)}`)
         }
         
-        const [command, ...args] = term as [string, ...Term[]]
+        const [command] = term as [string, ...Term[]]
         
         // Use guards to process commands
         if (isSetInterface(term)) {
-            const [gadgetInterface] = args as [{
-                inputs: Array<{ name: string; value?: Term; attributes?: Attributes }>
-                outputs: Array<{ name: string; attributes?: Attributes }>
-            }]
+            // Use Zod to get validated, typed data
+            const validatedCommand = P.zod(SetInterfaceSchema)(term)
+            const gadgetInterface = validatedCommand[1]
+            
+            // Store the interface for later access
+            this.interface = gadgetInterface
             
             // Create all input ports
             for (const input of gadgetInterface.inputs) {
                 const port = new Port(input.name, 'input', this, this.network, input.value || Nothing, input.attributes || {})
+                // Set connection limit if specified
+                if (input.connectionLimit !== undefined) {
+                    port.setConnectionLimit(input.connectionLimit)
+                }
                 this.ports.set(input.name, port)
             }
             
             // Create all output ports
             for (const output of gadgetInterface.outputs) {
                 const port = new Port(output.name, 'output', this, this.network, Nothing, output.attributes || {})
+                // Set connection limit if specified
+                if (output.connectionLimit !== undefined) {
+                    port.setConnectionLimit(output.connectionLimit)
+                }
                 this.ports.set(output.name, port)
             }
             return
         }
         
         if (isSetInputHandler(term)) {
-            const [name, handlerOpaque] = args as [string, [string, InputHandler]]
-            const [_, handler] = handlerOpaque
+            const validatedCommand = P.zod(SetInputHandlerSchema)(term)
+            const [_, name, handlerOpaque] = validatedCommand
+            const [__, handler] = handlerOpaque as [string, InputHandler]
             this.inputHandlers.set(name, handler)
             return
         }
         
         if (isSetConnectionLimit(term)) {
-            const [portName, limit] = args as [string, number | null]
+            const validatedCommand = P.zod(SetConnectionLimitSchema)(term)
+            const [_, portName, limit] = validatedCommand
             const port = this.ports.get(portName)
             if (port) {
                 port.setConnectionLimit(limit)
@@ -169,7 +190,8 @@ export class Gadget {
         }
         
         if (isConnect(term)) {
-            const [sourcePort, targetPath] = args as [string, ConnectionPath]
+            const validatedCommand = P.zod(ConnectSchema)(term)
+            const [_, sourcePort, targetPath] = validatedCommand
             const source = this.ports.get(sourcePort)
             if (source) {
                 source.connectTo(targetPath)
@@ -178,7 +200,8 @@ export class Gadget {
         }
         
         if (isConnectAndSync(term)) {
-            const [sourcePort, targetPath] = args as [string, ConnectionPath]
+            const validatedCommand = P.zod(ConnectAndSyncSchema)(term)
+            const [_, sourcePort, targetPath] = validatedCommand
             const source = this.ports.get(sourcePort)
             if (source) {
                 // Connect the ports
@@ -193,7 +216,8 @@ export class Gadget {
         }
         
         if (isBatch(term)) {
-            const commands = args[0] as Term[]
+            const validatedCommand = P.zod(BatchSchema)(term)
+            const [_, commands] = validatedCommand
             for (const command of commands) {
                 this.processControl(command)
             }
@@ -223,6 +247,11 @@ export class Gadget {
     // Get input handler for a port
     getInputHandler(portName: string): InputHandler | undefined {
         return this.inputHandlers.get(portName)
+    }
+    
+    // Get the gadget's interface definition
+    getInterface(): GadgetInterface | undefined {
+        return this.interface
     }
 }
 

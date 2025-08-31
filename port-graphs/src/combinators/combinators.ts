@@ -3,6 +3,7 @@
 // ================================
 
 import { Term } from '../terms'
+import { z } from 'zod'
 
 // Define types inline since we deleted types.ts
 export type TermMap<In = Term, Out = Term> = (input: In) => Out
@@ -49,7 +50,7 @@ export const compose = <A, B, C>(f: TermMap<B, C>, g: TermMap<A, B>): TermMap<A,
 
 // Compose multiple functions (right-to-left)
 export const composeMany = <T>(...fns: TermMap<T, T>[]): TermMap<T, T> =>
-  fns.reduceRight((acc, fn) => compose(acc, fn))
+  fns.reduceRight((acc, fn) => compose(fn, acc))
 
 // ================================
 // Utility Combinators
@@ -60,3 +61,28 @@ export const id: TermMap<Term, Term> = (term: Term) => term
 
 // Constant function
 export const constant = <T>(value: T): TermMap<Term, T> => () => value
+
+// ================================
+// Zod Integration
+// ================================
+
+// Zod schema validation combinator
+export const zod = <T>(schema: z.ZodSchema<T>): TermMap<Term, T> => 
+  (term: Term) => {
+    try {
+      return schema.parse(term)
+    } catch {
+      throw new Error(`Zod validation failed for term: ${JSON.stringify(term)}`)
+    }
+  }
+
+// Zod predicate combinator (returns boolean instead of throwing)
+export const zodPredicate = <T>(schema: z.ZodSchema<T>): TermPredicate => 
+  (term: Term) => {
+    try {
+      schema.parse(term)
+      return true
+    } catch {
+      return false
+    }
+  }
