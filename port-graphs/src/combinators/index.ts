@@ -24,7 +24,8 @@ import {
   isString, isNumber, isBoolean, isSymbol, isArray, isObject,
   hasTag, isTagged, hasLength, hasMinLength,
   eq, ne, gt, lt, gte, lte, inRange,
-  startsWith, hasStructure, sequence
+  startsWith, hasStructure, sequence,
+  isDefined
 } from './predicates'
 
 // Main export object for easy access
@@ -50,6 +51,7 @@ export const P = {
   isSymbol,
   isArray,
   isObject,
+  isDefined,
   
   // Structural predicates
   hasTag,

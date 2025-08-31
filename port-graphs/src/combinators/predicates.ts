@@ -34,6 +34,8 @@ export const hasTag = (tag: string): TermPredicate =>
 export const isTagged = (tag: string): TermPredicate => 
   (term: Term) => Array.isArray(term) && term[0] === tag
 
+export const isDefined = (term: Term) => term !== undefined && term !== null
+
 // Array structure predicates
 export const hasLength = (length: number): TermPredicate => 
   and(
@@ -100,3 +102,72 @@ export const lte = (value: number): TermPredicate => (term: Term) =>
 
 export const inRange = (min: number, max: number): TermPredicate => (term: Term) => 
   typeof term === 'number' && term >= min && term <= max
+
+// ================================
+// Object Predicates
+// ================================
+
+// Check if object has specific keys
+export const hasKeys = (...keys: string[]): TermPredicate =>
+  and(
+    isObject,
+    (term: Term) => {
+      const obj = term as { [key: string]: Term }
+      return keys.every(key => key in obj)
+    }
+  )
+
+// Check if object has specific key-value pairs
+export const hasKeyValue = (key: string, value: Term): TermPredicate =>
+  and(
+    isObject,
+    (term: Term) => {
+      const obj = term as { [key: string]: Term }
+      return key in obj && obj[key] === value
+    }
+  )
+
+// Check if object has specific structure (array of key predicates)
+export const objectStructure = (keyPredicates: Array<{ key: string; predicate: TermPredicate }>): TermPredicate =>
+  and(
+    isObject,
+    (term: Term) => {
+      const obj = term as { [key: string]: Term }
+      return keyPredicates.every(({ key, predicate }) => 
+        key in obj && predicate(obj[key])
+      )
+    }
+  )
+
+// Check if object has minimum number of keys
+export const hasMinKeys = (minKeys: number): TermPredicate =>
+  and(
+    isObject,
+    (term: Term) => {
+      const obj = term as { [key: string]: Term }
+      return Object.keys(obj).length >= minKeys
+    }
+  )
+
+// Check if object has exact number of keys
+export const hasExactKeys = (exactKeys: number): TermPredicate =>
+  and(
+    isObject,
+    (term: Term) => {
+      const obj = term as { [key: string]: Term }
+      return Object.keys(obj).length === exactKeys
+    }
+  )
+
+// Check if object values match a sequence of predicates
+export const objectValues = (...valuePredicates: TermPredicate[]): TermPredicate =>
+  and(
+    isObject,
+    (term: Term) => {
+      const obj = term as { [key: string]: Term }
+      const values = Object.values(obj)
+      return valuePredicates.every((pred, index) => 
+        index < values.length && pred(values[index])
+      )
+    }
+  )

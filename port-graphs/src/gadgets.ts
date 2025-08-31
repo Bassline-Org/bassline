@@ -6,6 +6,20 @@ export { Nothing }
 
 export type InputHandler = (self: Gadget, value: Term) => void
 
+// ================================
+// Command Predicates
+// ================================
+
+// Import our combinators
+import { P } from './combinators'
+// Define predicates for each command type
+const isSetInterface = P.startsWith(P.eq('setInterface'), P.hasMinLength(2))
+const isSetInputHandler = P.startsWith(P.eq('set-input-handler'), P.hasMinLength(3))
+const isSetConnectionLimit = P.startsWith(P.eq('set-connection-limit'), P.hasLength(3))
+const isConnect = P.startsWith(P.eq('connect'), P.hasLength(3))
+const isConnectAndSync = P.startsWith(P.eq('connect-and-sync'), P.hasLength(3))
+const isBatch = P.startsWith(P.eq('batch'), P.hasMinLength(2))
+
 // Ports belong to the network and handle their own propagation
 export class Port {
     private connections: Set<ConnectionPath> = new Set() // Connection paths like [gadgetId, portName]
@@ -111,70 +125,82 @@ export class Gadget {
     }
 
     private processControl(term: Term) {
-        if (Array.isArray(term) && term.length >= 2) {
-            const [command, ...args] = term
-
-            switch (command) {
-                case 'add-input-port': {
-                    const [name, value, attributes] = args as [string, Term, Attributes?]
-                    const port = new Port(name, 'input', this, this.network, value || Nothing, attributes || {})
-                    this.ports.set(name, port)
-                    break
-                }
-                case 'add-output-port': {
-                    const [name, attributes] = args as [string, Attributes?]
-                    const port = new Port(name, 'output', this, this.network, Nothing, attributes || {})
-                    this.ports.set(name, port)
-                    break
-                }
-                case 'set-input-handler': {
-                            const [name, handlerOpaque] = args as [string, [string, InputHandler]]
-        const [_, handler] = handlerOpaque
-                    this.inputHandlers.set(name, handler)
-                    break
-                }
-                case 'set-connection-limit': {
-                    const [portName, limit] = args as [string, number | null]
-                    const port = this.ports.get(portName)
-                    if (port) {
-                        port.setConnectionLimit(limit)
-                    }
-                    break
-                }
-                case 'connect': {
-                    const [sourcePort, targetPath] = args as [string, ConnectionPath]
-                    const source = this.ports.get(sourcePort)
-                    if (source) {
-                        source.connectTo(targetPath)
-                    }
-                    break
-                }
-                case 'connect-and-sync': {
-                    const [sourcePort, targetPath] = args as [string, ConnectionPath]
-                    const source = this.ports.get(sourcePort)
-                    if (source) {
-                        // Connect the ports
-                        source.connectTo(targetPath)
-                        
-                        // Forward current value if it's not Nothing
-                        if (source.value !== Nothing) {
-                            source.propagate(source.value)
-                        }
-                    }
-                    break
-                }
-                case 'batch': {
-                    const commands = args[0] as Term[]
-                    for (const command of commands) {
-                        this.processControl(command)
-                    }
-                    break
-                }
-                default: {
-                    throw new Error(`Unknown control command: ${String(command)}`)
+        if (!P.isArray(term) || !P.hasMinLength(2)(term)) {
+            throw new Error(`Invalid control term: ${JSON.stringify(term)}`)
+        }
+        
+        const [command, ...args] = term as [string, ...Term[]]
+        
+        // Use guards to process commands
+        if (isSetInterface(term)) {
+            const [gadgetInterface] = args as [{
+                inputs: Array<{ name: string; value?: Term; attributes?: Attributes }>
+                outputs: Array<{ name: string; attributes?: Attributes }>
+            }]
+            
+            // Create all input ports
+            for (const input of gadgetInterface.inputs) {
+                const port = new Port(input.name, 'input', this, this.network, input.value || Nothing, input.attributes || {})
+                this.ports.set(input.name, port)
+            }
+            
+            // Create all output ports
+            for (const output of gadgetInterface.outputs) {
+                const port = new Port(output.name, 'output', this, this.network, Nothing, output.attributes || {})
+                this.ports.set(output.name, port)
+            }
+            return
+        }
+        
+        if (isSetInputHandler(term)) {
+            const [name, handlerOpaque] = args as [string, [string, InputHandler]]
+            const [_, handler] = handlerOpaque
+            this.inputHandlers.set(name, handler)
+            return
+        }
+        
+        if (isSetConnectionLimit(term)) {
+            const [portName, limit] = args as [string, number | null]
+            const port = this.ports.get(portName)
+            if (port) {
+                port.setConnectionLimit(limit)
+            }
+            return
+        }
+        
+        if (isConnect(term)) {
+            const [sourcePort, targetPath] = args as [string, ConnectionPath]
+            const source = this.ports.get(sourcePort)
+            if (source) {
+                source.connectTo(targetPath)
+            }
+            return
+        }
+        
+        if (isConnectAndSync(term)) {
+            const [sourcePort, targetPath] = args as [string, ConnectionPath]
+            const source = this.ports.get(sourcePort)
+            if (source) {
+                // Connect the ports
+                source.connectTo(targetPath)
+                
+                // Forward current value if it's not Nothing
+                if (source.value !== Nothing) {
+                    source.propagate(source.value)
                 }
             }
+            return
         }
+        
+        if (isBatch(term)) {
+            const commands = args[0] as Term[]
+            for (const command of commands) {
+                this.processControl(command)
+            }
+            return
+        }
+        
+        throw new Error(`Unknown control command: ${command}`)
     }
 
     // Emit to output port (triggers automatic propagation)
@@ -204,17 +230,17 @@ export class Cell extends Gadget {
     constructor(id: string, network: Network, attributes: Attributes = {}, mergeFn: (current: Term, incoming: Term) => Term) {
         super(id, network, attributes)
 
-        // Set up the cell via batch control terms to ensure proper initialization order
-        const setupCommands: Term[] = [
-            ['add-input-port', 'value-in'],
-            ['add-output-port', 'value-out'],
-            ['set-input-handler', 'value-in', ['opaque', (self: Gadget, value: Term) => {
-                const currentValue = self.getPort('value-out')?.value || Nothing
-                const result = mergeFn(currentValue, value)
-                self.emit('value-out', result)
-            }]]
-        ]
-        this.receive('control', ['batch', ...setupCommands])
+        // Set up the cell interface and handler
+        this.receive('control', ['setInterface', {
+            inputs: [{ name: 'value-in' }],
+            outputs: [{ name: 'value-out' }]
+        }])
+        
+        this.receive('control', ['set-input-handler', 'value-in', ['opaque', (self: Gadget, value: Term) => {
+            const currentValue = self.getPort('value-out')?.value || Nothing
+            const result = mergeFn(currentValue, value)
+            self.emit('value-out', result)
+        }]])
     }
 }
 
@@ -234,18 +260,18 @@ export class FunctionGadget extends Gadget {
         super(id, network)
         this.fn = config.fn
 
-        // Auto-setup via batch control terms
-        const setupCommands: Term[] = [
-            // Create all input ports
-            ...config.inputs.map(name => ['add-input-port', name] as Term),
-            // Create all output ports  
-            ...config.outputs.map(name => ['add-output-port', name] as Term),
-            // Set up auto-trigger handler for each input
-            ...config.inputs.map(name => ['set-input-handler', name, ['opaque', (_self: Gadget, value: Term) => {
+        // Set up the gadget interface
+        this.receive('control', ['setInterface', {
+            inputs: config.inputs.map(name => ({ name })),
+            outputs: config.outputs.map(name => ({ name }))
+        }])
+
+        // Set up auto-trigger handler for each input
+        for (const name of config.inputs) {
+            this.receive('control', ['set-input-handler', name, ['opaque', (_self: Gadget, value: Term) => {
                 this.handleInputUpdate(name, value)
-            }]] as Term)
-        ]
-        this.receive('control', ['batch', ...setupCommands])
+            }]])
+        }
     }
 
     private handleInputUpdate(portName: string, value: Term) {
@@ -300,13 +326,17 @@ export class BehaviorCell extends Cell {
     constructor(id: string, network: Network, attributes: Attributes = {}) {
         super(id, network, attributes, (_current, incoming) => incoming)
         
-        // Set up behavior management ports
-        this.receive('control', ['batch',
-            ['add-input-port', 'define-behavior'],
-            ['add-input-port', 'load-behavior'],
-            ['add-output-port', 'behavior-defined'],
-            ['add-output-port', 'behavior-loaded']
-        ])
+        // Set up behavior management interface
+        this.receive('control', ['setInterface', {
+            inputs: [
+                { name: 'define-behavior' },
+                { name: 'load-behavior' }
+            ],
+            outputs: [
+                { name: 'behavior-defined' },
+                { name: 'behavior-loaded' }
+            ]
+        }])
         
         // Set up handlers
         this.receive('control', ['set-input-handler', 'define-behavior', ['opaque', (_self: Gadget, value: Term) => {
