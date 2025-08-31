@@ -3,7 +3,13 @@
 // ================================
 
 import { Term } from '../terms'
-import { TermPredicate, TermMap, PredicateCombinator, Pipeline, WhenMap } from './types'
+
+// Define types inline since we deleted types.ts
+export type TermMap<In = Term, Out = Term> = (input: In) => Out
+export type TermPredicate = TermMap<Term, boolean>
+export type PredicateCombinator = (...predicates: TermPredicate[]) => TermPredicate
+export type Pipeline<T = Term> = (...transforms: TermMap<T, T>[]) => TermMap<T, T>
+export type WhenMap<T = Term> = (predicate: TermPredicate, ifTrue: TermMap<Term, T>) => TermMap<Term, T | Term>
 
 // Logical OR - matches if ANY predicate matches
 export const or: PredicateCombinator = (...predicates) => 

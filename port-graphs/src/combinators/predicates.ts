@@ -3,7 +3,11 @@
 // ================================
 
 import { Term } from '../terms'
-import { TermPredicate } from './types'
+import { and, constant } from './combinators'
+
+// Define types inline since we deleted types.ts
+export type TermMap<In = Term, Out = Term> = (input: In) => Out
+export type TermPredicate = TermMap<Term, boolean>
 
 // Type checking predicates
 export const isString: TermPredicate = (term) => typeof term === 'string'
@@ -13,6 +17,11 @@ export const isSymbol: TermPredicate = (term) => typeof term === 'symbol'
 export const isArray: TermPredicate = (term) => Array.isArray(term)
 export const isObject: TermPredicate = (term) => 
   typeof term === 'object' && term !== null && !Array.isArray(term)
+
+export const constants = {
+  true: constant(true),
+  false: constant(false),
+}
 
 // ================================
 // Structural Predicates
@@ -27,10 +36,47 @@ export const isTagged = (tag: string): TermPredicate =>
 
 // Array structure predicates
 export const hasLength = (length: number): TermPredicate => 
-  (term: Term) => Array.isArray(term) && term.length === length
+  and(
+    isArray,
+    (term: Term) => (term as Term[]).length === length
+  )
 
 export const hasMinLength = (minLength: number): TermPredicate => 
-  (term: Term) => Array.isArray(term) && term.length >= minLength
+  and(
+    isArray,
+    (term: Term) => (term as Term[]).length >= minLength
+  )
+
+// ================================
+// Structural Matching Combinators
+// ================================
+
+export const sequence = (...predicates: TermPredicate[]): TermPredicate =>
+  (term: Term) => {
+    if (!isArray(term)) return false
+    const listTerm = term as Term[]
+    return predicates.every((pred, index) => {
+      const item = listTerm[index]
+      if (!item) return false
+      return pred(item)
+    })
+  }
+
+// Matches arrays that start with a sequence of predicates
+export const startsWith = (...predicates: TermPredicate[]): TermPredicate =>
+  and(
+    isArray,
+    hasMinLength(predicates.length),
+    sequence(...predicates)
+  )
+
+// Matches arrays that have a specific structure
+export const hasStructure = (structure: TermPredicate[]): TermPredicate =>
+  and(
+    isArray,
+    hasLength(structure.length),
+    sequence(...structure)
+  )
 
 // ================================
 // Comparison Predicates

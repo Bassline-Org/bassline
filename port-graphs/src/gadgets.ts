@@ -1,5 +1,5 @@
 import type { Attributes, PortDirection, ConnectionPath } from './gadget-types'
-import { Nothing, Term, Opaque } from './terms'
+import { Nothing, Term } from './terms'
 
 // Re-export Nothing for convenience
 export { Nothing }
@@ -128,8 +128,8 @@ export class Gadget {
                     break
                 }
                 case 'set-input-handler': {
-                    const [name, handlerOpaque] = args as [string, Opaque<InputHandler>]
-                    const [_, handler] = handlerOpaque
+                            const [name, handlerOpaque] = args as [string, [string, InputHandler]]
+        const [_, handler] = handlerOpaque
                     this.inputHandlers.set(name, handler)
                     break
                 }

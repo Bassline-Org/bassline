@@ -5,16 +5,11 @@
 // Re-exports from modular files
 // ================================
 
-// Export types (but not when to avoid conflicts)
-export type { TermMap, TermPredicate, PredicateCombinator, Pipeline, IfMap } from './types'
-export type { WhenMap } from './types'
-
 // Export predicates
 export * from './predicates'
 
-// Export combinators (but not when to avoid conflicts)
-export { or, and, not, nor, pipe, compose, composeMany, id, constant } from './combinators'
-export { when } from './combinators'
+// Export combinators
+export { or, and, not, nor, pipe, when, compose, composeMany, id, constant } from './combinators'
 
 // ================================
 // Convenience exports
@@ -28,7 +23,8 @@ import {
 import {
   isString, isNumber, isBoolean, isSymbol, isArray, isObject,
   hasTag, isTagged, hasLength, hasMinLength,
-  eq, ne, gt, lt, gte, lte, inRange
+  eq, ne, gt, lt, gte, lte, inRange,
+  startsWith, hasStructure, sequence
 } from './predicates'
 
 // Main export object for easy access
@@ -60,6 +56,11 @@ export const P = {
   isTagged,
   hasLength,
   hasMinLength,
+  
+  // Structural matching combinators
+  startsWith,
+  hasStructure,
+  sequence,
   
   // Comparison predicates
   eq,
