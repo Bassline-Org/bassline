@@ -4,16 +4,27 @@
 
 export type Opaque<T = unknown> = ['opaque', T]
 export type Atom = string | number | boolean | symbol | symbol | Opaque // opaque term, used for embedding host langugae data, such as functions
+
+// Generic tagged term: [tag, ...terms]
+export type TaggedTerm<T extends string = string> = [T, ...Term[]]
+
+// Specific tagged terms for common operations
+export type OrTerm = TaggedTerm<'or'>
+export type AndTerm = TaggedTerm<'and'>
+export type PremiseTerm = TaggedTerm<'premise'>
+export type ConstraintTerm = TaggedTerm<'constraint'>
+
 export type Term =
     | Atom
-    | Term[]
-    | { [key: string]: Term }
+    | TaggedTerm
 
 export type Predicate = (term: Term) => boolean
 
 // Transportable term, can be sent over the wire
 // The only difference between Term is the exclusion of opaque terms
 export type Transportable = string | number | boolean | symbol | Transportable[] | { [key: string]: Transportable }
+
+import { orSetP, andSetP, tail, createOrTerm, createAndTerm } from './pattern-matching'
 
 // ================================
 // Predicates
@@ -39,7 +50,7 @@ export const Nothing = Symbol('Nothing')
 export const Contradiction = Symbol('Contradiction')
 
 export const nothingp: Predicate = term => term === Nothing
-export const contradictionp: Predicate = term => term === Contradiction || (Array.isArray(term) && term[0] === Contradiction)
+export const contradictionp: Predicate = term => term === Contradiction || (Array.isArray(term) && term[0] === 'contradiction')
 
 // ================================
 // Logical Merge Operations for TMS
@@ -50,22 +61,25 @@ export const contradictionp: Predicate = term => term === Contradiction || (Arra
  * Addition means logical OR: any premise can be satisfied
  */
 export const logicalOrMerge = (current: Term, incoming: Term): Term => {
-  if (current === Nothing) return incoming
+  if (current === Nothing) {
+    // When starting fresh, create a logical OR wrapper
+    return createOrTerm(incoming)
+  }
   if (current === incoming) return current // Idempotent
   
   // Create a logical OR term: ['or', premise1, premise2, ...]
-  if (Array.isArray(current) && current[0] === 'or') {
+  if (orSetP(current)) {
     // Current is already an OR term, add the new premise
-    return ['or', ...current.slice(1), incoming] as Term[]
+    return createOrTerm(...tail(current), incoming)
   }
   
-  if (Array.isArray(incoming) && incoming[0] === 'or') {
+  if (orSetP(incoming)) {
     // Incoming is an OR term, add current to it
-    return ['or', current, ...incoming.slice(1)] as Term[]
+    return createOrTerm(current, ...tail(incoming))
   }
   
   // Create new OR term
-  return ['or', current, incoming] as Term[]
+  return createOrTerm(current, incoming)
 }
 
 /**
@@ -77,34 +91,61 @@ export const logicalAndMerge = (current: Term, incoming: Term): Term => {
   if (current === incoming) return current // Idempotent
   
   // Create a logical AND term: ['and', premise1, premise2, ...]
-  if (Array.isArray(current) && current[0] === 'and') {
+  if (andSetP(current)) {
     // Current is already an AND term, add the new premise
-    return ['and', ...current.slice(1), incoming] as Term[]
+    return createAndTerm(...tail(current), incoming)
   }
   
-  if (Array.isArray(incoming) && incoming[0] === 'and') {
+  if (andSetP(incoming)) {
     // Incoming is an AND term, add current to it
-    return ['and', current, ...incoming.slice(1)] as Term[]
+    return createAndTerm(current, ...tail(incoming))
   }
   
   // Create new AND term
-  return ['and', current, incoming] as Term[]
+  return createAndTerm(current, incoming)
 }
 
 /**
  * Set difference merge function - removes elements from first set
  * Used for computing believed = all - nogoods
+ * Handles both simple arrays and logical OR structures: ['or', premise1, premise2, ...]
  */
 export const setDifferenceMerge = (current: Term, incoming: Term): Term => {
   if (current === Nothing) return incoming
-  if (Array.isArray(current) && Array.isArray(incoming)) {
-    // If both are arrays, treat as sets and compute difference
-    const currentSet = new Set(current)
-    const incomingSet = new Set(incoming)
-    return [...currentSet].filter(x => !incomingSet.has(x)) as Term[]
+  
+  // Extract premises from logical OR structures or treat as simple arrays
+  const extractPremises = (term: Term): Term[] => {
+    if (orSetP(term)) {
+      return tail(term)
+    }
+    if (Array.isArray(term)) {
+      return term as Term[] // Simple array
+    }
+    return [term] // Single value
   }
-  // If not arrays, return current
-  return current
+  
+  const currentPremises = extractPremises(current)
+  const incomingPremises = extractPremises(incoming)
+  
+  // Compute set difference by filtering out incoming premises
+  const resultPremises = currentPremises.filter(currentPremise => 
+    !incomingPremises.some(incomingPremise => 
+      // Deep equality check for premises
+      Array.isArray(currentPremise) && Array.isArray(incomingPremise) 
+        ? currentPremise.length === incomingPremise.length && 
+          currentPremise.every((val, idx) => val === incomingPremise[idx])
+        : currentPremise === incomingPremise
+    )
+  )
+  
+  // Return as logical OR structure
+  if (resultPremises.length === 0) {
+    return createOrTerm() // Empty OR
+  } else if (resultPremises.length === 1) {
+    return resultPremises[0]! // Single premise, no need for OR wrapper
+  } else {
+    return createOrTerm(...resultPremises) // Multiple premises with OR wrapper
+  }
 }
 
 // Legacy function names for backward compatibility

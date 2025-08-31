@@ -214,7 +214,7 @@ export class Cell extends Gadget {
                 self.emit('value-out', result)
             }]]
         ]
-        this.receive('control', ['batch', setupCommands])
+        this.receive('control', ['batch', ...setupCommands])
     }
 }
 
@@ -245,7 +245,7 @@ export class FunctionGadget extends Gadget {
                 this.handleInputUpdate(name, value)
             }]] as Term)
         ]
-        this.receive('control', ['batch', setupCommands])
+        this.receive('control', ['batch', ...setupCommands])
     }
 
     private handleInputUpdate(portName: string, value: Term) {
@@ -301,12 +301,12 @@ export class BehaviorCell extends Cell {
         super(id, network, attributes, (_current, incoming) => incoming)
         
         // Set up behavior management ports
-        this.receive('control', ['batch', [
+        this.receive('control', ['batch',
             ['add-input-port', 'define-behavior'],
             ['add-input-port', 'load-behavior'],
             ['add-output-port', 'behavior-defined'],
             ['add-output-port', 'behavior-loaded']
-        ]])
+        ])
         
         // Set up handlers
         this.receive('control', ['set-input-handler', 'define-behavior', ['opaque', (_self: Gadget, value: Term) => {
@@ -336,7 +336,7 @@ export class BehaviorCell extends Cell {
                 const targetGadget = this.network.getGadget(targetGadgetId)
                 if (targetGadget) {
                     // Load the behavior into the target gadget
-                    targetGadget.receive('control', ['batch', behavior])
+                    targetGadget.receive('control', ['batch', ...behavior])
                     this.emit('behavior-loaded', [behaviorName, targetGadgetId])
                     console.log(`🚀 Behavior '${behaviorName}' loaded into '${targetGadgetId}'`)
                 } else {
