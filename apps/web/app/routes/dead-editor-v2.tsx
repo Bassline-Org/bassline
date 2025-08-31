@@ -1,73 +1,185 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { NodeEditor, ClassicPreset } from 'rete'
-import { AreaPlugin, AreaExtensions } from 'rete-area-plugin'
-import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin'
-import { ReactPlugin, Presets as ReactPresets, useRete } from 'rete-react-plugin'
+import type { GetSchemes } from 'rete'
+import { ReactPlugin } from 'rete-react-plugin'
 import type { ReactArea2D } from 'rete-react-plugin'
+import { AreaPlugin, AreaExtensions, Zoom } from 'rete-area-plugin'
+import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin'
+import { Presets as ReactPresets } from 'rete-react-plugin'
 
-// Node socket
-const socket = new ClassicPreset.Socket('socket')
+// Socket for connections
+const socket = new ClassicPreset.Socket('value')
 
-// Custom node class for DEAD editor
+// Types
+type Schemes = GetSchemes<
+  DeadCellNode | DeadPropagatorNode | DeadMacroNode,
+  ClassicPreset.Connection<DeadCellNode | DeadPropagatorNode | DeadMacroNode, DeadCellNode | DeadPropagatorNode | DeadMacroNode>
+>
+
+// Node classes
 class DeadCellNode extends ClassicPreset.Node {
-  prefix: string
+  prefix: string = 'main'
   mergeFunction: string = 'last'
+  width = 180
+  height = 120
+  hidden = false
   
   constructor(label: string) {
     super(label)
     this.prefix = 'main'
     
-    this.addInput('in', new ClassicPreset.Input(socket, 'Input', true))
-    this.addOutput('out', new ClassicPreset.Output(socket, 'Output', true))
-    
-    this.addControl('merge', new ClassicPreset.InputControl('text', {
-      initial: this.mergeFunction,
-      change: (value) => { this.mergeFunction = String(value) }
-    }))
+    // Cells can have multiple inputs, single output
+    this.addInput('in1', new ClassicPreset.Input(socket, 'In 1', true))
+    this.addInput('in2', new ClassicPreset.Input(socket, 'In 2', true))
+    this.addOutput('out', new ClassicPreset.Output(socket, 'Output'))
   }
 }
 
 class DeadPropagatorNode extends ClassicPreset.Node {
-  prefix: string
-  functionType: string
+  prefix: string = 'main'
+  functionType: string = 'identity'
+  width = 200
+  height = 120
+  hidden = false
   
-  constructor(label: string, fn: string = 'identity') {
+  constructor(label: string, fnType: string = 'identity') {
     super(label)
     this.prefix = 'main'
-    this.functionType = fn
+    this.functionType = fnType
     
-    this.addInput('in', new ClassicPreset.Input(socket, 'Input', true))
-    this.addOutput('out', new ClassicPreset.Output(socket, 'Output', true))
-    
-    this.addControl('function', new ClassicPreset.InputControl('text', {
-      initial: this.functionType,
-      change: (value) => { this.functionType = String(value) }
-    }))
+    // Configure inputs/outputs based on function type
+    switch(fnType) {
+      case 'add':
+      case 'subtract':
+      case 'multiply':
+      case 'divide':
+        this.addInput('a', new ClassicPreset.Input(socket, 'A'))
+        this.addInput('b', new ClassicPreset.Input(socket, 'B'))
+        this.addOutput('result', new ClassicPreset.Output(socket, 'Result'))
+        break
+        
+      case 'clamp':
+        this.addInput('value', new ClassicPreset.Input(socket, 'Value'))
+        this.addInput('min', new ClassicPreset.Input(socket, 'Min'))
+        this.addInput('max', new ClassicPreset.Input(socket, 'Max'))
+        this.addOutput('result', new ClassicPreset.Output(socket, 'Result'))
+        break
+        
+      case 'compare':
+        this.addInput('a', new ClassicPreset.Input(socket, 'A'))
+        this.addInput('b', new ClassicPreset.Input(socket, 'B'))
+        this.addOutput('equal', new ClassicPreset.Output(socket, 'Equal'))
+        this.addOutput('greater', new ClassicPreset.Output(socket, 'Greater'))
+        this.addOutput('less', new ClassicPreset.Output(socket, 'Less'))
+        break
+        
+      case 'identity':
+      default:
+        this.addInput('in', new ClassicPreset.Input(socket, 'Input'))
+        this.addOutput('out', new ClassicPreset.Output(socket, 'Output'))
+        break
+    }
   }
 }
 
-type Node = DeadCellNode | DeadPropagatorNode
-type Conn = ClassicPreset.Connection<Node, Node>
-type Schemes = {
-  Node: Node
-  Connection: Conn
+// TODO: MacroNode for later
+class DeadMacroNode extends ClassicPreset.Node {
+  prefix: string = 'main'
+  expanded: boolean = false
+  template: {
+    nodes: Array<{
+      id: string
+      type: 'cell' | 'propagator' | 'macro'
+      label: string
+      prefix: string
+      data: any
+    }>
+    connections: Array<{
+      source: string
+      target: string
+      sourceOutput: string
+      targetInput: string
+    }>
+  } | null = null
+  
+  constructor(label: string, template?: typeof DeadMacroNode.prototype.template) {
+    super(label)
+    this.prefix = 'main'
+    const socket = new ClassicPreset.Socket('default')
+    
+    if (template) {
+      this.template = template
+      // Create inputs/outputs based on template boundary nodes
+      const boundaryInputs = new Map<string, string>()
+      const boundaryOutputs = new Map<string, string>()
+      
+      // Find connections that cross the template boundary
+      template.connections.forEach(conn => {
+        const sourceInTemplate = template.nodes.some(n => n.id === conn.source)
+        const targetInTemplate = template.nodes.some(n => n.id === conn.target)
+        
+        if (!sourceInTemplate && targetInTemplate) {
+          // External source -> template target = input
+          boundaryInputs.set(conn.targetInput, conn.targetInput)
+        }
+        if (sourceInTemplate && !targetInTemplate) {
+          // Template source -> external target = output
+          boundaryOutputs.set(conn.sourceOutput, conn.sourceOutput)
+        }
+      })
+      
+      // Add inputs for boundary inputs
+      let inputIndex = 0
+      boundaryInputs.forEach((label, key) => {
+        this.addInput(`in${inputIndex++}`, new ClassicPreset.Input(socket, label))
+      })
+      
+      // Add outputs for boundary outputs
+      let outputIndex = 0
+      boundaryOutputs.forEach((label, key) => {
+        this.addOutput(`out${outputIndex++}`, new ClassicPreset.Output(socket, label))
+      })
+    } else {
+      // Default macro structure
+      this.addInput('in', new ClassicPreset.Input(socket, 'Input'))
+      this.addOutput('out', new ClassicPreset.Output(socket, 'Output'))
+    }
+  }
+  
+  expand() {
+    this.expanded = true
+    // When expanded, the macro's template nodes are shown
+    return this.template
+  }
+  
+  collapse() {
+    this.expanded = false
+    // When collapsed, only the macro node is shown
+  }
 }
+
+type Node = DeadCellNode | DeadPropagatorNode | DeadMacroNode
 
 // Export format
 interface DeadNetworkExport {
   cells: Array<{
     id: string
     merge: string
-    initial?: any
-    position?: { x: number; y: number }
+    inputs: string[]
+    outputs: string[]
   }>
   propagators: Array<{
     id: string
     fn: string
     inputs: string[]
     outputs: string[]
-    position?: { x: number; y: number }
+  }>
+  connections: Array<{
+    source: string       // Node ID
+    sourceOutput: string // Output port name
+    target: string       // Node ID
+    targetInput: string  // Input port name
   }>
   metadata?: {
     created: string
@@ -77,7 +189,10 @@ interface DeadNetworkExport {
 }
 
 // Create editor factory  
-const createDeadEditor = () => async (container: HTMLElement) => {
+const createDeadEditor = (
+  selectedNodesRef: React.MutableRefObject<Set<string>>,
+  setSelectedCount: (count: number) => void
+) => async (container: HTMLElement) => {
   const editor = new NodeEditor<Schemes>()
   const area = new AreaPlugin<Schemes, ReactArea2D<Schemes>>(container)
   const connection = new ConnectionPlugin<Schemes, ReactArea2D<Schemes>>()
@@ -91,8 +206,196 @@ const createDeadEditor = () => async (container: HTMLElement) => {
   area.use(connection)
   area.use(render)
   
-  // Listen for zoom events
+  // Track selected nodes
+  const selectedNodes = selectedNodesRef.current
+  
+  // Configure zoom to be less sensitive
+  area.area.setZoomHandler(new Zoom(0.05)) // Reduced zoom factor for less sensitivity
+  
+  // Handle keyboard shortcuts
+  container.addEventListener('keydown', async (e) => {
+    // Delete selected nodes
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      for (const nodeId of selectedNodes) {
+        const node = editor.getNode(nodeId)
+        if (node) {
+          // Remove connections first
+          const connections = editor.getConnections().filter(
+            c => c.source === nodeId || c.target === nodeId
+          )
+          for (const conn of connections) {
+            await editor.removeConnection(conn.id)
+          }
+          // Remove node
+          await editor.removeNode(nodeId)
+          selectedNodes.delete(nodeId)
+        }
+      }
+      setSelectedCount(selectedNodes.size)
+    }
+    
+    // Select all with Ctrl/Cmd+A
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault()
+      selectedNodes.clear()
+      const allNodes = editor.getNodes()
+      allNodes.forEach(node => {
+        selectedNodes.add(node.id)
+        const view = area.nodeViews.get(node.id)
+        if (view?.element) {
+          view.element.classList.add('selected')
+        }
+      })
+      setSelectedCount(selectedNodes.size)
+    }
+    
+    // Deselect all with Escape
+    if (e.key === 'Escape') {
+      selectedNodes.clear()
+      setSelectedCount(0)
+      editor.getNodes().forEach(node => {
+        const view = area.nodeViews.get(node.id)
+        if (view?.element) {
+          view.element.classList.remove('selected')
+        }
+      })
+    }
+  })
+  
+  // Handle node selection and double-click
   area.addPipe((context) => {
+    if (context.type === 'nodepicked') {
+      const nodeId = context.data.id
+      const event = (context.data as any).event
+      const isMultiSelect = event?.ctrlKey || event?.metaKey || event?.shiftKey
+      
+      // Handle double-click on macro nodes
+      if (event?.detail === 2) { // Double click
+        const node = editor.getNode(nodeId)
+        if (node instanceof DeadMacroNode) {
+          if (!node.expanded && node.template) {
+            // Expand macro: add template nodes to editor
+            const expandedNodes = new Map<string, string>() // old id -> new id
+            
+            // Add template nodes
+            const addNodes = async () => {
+              for (const templateNode of node.template!.nodes) {
+              const newId = `${nodeId}_${templateNode.id}`
+              let newNode: DeadCellNode | DeadPropagatorNode | DeadMacroNode
+              
+              if (templateNode.type === 'cell') {
+                newNode = new DeadCellNode(templateNode.label)
+                ;(newNode as DeadCellNode).mergeFunction = templateNode.data?.mergeFunction || 'last'
+              } else if (templateNode.type === 'propagator') {
+                newNode = new DeadPropagatorNode(templateNode.label, templateNode.data?.functionType || 'identity')
+              } else {
+                newNode = new DeadMacroNode(templateNode.label, templateNode.data?.template)
+              }
+              
+              newNode.id = newId
+              newNode.prefix = templateNode.prefix
+              expandedNodes.set(templateNode.id, newId)
+              
+              await editor.addNode(newNode)
+              
+              // Position nodes relative to macro position
+              const macroPos = await area.nodeViews.get(nodeId)?.position
+              if (macroPos) {
+                const offsetX = (Math.random() - 0.5) * 400
+                const offsetY = (Math.random() - 0.5) * 300
+                await area.translate(newId, {
+                  x: macroPos.x + offsetX,
+                  y: macroPos.y + offsetY + 100
+                })
+              }
+              }
+            }
+            
+            addNodes()
+            
+            // Add template connections with updated IDs
+            setTimeout(async () => {
+              if (!node.template) return
+              for (const conn of node.template.connections) {
+                const newSource = expandedNodes.get(conn.source) || conn.source
+                const newTarget = expandedNodes.get(conn.target) || conn.target
+                
+                // Only create connection if both nodes exist
+                const sourceNode = editor.getNode(newSource)
+                const targetNode = editor.getNode(newTarget)
+                
+                if (sourceNode && targetNode) {
+                  const connection = new ClassicPreset.Connection(
+                    sourceNode,
+                    conn.sourceOutput,
+                    targetNode,
+                    conn.targetInput
+                  )
+                  await editor.addConnection(connection)
+                }
+              }
+            }, 100)
+            
+            node.expanded = true
+            // Store expanded node IDs for later collapse
+            ;(node as any).expandedNodeIds = Array.from(expandedNodes.values())
+          } else if (node.expanded && (node as any).expandedNodeIds) {
+            // Collapse macro: remove expanded nodes
+            const expandedIds = (node as any).expandedNodeIds as string[]
+            
+            const collapseNodes = async () => {
+              for (const expandedId of expandedIds) {
+                // Remove connections first
+                const connections = editor.getConnections().filter(
+                  c => c.source === expandedId || c.target === expandedId
+                )
+                for (const conn of connections) {
+                  await editor.removeConnection(conn.id)
+                }
+                // Remove node
+                await editor.removeNode(expandedId)
+              }
+              
+              node.expanded = false
+              delete (node as any).expandedNodeIds
+            }
+            
+            collapseNodes()
+          }
+          return context // Don't process as selection
+        }
+      }
+      
+      if (!isMultiSelect) {
+        // Clear previous selection
+        selectedNodes.forEach(id => {
+          const view = area.nodeViews.get(id)
+          if (view?.element) {
+            view.element.classList.remove('selected')
+          }
+        })
+        selectedNodes.clear()
+        setSelectedCount(0)
+      }
+      
+      // Toggle selection for this node
+      if (selectedNodes.has(nodeId)) {
+        selectedNodes.delete(nodeId)
+        const view = area.nodeViews.get(nodeId)
+        if (view?.element) {
+          view.element.classList.remove('selected')
+        }
+      } else {
+        selectedNodes.add(nodeId)
+        const view = area.nodeViews.get(nodeId)
+        if (view?.element) {
+          view.element.classList.add('selected')
+        }
+      }
+      setSelectedCount(selectedNodes.size)
+    }
+    
+    // Listen for zoom events
     if (context.type === 'zoom') {
       const { zoom } = context.data
       currentZoom = zoom
@@ -111,179 +414,8 @@ const createDeadEditor = () => async (container: HTMLElement) => {
   // Add connection presets
   connection.addPreset(ConnectionPresets.classic.setup())
   
-  // Add render presets with custom node components
-  render.addPreset(ReactPresets.classic.setup({
-    customize: {
-      node(context) {
-        const node = context.payload
-        const displayName = node.id  // Show full ID including prefix
-        
-        // Determine zoom level for semantic rendering
-        const getZoomLevel = () => {
-          if (currentZoom < 0.3) return 'dot'        // Very zoomed out - just dots
-          if (currentZoom < 0.6) return 'compact'    // Zoomed out - compact boxes
-          if (currentZoom < 1.5) return 'normal'     // Normal view
-          if (currentZoom < 3) return 'detailed'     // Zoomed in - show more detail
-          return 'internal'                          // Very zoomed in - show internals
-        }
-        
-        const zoomLevel = getZoomLevel()
-        
-        // Check if this is a group node (has child nodes with this prefix)
-        const isGroupNode = (nodeId: string) => {
-          const prefix = nodeId
-          return editor.getNodes().some(n => {
-            const typedNode = n as DeadCellNode | DeadPropagatorNode
-            return typedNode.prefix?.startsWith(prefix + '.')
-          })
-        }
-        
-        const hasChildren = isGroupNode(node.id.substring(0, node.id.lastIndexOf('.')))
-        
-        if (node instanceof DeadCellNode) {
-          return () => (
-            <>
-              {zoomLevel === 'dot' ? (
-                // Very zoomed out - just a dot with tooltip
-                <div 
-                  data-node-id={node.id}
-                  className="w-3 h-3 bg-blue-500 rounded-full"
-                  title={displayName}
-                />
-              ) : zoomLevel === 'compact' ? (
-                // Zoomed out - compact box
-                <div 
-                  data-node-id={node.id}
-                  className="bg-blue-50 border border-blue-300 rounded px-2 py-1 min-w-[80px]"
-                >
-                  <div className="text-xs text-blue-900 truncate">{displayName}</div>
-                </div>
-              ) : zoomLevel === 'normal' || zoomLevel === 'detailed' ? (
-                // Normal/Detailed view
-                <div 
-                  data-node-id={node.id}
-                  className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 min-w-[180px]"
-                >
-                  <div className="font-medium text-blue-900">{displayName || 'cell'}</div>
-                  {zoomLevel === 'detailed' && (
-                    <div className="mt-2">
-                      <label className="text-xs text-gray-600">Merge:</label>
-                      <select 
-                        className="ml-1 text-xs border rounded px-1 py-0.5"
-                        defaultValue={node.mergeFunction}
-                        onChange={(e) => node.mergeFunction = e.target.value}
-                      >
-                        <option value="last">Last</option>
-                        <option value="max">Max</option>
-                        <option value="min">Min</option>
-                        <option value="sum">Sum</option>
-                        <option value="union">Union</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                // Internal view - show everything
-                <div 
-                  data-node-id={node.id}
-                  className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 min-w-[220px]"
-                >
-                  <div className="font-bold text-blue-900 text-lg">{displayName || 'cell'}</div>
-                  <div className="mt-3">
-                    <label className="text-sm text-gray-600">Merge Function:</label>
-                    <select 
-                      className="ml-2 text-sm border rounded px-2 py-1 w-full mt-1"
-                      defaultValue={node.mergeFunction}
-                      onChange={(e) => node.mergeFunction = e.target.value}
-                    >
-                      <option value="last">Last Write Wins</option>
-                      <option value="max">Maximum Value</option>
-                      <option value="min">Minimum Value</option>
-                      <option value="sum">Sum Values</option>
-                      <option value="union">Union Set</option>
-                    </select>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    Type: Cell | Prefix: {node.prefix}
-                  </div>
-                </div>
-              )}
-            </>
-          )
-        }
-        
-        if (node instanceof DeadPropagatorNode) {
-          return () => (
-            <>
-              {zoomLevel === 'dot' ? (
-                // Very zoomed out - just a dot
-                <div 
-                  data-node-id={node.id}
-                  className="w-3 h-3 bg-green-500 rounded-full"
-                  title={displayName}
-                />
-              ) : zoomLevel === 'compact' ? (
-                // Zoomed out - compact box
-                <div 
-                  data-node-id={node.id}
-                  className="bg-green-50 border border-green-300 rounded px-2 py-1 min-w-[80px]"
-                >
-                  <div className="text-xs text-green-900 truncate">{displayName}</div>
-                </div>
-              ) : zoomLevel === 'normal' || zoomLevel === 'detailed' ? (
-                // Normal/Detailed view
-                <div className="bg-green-50 border-2 border-green-300 rounded-lg p-3 min-w-[180px]">
-                  <div className="font-medium text-green-900">{displayName || 'propagator'}</div>
-                  {zoomLevel === 'detailed' && (
-                    <div className="mt-2">
-                      <label className="text-xs text-gray-600">Function:</label>
-                      <select 
-                        className="ml-1 text-xs border rounded px-1 py-0.5"
-                        defaultValue={node.functionType}
-                        onChange={(e) => node.functionType = e.target.value}
-                      >
-                        <option value="identity">Identity</option>
-                        <option value="add">Add</option>
-                        <option value="multiply">Multiply</option>
-                        <option value="subtract">Subtract</option>
-                        <option value="divide">Divide</option>
-                        <option value="clamp">Clamp</option>
-                        <option value="compare">Compare</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                // Internal view - show everything
-                <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4 min-w-[220px]">
-                  <div className="font-bold text-green-900 text-lg">{displayName || 'propagator'}</div>
-                  <div className="mt-3">
-                    <label className="text-sm text-gray-600">Function Type:</label>
-                    <select 
-                      className="ml-2 text-sm border rounded px-2 py-1 w-full mt-1"
-                      defaultValue={node.functionType}
-                      onChange={(e) => node.functionType = e.target.value}
-                    >
-                      <option value="identity">Identity Function</option>
-                      <option value="add">Addition (+)</option>
-                      <option value="multiply">Multiplication (×)</option>
-                      <option value="subtract">Subtraction (-)</option>
-                      <option value="divide">Division (÷)</option>
-                      <option value="clamp">Clamp Range</option>
-                      <option value="compare">Comparison</option>
-                    </select>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    Type: Propagator | Prefix: {node.prefix}
-                  </div>
-                </div>
-              )}
-            </>
-          )
-        }
-      }
-    }
-  }))
+  // Add render presets - use default for now to test connections
+  render.addPreset(ReactPresets.classic.setup())
   
   // Enable selectable nodes with accumulation
   AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
@@ -299,12 +431,12 @@ const createDeadEditor = () => async (container: HTMLElement) => {
     const groups: Record<string, Node[]> = {}
     
     // Don't show groups when very zoomed out
-    if (currentZoom < 0.5) return
+    if (currentZoom < 0.3) return
     
     // Group nodes by their prefix property (which stores the exact prefix used)
     nodes.forEach(node => {
       const typedNode = node as DeadCellNode | DeadPropagatorNode
-      const prefix = typedNode.prefix
+      const prefix = typedNode.prefix || 'main'
       if (!prefix) return
       
       if (!groups[prefix]) groups[prefix] = []
@@ -336,13 +468,13 @@ const createDeadEditor = () => async (container: HTMLElement) => {
     // Add group boundaries
     sortedPrefixes.forEach(prefix => {
       const groupNodes = groups[prefix]
-      if (groupNodes.length < 1) return
+      if (!groupNodes || groupNodes.length < 1) return
       
       // Calculate bounds
       let minX = Infinity, minY = Infinity
       let maxX = -Infinity, maxY = -Infinity
       
-      groupNodes.forEach(node => {
+      groupNodes?.forEach(node => {
         const view = area.nodeViews.get(node.id)
         if (view && view.position) {
           minX = Math.min(minX, view.position.x)
@@ -365,7 +497,7 @@ const createDeadEditor = () => async (container: HTMLElement) => {
       // Create group element
       const groupEl = document.createElement('div')
       groupEl.className = 'group-boundary'
-      groupEl.dataset.prefix = prefix
+      groupEl.dataset['prefix'] = prefix
       groupEl.style.cssText = `
         position: absolute;
         left: ${minX - padding}px;
@@ -418,7 +550,7 @@ const createDeadEditor = () => async (container: HTMLElement) => {
   })
   
   // Initial group update
-  setTimeout(updateGroups, 100)
+  setTimeout(updateGroups, 500)
   
   // Return editor with area attached
   return Object.assign(editor, { area })
@@ -431,35 +563,62 @@ function exportToIR(editor: NodeEditor<Schemes>): DeadNetworkExport {
   
   const cells = nodes
     .filter(n => n instanceof DeadCellNode)
-    .map(n => ({
-      id: n.id,
-      merge: (n as DeadCellNode).mergeFunction,
-      initial: null
-    }))
-  
-  const propagators = nodes
-    .filter(n => n instanceof DeadPropagatorNode)
     .map(n => {
+      const cell = n as DeadCellNode
+      // Get connected inputs
       const inputs = connections
-        .filter(c => c.target === n.id)
+        .filter(c => c.target === cell.id)
         .map(c => c.source)
-      const outputs = connections
-        .filter(c => c.source === n.id)
-        .map(c => c.target)
       
+      // Get connected outputs
+      const outputs = connections
+        .filter(c => c.source === cell.id)
+        .map(c => c.target)
+        
       return {
-        id: n.id,
-        fn: (n as DeadPropagatorNode).functionType,
+        id: cell.id,
+        merge: cell.mergeFunction || 'last',
         inputs,
         outputs
       }
     })
+    
+  const propagators = nodes
+    .filter(n => n instanceof DeadPropagatorNode)
+    .map(n => {
+      const prop = n as DeadPropagatorNode
+      // Get connected inputs
+      const inputs = connections
+        .filter(c => c.target === prop.id)
+        .map(c => c.source)
+      
+      // Get connected outputs
+      const outputs = connections
+        .filter(c => c.source === prop.id)
+        .map(c => c.target)
+        
+      return {
+        id: prop.id,
+        fn: prop.functionType,
+        inputs,
+        outputs
+      }
+    })
+    
+  // Export connections with port details
+  const connectionDetails = connections.map(conn => ({
+    source: conn.source,
+    sourceOutput: conn.sourceOutput,
+    target: conn.target,
+    targetInput: conn.targetInput
+  }))
   
-  const prefixes = [...new Set(nodes.map(n => n.id.split('.')[0]))].sort()
+  const prefixes = [...new Set(nodes.map((n: any) => n.prefix).filter(Boolean))]
   
   return {
     cells,
     propagators,
+    connections: connectionDetails,
     metadata: {
       created: new Date().toISOString(),
       version: '1.0.0',
@@ -469,86 +628,73 @@ function exportToIR(editor: NodeEditor<Schemes>): DeadNetworkExport {
 }
 
 // Import function
-async function importFromIR(ir: DeadNetworkExport, editor: NodeEditor<Schemes>, area: AreaPlugin<Schemes, ReactArea2D<Schemes>>) {
+async function importFromIR(editor: NodeEditor<Schemes>, data: DeadNetworkExport) {
+  const area = (editor as any).area
+  
+  // Clear existing
   await editor.clear()
   
-  // Create nodes
-  for (const cell of ir.cells) {
-    const [prefix, ...rest] = cell.id.split('.')
-    const label = rest.join('.') || cell.id
-    const node = new DeadCellNode(label)
-    node.id = cell.id
-    node.prefix = prefix || 'main'
-    node.mergeFunction = cell.merge
-    await editor.addNode(node)
-    await area.translate(node.id, { x: Math.random() * 600, y: Math.random() * 400 })
+  // Create cells
+  for (const cellData of data.cells) {
+    const cell = new DeadCellNode(cellData.id.split('.').pop() || 'cell')
+    cell.id = cellData.id
+    cell.prefix = cellData.id.split('.').slice(0, -1).join('.') || 'main'
+    cell.mergeFunction = cellData.merge
+    await editor.addNode(cell)
   }
   
-  for (const prop of ir.propagators) {
-    const [prefix, ...rest] = prop.id.split('.')
-    const label = rest.join('.') || prop.id
-    const node = new DeadPropagatorNode(label, prop.fn)
-    node.id = prop.id
-    node.prefix = prefix || 'main'
-    await editor.addNode(node)
-    await area.translate(node.id, { x: Math.random() * 600, y: Math.random() * 400 })
-    
-    // Create connections
-    for (const inputId of prop.inputs) {
-      const inputNode = editor.getNode(inputId)
-      if (inputNode) {
-        await editor.addConnection(new ClassicPreset.Connection(inputNode, 'out', node, 'in'))
-      }
-    }
-    
-    for (const outputId of prop.outputs) {
-      const outputNode = editor.getNode(outputId)
-      if (outputNode) {
-        await editor.addConnection(new ClassicPreset.Connection(node, 'out', outputNode, 'in'))
+  // Create propagators
+  for (const propData of data.propagators) {
+    const prop = new DeadPropagatorNode(
+      propData.id.split('.').pop() || 'propagator',
+      propData.fn
+    )
+    prop.id = propData.id
+    prop.prefix = propData.id.split('.').slice(0, -1).join('.') || 'main'
+    await editor.addNode(prop)
+  }
+  
+  // Position nodes in a grid
+  const nodes = editor.getNodes()
+  nodes.forEach((node, i) => {
+    const x = (i % 4) * 250
+    const y = Math.floor(i / 4) * 150
+    area.translate(node.id, { x, y })
+  })
+  
+  // Create connections
+  for (const connData of data.connections) {
+    const sourceNode = editor.getNode(connData.source)
+    const targetNode = editor.getNode(connData.target)
+    if (sourceNode && targetNode) {
+      const sourceSocket = sourceNode.outputs[connData.sourceOutput]
+      const targetSocket = targetNode.inputs[connData.targetInput]
+      if (sourceSocket && targetSocket) {
+        const connection = new ClassicPreset.Connection(
+          sourceNode,
+          connData.sourceOutput,
+          targetNode,
+          connData.targetInput
+        )
+        await editor.addConnection(connection)
       }
     }
   }
   
-  // Fit to view
   await AreaExtensions.zoomAt(area, editor.getNodes())
 }
 
-
 // Main component
-export default function DeadEditorV2() {
-  const createEditorFactory = useCallback(createDeadEditor(), [])
-  const [ref, editor] = useRete(createEditorFactory)
-  const [selectedPrefix, setSelectedPrefix] = useState('main')
-  const [showPreview, setShowPreview] = useState(false)
-  const [nodes, setNodes] = useState<Node[]>([])
-  const [activeFilter, setActiveFilter] = useState<string | null>(null)
-  const [availablePrefixes, setAvailablePrefixes] = useState<string[]>(['main'])
+export default function DeadEditorRoute() {
+  const [editor, setEditor] = useState<NodeEditor<Schemes> | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [currentPrefix, setCurrentPrefix] = useState('main')
+  const [filterPrefix, setFilterPrefix] = useState('')
+  const [availablePrefixes, setAvailablePrefixes] = useState(['main'])
+  const nodeCounterRef = useRef({ cell: 0, propagator: 0, macro: 0 })
+  const selectedNodesRef = useRef<Set<string>>(new Set())
+  const [selectedCount, setSelectedCount] = useState(0)
   const [currentZoom, setCurrentZoom] = useState(1)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const nodeCounter = useRef(0)
-  
-  const addNode = useCallback(async (type: 'cell' | 'propagator', fn?: string) => {
-    if (!editor) return
-    const area = (editor as any).area
-    
-    nodeCounter.current++
-    const id = `${selectedPrefix}.${type}_${nodeCounter.current}`
-    const label = `${type}_${nodeCounter.current}`
-    
-    const node = type === 'cell' 
-      ? new DeadCellNode(label)
-      : new DeadPropagatorNode(label, fn || 'identity')
-    
-    // Manually set the ID and prefix
-    node.id = id
-    node.prefix = selectedPrefix
-    
-    await editor.addNode(node)
-    await area.translate(node.id, {
-      x: 100 + Math.random() * 600,
-      y: 100 + Math.random() * 400
-    })
-  }, [editor, selectedPrefix])
   
   // Subscribe to zoom changes from the editor
   useEffect(() => {
@@ -575,8 +721,10 @@ export default function DeadEditorV2() {
       nodes.forEach(node => {
         const typedNode = node as DeadCellNode | DeadPropagatorNode
         if (typedNode.prefix) {
+          // Add the exact prefix
           prefixes.add(typedNode.prefix)
-          // Also add parent prefixes
+          
+          // Also add all parent prefixes
           const parts = typedNode.prefix.split('.')
           let currentPrefix = ''
           for (let i = 0; i < parts.length; i++) {
@@ -589,10 +737,9 @@ export default function DeadEditorV2() {
       setAvailablePrefixes(Array.from(prefixes).sort())
     }
     
-    // Update on node changes
     editor.addPipe((context) => {
       if (context.type === 'nodecreated' || context.type === 'noderemoved') {
-        setTimeout(updatePrefixes, 100)
+        updatePrefixes()
       }
       return context
     })
@@ -612,215 +759,325 @@ export default function DeadEditorV2() {
       const nodeElement = area.nodeViews.get(node.id)?.element
       
       if (nodeElement) {
-        if (activeFilter === null) {
-          // Show all nodes
-          nodeElement.style.opacity = '1'
-          nodeElement.style.pointerEvents = 'auto'
-        } else if (typedNode.prefix === activeFilter || typedNode.prefix?.startsWith(activeFilter + '.')) {
-          // Show nodes matching filter
-          nodeElement.style.opacity = '1'
-          nodeElement.style.pointerEvents = 'auto'
+        if (filterPrefix && !typedNode.prefix?.startsWith(filterPrefix)) {
+          nodeElement.style.opacity = '0.3'
+          typedNode.hidden = true
         } else {
-          // Hide nodes not matching filter
-          nodeElement.style.opacity = '0.2'
-          nodeElement.style.pointerEvents = 'none'
+          nodeElement.style.opacity = '1'
+          typedNode.hidden = false
         }
       }
     })
+  }, [filterPrefix, editor])
+  
+  // Initialize editor
+  useEffect(() => {
+    if (containerRef.current && !editor) {
+      createDeadEditor(selectedNodesRef, setSelectedCount)(containerRef.current).then(setEditor)
+    }
+  }, [])
+  
+  const addCell = async () => {
+    if (!editor) return
+    const area = (editor as any).area
+    const count = ++nodeCounterRef.current.cell
+    const id = `${currentPrefix}.cell_${count}`
+    const cell = new DeadCellNode(`cell_${count}`)
+    cell.id = id
+    cell.prefix = currentPrefix
+    await editor.addNode(cell)
     
-    // Update connections visibility
-    const connections = editor.getConnections()
-    connections.forEach(conn => {
-      const sourceNode = editor.getNode(conn.source) as DeadCellNode | DeadPropagatorNode
-      const targetNode = editor.getNode(conn.target) as DeadCellNode | DeadPropagatorNode
-      const connElement = area.connectionViews.get(conn.id)?.element
-      
-      if (connElement) {
-        if (activeFilter === null) {
-          connElement.style.opacity = '1'
-        } else if (
-          (sourceNode?.prefix === activeFilter || sourceNode?.prefix?.startsWith(activeFilter + '.')) &&
-          (targetNode?.prefix === activeFilter || targetNode?.prefix?.startsWith(activeFilter + '.'))
-        ) {
-          connElement.style.opacity = '1'
-        } else {
-          connElement.style.opacity = '0.1'
-        }
-      }
-    })
-  }, [editor, activeFilter])
+    // Position randomly near center
+    const x = 400 + Math.random() * 200 - 100
+    const y = 300 + Math.random() * 200 - 100
+    await area.translate(cell.id, { x, y })
+  }
+  
+  const addPropagator = async (fnType: string) => {
+    if (!editor) return
+    const area = (editor as any).area
+    const count = ++nodeCounterRef.current.propagator
+    const id = `${currentPrefix}.${fnType}_${count}`
+    const prop = new DeadPropagatorNode(`${fnType}_${count}`, fnType)
+    prop.id = id
+    prop.prefix = currentPrefix
+    await editor.addNode(prop)
+    
+    // Position randomly near center
+    const x = 400 + Math.random() * 200 - 100
+    const y = 300 + Math.random() * 200 - 100
+    await area.translate(prop.id, { x, y })
+  }
   
   const handleExport = () => {
     if (!editor) return
-    const ir = exportToIR(editor)
-    const blob = new Blob([JSON.stringify(ir, null, 2)], { type: 'application/json' })
+    const data = exportToIR(editor)
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `network-${Date.now()}.json`
+    a.download = 'network.json'
     a.click()
-    URL.revokeObjectURL(url)
   }
   
   const handleCopy = () => {
     if (!editor) return
-    const ir = exportToIR(editor)
-    navigator.clipboard.writeText(JSON.stringify(ir, null, 2))
+    const data = exportToIR(editor)
+    navigator.clipboard.writeText(JSON.stringify(data, null, 2))
   }
   
   const handlePaste = async () => {
     if (!editor) return
-    const area = (editor as any).area
     try {
       const text = await navigator.clipboard.readText()
-      const ir = JSON.parse(text) as DeadNetworkExport
-      await importFromIR(ir, editor, area)
+      const data = JSON.parse(text)
+      await importFromIR(editor, data)
     } catch (err) {
       console.error('Failed to paste:', err)
-      alert('Failed to paste from clipboard. Make sure you have valid JSON copied.')
     }
   }
   
   const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!editor) return
-    const area = (editor as any).area
     const file = event.target.files?.[0]
     if (!file) return
     
     const reader = new FileReader()
     reader.onload = async (e) => {
       try {
-        const ir = JSON.parse(e.target?.result as string) as DeadNetworkExport
-        await importFromIR(ir, editor, area)
+        const data = JSON.parse(e.target?.result as string)
+        await importFromIR(editor, data)
       } catch (err) {
         console.error('Failed to import:', err)
-        alert('Failed to import file. Please check the format.')
       }
     }
     reader.readAsText(file)
   }
   
+  const getZoomLevel = () => {
+    if (currentZoom < 0.3) return 'dot'
+    if (currentZoom < 0.6) return 'compact'
+    if (currentZoom < 1.5) return 'normal'
+    if (currentZoom < 3) return 'detailed'
+    return 'internal'
+  }
+  
+  const createMacroFromSelection = async () => {
+    const selectedNodes = selectedNodesRef.current
+    if (!editor || selectedNodes.size === 0) return
+    const area = (editor as any).area
+    
+    // Get selected nodes and their connections
+    const selectedNodeObjects: Array<{
+      id: string
+      type: 'cell' | 'propagator' | 'macro'
+      label: string
+      prefix: string
+      data: any
+    }> = []
+    
+    const internalConnections: Array<{
+      source: string
+      target: string
+      sourceOutput: string
+      targetInput: string
+    }> = []
+    
+    selectedNodes.forEach((nodeId: string) => {
+      const node = editor.getNode(nodeId)
+      if (node) {
+        const typedNode = node as DeadCellNode | DeadPropagatorNode | DeadMacroNode
+        selectedNodeObjects.push({
+          id: nodeId,
+          type: node instanceof DeadCellNode ? 'cell' : 
+                node instanceof DeadPropagatorNode ? 'propagator' : 'macro',
+          label: node.label,
+          prefix: typedNode.prefix,
+          data: node instanceof DeadPropagatorNode ? { functionType: (node as DeadPropagatorNode).functionType } : 
+                node instanceof DeadCellNode ? { mergeFunction: (node as DeadCellNode).mergeFunction } : 
+                { template: (node as DeadMacroNode).template }
+        })
+      }
+    })
+    
+    // Get all connections between selected nodes
+    const allConnections = editor.getConnections()
+    allConnections.forEach(conn => {
+      const sourceSelected = selectedNodes.has(conn.source)
+      const targetSelected = selectedNodes.has(conn.target)
+      
+      if (sourceSelected || targetSelected) {
+        internalConnections.push({
+          source: conn.source,
+          target: conn.target,
+          sourceOutput: conn.sourceOutput,
+          targetInput: conn.targetInput
+        })
+      }
+    })
+    
+    // Create macro node with template
+    const macroName = prompt('Enter macro name:') || 'macro'
+    const count = ++nodeCounterRef.current.macro
+    const macroId = `${currentPrefix}.macro_${count}`
+    
+    const template = {
+      nodes: selectedNodeObjects,
+      connections: internalConnections
+    }
+    
+    const macro = new DeadMacroNode(`${macroName}_${count}`, template)
+    macro.id = macroId
+    macro.prefix = currentPrefix
+    
+    // Add macro node
+    await editor.addNode(macro)
+    
+    // Position macro at center of selected nodes
+    let avgX = 0, avgY = 0
+    for (const nodeId of selectedNodes) {
+      const pos = await area.nodeViews.get(nodeId)?.position
+      if (pos) {
+        avgX += pos.x
+        avgY += pos.y
+      }
+    }
+    avgX /= selectedNodes.size
+    avgY /= selectedNodes.size
+    
+    await area.translate(macro.id, { x: avgX, y: avgY })
+    
+    // Remove original nodes
+    for (const nodeId of selectedNodes) {
+      await editor.removeNode(nodeId)
+    }
+    
+    selectedNodes.clear()
+    setSelectedCount(0)
+  }
+  
   return (
-    <div className="relative w-full h-screen bg-gray-50 overflow-hidden">
-      {/* Controls Panel */}
-      <div className="absolute top-4 left-4 z-20 space-y-3">
-        {/* Zoom indicator */}
-        <div className="bg-white rounded-lg shadow-lg px-3 py-2">
-          <div className="text-xs font-semibold text-gray-600">Zoom: {Math.round(currentZoom * 100)}%</div>
-          <div className="text-xs text-gray-500 mt-1">
-            {currentZoom < 0.3 ? 'Overview' : 
-             currentZoom < 0.6 ? 'Compact' : 
-             currentZoom < 1.5 ? 'Normal' : 
-             currentZoom < 3 ? 'Detailed' : 'Internal'}
+    <>
+      <style>{`
+        .selected {
+          outline: 3px solid #3b82f6 !important;
+          outline-offset: 2px;
+        }
+        .rete-node.selected {
+          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+      `}</style>
+      <div className="flex h-screen">
+        {/* Canvas */}
+        <div className="flex-1 relative bg-gray-50">
+          <div ref={containerRef} className="w-full h-full" />
+          
+          {/* Zoom indicator */}
+          <div className="absolute top-4 right-4 bg-white px-3 py-1 rounded shadow text-sm">
+            Zoom: {(currentZoom * 100).toFixed(0)}% ({getZoomLevel()})
           </div>
         </div>
         
-        {/* Prefix selector & Filter */}
-        <div className="bg-white rounded-lg shadow-lg p-3 space-y-3">
-          <div>
-            <label className="text-xs font-semibold text-gray-600">Current Prefix:</label>
+        {/* Sidebar */}
+        <div className="w-64 bg-white border-l border-gray-200 p-4 overflow-y-auto">
+          <h2 className="font-bold text-lg mb-4">DEAD Editor</h2>
+          
+          {/* Prefix selector */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Current Prefix:</label>
             <input
               type="text"
-              value={selectedPrefix}
-              onChange={(e) => setSelectedPrefix(e.target.value)}
-              className="ml-2 px-2 py-1 border rounded text-sm"
-              placeholder="e.g., auth, ui, data"
+              value={currentPrefix}
+              onChange={(e) => setCurrentPrefix(e.target.value)}
+              className="w-full px-2 py-1 border rounded text-sm"
+              placeholder="main"
             />
           </div>
           
-          <div>
-            <label className="text-xs font-semibold text-gray-600">Filter by Prefix:</label>
+          {/* Filter */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Filter by Prefix:</label>
             <select
-              value={activeFilter || ''}
-              onChange={(e) => setActiveFilter(e.target.value || null)}
-              className="ml-2 px-2 py-1 border rounded text-sm w-full mt-1"
+              value={filterPrefix}
+              onChange={(e) => setFilterPrefix(e.target.value)}
+              className="w-full px-2 py-1 border rounded text-sm"
             >
               <option value="">Show All</option>
               {availablePrefixes.map(prefix => (
-                <option key={prefix} value={prefix}>
-                  {prefix} {activeFilter === prefix ? '✓' : ''}
-                </option>
+                <option key={prefix} value={prefix}>{prefix}</option>
               ))}
             </select>
-            {activeFilter && (
-              <div className="mt-1 text-xs text-gray-500">
-                Showing: {activeFilter}.*
-              </div>
-            )}
           </div>
-        </div>
-        
-        {/* Node Palette */}
-        <div className="bg-white rounded-lg shadow-lg p-4 max-w-xs">
-          <h3 className="text-sm font-semibold mb-3">Add Nodes</h3>
           
-          <div className="mb-3">
-            <h4 className="text-xs font-medium text-gray-600 mb-2">Cells</h4>
-            <div className="grid grid-cols-2 gap-1">
-              <button onClick={() => addNode('cell')} className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded text-xs">Cell</button>
-              <button onClick={() => addNode('cell')} className="px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-xs">Max Cell</button>
-              <button onClick={() => addNode('cell')} className="px-2 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded text-xs">Min Cell</button>
-              <button onClick={() => addNode('cell')} className="px-2 py-1 bg-cyan-100 hover:bg-cyan-200 text-cyan-800 rounded text-xs">Sum Cell</button>
+          {/* Node creation */}
+          <div className="mb-4">
+            <h3 className="font-medium mb-2">Add Nodes:</h3>
+            <button
+              onClick={addCell}
+              className="w-full mb-2 px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Add Cell
+            </button>
+            
+            <div className="space-y-1">
+              {['identity', 'add', 'multiply', 'subtract', 'divide', 'clamp', 'compare'].map(fnType => (
+                <button
+                  key={fnType}
+                  onClick={() => addPropagator(fnType)}
+                  className="w-full px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+                >
+                  Add {fnType}
+                </button>
+              ))}
             </div>
           </div>
           
-          <div>
-            <h4 className="text-xs font-medium text-gray-600 mb-2">Propagators</h4>
-            <div className="grid grid-cols-2 gap-1">
-              <button onClick={() => addNode('propagator', 'add')} className="px-2 py-1 bg-green-100 hover:bg-green-200 text-green-800 rounded text-xs">Add</button>
-              <button onClick={() => addNode('propagator', 'multiply')} className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded text-xs">Multiply</button>
-              <button onClick={() => addNode('propagator', 'clamp')} className="px-2 py-1 bg-orange-100 hover:bg-orange-200 text-orange-800 rounded text-xs">Clamp</button>
-              <button onClick={() => addNode('propagator', 'compare')} className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded text-xs">Compare</button>
-            </div>
+          {/* Macro operations */}
+          <div className="mb-4 border-t pt-4">
+            <h3 className="font-medium mb-2">Macros:</h3>
+            <button
+              onClick={createMacroFromSelection}
+              disabled={selectedCount === 0}
+              className="w-full mb-2 px-3 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            >
+              Create Macro from Selection
+              {selectedCount > 0 && ` (${selectedCount})`}
+            </button>
+          </div>
+          
+          {/* Import/Export */}
+          <div className="border-t pt-4">
+            <h3 className="font-medium mb-2">Import/Export:</h3>
+            <button
+              onClick={handleExport}
+              className="w-full mb-2 px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Export JSON
+            </button>
+            <button
+              onClick={handleCopy}
+              className="w-full mb-2 px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Copy to Clipboard
+            </button>
+            <button
+              onClick={handlePaste}
+              className="w-full mb-2 px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Paste from Clipboard
+            </button>
+            <label className="block w-full px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 cursor-pointer text-center">
+              Import JSON
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                className="hidden"
+              />
+            </label>
           </div>
         </div>
       </div>
-      
-      {/* Export Panel */}
-      <div className="absolute top-4 right-4 z-20 bg-white rounded-lg shadow-lg p-4">
-        <h3 className="text-sm font-semibold mb-3">Import/Export</h3>
-        
-        <div className="space-y-2">
-          <button onClick={handleExport} className="w-full px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">
-            📥 Download JSON
-          </button>
-          
-          <button onClick={handleCopy} className="w-full px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm">
-            📋 Copy to Clipboard
-          </button>
-          
-          <button onClick={handlePaste} className="w-full px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white rounded text-sm">
-            📋 Paste from Clipboard
-          </button>
-          
-          <button onClick={() => fileInputRef.current?.click()} className="w-full px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded text-sm">
-            📤 Import from File
-          </button>
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImport}
-            className="hidden"
-          />
-          
-          <button onClick={() => setShowPreview(!showPreview)} className="w-full px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm">
-            {showPreview ? '🙈 Hide' : '👁️ Show'} Preview
-          </button>
-        </div>
-        
-        {showPreview && editor && (
-          <div className="mt-3 p-2 bg-gray-50 rounded border">
-            <pre className="text-xs overflow-auto max-h-64">
-              {JSON.stringify(exportToIR(editor), null, 2)}
-            </pre>
-          </div>
-        )}
-      </div>
-      
-      {/* Rete editor container */}
-      <div ref={ref} className="w-full h-full" />
-    </div>
+    </>
   )
 }

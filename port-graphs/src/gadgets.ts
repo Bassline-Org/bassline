@@ -1,6 +1,9 @@
 import type { Attributes, PortDirection, ConnectionPath } from './gadget-types'
 import { Nothing, Term, Opaque } from './terms'
 
+// Re-export Nothing for convenience
+export { Nothing }
+
 export type InputHandler = (self: Gadget, value: Term) => void
 
 // Ports belong to the network and handle their own propagation
@@ -201,14 +204,17 @@ export class Cell extends Gadget {
     constructor(id: string, network: Network, attributes: Attributes = {}, mergeFn: (current: Term, incoming: Term) => Term) {
         super(id, network, attributes)
 
-        // Set up the cell via control terms
-        this.receive('control', ['add-input-port', 'value-in'])
-        this.receive('control', ['add-output-port', 'value-out'])
-        this.receive('control', ['set-input-handler', 'value-in', ['opaque', (self: Gadget, value: Term) => {
-            const currentValue = self.getPort('value-out')?.value || Nothing
-            const result = mergeFn(currentValue, value)
-            self.emit('value-out', result)
-        }]])
+        // Set up the cell via batch control terms to ensure proper initialization order
+        const setupCommands: Term[] = [
+            ['add-input-port', 'value-in'],
+            ['add-output-port', 'value-out'],
+            ['set-input-handler', 'value-in', ['opaque', (self: Gadget, value: Term) => {
+                const currentValue = self.getPort('value-out')?.value || Nothing
+                const result = mergeFn(currentValue, value)
+                self.emit('value-out', result)
+            }]]
+        ]
+        this.receive('control', ['batch', setupCommands])
     }
 }
 
