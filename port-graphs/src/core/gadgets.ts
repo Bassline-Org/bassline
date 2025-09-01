@@ -3,6 +3,43 @@ import { Term } from "./terms";
 
 const { NETWORKS, REGISTRY, HOOKS } = globalThis.BASSLINE;
 
+export abstract class GraphNode {
+    attributes: Record<string, Term> = {};
+    networkId: string;
+    
+    constructor(public readonly id: string) {
+        
+    }
+
+    addAttribute(name: string, value: Term) {
+        this.attributes[name] = value;
+    }
+
+    removeAttribute(name: string) {
+        delete this.attributes[name];
+    }
+
+    getAttribute(name: string) {
+        return this.attributes[name];
+    }
+
+    hasAttribute(name: string) {
+        return name in this.attributes;
+    }
+}
+
+export class Connection extends GraphNode {
+    constructor(public readonly id: string, public readonly source: [string, string], public readonly target: [string, string]) {
+        super();
+    }
+}
+
+export class Gadget extends GraphNode {
+    constructor(public readonly id: string) {
+        super();
+    }
+}
+
 // Base gadget interface
 export interface GadgetInterface {
     inputs: Record<string, { name: string; value: Term; attributes: Record<string, Term> }>;

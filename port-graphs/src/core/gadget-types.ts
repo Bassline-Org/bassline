@@ -1,6 +1,8 @@
 import { Gadget } from './gadgets'
 import type { Term } from './terms'
 
+const { NETWORKS } = globalThis.BASSLINE;
+
 // ================================
 // Gadget types
 // ================================

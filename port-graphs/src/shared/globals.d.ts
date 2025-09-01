@@ -5,21 +5,29 @@ import { Gadget, GadgetMetadata } from "../core/gadgets";
 // Base global registry for gadget types
 declare global {
     namespace BASSLINE {
-        function initialize(): void;
+        function createGadget(id: string, kind: string): void;
+        function createNetwork(id: string): void;
+        function connect(source: [string, string], target: [string, string]): void;
+        function registerGadget(name: string, gadget: typeof Gadget): void;
+
+        function schedule(job: () => void): void;
+        function step(): number;
 
         // All networks in the system
         var NETWORKS: { [name: string]: INetwork }; // networkId -> INetwork
         var REGISTRY: { [name: string]: typeof Gadget }; // gadgetType -> constructor
+        var JOBS: (() => void)[];
 
         // Dynamic bindings
         namespace dynamic {
-            function network(): any; // Will be extended by specific targets
-            function gadget(): any; // Will be extended by specific targets
+            var CURRENT_NETWORK_ID: string | undefined;
+            var CURRENT_GADGET_ID: string | undefined;
+
+            function network(): Network; // Will be extended by specific targets
+            function gadget(): typeof Gadget; // Will be extended by specific targets
 
             function enterNetwork(id: string, body: () => void): void;
             function enterGadget(id: string, body: () => void): void;
-
-            function registerGadget(name: string, gadget: typeof Gadget): void;
         }
 
         // Hooks for the system. Allows for integration with other systems or debugging.
