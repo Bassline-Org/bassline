@@ -1,433 +1,262 @@
-import type { Attributes, PortDirection, ConnectionPath } from './gadget-types'
-import { Nothing, Term } from './terms'
-import { P } from './combinators'
-import {
-  SetInterfaceSchema,
-  SetInputHandlerSchema,
-  SetConnectionLimitSchema,
-  ConnectSchema,
-  ConnectAndSyncSchema,
-  BatchSchema,
-  type GadgetInterface
-} from './schemas'
+import { Term } from "./terms";
+import { ConnectionPath } from "./gadget-types";
 
-// Re-export Nothing for convenience
-export { Nothing }
-
-export type InputHandler = (self: Gadget, value: Term) => void
-
-// ================================
-// Command Predicates
-// ================================
-
-// Use Zod schemas for clean validation
-const isSetInterface = P.zodPredicate(SetInterfaceSchema)
-const isSetInputHandler = P.zodPredicate(SetInputHandlerSchema)
-const isSetConnectionLimit = P.zodPredicate(SetConnectionLimitSchema)
-const isConnect = P.zodPredicate(ConnectSchema)
-const isConnectAndSync = P.zodPredicate(ConnectAndSyncSchema)
-const isBatch = P.zodPredicate(BatchSchema)
-
-// Ports belong to the network and handle their own propagation
-export class Port {
-    private connections: Set<ConnectionPath> = new Set() // Connection paths like [gadgetId, portName]
-    private connectionLimit: number | null = null // null = unlimited, number = max connections
-
-    constructor(
-        public readonly name: string,
-        public readonly direction: PortDirection,
-        public readonly gadget: Gadget,
-        public readonly network: Network,
-        public value: Term = Nothing,
-        public readonly attributes: Attributes = {}
-    ) {}
-
-    // Set connection limit via terms
-    setConnectionLimit(limit: number | null) {
-        this.connectionLimit = limit
-    }
-
-    // Connect this port to another port by path
-    connectTo(targetPath: ConnectionPath) {
-        // Check connection limit if set
-        if (this.connectionLimit !== null && this.connections.size >= this.connectionLimit) {
-            throw new Error(`Port '${this.name}' has reached its connection limit of ${this.connectionLimit}`)
-        }
-        
-        this.connections.add(targetPath)
-    }
-
-    // Accept a value (triggers propagation)
-    accept(value: Term) {
-        // Only propagate if the value actually changed
-        if (this.value !== value) {
-            this.value = value
-            if (this.direction === 'output') {
-                // Output ports propagate to all connected input ports
-                this.propagate(value)
-            } else {
-                // Input ports trigger gadget handler directly
-                const handler = this.gadget.getInputHandler(this.name)
-                if (handler) {
-                    handler(this.gadget, value)
-                }
-            }
-        }
-    }
-
-    // Propagate value to all connected ports
-    public propagate(value: Term) {
-        const outputs = new Map<string, string[]>()
-        for (const connection of this.connections) {
-            const [targetGadgetId, targetPortName] = connection
-            if (!outputs.has(targetGadgetId)) {
-                outputs.set(targetGadgetId, [])
-            }
-            outputs.get(targetGadgetId)!.push(targetPortName)
-        }
-
-        for (const [gadget, ports] of outputs) {
-            const targetGadget = this.network.getGadget(gadget)
-            if (targetGadget) {
-                for (const portName of ports) {
-                    const targetPort = targetGadget.getPort(portName)
-                    if (targetPort) {
-                        targetPort.accept(value)
-                    }
-                }
-            }
-        }
-    }
-
-    // Get connection paths
-    getConnections(): ConnectionPath[] {
-        return Array.from(this.connections)
-    }
+// Gadget metadata interface
+export interface GadgetMetadata {
+    inputs: Record<string, any>;
+    outputs: Record<string, any>;
+    hasActivation: boolean;
+    isCell: boolean;
 }
 
-export class Gadget {
-    protected ports = new Map<string, Port>()
-    protected inputHandlers = new Map<string, InputHandler>()
-    protected interface?: GadgetInterface // Store the interface definition
+// Extended constructor interface to include decorator metadata
+interface GadgetConstructor {
+    new(id: string, namespace: string): Gadget;
+    _inputProperties?: Record<string, Term>;
+    _outputProperties?: Record<string, Term>;
+    _activationMethod?: string;
+    _isCell?: boolean;
+}
 
-    constructor(
-        public readonly id: string,
-        public readonly network: Network,
-        public readonly attributes: Attributes = {}
-    ) {
-        // All gadgets get a control port
-        this.network.addGadget(this)
-        this.ports.set('control', new Port('control', 'input', this, network))
+// Base gadget interface
+export interface GadgetInterface {
+    inputs: Record<string, { name: string; value: Term; attributes: Record<string, Term> }>;
+    outputs: Record<string, { name: string; value: Term; attributes: Record<string, Term> }>;
+};
+
+// Base gadget class
+export abstract class Gadget {
+    INTERFACE: GadgetInterface = {
+        inputs: {},
+        outputs: {},
+    };
+    namespace: any;
+    connections: Map<string, ConnectionPath[]> = new Map();
+
+    constructor(public readonly id: string, namespace: string) {
+        // Ensure namespace exists
+        if (!globalThis.GadgetGlobals.NAMESPACES[namespace]) {
+            globalThis.GadgetGlobals.NAMESPACES[namespace] = {};
+        }
+        
+        const ns = globalThis.GadgetGlobals.NAMESPACES[namespace];
+        if (ns[id]) {
+            throw new Error(`Gadget ${id} already exists in namespace ${namespace}`);
+        }
+        this.namespace = ns;
+        this.namespace[id] = this as any;
+        
+        this.initializePorts();
+        
+        if (globalThis.GadgetConfig.DEBUG_LOGGING) {
+            console.log(`🔧 Gadget ${id} initialized in namespace ${namespace}`);
+        }
     }
 
-    // Process terms to build ports and set handlers
-    receive(portName: string, term: Term) {
-        if (portName === 'control') {
-            this.processControl(term)
-        } else {
-            const port = this.ports.get(portName)
-            if (!port) {
-                throw new Error(`Unknown port: ${portName}`)
-            }
-            port.accept(term)
-        }
-    }
-
-    private processControl(term: Term) {
-        if (!P.isArray(term) || !P.hasMinLength(2)(term)) {
-            throw new Error(`Invalid control term: ${JSON.stringify(term)}`)
-        }
+    // Initialize ports based on decorator metadata
+    private initializePorts() {
+        const constructor = this.constructor as GadgetConstructor;
         
-        const [command] = term as [string, ...Term[]]
-        
-        // Use guards to process commands
-        if (isSetInterface(term)) {
-            // Use Zod to get validated, typed data
-            const validatedCommand = P.zod(SetInterfaceSchema)(term)
-            const gadgetInterface = validatedCommand[1]
-            
-            // Store the interface for later access
-            this.interface = gadgetInterface
-            
-            // Create all input ports
-            for (const input of gadgetInterface.inputs) {
-                const port = new Port(input.name, 'input', this, this.network, input.value || Nothing, input.attributes || {})
-                // Set connection limit if specified
-                if (input.connectionLimit !== undefined) {
-                    port.setConnectionLimit(input.connectionLimit)
-                }
-                this.ports.set(input.name, port)
-            }
-            
-            // Create all output ports
-            for (const output of gadgetInterface.outputs) {
-                const port = new Port(output.name, 'output', this, this.network, Nothing, output.attributes || {})
-                // Set connection limit if specified
-                if (output.connectionLimit !== undefined) {
-                    port.setConnectionLimit(output.connectionLimit)
-                }
-                this.ports.set(output.name, port)
-            }
-            return
-        }
-        
-        if (isSetInputHandler(term)) {
-            const validatedCommand = P.zod(SetInputHandlerSchema)(term)
-            const [_, name, handlerOpaque] = validatedCommand
-            const [__, handler] = handlerOpaque as [string, InputHandler]
-            this.inputHandlers.set(name, handler)
-            return
-        }
-        
-        if (isSetConnectionLimit(term)) {
-            const validatedCommand = P.zod(SetConnectionLimitSchema)(term)
-            const [_, portName, limit] = validatedCommand
-            const port = this.ports.get(portName)
-            if (port) {
-                port.setConnectionLimit(limit)
-            }
-            return
-        }
-        
-        if (isConnect(term)) {
-            const validatedCommand = P.zod(ConnectSchema)(term)
-            const [_, sourcePort, targetPath] = validatedCommand
-            const source = this.ports.get(sourcePort)
-            if (source) {
-                source.connectTo(targetPath)
-            }
-            return
-        }
-        
-        if (isConnectAndSync(term)) {
-            const validatedCommand = P.zod(ConnectAndSyncSchema)(term)
-            const [_, sourcePort, targetPath] = validatedCommand
-            const source = this.ports.get(sourcePort)
-            if (source) {
-                // Connect the ports
-                source.connectTo(targetPath)
+        // Initialize inputs with getter/setter
+        if (constructor._inputProperties) {
+            Object.entries(constructor._inputProperties).forEach(([name, defaultValue]) => {
+                const propertyName = String(name);
+                this.INTERFACE.inputs[propertyName] = {
+                    name: propertyName,
+                    value: defaultValue,
+                    attributes: {},
+                };
                 
-                // Forward current value if it's not Nothing
-                if (source.value !== Nothing) {
-                    source.propagate(source.value)
-                }
-            }
-            return
+                // Create getter/setter for input property
+                let inputValue = defaultValue;
+                const self = this;
+                Object.defineProperty(this, propertyName, {
+                    get() {
+                        return inputValue;
+                    },
+                    set(newValue: Term) {
+                        inputValue = newValue;
+                        // Update the interface
+                        if (self.INTERFACE.inputs[propertyName]) {
+                            self.INTERFACE.inputs[propertyName].value = newValue;
+                        }
+                        
+                        if (globalThis.GadgetConfig.DEBUG_LOGGING) {
+                            console.log(`📥 Input set to ${String(newValue)}`);
+                        }
+                        
+                        // Trigger computation if activation policy is met
+                        // But only if this isn't the initial value being set during initialization
+                        if (self.shouldActivate() && newValue !== defaultValue) {
+                            if (globalThis.GadgetConfig.COMPUTATION_LOGGING) {
+                                console.log(`⚡ Triggering computation for ${self.id}`);
+                            }
+                            self.compute();
+                        }
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+            });
+        }
+
+        // Initialize outputs with getter/setter
+        if (constructor._outputProperties) {
+            Object.entries(constructor._outputProperties).forEach(([name, defaultValue]) => {
+                this.INTERFACE.outputs[name] = {
+                    name,
+                    value: defaultValue,
+                    attributes: {},
+                };
+                
+                // Create getter/setter for output property
+                let outputValue = defaultValue;
+                Object.defineProperty(this, name, {
+                    get() {
+                        return outputValue;
+                    },
+                    set(newValue: Term) {
+                        outputValue = newValue;
+                        // Update the interface
+                        this.INTERFACE.outputs[name].value = newValue;
+                        // Propagate to connected gadgets
+                        this.propagateOutput(name, newValue);
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+            });
+        }
+    }
+
+    // Propagate output value to connected gadgets
+    // @ts-ignore - TypeScript incorrectly thinks this is unused
+    private propagateOutput(outputName: string, value: Term) {
+        const connections = this.connections.get(outputName);
+        if (!connections) {
+            return; // No connections for this output
         }
         
-        if (isBatch(term)) {
-            const validatedCommand = P.zod(BatchSchema)(term)
-            const [_, commands] = validatedCommand
-            for (const command of commands) {
-                this.processControl(command)
+        for (const [targetGadgetId, targetInputName] of connections) {
+            // Find the target gadget in the same namespace
+            const namespace = this.namespace;
+            const targetGadget = namespace[targetGadgetId];
+            if (!targetGadget) {
+                console.warn(`Target gadget ${targetGadgetId} not found in namespace`);
+                continue;
             }
-            return
+            (targetGadget as any)[targetInputName] = value;
         }
-        
-        throw new Error(`Unknown control command: ${command}`)
     }
 
-    // Emit to output port (triggers automatic propagation)
-    emit(portName: string, value: Term) {
-        const port = this.ports.get(portName)
-        if (!port) {
-            throw new Error(`Unknown port: ${portName}`)
+    // Connect an output to another gadget's input
+    connectOutput(outputName: string, targetGadgetId: string, targetInputName: string) {
+        if (!this.connections.has(outputName)) {
+            this.connections.set(outputName, []);
         }
-        if (port.direction !== 'output') {
-            throw new Error(`Cannot emit to input port: ${portName}`)
-        }
-        port.accept(value)
+        this.connections.get(outputName)!.push([targetGadgetId, targetInputName]);
     }
 
-    // Get port
-    getPort(portName: string): Port | undefined {
-        return this.ports.get(portName)
+    // Check if all inputs are ready
+    allInputsReady(): boolean {
+        return Object.values(this.INTERFACE.inputs).every(
+            (input) => input.value !== null && input.value !== undefined
+        );
     }
 
-    // Get input handler for a port
-    getInputHandler(portName: string): InputHandler | undefined {
-        return this.inputHandlers.get(portName)
+    // Default activation rule - run when all inputs are ready
+    shouldActivate(): boolean {
+        return this.allInputsReady();
     }
-    
-    // Get the gadget's interface definition
-    getInterface(): GadgetInterface | undefined {
-        return this.interface
-    }
+
+    // Abstract method that subclasses must implement
+    abstract compute(): void;
 }
 
-export class Cell extends Gadget {
-    constructor(id: string, network: Network, attributes: Attributes = {}, mergeFn: (current: Term, incoming: Term) => Term) {
-        super(id, network, attributes)
+// Decorator to define a gadget type
+export function defineGadget(name: string) {
+    return function (constructor: typeof Gadget) {
+        if(! globalThis.GadgetGlobals.__GADGET_GLOBALS_INITIALIZED) {
+            throw new Error('GadgetGlobals not initialized');
+        }
+        // Register the gadget class
+        globalThis.GadgetGlobals.GADGET_REGISTRY[name] = constructor;
 
-        // Set up the cell interface and handler
-        this.receive('control', ['setInterface', {
-            inputs: [{ name: 'value-in' }],
-            outputs: [{ name: 'value-out' }]
-        }])
-        
-        this.receive('control', ['set-input-handler', 'value-in', ['opaque', (self: Gadget, value: Term) => {
-            const currentValue = self.getPort('value-out')?.value || Nothing
-            const result = mergeFn(currentValue, value)
-            self.emit('value-out', result)
-        }]])
-    }
+        // Store metadata about the gadget
+        const typedConstructor = constructor as GadgetConstructor;
+        globalThis.GadgetGlobals.GADGET_METADATA[name] = {
+            inputs: typedConstructor._inputProperties || {},
+            outputs: typedConstructor._outputProperties || {},
+            hasActivation: !!typedConstructor._activationMethod,
+            isCell: !!typedConstructor._isCell,
+        };
+    };
 }
 
-export class FunctionGadget extends Gadget {
-    private inputValues = new Map<string, Term>()
-    private fn: (inputs: Record<string, Term>) => Term
-
-    constructor(
-        id: string, 
-        network: Network, 
-        config: {
-            inputs: string[]
-            outputs: string[]
-            fn: (inputs: Record<string, Term>) => Term
+// Decorator for input ports
+export function input(defaultValue: Term = null) {
+    return function (target: any, propertyKey: string, _descriptor?: PropertyDescriptor) {
+        // For old experimental decorators, target is the prototype
+        if (!target || !target.constructor) {
+            console.warn('Input decorator called with invalid target:', target);
+            return;
         }
-    ) {
-        super(id, network)
-        this.fn = config.fn
-
-        // Set up the gadget interface
-        this.receive('control', ['setInterface', {
-            inputs: config.inputs.map(name => ({ name })),
-            outputs: config.outputs.map(name => ({ name }))
-        }])
-
-        // Set up auto-trigger handler for each input
-        for (const name of config.inputs) {
-            this.receive('control', ['set-input-handler', name, ['opaque', (_self: Gadget, value: Term) => {
-                this.handleInputUpdate(name, value)
-            }]])
-        }
-    }
-
-    private handleInputUpdate(portName: string, value: Term) {
-        // Store the input value
-        this.inputValues.set(portName, value)
         
-        // Check if all inputs have values
-        if (this.allInputsReady()) {
-            // Execute the function with all input values
-            const inputs = Object.fromEntries(this.inputValues)
-            const result = this.fn(inputs)
-            
-            // Emit result to first output port (assuming single output for now)
-            const outputPortNames = this.getOutputPortNames()
-            if (outputPortNames.length > 0) {
-                const firstOutput = outputPortNames[0]
-                if (firstOutput) {
-                    this.emit(firstOutput, result)
-                }
-            }
+        if (!target.constructor._inputProperties) {
+            target.constructor._inputProperties = {};
         }
-    }
-
-    private allInputsReady(): boolean {
-        // Check if all input ports have values
-        const inputPortNames = this.getInputPortNames()
-        for (const name of inputPortNames) {
-            if (!this.inputValues.has(name)) {
-                return false
-            }
-        }
-        return true
-    }
-
-    private getInputPortNames(): string[] {
-        return Array.from(this.ports.entries())
-            .filter(([_, port]) => port.direction === 'input')
-            .map(([name, _]) => name)
-            .filter(name => name !== 'control')
-    }
-
-    private getOutputPortNames(): string[] {
-        return Array.from(this.ports.entries())
-            .filter(([_, port]) => port.direction === 'output')
-            .map(([name, _]) => name)
-    }
+        target.constructor._inputProperties[propertyKey] = defaultValue;
+    };
 }
 
-export class BehaviorCell extends Cell {
-    private behaviors = new Map<string, Term[]>()
-
-    constructor(id: string, network: Network, attributes: Attributes = {}) {
-        super(id, network, attributes, (_current, incoming) => incoming)
-        
-        // Set up behavior management interface
-        this.receive('control', ['setInterface', {
-            inputs: [
-                { name: 'define-behavior' },
-                { name: 'load-behavior' }
-            ],
-            outputs: [
-                { name: 'behavior-defined' },
-                { name: 'behavior-loaded' }
-            ]
-        }])
-        
-        // Set up handlers
-        this.receive('control', ['set-input-handler', 'define-behavior', ['opaque', (_self: Gadget, value: Term) => {
-            this.defineBehavior(value)
-        }]])
-        
-        this.receive('control', ['set-input-handler', 'load-behavior', ['opaque', (_self: Gadget, value: Term) => {
-            this.loadBehavior(value)
-        }]])
-    }
-
-    private defineBehavior(behaviorSpec: Term) {
-        if (Array.isArray(behaviorSpec) && behaviorSpec.length >= 2) {
-            const [behaviorName, commands] = behaviorSpec as [string, Term[]]
-            this.behaviors.set(behaviorName, commands)
-            this.emit('behavior-defined', behaviorName)
-            console.log(`📝 Behavior '${behaviorName}' defined with ${commands.length} commands`)
+// Decorator for cell input ports (allows multiple connections)
+export function cellInput(defaultValue: Term = null) {
+    return function (target: any, propertyKey: string, _descriptor?: PropertyDescriptor) {
+        if (!target || !target.constructor) {
+            console.warn('CellInput decorator called with invalid target:', target);
+            return;
         }
-    }
-
-    private loadBehavior(loadSpec: Term) {
-        if (Array.isArray(loadSpec) && loadSpec.length >= 2) {
-            const [behaviorName, targetGadgetId] = loadSpec as [string, string]
-            const behavior = this.behaviors.get(behaviorName)
-            
-            if (behavior) {
-                const targetGadget = this.network.getGadget(targetGadgetId)
-                if (targetGadget) {
-                    // Load the behavior into the target gadget
-                    targetGadget.receive('control', ['batch', ...behavior])
-                    this.emit('behavior-loaded', [behaviorName, targetGadgetId])
-                    console.log(`🚀 Behavior '${behaviorName}' loaded into '${targetGadgetId}'`)
-                } else {
-                    console.log(`❌ Target gadget '${targetGadgetId}' not found`)
-                }
-            } else {
-                console.log(`❌ Behavior '${behaviorName}' not found`)
-            }
+        
+        if (!target.constructor._inputProperties) {
+            target.constructor._inputProperties = {};
         }
-    }
-
-    getBehavior(behaviorName: string): Term[] | undefined {
-        return this.behaviors.get(behaviorName)
-    }
-
-    listBehaviors(): string[] {
-        return Array.from(this.behaviors.keys())
-    }
+        target.constructor._inputProperties[propertyKey] = defaultValue;
+        target.constructor._isCell = true;
+    };
 }
 
-// Network just manages gadgets and provides lookup
-export class Network {
-    private gadgets = new Map<string, Gadget>()
-
-    constructor(public readonly id: string) { }
-
-    addGadget(gadget: Gadget) {
-        this.gadgets.set(gadget.id, gadget)
-    }
-
-    // Get gadget by ID
-    getGadget(id: string): Gadget | undefined {
-        return this.gadgets.get(id)
-    }
+// Decorator for output ports
+export function output(defaultValue: Term = null) {
+    return function (target: any, propertyKey: string, _descriptor?: PropertyDescriptor) {
+        if (!target || !target.constructor) {
+            console.warn('Output decorator called with invalid target:', target);
+            return;
+        }
+        
+        if (!target.constructor._outputProperties) {
+            target.constructor._outputProperties = {};
+        }
+        target.constructor._outputProperties[propertyKey] = defaultValue;
+    };
 }
+
+// Factory function to create gadget instances
+export function createGadget(gadgetName: string, id: string, namespace: string) {
+    const GadgetClass = globalThis.GadgetGlobals.GADGET_REGISTRY[gadgetName];
+    if (!GadgetClass) {
+        throw new Error(`Unknown gadget type: ${gadgetName}`);
+    }
+    return new GadgetClass(id, namespace) as any;
+}
+
+// Get gadget metadata
+export function getGadgetMetadata(gadgetName: string): GadgetMetadata | undefined {
+    return globalThis.GadgetGlobals.GADGET_METADATA[gadgetName];
+}
+
+// List all available gadget types
+export function listGadgetTypes(): string[] {
+    return Object.keys(globalThis.GadgetGlobals.GADGET_REGISTRY || {});
+}
+
+
