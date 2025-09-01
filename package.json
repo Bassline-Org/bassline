@@ -16,6 +16,7 @@
   "scripts": {
     "start": "pnpm --filter @bassline/web start",
     "dev": "pnpm --filter @bassline/web dev",
+    "dev:wc": "pnpm --filter @bassline/web-components dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bassline Web Components</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .demo-section {
+      margin-bottom: 40px;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+    }
+    .demo-section h2 {
+      margin-top: 0;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎸 Bassline Web Components Demo</h1>
+    
+    <div class="demo-section">
+      <h2>Reactive Counter</h2>
+      <bassline-counter></bassline-counter>
+    </div>
+    
+    <div class="demo-section">
+      <h2>Reactive Input</h2>
+      <bassline-input></bassline-input>
+    </div>
+    
+    <div class="demo-section">
+      <h2>Reactive List</h2>
+      <bassline-list></bassline-list>
+    </div>
+    
+    <div class="demo-section">
+      <h2>Reactive Graph Node</h2>
+      <bassline-graph-node></bassline-graph-node>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

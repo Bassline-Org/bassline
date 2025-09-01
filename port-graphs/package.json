@@ -3,10 +3,20 @@
   "version": "1.0.0",
   "description": "Port-based graph data structure",
   "main": "./dist/index.js",
+  "module": "./dist-browser/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist-browser/index.js",
+      "require": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
+    "build:browser": "tsc -p tsconfig.browser.json",
+    "build:all": "npm run build && npm run build:browser",
     "dev": "tsc --watch",
+    "dev:browser": "tsc -p tsconfig.browser.json --watch",
     "test": "vitest --run"
   },
   "keywords": [

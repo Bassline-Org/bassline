@@ -1,3 +1,4 @@
+import { Gadget } from './gadgets'
 import type { Term } from './terms'
 
 // ================================
@@ -29,3 +30,24 @@ export type PortTerm = [ 'port' , string , PortDirection, Attributes? ]
 // Connection paths are tuples of [gadgetId, portName]
 export type ConnectionPath = [string, string] // [gadgetId, portName]
 export type ConnectionTerm = [ 'connection' , ConnectionPath , ConnectionPath, Attributes? ]
+
+
+export interface INetwork {
+    id: string;
+    // All gadgets in the network
+    gadgets: Record<string, typeof Gadget>;
+    // Gadget id -> [outputPort, [gadgetId, inputPort]]
+    connections: Record<string, [string, ConnectionPath][]>;
+}
+
+export interface IPort {
+    name: string;
+    value: Term;
+    gadget: typeof Gadget;
+    attributes: Record<string, Term>;
+}
+
+export interface IConnection {
+    source: ConnectionPath;
+    target: ConnectionPath;
+}

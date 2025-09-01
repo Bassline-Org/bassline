@@ -11,6 +11,8 @@ bassline-web/coverage/
 # Production
 build/
 dist/
+dist-browser/
+dist-node/
 bassline-web/build/
 bassline-web/dist/
 
