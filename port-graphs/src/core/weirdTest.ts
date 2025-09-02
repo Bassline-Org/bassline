@@ -1,5 +1,7 @@
 
 
+import { isEqual } from 'lodash';
+
 type Mode = 'wiring' | 'run'
 type MergeFn = (current: any, ...rest: any[]) => any
 
@@ -17,8 +19,9 @@ type Reactive = {
 }
 
 // Create callable reactive object
-function createReactive(body: (...args: any[]) => any, isGadget = false): Reactive {
+function createReactive(body: (...args: any[]) => any, isGadget = false, stateful = false, initialValue?: any): Reactive {
     const downstream = new Set<Reactive>()
+    let currentValue = initialValue
     
     function call(...args: any[]): any {
         if (current_mode === 'wiring') {
@@ -26,13 +29,35 @@ function createReactive(body: (...args: any[]) => any, isGadget = false): Reacti
             else throw new Error('No current reactive')
             return undefined
         } else {
-            return body(...args)
+            // Filter out undefined/null values
+            const validArgs = args.filter(arg => arg !== undefined && arg !== null)
+            
+            if (stateful) {
+                // For stateful reactives, only call body if we have valid arguments
+                if (validArgs.length === 0) {
+                    return currentValue
+                }
+                const result = body(currentValue, ...validArgs)
+                
+                // Use lodash isEqual for structural comparison
+                if (!isEqual(result, currentValue)) {
+                    currentValue = result
+                    // Notify downstream reactives
+                    reactive.downstream.forEach(downstream => downstream(result))
+                }
+                return result
+            } else {
+                const result = body(...validArgs)
+                // Notify downstream reactives with the result
+                reactive.downstream.forEach(downstream => downstream(result))
+                return result
+            }
         }
     }
     
     const reactive = Object.assign((...args: any[]) => call(...args), {
         call,
-        value: body, // value() just calls the body
+        value: stateful ? () => currentValue : body,
         downstream,
         isWired: false,
         isGadget,
@@ -50,6 +75,12 @@ function createReactive(body: (...args: any[]) => any, isGadget = false): Reacti
         connectAsInput() {
             if (!current_reactive) throw new Error('No current reactive')
             current_reactive.downstream.add(reactive)
+        },
+        into(target: Reactive) {
+            if(reactive.downstream.has(target)) return target;
+            reactive.downstream.add(target)
+            target(reactive.value())
+            return target
         }
     })
     
@@ -58,40 +89,25 @@ function createReactive(body: (...args: any[]) => any, isGadget = false): Reacti
 
 // Cell is a special kind of gadget that closes over state
 function Cell(mergeFn: MergeFn, initialValue: any = undefined): Reactive {
-    let currentValue = initialValue
-
-    const cell = createReactive(function(...args: any[]) {
-        // Cell body: handle arguments and merge with current value
-        const processedArgs = args.map(arg => {
-            if (arg?.isWired !== undefined || arg?.isGadget) {
-                // This is a reactive, wire it up and get its value
-                cell.downstream.add(arg)
-                arg.downstream.add(cell) // Bidirectional connection
-                return arg.value()
-            }
-            return arg
-        })
-        
-        const result = processedArgs.reduce((acc, arg) => mergeFn(acc, arg), currentValue)
-        if (result !== currentValue) {
-            currentValue = result
-            cell.downstream.forEach(d => d())
-        }
-        return result
-    })
-    
-    return cell
+    return createReactive(mergeFn, false, true, initialValue)
 }
 
 // Gadget is just a pure function
-function Gadget(body: () => any): Reactive {
-    const gadget = createReactive(body, true)
-    gadget.enterWiringMode(body)
-    return gadget
+function Gadget(body: (() => any) | ((...args: any[]) => any)): Reactive | ((...args: any[]) => Reactive) {
+    // Check if body is a function with parameters (length > 0)
+    if (body.length > 0) {
+        // Return a function that takes arguments and returns a gadget
+        return (...args: any[]) => Gadget(() => body(...args))
+    } else {
+        // Body is a function with no parameters
+        const gadget = createReactive(body, true)
+        gadget.enterWiringMode(body)
+        return gadget
+    }
 }
 
 const maxFn = (a: number, b: number) => Math.max(a, b);
-const setUnion = (a: Set<number>, b: Set<number>) => new Set([...a, ...b]);
+const setUnion = (a: Set<any>, b: Set<any>) => new Set([...a, ...b]);
 
 const a = Cell(maxFn, 0);
 const b = Cell(maxFn, 0);
@@ -103,8 +119,8 @@ const adder = Gadget(() => {
     return a() + b(); // a() and b() calls will wire up connections during construction
 });
 
-// Now we can wire up the gadget to the cell by calling c with the gadget
-c(adder) // This will wire adder as an input to c and use adder's value
+// Now we can wire up the gadget to the cell using the explicit .into() method
+adder.into(c) // This explicitly wires adder as an input to c
 
 console.log('Gadget is wired:', adder.isWired);
 console.log('Gadget downstream connections:', adder.downstream.size);
@@ -115,6 +131,8 @@ b(3);  // Set b to 3
 
 // The adder should now compute 5 + 3 = 8
 console.log('Adder value:', adder.value());
+console.log('a value:', a());
+console.log('b value:', b());
 
 a(123);
 console.log('Adder value:', adder.value());
@@ -127,11 +145,26 @@ const aSet = Cell(setUnion, new Set([1]));
 const bSet = Cell(setUnion, new Set([2]));
 const cSet = Cell(setUnion, new Set([3]));
 
-aSet(bSet, cSet);
-bSet(aSet, cSet);
-cSet(aSet, bSet);
+aSet.into(bSet);
+bSet.into(cSet);
+cSet.into(aSet);
 
+aSet([5,7,9]);
+
+
+console.log('aSet downstream size:', aSet.downstream.size);
+console.log('bSet downstream size:', bSet.downstream.size);
+console.log('cSet downstream size:', cSet.downstream.size);
 
 console.log('aSet value:', aSet());
 console.log('bSet value:', bSet());
 console.log('cSet value:', cSet());
+
+// Test parameterized gadget
+const multiplier = Gadget((x, y) => x() * y());
+const result = Cell(maxFn, 0);
+multiplier(a, b).into(result); // Call multiplier with a and b as arguments and wire to result
+
+a(2);
+b(3);
+console.log('Multiplier result:', result());
