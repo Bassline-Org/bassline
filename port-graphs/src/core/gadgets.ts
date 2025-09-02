@@ -42,7 +42,12 @@ export interface GadgetInterface {
     outputs: Record<string, { name: string; value: Term; attributes: Record<string, Term> }>;
 };
 
-export function input(defaultValue: Term = null) {
+export type DecoratorOptions = {
+    defaultValue?: Term;
+    validate?: (value: Term) => boolean;
+}
+
+export function input({defaultValue, validate}: DecoratorOptions = { defaultValue: null, validate: _term => true }) {
     return function (target: any, propertyKey: string) {
         const valueSymbol = Symbol(`__${propertyKey}`);
         const interfaceInitialized = Symbol(`__${propertyKey}_initialized`);
@@ -51,6 +56,9 @@ export function input(defaultValue: Term = null) {
             get() {
                 // Lazy initialization of value
                 if (!(valueSymbol in this)) {
+                    if (defaultValue && validate && !validate(defaultValue)) {
+                        throw new Error(`Invalid value for ${propertyKey}: ${String(defaultValue)}`);
+                    }
                     this[valueSymbol] = defaultValue;
                 }
                 return this[valueSymbol];
@@ -60,6 +68,9 @@ export function input(defaultValue: Term = null) {
                 // ALWAYS ensure INTERFACE is set up (even on first call)
                 if (!this[interfaceInitialized]) {
                     // First time setup
+                    if (validate && !validate(newValue)) {
+                        throw new Error(`Invalid value for ${propertyKey}: ${String(newValue)}`);
+                    }
                     if (!this.inputs[propertyKey]) {
                         this.inputs[propertyKey] = {
                             name: propertyKey,
@@ -75,6 +86,10 @@ export function input(defaultValue: Term = null) {
 
                 if (oldValue === newValue) {
                     return;
+                }
+
+                if (validate && !validate(newValue)) {
+                    throw new Error(`Invalid value for ${propertyKey}: ${String(newValue)}`);
                 }
 
                 // Store new value
@@ -96,7 +111,8 @@ export function input(defaultValue: Term = null) {
         });
     };
 }
-export function output(defaultValue: Term = null) {
+
+export function output({defaultValue, validate}: DecoratorOptions = { defaultValue: null, validate: _term => true }) {
     return function (target: any, propertyKey: string) {
         const valueSymbol = Symbol(`__output_${propertyKey}`);
         const interfaceInitialized = Symbol(`__output_${propertyKey}_initialized`);
@@ -107,6 +123,9 @@ export function output(defaultValue: Term = null) {
                 if (!(valueSymbol in this)) {
                     this[valueSymbol] = defaultValue;
                 }
+                if (validate && !validate(this[valueSymbol])) {
+                    throw new Error(`Invalid value for ${propertyKey}: ${this[valueSymbol]}`);
+                }
                 return this[valueSymbol];
             },
 
@@ -115,6 +134,9 @@ export function output(defaultValue: Term = null) {
                 if (!this[interfaceInitialized]) {
                     // First time setup
                     if (!this.outputs[propertyKey]) {
+                        if (validate && !validate(newValue)) {
+                            throw new Error(`Invalid value for ${propertyKey}: ${String(newValue)}`);
+                        }
                         this.outputs[propertyKey] = {
                             name: propertyKey,
                             value: newValue,
@@ -129,6 +151,10 @@ export function output(defaultValue: Term = null) {
 
                 if (oldValue === newValue) {
                     return;
+                }
+
+                if (validate && !validate(newValue)) {
+                    throw new Error(`Invalid value for ${propertyKey}: ${String(newValue)}`);
                 }
 
                 // Store new value
@@ -150,9 +176,12 @@ export function output(defaultValue: Term = null) {
     };
 }
 
+export type InputPort = { name: string; direction: 'input'; value: Term; attributes: Record<string, Term> };
+export type OutputPort = { name: string; direction: 'output'; value: Term; attributes: Record<string, Term> };
+
 export abstract class Gadget extends GraphNode {
-    inputs: Record<string, { name: string; value: Term; attributes: Record<string, Term> }> = {};
-    outputs: Record<string, { name: string; value: Term; attributes: Record<string, Term> }> = {};
+    inputs: Record<string, InputPort> = {};
+    outputs: Record<string, OutputPort> = {};
 
     constructor(id: string, networkId: string = bl.network().id) {
         super(id, networkId);
@@ -161,9 +190,11 @@ export abstract class Gadget extends GraphNode {
     }
 
     // Default activation rule - run when all inputs are ready
-    shouldRun(): boolean {
-        return this.allInputsReady();
+    shouldRun(inputs: Term[] = this.inputValues()): boolean {
+        return inputs.every(input => input !== null && input !== undefined);
     }
+
+    inputValues() { return Object.values(this.inputs).map(input => input.value) }
 
     maybeRun(): void {
         console.log('maybeRun', this.shouldRun());
@@ -209,23 +240,98 @@ export function defineGadget(name: string) {
     };
 }
 
-@defineGadget('foog')
+export abstract class Cell extends Gadget {
+    @input() in: Term = this.defaults().in;
+    @output() out: Term = this.defaults().out;
+
+    abstract merge(old: Term, incoming: Term): Term;
+
+    defaults(): { in: Term, out: Term } {
+        return { in: null, out: null };
+    }
+
+    compute() {
+        const merged = this.merge(this.out, this.in);
+        if(merged !== this.out) {
+            this.out = merged;
+        }
+    }
+}
+
+@defineGadget('or')
+export class Or extends Cell {
+    override defaults() {
+        return { in: null, out: null };
+    }
+    merge(old: Term, incoming: Term): Term {
+        return old || incoming;
+    }
+}
+
+@defineGadget('adder')
 export class FooGadget extends Gadget {
-    @input() a!: Term;
-    @input() b!: Term;
-    @output() c!: Term;
+    @input() a!: number;
+    @input() b!: number;
+    @output() c!: number;
+
+    override shouldRun(inputs: Term[]) {
+        return super.shouldRun(inputs)
+        && inputs.every(input => typeof input === 'number');
+    }
 
     compute(): void {
         this.c = (this.a as number) + (this.b as number);
     }
 }
 
+@defineGadget('max')
+export class Max extends Cell {
+    override defaults() {
+        return { in: -Infinity, out: -Infinity };
+    }
+    merge(old: Term, incoming: Term): Term {
+        return Math.max(old as number, incoming as number);
+    }
+}
+
+@defineGadget('min')
+export class Min extends Cell {
+    override defaults() {
+        return { in: Infinity, out: Infinity };
+    }
+    merge(old: Term, incoming: Term): Term {
+        return Math.min(old as number, incoming as number);
+    }
+}
+
+
 const net = bl.createNetwork('test');
+const other = bl.createNetwork('other');
+
 bl.enterNetwork('test', () => {
-    const foo = bl.createGadget('foo', 'foog');
-    foo.a = 1;
-    console.log('set a');
-    foo.b = 2;
-    console.log('set b');
-    console.log('foo.c', foo.c);
-})
+    const a = bl.createGadget('a', 'max');
+    console.log('Network', bl.network().id);
+
+    //console.log('gadgets', bl.network().gadgets);
+
+    bl.enterNetwork('other', () => {
+        const b = bl.createGadget('b', 'max');
+        console.log('Network', bl.network().id);
+
+        //console.log('gadgets', bl.network().gadgets);
+    });
+});
+
+//console.log('gadgets', bl.network().gadgets);
+
+// const net = bl.createNetwork('test');
+// bl.enterNetwork('test', () => {
+//     const a = bl.createGadget('a', 'max');
+//     const b = bl.createGadget('b', 'max');
+//     const c = bl.createGadget('c', 'max');
+//     const adder = bl.createGadget('adder', 'adder');
+
+//     bl.connect([a, 'out'], [adder, 'a']);
+//     bl.connect([b, 'out'], [adder, 'b']);
+//     bl.connect([adder, 'c'], [c, 'in']);
+// })

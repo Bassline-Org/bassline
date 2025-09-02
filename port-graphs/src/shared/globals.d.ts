@@ -1,6 +1,6 @@
 import { ConnectionPath, INetwork } from "../core/gadget-types";
 import { Term } from "../core/terms";
-import { Gadget } from "../core/gadgets";
+import { Gadget, InputPort, OutputPort } from "../core/gadgets";
 
 // Base global registry for gadget types
 declare global {

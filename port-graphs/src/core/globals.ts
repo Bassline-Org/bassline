@@ -178,9 +178,10 @@ export function createGadget<T extends Gadget>(id: string, kind: string): T {
     return g;
 }
 
-function connect(networkId: string, source: [string, string], target: [string, string]) {
-    throw new Error('Not implemented');
-    // globalThis.BASSLINE.onConnectionCreated();
+function connect(source: [string, string], target: [string, string]) {
+    const n = globalThis.BASSLINE.network();
+    n.connect(source, target);
+    globalThis.BASSLINE.onConnectionCreated(source[0]);
 }
 
 function schedule(job: () => void) {
@@ -199,6 +200,29 @@ export class Network {
 
     constructor(public readonly id: string) {
         globalThis.BASSLINE.NETWORKS[id] = this;
+    }
+
+    connect(source: [string, string], target: [string, string]): void {
+        const sourceGadget = this.gadgets[source[0]];
+        const targetGadget = this.gadgets[target[0]];
+        if (!sourceGadget || !targetGadget) {
+            throw new Error(`Source or target not found`);
+        }
+
+        let fromSource = this.connections[source[0]];
+        if (!fromSource) {
+            this.connections[source[0]] = {};
+            fromSource = this.connections[source[0]];
+        }
+
+        let fromPort = fromSource![source[1]];
+        if (!fromPort) {
+            fromSource![source[1]] = [];
+            fromPort = fromSource![source[1]];
+        }
+
+        fromPort!.push([target[0], target[1]]);
+        this.connections[source[0]] = fromSource!;
     }
 
     getOutputsFor(gadgetId: string, port: string): ConnectionPath[] {
