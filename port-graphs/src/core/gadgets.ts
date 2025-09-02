@@ -1,14 +1,24 @@
 import { INetwork } from "./gadget-types";
+import { initializeBassline, LoggingLevel, Network } from "./globals";
 import { Term } from "./terms";
 
-const { NETWORKS, REGISTRY, HOOKS } = globalThis.BASSLINE;
+// Extract global functions and objects
+initializeBassline();
+
+const bl = globalThis.BASSLINE;
+const { info } = bl;
 
 export abstract class GraphNode {
     attributes: Record<string, Term> = {};
-    networkId: string;
-    
+    networkId: string | null = null;
+
     constructor(public readonly id: string) {
-        
+        this.id = id;
+        this.networkId = bl.network().id;
+    }
+
+    setNetworkId(networkId: string) {
+        this.networkId = networkId;
     }
 
     addAttribute(name: string, value: Term) {
@@ -26,19 +36,25 @@ export abstract class GraphNode {
     hasAttribute(name: string) {
         return name in this.attributes;
     }
+    getNetwork(): Network {
+        if (!this.networkId) {
+            throw new Error('Network ID not set');
+        }
+        const n = bl.NETWORKS[this.networkId];
+        if (!n) {
+            throw new Error(`Network ${this.networkId} not found`);
+        }
+        return n as Network;
+    }
 }
 
 export class Connection extends GraphNode {
-    constructor(public readonly id: string, public readonly source: [string, string], public readonly target: [string, string]) {
-        super();
+    constructor(id: string, public readonly source: [string, string], public readonly target: [string, string]) {
+        super(id);
     }
 }
 
-export class Gadget extends GraphNode {
-    constructor(public readonly id: string) {
-        super();
-    }
-}
+
 
 // Base gadget interface
 export interface GadgetInterface {
@@ -46,65 +62,103 @@ export interface GadgetInterface {
     outputs: Record<string, { name: string; value: Term; attributes: Record<string, Term> }>;
 };
 
-export abstract class Gadget {
+export abstract class Gadget extends GraphNode {
+    // Instance interface that decorators populate
     INTERFACE: GadgetInterface = {
         inputs: {},
         outputs: {},
     };
     
-    constructor(public readonly id: string, public readonly networkId: string) {
-        // Register with global network system
-        if (NETWORKS?.[networkId]) {
-            NETWORKS[networkId][id] = this;
-        }
-    }
-
-    getNetwork(): INetwork {
-        const network = NETWORKS?.[this.networkId];
-        if (!network) {
-            throw new Error(`Network ${this.networkId} not found`);
-        }
-        return network;
-    }
-
-    protected setInputValue(name: string, value: Term) {
-        let currentValue = this.INTERFACE.inputs[name]?.value;
-        if (currentValue === value) return;
+    constructor(id: string, networkId: string = bl.network().id) {
+        super(id);
+        this.setNetworkId(networkId);
+        this.getNetwork().gadgets[id] = this;
         
-        this.INTERFACE.inputs[name]!.value = value;
-
-        if (HOOKS?.onPortValueChanged) {
-            HOOKS.onPortValueChanged(this, { name, value });
-        }
-
-        if (this.shouldActivate() && value !== this.INTERFACE.inputs[name]?.value) {
-            this.compute();
-        }
+        // Call the port definition method
+        this.definePorts();
     }
 
-    protected setOutputValue(name: string, value: Term) {
-        let currentValue = this.INTERFACE.outputs[name]?.value;
-        if (currentValue === value) return;
+    // Override this method to define your ports
+    protected definePorts(): void {
+        // Default implementation does nothing
+        // Subclasses should override this to call addInput() and addOutput()
+    }
+
+    // Add an input port
+    protected addInput(name: string, defaultValue: Term = null): void {
+        this.INTERFACE.inputs[name] = {
+            name,
+            value: defaultValue,
+            attributes: {}
+        };
         
-        this.INTERFACE.outputs[name]!.value = value;
-
-        if (HOOKS?.onPortValueChanged) {
-            HOOKS.onPortValueChanged(this, { name, value });
-        }
-
-        this.getNetwork()
+        // Define getter/setter on this instance
+        Object.defineProperty(this, name, {
+            get() {
+                return this.INTERFACE.inputs[name]!.value;
+            },
+            set(newValue: Term) {
+                const oldValue = this.INTERFACE.inputs[name]!.value;
+                if (oldValue === newValue) return;
+                
+                this.INTERFACE.inputs[name]!.value = newValue;
+                bl.onPortValueChanged(this, { name, value: newValue });
+                
+                if (this.shouldActivate()) {
+                    bl.schedule(() => this.compute());
+                }
+            },
+            enumerable: true,
+            configurable: true
+        });
     }
 
-    // Check if all inputs are ready
-    allInputsReady(): boolean {
-        return Object.values(this.INTERFACE.inputs).every(
-            (input) => input.value !== null && input.value !== undefined
-        );
+    // Add an output port
+    protected addOutput(name: string, defaultValue: Term = null): void {
+        this.INTERFACE.outputs[name] = {
+            name,
+            value: defaultValue,
+            attributes: {}
+        };
+        
+        // Define getter/setter on this instance
+        Object.defineProperty(this, name, {
+            get() {
+                return this.INTERFACE.outputs[name]!.value;
+            },
+            set(newValue: Term) {
+                const oldValue = this.INTERFACE.outputs[name]!.value;
+                if (oldValue === newValue) return;
+                
+                this.INTERFACE.outputs[name]!.value = newValue;
+                bl.onPortValueChanged(this, { name, value: newValue });
+                
+                // Propagate to connected inputs
+                for (const connection of this.getNetwork().getConnectionsFor(this.id, name)) {
+                    const [targetGadgetId, targetPortName] = connection.target;
+                    const targetGadget = this.getNetwork().gadgets[targetGadgetId];
+                    if (targetGadget) {
+                        bl.schedule(() => {
+                            targetGadget[targetPortName] = newValue;
+                        });
+                    }
+                }
+            },
+            enumerable: true,
+            configurable: true
+        });
     }
 
     // Default activation rule - run when all inputs are ready
     shouldActivate(): boolean {
         return this.allInputsReady();
+    }
+
+    // Check if all inputs are ready
+    allInputsReady(): boolean {
+        const inputs = Object.values(this.INTERFACE.inputs);
+        if (inputs.length === 0) return false; // No inputs defined yet
+        return inputs.every(input => input.value !== null && input.value !== undefined);
     }
 
     // Abstract method that subclasses must implement
@@ -115,103 +169,22 @@ export abstract class Gadget {
 export function defineGadget(name: string) {
     return function (constructor: typeof Gadget) {
         // Register the gadget class in global registry
-        if (REGISTRY) {
-            REGISTRY[name] = constructor;
+        if (bl.REGISTRY) {
+            bl.REGISTRY[name] = constructor;
         }
     };
 }
 
-// Decorator for input ports
-export function input(defaultValue: Term = null) {
-    return function (target: any, propertyKey: string, _descriptor?: PropertyDescriptor) {
-        if (!target || !target.constructor) {
-            console.warn('Input decorator called with invalid target:', target);
-            return;
-        }
 
-        let value = defaultValue;
-        
-        Object.defineProperty(target, propertyKey, {
-            get() {
-                return value;
-            },
-            set(newValue: Term) {
-                if (value === newValue) return;
-                value = newValue;
-                // Update the interface
-                if (this.INTERFACE.inputs[propertyKey]) {
-                    this.INTERFACE.inputs[propertyKey].value = newValue;
-                }
 
-                // Call the hook if it exists
-                if (HOOKS?.onPortValueChanged) {
-                    HOOKS.onPortValueChanged(this, { name: propertyKey, value: newValue });
-                }
+@defineGadget('foog')
+export class FooGadget extends Gadget {
+    a: Term = 0;
+    b: Term = 0;
+    c: Term = 0;
 
-                // Trigger computation if activation policy is met
-                if (this.shouldActivate() && newValue !== value) {
-                    this.compute();
-                }
-            },
-            enumerable: true,
-            configurable: true
-        });
-    };
-}
-
-// Decorator for output ports
-export function output(defaultValue: Term = null) {
-    return function (target: any, propertyKey: string, _descriptor?: PropertyDescriptor) {
-        if (!target || !target.constructor) {
-            console.warn('Output decorator called with invalid target:', target);
-            return;
-        }
-        
-        let value = defaultValue;
-        
-        Object.defineProperty(target, propertyKey, {
-            get() {
-                return value;
-            },
-            set(newValue: Term) {
-                if (value === newValue) return;
-                value = newValue;
-                // Update the interface
-                if (this.INTERFACE.outputs[propertyKey]) {
-                    this.INTERFACE.outputs[propertyKey].value = newValue;
-                }
-                
-                // Call the hook if it exists
-                if (HOOKS?.onPortValueChanged) {
-                    HOOKS.onPortValueChanged(this, { name: propertyKey, value: newValue });
-                }
-            },
-            enumerable: true,
-            configurable: true
-        });
-    };
-}
-
-// Factory function to create gadget instances
-export function createGadget(gadgetName: string, id: string, networkId: string) {
-    const GadgetClass = REGISTRY[gadgetName];
-    if (!GadgetClass) {
-        throw new Error(`Unknown gadget type: ${gadgetName}`);
+    compute(): void {
+        this.c = (this.a as number) + (this.b as number);
     }
-    return new (GadgetClass as any)(id, networkId);
 }
 
-// Get gadget interface
-export function getGadgetInterface(gadgetName: string): GadgetInterface | undefined {
-    const GadgetClass = REGISTRY[gadgetName];
-    if (!GadgetClass) return undefined;
-    
-    // Create a temporary instance to get the interface
-    const temp = new (GadgetClass as any)('temp', 'temp');
-    return temp.INTERFACE;
-}
-
-// List all available gadget types
-export function listGadgetTypes(): string[] {
-    return Object.keys(REGISTRY || {});
-}

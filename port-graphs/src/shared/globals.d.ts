@@ -1,11 +1,11 @@
 import { ConnectionPath, INetwork } from "../core/gadget-types";
 import { Term } from "../core/terms";
-import { Gadget, GadgetMetadata } from "../core/gadgets";
+import { Gadget } from "../core/gadgets";
 
 // Base global registry for gadget types
 declare global {
     namespace BASSLINE {
-        function createGadget(id: string, kind: string): void;
+        function createGadget<T extends Gadget>(id: string, kind: string): T;
         function createNetwork(id: string): void;
         function connect(source: [string, string], target: [string, string]): void;
         function registerGadget(name: string, gadget: typeof Gadget): void;
@@ -19,45 +19,49 @@ declare global {
         var JOBS: (() => void)[];
 
         // Dynamic bindings
-        namespace dynamic {
-            var CURRENT_NETWORK_ID: string | undefined;
-            var CURRENT_GADGET_ID: string | undefined;
+        var CURRENT_NETWORK_ID: string | undefined;
+        var CURRENT_GADGET_ID: string | undefined;
 
-            function network(): Network; // Will be extended by specific targets
-            function gadget(): typeof Gadget; // Will be extended by specific targets
+        function network(): Network; // Will be extended by specific targets
+        function gadget(): Gadget; // Will be extended by specific targets
 
-            function enterNetwork(id: string, body: () => void): void;
-            function enterGadget(id: string, body: () => void): void;
-        }
+        function enterNetwork(id: string, body: () => void): void;
+        function enterGadget(id: string, body: () => void): void;
+
+        // Logging
+        function info(message: string): void;
+        function debug(message: string): void;
+        function warn(message: string): void;
+        function error(message: string): void;
 
         // Hooks for the system. Allows for integration with other systems or debugging.
-        namespace HOOKS {
-            // Gadget lifecycle hooks
-            function onGadgetCreated(gadget: Gadget): void;
-            function onGadgetDestroyed(gadget: Gadget): void;            
-            function onGadgetStarted(gadget: Gadget): void;
-            function onGadgetFinished(gadget: Gadget): void;
+        // Gadget lifecycle hooks
+        function onGadgetCreated(id: string): void;
+        function onGadgetDestroyed(id: string): void;
+        function onGadgetStarted(id: string): void;
+        function onGadgetFinished(id: string): void;
 
-            // Connection Lifecycle hooks
-            function onConnectionCreated(connection: any): void; // Will be extended by specific targets
-            function onConnectionRemoved(connection: any): void; // Will be extended by specific targets
+        // Connection Lifecycle hooks
+        function onConnectionCreated(connection: id): void; // Will be extended by specific targets
+        function onConnectionRemoved(connection: id): void; // Will be extended by specific targets
 
-            // Network lifecycle hooks
-            function onNetworkCreated(network: any): void; // Will be extended by specific targets
-            function onNetworkRemoved(network: any): void; // Will be extended by specific targets
+        // Network lifecycle hooks
+        function onNetworkCreated(network: id): void; // Will be extended by specific targets
+        function onNetworkRemoved(network: id): void; // Will be extended by specific targets
 
-            // Port lifecycle hooks
-            function onPortAdded(port: any): void; // Will be extended by specific targets
-            function onPortRemoved(port: any): void; // Will be extended by specific targets
+        // Port lifecycle hooks
+        function onPortAdded(port: id): void; // Will be extended by specific targets
+        function onPortRemoved(port: id): void; // Will be extended by specific targets
 
-            // Port value hooks
-            function onPortValueChanged(gadget: Gadget, port: any): void; // Will be extended by specific targets
-        }
+        // Port value hooks
+        function onPortValueChanged(gadget: Gadget, port: id): void; // Will be extended by specific targets
 
-        namespace CONFIG {
-            var LOGGING_LEVEL: 'debug' | 'info' | 'warn' | 'error' | 'none';
-        }
+        // Job lifecycle hooks
+        function onJobScheduled(job: () => void): void; // Will be extended by specific targets
+        function onStep(): void; // Will be extended by specific targets
+
+        var LOGGING_LEVEL: LoggingLevel;
     }
 }
 
-export {}
+export { }

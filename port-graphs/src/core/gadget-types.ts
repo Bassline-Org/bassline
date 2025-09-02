@@ -37,15 +37,15 @@ export type ConnectionTerm = [ 'connection' , ConnectionPath , ConnectionPath, A
 export interface INetwork {
     id: string;
     // All gadgets in the network
-    gadgets: Record<string, typeof Gadget>;
-    // Gadget id -> [outputPort, [gadgetId, inputPort]]
-    connections: Record<string, [string, ConnectionPath][]>;
+    gadgets: Record<string, Gadget>;
+    // Gadget id -> outputPort -> [gadgetId, inputPort]
+    connections: Record<string, Record<string, ConnectionPath[]>>;
 }
 
 export interface IPort {
     name: string;
     value: Term;
-    gadget: typeof Gadget;
+    gadget: Gadget;
     attributes: Record<string, Term>;
 }
 
