@@ -162,9 +162,10 @@ function cell<T = any>(mergeFn: MergeFn<T>, initialValue: T = null as T, reactor
     });
 }
 
+//const adder = gadget((a,b) => a + b);
+
 // Test the dispatcher system
 console.log('=== Testing Dispatcher System ===');
-
 
 function testCase() {
     const a = cell(Math.max);
@@ -190,6 +191,7 @@ usingDispatcher(wiringDispatcher, () => {
     testCase();
 });
 
-const foo = cell(Math.max);
-const num = 1;
-console.log(isReactiveCell(foo), isReactiveCell(num));
+const foo = cell(Math.max, 5);
+
+console.log('foo: ', foo.value);
+console.log('foo.call(): ', foo());
