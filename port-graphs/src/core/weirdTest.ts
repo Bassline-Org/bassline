@@ -36,6 +36,7 @@ function createReactive(body: (...args: any[]) => any, isGadget = false, statefu
                 }
                 return result;
             } else {
+                if (validArgs.length === 0) return body();
                 const result = body(...validArgs);
                 reactive.downstream.forEach(downstream => downstream(result));
                 return result;
@@ -63,7 +64,7 @@ function createReactive(body: (...args: any[]) => any, isGadget = false, statefu
         into(target: Reactive) {
             if(reactive.downstream.has(target)) return target;
             reactive.downstream.add(target);
-            target(reactive.value());
+            target(reactive());
             return target;
         }
     });
@@ -85,31 +86,39 @@ function Gadget(body: (() => any) | ((...args: any[]) => any)): Reactive | ((...
     }
 }
 
-const maxFn = (a: number, b: number) => Math.max(a, b);
+const maxFn = (a: number, b: number) => {
+    if (b === 0) return b;
+
+    return Math.max(a, b);
+};
 const setUnion = (a: Set<any>, b: Set<any>) => new Set([...a, ...b]);
 
 const a = Cell(maxFn, 0);
 const b = Cell(maxFn, 0);
 const c = Cell(maxFn, 0);
 
-const adder = Gadget(() => {
-    return a() + b();
-});
+const adder = Gadget((a,b) => a() + b());
+const subtractor = Gadget((a,b) => a() - b());
 
-adder.into(c);
+const abToC = adder(a, b);
 
-console.log('Gadget is wired:', adder.isWired);
-console.log('Gadget downstream connections:', adder.downstream.size);
+const caToB = subtractor(c, a);
+
+const cbToA = subtractor(c, b);
+
+const foo = Gadget(() => abToC() + caToB() + cbToA());
+
+abToC.into(c);
+caToB.into(b);
+cbToA.into(a);
 
 a(5);
-b(3);
+c(10);
 
-console.log('Adder value:', adder.value());
 console.log('a value:', a());
 console.log('b value:', b());
-
-a(123);
-console.log('Adder value:', adder.value());
+console.log('c value:', c());
+console.log('foo value:', foo());
 
 const aSet = Cell(setUnion, new Set([1]));
 const bSet = Cell(setUnion, new Set([2]));
@@ -130,10 +139,12 @@ console.log('bSet value:', bSet());
 console.log('cSet value:', cSet());
 
 const multiplier = Gadget((x, y) => x() * y());
+// (x,y) => Gadget(() => x() * y())
 const result = Cell(maxFn, 0);
 
 multiplier(a, b).into(result);
 
 a(2);
 b(3);
+
 console.log('Multiplier result:', result());
