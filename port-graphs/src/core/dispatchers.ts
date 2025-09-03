@@ -42,57 +42,100 @@ export const usingDispatcher = (dispatcher: Dispatcher, fn: () => void) => {
 
 export interface Gadget {
     (...args: any[]): any;
-    bindInputs: (...args: Gadget[]) => void;
     downstream: Set<Gadget>;
     boundInputs: Gadget[];
     body: (...args: any[]) => any;
-    [BASSLINE_REACTIVE]: true;
+    [BASSLINE_REACTIVE]: boolean;
 }
 
 export function Gadget(body: (...args: any[]) => any): Gadget {
     const downstream = new Set<Gadget>();
     const boundInputs: Gadget[] = [];
-    let gadget: Gadget;
     
-    function call(...args: any[]): any {
-        if (boundInputs.length < body.length) {
-            const gadgets = args.filter(arg => arg?.[BASSLINE_REACTIVE]);
-            bindInputs(...gadgets);
-            if(boundInputs.length === body.length) return gadget;
-        }
-        return body(...boundInputs);
-    }
-    
-    function bindInputs(...args: Gadget[]): void {
-        for (const arg of args) {
-            if (boundInputs.length === body.length) return;
-            if (boundInputs.includes(arg)) continue;
-            boundInputs.push(arg);
-            arg.downstream.add(gadget);
-        }
-    }
+    function gadget(...args: any[]): any {
+        const d = dispatcher();
 
-    // Create the callable gadget object
-    gadget = Object.assign(call, {
-        downstream,
-        boundInputs,
-        body,
-        bindInputs,
-        [BASSLINE_REACTIVE]: true as const
-    });
+        if (boundInputs.length === body.length) {
+            return body(...boundInputs);
+        }
+
+        for (const arg of args) {
+            if (arg?.[BASSLINE_REACTIVE]
+                && !boundInputs.includes(arg)
+                && boundInputs.length < body.length
+            ) {
+                boundInputs.push(arg);
+                arg.downstream.add(gadget);
+            }
+        }
+        
+        if (args.length === 0) {
+            return d.read(gadget as Gadget);
+        }
+
+        return gadget;
+    }
+    
+    gadget.downstream = downstream;
+    gadget.body = body;
+    gadget.boundInputs = boundInputs;
+    gadget[BASSLINE_REACTIVE] = true;
     
     return gadget;
 }
 
-// A gadget takes a body function, and returns a curried function that allows us to bind inputs to cells and other gadgets.
-const adder = Gadget((a,b) => a() + b());
-const foo = Gadget(() => 5);
-const bar = Gadget(() => 10);
-console.log('foo: ', foo());
-console.log('bar: ', bar());
+type Cell = ReturnType<typeof Cell>;
+export function Cell<T>(merge: MergeFn<T>, initial: T) {
+    let state = initial;
+    
+    const cell = Gadget((values: T[]) => {
+        const d = dispatcher();
 
-const myAdder = adder(foo, bar);
-console.log(myAdder());
+        const value = values
+            .filter(value => value !== undefined && value !== null)
+            .reduce((acc, value) => merge(acc, value), state);
+        
+        if (!d.equivalent(state, value)) {
+            const merged = merge(state, value);
+            if (!d.equivalent(state, merged)) {
+                state = merged;
+                d.propagate(cell, state);
+            }
+        }
+        return cell;
+    });
+    
+    return cell;
+}
+
+
+// Usage is now dead simple:
+const a = Cell(Math.max, 0);
+const b = Cell(Math.max, 0);
+
+console.log(a(), b());
+
+a(123);
+b(456);
+
+console.log(a(), b());
+
+// // Gadgets are just functions that read from their args
+// const add = Gadget((x, y) => x() + y());
+
+// // Wire by passing gadgets
+// const c = Cell(Math.max, 0);
+// c(add);  // c now gets values from add
+
+// // A gadget takes a body function, and returns a curried function that allows us to bind inputs to cells and other gadgets.
+// const adder = Gadget((a,b) => a() + b());
+// const foo = Gadget(() => 5);
+// const bar = Gadget(() => 10);
+// console.log('foo: ', foo());
+// console.log('bar: ', bar());
+
+// const myAdder = adder(foo, bar);
+// console.log(myAdder());
 
 // class Reactive<T = any> {
 //     downstream: Set<Reactive<T>>;
