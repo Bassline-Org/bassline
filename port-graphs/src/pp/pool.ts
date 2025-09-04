@@ -130,39 +130,6 @@ export function usingPool<T>(pool: Pool<T>, fn: (pool: Pool<T>) => void): void {
     }
 }
 
-let alice = 'alice';
-let bob = 'bob';
-let charlie = 'charlie';
-
-let testNeed = need({ tag: 'test', source: alice });
-let testNeed2 = need({ tag: 'test2', source: alice });
-let testNeed3 = need({ tag: 'test', source: charlie });
-
-let testHave = have({ tag: 'test', source: bob });
-let testHave2 = have({ tag: 'test4', source: bob });
-
-currentPool.assert(testNeed);
-currentPool.assert(testNeed2);
-currentPool.assert(testNeed3);
-currentPool.assert(testHave);
-currentPool.assert(testHave2);
-
-let filledNeeds = currentPool.whoHas(testNeed);
-console.log('filledNeeds: ', filledNeeds);
-console.log('\n');
-
-console.log('describe: ');
-console.log('alice: ', currentPool.describe(alice));
-console.log('\n');
-console.log('bob: ', currentPool.describe(bob));
-console.log('\n');
-console.log('charlie: ', currentPool.describe(charlie));
-console.log('\n');
-
-console.log('testNeed: ', testNeed);
-console.log('testHave: ', testHave);
-console.log('matches: ', _.matches(testNeed)(testHave));
-
 export interface IPool {
     id: string,
     need: Set<INeed<any>>;
@@ -183,5 +150,38 @@ export type INeed<T = any> = IAssertion<T, 'need'>;
 export type IHave<T = any> = IAssertion<T, 'have'>;
 export type InverseOf<T = any, K extends AssertionKind = AssertionKind> = K extends 'need' ? Omit<IHave<T>, 'id' | 'source'> : Omit<INeed<T>, 'id' | 'source'>;
 
-console.log('testNeed: ', testNeed);
-console.log('Complemented: ', inverseOf(testNeed));
+// let alice = 'alice';
+// let bob = 'bob';
+// let charlie = 'charlie';
+
+// let testNeed = need({ tag: 'test', source: alice });
+// let testNeed2 = need({ tag: 'test2', source: alice });
+// let testNeed3 = need({ tag: 'test', source: charlie });
+
+// let testHave = have({ tag: 'test', source: bob });
+// let testHave2 = have({ tag: 'test4', source: bob });
+
+// currentPool.assert(testNeed);
+// currentPool.assert(testNeed2);
+// currentPool.assert(testNeed3);
+// currentPool.assert(testHave);
+// currentPool.assert(testHave2);
+
+// let filledNeeds = currentPool.whoHas(testNeed);
+// console.log('filledNeeds: ', filledNeeds);
+// console.log('\n');
+
+// console.log('describe: ');
+// console.log('alice: ', currentPool.describe(alice));
+// console.log('\n');
+// console.log('bob: ', currentPool.describe(bob));
+// console.log('\n');
+// console.log('charlie: ', currentPool.describe(charlie));
+// console.log('\n');
+
+// console.log('testNeed: ', testNeed);
+// console.log('testHave: ', testHave);
+// console.log('matches: ', _.matches(testNeed)(testHave));
+
+// console.log('testNeed: ', testNeed);
+// console.log('Complemented: ', inverseOf(testNeed));
