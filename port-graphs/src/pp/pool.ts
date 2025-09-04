@@ -16,36 +16,15 @@
 //
 // NOTE: This is ONLY FOR SEMANTICS! Raw data is not put into pools, only tags & properties.
 
-import * as _ from 'lodash';
+import _ from 'lodash';
 
-interface IAssertion<T> extends Record<string, any> {
-    id: string,
-    kind: 'need' | 'have',
-    tag: T,
-    source: string, // the id of the gadget that made the assertion
-}
-
-interface INeed<T> extends IAssertion<T> { kind: 'need' }
-interface IHave<T> extends IAssertion<T> { kind: 'have' }
-export function need<T>(obj: { tag: T, source: string }): INeed<T> {
-    return {
-        ...obj,
-        kind: 'need',
-        id: _.uniqueId(),
+// Used to get the complementary assertion for a given assertion, so it removes the id & source
+export function inverseOf<T = any, K extends AssertionKind = AssertionKind>(assertion: IAssertion<T, K>): Omit<InverseOf<T, K>, 'id' | 'source'> {
+    const {id, source, ...rest} = {
+        ...assertion,
+        kind: (assertion.kind === 'need' ? 'have' : 'need') as K extends 'need' ? 'have' : 'need',
     }
-}
-export function have<T>(obj: { tag: T, source: string }): IHave<T> {
-    return {
-        ...obj,
-        kind: 'have',
-        id: _.uniqueId(),
-    }
-}
-
-export interface IPool {
-    id: string,
-    need: Set<INeed<any>>;
-    have: Set<IHave<any>>;
+    return rest as Omit<InverseOf<T, K>, 'id' | 'source'>
 }
 
 export class Pool<Tags> extends EventTarget implements IPool {
@@ -56,15 +35,19 @@ export class Pool<Tags> extends EventTarget implements IPool {
         super();
     }
 
-    assert(assertion: IAssertion<keyof Tags>): void {
+    announce<T>(kind: IPoolEventType, assertion: IAssertion<T, AssertionKind>): void {
+        this.dispatchEvent(new CustomEvent<IPoolEvent<T>>(kind, { detail: { poolId: this.id, type: kind, assertion } }));
+    }
+
+    assert(assertion: IAssertion<keyof Tags, AssertionKind>): void {
         if (assertion.kind === 'need') {
             this.need.add(assertion as INeed<keyof Tags>);
-            this.dispatchEvent(new CustomEvent('needAdded', { detail: assertion }));
+            this.announce('newNeed', assertion);
             return;
         }
         if (assertion.kind === 'have') {
             this.have.add(assertion as IHave<keyof Tags>);
-            this.dispatchEvent(new CustomEvent('haveAdded', { detail: assertion}));
+            this.announce('newHave', assertion);
             return;
         }
         throw new Error('Invalid assertion!');
@@ -116,8 +99,36 @@ export class Pool<Tags> extends EventTarget implements IPool {
     }
 }
 
+export function need<T>(obj: { tag: T, source: string }): INeed<T> {
+    return {
+        ...obj,
+        kind: 'need',
+        id: _.uniqueId(),
+    }
+}
+export function have<T>(obj: { tag: T, source: string }): IHave<T> {
+    return {
+        ...obj,
+        kind: 'have',
+        id: _.uniqueId(),
+    }
+}
+
 export const GLOBAL_POOL_ID = 'BASSLINE_GLOBAL_POOL';
 export let currentPool: Pool<any> | null = new Pool(GLOBAL_POOL_ID);
+
+export function getCurrentPool<T>(): Pool<T> {
+    return currentPool as Pool<T>;
+}
+export function usingPool<T>(pool: Pool<T>, fn: (pool: Pool<T>) => void): void {
+    const oldPool = currentPool;
+    currentPool = pool;
+    try {
+        fn(pool);
+    } finally {
+        currentPool = oldPool;
+    }
+}
 
 let alice = 'alice';
 let bob = 'bob';
@@ -151,3 +162,26 @@ console.log('\n');
 console.log('testNeed: ', testNeed);
 console.log('testHave: ', testHave);
 console.log('matches: ', _.matches(testNeed)(testHave));
+
+export interface IPool {
+    id: string,
+    need: Set<INeed<any>>;
+    have: Set<IHave<any>>;
+}
+
+export type IPoolEventType = 'newNeed' | 'newHave' | 'needRemoved' | 'haveRemoved';
+export type IPoolEvent<T> = { poolId: string, type: IPoolEventType, assertion: IAssertion<T, AssertionKind> }
+
+interface IAssertion<T = any, K extends AssertionKind = AssertionKind> extends Record<string, any> {
+    id: string,
+    kind: K,
+    tag: T,
+    source: string, // the id of the gadget that made the assertion
+}
+export type AssertionKind = 'need' | 'have';
+export type INeed<T = any> = IAssertion<T, 'need'>;
+export type IHave<T = any> = IAssertion<T, 'have'>;
+export type InverseOf<T = any, K extends AssertionKind = AssertionKind> = K extends 'need' ? Omit<IHave<T>, 'id' | 'source'> : Omit<INeed<T>, 'id' | 'source'>;
+
+console.log('testNeed: ', testNeed);
+console.log('Complemented: ', inverseOf(testNeed));
