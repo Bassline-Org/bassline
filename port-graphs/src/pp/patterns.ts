@@ -5,6 +5,7 @@
  * while allowing custom action semantics to be injected.
  */
 
+import _ from "lodash";
 import { protocol, Gadget } from "./core";
 
 /**
@@ -51,7 +52,7 @@ export function cell<T, G extends Gadget<T> = Gadget<T>>(
     (result) => {
       // Using !== for reference equality check
       // For deep equality, caller should ensure merge returns same reference
-      return result !== initial && result !== undefined ? result : null;
+      return ! _.isEqual(result,initial) && result !== undefined ? result : null;
     },
     // ACT: Perform the injected action
     act

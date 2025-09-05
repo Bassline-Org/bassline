@@ -3,7 +3,7 @@
  */
 
 import { cell, fn } from "./patterns";
-import { createPool, assert } from "./pool";
+import { createPool, assert, Assertion } from "./pool";
 import { EventfulGadget, emitEvent, wireEvents } from "./event-gadget";
 
 console.log("=== Self-Organizing Temperature Network ===\n");
@@ -45,10 +45,16 @@ const display = new EventfulGadget<number>('display')
   ));
 
 // Pool that wires gadgets based on assertions
-const pool = new EventfulGadget<any>('pool')
+const pool = new EventfulGadget<Assertion>('pool')
   .use(createPool((match) => {
     console.log(`🔌 Wiring: ${match.provider.id} → ${match.consumer.id}`);
-    wireEvents(match.provider.gadget, match.consumer.gadget, 'temperature');
+    if (match.provider.gadget && match.consumer.gadget) {
+      wireEvents(
+        match.provider.gadget as EventfulGadget<number>, 
+        match.consumer.gadget as EventfulGadget<number>, 
+        'temperature'
+      );
+    }
   }));
 
 // Phase 1: Gadgets announce capabilities

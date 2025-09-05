@@ -4,12 +4,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { cell, fn } from "./patterns";
-import { createPool, assert } from "./pool";
+import { createPool, assert, Assertion } from "./pool";
 import { EventfulGadget, emitEvent, wireEvents } from "./event-gadget";
 
 describe('Integration Tests', () => {
   it('should propagate through event-based gadgets', () => {
-    const results: any[] = [];
+    const results: number[] = [];
     
     // Create a sensor that emits events
     const sensor = new EventfulGadget<number>('sensor')
@@ -71,9 +71,15 @@ describe('Integration Tests', () => {
       ));
     
     // Create pool with wiring action
-    const pool = new EventfulGadget<any>('pool')
+    const pool = new EventfulGadget<Assertion>('pool')
       .use(createPool((match) => {
-        wireEvents(match.provider.gadget, match.consumer.gadget, 'message');
+        if (match.provider.gadget && match.consumer.gadget) {
+          wireEvents(
+            match.provider.gadget as EventfulGadget<string>, 
+            match.consumer.gadget as EventfulGadget<string>, 
+            'message'
+          );
+        }
       }));
     
     // Announce capabilities - network self-organizes

@@ -16,7 +16,7 @@ export interface Assertion {
   gadgetId: string;
   type: 'provides' | 'needs';
   tag: string;
-  gadget?: Gadget<any>;
+  gadget?: Gadget<unknown>;
 }
 
 /**
@@ -26,11 +26,11 @@ export interface Match {
   tag: string;
   provider: {
     id: string;
-    gadget?: Gadget<any>;
+    gadget?: Gadget<unknown>;
   };
   consumer: {
     id: string;
-    gadget?: Gadget<any>;
+    gadget?: Gadget<unknown>;
   };
 }
 
@@ -137,7 +137,7 @@ export const assert = {
   /**
    * Create a "provides" assertion
    */
-  provides: (gadgetId: string, tag: string, gadget?: Gadget<any>): Assertion => ({
+  provides: (gadgetId: string, tag: string, gadget?: Gadget<unknown>): Assertion => ({
     gadgetId,
     type: 'provides',
     tag,
@@ -147,7 +147,7 @@ export const assert = {
   /**
    * Create a "needs" assertion  
    */
-  needs: (gadgetId: string, tag: string, gadget?: Gadget<any>): Assertion => ({
+  needs: (gadgetId: string, tag: string, gadget?: Gadget<unknown>): Assertion => ({
     gadgetId,
     type: 'needs',
     tag,
@@ -179,7 +179,7 @@ export const poolActions = {
         // Wrap the original receive to intercept and forward
         const originalReceive = provider.receive?.bind(provider);
         if (originalReceive) {
-          provider.receive = function(data: any) {
+          provider.receive = function(data: unknown) {
             originalReceive(data);
             // Forward to consumer
             consumer.receive(data);
@@ -195,10 +195,10 @@ export const poolActions = {
   eventWire: <G extends Gadget = Gadget>(eventName: string = 'propagate'): Action<Match, G> =>
     (match) => {
       if (match.provider.gadget && match.consumer.gadget) {
-        const provider = match.provider.gadget as any;
+        const provider = match.provider.gadget as EventTarget & Gadget<unknown>;
         const consumer = match.consumer.gadget;
         
-        if (provider.addEventListener) {
+        if ('addEventListener' in provider) {
           provider.addEventListener(eventName, (e: Event) => {
             consumer.receive((e as CustomEvent).detail);
           });

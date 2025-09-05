@@ -2,34 +2,14 @@
  * Simple example showing the core patterns
  */
 
-import { Gadget } from "./core";
 import { cell, fn } from "./patterns";
-import { createPool, assert } from "./pool";
-import { emitEvent, wireEvents } from "./event-gadget";
-
-// Create gadgets that mix EventTarget for event support
-class SimpleGadget<T> extends EventTarget implements Gadget<T> {
-  constructor(
-    public id: string,
-    private protocol?: (this: SimpleGadget<T>, data: T) => void
-  ) {
-    super();
-  }
-  
-  receive(data: T): void {
-    this.protocol?.call(this, data);
-  }
-  
-  use(protocol: (this: SimpleGadget<T>, data: T) => void): this {
-    this.protocol = protocol;
-    return this;
-  }
-}
+import { createPool, assert, Assertion } from "./pool";
+import { EventfulGadget, emitEvent, wireEvents } from "./event-gadget";
 
 console.log("=== Simple Temperature Network ===\n");
 
 // Temperature sensor - a FUNCTION that transforms readings
-const sensor = new SimpleGadget<number>('sensor')
+const sensor = new EventfulGadget<number>('sensor')
   .use(fn(
     (reading: number) => {
       console.log(`📡 Sensor reading: ${reading}°C`);
@@ -39,7 +19,7 @@ const sensor = new SimpleGadget<number>('sensor')
   ));
 
 // Converter - another FUNCTION that transforms celsius to fahrenheit  
-const converter = new SimpleGadget<number>('converter')
+const converter = new EventfulGadget<number>('converter')
   .use(fn(
     (celsius: number) => {
       const fahrenheit = (celsius * 9/5) + 32;
@@ -50,7 +30,7 @@ const converter = new SimpleGadget<number>('converter')
   ));
 
 // Display - a CELL that accumulates the last value
-const display = new SimpleGadget<number>('display')
+const display = new EventfulGadget<number>('display')
   .use(cell(
     (_old, value) => value, // Just replace with new value
     0,
@@ -58,17 +38,23 @@ const display = new SimpleGadget<number>('display')
   ));
 
 // High temp alert - a FUNCTION that only acts on high temps
-const alert = new SimpleGadget<number>('alert')
+const alert = new EventfulGadget<number>('alert')
   .use(fn(
     (temp: number) => temp > 25 ? temp : null,
     (value) => console.log(`⚠️  ALERT: High temperature ${value}°C!\n`)
   ));
 
 // Create pool with event wiring
-const pool = new SimpleGadget<any>('pool')
+const pool = new EventfulGadget<Assertion>('pool')
   .use(createPool((match) => {
     console.log(`🔌 Wiring: ${match.provider.id} → ${match.consumer.id}`);
-    wireEvents(match.provider.gadget, match.consumer.gadget, 'temperature');
+    if (match.provider.gadget && match.consumer.gadget) {
+      wireEvents(
+        match.provider.gadget as EventfulGadget<number>,
+        match.consumer.gadget as EventfulGadget<number>,
+        'temperature'
+      );
+    }
   }));
 
 // Gadgets announce capabilities

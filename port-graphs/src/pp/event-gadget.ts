@@ -30,7 +30,7 @@ export class EventfulGadget<T = unknown> extends EventTarget implements Gadget<T
     return this;
   }
   
-  emit(eventName: string, data: any): void {
+  emit<TData = T>(eventName: string, data: TData): void {
     this.dispatchEvent(new CustomEvent(eventName, { detail: data }));
   }
 }
@@ -51,10 +51,12 @@ export const emitEvent = <T>(eventName: string = 'propagate'): Action<T, Eventfu
 /**
  * Wire two gadgets using events
  */
-export function wireEvents(from: any, to: any, eventName: string = 'propagate'): void {
-  if ('addEventListener' in from) {
-    from.addEventListener(eventName, (e: Event) => {
-      to.receive((e as CustomEvent).detail);
-    });
-  }
+export function wireEvents<T>(
+  from: EventfulGadget<T>,
+  to: EventfulGadget<T>,
+  eventName: string = 'propagate'
+): void {
+  from.addEventListener(eventName, (e: Event) => {
+    to.receive((e as CustomEvent).detail);
+  });
 }
