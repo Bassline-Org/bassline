@@ -163,5 +163,29 @@ export const actions = {
         buffer = [];
       }
     };
-  }
+  },
+
+  /**
+   * Transform value before acting
+   * 
+   * Semantic: Value transformation in action phase
+   * Dependencies: None
+   */
+  map: <TIn, TOut, G extends Gadget = Gadget>(
+    transform: (value: TIn) => TOut,
+    act: Action<TOut, G>
+  ): Action<TIn, G> =>
+    (value, gadget) => act(transform(value), gadget),
+
+  /**
+   * Emit as tagged value for semantic routing
+   * 
+   * Semantic: Wrap value with semantic tag
+   * Dependencies: Target gadget accepts TaggedValue
+   */
+  taggedEmit: <T, G extends Gadget = Gadget>(
+    tag: string,
+    target: Gadget<{ tag: string; value: T }>
+  ): Action<T, G> =>
+    (value) => target.receive({ tag, value })
 };
