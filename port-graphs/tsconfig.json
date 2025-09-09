@@ -5,7 +5,8 @@
     "outDir": "./dist"
   },
   "include": [
-    "src/core/**/*",
-    "src/shared/**/*"
+    "src/pp/*.ts",
+    // "src/core/**/*",
+    // "src/shared/**/*"
   ]
 }
