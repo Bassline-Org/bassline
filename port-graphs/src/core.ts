@@ -1,9 +1,5 @@
 import _ from "lodash";
-
-export const noop = () => ['noop'] as const;
-export const changed = <T>(value: NonNullable<T>) => ['changed', value] as const;
-export const contradiction = <Curr, Inc>(current: NonNullable<Curr>, incoming: NonNullable<Inc>) =>
-  ['contradiction', current, incoming] as const;
+import { noop, changed, contradiction } from "./effects";
 
 export type GadgetDetails<G> = G extends Gadget<infer Current, infer Incoming, infer Effect> ? Gadget & {
   current: Current;
