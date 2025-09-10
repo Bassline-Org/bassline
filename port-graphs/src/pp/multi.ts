@@ -1,38 +1,22 @@
+type Fn<Args extends any[] = any[], T = any> = (...args: Args) => T;
+type DispatchFn<T> = T extends Fn<any[], string | number | symbol> ? T : never;
 
-export function defMulti<TArgs extends any[], TReturn extends string | number | symbol>(
-    dispatch: (...args: TArgs) => TReturn,
-) {
-    type BodyFn = (...args: TArgs & {length: TArgs['length']}) => any;
-    const action = {} as Record<TReturn, BodyFn>;
+export const defMulti = <D>(dispatch: D) => {
+    type Disp = typeof dispatch extends DispatchFn<D> ? D : never;
 
-    const defMethods = <TEffects extends Record<TReturn, BodyFn>>(
-        methods: TEffects
-    ) => {
-        for (const [key, fn] of Object.entries(methods) as [TReturn, BodyFn][]) {
-            action[key] = fn;
+    const d = dispatch as Disp;
+    type Methods = {
+        [K in ReturnType<typeof d>]:
+        (...args: Parameters<typeof d>) => any extends (...args: Parameters<typeof d>) => infer R
+            ? R : never;
+    }
+
+    const defMethod = (methods: Methods) => {
+        return (...args: Parameters<typeof d>) => {
+            const key = d(...args) as keyof Methods;
+            const method = methods[key];
+            return method(...args)
         }
-        
-        function call(...args: TArgs): ReturnType<TEffects[keyof TEffects]> {
-            const key = dispatch(...args);
-            const fn = action[key] || action['default' as TReturn];
-            if (!fn) {
-                throw new Error(`No method or default for key: ${key.toString()}`);
-            }
-            return fn(...args) as ReturnType<TEffects[keyof TEffects]>;
-        }
-        
-        return call;
-    };
-
-    function call(...args: TArgs): ReturnType<BodyFn> {
-        const key = dispatch(...args);
-        const fn = action[key] || action['default' as TReturn];
-        if (!fn) {
-            throw new Error(`No method or default for key: ${key.toString()}`);
-        }
-        return fn(...args);
-    };
-
-    call.defMethods = defMethods;
-    return call;
+    }
+    return defMethod;
 }
