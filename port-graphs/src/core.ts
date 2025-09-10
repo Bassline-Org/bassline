@@ -75,8 +75,8 @@ export function createGadget<T>(considerFn: T) {
             gadget.emit(effect);
           }
         },
-        // By default emit does nothing
-        emit: (_effect: AllEffects) => { }
+        // By default emit just logs
+        emit: (effect: AllEffects) => { console.log('emit: ', effect); }
       }
       return gadget;
     }

@@ -22,18 +22,20 @@ export const defMulti = <D>(dispatch: D) => {
     return call;
 }
 
-const foo = defMulti((a: number, b: number) => {
-    if (a > b) return 'gt';
-    if (a < b) return 'lt';
-    return 'eq';
-})
+// function test() {
+//     const foo = defMulti((a: number, b: number) => {
+//         if (a > b) return 'gt';
+//         if (a < b) return 'lt';
+//         return 'eq';
+//     })
 
-foo.defMethods({
-    'eq': (_a, _b) => 69,
-    'gt': (a, b) => a - b,
-    'lt': (a, b) => a + b,
-})
+//     foo.defMethods({
+//         'eq': (_a, _b) => 69,
+//         'gt': (a, b) => a - b,
+//         'lt': (a, b) => a + b,
+//     })
 
-console.log(foo(1, 2))
-console.log(foo(2, 1))
-console.log(foo(1, 1))
+//     console.log(foo(1, 2))
+//     console.log(foo(2, 1))
+//     console.log(foo(1, 1))
+// }
