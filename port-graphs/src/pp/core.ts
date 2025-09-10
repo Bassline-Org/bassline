@@ -1,11 +1,70 @@
-import { defMulti } from "./multi";
 import _ from "lodash";
 
-// Simple effect creators - let TypeScript infer the types
 export const noop = () => ['noop'] as const;
-export const changed = <T>(value: T) => ['changed', value] as const;
-export const contradiction = <Curr, Inc>(current: Curr, incoming: Inc) =>
+export const changed = <T>(value: NonNullable<T>) => ['changed', value] as const;
+export const contradiction = <Curr, Inc>(current: NonNullable<Curr>, incoming: NonNullable<Inc>) =>
   ['contradiction', current, incoming] as const;
+
+export type GadgetDetails<G> = G extends Gadget<infer Current, infer Incoming, infer Effect> ? Gadget & {
+  current: Current;
+  incoming: Incoming;
+  effect: Effect;
+  emit: G['emit'];
+  receive: G['receive'];
+  update: G['update'];
+} : never;
+
+export const effects = {
+  noop,
+  changed,
+  contradiction,
+  creation: (gadget: Gadget) => ['creation', gadget] as const,
+}
+
+export function compatibleEffects<F, T>(fromGadget: F, toGadget: T) {
+  type FromEffects = GadgetDetails<F>['effect'];
+  type ToEffects = GadgetDetails<T>['effect'];
+
+  type CommonEffects = FromEffects & ToEffects;
+
+  return [fromGadget as F & { emit: (effect: CommonEffects) => void },
+  toGadget as T & { emit: (effect: CommonEffects) => void }] as const;
+}
+
+export const wires = {
+  directed: <From, To>(fromGadget: From, toGadget: To) => {
+    type FromDetails = GadgetDetails<From>;
+    type ToDetails = GadgetDetails<To>;
+    const from = fromGadget as FromDetails;
+    const to = toGadget as ToDetails;
+    const oldEmit = from.emit;
+    from.emit = (effect) => {
+      const [kind, ...args] = effect;
+      if (kind === 'changed') {
+        to.receive(args[0]);
+      }
+      oldEmit(effect);
+    }
+  },
+  bi: <From extends Gadget, To extends Gadget>(from: From, to: To) => {
+    const fromEmit = from.emit;
+    from.emit = (effect) => {
+      const [kind, ...args] = effect;
+      if (kind === 'changed') {
+        to.receive(args[0]);
+      }
+      fromEmit(effect);
+    }
+    const toEmit = to.emit;
+    to.emit = (effect) => {
+      const [kind, ...args] = effect;
+      if (kind === 'changed') {
+        from.receive(args[0]);
+      }
+      toEmit(effect);
+    }
+  }
+}
 
 export interface Gadget<
   Current extends any = any, Incoming extends any = any, Effect extends any = any> {
@@ -13,37 +72,6 @@ export interface Gadget<
   current: () => Current;
   receive: (data: Incoming) => void;
   emit: (effect: Effect) => void;
-}
-
-export function cellFn<T>(multi: T) {
-  type Multi = typeof multi extends (cell: Gadget, current: infer Current, incoming: infer Incoming) => infer R
-    ? {
-      cell: Gadget;
-      Current: Current;
-      Incoming: Incoming;
-      Return: R;
-      (c: Gadget, current: Current, incoming: Incoming): R;
-    }
-    : never;
-  const m = multi as Multi;
-
-  return (initial: typeof m['Current']) => {
-    let current = initial;
-    const cell: Gadget<typeof m['Current'], typeof m['Incoming'], typeof m['Return']> = {
-      current: () => current,
-      update: (data: typeof m['Current']) => {
-        current = data;
-      },
-      emit: (_effect: typeof m['Return']) => { },
-      receive: (data: typeof m['Incoming']) => {
-        const effect = m(cell, current, data);
-        if (effect !== undefined) {
-          cell.emit(effect);
-        }
-      }
-    }
-    return cell;
-  }
 }
 
 export function createGadget<T>(multi: T) {
@@ -61,238 +89,163 @@ export function createGadget<T>(multi: T) {
 
   const consider = multi as Consider['signature'];
 
-  return function <T>(actions: Record<Action, T>, initial: Current) {
-    type ActionEffect = typeof actions[keyof typeof actions] extends (gadget: Gadget, current: Current, incoming: Incoming) => infer Effect
-      ? Effect
-      : never;
+  return function <Actions extends Record<Action, (gadget: Gadget<Current, Incoming, any>, current: Current, incoming: Incoming) => any>>(
+    actions: Actions
+  ) {
+    type AllEffects = {
+      [K in keyof Actions]: Actions[K] extends (...args: any[]) => infer R ? R : never
+    }[keyof Actions];
 
-    type ActionFn = T extends (gadget: Gadget<Current, Incoming, ActionEffect>, current: Current, incoming: Incoming) => ActionEffect
-      ? T
-      : never;
+    const cases = actions as Record<Action, Actions[keyof Actions]>;
 
-    const cases = actions as Record<Action, ActionFn>;
-
-    let current = initial;
-
-    const gadget: Gadget<Current, Incoming, ActionEffect> = {
-      current: () => current,
-      update: (data) => {
-        current = data;
-      },
-      receive: (data: Incoming) => {
-        const action = consider(current, data);
-        const actionFn = cases[action] as ActionFn;
-        if (actionFn) {
-          const effect = actionFn(gadget, current, data) as ActionEffect;
-          gadget.emit(effect);
-        }
-      },
-      emit: (effect: ActionEffect) => { }
+    return (initial: Current) => {
+      let current = initial;
+      const gadget: Gadget<Current, Incoming, AllEffects> = {
+        current: () => current,
+        update: (data) => {
+          current = data;
+        },
+        receive: (data: Incoming) => {
+          const action = consider(current, data);
+          const actionFn = cases[action];
+          if (actionFn) {
+            const effect = actionFn(gadget, current, data);
+            gadget.emit(effect);
+          }
+        },
+        emit: (effect: AllEffects) => { }
+      }
+      return gadget;
     }
-    return gadget;
   }
 }
 
-const foo = createGadget((current: number, incoming: number) => {
-  if (!_.isNumber(incoming)) return 'ignore';
+export const unionCell = createGadget((current: any[], incoming: any[]) => {
+  if (incoming.length > current.length) return 'merge';
+  if (_.isEmpty(_.difference(current, incoming))) return 'ignore';
   return 'merge';
 })({
-  'ignore': (gadget, current, incoming) => {
+  'merge': (gadget, current, incoming) => {
+    const result = _.union(current, incoming) as any[];
+    if (_.difference(result, current).length > 0) {
+      gadget.update(result);
+      return changed(result);
+    }
     return noop();
   },
-  'merge': (gadget, current, incoming) => {
-    return changed(current + incoming);
+  'ignore': (_gadget, _current, _incoming) => {
+    return noop();
   }
-}, 0);
+});
 
-// // Extract effect type from merge function using infer
-// type MergeEffectType<T> = T extends (...args: any[]) => infer R ? R : never;
+export const differenceCell = createGadget((current: any[], incoming: any[]) => {
+  if (_.isEmpty(_.difference(current, incoming))) return 'ignore';
+  return 'merge';
+})({
+  'merge': (gadget, current, incoming) => {
+    const result = _.difference(current, incoming) as any[];
+    if (result.length > 0) {
+      gadget.update(result);
+      return changed(result);
+    } else {
+      return contradiction(current, incoming);
+    }
+  },
+  'ignore': (_gadget, _current, _incoming) => {
+    return noop();
+  }
+});
 
-// // Simple cell interface with proper effect typing
-// export interface Cell<TCurrent, TIncoming, TEffect> {
-//   current: TCurrent;
-//   emit: (effect: TEffect) => void;
-//   receive: (data: TIncoming) => void;
-// }
+export const intersectionCell = createGadget((current: any[], incoming: any[]) => {
+  const overlap = _.intersection(current, incoming);
+  if (_.isEmpty(overlap)) return 'contradiction';
+  if (overlap.length === current.length) return 'ignore';
+  return 'merge';
+})({
+  'merge': (gadget, current, incoming) => {
+    const result = _.intersection(current, incoming) as any[];
+    if (result.length > 0) {
+      gadget.update(result);
+      return changed(result);
+    } else {
+      return contradiction(current, incoming);
+    }
+  },
+  'ignore': (_gadget, _current, _incoming) => {
+    return noop();
+  },
+  'contradiction': (_gadget, current, incoming) => {
+    return contradiction(current, incoming);
+  }
+});
 
-// // Cell creator that infers effect types from merge function
-// export function createCell<TCurrent, TIncoming, TMerge extends (cell: any, current: TCurrent, incoming: TIncoming) => any>(
-//   merge: TMerge,
-//   initial: TCurrent
-// ): Cell<TCurrent, TIncoming, MergeEffectType<TMerge>> {
-//   let current = initial;
+const a = unionCell([1, 2, 3]);
+const b = unionCell([4, 5, 6]);
+const c = intersectionCell([1, 2, 3, 4, 5, 6, 7]);
+const d = intersectionCell(c.current());
+const max = createGadget((current: number, incoming: number) => {
+  if (current >= incoming) return 'ignore';
+  return 'merge';
+})({
+  'merge': (gadget, current, incoming) => {
+    const result = Math.max(current, incoming);
+    gadget.update(result);
+    return changed(result);
+  },
+  'ignore': (_gadget, _current, _incoming) => noop()
+});
+const e = max(0);
 
-//   const cell: Cell<TCurrent, TIncoming, MergeEffectType<TMerge>> = {
-//     current,
-//     emit: (_effect: MergeEffectType<TMerge>) => { },
-//     receive: (data: TIncoming) => {
-//       const effect = merge(cell, current, data);
-//       if (effect !== undefined) {
-//         cell.emit(effect);
-//       }
-//     },
-//   };
+const [a2, b2] = compatibleEffects(a, b);
+wires.directed(a2, b2);
 
-//   return cell;
-// }
+a.receive([7, 8, 9]);
 
-// // Clean merge functions - TypeScript infers everything
-// export function setUnion<T>(initial: T[]) {
-//   const merge = defMulti((_cell: any, current: T[], incoming: T[]) => {
-//     const [curr, inc] = [current, incoming].map(v => v ?? []);
-//     if (_.isEqual(curr, inc)) return 'ignore';
-//     return 'merge';
-//   }).defMethods({
-//     'ignore': () => noop(),
-//     'merge': (cell: any, current: T[], incoming: T[]) => {
-//       const result = _.union(current, incoming);
-//       if (!_.isEqual(result, current)) {
-//         cell.current = result;
-//         return changed(result);
-//       } else {
-//         return noop();
-//       }
-//     },
-//   });
+console.log('a: ', a2.current());
+console.log('b: ', b2.current());
 
-//   return createCell(merge, initial);
-// }
+a.receive([7, 8, 9]);
+a.receive([7, 8, 9]);
 
-// export function setIntersection<T>(initial: T[]) {
-//   const merge = defMulti((_cell: any, current: T[], incoming: T[]) => {
-//     const [curr, inc] = [current, incoming].map(v => v ?? []);
-//     if (_.intersection(curr, inc).length === 0) return 'contradiction';
-//     if (_.isEqual(curr, inc)) return 'ignore';
-//     return 'merge';
-//   }).defMethods({
-//     'ignore': () => noop(),
-//     'merge': (cell: any, current: T[], incoming: T[]) => {
-//       const result = _.intersection(current, incoming);
-//       if (!_.isEqual(result, current)) {
-//         cell.current = result;
-//         return changed(result);
-//       } else {
-//         return noop();
-//       }
-//     },
-//     'contradiction': (_cell: any, current: T[], incoming: T[]) =>
-//       contradiction(current, incoming),
-//   });
+console.log('a: ', a2.current());
+console.log('b: ', b2.current());
 
-//   return createCell(merge, initial);
-// }
-
-// export function setDifference<T>(initial: T[]) {
-//   const merge = defMulti((_cell: any, current: T[], incoming: T[]) => {
-//     const [curr, inc] = [current, incoming].map(v => v ?? []);
-//     if (_.isEqual(curr, inc)) return 'ignore';
-//     return 'merge';
-//   }).defMethods({
-//     'ignore': () => noop(),
-//     'merge': (cell: any, current: T[], incoming: T[]) => {
-//       const result = _.difference(current ?? [], incoming ?? []);
-//       if (!_.isEqual(result, current)) {
-//         cell.current = result;
-//         return changed(result);
-//       } else {
-//         return noop();
-//       }
-//     },
-//   });
-
-//   return createCell(merge, initial);
-// }
-
-// export function max(initial: number) {
-//   const merge = defMulti((_cell: any, current: number, incoming: number) => {
-//     if (current > incoming) return 'ignore';
-//     return 'max';
-//   }).defMethods({
-//     'ignore': () => noop(),
-//     'max': (cell: any, current: number, incoming: number) => {
-//       const result = Math.max(current, incoming);
-//       if (!_.isEqual(result, current)) {
-//         cell.current = result;
-//         return changed(result);
-//       } else {
-//         return noop();
-//       }
-//     },
-//   });
-
-//   return createCell(merge, initial);
-// }
-
-// // Clean usage - TypeScript infers everything
-// const foo = setUnion<number>([1]);
-// const bar = setUnion<number>([]);
-// const baz = setIntersection<number>([1, 2, 3, 4, 5]);
-// const qux = setDifference<number>([1, 2, 3, 4, 5]);
-
-// foo.emit = (data) => {
-//   const [effect, ...args] = data;
-//   switch (effect) {
-//     case 'changed': {
-//       const [result] = args;
-//       console.log('foo: ', result);
-//       bar.receive(result ?? []);
-//       baz.receive(result ?? []);
-//       break;
-//     }
-//     case 'noop': {
-//       console.log('foo: noop');
-//       break;
-//     }
+// c.emit = (e) => {
+//   console.log('c.emit: ', e);
+//   const [effect, ...args] = e;
+//   if (effect === 'changed') {
+//     const [result] = args;
+//     d.receive(result!);
 //   }
-// };
+// }
 
-// bar.emit = (data) => {
-//   const [effect, ...args] = data;
-//   switch (effect) {
-//     case 'changed': {
-//       const [result] = args;
-//       console.log('bar: ', result);
-//       qux.receive(result ?? []);
-//       break;
-//     }
-//     case 'noop': {
-//       console.log('bar: noop');
-//       break;
-//     }
+// d.emit = (e) => {
+//   console.log('d.emit: ', e);
+//   const [effect, ...args] = e;
+//   if (effect === 'changed') {
+//     const [result] = args;
+//     c.receive(result!);
 //   }
-// };
+// }
 
-// baz.emit = (data) => {
-//   const [effect, ...args] = data;
-//   switch (effect) {
-//     case 'changed': {
-//       const [result] = args;
-//       console.log('baz: ', baz.current);
-//       console.log('baz: ', result);
-//       break;
-//     }
-//     case 'noop': {
-//       console.log('baz: ', baz.current);
-//       console.log('baz: noop');
-//       break;
-//     }
+// c.receive(a.current());
+// d.receive(b.current());
+// console.log('c: ', c.current());
+// console.log('d: ', d.current());
+
+// b.emit = (e) => {
+//   const [effect, ...args] = e;
+//   if (effect === 'changed') {
+//     const [result] = args;
+//     a.receive(result!);
 //   }
-// };
+// }
 
-// qux.emit = (data) => {
-//   const [effect, ...args] = data;
-//   switch (effect) {
-//     case 'changed': {
-//       const [result] = args;
-//       console.log('qux: ', qux.current);
-//       console.log('qux: ', result);
-//       break;
-//     }
-//   }
-// };
+// console.log('a: ', a.current());
+// console.log('b: ', b.current());
 
-// foo.receive([2]);
-// foo.receive([3]);
+// a.receive([7, 8, 9]);
 
-// foo.receive([1]);
-// foo.receive([2]);
+// console.log('a: ', a.current());
+// console.log('b: ', b.current());
+// console.log('equal?: ', _.isEqual(_.difference(a.current(), b.current()), []));
