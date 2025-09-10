@@ -3,20 +3,37 @@ type DispatchFn<T> = T extends Fn<any[], string | number | symbol> ? T : never;
 
 export const defMulti = <D>(dispatch: D) => {
     type Disp = typeof dispatch extends DispatchFn<D> ? D : never;
-
     const d = dispatch as Disp;
-    type Methods = {
-        [K in ReturnType<typeof d>]:
-        (...args: Parameters<typeof d>) => any extends (...args: Parameters<typeof d>) => infer R
-            ? R : never;
-    }
+    const methods = {} as { [K in ReturnType<typeof d>]: (...args: Parameters<typeof d>) => any };
 
-    const defMethod = (methods: Methods) => {
-        return (...args: Parameters<typeof d>) => {
-            const key = d(...args) as keyof Methods;
-            const method = methods[key];
-            return method(...args)
+    function call(...args: Parameters<typeof d>) {
+        const key = d(...args);
+        const method = methods[key as ReturnType<typeof d>];
+        if (method) {
+            return method(...args);
+        }
+        return undefined;
+    }
+    call.defMethods = (m: { [K in ReturnType<typeof d>]: (...args: Parameters<typeof d>) => any }) => {
+        for (const [key, value] of Object.entries(m)) {
+            methods[key as ReturnType<typeof d>] = value as (...args: Parameters<typeof d>) => any;
         }
     }
-    return defMethod;
+    return call;
 }
+
+const foo = defMulti((a: number, b: number) => {
+    if (a > b) return 'gt';
+    if (a < b) return 'lt';
+    return 'eq';
+})
+
+foo.defMethods({
+    'eq': (_a, _b) => 69,
+    'gt': (a, b) => a - b,
+    'lt': (a, b) => a + b,
+})
+
+console.log(foo(1, 2))
+console.log(foo(2, 1))
+console.log(foo(1, 1))
