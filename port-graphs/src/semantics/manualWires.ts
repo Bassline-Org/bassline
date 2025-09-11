@@ -2,10 +2,8 @@ import { Gadget } from "../core";
 
 export const wires = {
     directed: <From, To>(fromGadget: From, toGadget: To) => {
-        type FromDetails = GadgetDetails<From>;
-        type ToDetails = GadgetDetails<To>;
-        const from = fromGadget as FromDetails;
-        const to = toGadget as ToDetails;
+        const from = fromGadget as GadgetDetails<From>;
+        const to = toGadget as GadgetDetails<To>;
         const oldEmit = from.emit;
         from.emit = (effect) => {
             const [kind, ...args] = effect;
@@ -15,7 +13,9 @@ export const wires = {
             oldEmit(effect);
         }
     },
-    bi: <From extends Gadget, To extends Gadget>(from: From, to: To) => {
+    bi: <From, To>(fromGadget: From, toGadget: To) => {
+        const from = fromGadget as GadgetDetails<From>;
+        const to = toGadget as GadgetDetails<To>;
         const fromEmit = from.emit;
         from.emit = (effect) => {
             const [kind, ...args] = effect;
@@ -35,10 +35,8 @@ export const wires = {
     },
     // Meta-wires that route effects directly instead of just values
     effectDirected: <From, To>(fromGadget: From, toGadget: To) => {
-        type FromDetails = GadgetDetails<From>;
-        type ToDetails = GadgetDetails<To>;
-        const from = fromGadget as FromDetails;
-        const to = toGadget as ToDetails;
+        const from = fromGadget as GadgetDetails<From>;
+        const to = toGadget as GadgetDetails<To>;
         const oldEmit = from.emit;
         from.emit = (effect) => {
             to.receive(effect);

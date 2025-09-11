@@ -1,3 +1,5 @@
+import _ from "lodash";
+
 type Fn<Args extends any[] = any[], T = any> = (...args: Args) => T;
 type DispatchFn<T> = T extends Fn<any[], string | number | symbol> ? T : never;
 
@@ -18,6 +20,9 @@ export const defMulti = <D>(dispatch: D) => {
         for (const [key, value] of Object.entries(m)) {
             methods[key as ReturnType<typeof d>] = value as (...args: Parameters<typeof d>) => any;
         }
+    }
+    call.derive = () => {
+        return defMulti(_.cloneDeep(dispatch))
     }
     return call;
 }

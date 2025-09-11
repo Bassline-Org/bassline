@@ -1,40 +1,73 @@
+import _ from "lodash";
 import { createGadget } from "../core";
 import { changed, noop } from "../effects";
 import { maxCell } from "../patterns/cells";
 import { wires } from "./manualWires";
+import { adder } from "../patterns/functions";
 
-// A meta-gadget that tags values from other gadgets
-export const tagger = <T>(tag: string) => {
-    return createGadget((current: T | null, incoming: any) => {
-        if (current === incoming) return 'ignore';
+export type Tagged<K extends string, V> = {
+    [key in K]: V;
+}
 
-        // Check if incoming is a 'changed' effect from another gadget
-        if (Array.isArray(incoming) && incoming[0] === 'changed') {
-            return 'tag';
+export const getter = (tag: string) => createGadget(
+    (current: any, incoming: any) => {
+        if (_.isPlainObject(incoming)) {
+            if (_.isEqual(incoming, current)) return 'ignore';
+            if (_.has(incoming, tag)) return 'extract';
         }
         return 'ignore';
     })({
+        'extract': (gadget, _current, incoming) => {
+            const value = incoming[tag];
+            gadget.update(value);
+            return changed(value);
+        },
+        'ignore': () => noop()
+    })(undefined);
+
+export const pair = <T extends string>(tag: T) => createGadget(
+    (current: Tagged<T, any>, incoming: any) => {
+        if (_.isPlainObject(incoming)
+            && incoming[tag] === current[tag])
+            return 'ignore';
+
+        if (current[tag] === incoming)
+            return 'ignore';
+
+        return 'tag';
+    })({
         'tag': (gadget, _current, incoming) => {
-            // incoming is ['changed', value]
-            const [, value] = incoming;
-            const taggedValue = { tag, value, original: incoming };
-            gadget.update(taggedValue as T);
+            const value = incoming[tag] || incoming;
+            const taggedValue = { [tag]: value } as Tagged<T, any>;
+            gadget.update(taggedValue);
             return changed(taggedValue);
         },
         'ignore': () => noop()
-    })(null);
-};
-
-const aTagger = tagger('foo');
-const metaTagger = tagger('meta');
+    })({ [tag]: undefined } as Tagged<T, any>);
 
 const source = maxCell(0);
 
-wires.effectDirected(source, aTagger);
-wires.effectDirected(aTagger, metaTagger);
+const aTagger = pair('a');
+
+const bTagger = pair('b');
+
+const add = adder({});
+
+const get = getter('result');
+
+const dump = maxCell(0);
+
+
+wires.directed(source, aTagger);
+wires.directed(source, bTagger);
+
+wires.directed(aTagger, add);
+wires.directed(bTagger, add);
+wires.directed(add, get);
+wires.directed(get, dump);
 
 source.receive(10);
 source.receive(20);
 source.receive(30);
-source.receive(20);
-source.receive(10);
+
+console.log(dump.current());
