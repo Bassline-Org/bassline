@@ -32,7 +32,19 @@ export const wires = {
             }
             toEmit(effect);
         }
-    }
+    },
+    // Meta-wires that route effects directly instead of just values
+    effectDirected: <From, To>(fromGadget: From, toGadget: To) => {
+        type FromDetails = GadgetDetails<From>;
+        type ToDetails = GadgetDetails<To>;
+        const from = fromGadget as FromDetails;
+        const to = toGadget as ToDetails;
+        const oldEmit = from.emit;
+        from.emit = (effect) => {
+            to.receive(effect);
+            oldEmit(effect);
+        }
+    },
 }
 
 export type GadgetDetails<G> = G extends Gadget<infer Current, infer Incoming, infer Effect> ? Gadget & {

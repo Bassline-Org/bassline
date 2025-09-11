@@ -1,7 +1,6 @@
 import _ from "lodash";
 import { createGadget } from "../../core";
 import { changed, contradiction, noop } from "../../effects";
-import { wires } from "../../helpers/manualWires";
 
 export const unionCell = createGadget((current: Set<any>, incoming: Set<any>) => {
     if (incoming.size > current.size) return 'merge';
