@@ -11,11 +11,11 @@ export type Tagged<K extends string, V> = {
 
 export const getter = (tag: string) => createGadget(
     (current: any, incoming: any) => {
-        if (_.isPlainObject(incoming)) {
-            if (_.isEqual(incoming, current)) return 'ignore';
-            if (_.has(incoming, tag)) return 'extract';
-        }
-        return 'ignore';
+        return _.cond([
+            [() => _.isPlainObject(incoming) && _.isEqual(incoming, current), () => 'ignore'],
+            [() => _.isPlainObject(incoming) && _.has(incoming, tag), () => 'extract'],
+            [() => true, () => 'ignore']
+        ])();
     })({
         'extract': (gadget, _current, incoming) => {
             const value = incoming[tag];
@@ -27,14 +27,11 @@ export const getter = (tag: string) => createGadget(
 
 export const pair = <T extends string>(tag: T) => createGadget(
     (current: Tagged<T, any>, incoming: any) => {
-        if (_.isPlainObject(incoming)
-            && incoming[tag] === current[tag])
-            return 'ignore';
-
-        if (current[tag] === incoming)
-            return 'ignore';
-
-        return 'tag';
+        return _.cond([
+            [() => _.isPlainObject(incoming) && incoming[tag] === current[tag], _.constant('ignore')],
+            [() => current[tag] === incoming, _.constant('ignore')],
+            [_.stubTrue, _.constant('tag')]
+        ])();
     })({
         'tag': (gadget, _current, incoming) => {
             const value = incoming[tag] || incoming;
