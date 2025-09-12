@@ -1,9 +1,6 @@
 import _ from "lodash";
 import { createGadget } from "../core";
 import { changed, noop } from "../effects";
-import { maxCell } from "../patterns/cells";
-import { wires } from "./manualWires";
-import { adder } from "../patterns/functions";
 
 export type Tagged<K extends string, V> = {
     [key in K]: V;
@@ -41,30 +38,3 @@ export const pair = <T extends string>(tag: T) => createGadget(
         },
         'ignore': () => noop()
     })({ [tag]: undefined } as Tagged<T, any>);
-
-const source = maxCell(0);
-
-const aTagger = pair('a');
-
-const bTagger = pair('b');
-
-const add = adder({});
-
-const get = getter('result');
-
-const dump = maxCell(0);
-
-
-wires.directed(source, aTagger);
-wires.directed(source, bTagger);
-
-wires.directed(aTagger, add);
-wires.directed(bTagger, add);
-wires.directed(add, get);
-wires.directed(get, dump);
-
-source.receive(10);
-source.receive(20);
-source.receive(30);
-
-console.log(dump.current());

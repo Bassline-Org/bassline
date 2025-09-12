@@ -57,17 +57,17 @@ export const unionMap = createMap(mapDispatch<string, any[]>)({
     }
 })
 
-const foo = firstMap({ a: 1, b: 2 });
-foo.receive({ c: 3 });
-foo.receive({ c: 5 });
-console.log('c should be 3:', foo.current());
+// const foo = firstMap({ a: 1, b: 2 });
+// foo.receive({ c: 3 });
+// foo.receive({ c: 5 });
+// console.log('c should be 3:', foo.current());
 
-const bar = lastMap({ a: 1, b: 2 });
-bar.receive({ c: 3 });
-bar.receive({ c: 5 });
-console.log('c should be 5:', bar.current());
+// const bar = lastMap({ a: 1, b: 2 });
+// bar.receive({ c: 3 });
+// bar.receive({ c: 5 });
+// console.log('c should be 5:', bar.current());
 
-const baz = unionMap({ a: [1, 2], b: [3, 4] });
-baz.receive({ c: [5, 6] });
-baz.receive({ c: [7, 8] });
-console.log('c should be [5, 6, 7, 8]:', baz.current());
+// const baz = unionMap({ a: [1, 2], b: [3, 4] });
+// baz.receive({ c: [5, 6] });
+// baz.receive({ c: [7, 8] });
+// console.log('c should be [5, 6, 7, 8]:', baz.current());
