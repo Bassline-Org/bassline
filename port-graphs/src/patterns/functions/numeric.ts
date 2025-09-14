@@ -10,33 +10,35 @@ export function createFn<T extends Record<string, any> & { result: V | undefined
         const [cleanedCurrent, cleanedIncoming] = clean(current, incoming);
         return _.difference(allKeys, _.keys(cleanedIncoming), _.keys(cleanedCurrent)).length > 0;
     }
-    return createGadget((current: T, incoming: Partial<T>) => {
-        // If they are equal, ignore
-        if (_.isEqual(current, incoming)) return 'ignore';
+    return (initial: Omit<T, 'result'>) => {
+        return createGadget((current: T, incoming: Partial<T>) => {
+            // If they are equal, ignore
+            if (_.isEqual(current, incoming)) return 'ignore';
 
-        if (missingKeys(current, incoming)) return 'update';
+            if (missingKeys(current, incoming)) return 'update';
 
-        return 'run';
-    })({
-        'update': (gadget, current, incoming) => {
-            const args = _.merge(current, incoming);
-            if (!missingKeys(current, args)) {
+            return 'run';
+        })({
+            'update': (gadget, current, incoming) => {
+                const args = _.merge(current, incoming);
+                if (!missingKeys(current, args)) {
+                    const result = f(args);
+                    gadget.update(result);
+                    return changed(result);
+                }
+                return noop();
+            },
+            'run': (gadget, current, incoming) => {
+                const args = _.merge(current, incoming);
                 const result = f(args);
                 gadget.update(result);
                 return changed(result);
+            },
+            'ignore': (_gadget, _current, _incoming) => {
+                return noop();
             }
-            return noop();
-        },
-        'run': (gadget, current, incoming) => {
-            const args = _.merge(current, incoming);
-            const result = f(args);
-            gadget.update(result);
-            return changed(result);
-        },
-        'ignore': (_gadget, _current, _incoming) => {
-            return noop();
-        }
-    });
+        })({ ...initial, result: undefined } as T);
+    }
 }
 
 export function binary<T extends (a: any, b: any) => any>(f: T) {
@@ -66,7 +68,7 @@ export const multiplier = binary((a: number, b: number) => a * b);
 export const divider = binary((a: number, b: number) => a / b);
 
 
-const foo = adder({ a: undefined, b: undefined, result: null });
+const foo = adder({ a: undefined, b: undefined });
 foo.receive({ a: 2, b: 3 });
 foo.receive({ b: 3 });
 foo.receive({ a: 3, b: 4 });
