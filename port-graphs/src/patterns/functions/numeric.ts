@@ -7,7 +7,7 @@ export function createFn<T extends Record<string, any> & { result: V | undefined
     function missingKeys(current: T, incoming: Partial<T>) {
         const nonResult = _.omit(current, 'result');
         const allKeys = _.keys(nonResult);
-        const [cleanedCurrent, cleanedIncoming] = clean(current, incoming);
+        const [cleanedCurrent, cleanedIncoming] = clean(_.omit(current, 'result'), _.omit(incoming, 'result'));
         return _.difference(allKeys, _.keys(cleanedIncoming), _.keys(cleanedCurrent)).length > 0;
     }
     return (initial: Omit<T, 'result'>) => {
