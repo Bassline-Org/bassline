@@ -1,16 +1,18 @@
-import _ from "lodash";
-import { adder } from "../patterns/functions";
-import { GadgetDetails } from "./manualWires";
+import { Gadget } from "../core";
 
-export function extendGadget<G>(gad: G) {
-    type Details = GadgetDetails<G>;
-    const gadget = gad as Details;
-    return function extend(emit: Details['emit']) {
-        const oldEmit = gadget.emit;
-        gadget.emit = (effect) => {
-            emit(effect);
-            oldEmit(effect);
-        }
-        return extend;
-    }
+/**
+ * Extends a gadget's emit function to add additional behavior
+ * Useful for adding logging, routing, or other side effects
+ */
+export function extendGadget<State, Incoming, Effect>(
+  gadget: Gadget<State, Incoming, Effect>
+) {
+  return function extend(emit: (effect: Effect) => void) {
+    const oldEmit = gadget.emit;
+    gadget.emit = (effect) => {
+      emit(effect);
+      oldEmit(effect);
+    };
+    return extend;
+  };
 }

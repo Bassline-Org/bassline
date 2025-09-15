@@ -1,74 +1,70 @@
 import _ from "lodash";
 import { createGadget } from "../../core";
 import { changed, noop } from "../../effects";
-import { clean } from "../cells/maps";
 
-export function createFn<T extends Record<string, any> & { result: V | undefined }, V>(f: (args: T) => T) {
-    function missingKeys(current: T, incoming: Partial<T>) {
-        const nonResult = _.omit(current, 'result');
-        const allKeys = _.keys(nonResult);
-        const [cleanedCurrent, cleanedIncoming] = clean(_.omit(current, 'result'), _.omit(incoming, 'result'));
-        return _.difference(allKeys, _.keys(cleanedIncoming), _.keys(cleanedCurrent)).length > 0;
-    }
-    return (initial: Omit<T, 'result'>) => {
-        return createGadget((current: T, incoming: Partial<T>) => {
-            // If they are equal, ignore
-            if (_.isEqual(current, incoming)) return 'ignore';
+/**
+ * Creates a function gadget that computes when all arguments are present
+ * Uses map-based arguments for natural partial binding
+ */
+export function createFn<TArgs extends Record<string, any>, TResult>(
+  compute: (args: TArgs) => TResult,
+  requiredKeys: (keyof TArgs)[]
+) {
+  type State = TArgs & { result?: TResult };
 
-            if (missingKeys(current, incoming)) return 'update';
+  return (initial: Partial<TArgs>) => {
+    return createGadget<State, Partial<TArgs>>(
+      (current, incoming) => {
+        // Merge incoming arguments with current
+        const merged = { ...current, ..._.omitBy(incoming, _.isNil) } as TArgs;
 
-            return 'run';
-        })({
-            'update': (gadget, current, incoming) => {
-                const args = _.merge(current, incoming);
-                if (!missingKeys(current, args)) {
-                    const result = f(args);
-                    gadget.update(result);
-                    return changed(result);
-                }
-                return noop();
-            },
-            'run': (gadget, current, incoming) => {
-                const args = _.merge(current, incoming);
-                const result = f(args);
-                gadget.update(result);
-                return changed(result);
-            },
-            'ignore': (_gadget, _current, _incoming) => {
-                return noop();
-            }
-        })({ ...initial, result: undefined } as T);
-    }
+        // Check if we have all required keys
+        const hasAllKeys = requiredKeys.every(key => merged[key] !== undefined);
+
+        if (!hasAllKeys) {
+          // Just accumulate arguments, don't compute yet
+          return { action: 'accumulate', context: { merged } };
+        }
+
+        // We have all keys, compute the result
+        const result = compute(merged);
+
+        // Check if result changed
+        if (_.isEqual(result, current.result)) {
+          return null; // No change
+        }
+
+        return { action: 'compute', context: { merged, result } };
+      },
+      {
+        'accumulate': (gadget, { merged }) => {
+          gadget.update(merged as State);
+          return noop();
+        },
+        'compute': (gadget, { merged, result }) => {
+          const newState = { ...merged, result } as State;
+          gadget.update(newState);
+          return changed({ result, args: merged });
+        }
+      }
+    )({ ...initial, result: undefined } as State);
+  };
 }
 
-export function binary<T extends (a: any, b: any) => any>(f: T) {
-    type Func = T extends (a: infer A, b: infer B) => infer R
-        ? {
-            a: A,
-            b: B,
-            result: R,
-            signature: (a: A, b: B) => R;
-        } : never;
-    type Args = {
-        a: Func['a'];
-        b: Func['b'];
-        result: Func['result'] | null;
-    };
+/**
+ * Creates a binary function gadget
+ */
+export function binary<A, B, R>(fn: (a: A, b: B) => R) {
+  type Args = { a: A; b: B };
 
-    return createFn<Args, Func['result']>((args: Args) => {
-        const func = f as Func['signature'];
-        const result = func(args.a, args.b);
-        return { ...args, result } as Args;
-    });
+  return createFn<Args, R>(
+    (args) => fn(args.a, args.b),
+    ['a', 'b']
+  );
 }
 
-export const adder = binary((a: number = 0, b: number = 0) => a + b);
-export const subtractor = binary((a: number, b: number) => a - b);
-export const multiplier = binary((a: number, b: number) => a * b);
-export const divider = binary((a: number, b: number) => a / b);
-
-
-const foo = adder({ a: undefined, b: undefined });
-foo.receive({ a: 2, b: 3 });
-foo.receive({ b: 3 });
-foo.receive({ a: 3, b: 4 });
+// Standard arithmetic functions
+export const adder = binary<number, number, number>((a, b) => a + b);
+export const subtractor = binary<number, number, number>((a, b) => a - b);
+export const multiplier = binary<number, number, number>((a, b) => a * b);
+export const divider = binary<number, number, number>((a, b) => a / b);

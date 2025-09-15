@@ -1,37 +1,32 @@
 import { createGadget } from "../../core";
-import { changed, noop } from "../../effects";
-import _ from "lodash";
+import { changed } from "../../effects";
 
-export const maxCell = createGadget((current: number, incoming: number) => {
-    if (incoming > current) return 'merge';
-    return 'ignore';
-})({
-    'merge': (gadget, current, incoming) => {
-        const result = Math.max(current, incoming);
-        gadget.update(result);
-        return changed(result);
-    },
-    'ignore': (_gadget, _current, _incoming) => noop()
-});
+export const maxCell = createGadget<number, number>(
+  (current, incoming) => {
+    if (incoming > current) {
+      return { action: 'merge', context: { result: incoming } };
+    }
+    return null; // No action needed
+  },
+  {
+    'merge': (gadget, { result }) => {
+      gadget.update(result);
+      return changed(result);
+    }
+  }
+);
 
-export const minCell = createGadget((current: number, incoming: number) => {
-    if (incoming < current) return 'merge';
-    return 'ignore';
-})({
-    'merge': (gadget, current, incoming) => {
-        const result = Math.min(current, incoming);
-        gadget.update(result);
-        return changed(result);
-    },
-    'ignore': (_gadget, _current, _incoming) => noop()
-});
-
-// function test() {
-//     const max = maxCell(10);
-//     const min = minCell(10);
-//     max.receive(20);
-//     console.log('max.current(): ', max.current());
-
-//     min.receive(5);
-//     console.log('min.current(): ', min.current());
-// }
+export const minCell = createGadget<number, number>(
+  (current, incoming) => {
+    if (incoming < current) {
+      return { action: 'merge', context: { result: incoming } };
+    }
+    return null; // No action needed
+  },
+  {
+    'merge': (gadget, { result }) => {
+      gadget.update(result);
+      return changed(result);
+    }
+  }
+);

@@ -1,66 +1,64 @@
 import { Gadget } from "../core";
 
+/**
+ * Wire utilities for connecting gadgets mechanically
+ */
 export const wires = {
-    directed: <From, To>(fromGadget: From, toGadget: To) => {
-        const from = fromGadget as GadgetDetails<From>;
-        const to = toGadget as GadgetDetails<To>;
-        const oldEmit = from.emit;
-        from.emit = (effect) => {
-            const [kind, ...args] = effect;
-            if (kind === 'changed') {
-                to.receive(args[0]);
-            }
-            oldEmit(effect);
-        }
-    },
-    bi: <From, To>(fromGadget: From, toGadget: To) => {
-        const from = fromGadget as GadgetDetails<From>;
-        const to = toGadget as GadgetDetails<To>;
-        const fromEmit = from.emit;
-        from.emit = (effect) => {
-            const [kind, ...args] = effect;
-            if (kind === 'changed') {
-                to.receive(args[0]);
-            }
-            fromEmit(effect);
-        }
-        const toEmit = to.emit;
-        to.emit = (effect) => {
-            const [kind, ...args] = effect;
-            if (kind === 'changed') {
-                from.receive(args[0]);
-            }
-            toEmit(effect);
-        }
-    },
-    // Meta-wires that route effects directly instead of just values
-    effectDirected: <From, To>(fromGadget: From, toGadget: To) => {
-        const from = fromGadget as GadgetDetails<From>;
-        const to = toGadget as GadgetDetails<To>;
-        const oldEmit = from.emit;
-        from.emit = (effect) => {
-            to.receive(effect);
-            oldEmit(effect);
-        }
-    },
-}
+  /**
+   * Creates a directed connection from one gadget to another
+   * When from emits a 'changed' effect, to receives the value
+   */
+  directed: <FromState, ToIncoming>(
+    from: Gadget<FromState, any, any>,
+    to: Gadget<any, ToIncoming, any>
+  ) => {
+    const oldEmit = from.emit;
+    from.emit = (effect: any) => {
+      // Check if it's a changed effect and route the value
+      if (effect && typeof effect === 'object' && 'changed' in effect) {
+        to.receive(effect.changed as ToIncoming);
+      }
+      oldEmit(effect);
+    };
+  },
 
-export type GadgetDetails<G> = G extends Gadget<infer Current, infer Incoming, infer Effect> ? Gadget & {
-    current: Current;
-    incoming: Incoming;
-    effect: Effect;
-    emit: G['emit'];
-    receive: G['receive'];
-    update: G['update'];
-} : never;
+  /**
+   * Creates a bidirectional connection between two gadgets
+   * Changed effects flow both ways
+   */
+  bi: <State1, State2>(
+    gadget1: Gadget<State1, State2, any>,
+    gadget2: Gadget<State2, State1, any>
+  ) => {
+    const emit1 = gadget1.emit;
+    gadget1.emit = (effect: any) => {
+      if (effect && typeof effect === 'object' && 'changed' in effect) {
+        gadget2.receive(effect.changed as State1);
+      }
+      emit1(effect);
+    };
 
-// NOTE: This isn't used yet, was testing to see what kind of type inference we could get from our new implementation
-export function compatibleEffects<F, T>(fromGadget: F, toGadget: T) {
-    type FromEffects = GadgetDetails<F>['effect'];
-    type ToEffects = GadgetDetails<T>['effect'];
+    const emit2 = gadget2.emit;
+    gadget2.emit = (effect: any) => {
+      if (effect && typeof effect === 'object' && 'changed' in effect) {
+        gadget1.receive(effect.changed as State2);
+      }
+      emit2(effect);
+    };
+  },
 
-    type CommonEffects = FromEffects & ToEffects;
-
-    return [fromGadget as F & { emit: (effect: CommonEffects) => void },
-    toGadget as T & { emit: (effect: CommonEffects) => void }] as const;
-}
+  /**
+   * Routes effects directly as data to another gadget
+   * Meta-wire for effect-consuming gadgets
+   */
+  effectDirected: <FromEffect, ToIncoming>(
+    from: Gadget<any, any, FromEffect>,
+    to: Gadget<any, ToIncoming, any>
+  ) => {
+    const oldEmit = from.emit;
+    from.emit = (effect) => {
+      to.receive(effect as unknown as ToIncoming);
+      oldEmit(effect);
+    };
+  }
+};

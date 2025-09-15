@@ -1,20 +1,23 @@
 import _ from "lodash";
 import { createGadget } from "../../core";
-import { changed, noop } from "../../effects";
+import { changed } from "../../effects";
 
 export const predicate = (fn: (value: any) => boolean) => {
-    return createGadget((value: any) => {
-        if (fn(value)) return 'true';
-        return 'false';
-    })({
-        'true': (gadget, value) => {
-            if (value === gadget.current()) return noop();
-            gadget.update(value);
-            return changed(value);
-        },
-        'false': (_gadget, _value) => noop()
-    });
-}
+  return createGadget<any, any>(
+    (current, incoming) => {
+      if (fn(incoming) && incoming !== current) {
+        return { action: 'update', context: { value: incoming } };
+      }
+      return null; // Predicate failed or no change
+    },
+    {
+      'update': (gadget, { value }) => {
+        gadget.update(value);
+        return changed(value);
+      }
+    }
+  );
+};
 
 export const numberp = predicate((value: any) => _.isNumber(value));
 export const stringp = predicate((value: any) => _.isString(value));
