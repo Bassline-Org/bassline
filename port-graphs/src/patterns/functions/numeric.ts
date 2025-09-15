@@ -15,6 +15,11 @@ export function createFn<TArgs extends Record<string, any>, TResult>(
   return (initial: Partial<TArgs>) => {
     return createGadget<State, Partial<TArgs>>(
       (current, incoming) => {
+        // If incoming is empty, just return noop
+        if (_.isEmpty(_.omitBy(incoming, _.isNil))) {
+          return { action: 'noop' };
+        }
+
         // Merge incoming arguments with current
         const merged = { ..._.pick(current, requiredKeys), ..._.omitBy(incoming, _.isNil) } as TArgs;
 
@@ -26,21 +31,29 @@ export function createFn<TArgs extends Record<string, any>, TResult>(
           return { action: 'accumulate', context: { merged } };
         }
 
+        // Check if arguments actually changed
+        const argsChanged = !requiredKeys.every(key => merged[key] === current[key]);
+        if (!argsChanged) {
+          return null; // No change, don't compute
+        }
+
         return { action: 'compute', context: { merged } };
       },
       {
+        'noop': () => noop(),
         'accumulate': (gadget, { merged }) => {
           gadget.update(merged as State);
           return noop();
         },
         'compute': (gadget, { merged }) => {
-          let result = compute(merged);
-          if (_.isEqual(result, gadget.current().result)) {
-            gadget.update({ ...merged });
+          const result = compute(merged);
+          const currentResult = gadget.current().result;
+          const newState = { ...merged, result } as State;
+          gadget.update(newState);
+
+          if (_.isEqual(result, currentResult)) {
             return noop();
           } else {
-            const newState = { ...merged, result };
-            gadget.update(newState);
             return changed({ result, args: merged });
           }
         }
