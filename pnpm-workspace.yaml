@@ -1,5 +1,4 @@
 packages:
   - 'apps/*'
-  - 'proper-bassline'
-  - 'proper-bassline-react'
   - 'port-graphs'
+  - 'port-graphs-react'

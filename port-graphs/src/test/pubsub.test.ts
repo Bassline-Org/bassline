@@ -75,13 +75,13 @@ describe('PubSub Architecture', () => {
 
       // Create test gadgets
       const listener1 = createGadget(
-        (state, data) => ({ action: 'record', context: data }),
-        { 'record': (g, data) => { received.push({ id: 'listener1', data }); return null; } }
+        (_state, data) => ({ action: 'record', context: data }),
+        { 'record': (_g, data) => { received.push({ id: 'listener1', data }); return null; } }
       )([]);
 
       const listener2 = createGadget(
-        (state, data) => ({ action: 'record', context: data }),
-        { 'record': (g, data) => { received.push({ id: 'listener2', data }); return null; } }
+        (_state, data) => ({ action: 'record', context: data }),
+        { 'record': (_g, data) => { received.push({ id: 'listener2', data }); return null; } }
       )([]);
 
       // Register gadgets
@@ -101,12 +101,12 @@ describe('PubSub Architecture', () => {
     });
 
     it('should only deliver to actual subscribers', () => {
-      const { registry, subscriptions: subs, pubsub } = createPubSubSystem();
+      const { registry, pubsub } = createPubSubSystem();
       const received: any[] = [];
 
       const listener = createGadget(
-        (state, data) => ({ action: 'record', context: data }),
-        { 'record': (g, data) => { received.push(data); return null; } }
+        (_state, data) => ({ action: 'record', context: data }),
+        { 'record': (_g, data) => { received.push(data); return null; } }
       )([]);
 
       registry.receive({ listener });
@@ -124,13 +124,13 @@ describe('PubSub Architecture', () => {
       const alertsReceived: any[] = [];
 
       const newsListener = createGadget(
-        (state, data) => ({ action: 'record', context: data }),
-        { 'record': (g, data) => { newsReceived.push(data); return null; } }
+        (_state, data) => ({ action: 'record', context: data }),
+        { 'record': (_g, data) => { newsReceived.push(data); return null; } }
       )([]);
 
       const alertListener = createGadget(
-        (state, data) => ({ action: 'record', context: data }),
-        { 'record': (g, data) => { alertsReceived.push(data); return null; } }
+        (_state, data) => ({ action: 'record', context: data }),
+        { 'record': (_g, data) => { alertsReceived.push(data); return null; } }
       )([]);
 
       registry.receive({ newsListener, alertListener });
@@ -155,8 +155,8 @@ describe('PubSub Architecture', () => {
       const received: any[] = [];
 
       const listener = createGadget(
-        (state, data) => ({ action: 'record', context: data }),
-        { 'record': (g, data) => { received.push(data); return null; } }
+        (_state, data) => ({ action: 'record', context: data }),
+        { 'record': (_g, data) => { received.push(data); return null; } }
       )([]);
 
       registry.receive({ listener });
@@ -186,8 +186,8 @@ describe('PubSub Architecture', () => {
       const received: any[] = [];
 
       const listener = createGadget(
-        (state, data) => ({ action: 'record', context: data }),
-        { 'record': (g, data) => { received.push(data); return null; } }
+        (_state, data) => ({ action: 'record', context: data }),
+        { 'record': (_g, data) => { received.push(data); return null; } }
       )([]);
 
       registry.receive({ listener });
