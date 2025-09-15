@@ -16,7 +16,7 @@ export function createFn<TArgs extends Record<string, any>, TResult>(
     return createGadget<State, Partial<TArgs>>(
       (current, incoming) => {
         // Merge incoming arguments with current
-        const merged = { ...current, ..._.omitBy(incoming, _.isNil) } as TArgs;
+        const merged = { ..._.pick(current, requiredKeys), ..._.omitBy(incoming, _.isNil) } as TArgs;
 
         // Check if we have all required keys
         const hasAllKeys = requiredKeys.every(key => merged[key] !== undefined);
@@ -26,22 +26,15 @@ export function createFn<TArgs extends Record<string, any>, TResult>(
           return { action: 'accumulate', context: { merged } };
         }
 
-        // We have all keys, compute the result
-        const result = compute(merged);
-
-        // Check if result changed
-        if (_.isEqual(result, current.result)) {
-          return null; // No change
-        }
-
-        return { action: 'compute', context: { merged, result } };
+        return { action: 'compute', context: { merged } };
       },
       {
         'accumulate': (gadget, { merged }) => {
           gadget.update(merged as State);
           return noop();
         },
-        'compute': (gadget, { merged, result }) => {
+        'compute': (gadget, { merged }) => {
+          const result = compute(merged);
           const newState = { ...merged, result } as State;
           gadget.update(newState);
           return changed({ result, args: merged });

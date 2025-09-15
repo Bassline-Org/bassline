@@ -324,8 +324,10 @@ describe('Function Patterns', () => {
     expect(emissions.length).toBe(1);
     emissions.length = 0; // Reset
 
-    sub.receive({}); // No new args
-    expect(emissions.length).toBe(0);
+    sub.receive({}); // No new args, but still accumulates (emits noop)
+    expect(emissions.length).toBe(1);
+    expect(emissions[0]).toEqual(noop());
+    emissions.length = 0;
 
     sub.receive({ a: 10, b: 5 }); // Same args, same result
     expect(emissions.length).toBe(0);
