@@ -146,17 +146,3 @@ export function createRouter(): Gadget<RouterState, RouteCommand> {
     gadgets: new Map()
   });
 }
-
-/**
- * Helper to register a gadget with the router
- */
-export function registerGadget(
-  routerGadget: Gadget<RouterState, RouteCommand>,
-  id: string,
-  gadget: Gadget
-) {
-  const state = routerGadget.current();
-  const newGadgets = new Map(state.gadgets);
-  newGadgets.set(id, gadget);
-  routerGadget.update({ ...state, gadgets: newGadgets });
-}

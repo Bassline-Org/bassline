@@ -34,10 +34,15 @@ export function createFn<TArgs extends Record<string, any>, TResult>(
           return noop();
         },
         'compute': (gadget, { merged }) => {
-          const result = compute(merged);
-          const newState = { ...merged, result } as State;
-          gadget.update(newState);
-          return changed({ result, args: merged });
+          let result = compute(merged);
+          if (_.isEqual(result, gadget.current().result)) {
+            gadget.update({ ...merged });
+            return noop();
+          } else {
+            const newState = { ...merged, result };
+            gadget.update(newState);
+            return changed({ result, args: merged });
+          }
         }
       }
     )({ ...initial, result: undefined } as State);
