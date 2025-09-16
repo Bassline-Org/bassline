@@ -5,6 +5,9 @@
  * gadgets with React components, using React state as the single source of truth.
  */
 
+import { Gadget, replaceSemantics } from 'port-graphs';
+import { useEffect, useRef, useState } from 'react';
+
 export { useGadget } from './useGadget';
 
 export {
@@ -14,9 +17,8 @@ export {
 } from './useGadgetEffect';
 export type { EffectHandler } from './useGadgetEffect';
 
-// PubSub integration
-export { PubSubProvider, usePubSubContext } from './PubSubProvider';
-export { useRegistry } from './usePubSub';
+// Topic routing
+export { TopicsProvider, useTopics } from './TopicsProvider';
 
 // Re-export core gadget types for convenience
 export type { Gadget } from 'port-graphs';

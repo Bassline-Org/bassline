@@ -52,7 +52,7 @@ export const wires = {
    * Routes effects directly as data to another gadget
    * Meta-wire for effect-consuming gadgets
    */
-  effectDirected: <FromEffect, ToIncoming>(
+  effect: <FromEffect, ToIncoming>(
     from: Gadget<any, any, FromEffect>,
     to: Gadget<any, ToIncoming, any>
   ) => {

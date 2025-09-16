@@ -4,6 +4,23 @@ import { Gadget } from "../core";
  * Extends a gadget's emit function to add additional behavior
  * Useful for adding logging, routing, or other side effects
  */
+interface GadgetExtension<State, Effect> {
+  emit: (effect: Effect) => void;
+  update: (state: State) => void;
+  current: () => State;
+}
+
+export function replaceSemantics<State, Incoming, Effect>(
+  gadget: Gadget<State, Incoming, Effect>,
+  extensions: GadgetExtension<State, Effect>
+) {
+  const { emit, update, current } = extensions;
+  gadget.emit = emit;
+  gadget.update = update;
+  gadget.current = current;
+  return gadget;
+}
+
 export function extendGadget<State, Incoming, Effect>(
   gadget: Gadget<State, Incoming, Effect>
 ) {
@@ -16,3 +33,5 @@ export function extendGadget<State, Incoming, Effect>(
     return extend;
   };
 }
+
+export { eventSemantics } from './events';

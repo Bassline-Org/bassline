@@ -9,7 +9,7 @@
  */
 
 import { useEffect } from 'react';
-import { useGadget, PubSubProvider, useRegistry } from 'port-graphs-react';
+import { useGadget, TopicsProvider, useTopics } from 'port-graphs-react';
 import { maxCell, minCell, lastCell, lastMap } from 'port-graphs/cells';
 import { adder, multiplier } from 'port-graphs/functions';
 import { createGadget } from 'port-graphs';
@@ -405,10 +405,12 @@ function ColorController() {
     () => lastMap({ red: 128, green: 128, blue: 128 }),
     { red: 128, green: 128, blue: 128 }
   );
-  const { addTopics } = useRegistry(colorGadget, 'color-controller');
+  const topics = useTopics();
+
+  // Publish color changes
   useEffect(() => {
-    addTopics('color');
-  }, [addTopics]);
+    topics.publish('color', color);
+  }, [color, topics]);
 
   const rgbColor = `rgb(${color['red']}, ${color['green']}, ${color['blue']})`;
 
@@ -477,11 +479,12 @@ function SizeController() {
     () => lastCell(50),
     50
   );
+  const topics = useTopics();
 
-  const { addTopics } = useRegistry(sizeGadget, 'size-controller');
+  // Publish size changes
   useEffect(() => {
-    addTopics('size');
-  }, [addTopics]);
+    topics.publish('size', size);
+  }, [size, topics]);
 
   // For now, just local state - pubsub integration can be added when needed
 
@@ -533,7 +536,7 @@ function VisualElement({
   colorTransform?: (color: { red: number; green: number; blue: number }) => { red: number; green: number; blue: number };
   sizeTransform?: (size: number) => number;
 }) {
-  // For demo purposes, just use local state with transforms
+  // Subscribe to color and size topics
   const [color, , colorGadget] = useGadget(
     lastMap,
     { red: 128, green: 128, blue: 128 }
@@ -544,13 +547,17 @@ function VisualElement({
     50
   );
 
-  const colorRegistry = useRegistry(colorGadget, `visual-element-${id}-color`);
-  const sizeRegistry = useRegistry(sizeGadget, `visual-element-${id}-size`);
+  const topics = useTopics();
 
   useEffect(() => {
-    colorRegistry.subscribe('color');
-    sizeRegistry.subscribe('size');
-  }, [colorRegistry, sizeRegistry]);
+    const unsubColor = topics.subscribe('color', colorGadget);
+    const unsubSize = topics.subscribe('size', sizeGadget);
+
+    return () => {
+      unsubColor();
+      unsubSize();
+    };
+  }, [topics, colorGadget, sizeGadget]);
 
   const transformed = colorTransform(color as { red: number; green: number; blue: number });
   const rgbColor = `rgb(${Math.round(transformed.red)}, ${Math.round(transformed.green)}, ${Math.round(transformed.blue)})`;
@@ -645,7 +652,7 @@ function VisualCoordination() {
 // ============================================================================
 export default function GadgetDemo() {
   return (
-    <PubSubProvider>
+    <TopicsProvider>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="container mx-auto py-8 px-4">
           <div className="mb-8">
@@ -702,6 +709,6 @@ export default function GadgetDemo() {
           </div>
         </div>
       </div>
-    </PubSubProvider>
+    </TopicsProvider>
   );
 }

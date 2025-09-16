@@ -1,40 +1,36 @@
 /**
- * Meta-Gadgets
+ * Meta-Patterns
  *
- * These demonstrate that meta-level operations follow the same protocol as regular gadgets.
- * The network builds itself using the same mechanism it uses to process data!
+ * Simple utilities for coordinating gadgets.
+ * These are much simpler than full meta-gadgets - just helpers.
  */
 
-// Export the pubsub system
-export * from './routing';
-
 /**
- * Example of using the pubsub system:
+ * Example of using topics:
  *
  * ```typescript
- * import { createPubSubSystem } from './patterns/meta';
- * import { maxCell } from './patterns/cells/numeric';
+ * import { createTopics } from './patterns/meta';
+ * import { eventSemantics } from './semantics';
+ * import { maxCell } from './patterns/cells';
  *
- * // Create the pubsub infrastructure
- * const { registry, subscriptions, pubsub } = createPubSubSystem();
+ * // Create topic router
+ * const topics = createTopics();
  *
- * // Create some gadgets
- * const sensor1 = maxCell(0);
- * const sensor2 = maxCell(0);
- * const display = maxCell(0);
+ * // Create gadgets with event semantics
+ * const sensor = eventSemantics(maxCell(0));
+ * const display = eventSemantics(maxCell(0));
  *
- * // Register them (registry is just a firstMap!)
- * registry.receive({ sensor1, sensor2, display });
+ * // Subscribe display to temperature topic
+ * topics.subscribe('temperature', display);
  *
- * // Subscribe to topics (subscriptions is a cell!)
- * subscriptions.receive({ type: 'subscribe', topic: 'temperature', subscriber: 'display' });
- * subscriptions.receive({ type: 'subscribe', topic: 'humidity', subscriber: 'display' });
+ * // When sensor changes, publish to topic
+ * sensor.on('changed', (e) => {
+ *   topics.publish('temperature', e.detail);
+ * });
  *
- * // Publish messages (pubsub is a function gadget!)
- * pubsub.receive({ command: { type: 'publish', topic: 'temperature', data: 72 } });
- * // display receives 72!
- *
- * // The beauty: registry, subscriptions, and pubsub are all just regular gadgets
- * // following the same consider → act protocol!
+ * // Or wire directly without topics
+ * sensor.on('changed', (e) => {
+ *   display.receive(e.detail);
+ * });
  * ```
  */
