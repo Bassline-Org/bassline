@@ -5,8 +5,7 @@
  * gadgets with React components, using React state as the single source of truth.
  */
 
-export { useGadget, useGadgetWithRef } from './useGadget';
-export type { GadgetFactory } from './useGadget';
+export { useGadget } from './useGadget';
 
 export {
   useGadgetEffect,
@@ -20,4 +19,4 @@ export { PubSubProvider, usePubSubContext } from './PubSubProvider';
 export { usePub, useSub, usePubSub } from './usePubSub';
 
 // Re-export core gadget types for convenience
-export type { Gadget } from '../../port-graphs/dist/core';
+export type { Gadget } from 'port-graphs';

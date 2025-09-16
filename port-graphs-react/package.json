@@ -2,7 +2,7 @@
   "name": "port-graphs-react",
   "version": "1.0.0",
   "description": "React integration for port-graphs gadgets",
-  "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",

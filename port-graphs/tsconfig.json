@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "ESNext"],
+    "lib": [
+      "ES2022",
+      "ESNext"
+    ],
     "module": "ESNext",
     "moduleResolution": "node",
     "outDir": "./dist",
@@ -22,6 +25,14 @@
     "allowUnreachableCode": false,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "dist-browser"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-browser",
+    "**/*.test.ts",
+    "src/test/**/*"
+  ]
 }

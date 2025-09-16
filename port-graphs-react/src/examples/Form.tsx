@@ -4,10 +4,10 @@
  * Demonstrates how gadgets can manage form state with validation
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useGadget, useGadgetEffect } from '../index';
-import { createGadget } from 'port-graphs/dist/core';
-import { lastMap } from 'port-graphs/dist/patterns/cells/maps';
+import { createGadget } from 'port-graphs';
+import { lastMap } from 'port-graphs/cells';
 
 // Form state type
 interface FormData {
@@ -17,7 +17,7 @@ interface FormData {
 }
 
 // Create a form gadget that validates on update
-const createFormGadget = (initial: FormData) =>
+const createFormGadget =
   createGadget<FormData & { errors?: string[] }, Partial<FormData>>(
     (current, updates) => {
       // Merge updates with current
@@ -44,15 +44,13 @@ const createFormGadget = (initial: FormData) =>
         };
       }
     }
-  )(initial);
-
-export function FormExample() {
-  const [formState, form] = useGadget(
-    () => createFormGadget({ name: '', email: '', age: 0 }),
-    { name: '', email: '', age: 0 }
   );
 
-  const [submitted, setSubmitted] = React.useState<FormData | null>(null);
+export function FormExample() {
+  const [formState, formSend, form] = useGadget(
+    createFormGadget,
+    { name: '', email: '', age: 0 }
+  );
 
   // Handle form emissions
   useGadgetEffect(
@@ -65,25 +63,21 @@ export function FormExample() {
     []
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formState.errors) {
-      setSubmitted(formState);
-    }
-  };
-
   return (
     <div style={{ padding: '20px', maxWidth: '400px' }}>
       <h2>Form with Gadget State Management</h2>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        formSend(formState);
+      }}>
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>
             Name:
             <input
               type="text"
               value={formState.name}
-              onChange={(e) => form?.receive({ name: e.target.value })}
+              onChange={(e) => formSend({ name: e.target.value })}
               style={{ display: 'block', width: '100%', padding: '5px' }}
             />
           </label>
@@ -95,7 +89,7 @@ export function FormExample() {
             <input
               type="email"
               value={formState.email}
-              onChange={(e) => form?.receive({ email: e.target.value })}
+              onChange={(e) => formSend({ email: e.target.value })}
               style={{ display: 'block', width: '100%', padding: '5px' }}
             />
           </label>
@@ -107,7 +101,7 @@ export function FormExample() {
             <input
               type="number"
               value={formState.age}
-              onChange={(e) => form?.receive({ age: parseInt(e.target.value) || 0 })}
+              onChange={(e) => formSend({ age: parseInt(e.target.value) || 0 })}
               style={{ display: 'block', width: '100%', padding: '5px' }}
             />
           </label>
@@ -137,7 +131,7 @@ export function FormExample() {
         </button>
       </form>
 
-      {submitted && (
+      {formState && (
         <div style={{
           marginTop: '20px',
           padding: '15px',
@@ -146,7 +140,7 @@ export function FormExample() {
           borderRadius: '4px'
         }}>
           <h3>Submitted Successfully!</h3>
-          <pre>{JSON.stringify(submitted, null, 2)}</pre>
+          <pre>{JSON.stringify(formState, null, 2)}</pre>
         </div>
       )}
     </div>

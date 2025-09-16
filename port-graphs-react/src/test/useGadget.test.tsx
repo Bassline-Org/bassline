@@ -4,17 +4,17 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useGadget, useGadgetWithRef } from '../useGadget';
-import { createGadget } from '../../../port-graphs/dist/core';
+import { useGadget } from '../useGadget';
+import { createGadget } from 'port-graphs';
 
 describe('useGadget', () => {
   it('should initialize with provided state', () => {
     const { result } = renderHook(() =>
       useGadget(
-        (initial) => createGadget(
+        createGadget(
           () => ({ action: 'noop' }),
           { noop: () => null }
-        )(initial),
+        ),
         { count: 0 }
       )
     );
@@ -95,7 +95,7 @@ describe('useGadget', () => {
     const emissionSpy = vi.fn();
 
     const { result } = renderHook(() =>
-      useGadgetWithRef(
+      useGadget(
         (initial) => {
           const g = createGadget<string, string>(
             (current, incoming) => ({ action: 'update', context: incoming }),
@@ -105,7 +105,7 @@ describe('useGadget', () => {
                 return { changed: value };
               }
             }
-          )(initial);
+          )(initial)
           g.emit = emissionSpy;
           return g;
         },

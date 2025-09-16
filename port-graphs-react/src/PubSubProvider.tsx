@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useMemo, ReactNode } from 'react';
-import { createPubSubSystem } from 'port-graphs/meta/routing';
-import type { Gadget } from 'port-graphs';
+import { createContext, useContext, useMemo, ReactNode } from 'react';
+import { createPubSubSystem } from 'port-graphs/meta';
 
 interface PubSubContextType {
-  registry: any;
-  subscriptions: any;
-  pubsub: any;
+  registry: ReturnType<typeof createPubSubSystem>['registry'];
+  subscriptions: ReturnType<typeof createPubSubSystem>['subscriptions'];
+  pubsub: ReturnType<typeof createPubSubSystem>['pubsub'];
 }
 
 const PubSubContext = createContext<PubSubContextType | null>(null);
@@ -24,10 +23,10 @@ export function PubSubProvider({ children }: PubSubProviderProps) {
   );
 }
 
-export function usePubSubContext() {
+export function usePubSubContext(): PubSubContextType {
   const context = useContext(PubSubContext);
   if (!context) {
     throw new Error('usePubSubContext must be used within a PubSubProvider');
   }
-  return context;
+  return context as PubSubContextType;
 }

@@ -10,13 +10,14 @@ export const wires = {
    */
   directed: <FromState, ToIncoming>(
     from: Gadget<FromState, any, any>,
-    to: Gadget<any, ToIncoming, any>
+    to: Gadget<any, ToIncoming, any>,
+    transform: (effect: FromState) => ToIncoming = (e) => e as unknown as ToIncoming,
   ) => {
     const oldEmit = from.emit;
     from.emit = (effect: any) => {
       // Check if it's a changed effect and route the value
       if (effect && typeof effect === 'object' && 'changed' in effect) {
-        to.receive(effect.changed as ToIncoming);
+        to.receive(transform(effect.changed));
       }
       oldEmit(effect);
     };

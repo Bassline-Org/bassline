@@ -2,34 +2,32 @@
   "name": "port-graphs",
   "version": "1.0.0",
   "description": "Port-based graph data structure",
-  "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/index.js",
-      "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./core": {
-      "import": "./dist/core.js",
-      "require": "./dist/core.js",
-      "types": "./dist/core.d.ts"
-    },
-    "./patterns/cells": {
+    "./cells": {
       "import": "./dist/patterns/cells/index.js",
-      "require": "./dist/patterns/cells/index.js",
       "types": "./dist/patterns/cells/index.d.ts"
     },
-    "./patterns/functions/numeric": {
-      "import": "./dist/patterns/functions/numeric.js",
-      "require": "./dist/patterns/functions/numeric.js",
-      "types": "./dist/patterns/functions/numeric.d.ts"
+    "./functions": {
+      "import": "./dist/patterns/functions/index.js",
+      "types": "./dist/patterns/functions/index.d.ts"
     },
-    "./meta/routing": {
-      "import": "./dist/patterns/meta/routing.js",
-      "require": "./dist/patterns/meta/routing.js",
-      "types": "./dist/patterns/meta/routing.d.ts"
+    "./meta": {
+      "import": "./dist/patterns/meta/index.js",
+      "types": "./dist/patterns/meta/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist/core/index.js",
+      "types": "./dist/core/index.d.ts"
+    },
+    "./effects": {
+      "import": "./dist/effects/index.js",
+      "types": "./dist/effects/index.d.ts"
     }
   },
   "scripts": {
@@ -37,21 +35,14 @@
     "dev": "tsc --watch",
     "test": "vitest --run"
   },
-  "keywords": [
-    "graph",
-    "ports",
-    "dataflow"
-  ],
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/lodash": "^4.17.20",
     "typescript": "^5.3.0",
     "vitest": "^1.2.0"
   },
   "dependencies": {
-    "@types/lodash": "^4.17.20",
-    "lodash": "^4.17.21",
-    "ts-pattern": "^5.8.0",
-    "zod": "^4.1.5"
+    "lodash": "^4.17.21"
   }
 }

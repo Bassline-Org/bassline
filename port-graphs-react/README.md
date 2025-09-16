@@ -22,7 +22,7 @@ pnpm add port-graphs-react
 
 ```tsx
 import { useGadget } from 'port-graphs-react';
-import { maxCell } from 'port-graphs/dist/patterns/cells/numeric';
+import { maxCell } from 'port-graphs/patterns/cells/numeric';
 
 function Counter() {
   const [count, send] = useGadget(

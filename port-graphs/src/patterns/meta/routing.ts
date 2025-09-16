@@ -82,41 +82,39 @@ export const subscriptions = createGadget<Subscriptions, PubSubCommand>(
  * - gadgets: The registry of gadgets
  * - command: The pubsub command to execute
  */
-export const createPubSub = () => {
-  return createFn<
-    {
-      subscriptions: Subscriptions;
-      gadgets: Registry;
-      command: PubSubCommand;
-    },
-    { delivered: string[] } | null
-  >(
-    ({ subscriptions, gadgets, command }) => {
-      // Only handle publish commands
-      if (!command || command.type !== 'publish') {
-        return null;
+export const createPubSub = createFn<
+  {
+    subscriptions: Subscriptions;
+    gadgets: Registry;
+    command: PubSubCommand;
+  },
+  { delivered: string[] } | null
+>(
+  ({ subscriptions, gadgets, command }) => {
+    // Only handle publish commands
+    if (!command || command.type !== 'publish') {
+      return null;
+    }
+
+    const subscribers = subscriptions[command.topic];
+    if (!subscribers || subscribers.length === 0) {
+      return null; // No subscribers
+    }
+
+    const delivered: string[] = [];
+
+    for (const subscriberId of subscribers) {
+      const gadget = gadgets[subscriberId];
+      if (gadget) {
+        gadget.receive(command.data);
+        delivered.push(subscriberId);
       }
+    }
 
-      const subscribers = subscriptions[command.topic];
-      if (!subscribers || subscribers.length === 0) {
-        return null; // No subscribers
-      }
-
-      const delivered: string[] = [];
-
-      for (const subscriberId of subscribers) {
-        const gadget = gadgets[subscriberId];
-        if (gadget) {
-          gadget.receive(command.data);
-          delivered.push(subscriberId);
-        }
-      }
-
-      return delivered.length > 0 ? { delivered } : null;
-    },
-    ['subscriptions', 'gadgets', 'command']
-  );
-};
+    return delivered.length > 0 ? { delivered } : null;
+  },
+  ['subscriptions', 'gadgets', 'command']
+);
 
 /**
  * Helper to create a complete pubsub system
@@ -126,7 +124,7 @@ export function createPubSubSystem() {
   // Create the components
   const registry = firstMap({} as Registry);
   const subs = subscriptions({});
-  const pubsub = createPubSub()({
+  const pubsub = createPubSub({
     subscriptions: {},
     gadgets: {},
     command: null as any // Start with null command

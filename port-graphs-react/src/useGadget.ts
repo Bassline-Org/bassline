@@ -5,11 +5,8 @@
  * making React's state the single source of truth while preserving gadget behavior.
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import type { Gadget } from '../../port-graphs/dist/core';
-
-export type GadgetFactory<State, Incoming, Effect> =
-  (initial: State) => Gadget<State, Incoming, Effect>;
+import { useRef, useState, useCallback } from 'react';
+import type { Gadget } from 'port-graphs';
 
 /**
  * Creates a React-aware gadget that uses React state as its source of truth
@@ -18,31 +15,23 @@ export type GadgetFactory<State, Incoming, Effect> =
  * @param initialState - Initial state for both React and the gadget
  * @returns Tuple of [currentState, send] where send passes data to gadget.receive
  */
+type GadgetFactory<State, Incoming = any, Effect = any> = (initial: State) => Gadget<State, Incoming, Effect>;
+
 export function useGadget<State, Incoming = any, Effect = any>(
   factory: GadgetFactory<State, Incoming, Effect>,
-  initialState: State
-): [State, (data: Incoming) => void] {
-  const [state, setState] = useState<State>(initialState);
+  initial: State
+) {
+  const [state, setState] = useState<State>(initial);
   const stateRef = useRef<State>(state);
-
-  // Keep stateRef in sync with state
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
 
   // Create gadget once, immediately (not in effect)
   const gadgetRef = useRef<Gadget<State, Incoming, Effect>>();
 
   if (!gadgetRef.current) {
-    const gadget = factory(initialState);
-
-    // Store original methods
-    const originalUpdate = gadget.update;
+    const gadget = factory(initial);
 
     // Override update to use React's setState
     gadget.update = (newState: State) => {
-      // Call original update for any internal bookkeeping
-      originalUpdate.call(gadget, newState);
       // Update React state
       setState(newState);
       // Update ref immediately for current() calls
@@ -62,54 +51,5 @@ export function useGadget<State, Incoming = any, Effect = any>(
     gadgetRef.current?.receive(data);
   }, []);
 
-  return [state, send];
-}
-
-/**
- * Advanced hook that also exposes the gadget for wiring
- * Use this when you need to connect gadgets together
- */
-export function useGadgetWithRef<State, Incoming = any, Effect = any>(
-  factory: GadgetFactory<State, Incoming, Effect>,
-  initialState: State
-): [State, (data: Incoming) => void, Gadget<State, Incoming, Effect>] {
-  const [state, setState] = useState<State>(initialState);
-  const stateRef = useRef<State>(state);
-
-  // Keep stateRef in sync with state
-  useEffect(() => {
-    stateRef.current = state;
-  }, [state]);
-
-  // Create gadget once, immediately (not in effect)
-  const gadgetRef = useRef<Gadget<State, Incoming, Effect>>();
-
-  if (!gadgetRef.current) {
-    const gadget = factory(initialState);
-
-    // Store original methods
-    const originalUpdate = gadget.update;
-
-    // Override update to use React's setState
-    gadget.update = (newState: State) => {
-      // Call original update for any internal bookkeeping
-      originalUpdate.call(gadget, newState);
-      // Update React state
-      setState(newState);
-      // Update ref immediately for current() calls
-      stateRef.current = newState;
-    };
-
-    // Override current to read from React state ref
-    gadget.current = () => stateRef.current;
-
-    gadgetRef.current = gadget;
-  }
-
-  // Stable send function
-  const send = useCallback((data: Incoming) => {
-    gadgetRef.current?.receive(data);
-  }, []);
-
-  return [state, send, gadgetRef.current!];
+  return [state, send, gadgetRef.current!] as const;
 }

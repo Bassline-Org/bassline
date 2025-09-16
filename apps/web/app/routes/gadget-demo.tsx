@@ -9,7 +9,7 @@
  */
 
 import { useGadget, useGadgetWithRef, useGadgetEffect, PubSubProvider, usePub, useSub } from 'port-graphs-react';
-import { maxCell, minCell, lastCell, lastMap } from 'port-graphs/patterns/cells';
+import { maxCell, minCell, lastCell, lastMap } from 'port-graphs';
 import { adder, multiplier } from 'port-graphs/patterns/functions/numeric';
 import { createGadget } from 'port-graphs/core';
 import { Button } from '~/components/ui/button';
@@ -30,8 +30,8 @@ export function meta() {
 // Component 1: Slider feeding into MaxCell
 // ============================================================================
 function MaxCellSlider() {
-  const [maxValue, sendMax] = useGadget(
-    () => maxCell(50),
+  const [maxValue, sendMax, maxGadget] = useGadget(
+    maxCell,
     50
   );
 
@@ -47,7 +47,7 @@ function MaxCellSlider() {
         <div>
           <Label>Input Value</Label>
           <Slider
-            value={[maxValue ?? 50]}
+            value={[maxValue]}
             onValueChange={([value]) => sendMax(value ?? 50)}
             max={100}
             step={1}

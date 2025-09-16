@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import type { Gadget } from '../../port-graphs/dist/core';
+import type { Gadget } from 'port-graphs';
 
 export type EffectHandler<Effect> = (effect: Effect) => void;
 

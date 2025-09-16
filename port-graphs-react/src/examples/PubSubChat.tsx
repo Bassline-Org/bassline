@@ -5,25 +5,24 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import { useGadget, useGadgetEffect, useStableGadget } from '../index';
-import { createPubSubSystem } from 'port-graphs/dist/patterns/meta/routing';
-import { createGadget } from 'port-graphs/dist/core';
-import type { Gadget } from 'port-graphs';
+import { PubSubProvider, useGadget, useGadgetEffect, usePubSub, usePubSubContext } from '../index';
+import { createPubSubSystem } from 'port-graphs/meta';
+import { createGadget } from 'port-graphs';
 
 // Create a message collector gadget that accumulates messages
-const createMessageCollector = (initial: string[]) =>
+const createMessageCollector =
   createGadget<string[], string>(
     (messages, newMessage) => {
-      return { action: 'add', context: newMessage };
+      return { action: 'add', context: { messages, newMessage } };
     },
     {
-      add: (gadget, message) => {
-        const updated = [...gadget.current(), message];
+      add: (gadget, { messages, newMessage }) => {
+        const updated = [...messages, newMessage];
         gadget.update(updated);
         return { changed: updated };
       }
     }
-  )(initial);
+  );
 
 interface ChatWidgetProps {
   userId: string;
@@ -34,23 +33,23 @@ function ChatWidget({ userId, topic }: ChatWidgetProps) {
   const [input, setInput] = useState('');
 
   // Create a message collector for this widget
-  const [messages, messageCollector] = useGadget(
-    () => createMessageCollector([]),
+  const [messages, messageSend, messageCollector] = useGadget(
+    createMessageCollector,
     []
   );
 
-  // Get the global pubsub system (in a real app, this might come from context)
-  const pubsubSystem = React.useContext(PubSubContext);
+  const pubsubSystem = usePubSubContext();
+  const { registry, subscriptions, pubsub } = pubsubSystem;
 
   // Subscribe this widget's collector to the topic
   React.useEffect(() => {
     if (!pubsubSystem || !messageCollector) return;
 
     // Register our message collector
-    pubsubSystem.registry.receive({ [userId]: messageCollector });
+    registry.receive({ [userId]: messageCollector });
 
     // Subscribe to the topic
-    pubsubSystem.subscriptions.receive({
+    subscriptions.receive({
       type: 'subscribe',
       topic,
       subscriber: userId
@@ -58,21 +57,21 @@ function ChatWidget({ userId, topic }: ChatWidgetProps) {
 
     // Cleanup on unmount
     return () => {
-      pubsubSystem.subscriptions.receive({
+      subscriptions.receive({
         type: 'unsubscribe',
         topic,
         subscriber: userId
       });
     };
-  }, [pubsubSystem, messageCollector, userId, topic]);
+  }, []);
 
   const sendMessage = () => {
-    if (!input.trim() || !pubsubSystem) return;
+    if (!input.trim() || !pubsub) return;
 
     const message = `[${userId}]: ${input}`;
 
     // Publish to the topic
-    pubsubSystem.pubsub.receive({
+    pubsub.receive({
       command: {
         type: 'publish',
         topic,
@@ -120,25 +119,9 @@ function ChatWidget({ userId, topic }: ChatWidgetProps) {
   );
 }
 
-// Context for sharing pubsub system
-const PubSubContext = React.createContext<ReturnType<typeof createPubSubSystem> | null>(null);
-
 export function PubSubChatExample() {
-  // Create the pubsub system at the app level
-  const { state: pubsubState, gadget: pubsubSystem } = useStableGadget(
-    () => {
-      const system = createPubSubSystem();
-      // Return a composite gadget that holds the whole system
-      return createGadget(
-        () => ({ action: 'noop' }),
-        { noop: () => null }
-      )(system);
-    },
-    createPubSubSystem()
-  );
-
   return (
-    <PubSubContext.Provider value={pubsubState}>
+    <PubSubProvider>
       <div style={{ padding: '20px' }}>
         <h2>PubSub Chat Example</h2>
         <p>Multiple chat widgets sharing topics through the gadget pubsub system</p>
@@ -153,6 +136,6 @@ export function PubSubChatExample() {
           <ChatWidget userId="Dana" topic="tech" />
         </div>
       </div>
-    </PubSubContext.Provider>
+    </PubSubProvider>
   );
 }

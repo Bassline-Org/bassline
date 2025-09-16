@@ -6,12 +6,12 @@
 
 import React from 'react';
 import { useGadget, useGadgetEffect } from '../index';
-import { maxCell } from 'port-graphs/dist/patterns/cells/numeric';
+import { maxCell } from 'port-graphs/cells';
 
 export function CounterExample() {
   // Create a maxCell gadget that's managed by React state
-  const [count, counter] = useGadget(
-    (initial) => maxCell(initial),
+  const [count, counterSend, counter] = useGadget(
+    maxCell,
     0
   );
 
@@ -29,11 +29,6 @@ export function CounterExample() {
     counter?.receive(count + 1);
   };
 
-  const handleSet = (value: number) => {
-    // maxCell will only update if this is higher than current
-    counter?.receive(value);
-  };
-
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px' }}>
       <h2>MaxCell Counter</h2>
@@ -47,15 +42,15 @@ export function CounterExample() {
           Increment (+1)
         </button>
 
-        <button onClick={() => handleSet(10)}>
+        <button onClick={() => counter.receive(10)}>
           Set to 10
         </button>
 
-        <button onClick={() => handleSet(5)}>
+        <button onClick={() => counterSend(5)}>
           Set to 5 (won't work if above 5)
         </button>
 
-        <button onClick={() => handleSet(100)}>
+        <button onClick={() => counterSend(100)}>
           Set to 100
         </button>
       </div>
