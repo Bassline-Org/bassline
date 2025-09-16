@@ -8,7 +8,28 @@
   "exports": {
     ".": {
       "import": "./dist-browser/index.js",
-      "require": "./dist/index.js"
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist-browser/core.js",
+      "require": "./dist/core.js",
+      "types": "./dist/core.d.ts"
+    },
+    "./patterns/cells": {
+      "import": "./dist-browser/patterns/cells/index.js",
+      "require": "./dist/patterns/cells/index.js",
+      "types": "./dist/patterns/cells/index.d.ts"
+    },
+    "./patterns/functions/numeric": {
+      "import": "./dist-browser/patterns/functions/numeric.js",
+      "require": "./dist/patterns/functions/numeric.js",
+      "types": "./dist/patterns/functions/numeric.d.ts"
+    },
+    "./meta/routing": {
+      "import": "./dist-browser/patterns/meta/routing.js",
+      "require": "./dist/patterns/meta/routing.js",
+      "types": "./dist/patterns/meta/routing.d.ts"
     }
   },
   "scripts": {

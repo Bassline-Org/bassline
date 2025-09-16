@@ -115,10 +115,21 @@ export default function Home() {
         </p>
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Gadget Demo - NEW! */}
+          <Link to="/gadget-demo" className="block">
+            <div className="border border-emerald-200 rounded-lg p-6 hover:border-emerald-300 hover:shadow-lg transition-all bg-emerald-50">
+              <h2 className="text-xl font-semibold mb-2">✨ Gadget Demo (NEW!)</h2>
+              <p className="text-slate-600 mb-4">
+                Interactive gadgets with React - bidirectional data flow
+              </p>
+              <Button variant="default">Try Gadget Demo</Button>
+            </div>
+          </Link>
+
           {/* Konva Canvas */}
           <Link to="/canvas" className="block">
             <div className="border border-purple-200 rounded-lg p-6 hover:border-purple-300 hover:shadow-lg transition-all bg-purple-50">
-              <h2 className="text-xl font-semibold mb-2">Infinite Canvas (New!)</h2>
+              <h2 className="text-xl font-semibold mb-2">Infinite Canvas</h2>
               <p className="text-slate-600 mb-4">
                 Konva-powered semantic zoom with visual gadgets
               </p>

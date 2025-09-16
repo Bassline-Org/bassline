@@ -15,5 +15,9 @@ export {
 } from './useGadgetEffect';
 export type { EffectHandler } from './useGadgetEffect';
 
+// PubSub integration
+export { PubSubProvider } from './PubSubProvider';
+export { usePub, useSub, usePubSub } from './usePubSub';
+
 // Re-export core gadget types for convenience
 export type { Gadget } from '../../port-graphs/dist/core';

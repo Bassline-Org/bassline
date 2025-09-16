@@ -7,8 +7,10 @@
     "types": []
   },
   "include": [
-    "src/core/**/*",
-    "src/browser/**/*",
-    "src/shared/**/*"
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
   ]
 }

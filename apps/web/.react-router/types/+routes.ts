@@ -13,16 +13,7 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/port-graph-editor": {
-    params: {};
-  };
   "/proper-demo-cool": {
-    params: {};
-  };
-  "/rete-engine-test": {
-    params: {};
-  };
-  "/dead-editor-v2": {
     params: {};
   };
   "/inspector-demo": {
@@ -37,25 +28,10 @@ type Pages = {
   "/test-viewport": {
     params: {};
   };
-  "/rete-builder": {
-    params: {};
-  };
-  "/dead-editor": {
+  "/gadget-demo": {
     params: {};
   };
   "/proper-demo": {
-    params: {};
-  };
-  "/rete-simple": {
-    params: {};
-  };
-  "/konva-test": {
-    params: {};
-  };
-  "/rete-demo": {
-    params: {};
-  };
-  "/canvas": {
     params: {};
   };
   "/home": {
@@ -66,23 +42,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/port-graph-editor" | "/proper-demo-cool" | "/rete-engine-test" | "/dead-editor-v2" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/rete-builder" | "/dead-editor" | "/proper-demo" | "/rete-simple" | "/konva-test" | "/rete-demo" | "/canvas" | "/home";
-  };
-  "routes/port-graph-editor.tsx": {
-    id: "routes/port-graph-editor";
-    page: "/port-graph-editor";
+    page: "/" | "/proper-demo-cool" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/gadget-demo" | "/proper-demo" | "/home";
   };
   "routes/proper-demo-cool.tsx": {
     id: "routes/proper-demo-cool";
     page: "/proper-demo-cool";
-  };
-  "routes/rete-engine-test.tsx": {
-    id: "routes/rete-engine-test";
-    page: "/rete-engine-test";
-  };
-  "routes/dead-editor-v2.tsx": {
-    id: "routes/dead-editor-v2";
-    page: "/dead-editor-v2";
   };
   "routes/inspector-demo.tsx": {
     id: "routes/inspector-demo";
@@ -100,33 +64,13 @@ type RouteFiles = {
     id: "routes/test-viewport";
     page: "/test-viewport";
   };
-  "routes/rete-builder.tsx": {
-    id: "routes/rete-builder";
-    page: "/rete-builder";
-  };
-  "routes/dead-editor.tsx": {
-    id: "routes/dead-editor";
-    page: "/dead-editor";
+  "routes/gadget-demo.tsx": {
+    id: "routes/gadget-demo";
+    page: "/gadget-demo";
   };
   "routes/proper-demo.tsx": {
     id: "routes/proper-demo";
     page: "/proper-demo";
-  };
-  "routes/rete-simple.tsx": {
-    id: "routes/rete-simple";
-    page: "/rete-simple";
-  };
-  "routes/konva-test.tsx": {
-    id: "routes/konva-test";
-    page: "/konva-test";
-  };
-  "routes/rete-demo.tsx": {
-    id: "routes/rete-demo";
-    page: "/rete-demo";
-  };
-  "routes/canvas.tsx": {
-    id: "routes/canvas";
-    page: "/canvas";
   };
   "routes/home.tsx": {
     id: "routes/home";
