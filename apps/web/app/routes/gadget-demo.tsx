@@ -8,10 +8,10 @@
  * - Gadgets can modify other gadgets
  */
 
-import { useGadget, useGadgetWithRef, useGadgetEffect, PubSubProvider, usePub, useSub } from 'port-graphs-react';
+import { useGadget, useGadgetEffect, PubSubProvider, usePub, useSub } from 'port-graphs-react';
 import { maxCell, minCell, lastCell, lastMap } from 'port-graphs';
-import { adder, multiplier } from 'port-graphs/patterns/functions/numeric';
-import { createGadget } from 'port-graphs/core';
+import { adder, multiplier } from 'port-graphs/functions';
+import { createGadget } from 'port-graphs';
 import { Button } from '~/components/ui/button';
 import { Slider } from '~/components/ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
@@ -30,7 +30,7 @@ export function meta() {
 // Component 1: Slider feeding into MaxCell
 // ============================================================================
 function MaxCellSlider() {
-  const [maxValue, sendMax, maxGadget] = useGadget(
+  const [maxValue, sendMax] = useGadget(
     maxCell,
     50
   );
@@ -48,7 +48,7 @@ function MaxCellSlider() {
           <Label>Input Value</Label>
           <Slider
             value={[maxValue]}
-            onValueChange={([value]) => sendMax(value ?? 50)}
+            onValueChange={([value]) => value && sendMax(value)}
             max={100}
             step={1}
             className="mt-2"
@@ -134,13 +134,13 @@ function AdderComponent() {
 // ============================================================================
 function ChainedFunctions() {
   // Create an adder gadget
-  const [adderState, sendToAdder, adderGadget] = useGadgetWithRef(
+  const [adderState, sendToAdder, adderGadget] = useGadget(
     () => adder({ a: 0, b: 0 }),
     { a: 0, b: 0 }
   );
 
   // Create a multiplier gadget
-  const [multiplierState, sendToMultiplier] = useGadgetWithRef(
+  const [multiplierState, sendToMultiplier] = useGadget(
     () => multiplier({ a: 0, b: 1 }),
     { a: 0, b: 1 }
   );
@@ -404,7 +404,7 @@ function FormValidatorGadget() {
 
 // Color Controller - publishes RGB color object
 function ColorController() {
-  const [color, sendColor, colorGadget] = useGadgetWithRef(
+  const [color, sendColor, colorGadget] = useGadget(
     () => lastMap({ red: 128, green: 128, blue: 128 }),
     { red: 128, green: 128, blue: 128 }
   );
@@ -412,7 +412,7 @@ function ColorController() {
   // Publish color changes to topic
   usePub(colorGadget, 'color');
 
-  const rgbColor = `rgb(${color.red}, ${color.green}, ${color.blue})`;
+  const rgbColor = `rgb(${color['red']}, ${color['green']}, ${color['blue']})`;
 
   return (
     <Card>
@@ -431,11 +431,11 @@ function ColorController() {
         <div className="space-y-3">
           <div>
             <div className="flex justify-between">
-              <Label>Red ({color.red})</Label>
+              <Label>Red ({color['red']})</Label>
               <span className="text-xs text-muted-foreground">topic: color</span>
             </div>
             <Slider
-              value={[color.red ?? 128]}
+              value={[color['red'] ?? 128]}
               onValueChange={([value]) => sendColor({ red: value })}
               max={255}
               className="mt-1"
@@ -444,11 +444,11 @@ function ColorController() {
 
           <div>
             <div className="flex justify-between">
-              <Label>Green ({color.green})</Label>
+              <Label>Green ({color['green']})</Label>
               <span className="text-xs text-muted-foreground">topic: color</span>
             </div>
             <Slider
-              value={[color.green ?? 128]}
+              value={[color['green'] ?? 128]}
               onValueChange={([value]) => sendColor({ green: value })}
               max={255}
               className="mt-1"
@@ -457,11 +457,11 @@ function ColorController() {
 
           <div>
             <div className="flex justify-between">
-              <Label>Blue ({color.blue})</Label>
+              <Label>Blue ({color['blue']})</Label>
               <span className="text-xs text-muted-foreground">topic: color</span>
             </div>
             <Slider
-              value={[color.blue ?? 128]}
+              value={[color['blue'] ?? 128]}
               onValueChange={([value]) => sendColor({ blue: value })}
               max={255}
               className="mt-1"
@@ -475,7 +475,7 @@ function ColorController() {
 
 // Size Controller - publishes size value
 function SizeController() {
-  const [size, sendSize, sizeGadget] = useGadgetWithRef(
+  const [size, sendSize, sizeGadget] = useGadget(
     () => lastCell(50),
     50
   );
@@ -509,7 +509,7 @@ function SizeController() {
             <span className="text-xs text-muted-foreground">topic: size</span>
           </div>
           <Slider
-            value={[size ?? 50]}
+            value={[size]}
             onValueChange={([value]) => sendSize(value)}
             min={20}
             max={100}
@@ -536,13 +536,13 @@ function VisualElement({
   sizeTransform?: (size: number) => number;
 }) {
   // Use lastMap for partial color updates
-  const [color, , colorGadget] = useGadgetWithRef(
-    () => lastMap({ red: 128, green: 128, blue: 128 }),
+  const [color, , colorGadget] = useGadget(
+    lastMap,
     { red: 128, green: 128, blue: 128 }
   );
 
-  const [size, , sizeGadget] = useGadgetWithRef(
-    () => lastCell(50),
+  const [size, , sizeGadget] = useGadget(
+    lastCell,
     50
   );
 
@@ -555,7 +555,7 @@ function VisualElement({
     useSub(sizeGadget, 'size');
   }
 
-  const transformed = colorTransform(color);
+  const transformed = colorTransform(color as { red: number; green: number; blue: number });
   const rgbColor = `rgb(${Math.round(transformed.red)}, ${Math.round(transformed.green)}, ${Math.round(transformed.blue)})`;
   const transformedSize = sizeTransform(size);
 

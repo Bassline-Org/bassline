@@ -38,7 +38,7 @@ export function createGadget<State, Incoming, Effect = any>(
         current = state;
       },
       receive: (data) => {
-        const result = consider(current, data);
+        const result = consider(gadget.current(), data);
         if (result) {
           const action = actions[result.action];
           if (action) {

@@ -10,6 +10,7 @@ import { createGadget, type Gadget } from "../../core";
 import { changed } from "../../effects";
 import { firstMap } from "../cells/maps";
 import { createFn } from "../functions/numeric";
+import { extendGadget } from "../../semantics";
 
 // PubSub command types
 export type PubSubCommand =
@@ -86,7 +87,7 @@ export const createPubSub = createFn<
   {
     subscriptions: Subscriptions;
     gadgets: Registry;
-    command: PubSubCommand;
+    command: PubSubCommand & { type: 'publish' };
   },
   { delivered: string[] } | null
 >(
@@ -132,22 +133,18 @@ export function createPubSubSystem() {
 
   // Wire them together
   // When registry changes, update pubsub's gadgets argument
-  const origRegistryEmit = registry.emit;
-  registry.emit = (effect) => {
-    origRegistryEmit(effect);
+  extendGadget(registry)(effect => {
     if (effect && typeof effect === 'object' && 'changed' in effect) {
       pubsub.receive({ gadgets: effect.changed as Registry });
     }
-  };
+  })
 
   // When subscriptions change, update pubsub's subscriptions argument
-  const origSubsEmit = subs.emit;
-  subs.emit = (effect) => {
-    origSubsEmit(effect);
+  extendGadget(subs)(effect => {
     if (effect && typeof effect === 'object' && 'changed' in effect) {
       pubsub.receive({ subscriptions: effect.changed as Subscriptions });
     }
-  };
+  });
 
   return { registry, subscriptions: subs, pubsub };
 }

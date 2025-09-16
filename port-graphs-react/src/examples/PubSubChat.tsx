@@ -4,9 +4,8 @@
  * Demonstrates how the pubsub system works in React with multiple components
  */
 
-import React, { useState, useCallback } from 'react';
-import { PubSubProvider, useGadget, useGadgetEffect, usePubSub, usePubSubContext } from '../index';
-import { createPubSubSystem } from 'port-graphs/meta';
+import React, { useEffect, useState } from 'react';
+import { PubSubProvider, useGadget, useRegistry } from '../index';
 import { createGadget } from 'port-graphs';
 
 // Create a message collector gadget that accumulates messages
@@ -37,50 +36,10 @@ function ChatWidget({ userId, topic }: ChatWidgetProps) {
     createMessageCollector,
     []
   );
-
-  const pubsubSystem = usePubSubContext();
-  const { registry, subscriptions, pubsub } = pubsubSystem;
-
-  // Subscribe this widget's collector to the topic
-  React.useEffect(() => {
-    if (!pubsubSystem || !messageCollector) return;
-
-    // Register our message collector
-    registry.receive({ [userId]: messageCollector });
-
-    // Subscribe to the topic
-    subscriptions.receive({
-      type: 'subscribe',
-      topic,
-      subscriber: userId
-    });
-
-    // Cleanup on unmount
-    return () => {
-      subscriptions.receive({
-        type: 'unsubscribe',
-        topic,
-        subscriber: userId
-      });
-    };
-  }, []);
-
-  const sendMessage = () => {
-    if (!input.trim() || !pubsub) return;
-
-    const message = `[${userId}]: ${input}`;
-
-    // Publish to the topic
-    pubsub.receive({
-      command: {
-        type: 'publish',
-        topic,
-        data: message
-      }
-    });
-
-    setInput('');
-  };
+  const { publish, subscribe } = useRegistry(messageCollector, userId);
+  useEffect(() => {
+    subscribe(topic);
+  }, [subscribe, topic])
 
   return (
     <div style={{
@@ -109,11 +68,11 @@ function ChatWidget({ userId, topic }: ChatWidgetProps) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyPress={(e) => e.key === 'Enter' && messageSend(input)}
           placeholder="Type a message..."
           style={{ flex: 1, padding: '5px' }}
         />
-        <button onClick={sendMessage}>Send</button>
+        <button onClick={() => messageSend(input)}>Send</button>
       </div>
     </div>
   );
