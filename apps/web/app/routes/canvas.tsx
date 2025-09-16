@@ -9,7 +9,6 @@ import { useCallback, useEffect } from 'react';
 import {
   ReactFlow,
   Controls,
-  MiniMap,
   Background,
   BackgroundVariant,
   type Node,
@@ -17,16 +16,15 @@ import {
   type EdgeChange,
   type Connection,
   type Edge,
-  ReactFlowProvider,
   applyNodeChanges,
   applyEdgeChanges,
   ConnectionMode,
-  type XYPosition
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { useGadget, TopicsProvider, useTopics } from 'port-graphs-react';
-import { lastMap, createGadget, changed } from 'port-graphs';
+import { useGadget, TopicsProvider, useTopics, useGadgetSubscription } from 'port-graphs-react';
+import { lastMap, aggregatorCell } from 'port-graphs';
+import { topic } from 'port-graphs/meta';
 import _ from 'lodash';
 
 const nodeTypes = {
@@ -37,31 +35,14 @@ const edgeTypes = {
   gadget: EdgeGadget
 }
 
-const createNodes = createGadget<Node[], NodeChange[]>(
-  (current, incoming) => {
-    return { action: 'update', context: { nodes: current, changes: incoming } };
-  },
-  {
-    'update': (gadget, { nodes, changes }) => {
-      const updated = applyNodeChanges(changes, nodes);
-      gadget.update(updated);
-      return changed(updated);
-    }
-  }
-);
+// Helper to process ReactFlow changes through aggregator
+const processNodeChanges = (nodes: Node[], changes: NodeChange[]): Node[] => {
+  return applyNodeChanges(changes, nodes);
+};
 
-const createEdges = createGadget<Edge[], EdgeChange[]>(
-  (current, incoming) => {
-    return { action: 'update', context: { edges: current, changes: incoming } };
-  },
-  {
-    'update': (gadget, { edges, changes }) => {
-      const state = applyEdgeChanges(changes, edges);
-      gadget.update(state);
-      return changed(state);
-    }
-  }
-);
+const processEdgeChanges = (edges: Edge[], changes: EdgeChange[]): Edge[] => {
+  return applyEdgeChanges(changes, edges);
+};
 
 // Node gadget component
 function NodeGadget({ id, data }: { id: string; data: Record<string, any> }) {
@@ -69,19 +50,18 @@ function NodeGadget({ id, data }: { id: string; data: Record<string, any> }) {
   const fullNode = { id, type: 'gadget', position: { x: 0, y: 0 }, data };
   const [state, updateState, nodeGadget] = useGadget(lastMap, fullNode);
 
-  useEffect(() => {
-    topics.subscribe([`node:${id}`], nodeGadget);
-  }, [topics, id, nodeGadget]);
+  // Subscribe to node-specific updates
+  useGadgetSubscription([topic.node(id)], nodeGadget, [id]);
 
   useEffect(() => {
     // Publish the full node state when it changes
     if (state && state['id']) {
       console.log('node changed', state);
-      topics.publish(['node:changes'], [{ type: 'replace', id: state['id'], item: state }]);
+      topics.publish([topic.changes('node')], { type: 'replace', id: state['id'], item: state });
     }
     if (state['data']['bg-key']) {
       console.log('bg key changed', state['data']['bg-key'], state['position']['x']);
-      topics.publish(['bg'], { [state['data']['bg-key']]: state['position']['x'] });
+      topics.publish([topic.build('bg')], { [state['data']['bg-key']]: state['position']['x'] });
     }
   }, [topics, state]);
 
@@ -100,12 +80,11 @@ function EdgeGadget({ id, data }: { id: string; data: Record<string, any> }) {
   const topics = useTopics();
   const [state, , edgeGadget] = useGadget(lastMap, { id, type: 'gadget', data });
 
-  useEffect(() => {
-    topics.subscribe([`edge:${id}`], edgeGadget);
-  }, [topics, id, edgeGadget]);
+  // Subscribe to edge-specific updates
+  useGadgetSubscription([topic.edge(id)], edgeGadget, [id]);
 
   useEffect(() => {
-    topics.publish(['edge:changes'], [{ type: 'replace', id: state['id'], item: state }]);
+    topics.publish([topic.changes('edge')], { type: 'replace', id: state['id'], item: state });
   }, [topics, state]);
 
   return null;
@@ -114,16 +93,19 @@ function EdgeGadget({ id, data }: { id: string; data: Record<string, any> }) {
 function CanvasContent() {
   const topics = useTopics();
 
-  const [nodes, , nodesGadget] = useGadget(createNodes, []);
-  const [edges, , edgesGadget] = useGadget(createEdges, []);
+  // Use aggregator cells for managing collections
+  const [nodeState, sendNodeChange, nodesGadget] = useGadget(aggregatorCell<Node>(), []);
+  const [edgeState, sendEdgeChange, edgesGadget] = useGadget(aggregatorCell<Edge>(), []);
   const [bg, , bgGadget] = useGadget(lastMap, { red: 0, green: 0, blue: 0 });
 
-  // Subscribe aggregators
-  useEffect(() => {
-    topics.subscribe(['node:changes'], nodesGadget);
-    topics.subscribe(['edge:changes'], edgesGadget);
-    topics.subscribe(['bg'], bgGadget);
-  }, [topics, nodesGadget, edgesGadget]);
+  // Process ReactFlow changes through nodes/edges state
+  const nodes = nodeState;
+  const edges = edgeState;
+
+  // Subscribe aggregators to topics
+  useGadgetSubscription([topic.changes('node')], nodesGadget);
+  useGadgetSubscription([topic.changes('edge')], edgesGadget);
+  useGadgetSubscription([topic.build('bg')], bgGadget);
 
   // Handle new connections
   const onConnect = useCallback((connection: Connection) => {
@@ -133,7 +115,7 @@ function CanvasContent() {
         source: connection.source,
         target: connection.target,
       };
-      topics.publish([`edge:changes`], [{ type: 'add', item: newEdge }]);
+      topics.publish([topic.changes('edge')], { type: 'add', item: newEdge });
     }
   }, [topics]);
 
@@ -142,7 +124,7 @@ function CanvasContent() {
   // Initialize demo data - just add the nodes, NodeGadget components will handle their state
   useEffect(() => {
     ['node-1', 'node-2', 'node-3'].forEach((id, i) => {
-      topics.publish([`node:changes`], [{
+      topics.publish([topic.changes('node')], {
         type: 'add',
         item: {
           id,
@@ -150,7 +132,7 @@ function CanvasContent() {
           position: { x: 100 + i * 150, y: 100 },
           data: { label: `Node ${i + 1}`, 'bg-key': keys[i] }
         },
-      }]);
+      });
     });
   }, [topics]);
 
@@ -161,16 +143,24 @@ function CanvasContent() {
           nodes={nodes}
           edges={edges}
           onNodesChange={(changes: NodeChange[]) => {
-            topics.publish([`node:changes`], changes);
+            // Process changes and send to aggregator
+            const processed = processNodeChanges(nodes, changes);
+            processed.forEach(node => {
+              sendNodeChange({ type: 'replace', id: node.id, item: node });
+            });
           }}
           onEdgesChange={(changes: EdgeChange[]) => {
-            topics.publish([`edge:changes`], changes);
+            // Process changes and send to aggregator
+            const processed = processEdgeChanges(edges, changes);
+            processed.forEach(edge => {
+              sendEdgeChange({ type: 'replace', id: edge.id, item: edge });
+            });
           }}
-          onNodeDrag={(e, node) => {
-            topics.publish([`node:${node.id}`], node);
+          onNodeDrag={(_e, node) => {
+            topics.publish([topic.node(node.id)], node);
           }}
-          onNodeClick={(e, node) => {
-            topics.publish([`node:${node.id}`], node);
+          onNodeClick={(_e, node) => {
+            topics.publish([topic.node(node.id)], node);
           }}
           onConnect={onConnect}
           nodeTypes={nodeTypes}

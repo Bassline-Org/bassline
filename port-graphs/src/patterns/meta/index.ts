@@ -6,6 +6,7 @@
  */
 
 export * from './pubsub';
+export * from './topics';
 
 /**
  * Example of using topics:

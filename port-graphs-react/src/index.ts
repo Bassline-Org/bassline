@@ -20,5 +20,8 @@ export type { EffectHandler } from './useGadgetEffect';
 // Topic routing
 export { TopicsProvider, useTopics } from './TopicsProvider';
 
+// Lifecycle management
+export * from './lifecycle';
+
 // Re-export core gadget types for convenience
 export type { Gadget } from 'port-graphs';
