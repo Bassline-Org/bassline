@@ -20,7 +20,8 @@ import {
   ReactFlowProvider,
   applyNodeChanges,
   applyEdgeChanges,
-  ConnectionMode
+  ConnectionMode,
+  type XYPosition
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -29,7 +30,7 @@ import { lastMap, createGadget, changed } from 'port-graphs';
 import _ from 'lodash';
 
 const nodeTypes = {
-  gadget: NodeGadget
+  gadget: NodeGadget,
 };
 
 const edgeTypes = {
@@ -78,10 +79,15 @@ function NodeGadget({ id, data }: { id: string; data: Record<string, any> }) {
       console.log('node changed', state);
       topics.publish(['node:changes'], [{ type: 'replace', id: state['id'], item: state }]);
     }
+    if (state['data']['bg-key']) {
+      console.log('bg key changed', state['data']['bg-key'], state['position']['x']);
+      topics.publish(['bg'], { [state['data']['bg-key']]: state['position']['x'] });
+    }
   }, [topics, state]);
 
   return <>
     <div onContextMenu={(e) => {
+      e.stopPropagation();
       e.preventDefault();
       console.log('context menu');
       updateState({ position: { x: state['position']['x'] + 100, y: state['position']['y'] + 100 } });
@@ -110,22 +116,14 @@ function CanvasContent() {
 
   const [nodes, , nodesGadget] = useGadget(createNodes, []);
   const [edges, , edgesGadget] = useGadget(createEdges, []);
+  const [bg, , bgGadget] = useGadget(lastMap, { red: 0, green: 0, blue: 0 });
 
   // Subscribe aggregators
   useEffect(() => {
     topics.subscribe(['node:changes'], nodesGadget);
     topics.subscribe(['edge:changes'], edgesGadget);
+    topics.subscribe(['bg'], bgGadget);
   }, [topics, nodesGadget, edgesGadget]);
-
-  // Handle node changes - just publish them as data
-  const onNodesChange = useCallback((changes: NodeChange[]) => {
-    topics.publish([`node:changes`], changes);
-  }, [topics]);
-
-  // Handle edge changes - just publish them as data
-  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
-    topics.publish([`edge:changes`], changes);
-  }, [topics]);
 
   // Handle new connections
   const onConnect = useCallback((connection: Connection) => {
@@ -139,6 +137,8 @@ function CanvasContent() {
     }
   }, [topics]);
 
+  const keys = ['red', 'green', 'blue'];
+
   // Initialize demo data - just add the nodes, NodeGadget components will handle their state
   useEffect(() => {
     ['node-1', 'node-2', 'node-3'].forEach((id, i) => {
@@ -148,7 +148,7 @@ function CanvasContent() {
           id,
           type: 'gadget',
           position: { x: 100 + i * 150, y: 100 },
-          data: { label: `Node ${i + 1}` }
+          data: { label: `Node ${i + 1}`, 'bg-key': keys[i] }
         },
       }]);
     });
@@ -160,8 +160,18 @@ function CanvasContent() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={(changes: NodeChange[]) => {
+            topics.publish([`node:changes`], changes);
+          }}
+          onEdgesChange={(changes: EdgeChange[]) => {
+            topics.publish([`edge:changes`], changes);
+          }}
+          onNodeDrag={(e, node) => {
+            topics.publish([`node:${node.id}`], node);
+          }}
+          onNodeClick={(e, node) => {
+            topics.publish([`node:${node.id}`], node);
+          }}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -170,7 +180,7 @@ function CanvasContent() {
         >
           <Controls />
           {/* <MiniMap /> */}
-          <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+          <Background variant={BackgroundVariant.Dots} gap={12} size={1} bgColor={`rgb(${bg['red']}, ${bg['green']}, ${bg['blue']})`} />
         </ReactFlow>
       </div>
     </>
