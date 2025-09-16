@@ -93,12 +93,12 @@ export const publishers = createGadget<Publishers, PublisherCommand>(
   },
   {
     'add_topics': (gadget, { topics, publisher, publishers }) => {
-      publishers[publisher] = { ...publishers[publisher], topics };
+      publishers[publisher] = [...(publishers[publisher] ?? []), ...topics];
       gadget.update(publishers);
       return changed(publishers);
     },
     'remove_topics': (gadget, { topics, publisher, publishers }) => {
-      publishers[publisher] = { ...publishers[publisher], topics: publishers[publisher].topics.filter((t: string) => !topics.includes(t)) };
+      publishers[publisher] = publishers[publisher].filter((t: string) => !topics.includes(t));
       gadget.update(publishers);
       return changed(publishers);
     }
@@ -116,8 +116,8 @@ export const publishers = createGadget<Publishers, PublisherCommand>(
 export const createPubSub = createFn<
   {
     subscriptions: Subscriptions;
-    gadgets: Registry;
     publishers: Publishers;
+    gadgets: Registry;
     command: PubSubCommand;
   },
   { delivered: string[] } | null
@@ -146,7 +146,7 @@ export const createPubSub = createFn<
 
     return delivered.length > 0 ? { delivered } : null;
   },
-  ['subscriptions', 'gadgets', 'command']
+  ['subscriptions', 'gadgets', 'command', 'publishers']
 );
 
 /**
@@ -161,7 +161,14 @@ export function createPubSubSystem() {
   const pubsub = createPubSub({
     subscriptions: {},
     gadgets: {},
+    publishers: {},
     command: null as any // Start with null command
+  });
+
+  extendGadget(pubsub)(effect => {
+    if (effect && typeof effect === 'object' && 'changed' in effect) {
+      console.log('pubsub changed', effect.changed);
+    }
   });
 
   // Wire them together
@@ -169,6 +176,7 @@ export function createPubSubSystem() {
   extendGadget(registry)(effect => {
     if (effect && typeof effect === 'object' && 'changed' in effect) {
       pubsub.receive({ gadgets: effect.changed as Registry });
+      console.log('registry changed', effect.changed);
     }
   })
 
@@ -176,13 +184,15 @@ export function createPubSubSystem() {
   extendGadget(subs)(effect => {
     if (effect && typeof effect === 'object' && 'changed' in effect) {
       pubsub.receive({ subscriptions: effect.changed as Subscriptions });
+      console.log('subscriptions changed', effect.changed);
     }
   });
 
   // When publishers change, update pubsub's publishers argument
   extendGadget(pubs)(effect => {
     if (effect && typeof effect === 'object' && 'changed' in effect) {
-      pubsub.receive({ publishers: effect.changed as Publishers });
+      pubsub.receive({ publishers: effect.changed });
+      console.log('publishers changed', effect.changed);
     }
   });
 

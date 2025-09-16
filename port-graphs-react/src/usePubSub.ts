@@ -18,8 +18,8 @@ export function useRegistry(gadget: Gadget<any, any, any> | null, id: string) {
     registry.receive({ [id]: gadgetRef.current });
 
     extendGadget(gadgetRef.current!)(effect => {
-      if (effect && typeof effect === 'object' && 'type' in effect && effect.type === 'publish') {
-        pubsub.receive({ command: { type: 'publish', data: effect, source: id } });
+      if (effect && typeof effect === 'object' && 'changed' in effect) {
+        pubsub.receive({ command: { type: 'publish', data: effect.changed, source: id } });
       }
     });
 

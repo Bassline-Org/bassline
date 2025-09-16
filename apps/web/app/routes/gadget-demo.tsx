@@ -8,8 +8,9 @@
  * - Gadgets can modify other gadgets
  */
 
-import { useGadget, useGadgetEffect, PubSubProvider, usePub, useSub } from 'port-graphs-react';
-import { maxCell, minCell, lastCell, lastMap } from 'port-graphs';
+import { useEffect } from 'react';
+import { useGadget, PubSubProvider, useRegistry } from 'port-graphs-react';
+import { maxCell, minCell, lastCell, lastMap } from 'port-graphs/cells';
 import { adder, multiplier } from 'port-graphs/functions';
 import { createGadget } from 'port-graphs';
 import { Button } from '~/components/ui/button';
@@ -134,27 +135,23 @@ function AdderComponent() {
 // ============================================================================
 function ChainedFunctions() {
   // Create an adder gadget
-  const [adderState, sendToAdder, adderGadget] = useGadget(
+  const [adderState, sendToAdder] = useGadget(
     () => adder({ a: 0, b: 0 }),
     { a: 0, b: 0 }
   );
 
-  // Create a multiplier gadget
+  // Create a multiplier gadget that gets input from adder
   const [multiplierState, sendToMultiplier] = useGadget(
     () => multiplier({ a: 0, b: 1 }),
     { a: 0, b: 1 }
   );
 
-  // Wire adder output to multiplier input
-  useGadgetEffect(
-    adderGadget,
-    (effect: any) => {
-      if (effect?.changed?.result !== undefined) {
-        sendToMultiplier({ a: effect.changed.result });
-      }
-    },
-    []
-  );
+  // Simple direct connection - when adder produces result, send to multiplier
+  useEffect(() => {
+    if (adderState.result !== undefined) {
+      sendToMultiplier({ a: adderState.result });
+    }
+  }, [adderState.result, sendToMultiplier]);
 
   return (
     <Card>
@@ -408,9 +405,12 @@ function ColorController() {
     () => lastMap({ red: 128, green: 128, blue: 128 }),
     { red: 128, green: 128, blue: 128 }
   );
+  const { addTopics } = useRegistry(colorGadget, 'color-controller');
+  useEffect(() => {
+    addTopics('color');
+  }, [addTopics]);
 
-  // Publish color changes to topic
-  usePub(colorGadget, 'color');
+  // For now, just local state - pubsub integration can be added when needed
 
   const rgbColor = `rgb(${color['red']}, ${color['green']}, ${color['blue']})`;
 
@@ -480,8 +480,13 @@ function SizeController() {
     50
   );
 
-  // Publish size changes to topic
-  usePub(sizeGadget, 'size');
+  const { addTopics } = useRegistry(sizeGadget, 'size-controller');
+  useEffect(() => {
+    addTopics('size');
+    console.log('added size topic');
+  }, []);
+
+  // For now, just local state - pubsub integration can be added when needed
 
   return (
     <Card>
@@ -535,7 +540,7 @@ function VisualElement({
   colorTransform?: (color: { red: number; green: number; blue: number }) => { red: number; green: number; blue: number };
   sizeTransform?: (size: number) => number;
 }) {
-  // Use lastMap for partial color updates
+  // For demo purposes, just use local state with transforms
   const [color, , colorGadget] = useGadget(
     lastMap,
     { red: 128, green: 128, blue: 128 }
@@ -546,14 +551,14 @@ function VisualElement({
     50
   );
 
-  // Subscribe to topics
-  if (subscribeToColor) {
-    useSub(colorGadget, 'color');
-  }
+  const colorRegistry = useRegistry(colorGadget, `visual-element-${id}-color`);
+  const sizeRegistry = useRegistry(sizeGadget, `visual-element-${id}-size`);
 
-  if (subscribeToSize) {
-    useSub(sizeGadget, 'size');
-  }
+  useEffect(() => {
+    colorRegistry.subscribe('color');
+    sizeRegistry.subscribe('size');
+    console.log('subscribed to color and size');
+  }, []);
 
   const transformed = colorTransform(color as { red: number; green: number; blue: number });
   const rgbColor = `rgb(${Math.round(transformed.red)}, ${Math.round(transformed.green)}, ${Math.round(transformed.blue)})`;

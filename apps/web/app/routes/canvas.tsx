@@ -10,7 +10,7 @@ import React, { useCallback } from 'react';
 import { ReactFlow, Controls, MiniMap, Background, BackgroundVariant, applyNodeChanges, applyEdgeChanges, type Node, type NodeChange, type EdgeChange, type Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { useGadget, usePubSubContext, PubSubProvider, useSub } from 'port-graphs-react';
+import { useGadget, usePubSubContext, PubSubProvider } from 'port-graphs-react';
 import { lastCell, lastMap, maxCell, createNodeTransformer, createEdgeTransformer } from 'port-graphs';
 
 // Initial positions for demo gadgets
