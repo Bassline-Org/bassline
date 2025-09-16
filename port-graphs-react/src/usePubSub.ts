@@ -19,7 +19,9 @@ export function useRegistry(gadget: Gadget<any, any, any> | null, id: string) {
 
     extendGadget(gadgetRef.current!)(effect => {
       if (effect && typeof effect === 'object' && 'changed' in effect) {
-        pubsub.receive({ command: { type: 'publish', data: effect.changed, source: id } });
+        if (publishers.current()[id]) {
+          pubsub.receive({ command: { type: 'publish', data: effect.changed, source: id } });
+        }
       }
     });
 

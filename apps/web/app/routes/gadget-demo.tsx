@@ -410,8 +410,6 @@ function ColorController() {
     addTopics('color');
   }, [addTopics]);
 
-  // For now, just local state - pubsub integration can be added when needed
-
   const rgbColor = `rgb(${color['red']}, ${color['green']}, ${color['blue']})`;
 
   return (
@@ -483,8 +481,7 @@ function SizeController() {
   const { addTopics } = useRegistry(sizeGadget, 'size-controller');
   useEffect(() => {
     addTopics('size');
-    console.log('added size topic');
-  }, []);
+  }, [addTopics]);
 
   // For now, just local state - pubsub integration can be added when needed
 
@@ -529,14 +526,10 @@ function SizeController() {
 // Visual Element that subscribes to color and size
 function VisualElement({
   id,
-  subscribeToColor = true,
-  subscribeToSize = true,
   colorTransform = (color: { red: number; green: number; blue: number }) => color,
   sizeTransform = (size: number) => size
 }: {
   id: string;
-  subscribeToColor?: boolean;
-  subscribeToSize?: boolean;
   colorTransform?: (color: { red: number; green: number; blue: number }) => { red: number; green: number; blue: number };
   sizeTransform?: (size: number) => number;
 }) {
@@ -557,8 +550,7 @@ function VisualElement({
   useEffect(() => {
     colorRegistry.subscribe('color');
     sizeRegistry.subscribe('size');
-    console.log('subscribed to color and size');
-  }, []);
+  }, [colorRegistry, sizeRegistry]);
 
   const transformed = colorTransform(color as { red: number; green: number; blue: number });
   const rgbColor = `rgb(${Math.round(transformed.red)}, ${Math.round(transformed.green)}, ${Math.round(transformed.blue)})`;
@@ -638,7 +630,7 @@ function VisualCoordination() {
               />
               <VisualElement
                 id="mixed-2"
-                subscribeToColor={false} // only subscribes to size
+                colorTransform={() => ({ red: 128, green: 128, blue: 128 })} // constant color
               />
             </div>
           </div>
