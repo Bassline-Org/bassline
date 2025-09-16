@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { usePubSubContext } from './PubSubProvider';
-import type { Gadget } from 'port-graphs';
+import { extendGadget, type Gadget } from 'port-graphs';
 
 export function useRegistry(gadget: Gadget<any, any, any> | null, id: string) {
-  const { registry, pubsub, subscriptions } = usePubSubContext();
+  const { registry, subscriptions, publishers, pubsub } = usePubSubContext();
   const gadgetRef = useRef<typeof gadget>(gadget);
 
   useEffect(() => {
@@ -17,18 +17,32 @@ export function useRegistry(gadget: Gadget<any, any, any> | null, id: string) {
 
     registry.receive({ [id]: gadgetRef.current });
 
+    extendGadget(gadgetRef.current!)(effect => {
+      if (effect && typeof effect === 'object' && 'type' in effect && effect.type === 'publish') {
+        pubsub.receive({ command: { type: 'publish', data: effect, source: id } });
+      }
+    });
+
     return () => {
       registry.receive({ [id]: undefined });
     };
   }, [gadgetRef, registry]);
 
-  const publish = useCallback((data: any, topic: string) => {
-    pubsub.receive({ command: { type: 'publish', topic, data } });
-  }, [pubsub]);
+  const addTopics = useCallback((...topics: string[]) => {
+    publishers.receive({ type: 'add_topics', topics, publisher: id });
+  }, [registry]);
+
+  const removeTopics = useCallback((...topics: string[]) => {
+    publishers.receive({ type: 'remove_topics', topics, publisher: id });
+  }, [publishers]);
 
   const subscribe = useCallback((topic: string) => {
     subscriptions.receive({ type: 'subscribe', topic, subscriber: id });
   }, [subscriptions]);
 
-  return { publish, subscribe };
+  const unsubscribe = useCallback((topic: string) => {
+    subscriptions.receive({ type: 'unsubscribe', topic, subscriber: id });
+  }, [subscriptions]);
+
+  return { subscribe, unsubscribe, addTopics, removeTopics };
 }

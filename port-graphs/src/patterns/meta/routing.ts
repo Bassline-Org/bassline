@@ -14,12 +14,19 @@ import { extendGadget } from "../../semantics";
 
 // PubSub command types
 export type PubSubCommand =
+  | { type: 'publish'; data: any; source: string };
+
+export type SubscriptionCommand =
   | { type: 'subscribe'; topic: string; subscriber: string }
   | { type: 'unsubscribe'; topic: string; subscriber: string }
-  | { type: 'publish'; topic: string; data: any };
+
+export type PublisherCommand =
+  | { type: 'add_topics'; topics: string[], publisher: string }
+  | { type: 'remove_topics'; topics: string[], publisher: string }
 
 // Subscriptions type: topic -> array of subscribers
 export type Subscriptions = Record<string, string[]>;
+export type Publishers = Record<string, string[]>;
 
 // Registry is just a firstMap that accumulates gadget references
 export type Registry = Record<string, Gadget>;
@@ -28,7 +35,7 @@ export type Registry = Record<string, Gadget>;
  * Subscriptions cell - manages topic subscriptions
  * Handles subscribe/unsubscribe commands
  */
-export const subscriptions = createGadget<Subscriptions, PubSubCommand>(
+export const subscriptions = createGadget<Subscriptions, SubscriptionCommand>(
   (subs, cmd) => {
     switch (cmd.type) {
       case 'subscribe': {
@@ -36,7 +43,7 @@ export const subscriptions = createGadget<Subscriptions, PubSubCommand>(
         if (subscribers?.includes(cmd.subscriber)) {
           return null; // Already subscribed
         }
-        return { action: 'add_subscription', context: cmd };
+        return { action: 'add_subscription', context: { ...cmd, subs } };
       }
 
       case 'unsubscribe': {
@@ -44,7 +51,7 @@ export const subscriptions = createGadget<Subscriptions, PubSubCommand>(
         if (!subscribers?.includes(cmd.subscriber)) {
           return null; // Not subscribed
         }
-        return { action: 'remove_subscription', context: cmd };
+        return { action: 'remove_subscription', context: { ...cmd, subs } };
       }
 
       default:
@@ -52,25 +59,48 @@ export const subscriptions = createGadget<Subscriptions, PubSubCommand>(
     }
   },
   {
-    'add_subscription': (gadget, { topic, subscriber }) => {
-      const subs = { ...gadget.current() };
+    'add_subscription': (gadget, { topic, subscriber, subs }) => {
       const subscribers = subs[topic] || [];
       subs[topic] = [...subscribers, subscriber];
       gadget.update(subs);
       return changed(subs);
     },
 
-    'remove_subscription': (gadget, { topic, subscriber }) => {
-      const subs = { ...gadget.current() };
+    'remove_subscription': (gadget, { topic, subscriber, subs }) => {
       const subscribers = subs[topic];
       if (subscribers) {
-        subs[topic] = subscribers.filter(s => s !== subscriber);
+        subs[topic] = subscribers.filter((s: string) => s !== subscriber);
         if (subs[topic].length === 0) {
           delete subs[topic];
         }
       }
       gadget.update(subs);
       return changed(subs);
+    }
+  }
+);
+
+export const publishers = createGadget<Publishers, PublisherCommand>(
+  (publishers, cmd) => {
+    switch (cmd.type) {
+      case 'add_topics':
+        return { action: 'add_topics', context: { ...cmd, publishers } };
+      case 'remove_topics':
+        return { action: 'remove_topics', context: { ...cmd, publishers } };
+      default:
+        return null;
+    }
+  },
+  {
+    'add_topics': (gadget, { topics, publisher, publishers }) => {
+      publishers[publisher] = { ...publishers[publisher], topics };
+      gadget.update(publishers);
+      return changed(publishers);
+    },
+    'remove_topics': (gadget, { topics, publisher, publishers }) => {
+      publishers[publisher] = { ...publishers[publisher], topics: publishers[publisher].topics.filter((t: string) => !topics.includes(t)) };
+      gadget.update(publishers);
+      return changed(publishers);
     }
   }
 );
@@ -87,17 +117,19 @@ export const createPubSub = createFn<
   {
     subscriptions: Subscriptions;
     gadgets: Registry;
-    command: PubSubCommand & { type: 'publish' };
+    publishers: Publishers;
+    command: PubSubCommand;
   },
   { delivered: string[] } | null
 >(
-  ({ subscriptions, gadgets, command }) => {
+  ({ subscriptions, gadgets, command, publishers }) => {
     // Only handle publish commands
     if (!command || command.type !== 'publish') {
       return null;
     }
 
-    const subscribers = subscriptions[command.topic];
+    const topics = publishers[command.source] || [];
+    const subscribers = topics.flatMap(topic => subscriptions[topic] || []);
     if (!subscribers || subscribers.length === 0) {
       return null; // No subscribers
     }
@@ -125,6 +157,7 @@ export function createPubSubSystem() {
   // Create the components
   const registry = firstMap({} as Registry);
   const subs = subscriptions({});
+  const pubs = publishers({});
   const pubsub = createPubSub({
     subscriptions: {},
     gadgets: {},
@@ -146,5 +179,12 @@ export function createPubSubSystem() {
     }
   });
 
-  return { registry, subscriptions: subs, pubsub };
+  // When publishers change, update pubsub's publishers argument
+  extendGadget(pubs)(effect => {
+    if (effect && typeof effect === 'object' && 'changed' in effect) {
+      pubsub.receive({ publishers: effect.changed as Publishers });
+    }
+  });
+
+  return { registry, subscriptions: subs, publishers: pubs, pubsub };
 }

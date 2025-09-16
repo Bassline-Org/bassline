@@ -1,11 +1,7 @@
 import { createContext, useContext, useMemo, ReactNode } from 'react';
 import { createPubSubSystem } from 'port-graphs/meta';
 
-interface PubSubContextType {
-  registry: ReturnType<typeof createPubSubSystem>['registry'];
-  subscriptions: ReturnType<typeof createPubSubSystem>['subscriptions'];
-  pubsub: ReturnType<typeof createPubSubSystem>['pubsub'];
-}
+type PubSubContextType = ReturnType<typeof createPubSubSystem>;
 
 const PubSubContext = createContext<PubSubContextType | null>(null);
 
