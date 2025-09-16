@@ -22,10 +22,10 @@ type GadgetFactory<State, Incoming = any, Effect = any> = (initial: State) => Ga
  * Creates a React-aware gadget by replacing its state management
  * with React state. Must be used inside a React component.
  */
-export function useGadget<State, Incoming, Effect>(
+export function useGadget<State, Incoming = any, Effect = any>(
   factory: (initial: State) => Gadget<State, Incoming, Effect>,
   initial: State
-) {
+): readonly [State, (data: Incoming) => void, Gadget<State, Incoming, Effect>] {
   const gadgetRef = useRef<Gadget<State, Incoming, Effect>>();
   const [state, setState] = useState<State>(initial);
   const stateRef = useRef<State>(state);
@@ -37,14 +37,16 @@ export function useGadget<State, Incoming, Effect>(
       emit: gadget.emit,
       current: () => stateRef.current,
       update: (newState) => {
-        setState(newState);
+        setState((prev) => newState);
         stateRef.current = newState;
       },
     });
     gadgetRef.current = replaced;
     stateRef.current = initial;
   };
-  const send = gadgetRef.current!.receive;
+  const send = useCallback((data: Incoming) => {
+    gadgetRef.current!.receive(data);
+  }, []);
 
-  return [state, send, gadgetRef.current!];
+  return [state, send, gadgetRef.current!] as const;
 }

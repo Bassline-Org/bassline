@@ -31,10 +31,7 @@ export function meta() {
 // Component 1: Slider feeding into MaxCell
 // ============================================================================
 function MaxCellSlider() {
-  const [maxValue, sendMax] = useGadget(
-    maxCell,
-    50
-  );
+  const [maxValue, sendMax] = useGadget(maxCell, 50);
 
   return (
     <Card>
@@ -82,7 +79,7 @@ function MaxCellSlider() {
 // ============================================================================
 function AdderComponent() {
   const [adderState, send] = useGadget(
-    () => adder({ a: 0, b: 0 }),
+    adder,
     { a: 0, b: 0 }
   );
 
@@ -136,13 +133,13 @@ function AdderComponent() {
 function ChainedFunctions() {
   // Create an adder gadget
   const [adderState, sendToAdder] = useGadget(
-    () => adder({ a: 0, b: 0 }),
+    adder,
     { a: 0, b: 0 }
   );
 
   // Create a multiplier gadget that gets input from adder
   const [multiplierState, sendToMultiplier] = useGadget(
-    () => multiplier({ a: 0, b: 1 }),
+    multiplier,
     { a: 0, b: 1 }
   );
 
@@ -221,16 +218,10 @@ function ChainedFunctions() {
 // ============================================================================
 function MinMaxTracker() {
   // Simple current value cell - just stores latest value
-  const [current, sendCurrent] = useGadget(
-    () => createGadget<number, number>(
-      (_current, incoming) => ({ action: 'update', context: { value: incoming } }),
-      { 'update': (gadget, { value }) => { gadget.update(value); return { changed: value }; } }
-    )(50),
-    50
-  );
+  const [current, sendCurrent] = useGadget(lastCell, 50);
 
-  const [minValue, sendMin] = useGadget(() => minCell(50), 50);
-  const [maxValue, sendMax] = useGadget(() => maxCell(50), 50);
+  const [minValue, sendMin] = useGadget(minCell, 50);
+  const [maxValue, sendMax] = useGadget(maxCell, 50);
 
   const handleValueChange = (value: number) => {
     sendCurrent(value);
@@ -297,31 +288,34 @@ function MinMaxTracker() {
 // ============================================================================
 function FormValidatorGadget() {
   // Create a validation gadget
-  const [formState, sendForm] = useGadget(
-    () => createGadget<any, any>(
-      (current, updates) => {
-        const merged = { ...current, ...updates };
-        const errors = [];
+  // Create a validation gadget factory
+  const formValidator = createGadget<any, any>(
+    (current, updates) => {
+      const merged = { ...current, ...updates };
+      const errors = [];
 
-        if (!merged.email?.includes('@')) {
-          errors.push('Invalid email');
-        }
-        if (merged.password?.length < 8) {
-          errors.push('Password must be at least 8 characters');
-        }
-        if (merged.password !== merged.confirmPassword) {
-          errors.push('Passwords do not match');
-        }
-
-        return { action: 'validate', context: { merged, errors } };
-      },
-      {
-        validate: (gadget, { merged, errors }) => {
-          gadget.update({ ...merged, errors, valid: errors.length === 0 });
-          return { changed: { valid: errors.length === 0, errors } };
-        }
+      if (!merged.email?.includes('@')) {
+        errors.push('Invalid email');
       }
-    )({ email: '', password: '', confirmPassword: '', errors: [], valid: false }),
+      if (merged.password?.length < 8) {
+        errors.push('Password must be at least 8 characters');
+      }
+      if (merged.password !== merged.confirmPassword) {
+        errors.push('Passwords do not match');
+      }
+
+      return { action: 'validate', context: { merged, errors } };
+    },
+    {
+      validate: (gadget, { merged, errors }) => {
+        gadget.update({ ...merged, errors, valid: errors.length === 0 });
+        return { changed: { valid: errors.length === 0, errors } };
+      }
+    }
+  )
+
+  const [formState, sendForm] = useGadget(
+    formValidator,
     { email: '', password: '', confirmPassword: '', errors: [], valid: false }
   );
 
@@ -401,15 +395,15 @@ function FormValidatorGadget() {
 
 // Color Controller - publishes RGB color object
 function ColorController() {
-  const [color, sendColor, colorGadget] = useGadget(
-    () => lastMap({ red: 128, green: 128, blue: 128 }),
+  const [color, sendColor] = useGadget(
+    lastMap,
     { red: 128, green: 128, blue: 128 }
   );
   const topics = useTopics();
 
   // Publish color changes
   useEffect(() => {
-    topics.publish('color', color);
+    topics.publish(['color'], color);
   }, [color, topics]);
 
   const rgbColor = `rgb(${color['red']}, ${color['green']}, ${color['blue']})`;
@@ -475,15 +469,15 @@ function ColorController() {
 
 // Size Controller - publishes size value
 function SizeController() {
-  const [size, sendSize, sizeGadget] = useGadget(
-    () => lastCell(50),
+  const [size, sendSize] = useGadget(
+    lastCell,
     50
   );
   const topics = useTopics();
 
   // Publish size changes
   useEffect(() => {
-    topics.publish('size', size);
+    topics.publish(['size'], size);
   }, [size, topics]);
 
   // For now, just local state - pubsub integration can be added when needed
@@ -537,26 +531,15 @@ function VisualElement({
   sizeTransform?: (size: number) => number;
 }) {
   // Subscribe to color and size topics
-  const [color, , colorGadget] = useGadget(
-    lastMap,
-    { red: 128, green: 128, blue: 128 }
-  );
+  const [color, , colorGadget] = useGadget(lastMap, { red: 128, green: 128, blue: 128 });
 
-  const [size, , sizeGadget] = useGadget(
-    lastCell,
-    50
-  );
+  const [size, , sizeGadget] = useGadget(lastCell, 50);
 
   const topics = useTopics();
 
   useEffect(() => {
-    const unsubColor = topics.subscribe('color', colorGadget);
-    const unsubSize = topics.subscribe('size', sizeGadget);
-
-    return () => {
-      unsubColor();
-      unsubSize();
-    };
+    topics.subscribe(['color'], colorGadget);
+    topics.subscribe(['size'], sizeGadget);
   }, [topics, colorGadget, sizeGadget]);
 
   const transformed = colorTransform(color as { red: number; green: number; blue: number });

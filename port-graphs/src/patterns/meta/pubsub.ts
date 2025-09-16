@@ -1,6 +1,6 @@
-import _, { noop } from "lodash";
+import _ from "lodash";
 import { createGadget, Gadget } from "../../core";
-import { changed } from "../../effects";
+import { changed, noop } from "../../effects";
 
 type PublisherArgs = {
     topics: string[];
@@ -35,7 +35,7 @@ type PubSubArgs = {
 type PubSubState = Record<string, Gadget[]>;
 
 export const pubsub = createGadget<PubSubState, Partial<PubSubArgs>>(
-    (current, incoming) => {
+    (_current, incoming) => {
         const { publish, subscribe } = incoming;
         if (publish) {
             const { topics, data } = publish;
