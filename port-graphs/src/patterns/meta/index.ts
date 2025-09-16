@@ -5,6 +5,8 @@
  * These are much simpler than full meta-gadgets - just helpers.
  */
 
+export * from './pubsub';
+
 /**
  * Example of using topics:
  *
