@@ -9,10 +9,9 @@
  */
 
 import { useGadget, useGadgetWithRef, useGadgetEffect, PubSubProvider, usePub, useSub } from 'port-graphs-react';
-import { maxCell, minCell, lastCell } from 'port-graphs/patterns/cells';
+import { maxCell, minCell, lastCell, lastMap } from 'port-graphs/patterns/cells';
 import { adder, multiplier } from 'port-graphs/patterns/functions/numeric';
 import { createGadget } from 'port-graphs/core';
-import { useEffect } from 'react';
 import { Button } from '~/components/ui/button';
 import { Slider } from '~/components/ui/slider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card';
@@ -49,7 +48,7 @@ function MaxCellSlider() {
           <Label>Input Value</Label>
           <Slider
             value={[maxValue ?? 50]}
-            onValueChange={([value]) => sendMax(value)}
+            onValueChange={([value]) => sendMax(value ?? 50)}
             max={100}
             step={1}
             className="mt-2"
@@ -255,7 +254,7 @@ function MinMaxTracker() {
           <Label>Input Value: {current}</Label>
           <Slider
             value={[current ?? 50]}
-            onValueChange={([value]) => handleValueChange(value)}
+            onValueChange={([value]) => handleValueChange(value ?? 50)}
             max={100}
             step={1}
             className="mt-2"
@@ -406,7 +405,7 @@ function FormValidatorGadget() {
 // Color Controller - publishes RGB color object
 function ColorController() {
   const [color, sendColor, colorGadget] = useGadgetWithRef(
-    () => lastCell({ red: 128, green: 128, blue: 128 }),
+    () => lastMap({ red: 128, green: 128, blue: 128 }),
     { red: 128, green: 128, blue: 128 }
   );
 
@@ -437,7 +436,7 @@ function ColorController() {
             </div>
             <Slider
               value={[color.red ?? 128]}
-              onValueChange={([value]) => sendColor({ ...color, red: value })}
+              onValueChange={([value]) => sendColor({ red: value })}
               max={255}
               className="mt-1"
             />
@@ -450,7 +449,7 @@ function ColorController() {
             </div>
             <Slider
               value={[color.green ?? 128]}
-              onValueChange={([value]) => sendColor({ ...color, green: value })}
+              onValueChange={([value]) => sendColor({ green: value })}
               max={255}
               className="mt-1"
             />
@@ -463,7 +462,7 @@ function ColorController() {
             </div>
             <Slider
               value={[color.blue ?? 128]}
-              onValueChange={([value]) => sendColor({ ...color, blue: value })}
+              onValueChange={([value]) => sendColor({ blue: value })}
               max={255}
               className="mt-1"
             />
@@ -536,9 +535,9 @@ function VisualElement({
   colorTransform?: (color: { red: number; green: number; blue: number }) => { red: number; green: number; blue: number };
   sizeTransform?: (size: number) => number;
 }) {
-  // Use single color gadget
+  // Use lastMap for partial color updates
   const [color, , colorGadget] = useGadgetWithRef(
-    () => lastCell({ red: 128, green: 128, blue: 128 }),
+    () => lastMap({ red: 128, green: 128, blue: 128 }),
     { red: 128, green: 128, blue: 128 }
   );
 
@@ -651,61 +650,61 @@ export default function GadgetDemo() {
   return (
     <PubSubProvider>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto py-8 px-4">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Gadget Demo</h1>
-          <p className="text-lg text-muted-foreground">
-            Interactive demonstration of port-graphs with React. These components show how
-            gadgets create moldable tools with bidirectional data flow.
-          </p>
-        </div>
+        <div className="container mx-auto py-8 px-4">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold mb-2">Gadget Demo</h1>
+            <p className="text-lg text-muted-foreground">
+              Interactive demonstration of port-graphs with React. These components show how
+              gadgets create moldable tools with bidirectional data flow.
+            </p>
+          </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <MaxCellSlider />
-          <AdderComponent />
-          <ChainedFunctions />
-          <MinMaxTracker />
-          <FormValidatorGadget />
-          <ColorController />
-          <SizeController />
-        </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <MaxCellSlider />
+            <AdderComponent />
+            <ChainedFunctions />
+            <MinMaxTracker />
+            <FormValidatorGadget />
+            <ColorController />
+            <SizeController />
+          </div>
 
-        {/* Visual Coordination Demo - Full width */}
-        <div className="mt-6">
-          <VisualCoordination />
-        </div>
+          {/* Visual Coordination Demo - Full width */}
+          <div className="mt-6">
+            <VisualCoordination />
+          </div>
 
-        <div className="mt-12 p-6 bg-white rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold mb-3">Key Concepts Demonstrated</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <h3 className="font-medium mb-1">🔄 Bidirectional Flow</h3>
-              <p className="text-muted-foreground">
-                UI controls update gadget state, gadget state drives UI rendering
-              </p>
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">📦 Cell Patterns</h3>
-              <p className="text-muted-foreground">
-                MaxCell, MinCell - monotonic state accumulation with ACI merge
-              </p>
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">⚡ Function Patterns</h3>
-              <p className="text-muted-foreground">
-                Adder, Multiplier - compute when all arguments present
-              </p>
-            </div>
-            <div>
-              <h3 className="font-medium mb-1">🔗 Gadget Wiring</h3>
-              <p className="text-muted-foreground">
-                Gadgets can be connected - output of one feeds input of another
-              </p>
+          <div className="mt-12 p-6 bg-white rounded-lg shadow-sm border">
+            <h2 className="text-xl font-semibold mb-3">Key Concepts Demonstrated</h2>
+            <div className="grid md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <h3 className="font-medium mb-1">🔄 Bidirectional Flow</h3>
+                <p className="text-muted-foreground">
+                  UI controls update gadget state, gadget state drives UI rendering
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium mb-1">📦 Cell Patterns</h3>
+                <p className="text-muted-foreground">
+                  MaxCell, MinCell - monotonic state accumulation with ACI merge
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium mb-1">⚡ Function Patterns</h3>
+                <p className="text-muted-foreground">
+                  Adder, Multiplier - compute when all arguments present
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium mb-1">🔗 Gadget Wiring</h3>
+                <p className="text-muted-foreground">
+                  Gadgets can be connected - output of one feeds input of another
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     </PubSubProvider>
   );
 }

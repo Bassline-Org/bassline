@@ -1,10 +1,27 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "outDir": "./dist"
+    "target": "ES2022",
+    "lib": ["ES2022", "ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    "exactOptionalPropertyTypes": true
   },
-  "include": [
-    "src/**/*.ts",
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "dist-browser"]
 }
