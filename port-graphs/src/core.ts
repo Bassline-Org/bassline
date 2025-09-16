@@ -49,8 +49,8 @@ export function createGadget<State, Incoming, Effect = any>(
           }
         }
       },
-      emit: (effect) => {
-        console.log('emit:', effect);
+      emit: (_effect) => {
+        // Effects go into the void
       }
     };
 

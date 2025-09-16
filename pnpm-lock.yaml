@@ -86,9 +86,6 @@ importers:
       isbot:
         specifier: ^5.1.27
         version: 5.1.29
-      konva:
-        specifier: ^9.3.22
-        version: 9.3.22
       lucide-react:
         specifier: ^0.535.0
         version: 0.535.0(react@19.1.1)
@@ -104,9 +101,6 @@ importers:
       react-dom:
         specifier: ^19.1.0
         version: 19.1.1(react@19.1.1)
-      react-konva:
-        specifier: ^19.0.7
-        version: 19.0.7(@types/react@19.1.9)(konva@9.3.22)(react-dom@19.1.1)(react@19.1.1)
       react-router:
         specifier: ^7.7.1
         version: 7.7.1(react-dom@19.1.1)(react@19.1.1)
@@ -2572,22 +2566,6 @@ packages:
     dependencies:
       '@types/react': 19.1.9
 
-  /@types/react-reconciler@0.28.9(@types/react@19.1.9):
-    resolution: {integrity: sha512-HHM3nxyUZ3zAylX8ZEyrDNd2XZOnQ0D5XfunJF5FLQnZbHHYq4UWvW1QfelQNXv1ICNkwYhfxjwfnqivYB6bFg==}
-    peerDependencies:
-      '@types/react': '*'
-    dependencies:
-      '@types/react': 19.1.9
-    dev: false
-
-  /@types/react-reconciler@0.32.0(@types/react@19.1.9):
-    resolution: {integrity: sha512-+WHarFkJevhH1s655qeeSEf/yxFST0dVRsmSqUgxG8mMOKqycgYBv2wVpyubBY7MX8KiX5FQ03rNIwrxfm7Bmw==}
-    peerDependencies:
-      '@types/react': '*'
-    dependencies:
-      '@types/react': 19.1.9
-    dev: false
-
   /@types/react@18.3.24:
     resolution: {integrity: sha512-0dLEBsA1kI3OezMBF8nSsb7Nk19ZnsyE1LLhB8r27KbgU5H4pvuqZLdtE+aUkJVoXgTVuA+iLIwmZ0TuK4tx6A==}
     dependencies:
@@ -3723,17 +3701,6 @@ packages:
   /isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  /its-fine@2.0.0(@types/react@19.1.9)(react@19.1.1):
-    resolution: {integrity: sha512-KLViCmWx94zOvpLwSlsx6yOCeMhZYaxrJV87Po5k/FoZzcPSahvK5qJ7fYhS61sZi5ikmh2S3Hz55A2l3U69ng==}
-    peerDependencies:
-      react: ^19.0.0
-    dependencies:
-      '@types/react-reconciler': 0.28.9(@types/react@19.1.9)
-      react: 19.1.1
-    transitivePeerDependencies:
-      - '@types/react'
-    dev: false
-
   /jackspeak@3.4.3:
     resolution: {integrity: sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw==}
     dependencies:
@@ -3837,10 +3804,6 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
-
-  /konva@9.3.22:
-    resolution: {integrity: sha512-yQI5d1bmELlD/fowuyfOp9ff+oamg26WOCkyqUyc+nczD/lhRa3EvD2MZOoc4c1293TAubW9n34fSQLgSeEgSw==}
-    dev: false
 
   /lightningcss-darwin-arm64@1.30.1:
     resolution: {integrity: sha512-c8JK7hyE65X1MHMN+Viq9n11RRC7hgin3HhYKhrMyaXflk5GVplZ60IxyoVtzILeKr+xAJwg6zK6sjTBJ0FKYQ==}
@@ -4431,34 +4394,6 @@ packages:
   /react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
     dev: true
-
-  /react-konva@19.0.7(@types/react@19.1.9)(konva@9.3.22)(react-dom@19.1.1)(react@19.1.1):
-    resolution: {integrity: sha512-uYWCpSv4ajLymTh8S8fV9396fHDX7eDTWiLGkYlBuawud5MoNiuGjapPhA5Avdy/Jfh9P2KaWuNf4i9PI1F9HQ==}
-    peerDependencies:
-      konva: ^8.0.1 || ^7.2.5 || ^9.0.0
-      react: ^18.3.1 || ^19.0.0
-      react-dom: ^18.3.1 || ^19.0.0
-    dependencies:
-      '@types/react-reconciler': 0.32.0(@types/react@19.1.9)
-      its-fine: 2.0.0(@types/react@19.1.9)(react@19.1.1)
-      konva: 9.3.22
-      react: 19.1.1
-      react-dom: 19.1.1(react@19.1.1)
-      react-reconciler: 0.32.0(react@19.1.1)
-      scheduler: 0.26.0
-    transitivePeerDependencies:
-      - '@types/react'
-    dev: false
-
-  /react-reconciler@0.32.0(react@19.1.1):
-    resolution: {integrity: sha512-2NPMOzgTlG0ZWdIf3qG+dcbLSoAc/uLfOwckc3ofy5sSK0pLJqnQLpUFxvGcN2rlXSjnVtGeeFLNimCQEj5gOQ==}
-    engines: {node: '>=0.10.0'}
-    peerDependencies:
-      react: ^19.1.0
-    dependencies:
-      react: 19.1.1
-      scheduler: 0.26.0
-    dev: false
 
   /react-refresh@0.14.2:
     resolution: {integrity: sha512-jCvmsr+1IUSMUyzOkRcvnVbX3ZYC6g9TDrDbFuFmRDq7PD4yaGbLKNQL6k2jnArV8hjYxh7hVhAZB6s9HDGpZA==}

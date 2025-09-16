@@ -34,6 +34,9 @@ type Pages = {
   "/proper-demo": {
     params: {};
   };
+  "/canvas": {
+    params: {};
+  };
   "/home": {
     params: {};
   };
@@ -42,7 +45,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/proper-demo-cool" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/gadget-demo" | "/proper-demo" | "/home";
+    page: "/" | "/proper-demo-cool" | "/inspector-demo" | "/list-view-demo" | "/tree-view-demo" | "/test-viewport" | "/gadget-demo" | "/proper-demo" | "/canvas" | "/home";
   };
   "routes/proper-demo-cool.tsx": {
     id: "routes/proper-demo-cool";
@@ -71,6 +74,10 @@ type RouteFiles = {
   "routes/proper-demo.tsx": {
     id: "routes/proper-demo";
     page: "/proper-demo";
+  };
+  "routes/canvas.tsx": {
+    id: "routes/canvas";
+    page: "/canvas";
   };
   "routes/home.tsx": {
     id: "routes/home";
