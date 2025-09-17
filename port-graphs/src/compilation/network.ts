@@ -2,23 +2,21 @@
  * Compilation Choreography Network
  *
  * Creates and orchestrates the always-on compilation network where
- * parser, validator, optimizer, and compiler gadgets collaborate
+ * parser, validator, and compiler gadgets collaborate
  * continuously to transform choreographies into deployable artifacts
  */
 
 import { IncrementalCompiler } from './base';
-import { createChoreographyParser } from './gadgets/parser';
-import { createSemanticValidator } from './gadgets/validator';
-import { createChoreographyOptimizer } from './gadgets/optimizer';
-import { createFilesystemCompiler } from './targets/filesystem';
+import { createChoreographyParser } from './gadgets/parser-functional';
+import { createSemanticValidator } from './gadgets/validator-functional';
+import { createFilesystemCompiler } from './targets/filesystem-functional';
 import { createContainerCompiler } from './targets/container';
-import { createFileMaterializer } from './gadgets/materializer';
+import { createFileMaterializer } from './gadgets/materializer-functional';
 import { CompilationEffect, CompilationMetrics } from './types';
 
 export interface CompilationNetworkConfig {
   outputPath: string;
   targets?: string[];
-  optimizationLevel?: 'none' | 'basic' | 'aggressive';
   dryRun?: boolean;
   enableBackup?: boolean;
 }
@@ -27,7 +25,6 @@ export class CompilationNetwork {
   private coordinator: IncrementalCompiler;
   private parser: any;
   private validator: any;
-  private optimizer: any;
   private filesystemCompiler: any;
   private containerCompiler: any;
   private materializer: any;
@@ -37,7 +34,6 @@ export class CompilationNetwork {
   constructor(config: CompilationNetworkConfig) {
     this.config = {
       targets: ['filesystem'],
-      optimizationLevel: 'basic',
       dryRun: false,
       enableBackup: true,
       ...config
@@ -52,9 +48,6 @@ export class CompilationNetwork {
     // Create compilation gadgets
     this.parser = createChoreographyParser();
     this.validator = createSemanticValidator();
-    this.optimizer = createChoreographyOptimizer({
-      level: this.config.optimizationLevel
-    });
 
     // Create target compilers
     if (this.config.targets?.includes('filesystem')) {
@@ -82,7 +75,6 @@ export class CompilationNetwork {
     // Register gadgets with coordinator
     this.coordinator.addGadget('parser', this.parser);
     this.coordinator.addGadget('validator', this.validator);
-    this.coordinator.addGadget('optimizer', this.optimizer);
 
     if (this.filesystemCompiler) {
       this.coordinator.addGadget('filesystem_compiler', this.filesystemCompiler);
@@ -106,26 +98,28 @@ export class CompilationNetwork {
   }
 
   private setupEffectRouting(): void {
+    // Store original emit methods and wrap them
+    const originalParserEmit = this.parser.emit.bind(this.parser);
+    const originalValidatorEmit = this.validator.emit.bind(this.validator);
+
     // Parser -> Validator
     this.parser.emit = (effect: CompilationEffect) => {
       this.logEffect('parser', effect);
       this.coordinator.propagateEffect(effect);
+      // Call original emit for any internal gadget processing
+      originalParserEmit(effect);
     };
 
-    // Validator -> Optimizer and Compiler
+    // Validator -> Compilers
     this.validator.emit = (effect: CompilationEffect) => {
       this.logEffect('validator', effect);
       this.coordinator.propagateEffect(effect);
-    };
-
-    // Optimizer -> Compiler
-    this.optimizer.emit = (effect: CompilationEffect) => {
-      this.logEffect('optimizer', effect);
-      this.coordinator.propagateEffect(effect);
+      originalValidatorEmit(effect);
     };
 
     // Target Compilers -> Materializer
     if (this.filesystemCompiler && this.materializer) {
+      const originalFilesystemEmit = this.filesystemCompiler.emit.bind(this.filesystemCompiler);
       this.filesystemCompiler.emit = (effect: CompilationEffect) => {
         this.logEffect('filesystem_compiler', effect);
 
@@ -135,10 +129,12 @@ export class CompilationNetwork {
         }
 
         this.coordinator.propagateEffect(effect);
+        originalFilesystemEmit(effect);
       };
     }
 
     if (this.containerCompiler && this.materializer) {
+      const originalContainerEmit = this.containerCompiler.emit.bind(this.containerCompiler);
       this.containerCompiler.emit = (effect: CompilationEffect) => {
         this.logEffect('container_compiler', effect);
 
@@ -148,13 +144,16 @@ export class CompilationNetwork {
         }
 
         this.coordinator.propagateEffect(effect);
+        originalContainerEmit(effect);
       };
     }
 
     if (this.materializer) {
+      const originalMaterializerEmit = this.materializer.emit.bind(this.materializer);
       this.materializer.emit = (effect: CompilationEffect) => {
         this.logEffect('materializer', effect);
         this.coordinator.propagateEffect(effect);
+        originalMaterializerEmit(effect);
       };
     }
   }
@@ -327,11 +326,6 @@ export class CompilationNetwork {
     this.config = { ...this.config, ...updates };
 
     // Apply configuration changes to gadgets
-    if (updates.optimizationLevel && this.optimizer) {
-      // Reconfigure optimizer
-      this.optimizer.configure({ level: updates.optimizationLevel });
-    }
-
     if (updates.dryRun !== undefined && this.materializer) {
       // Reconfigure materializer
       this.materializer.configure({ dryRun: updates.dryRun });

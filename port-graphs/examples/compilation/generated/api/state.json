@@ -1,0 +1,12 @@
+{
+  "role": "api",
+  "type": "coordinator",
+  "capabilities": [
+    "receive",
+    "route",
+    "emit"
+  ],
+  "status": "ready",
+  "version": 1,
+  "created": "2025-09-17T10:11:08.661Z"
+}

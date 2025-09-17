@@ -4,7 +4,8 @@
  * Continuously parses choreography specifications, emitting incremental AST updates
  */
 
-import { CompilationGadget, CompilationEffects } from '../base';
+import { createGadget } from '../../core';
+import { changed, noop } from '../../effects';
 import {
   CompilationEffect,
   CompilationGadgetState,
@@ -14,7 +15,7 @@ import {
   ParseError,
   SourceLocation
 } from '../types';
-import { changed, noop } from '../../effects';
+import { createEmptyAST, createEmptyMetrics, CompilationEffects } from '../base';
 
 interface ParserInput {
   source: string;
@@ -22,29 +23,37 @@ interface ParserInput {
   format?: 'yaml' | 'json';
 }
 
-export class ChoreographyParser extends CompilationGadget {
-  protected consider(
-    state: CompilationGadgetState,
-    effect: CompilationEffect | ParserInput
-  ): { action: string; context: any } | null {
-    // Handle direct source input
-    if ('source' in effect) {
-      return { action: 'parse', context: effect };
+interface ParserState extends CompilationGadgetState {
+  lastSource?: string;
+}
+/**
+ * Create a choreography parser gadget using createGadget
+ */
+export function createChoreographyParser() {
+  const initialState: ParserState = {
+    ast: createEmptyAST(),
+    metrics: createEmptyMetrics(),
+    cache: new Map(),
+    lastSource: undefined
+  };
+
+  return createGadget<ParserState, CompilationEffect | ParserInput>(
+    (state, incoming) => {
+      // Handle direct source input
+      if ('source' in incoming) {
+        return { action: 'parse', context: incoming };
+      }
+
+      // Handle compilation effects that might trigger re-parsing
+      if ('astUpdate' in incoming && incoming.astUpdate.update.status === 'invalid') {
+        // Re-parse if validation failed
+        return { action: 'reparse', context: { nodeId: incoming.astUpdate.nodeId } };
+      }
+
+      return null;
     }
-
-    // Handle compilation effects that might trigger re-parsing
-    if ('astUpdate' in effect && effect.astUpdate.update.status === 'invalid') {
-      // Re-parse if validation failed
-      return { action: 'reparse', context: { nodeId: effect.astUpdate.nodeId } };
-    }
-
-    return null;
-  }
-
-  protected createActions() {
-    return {
-      'parse': (gadget: any, input: ParserInput) => {
-        const state = gadget.current() as CompilationGadgetState;
+  )({
+    'parse': (gadget: any, state: ParserState, input: ParserInput) => {
 
         try {
           const spec = this.parseChoreographySpec(input.source, input.format || 'yaml');
@@ -52,6 +61,9 @@ export class ChoreographyParser extends CompilationGadget {
 
           // Update AST incrementally
           const newAST = { ...state.ast };
+
+          // Store effects to emit
+          const effectsToEmit: any[] = [];
 
           // Add/update roles
           roles.forEach(role => {
@@ -62,8 +74,8 @@ export class ChoreographyParser extends CompilationGadget {
               progress: 100
             });
 
-            // Emit AST update for each role
-            gadget.emit(CompilationEffects.astUpdate(role.id, role));
+            // Store AST update effect for each role
+            effectsToEmit.push(CompilationEffects.astUpdate(role.id, role));
           });
 
           // Add/update relationships
@@ -75,9 +87,12 @@ export class ChoreographyParser extends CompilationGadget {
               progress: 100
             });
 
-            // Emit AST update for each relationship
-            gadget.emit(CompilationEffects.astUpdate(rel.id, rel));
+            // Store AST update effect for each relationship
+            effectsToEmit.push(CompilationEffects.astUpdate(rel.id, rel));
           });
+
+          // Emit all effects after updating state
+          effectsToEmit.forEach(effect => gadget.emit(effect));
 
           newAST.version++;
 
@@ -154,20 +169,40 @@ export class ChoreographyParser extends CompilationGadget {
     let currentRole = '';
 
     for (const line of lines) {
-      if (line.endsWith(':') && !line.includes(' ')) {
-        currentSection = line.slice(0, -1);
+      // Check for top-level sections (name:, roles:, relationships:)
+      if (line.match(/^(name|version|roles|relationships):/) && line.endsWith(':')) {
+        currentSection = line.split(':')[0];
+        if (currentSection === 'name') {
+          // Handle name: value on same line
+          const parts = line.split(':');
+          if (parts.length > 1) {
+            spec.name = parts[1].trim();
+          }
+        } else if (currentSection === 'version') {
+          // Handle version: value on same line
+          const parts = line.split(':');
+          if (parts.length > 1) {
+            spec.version = parts[1].trim();
+          }
+        }
         continue;
       }
 
       if (currentSection === 'roles') {
-        if (line.includes(':') && !line.startsWith(' ')) {
-          currentRole = line.split(':')[0];
+        // Look for role names (lines ending with : that aren't properties)
+        if (line.endsWith(':') && !line.includes(' ') && !line.match(/^(type|capabilities|deployment):/)) {
+          currentRole = line.slice(0, -1);
           spec.roles[currentRole] = { type: 'worker' };
-        } else if (line.startsWith('type:')) {
+        } else if (line.startsWith('type:') && currentRole) {
           spec.roles[currentRole].type = line.split(':')[1].trim();
-        } else if (line.startsWith('capabilities:')) {
+        } else if (line.startsWith('capabilities:') && currentRole) {
           const caps = line.split(':')[1].trim();
-          spec.roles[currentRole].capabilities = caps.split(',').map(c => c.trim());
+          // Handle both array notation and simple list
+          if (caps.startsWith('[') && caps.endsWith(']')) {
+            spec.roles[currentRole].capabilities = caps.slice(1, -1).split(',').map(c => c.trim());
+          } else {
+            spec.roles[currentRole].capabilities = caps.split(',').map(c => c.trim());
+          }
         }
       } else if (currentSection === 'relationships') {
         if (line.includes('->')) {

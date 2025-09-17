@@ -1,0 +1,13 @@
+{
+  "name": "database",
+  "type": "observer",
+  "capabilities": [
+    "store",
+    "retrieve"
+  ],
+  "deployment": {
+    "target": "filesystem"
+  },
+  "generated": "2025-09-17T10:11:08.662Z",
+  "generator": "bassline-choreography-compiler"
+}

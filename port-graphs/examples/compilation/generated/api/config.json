@@ -1,0 +1,14 @@
+{
+  "name": "api",
+  "type": "coordinator",
+  "capabilities": [
+    "receive",
+    "route",
+    "emit"
+  ],
+  "deployment": {
+    "target": "filesystem"
+  },
+  "generated": "2025-09-17T10:11:08.661Z",
+  "generator": "bassline-choreography-compiler"
+}
