@@ -1,0 +1,13 @@
+{
+  "name": "gadget-transport-examples",
+  "version": "1.0.0",
+  "description": "Examples showing gadgets communicating across different transports",
+  "dependencies": {
+    "node-fetch": "^2.6.7",
+    "eventsource": "^2.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^3.12.0"
+  }
+}
