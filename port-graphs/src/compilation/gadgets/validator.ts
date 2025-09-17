@@ -1,11 +1,12 @@
 /**
- * Semantic Validator Gadget
+ * Semantic Validator Gadget (Functional Implementation)
  *
  * Continuously validates AST nodes as they become available, checking for
  * semantic correctness, dependency consistency, and choreography validity
  */
 
-import { CompilationGadget, CompilationEffects, DependencyAnalyzer } from '../base';
+import { createGadget } from '../../core';
+import { changed, noop } from '../../effects';
 import {
   CompilationEffect,
   CompilationGadgetState,
@@ -15,62 +16,278 @@ import {
   RoleNode,
   RelationshipNode
 } from '../types';
-import { changed, noop } from '../../effects';
+import { createEmptyAST, createEmptyMetrics, CompilationEffects } from '../base';
 
-export class SemanticValidator extends CompilationGadget {
-  protected consider(
-    state: CompilationGadgetState,
-    effect: CompilationEffect
-  ): { action: string; context: any } | null {
-    if ('astUpdate' in effect && effect.astUpdate.update.status === 'parsed') {
-      return { action: 'validate', context: effect.astUpdate };
+interface ValidatorState extends CompilationGadgetState {
+  validatedNodes: Set<string>;
+}
+
+// Helper functions for validation
+function validateNode(nodeId: string, update: any, state: ValidatorState): ValidationResult {
+  const errors: ValidationError[] = [];
+  const warnings: Warning[] = [];
+  const dependencies: string[] = [];
+
+  try {
+    if (update.type === 'role') {
+      const roleValidation = validateRole(update as RoleNode, state);
+      errors.push(...roleValidation.errors);
+      warnings.push(...roleValidation.warnings);
+      dependencies.push(...roleValidation.dependencies);
+    } else if (update.type === 'relationship') {
+      const relValidation = validateRelationship(update as RelationshipNode, state);
+      errors.push(...relValidation.errors);
+      warnings.push(...relValidation.warnings);
+      dependencies.push(...relValidation.dependencies);
     }
 
-    if ('dependencyChange' in effect) {
-      return { action: 'revalidate_dependencies', context: effect.dependencyChange };
-    }
+    return {
+      nodeId,
+      valid: errors.length === 0,
+      errors,
+      warnings,
+      dependencies,
+      timestamp: Date.now()
+    };
 
-    return null;
+  } catch (error) {
+    errors.push({
+      code: 'VALIDATION_EXCEPTION',
+      message: error instanceof Error ? error.message : 'Unknown validation error',
+      severity: 'error',
+      location: update.sourceLocation
+    });
+
+    return {
+      nodeId,
+      valid: false,
+      errors,
+      warnings: [],
+      dependencies: [],
+      timestamp: Date.now()
+    };
+  }
+}
+
+function validateRole(role: RoleNode, state: ValidatorState): {
+  errors: ValidationError[];
+  warnings: Warning[];
+  dependencies: string[];
+} {
+  const errors: ValidationError[] = [];
+  const warnings: Warning[] = [];
+  const dependencies: string[] = [];
+
+  // Validate role type
+  const validRoleTypes = ['coordinator', 'worker', 'validator', 'observer'];
+  if (!validRoleTypes.includes(role.roleType)) {
+    errors.push({
+      code: 'INVALID_ROLE_TYPE',
+      message: `Invalid role type '${role.roleType}'. Must be one of: ${validRoleTypes.join(', ')}`,
+      severity: 'error',
+      location: role.sourceLocation
+    });
   }
 
-  protected createActions() {
-    return {
+  // Validate capabilities
+  if (!role.capabilities || role.capabilities.length === 0) {
+    warnings.push({
+      code: 'NO_CAPABILITIES',
+      message: `Role '${role.name}' has no capabilities defined`,
+      severity: 'warning',
+      location: role.sourceLocation
+    });
+  }
+
+  // Check for capability naming conventions
+  role.capabilities.forEach(cap => {
+    if (!cap.match(/^[a-z_][a-z0-9_]*$/)) {
+      warnings.push({
+        code: 'CAPABILITY_NAMING',
+        message: `Capability '${cap}' should use snake_case naming`,
+        severity: 'warning',
+        location: role.sourceLocation
+      });
+    }
+  });
+
+  // Validate deployment configuration if present
+  if (role.deployment) {
+    if (role.deployment.target && !['filesystem', 'container', 'cloud'].includes(role.deployment.target)) {
+      errors.push({
+        code: 'INVALID_DEPLOYMENT_TARGET',
+        message: `Invalid deployment target '${role.deployment.target}'`,
+        severity: 'error',
+        location: role.sourceLocation
+      });
+    }
+  }
+
+  return { errors, warnings, dependencies };
+}
+
+function validateRelationship(rel: RelationshipNode, state: ValidatorState): {
+  errors: ValidationError[];
+  warnings: Warning[];
+  dependencies: string[];
+} {
+  const errors: ValidationError[] = [];
+  const warnings: Warning[] = [];
+  const dependencies = [rel.from, rel.to];
+
+  // Check if roles exist
+  if (!state.ast.roles.has(rel.from)) {
+    errors.push({
+      code: 'MISSING_ROLE',
+      message: `Role '${rel.from}' referenced in relationship but not defined`,
+      severity: 'error',
+      location: rel.sourceLocation
+    });
+  }
+
+  if (!state.ast.roles.has(rel.to)) {
+    errors.push({
+      code: 'MISSING_ROLE',
+      message: `Role '${rel.to}' referenced in relationship but not defined`,
+      severity: 'error',
+      location: rel.sourceLocation
+    });
+  }
+
+  // Check for self-relationships
+  if (rel.from === rel.to) {
+    warnings.push({
+      code: 'SELF_RELATIONSHIP',
+      message: `Role '${rel.from}' has relationship with itself`,
+      severity: 'warning',
+      location: rel.sourceLocation
+    });
+  }
+
+  // Validate protocol
+  if (!rel.protocol || rel.protocol.trim() === '') {
+    warnings.push({
+      code: 'MISSING_PROTOCOL',
+      message: 'Relationship has no protocol specified',
+      severity: 'warning',
+      location: rel.sourceLocation
+    });
+  }
+
+  // Check for duplicate relationships
+  const existingRels = Array.from(state.ast.relationships.values());
+  const duplicates = existingRels.filter(existing =>
+    existing.id !== rel.id &&
+    existing.from === rel.from &&
+    existing.to === rel.to &&
+    existing.protocol === rel.protocol
+  );
+
+  if (duplicates.length > 0) {
+    warnings.push({
+      code: 'DUPLICATE_RELATIONSHIP',
+      message: `Duplicate relationship between '${rel.from}' and '${rel.to}' with protocol '${rel.protocol}'`,
+      severity: 'warning',
+      location: rel.sourceLocation
+    });
+  }
+
+  return { errors, warnings, dependencies };
+}
+
+/**
+ * Create a semantic validator gadget using createGadget
+ */
+export function createSemanticValidator() {
+  const initialState: ValidatorState = {
+    ast: createEmptyAST(),
+    metrics: createEmptyMetrics(),
+    cache: new Map(),
+    validatedNodes: new Set()
+  };
+
+  return createGadget<ValidatorState, CompilationEffect>(
+    (state, incoming) => {
+      // Handle AST updates for validation
+      if ('astUpdate' in incoming && incoming.astUpdate.update.status === 'parsed') {
+        return { action: 'validate', context: incoming.astUpdate };
+      }
+
+      // Handle dependency changes that might require revalidation
+      if ('dependencyChange' in incoming) {
+        return { action: 'revalidate_dependencies', context: incoming.dependencyChange };
+      }
+
+      return null;
+    },
+    {
       'validate': (gadget: any, { nodeId, update }: { nodeId: string; update: any }) => {
-        const state = gadget.current() as CompilationGadgetState;
+        const state = gadget.current() as ValidatorState;
 
         try {
-          const validationResult = this.validateNode(nodeId, update, state);
+          const validationResult = validateNode(nodeId, update, state);
 
-          // Update validation state
+          // Update validation state in AST
           const newAST = { ...state.ast };
           newAST.validationState.set(nodeId, validationResult);
 
+          // Update the node in AST if it's not already there
+          if (update.type === 'role' && !newAST.roles.has(nodeId)) {
+            newAST.roles.set(nodeId, update);
+          } else if (update.type === 'relationship' && !newAST.relationships.has(nodeId)) {
+            newAST.relationships.set(nodeId, update);
+          }
+
           // Update node status based on validation
           const nodeStatus = validationResult.valid ? 'valid' : 'invalid';
-          this.updateASTNode(newAST, nodeId, { status: nodeStatus });
+          if (update.type === 'role') {
+            const role = newAST.roles.get(nodeId);
+            if (role) {
+              newAST.roles.set(nodeId, { ...role, status: nodeStatus });
+            }
+          } else if (update.type === 'relationship') {
+            const rel = newAST.relationships.get(nodeId);
+            if (rel) {
+              newAST.relationships.set(nodeId, { ...rel, status: nodeStatus });
+            }
+          }
+
+          newAST.version++;
 
           // Update metrics
           const newMetrics = { ...state.metrics };
+          newMetrics.totalNodes = Math.max(newMetrics.totalNodes, newAST.roles.size + newAST.relationships.size);
+
           if (validationResult.valid) {
-            newMetrics.validNodes++;
+            if (!state.validatedNodes.has(nodeId)) {
+              newMetrics.validNodes++;
+            }
           } else {
             newMetrics.errors += validationResult.errors.length;
             newMetrics.warnings += validationResult.warnings.length;
           }
 
-          gadget.update({
+          // Update state
+          const newValidatedNodes = new Set(state.validatedNodes);
+          if (validationResult.valid) {
+            newValidatedNodes.add(nodeId);
+          }
+
+          const newState = {
             ...state,
             ast: newAST,
-            metrics: newMetrics
-          });
+            metrics: newMetrics,
+            validatedNodes: newValidatedNodes
+          };
+
+          gadget.update(newState);
 
           // Emit validation result
           gadget.emit(CompilationEffects.validationResult(validationResult));
 
           // If validation found new dependencies, emit dependency changes
-          const existingDeps = state.ast.dependencies;
           validationResult.dependencies.forEach(dep => {
-            if (!existingDeps.edges.get(nodeId)?.has(dep)) {
+            if (!state.ast.dependencies.edges.get(nodeId)?.has(dep)) {
               gadget.emit(CompilationEffects.dependencyChange(nodeId, dep, 'added'));
             }
           });
@@ -90,259 +307,47 @@ export class SemanticValidator extends CompilationGadget {
             severity: 'error'
           }));
 
-          return changed({ validated: false, nodeId, error: error.message });
+          return changed({
+            validated: false,
+            nodeId,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
         }
       },
 
       'revalidate_dependencies': (gadget: any, { from, to, type }: { from: string; to: string; type: string }) => {
-        const state = gadget.current() as CompilationGadgetState;
+        const state = gadget.current() as ValidatorState;
 
         // Find all nodes that might be affected by this dependency change
-        const affectedNodes = DependencyAnalyzer.getAffectedNodes(state.ast.dependencies, from);
+        const affectedNodes = new Set<string>();
 
-        // Re-validate all affected nodes
-        affectedNodes.forEach(nodeId => {
+        // The node that had its dependencies changed
+        affectedNodes.add(from);
+
+        // Any nodes that depend on the changed dependency
+        for (const [nodeId, deps] of state.ast.dependencies.edges) {
+          if (deps.has(from) || deps.has(to)) {
+            affectedNodes.add(nodeId);
+          }
+        }
+
+        // Revalidate affected nodes
+        let revalidatedCount = 0;
+        for (const nodeId of affectedNodes) {
           const node = state.ast.roles.get(nodeId) || state.ast.relationships.get(nodeId);
           if (node) {
-            const validationResult = this.validateNode(nodeId, node, state);
-            gadget.emit(CompilationEffects.validationResult(validationResult));
+            // Trigger revalidation by calling validate action
+            gadget.receive(CompilationEffects.astUpdate(nodeId, node));
+            revalidatedCount++;
           }
+        }
+
+        return changed({
+          dependencyRevalidation: true,
+          affectedNodes: Array.from(affectedNodes),
+          revalidatedCount
         });
-
-        return changed({ revalidated: affectedNodes.length, trigger: from });
       }
-    };
-  }
-
-  private validateNode(
-    nodeId: string,
-    node: any,
-    state: CompilationGadgetState
-  ): ValidationResult {
-    const errors: ValidationError[] = [];
-    const warnings: Warning[] = [];
-    const dependencies: string[] = [];
-
-    if (node.type === 'role') {
-      this.validateRole(node as RoleNode, state, errors, warnings, dependencies);
-    } else if (node.type === 'relationship') {
-      this.validateRelationship(node as RelationshipNode, state, errors, warnings, dependencies);
     }
-
-    return {
-      nodeId,
-      valid: errors.length === 0,
-      errors,
-      warnings,
-      dependencies
-    };
-  }
-
-  private validateRole(
-    role: RoleNode,
-    state: CompilationGadgetState,
-    errors: ValidationError[],
-    warnings: Warning[],
-    dependencies: string[]
-  ): void {
-    // Validate role name
-    if (!role.name || role.name.trim() === '') {
-      errors.push({
-        code: 'EMPTY_ROLE_NAME',
-        message: 'Role name cannot be empty',
-        location: role.sourceLocation
-      });
-    }
-
-    // Validate role name uniqueness
-    const existingRoles = Array.from(state.ast.roles.values());
-    const duplicates = existingRoles.filter(r => r.id !== role.id && r.name === role.name);
-    if (duplicates.length > 0) {
-      errors.push({
-        code: 'DUPLICATE_ROLE_NAME',
-        message: `Role name '${role.name}' is already used`,
-        location: role.sourceLocation,
-        suggestions: [`${role.name}_1`, `${role.name}_alt`]
-      });
-    }
-
-    // Validate role type
-    const validRoleTypes = ['worker', 'coordinator', 'mediator', 'observer'];
-    if (!validRoleTypes.includes(role.roleType)) {
-      warnings.push({
-        code: 'UNKNOWN_ROLE_TYPE',
-        message: `Unknown role type '${role.roleType}'. Known types: ${validRoleTypes.join(', ')}`,
-        location: role.sourceLocation
-      });
-    }
-
-    // Validate capabilities
-    if (role.capabilities.length === 0) {
-      warnings.push({
-        code: 'NO_CAPABILITIES',
-        message: 'Role has no defined capabilities',
-        location: role.sourceLocation
-      });
-    }
-
-    // Check for unused capabilities
-    const usedCapabilities = this.getUsedCapabilities(role.name, state);
-    const unusedCapabilities = role.capabilities.filter(cap => !usedCapabilities.has(cap));
-    if (unusedCapabilities.length > 0) {
-      warnings.push({
-        code: 'UNUSED_CAPABILITIES',
-        message: `Capabilities not used in any relationships: ${unusedCapabilities.join(', ')}`,
-        location: role.sourceLocation
-      });
-    }
-
-    // Validate deployment configuration
-    if (role.deployment) {
-      this.validateDeployment(role.deployment, errors, warnings);
-    }
-  }
-
-  private validateRelationship(
-    relationship: RelationshipNode,
-    state: CompilationGadgetState,
-    errors: ValidationError[],
-    warnings: Warning[],
-    dependencies: string[]
-  ): void {
-    // Validate that source and target roles exist
-    if (!state.ast.roles.has(relationship.from)) {
-      errors.push({
-        code: 'UNDEFINED_ROLE',
-        message: `Source role '${relationship.from}' is not defined`,
-        location: relationship.sourceLocation,
-        suggestions: Array.from(state.ast.roles.keys())
-      });
-    } else {
-      dependencies.push(relationship.from);
-    }
-
-    if (!state.ast.roles.has(relationship.to)) {
-      errors.push({
-        code: 'UNDEFINED_ROLE',
-        message: `Target role '${relationship.to}' is not defined`,
-        location: relationship.sourceLocation,
-        suggestions: Array.from(state.ast.roles.keys())
-      });
-    } else {
-      dependencies.push(relationship.to);
-    }
-
-    // Validate protocol
-    if (!relationship.protocol || relationship.protocol.trim() === '') {
-      errors.push({
-        code: 'EMPTY_PROTOCOL',
-        message: 'Relationship protocol cannot be empty',
-        location: relationship.sourceLocation
-      });
-    }
-
-    // Check for self-relationships
-    if (relationship.from === relationship.to) {
-      warnings.push({
-        code: 'SELF_RELATIONSHIP',
-        message: 'Role has relationship with itself',
-        location: relationship.sourceLocation
-      });
-    }
-
-    // Check for duplicate relationships
-    const existingRelationships = Array.from(state.ast.relationships.values());
-    const duplicates = existingRelationships.filter(r =>
-      r.id !== relationship.id &&
-      r.from === relationship.from &&
-      r.to === relationship.to &&
-      r.protocol === relationship.protocol
-    );
-
-    if (duplicates.length > 0) {
-      warnings.push({
-        code: 'DUPLICATE_RELATIONSHIP',
-        message: `Duplicate relationship between '${relationship.from}' and '${relationship.to}' with protocol '${relationship.protocol}'`,
-        location: relationship.sourceLocation
-      });
-    }
-
-    // Validate that roles have required capabilities for this relationship
-    this.validateRoleCapabilities(relationship, state, errors, warnings);
-  }
-
-  private validateRoleCapabilities(
-    relationship: RelationshipNode,
-    state: CompilationGadgetState,
-    errors: ValidationError[],
-    warnings: Warning[]
-  ): void {
-    const fromRole = state.ast.roles.get(relationship.from);
-    const toRole = state.ast.roles.get(relationship.to);
-
-    if (!fromRole || !toRole) return;
-
-    // Check if source role can send this protocol
-    const sendCapability = `send_${relationship.protocol}`;
-    if (!fromRole.capabilities.includes(sendCapability) && !fromRole.capabilities.includes('*')) {
-      warnings.push({
-        code: 'MISSING_SEND_CAPABILITY',
-        message: `Role '${relationship.from}' lacks capability '${sendCapability}' for relationship`,
-        location: relationship.sourceLocation
-      });
-    }
-
-    // Check if target role can receive this protocol
-    const receiveCapability = `receive_${relationship.protocol}`;
-    if (!toRole.capabilities.includes(receiveCapability) && !toRole.capabilities.includes('*')) {
-      warnings.push({
-        code: 'MISSING_RECEIVE_CAPABILITY',
-        message: `Role '${relationship.to}' lacks capability '${receiveCapability}' for relationship`,
-        location: relationship.sourceLocation
-      });
-    }
-  }
-
-  private getUsedCapabilities(roleName: string, state: CompilationGadgetState): Set<string> {
-    const used = new Set<string>();
-
-    state.ast.relationships.forEach(rel => {
-      if (rel.from === roleName) {
-        used.add(`send_${rel.protocol}`);
-      }
-      if (rel.to === roleName) {
-        used.add(`receive_${rel.protocol}`);
-      }
-    });
-
-    return used;
-  }
-
-  private validateDeployment(
-    deployment: any,
-    errors: ValidationError[],
-    warnings: Warning[]
-  ): void {
-    if (!deployment.target) {
-      errors.push({
-        code: 'MISSING_DEPLOYMENT_TARGET',
-        message: 'Deployment target is required'
-      });
-    }
-
-    const validTargets = ['filesystem', 'container', 'cloud', 'embedded'];
-    if (!validTargets.includes(deployment.target)) {
-      warnings.push({
-        code: 'UNKNOWN_DEPLOYMENT_TARGET',
-        message: `Unknown deployment target '${deployment.target}'. Known targets: ${validTargets.join(', ')}`
-      });
-    }
-  }
-}
-
-/**
- * Create a semantic validator gadget
- */
-export function createSemanticValidator(): SemanticValidator {
-  return new SemanticValidator({});
+  )(initialState);
 }

@@ -5,10 +5,10 @@
  * No classes, just gadgets wired together.
  */
 
-import { createChoreographyParser } from '../../src/compilation/gadgets/parser-functional';
-import { createSemanticValidator } from '../../src/compilation/gadgets/validator-functional';
-import { createFilesystemCompiler } from '../../src/compilation/targets/filesystem-functional';
-import { createFileMaterializer } from '../../src/compilation/gadgets/materializer-functional';
+import { createChoreographyParser } from '../../src/compilation/gadgets/parser';
+import { createSemanticValidator } from '../../src/compilation/gadgets/validator';
+import { createFilesystemCompiler } from '../../src/compilation/targets/filesystem';
+import { createFileMaterializer } from '../../src/compilation/gadgets/materializer';
 
 // Create our compilation gadgets
 const parser = createChoreographyParser();
