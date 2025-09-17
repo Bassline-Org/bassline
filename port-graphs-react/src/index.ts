@@ -23,5 +23,8 @@ export { TopicsProvider, useTopics } from './TopicsProvider';
 // Lifecycle management
 export * from './lifecycle';
 
+// Context patterns
+export * from './useContext';
+
 // Re-export core gadget types for convenience
 export type { Gadget } from 'port-graphs';

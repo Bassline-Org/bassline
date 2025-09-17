@@ -3,7 +3,7 @@ import { createGadget } from '../core';
 export * as cells from './cells';
 export * as functions from './functions';
 export * as meta from './meta';
-export * as composition from './composition';
+export * as contexts from './contexts';
 
 // A constant gadget that never changes
 export const constant = <T>(value: T) => {

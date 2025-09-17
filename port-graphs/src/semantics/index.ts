@@ -35,3 +35,4 @@ export function extendGadget<State, Incoming, Effect>(
 }
 
 export { eventSemantics } from './events';
+export { withTaps, type Tappable } from './tapping';
