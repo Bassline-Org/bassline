@@ -1,6 +1,8 @@
 import { createGadget, Gadget } from "../../core";
 import { changed, creation } from "../../effects";
 import { Role, Relationship } from "./roles";
+import { wireParticipants } from "./wiring";
+import { ChoreographyError, ChoreographyEffect, createHealthMonitor, createTimeoutMonitor } from "./errors";
 
 /**
  * Choreography gadget - Instantiates and wires participants
@@ -73,34 +75,8 @@ export const choreography = createGadget<
         }
       }
 
-      // Wire participants according to relationships
-      for (const rel of spec.relationships) {
-        const from = participants[rel.from];
-        const to = participants[rel.to];
-
-        if (from && to) {
-          // Wire based on relationship type
-          if (rel.type === 'sends' || rel.type === 'responds') {
-            const originalEmit = from.emit;
-            from.emit = (effect) => {
-              originalEmit(effect);
-              // Route specific effects to target
-              if (effect && typeof effect === 'object') {
-                to.receive(effect);
-              }
-            };
-          } else if (rel.type === 'broadcasts') {
-            // Wire to all targets
-            const originalEmit = from.emit;
-            from.emit = (effect) => {
-              originalEmit(effect);
-              Object.values(participants).forEach(p => {
-                if (p !== from) p.receive(effect);
-              });
-            };
-          }
-        }
-      }
+      // Wire participants using improved wiring logic
+      const wired = wireParticipants(participants, spec.relationships);
 
       gadget.update({
         spec,

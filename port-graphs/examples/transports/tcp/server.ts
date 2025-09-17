@@ -5,11 +5,11 @@
  */
 
 import { createServer, Socket } from 'net';
-import { unionCell } from '../../../src/patterns/cells/array-set';
+import { arrayUnionCell } from '../../../src/patterns/cells';
 import * as readline from 'readline';
 
 // Create a unionCell that accumulates unique values (using arrays)
-const union = unionCell([]);
+const union = arrayUnionCell([]);
 
 // Track connected clients
 const clients = new Set<Socket>();
