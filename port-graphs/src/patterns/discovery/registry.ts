@@ -1,5 +1,5 @@
 import { createGadget } from "../../core";
-import { changed, noop } from "../../effects";
+import { changed } from "../../effects";
 import _ from "lodash";
 
 /**
@@ -89,10 +89,10 @@ export const registry = createGadget<RegistryState, RegistryMessage>(
  * Service announcement gadget - Periodically announces presence
  */
 export const announcer = createGadget<
-  { registration: Registration; interval?: number },
+  { registration: Registration; interval?: number, timer?: NodeJS.Timeout },
   { start: true } | { stop: true }
 >(
-  (current, incoming) => {
+  (_current, incoming) => {
     if ('start' in incoming) {
       return { action: 'start' };
     }

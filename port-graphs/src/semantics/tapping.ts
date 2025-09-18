@@ -1,6 +1,7 @@
 import { addGadgetExtensions, extensions, Gadget } from "../core";
 import { maxCell } from "../patterns/cells";
 
+
 /**
  * Tapping semantic - adds multi-tap capability to any gadget
  *
@@ -8,8 +9,8 @@ import { maxCell } from "../patterns/cells";
  * without modifying the core protocol.
  */
 
-export interface Tappable {
-  tap: (fn: (effect: any) => void) => () => void;
+export interface Tappable extends Gadget {
+  tap: (fn: (effect: Parameters<Gadget['emit']>[0]) => void) => () => void;
 }
 
 export function isTappable(gadget: Gadget): typeof gadget & Tappable | null {
@@ -43,28 +44,3 @@ export function withTaps<State, Incoming, Effect>(
     }
   }) as typeof gadget & Tappable;
 }
-
-const fooCell = maxCell(0);
-
-addGadgetExtensions(withTaps);
-
-console.log('extensions', extensions());
-
-const barCell = maxCell<Tappable>(0);
-
-const cleanup = barCell.tap((effect) => {
-  'changed' in effect ? fooCell.receive(effect['changed']) : null;
-});
-
-// fooCell.receive(10);
-barCell.receive(10);
-
-console.log('fooCell current', fooCell.current());
-console.log('barCell current', barCell.current());
-
-cleanup();
-
-barCell.receive(20);
-
-console.log('fooCell current', fooCell.current());
-console.log('barCell current', barCell.current());
