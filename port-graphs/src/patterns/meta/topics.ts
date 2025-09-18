@@ -189,7 +189,7 @@ export class TopicRegistry {
       topics: this.subscriptions.size,
       patterns: this.patterns.size,
       totalSubscriptions: Array.from(this.subscriptions.values()).reduce((sum, set) => sum + set.size, 0) +
-                          Array.from(this.patterns.values()).reduce((sum, set) => sum + set.size, 0)
+        Array.from(this.patterns.values()).reduce((sum, set) => sum + set.size, 0)
     };
   }
 }

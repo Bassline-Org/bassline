@@ -7,11 +7,13 @@ import { extendGadget } from "./index";
  * Replaces the default emit/update/current with event-based versions,
  * allowing gadgets to dispatch and listen to events.
  */
-export function eventSemantics<State, Incoming, Effect>(
+export interface EventEmitting {
+  emitter: EventTarget;
+}
+
+export function withEvents<State, Incoming, Effect>(
   gadget: Gadget<State, Incoming, Effect>
-): Gadget<State, Incoming, Effect> & {
-  emitter: EventTarget
-} {
+): Gadget<State, Incoming, Effect> & EventEmitting {
   const emitter = new EventTarget();
   extendGadget(gadget)((event) => {
     emitter.dispatchEvent(new CustomEvent('effect', { detail: event }));

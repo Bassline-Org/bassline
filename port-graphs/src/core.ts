@@ -3,6 +3,8 @@
  * Consider → Act with context passing
  */
 
+import _ from "lodash";
+
 export interface Gadget<State = any, Incoming = any, Effect = any> {
   current: () => State;
   update: (state: State) => void;
@@ -18,6 +20,22 @@ export type ConsiderResult<Context = any> = {
 export type Action<State, Incoming, Context, Effect> =
   (gadget: Gadget<State, Incoming, Effect>, context: Context) => Effect | null;
 
+export type GadgetExtension<In extends Gadget = Gadget, Out extends Gadget = In> = (gadget: In) => Out;
+
+export type Callback<T> = T extends (gadget: infer In) => infer Out ? (gadget: In) => Out : never;
+
+let gadgetExtensions: GadgetExtension[] = [];
+export const extensions = () => gadgetExtensions;
+
+export function addGadgetExtensions(...extensions: GadgetExtension[]) {
+  const union = _.union(gadgetExtensions, extensions);
+  gadgetExtensions = union;
+  return () => {
+    const cleaned = _.difference(gadgetExtensions, extensions);
+    gadgetExtensions = cleaned;
+  }
+}
+
 /**
  * Creates a gadget with consider → act protocol
  *
@@ -29,7 +47,7 @@ export function createGadget<State, Incoming, Effect = any>(
   consider: (current: State, incoming: Incoming) => ConsiderResult,
   actions: Record<string, Action<State, Incoming, any, Effect>>
 ) {
-  return (initial: State): Gadget<State, Incoming, Effect> => {
+  return <T>(initial: State, callback?: (g: Gadget<State, Incoming, Effect>) => T & Gadget<State, Incoming, Effect>) => {
     let current = initial;
 
     const gadget: Gadget<State, Incoming, Effect> = {
@@ -53,7 +71,7 @@ export function createGadget<State, Incoming, Effect = any>(
         // Effects go into the void
       }
     };
-
-    return gadget;
+    const extended: Gadget<State, Incoming, Effect> = extensions().reduce((gadget, extension) => extension(gadget), gadget);
+    return (callback ? callback(extended) : extended) as T & Gadget<State, Incoming, Effect>;
   };
 }
