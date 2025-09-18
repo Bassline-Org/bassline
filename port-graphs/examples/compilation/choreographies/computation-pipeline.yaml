@@ -1,0 +1,59 @@
+# Computation pipeline demonstrating function composition
+gadgets:
+  # Input source
+  input:
+    type: tap
+    initial: {}
+
+  # Double the input
+  doubler:
+    type: double
+    initial: {}
+
+  # Add two numbers together
+  adder:
+    type: add
+    initial: {}
+
+  # Multiply result
+  multiplier:
+    type: multiply
+    initial: {}
+
+  # Final accumulator
+  accumulator:
+    type: unionCell
+    initial: []
+
+  # Output logger
+  output:
+    type: logger
+    initial:
+      prefix: "[RESULT]"
+
+# Wire up the pipeline and send initial data
+bootstrap:
+  # Send initial value to doubler (uses 'x' as argument)
+  - to: doubler
+    data:
+      x: 5  # Will become 10
+
+  # Send to adder (uses 'a' and 'b' as arguments)
+  - to: adder
+    data:
+      a: 10  # Result from doubler conceptually
+      b: 7   # Additional input
+
+  # Adder will output 17, send to multiplier with factor
+  - to: multiplier
+    data:
+      a: 17
+      b: 2
+
+  # Final result: 34 will go to accumulator
+  - to: accumulator
+    data: [34]
+
+  # Log the accumulated results
+  - to: output
+    data: "Pipeline complete: [34]"

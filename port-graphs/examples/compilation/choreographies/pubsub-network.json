@@ -1,0 +1,85 @@
+{
+  "gadgets": {
+    "broker": {
+      "type": "pubsub",
+      "initial": {}
+    },
+    "publisher1": {
+      "type": "tap",
+      "initial": {
+        "label": "pub1"
+      }
+    },
+    "publisher2": {
+      "type": "tap",
+      "initial": {
+        "label": "pub2"
+      }
+    },
+    "subscriber1": {
+      "type": "logger",
+      "initial": {
+        "prefix": "[SUB1]"
+      }
+    },
+    "subscriber2": {
+      "type": "logger",
+      "initial": {
+        "prefix": "[SUB2]"
+      }
+    },
+    "subscriber3": {
+      "type": "logger",
+      "initial": {
+        "prefix": "[SUB3]"
+      }
+    }
+  },
+  "bootstrap": [
+    {
+      "to": "broker",
+      "data": {
+        "subscribe": {
+          "topic": "events",
+          "subscriber": "subscriber1"
+        }
+      }
+    },
+    {
+      "to": "broker",
+      "data": {
+        "subscribe": {
+          "topic": "events",
+          "subscriber": "subscriber2"
+        }
+      }
+    },
+    {
+      "to": "broker",
+      "data": {
+        "subscribe": {
+          "topic": "alerts",
+          "subscriber": "subscriber3"
+        }
+      }
+    },
+    {
+      "to": "broker",
+      "data": {
+        "publish": {
+          "topic": "events",
+          "data": "First event"
+        }
+      }
+    },
+    {
+      "to": "broker",
+      "data": {
+        "publish": {
+          "topic": "alerts",
+          "data": "System alert"
+        }
+      }
+    }
+  ]
+}

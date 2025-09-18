@@ -94,13 +94,9 @@ function CanvasContent() {
   const topics = useTopics();
 
   // Use aggregator cells for managing collections
-  const [nodeState, sendNodeChange, nodesGadget] = useGadget(aggregatorCell<Node>(), []);
-  const [edgeState, sendEdgeChange, edgesGadget] = useGadget(aggregatorCell<Edge>(), []);
+  const [nodes, sendNodeChange, nodesGadget] = useGadget(aggregatorCell<Node>(), []);
+  const [edges, sendEdgeChange, edgesGadget] = useGadget(aggregatorCell<Edge>(), []);
   const [bg, , bgGadget] = useGadget(lastMap, { red: 0, green: 0, blue: 0 });
-
-  // Process ReactFlow changes through nodes/edges state
-  const nodes = nodeState;
-  const edges = edgeState;
 
   // Subscribe aggregators to topics
   useGadgetSubscription([topic.changes('node')], nodesGadget);

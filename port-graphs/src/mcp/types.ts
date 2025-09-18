@@ -4,7 +4,8 @@
  * Types for interactive choreography shell and network access
  */
 
-import { CompilationNetwork } from '../compilation/network';
+// Compilation network was removed - stub for now
+type CompilationNetwork = any;
 
 export interface MCPShellConfig {
   networks: Map<string, CompilationNetwork>;

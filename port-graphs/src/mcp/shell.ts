@@ -5,8 +5,9 @@
  * directories, gadgets as subdirectories, and compilation state as files
  */
 
-import { CompilationNetwork } from '../compilation/network';
-import { createCompilationNetwork } from '../compilation/network';
+// Compilation network was removed - stub for now
+type CompilationNetwork = any;
+const createCompilationNetwork = (choreography: any) => ({ gadgets: new Map() });
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { MCPShellConfig, NetworkHandle, ShellCommand, ShellResult } from './types';
