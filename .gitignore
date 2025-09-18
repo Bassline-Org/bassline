@@ -4,6 +4,9 @@ bassline-web/node_modules/
 .pnp
 .pnp.js
 
+# rust
+gadgets-rust/target/
+
 # Testing
 coverage/
 bassline-web/coverage/

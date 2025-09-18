@@ -17,6 +17,7 @@ export * from './lifecycle';
 
 // Context patterns
 export * from './useContext';
+export { CommonGadgetProvider, useCommonGadget } from './CommonGadgetContext';
 
 // Re-export core gadget types for convenience
 export type { Gadget, Tappable } from 'port-graphs';
