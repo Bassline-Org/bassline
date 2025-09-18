@@ -1,14 +1,12 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Gadget } from 'port-graphs';
-import { Topic } from 'port-graphs/meta';
-import { useTopics } from './TopicsProvider';
 
 /**
  * Lifecycle management utilities for React + Gadget integration
  */
 
 /**
- * Automatically cleanup gadget subscriptions on unmount
+ * Automatically cleanup gadget connections on unmount
  */
 export function useGadgetCleanup<G extends Gadget>(
   gadget: G,
@@ -20,22 +18,6 @@ export function useGadgetCleanup<G extends Gadget>(
       if (cleanup) cleanup();
     };
   }, [gadget, setup]);
-}
-
-/**
- * Managed topic subscription with automatic cleanup
- */
-export function useGadgetSubscription(
-  topics: (Topic | string)[],
-  gadget: Gadget,
-  deps: React.DependencyList = []
-): void {
-  const topicsContext = useTopics();
-
-  useEffect(() => {
-    topicsContext.subscribe(topics, gadget);
-    // No cleanup needed - TopicsProvider handles it
-  }, [topicsContext, ...deps]);
 }
 
 /**

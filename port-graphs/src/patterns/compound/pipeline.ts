@@ -8,9 +8,14 @@ import { noop } from "../../effects";
  * Uses tapping to connect gadgets without modifying their core behavior.
  * The pipeline itself is a gadget that forwards data to the first stage.
  */
+type PipelineState = {
+  stages: Tappable[];
+  cleanups: Array<() => void>;
+};
+
 export function pipeline<State = any, Incoming = any, Effect = any>(
   ...stages: Tappable[]
-): Gadget<{ stages: Tappable[] }, Incoming, Effect> {
+): Gadget<PipelineState, Incoming, Effect> {
   // Make all stages tappable
   const tappableStages = stages.map(withTaps);
 
@@ -27,20 +32,27 @@ export function pipeline<State = any, Incoming = any, Effect = any>(
     cleanups.push(cleanup);
   }
 
-  return createGadget<{ stages: Tappable[]; cleanups: Array<() => void> }, Incoming, Effect>(
+  return createGadget<PipelineState, Incoming, Effect>(
     (_state, incoming) => ({ action: 'forward', context: incoming }),
     {
       'forward': (gadget, incoming) => {
         const { stages } = gadget.current();
 
+        if (stages.length === 0) return null;
+
         // Wire last stage to emit through the pipeline
         const lastStage = stages[stages.length - 1];
-        lastStage.tap((effect) => gadget.emit(effect as Effect));
+        if (lastStage) {
+          lastStage.tap((effect) => gadget.emit(effect as Effect));
+        }
 
         // Start the pipeline
-        stages[0].receive(incoming);
+        const firstStage = stages[0];
+        if (firstStage) {
+          firstStage.receive(incoming);
+        }
 
-        return noop();
+        return null;
       }
     }
   )({ stages: tappableStages, cleanups });

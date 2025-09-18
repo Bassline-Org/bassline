@@ -13,7 +13,7 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/gadget-demo": {
+  "/canvas-new": {
     params: {};
   };
   "/canvas": {
@@ -27,11 +27,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/gadget-demo" | "/canvas" | "/home";
+    page: "/" | "/canvas-new" | "/canvas" | "/home";
   };
-  "routes/gadget-demo.tsx": {
-    id: "routes/gadget-demo";
-    page: "/gadget-demo";
+  "routes/canvas-new.tsx": {
+    id: "routes/canvas-new";
+    page: "/canvas-new";
   };
   "routes/canvas.tsx": {
     id: "routes/canvas";

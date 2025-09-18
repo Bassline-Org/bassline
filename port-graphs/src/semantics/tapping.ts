@@ -1,5 +1,4 @@
 import { Gadget } from "../core";
-import { maxCell } from "../patterns/cells";
 
 /**
  * Tapping semantic - adds multi-tap capability to any gadget
@@ -41,24 +40,3 @@ export function withTaps<State, Incoming, Effect>(
     }
   });
 }
-
-const fooCell = maxCell(0);
-const barCell = withTaps(maxCell(0));
-
-const cleanup = barCell.tap((effect) => {
-  if (effect && 'changed' in effect) {
-    fooCell.receive(effect.changed);
-  }
-});
-
-barCell.receive(10);
-
-console.log('fooCell current', fooCell.current());
-console.log('barCell current', barCell.current());
-
-cleanup();
-
-barCell.receive(20);
-
-console.log('fooCell current', fooCell.current());
-console.log('barCell current', barCell.current());

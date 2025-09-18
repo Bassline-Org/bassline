@@ -5,7 +5,7 @@
  * No topics, no pubsub, just direct gadget connections.
  */
 
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -20,30 +20,28 @@ import {
   applyEdgeChanges,
   ConnectionMode,
   addEdge,
+  Handle,
+  Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import { useGadget, useTap, type Tappable } from 'port-graphs-react';
 import { lastMap, mapCell } from 'port-graphs';
-import _ from 'lodash';
 
-// Node gadget component - each node is a tappable gadget
-function NodeGadget({ id, data, xPos, yPos }: any) {
+// Node component that is itself a tappable gadget
+function NodeGadget({ id, data }: { id: string; data: any }) {
   const [state, updateState, nodeGadget] = useGadget(
     lastMap,
-    { id, data, position: { x: xPos || 0, y: yPos || 0 } }
+    { id, data, position: { x: 0, y: 0 } }
   );
 
-  // Register this node gadget globally (for connections)
+  // Register this gadget with the parent canvas
   useEffect(() => {
-    if (window.__nodeGadgets) {
-      window.__nodeGadgets.set(id, nodeGadget);
+    if (window.__canvasNodeGadgets) {
+      window.__canvasNodeGadgets.receive({
+        set: [[id, nodeGadget]]
+      });
     }
-    return () => {
-      if (window.__nodeGadgets) {
-        window.__nodeGadgets.delete(id);
-      }
-    };
   }, [id, nodeGadget]);
 
   return (
@@ -51,7 +49,7 @@ function NodeGadget({ id, data, xPos, yPos }: any) {
       onContextMenu={(e) => {
         e.stopPropagation();
         e.preventDefault();
-        // Demo: update position on right-click
+        // Update position on right click (demo)
         updateState({
           position: {
             x: state['position'].x + 10,
@@ -64,16 +62,11 @@ function NodeGadget({ id, data, xPos, yPos }: any) {
         border: '2px solid #777',
         borderRadius: '5px',
         background: 'white',
-        minWidth: '100px',
-        textAlign: 'center',
       }}
     >
-      <div>{data?.label || id}</div>
-      {state['data']?.value && (
-        <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-          Value: {state['data'].value}
-        </div>
-      )}
+      <Handle id={`${id}-target`} type="target" position={Position.Left} />
+      {data.label || id}
+      <Handle id={`${id}-source`} type="source" position={Position.Right} />
     </div>
   );
 }
@@ -82,9 +75,12 @@ const nodeTypes = {
   gadget: NodeGadget,
 };
 
-export default function Canvas() {
-  // Map to store node gadgets
-  const nodeGadgetsRef = useRef(new Map<string, Tappable>());
+export default function CanvasNew() {
+  // Store node gadgets in a map cell - reactive map!
+  const [nodeGadgets, , nodeGadgetsCell] = useGadget(
+    mapCell<string, Tappable>(),
+    new Map()
+  );
 
   // Store tap connections in a map cell
   const [connections, , connectionsCell] = useGadget(
@@ -92,13 +88,13 @@ export default function Canvas() {
     new Map()
   );
 
-  // Make node gadgets accessible globally
+  // Make the node gadgets accessible to node components
   useEffect(() => {
-    window.__nodeGadgets = nodeGadgetsRef.current;
+    window.__canvasNodeGadgets = nodeGadgetsCell;
     return () => {
-      delete window.__nodeGadgets;
+      delete window.__canvasNodeGadgets;
     };
-  }, []);
+  }, [nodeGadgetsCell]);
 
   // React Flow state
   const [nodes, setNodes] = useState<Node[]>([
@@ -106,19 +102,19 @@ export default function Canvas() {
       id: 'node-1',
       type: 'gadget',
       position: { x: 100, y: 100 },
-      data: { label: 'Source', value: 0 },
+      data: { label: 'Node 1' },
     },
     {
       id: 'node-2',
       type: 'gadget',
       position: { x: 300, y: 100 },
-      data: { label: 'Processor' },
+      data: { label: 'Node 2' },
     },
     {
       id: 'node-3',
       type: 'gadget',
-      position: { x: 500, y: 100 },
-      data: { label: 'Output' },
+      position: { x: 200, y: 250 },
+      data: { label: 'Node 3' },
     },
   ]);
 
@@ -132,19 +128,20 @@ export default function Canvas() {
     []
   );
 
-  // Handle edge changes - including cleanup of taps
+  // Handle edge changes
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       setEdges((eds) => applyEdgeChanges(changes, eds));
 
-      // Clean up taps when edges are removed
+      // Handle edge removal - cleanup taps
       changes.forEach((change) => {
         if (change.type === 'remove') {
-          const cleanup = connections.get(change.id);
+          const key = change.id;
+          const cleanup = connections.get(key);
           if (cleanup) {
-            cleanup();
+            cleanup(); // Clean up the tap
             connectionsCell.receive({
-              delete: [change.id]
+              delete: [key]
             });
           }
         }
@@ -153,49 +150,43 @@ export default function Canvas() {
     [connections, connectionsCell]
   );
 
-  // Handle new connections - create taps between gadgets!
+  // Handle new connections - create taps!
   const onConnect = useCallback(
     (params: Connection) => {
       if (params.source && params.target) {
-        const sourceGadget = nodeGadgetsRef.current.get(params.source);
-        const targetGadget = nodeGadgetsRef.current.get(params.target);
+        const sourceGadget = nodeGadgets.get(params.source);
+        const targetGadget = nodeGadgets.get(params.target);
 
         if (sourceGadget && targetGadget) {
-          // Create visual edge
-          const edgeId = `${params.source}-${params.target}`;
-          setEdges((eds) => addEdge({ ...params, id: edgeId }, eds));
+          // Create the visual edge
+          const newEdge = {
+            id: `${params.source}-${params.target}`,
+            source: params.source,
+            sourceHandle: `${params.source}-source`,
+            targetHandle: `${params.target}-target`,
+            target: params.target,
+          };
+          setEdges((eds) => addEdge(newEdge as Edge, eds));
 
-          // Create computational tap
+          // Create the computational tap
           const cleanup = sourceGadget.tap((effect: any) => {
-            console.log(`Tap flow: ${params.source} → ${params.target}`, effect);
-
-            // Extract value from effect
+            console.log(`Tap: ${params.source} → ${params.target}`, effect);
+            // Extract value and send to target
             const value = effect && typeof effect === 'object' && 'changed' in effect
-              ? effect.changed
+              ? (effect as any).changed
               : effect;
-
-            // Send to target gadget
             targetGadget.receive(value);
           });
 
-          // Store cleanup function
+          // Store the cleanup function
           connectionsCell.receive({
-            set: [[edgeId, cleanup]]
+            set: [[newEdge.id, cleanup]]
           });
         }
       }
     },
-    [connectionsCell]
+    [nodeGadgets, connectionsCell]
   );
-
-  // Demo: button to trigger data flow
-  const sendData = () => {
-    const source = nodeGadgetsRef.current.get('node-1');
-    if (source) {
-      const value = Math.floor(Math.random() * 100);
-      source.receive({ data: { label: 'Source', value } });
-    }
-  };
 
   // Log active connections
   useTap(connectionsCell, (effect: any) => {
@@ -205,6 +196,19 @@ export default function Canvas() {
     }
   });
 
+  // Add a button to trigger updates (for testing)
+  const triggerUpdate = () => {
+    const node1 = nodeGadgets.get('node-1');
+    if (node1) {
+      node1.receive({
+        data: {
+          label: `Node 1 (${Date.now()})`,
+          timestamp: Date.now()
+        }
+      });
+    }
+  };
+
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
       <div style={{
@@ -213,29 +217,18 @@ export default function Canvas() {
         left: 10,
         zIndex: 10,
         background: 'white',
-        padding: '15px',
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+        padding: '10px',
+        borderRadius: '5px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
-        <h3 style={{ margin: '0 0 10px 0' }}>Tap-Based Canvas</h3>
-        <button
-          onClick={sendData}
-          style={{
-            padding: '8px 16px',
-            background: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          Send Random Data
+        <h3 style={{ margin: '0 0 10px 0' }}>Direct Tap Canvas</h3>
+        <button onClick={triggerUpdate}>
+          Update Node 1
         </button>
         <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-          • Connect nodes by dragging between them<br />
-          • Connections create direct taps between gadgets<br />
-          • Data flows through taps automatically<br />
-          • Right-click nodes to trigger position update
+          • Drag to connect nodes (creates taps)<br />
+          • Right-click nodes to update position<br />
+          • Connections are direct gadget taps
         </div>
       </div>
 
@@ -256,9 +249,9 @@ export default function Canvas() {
   );
 }
 
-// Type declaration for global node gadgets
+// Type for window extension
 declare global {
   interface Window {
-    __nodeGadgets?: Map<string, Tappable>;
+    __canvasNodeGadgets?: any;
   }
 }

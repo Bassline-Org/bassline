@@ -8,12 +8,12 @@ import { Registration } from "./registry";
  * Caches lookups and can wire gadgets automatically when resolved.
  */
 
-interface LookupRequest {
+export interface LookupRequest {
   resolve: string;
   cache?: boolean; // Cache the result (default: true)
 }
 
-interface LookupState {
+export interface LookupState {
   cache: Record<string, Registration>;
   pending: Record<string, boolean>;
 }

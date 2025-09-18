@@ -30,8 +30,10 @@ export function parse(text: string): Node[] {
     if (trimmed === 'relationships:') { section = 'rels'; continue; }
 
     if (section === 'roles' && !trimmed.endsWith(':')) {
-      const [name, roleType] = trimmed.split(':').map(s => s.trim());
-      nodes.push({ id: name, type: 'role', roleType: roleType || '' });
+      const parts = trimmed.split(':').map(s => s.trim());
+      const name = parts[0] ?? '';
+      const roleType = parts[1] ?? '';
+      nodes.push({ id: name, type: 'role', roleType });
     }
 
     if (section === 'rels' && trimmed.includes('->')) {
