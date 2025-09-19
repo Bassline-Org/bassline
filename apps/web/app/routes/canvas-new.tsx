@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -21,48 +21,132 @@ import '@xyflow/react/dist/style.css';
 import { useGadget, useTap, CommonGadgetProvider, useCommonGadget, type Tappable } from 'port-graphs-react';
 import { lastMap, unionCell, maxCell, lastCell, createGadget } from 'port-graphs';
 
-// Node component that creates a gadget and registers it
-function NodeGadget({ id }: { id: string }) {
+// Counter gadget - clicks increment
+function CounterGadget({ id }: { id: string }) {
   const gadgetsTable = useCommonGadget();
-
-  // Create a simple counter gadget for this node
   const [count, , counterGadget] = useGadget(
     () => maxCell(0),
     0
   );
 
-  // Register this node's gadget in the gadgets table
   useEffect(() => {
     gadgetsTable.receive({ [id]: counterGadget });
     return () => {
-      // Clean up on unmount
       gadgetsTable.receive({ [id]: undefined });
     };
   }, [id, counterGadget, gadgetsTable]);
 
   return (
     <div
-      onClick={() => {
-        // Increment counter on click
-        counterGadget.receive(count + 1);
-      }}
+      onClick={() => counterGadget.receive(count + 1)}
       style={{
         padding: '10px',
-        border: '2px solid #777',
+        border: '2px solid #4a90e2',
         borderRadius: '5px',
-        background: 'white',
+        background: '#e3f2fd',
         cursor: 'pointer',
         userSelect: 'none',
       }}
     >
       <Handle id={`${id}-target`} type="target" position={Position.Left} />
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '12px', color: '#666' }}>{id}</div>
+        <div style={{ fontSize: '10px', color: '#666' }}>Counter</div>
         <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{count}</div>
       </div>
       <Handle id={`${id}-source`} type="source" position={Position.Right} />
     </div>
   );
+}
+
+// Timer gadget - emits incremental values
+function TimerGadget({ id }: { id: string }) {
+  const gadgetsTable = useCommonGadget();
+  const [value, , timerGadget] = useGadget(
+    lastCell,
+    0
+  );
+
+  useEffect(() => {
+    gadgetsTable.receive({ [id]: timerGadget });
+    const interval = setInterval(() => {
+      timerGadget.receive((value as number) + 1);
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      gadgetsTable.receive({ [id]: undefined });
+    };
+  }, [id, timerGadget, gadgetsTable, value]);
+
+  return (
+    <div
+      style={{
+        padding: '10px',
+        border: '2px solid #4caf50',
+        borderRadius: '5px',
+        background: '#e8f5e9',
+        userSelect: 'none',
+      }}
+    >
+      <Handle id={`${id}-target`} type="target" position={Position.Left} />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '10px', color: '#666' }}>Timer</div>
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>⏰ {value}</div>
+      </div>
+      <Handle id={`${id}-source`} type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+// Display gadget - shows last received value
+function DisplayGadget({ id }: { id: string }) {
+  const gadgetsTable = useCommonGadget();
+  const [display, , displayGadget] = useGadget(
+    lastCell,
+    '-'
+  );
+
+  useEffect(() => {
+    gadgetsTable.receive({ [id]: displayGadget });
+    return () => {
+      gadgetsTable.receive({ [id]: undefined });
+    };
+  }, [id, displayGadget, gadgetsTable]);
+
+  return (
+    <div
+      style={{
+        padding: '10px',
+        border: '2px solid #9c27b0',
+        borderRadius: '5px',
+        background: '#f3e5f5',
+        userSelect: 'none',
+      }}
+    >
+      <Handle id={`${id}-target`} type="target" position={Position.Left} />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '10px', color: '#666' }}>Display</div>
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>📺 {display}</div>
+      </div>
+      <Handle id={`${id}-source`} type="source" position={Position.Right} />
+    </div>
+  );
+}
+
+// Main node component that switches based on type
+function NodeGadget({ id, data }: { id: string; data: any }) {
+  // Get the type from the data (ReactFlow passes it through)
+  const nodeType = data?.type || 'counter';
+
+  switch (nodeType) {
+    case 'timer':
+      return <TimerGadget id={id} />;
+    case 'display':
+      return <DisplayGadget id={id} />;
+    case 'counter':
+    default:
+      return <CounterGadget id={id} />;
+  }
 }
 
 const nodeTypes = {
@@ -206,9 +290,9 @@ export default function CanvasNew() {
       // Create new node
       return {
         id,
-        type: types[id] || 'gadget',
+        type: 'gadget', // ReactFlow node type (always gadget)
         position: positions[id] || { x: 100, y: 100 },
-        data: { id }
+        data: { id, type: types[id] || 'counter' } // Pass our gadget type in data
       };
     });
 
@@ -351,8 +435,9 @@ export default function CanvasNew() {
   }, [gadgets]);
 
   // Add test nodes
-  const addTestNode = useCallback(() => {
-    const id = `node-${Math.random().toString(36).substring(2, 11)}`;
+  // Add nodes of different types
+  const addNode = useCallback((type: string) => {
+    const id = `${type}-${Math.random().toString(36).substring(2, 6)}`;
 
     // Add to node set
     nodeIdsCell.receive(new Set([id]));
@@ -364,21 +449,23 @@ export default function CanvasNew() {
 
     // Set type
     typesCell.receive({
-      [id]: 'gadget'
+      [id]: type
     });
   }, [nodeIdsCell, positionsCell, typesCell]);
 
   // Initialize with some test nodes
   useEffect(() => {
-    // Add initial nodes
-    nodeIdsCell.receive(new Set(['node-1', 'node-2']));
+    // Add initial nodes of different types
+    nodeIdsCell.receive(new Set(['timer-1', 'display-1', 'counter-1']));
     positionsCell.receive({
-      'node-1': { x: 100, y: 100 },
-      'node-2': { x: 300, y: 100 }
+      'timer-1': { x: 100, y: 150 },
+      'counter-1': { x: 300, y: 150 },
+      'display-1': { x: 500, y: 150 }
     });
     typesCell.receive({
-      'node-1': 'gadget',
-      'node-2': 'gadget'
+      'timer-1': 'timer',
+      'counter-1': 'counter',
+      'display-1': 'display'
     });
   }, []);
 
@@ -396,9 +483,24 @@ export default function CanvasNew() {
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
         }}>
           <h3 style={{ margin: '0 0 10px 0' }}>Spatial Computing Canvas</h3>
-          <button onClick={addTestNode}>
-            Add Node
-          </button>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px' }}>
+            <button onClick={() => addNode('counter')}
+              style={{ padding: '5px 10px', background: '#e3f2fd', border: '1px solid #4a90e2', borderRadius: '3px', cursor: 'pointer' }}>
+              + Counter
+            </button>
+            <button onClick={() => addNode('timer')}
+              style={{ padding: '5px 10px', background: '#e8f5e9', border: '1px solid #4caf50', borderRadius: '3px', cursor: 'pointer' }}>
+              + Timer
+            </button>
+            <button onClick={() => addNode('adder')}
+              style={{ padding: '5px 10px', background: '#fff3e0', border: '1px solid #ff9800', borderRadius: '3px', cursor: 'pointer' }}>
+              + Adder
+            </button>
+            <button onClick={() => addNode('display')}
+              style={{ padding: '5px 10px', background: '#f3e5f5', border: '1px solid #9c27b0', borderRadius: '3px', cursor: 'pointer' }}>
+              + Display
+            </button>
+          </div>
           <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
             • Click nodes to increment counter<br />
             • Drag close for auto-sync (bidirectional)<br />
