@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -38,7 +38,7 @@ function CounterGadget({ id }: { id: string }) {
 
   return (
     <div
-      onClick={() => counterGadget.receive(count + 1)}
+      onClick={() => { counterGadget.receive(count + 1); console.log('id: ', id) }}
       style={{
         padding: '10px',
         border: '2px solid #4a90e2',
@@ -54,7 +54,7 @@ function CounterGadget({ id }: { id: string }) {
         <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{count}</div>
       </div>
       <Handle id={`${id}-source`} type="source" position={Position.Right} />
-    </div>
+    </div >
   );
 }
 
@@ -103,8 +103,12 @@ function DisplayGadget({ id }: { id: string }) {
   const gadgetsTable = useCommonGadget();
   const [display, , displayGadget] = useGadget(
     lastCell,
-    '-'
+    0
   );
+
+  useTap(displayGadget, (effect) => {
+    console.log('displayGadget', effect);
+  }, []);
 
   useEffect(() => {
     gadgetsTable.receive({ [id]: displayGadget });
@@ -151,11 +155,12 @@ function NodeGadget({ id, data }: { id: string; data: any }) {
 
 const nodeTypes = {
   gadget: NodeGadget,
+  //region: RegionNode,
 };
 
 // Spatial computation gadgets
 const createProximityGadget = (threshold: number) =>
-  createGadget<Set<[string, string]>, Record<string, {x: number, y: number}>>(
+  createGadget<Set<[string, string]>, Record<string, { x: number, y: number }>>(
     (current, positions) => {
       const pairs = new Set<[string, string]>();
       const ids = Object.keys(positions);
@@ -180,9 +185,9 @@ const createProximityGadget = (threshold: number) =>
 
       // Only emit if changed
       if (pairs.size !== current.size ||
-          !Array.from(pairs).every(p =>
-            Array.from(current).some(c => c[0] === p[0] && c[1] === p[1])
-          )) {
+        !Array.from(pairs).every(p =>
+          Array.from(current).some(c => c[0] === p[0] && c[1] === p[1])
+        )) {
         return { action: 'update', context: { pairs } };
       }
       return null;
@@ -195,41 +200,94 @@ const createProximityGadget = (threshold: number) =>
     }
   );
 
-const createCenterOfMassGadget = () =>
-  createGadget<{x: number, y: number}, Record<string, {x: number, y: number}>>(
-    (current, positions) => {
-      const ids = Object.keys(positions);
-      if (ids.length === 0) return null;
+// Region gadget - detects which nodes are inside and applies transformations
+const createRegionGadget = (bounds: { x: number, y: number, width: number, height: number }, transform?: (value: any) => any) =>
+  createGadget<Set<string>, { positions: Record<string, { x: number, y: number }>, gadgets: Record<string, any> }>(
+    (current, { positions, gadgets }) => {
+      const inside = new Set<string>();
 
-      let sumX = 0, sumY = 0;
-      let count = 0;
-      for (const id of ids) {
-        const pos = positions[id];
-        if (pos) {
-          sumX += pos.x;
-          sumY += pos.y;
-          count++;
+      for (const [id, pos] of Object.entries(positions)) {
+        if (pos.x >= bounds.x &&
+          pos.x <= bounds.x + bounds.width &&
+          pos.y >= bounds.y &&
+          pos.y <= bounds.y + bounds.height) {
+          inside.add(id);
         }
       }
-      if (count === 0) return null;
 
-      const center = {
-        x: sumX / count,
-        y: sumY / count
-      };
+      // Check if the set of nodes inside has changed
+      const changed = inside.size !== current.size ||
+        !Array.from(inside).every(id => current.has(id));
 
-      if (Math.abs(center.x - current.x) > 1 || Math.abs(center.y - current.y) > 1) {
-        return { action: 'update', context: { center } };
+      if (changed) {
+        return { action: 'update', context: { inside, gadgets } };
       }
       return null;
     },
     {
-      'update': (gadget, { center }) => {
-        gadget.update(center);
-        return { changed: center, centerOfMass: true };
+      'update': (gadget, { inside, gadgets }) => {
+        const prevInside = gadget.current();
+        gadget.update(inside);
+
+        // Apply transformation to nodes entering the region
+        if (transform) {
+          for (const id of inside) {
+            if (!prevInside.has(id) && gadgets[id]) {
+              // Node just entered - could apply transformation
+              console.log(`Node ${String(id)} entered region`);
+            }
+          }
+        }
+
+        return {
+          changed: inside,
+          entered: Array.from(inside).filter(id => !prevInside.has(id as string)),
+          exited: Array.from(prevInside).filter(id => !inside.has(id))
+        };
       }
     }
   );
+
+// // Custom node to represent regions in ReactFlow's coordinate system
+// function RegionNode({ data }: { data: any }) {
+//   return (
+//     <div
+//       style={{
+//         width: data.width || 200,
+//         height: data.height || 150,
+//         border: `2px dashed ${data.color}`,
+//         borderRadius: '8px',
+//         background: `${data.color}20`,
+//         display: 'flex',
+//         flexDirection: 'column',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//       }}
+//     >
+//       <div style={{
+//         background: 'white',
+//         padding: '4px 8px',
+//         borderRadius: '4px',
+//         fontSize: '12px',
+//         fontWeight: 'bold',
+//         color: data.color
+//       }}>
+//         {data.label}
+//       </div>
+//       {data.nodesInside > 0 && (
+//         <div style={{
+//           fontSize: '10px',
+//           marginTop: '4px',
+//           background: 'white',
+//           padding: '2px 6px',
+//           borderRadius: '4px'
+//         }}>
+//           {data.nodesInside} nodes
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
 
 export default function CanvasNew() {
   // ECS-style tables for node data
@@ -259,19 +317,59 @@ export default function CanvasNew() {
     new Set<[string, string]>()
   );
 
-  const [centerOfMass, , centerGadget] = useGadget(
-    () => createCenterOfMassGadget()({ x: 0, y: 0 }),
-    { x: 0, y: 0 }
-  );
+  // // Create spatial regions
+  // const [multiplyRegion, , multiplyRegionGadget] = useGadget(
+  //   () => createRegionGadget(
+  //     { x: 250, y: 50, width: 200, height: 150 },
+  //     (value) => value * 2
+  //   )(new Set()),
+  //   new Set<string>()
+  // );
+
+  // const [slowRegion, , slowRegionGadget] = useGadget(
+  //   () => createRegionGadget(
+  //     { x: 50, y: 250, width: 200, height: 150 },
+  //     (value) => value / 2
+  //   )(new Set()),
+  //   new Set<string>()
+  // );
+
+  // Track which gadgets are in which regions for transformations
+  const regionTransformsRef = useRef<Map<string, (value: any) => any>>(new Map());
+
+  // // Update transforms based on regions
+  // useTap(multiplyRegionGadget, (effect) => {
+  //   if (effect && 'changed' in effect) {
+  //     const inside = effect.changed as Set<string>;
+  //     // Apply 2x multiplier to gadgets in this region
+  //     for (const id of inside) {
+  //       regionTransformsRef.current.set(id, (v) => typeof v === 'number' ? v * 2 : v);
+  //     }
+  //     // Remove transform for gadgets that left
+  //     for (const [id, _] of regionTransformsRef.current) {
+  //       if (!inside.has(id) && id.includes('multiply')) {
+  //         regionTransformsRef.current.delete(id);
+  //       }
+  //     }
+  //   }
+  // }, []);
+
+  // useTap(slowRegionGadget, (effect) => {
+  //   if (effect && 'entered' in effect) {
+  //     const entered = effect.entered as string[];
+  //     console.log('Nodes entered slow region:', entered);
+  //   }
+  // }, []);
 
   // Connect position changes to spatial gadgets
   useTap(positionsCell, (effect) => {
     if (effect && 'changed' in effect) {
-      const positions = effect.changed as Record<string, {x: number, y: number}>;
+      const positions = effect.changed as Record<string, { x: number, y: number }>;
       proximityGadget.receive(positions);
-      centerGadget.receive(positions);
+      // multiplyRegionGadget.receive({ positions, gadgets });
+      // slowRegionGadget.receive({ positions, gadgets });
     }
-  }, []);
+  }, [gadgets]);
 
   // Use a gadget for the derived nodes state
   const [nodes, , nodesGadget] = useGadget(
@@ -281,26 +379,60 @@ export default function CanvasNew() {
 
   // Rebuild nodes whenever nodeIds or initial data changes
   useEffect(() => {
-    const newNodes = Array.from(nodeIds).map(id => {
+    //   // Add region nodes first (so they appear behind gadgets)
+    //   const regionNodes = [
+    //     {
+    //       id: 'multiply-region',
+    //       type: 'region' as const,
+    //       position: { x: 250, y: 50 },
+    //       selectable: false,
+    //       draggable: false,
+    //       data: {
+    //         width: 200,
+    //         height: 150,
+    //         label: 'Multiply Region (2x)',
+    //         color: '#4caf50',
+    //         nodesInside: 0
+    //       }
+    //     },
+    //     {
+    //       id: 'slow-region',
+    //       type: 'region' as const,
+    //       position: { x: 50, y: 250 },
+    //       selectable: false,
+    //       draggable: false,
+    //       data: {
+    //         width: 200,
+    //         height: 150,
+    //         label: 'Slow Region (÷2)',
+    //         color: '#f44336',
+    //         nodesInside: 0
+    //       }
+    //     }
+    //   ];
+
+    const gadgetNodes = Array.from(nodeIds).map(id => {
       // Preserve existing node if it exists
       const existing = nodes.find((n: Node) => n.id === id);
-      if (existing) {
+      if (existing && existing.type !== 'region') {
         return existing;
       }
       // Create new node
       return {
         id,
-        type: 'gadget', // ReactFlow node type (always gadget)
+        type: 'gadget' as const, // ReactFlow node type (always gadget)
         position: positions[id] || { x: 100, y: 100 },
         data: { id, type: types[id] || 'counter' } // Pass our gadget type in data
       };
     });
 
+    const allNodes = [...gadgetNodes];
+
     // Only update if actually different
-    if (newNodes.length !== nodes.length || !newNodes.every((n, i) => n.id === nodes[i]?.id)) {
-      nodesGadget.receive(newNodes);
+    if (allNodes.length !== nodes.length || !allNodes.every((n, i) => n.id === nodes[i]?.id)) {
+      nodesGadget.receive(allNodes);
     }
-  }, [nodeIds, types]); // Don't depend on positions to avoid circular updates
+  }, [nodeIds, types]); // Include region sizes to update counts
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     // Apply changes to nodes gadget
@@ -359,18 +491,66 @@ export default function CanvasNew() {
           const targetGadget = gadgets[target];
 
           if (sourceGadget && targetGadget) {
-            // Create bidirectional tap for proximity
+            // Sync current values immediately
+            const sourceValue = sourceGadget.current();
+            const targetValue = targetGadget.current();
+
+            // Send current values to establish initial sync
+            const targetType = types[target];
+            const sourceType = types[source];
+
+            if (targetType === 'adder' && sourceValue !== undefined && sourceValue !== null) {
+              targetGadget.receive({ from: source as string, value: sourceValue });
+            } else if (sourceValue !== undefined && sourceValue !== null && sourceValue !== '-') {
+              targetGadget.receive(sourceValue);
+            }
+
+            if (sourceType === 'adder' && targetValue !== undefined && targetValue !== null) {
+              sourceGadget.receive({ from: target as string, value: targetValue });
+            } else if (targetValue !== undefined && targetValue !== null && targetValue !== '-') {
+              sourceGadget.receive(targetValue);
+            }
+
+            // Create bidirectional tap for ongoing changes
             const cleanup1 = sourceGadget.tap((effect: any) => {
               if (effect && 'changed' in effect) {
-                targetGadget.receive(effect.changed);
-                console.log(`Proximity tap: ${source} → ${target}`, effect.changed);
+                let value = effect.changed;
+
+                // Apply region transformation if source is in a region
+                const transform = regionTransformsRef.current.get(source);
+                if (transform) {
+                  value = transform(value);
+                  console.log(`Applied transform to ${source}: ${effect.changed} → ${value}`);
+                }
+
+                // Send with source info if target is an adder
+                if (targetType === 'adder') {
+                  targetGadget.receive({ from: source as string, value });
+                } else {
+                  targetGadget.receive(value);
+                }
+                console.log(`Proximity tap: ${source} → ${target}`, value);
               }
             });
 
             const cleanup2 = targetGadget.tap((effect: any) => {
               if (effect && 'changed' in effect) {
-                sourceGadget.receive(effect.changed);
-                console.log(`Proximity tap: ${target} → ${source}`, effect.changed);
+                let value = effect.changed;
+
+                // Apply region transformation if target is in a region
+                const transform = regionTransformsRef.current.get(target);
+                if (transform) {
+                  value = transform(value);
+                  console.log(`Applied transform to ${target}: ${effect.changed} → ${value}`);
+                }
+
+                // Send with source info if source is an adder
+                if (sourceType === 'adder') {
+                  sourceGadget.receive({ from: target as string, value });
+                } else {
+                  sourceGadget.receive(value);
+                }
+                console.log(`Proximity tap: ${target} → ${source}`, value);
               }
             });
 
@@ -400,7 +580,7 @@ export default function CanvasNew() {
       const nonProximityEdges = edges.filter((e: Edge) => !(e.data as any)?.proximity);
       edgesGadget.receive([...nonProximityEdges, ...proximityEdges]);
     }
-  }, [edges, gadgets]);
+  }, [edges, gadgets, types]);
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     const updatedEdges = applyEdgeChanges(changes, edges);
@@ -453,18 +633,20 @@ export default function CanvasNew() {
     });
   }, [nodeIdsCell, positionsCell, typesCell]);
 
-  // Initialize with some test nodes
+  // Initialize with demo setup showing composition
   useEffect(() => {
-    // Add initial nodes of different types
-    nodeIdsCell.receive(new Set(['timer-1', 'display-1', 'counter-1']));
+    // Create a demo setup: two counters feeding an adder, displayed
+    nodeIdsCell.receive(new Set(['counter-1', 'counter-2', 'adder-1', 'display-1']));
     positionsCell.receive({
-      'timer-1': { x: 100, y: 150 },
-      'counter-1': { x: 300, y: 150 },
+      'counter-1': { x: 100, y: 100 },
+      'counter-2': { x: 100, y: 200 },
+      'adder-1': { x: 300, y: 150 },
       'display-1': { x: 500, y: 150 }
     });
     typesCell.receive({
-      'timer-1': 'timer',
       'counter-1': 'counter',
+      'counter-2': 'counter',
+      'adder-1': 'adder',
       'display-1': 'display'
     });
   }, []);
@@ -505,7 +687,8 @@ export default function CanvasNew() {
             • Click nodes to increment counter<br />
             • Drag close for auto-sync (bidirectional)<br />
             • Proximity pairs (&lt; 150px): {proximityPairs.size}<br />
-            • Center of mass: ({Math.round(centerOfMass.x)}, {Math.round(centerOfMass.y)})
+            {/* • Multiply region (2x): {multiplyRegion.size} nodes<br /> */}
+            {/* • Slow region (÷2): {slowRegion.size} nodes */}
           </div>
         </div>
 
