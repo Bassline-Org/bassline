@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGadget, useGadgetFromFamily, useTap } from 'port-graphs-react';
-import { createFamily, lastCell, tapValue } from 'port-graphs';
+import { createFamily, lastCell, tapValue, withTaps } from 'port-graphs';
 
 
 // Component that uses a gadget from the family
@@ -38,7 +38,7 @@ function NodeComponent({ id }: { id: string }) {
 }
 
 // Create a family of node gadgets - static like Recoil atomFamily
-const nodeFamily = createFamily((id: string) => lastCell(`Node ${id}`));
+const nodeFamily = createFamily((id: string) => withTaps(lastCell(`Node ${id}`)));
 
 // Dynamic node creation demo
 function DynamicNodes() {
@@ -107,8 +107,8 @@ function DynamicNodes() {
 }
 
 // Create families for different types
-const sourceFamily = createFamily((id: string) => lastCell(0));
-const displayFamily = createFamily((id: string) => lastCell('-'));
+const sourceFamily = createFamily((id: string) => withTaps(lastCell(0)));
+const displayFamily = createFamily((id: string) => withTaps(lastCell('')));
 
 // Connected family members
 function ConnectedFamily() {
@@ -119,10 +119,16 @@ function ConnectedFamily() {
 
     if (!source || !target) return <div>Loading...</div>;
 
-    const [value, send] = useGadget(source);
+    const [value, send, tappableSource] = useGadget(source);
 
-    // Connect source to target
-    useTap(source, tapValue(target));
+    // Connect source to target directly (not through useGadget wrapper)
+    useTap(tappableSource, (effect) => {
+      console.log(`Source ${id} emitted:`, effect);
+      if (effect?.changed !== undefined) {
+        console.log(`Sending to display ${targetId}:`, effect.changed);
+        target.receive(effect.changed);
+      }
+    }, [target]);
 
     return (
       <div style={{
@@ -153,7 +159,8 @@ function ConnectedFamily() {
     const gadget = useGadgetFromFamily(displayFamily, id);
     if (!gadget) return <div>Loading...</div>;
 
-    const [value] = useGadget(gadget);
+    const [value, send] = useGadget(gadget);
+    console.log(`Display ${id} current value:`, value);
 
     return (
       <div style={{

@@ -68,7 +68,9 @@ function CounterWithDisplay() {
     const [value] = useGadget(display);
 
     // Connect counter to display
-    useTap(counter, tapValue(display));
+    // Note: counter from useGadget is already tappable
+    const [, , tappableCounter] = useGadget(counter);
+    useTap(tappableCounter, tapValue(display));
 
     return (
       <div style={{
@@ -126,9 +128,12 @@ function CounterWithTransform() {
     const [doubledValue] = useGadget(doubled);
     const [squaredValue] = useGadget(squared);
 
+    // Get tappable version of counter
+    const [, , tappableCounter] = useGadget(counter);
+
     // Set up transformations
-    useTap(counter, tapTransform(doubled, (x: number) => x * 2));
-    useTap(counter, tapTransform(squared, (x: number) => x * x));
+    useTap(tappableCounter, tapTransform(doubled, (x: number) => x * 2));
+    useTap(tappableCounter, tapTransform(squared, (x: number) => x * x));
 
     return (
       <div style={{ marginTop: '10px' }}>

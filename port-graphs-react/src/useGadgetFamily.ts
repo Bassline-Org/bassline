@@ -2,27 +2,24 @@
  * React hook for using gadget families
  *
  * This hook makes it easy to get gadgets from a family gadget,
- * handling the async nature of gadget creation and cleanup.
+ * creating them synchronously if they don't exist.
  */
 
-import { useEffect, useState } from 'react';
-import { useTap } from './useTap';
 import type { Gadget } from 'port-graphs';
 
 /**
  * Get a gadget from a family, creating it if necessary.
+ * This is completely synchronous - no loading states needed!
  *
  * @param family - The family gadget
  * @param key - The key to get/create a gadget for
- * @returns The gadget for this key, or undefined while loading
+ * @returns The gadget for this key
  *
  * @example
- * const nodeFamily = createFamily((id: string) => lastCell(0));
+ * const nodeFamily = createFamily((id: string) => withTaps(lastCell(0)));
  *
  * function Node({id}: {id: string}) {
  *   const nodeGadget = useGadgetFromFamily(nodeFamily, id);
- *   if (!nodeGadget) return <div>Loading...</div>;
- *
  *   const [state, send] = useGadget(nodeGadget);
  *   return <div>{state}</div>;
  * }
@@ -30,35 +27,31 @@ import type { Gadget } from 'port-graphs';
 export function useGadgetFromFamily<K extends string | number, G extends Gadget>(
   family: Gadget<any, { get: K }, any>,
   key: K
-): G | undefined {
-  const [gadget, setGadget] = useState<G | undefined>(undefined);
+): G {
+  // Check if gadget already exists
+  const familyState = family.current();
+  let gadget = familyState.gadgets?.get(key) as G | undefined;
 
-  // Request the gadget from the family
-  useEffect(() => {
+  // If not, create it synchronously
+  if (!gadget) {
     family.receive({ get: key });
-  }, [family, key]);
-
-  // Listen for the gadget to be created or returned
-  useTap(family as any, (effect: any) => {
-    if (effect?.created?.key === key) {
-      setGadget(effect.created.gadget as G);
-    } else if (effect?.existing?.key === key) {
-      setGadget(effect.existing.gadget as G);
-    }
-  }, [key]);
+    // Get the newly created gadget
+    gadget = family.current().gadgets?.get(key) as G;
+  }
 
   return gadget;
 }
 
 /**
  * Get multiple gadgets from a family at once.
+ * All gadgets are created synchronously if needed.
  *
  * @param family - The family gadget
  * @param keys - Array of keys to get gadgets for
- * @returns Map of key to gadget (may be incomplete while loading)
+ * @returns Map of key to gadget
  *
  * @example
- * const nodeFamily = createFamily((id: string) => lastCell(0));
+ * const nodeFamily = createFamily((id: string) => withTaps(lastCell(0)));
  *
  * function NodeGroup({ids}: {ids: string[]}) {
  *   const gadgets = useGadgetsFromFamily(nodeFamily, ids);
@@ -67,8 +60,7 @@ export function useGadgetFromFamily<K extends string | number, G extends Gadget>
  *     <div>
  *       {ids.map(id => {
  *         const gadget = gadgets.get(id);
- *         if (!gadget) return null;
- *         return <NodeDisplay key={id} gadget={gadget} />;
+ *         return <NodeDisplay key={id} gadget={gadget!} />;
  *       })}
  *     </div>
  *   );
@@ -78,31 +70,22 @@ export function useGadgetsFromFamily<K extends string | number, G extends Gadget
   family: Gadget<any, { get: K }, any>,
   keys: K[]
 ): Map<K, G> {
-  const [gadgets, setGadgets] = useState<Map<K, G>>(new Map());
+  const gadgets = new Map<K, G>();
 
-  // Request all gadgets from the family
-  useEffect(() => {
-    keys.forEach(key => {
+  keys.forEach(key => {
+    // Check if gadget exists
+    let gadget = family.current().gadgets?.get(key) as G | undefined;
+
+    // If not, create it
+    if (!gadget) {
       family.receive({ get: key });
-    });
-  }, [family, ...keys]);
-
-  // Listen for gadgets to be created or returned
-  useTap(family as any, (effect: any) => {
-    if (effect?.created && keys.includes(effect.created.key)) {
-      setGadgets(prev => {
-        const next = new Map(prev);
-        next.set(effect.created.key, effect.created.gadget as G);
-        return next;
-      });
-    } else if (effect?.existing && keys.includes(effect.existing.key)) {
-      setGadgets(prev => {
-        const next = new Map(prev);
-        next.set(effect.existing.key, effect.existing.gadget as G);
-        return next;
-      });
+      gadget = family.current().gadgets?.get(key) as G;
     }
-  }, [keys.join(',')]); // Use string key for stable dependency
+
+    if (gadget) {
+      gadgets.set(key, gadget);
+    }
+  });
 
   return gadgets;
 }
