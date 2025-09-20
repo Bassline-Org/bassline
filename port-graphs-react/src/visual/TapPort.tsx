@@ -14,6 +14,9 @@ export interface TapPortProps {
   onMouseUp?: (e: React.MouseEvent) => void;
   className?: string;
   label?: string;
+  'data-gadget-id'?: string;
+  'data-port-id'?: string;
+  'data-port-type'?: string;
 }
 
 export function TapPort({
@@ -25,7 +28,11 @@ export function TapPort({
   onMouseDown,
   onMouseUp,
   className,
-  label
+  label,
+  'data-gadget-id': dataGadgetId,
+  'data-port-id': dataPortId,
+  'data-port-type': dataPortType,
+  ...props
 }: TapPortProps) {
   // Build classes with simple string concatenation
   const positionClasses = {
@@ -40,16 +47,18 @@ export function TapPort({
     if (connected) {
       return type === 'input' ? 'border-blue-600 bg-blue-500' : 'border-green-600 bg-green-500';
     }
-    return type === 'input' ? 'border-blue-500 bg-blue-100' : 'border-green-500 bg-green-100';
+    return type === 'input' ? 'border-blue-500 bg-blue-400' : 'border-green-500 bg-green-400';
   };
 
   const baseClasses = [
-    'absolute w-3 h-3 rounded-full border-2 transition-all duration-200',
-    'hover:scale-125 cursor-pointer',
+    'absolute w-4 h-4 rounded-full border-2 transition-all duration-200',
+    'hover:scale-125 cursor-pointer z-50',
     positionClasses[position],
     getTypeClasses(),
     className
   ].filter(Boolean).join(' ');
+
+  console.log('Rendering TapPort:', { type, position, dataGadgetId, dataPortId });
 
   return (
     <div
@@ -58,6 +67,9 @@ export function TapPort({
       onMouseDown={onMouseDown}
       onMouseUp={onMouseUp}
       title={label}
+      data-gadget-id={dataGadgetId}
+      data-port-id={dataPortId}
+      data-port-type={dataPortType}
     >
       {/* Optional label */}
       {label && (

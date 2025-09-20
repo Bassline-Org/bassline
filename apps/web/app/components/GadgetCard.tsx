@@ -52,6 +52,8 @@ export function GadgetCard({
     const cardWidth = cardRect.width;
     const cardHeight = cardRect.height;
 
+    console.log('Registering ports for', id, { cardRect, ports });
+
     ports.forEach(port => {
       let portPosition: Point;
 
@@ -74,6 +76,7 @@ export function GadgetCard({
       portPosition.x += position.x;
       portPosition.y += position.y;
 
+      console.log('Registering port', { id, portId: port.id, portPosition });
       registerPort(id, port.id, portPosition);
     });
 
@@ -82,15 +85,35 @@ export function GadgetCard({
 
   const handlePortMouseDown = (port: PortConfig, e: React.MouseEvent) => {
     if (port.type === 'output') {
-      const rect = cardRef.current?.getBoundingClientRect();
-      if (!rect) return;
+      // Prevent event from bubbling to card selection
+      e.stopPropagation();
 
-      const startPoint: Point = {
-        x: e.clientX - rect.left + position.x,
-        y: e.clientY - rect.top + position.y
-      };
+      // Get the port position relative to the container
+      const cardRect = cardRef.current?.getBoundingClientRect();
+      if (!cardRect) return;
 
-      startDrag(id, port.id, startPoint);
+      let portX, portY;
+      switch (port.position) {
+        case 'top':
+          portX = position.x + cardRect.width / 2;
+          portY = position.y;
+          break;
+        case 'bottom':
+          portX = position.x + cardRect.width / 2;
+          portY = position.y + cardRect.height;
+          break;
+        case 'left':
+          portX = position.x;
+          portY = position.y + cardRect.height / 2;
+          break;
+        case 'right':
+          portX = position.x + cardRect.width;
+          portY = position.y + cardRect.height / 2;
+          break;
+      }
+
+      console.log('Starting drag:', { id, portId: port.id, position: { x: portX, y: portY } });
+      startDrag(id, port.id, { x: portX, y: portY });
     }
   };
 
@@ -106,7 +129,7 @@ export function GadgetCard({
       <Card
         className={[
           'relative cursor-pointer transition-all duration-200',
-          'hover:shadow-lg',
+          'hover:shadow-lg overflow-visible',
           selected && 'ring-2 ring-blue-500',
           violated && 'ring-2 ring-red-500 bg-red-50',
           className

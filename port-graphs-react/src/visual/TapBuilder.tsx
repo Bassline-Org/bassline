@@ -58,23 +58,31 @@ export function TapBuilder({
     };
 
     const handleMouseUp = (e: MouseEvent) => {
+      console.log('TapBuilder: handleMouseUp', { dragState });
+
       // Check if we're dropping on a valid port
       const target = e.target as Element;
       const portElement = target.closest('[data-port-id]');
+
+      console.log('Drop target:', { target, portElement });
 
       if (portElement && dragState.fromGadget && dragState.fromPort) {
         const toGadget = portElement.getAttribute('data-gadget-id');
         const toPort = portElement.getAttribute('data-port-id');
         const toType = portElement.getAttribute('data-port-type');
 
+        console.log('Connection attempt:', { toGadget, toPort, toType });
+
         // Only allow connections from output to input
         if (toType === 'input' && toGadget && toPort) {
-          onConnectionCreate?.({
+          const newConnection = {
             from: dragState.fromGadget,
             to: toGadget,
             fromPort: dragState.fromPort,
             toPort: toPort
-          });
+          };
+          console.log('Creating connection:', newConnection);
+          onConnectionCreate?.(newConnection);
         }
       }
 
@@ -92,6 +100,7 @@ export function TapBuilder({
 
   // Start drag operation from a port
   const startDrag = (gadgetId: string, portId: string, startPoint: Point) => {
+    console.log('TapBuilder: startDrag called', { gadgetId, portId, startPoint });
     setDragState({
       isActive: true,
       start: startPoint,
