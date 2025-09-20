@@ -90,3 +90,6 @@ bassline-web/.env.test
 *.tmp
 *.temp
 /bassline-web/.react-router/
+
+*storybook.log
+storybook-static

@@ -12,6 +12,9 @@ export { useGadget } from './useGadget';
 // Tap-based connections
 export { useTap, useTaps, useBidirectionalTap } from './useTap';
 
+// Family pattern
+export { useGadgetFromFamily, useGadgetsFromFamily } from './useGadgetFamily';
+
 // Lifecycle management
 export * from './lifecycle';
 

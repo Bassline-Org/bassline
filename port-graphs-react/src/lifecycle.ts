@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Gadget } from 'port-graphs';
 
 /**
@@ -28,7 +28,7 @@ export function useBatchedGadget<State, Incoming, Effect>(
   initial: State,
   batchDelay: number = 0
 ): readonly [State, (data: Incoming) => void, Gadget<State, Incoming, Effect>] {
-  const [state, setState] = React.useState<State>(initial);
+  const [state, setState] = useState<State>(initial);
   const gadgetRef = useRef<Gadget<State, Incoming, Effect>>();
   const batchTimeoutRef = useRef<NodeJS.Timeout>();
   const pendingUpdates = useRef<State[]>([]);
@@ -135,7 +135,7 @@ export function useManagedGadget<State, Incoming, Effect>(
     onEffect?: (effect: Effect) => void;
   } = {}
 ): readonly [State, (data: Incoming) => void, Gadget<State, Incoming, Effect>] {
-  const [state, setState] = React.useState<State>(initial);
+  const [state, setState] = useState<State>(initial);
   const gadgetRef = useRef<Gadget<State, Incoming, Effect>>();
   const { onMount, onUnmount, onStateChange, onEffect } = options;
 
@@ -188,4 +188,3 @@ export function useManagedGadget<State, Incoming, Effect>(
   return [state, send, gadgetRef.current!] as const;
 }
 
-import React from 'react';
