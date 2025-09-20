@@ -25,7 +25,7 @@ import { lastMap, unionCell, maxCell, lastCell, createGadget } from 'port-graphs
 function CounterGadget({ id }: { id: string }) {
   const gadgetsTable = useCommonGadget();
   const [count, , counterGadget] = useGadget(
-    () => maxCell(0),
+    maxCell,
     0
   );
 
@@ -38,7 +38,7 @@ function CounterGadget({ id }: { id: string }) {
 
   return (
     <div
-      onClick={() => { counterGadget.receive(count + 1); console.log('id: ', id) }}
+      onClick={() => { counterGadget.receive(count + 1) }}
       style={{
         padding: '10px',
         border: '2px solid #4a90e2',
@@ -155,7 +155,6 @@ function NodeGadget({ id, data }: { id: string; data: any }) {
 
 const nodeTypes = {
   gadget: NodeGadget,
-  //region: RegionNode,
 };
 
 // Spatial computation gadgets
@@ -248,47 +247,6 @@ const createRegionGadget = (bounds: { x: number, y: number, width: number, heigh
     }
   );
 
-// // Custom node to represent regions in ReactFlow's coordinate system
-// function RegionNode({ data }: { data: any }) {
-//   return (
-//     <div
-//       style={{
-//         width: data.width || 200,
-//         height: data.height || 150,
-//         border: `2px dashed ${data.color}`,
-//         borderRadius: '8px',
-//         background: `${data.color}20`,
-//         display: 'flex',
-//         flexDirection: 'column',
-//         alignItems: 'center',
-//         justifyContent: 'center',
-//       }}
-//     >
-//       <div style={{
-//         background: 'white',
-//         padding: '4px 8px',
-//         borderRadius: '4px',
-//         fontSize: '12px',
-//         fontWeight: 'bold',
-//         color: data.color
-//       }}>
-//         {data.label}
-//       </div>
-//       {data.nodesInside > 0 && (
-//         <div style={{
-//           fontSize: '10px',
-//           marginTop: '4px',
-//           background: 'white',
-//           padding: '2px 6px',
-//           borderRadius: '4px'
-//         }}>
-//           {data.nodesInside} nodes
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
 export default function CanvasNew() {
   // ECS-style tables for node data
   const [nodeIds, , nodeIdsCell] = useGadget(
@@ -317,57 +275,11 @@ export default function CanvasNew() {
     new Set<[string, string]>()
   );
 
-  // // Create spatial regions
-  // const [multiplyRegion, , multiplyRegionGadget] = useGadget(
-  //   () => createRegionGadget(
-  //     { x: 250, y: 50, width: 200, height: 150 },
-  //     (value) => value * 2
-  //   )(new Set()),
-  //   new Set<string>()
-  // );
-
-  // const [slowRegion, , slowRegionGadget] = useGadget(
-  //   () => createRegionGadget(
-  //     { x: 50, y: 250, width: 200, height: 150 },
-  //     (value) => value / 2
-  //   )(new Set()),
-  //   new Set<string>()
-  // );
-
-  // Track which gadgets are in which regions for transformations
-  const regionTransformsRef = useRef<Map<string, (value: any) => any>>(new Map());
-
-  // // Update transforms based on regions
-  // useTap(multiplyRegionGadget, (effect) => {
-  //   if (effect && 'changed' in effect) {
-  //     const inside = effect.changed as Set<string>;
-  //     // Apply 2x multiplier to gadgets in this region
-  //     for (const id of inside) {
-  //       regionTransformsRef.current.set(id, (v) => typeof v === 'number' ? v * 2 : v);
-  //     }
-  //     // Remove transform for gadgets that left
-  //     for (const [id, _] of regionTransformsRef.current) {
-  //       if (!inside.has(id) && id.includes('multiply')) {
-  //         regionTransformsRef.current.delete(id);
-  //       }
-  //     }
-  //   }
-  // }, []);
-
-  // useTap(slowRegionGadget, (effect) => {
-  //   if (effect && 'entered' in effect) {
-  //     const entered = effect.entered as string[];
-  //     console.log('Nodes entered slow region:', entered);
-  //   }
-  // }, []);
-
   // Connect position changes to spatial gadgets
   useTap(positionsCell, (effect) => {
     if (effect && 'changed' in effect) {
       const positions = effect.changed as Record<string, { x: number, y: number }>;
       proximityGadget.receive(positions);
-      // multiplyRegionGadget.receive({ positions, gadgets });
-      // slowRegionGadget.receive({ positions, gadgets });
     }
   }, [gadgets]);
 
@@ -379,38 +291,6 @@ export default function CanvasNew() {
 
   // Rebuild nodes whenever nodeIds or initial data changes
   useEffect(() => {
-    //   // Add region nodes first (so they appear behind gadgets)
-    //   const regionNodes = [
-    //     {
-    //       id: 'multiply-region',
-    //       type: 'region' as const,
-    //       position: { x: 250, y: 50 },
-    //       selectable: false,
-    //       draggable: false,
-    //       data: {
-    //         width: 200,
-    //         height: 150,
-    //         label: 'Multiply Region (2x)',
-    //         color: '#4caf50',
-    //         nodesInside: 0
-    //       }
-    //     },
-    //     {
-    //       id: 'slow-region',
-    //       type: 'region' as const,
-    //       position: { x: 50, y: 250 },
-    //       selectable: false,
-    //       draggable: false,
-    //       data: {
-    //         width: 200,
-    //         height: 150,
-    //         label: 'Slow Region (÷2)',
-    //         color: '#f44336',
-    //         nodesInside: 0
-    //       }
-    //     }
-    //   ];
-
     const gadgetNodes = Array.from(nodeIds).map(id => {
       // Preserve existing node if it exists
       const existing = nodes.find((n: Node) => n.id === id);
