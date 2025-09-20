@@ -18,5 +18,8 @@ export { createReactFamily } from './createReactFamily';
 export { GadgetContext, ProvideGadget, useCurrentGadget, useExplicitGadget } from './GadgetContext';
 export { Tap } from './Tap';
 
+// Visual components for tap connections
+export * from './visual';
+
 // Re-export core gadget types for convenience
 export type { Gadget, Tappable } from 'port-graphs';

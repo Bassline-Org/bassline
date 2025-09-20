@@ -16,6 +16,9 @@ type Pages = {
   "/canvas-clean": {
     params: {};
   };
+  "/gadget-demo": {
+    params: {};
+  };
   "/canvas-new": {
     params: {};
   };
@@ -30,11 +33,15 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/canvas-clean" | "/canvas-new" | "/canvas" | "/home";
+    page: "/" | "/canvas-clean" | "/gadget-demo" | "/canvas-new" | "/canvas" | "/home";
   };
   "routes/canvas-clean.tsx": {
     id: "routes/canvas-clean";
     page: "/canvas-clean";
+  };
+  "routes/gadget-demo.tsx": {
+    id: "routes/gadget-demo";
+    page: "/gadget-demo";
   };
   "routes/canvas-new.tsx": {
     id: "routes/canvas-new";

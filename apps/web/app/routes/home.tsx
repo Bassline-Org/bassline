@@ -4,7 +4,7 @@ import { Button } from "~/components/ui/button";
 import { useRef, useEffect } from "react";
 import { toast } from "sonner";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Bassline" },
     { name: "description", content: "Propagation networks" },
@@ -15,30 +15,30 @@ export function meta({}: Route.MetaArgs) {
 export async function clientAction({ request }: Route.ActionArgs) {
   const formData = await request.formData();
   const file = formData.get("basslineFile") as File;
-  
+
   if (!file || file.size === 0) {
     return { error: "No file uploaded" };
   }
-  
+
   try {
     const text = await file.text();
     const template = JSON.parse(text);
-    
+
     // Validate the template
     if (!template.rootGroup) {
       return { error: "Invalid bassline format: missing rootGroup" };
     }
-    
+
     // Encode the template in base64 for URL transport
     const encodedTemplate = btoa(text);
-    
+
     // Return a redirect response to the editor with search params
     const params = new URLSearchParams({
       bassline: 'uploaded',
       data: encodedTemplate,
       name: file.name.replace('.json', '')
     });
-    
+
     return Response.redirect(`/editor?${params.toString()}`);
   } catch (error) {
     return { error: "Failed to parse bassline file" };
@@ -84,7 +84,7 @@ const basslines = [
   },
   {
     name: "set-test",
-    title: "Set Serialization Test", 
+    title: "Set Serialization Test",
     description: "Testing Set and other special value serialization",
   },
   {
@@ -99,13 +99,13 @@ export default function Home() {
   const navigation = useNavigation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isUploading = navigation.state === "submitting";
-  
+
   useEffect(() => {
     if (actionData?.error) {
       toast.error(actionData.error, { duration: 2000 });
     }
   }, [actionData]);
-  
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="container mx-auto py-12 px-4">
@@ -113,7 +113,7 @@ export default function Home() {
         <p className="text-lg text-slate-600 mb-12">
           Visual programming with propagation networks. Choose a bassline to start grooving:
         </p>
-        
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {/* Gadget Demo - NEW! */}
           <Link to="/gadget-demo" className="block">
@@ -136,7 +136,7 @@ export default function Home() {
               <Button variant="default">Open Canvas</Button>
             </div>
           </Link>
-          
+
           {/* New v2 editor */}
           <Link to="/editor" className="block">
             <div className="border border-green-200 rounded-lg p-6 hover:border-green-300 hover:shadow-lg transition-all bg-green-50">
@@ -147,7 +147,7 @@ export default function Home() {
               <Button variant="default">Try Editor V2</Button>
             </div>
           </Link>
-          
+
           {/* Default editor */}
           <Link to="/simple-editor" className="block">
             <div className="border border-slate-200 rounded-lg p-6 hover:border-slate-300 hover:shadow-lg transition-all">
@@ -158,11 +158,11 @@ export default function Home() {
               <Button variant="outline">Use Simple Editor</Button>
             </div>
           </Link>
-          
+
           {/* Bassline templates */}
           {basslines.map((bassline) => (
-            <Link 
-              key={bassline.name} 
+            <Link
+              key={bassline.name}
               to={{
                 pathname: '/editor',
                 search: new URLSearchParams({ bassline: bassline.name }).toString()
@@ -178,10 +178,10 @@ export default function Home() {
               </div>
             </Link>
           ))}
-          
+
           {/* Load from file */}
           <Form method="post" encType="multipart/form-data">
-            <div 
+            <div
               className="border border-dashed border-slate-300 rounded-lg p-6 hover:border-slate-400 hover:shadow-lg transition-all cursor-pointer"
               onClick={() => !isUploading && fileInputRef.current?.click()}
             >
@@ -189,9 +189,9 @@ export default function Home() {
               <p className="text-slate-600 mb-4">
                 Upload a bassline JSON file from your computer
               </p>
-              <Button 
-                type="button" 
-                variant="secondary" 
+              <Button
+                type="button"
+                variant="secondary"
                 disabled={isUploading}
               >
                 {isUploading ? "Uploading..." : "Choose File"}
