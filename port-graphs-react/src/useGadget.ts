@@ -1,68 +1,82 @@
 /**
  * React hook for integrating gadgets with React state management
  *
- * This hook creates a bridge between the gadget protocol and React's state system,
- * making React's state the single source of truth while preserving gadget behavior.
- * All gadgets are automatically made tappable for easy connections.
+ * This hook supports both direct gadgets and family gadgets with keys.
+ * All gadgets are managed through the GadgetProvider for consistent state.
  */
 
-import { useRef, useState, useCallback } from 'react';
-import type React from 'react';
-import { replaceSemantics, type Gadget, withTaps, type Tappable } from 'port-graphs';
+import { type Gadget, type Tappable } from 'port-graphs';
+import { useGadgetFromProvider } from './GadgetProvider';
 
-/**
- * Creates a React-aware gadget that uses React state as its source of truth
- * and is automatically tappable for connections.
- *
- * @param gadget - A gadget instance to connect to React state
- * @returns Tuple of [currentState, send, tappableGadget]
- */
+// Type to check if something is a family gadget
+type FamilyGadget<K extends string | number = string | number> = Gadget<
+  { gadgets: Map<K, any>; factory: () => any },
+  { get: K } | { delete: K } | { clear: true },
+  any
+>;
 
-export type ReactExtension = {
-  reactExtensionSetup: true;
-  reactStateRef?: React.MutableRefObject<any>;
+function isFamily(gadget: any): gadget is FamilyGadget {
+  return gadget?.current?.()?.gadgets instanceof Map && typeof gadget?.current?.()?.factory === 'function';
 }
 
+/**
+ * React hook for using gadgets with automatic state management.
+ * Supports both direct gadgets and family gadgets.
+ *
+ * @example
+ * // Direct gadget
+ * const [value, send] = useGadget(counterGadget);
+ *
+ * @example
+ * // Family gadget with key
+ * const [value, send] = useGadget(nodeFamily, 'node-1');
+ */
 export function useGadget<State, Incoming = any, Effect = any>(
   gadget: Gadget<State, Incoming, Effect>
-): readonly [State, (data: Incoming) => void, Tappable<State, Incoming, Effect>] {
-  const gadgetRef = useRef<Tappable<State, Incoming, Effect> & ReactExtension>();
-  const [state, setState] = useState<State>(gadget.current());
-  const stateRef = useRef<State>(state);
+): readonly [State, (data: Incoming) => void, Tappable<State, Incoming, Effect>];
 
-  // Configure the gadget once, or reuse if already configured
-  if (!gadgetRef.current) {
-    // Check if gadget is already React-extended
-    const extended = gadget as any as ReactExtension;
-    if (extended.reactExtensionSetup) {
-      // Reuse the existing React-extended gadget
-      gadgetRef.current = gadget as Tappable<State, Incoming, Effect> & ReactExtension;
-      // Sync with existing state
-      if (extended.reactStateRef) {
-        setState(extended.reactStateRef.current);
-        stateRef.current = extended.reactStateRef.current;
-      }
-    } else {
-      // Make it tappable first
-      const tappable = withTaps(gadget);
-      // Then replace state management with React state
-      const replaced = replaceSemantics(tappable, {
-        emit: tappable.emit, // Keep the tappable emit
-        current: () => stateRef.current,
-        update: (newState) => {
-          setState(newState);
-          stateRef.current = newState;
-        },
-      }) as Tappable<State, Incoming, Effect> & ReactExtension;
-      replaced.reactExtensionSetup = true;
-      replaced.reactStateRef = stateRef;
-      gadgetRef.current = replaced;
+export function useGadget<K extends string | number, State, Incoming = any, Effect = any>(
+  family: FamilyGadget<K>,
+  key: K
+): readonly [State, (data: Incoming) => void, Tappable<State, Incoming, Effect>];
+
+export function useGadget<State, Incoming = any, Effect = any>(
+  gadgetOrFamily: Gadget<State, Incoming, Effect> | FamilyGadget,
+  key?: string | number
+): readonly [State, (data: Incoming) => void, Tappable<State, Incoming, Effect>] {
+  // Handle family gadgets
+  if (isFamily(gadgetOrFamily) && key !== undefined) {
+    // Get or create the gadget from the family
+    const familyState = gadgetOrFamily.current();
+    let gadget = familyState.gadgets?.get(key) as Gadget<State, Incoming, Effect> | undefined;
+
+    if (!gadget) {
+      // Create the gadget
+      gadgetOrFamily.receive({ get: key });
+      gadget = gadgetOrFamily.current().gadgets?.get(key) as Gadget<State, Incoming, Effect>;
     }
+
+    if (!gadget) {
+      throw new Error(`Failed to create gadget for key: ${key}`);
+    }
+
+    // Use the provider for state management
+    return useGadgetFromProvider(gadget);
   }
 
-  const send = useCallback((data: Incoming) => {
-    gadgetRef.current!.receive(data);
-  }, []);
+  // Handle direct gadgets
+  if (!isFamily(gadgetOrFamily) && key === undefined) {
+    return useGadgetFromProvider(gadgetOrFamily);
+  }
 
-  return [state, send, gadgetRef.current!] as const;
+  // Error cases
+  if (isFamily(gadgetOrFamily) && key === undefined) {
+    throw new Error('Family gadgets require a key parameter');
+  }
+
+  if (!isFamily(gadgetOrFamily) && key !== undefined) {
+    throw new Error('Direct gadgets do not accept a key parameter');
+  }
+
+  throw new Error('Invalid useGadget call');
 }

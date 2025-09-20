@@ -2,17 +2,26 @@
  * React integration for port-graphs gadgets
  *
  * This package provides hooks and utilities for seamlessly integrating
- * gadgets with React components, using React state as the single source of truth.
- * All gadgets are automatically tappable for easy direct connections.
+ * gadgets with React components, using a global provider for state management.
  */
 
-// Core hook - returns Tappable gadgets
+// Provider for global gadget state management
+export { GadgetProvider, useGadgetContext } from './GadgetProvider';
+
+// Core hook - polymorphic, supports both direct and family gadgets
 export { useGadget } from './useGadget';
+
+// Family creation helper
+export { createReactFamily } from './createReactFamily';
+
+// Declarative wiring components
+export { GadgetContext, ProvideGadget, useCurrentGadget, useExplicitGadget } from './GadgetContext';
+export { Tap } from './Tap';
 
 // Tap-based connections
 export { useTap, useTaps, useBidirectionalTap } from './useTap';
 
-// Family pattern
+// Legacy family hooks (may be deprecated)
 export { useGadgetFromFamily, useGadgetsFromFamily } from './useGadgetFamily';
 
 // Lifecycle management

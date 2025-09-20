@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useGadget, useTap } from 'port-graphs-react';
-import { maxCell, tapValue, tapTransform } from 'port-graphs';
+import { maxCell, tapValue, tapTransform, withTaps } from 'port-graphs';
 
 // Create gadget outside component - like a Recoil atom
-const counterGadget = maxCell(0);
+const counterGadget = withTaps(maxCell(0));
 
 // Counter component that uses the gadget
 function Counter() {
@@ -34,8 +34,8 @@ function Counter() {
 }
 
 // Gadgets for the connected example
-const connectedCounter = maxCell(0);
-const connectedDisplay = maxCell(0);
+const connectedCounter = withTaps(maxCell(0));
+const connectedDisplay = withTaps(maxCell(0));
 
 // Counter with display
 function CounterWithDisplay() {
@@ -94,9 +94,9 @@ function CounterWithDisplay() {
 }
 
 // Gadgets for transformation example
-const transformCounter = maxCell(0);
-const doubledGadget = maxCell(0);
-const squaredGadget = maxCell(0);
+const transformCounter = withTaps(maxCell(0));
+const doubledGadget = withTaps(maxCell(0));
+const squaredGadget = withTaps(maxCell(0));
 
 // Counter with transformation
 function CounterWithTransform() {

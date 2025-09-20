@@ -1,18 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { useState, useEffect } from 'react';
-import { useGadget, useGadgetFromFamily, useTap } from 'port-graphs-react';
-import { createFamily, lastCell, tapValue, withTaps } from 'port-graphs';
+import { useState } from 'react';
+import { useGadget, useTap, createReactFamily } from 'port-graphs-react';
+import { lastCell, tapValue } from 'port-graphs';
 
 
 // Component that uses a gadget from the family
 function NodeComponent({ id }: { id: string }) {
-  const gadget = useGadgetFromFamily(nodeFamily, id);
-
-  if (!gadget) {
-    return <div>Loading node {id}...</div>;
-  }
-
-  const [value, send] = useGadget(gadget);
+  const [value, send] = useGadget(nodeFamily, id);
 
   return (
     <div style={{
@@ -38,7 +32,7 @@ function NodeComponent({ id }: { id: string }) {
 }
 
 // Create a family of node gadgets - static like Recoil atomFamily
-const nodeFamily = createFamily((id: string) => withTaps(lastCell(`Node ${id}`)));
+const nodeFamily = createReactFamily(() => lastCell(''));
 
 // Dynamic node creation demo
 function DynamicNodes() {
@@ -107,28 +101,18 @@ function DynamicNodes() {
 }
 
 // Create families for different types
-const sourceFamily = createFamily((id: string) => withTaps(lastCell(0)));
-const displayFamily = createFamily((id: string) => withTaps(lastCell('')));
+const sourceFamily = createReactFamily(() => lastCell(0));
+const displayFamily = createReactFamily(() => lastCell(''));
 
 // Connected family members
 function ConnectedFamily() {
 
   function SourceNode({ id, targetId }: { id: string; targetId: string }) {
-    const source = useGadgetFromFamily(sourceFamily, id);
-    const target = useGadgetFromFamily(displayFamily, targetId);
+    const [value, send, tappableSource] = useGadget(sourceFamily, id);
+    const [, , tappableTarget] = useGadget(displayFamily, targetId);
 
-    if (!source || !target) return <div>Loading...</div>;
-
-    const [value, send, tappableSource] = useGadget(source);
-
-    // Connect source to target directly (not through useGadget wrapper)
-    useTap(tappableSource, (effect) => {
-      console.log(`Source ${id} emitted:`, effect);
-      if (effect?.changed !== undefined) {
-        console.log(`Sending to display ${targetId}:`, effect.changed);
-        target.receive(effect.changed);
-      }
-    }, [target]);
+    // Connect source to target
+    useTap(tappableSource, tapValue(tappableTarget), [tappableTarget]);
 
     return (
       <div style={{
@@ -156,11 +140,7 @@ function ConnectedFamily() {
   }
 
   function DisplayNode({ id }: { id: string }) {
-    const gadget = useGadgetFromFamily(displayFamily, id);
-    if (!gadget) return <div>Loading...</div>;
-
-    const [value, send] = useGadget(gadget);
-    console.log(`Display ${id} current value:`, value);
+    const [value] = useGadget(displayFamily, id);
 
     return (
       <div style={{

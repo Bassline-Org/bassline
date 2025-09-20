@@ -14,7 +14,7 @@ import { changed, noop } from '../effects';
  */
 type FamilyState<K extends string | number, G> = {
   gadgets: Map<K, G>;
-  factory: (key: K) => G;
+  factory: () => G;
 };
 
 /**
@@ -37,13 +37,14 @@ type FamilyEffect<K, G> =
 /**
  * Creates a family gadget that manages a collection of gadgets.
  * Gadgets are created lazily when first requested.
+ * All gadgets created are identical - the key is only for storage/retrieval.
  *
- * @param factory - Function that creates a gadget for a given key
+ * @param factory - Parameterless function that creates a gadget
  * @returns A gadget that manages other gadgets
  *
  * @example
  * // Create a family of counter gadgets
- * const counterFamily = createFamily((id: string) => maxCell(0));
+ * const counterFamily = createFamily(() => maxCell(0));
  *
  * // Request a gadget from the family
  * counterFamily.receive({ get: 'counter-1' });
@@ -54,7 +55,7 @@ type FamilyEffect<K, G> =
  * // Effect: { existing: { key: 'counter-1', gadget: <gadget> } }
  */
 export function createFamily<K extends string | number, State, Incoming = any, Effect = any>(
-  factory: (key: K) => Gadget<State, Incoming, Effect>
+  factory: () => Gadget<State, Incoming, Effect>
 ): Gadget<FamilyState<K, Gadget<State, Incoming, Effect>>, FamilyIncoming<K>, FamilyEffect<K, Gadget<State, Incoming, Effect>>> {
   return createGadget<
     FamilyState<K, Gadget<State, Incoming, Effect>>,
@@ -90,7 +91,7 @@ export function createFamily<K extends string | number, State, Incoming = any, E
     {
       'create': (gadget, context) => {
         const key = context.key as K;
-        const newGadget = gadget.current().factory(key);
+        const newGadget = gadget.current().factory();
         const newGadgets = new Map(gadget.current().gadgets);
         newGadgets.set(key, newGadget);
         gadget.update({ ...gadget.current(), gadgets: newGadgets });
