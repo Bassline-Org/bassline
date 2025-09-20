@@ -28,6 +28,10 @@
     "./effects": {
       "import": "./dist/effects/index.js",
       "types": "./dist/effects/index.d.ts"
+    },
+    "./ui": {
+      "import": "./dist/patterns/ui/index.js",
+      "types": "./dist/patterns/ui/index.d.ts"
     }
   },
   "scripts": {

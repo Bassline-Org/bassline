@@ -1,7 +1,9 @@
 import type { Route } from "./+types/gadget-demo";
 import { useState, useEffect } from "react";
 import { GadgetProvider, useGadget, TapBuilder, type Connection } from 'port-graphs-react';
-import { lastCell, tapValue, withTaps } from 'port-graphs';
+import { lastCell, tapValue, tapTo, tapDebug, withTaps } from 'port-graphs';
+import { adder } from 'port-graphs/functions';
+import { sliderGadget, meterGadget } from 'port-graphs/ui';
 import { Slider } from '~/components/ui/slider';
 import { Progress } from '~/components/ui/progress';
 import { Badge } from '~/components/ui/badge';
@@ -34,8 +36,8 @@ function ConnectedSlider({
   min?: number,
   max?: number
 }) {
-  const [value, setValue] = useGadget(gadget);
-  const numValue = typeof value === 'number' ? value : min;
+  const [state] = useGadget(gadget);
+  const numValue = (state && typeof state === 'object' && 'value' in state && typeof (state as any).value === 'number') ? (state as any).value : min;
 
   const ports: PortConfig[] = [
     { id: 'output', type: 'output', position: 'right', label: 'value' }
@@ -47,7 +49,7 @@ function ConnectedSlider({
       title={title}
       ports={ports}
       position={position}
-      selected={selected}
+      selected={selected ?? false}
       onSelect={onSelect}
       className="w-64"
     >
@@ -60,7 +62,7 @@ function ConnectedSlider({
         </div>
         <Slider
           value={[numValue]}
-          onValueChange={([newValue]) => setValue(newValue)}
+          onValueChange={([newValue]) => gadget.receive({ type: 'set', value: newValue })}
           min={min}
           max={max}
           step={1}
@@ -93,8 +95,8 @@ function ConnectedMeter({
   min?: number,
   max?: number
 }) {
-  const [value] = useGadget(gadget);
-  const numValue = typeof value === 'number' ? value : 0;
+  const [state] = useGadget(gadget);
+  const numValue = (state && typeof state === 'object' && 'value' in state && typeof (state as any).value === 'number') ? (state as any).value : 0;
   const percentage = Math.max(0, Math.min(100, ((numValue - min) / (max - min)) * 100));
 
   const ports: PortConfig[] = [
@@ -107,7 +109,7 @@ function ConnectedMeter({
       title={title}
       ports={ports}
       position={position}
-      selected={selected}
+      selected={selected ?? false}
       onSelect={onSelect}
       className="w-64"
     >
@@ -134,34 +136,22 @@ function ConnectedMeter({
 function ConnectedCalculator({
   id,
   title,
-  inputA,
-  inputB,
-  result,
+  gadget,
   position,
   selected,
   onSelect
 }: {
   id: string,
   title: string,
-  inputA: any,
-  inputB: any,
-  result: any,
+  gadget: any,
   position: { x: number, y: number },
   selected?: boolean,
   onSelect?: () => void
 }) {
-  const [valueA] = useGadget(inputA);
-  const [valueB] = useGadget(inputB);
-  const [resultValue, setResult] = useGadget(result);
-
-  const numA = typeof valueA === 'number' ? valueA : 0;
-  const numB = typeof valueB === 'number' ? valueB : 0;
-  const sum = numA + numB;
-
-  // Update result when inputs change
-  useEffect(() => {
-    setResult(sum);
-  }, [sum, setResult]);
+  const [state] = useGadget(gadget);
+  const numA = (state && typeof state === 'object' && 'a' in state && typeof (state as any).a === 'number') ? (state as any).a : 0;
+  const numB = (state && typeof state === 'object' && 'b' in state && typeof (state as any).b === 'number') ? (state as any).b : 0;
+  const sum = (state && typeof state === 'object' && 'result' in state && typeof (state as any).result === 'number') ? (state as any).result : 0;
 
   const ports: PortConfig[] = [
     { id: 'inputA', type: 'input', position: 'left', label: 'A' },
@@ -175,7 +165,7 @@ function ConnectedCalculator({
       title={title}
       ports={ports}
       position={position}
-      selected={selected}
+      selected={selected ?? false}
       onSelect={onSelect}
       className="w-64"
     >
@@ -200,23 +190,26 @@ function ConnectedCalculator({
 }
 
 export default function GadgetDemo() {
-  // Create tappable gadgets
-  const [sliderA] = useState(() => withTaps(lastCell(25)));
-  const [sliderB] = useState(() => withTaps(lastCell(75)));
-  const [calculatorInputA] = useState(() => withTaps(lastCell(0)));
-  const [calculatorInputB] = useState(() => withTaps(lastCell(0)));
-  const [result] = useState(() => withTaps(lastCell(0)));
+  // Create REAL protocol gadgets
+  const [sliderA] = useState(() => withTaps(sliderGadget(25, 0, 100, 1)));
+  const [sliderB] = useState(() => withTaps(sliderGadget(75, 0, 100, 1)));
+
+  // Adder is a proper function gadget that needs both inputs
+  const [calculator] = useState(() => withTaps(adder({})));
+
+  // Meters to display values
+  const [resultMeter] = useState(() => withTaps(meterGadget(0, 200)));
+  const [monitorA] = useState(() => withTaps(meterGadget(0, 100)));
+  const [monitorB] = useState(() => withTaps(meterGadget(0, 100)));
 
   // Map gadget IDs to actual gadgets for wiring
-  const gadgetMap = {
+  const gadgetMap: Record<string, any> = {
     'slider-a': sliderA,
     'slider-b': sliderB,
-    'calculator-inputA': calculatorInputA,
-    'calculator-inputB': calculatorInputB,
-    'calculator-result': result,
-    'result-meter': result,
-    'monitor-a': sliderA,
-    'monitor-b': sliderB
+    'calculator': calculator,
+    'result-meter': resultMeter,
+    'monitor-a': monitorA,
+    'monitor-b': monitorB
   };
 
   // Connection state
@@ -229,20 +222,48 @@ export default function GadgetDemo() {
 
   const [selectedGadget, setSelectedGadget] = useState<string | null>(null);
 
-  // Wire gadgets based on connections using proper tapping
+  // Wire gadgets based on visual connections using proper tap utilities
   useEffect(() => {
-    // Set up the predefined connections with proper gadget tapping
-    sliderA.tap(tapValue(calculatorInputA));
-    sliderB.tap(tapValue(calculatorInputB));
-    // The calculator will automatically output to result via its useEffect
+    // Clear previous taps (we need a better way to manage this)
+    // For now, we'll just re-wire based on current connections
 
-    // Log connection status
-    console.log('Gadget wiring established:', {
-      'slider-a → calculator-inputA': 'connected',
-      'slider-b → calculator-inputB': 'connected',
-      'calculator → result': 'connected via useEffect'
+    // Add debug logging to see what's happening
+    sliderA.tap(tapDebug('SliderA'));
+    sliderB.tap(tapDebug('SliderB'));
+    calculator.tap(tapDebug('Calculator'));
+
+    // Create taps for each connection using proper utilities
+    connections.forEach(conn => {
+      if (conn.from === 'slider-a' && conn.to === 'calculator' && conn.toPort === 'inputA') {
+        // Use tapTo to send slider value to calculator's 'a' input
+        sliderA.tap(tapTo(calculator, 'a'));
+      }
+
+      if (conn.from === 'slider-b' && conn.to === 'calculator' && conn.toPort === 'inputB') {
+        // Use tapTo to send slider value to calculator's 'b' input
+        sliderB.tap(tapTo(calculator, 'b'));
+      }
+
+      if (conn.from === 'calculator' && conn.to === 'result-meter') {
+        // Calculator emits {changed: {result: X, args: {...}}}
+        // We need to extract the result value
+        calculator.tap((effect) => {
+          if (effect?.changed?.result !== undefined) {
+            resultMeter.receive(effect.changed.result);
+          }
+        });
+      }
+
+      // Direct monitor connections using tapValue
+      if (conn.from === 'slider-a' && conn.to === 'monitor-a') {
+        sliderA.tap(tapValue(monitorA));
+      }
+
+      if (conn.from === 'slider-b' && conn.to === 'monitor-b') {
+        sliderB.tap(tapValue(monitorB));
+      }
     });
-  }, [sliderA, sliderB, calculatorInputA, calculatorInputB, result]);
+  }, [connections]); // Re-wire when connections change
 
   const handleConnectionCreate = (connection: Omit<Connection, 'id'>) => {
     const newConnection: Connection = {
@@ -250,10 +271,6 @@ export default function GadgetDemo() {
       ...connection
     };
     setConnections(prev => [...prev, newConnection]);
-    console.log('✅ Created connection:', newConnection);
-
-    // Show visual feedback
-    console.log('📊 Total connections:', connections.length + 1);
   };
 
   const handleConnectionDelete = (connectionId: string) => {
@@ -269,18 +286,9 @@ export default function GadgetDemo() {
       <div className="min-h-screen bg-slate-50">
         <div className="container mx-auto py-8 px-4">
           <div className="mb-8">
-            <div className="flex items-center gap-3 mb-3">
-              <h1 className="text-3xl font-bold">Gadget Demo Dashboard</h1>
-              <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full border border-green-300">
-                ✅ LIVE
-              </span>
-            </div>
-            <p className="text-slate-600 text-lg">
-              Interactive gadgets demonstrating <strong className="text-blue-600">"GADGETS FOR EVERYTHING"</strong> —
-              universal protocol with dynamic visual connections and real-time data flow.
-            </p>
-            <p className="text-slate-500 text-sm mt-2">
-              Every component follows: <code className="bg-slate-100 px-2 py-1 rounded text-slate-700">receive → consider → act → emit</code>
+            <h1 className="text-3xl font-bold mb-3">Gadget Demo</h1>
+            <p className="text-slate-600">
+              Universal gadget protocol demonstration. Every component follows: <code className="bg-slate-100 px-2 py-1 rounded text-slate-700">receive → consider → act → emit</code>
             </p>
           </div>
 
@@ -318,9 +326,7 @@ export default function GadgetDemo() {
               <ConnectedCalculator
                 id="calculator"
                 title="A + B Calculator"
-                inputA={calculatorInputA}
-                inputB={calculatorInputB}
-                result={result}
+                gadget={calculator}
                 position={{ x: 400, y: 250 }}
                 selected={selectedGadget === 'calculator' || false}
                 onSelect={() => handleGadgetSelect('calculator')}
@@ -329,7 +335,7 @@ export default function GadgetDemo() {
               <ConnectedMeter
                 id="result-meter"
                 title="Result Display"
-                gadget={result}
+                gadget={resultMeter}
                 position={{ x: 750, y: 250 }}
                 selected={selectedGadget === 'result-meter' || false}
                 onSelect={() => handleGadgetSelect('result-meter')}
@@ -340,7 +346,7 @@ export default function GadgetDemo() {
               <ConnectedMeter
                 id="monitor-a"
                 title="Monitor A"
-                gadget={sliderA}
+                gadget={monitorA}
                 position={{ x: 400, y: 50 }}
                 selected={selectedGadget === 'monitor-a' || false}
                 onSelect={() => handleGadgetSelect('monitor-a')}
@@ -351,7 +357,7 @@ export default function GadgetDemo() {
               <ConnectedMeter
                 id="monitor-b"
                 title="Monitor B"
-                gadget={sliderB}
+                gadget={monitorB}
                 position={{ x: 400, y: 450 }}
                 selected={selectedGadget === 'monitor-b' || false}
                 onSelect={() => handleGadgetSelect('monitor-b')}
@@ -363,50 +369,30 @@ export default function GadgetDemo() {
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-6 bg-white rounded-lg border border-slate-200">
-              <h3 className="text-lg font-semibold mb-4 text-slate-800">🎮 Interactive Demo</h3>
-              <div className="space-y-3 text-sm text-slate-700">
-                <p>• <strong className="text-blue-600">Drag Connections:</strong> Click and drag from output ports (●) to input ports</p>
-                <p>• <strong className="text-green-600">Adjust Sliders:</strong> Move sliders to see real-time data flow</p>
-                <p>• <strong className="text-purple-600">Watch Wires:</strong> Visual connections show live data flow</p>
-                <p>• <strong className="text-orange-600">Select Gadgets:</strong> Click gadgets to highlight them</p>
-                <div className="mt-4 p-3 bg-slate-50 rounded border-l-4 border-blue-400">
-                  <p className="text-xs text-slate-600 font-medium">
-                    🎯 <strong>Try this:</strong> Adjust the "Input A" slider and watch how the calculator and result meter update automatically!
-                  </p>
-                </div>
+              <h3 className="text-lg font-semibold mb-4 text-slate-800">Instructions</h3>
+              <div className="space-y-2 text-sm text-slate-600">
+                <p>• Drag from output ports to input ports to create connections</p>
+                <p>• Adjust sliders to see data flow through the network</p>
+                <p>• Click gadgets to select them</p>
               </div>
             </div>
 
-            {selectedGadget && (
-              <div className="p-6 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-800 mb-2">Selected Gadget</h4>
-                <p className="text-blue-700">{selectedGadget}</p>
-              </div>
-            )}
-
-            <div className="p-6 bg-green-50 rounded-lg border border-green-200">
-              <h4 className="font-semibold text-green-800 mb-3">🔗 Live System Status</h4>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-1">
-                    <p className="text-green-700 font-medium">📊 Current Values:</p>
-                    <p className="text-xs text-green-600">Input A: {sliderA.current()}</p>
-                    <p className="text-xs text-green-600">Input B: {sliderB.current()}</p>
-                    <p className="text-xs text-green-600">Result: {result.current()}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-green-700 font-medium">⚡ Active Connections:</p>
-                    {connections.map(conn => (
-                      <p key={conn.id} className="text-xs text-green-600">
-                        {conn.from} → {conn.to}
-                      </p>
-                    ))}
-                  </div>
+            <div className="p-6 bg-slate-50 rounded-lg border border-slate-200">
+              <h4 className="font-semibold text-slate-800 mb-3">System State</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-1">
+                  <p className="text-slate-700 font-medium">Current Values:</p>
+                  <p className="text-xs text-slate-600">Input A: {(sliderA.current() as any)?.value ?? 0}</p>
+                  <p className="text-xs text-slate-600">Input B: {(sliderB.current() as any)?.value ?? 0}</p>
+                  <p className="text-xs text-slate-600">Result: {(calculator.current() as any)?.result ?? 0}</p>
                 </div>
-                <div className="pt-2 border-t border-green-200">
-                  <p className="text-xs text-green-600 font-medium">
-                    ✨ Data flows automatically through connected gadgets!
-                  </p>
+                <div className="space-y-1">
+                  <p className="text-slate-700 font-medium">Connections:</p>
+                  {connections.slice(0, 5).map(conn => (
+                    <p key={conn.id} className="text-xs text-slate-600">
+                      {conn.from} → {conn.to}
+                    </p>
+                  ))}
                 </div>
               </div>
             </div>

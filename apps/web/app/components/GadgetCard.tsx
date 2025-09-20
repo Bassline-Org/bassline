@@ -52,8 +52,6 @@ export function GadgetCard({
     const cardWidth = cardRect.width;
     const cardHeight = cardRect.height;
 
-    console.log('Registering ports for', id, { cardRect, ports });
-
     ports.forEach(port => {
       let portPosition: Point;
 
@@ -76,7 +74,6 @@ export function GadgetCard({
       portPosition.x += position.x;
       portPosition.y += position.y;
 
-      console.log('Registering port', { id, portId: port.id, portPosition });
       registerPort(id, port.id, portPosition);
     });
 
@@ -112,7 +109,6 @@ export function GadgetCard({
           break;
       }
 
-      console.log('Starting drag:', { id, portId: port.id, position: { x: portX, y: portY } });
       startDrag(id, port.id, { x: portX, y: portY });
     }
   };
@@ -135,6 +131,7 @@ export function GadgetCard({
           className
         ].filter(Boolean).join(' ')}
         onClick={onSelect}
+        style={{ overflow: 'visible' }}
       >
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">{title}</CardTitle>

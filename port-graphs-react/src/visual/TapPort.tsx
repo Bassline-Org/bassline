@@ -43,22 +43,20 @@ export function TapPort({
   };
 
   const getTypeClasses = () => {
-    if (active) return 'border-yellow-500 bg-yellow-200 scale-125';
+    if (active) return 'border-yellow-500 bg-yellow-400 scale-125';
     if (connected) {
       return type === 'input' ? 'border-blue-600 bg-blue-500' : 'border-green-600 bg-green-500';
     }
-    return type === 'input' ? 'border-blue-500 bg-blue-400' : 'border-green-500 bg-green-400';
+    return type === 'input' ? 'border-blue-500 bg-blue-500' : 'border-green-500 bg-green-500';
   };
 
   const baseClasses = [
-    'absolute w-4 h-4 rounded-full border-2 transition-all duration-200',
-    'hover:scale-125 cursor-pointer z-50',
+    'absolute w-6 h-6 rounded-full border-2 transition-all duration-200',
+    'hover:scale-150 cursor-pointer z-[100] shadow-lg',
     positionClasses[position],
     getTypeClasses(),
     className
   ].filter(Boolean).join(' ');
-
-  console.log('Rendering TapPort:', { type, position, dataGadgetId, dataPortId });
 
   return (
     <div
