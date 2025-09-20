@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
-import { useGadget, useTap, createReactFamily } from 'port-graphs-react';
+import { useGadget, createReactFamily, GadgetContext, Tap } from 'port-graphs-react';
 import { lastCell, tapValue } from 'port-graphs';
 
 
@@ -111,11 +111,12 @@ function ConnectedFamily() {
     const [value, send, tappableSource] = useGadget(sourceFamily, id);
     const [, , tappableTarget] = useGadget(displayFamily, targetId);
 
-    // Connect source to target
-    useTap(tappableSource, tapValue(tappableTarget), [tappableTarget]);
-
     return (
-      <div style={{
+      <>
+        <GadgetContext gadget={tappableSource}>
+          <Tap handler={tapValue(tappableTarget)} />
+        </GadgetContext>
+        <div style={{
         padding: '15px',
         background: '#e3f2fd',
         borderRadius: '8px',
@@ -135,7 +136,8 @@ function ConnectedFamily() {
         <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
           Connected to: {targetId}
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -157,7 +159,7 @@ function ConnectedFamily() {
           fontWeight: 'bold',
           textAlign: 'center'
         }}>
-          {value}
+          {String(value)}
         </div>
       </div>
     );

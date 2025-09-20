@@ -63,6 +63,18 @@ export function createFn<TArgs extends Record<string, any>, TResult>(
 }
 
 /**
+ * Creates a unary function gadget (single input)
+ */
+export function unary<A, R>(fn: (a: A) => R) {
+  type Args = { value: A };
+
+  return createFn<Args, R>(
+    (args) => fn(args.value),
+    ['value']
+  );
+}
+
+/**
  * Creates a binary function gadget
  */
 export function binary<A, B, R>(fn: (a: A, b: B) => R) {
@@ -72,6 +84,37 @@ export function binary<A, B, R>(fn: (a: A, b: B) => R) {
     (args) => fn(args.a, args.b),
     ['a', 'b']
   );
+}
+
+/**
+ * Creates a ternary function gadget (three inputs)
+ */
+export function ternary<A, B, C, R>(fn: (a: A, b: B, c: C) => R) {
+  type Args = { a: A; b: B; c: C };
+
+  return createFn<Args, R>(
+    (args) => fn(args.a, args.b, args.c),
+    ['a', 'b', 'c']
+  );
+}
+
+/**
+ * Creates a selector gadget - transforms a single source
+ * This is just a unary function with clearer semantics
+ */
+export function selector<T, R>(select: (source: T) => R) {
+  return unary(select);
+}
+
+/**
+ * Creates a derived gadget that combines multiple sources
+ * This is a more semantic name for multi-input functions
+ */
+export function derived<Args extends Record<string, any>, R>(
+  compute: (args: Args) => R,
+  requiredKeys: (keyof Args)[]
+) {
+  return createFn(compute, requiredKeys);
 }
 
 // Standard arithmetic functions

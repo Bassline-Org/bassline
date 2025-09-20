@@ -13,10 +13,14 @@ import { Gadget } from './core';
  * @example
  * source.tap(tapValue(target));
  */
-export const tapValue = <T>(target: Gadget<any, T, any>) =>
+export const tapValue = <T>(target: Gadget<any, T, any>, key?: string) =>
   (effect: any) => {
     if (effect?.changed !== undefined) {
-      target.receive(effect.changed);
+      if (key) {
+        target.receive({ [key]: effect.changed } as T);
+      } else {
+        target.receive(effect.changed);
+      }
     }
   };
 

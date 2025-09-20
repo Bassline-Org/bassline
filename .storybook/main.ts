@@ -25,6 +25,10 @@ const config: StorybookConfig = {
       ...config.resolve.alias,
       'port-graphs': path.resolve(__dirname, '../port-graphs/src'),
       'port-graphs-react': path.resolve(__dirname, '../port-graphs-react/src'),
+      '@/components': path.resolve(__dirname, '../apps/web/app/components'),
+      '@/lib': path.resolve(__dirname, '../apps/web/app/lib'),
+      '~/lib': path.resolve(__dirname, '../apps/web/app/lib'),
+      '~': path.resolve(__dirname, '../apps/web/app'),
     };
 
     // Add React plugin with automatic JSX runtime

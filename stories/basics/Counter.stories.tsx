@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { useGadget, useTap } from 'port-graphs-react';
+import { useGadget, GadgetContext, Tap } from 'port-graphs-react';
 import { maxCell, tapValue, tapTransform, withTaps } from 'port-graphs';
 
 // Create gadget outside component - like a Recoil atom
@@ -66,21 +66,22 @@ function CounterWithDisplay() {
   // Display component
   function DisplayPart() {
     const [value] = useGadget(display);
-
-    // Connect counter to display
-    // Note: counter from useGadget is already tappable
     const [, , tappableCounter] = useGadget(counter);
-    useTap(tappableCounter, tapValue(display));
 
     return (
-      <div style={{
-        padding: '10px 20px',
-        background: '#f0f0f0',
-        borderRadius: '4px',
-        marginTop: '10px'
-      }}>
-        Display: {value}
-      </div>
+      <>
+        <GadgetContext gadget={tappableCounter}>
+          <Tap handler={tapValue(display)} />
+        </GadgetContext>
+        <div style={{
+          padding: '10px 20px',
+          background: '#f0f0f0',
+          borderRadius: '4px',
+          marginTop: '10px'
+        }}>
+          Display: {value}
+        </div>
+      </>
     );
   }
 
@@ -127,16 +128,15 @@ function CounterWithTransform() {
   function TransformedDisplays() {
     const [doubledValue] = useGadget(doubled);
     const [squaredValue] = useGadget(squared);
-
-    // Get tappable version of counter
     const [, , tappableCounter] = useGadget(counter);
 
-    // Set up transformations
-    useTap(tappableCounter, tapTransform(doubled, (x: number) => x * 2));
-    useTap(tappableCounter, tapTransform(squared, (x: number) => x * x));
-
     return (
-      <div style={{ marginTop: '10px' }}>
+      <>
+        <GadgetContext gadget={tappableCounter}>
+          <Tap handler={tapTransform(doubled, (x: number) => x * 2)} />
+          <Tap handler={tapTransform(squared, (x: number) => x * x)} />
+        </GadgetContext>
+        <div style={{ marginTop: '10px' }}>
         <div style={{
           padding: '10px',
           background: '#e3f2fd',
@@ -152,7 +152,8 @@ function CounterWithTransform() {
         }}>
           Squared: {squaredValue}
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 

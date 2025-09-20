@@ -17,7 +17,9 @@
       "port-graphs": ["./port-graphs/src"],
       "port-graphs/*": ["./port-graphs/src/*"],
       "port-graphs-react": ["./port-graphs-react/src"],
-      "port-graphs-react/*": ["./port-graphs-react/src/*"]
+      "port-graphs-react/*": ["./port-graphs-react/src/*"],
+      "@/components/*": ["./apps/web/app/components/*"],
+      "@/lib/*": ["./apps/web/app/lib/*"]
     },
     "baseUrl": "."
   },
