@@ -9,10 +9,12 @@ import type { GadgetActions, GadgetEffects } from '../core/types';
  * Cell Pattern - Accumulates state monotonically through merge operations
  *
  * The relationship between State and Input is defined by the merge operation.
+ * The merge operation must be Associative, Commutative, and Idempotent (ACI).
+ *
  * Examples:
  * - MaxCell: State=number, Input=number (merge via max)
- * - SetCell: State=Set<T>, Input=T (merge via add)
- * - MapCell: State=Map<K,V>, Input=[K,V] (merge via set)
+ * - UnionCell: State=Set<T>, Input=Set<T> (merge via union)
+ * - LastCell: State=T, Input=T (merge via replacement)
  */
 export type CellSpec<State, Input> = {
   state: State;

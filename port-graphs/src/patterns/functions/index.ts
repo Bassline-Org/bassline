@@ -1,1 +1,2 @@
-export * from './numeric';
+// Export the typed functions
+export * from './typed-functions';

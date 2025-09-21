@@ -3,7 +3,7 @@
  */
 
 import * as _ from 'lodash';
-import { defGadgetTyped } from '../../core/typed';
+import { defGadget } from '../../core/typed';
 import type { FunctionSpec } from '../specs';
 
 /**
@@ -19,7 +19,7 @@ export function typedFn<
   type Spec = FunctionSpec<Args, Result>;
 
   return (initialArgs?: Partial<Args>) => {
-    return defGadgetTyped<Spec>(
+    return defGadget<Spec>(
       (state, input) => {
         // If input is empty, ignore
         if (_.isEmpty(input)) {
@@ -143,28 +143,3 @@ export const conditional = typedFn<
   ['condition', 'ifTrue', 'ifFalse']
 );
 
-/**
- * N-ary function example - sum all values
- */
-export const sumAll = <K extends string = string>(keys: K[]) => {
-  type Args = Record<K, number>;
-
-  return typedFn<Args, number>(
-    args => Object.values(args).reduce((a, b) => a + b, 0),
-    keys
-  );
-};
-
-/**
- * Async function example - demonstrates that functions can be async
- */
-export const delay = typedFn<
-  { value: any; ms: number },
-  Promise<any>
->(
-  async args => {
-    await new Promise(resolve => setTimeout(resolve, args.ms));
-    return args.value;
-  },
-  ['value', 'ms']
-);
