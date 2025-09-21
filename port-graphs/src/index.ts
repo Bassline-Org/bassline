@@ -1,4 +1,6 @@
 export * from './core'
+export * from './core/typed'
+export * from './core/types'
 export * from './effects'
 export * from './multi'
 export * from './patterns/cells'

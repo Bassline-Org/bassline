@@ -15,7 +15,7 @@ export const effects = {
 
 export type ChangedEffect<T> = ReturnType<typeof changed<T>> & EffectType;
 export type NoopEffect = ReturnType<typeof noop> & EffectType;
-export type ContradictionEffect<Curr, Inc> = ReturnType<typeof contradiction<Curr, Inc>> & EffectType;
+export type ContradictionEffect<Curr = unknown, Inc = unknown> = ReturnType<typeof contradiction<Curr, Inc>> & EffectType;
 export type CreationEffect = ReturnType<typeof effects['creation']> & EffectType;
 export type EffectType = {
     [K in keyof typeof effects]: K extends keyof typeof effects ? (typeof effects)[K] : never
