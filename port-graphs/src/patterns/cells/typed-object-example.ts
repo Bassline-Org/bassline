@@ -2,26 +2,74 @@
  * Example using the new object-based action/effect pattern
  */
 
-import { defGadgetTyped, type ActionResult, type EffectResult } from '../../core/typed';
-import type { GadgetSpec } from '../../core/types';
+import _ from 'lodash';
+import { defGadget, type ActionResult, type EffectResult } from '../../core/typed';
+
+type CrudInput<T = unknown> =
+  | { create: T }
+  | { read: T }
+  | { update: T }
+  | { delete: T };
+
+type CrudSpec<T> = {
+  state: T[];
+  input: CrudInput<T>;
+  actions: {
+    add: T;
+    delete: T;
+  },
+  effects: {
+    changed: { newValue: T[], added: T[], removed: T[] }
+  }
+};
+
+const crudExample = defGadget<CrudSpec<number>>(
+  (state, input) => {
+    if ('create' in input || 'update' in input) {
+      const value = 'create' in input ? input.create : input.update;
+      if (_.includes(state, value)) {
+        return null;
+      }
+      return { add: value };
+    }
+    if ('delete' in input) {
+      const value = input.delete;
+      if (!_.includes(state, value)) {
+        return null;
+      }
+      return { delete: value };
+    }
+    return null;
+  },
+  {
+    add: (gadget, value) => {
+      gadget.update([...gadget.current(), value]);
+      return { changed: { newValue: gadget.current(), added: [value], removed: [] } };
+    },
+    delete: (gadget, value) => {
+      gadget.update(gadget.current().filter(x => x !== value));
+      return { changed: { newValue: gadget.current(), added: [], removed: [value] } };
+    },
+  }
+)
 
 // Define a counter spec with object-based actions and effects
-type CounterSpec = GadgetSpec<
-  number,  // State
-  'inc' | 'dec' | 'reset',  // Input
-  {
+type CounterSpec = {
+  state: number,  // State
+  input: 'inc' | 'dec' | 'reset',  // Input
+  actions: {
     update: number;
     skip: {};
   },  // Actions
-  {
+  effects: {
     changed: { value: number };
     noop: {};
   }  // Effects
->;
+};
 
 // Create a typed counter gadget
 export const createCounter = (initial: number) => {
-  return defGadgetTyped<CounterSpec>(
+  return defGadget<CounterSpec>(
     // Consider function - returns single-key object
     (state, input): ActionResult<CounterSpec['actions']> | null => {
       switch (input) {
@@ -64,21 +112,21 @@ counter.receive('reset');
 const value: number = counter.current();  // TypeScript knows this is a number
 
 // Max cell example
-type MaxCellSpec = GadgetSpec<
-  number,
-  number,
-  {
+type MaxCellSpec = {
+  state: number,
+  input: number,
+  actions: {
     update: { value: number };
     ignore: {};
   },
-  {
+  effects: {
     changed: { value: number };
     noop: {};
   }
->;
+};
 
 export const createMaxCell = (initial: number) => {
-  return defGadgetTyped<MaxCellSpec>(
+  return defGadget<MaxCellSpec>(
     (state, input) => {
       if (input > state) {
         return { update: { value: input } };

@@ -19,7 +19,7 @@ export type ActionResult<Actions extends GadgetActions> = {
 // Effect result type - what handlers return (partial object, can emit multiple)
 export type EffectResult<Effects extends GadgetEffects> = Partial<Effects>;
 
-export function defGadgetTyped<
+export function defGadget<
   Spec extends GadgetSpec
 >(
   consider: (state: Spec['state'], input: Spec['input']) => ActionResult<Spec['actions']> | null,
