@@ -37,6 +37,16 @@ export type GadgetSpec<
 
 export type TypedGadget<Spec extends GadgetSpec = GadgetSpec> = Gadget<Spec['state'], Spec['input'], Spec['effects']>;
 
+export type Gadgetish<G> = G extends TypedGadget<infer S> ? G & TypedGadget<S> : never;
+
+export type ExtractSpec<G> =
+  G extends TypedGadget<infer S>
+  ? S
+  : G extends GadgetSpec
+  ? G
+  : never;
+
+
 // Additional effect types
 export type ErrorEffect<E = string> = { error: E };
 

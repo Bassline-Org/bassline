@@ -4,13 +4,13 @@
  * Simple tap extension for observing effects
  */
 
-import type { GadgetSpec, TypedGadget } from '../core/types';
+import type { ExtractSpec, Gadgetish, GadgetSpec, TypedGadget } from '../core/types';
 
 /**
  * Tappable extension - adds tap method while preserving types
  */
-export function withTaps<Spec extends GadgetSpec>(
-  gadget: TypedGadget<Spec>
+export function withTaps<G, Spec extends ExtractSpec<G>>(
+  gadget: Gadgetish<G>
 ) {
   const taps = new Set<(effect: Spec['effects']) => void>();
   const originalEmit = gadget.emit;

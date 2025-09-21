@@ -1,5 +1,5 @@
 /**
- * Global state management for gadgets in React
+ * Global state management for typed gadgets in React
  *
  * This provider maintains a registry of all gadgets and their React state,
  * ensuring each gadget is wrapped exactly once and all components share
@@ -7,24 +7,27 @@
  */
 
 import React, { createContext, useContext, useRef, useSyncExternalStore, useCallback } from 'react';
-import { Gadget, replaceSemantics, withTaps, type Tappable } from 'port-graphs';
+import { ExtractSpec, Gadgetish, type GadgetSpec, Tappable, type TypedGadget, withTaps } from 'port-graphs';
 
-type GadgetEntry<State, Incoming, Effect> = {
-  tappable: Tappable<State, Incoming, Effect>;
+// Registry entry for a typed gadget with its spec
+type GadgetEntry<G, Spec extends ExtractSpec<G>> = {
+  gadget: Gadgetish<G>;
   listeners: Set<() => void>;
-  state: State;
+  state: Spec['state'];
 };
 
-type GadgetRegistry = Map<Gadget, GadgetEntry<any, any, any>>;
+// Map from gadget instances to their entries
+// We use WeakMap for better memory management
+type GadgetRegistry<G = unknown, Spec extends ExtractSpec<G> = ExtractSpec<G>> = WeakMap<Gadgetish<G>, GadgetEntry<G, Spec>>;
 
-type GadgetContextValue = {
-  registry: GadgetRegistry;
+type GadgetContextValue<G, Spec extends ExtractSpec<G> = ExtractSpec<G>> = {
+  registry: GadgetRegistry<G, Spec>;
 };
 
-const GadgetContext = createContext<GadgetContextValue | null>(null);
+const GadgetContext = createContext<GadgetContextValue<unknown> | null>(null);
 
-export function useGadgetContext() {
-  const context = useContext(GadgetContext);
+export function useGadgetContext<G>() {
+  const context = useContext(GadgetContext) as GadgetContextValue<G>;
   if (!context) {
     throw new Error('useGadget must be used within a GadgetProvider');
   }
@@ -35,9 +38,9 @@ export function useGadgetContext() {
  * Provides global gadget state management for all child components
  */
 export function GadgetProvider({ children }: { children: React.ReactNode }) {
-  const registryRef = useRef<GadgetRegistry>(new Map());
+  const registryRef = useRef<GadgetRegistry<unknown>>(new WeakMap());
 
-  const contextValue: GadgetContextValue = {
+  const contextValue: GadgetContextValue<unknown> = {
     registry: registryRef.current
   };
 
@@ -49,61 +52,72 @@ export function GadgetProvider({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Internal hook used by useGadget to get or create state for a gadget
+ * Internal hook used by useGadget to get or create state for a typed gadget
+ *
+ * This hook ensures proper type inference from the gadget's spec
  */
-export function useGadgetFromProvider<State, Incoming, Effect>(
-  gadget: Gadget<State, Incoming, Effect>
-): readonly [State, (data: Incoming) => void, Tappable<State, Incoming, Effect>] {
-  const { registry } = useGadgetContext();
+export function useGadgetFromProvider<G, Spec extends ExtractSpec<G>>(
+  gadget: Gadgetish<G> & Tappable<Spec['effects']>
+): readonly [
+  Spec['state'],
+  (data: Spec['input']) => void,
+  Gadgetish<G> & Tappable<Spec['effects']>
+] {
+  const { registry } = useGadgetContext<G>();
 
   // Get or create the registry entry for this gadget
-  let entry = registry.get(gadget) as GadgetEntry<State, Incoming, Effect> | undefined;
+  let entry = registry.get(gadget);
 
   if (!entry) {
-    // First time seeing this gadget - wrap it
-    const tappable = withTaps(gadget);
+    // First time seeing this gadget - wrap it with tap
+    const tappableGadget = withTaps<G, Spec>(gadget);
 
-    // Create the entry with initial state
+    // Create the entry with initial state and proper typing
     entry = {
-      tappable,
-      listeners: new Set(),
+      gadget: tappableGadget as Gadgetish<G> & Tappable<Spec['effects']>,
+      listeners: new Set<() => void>(),
       state: gadget.current()
     };
 
-    // Replace semantics to track state changes
-    replaceSemantics(tappable, {
-      emit: tappable.emit,
-      current: () => entry!.state,
-      update: (newState: State) => {
-        entry!.state = newState;
-        // Notify all listeners
-        entry!.listeners.forEach(listener => listener());
+    // Override the update method to track state changes
+    const originalUpdate = gadget.update;
+    gadget.update = (newState: Spec['state']) => {
+      originalUpdate.call(gadget, newState);
+      // Update our cached state
+      const currentEntry = registry.get(gadget);
+      if (currentEntry) {
+        currentEntry.state = newState;
+        // Notify all listeners that state has changed
+        currentEntry.listeners.forEach(listener => listener());
       }
-    });
+    };
 
+    // Store in registry with proper type
     registry.set(gadget, entry);
   }
 
-  const finalEntry = entry;
+  // TypeScript knows entry is GadgetEntry<Spec> here
+  const typedEntry = entry;
 
   // Use useSyncExternalStore for React 18+ concurrent features
-  const state = useSyncExternalStore(
+  const state = useSyncExternalStore<Spec['state']>(
     // Subscribe
     (onStoreChange) => {
-      finalEntry.listeners.add(onStoreChange);
+      typedEntry.listeners.add(onStoreChange);
       return () => {
-        finalEntry.listeners.delete(onStoreChange);
+        typedEntry.listeners.delete(onStoreChange);
       };
     },
-    // Get snapshot
-    () => finalEntry.state,
+    // Get snapshot - returns the exact state type
+    () => typedEntry.state,
     // Get server snapshot (for SSR)
-    () => finalEntry.state
+    () => typedEntry.state
   );
 
-  const send = useCallback((data: Incoming) => {
-    finalEntry.tappable.receive(data);
-  }, [finalEntry]);
+  // Create send function with proper input type
+  const send = useCallback((data: Spec['input']) => {
+    typedEntry.gadget.receive(data);
+  }, [typedEntry]);
 
-  return [state, send, finalEntry.tappable] as const;
+  return [state, send, typedEntry.gadget as Gadgetish<G> & Tappable<Spec['effects']>] as const;
 }

@@ -1,33 +1,32 @@
 /**
  * Creates a family of React-ready gadgets
  *
- * This is a convenience wrapper around createFamily that automatically
+ * This is a convenience wrapper around createTypedFamily that automatically
  * makes all gadgets tappable for easy connections in React components.
  */
 
-import { createFamily, withTaps, type Gadget } from 'port-graphs';
+import { withTaps, createTypedFamily, type TypedGadget, type GadgetSpec, ExtractSpec, Gadgetish, Tappable } from 'port-graphs';
 
 /**
  * Creates a family gadget that produces React-ready (tappable) gadgets.
  * All gadgets created are identical - the key is only for storage/retrieval.
  *
- * @param factory - Parameterless function that creates a gadget
+ * @param factory - Function that creates a typed gadget
  * @returns A family gadget that manages tappable gadgets
  *
  * @example
- * // Create a family of tappable counter gadgets
- * const counterFamily = createReactFamily(() => lastCell(0));
+ * // Create a family of tappable slider gadgets
+ * const sliderFamily = createReactFamily(() => sliderGadget(0, 0, 100));
  *
  * // Use in components
- * function Counter({ id }: { id: string }) {
- *   const [value, send] = useGadget(counterFamily, id);
- *   return <div>{value}</div>;
+ * function Slider({ id }: { id: string }) {
+ *   const [state, send] = useGadget(sliderFamily, id);
+ *   return <div>{state.value}</div>;
  * }
  */
-export function createReactFamily<State, Incoming = any, Effect = any>(
-  factory: () => Gadget<State, Incoming, Effect>
+export function createReactFamily<G, Spec extends ExtractSpec<G>>(
+  factory: () => Gadgetish<G> & Tappable<Spec['effects']>
 ) {
-  type FactoryGadget = Gadget<State, Incoming, Effect>;
   // Wrap the factory to produce tappable gadgets
-  return createFamily(() => withTaps(factory()) as FactoryGadget);
+  return createTypedFamily(() => withTaps<G, Spec>(factory()));
 }

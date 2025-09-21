@@ -9,6 +9,7 @@ export * from './patterns/specs';
 export * from './patterns/cells';
 export * from './patterns/functions';
 export * from './patterns/ui';
+export * from './patterns/family';
 
 // Shared utilities
 export * from './effects';

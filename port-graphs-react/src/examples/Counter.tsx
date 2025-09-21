@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { useGadget, useTap } from '../index';
+import { useGadget } from '../index';
 import { maxCell } from 'port-graphs/cells';
 
 export function CounterExample() {

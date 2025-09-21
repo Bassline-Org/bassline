@@ -7,38 +7,38 @@
  */
 
 import React, { createContext, useContext, useState } from 'react';
-import type { Tappable } from 'port-graphs';
+import type { Tappable, TypedGadget } from 'port-graphs';
 
 // Context for the current gadget
-const CurrentGadgetContext = createContext<Tappable | null>(null);
+const CurrentGadgetContext = createContext<TypedGadget & Tappable | null>(null);
 
 // Context for named gadgets registry
-type NamedGadgets = Map<string, Tappable>;
+type NamedGadgets = Map<string, TypedGadget & Tappable>;
 const NamedGadgetsContext = createContext<NamedGadgets>(new Map());
 
 /**
  * Hook to access the current gadget from context
  */
-export function useCurrentGadget<State = any, Incoming = any, Effect = any>(): Tappable<State, Incoming, Effect> {
+export function useCurrentGadget<Effect = any>() {
   const gadget = useContext(CurrentGadgetContext);
   if (!gadget) {
     throw new Error('useCurrentGadget must be used within a GadgetContext');
   }
-  return gadget as Tappable<State, Incoming, Effect>;
+  return gadget as TypedGadget & Tappable<Effect>;
 }
 
 /**
  * Hook to access a named gadget from context
  */
-export function useExplicitGadget<State = any, Incoming = any, Effect = any>(
+export function useExplicitGadget<Effect = any>(
   name: string
-): Tappable<State, Incoming, Effect> {
+) {
   const namedGadgets = useContext(NamedGadgetsContext);
   const gadget = namedGadgets.get(name);
   if (!gadget) {
     throw new Error(`No gadget found with name: ${name}. Did you forget to use ProvideGadget?`);
   }
-  return gadget as Tappable<State, Incoming, Effect>;
+  return gadget as TypedGadget & Tappable<Effect>;
 }
 
 /**
@@ -48,7 +48,7 @@ export function GadgetContext({
   gadget,
   children
 }: {
-  gadget: Tappable;
+  gadget: TypedGadget & Tappable;
   children: React.ReactNode;
 }) {
   return (
@@ -67,7 +67,7 @@ export function ProvideGadget({
   children
 }: {
   name: string;
-  gadget: Tappable;
+  gadget: TypedGadget & Tappable;
   children?: React.ReactNode;
 }) {
   const parentGadgets = useContext(NamedGadgetsContext);

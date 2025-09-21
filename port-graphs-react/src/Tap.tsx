@@ -34,11 +34,11 @@ export function Tap<Effect = any>({
   deps = []
 }: {
   handler: (effect: Effect) => void;
-  source?: Tappable<any, any, Effect>;
+  source?: Tappable<Effect>;
   deps?: React.DependencyList;
 }) {
   // Use provided source or get from context
-  const contextGadget = useCurrentGadget<any, any, Effect>();
+  const contextGadget = useCurrentGadget<Effect>();
   const gadget = source || contextGadget;
 
   if (!gadget) {
