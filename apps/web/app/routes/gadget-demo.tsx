@@ -24,19 +24,39 @@ function ConnectedSlider({
   position,
   selected,
   onSelect,
+  onChange,
   min = 0,
-  max = 100
+  max = 100,
+  initial = 50
 }: {
   id: string,
   title: string,
-  gadget: any,
+  gadget?: any,
   position: { x: number, y: number },
   selected?: boolean,
   onSelect?: () => void,
+  onChange?: (value: number) => void,
   min?: number,
-  max?: number
+  max?: number,
+  initial?: number
 }) {
-  const [state] = useGadget(gadget);
+  // Use provided gadget or create default
+  const [state, send, g] = useGadget(
+    gadget || withTaps(sliderGadget(initial, min, max, 1))
+  );
+
+  // Optional onChange creates tap
+  useEffect(() => {
+    if (onChange && g) {
+      return g.tap((effect: any) => {
+        if (effect?.changed !== undefined) {
+          onChange(effect.changed);
+        }
+      });
+    }
+    return undefined;
+  }, [onChange, g]);
+
   const numValue = (state && typeof state === 'object' && 'value' in state && typeof (state as any).value === 'number') ? (state as any).value : min;
 
   const ports: PortConfig[] = [
@@ -62,7 +82,7 @@ function ConnectedSlider({
         </div>
         <Slider
           value={[numValue]}
-          onValueChange={([newValue]) => gadget.receive({ type: 'set', value: newValue })}
+          onValueChange={([newValue]) => send({ type: 'set', value: newValue })}
           min={min}
           max={max}
           step={1}
@@ -88,14 +108,17 @@ function ConnectedMeter({
 }: {
   id: string,
   title: string,
-  gadget: any,
+  gadget?: any,
   position: { x: number, y: number },
   selected?: boolean,
   onSelect?: () => void,
   min?: number,
   max?: number
 }) {
-  const [state] = useGadget(gadget);
+  // Use provided gadget or create default
+  const [state] = useGadget(
+    gadget || withTaps(meterGadget(min, max))
+  );
   const numValue = (state && typeof state === 'object' && 'value' in state && typeof (state as any).value === 'number') ? (state as any).value : 0;
   const percentage = Math.max(0, Math.min(100, ((numValue - min) / (max - min)) * 100));
 
@@ -139,16 +162,33 @@ function ConnectedCalculator({
   gadget,
   position,
   selected,
-  onSelect
+  onSelect,
+  onResult
 }: {
   id: string,
   title: string,
-  gadget: any,
+  gadget?: any,
   position: { x: number, y: number },
   selected?: boolean,
-  onSelect?: () => void
+  onSelect?: () => void,
+  onResult?: (result: number) => void
 }) {
-  const [state] = useGadget(gadget);
+  // Use provided gadget or create default
+  const [state, send, calc] = useGadget(
+    gadget || withTaps(adder({}))
+  );
+
+  // Optional onResult creates tap
+  useEffect(() => {
+    if (onResult && calc) {
+      return calc.tap((effect: any) => {
+        if (effect?.changed?.result !== undefined) {
+          onResult(effect.changed.result);
+        }
+      });
+    }
+    return undefined;
+  }, [onResult, calc]);
   const numA = (state && typeof state === 'object' && 'a' in state && typeof (state as any).a === 'number') ? (state as any).a : 0;
   const numB = (state && typeof state === 'object' && 'b' in state && typeof (state as any).b === 'number') ? (state as any).b : 0;
   const sum = (state && typeof state === 'object' && 'result' in state && typeof (state as any).result === 'number') ? (state as any).result : 0;
@@ -217,52 +257,59 @@ export default function GadgetDemo() {
     // Pre-made connections to show the system working
     { id: 'conn1', from: 'slider-a', fromPort: 'output', to: 'calculator', toPort: 'inputA' },
     { id: 'conn2', from: 'slider-b', fromPort: 'output', to: 'calculator', toPort: 'inputB' },
-    { id: 'conn3', from: 'calculator', fromPort: 'output', to: 'result-meter', toPort: 'input' }
+    { id: 'conn3', from: 'calculator', fromPort: 'output', to: 'result-meter', toPort: 'input' },
+    // Monitor connections
+    { id: 'conn4', from: 'slider-a', fromPort: 'output', to: 'monitor-a', toPort: 'input' },
+    { id: 'conn5', from: 'slider-b', fromPort: 'output', to: 'monitor-b', toPort: 'input' }
   ]);
 
   const [selectedGadget, setSelectedGadget] = useState<string | null>(null);
 
   // Wire gadgets based on visual connections using proper tap utilities
   useEffect(() => {
-    // Clear previous taps (we need a better way to manage this)
-    // For now, we'll just re-wire based on current connections
+    const cleanups: (() => void)[] = [];
 
-    // Add debug logging to see what's happening
-    sliderA.tap(tapDebug('SliderA'));
-    sliderB.tap(tapDebug('SliderB'));
-    calculator.tap(tapDebug('Calculator'));
+    // Add debug logging (only once)
+    cleanups.push(sliderA.tap(tapDebug('SliderA')));
+    cleanups.push(sliderB.tap(tapDebug('SliderB')));
+    cleanups.push(calculator.tap(tapDebug('Calculator')));
 
     // Create taps for each connection using proper utilities
     connections.forEach(conn => {
       if (conn.from === 'slider-a' && conn.to === 'calculator' && conn.toPort === 'inputA') {
         // Use tapTo to send slider value to calculator's 'a' input
-        sliderA.tap(tapTo(calculator, 'a'));
+        cleanups.push(sliderA.tap(tapTo(calculator, 'a')));
       }
 
       if (conn.from === 'slider-b' && conn.to === 'calculator' && conn.toPort === 'inputB') {
         // Use tapTo to send slider value to calculator's 'b' input
-        sliderB.tap(tapTo(calculator, 'b'));
+        cleanups.push(sliderB.tap(tapTo(calculator, 'b')));
       }
 
       if (conn.from === 'calculator' && conn.to === 'result-meter') {
         // Calculator emits {changed: {result: X, args: {...}}}
         // We need to extract the result value
-        calculator.tap((effect) => {
+        cleanups.push(calculator.tap((effect) => {
           if (effect?.changed?.result !== undefined) {
             resultMeter.receive(effect.changed.result);
           }
-        });
+        }));
       }
 
       // Direct monitor connections using tapValue
       if (conn.from === 'slider-a' && conn.to === 'monitor-a') {
-        sliderA.tap(tapValue(monitorA));
+        cleanups.push(sliderA.tap(tapValue(monitorA)));
       }
 
       if (conn.from === 'slider-b' && conn.to === 'monitor-b') {
-        sliderB.tap(tapValue(monitorB));
+        cleanups.push(sliderB.tap(tapValue(monitorB)));
       }
     });
+
+    // Cleanup function
+    return () => {
+      cleanups.forEach(cleanup => cleanup());
+    };
   }, [connections]); // Re-wire when connections change
 
   const handleConnectionCreate = (connection: Omit<Connection, 'id'>) => {
