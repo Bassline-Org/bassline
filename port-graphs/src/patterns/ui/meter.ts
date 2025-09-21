@@ -13,14 +13,14 @@ interface MeterState {
 }
 
 type MeterInput = number | {
-  type: 'value',
   value: number
 } | {
-  type: 'configure',
-  min?: number,
-  max?: number,
-  label?: string
-};
+  configure: {
+    min?: number,
+    max?: number,
+    label?: string
+  };
+}
 
 export const meterGadget = (min = 0, max = 100, label?: string) => {
   return createGadget<MeterState, MeterInput>(
@@ -36,29 +36,9 @@ export const meterGadget = (min = 0, max = 100, label?: string) => {
           };
         }
         return null;
-      } else if (input && typeof input === 'object') {
-        switch (input.type) {
-          case 'value':
-            const clamped = Math.min(Math.max(input.value, state.min), state.max);
-            if (clamped !== state.value) {
-              return {
-                action: 'update',
-                context: { value: clamped, state }
-              };
-            }
-            return null;
-
-          case 'configure':
-            return {
-              action: 'configure',
-              context: { config: input, state }
-            };
-
-          default:
-            return null;
-        }
+      } else {
+        const action = 'configure' in input ? input['configure'] : input['value'];
       }
-      return null;
     },
     {
       'update': (gadget, context) => {

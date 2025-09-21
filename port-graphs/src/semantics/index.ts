@@ -36,3 +36,4 @@ export function extendGadget<State, Incoming, Effect>(
 
 export { withEvents } from './events';
 export { withTaps, type Tappable, isTappable } from './tapping';
+export { withTaps as withTypedTaps } from './typed-extensions';

@@ -28,7 +28,7 @@ export type GadgetSpec<
   effects: Effects;
 };
 
-export type TypedGadget<Spec extends GadgetSpec> = Gadget<Spec['state'], Spec['input'], Spec['effects']>;
+export type TypedGadget<Spec extends GadgetSpec = GadgetSpec> = Gadget<Spec['state'], Spec['input'], Spec['effects']>;
 
 // Additional effect types
 export type ErrorEffect<E = string> = { error: E };

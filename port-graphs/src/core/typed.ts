@@ -65,7 +65,7 @@ export function defGadget<
       emit: (_effect: Spec['effects']) => {
         // Effects go into the void by default
         // Can be overridden with semantics replacement
-      }
+      },
     };
 
     return gadget;
