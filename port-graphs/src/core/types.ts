@@ -2,9 +2,16 @@
  * Core type definitions for spec-driven gadgets
  */
 
-import { Gadget } from '../old/core';
 // Import effect types from effects module to avoid duplication
 import type { ChangedEffect, NoopEffect, ContradictionEffect } from '../effects';
+
+// Core Gadget interface
+export interface Gadget<State = any, Incoming = any, Effect = any> {
+  current: () => State;
+  update: (state: State) => void;
+  receive: (data: Incoming) => void;
+  emit: (effect: Effect) => void;
+}
 
 // Base types for actions and effects - just objects with named contexts
 export type GadgetActions = {

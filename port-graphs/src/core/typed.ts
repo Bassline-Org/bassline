@@ -1,7 +1,7 @@
 /**
  * Type-safe spec-driven gadget creation
  */
-import * as _ from 'lodash';
+import _ from 'lodash';
 import type { GadgetSpec, TypedGadget, GadgetActions, GadgetEffects } from './types';
 
 /**

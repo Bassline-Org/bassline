@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "noEmit": false
+  },
+  "include": [
+    "src/index.ts",
+    "src/core/**/*.ts",
+    "src/patterns/**/*.ts",
+    "src/effects/**/*.ts",
+    "src/semantics/**/*.ts",
+    "src/multi.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-browser",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "src/test/**/*",
+    "src/old/**/*"
+  ]
+}

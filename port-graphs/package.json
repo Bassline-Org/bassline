@@ -17,13 +17,9 @@
       "import": "./dist/patterns/functions/index.js",
       "types": "./dist/patterns/functions/index.d.ts"
     },
-    "./meta": {
-      "import": "./dist/patterns/meta/index.js",
-      "types": "./dist/patterns/meta/index.d.ts"
-    },
     "./core": {
-      "import": "./dist/core/index.js",
-      "types": "./dist/core/index.d.ts"
+      "import": "./dist/core/typed.js",
+      "types": "./dist/core/typed.d.ts"
     },
     "./effects": {
       "import": "./dist/effects/index.js",
@@ -35,9 +31,10 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "tsc --watch",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "typecheck": "tsc --noEmit"
   },
   "license": "MIT",
   "devDependencies": {
