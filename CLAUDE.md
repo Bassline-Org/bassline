@@ -28,70 +28,152 @@ gadget = (incoming_data) => {
 }
 ```
 
-## Common Patterns (Not Fundamental Types!)
+## Type-Safe Gadget Creation
 
-### Cell Pattern
-Gadgets that accumulate state monotonically:
-- Use ACI (Associative, Commutative, Idempotent) merge functions
-- Naturally support multiple writers (order doesn't matter)
-- Examples: `maxCell`, `unionCell`, `intersectionCell`
+We use a **spec-driven approach** for type-safe gadgets:
 
 ```typescript
-const max = maxCell(10);      // Keeps maximum value seen
-max.receive(20);               // Updates to 20
-max.receive(15);               // Stays at 20
-```
+// Define a spec as a plain type literal
+type CounterSpec = {
+  state: number;
+  input: 'inc' | 'dec' | 'reset';
+  actions: {
+    update: number;   // Actions are objects, not discriminated unions
+    skip: {};
+  };
+  effects: {
+    changed: number;  // Effects are objects too
+    noop: {};
+  };
+};
 
-### Function Pattern
-Gadgets that transform inputs to outputs:
-- Use maps for multiple arguments: `{a: 5, b: 3}`
-- Semantically expect single writer per argument
-- Compute when all required arguments present
-- Natural partial binding through partial maps
-
-```typescript
-const adder = binary((a, b) => a + b);
-const add = adder({a: undefined, b: undefined});
-add.receive({a: 5});           // Waits for b
-add.receive({b: 3});           // Computes: 8
-```
-
-### Meta-gadget Pattern
-Gadgets that manage connections/routing:
-- Receive routing information as their data
-- Internally create/manage connections
-- **Still just regular gadgets** following the same protocol
-
-```typescript
-// A routing gadget - same shape as any other gadget!
-const router = createGadget((routes, newRoute) => {
-  if (shouldConnect(newRoute)) return 'connect';
-  return 'ignore';
-})({
-  'connect': (gadget, routes, newRoute) => {
-    // Internally wire gadgets together
-    createConnection(newRoute.from, newRoute.to);
-    return changed({connected: newRoute});
+// Create gadget using defGadget
+const counter = defGadget<CounterSpec>(
+  (state, input) => {
+    // Consider returns single-key object
+    if (input === 'inc') return { update: state + 1 };
+    if (input === 'dec') return { update: state - 1 };
+    if (input === 'reset') return { update: 0 };
+    return { skip: {} };
   },
-  'ignore': () => noop()
-});
+  {
+    // Action handlers get exact typed context
+    update: (gadget, value) => {
+      gadget.update(value);
+      return { changed: value };
+    },
+    skip: () => ({ noop: {} })
+  }
+)(0);
 ```
 
-## Key Insights
+Key insights:
+- **Specs are just type literals** - no generic ceremony
+- **Actions/effects are objects** - `{ update: value }` not `{ action: 'update', context: value }`
+- **Full type inference** - TypeScript knows all the types
+- **Compile-time safety** - can't return wrong actions or emit wrong effects
 
-### Everything Has the Same Shape
-A router managing connections is the **exact same shape** as a cell tracking a maximum:
-- Both receive data
-- Both consider what to do
-- Both act (and maybe emit effects)
+## Pattern Recognition and Discipline
 
-The router just happens to interpret its data as routing instructions, while the max cell interprets its data as numbers to compare.
+### Cell Pattern - ACI Merge Operations
+Cells MUST have **Associative, Commutative, and Idempotent** merge operations:
+
+```typescript
+type CellSpec<State, Input> = {
+  state: State;
+  input: Input;
+  actions: {
+    merge: Input;
+    ignore: {}
+  };
+  effects: {
+    changed: State;
+    noop: {}
+  };
+};
+```
+
+**Valid Cells** (all are ACI):
+- `maxCell` - max(x,x) = x ✓
+- `minCell` - min(x,x) = x ✓
+- `unionCell` - union(S,S) = S ✓
+- `lastCell` - last(x,x) = x ✓
+- `predicateCell` - first valid value wins (monotonic) ✓
+- `firstMap` - first value per key wins ✓
+
+**NOT Cells** (not ACI):
+- `sumCell` - sum(x,x) ≠ x ✗ (not idempotent)
+- `counterCell` - count++ ✗ (not idempotent)
+- `listCell` - append operations ✗ (not idempotent)
+- Collections with add/remove ✗ (command-driven)
+
+### Function Pattern - Map-Based Computation
+Functions compute results from map-based arguments:
+
+```typescript
+type FunctionSpec<Args, Result> = {
+  state: Args & { result?: Result };
+  input: Partial<Args>;  // Partial maps for natural binding
+  actions: {
+    compute: Args;
+    accumulate: Partial<Args>;
+    ignore: {};
+  };
+  effects: {
+    changed: { result: Result; args: Args };
+    noop: {};
+  };
+};
+```
+
+Map-based arguments enable:
+- **Partial binding**: `{a: 5}` waiting for `{b: 3}`
+- **Named arguments**: No positional coupling
+- **Natural merging**: Maps compose cleanly
+
+### Command Pattern - Instruction Interpretation
+Commands interpret explicit instructions rather than merge data:
+
+```typescript
+type CommandSpec<State, Commands> = {
+  state: State;
+  input: Commands;  // Explicit commands/instructions
+  actions: /* derived from commands */;
+  effects: /* domain specific */;
+};
+```
+
+**Examples of Command Gadgets**:
+- **UI Controls**: slider, meter, toggle (respond to user commands)
+- **Collections**: list, index (respond to add/remove/clear)
+- **Position transformers**: anchoredPosition, boundedPosition (transform input)
+- **State machines**: explicit state transitions
+- **Protocol handlers**: interpret protocol messages
+
+Commands are NOT cells because they:
+- Don't have ACI merge semantics
+- Interpret instructions rather than accumulate data
+- Often have order-dependent operations
+
+## Key Implementation Insights
+
+### Composition Over Specialization
+Don't create specialized gadgets when composition works:
+- `positionCell` → just use `lastMap<number>()` with keys 'x' and 'y'
+- Array operations → Set cells already accept arrays
+- Specialized types → compose from primitives
+
+### Pattern Selection Guide
+1. **Is the merge operation ACI?** → Cell pattern
+2. **Computing from arguments?** → Function pattern
+3. **Interpreting instructions?** → Command pattern
+4. **Managing connections?** → Meta-gadget (still follows protocol)
 
 ### Effects Are Just Data
 - Gadgets emit effects into "the void"
 - They don't know or care who handles them
-- Effects are partial data: `changed(value)`, `noop()`, `contradiction()`
-- Meta-gadgets can consume effects as their input
+- Effects are partial objects: `{ changed: value }`, `{ noop: {} }`
+- Can emit multiple effects at once
 
 ### Semantic Openness
 - No prescribed communication patterns
@@ -103,27 +185,21 @@ The router just happens to interpret its data as routing instructions, while the
 
 ### Core (`port-graphs/src/`)
 
-- **core.ts**: The gadget creation function with multimethod dispatch
-- **patterns/cells/**: Cell pattern implementations (max, min, union, etc.)
-- **patterns/functions/**: Function pattern implementations
+- **core/typed.ts**: Type-safe gadget creation with `defGadget`
+- **patterns/specs.ts**: Core pattern specifications (CellSpec, FunctionSpec, CommandSpec)
+- **patterns/cells/typed-*.ts**: Typed cell implementations (all ACI)
+- **patterns/functions/typed-*.ts**: Typed function implementations
+- **patterns/commands/**: Command pattern implementations (coming soon)
 - **effects/**: Effect constructors and types
 - **semantics/**: Wiring and extension mechanisms
 
 ### Design Principles
 
 1. **Extreme minimalism** - One protocol, infinite patterns
-2. **Semantic openness** - Don't prescribe communication
-3. **Mechanical simplicity** - Direct wiring without magic
+2. **Pattern discipline** - Use the right pattern for the semantics
+3. **Type safety** - Full compile-time verification with specs
 4. **Composability** - Complex behavior from simple gadgets
-5. **Type safety** - Full TypeScript with inference
-
-## Map-Based Arguments
-
-Functions use maps for arguments to enable:
-- **Partial binding**: `{a: 5}` waiting for `{b: 3}`
-- **Named arguments**: No positional coupling
-- **Natural merging**: Maps compose cleanly
-- **Utilities**: Use lodash `pick`, `omit`, etc. for ergonomics
+5. **Semantic openness** - Don't prescribe communication
 
 ## TypeScript Configuration
 
@@ -139,4 +215,10 @@ The entire system is:
 data → consider → act → effects → (someone else's data)
 ```
 
-Everything else - cells, functions, routers, tuplespaces - are just gadgets with different consider/act implementations. The network builds itself using the same mechanism it uses to process data.
+Everything else - cells, functions, commands, routers - are just gadgets with different consider/act implementations. The network builds itself using the same mechanism it uses to process data.
+
+The key is recognizing which pattern fits your semantics:
+- **Cells** for ACI merge operations
+- **Functions** for computation with partial binding
+- **Commands** for instruction interpretation
+- **Meta-gadgets** for managing other gadgets
