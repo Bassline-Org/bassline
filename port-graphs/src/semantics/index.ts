@@ -1,4 +1,4 @@
-import { Gadget } from "../core";
+import { Gadget } from "../old/core";
 
 /**
  * Extends a gadget's emit function to add additional behavior

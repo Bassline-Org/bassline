@@ -1,4 +1,4 @@
-import { Gadget } from "../core";
+import { Gadget } from "../old/core";
 
 export const noop = () => ({ noop: true } as const);
 export const changed = <T>(value: NonNullable<T>) => ({ changed: value } as const);

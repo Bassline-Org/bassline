@@ -1,4 +1,2 @@
-export * from './slider';
-export * from './meter';
-export * from './calculator';
+// Export only typed UI patterns
 export * from './typed-ui';

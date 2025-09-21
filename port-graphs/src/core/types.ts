@@ -2,7 +2,7 @@
  * Core type definitions for spec-driven gadgets
  */
 
-import { Gadget } from '../core';
+import { Gadget } from '../old/core';
 // Import effect types from effects module to avoid duplication
 import type { ChangedEffect, NoopEffect, ContradictionEffect } from '../effects';
 

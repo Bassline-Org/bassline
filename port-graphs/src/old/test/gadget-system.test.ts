@@ -10,9 +10,9 @@ import { unionCell, intersectionCell } from '../patterns/cells/set';
 import { firstMap, lastMap, unionMap } from '../patterns/cells/maps';
 import { numberp, stringp, arrayp } from '../patterns/cells/predicates';
 import { adder, subtractor, multiplier, divider, binary } from '../patterns/functions/numeric';
-import { wires } from '../semantics/manualWires';
-import { extendGadget } from '../semantics';
-import { changed, noop, contradiction } from '../effects';
+import { wires } from '../../semantics/manualWires';
+import { extendGadget } from '../../semantics';
+import { changed, noop, contradiction } from '../../effects';
 
 describe('Core Gadget Protocol', () => {
   it('should follow consider → act protocol', () => {
