@@ -1,4 +1,4 @@
-import { Gadget } from "../core/types";
+import { Gadget } from "../core";
 
 /**
  * Tapping semantic - adds multi-tap capability to any gadget

@@ -1,4 +1,4 @@
-import { Gadget } from "../core/types";
+import { Gadget } from "../core";
 import { extendGadget } from "./index";
 
 /**

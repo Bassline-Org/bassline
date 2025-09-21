@@ -4,7 +4,7 @@
 
 import { defGadget } from '../../core/typed';
 import type { CommandSpec } from '../specs';
-import { withTypedTaps } from '../../semantics';
+import { withTaps } from '../../semantics';
 
 /**
  * Slider gadget with typed commands
@@ -113,7 +113,7 @@ export const sliderGadget = (
     }
   )({ value: initial, min, max, step });
 
-  return withTypedTaps(baseGadget);
+  return withTaps(baseGadget);
 };
 
 /**
@@ -198,7 +198,7 @@ export const meterGadget = (
     }
   )({ value: min, min, max, label });
 
-  return withTypedTaps(baseGadget);
+  return withTaps(baseGadget);
 };
 
 /**
@@ -268,5 +268,5 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
     }
   )({ on: initial, label: label ?? '' });
 
-  return withTypedTaps(baseGadget);
+  return withTaps(baseGadget);
 };
