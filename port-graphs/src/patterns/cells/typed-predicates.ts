@@ -53,14 +53,14 @@ export const isUndefined = (x: unknown): x is undefined => x === undefined;
 export const isSymbol = (x: unknown): x is symbol => typeof x === 'symbol';
 
 // Predicate cell factories using the type guards
-export const numberCell = (initial?: number) => predicateCell(isNumber);
-export const stringCell = (initial?: string) => predicateCell(isString);
-export const booleanCell = (initial?: boolean) => predicateCell(isBoolean);
-export const arrayCell = <T>(initial?: T[]) => predicateCell(isArray);
-export const objectCell = (initial?: object) => predicateCell(isObject);
-export const functionCell = (initial?: Function) => predicateCell(isFunction);
-export const nullCell = () => predicateCell(isNull);
-export const symbolCell = (initial?: symbol) => predicateCell(isSymbol);
+export const numberCell = predicateCell(isNumber);
+export const stringCell = predicateCell(isString);
+export const booleanCell = predicateCell(isBoolean);
+export const arrayCell = predicateCell(isArray);;
+export const objectCell = predicateCell(isObject);
+export const functionCell = predicateCell(isFunction);
+export const nullCell = predicateCell(isNull);
+export const symbolCell = predicateCell(isSymbol);
 
 // Range predicates for numbers
 export const rangeCell = (min: number, max: number) =>
