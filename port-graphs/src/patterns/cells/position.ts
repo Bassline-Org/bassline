@@ -6,34 +6,20 @@
  */
 
 import { createGadget } from "../../core";
+import { defGadget } from "../../core/typed";
 import { changed } from "../../effects";
 import _ from "lodash";
+import { CellSpec } from "../specs";
+import { lastMap } from "./typed-maps";
+import { TypedGadget } from "../../core/types";
 
-export type Position = { x: number; y: number };
+export interface Position extends Record<string, number> { x: number; y: number }
 
 /**
  * Basic position cell - updates to latest position
  * Similar to lastCell but specifically for position data
  */
-export const positionCell = createGadget<Position, Partial<Position>>(
-  (current, incoming) => {
-    // Allow partial updates
-    const newPos = { ...current, ...incoming };
-
-    // Check if position actually changed
-    if (_.isEqual(current, newPos)) {
-      return null;
-    }
-
-    return { action: 'update', context: { position: newPos } };
-  },
-  {
-    'update': (gadget, { position }) => {
-      gadget.update(position);
-      return changed(position);
-    }
-  }
-);
+export const positionCell = (initial: Position) => lastMap<Position, Partial<Position>>(initial);
 
 /**
  * Anchored position - snaps to a grid or anchor points
