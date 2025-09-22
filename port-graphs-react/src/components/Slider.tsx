@@ -6,12 +6,12 @@
  */
 
 import React from 'react';
-import { type TypedGadget, type SliderSpec, type SliderState, ExtractSpec, Gadgetish, Tappable } from 'port-graphs';
+import { type TypedGadget, type SliderSpec, type SliderState, ExtractSpec, Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
 
-export interface SliderProps<G, Spec extends ExtractSpec<G> & SliderSpec> {
+export interface SliderProps<G extends TypedGadget<SliderSpec>, Spec extends ExtractSpec<G>> {
   /** The slider gadget instance */
-  gadget: Gadgetish<G> & Tappable<Spec['effects']>;
+  gadget: G & Tappable<SliderSpec['effects']>;
   /** Optional CSS class name */
   className?: string;
   /** Whether to show the current value */
@@ -46,7 +46,7 @@ export interface SliderProps<G, Spec extends ExtractSpec<G> & SliderSpec> {
  * }
  * ```
  */
-export function Slider<G, Spec extends ExtractSpec<G> & SliderSpec>({
+export function Slider<G extends TypedGadget<SliderSpec>, Spec extends ExtractSpec<G>>({
   gadget,
   className = '',
   showValue = true,
@@ -56,7 +56,7 @@ export function Slider<G, Spec extends ExtractSpec<G> & SliderSpec>({
 }: SliderProps<G, Spec>) {
   // useGadget gives us perfect type inference
   // state is SliderState, send accepts SliderCommands
-  const [state, send] = useGadget<G, Spec>(gadget);
+  const [state, send] = useGadget<G>(gadget);
 
   // Extract typed values from state
   const { value, min, max, step } = state;

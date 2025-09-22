@@ -5,7 +5,7 @@
  * All gadgets are managed through the GadgetProvider for consistent state.
  */
 
-import { ExtractSpec, Gadget, Gadgetish, Tappable, type GadgetSpec, type TypedGadget } from 'port-graphs';
+import { ExtractSpec, Tappable, type GadgetSpec, type TypedGadget } from 'port-graphs';
 import { useGadgetFromProvider } from './GadgetProvider';
 
 /**
@@ -28,12 +28,8 @@ import { useGadgetFromProvider } from './GadgetProvider';
  * @returns Tuple of [state, send function, gadget with tap]
  */
 
-export function useGadget<G, S extends ExtractSpec<G>>(
-  gadget: Gadgetish<G> & Tappable<S['effects']>
-): readonly [
-  S['state'],
-  (data: S['input']) => void,
-  Gadgetish<G> & Tappable<S['effects']>
-] {
-  return useGadgetFromProvider<G, S>(gadget);
+export function useGadget<G extends TypedGadget<any>>(
+  gadget: G
+) {
+  return useGadgetFromProvider(gadget);
 }

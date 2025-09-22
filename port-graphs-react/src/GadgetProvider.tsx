@@ -7,27 +7,27 @@
  */
 
 import React, { createContext, useContext, useRef, useSyncExternalStore, useCallback } from 'react';
-import { ExtractSpec, Gadgetish, type GadgetSpec, Tappable, type TypedGadget, withTaps } from 'port-graphs';
+import { ExtractSpec, Tappable, type TypedGadget, withTaps } from 'port-graphs';
 
 // Registry entry for a typed gadget with its spec
 type GadgetEntry<G, Spec extends ExtractSpec<G>> = {
-  gadget: Gadgetish<G>;
+  gadget: G;
   listeners: Set<() => void>;
   state: Spec['state'];
 };
 
 // Map from gadget instances to their entries
 // We use WeakMap for better memory management
-type GadgetRegistry<G = unknown, Spec extends ExtractSpec<G> = ExtractSpec<G>> = WeakMap<Gadgetish<G>, GadgetEntry<G, Spec>>;
+type GadgetRegistry<G extends TypedGadget<any> = TypedGadget, Spec extends ExtractSpec<G> = ExtractSpec<G>> = WeakMap<G, GadgetEntry<G, Spec>>;
 
-type GadgetContextValue<G, Spec extends ExtractSpec<G> = ExtractSpec<G>> = {
+type GadgetContextValue<G extends TypedGadget<any>, Spec extends ExtractSpec<G> = ExtractSpec<G>> = {
   registry: GadgetRegistry<G, Spec>;
 };
 
-const GadgetContext = createContext<GadgetContextValue<unknown> | null>(null);
+const GadgetContext = createContext<GadgetContextValue<TypedGadget<any>> | null>(null);
 
-export function useGadgetContext<G>() {
-  const context = useContext(GadgetContext) as GadgetContextValue<G>;
+export function useGadgetContext<G extends TypedGadget<any>, Spec extends ExtractSpec<G> = ExtractSpec<G>>() {
+  const context = useContext(GadgetContext) as GadgetContextValue<G, Spec>;
   if (!context) {
     throw new Error('useGadget must be used within a GadgetProvider');
   }
@@ -38,9 +38,9 @@ export function useGadgetContext<G>() {
  * Provides global gadget state management for all child components
  */
 export function GadgetProvider({ children }: { children: React.ReactNode }) {
-  const registryRef = useRef<GadgetRegistry<unknown>>(new WeakMap());
+  const registryRef = useRef<GadgetRegistry<TypedGadget>>(new WeakMap());
 
-  const contextValue: GadgetContextValue<unknown> = {
+  const contextValue: GadgetContextValue<TypedGadget> = {
     registry: registryRef.current
   };
 
@@ -56,12 +56,12 @@ export function GadgetProvider({ children }: { children: React.ReactNode }) {
  *
  * This hook ensures proper type inference from the gadget's spec
  */
-export function useGadgetFromProvider<G, Spec extends ExtractSpec<G>>(
-  gadget: Gadgetish<G> & Tappable<Spec['effects']>
+export function useGadgetFromProvider<G extends TypedGadget<any>, Spec extends ExtractSpec<G>>(
+  gadget: G
 ): readonly [
   Spec['state'],
   (data: Spec['input']) => void,
-  Gadgetish<G> & Tappable<Spec['effects']>
+  G & Tappable<Spec['effects']>
 ] {
   const { registry } = useGadgetContext<G>();
 
@@ -70,11 +70,11 @@ export function useGadgetFromProvider<G, Spec extends ExtractSpec<G>>(
 
   if (!entry) {
     // First time seeing this gadget - wrap it with tap
-    const tappableGadget = withTaps<G, Spec>(gadget);
+    const tappableGadget = withTaps(gadget);
 
     // Create the entry with initial state and proper typing
     entry = {
-      gadget: tappableGadget as Gadgetish<G> & Tappable<Spec['effects']>,
+      gadget: tappableGadget as G & Tappable<Spec['effects']>,
       listeners: new Set<() => void>(),
       state: gadget.current()
     };
@@ -119,5 +119,5 @@ export function useGadgetFromProvider<G, Spec extends ExtractSpec<G>>(
     typedEntry.gadget.receive(data);
   }, [typedEntry]);
 
-  return [state, send, typedEntry.gadget as Gadgetish<G> & Tappable<Spec['effects']>] as const;
+  return [state, send, typedEntry.gadget as G & Tappable<Spec['effects']>] as const;
 }

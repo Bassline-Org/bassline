@@ -11,7 +11,8 @@ import {
   sliderGadget,
   meterGadget,
   toggleGadget,
-  withTaps
+  withTaps,
+  type ExtractSpec,
 } from 'port-graphs';
 import { adder } from 'port-graphs/functions';
 
@@ -34,10 +35,7 @@ const calc = withTaps(calcBase);
 
 function TypedUIDemoInner() {
 
-  // Get state from calc to display - type inference issue with function gadgets
-  // The state includes both the arguments (a, b) and the result
-  type CalcState = { a: number; b: number; result?: number };
-  const [calcState] = useGadget(calc) as readonly [CalcState, any, any];
+  const [calcState] = useGadget(calc);
   const a = calcState?.a ?? 0;
   const b = calcState?.b ?? 0;
   const result = calcState?.result ?? 0;
@@ -86,7 +84,7 @@ function TypedUIDemoInner() {
       <div className="grid grid-cols-2 gap-8 max-w-4xl">
         <div>
           <h3 className="font-semibold mb-2">Slider 1</h3>
-          <Slider gadget={slider1} showValue showLabels />
+          <Slider gadget={slider1} />
         </div>
 
         <div>

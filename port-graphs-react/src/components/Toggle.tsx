@@ -5,13 +5,12 @@
  * with automatic type inference from the ToggleSpec.
  */
 
-import React from 'react';
-import { type TypedGadget, type ToggleSpec, type ToggleState, ExtractSpec, Tappable, Gadgetish } from 'port-graphs';
+import { type TypedGadget, type ToggleSpec, ExtractSpec, Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
 
-export interface ToggleProps<G, Spec extends ExtractSpec<G> & ToggleSpec> {
+export interface ToggleProps<G extends TypedGadget<ToggleSpec>> {
   /** The toggle gadget instance */
-  gadget: Gadgetish<G> & Tappable<Spec['effects']>;
+  gadget: G & Tappable<ToggleSpec['effects']>;
   /** Optional CSS class name */
   className?: string;
   /** Display style for the toggle */
@@ -48,7 +47,7 @@ export interface ToggleProps<G, Spec extends ExtractSpec<G> & ToggleSpec> {
  * }
  * ```
  */
-export function Toggle<G, Spec extends ExtractSpec<G> & ToggleSpec>({
+export function Toggle<G extends TypedGadget<ToggleSpec>>({
   gadget,
   className = '',
   variant = 'switch',
@@ -56,10 +55,10 @@ export function Toggle<G, Spec extends ExtractSpec<G> & ToggleSpec>({
   disabled = false,
   label,
   labelPosition = 'right'
-}: ToggleProps<G, Spec>) {
+}: ToggleProps<G>) {
   // useGadget gives us perfect type inference
   // state is ToggleState, send accepts ToggleCommands
-  const [state, send] = useGadget<G, Spec>(gadget);
+  const [state, send] = useGadget<G>(gadget);
 
   // Extract typed values from state
   const { on } = state;

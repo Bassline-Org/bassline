@@ -6,7 +6,7 @@
 import type { ChangedEffect, NoopEffect, ContradictionEffect } from '../effects';
 
 // Core Gadget interface
-export interface Gadget<State = any, Incoming = any, Effect = any> {
+export interface Gadget<State = unknown, Incoming = unknown, Effect extends GadgetEffects = GadgetEffects> {
   current: () => State;
   update: (state: State) => void;
   receive: (data: Incoming) => void;
@@ -23,28 +23,36 @@ export type GadgetEffects = {
 };
 
 // The core spec type - defines the complete shape of a gadget
-export type GadgetSpec<
+export type PartialSpec<
   State = unknown,
   Input = unknown,
-  Actions extends GadgetActions = GadgetActions,
   Effects extends GadgetEffects = GadgetEffects
 > = {
   state: State;
   input: Input;
-  actions: Actions;
   effects: Effects;
 };
 
-export type TypedGadget<Spec extends GadgetSpec = GadgetSpec> = Gadget<Spec['state'], Spec['input'], Spec['effects']>;
+export type GadgetSpec<State = unknown, Input = unknown, Actions extends GadgetActions = GadgetActions, Effects extends GadgetEffects = GadgetEffects> = PartialSpec<State, Input, Effects> & {
+  actions: Actions;
+};
 
-export type Gadgetish<G> = G extends TypedGadget<infer S> ? G & TypedGadget<S> : never;
+export interface TypedGadget<Spec extends PartialSpec = PartialSpec> extends Gadget<Spec['state'], Spec['input'], Spec['effects']> { }
 
-export type ExtractSpec<G> =
-  G extends TypedGadget<infer S>
-  ? S
-  : G extends GadgetSpec
-  ? G
+export type ExtractSpec<G> = G extends Gadget<infer S, infer I, infer E>
+  ? PartialSpec<S, I, E>
+  : G extends PartialSpec<infer S, infer I, infer E> ?
+  PartialSpec<S, I, E>
   : never;
+
+// export type ExtractSpec<G> =
+//   G extends TypedGadget<any>
+//   ? G extends TypedGadget<infer S>
+//   ? S
+//   : G extends GadgetSpec
+//   ? G
+//   : never
+//   : never;
 
 
 // Additional effect types
