@@ -16,5 +16,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['events']
+  },
+  server: {
+    watch: {
+      // Watch the source directories of workspace packages
+      ignored: ['!**/node_modules/port-graphs/**', '!**/node_modules/port-graphs-react/**']
+    }
   }
 });

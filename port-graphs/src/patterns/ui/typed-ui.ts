@@ -223,7 +223,8 @@ export type ToggleSpec = CommandSpec<
     ignore: {};
   },
   {
-    changed: boolean;
+    changed: ToggleState;
+    toggled: boolean;
     configured: ToggleState;
     noop: {};
   }
@@ -233,7 +234,10 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
   const baseGadget = defGadget<ToggleSpec>(
     (state, command) => {
       if ('toggle' in command) {
-        return { set: state.on ? false : true };
+        console.log('Toggle command received');
+        console.log('Toggle state:', state);
+        console.log('Updating to:', !state.on);
+        return { set: !state.on };
       }
       if ('set' in command) {
         if (command.set !== state.on) {
@@ -247,8 +251,14 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
     {
       set: (gadget, value) => {
         const state = gadget.current();
-        gadget.update({ ...state, on: value });
-        return { changed: value };
+        if (state.on === value) {
+          return { ignore: {} };
+        }
+        console.log('Setting toggle to:', value);
+        const newState = { ...state, on: value };
+        console.log('New state:', newState);
+        gadget.update(newState);
+        return { changed: newState, toggled: value };
       },
       configure: (gadget, config) => {
         const state = gadget.current();

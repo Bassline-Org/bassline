@@ -15,8 +15,8 @@
   "packageManager": "pnpm@8.15.0",
   "scripts": {
     "start": "pnpm --filter @bassline/web start",
-    "dev": "pnpm --filter @bassline/web dev",
-    "dev:wc": "pnpm --filter @bassline/web-components dev",
+    "dev": "pnpm --parallel --stream dev",
+    "dev:web": "pnpm --filter @bassline/web dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",

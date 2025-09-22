@@ -60,15 +60,12 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
   // useGadget gives us perfect type inference
   // state is ToggleState, send accepts ToggleCommands
   const [state, send] = useGadget<G>(gadget);
-
-  // Extract typed values from state
-  const { on } = state;
   const displayLabel = label || state.label;
 
   // Handle toggle with proper type
-  const handleToggle = useCallback(() => {
+  const handleToggle = () => {
     send({ toggle: {} })
-  }, [send]);
+  }
 
   // Get size classes
   const getSizeClass = () => {
@@ -97,7 +94,7 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
           {labelPosition === 'left' && renderLabel()}
           <input
             type="checkbox"
-            checked={on}
+            checked={state.on}
             onChange={handleToggle}
             disabled={disabled}
             className={`checkbox-input ${getSizeClass()}`}
@@ -112,9 +109,9 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
         <button
           onClick={handleToggle}
           disabled={disabled}
-          className={`toggle-button ${className} ${getSizeClass()} ${on ? 'toggle-on' : 'toggle-off'} ${disabled ? 'toggle-disabled' : ''}`}
+          className={`toggle-button ${className} ${getSizeClass()} ${state.on ? 'toggle-on' : 'toggle-off'} ${disabled ? 'toggle-disabled' : ''}`}
         >
-          {displayLabel || (on ? 'ON' : 'OFF')}
+          {displayLabel || (state.on ? 'ON' : 'OFF')}
         </button>
       );
 
@@ -126,12 +123,15 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
           <div className={`switch-container ${getSizeClass()}`}>
             <input
               type="checkbox"
-              checked={on}
-              onChange={handleToggle}
+              checked={state.on}
+              onChange={(e) => {
+                send({ set: e.target.checked })
+              }}
+              onClick={handleToggle}
               disabled={disabled}
               className="switch-input"
             />
-            <div className={`switch-slider ${on ? 'switch-on' : 'switch-off'}`}>
+            <div className={`switch-slider ${state.on ? 'switch-on' : 'switch-off'}`}>
               <div className="switch-thumb" />
             </div>
           </div>
