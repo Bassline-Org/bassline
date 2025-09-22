@@ -38,7 +38,8 @@ const ageInput = numberInputGadget(25, 1, 120, 1);
 const volumeSlider = sliderGadget(50, 0, 100, 1);
 const volumeMeter = meterGadget(0, 100);
 
-// Wire slider to meter
+// Initialize meter to match slider and wire them together
+volumeMeter.receive({ display: 50 });
 volumeSlider.tap((effect) => {
   if ('changed' in effect) {
     volumeMeter.receive({ display: effect.changed });
@@ -165,11 +166,32 @@ function UIGalleryInner() {
             <h2 className="text-xl font-semibold mb-4">Buttons</h2>
 
             <div className="flex gap-2">
-              <Button gadget={resetButton} variant="secondary" onClick={(changed) => {
-                console.log('Reset button clicked');
+              <Button gadget={submitButton} variant="primary" onClick={() => {
+                const data = formDataCell.current();
+                console.log('Form submitted:', data);
+                alert(`Form submitted! Check console for details.`);
               }} />
-              <Button gadget={dangerButton} variant="danger" onClick={(changed) => {
-                console.log('Danger button clicked');
+              <Button gadget={resetButton} variant="secondary" onClick={() => {
+                // Reset all form fields
+                nameInput.receive({ set: '' });
+                ageInput.receive({ set: 25 });
+                colorSelect.receive({ select: 'Blue' });
+                sizeSelect.receive({ select: 'Medium' });
+                emailCheck.receive({ uncheck: {} });
+                termsCheck.receive({ uncheck: {} });
+                volumeSlider.receive({ set: 50 });
+              }} />
+              <Button gadget={dangerButton} variant="danger" onClick={() => {
+                if (confirm('Are you sure you want to delete all data?')) {
+                  formDataCell.receive({
+                    name: '',
+                    age: 0,
+                    color: '',
+                    size: '',
+                    newsletter: false,
+                    terms: false
+                  });
+                }
               }} />
             </div>
           </div>
@@ -179,10 +201,16 @@ function UIGalleryInner() {
             <h2 className="text-xl font-semibold mb-4">Interactive Counter</h2>
 
             <div className="flex items-center gap-2">
-              <Button gadget={decrementBtn} variant="secondary" />
+              <Button gadget={decrementBtn} onClick={() => {
+                countDisplay.receive({ decrement: {} })
+              }} variant="secondary" />
               <NumberInput gadget={countDisplay} showButtons={false} />
-              <Button gadget={incrementBtn} variant="secondary" />
-              <Button gadget={resetCountBtn} variant="primary" />
+              <Button gadget={incrementBtn} variant="secondary" onClick={() => {
+                countDisplay.receive({ increment: {} })
+              }} />
+              <Button gadget={resetCountBtn} variant="primary" onClick={() => {
+                countDisplay.receive({ set: 0 })
+              }} />
             </div>
             <p className="text-sm text-gray-600">
               Current count: {countState?.value ?? 0}

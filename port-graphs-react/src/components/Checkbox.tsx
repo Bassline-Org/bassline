@@ -20,7 +20,7 @@ export function Checkbox<G extends TypedGadget<CheckboxSpec>>({
   const [state, send] = useGadget(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
-    if (changed) {
+    if (changed !== undefined) {
       onChange?.(changed);
     }
   }, [onChange]);
