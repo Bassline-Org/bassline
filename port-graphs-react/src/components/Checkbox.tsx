@@ -2,20 +2,28 @@
  * React component for Checkbox gadget
  */
 
-import React from 'react';
 import { type TypedGadget, type CheckboxSpec, type Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
+import { useGadgetEffect } from '../useGadgetEffect';
 
 export interface CheckboxProps<G extends TypedGadget<CheckboxSpec>> {
   gadget: G & Tappable<CheckboxSpec['effects']>;
   className?: string;
+  onChange?: (change: CheckboxSpec['effects']['changed']) => void;
 }
 
 export function Checkbox<G extends TypedGadget<CheckboxSpec>>({
   gadget,
-  className = ''
+  className = '',
+  onChange
 }: CheckboxProps<G>) {
   const [state, send] = useGadget(gadget);
+
+  useGadgetEffect(gadget, ({ changed }) => {
+    if (changed) {
+      onChange?.(changed);
+    }
+  }, [onChange]);
 
   if (!state) return null;
 

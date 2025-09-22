@@ -8,6 +8,7 @@
 import React from 'react';
 import { type TypedGadget, type SliderSpec, type SliderState, ExtractSpec, Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
+import { useGadgetEffect } from '../useGadgetEffect';
 
 export interface SliderProps<G extends TypedGadget<SliderSpec>, Spec extends ExtractSpec<G>> {
   /** The slider gadget instance */
@@ -22,6 +23,7 @@ export interface SliderProps<G extends TypedGadget<SliderSpec>, Spec extends Ext
   label?: string;
   /** Disable the slider */
   disabled?: boolean;
+  onChange?: (change: SliderSpec['effects']['changed']) => void;
 }
 
 /**
@@ -52,11 +54,18 @@ export function Slider<G extends TypedGadget<SliderSpec>, Spec extends ExtractSp
   showValue = true,
   showLabels = false,
   label,
-  disabled = false
+  disabled = false,
+  onChange
 }: SliderProps<G, Spec>) {
   // useGadget gives us perfect type inference
   // state is SliderState, send accepts SliderCommands
   const [state, send] = useGadget<G>(gadget);
+
+  useGadgetEffect(gadget, ({ changed }) => {
+    if (changed) {
+      onChange?.(changed);
+    }
+  }, [onChange]);
 
   // Extract typed values from state
   const { value, min, max, step } = state;

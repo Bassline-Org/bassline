@@ -1,7 +1,7 @@
 /**
  * Typed Button Gadget
  *
- * A button gadget that tracks press/release states and emits click events.
+ * A simple button gadget that emits click events.
  */
 
 import { defGadget } from '../../core/typed';
@@ -12,7 +12,6 @@ import type { CommandSpec } from '../specs';
  * Button state
  */
 export type ButtonState = {
-  pressed: boolean;
   disabled?: boolean;
   label: string;
 };
@@ -21,8 +20,6 @@ export type ButtonState = {
  * Button commands
  */
 export type ButtonCommands =
-  | { press: {} }
-  | { release: {} }
   | { click: {} }
   | { setLabel: string }
   | { enable: {} }
@@ -35,8 +32,6 @@ export type ButtonSpec = CommandSpec<
   ButtonState,
   ButtonCommands,
   {
-    press: {};
-    release: {};
     click: {};
     setLabel: string;
     enable: {};
@@ -45,8 +40,6 @@ export type ButtonSpec = CommandSpec<
   },
   {
     clicked: {};
-    pressed: {};
-    released: {};
     configured: ButtonState;
     noop: {};
   }
@@ -61,25 +54,7 @@ export function buttonGadget(
 ) {
   const baseGadget = defGadget<ButtonSpec>(
     (state, command) => {
-      // Handle press command
-      if ('press' in command) {
-        if (state.disabled) return { ignore: {} };
-        if (!state.pressed) {
-          return { press: {} };
-        }
-        return { ignore: {} };
-      }
-
-      // Handle release command
-      if ('release' in command) {
-        if (state.disabled) return { ignore: {} };
-        if (state.pressed) {
-          return { release: {} };
-        }
-        return { ignore: {} };
-      }
-
-      // Handle click command (combined press + release)
+      // Handle click command
       if ('click' in command) {
         if (state.disabled) return { ignore: {} };
         return { click: {} };
@@ -111,20 +86,8 @@ export function buttonGadget(
       return { ignore: {} };
     },
     {
-      press: (gadget) => {
-        const state = gadget.current();
-        gadget.update({ ...state, pressed: true });
-        return { pressed: {} };
-      },
-
-      release: (gadget) => {
-        const state = gadget.current();
-        gadget.update({ ...state, pressed: false });
-        return { released: {} };
-      },
-
-      click: (gadget) => {
-        // Click doesn't change pressed state (momentary action)
+      click: () => {
+        // Click is a simple event emission
         return { clicked: {} };
       },
 
@@ -144,7 +107,7 @@ export function buttonGadget(
 
       disable: (gadget) => {
         const state = gadget.current();
-        const newState = { ...state, disabled: true, pressed: false };
+        const newState = { ...state, disabled: true };
         gadget.update(newState);
         return { configured: newState };
       },
@@ -152,7 +115,6 @@ export function buttonGadget(
       ignore: () => ({ noop: {} })
     }
   )({
-    pressed: false,
     disabled,
     label
   });

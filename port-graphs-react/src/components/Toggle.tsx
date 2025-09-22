@@ -7,6 +7,7 @@
 
 import { type TypedGadget, type ToggleSpec, ExtractSpec, Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
+import { useCallback } from 'react';
 
 export interface ToggleProps<G extends TypedGadget<ToggleSpec>> {
   /** The toggle gadget instance */
@@ -65,12 +66,9 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
   const displayLabel = label || state.label;
 
   // Handle toggle with proper type
-  const handleToggle = () => {
-    if (!disabled) {
-      // Send typed command to gadget
-      send({ toggle: {} });
-    }
-  };
+  const handleToggle = useCallback(() => {
+    send({ toggle: {} })
+  }, [send]);
 
   // Get size classes
   const getSizeClass = () => {

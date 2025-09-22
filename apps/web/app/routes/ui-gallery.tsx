@@ -23,7 +23,8 @@ import {
   checkboxGadget,
   withTaps,
 } from 'port-graphs';
-import { lastCell } from 'port-graphs/cells';
+import { lastCell, lastMap } from 'port-graphs/cells';
+import { use } from "react";
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -50,82 +51,32 @@ const termsCheck = checkboxGadget(false, 'I agree to terms and conditions');
 const darkModeToggle = toggleGadget(false);
 
 // Create a cell to collect form data
-const formDataCell = withTaps(lastCell<any>({}));
+const formDataCell = withTaps(lastMap({
+  name: '',
+  age: 0,
+  color: '',
+  size: '',
+  newsletter: false,
+  terms: false
+}));
 
 // Counter example
-const countDisplay = withTaps(numberInputGadget(0, -100, 100, 1));
+const countDisplay = numberInputGadget(0, -100, 100, 1);
 const incrementBtn = buttonGadget('+1');
 const decrementBtn = buttonGadget('-1');
 const resetCountBtn = buttonGadget('Reset');
 
 function UIGalleryInner() {
-  const [formData] = useGadget(formDataCell);
-  const [nameState] = useGadget(nameInput);
-  const [ageState] = useGadget(ageInput);
-  const [colorState] = useGadget(colorSelect);
-  const [sizeState] = useGadget(sizeSelect);
-  const [emailState] = useGadget(emailCheck);
-  const [termsState] = useGadget(termsCheck);
   const [darkMode] = useGadget(darkModeToggle);
+  const [formData] = useGadget(formDataCell);
   const [countState] = useGadget(countDisplay);
 
-  // Wire volume slider to meter
-  useGadgetEffect(volumeSlider, ({ changed }) => {
-    if (changed) {
-      volumeMeter.receive({ display: changed });
-    }
-  }, []);
-
-  // Wire counter buttons
-  useGadgetEffect(incrementBtn, ({ clicked }) => {
-    if (clicked) {
-      countDisplay.receive({ increment: {} });
-    }
-  }, []);
-
-  useGadgetEffect(decrementBtn, ({ clicked }) => {
-    if (clicked) {
-      countDisplay.receive({ decrement: {} });
-    }
-  }, []);
-
-  useGadgetEffect(resetCountBtn, ({ clicked }) => {
-    if (clicked) {
-      countDisplay.receive({ set: 0 });
-    }
-  }, []);
-
-  // Collect form data
-  useGadgetEffect(submitButton, ({ clicked }) => {
-    if (clicked) {
-      const data = {
-        name: nameState?.value,
-        age: ageState?.value,
-        color: colorState?.value,
-        size: sizeState?.value,
-        newsletter: emailState?.checked,
-        terms: termsState?.checked
-      };
-      formDataCell.receive(data);
-      console.log('Form submitted:', data);
-    }
-  }, [nameState, ageState, colorState, sizeState, emailState, termsState]);
-
-  // Reset form
-  useGadgetEffect(resetButton, ({ clicked }) => {
-    if (clicked) {
-      nameInput.receive({ clear: {} });
-      ageInput.receive({ set: 25 });
-      colorSelect.receive({ select: 'Blue' });
-      sizeSelect.receive({ select: 'Medium' });
-      emailCheck.receive({ uncheck: {} });
-      termsCheck.receive({ uncheck: {} });
-      formDataCell.receive({});
-    }
-  }, []);
+  useGadgetEffect(formDataCell, ({ changed }) => {
+    console.log('Form data changed:', changed);
+  }, [formDataCell]);
 
   return (
-    <div className={`min-h-screen p-8 ${darkMode?.value ? 'bg-gray-900 text-white' : 'bg-white'}`}>
+    <div className={`min-h-screen p-8 ${darkMode?.on ? 'bg-gray-900 text-white' : 'bg-white'}`}>
       <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">UI Component Gallery</h1>
@@ -142,12 +93,16 @@ function UIGalleryInner() {
 
             <div>
               <label className="block text-sm font-medium mb-1">Name</label>
-              <TextInput gadget={nameInput} className="w-full" />
+              <TextInput gadget={nameInput} className="w-full" onChange={(changed) => {
+                formDataCell.receive({ name: changed });
+              }} />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Age</label>
-              <NumberInput gadget={ageInput} />
+              <NumberInput gadget={ageInput} onChange={(changed) => {
+                formDataCell.receive({ age: changed });
+              }} />
             </div>
           </div>
 
@@ -157,12 +112,16 @@ function UIGalleryInner() {
 
             <div>
               <label className="block text-sm font-medium mb-1">Favorite Color</label>
-              <Select gadget={colorSelect} className="w-full" />
+              <Select gadget={colorSelect} className="w-full" onChange={(changed) => {
+                formDataCell.receive({ color: changed });
+              }} />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">T-Shirt Size</label>
-              <Select gadget={sizeSelect} className="w-full" />
+              <Select gadget={sizeSelect} className="w-full" onChange={(changed) => {
+                formDataCell.receive({ size: changed });
+              }} />
             </div>
           </div>
 
@@ -172,7 +131,9 @@ function UIGalleryInner() {
 
             <div>
               <label className="block text-sm font-medium mb-1">Volume Control</label>
-              <Slider gadget={volumeSlider} showValue showLabels />
+              <Slider gadget={volumeSlider} showValue showLabels onChange={(changed) => {
+                formDataCell.receive({ volume: changed });
+              }} />
               <div className="mt-2">
                 <Meter gadget={volumeMeter} showPercentage />
               </div>
@@ -183,8 +144,12 @@ function UIGalleryInner() {
           <div className="space-y-4">
             <h2 className="text-xl font-semibold mb-4">Checkboxes & Toggles</h2>
 
-            <Checkbox gadget={emailCheck} />
-            <Checkbox gadget={termsCheck} />
+            <Checkbox gadget={emailCheck} onChange={(changed) => {
+              formDataCell.receive({ newsletter: changed });
+            }} />
+            <Checkbox gadget={termsCheck} onChange={(changed) => {
+              formDataCell.receive({ terms: changed });
+            }} />
           </div>
 
           {/* Buttons Section */}
@@ -192,9 +157,12 @@ function UIGalleryInner() {
             <h2 className="text-xl font-semibold mb-4">Buttons</h2>
 
             <div className="flex gap-2">
-              <Button gadget={submitButton} variant="primary" />
-              <Button gadget={resetButton} variant="secondary" />
-              <Button gadget={dangerButton} variant="danger" />
+              <Button gadget={resetButton} variant="secondary" onClick={(changed) => {
+                console.log('Reset button clicked');
+              }} />
+              <Button gadget={dangerButton} variant="danger" onClick={(changed) => {
+                console.log('Danger button clicked');
+              }} />
             </div>
           </div>
 

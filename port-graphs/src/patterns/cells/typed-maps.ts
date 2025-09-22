@@ -74,7 +74,7 @@ export const lastMap = <State extends MapCellState, Input extends MapCellState>(
     },
     {
       merge: (gadget, value) => {
-        gadget.update(value);
+        gadget.update({ ...gadget.current(), ...value });
         return { changed: value };
       },
       ignore: () => ({ noop: {} })

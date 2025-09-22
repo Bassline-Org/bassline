@@ -45,8 +45,6 @@ export type CheckboxSpec = CommandSpec<
   },
   {
     changed: boolean;
-    checked: {};
-    unchecked: {};
     configured: CheckboxState;
     noop: {};
   }
@@ -116,24 +114,19 @@ export function checkboxGadget(
         const state = gadget.current();
         const newChecked = !state.checked;
         gadget.update({ ...state, checked: newChecked });
-
-        if (newChecked) {
-          return { checked: {} };
-        } else {
-          return { unchecked: {} };
-        }
+        return { changed: newChecked };
       },
 
       check: (gadget) => {
         const state = gadget.current();
         gadget.update({ ...state, checked: true });
-        return { checked: {} };
+        return { changed: true };
       },
 
       uncheck: (gadget) => {
         const state = gadget.current();
         gadget.update({ ...state, checked: false });
-        return { unchecked: {} };
+        return { changed: false };
       },
 
       setLabel: (gadget, label) => {

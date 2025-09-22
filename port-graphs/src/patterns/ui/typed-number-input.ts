@@ -39,8 +39,6 @@ export type NumberInputSpec = CommandSpec<
   NumberInputCommands,
   {
     set: number;
-    increment: {};
-    decrement: {};
     configure: { min?: number; max?: number; step?: number };
     enable: {};
     disable: {};
@@ -49,7 +47,6 @@ export type NumberInputSpec = CommandSpec<
   {
     changed: number;
     validated: number;
-    invalid: { value: number; reason: string };
     configured: NumberInputState;
     noop: {};
   }
@@ -79,10 +76,8 @@ export function numberInputGadget(
       // Handle set command
       if ('set' in command) {
         if (state.disabled) return { ignore: {} };
-
-        const clamped = clampValue(command.set, state.min, state.max);
-        if (clamped !== state.value) {
-          return { set: clamped };
+        if (command.set !== state.value) {
+          return { set: command.set };
         }
         return { ignore: {} };
       }
@@ -92,11 +87,7 @@ export function numberInputGadget(
         if (state.disabled) return { ignore: {} };
 
         const newValue = state.value + (state.step || 1);
-        const clamped = clampValue(newValue, state.min, state.max);
-        if (clamped !== state.value) {
-          return { set: clamped };
-        }
-        return { ignore: {} };
+        return { set: newValue };
       }
 
       // Handle decrement command
@@ -104,11 +95,7 @@ export function numberInputGadget(
         if (state.disabled) return { ignore: {} };
 
         const newValue = state.value - (state.step || 1);
-        const clamped = clampValue(newValue, state.min, state.max);
-        if (clamped !== state.value) {
-          return { set: clamped };
-        }
-        return { ignore: {} };
+        return { set: newValue };
       }
 
       // Handle configure command
@@ -140,32 +127,21 @@ export function numberInputGadget(
         // Check if value was clamped
         const original = value;
         const clamped = clampValue(value, state.min, state.max);
-
-        gadget.update({ ...state, value: clamped });
-
-        if (original !== clamped) {
-          return { validated: clamped };
+        if (clamped !== state.value) {
+          gadget.update({ ...state, value: clamped });
+          if (original !== clamped) {
+            return { validated: clamped };
+          }
+          return { changed: clamped };
+        } else {
+          return { noop: {} };
         }
-        return { changed: clamped };
       },
-
-      increment: (gadget) => {
-        // This action is never called directly; increment converts to set
-        return { noop: {} };
-      },
-
-      decrement: (gadget) => {
-        // This action is never called directly; decrement converts to set
-        return { noop: {} };
-      },
-
       configure: (gadget, config) => {
         const state = gadget.current();
         const newState = {
           ...state,
-          ...(config.min !== undefined && { min: config.min }),
-          ...(config.max !== undefined && { max: config.max }),
-          ...(config.step !== undefined && { step: config.step })
+          ...config
         };
 
         // Re-validate current value with new constraints
@@ -173,11 +149,13 @@ export function numberInputGadget(
         if (clamped !== state.value) {
           newState.value = clamped;
         }
-
-        gadget.update(newState);
-        return { configured: newState };
+        if (newState.value !== state.value) {
+          gadget.update(newState);
+          return { changed: newState.value, configured: newState };
+        } else {
+          return { noop: {} };
+        }
       },
-
       enable: (gadget) => {
         const state = gadget.current();
         const newState = { ...state, disabled: false };

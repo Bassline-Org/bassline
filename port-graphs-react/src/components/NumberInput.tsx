@@ -5,19 +5,28 @@
 import React from 'react';
 import { type TypedGadget, type NumberInputSpec, type Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
+import { useGadgetEffect } from '../useGadgetEffect';
 
 export interface NumberInputProps<G extends TypedGadget<NumberInputSpec>> {
   gadget: G & Tappable<NumberInputSpec['effects']>;
   className?: string;
   showButtons?: boolean;
+  onChange?: (change: NumberInputSpec['effects']['changed']) => void;
 }
 
 export function NumberInput<G extends TypedGadget<NumberInputSpec>>({
   gadget,
   className = '',
-  showButtons = true
+  showButtons = true,
+  onChange
 }: NumberInputProps<G>) {
   const [state, send] = useGadget(gadget);
+
+  useGadgetEffect(gadget, ({ changed }) => {
+    if (changed) {
+      onChange?.(changed);
+    }
+  }, [onChange]);
 
   if (!state) return null;
 
@@ -45,9 +54,8 @@ export function NumberInput<G extends TypedGadget<NumberInputSpec>>({
             send({ set: value });
           }
         }}
-        className={`px-3 py-1 border-y ${showButtons ? '' : 'border-x rounded-md'} text-center w-20 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
-        }`}
+        className={`px-3 py-1 border-y ${showButtons ? '' : 'border-x rounded-md'} text-center w-20 focus:outline-none focus:ring-2 focus:ring-blue-500 ${state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+          }`}
       />
       {showButtons && (
         <button
