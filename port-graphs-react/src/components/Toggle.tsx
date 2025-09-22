@@ -8,6 +8,7 @@
 import { type TypedGadget, type ToggleSpec, ExtractSpec, Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useCallback } from 'react';
+import { useGadgetEffect } from '../useGadgetEffect';
 
 export interface ToggleProps<G extends TypedGadget<ToggleSpec>> {
   /** The toggle gadget instance */
@@ -24,6 +25,10 @@ export interface ToggleProps<G extends TypedGadget<ToggleSpec>> {
   label?: string;
   /** Position of label relative to toggle */
   labelPosition?: 'left' | 'right';
+  /** Optional callback to call when the toggle changes */
+  onChange?: (changed: ToggleSpec['effects']['changed']) => void;
+  /** Optional callback to call when the toggle is toggled */
+  onToggle?: (toggled: ToggleSpec['effects']['toggled']) => void;
 }
 
 /**
@@ -55,7 +60,9 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
   size = 'md',
   disabled = false,
   label,
-  labelPosition = 'right'
+  labelPosition = 'right',
+  onChange,
+  onToggle,
 }: ToggleProps<G>) {
   // useGadget gives us perfect type inference
   // state is ToggleState, send accepts ToggleCommands
@@ -66,6 +73,15 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
   const handleToggle = () => {
     send({ toggle: {} })
   }
+
+  useGadgetEffect(gadget, ({ changed, toggled }) => {
+    if (changed) {
+      onChange?.(changed);
+    }
+    if (toggled !== undefined) {
+      onToggle?.(toggled);
+    }
+  }, [onChange, onToggle]);
 
   // Get size classes
   const getSizeClass = () => {

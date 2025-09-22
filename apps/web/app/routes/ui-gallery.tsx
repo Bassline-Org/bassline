@@ -88,7 +88,9 @@ function UIGalleryInner() {
           <h1 className="text-3xl font-bold">UI Component Gallery</h1>
           <div className="flex items-center gap-2">
             <span>Dark Mode</span>
-            <Toggle gadget={darkModeToggle} />
+            <Toggle gadget={darkModeToggle} onToggle={(state) => {
+              return formDataCell.receive({ darkMode: state });
+            }} />
           </div>
         </div>
 
