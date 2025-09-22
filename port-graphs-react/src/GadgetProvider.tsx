@@ -80,15 +80,18 @@ export function useGadgetFromProvider<G extends TypedGadget<any>, Spec extends E
     };
 
     // Override the update method to track state changes
-    // const originalUpdate = gadget.update;
     gadget.update = (newState: Spec['state']) => {
-      // originalUpdate.call(gadget, newState);
-      // Update our cached state
       const currentEntry = registry.get(gadget);
       if (currentEntry) {
         currentEntry.state = newState;
         // Notify all listeners that state has changed
         currentEntry.listeners.forEach(listener => listener());
+      }
+    };
+    gadget.current = () => {
+      const currentEntry = registry.get(gadget);
+      if (currentEntry) {
+        return currentEntry.state;
       }
     };
 

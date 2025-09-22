@@ -38,6 +38,13 @@ const ageInput = numberInputGadget(25, 1, 120, 1);
 const volumeSlider = sliderGadget(50, 0, 100, 1);
 const volumeMeter = meterGadget(0, 100);
 
+// Wire slider to meter
+volumeSlider.tap((effect) => {
+  if ('changed' in effect) {
+    volumeMeter.receive({ display: effect.changed });
+  }
+});
+
 const colorSelect = selectGadget(['Red', 'Green', 'Blue', 'Yellow'], 'Blue');
 const sizeSelect = selectGadget(['Small', 'Medium', 'Large'], 'Medium');
 

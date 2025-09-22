@@ -234,9 +234,6 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
   const baseGadget = defGadget<ToggleSpec>(
     (state, command) => {
       if ('toggle' in command) {
-        console.log('Toggle command received');
-        console.log('Toggle state:', state);
-        console.log('Updating to:', !state.on);
         return { set: !state.on };
       }
       if ('set' in command) {
@@ -251,12 +248,7 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
     {
       set: (gadget, value) => {
         const state = gadget.current();
-        if (state.on === value) {
-          return { ignore: {} };
-        }
-        console.log('Setting toggle to:', value);
         const newState = { ...state, on: value };
-        console.log('New state:', newState);
         gadget.update(newState);
         return { changed: newState, toggled: value };
       },

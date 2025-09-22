@@ -124,10 +124,7 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
             <input
               type="checkbox"
               checked={state.on}
-              onChange={(e) => {
-                send({ set: e.target.checked })
-              }}
-              onClick={handleToggle}
+              onChange={handleToggle}
               disabled={disabled}
               className="switch-input"
             />
