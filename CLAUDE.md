@@ -20,7 +20,15 @@ That's it. Everything else is just patterns built on this protocol.
 ## The Consider → Act Protocol
 
 ```typescript
-// The shape of every gadget
+// The actual interface
+interface Gadget<State, Incoming, Effect> {
+  current: () => State;              // Get current state
+  update: (state: State) => void;    // Update state
+  receive: (data: Incoming) => void; // Receive and process data
+  emit: (effect: Effect) => void;    // Emit effects to the world
+}
+
+// The conceptual flow
 gadget = (incoming_data) => {
   const action = consider(current_state, incoming_data);  // CONSIDER
   const result = act_on(action);                         // ACT
@@ -28,9 +36,54 @@ gadget = (incoming_data) => {
 }
 ```
 
+## Type System Architecture (CRITICAL!)
+
+### Core Types That Make Everything Work
+
+```typescript
+// Simplified spec - just the essentials
+export type PartialSpec<State, Input, Effects> = {
+  state: State;
+  input: Input;
+  effects: Effects;
+};
+
+// Full spec includes actions for multimethod dispatch
+export type GadgetSpec<State, Input, Actions, Effects> =
+  PartialSpec<State, Input, Effects> & {
+    actions: Actions;
+  };
+
+// TypedGadget is an INTERFACE (not a type alias!)
+// This is CRUCIAL for type compatibility with intersection types
+export interface TypedGadget<Spec extends PartialSpec>
+  extends Gadget<Spec['state'], Spec['input'], Spec['effects']> { }
+
+// Extract spec from any gadget-like type
+export type ExtractSpec<G> = G extends Gadget<infer S, infer I, infer E>
+  ? PartialSpec<S, I, E>
+  : never;
+```
+
+**CRITICAL INSIGHT**: `TypedGadget` MUST be an interface, not a type alias. This allows `TypedGadget & Tappable` to properly extend `TypedGadget`. Without this, the type system breaks.
+
+### The withTaps Extension
+
+```typescript
+export interface Tappable<Effect> {
+  tap: (fn: (effect: Effect) => void) => () => void;
+}
+
+export function withTaps<G extends TypedGadget<any>>(gadget: G) {
+  // PRESERVES the original type G
+  // Returns G & Tappable<Effects>
+  // This preservation is critical for type inference
+}
+```
+
 ## Type-Safe Gadget Creation
 
-We use a **spec-driven approach** for type-safe gadgets:
+We use a **spec-driven approach** with multimethod dispatch for type-safe gadgets:
 
 ```typescript
 // Define a spec as a plain type literal
@@ -208,6 +261,143 @@ Uses strict mode with additional safety checks:
 - `noUncheckedIndexedAccess`: Safe array access
 - `exactOptionalPropertyTypes`: Distinguish undefined vs missing
 
+## React Integration Patterns
+
+### Core Hook Architecture
+
+```typescript
+// The main hook - handles everything
+export function useGadget<G extends TypedGadget<any>>(gadget: G) {
+  // Returns [state, send, gadgetWithTap]
+  // Automatically wraps with tap if needed
+  // Uses GadgetProvider for global state management
+}
+
+// Effect subscription hook - clean and declarative
+export function useGadgetEffect<G extends TypedGadget<any>>(
+  gadget: G,
+  callback: (effect: ExtractSpec<typeof gadget>['effects']) => void,
+  deps?: React.DependencyList
+) {
+  // Subscribes to gadget effects with automatic cleanup
+  // Fully typed based on the gadget's spec
+  // Handles React lifecycle properly
+}
+```
+
+### Component Pattern (CRITICAL!)
+
+```typescript
+// CORRECT - Uses generic constraint
+export interface SliderProps<G extends TypedGadget<SliderSpec>> {
+  gadget: G & Tappable<SliderSpec['effects']>;  // Expects tappable gadget
+}
+
+export function Slider<G extends TypedGadget<SliderSpec>>({
+  gadget
+}: SliderProps<G>) {
+  const [state, send] = useGadget(gadget);
+  // Component implementation
+}
+```
+
+### Usage Rules
+
+```typescript
+// ✅ CORRECT - Create gadgets OUTSIDE components
+const slider1 = sliderGadget(50, 0, 100, 1);
+const meter1 = meterGadget(0, 100);
+
+function MyComponent() {
+  const [sliderState] = useGadget(slider1);
+
+  // Wire gadgets together with useGadgetEffect (PREFERRED)
+  useGadgetEffect(slider1, ({ changed }) => {
+    if (changed) {
+      meter1.receive({ display: changed });
+    }
+  }, []);
+
+  return <Slider gadget={slider1} />;
+}
+
+// ❌ WRONG - Never create gadgets inside render
+function BadComponent() {
+  const slider = sliderGadget(50);  // RECREATED EVERY RENDER!
+  return <Slider gadget={slider} />;
+}
+```
+
+## Current File Structure
+
+### port-graphs/ (Core Library)
+```
+src/
+├── core/
+│   ├── typed.ts         # defGadget - multimethod dispatch creator
+│   └── types.ts         # CRITICAL types (TypedGadget interface!)
+├── patterns/
+│   ├── specs.ts         # Pattern specifications
+│   ├── cells/          # Cell implementations (all ACI)
+│   ├── functions/      # Function implementations
+│   └── ui/             # UI gadget implementations
+├── semantics/
+│   └── typed-extensions.ts  # withTaps (preserves types!)
+└── old/                # Legacy code (EXCLUDED from build)
+```
+
+### port-graphs-react/ (React Integration)
+```
+src/
+├── components/         # Typed React components (Slider, Meter, Toggle)
+├── GadgetProvider.tsx  # Global state with WeakMap
+└── useGadget.ts       # Core hook with type inference
+```
+
+## Critical Implementation Rules
+
+### DO:
+1. ✅ Use **interfaces** for extendable types (TypedGadget)
+2. ✅ **Preserve types** through generic functions (withTaps)
+3. ✅ Create gadgets **outside** React components
+4. ✅ Use **factory functions** that return tappable gadgets
+5. ✅ Let TypeScript **infer** types where possible
+6. ✅ Use **structural typing** over nominal typing
+7. ✅ Keep specs **simple** (use PartialSpec when possible)
+
+### DON'T:
+1. ❌ Use type aliases for extendable types
+2. ❌ Use `any` unless absolutely necessary
+3. ❌ Create gadgets inside render functions
+4. ❌ Add complexity to typed-extensions.ts
+5. ❌ Create files unless explicitly needed
+6. ❌ Add marketing language or unnecessary features
+7. ❌ Forget to return gadgets with tap from factories
+
+## Common Pitfalls and Solutions
+
+### Type Inference Issues
+
+**Problem**: `typeof gadget extends TypedGadget` returns false
+**Solution**: TypedGadget MUST be an interface, not a type alias
+
+**Problem**: Components won't accept gadgets with tap
+**Solution**: Use generic constraints: `G extends TypedGadget<Spec>`
+
+**Problem**: Function gadget state types are complex
+**Solution**: State includes args + result: `{ a: number; b: number; result?: number }`
+
+### Runtime Issues
+
+**Problem**: Gadgets recreated every render
+**Solution**: Move gadget creation outside component
+
+**Problem**: State not updating in React
+**Solution**: Ensure GadgetProvider wraps component tree
+
+**Problem**: Effects not being received
+**Solution**: Check tap cleanup is called in useEffect return
+
 ## Summary
 
 The entire system is:
@@ -217,8 +407,10 @@ data → consider → act → effects → (someone else's data)
 
 Everything else - cells, functions, commands, routers - are just gadgets with different consider/act implementations. The network builds itself using the same mechanism it uses to process data.
 
-The key is recognizing which pattern fits your semantics:
-- **Cells** for ACI merge operations
-- **Functions** for computation with partial binding
-- **Commands** for instruction interpretation
-- **Meta-gadgets** for managing other gadgets
+**The secret sauce**:
+- TypedGadget as an **interface** enables type composition
+- withTaps **preserves** the original type
+- Components use **generic constraints** for flexibility
+- Gadgets created **outside** components for stability
+
+When in doubt, keep it simple. The power comes from the single gadget primitive, not from complex abstractions.

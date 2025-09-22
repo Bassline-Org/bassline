@@ -1,18 +1,17 @@
 import type { Route } from "./+types/typed-ui";
-import { useEffect } from "react";
 import {
   GadgetProvider,
   Slider,
   Meter,
   Toggle,
-  useGadget
+  useGadget,
+  useGadgetEffect
 } from 'port-graphs-react';
 import {
   sliderGadget,
   meterGadget,
   toggleGadget,
   withTaps,
-  type ExtractSpec,
 } from 'port-graphs';
 import { adder } from 'port-graphs/functions';
 
@@ -26,53 +25,37 @@ export function meta({ }: Route.MetaArgs) {
 // Create gadgets outside the component
 const slider1 = sliderGadget(50, 0, 100, 1);
 const slider2 = sliderGadget(25, 0, 100, 1);
+const slider3 = sliderGadget(75, 0, 200, 1);
 const meter1 = meterGadget(0, 100);
 const meter2 = meterGadget(0, 200);
 const toggle1 = toggleGadget(false);
+
 // Create the adder gadget with initial values
-const calcBase = adder({ a: 0, b: 0 });
-const calc = withTaps(calcBase);
+const calc = withTaps(adder({ a: slider1.current().value, b: slider2.current().value }));
 
 function TypedUIDemoInner() {
 
   const [calcState] = useGadget(calc);
-  const a = calcState?.a ?? 0;
-  const b = calcState?.b ?? 0;
-  const result = calcState?.result ?? 0;
 
-  // Wire them together
-  useEffect(() => {
-    const cleanups: (() => void)[] = [];
+  useGadgetEffect(slider1, ({ changed }) => {
+    if (changed) {
+      meter1.receive({ display: changed });
+      calc.receive({ a: changed });
+    }
+  }, [meter1, calc]);
 
-    // Connect slider1 to meter1
-    cleanups.push(slider1.tap((effect) => {
-      if ('changed' in effect) {
-        meter1.receive({ display: effect["changed"] });
-      }
-    }));
+  useGadgetEffect(slider2, ({ changed }) => {
+    if (changed) {
+      calc.receive({ b: changed });
+    }
+  }, [calc]);
 
-    // Connect sliders to calculator
-    cleanups.push(slider1.tap((effect) => {
-      if ('changed' in effect) {
-        calc.receive({ a: effect["changed"] });
-      }
-    }));
-
-    cleanups.push(slider2.tap((effect) => {
-      if ('changed' in effect) {
-        calc.receive({ b: effect["changed"] });
-      }
-    }));
-
-    // Connect calculator to meter2
-    cleanups.push(calc.tap((effect: any) => {
-      if (effect?.changed?.result !== undefined) {
-        meter2.receive({ display: effect.changed.result });
-      }
-    }));
-
-    return () => cleanups.forEach(cleanup => cleanup());
-  }, [slider1, slider2, meter1, meter2, toggle1, calc]);
+  useGadgetEffect(calc, ({ changed }) => {
+    if (changed && 'result' in changed) {
+      meter2.receive({ display: changed.result });
+      slider3.receive({ set: changed.result });
+    }
+  }, [meter2]);
 
   return (
     <div className="min-h-screen bg-white p-8">
@@ -85,11 +68,13 @@ function TypedUIDemoInner() {
         <div>
           <h3 className="font-semibold mb-2">Slider 1</h3>
           <Slider gadget={slider1} />
+          <Slider gadget={slider3} showValue showLabels />
         </div>
 
         <div>
           <h3 className="font-semibold mb-2">Meter 1 (connected to Slider 1)</h3>
           <Meter gadget={meter1} showPercentage />
+          <Meter gadget={meter1} variant="circle" />
         </div>
 
         <div>
@@ -111,7 +96,7 @@ function TypedUIDemoInner() {
           <h3 className="font-semibold mb-2">Calculator</h3>
           <div className="p-4 border rounded">
             <div className="font-mono">
-              {a.toFixed(1)} + {b.toFixed(1)} = {result.toFixed(1)}
+              {calcState?.a} + {calcState?.b} = {calcState?.result}
             </div>
           </div>
         </div>
