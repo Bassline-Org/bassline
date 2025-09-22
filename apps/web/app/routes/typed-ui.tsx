@@ -28,12 +28,16 @@ const slider2 = sliderGadget(25, 0, 100, 1);
 const meter1 = meterGadget(0, 100);
 const meter2 = meterGadget(0, 200);
 const toggle1 = toggleGadget(false);
-const calc = withTaps(adder({}));
+// Create the adder gadget with initial values
+const calcBase = adder({ a: 0, b: 0 });
+const calc = withTaps(calcBase);
 
 function TypedUIDemoInner() {
 
-  // Get state from calc to display
-  const [calcState] = useGadget(calc);
+  // Get state from calc to display - type inference issue with function gadgets
+  // The state includes both the arguments (a, b) and the result
+  type CalcState = { a: number; b: number; result?: number };
+  const [calcState] = useGadget(calc) as readonly [CalcState, any, any];
   const a = calcState?.a ?? 0;
   const b = calcState?.b ?? 0;
   const result = calcState?.result ?? 0;
