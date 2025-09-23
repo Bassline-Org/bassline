@@ -3,13 +3,11 @@
  */
 
 import type { Route } from './+types/visual-editor';
-import { GadgetProvider } from 'port-graphs-react';
-import { NodeCanvas } from '../components/visual/NodeCanvas';
-import { nodeCommandCell } from '../gadgets/visual/node-command-cell';
-import { positionCell } from '../gadgets/visual/position-cell';
-import { selectionCell } from '../gadgets/visual/selection-cell';
+import { GadgetProvider, useGadget } from 'port-graphs-react';
+import { NodeCanvas, type NodeGadgets } from '../components/visual/NodeCanvas';
 import { createCounterNode, createDisplayNode } from '../gadgets/visual/node-factory';
-import type { NodeRegistry } from '../gadgets/visual/types';
+import { lastCell, lastMap, tableCell } from 'port-graphs/cells';
+import { withTaps, type Tappable } from 'port-graphs';
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -18,33 +16,42 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
-// Create gadgets OUTSIDE components - they're singletons!
-const commands = nodeCommandCell();
-const positions = positionCell({
-  'counter-1': { x: 100, y: 100 },
-  'display-1': { x: 400, y: 100 }
-});
-const selections = selectionCell({});
-
-// Create initial nodes with proper typing
-const counterNode = createCounterNode('counter-1', 0);
-const displayNode = createDisplayNode('display-1', null);
-
-// Build the registry - nodes are properly typed now
-const nodeInstances: NodeRegistry = {
-  'counter-1': counterNode,
-  'display-1': displayNode
-};
-
-// Wire counter to display with proper types
-// We have direct access to the properly typed nodes
-counterNode.gadgets.logic.tap((effect) => {
-  if ('changed' in effect && effect.changed !== undefined) {
-    displayNode.gadgets.logic.receive({ display: effect.changed });
+const nodeTable = withTaps(tableCell<string, Tappable<{ changed: any }> & NodeGadgets<any, any>>({}));
+nodeTable.tap(({ added }) => {
+  if (added) {
+    Object.values(added).forEach(gadget => {
+      gadget.tap(({ changed }) => {
+        if (changed) {
+          console.log('changed', changed);
+        }
+      });
+    });
   }
 });
 
+const exampleGadget = withTaps(lastMap({}));
+
+const foo = withTaps(lastMap({
+  position: withTaps(lastCell({ x: 0, y: 0 })),
+  selected: withTaps(lastCell(false)),
+  gadget: exampleGadget,
+}));
+
+const bar = withTaps(lastMap({
+  position: withTaps(lastCell({ x: 100, y: 100 })),
+  selected: withTaps(lastCell(true)),
+  gadget: exampleGadget,
+}));
+
+nodeTable.receive({
+  'foo': foo,
+  'bar': bar,
+});
+
 function VisualEditorInner() {
+  const [nodeTableState, , nodeTableCell] = useGadget(nodeTable);
+  const [fooState, ,] = useGadget(foo);
+  const [barState, ,] = useGadget(bar);
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -57,10 +64,7 @@ function VisualEditorInner() {
 
       <div style={{ flex: 1, position: 'relative' }}>
         <NodeCanvas
-          nodeInstances={nodeInstances}
-          positions={positions}
-          selections={selections}
-          commands={commands}
+          nodeTable={nodeTableCell}
         />
       </div>
 

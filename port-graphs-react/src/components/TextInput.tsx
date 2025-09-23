@@ -2,7 +2,6 @@
  * React component for TextInput gadget
  */
 
-import React from 'react';
 import { type TypedGadget, type TextInputSpec, type Tappable } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';

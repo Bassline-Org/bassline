@@ -2,13 +2,12 @@
  * Main canvas component for visual gadget editor
  */
 
-import React, { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
-  type Node,
   type Edge,
   type NodeChange,
   type EdgeChange,
@@ -17,99 +16,71 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { useGadget, useGadgetEffect } from 'port-graphs-react';
-import type { TypedGadget } from 'port-graphs';
-import type {
-  NodeRegistry,
-  PositionState,
-  SelectionState
-} from '../../gadgets/visual/types';
-import type { NodeCommandSpec } from '../../gadgets/visual/node-command-cell';
-import type { PositionCellSpec } from '../../gadgets/visual/position-cell';
-import type { SelectionCellSpec } from '../../gadgets/visual/selection-cell';
+import { useGadget } from 'port-graphs-react';
+import { type CellSpec, type PartialSpec, type TableSpec, type Tappable, type TypedGadget } from 'port-graphs';
 import { GadgetNode } from './GadgetNode';
 
 // Define node types for React Flow
 const nodeTypes = {
-  'gadget-node': GadgetNode
 };
 
-/**
- * Props for NodeCanvas component
- */
-interface NodeCanvasProps {
-  nodeInstances: NodeRegistry;
-  positions: TypedGadget<PositionCellSpec>;
-  selections: TypedGadget<SelectionCellSpec>;
-  commands: TypedGadget<NodeCommandSpec>;
+type Position = {
+  x: number;
+  y: number;
 }
+export type PositionSpec = CellSpec<Position, Position>;
+
+export type NodeGadgets<T extends PartialSpec = PartialSpec> = {
+  position: TypedGadget<Tappable & PositionSpec>;
+  selected: TypedGadget<Tappable & CellSpec<boolean, boolean>>;
+  gadget: TypedGadget<Tappable & T>;
+};
+
 
 /**
  * Canvas component that integrates React Flow with gadgets
  */
+interface NodeCanvasProps {
+  nodeTable: TypedGadget<TableSpec<NodeGadgets>>;
+}
+
 export function NodeCanvas({
-  nodeInstances,
-  positions,
-  selections,
-  commands
+  nodeTable,
 }: NodeCanvasProps) {
-  const [positionState] = useGadget(positions);
-  const [selectionState] = useGadget(selections);
+  const [nodeState, , nodeTableCell] = useGadget(nodeTable);
 
-  // Wire command cell to position and selection cells
-  useGadgetEffect(commands, (effects) => {
-    if ('positionsChanged' in effects && effects.positionsChanged) {
-      const newPositions = { ...positionState };
-      effects.positionsChanged.forEach(({ id, position }) => {
-        newPositions[id] = position;
-      });
-      positions.receive(newPositions);
+  const nodes = Object.entries(nodeState).map(([id, instance]) => {
+    const { position, selected, gadget } = instance.current();
+    return {
+      id,
+      type: 'default',
+      position: position.current(),
+      selected: selected.current(),
+      data: {
+        gadget: gadget.current(),
+      }
     }
-
-    if ('selectionsChanged' in effects && effects.selectionsChanged) {
-      const newSelections = { ...selectionState };
-      effects.selectionsChanged.forEach(({ id, selected }) => {
-        if (selected) {
-          newSelections[id] = true;
-        } else {
-          delete newSelections[id];
-        }
-      });
-      selections.receive(newSelections);
-    }
-
-    if ('nodesRemoved' in effects && effects.nodesRemoved) {
-      // Handle node removal
-      const newPositions = { ...positionState };
-      const newSelections = { ...selectionState };
-      effects.nodesRemoved.forEach(id => {
-        delete newPositions[id];
-        delete newSelections[id];
-      });
-      positions.receive(newPositions);
-      selections.receive(newSelections);
-    }
-  }, [positionState, selectionState]);
-
-  // Build React Flow nodes from gadget instances
-  const nodes: Node[] = Object.entries(nodeInstances).map(([id, instance]) => ({
-    id,
-    type: 'gadget-node',
-    position: positionState[id] || { x: 100, y: 100 },
-    selected: selectionState[id] || false,
-    data: {
-      ...instance.gadgets,
-      nodeType: instance.gadgets.label?.current?.()?.text?.toLowerCase() || undefined
-    }
-  }));
+  });
 
   // For now, no edges
   const edges: Edge[] = [];
 
   // Handle node changes from React Flow
   const onNodesChange = useCallback((changes: NodeChange[]) => {
-    commands.receive(changes);
-  }, [commands]);
+    for (const change of changes) {
+      console.log('node change', change);
+      if (change.type === 'position') {
+        nodeState[change.id]?.current().position.receive(change.position as Position);
+      }
+      if (change.type === 'select') {
+        console.log('node select', change, nodeState[change.id]?.current().selected);
+        nodeState[change.id]?.current().selected.receive(change.selected);
+      }
+      if (change.type === 'remove') {
+        nodeTableCell.receive({ [change.id]: null });
+      }
+    }
+  }, [nodeTableCell]);
 
   // Handle edge changes (for future use)
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
@@ -129,7 +100,6 @@ export function NodeCanvas({
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
         fitView
       >
         <Background color="#aaa" gap={16} variant={BackgroundVariant.Dots} />

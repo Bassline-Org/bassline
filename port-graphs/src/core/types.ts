@@ -45,16 +45,6 @@ export type ExtractSpec<G> = G extends Gadget<infer S, infer I, infer E>
   PartialSpec<S, I, E>
   : never;
 
-// export type ExtractSpec<G> =
-//   G extends TypedGadget<any>
-//   ? G extends TypedGadget<infer S>
-//   ? S
-//   : G extends GadgetSpec
-//   ? G
-//   : never
-//   : never;
-
-
 // Additional effect types
 export type ErrorEffect<E = string> = { error: E };
 
