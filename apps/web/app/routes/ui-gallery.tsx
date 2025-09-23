@@ -75,7 +75,7 @@ const resetCountBtn = buttonGadget('Reset');
 
 function UIGalleryInner() {
   const [darkMode] = useGadget(darkModeToggle);
-  const [formData] = useGadget(formDataCell);
+  const [formData, updateFormData] = useGadget(formDataCell);
   const [countState] = useGadget(countDisplay);
 
   useGadgetEffect(formDataCell, ({ changed }) => {
@@ -90,7 +90,7 @@ function UIGalleryInner() {
           <div className="flex items-center gap-2">
             <span>Dark Mode</span>
             <Toggle gadget={darkModeToggle} onToggle={(state) => {
-              return formDataCell.receive({ darkMode: state });
+              return updateFormData({ darkMode: state });
             }} />
           </div>
         </div>
@@ -103,14 +103,14 @@ function UIGalleryInner() {
             <div>
               <label className="block text-sm font-medium mb-1">Name</label>
               <TextInput gadget={nameInput} className="w-full" onChange={(changed) => {
-                formDataCell.receive({ name: changed });
+                updateFormData({ name: changed });
               }} />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Age</label>
               <NumberInput gadget={ageInput} onChange={(changed) => {
-                formDataCell.receive({ age: changed });
+                updateFormData({ age: changed });
               }} />
             </div>
           </div>
@@ -122,14 +122,14 @@ function UIGalleryInner() {
             <div>
               <label className="block text-sm font-medium mb-1">Favorite Color</label>
               <Select gadget={colorSelect} className="w-full" onChange={(changed) => {
-                formDataCell.receive({ color: changed });
+                updateFormData({ color: changed });
               }} />
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">T-Shirt Size</label>
               <Select gadget={sizeSelect} className="w-full" onChange={(changed) => {
-                formDataCell.receive({ size: changed });
+                updateFormData({ size: changed });
               }} />
             </div>
           </div>
@@ -141,7 +141,13 @@ function UIGalleryInner() {
             <div>
               <label className="block text-sm font-medium mb-1">Volume Control</label>
               <Slider gadget={volumeSlider} showValue showLabels onChange={(changed) => {
-                formDataCell.receive({ volume: changed });
+                updateFormData({ volume: changed });
+              }} />
+              <Slider gadget={volumeSlider} onChange={(changed) => {
+                console.log('Volume changed:', changed);
+              }} />
+              <Slider gadget={volumeSlider} showLabels onChange={(changed) => {
+                console.log('Volume changed from anotha:', changed);
               }} />
               <div className="mt-2">
                 <Meter gadget={volumeMeter} showPercentage />
@@ -154,10 +160,10 @@ function UIGalleryInner() {
             <h2 className="text-xl font-semibold mb-4">Checkboxes & Toggles</h2>
 
             <Checkbox gadget={emailCheck} onChange={(changed) => {
-              formDataCell.receive({ newsletter: changed });
+              updateFormData({ newsletter: changed });
             }} />
             <Checkbox gadget={termsCheck} onChange={(changed) => {
-              formDataCell.receive({ terms: changed });
+              updateFormData({ terms: changed });
             }} />
           </div>
 
@@ -167,7 +173,7 @@ function UIGalleryInner() {
 
             <div className="flex gap-2">
               <Button gadget={submitButton} variant="primary" onClick={() => {
-                const data = formDataCell.current();
+                const data = formData;
                 console.log('Form submitted:', data);
                 alert(`Form submitted! Check console for details.`);
               }} />

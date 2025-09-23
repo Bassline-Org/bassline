@@ -13,6 +13,9 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/visual-editor": {
+    params: {};
+  };
   "/canvas-clean": {
     params: {};
   };
@@ -39,7 +42,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/canvas-clean" | "/gadget-demo" | "/canvas-new" | "/ui-gallery" | "/typed-ui" | "/canvas" | "/home";
+    page: "/" | "/visual-editor" | "/canvas-clean" | "/gadget-demo" | "/canvas-new" | "/ui-gallery" | "/typed-ui" | "/canvas" | "/home";
+  };
+  "routes/visual-editor.tsx": {
+    id: "routes/visual-editor";
+    page: "/visual-editor";
   };
   "routes/canvas-clean.tsx": {
     id: "routes/canvas-clean";
