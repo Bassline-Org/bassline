@@ -10,7 +10,7 @@ export interface Gadget<State = unknown, Incoming = unknown, Effect extends Gadg
   current: () => State;
   update: (state: State) => void;
   receive: (data: Incoming) => void;
-  emit: (effect: Effect) => void;
+  emit: (effect: Partial<Effect>) => void;
 }
 
 // Base types for actions and effects - just objects with named contexts
