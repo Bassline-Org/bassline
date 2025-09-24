@@ -2,53 +2,63 @@ import _ from 'lodash';
 import { defGadget } from '../../core/typed';
 import { CellSpec } from '../specs';
 import { ExtractSpec, TypedGadget } from '../../core/types';
-import { withTaps } from '../../semantics';
+import { Tappable, withTaps } from '../../semantics';
 import { lastMap } from './typed-maps';
+import { adder } from '../functions';
 
-export type TableSpec<Key extends string = string, Row = unknown> = CellSpec<
-    Record<Key, Row>,
-    Record<Key, Row | null>,
+export type TableSpec<Key extends string | number | symbol, Entry> = CellSpec<
+    Record<Key, Entry>,
+    Record<Key, Entry | null>,
     {
-        added: Record<Key, Row>;
-        removed: Record<Key, Row>;
+        added: Record<Key, Entry>;
+        removed: Record<Key, Entry>;
     }
 > & {
     effects: {
         // The changed effect is the full table state
-        changed: Record<Key, Row>;
+        changed: Record<Key, Entry>;
         // Added rows
-        added: Record<Key, Row>;
+        added: Record<Key, Entry>;
         // Removed rows
-        removed: Record<Key, Row>;
+        removed: Record<Key, Entry>;
     };
 };
 
-export const tableCell = <Key extends string = string, Row = unknown>(initial: Record<Key, Row>) => {
-    return defGadget<TableSpec<Key, Row>>(
+// A table is just a table - no transform
+export const table = <Entry, Key extends string | number | symbol = string | number | symbol>(
+    initial: Record<Key, Entry> = {} as typeof initial
+) => {
+
+    const initialData = {} as Record<Key, Entry>;
+
+    for (const key in initial) {
+        initialData[key] = { ...initial[key] };
+    }
+
+    const gadget = defGadget<TableSpec<Key, Entry>>(
         (state, input) => {
-            const changes = {
-                added: {} as Record<Key, Row>,
-                removed: {} as Record<Key, Row>,
-            };
+            const added = {} as Record<Key, Entry>;
+            const removed = {} as Record<Key, Entry>;
 
             for (const key in input) {
                 const incoming = input[key];
-                const existing = state[key];
 
                 if (incoming === null) {
-                    if (existing !== undefined) {
-                        changes.removed[key] = existing;
+                    if (state[key] !== undefined) {
+                        removed[key] = state[key];
                     }
-                } else if (incoming !== undefined) {
-                    changes.added[key] = incoming;
+                } else {
+                    if (state[key] !== incoming) {
+                        added[key] = { ...state[key], ...incoming };
+                    }
                 }
             }
 
-            if (_.isEmpty(changes.added) && _.isEmpty(changes.removed)) {
+            if (_.isEmpty(added) && _.isEmpty(removed)) {
                 return { ignore: {} };
             }
 
-            return { merge: changes };
+            return { merge: { added, removed } };
         },
         {
             merge: (gadget, { added, removed }) => {
@@ -63,178 +73,114 @@ export const tableCell = <Key extends string = string, Row = unknown>(initial: R
                 }
 
                 gadget.update(newState);
-
                 return { changed: newState, added, removed };
             },
             ignore: () => ({ noop: {} })
         }
-    )(initial as Record<Key, Row>);
+    )(initialData);
+    return withTaps(gadget);
 };
 
-export type TableViewState<Source extends TableSpec, Derived> = {
-    fn: (source: Source['state'][keyof Source['state']]) => Derived;
-    derived: Derived;
+export const derive = <Derived, Source = Derived, Key extends string | number | symbol = string | number | symbol>(
+    source: TypedGadget<TableSpec<Key, Source>> & Tappable<TableSpec<Key, Source>['effects']>,
+    transform: (key: Key, value: Source) => [Key, Derived | null]
+) => {
+
+    // Compute the initial state of the derived table
+    const initial = {} as Record<Key, Derived>;
+    const currentSource = source.current();
+    for (const key in currentSource) {
+        const value = currentSource[key];
+        const [derivedKey, derivedValue] = transform(key, value);
+        if (derivedValue !== null) {
+            initial[derivedKey] = derivedValue;
+        }
+    }
+
+    const derived = withTaps(table<Derived>(initial));
+
+    // Wire with transformation
+    source.tap(({ added, removed }) => {
+        const updates = {} as Record<Key, Derived | null>;
+
+        // Apply the transform to the added items
+        if (added) {
+            for (const key in added) {
+                const [derivedKey, value] = transform(key, added[key]);
+                updates[derivedKey] = value;
+            }
+        }
+
+        // Handle explicit removals
+        if (removed) {
+            for (const key in removed) {
+                updates[key] = null;
+            }
+        }
+
+        derived.receive(updates);
+    });
+
+    return derived;
+};
+
+// Join is just a function that runs once and returns a result
+function join<K1 extends keyof any, K2 extends keyof any, V1, V2>(
+    left: Record<K1, V1>,
+    right: Record<K2, V2>,
+    on: (l: { key: K1, value: V1 }, r: { key: K2, value: V2 }) => boolean
+): Array<V1 & V2> {
+    const results = [] as Array<V1 & V2>;
+    for (const lKey in left) {
+        for (const rKey in right) {
+            const lRow = left[lKey];
+            const rRow = right[rKey];
+            if (on({ key: lKey, value: lRow }, { key: rKey, value: rRow })) {
+                results.push({ ...lRow, ...rRow });
+            }
+        }
+    }
+    return results;
 }
 
-export type TableViewSpec<Key extends string, Source, Derived> = {
-    state: Record<Key, Derived>;
-    input: {
-        added?: Record<Key, Source>;
-        removed?: Key[];
-    };
-    actions: {
-        update: {
-            added: Record<Key, Derived>;
-            removed: Key[];
-        };
-        ignore: {};
-    };
-    effects: {
-        changed: Record<Key, Derived>;
-        noop: {};
-    };
-};
-
-export const tableView = <Key extends string, Source, Derived>(
-    transform: (source: Source) => Derived,
-    initial: Record<Key, Derived> = {} as Record<Key, Derived>
-) => {
-    return defGadget<TableViewSpec<Key, Source, Derived>>(
-        (state, input) => {
-            const added = {} as Record<Key, Derived>;
-            const removed = [] as Key[];
-
-            // Transform added items
-            if (input.added) {
-                for (const key in input.added) {
-                    const result = transform(input.added[key]);
-                    if (!_.isNil(result)) {
-                        added[key] = result;
-                    } else {
-                        removed.push(key);
-                    }
-                }
-            }
-
-            // Collect removed keys
-            if (input.removed) {
-                for (const key of input.removed) {
-                    if (state[key] !== undefined) {
-                        removed.push(key);
-                    }
-                }
-            }
-
-            if (_.isEmpty(added) && removed.length === 0) {
-                return { ignore: {} };
-            }
-
-            return { update: { added, removed } };
-        },
-        {
-            update: (gadget, { added, removed }) => {
-                const newState = { ...gadget.current() };
-
-                // Add transformed items
-                for (const key in added) {
-                    newState[key] = added[key]!;
-                }
-
-                // Remove items
-                for (const key of removed) {
-                    delete newState[key];
-                }
-
-                gadget.update(newState);
-                return { changed: newState };
-            },
-            ignore: () => ({ noop: {} })
-        }
-    )(initial);
-};
-
-export const wireTableView = <Key extends string, Source, Derived>(
-    table: TypedGadget<TableSpec<Key, Source>>,
-    view: TypedGadget<TableViewSpec<Key, Source, Derived>>
-) => {
-    return withTaps(table).tap(({ added, removed }) => {
-        if (added) {
-            view.receive({
-                added,
-                removed: removed ? Object.keys(removed) as Key[] : []
-            });
-        }
-    });
-};
-
-export const deriveView = <Table, Spec extends ExtractSpec<Table> = ExtractSpec<Table>, Derived = unknown>(
-    table: Table,
-    transform: (source: Spec['state'][keyof Spec['state']]) => Derived,
-) => {
-    type TableType = Table extends TypedGadget<TableSpec> ? Table : never;
-    type Key = keyof Spec['state'] extends string ? keyof Spec['state'] : never;
-    // Create the view gadget
-    const view = withTaps(tableView<Key, Spec['state'][keyof Spec['state']], Derived>(transform, {} as Record<Key, Derived>));
-
-    // Auto-wire the connection
-    withTaps(table as TableType).tap(({ added, removed }) => {
-        if (added || removed) {
-            view.receive({
-                added: added as Record<Key, Spec['state'][keyof Spec['state']]>,
-                removed: removed ? Object.keys(removed) as Key[] : []
-            });
-        }
-    });
-
-    return view;
-};
-
 type Pos = { x: number, y: number };
-const a = withTaps(lastMap<Pos, Pos>({ x: 0, y: 0 }));
-const b = withTaps(lastMap<Pos, Pos>({ x: 0, y: 0 }));
-const c = withTaps(lastMap<Pos, Pos>({ x: 0, y: 0 }));
+const exampleTable = table<Pos>({});
+const derivedTable = derive<Pos>(exampleTable, (id, { x, y }) => [id, { x: x + 10, y: y + 10 }]);
+const derivedDerivedTable = derive<Pos & { sum: number }, Pos>(derivedTable, (id, { x, y }) => [id, { x: x + 10, y: y + 10, sum: x + y }]);
 
-const exampleTable = withTaps(tableCell<string, Pos>({}));
+derivedTable.tap(({ added, removed }) => {
+    console.log('added', added);
+    console.log('removed', removed);
+});
 
-const sumView = deriveView(exampleTable, ({ x, y }) => x + y);
-const productView = deriveView(exampleTable, ({ x, y }) => x * y);
-const avgView = deriveView(exampleTable, ({ x, y }) => (x + y) / 2);
-const xGt10 = deriveView(exampleTable, ({ x }) => x > 10 ? x : null);
+derivedDerivedTable.tap(({ added, removed }) => {
+    console.log('added', added);
+    console.log('removed', removed);
+});
 
-a.tap(({ changed }) => {
-    exampleTable.receive({
-        a: changed,
-    });
-}, ['changed'])
+console.log('exampleTable', exampleTable.current());
 
-b.tap(({ changed }) => {
-    exampleTable.receive({
-        b: changed,
-    });
-}, ['changed'])
+exampleTable.receive({
+    a: { x: 1, y: 2 },
+    b: { x: 20, y: 30 },
+    c: { x: 3, y: 4 },
+});
 
-c.tap(({ changed }) => {
-    exampleTable.receive({
-        c: changed,
-    });
-}, ['changed'])
+console.log('exampleTable', exampleTable.current());
+console.log('derivedTable', derivedTable.current());
+console.log('derivedDerivedTable', derivedDerivedTable.current());
 
-a.receive({ x: 1, y: 2 });
-b.receive({ x: 2, y: 3 });
-c.receive({ x: 3, y: 4 });
+exampleTable.receive({
+    c: { x: 5, y: 6 },
+});
 
-console.log('sumView', sumView.current());
-console.log('productView', productView.current());
-console.log('avgView', avgView.current());
-console.log('xGt10', xGt10.current());
+exampleTable.receive({
+    c: null,
+});
 
-c.receive({ x: 15, y: 19 });
+console.log('exampleTable', exampleTable.current());
+console.log('derivedTable', derivedTable.current());
+console.log('derivedDerivedTable', derivedDerivedTable.current());
 
-console.log('sumView', sumView.current());
-console.log('productView', productView.current());
-console.log('avgView', avgView.current());
-console.log('xGt10', xGt10.current());
-
-c.receive({ x: 5, y: 19 });
-console.log('full', exampleTable.current());
-console.log('xGt10', xGt10.current());
+const joined = join(derivedDerivedTable.current(), exampleTable.current(), (l, r) => l.key === r.key);
+console.log('joined', joined);

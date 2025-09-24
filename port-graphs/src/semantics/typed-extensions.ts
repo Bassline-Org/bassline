@@ -4,7 +4,7 @@
  * Simple tap extension for observing effects
  */
 
-import type { ExtractSpec, GadgetEffects, GadgetSpec, TypedGadget } from '../core/types';
+import type { ExtractSpec, GadgetEffects, GadgetSpec, PartialSpec, TypedGadget } from '../core/types';
 
 /**
  * Tappable interface for gadgets with tap method
@@ -20,10 +20,9 @@ export interface Tappable<T = unknown> {
   tap: (fn: (effect: ExtractEffect<T>) => void, keys?: (keyof ExtractEffect<T>)[]) => () => void;
 }
 
-export type TappableGadget<G> =
-  G extends TypedGadget<infer S> ? G & Tappable<S['effects']>
-  : G extends GadgetSpec ? TypedGadget<G> & Tappable<ExtractEffect<G>>
-  : never;
+export interface TappableGadget<Spec extends PartialSpec> extends TypedGadget<Spec> {
+  tap: (fn: (effect: Spec['effects']) => void, keys?: (keyof Spec['effects'])[]) => () => void;
+}
 
 /**
  * Tappable extension - adds tap method while preserving types
