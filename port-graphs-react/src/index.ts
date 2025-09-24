@@ -24,7 +24,6 @@ export { createReactFamily } from './createReactFamily';
 
 // Declarative wiring components
 export { GadgetContext, ProvideGadget, useCurrentGadget, useExplicitGadget } from './GadgetContext';
-export { Tap } from './Tap';
 
 // Visual components for tap connections
 export * from './visual';

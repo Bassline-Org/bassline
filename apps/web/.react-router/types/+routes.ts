@@ -16,22 +16,10 @@ type Pages = {
   "/visual-editor": {
     params: {};
   };
-  "/canvas-clean": {
-    params: {};
-  };
-  "/gadget-demo": {
-    params: {};
-  };
-  "/canvas-new": {
-    params: {};
-  };
   "/ui-gallery": {
     params: {};
   };
   "/typed-ui": {
-    params: {};
-  };
-  "/canvas": {
     params: {};
   };
   "/home": {
@@ -42,23 +30,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/visual-editor" | "/canvas-clean" | "/gadget-demo" | "/canvas-new" | "/ui-gallery" | "/typed-ui" | "/canvas" | "/home";
+    page: "/" | "/visual-editor" | "/ui-gallery" | "/typed-ui" | "/home";
   };
   "routes/visual-editor.tsx": {
     id: "routes/visual-editor";
     page: "/visual-editor";
-  };
-  "routes/canvas-clean.tsx": {
-    id: "routes/canvas-clean";
-    page: "/canvas-clean";
-  };
-  "routes/gadget-demo.tsx": {
-    id: "routes/gadget-demo";
-    page: "/gadget-demo";
-  };
-  "routes/canvas-new.tsx": {
-    id: "routes/canvas-new";
-    page: "/canvas-new";
   };
   "routes/ui-gallery.tsx": {
     id: "routes/ui-gallery";
@@ -67,10 +43,6 @@ type RouteFiles = {
   "routes/typed-ui.tsx": {
     id: "routes/typed-ui";
     page: "/typed-ui";
-  };
-  "routes/canvas.tsx": {
-    id: "routes/canvas";
-    page: "/canvas";
   };
   "routes/home.tsx": {
     id: "routes/home";

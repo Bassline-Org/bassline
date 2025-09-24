@@ -17,31 +17,24 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { useGadget } from 'port-graphs-react';
-import { type CellSpec, type PartialSpec, type TableSpec, type Tappable, type TypedGadget } from 'port-graphs';
-import { GadgetNode } from './GadgetNode';
+import { type CellSpec, type TypedGadget } from 'port-graphs';
 
 // Define node types for React Flow
-const nodeTypes = {
-};
+const nodeTypes = {};
 
-type Position = {
+interface Position {
   x: number;
   y: number;
 }
-export type PositionSpec = CellSpec<Position, Position>;
 
-export type NodeGadgets<T extends PartialSpec = PartialSpec> = {
-  position: TypedGadget<Tappable & PositionSpec>;
-  selected: TypedGadget<Tappable & CellSpec<boolean, boolean>>;
-  gadget: TypedGadget<Tappable & T>;
-};
+export interface NodeGadgets {
+  id: TypedGadget<CellSpec<string, string>>,
+  position: TypedGadget<CellSpec<Position, Position>>,
+  gadget: TypedGadget<any>,
+}
 
-
-/**
- * Canvas component that integrates React Flow with gadgets
- */
-interface NodeCanvasProps {
-  nodeTable: TypedGadget<TableSpec<NodeGadgets>>;
+export interface NodeCanvasProps {
+  nodeTable: NodeGadgets[];
 }
 
 export function NodeCanvas({
@@ -49,13 +42,11 @@ export function NodeCanvas({
 }: NodeCanvasProps) {
   const [nodeState, , nodeTableCell] = useGadget(nodeTable);
 
-  const nodes = Object.entries(nodeState).map(([id, instance]) => {
-    const { position, selected, gadget } = instance.current();
+  const nodes = Object.entries(nodeState).map(([id, { position, gadget }]) => {
     return {
       id,
       type: 'default',
       position: position.current(),
-      selected: selected.current(),
       data: {
         gadget: gadget.current(),
       }
@@ -70,12 +61,12 @@ export function NodeCanvas({
     for (const change of changes) {
       console.log('node change', change);
       if (change.type === 'position') {
-        nodeState[change.id]?.current().position.receive(change.position as Position);
+        nodeState[change.id]?.position.receive(change.position as Position);
       }
-      if (change.type === 'select') {
-        console.log('node select', change, nodeState[change.id]?.current().selected);
-        nodeState[change.id]?.current().selected.receive(change.selected);
-      }
+      // if (change.type === 'select') {
+      //   console.log('node select', change, nodeState[change.id]?.selected);
+      //   nodeState[change.id]?.selected.receive(change.selected);
+      // }
       if (change.type === 'remove') {
         nodeTableCell.receive({ [change.id]: null });
       }

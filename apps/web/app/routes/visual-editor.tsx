@@ -6,8 +6,8 @@ import type { Route } from './+types/visual-editor';
 import { GadgetProvider, useGadget } from 'port-graphs-react';
 import { NodeCanvas, type NodeGadgets } from '../components/visual/NodeCanvas';
 import { createCounterNode, createDisplayNode } from '../gadgets/visual/node-factory';
-import { lastCell, lastMap, tableCell } from 'port-graphs/cells';
-import { withTaps, type Tappable } from 'port-graphs';
+import { lastCell, lastMap, tableCell, type TableSpec } from 'port-graphs/cells';
+import { withTaps, type CellSpec, type Tappable, type TypedGadget, type TappableGadget, type GadgetSpec } from 'port-graphs';
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -16,42 +16,25 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
-const nodeTable = withTaps(tableCell<string, Tappable<{ changed: any }> & NodeGadgets<any, any>>({}));
-nodeTable.tap(({ added }) => {
-  if (added) {
-    Object.values(added).forEach(gadget => {
-      gadget.tap(({ changed }) => {
-        if (changed) {
-          console.log('changed', changed);
-        }
-      });
-    });
-  }
-});
-
 const exampleGadget = withTaps(lastMap({}));
 
-const foo = withTaps(lastMap({
-  position: withTaps(lastCell({ x: 0, y: 0 })),
-  selected: withTaps(lastCell(false)),
+const foo = {
+  position: lastCell({ x: 0, y: 0 }),
   gadget: exampleGadget,
-}));
+};
 
-const bar = withTaps(lastMap({
-  position: withTaps(lastCell({ x: 100, y: 100 })),
-  selected: withTaps(lastCell(true)),
+const bar = {
+  position: lastCell({ x: 100, y: 100 }),
   gadget: exampleGadget,
-}));
+};
 
-nodeTable.receive({
+const exampleTable = tableCell<string, NodeGadgets>({
   'foo': foo,
   'bar': bar,
 });
 
 function VisualEditorInner() {
-  const [nodeTableState, , nodeTableCell] = useGadget(nodeTable);
-  const [fooState, ,] = useGadget(foo);
-  const [barState, ,] = useGadget(bar);
+  const [nodeTableState, , nodeTableCell] = useGadget(exampleTable);
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>

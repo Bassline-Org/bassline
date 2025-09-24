@@ -4,14 +4,26 @@
  * Simple tap extension for observing effects
  */
 
-import type { ExtractSpec, GadgetSpec, TypedGadget } from '../core/types';
+import type { ExtractSpec, GadgetEffects, GadgetSpec, TypedGadget } from '../core/types';
 
 /**
  * Tappable interface for gadgets with tap method
  */
-export interface Tappable<Effect = unknown> {
-  tap: (fn: (effect: Effect) => void) => () => void;
+export type ExtractEffect<G> =
+  G extends TypedGadget<infer S> ? S['effects']
+  : G extends GadgetSpec<infer S, infer I, infer A, infer E> ? E
+  : G extends GadgetEffects
+  ? G
+  : never;
+
+export interface Tappable<T = unknown> {
+  tap: (fn: (effect: ExtractEffect<T>) => void, keys?: (keyof ExtractEffect<T>)[]) => () => void;
 }
+
+export type TappableGadget<G> =
+  G extends TypedGadget<infer S> ? G & Tappable<S['effects']>
+  : G extends GadgetSpec ? TypedGadget<G> & Tappable<ExtractEffect<G>>
+  : never;
 
 /**
  * Tappable extension - adds tap method while preserving types
@@ -29,9 +41,17 @@ export function withTaps<G extends TypedGadget<any>>(
   };
 
   return Object.assign(gadget, {
-    tap: (fn: (effect: Spec['effects']) => void) => {
-      taps.add(fn);
-      return () => taps.delete(fn);
+    tap: (fn: (effect: Spec['effects']) => void, keys: (keyof Spec['effects'])[] = []) => {
+      let tapFn = fn;
+      if (keys.length > 0) {
+        tapFn = (effect) => {
+          if (keys.every(key => effect[key] !== undefined)) {
+            fn(effect);
+          }
+        };
+      }
+      taps.add(tapFn);
+      return () => taps.delete(tapFn);
     }
   })
 }
