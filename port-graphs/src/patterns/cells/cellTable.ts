@@ -10,7 +10,7 @@ export type CellTableSpec<Key extends string, S extends Omit<CellSpec<unknown, u
         cells: Record<Key, TappableGadget<S>>;
         cleanups: Record<Key, () => void>;
     };
-    input: Record<Key, S['input'] | null>;
+    input: Record<Key, TappableGadget<S> | null>;
     actions: {
         merge: {
             added: Record<Key, TappableGadget<S>>;
@@ -111,7 +111,10 @@ console.log('exampleTable', exampleTable.current());
 
 exampleTable.tap(({ cellChanged }) => {
     if (cellChanged) {
-        console.log('cellChanged', Object.keys(cellChanged));
+        for (const key in cellChanged) {
+            const value = cellChanged[key]?.current();
+            console.log('cellChanged', key, value);
+        }
     }
 });
 
@@ -120,3 +123,13 @@ bar.receive({ a: 2 });
 
 foo.receive({ a: 3 });
 bar.receive({ a: 4 });
+
+exampleTable.receive({ foo: null, bar: null });
+
+foo.receive({ a: 5 });
+bar.receive({ a: 6 });
+
+console.log('foo', foo.current());
+console.log('bar', bar.current());
+
+exampleTable.receive({ foo });
