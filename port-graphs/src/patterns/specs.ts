@@ -16,7 +16,7 @@ import type { GadgetActions, GadgetEffects } from '../core/types';
  * - UnionCell: State=Set<T>, Input=Set<T> (merge via union)
  * - LastCell: State=T, Input=T (merge via replacement)
  */
-export type CellSpec<State = unknown, Input = unknown, MergeType = Input> = {
+export type CellSpec<State = unknown, Input = State, MergeType = Input> = {
   state: State;
   input: Input;
   actions: Required<{
