@@ -16,13 +16,13 @@ import type { GadgetActions, GadgetEffects } from '../core/types';
  * - UnionCell: State=Set<T>, Input=Set<T> (merge via union)
  * - LastCell: State=T, Input=T (merge via replacement)
  */
-export type CellSpec<State, Input, MergeType = Input> = {
+export type CellSpec<State = unknown, Input = unknown, MergeType = Input> = {
   state: State;
   input: Input;
-  actions: {
+  actions: Required<{
     merge: MergeType;
     ignore: {};
-  };
+  }>;
   effects: {
     changed: State;
     noop: {};
