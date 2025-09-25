@@ -1,4 +1,4 @@
-import { State } from "./betterTypes";
+import { Effects, Gadget, Input, State } from "./betterTypes";
 
 // Contract constructors as a single map
 type Contract = {
@@ -39,12 +39,6 @@ export const contracts = {
     } as const),
 };
 
-const { record, array, union, number, string, boolean, intersect } = contracts;
-
-export const defContract = <T>(contract: InferContract<T> extends never ? never : T) => {
-    type Contract = InferContract<T>;
-    return contract
-};
 // Helper type to convert union to intersection
 type UnionToIntersection<U> =
     (U extends any ? (k: U) => void : never) extends ((k: infer I) => void) ? I : never;
@@ -71,18 +65,29 @@ export type InferContract<C> =
     ? InferContract<R>
     : never;
 
-const foo = defContract(record({
-    state: number(),
-}));
-type Foo = InferContract<typeof foo>;
+export type Contractable<C extends Contract> = {
+    contract: {
+        // The raw contract data
+        spec: () => C;
 
-const bar = defContract(record({
-    anotherField: number(),
-}));
+        // Query capabilities
+        accepts: (value: C extends Input<infer I> ? I : never) => boolean;
+        emits: () => C extends Effects<infer E> ? keyof E : never;
+        // Human-readable info
+        describe: () => string;
 
-const combined = defContract(intersect([
-    foo,
-    bar,
-]));
+        // Validate without enforcing
+        validate: {
+            state: (value: C extends State<infer S> ? S : never) => boolean;
+            input: (value: C extends Input<infer I> ? I : never) => boolean;
+            effect: (value: C extends Effects<infer E> ? Partial<E> : never) => boolean;
+        };
+    };
+}
 
-type Combined = InferContract<typeof combined>;
+export function withContract<G, C extends Contract>(
+    gadget: G extends Gadget<infer S> ? Gadget<S> : never,
+    contract: Contractable<C>
+): (G extends Gadget<infer S> ? Gadget<S> : never) & Contractable<C> {
+    return Object.assign(gadget, contract);
+}

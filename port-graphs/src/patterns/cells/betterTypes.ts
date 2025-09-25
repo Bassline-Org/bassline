@@ -1,6 +1,7 @@
 /**
  * Composable Gadget System with Type-Level Composition
  */
+import { contracts as c } from './contracts';
 
 // ============================================
 // Type-Level Building Blocks
