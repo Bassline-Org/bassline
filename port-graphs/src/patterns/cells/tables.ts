@@ -1,6 +1,6 @@
 import _ from 'lodash';
 import { defGadget } from '../../core/typed';
-import { ExtractSpec, GadgetEffects, TypedGadget } from '../../core/types';
+import { ExtractSpec, Gadget, GadgetEffects, PartialSpec, TypedGadget } from '../../core/types';
 import { Tappable, withTaps, TappableGadget, ExtractEffect } from '../../semantics';
 import { CellSpec } from '../specs';
 
@@ -93,7 +93,7 @@ export const defTable = <State, Input, Changes, ExtraEffects extends GadgetEffec
             }
         )(initialData));
 
-        return withTaps(gadget);
+        return gadget;
     }
 };
 
@@ -194,113 +194,43 @@ export const cellTable = <Key extends string, Spec extends CellSpec>(
     return gadget;
 }
 
-export const derive = <Key extends string | number | symbol, Source, Derived>(
-    source: TypedGadget<TableSpec<Record<Key, Source>, Record<Key, Source | null>, Record<Key, Source>>> &
-        Tappable<TableSpec<Record<Key, Source>, Record<Key, Source | null>, Record<Key, Source>>['effects']>,
-    transform: (key: Key, value: Source) => [Key, Derived | null],
-) => {
-    // Initialize with current source values
-    const initial = {} as Record<Key, Derived>;
-    const currentSource = source.current();
-
-    for (const key in currentSource) {
-        const value = currentSource[key];
-        const [derivedKey, derivedValue] = transform(key, value);
-        if (derivedValue !== null) {
-            initial[derivedKey] = derivedValue;
-        }
-    }
-
-    const derived = lastTable(initial);
-
-    // Wire up reactive updates
-    source.tap(({ added, removed }) => {
-        const updates = {} as Record<Key, Derived | null>;
-
-        if (added) {
-            for (const key in added) {
-                const [derivedKey, value] = transform(key, added[key]);
-                updates[derivedKey] = value;
-            }
-        }
-
-        if (removed) {
-            for (const key in removed) {
-                // Assumes key mapping is stable for removals
-                updates[key] = null;
-            }
-        }
-
-        if (!_.isEmpty(updates)) {
-            derived.receive(updates);
-        }
-    });
-
-    return derived;
-};
-
-export const cellDerive = <Key extends keyof any, Spec extends CellSpec, Derived>(
-    source: TappableGadget<CellTableSpec<Spec>>,
-    transform: (key: Key, cellValue: Spec['state']) => [Key, Derived | null],
-) => {
-    // Compute initial state from current cell values
-    const initial = {} as Record<Key, Derived>;
-    const currentCells = source.current().cells;
-
-    for (const key in currentCells) {
-        const cell = currentCells[key];
-        if (cell) {
-            const cellValue = cell.current();
-            const [derivedKey, derivedValue] = transform(key as Key, cellValue);
-            if (derivedValue !== null) {
-                initial[derivedKey] = derivedValue;
-            }
-        }
-    }
-
-    const derived = lastTable(initial);
-
-    // Wire to both structural changes AND cell value changes
-    source.tap(({ cellChanged, added, removed }) => {
-        const updates = {} as Record<Key, Derived | null>;
-
-        // Handle individual cell changes (the key feature!)
-        if (cellChanged) {
-            _.entries(cellChanged).forEach(([key, cell]) => {
-                const cellValue = cell.current();
-                const [derivedKey, value] = transform(key as Key, cellValue);
-                updates[derivedKey] = value;
-            });
-        }
-
-        // Handle structural changes
-        if (added) {
-            _.entries(added).forEach(([key, cell]) => {
-                const cellValue = cell.current();
-                const [derivedKey, value] = transform(key as Key, cellValue);
-                updates[derivedKey] = value;
-            });
-        }
-
-        if (removed) {
-            _.entries(removed).forEach(([key]) => {
-                updates[key as Key] = null;
-            });
-        }
-
-        if (!_.isEmpty(updates)) {
-            derived.receive(updates as Record<Key, Derived>);
-        }
-    });
-
-    return derived;
-};
-
 const a = lastTable<string, number>({
     a: 1,
     b: 2,
     c: 3
 });
+
+export const defDerivation = <S>(sourceGadget: S) => {
+    type SourceTypes = ExtractSpec<S>;
+    type Key = keyof SourceTypes['state'];
+    type Value = SourceTypes['state'][Key];
+    const source = sourceGadget as TypedGadget<SourceTypes> & Tappable<SourceTypes['effects']>;
+    return <T>(transform: (key: keyof SourceTypes['state'], value: SourceTypes['state'][typeof key]) => [Key, T | null]) => {
+        type Derived = Record<Key, T>;
+        type Input = Record<Key, Value | null>;
+        return <F>(factory: (initial: Derived) => F) => {
+            const currentSource = source.current();
+            const initial = {} as Derived;
+            for (const key in currentSource) {
+                const value = currentSource[key];
+                const [derivedKey, derivedValue] = transform(key, value);
+                if (derivedValue !== null) {
+                    initial[derivedKey] = derivedValue;
+                }
+            }
+            type GadgetType = TableSpec<Derived, Input, Derived>;
+            const gadget = factory(initial) as TypedGadget<GadgetType> & Tappable<GadgetType['effects']>;
+            type Handler = (effect: SourceTypes['effects']) => Input;
+            return (handler: Handler) => {
+                source.tap((effect) => {
+                    const updates = handler(effect);
+                    gadget.receive(updates);
+                });
+                return gadget;
+            }
+        }
+    }
+}
 
 const derivedA = derive(a, (key, value) => [key, value * 2]);
 
@@ -314,6 +244,22 @@ const cellT = cellTable<string, CellSpec<Record<string, any>>>({
     a,
     b
 });
+
+const foo = defDerivation(cellT)((key, value) => [key, value])(lastTable)(({ cellChanged }) => {
+    const updates = {} as Record<string, any>;
+    if (cellChanged) {
+        _.entries(cellChanged).forEach(([key, value]) => {
+            updates[key] = value.current();
+        });
+    }
+    return updates;
+});
+
+foo.tap(({ changed }) => {
+    if (changed) {
+        console.log('foo changed', _.keys(changed));
+    }
+})
 
 const derivedFromCellT = cellDerive(cellT, (key, value) => [key, _.entries(value).reduce((acc, [key, value]) => _.isNumber(value) ? acc + value : acc, 0)]);
 
