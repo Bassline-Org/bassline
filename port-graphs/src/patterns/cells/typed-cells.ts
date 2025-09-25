@@ -1,5 +1,9 @@
 import { defGadget, cellMethods, CellSpec, Contradicts } from '../../core/typed';
 
+// ============================================
+// NUMERIC CELLS
+// ============================================
+
 export const maxCell = defGadget<CellSpec<number>>({
   dispatch: (state, input) => {
     if (input > state) {
@@ -19,6 +23,10 @@ export const minCell = defGadget<CellSpec<number>>({
   },
   methods: cellMethods()
 });
+
+// ============================================
+// GENERIC CELLS
+// ============================================
 
 export const lastCell = <T>(initial: T) => {
   return defGadget<CellSpec<T>>({
@@ -45,6 +53,10 @@ export const ordinalCell = <T>(initial: Ordinal<T>) => {
     methods: cellMethods()
   })(initial);
 };
+
+// ============================================
+// SET CELLS
+// ============================================
 
 export type SetCell<T> = CellSpec<Set<T>>;
 export const unionCell = <T>(initial: Set<T>) => {
