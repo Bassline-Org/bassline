@@ -1,9 +1,5 @@
 // Core typed API
-export * from './core/typed';
-export * from './core/types';
-
-// Pattern specifications
-export * from './patterns/specs';
+export * from './core/typed';;
 
 // Typed patterns
 export * from './patterns/cells';

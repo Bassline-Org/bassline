@@ -1,10 +1,6 @@
-/**
- * Cell implementations using the typed pattern approach
- */
-//import { cellMethods, withTaps, CellSpec, implement } from './betterTypes';
-import { implement, cellMethods, CellSpec, withTaps } from '../../core/typed';
+import { defGadget, cellMethods, CellSpec, Contradicts } from '../../core/typed';
 
-export const maxCell = implement<CellSpec<number>>({
+export const maxCell = defGadget<CellSpec<number>>({
   dispatch: (state, input) => {
     if (input > state) {
       return { merge: input };
@@ -14,7 +10,7 @@ export const maxCell = implement<CellSpec<number>>({
   methods: cellMethods()
 });
 
-export const minCell = implement<CellSpec<number>>({
+export const minCell = defGadget<CellSpec<number>>({
   dispatch: (state, input) => {
     if (input < state) {
       return { merge: input };
@@ -24,11 +20,8 @@ export const minCell = implement<CellSpec<number>>({
   methods: cellMethods()
 });
 
-/**
- * Last cell - always keeps the last value received
- */
 export const lastCell = <T>(initial: T) => {
-  return implement<CellSpec<T>>({
+  return defGadget<CellSpec<T>>({
     dispatch: (_state, input) => {
       return { merge: input };  // Always take the new value
     },
@@ -41,7 +34,7 @@ export type OrdinalCell<T> = CellSpec<Ordinal<T>>;
 
 export const ordinalCell = <T>(initial: Ordinal<T>) => {
   type Spec = OrdinalCell<T>;
-  return implement<Spec>({
+  return defGadget<Spec>({
     dispatch: (state, input) => {
       if (state[0] < input[0]) {
         return { merge: input };
@@ -53,13 +46,9 @@ export const ordinalCell = <T>(initial: Ordinal<T>) => {
   })(initial);
 };
 
-/**
- * Set cell - accumulates unique values
- */
 export type SetCell<T> = CellSpec<Set<T>>;
-
 export const unionCell = <T>(initial: Set<T>) => {
-  return implement<SetCell<T>>({
+  return defGadget<SetCell<T>>({
     dispatch: (state, input) => {
       if (input.isSubsetOf(state)) {
         return { ignore: {} };
@@ -70,27 +59,10 @@ export const unionCell = <T>(initial: Set<T>) => {
   })(initial);
 };
 
-/**
- * Intersection cell - keeps only common elements
- */
-type IntersectionCell<T> = SetCell<T> & {
-  actions: {
-    contradiction: {
-      current: Set<T>;
-      incoming: Set<T>;
-    };
-  }
-  effects: {
-    contradiction: {
-      current: Set<T>;
-      incoming: Set<T>;
-    }
-  };
-};
-
+type IntersectionCell<T> = Contradicts<SetCell<T>>;
 export const intersectionCell = <T>(initial: Set<T>) => {
   type Spec = IntersectionCell<T>;
-  return implement<Spec>({
+  return defGadget<Spec>({
     dispatch: (state, input) => {
       const intersection = state.intersection(input);
       if (intersection.size === 0) {
@@ -107,9 +79,3 @@ export const intersectionCell = <T>(initial: Set<T>) => {
     }
   })(initial);
 };
-
-
-const foo = maxCell(1)
-const tapped = withTaps(foo);
-
-const bar = unionCell(new Set([4, 5, 6]));

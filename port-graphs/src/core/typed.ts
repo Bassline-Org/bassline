@@ -48,7 +48,7 @@ export type Methods<Spec> =
 // Implementation Function
 // ============================================
 
-export function implement<Spec>(
+export function defGadget<Spec>(
   config: {
     dispatch: (
       state: Spec extends State<infer S> ? S : never,
@@ -130,13 +130,13 @@ export type CellSpec<T> =
     noop: {};
   }>;
 
-export const maxCell = implement<CellSpec<number>>({
+export const maxCell = defGadget<CellSpec<number>>({
   dispatch: (state, input) =>
     input > state ? { merge: input } : { ignore: {} },
   methods: cellMethods()
 });
 
-export const minCell = implement<CellSpec<number>>({
+export const minCell = defGadget<CellSpec<number>>({
   dispatch: (state, input) =>
     input < state ? { merge: input } : { ignore: {} },
   methods: cellMethods()
@@ -196,7 +196,7 @@ export const derive = <S, D>(
   source: Gadget<Derivable<S>> & Tappable<Derivable<S>>,
   transform: (state: S) => D
 ): Gadget<Derivable<D>> & Tappable<Derivable<D>> => {
-  const derived = implement<Derivable<D> & Input<S> & Actions<{ update: S }>>({
+  const derived = defGadget<Derivable<D> & Input<S> & Actions<{ update: S }>>({
     dispatch: (_state, input) => ({ update: input }),
     methods: {
       update: (gadget, value) => {
@@ -261,5 +261,20 @@ export function tableMethods<K extends PropertyKey, V>(): Methods<TableSpec<K, V
     },
 
     ignore: () => ({ noop: {} })
+  };
+}
+
+export type Contradicts<Spec> = Spec & {
+  actions: {
+    contradiction: {
+      current: Spec extends State<infer S> ? S : never;
+      incoming: Spec extends State<infer S> ? S : never;
+    };
+  }
+  effects: {
+    contradiction: {
+      current: Spec extends State<infer S> ? S : never;
+      incoming: Spec extends State<infer S> ? S : never;
+    };
   };
 }
