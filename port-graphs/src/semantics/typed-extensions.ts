@@ -50,7 +50,7 @@ export function withTaps<G extends TypedGadget<any>>(
         };
       }
       taps.add(tapFn);
-      return () => taps.delete(tapFn);
+      return () => { taps.delete(tapFn); }
     }
   })
 }
