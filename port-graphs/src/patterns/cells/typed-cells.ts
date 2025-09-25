@@ -1,4 +1,4 @@
-import { defGadget, cellMethods, CellSpec, Contradicts } from '../../core/typed';
+import { defGadget, cellMethods, CellSpec, Contradicts, State, Input, Actions, Effects } from '../../core/typed';
 
 // ============================================
 // NUMERIC CELLS
@@ -91,3 +91,63 @@ export const intersectionCell = <T>(initial: Set<T>) => {
     }
   })(initial);
 };
+
+
+// Define custom spec by composing pieces
+export type CounterSpec =
+  & State<number>
+  & Input<{ increment?: number; decrement?: number; reset?: boolean }>
+  & Actions<{
+    add: number;
+    subtract: number;
+    reset: {};
+    ignore: {};
+  }>
+  & Effects<{
+    changed: number;
+    overflow: number;
+    underflow: number;
+    noop: {};
+  }>;
+
+export const counter = (initial: number, min = -100, max = 100) => defGadget<CounterSpec>({
+  dispatch: (state, input) => {
+    if (input.reset) return { reset: {} };
+    if (input.increment) {
+      const next = state + input.increment;
+      if (next > max) return { add: max - state };  // Clamp
+      return { add: input.increment };
+    }
+    if (input.decrement) {
+      const next = state - input.decrement;
+      if (next < min) return { subtract: state - min };  // Clamp
+      return { subtract: input.decrement };
+    }
+    return { ignore: {} };
+  },
+
+  methods: {
+    add: (gadget, amount) => {
+      const next = gadget.current() + amount;
+      gadget.update(next);
+      return next >= max
+        ? { changed: next, overflow: next }
+        : { changed: next };
+    },
+
+    subtract: (gadget, amount) => {
+      const next = gadget.current() - amount;
+      gadget.update(next);
+      return next <= min
+        ? { changed: next, underflow: next }
+        : { changed: next };
+    },
+
+    reset: (gadget) => {
+      gadget.update(initial);
+      return { changed: initial };
+    },
+
+    ignore: () => ({ noop: {} })
+  }
+})(initial);

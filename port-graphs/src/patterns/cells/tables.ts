@@ -149,52 +149,52 @@ export const unionTable = <K extends PropertyKey, V>(initial: Record<K, Set<V>>)
     })(initial);
 }
 
-const a = withTaps(lastTable<string, number>({
-    a: 1,
-    b: 2,
-    c: 3
-}));
+// const a = withTaps(lastTable<string, number>({
+//     a: 1,
+//     b: 2,
+//     c: 3
+// }));
 
-const b = withTaps(firstTable<string, string>({
-    foo: 'a',
-    bar: 'b',
-    baz: 'c'
-}));
+// const b = withTaps(firstTable<string, string>({
+//     foo: 'a',
+//     bar: 'b',
+//     baz: 'c'
+// }));
 
-const c = withTaps(unionTable<string, number>({
-    foo: new Set([1]),
-    bar: new Set([2]),
-    baz: new Set([3])
-}));
+// const c = withTaps(unionTable<string, number>({
+//     foo: new Set([1]),
+//     bar: new Set([2]),
+//     baz: new Set([3])
+// }));
 
-const derived = derive(c, entries => Object.fromEntries(Object.entries(entries).map(([key, value]) => [key, Array.from(value).reduce((acc, x) => acc + x, 0)])));
+// const derived = derive(c, entries => Object.fromEntries(Object.entries(entries).map(([key, value]) => [key, Array.from(value).reduce((acc, x) => acc + x, 0)])));
 
-derived.tap(({ changed }) => {
-    if (changed) {
-        console.log('Derived changed to:', changed);
-    }
-});
+// derived.tap(({ changed }) => {
+//     if (changed) {
+//         console.log('Derived changed to:', changed);
+//     }
+// });
 
-c.tap(({ changed }) => {
-    if (changed) {
-        console.log('Changed to:', changed);
-    }
-});
+// c.tap(({ changed }) => {
+//     if (changed) {
+//         console.log('Changed to:', changed);
+//     }
+// });
 
-c.receive({
-    foo: new Set([1, 2, 3, 4]),
-    bar: new Set([2, 3, 4, 5]),
-    baz: new Set([3, 4, 5, 6])
-});
+// c.receive({
+//     foo: new Set([1, 2, 3, 4]),
+//     bar: new Set([2, 3, 4, 5]),
+//     baz: new Set([3, 4, 5, 6])
+// });
 
-c.receive({
-    foo: new Set([1, 2, 3, 4]),
-    bar: new Set([2, 3, 4, 5]),
-    baz: new Set([3, 4, 5, 6])
-});
+// c.receive({
+//     foo: new Set([1, 2, 3, 4]),
+//     bar: new Set([2, 3, 4, 5]),
+//     baz: new Set([3, 4, 5, 6])
+// });
 
-c.receive({
-    foo: null,
-    bar: null,
-    baz: null
-});
+// c.receive({
+//     foo: null,
+//     bar: null,
+//     baz: null
+// });
