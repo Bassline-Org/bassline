@@ -157,18 +157,26 @@ export type Tappable<Spec> = {
     tap: (fn: TapFn<Spec>) => () => void;
 }
 
+type WithTaps<G> = G extends Tappable<any>
+    ? G
+    : G extends Gadget<infer S>
+    ? Gadget<S> & Tappable<S>
+    : never;
+
 export function isTappable<Spec>(
     gadget: Gadget<Spec>
 ): gadget is Gadget<Spec> & Tappable<Spec> {
     return 'tap' in gadget;
 }
 
-export function withTaps<S>(
-    gadget: Gadget<S>
-): Gadget<S> & Tappable<S> {
-
+export function withTaps<S, G extends Gadget<S>>(
+    gadget: G
+): WithTaps<G> {
     const taps = new Set<TapFn<S>>();
     const originalEmit = gadget.emit;
+    if (isTappable(gadget)) {
+        return gadget as WithTaps<G>;
+    }
 
     gadget.emit = (effect) => {
         originalEmit(effect);
@@ -180,7 +188,7 @@ export function withTaps<S>(
             taps.add(fn);
             return () => { taps.delete(fn); };
         }
-    })
+    }) as WithTaps<G>;
 }
 
 // Derivable only needs state and changed effect
@@ -363,8 +371,7 @@ min.tap(({ changed }) => {
     }
 });
 
-// Derive from partial spec
-const doubled = withTaps(derive(min, x => x * 2));
+const doubled = withTaps(withTaps(derive(min, x => x * 2)));
 
 doubled.tap(({ changed }) => {
     if (changed !== undefined) {
