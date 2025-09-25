@@ -1,7 +1,3 @@
-/**
- * Composable Gadget System with Type-Level Composition
- */
-
 // ============================================
 // Type-Level Building Blocks
 // ============================================
@@ -225,73 +221,6 @@ export const derive = <S, D>(
 // Table Specs via Composition
 // ============================================
 
-export type TableSpec<K extends PropertyKey, V> =
-    & State<Record<K, V>>
-    & Input<Record<K, V | null>>
-    & Actions<{
-        merge: { added: Record<K, V>; removed: Record<K, V> };
-        ignore: {};
-    }>
-    & Effects<{
-        changed: Record<K, V>;
-        added: Record<K, V>;
-        removed: Record<K, V>;
-        noop: {};
-    }>;
-
-export function tableMethods<K extends PropertyKey, V>(): Methods<TableSpec<K, V>> {
-    return {
-        merge: (gadget, { added, removed }) => {
-            const current = gadget.current();
-            const next = { ...current };
-
-            // Remove keys
-            for (const key in removed) {
-                delete next[key];
-            }
-
-            // Add/update keys
-            for (const key in added) {
-                next[key] = added[key];
-            }
-
-            gadget.update(next);
-
-            return {
-                changed: next,
-                added,
-                removed
-            };
-        },
-
-        ignore: () => ({ noop: {} })
-    };
-}
-
-export const lastTable = <K extends PropertyKey, V>(initial: Record<K, V>) => implement<TableSpec<K, V>>({
-    dispatch: (state, input) => {
-        const added: Record<K, V> = {} as Record<K, V>;
-        const removed: Record<K, V> = {} as Record<K, V>;
-        let hasChanges = false;
-
-        for (const key in input) {
-            const value = input[key];
-
-            if (value === null) {
-                if (key in state) {
-                    removed[key] = state[key];
-                    hasChanges = true;
-                }
-            } else if (state[key] !== value) {
-                added[key] = value;
-                hasChanges = true;
-            }
-        }
-        return hasChanges ? { merge: { added, removed } } : { ignore: {} };
-    },
-
-    methods: tableMethods<K, V>()
-})(initial);
 
 // ============================================
 // Custom Gadget Example

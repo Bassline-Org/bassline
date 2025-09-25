@@ -1,4 +1,4 @@
-import { Effects, Gadget, Input, State } from "./betterTypes";
+import { Effects, Gadget, Input, State } from "./typed";
 
 // Contract constructors as a single map
 type Contract = {

@@ -4,23 +4,10 @@
 
 import * as _ from 'lodash';
 import { defGadget } from '../../core/typed';
-import type { CellSpec } from '../specs';
 
 // Helper to clean objects by removing nil values
 export const clean = (...objs: Record<string, any>[]) =>
   objs.map(x => _.omitBy(x, _.isNil));
-
-/**
- * First map - keeps first seen values for each key
- * This is ACI because once a key has a value, it never changes
- */
-type MapCellState = { [key: string]: unknown };
-
-export type MapCell<State extends MapCellState, Input extends MapCellState> = CellSpec<
-  State,
-  Input,
-  State
->
 
 export const firstMap = <State extends MapCellState, Input extends MapCellState>(initial: State) => {
   return defGadget<MapCell<State, Input>>(

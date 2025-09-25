@@ -130,18 +130,6 @@ export type CellSpec<T> =
     noop: {};
   }>;
 
-export const maxCell = defGadget<CellSpec<number>>({
-  dispatch: (state, input) =>
-    input > state ? { merge: input } : { ignore: {} },
-  methods: cellMethods()
-});
-
-export const minCell = defGadget<CellSpec<number>>({
-  dispatch: (state, input) =>
-    input < state ? { merge: input } : { ignore: {} },
-  methods: cellMethods()
-});
-
 // ============================================
 // Partial Specs & Mixins
 // ============================================
