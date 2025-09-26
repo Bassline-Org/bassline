@@ -82,7 +82,7 @@ export function useGadgetFromProvider<S, G extends Gadget<S> = Gadget<S>>(
     // Override the update method to track state changes
     gadget.update = (newState: S extends State<infer St> ? St : never) => {
       const currentEntry = registry.get(gadget);
-      if (currentEntry) {
+      if (currentEntry !== undefined) {
         currentEntry.state = newState;
         // Notify all listeners that state has changed
         currentEntry.listeners.forEach(listener => listener());

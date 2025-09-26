@@ -56,17 +56,17 @@ export function defGadget<Spec>(
 ): (initial: StateOf<Spec>) => Gadget<Spec> {
 
   return (initial: StateOf<Spec>) => {
-    let current = initial;
+    let currentState = initial;
 
     const gadget: Gadget<Spec> = {
-      current: () => current,
+      current: () => currentState,
 
       update: (state) => {
-        current = state;
+        currentState = state;
       },
 
       receive: (input) => {
-        const result = config.dispatch(current, input);
+        const result = config.dispatch(gadget.current(), input);
 
         if (result !== null) {
           // Extract action name and context
@@ -145,10 +145,11 @@ export function isTappable<Spec>(
 export function withTaps<Spec>(
   gadget: Gadget<Spec>
 ): Gadget<Spec> & Tappable<Spec> {
+  if (isTappable(gadget)) return gadget;
 
   const taps = new Set<TapFn<Spec>>();
   const originalEmit = gadget.emit;
-  if (isTappable(gadget)) return gadget;
+
 
   gadget.emit = (effect) => {
     originalEmit(effect);

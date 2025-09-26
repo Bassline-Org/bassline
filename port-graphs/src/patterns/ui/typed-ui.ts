@@ -216,7 +216,6 @@ export type ToggleSpec = & State<ToggleState>
   & Input<ToggleCommands>
   & Actions<
     {
-      toggle: {};
       set: boolean;
       configure: { label?: string };
       ignore: {};
@@ -232,7 +231,8 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
   const baseGadget = defGadget<ToggleSpec>({
     dispatch: (state, command) => {
       if ('toggle' in command) {
-        return { set: !state.on };
+        console.log('Toggling toggle gadget, state:', state, 'command:', command);
+        return { set: state.on ? false : true };
       }
       if ('set' in command) {
         if (command.set !== state.on) {
@@ -241,20 +241,22 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
         return { ignore: {} };
       }
       if ('configure' in command) return { configure: command.configure };
+      console.log('Ignoring command:', command);
       return { ignore: {} };
     },
     methods: {
-      toggle: (gadget) => {
-        const state = gadget.current();
-        const newState = { ...state, on: !state.on };
-        gadget.update(newState);
-        return { changed: newState, toggled: newState.on };
-      },
       set: (gadget, value) => {
         const state = gadget.current();
-        const newState = { ...state, on: value };
-        gadget.update(newState);
-        return { changed: newState, toggled: value };
+        if (value !== state.on) {
+          const newState = { ...state, on: value };
+          gadget.update(newState);
+          console.log('State:', state);
+          console.log('Setting toggle gadget to:', value);
+          return { changed: newState, toggled: value };
+        } else {
+          console.log('Ignoring set command:', value, 'state:', state);
+          return { ignore: {} };
+        }
       },
       configure: (gadget, config) => {
         const state = gadget.current();

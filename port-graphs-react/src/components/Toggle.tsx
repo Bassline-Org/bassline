@@ -69,16 +69,17 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
   const [state, send] = useGadget<S, G>(gadget);
   const displayLabel = label || state.label;
 
-  // Handle toggle with proper type
   const handleToggle = () => {
     send({ toggle: {} } as InputOf<S>);
   }
 
   useGadgetEffect(gadget, ({ changed, toggled }) => {
     if (changed !== undefined) {
+      console.log('Changed:', changed);
       onChange?.(changed);
     }
     if (toggled !== undefined) {
+      console.log('Toggled:', toggled);
       onToggle?.(toggled);
     }
   }, [onChange, onToggle]);
@@ -131,7 +132,6 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
         </button>
       );
 
-    case 'switch':
     default:
       return (
         <label className={`toggle-switch ${className} ${disabled ? 'toggle-disabled' : ''}`}>
