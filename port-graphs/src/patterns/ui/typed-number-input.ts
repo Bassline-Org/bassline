@@ -5,8 +5,7 @@
  * and step increments.
  */
 
-import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
-import { withTaps } from '../../semantics/typed-extensions';
+import { Actions, defGadget, Effects, Input, State, withTaps } from '../../core/typed';
 
 /**
  * NumberInput state

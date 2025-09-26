@@ -198,53 +198,6 @@ export const derive = <S extends Effects<{ changed: StateOf<S> }>, Transformed>(
   return withTaps(derived);
 }
 
-// ============================================
-// Table Specs via Composition
-// ============================================
-
-export type TableSpec<K extends PropertyKey, V> =
-  & State<Record<K, V>>
-  & Input<Record<K, V | null>>
-  & Actions<{
-    merge: { added: Record<K, V>; removed: Record<K, V> };
-    ignore: {};
-  }>
-  & Effects<{
-    changed: Record<K, V>;
-    added: Record<K, V>;
-    removed: Record<K, V>;
-    noop: {};
-  }>;
-
-export function tableMethods<K extends PropertyKey, V>(): Methods<TableSpec<K, V>> {
-  return {
-    merge: (gadget, { added, removed }) => {
-      const current = gadget.current();
-      const next = { ...current };
-
-      // Remove keys
-      for (const key in removed) {
-        delete next[key];
-      }
-
-      // Add/update keys
-      for (const key in added) {
-        next[key] = added[key];
-      }
-
-      gadget.update(next);
-
-      return {
-        changed: next,
-        added,
-        removed
-      };
-    },
-
-    ignore: () => ({ noop: {} })
-  };
-}
-
 export type Contradicts<Spec> = Spec & {
   actions: {
     contradiction: {

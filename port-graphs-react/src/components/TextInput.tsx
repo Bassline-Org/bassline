@@ -19,7 +19,7 @@ export function TextInput<S extends TextInputSpec, G extends Gadget<S> & Tappabl
   autoFocus = false,
   onChange
 }: TextInputProps<S, G>) {
-  const [state, send] = useGadget<G, S>(gadget);
+  const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
     if (changed) {

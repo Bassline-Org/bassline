@@ -2,8 +2,7 @@
  * Typed UI gadgets using generic extensions
  */
 
-import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
-import { withTaps } from '../../semantics';
+import { Actions, defGadget, Effects, Input, State, withTaps } from '../../core/typed';
 
 /**
  * Slider gadget with typed commands

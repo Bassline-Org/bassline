@@ -6,49 +6,50 @@
  * 2. Named gadgets - registered with ProvideGadget and accessed via useExplicitGadget(name)
  */
 
-import React, { createContext, useContext, useState } from 'react';
-import type { Tappable, TypedGadget } from 'port-graphs';
+import React, { Context, createContext, useContext, useState } from 'react';
+import type { Tappable, Gadget } from 'port-graphs';
 
 // Context for the current gadget
-const CurrentGadgetContext = createContext<TypedGadget & Tappable | null>(null);
+type CurrentGadget<S, G extends Gadget<S> & Tappable<S> = Gadget<S> & Tappable<S>> = G | null;
+const CurrentGadgetContext = createContext<CurrentGadget<unknown>>(null);
 
 // Context for named gadgets registry
-type NamedGadgets = Map<string, TypedGadget & Tappable>;
-const NamedGadgetsContext = createContext<NamedGadgets>(new Map());
+type NamedGadgets<S, G extends Gadget<S> & Tappable<S> = Gadget<S> & Tappable<S>> = Map<string, G>;
+const NamedGadgetsContext = createContext<NamedGadgets<unknown>>(new Map());
 
 /**
  * Hook to access the current gadget from context
  */
-export function useCurrentGadget<Effect = any>() {
-  const gadget = useContext(CurrentGadgetContext);
+export function useCurrentGadget<S, G extends Gadget<S> & Tappable<S> = Gadget<S> & Tappable<S>>() {
+  const gadget = useContext(CurrentGadgetContext) as CurrentGadget<S, G>;
   if (!gadget) {
     throw new Error('useCurrentGadget must be used within a GadgetContext');
   }
-  return gadget as TypedGadget & Tappable<Effect>;
+  return gadget as G
 }
 
 /**
  * Hook to access a named gadget from context
  */
-export function useExplicitGadget<Effect = any>(
+export function useExplicitGadget<S, G extends Gadget<S> & Tappable<S> = Gadget<S> & Tappable<S>>(
   name: string
 ) {
-  const namedGadgets = useContext(NamedGadgetsContext);
+  const namedGadgets = useContext(NamedGadgetsContext) as NamedGadgets<S, G>;
   const gadget = namedGadgets.get(name);
   if (!gadget) {
     throw new Error(`No gadget found with name: ${name}. Did you forget to use ProvideGadget?`);
   }
-  return gadget as TypedGadget & Tappable<Effect>;
+  return gadget as G;
 }
 
 /**
  * Provides the current gadget to child components
  */
-export function GadgetContext({
+export function GadgetContext<S, G extends Gadget<S> & Tappable<S> = Gadget<S> & Tappable<S>>({
   gadget,
   children
 }: {
-  gadget: TypedGadget & Tappable;
+  gadget: G;
   children: React.ReactNode;
 }) {
   return (
@@ -61,16 +62,16 @@ export function GadgetContext({
 /**
  * Registers a named gadget in the context
  */
-export function ProvideGadget({
+export function ProvideGadget<S, G extends Gadget<S> & Tappable<S> = Gadget<S> & Tappable<S>>({
   name,
   gadget,
   children
 }: {
   name: string;
-  gadget: TypedGadget & Tappable;
+  gadget: G;
   children?: React.ReactNode;
 }) {
-  const parentGadgets = useContext(NamedGadgetsContext);
+  const parentGadgets = useContext(NamedGadgetsContext) as NamedGadgets<S, G>;
   const [namedGadgets] = useState(() => {
     const newMap = new Map(parentGadgets);
     newMap.set(name, gadget);

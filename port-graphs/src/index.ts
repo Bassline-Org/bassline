@@ -9,5 +9,4 @@ export * from './patterns/family';
 
 // Shared utilities
 export * from './effects';
-export * from './semantics';
 export * from './multi';

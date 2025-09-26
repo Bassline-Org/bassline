@@ -4,8 +4,7 @@
  * A generic select gadget that can work with any type of options.
  */
 
-import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
-import { withTaps } from '../../semantics/typed-extensions';
+import { Actions, defGadget, Effects, Input, State, withTaps } from '../../core/typed';
 
 /**
  * Select state - generic over option type
