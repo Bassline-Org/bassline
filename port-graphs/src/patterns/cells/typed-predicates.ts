@@ -5,25 +5,30 @@
  * This is ACI because the merge operation is "keep if valid" which is idempotent.
  */
 
-import { defGadget } from '../../core/typed';
-import type { CellSpec } from '../specs';
+import { Actions, cellMethods, defGadget, Effects, Input, State } from '../../core/typed';
+
 
 /**
  * Predicate cell - only accepts values that pass the predicate test
  * Forms a lattice where merge is "first valid value wins" (monotonic)
  * Once it has a value, it never changes
  */
-export type PredicateCell<T> = CellSpec<boolean, T, boolean>;
-
 export const predicateCell = <T>(
   predicate: (value: T) => boolean,
 ) => () => {
-  return defGadget<PredicateCell<T>>(
-    (state, input) => {
+  type Spec = State<boolean> & Input<T> & Actions<{
+    ignore: {};
+    merge: boolean;
+  }> & Effects<{
+    changed: boolean;
+    noop: {};
+  }>;
+
+  return defGadget<Spec>({
+    dispatch: (state, input) => {
       if (state) {
         return { ignore: {} };
       }
-
       // Only accept input if it passes the predicate
       if (predicate(input)) {
         return { merge: true };
@@ -31,14 +36,8 @@ export const predicateCell = <T>(
 
       return { ignore: {} };
     },
-    {
-      merge: (gadget, value) => {
-        gadget.update(value);
-        return { changed: value };
-      },
-      ignore: () => ({ noop: {} })
-    }
-  )(false);
+    methods: cellMethods()
+  })(false);
 };
 
 // Common type predicates as convenience functions

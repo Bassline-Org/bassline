@@ -21,19 +21,13 @@ export function tableMethods<K extends PropertyKey, V>(): Methods<TableSpec<K, V
         merge: (gadget, { added, removed }) => {
             const current = gadget.current();
             const next = { ...current };
-
-            // Remove keys
             for (const key in removed) {
                 delete next[key];
             }
-
-            // Add/update keys
             for (const key in added) {
                 next[key] = added[key];
             }
-
             gadget.update(next);
-
             return {
                 changed: next,
                 added,
@@ -68,7 +62,7 @@ export const lastTable = <K extends PropertyKey, V>(initial: Record<K, V>) => de
         const { added, removed, hasChanges } = getTableChanges(state, input);
         return hasChanges ? { merge: { added, removed } } : { ignore: {} };
     },
-    methods: tableMethods<K, V>()
+    methods: tableMethods()
 })(initial);
 
 export const firstTable = <K extends PropertyKey, V>(initial: Record<K, V>) => {

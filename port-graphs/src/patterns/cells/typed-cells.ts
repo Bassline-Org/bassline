@@ -92,7 +92,6 @@ export const intersectionCell = <T>(initial: Set<T>) => {
   })(initial);
 };
 
-
 // Define custom spec by composing pieces
 export type CounterSpec =
   & State<number>

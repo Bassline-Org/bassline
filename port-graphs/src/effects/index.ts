@@ -1,10 +1,10 @@
-import { Gadget } from "../core/types";
+import { Gadget } from "../core/typed";
 
 export const noop = () => ({ noop: true } as const);
 export const changed = <T>(value: NonNullable<T>) => ({ changed: value } as const);
 export const contradiction = <Curr, Inc>(current: NonNullable<Curr>, incoming: NonNullable<Inc>) =>
     ({ contradiction: { current, incoming } } as const);
-export const creation = (gadget: Gadget) => ({ creation: gadget } as const);
+export const creation = <S>(gadget: Gadget<S>) => ({ creation: gadget } as const);
 
 export const effects = {
     noop,
