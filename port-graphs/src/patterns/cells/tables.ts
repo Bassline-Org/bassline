@@ -1,6 +1,6 @@
 import _ from 'lodash';
-import { Actions, CellSpec, defGadget, derive, Effects, Gadget, Input, Methods, State, withTaps } from '../../core/typed';
-
+import { Actions, defGadget, derive, Effects, Gadget, Input, Methods, State, withTaps } from '../../core/typed';
+import { maxCell } from './typed-cells';
 
 export type TableSpec<K extends PropertyKey, V> =
     & State<Record<K, V>>
@@ -142,6 +142,85 @@ export const unionTable = <K extends PropertyKey, V>(initial: Record<K, Set<V>>)
         }
     })(initial);
 }
+
+export type FamilyTableSpec<K extends PropertyKey, G> =
+    & State<Record<K, G>>
+    & Input<{
+        send: {
+            [key in K]: Input<G>;
+        },
+        create: {
+            [key in K]: State<G>;
+        },
+        delete: K,
+        clear: true,
+    }[]>
+    & Actions<{
+        merge: { added: Record<K, G>; removed: Record<K, G>; cleared: boolean };
+        ignore: {};
+    }>
+    & Effects<{
+        changed: Record<K, G>;
+        added: Record<K, G>;
+        removed: Record<K, G>;
+        received: Record<K, State<G>>;
+        noop: {};
+    }>;
+
+export const defFamilyTable = <K extends PropertyKey, G>(factory: () => G extends Gadget<infer S> ? G : never) => {
+    return defGadget<FamilyTableSpec<K, G>>({
+        dispatch: (state, input) => {
+            const added = {} as Record<K, G>;
+            const removed = {} as Record<K, G>;
+            let cleared = false;
+            const received = {} as Record<K, Input<G>>;
+            for (const message of input) {
+                if (message.send) {
+                    for (const key in message.send) {
+                        received[key] = message.send[key];
+                    }
+                }
+                if (message.create) {
+                    for (const key in message.create) {
+                        if (state[key] === undefined) {
+                            added[key] = factory();
+                        }
+                    }
+                }
+                if (message.delete) {
+                    removed[message.delete] = state[message.delete];
+                }
+                if (message.clear) {
+                    cleared = true;
+                }
+            }
+            const hasChanges = _.keys(added).length > 0 || _.keys(removed).length > 0 || cleared;
+            return hasChanges ? { merge: { added, removed, cleared } } : { ignore: {} };
+        },
+        methods: {
+            merge: (gadget, { added, removed, cleared }) => {
+                const current = { ...gadget.current() };
+                for (const key in removed) {
+                    delete current[key];
+                }
+                for (const key in added) {
+                    current[key] = added[key];
+                }
+                gadget.update({ ...current, ...added });
+                return {
+                    changed: { ...current, ...added },
+                    added,
+                    removed,
+                    cleared
+                };
+            },
+            ignore: () => ({ noop: {} })
+        }
+    })({} as Record<K, G>);
+}
+
+const maxFamilyFn = () => withTaps(maxCell(0));
+const maxFamily = defFamilyTable(maxFamilyFn);
 
 const a = withTaps(lastTable<string, number>({
     a: 1,

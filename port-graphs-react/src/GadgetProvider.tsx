@@ -7,27 +7,27 @@
  */
 
 import React, { createContext, useContext, useRef, useSyncExternalStore, useCallback } from 'react';
-import { ExtractSpec, Tappable, type TypedGadget, withTaps } from 'port-graphs';
+import { Tappable, Gadget, withTaps, State, Input } from 'port-graphs';
 
 // Registry entry for a typed gadget with its spec
-type GadgetEntry<G, Spec extends ExtractSpec<G>> = {
-  gadget: G;
+type GadgetEntry<S> = {
+  gadget: Gadget<S>;
   listeners: Set<() => void>;
-  state: Spec['state'];
+  state: S extends State<infer St> ? St : never;
 };
 
 // Map from gadget instances to their entries
 // We use WeakMap for better memory management
-type GadgetRegistry<G extends TypedGadget<any> = TypedGadget, Spec extends ExtractSpec<G> = ExtractSpec<G>> = WeakMap<G, GadgetEntry<G, Spec>>;
+type GadgetRegistry<S> = WeakMap<Gadget<S>, GadgetEntry<S>>;
 
-type GadgetContextValue<G extends TypedGadget<any>, Spec extends ExtractSpec<G> = ExtractSpec<G>> = {
-  registry: GadgetRegistry<G, Spec>;
+type GadgetContextValue<S> = {
+  registry: GadgetRegistry<S>;
 };
 
-const GadgetContext = createContext<GadgetContextValue<TypedGadget<any>> | null>(null);
+const GadgetContext = createContext<GadgetContextValue<any> | null>(null);
 
-export function useGadgetContext<G extends TypedGadget<any>, Spec extends ExtractSpec<G> = ExtractSpec<G>>() {
-  const context = useContext(GadgetContext) as GadgetContextValue<G, Spec>;
+export function useGadgetContext<S>() {
+  const context = useContext(GadgetContext) as GadgetContextValue<S>;
   if (!context) {
     throw new Error('useGadget must be used within a GadgetProvider');
   }
@@ -38,9 +38,9 @@ export function useGadgetContext<G extends TypedGadget<any>, Spec extends Extrac
  * Provides global gadget state management for all child components
  */
 export function GadgetProvider({ children }: { children: React.ReactNode }) {
-  const registryRef = useRef<GadgetRegistry<TypedGadget>>(new WeakMap());
+  const registryRef = useRef<GadgetRegistry<unknown>>(new WeakMap());
 
-  const contextValue: GadgetContextValue<TypedGadget> = {
+  const contextValue: GadgetContextValue<unknown> = {
     registry: registryRef.current
   };
 
@@ -56,14 +56,14 @@ export function GadgetProvider({ children }: { children: React.ReactNode }) {
  *
  * This hook ensures proper type inference from the gadget's spec
  */
-export function useGadgetFromProvider<G extends TypedGadget<any>, Spec extends ExtractSpec<G>>(
-  gadget: G
+export function useGadgetFromProvider<S>(
+  gadget: Gadget<S>
 ): readonly [
-  Spec['state'],
-  (data: Spec['input']) => void,
-  G & Tappable<Spec['effects']>
+  S extends State<infer St> ? St : never,
+  (data: S extends Input<infer I> ? I : never) => void,
+  Gadget<S> & Tappable<S>
 ] {
-  const { registry } = useGadgetContext<G>();
+  const { registry } = useGadgetContext<S>();
 
   // Get or create the registry entry for this gadget
   let entry = registry.get(gadget);
@@ -74,13 +74,13 @@ export function useGadgetFromProvider<G extends TypedGadget<any>, Spec extends E
 
     // Create the entry with initial state and proper typing
     entry = {
-      gadget: tappableGadget as G & Tappable<Spec['effects']>,
+      gadget: tappableGadget,
       listeners: new Set<() => void>(),
       state: gadget.current()
     };
 
     // Override the update method to track state changes
-    gadget.update = (newState: Spec['state']) => {
+    gadget.update = (newState: S extends State<infer St> ? St : never) => {
       const currentEntry = registry.get(gadget);
       if (currentEntry) {
         currentEntry.state = newState;
@@ -89,38 +89,33 @@ export function useGadgetFromProvider<G extends TypedGadget<any>, Spec extends E
       }
     };
     gadget.current = () => {
-      const currentEntry = registry.get(gadget);
-      if (currentEntry) {
-        return currentEntry.state;
-      }
+      const currentEntry = registry.get(gadget)!;
+      return currentEntry.state;
     };
 
     // Store in registry with proper type
     registry.set(gadget, entry);
   }
 
-  // TypeScript knows entry is GadgetEntry<Spec> here
-  const typedEntry = entry;
-
   // Use useSyncExternalStore for React 18+ concurrent features
-  const state = useSyncExternalStore<Spec['state']>(
+  const state = useSyncExternalStore<S extends State<infer St> ? St : never>(
     // Subscribe
     (onStoreChange) => {
-      typedEntry.listeners.add(onStoreChange);
+      entry.listeners.add(onStoreChange);
       return () => {
-        typedEntry.listeners.delete(onStoreChange);
+        entry.listeners.delete(onStoreChange);
       };
     },
     // Get snapshot - returns the exact state type
-    () => typedEntry.state,
+    () => entry.state,
     // Get server snapshot (for SSR)
-    () => typedEntry.state
+    () => entry.state
   );
 
   // Create send function with proper input type
-  const send = useCallback((data: Spec['input']) => {
-    typedEntry.gadget.receive(data);
-  }, [typedEntry]);
+  const send = useCallback((data: S extends Input<infer I> ? I : never) => {
+    entry.gadget.receive(data);
+  }, [entry]);
 
-  return [state, send, typedEntry.gadget as G & Tappable<Spec['effects']>] as const;
+  return [state, send, entry.gadget as Gadget<S> & Tappable<S>] as const;
 }

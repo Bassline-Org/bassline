@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { ExtractSpec, Tappable, type TypedGadget } from 'port-graphs';
+import { Effects, Gadget, Tappable } from 'port-graphs';
 import { useGadget } from './useGadget';
 
 /**
@@ -35,25 +35,18 @@ import { useGadget } from './useGadget';
  * @param callback - Function to call when effects are emitted
  * @param deps - Optional dependency array for the effect callback
  */
-export function useGadgetEffect<G extends TypedGadget<any>>(
-  gadget: G,
-  callback: (effect: ExtractSpec<typeof gadget>['effects']) => void,
+export function useGadgetEffect<S>(
+  gadget: Gadget<S> & Tappable<S>,
+  callback: (effect: S extends Effects<infer E> ? Partial<E> : never) => void,
   deps?: React.DependencyList
 ) {
-  // Get the tappable gadget from useGadget
-  const [, , tappableGadget] = useGadget(gadget);
-
-  // Store the latest callback to avoid stale closures
   const callbackRef = useRef(callback);
   callbackRef.current = callback;
 
   useEffect(() => {
-    // Subscribe to effects with proper typing
-    const unsubscribe = tappableGadget.tap((effect: ExtractSpec<typeof gadget>['effects']) => {
+    const cleanup = gadget.tap((effect) => {
       callbackRef.current(effect);
     });
-
-    // Cleanup on unmount or when dependencies change
-    return unsubscribe;
-  }, [tappableGadget, ...(deps || [])]);
+    return cleanup;
+  }, [gadget, ...(deps || [])]);
 }

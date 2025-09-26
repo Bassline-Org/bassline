@@ -5,8 +5,6 @@
  * gadgets with React components, using a global provider for state management.
  */
 
-import { GadgetSpec, TypedGadget } from 'port-graphs';
-
 // Provider for global gadget state management
 export { GadgetProvider, useGadgetContext } from './GadgetProvider';
 
@@ -24,9 +22,3 @@ export { createReactFamily } from './createReactFamily';
 
 // Declarative wiring components
 export { GadgetContext, ProvideGadget, useCurrentGadget, useExplicitGadget } from './GadgetContext';
-
-// Visual components for tap connections
-export * from './visual';
-
-// Re-export typed gadget types for convenience
-export type { TypedGadget, GadgetSpec } from 'port-graphs';
