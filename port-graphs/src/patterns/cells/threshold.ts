@@ -1,4 +1,4 @@
-import { Actions, defGadget, Effects, Gadget, Input, State, withTaps } from '../../core/typed';
+import { Actions, defGadget, derive, Effects, Gadget, Input, State, withTaps } from '../../core/typed';
 import { maxCell, unionCell } from './typed-cells';
 
 export const thresholdCell = <T>(predicate: (value: T) => T | null) => {
@@ -40,53 +40,61 @@ export const thresholdCell = <T>(predicate: (value: T) => T | null) => {
     })(null);
 }
 
-// const above10 = withTaps(thresholdCell((value: number) => value > 10 ? value : null));
-// const includes5 = withTaps(thresholdCell((value: Set<number>) => value.has(5) ? value : null));
-// const union = withTaps(unionCell(new Set([1, 2, 3])));
+const above10 = withTaps(thresholdCell((value: number) => value > 10 ? value : null));
+const includes5 = withTaps(thresholdCell((value: Set<number>) => value.has(5) ? value : null));
+const union = withTaps(unionCell(new Set([1, 2, 3])));
 
-// above10.tap(({ notMet, changed, alreadyMet }) => {
-//     if (notMet) {
-//         console.log('notMet', notMet);
-//     }
-//     if (changed) {
-//         console.log('changed', changed);
-//     }
-//     if (alreadyMet) {
-//         console.log('alreadyMet', alreadyMet);
-//     }
-// });
+const unionSum = withTaps(derive(union, (value) => Array.from(value).reduce((acc, x) => acc + x, 0)));
 
-// union.tap(({ changed }) => {
-//     if (changed) {
-//         includes5.receive(changed);
-//     }
-// });
+unionSum.tap(({ changed }) => {
+    if (changed) {
+        console.log('unionSum', changed);
+    }
+});
 
-// includes5.tap(({ notMet, changed, alreadyMet }) => {
-//     if (notMet) {
-//         console.log('notMet', notMet);
-//     }
-//     if (changed) {
-//         console.log('changed', changed);
-//     }
-// });
+above10.tap(({ notMet, changed, alreadyMet }) => {
+    if (notMet) {
+        console.log('notMet', notMet);
+    }
+    if (changed) {
+        console.log('changed', changed);
+    }
+    if (alreadyMet) {
+        console.log('alreadyMet', alreadyMet);
+    }
+});
 
-// const number = withTaps(maxCell(0));
+union.tap(({ changed }) => {
+    if (changed) {
+        includes5.receive(changed);
+    }
+});
 
-// number.tap(({ changed }) => {
-//     if (changed) {
-//         above10.receive(changed);
-//     }
-// });
+includes5.tap(({ notMet, changed, alreadyMet }) => {
+    if (notMet) {
+        console.log('notMet', notMet);
+    }
+    if (changed) {
+        console.log('changed', changed);
+    }
+});
 
-// number.receive(1);
+const number = withTaps(maxCell(0));
 
-// number.receive(5);
+number.tap(({ changed }) => {
+    if (changed) {
+        above10.receive(changed);
+    }
+});
 
-// number.receive(15);
+number.receive(1);
 
-// number.receive(20);
+number.receive(5);
 
-// union.receive(new Set([4, 8, 9, 10]));
-// union.receive(new Set([11, 12, 13, 14]));
-// union.receive(new Set([5, 8, 10]));
+number.receive(15);
+
+number.receive(20);
+
+union.receive(new Set([4, 8, 9, 10]));
+union.receive(new Set([11, 12, 13, 14]));
+union.receive(new Set([5, 8, 10]));
