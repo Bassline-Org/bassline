@@ -47,7 +47,8 @@ export type SelectSpec<T> =
     cleared: {};
     configured: SelectState<T>;
     noop: {};
-  }>;
+  }
+  >;
 
 /**
  * Creates a typed Select gadget

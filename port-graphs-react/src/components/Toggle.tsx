@@ -12,7 +12,7 @@ import { useGadgetEffect } from '../useGadgetEffect';
 
 export interface ToggleProps<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>> {
   /** The toggle gadget instance */
-  gadget: G & Tappable<ToggleSpec['effects']>;
+  gadget: G;
   /** Optional CSS class name */
   className?: string;
   /** Display style for the toggle */
@@ -66,7 +66,7 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
 }: ToggleProps<S, G>) {
   // useGadget gives us perfect type inference
   // state is ToggleState, send accepts ToggleCommands
-  const [state, send] = useGadget<S, G>(gadget);
+  const [state, send] = useGadget<S, typeof gadget>(gadget);
   const displayLabel = label || state.label;
 
   // Handle toggle with proper type

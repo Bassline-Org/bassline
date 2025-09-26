@@ -2,15 +2,15 @@
  * React component for TextInput gadget
  */
 
-import { type TextInputSpec, type Tappable, Gadget, InputOf } from 'port-graphs';
+import { type TextInputSpec, type Tappable, Gadget, InputOf, EffectsOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
 export interface TextInputProps<S extends TextInputSpec, G extends Gadget<S> & Tappable<S>> {
-  gadget: G & Tappable<TextInputSpec['effects']>;
+  gadget: G,
   className?: string;
   autoFocus?: boolean;
-  onChange?: (change: TextInputSpec['effects']['changed']) => void;
+  onChange?: (change: EffectsOf<S>['changed']) => void;
 }
 
 export function TextInput<S extends TextInputSpec, G extends Gadget<S> & Tappable<S>>({
@@ -19,7 +19,7 @@ export function TextInput<S extends TextInputSpec, G extends Gadget<S> & Tappabl
   autoFocus = false,
   onChange
 }: TextInputProps<S, G>) {
-  const [state, send] = useGadget<S, G>(gadget);
+  const [state, send] = useGadget<G, S>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
     if (changed) {

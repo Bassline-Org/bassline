@@ -113,7 +113,7 @@ export function useGadgetFromProvider<S, G extends Gadget<S> = Gadget<S>>(
   );
 
   // Create send function with proper input type
-  const send = useCallback((data: S extends Input<infer I> ? I : never) => {
+  const send = useCallback((data: InputOf<S>) => {
     entry.gadget.receive(data);
   }, [entry]);
 

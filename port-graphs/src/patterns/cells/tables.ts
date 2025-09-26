@@ -4,7 +4,7 @@ import { maxCell } from './typed-cells';
 
 export type TableSpec<K extends PropertyKey, V> =
     & State<Record<K, V>>
-    & Input<Record<K, V | null>>
+    & Input<Partial<Record<K, V | null>>>
     & Actions<{
         merge: { added: Record<K, V>; removed: Record<K, V> };
         ignore: {};
@@ -39,7 +39,7 @@ export function tableMethods<K extends PropertyKey, V>(): Methods<TableSpec<K, V
     };
 }
 
-const getTableChanges = <K extends PropertyKey, V>(state: Record<K, V>, input: Record<K, V | null>) => {
+const getTableChanges = <K extends PropertyKey, V>(state: Record<K, V>, input: Partial<Record<K, V | null>>) => {
     const added: Record<K, V> = {} as Record<K, V>;
     const removed: Record<K, V> = {} as Record<K, V>;
     for (const key in input) {
@@ -50,7 +50,7 @@ const getTableChanges = <K extends PropertyKey, V>(state: Record<K, V>, input: R
             }
         } else {
             if (state[key] !== value) {
-                added[key] = value;
+                added[key] = value as V;
             }
         }
     }
@@ -108,7 +108,7 @@ export const unionTable = <K extends PropertyKey, V>(initial: Record<K, Set<V>>)
                     }
                 } else {
                     const stateValue = state[key] ?? new Set<V>();
-                    const union = stateValue.union(value);
+                    const union = stateValue.union(value as Set<V>);
                     if (union.size !== stateValue.size) {
                         added[key] = value;
                     }

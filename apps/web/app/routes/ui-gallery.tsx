@@ -22,6 +22,7 @@ import {
   buttonGadget,
   checkboxGadget,
   withTaps,
+  type SpecOf,
 } from 'port-graphs';
 import { lastTable } from 'port-graphs/cells';
 
@@ -33,10 +34,10 @@ export function meta({ }: Route.MetaArgs) {
 }
 
 // Create all our gadgets
-const nameInput = textInputGadget('', 'Enter your name...');
-const ageInput = numberInputGadget(25, 1, 120, 1);
-const volumeSlider = sliderGadget(50, 0, 100, 1);
-const volumeMeter = meterGadget(0, 100);
+const nameInput = withTaps(textInputGadget('', 'Enter your name...'));
+const ageInput = withTaps(numberInputGadget(25, 1, 120, 1));
+const volumeSlider = withTaps(sliderGadget(50, 0, 100, 1));
+const volumeMeter = withTaps(meterGadget(0, 100));
 
 // Initialize meter to match slider and wire them together
 volumeMeter.receive({ display: 50 });
@@ -58,25 +59,28 @@ const termsCheck = checkboxGadget(false, 'I agree to terms and conditions');
 const darkModeToggle = toggleGadget(false);
 
 // Create a cell to collect form data
-const formDataCell = withTaps(lastMap({
+const defaultFormData = {
   name: '',
   age: 0,
   color: '',
   size: '',
   newsletter: false,
-  terms: false
-}));
+  terms: false,
+  volume: 0,
+  darkMode: false
+}
+const formDataCell = withTaps(lastTable(defaultFormData));
 
 // Counter example
-const countDisplay = numberInputGadget(0, -100, 100, 1);
-const incrementBtn = buttonGadget('+1');
-const decrementBtn = buttonGadget('-1');
-const resetCountBtn = buttonGadget('Reset');
+const countDisplay = withTaps(numberInputGadget(0, -100, 100, 1));
+const incrementBtn = withTaps(buttonGadget('+1'));
+const decrementBtn = withTaps(buttonGadget('-1'));
+const resetCountBtn = withTaps(buttonGadget('Reset'));
 
 function UIGalleryInner() {
-  const [darkMode] = useGadget(darkModeToggle);
-  const [formData, updateFormData] = useGadget(formDataCell);
-  const [countState] = useGadget(countDisplay);
+  const [darkMode] = useGadget<SpecOf<typeof darkModeToggle>>(darkModeToggle);
+  const [formData, updateFormData] = useGadget<SpecOf<typeof formDataCell>>(formDataCell);
+  const [countState] = useGadget<SpecOf<typeof countDisplay>>(countDisplay);
 
   useGadgetEffect(formDataCell, ({ changed }) => {
     console.log('Form data changed:', changed);

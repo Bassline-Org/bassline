@@ -5,7 +5,7 @@
  * All gadgets are managed through the GadgetProvider for consistent state.
  */
 
-import { Gadget, Tappable } from 'port-graphs';
+import { Gadget, SpecOf, Tappable } from 'port-graphs';
 import { useGadgetFromProvider } from './GadgetProvider';
 
 /**
@@ -28,7 +28,7 @@ import { useGadgetFromProvider } from './GadgetProvider';
  * @returns Tuple of [state, send function, gadget with tap]
  */
 
-export function useGadget<S, G extends Gadget<S>>(
+export function useGadget<S, G extends Gadget<S> = Gadget<S>>(
   gadget: G
 ) {
   return useGadgetFromProvider<S, G>(gadget);

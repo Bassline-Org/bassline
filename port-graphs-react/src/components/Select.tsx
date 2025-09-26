@@ -2,32 +2,32 @@
  * React component for Select gadget
  */
 
-import { type SelectSpec, type Tappable, EffectsOf, Gadget, InputOf } from 'port-graphs';
+import { type SelectSpec, type Tappable, EffectsOf, Gadget, InputOf, SpecOf, StateOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface SelectProps<T, S extends SelectSpec<T>, G extends Gadget<S> & Tappable<S>> {
+export interface SelectProps<S extends SelectSpec<any>, G extends Gadget<S> & Tappable<S>> {
   gadget: G;
   className?: string;
-  renderOption?: (option: T) => React.ReactNode;
-  getOptionValue?: (option: T) => string;
+  renderOption?: (option: StateOf<S>['value']) => React.ReactNode;
+  getOptionValue?: (option: StateOf<S>['value']) => string;
   placeholder?: string;
-  onChange?: (change: EffectsOf<SelectSpec<T>>['changed']) => void;
+  onChange?: (change: EffectsOf<S>['changed']) => void;
 }
 
-export function Select<T, S extends SelectSpec<T>, G extends Gadget<S> & Tappable<S>>({
+export function Select<S extends SelectSpec<any>, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   renderOption = (opt) => String(opt),
   getOptionValue = (opt) => String(opt),
   placeholder = 'Select...',
   onChange
-}: SelectProps<T, S, G>) {
-  const [state, send] = useGadget<S, G>(gadget);
+}: SelectProps<S, G>) {
+  const [state, send] = useGadget<S>(gadget);
 
-  useGadgetEffect(gadget, ({ changed }) => {
+  useGadgetEffect<S>(gadget, ({ changed }) => {
     if (changed) {
-      onChange?.(changed);
+      onChange?.(changed as EffectsOf<S>['changed']);
     }
   }, [onChange]);
 
