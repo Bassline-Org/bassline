@@ -2,20 +2,27 @@
 // Type-Level Building Blocks
 // ============================================
 
+export type SpecOf<T> = T extends { _spec?: infer Spec } ? Spec : never;
 export type State<S> = { state: S };
 export type Input<I> = { input: I };
-export type Actions<A extends Record<PropertyKey, unknown>> = { actions: A };
-export type Effects<E extends Record<PropertyKey, unknown>> = { effects: E };
+export type Actions<A> = { actions: A };
+export type Effects<E> = { effects: E };
+
+export type StateOf<S> = S extends State<infer S> ? S : never;
+export type InputOf<I> = I extends Input<infer I> ? I : never;
+export type EffectsOf<E> = E extends Effects<infer E> ? E : never;
+export type ActionsOf<A> = A extends Actions<infer A> ? A : never;
 
 // ============================================
 // Core Gadget Interface
 // ============================================
 
-export interface Gadget<Spec> {
-  current: () => Spec extends State<infer S> ? S : never;
-  update: (state: Spec extends State<infer S> ? S : never) => void;
-  receive: (data: Spec extends Input<infer I> ? I : never) => void;
-  emit: (effect: Spec extends Effects<infer E> ? Partial<E> : never) => void;
+export type Gadget<Spec = unknown> = {
+  current: () => StateOf<Spec>;
+  update: (state: StateOf<Spec>) => void;
+  receive: (data: InputOf<Spec>) => void;
+  emit: (effect: Partial<EffectsOf<Spec>>) => void;
+  _spec?: Spec;
 }
 
 // ============================================
@@ -23,26 +30,16 @@ export interface Gadget<Spec> {
 // ============================================
 
 // Extract just the action names from a spec
-export type ActionNames<Spec> =
-  Spec extends Actions<infer A> ? keyof A : never;
+export type ActionNames<Spec> = keyof ActionsOf<Spec>;
 
 // The dispatch function returns action + context
-export type DispatchResult<Spec> =
-  Spec extends Actions<infer A>
-  ? { [K in keyof A]: { [P in K]: A[K] } }[keyof A]
-  : never;
+export type DispatchResult<Spec> = { [K in ActionNames<Spec>]: { [P in K]: ActionsOf<Spec>[K] } }[keyof ActionsOf<Spec>];
 
 // Method signature for a specific action
-export type Method<Spec, Action extends ActionNames<Spec>> =
-  Spec extends Actions<infer A> & Effects<infer E>
-  ? (gadget: Gadget<Spec>, context: A[Action]) => Partial<E>
-  : never;
+export type Method<Spec, Action extends ActionNames<Spec>> = (gadget: Gadget<Spec>, context: ActionsOf<Spec>[Action]) => Partial<EffectsOf<Spec>>;
 
 // All methods for a spec
-export type Methods<Spec> =
-  Spec extends Actions<infer A> & Effects<infer E>
-  ? { [K in keyof A]: (gadget: Gadget<Spec>, context: A[K]) => Partial<E> }
-  : never;
+export type Methods<Spec> = { [K in keyof ActionsOf<Spec>]: Method<Spec, K> }
 
 // ============================================
 // Implementation Function
@@ -51,14 +48,14 @@ export type Methods<Spec> =
 export function defGadget<Spec>(
   config: {
     dispatch: (
-      state: Spec extends State<infer S> ? S : never,
-      input: Spec extends Input<infer I> ? I : never
+      state: StateOf<Spec>,
+      input: InputOf<Spec>
     ) => DispatchResult<Spec> | null;
     methods: Methods<Spec>;
   }
-): (initial: Spec extends State<infer S> ? S : never) => Gadget<Spec> {
+): (initial: StateOf<Spec>) => Gadget<Spec> {
 
-  return (initial: Spec extends State<infer S> ? S : never) => {
+  return (initial: StateOf<Spec>) => {
     let current = initial;
 
     const gadget: Gadget<Spec> = {
@@ -73,14 +70,14 @@ export function defGadget<Spec>(
 
         if (result !== null) {
           // Extract action name and context
-          const actionName = Object.keys(result)[0] as keyof typeof config.methods;
-          const context = result[actionName as keyof typeof result];
+          const actionName = Object.keys(result)[0] as ActionNames<Spec>;
+          const context = result[actionName];
 
           const method = config.methods[actionName];
           if (method) {
             const effect = method(gadget, context);
             if (effect) {
-              gadget.emit(effect as Spec extends Effects<infer E> ? Partial<E> : never);
+              gadget.emit(effect);
             }
           }
         }
@@ -100,7 +97,7 @@ export function defGadget<Spec>(
 // ============================================
 
 export type CellMethods<Spec> = {
-  merge: (gadget: Gadget<Spec>, value: Spec extends State<infer S> ? S : never) => { changed: Spec extends State<infer S> ? S : never };
+  merge: (gadget: Gadget<Spec>, value: StateOf<Spec>) => { changed: StateOf<Spec> };
   ignore: (gadget: Gadget<Spec>, context: {}) => { noop: {} };
 };
 
@@ -133,34 +130,25 @@ export type CellSpec<T> =
 // ============================================
 // Partial Specs & Mixins
 // ============================================
-
-type TapFn<Spec> = (effect: Spec extends Effects<infer E> ? Partial<E> : never) => void;
-
+export type TapFn<Spec> = (effect: Partial<EffectsOf<Spec>>) => void;
 // Tappable only cares about effects
 export type Tappable<Spec> = {
   tap: (fn: TapFn<Spec>) => () => void;
 }
 
-type WithTaps<G> = G extends Tappable<any>
-  ? G
-  : G extends Gadget<infer S>
-  ? Gadget<S> & Tappable<S>
-  : never;
-
 export function isTappable<Spec>(
   gadget: Gadget<Spec>
 ): gadget is Gadget<Spec> & Tappable<Spec> {
-  return 'tap' in gadget;
+  return 'tap' in gadget && typeof gadget.tap === 'function';
 }
 
-export function withTaps<S, G extends Gadget<S>>(
-  gadget: G
-): WithTaps<G> {
-  const taps = new Set<TapFn<S>>();
+export function withTaps<Spec>(
+  gadget: Gadget<Spec>
+): Gadget<Spec> & Tappable<Spec> {
+
+  const taps = new Set<TapFn<Spec>>();
   const originalEmit = gadget.emit;
-  if (isTappable(gadget)) {
-    return gadget as WithTaps<G>;
-  }
+  if (isTappable(gadget)) return gadget;
 
   gadget.emit = (effect) => {
     originalEmit(effect);
@@ -168,23 +156,28 @@ export function withTaps<S, G extends Gadget<S>>(
   };
 
   return Object.assign(gadget, {
-    tap: (fn: TapFn<S>) => {
+    tap: (fn: TapFn<Spec>) => {
       taps.add(fn);
       return () => { taps.delete(fn); };
     }
-  }) as WithTaps<G>;
+  })
 }
 
-// Derivable only needs state and changed effect
-export type Derivable<S> =
-  & State<S>
-  & Effects<{ changed: S }>;
+export type Derivable<TState> =
+  & State<TState>
+  & Effects<{ changed: TState }>;
 
-export const derive = <S, D>(
-  source: Gadget<Derivable<S>> & Tappable<Derivable<S>>,
-  transform: (state: S) => D
-): Gadget<Derivable<D>> & Tappable<Derivable<D>> => {
-  const derived = defGadget<Derivable<D> & Input<S> & Actions<{ update: S }>>({
+export const derive = <S extends Effects<{ changed: StateOf<S> }>, Transformed>(
+  source: Gadget<S> & Tappable<S>,
+  transform: (state: StateOf<S>) => Transformed
+) => {
+  type DerivedSpec =
+    & State<Transformed>
+    & Input<StateOf<S>>
+    & Actions<{ update: StateOf<S> }>
+    & Effects<{ changed: Transformed }>
+
+  const derived = defGadget<DerivedSpec>({
     dispatch: (_state, input) => ({ update: input }),
     methods: {
       update: (gadget, value) => {
