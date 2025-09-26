@@ -62,9 +62,9 @@ export function fn<Compute extends (args: any) => any>(compute: Compute, require
   })({ ...initial, result: compute(initial) } as FnRecord<Compute>)
 }
 
-type ExampleFn = (args: { foo: number, bar: number }) => number;
-const exampleFn: ExampleFn = (args) => args.foo + args.bar;
-const example = fn(exampleFn, ['foo', 'bar']);
+const example = fn(({ foo, bar }: { foo: number, bar: number }) => foo + bar, ['foo', 'bar']);
+
+const instance = example({ foo: 1, bar: 2 });
 
 const nary = fn((args: Record<string, number>) => {
   return Object.values(args).reduce((acc, val) => acc + val, 0);
@@ -72,8 +72,13 @@ const nary = fn((args: Record<string, number>) => {
 
 const foo = withTaps(nary({ a: 1, b: 2, c: 3 }));
 
-foo.tap(({ computed }) => {
-  console.log('nary computed', computed);
+foo.tap(({ computed, changed }) => {
+  if (changed) {
+    console.log('nary changed', changed);
+  }
+  if (computed) {
+    console.log('nary computed', computed);
+  }
 });
 foo.receive({
   a: 10,
