@@ -5,7 +5,7 @@
  * makes all gadgets tappable for easy connections in React components.
  */
 
-import { withTaps, createTypedFamily, type TypedGadget, type GadgetSpec, ExtractSpec, Tappable, PartialSpec } from 'port-graphs';
+import { defFamilyTable, Gadget, withTaps } from 'port-graphs';
 
 /**
  * Creates a family gadget that produces React-ready (tappable) gadgets.
@@ -24,9 +24,9 @@ import { withTaps, createTypedFamily, type TypedGadget, type GadgetSpec, Extract
  *   return <div>{state.value}</div>;
  * }
  */
-export function createReactFamily<G, Spec extends PartialSpec = ExtractSpec<G>>(
-  factory: () => TypedGadget<Spec>
+export function createReactFamily<Spec, G extends Gadget<Spec>>(
+  factory: () => G
 ) {
   // Wrap the factory to produce tappable gadgets
-  return createTypedFamily(() => withTaps(factory()));
+  return defFamilyTable(() => withTaps(factory()));
 }

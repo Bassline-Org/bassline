@@ -5,9 +5,8 @@
  * and step increments.
  */
 
-import { defGadget } from '../../core/typed';
+import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
 import { withTaps } from '../../semantics/typed-extensions';
-import type { CommandSpec } from '../specs';
 
 /**
  * NumberInput state
@@ -34,24 +33,24 @@ export type NumberInputCommands =
 /**
  * NumberInput specification
  */
-export type NumberInputSpec = CommandSpec<
-  NumberInputState,
-  NumberInputCommands,
-  {
-    set: number;
-    configure: { min?: number; max?: number; step?: number };
-    enable: {};
-    disable: {};
-    ignore: {};
-  },
-  {
+export type NumberInputSpec =
+  & State<NumberInputState>
+  & Input<NumberInputCommands>
+  & Actions<
+    {
+      set: number;
+      configure: { min?: number; max?: number; step?: number };
+      enable: {};
+      disable: {};
+      ignore: {};
+    }>
+  & Effects<{
     changed: number;
     validated: number;
     configured: NumberInputState;
     noop: {};
   }
->;
-
+  >;
 /**
  * Validates a number against min/max constraints
  */
@@ -71,8 +70,8 @@ export function numberInputGadget(
   step = 1,
   disabled = false
 ) {
-  const baseGadget = defGadget<NumberInputSpec>(
-    (state, command) => {
+  const baseGadget = defGadget<NumberInputSpec>({
+    dispatch: (state, command) => {
       // Handle set command
       if ('set' in command) {
         if (state.disabled) return { ignore: {} };
@@ -120,7 +119,7 @@ export function numberInputGadget(
 
       return { ignore: {} };
     },
-    {
+    methods: {
       set: (gadget, value) => {
         const state = gadget.current();
 
@@ -172,7 +171,7 @@ export function numberInputGadget(
 
       ignore: () => ({ noop: {} })
     }
-  )({
+  })({
     value: clampValue(initial, min, max),
     ...(min !== undefined && { min }),
     ...(max !== undefined && { max }),

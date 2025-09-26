@@ -4,9 +4,8 @@
  * A checkbox gadget with toggle, check, and uncheck operations.
  */
 
-import { defGadget } from '../../core/typed';
+import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
 import { withTaps } from '../../semantics/typed-extensions';
-import type { CommandSpec } from '../specs';
 
 /**
  * Checkbox state
@@ -31,24 +30,25 @@ export type CheckboxCommands =
 /**
  * Checkbox specification
  */
-export type CheckboxSpec = CommandSpec<
-  CheckboxState,
-  CheckboxCommands,
-  {
-    toggle: {};
-    check: {};
-    uncheck: {};
-    setLabel: string;
-    enable: {};
-    disable: {};
-    ignore: {};
-  },
-  {
+export type CheckboxSpec =
+  & State<CheckboxState>
+  & Input<CheckboxCommands>
+  & Actions<
+    {
+      toggle: {};
+      check: {};
+      uncheck: {};
+      setLabel: string;
+      enable: {};
+      disable: {};
+      ignore: {};
+    }>
+  & Effects<{
     changed: boolean;
     configured: CheckboxState;
     noop: {};
   }
->;
+  >;
 
 /**
  * Creates a typed Checkbox gadget
@@ -58,8 +58,8 @@ export function checkboxGadget(
   label?: string,
   disabled = false
 ) {
-  const baseGadget = defGadget<CheckboxSpec>(
-    (state, command) => {
+  const baseGadget = defGadget<CheckboxSpec>({
+    dispatch: (state, command) => {
       // Handle toggle command
       if ('toggle' in command) {
         if (state.disabled) return { ignore: {} };
@@ -109,7 +109,7 @@ export function checkboxGadget(
 
       return { ignore: {} };
     },
-    {
+    methods: {
       toggle: (gadget) => {
         const state = gadget.current();
         const newChecked = !state.checked;
@@ -152,7 +152,7 @@ export function checkboxGadget(
 
       ignore: () => ({ noop: {} })
     }
-  )({
+  })({
     checked,
     ...(label !== undefined && { label }),
     disabled

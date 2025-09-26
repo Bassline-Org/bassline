@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { Effects, Gadget, Tappable } from 'port-graphs';
+import { Effects, Gadget, TapFn, Tappable } from 'port-graphs';
 import { useGadget } from './useGadget';
 
 /**
@@ -37,7 +37,7 @@ import { useGadget } from './useGadget';
  */
 export function useGadgetEffect<S>(
   gadget: Gadget<S> & Tappable<S>,
-  callback: (effect: S extends Effects<infer E> ? Partial<E> : never) => void,
+  callback: TapFn<S>,
   deps?: React.DependencyList
 ) {
   const callbackRef = useRef(callback);

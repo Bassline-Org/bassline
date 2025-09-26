@@ -23,7 +23,7 @@ import {
   checkboxGadget,
   withTaps,
 } from 'port-graphs';
-import { lastMap } from 'port-graphs/cells';
+import { lastTable } from 'port-graphs/cells';
 
 export function meta({ }: Route.MetaArgs) {
   return [

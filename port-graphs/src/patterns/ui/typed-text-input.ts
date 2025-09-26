@@ -5,9 +5,8 @@
  * text input state and operations.
  */
 
-import { defGadget } from '../../core/typed';
+import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
 import { withTaps } from '../../semantics/typed-extensions';
-import type { CommandSpec } from '../specs';
 
 /**
  * TextInput state
@@ -31,24 +30,23 @@ export type TextInputCommands =
 /**
  * TextInput specification
  */
-export type TextInputSpec = CommandSpec<
-  TextInputState,
-  TextInputCommands,
-  {
-    set: string;
-    clear: {};
-    setPlaceholder: string;
-    enable: {};
-    disable: {};
-    ignore: {};
-  },
-  {
+export type TextInputSpec = & State<TextInputState>
+  & Input<TextInputCommands>
+  & Actions<
+    {
+      set: string;
+      clear: {};
+      setPlaceholder: string;
+      enable: {};
+      disable: {};
+      ignore: {};
+    }>
+  & Effects<{
     changed: string;
     cleared: {};
     configured: TextInputState;
     noop: {};
-  }
->;
+  }>;
 
 /**
  * Creates a typed TextInput gadget
@@ -58,8 +56,8 @@ export function textInputGadget(
   placeholder?: string,
   disabled = false
 ) {
-  const baseGadget = defGadget<TextInputSpec>(
-    (state, command) => {
+  const baseGadget = defGadget<TextInputSpec>({
+    dispatch: (state, command) => {
       // Handle set command
       if ('set' in command) {
         if (state.disabled) return { ignore: {} };
@@ -103,7 +101,7 @@ export function textInputGadget(
 
       return { ignore: {} };
     },
-    {
+    methods: {
       set: (gadget, value) => {
         const state = gadget.current();
         gadget.update({ ...state, value });
@@ -139,7 +137,7 @@ export function textInputGadget(
 
       ignore: () => ({ noop: {} })
     }
-  )({
+  })({
     value: initial,
     ...(placeholder !== undefined && { placeholder }),
     disabled

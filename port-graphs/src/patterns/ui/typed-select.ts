@@ -4,9 +4,8 @@
  * A generic select gadget that can work with any type of options.
  */
 
-import { defGadget } from '../../core/typed';
+import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
 import { withTaps } from '../../semantics/typed-extensions';
-import type { CommandSpec } from '../specs';
 
 /**
  * Select state - generic over option type
@@ -30,25 +29,25 @@ export type SelectCommands<T> =
 /**
  * Select specification
  */
-export type SelectSpec<T> = CommandSpec<
-  SelectState<T>,
-  SelectCommands<T>,
-  {
-    select: T;
-    setOptions: T[];
-    clear: {};
-    enable: {};
-    disable: {};
-    ignore: {};
-  },
-  {
+export type SelectSpec<T> =
+  & State<SelectState<T>>
+  & Input<SelectCommands<T>>
+  & Actions<
+    {
+      select: T;
+      setOptions: T[];
+      clear: {};
+      enable: {};
+      disable: {};
+      ignore: {};
+    }>
+  & Effects<{
     changed: T;
     optionsChanged: T[];
     cleared: {};
     configured: SelectState<T>;
     noop: {};
-  }
->;
+  }>;
 
 /**
  * Creates a typed Select gadget
@@ -58,8 +57,8 @@ export function selectGadget<T>(
   initial?: T,
   disabled = false
 ) {
-  const baseGadget = defGadget<SelectSpec<T>>(
-    (state, command) => {
+  const baseGadget = defGadget<SelectSpec<T>>({
+    dispatch: (state, command) => {
       // Handle select command
       if ('select' in command) {
         if (state.disabled) return { ignore: {} };
@@ -105,7 +104,7 @@ export function selectGadget<T>(
 
       return { ignore: {} };
     },
-    {
+    methods: {
       select: (gadget, value) => {
         const state = gadget.current();
         gadget.update({ ...state, value });
@@ -148,7 +147,7 @@ export function selectGadget<T>(
 
       ignore: () => ({ noop: {} })
     }
-  )({
+  })({
     value: initial,
     options,
     disabled

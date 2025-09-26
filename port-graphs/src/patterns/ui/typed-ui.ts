@@ -2,8 +2,7 @@
  * Typed UI gadgets using generic extensions
  */
 
-import { defGadget } from '../../core/typed';
-import type { CommandSpec } from '../specs';
+import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
 import { withTaps } from '../../semantics';
 
 /**
@@ -22,22 +21,22 @@ export type SliderCommands =
   | { decrement: {} }
   | { configure: { min?: number; max?: number; step?: number } };
 
-export type SliderSpec = CommandSpec<
-  SliderState,
-  SliderCommands,
-  {
-    set: number;
-    increment: {};
-    decrement: {};
-    configure: { min?: number; max?: number; step?: number };
-    ignore: {};
-  },
-  {
+export type SliderSpec = & State<SliderState>
+  & Input<SliderCommands>
+  & Actions<
+    {
+      set: number;
+      increment: {};
+      decrement: {};
+      configure: { min?: number; max?: number; step?: number };
+      ignore: {};
+    }>
+  & Effects<{
     changed: number;
     configured: SliderState;
     noop: {};
   }
->;
+  >;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -48,8 +47,8 @@ export const sliderGadget = (
   max: number = 100,
   step: number = 1
 ) => {
-  const baseGadget = defGadget<SliderSpec>(
-    (state, command) => {
+  const baseGadget = defGadget<SliderSpec>({
+    dispatch: (state, command) => {
       if ('set' in command) {
         const newValue = clamp(command.set, state.min, state.max);
         if (newValue !== state.value) {
@@ -74,7 +73,7 @@ export const sliderGadget = (
       }
       return { ignore: {} };
     },
-    {
+    methods: {
       set: (gadget, value) => {
         const state = gadget.current();
         const clamped = clamp(value, state.min, state.max);
@@ -111,7 +110,7 @@ export const sliderGadget = (
       },
       ignore: () => ({ noop: {} })
     }
-  )({ value: initial, min, max, step });
+  })({ value: initial, min, max, step });
 
   return withTaps(baseGadget);
 };
@@ -131,29 +130,29 @@ export type MeterCommands =
   | { configure: { min?: number; max?: number; label?: string } }
   | { reset: {} };
 
-export type MeterSpec = CommandSpec<
-  MeterState,
-  MeterCommands,
-  {
-    display: number;
-    configure: { min?: number; max?: number; label?: string };
-    reset: {};
-    ignore: {};
-  },
-  {
+export type MeterSpec = & State<MeterState>
+  & Input<MeterCommands>
+  & Actions<
+    {
+      display: number;
+      configure: { min?: number; max?: number; label?: string };
+      reset: {};
+      ignore: {};
+    }>
+  & Effects<{
     changed: number;
     configured: MeterState;
     noop: {};
   }
->;
+  >;
 
 export const meterGadget = (
   min: number = 0,
   max: number = 100,
   label?: string
 ) => {
-  const baseGadget = defGadget<MeterSpec>(
-    (state, command) => {
+  const baseGadget = defGadget<MeterSpec>({
+    dispatch: (state, command) => {
       if ('display' in command) {
         const clamped = clamp(command.display, state.min, state.max);
         if (clamped !== state.value) {
@@ -169,7 +168,7 @@ export const meterGadget = (
       }
       return { ignore: {} };
     },
-    {
+    methods: {
       display: (gadget, value) => {
         const state = gadget.current();
         gadget.update({ ...state, value });
@@ -196,7 +195,7 @@ export const meterGadget = (
       },
       ignore: () => ({ noop: {} })
     }
-  )({ value: min, min, max, label });
+  })({ value: min, min, max, label });
 
   return withTaps(baseGadget);
 };
@@ -214,25 +213,25 @@ export type ToggleCommands =
   | { set: boolean }
   | { configure: { label?: string } };
 
-export type ToggleSpec = CommandSpec<
-  ToggleState,
-  ToggleCommands,
-  {
-    set: boolean;
-    configure: { label?: string };
-    ignore: {};
-  },
-  {
+export type ToggleSpec = & State<ToggleState>
+  & Input<ToggleCommands>
+  & Actions<
+    {
+      toggle: {};
+      set: boolean;
+      configure: { label?: string };
+      ignore: {};
+    }>
+  & Effects<{
     changed: ToggleState;
     toggled: boolean;
     configured: ToggleState;
     noop: {};
-  }
->;
+  }>;
 
 export const toggleGadget = (initial: boolean = false, label?: string) => {
-  const baseGadget = defGadget<ToggleSpec>(
-    (state, command) => {
+  const baseGadget = defGadget<ToggleSpec>({
+    dispatch: (state, command) => {
       if ('toggle' in command) {
         return { set: !state.on };
       }
@@ -245,7 +244,13 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
       if ('configure' in command) return { configure: command.configure };
       return { ignore: {} };
     },
-    {
+    methods: {
+      toggle: (gadget) => {
+        const state = gadget.current();
+        const newState = { ...state, on: !state.on };
+        gadget.update(newState);
+        return { changed: newState, toggled: newState.on };
+      },
       set: (gadget, value) => {
         const state = gadget.current();
         const newState = { ...state, on: value };
@@ -263,7 +268,7 @@ export const toggleGadget = (initial: boolean = false, label?: string) => {
       },
       ignore: () => ({ noop: {} })
     }
-  )({ on: initial, label: label ?? '' });
+  })({ on: initial, label: label ?? '' });
 
   return withTaps(baseGadget);
 };

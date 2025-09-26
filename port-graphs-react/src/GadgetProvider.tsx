@@ -7,21 +7,21 @@
  */
 
 import React, { createContext, useContext, useRef, useSyncExternalStore, useCallback } from 'react';
-import { Tappable, Gadget, withTaps, State, Input } from 'port-graphs';
+import { Tappable, Gadget, withTaps, State, Input, StateOf, InputOf } from 'port-graphs';
 
 // Registry entry for a typed gadget with its spec
-type GadgetEntry<S> = {
-  gadget: Gadget<S>;
+type GadgetEntry<S, G extends Gadget<S> = Gadget<S>> = {
+  gadget: G;
   listeners: Set<() => void>;
-  state: S extends State<infer St> ? St : never;
+  state: StateOf<S>;
 };
 
 // Map from gadget instances to their entries
 // We use WeakMap for better memory management
-type GadgetRegistry<S> = WeakMap<Gadget<S>, GadgetEntry<S>>;
+type GadgetRegistry<S, G extends Gadget<S> = Gadget<S>> = WeakMap<G, GadgetEntry<S, G>>;
 
-type GadgetContextValue<S> = {
-  registry: GadgetRegistry<S>;
+type GadgetContextValue<S, G extends Gadget<S> = Gadget<S>> = {
+  registry: GadgetRegistry<S, G>;
 };
 
 const GadgetContext = createContext<GadgetContextValue<any> | null>(null);
@@ -56,12 +56,12 @@ export function GadgetProvider({ children }: { children: React.ReactNode }) {
  *
  * This hook ensures proper type inference from the gadget's spec
  */
-export function useGadgetFromProvider<S>(
-  gadget: Gadget<S>
+export function useGadgetFromProvider<S, G extends Gadget<S> = Gadget<S>>(
+  gadget: G
 ): readonly [
-  S extends State<infer St> ? St : never,
-  (data: S extends Input<infer I> ? I : never) => void,
-  Gadget<S> & Tappable<S>
+  StateOf<S>,
+  (data: InputOf<S>) => void,
+  G & Tappable<S>
 ] {
   const { registry } = useGadgetContext<S>();
 
@@ -117,5 +117,5 @@ export function useGadgetFromProvider<S>(
     entry.gadget.receive(data);
   }, [entry]);
 
-  return [state, send, entry.gadget as Gadget<S> & Tappable<S>] as const;
+  return [state, send, entry.gadget as G & Tappable<S>] as const;
 }

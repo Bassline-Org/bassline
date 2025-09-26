@@ -4,9 +4,8 @@
  * A simple button gadget that emits click events.
  */
 
-import { defGadget } from '../../core/typed';
+import { Actions, defGadget, Effects, Input, State } from '../../core/typed';
 import { withTaps } from '../../semantics/typed-extensions';
-import type { CommandSpec } from '../specs';
 
 /**
  * Button state
@@ -28,22 +27,23 @@ export type ButtonCommands =
 /**
  * Button specification
  */
-export type ButtonSpec = CommandSpec<
-  ButtonState,
-  ButtonCommands,
-  {
-    click: {};
-    setLabel: string;
-    enable: {};
-    disable: {};
-    ignore: {};
-  },
-  {
+export type ButtonSpec =
+  & State<ButtonState>
+  & Input<ButtonCommands>
+  & Actions<
+    {
+      click: {};
+      setLabel: string;
+      enable: {};
+      disable: {};
+      ignore: {};
+    }>
+  & Effects<{
     clicked: {};
     configured: ButtonState;
     noop: {};
   }
->;
+  >;
 
 /**
  * Creates a typed Button gadget
@@ -52,8 +52,8 @@ export function buttonGadget(
   label = 'Button',
   disabled = false
 ) {
-  const baseGadget = defGadget<ButtonSpec>(
-    (state, command) => {
+  const baseGadget = defGadget<ButtonSpec>({
+    dispatch: (state, command) => {
       // Handle click command
       if ('click' in command) {
         if (state.disabled) return { ignore: {} };
@@ -85,7 +85,7 @@ export function buttonGadget(
 
       return { ignore: {} };
     },
-    {
+    methods: {
       click: () => {
         // Click is a simple event emission
         return { clicked: {} };
@@ -114,7 +114,7 @@ export function buttonGadget(
 
       ignore: () => ({ noop: {} })
     }
-  )({
+  })({
     disabled,
     label
   });
