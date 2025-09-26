@@ -5,12 +5,12 @@ export function formatContentForDisplay(content: any): string {
   if (content === undefined || content === null) {
     return '∅'
   }
-  
+
   // Handle Set objects
   if (content instanceof Set) {
     return `{${Array.from(content).join(', ')}}`
   }
-  
+
   // Handle Map objects
   if (content instanceof Map) {
     const entries = Array.from(content.entries())
@@ -18,17 +18,17 @@ export function formatContentForDisplay(content: any): string {
       .join(', ')
     return `Map{${entries}}`
   }
-  
+
   // Handle Date objects
   if (content instanceof Date) {
-    return content.toISOString().split('T')[0] // Just show the date part
+    return content.toISOString().split('T')[0] || 'Invalid Date' // Just show the date part
   }
-  
+
   // Handle arrays
   if (Array.isArray(content)) {
     return `[${content.join(', ')}]`
   }
-  
+
   // Handle objects
   if (content !== null && typeof content === 'object') {
     try {
@@ -39,7 +39,7 @@ export function formatContentForDisplay(content: any): string {
       return '[Object]'
     }
   }
-  
+
   // Handle primitives
   return String(content)
 }
@@ -51,29 +51,29 @@ export function formatContentForTooltip(content: any): string | undefined {
   if (content === undefined || content === null) {
     return undefined
   }
-  
+
   // Handle Set objects
   if (content instanceof Set) {
     return `Set with ${content.size} items: {${Array.from(content).join(', ')}}`
   }
-  
+
   // Handle Map objects
   if (content instanceof Map) {
     const entries = Array.from(content.entries())
       .map(([k, v]) => `${k}: ${v}`)
     return `Map with ${content.size} entries: {${entries.join(', ')}}`
   }
-  
+
   // Handle Date objects
   if (content instanceof Date) {
     return `Date: ${content.toISOString()}`
   }
-  
+
   // Handle arrays
   if (Array.isArray(content)) {
     return `Array with ${content.length} items: [${content.join(', ')}]`
   }
-  
+
   // Handle objects
   if (content !== null && typeof content === 'object') {
     try {
@@ -82,6 +82,6 @@ export function formatContentForTooltip(content: any): string | undefined {
       return 'Complex object'
     }
   }
-  
+
   return String(content)
 }
