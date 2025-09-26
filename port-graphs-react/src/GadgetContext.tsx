@@ -6,7 +6,7 @@
  * 2. Named gadgets - registered with ProvideGadget and accessed via useExplicitGadget(name)
  */
 
-import React, { Context, createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import type { Tappable, Gadget } from 'port-graphs';
 
 // Context for the current gadget

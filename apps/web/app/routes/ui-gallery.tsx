@@ -34,10 +34,10 @@ export function meta({ }: Route.MetaArgs) {
 }
 
 // Create all our gadgets
-const nameInput = withTaps(textInputGadget('', 'Enter your name...'));
-const ageInput = withTaps(numberInputGadget(25, 1, 120, 1));
-const volumeSlider = withTaps(sliderGadget(50, 0, 100, 1));
-const volumeMeter = withTaps(meterGadget(0, 100));
+const nameInput = textInputGadget('', 'Enter your name...');
+const ageInput = numberInputGadget(25, 1, 120, 1);
+const volumeSlider = sliderGadget(50, 0, 100, 1);
+const volumeMeter = meterGadget(0, 100);
 
 // Initialize meter to match slider and wire them together
 volumeMeter.receive({ display: 50 });
@@ -56,7 +56,7 @@ const dangerButton = buttonGadget('Delete All');
 
 const emailCheck = checkboxGadget(false, 'Subscribe to newsletter');
 const termsCheck = checkboxGadget(false, 'I agree to terms and conditions');
-const darkModeToggle = toggleGadget(false);
+const darkModeToggle = toggleGadget();
 
 // Create a cell to collect form data
 const defaultFormData = {
@@ -69,7 +69,7 @@ const defaultFormData = {
   volume: 0,
   darkMode: false
 }
-const formDataCell = withTaps(lastTable(defaultFormData));
+const formDataCell = lastTable(defaultFormData);
 
 // Counter example
 const countDisplay = withTaps(numberInputGadget(0, -100, 100, 1));
@@ -79,10 +79,10 @@ const resetCountBtn = withTaps(buttonGadget('Reset'));
 
 function UIGalleryInner() {
   const [darkMode] = useGadget<SpecOf<typeof darkModeToggle>>(darkModeToggle);
-  const [formData, updateFormData] = useGadget<SpecOf<typeof formDataCell>>(formDataCell);
+  const [formData, updateFormData, formDataGadget] = useGadget<SpecOf<typeof formDataCell>>(formDataCell);
   const [countState] = useGadget<SpecOf<typeof countDisplay>>(countDisplay);
 
-  useGadgetEffect(formDataCell, ({ changed }) => {
+  useGadgetEffect(formDataGadget, ({ changed }) => {
     console.log('Form data changed:', changed);
   }, [formDataCell]);
 
@@ -94,6 +94,7 @@ function UIGalleryInner() {
           <div className="flex items-center gap-2">
             <span>Dark Mode</span>
             <Toggle gadget={darkModeToggle} onToggle={(state) => {
+              console.log('Dark mode toggled:', state);
               return updateFormData({ darkMode: state });
             }} />
           </div>

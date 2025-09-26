@@ -66,7 +66,7 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
 }: ToggleProps<S, G>) {
   // useGadget gives us perfect type inference
   // state is ToggleState, send accepts ToggleCommands
-  const [state, send] = useGadget<S, typeof gadget>(gadget);
+  const [state, send] = useGadget<S, G>(gadget);
   const displayLabel = label || state.label;
 
   // Handle toggle with proper type
@@ -75,7 +75,7 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
   }
 
   useGadgetEffect(gadget, ({ changed, toggled }) => {
-    if (changed) {
+    if (changed !== undefined) {
       onChange?.(changed);
     }
     if (toggled !== undefined) {

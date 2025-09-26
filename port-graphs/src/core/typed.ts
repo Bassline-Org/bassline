@@ -74,9 +74,9 @@ export function defGadget<Spec>(
           const context = result[actionName];
 
           const method = config.methods[actionName];
-          if (method) {
+          if (method !== undefined) {
             const effect = method(gadget, context);
-            if (effect) {
+            if (effect !== undefined) {
               gadget.emit(effect);
             }
           }

@@ -22,7 +22,7 @@ export function TextInput<S extends TextInputSpec, G extends Gadget<S> & Tappabl
   const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
-    if (changed) {
+    if (changed !== undefined) {
       onChange?.(changed);
     }
   }, [onChange]);

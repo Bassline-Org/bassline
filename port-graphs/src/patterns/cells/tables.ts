@@ -215,34 +215,3 @@ export const defFamilyTable = <G extends Gadget, K extends PropertyKey = Propert
         }
     })({} as Record<K, G>);
 }
-
-const maxFamily = withTaps(defFamilyTable(() => withTaps(maxCell(0))));
-maxFamily.tap(({ added, removed, received }) => {
-    if (added) {
-        console.log('Added:', added);
-    }
-    if (removed) {
-        console.log('Removed:', removed);
-    }
-    if (received) {
-        console.log('Received:', received);
-    }
-});
-maxFamily.receive({
-    create: ['a', 'b', 'c'],
-    send: {
-        a: 10,
-        b: 20,
-        c: 30
-    },
-    delete: ['b']
-});
-
-const fromFamily = maxFamily.current()['a']!;
-fromFamily.tap(({ changed }) => {
-    if (changed) {
-        console.log('From family changed to:', changed);
-    }
-});
-fromFamily.receive(20);
-console.log(fromFamily.current());
