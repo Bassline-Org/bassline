@@ -2,24 +2,24 @@
  * React component for TextInput gadget
  */
 
-import { type TypedGadget, type TextInputSpec, type Tappable } from 'port-graphs';
+import { type TextInputSpec, type Tappable, Gadget, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface TextInputProps<G extends TypedGadget<TextInputSpec>> {
+export interface TextInputProps<S extends TextInputSpec, G extends Gadget<S> & Tappable<S>> {
   gadget: G & Tappable<TextInputSpec['effects']>;
   className?: string;
   autoFocus?: boolean;
   onChange?: (change: TextInputSpec['effects']['changed']) => void;
 }
 
-export function TextInput<G extends TypedGadget<TextInputSpec>>({
+export function TextInput<S extends TextInputSpec, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   autoFocus = false,
   onChange
-}: TextInputProps<G>) {
-  const [state, send] = useGadget(gadget);
+}: TextInputProps<S, G>) {
+  const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
     if (changed) {
@@ -36,7 +36,7 @@ export function TextInput<G extends TypedGadget<TextInputSpec>>({
       placeholder={state.placeholder}
       disabled={state.disabled}
       autoFocus={autoFocus}
-      onChange={(e) => send({ set: e.target.value })}
+      onChange={(e) => send({ set: e.target.value } as InputOf<S>)}
       className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
         } ${className}`}
     />

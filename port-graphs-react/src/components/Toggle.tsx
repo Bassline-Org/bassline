@@ -5,12 +5,12 @@
  * with automatic type inference from the ToggleSpec.
  */
 
-import { type TypedGadget, type ToggleSpec, ExtractSpec, Tappable } from 'port-graphs';
+import { type ToggleSpec, Tappable, Gadget, EffectsOf, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useCallback } from 'react';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface ToggleProps<G extends TypedGadget<ToggleSpec>> {
+export interface ToggleProps<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>> {
   /** The toggle gadget instance */
   gadget: G & Tappable<ToggleSpec['effects']>;
   /** Optional CSS class name */
@@ -26,9 +26,9 @@ export interface ToggleProps<G extends TypedGadget<ToggleSpec>> {
   /** Position of label relative to toggle */
   labelPosition?: 'left' | 'right';
   /** Optional callback to call when the toggle changes */
-  onChange?: (changed: ToggleSpec['effects']['changed']) => void;
+  onChange?: (changed: EffectsOf<S>['changed']) => void;
   /** Optional callback to call when the toggle is toggled */
-  onToggle?: (toggled: ToggleSpec['effects']['toggled']) => void;
+  onToggle?: (toggled: EffectsOf<S>['toggled']) => void;
 }
 
 /**
@@ -53,7 +53,7 @@ export interface ToggleProps<G extends TypedGadget<ToggleSpec>> {
  * }
  * ```
  */
-export function Toggle<G extends TypedGadget<ToggleSpec>>({
+export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   variant = 'switch',
@@ -63,15 +63,15 @@ export function Toggle<G extends TypedGadget<ToggleSpec>>({
   labelPosition = 'right',
   onChange,
   onToggle,
-}: ToggleProps<G>) {
+}: ToggleProps<S, G>) {
   // useGadget gives us perfect type inference
   // state is ToggleState, send accepts ToggleCommands
-  const [state, send] = useGadget<G>(gadget);
+  const [state, send] = useGadget<S, G>(gadget);
   const displayLabel = label || state.label;
 
   // Handle toggle with proper type
   const handleToggle = () => {
-    send({ toggle: {} })
+    send({ toggle: {} } as InputOf<S>);
   }
 
   useGadgetEffect(gadget, ({ changed, toggled }) => {

@@ -2,29 +2,28 @@
  * React component for Select gadget
  */
 
-import React from 'react';
-import { type TypedGadget, type SelectSpec, type Tappable } from 'port-graphs';
+import { type SelectSpec, type Tappable, EffectsOf, Gadget, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface SelectProps<T, G extends TypedGadget<SelectSpec<T>>> {
-  gadget: G & Tappable<SelectSpec<T>['effects']>;
+export interface SelectProps<T, S extends SelectSpec<T>, G extends Gadget<S> & Tappable<S>> {
+  gadget: G;
   className?: string;
   renderOption?: (option: T) => React.ReactNode;
   getOptionValue?: (option: T) => string;
   placeholder?: string;
-  onChange?: (change: SelectSpec<T>['effects']['changed']) => void;
+  onChange?: (change: EffectsOf<SelectSpec<T>>['changed']) => void;
 }
 
-export function Select<T, G extends TypedGadget<SelectSpec<T>>>({
+export function Select<T, S extends SelectSpec<T>, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   renderOption = (opt) => String(opt),
   getOptionValue = (opt) => String(opt),
   placeholder = 'Select...',
   onChange
-}: SelectProps<T, G>) {
-  const [state, send] = useGadget(gadget);
+}: SelectProps<T, S, G>) {
+  const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
     if (changed) {
@@ -42,7 +41,7 @@ export function Select<T, G extends TypedGadget<SelectSpec<T>>>({
         const selectedValue = e.target.value;
         const option = state.options.find(opt => getOptionValue(opt) === selectedValue);
         if (option !== undefined) {
-          send({ select: option });
+          send({ select: option } as InputOf<S>);
         }
       }}
       className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'

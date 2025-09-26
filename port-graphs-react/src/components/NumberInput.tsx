@@ -2,25 +2,24 @@
  * React component for NumberInput gadget
  */
 
-import React from 'react';
-import { type TypedGadget, type NumberInputSpec, type Tappable } from 'port-graphs';
+import { type NumberInputSpec, type Tappable, EffectsOf, Gadget, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface NumberInputProps<G extends TypedGadget<NumberInputSpec>> {
-  gadget: G & Tappable<NumberInputSpec['effects']>;
+export interface NumberInputProps<S extends NumberInputSpec, G extends Gadget<S> & Tappable<S>> {
+  gadget: G;
   className?: string;
   showButtons?: boolean;
-  onChange?: (change: NumberInputSpec['effects']['changed']) => void;
+  onChange?: (change: EffectsOf<S>['changed']) => void;
 }
 
-export function NumberInput<G extends TypedGadget<NumberInputSpec>>({
+export function NumberInput<S extends NumberInputSpec, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   showButtons = true,
   onChange
-}: NumberInputProps<G>) {
-  const [state, send] = useGadget(gadget);
+}: NumberInputProps<S, G>) {
+  const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
     if (changed) {
@@ -34,7 +33,7 @@ export function NumberInput<G extends TypedGadget<NumberInputSpec>>({
     <div className={`inline-flex items-center ${className}`}>
       {showButtons && (
         <button
-          onClick={() => send({ decrement: {} })}
+          onClick={() => send({ decrement: {} } as InputOf<S>)}
           disabled={state.disabled || (state.min !== undefined && state.value <= state.min)}
           className="px-2 py-1 border rounded-l-md bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -51,7 +50,7 @@ export function NumberInput<G extends TypedGadget<NumberInputSpec>>({
         onChange={(e) => {
           const value = parseFloat(e.target.value);
           if (!isNaN(value)) {
-            send({ set: value });
+            send({ set: value } as InputOf<S>);
           }
         }}
         className={`px-3 py-1 border-y ${showButtons ? '' : 'border-x rounded-md'} text-center w-20 focus:outline-none focus:ring-2 focus:ring-blue-500 ${state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
@@ -59,7 +58,7 @@ export function NumberInput<G extends TypedGadget<NumberInputSpec>>({
       />
       {showButtons && (
         <button
-          onClick={() => send({ increment: {} })}
+          onClick={() => send({ increment: {} } as InputOf<S>)}
           disabled={state.disabled || (state.max !== undefined && state.value >= state.max)}
           className="px-2 py-1 border rounded-r-md bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >

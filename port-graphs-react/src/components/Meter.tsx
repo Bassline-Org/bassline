@@ -5,13 +5,12 @@
  * with automatic type inference from the MeterSpec.
  */
 
-import React from 'react';
-import { type TypedGadget, type MeterSpec, type MeterState, Tappable, ExtractSpec } from 'port-graphs';
+import { type MeterSpec, type MeterState, Tappable, Gadget } from 'port-graphs';
 import { useGadget } from '../useGadget';
 
-export interface MeterProps<G extends TypedGadget<MeterSpec>> {
+export interface MeterProps<S extends MeterSpec, G extends Gadget<S> & Tappable<S>> {
   /** The meter gadget instance */
-  gadget: G & Tappable<MeterSpec['effects']>;
+  gadget: G;
   /** Optional CSS class name */
   className?: string;
   /** Display style for the meter */
@@ -47,7 +46,7 @@ export interface MeterProps<G extends TypedGadget<MeterSpec>> {
  * }
  * ```
  */
-export function Meter<G extends TypedGadget<MeterSpec>, Spec extends ExtractSpec<G>>(
+export function Meter<S extends MeterSpec, G extends Gadget<S> & Tappable<S>>(
   {
     gadget,
     className = '',
@@ -55,10 +54,10 @@ export function Meter<G extends TypedGadget<MeterSpec>, Spec extends ExtractSpec
     showPercentage = false,
     color = 'blue',
     animated = true
-  }: MeterProps<G>) {
+  }: MeterProps<S, G>) {
   // useGadget gives us perfect type inference
   // state is MeterState
-  const [state] = useGadget<G>(gadget);
+  const [state] = useGadget<S, G>(gadget);
 
   // Extract typed values from state
   const { value, min, max, label } = state;

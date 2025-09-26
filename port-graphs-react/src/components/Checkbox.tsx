@@ -2,22 +2,22 @@
  * React component for Checkbox gadget
  */
 
-import { type TypedGadget, type CheckboxSpec, type Tappable } from 'port-graphs';
+import { type CheckboxSpec, type Tappable, EffectsOf, Gadget, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface CheckboxProps<G extends TypedGadget<CheckboxSpec>> {
-  gadget: G & Tappable<CheckboxSpec['effects']>;
+export interface CheckboxProps<S extends CheckboxSpec, G extends Gadget<S> & Tappable<S>> {
+  gadget: G;
   className?: string;
-  onChange?: (change: CheckboxSpec['effects']['changed']) => void;
+  onChange?: (change: EffectsOf<S>['changed']) => void;
 }
 
-export function Checkbox<G extends TypedGadget<CheckboxSpec>>({
+export function Checkbox<S extends CheckboxSpec, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   onChange
-}: CheckboxProps<G>) {
-  const [state, send] = useGadget(gadget);
+}: CheckboxProps<S, G>) {
+  const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
     if (changed !== undefined) {
@@ -33,7 +33,7 @@ export function Checkbox<G extends TypedGadget<CheckboxSpec>>({
         type="checkbox"
         checked={state.checked}
         disabled={state.disabled}
-        onChange={() => send({ toggle: {} })}
+        onChange={() => send({ toggle: {} } as InputOf<S>)}
         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
       />
       {state.label && (

@@ -28,8 +28,8 @@ import { useGadgetFromProvider } from './GadgetProvider';
  * @returns Tuple of [state, send function, gadget with tap]
  */
 
-export function useGadget<S>(
-  gadget: Gadget<S>
+export function useGadget<S, G extends Gadget<S>>(
+  gadget: G
 ) {
-  return useGadgetFromProvider(gadget);
+  return useGadgetFromProvider<S, G>(gadget);
 }

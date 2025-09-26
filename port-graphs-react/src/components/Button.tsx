@@ -2,24 +2,24 @@
  * React component for Button gadget
  */
 
-import { type TypedGadget, type ButtonSpec, type Tappable } from 'port-graphs';
+import { type ButtonSpec, type Tappable, Gadget, EffectsOf, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface ButtonProps<G extends TypedGadget<ButtonSpec>> {
-  gadget: G & Tappable<ButtonSpec['effects']>;
+export interface ButtonProps<S extends ButtonSpec, G extends Gadget<S> & Tappable<S>> {
+  gadget: G;
   className?: string;
   variant?: 'primary' | 'secondary' | 'danger';
-  onClick?: (change: ButtonSpec['effects']['clicked']) => void;
+  onClick?: (change: EffectsOf<S>['clicked']) => void;
 }
 
-export function Button<G extends TypedGadget<ButtonSpec>>({
+export function Button<S extends ButtonSpec, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   variant = 'primary',
   onClick
-}: ButtonProps<G>) {
-  const [state, send] = useGadget(gadget);
+}: ButtonProps<S, G>) {
+  const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ clicked }) => {
     if (clicked) {
@@ -37,7 +37,7 @@ export function Button<G extends TypedGadget<ButtonSpec>>({
 
   return (
     <button
-      onClick={() => send({ click: {} })}
+      onClick={() => send({ click: {} } as InputOf<S>)}
       disabled={state.disabled}
       className={`px-4 py-2 rounded-md font-medium transition-colors ${state.disabled
         ? 'opacity-50 cursor-not-allowed bg-gray-200 text-gray-500'

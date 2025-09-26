@@ -6,13 +6,13 @@
  */
 
 import React from 'react';
-import { type TypedGadget, type SliderSpec, type SliderState, ExtractSpec, Tappable } from 'port-graphs';
+import { type SliderSpec, type SliderState, Tappable, Gadget, EffectsOf, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface SliderProps<G extends TypedGadget<SliderSpec>, Spec extends ExtractSpec<G>> {
+export interface SliderProps<S extends SliderSpec, G extends Gadget<S> & Tappable<S>> {
   /** The slider gadget instance */
-  gadget: G & Tappable<SliderSpec['effects']>;
+  gadget: G;
   /** Optional CSS class name */
   className?: string;
   /** Whether to show the current value */
@@ -23,7 +23,7 @@ export interface SliderProps<G extends TypedGadget<SliderSpec>, Spec extends Ext
   label?: string;
   /** Disable the slider */
   disabled?: boolean;
-  onChange?: (change: SliderSpec['effects']['changed']) => void;
+  onChange?: (change: EffectsOf<S>['changed']) => void;
 }
 
 /**
@@ -48,7 +48,7 @@ export interface SliderProps<G extends TypedGadget<SliderSpec>, Spec extends Ext
  * }
  * ```
  */
-export function Slider<G extends TypedGadget<SliderSpec>, Spec extends ExtractSpec<G>>({
+export function Slider<S extends SliderSpec, G extends Gadget<S> & Tappable<S>>({
   gadget,
   className = '',
   showValue = true,
@@ -56,10 +56,10 @@ export function Slider<G extends TypedGadget<SliderSpec>, Spec extends ExtractSp
   label,
   disabled = false,
   onChange
-}: SliderProps<G, Spec>) {
+}: SliderProps<S, G>) {
   // useGadget gives us perfect type inference
   // state is SliderState, send accepts SliderCommands
-  const [state, send] = useGadget<G>(gadget);
+  const [state, send] = useGadget<S, G>(gadget);
 
   useGadgetEffect(gadget, ({ changed }) => {
     if (changed) {
@@ -74,7 +74,7 @@ export function Slider<G extends TypedGadget<SliderSpec>, Spec extends ExtractSp
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(event.target.value);
     // Send typed command to gadget
-    send({ set: newValue });
+    send({ set: newValue } as InputOf<S>);
   };
 
   // Calculate percentage for display
