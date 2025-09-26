@@ -13,13 +13,7 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/visual-editor": {
-    params: {};
-  };
   "/ui-gallery": {
-    params: {};
-  };
-  "/typed-ui": {
     params: {};
   };
   "/home": {
@@ -30,19 +24,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/visual-editor" | "/ui-gallery" | "/typed-ui" | "/home";
-  };
-  "routes/visual-editor.tsx": {
-    id: "routes/visual-editor";
-    page: "/visual-editor";
+    page: "/" | "/ui-gallery" | "/home";
   };
   "routes/ui-gallery.tsx": {
     id: "routes/ui-gallery";
     page: "/ui-gallery";
-  };
-  "routes/typed-ui.tsx": {
-    id: "routes/typed-ui";
-    page: "/typed-ui";
   };
   "routes/home.tsx": {
     id: "routes/home";
