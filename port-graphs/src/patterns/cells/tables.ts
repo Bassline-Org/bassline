@@ -216,27 +216,27 @@ export const defFamilyTable = <G extends Gadget, K extends PropertyKey = Propert
     })({} as Record<K, G>);
 }
 
-const maxFamilyFn = () => {
-    const max = maxCell(0);
-    return withTaps(withTaps(max));
-}
-
-const max = maxCell(0);
-const tapped = withTaps(withTaps(max));
-type MaxSpec = SpecOf<typeof max>;
-type MaxInput = InputOf<MaxSpec>;
-
-type InputOfMax = InputOf<MaxSpec>;
-type InputOfTapped = InputOf<MaxSpec>;
-type InputOfMaxFamily = InputOf<SpecOf<ReturnType<typeof maxFamilyFn>>>;
-
-const maxFamily = defFamilyTable(maxFamilyFn);
-
+const maxFamily = withTaps(defFamilyTable(() => withTaps(maxCell(0))));
+maxFamily.tap(({ added, removed, received }) => {
+    if (added) {
+        console.log('Added:', added);
+    }
+    if (removed) {
+        console.log('Removed:', removed);
+    }
+    if (received) {
+        console.log('Received:', received);
+    }
+});
 maxFamily.receive({
     create: ['a', 'b', 'c'],
+    send: {
+        a: 10,
+        b: 20,
+        c: 30
+    },
+    delete: ['b']
 });
-
-console.log(maxFamily.current());
 
 const fromFamily = maxFamily.current()['a']!;
 fromFamily.tap(({ changed }) => {
@@ -244,58 +244,5 @@ fromFamily.tap(({ changed }) => {
         console.log('From family changed to:', changed);
     }
 });
-
 fromFamily.receive(20);
-
 console.log(fromFamily.current());
-
-
-const a = withTaps(lastTable<string, number>({
-    a: 1,
-    b: 2,
-    c: 3
-}));
-
-const b = withTaps(firstTable<string, string>({
-    foo: 'a',
-    bar: 'b',
-    baz: 'c'
-}));
-
-const c = withTaps(unionTable<string, number>({
-    foo: new Set([1]),
-    bar: new Set([2]),
-    baz: new Set([3])
-}));
-
-const derived = derive(c, entries => Object.fromEntries(Object.entries(entries).map(([key, value]) => [key, Array.from(value).reduce((acc, x) => acc + x, 0)])));
-
-derived.tap(({ changed }) => {
-    if (changed) {
-        console.log('Derived changed to:', changed);
-    }
-});
-
-c.tap(({ changed }) => {
-    if (changed) {
-        console.log('Changed to:', changed);
-    }
-});
-
-c.receive({
-    foo: new Set([1, 2, 3, 4]),
-    bar: new Set([2, 3, 4, 5]),
-    baz: new Set([3, 4, 5, 6])
-});
-
-c.receive({
-    foo: new Set([1, 2, 3, 4]),
-    bar: new Set([2, 3, 4, 5]),
-    baz: new Set([3, 4, 5, 6])
-});
-
-c.receive({
-    foo: null,
-    bar: null,
-    baz: null
-});
