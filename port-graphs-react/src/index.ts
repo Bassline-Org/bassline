@@ -15,6 +15,12 @@ export { useGadgetMap } from './useGadgetMap';
 // Effect hooks for typed gadgets
 export { useGadgetEffect } from './useGadgetEffect';
 
+// Relations hook for wiring gadgets
+export { useRelations } from './useRelations';
+
+// Declarative wiring component
+export { Wire } from './Wire';
+
 // Typed React components for UI gadgets
 export * from './components';
 

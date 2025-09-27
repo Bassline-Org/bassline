@@ -1,12 +1,16 @@
 import type { Route } from "./+types/notebook-demo";
 import { useEffect, useState } from 'react';
-import { GadgetProvider, useGadgetMap } from 'port-graphs-react';
+import { GadgetProvider, useGadgetMap, useRelations, Wire } from 'port-graphs-react';
 import {
   withTaps,
   maxCell,
   unionCell,
   sliderGadget,
   lastCell,
+  extract,
+  transform,
+  combiner,
+  fn,
   type Gadget,
   type Tappable,
   type CellSpec,
@@ -22,43 +26,20 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
-// Pattern 1: Bidirectional Sync
-function createBidirectionalSync() {
-  const a = withTaps(maxCell(10));
-  const b = withTaps(maxCell(10));
-
-  // Wire them bidirectionally
-  const c1 = a.tap(({ changed }) => {
-    if (changed !== undefined) b.receive(changed);
-  });
-  const c2 = b.tap(({ changed }) => {
-    if (changed !== undefined) a.receive(changed);
-  });
-
-  return {
-    gadgets: { a, b },
-    cleanup: () => { c1(); c2(); }
-  };
-}
-
+// Pattern 1: Bidirectional Sync (simplified with relations)
 function BidirectionalSyncDemo() {
-  const [ecosystem, setEcosystem] = useState<{
-    gadgets: {
-      a: Gadget<CellSpec<number>> & Tappable<CellSpec<number>>;
-      b: Gadget<CellSpec<number>> & Tappable<CellSpec<number>>;
-    };
-    cleanup: () => void;
-  } | null>(null);
+  const [gadgets] = useState(() => ({
+    a: withTaps(maxCell(10)),
+    b: withTaps(maxCell(10))
+  }));
 
-  useEffect(() => {
-    const eco = createBidirectionalSync();
-    setEcosystem(eco);
-    return eco.cleanup;
-  }, []);
+  // Use relations for clean bidirectional wiring
+  useRelations([
+    () => extract(gadgets.a, 'changed', gadgets.b),
+    () => extract(gadgets.b, 'changed', gadgets.a)
+  ]);
 
-  if (!ecosystem) return <div>Loading...</div>;
-
-  return <BidirectionalDisplay gadgets={ecosystem.gadgets} />;
+  return <BidirectionalDisplay gadgets={gadgets} />;
 }
 
 function BidirectionalDisplay({ gadgets }: {
@@ -96,62 +77,33 @@ function BidirectionalDisplay({ gadgets }: {
   );
 }
 
-// Pattern 2: Many-to-One Aggregation
-function createSumAggregator() {
-  const input1 = withTaps(sliderGadget(10, 0, 100, 1));
-  const input2 = withTaps(sliderGadget(20, 0, 100, 1));
-  const input3 = withTaps(sliderGadget(30, 0, 100, 1));
-  const sum = withTaps(lastCell(60)); // Use lastCell for the sum
-
-  // Helper to recalculate sum
-  const updateSum = () => {
-    const total =
-      input1.current().value +
-      input2.current().value +
-      input3.current().value;
-    sum.receive(total);
-  };
-
-  // Wire all inputs to update the sum
-  const c1 = input1.tap(() => updateSum());
-  const c2 = input2.tap(() => updateSum());
-  const c3 = input3.tap(() => updateSum());
-
-  return {
-    gadgets: { input1, input2, input3, sum },
-    cleanup: () => { c1(); c2(); c3(); }
-  };
+// Pattern 2: Many-to-One Aggregation (using combiner)
+const aggregatorGadgets = {
+  input1: withTaps(sliderGadget(10, 0, 100, 1)),
+  input2: withTaps(sliderGadget(20, 0, 100, 1)),
+  input3: withTaps(sliderGadget(30, 0, 100, 1)),
+  sum: withTaps(fn(
+    ({ a, b, c }: { a: number; b: number; c: number }) => a + b + c,
+    ['a', 'b', 'c']
+  )({ a: 10, b: 20, c: 30 }))
 }
-
 function AggregatorDemo() {
-  const [ecosystem, setEcosystem] = useState<{
-    gadgets: {
-      input1: Gadget<SliderSpec> & Tappable<SliderSpec>;
-      input2: Gadget<SliderSpec> & Tappable<SliderSpec>;
-      input3: Gadget<SliderSpec> & Tappable<SliderSpec>;
-      sum: Gadget<CellSpec<number>> & Tappable<CellSpec<number>>;
-    };
-    cleanup: () => void;
-  } | null>(null);
+  const gadgets = useGadgetMap(aggregatorGadgets);
 
-  useEffect(() => {
-    const eco = createSumAggregator();
-    setEcosystem(eco);
-    return eco.cleanup;
-  }, []);
+  // Use combiner to wire sliders to the sum function
+  useRelations([
+    () => combiner(gadgets.sum.gadget)
+      .wire('a', gadgets.input1.gadget)
+      .wire('b', gadgets.input2.gadget)
+      .wire('c', gadgets.input3.gadget)
+      .build()
+  ]);
 
-  if (!ecosystem) return <div>Loading...</div>;
-
-  return <AggregatorDisplay gadgets={ecosystem.gadgets} />;
+  return <AggregatorDisplay gadgets={aggregatorGadgets} />;
 }
 
 function AggregatorDisplay({ gadgets }: {
-  gadgets: {
-    input1: Gadget<SliderSpec> & Tappable<SliderSpec>;
-    input2: Gadget<SliderSpec> & Tappable<SliderSpec>;
-    input3: Gadget<SliderSpec> & Tappable<SliderSpec>;
-    sum: Gadget<CellSpec<number>> & Tappable<CellSpec<number>>;
-  }
+  gadgets: typeof aggregatorGadgets
 }) {
   const g = useGadgetMap(gadgets);
 
@@ -191,7 +143,7 @@ function AggregatorDisplay({ gadgets }: {
         />
       </div>
       <div className="p-4 bg-blue-50 rounded">
-        <strong>Sum: {g.sum.state}</strong>
+        <strong>Sum: {g.sum.state.result}</strong>
       </div>
     </div>
   );
@@ -246,56 +198,48 @@ function SharedCounterDemo() {
   );
 }
 
-// Pattern 4: Complex Multi-Directional
-function createComplexEcosystem() {
-  const controller = withTaps(sliderGadget(50, 0, 100, 5));
-  const accumulator = withTaps(unionCell<number>(new Set([50])));
-  const max = withTaps(maxCell(50));
-  const count = withTaps(lastCell(1));
-
-  // Controller updates everything
-  const c1 = controller.tap(({ changed }) => {
-    if (changed !== undefined) {
-      accumulator.receive(new Set([changed]));
-      max.receive(changed);
-      count.receive(count.current() + 1);
-    }
-  });
-
-  // Accumulator size affects max
-  const c2 = accumulator.tap(({ changed }) => {
-    if (changed !== undefined && changed.size > 0) {
-      const maxValue = Math.max(...Array.from(changed));
-      max.receive(maxValue);
-    }
-  });
-
-  return {
-    gadgets: { controller, accumulator, max, count },
-    cleanup: () => { c1(); c2(); }
-  };
-}
-
+// Pattern 4: Complex Multi-Directional (simplified with relations)
 function ComplexEcosystemDemo() {
-  const [ecosystem, setEcosystem] = useState<{
-    gadgets: {
-      controller: Gadget<SliderSpec> & Tappable<SliderSpec>;
-      accumulator: Gadget<SetCell<number>> & Tappable<SetCell<number>>;
-      max: Gadget<CellSpec<number>> & Tappable<CellSpec<number>>;
-      count: Gadget<CellSpec<number>> & Tappable<CellSpec<number>>;
-    };
-    cleanup: () => void;
-  } | null>(null);
+  const gadgets = useGadgetMap({
+    controller: withTaps(sliderGadget(50, 0, 100, 5)),
+    accumulator: withTaps(unionCell<number>(new Set([50]))),
+    max: withTaps(maxCell(50)),
+    count: withTaps(lastCell(1))
+  });
 
-  useEffect(() => {
-    const eco = createComplexEcosystem();
-    setEcosystem(eco);
-    return eco.cleanup;
-  }, []);
+  // Clean wiring with useRelations
+  useRelations([
+    // Controller updates accumulator with single-value sets
+    () => transform(
+      gadgets.controller.gadget,
+      'changed',
+      (state) => new Set([state]),
+      gadgets.accumulator.gadget
+    ),
+    // Controller updates max
+    () => transform(
+      gadgets.controller.gadget,
+      'changed',
+      (state) => state,
+      gadgets.max.gadget
+    ),
+    // Controller increments count
+    () => transform(
+      gadgets.controller.gadget,
+      'changed',
+      (_change) => gadgets.count.state + 1,
+      gadgets.count.gadget
+    ),
+    // Accumulator affects max
+    () => transform(
+      gadgets.accumulator.gadget,
+      'changed',
+      (set) => set.size > 0 ? Math.max(...Array.from(set)) : 0,
+      gadgets.max.gadget
+    )
+  ]);
 
-  if (!ecosystem) return <div>Loading...</div>;
-
-  return <ComplexDisplay gadgets={ecosystem.gadgets} />;
+  return <ComplexDisplay gadgets={gadgets} />;
 }
 
 function ComplexDisplay({ gadgets }: {
@@ -338,6 +282,74 @@ function ComplexDisplay({ gadgets }: {
   );
 }
 
+// Pattern 5: Declarative Wiring with Wire Component
+function DeclarativeWiringDemo() {
+  const [gadgets] = useState(() => ({
+    source: withTaps(sliderGadget(25, 0, 100, 1)),
+    doubled: withTaps(lastCell(50)),
+    squared: withTaps(lastCell(625)),
+    display: withTaps(lastCell(0))
+  }));
+
+  const g = useGadgetMap(gadgets);
+
+  return (
+    <div className="p-4 space-y-4">
+      {/* Declarative wiring using Wire components */}
+      <Wire
+        from={gadgets.source}
+        field="changed"
+        transform={(state) => (typeof state === 'object' && 'value' in state ? state.value : state) * 2}
+        to={gadgets.doubled}
+      />
+      <Wire
+        from={gadgets.source}
+        field="changed"
+        transform={(state) => {
+          const val = typeof state === 'object' && 'value' in state ? state.value : state;
+          return val * val;
+        }}
+        to={gadgets.squared}
+      />
+      <Wire
+        from={gadgets.doubled}
+        to={gadgets.display}
+      />
+
+      <div>
+        <label className="block text-sm mb-1">Source Value: {g.source.state.value}</label>
+        <input
+          type="range"
+          min={g.source.state.min}
+          max={g.source.state.max}
+          value={g.source.state.value}
+          onChange={(e) => g.source.send({ set: Number(e.target.value) })}
+          className="w-full"
+        />
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="p-3 bg-gray-50 rounded text-center">
+          <div className="text-sm text-gray-600">Doubled</div>
+          <div className="text-2xl font-bold">{g.doubled.state}</div>
+        </div>
+        <div className="p-3 bg-gray-50 rounded text-center">
+          <div className="text-sm text-gray-600">Squared</div>
+          <div className="text-2xl font-bold">{g.squared.state}</div>
+        </div>
+        <div className="p-3 bg-blue-50 rounded text-center">
+          <div className="text-sm text-gray-600">Display (from doubled)</div>
+          <div className="text-2xl font-bold">{g.display.state}</div>
+        </div>
+      </div>
+
+      <div className="text-sm text-gray-600">
+        Wire components declaratively describe the data flow. Changes are automatically propagated through the wiring.
+      </div>
+    </div>
+  );
+}
+
 function NotebookDemoInner() {
   return (
     <Notebook
@@ -360,13 +372,19 @@ function NotebookDemoInner() {
         <ComplexEcosystemDemo />
       </NotebookSection>
 
+      <NotebookSection title="Pattern 5: Declarative Wiring">
+        <DeclarativeWiringDemo />
+      </NotebookSection>
+
       <div className="mt-8 p-4 bg-blue-50 rounded">
         <h3 className="font-semibold mb-2">Key Improvements</h3>
         <ul className="list-disc ml-5 space-y-1 text-sm">
           <li><strong>useGadgetMap:</strong> Clean access to multiple gadgets with <code>g.name.state</code> and <code>g.name.send</code></li>
+          <li><strong>useRelations:</strong> Automatic cleanup of gadget wiring with builder pattern support</li>
+          <li><strong>Wire component:</strong> Declarative JSX syntax for gadget connections</li>
+          <li><strong>Combiner builder:</strong> Type-safe wiring with autocomplete for fn gadgets</li>
           <li><strong>No widget abstractions:</strong> Just functions that create gadgets and components that display them</li>
           <li><strong>Pattern focused:</strong> Each example showcases a specific composition pattern</li>
-          <li><strong>Lifecycle management:</strong> Components handle their own setup/cleanup</li>
           <li><strong>Type safe:</strong> Full TypeScript inference throughout</li>
         </ul>
       </div>
