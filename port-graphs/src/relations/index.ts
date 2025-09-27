@@ -7,6 +7,11 @@
 
 import type { Gadget, Tappable, EffectsOf, InputOf, Effects } from '../core/typed';
 
+// Type helpers for cleaner combiner signatures
+
+/** Keys from the target's inputs that haven't been wired yet */
+type AvailableKeys<Target, Wired> = Exclude<keyof InputOf<Target>, Wired>;
+
 /**
  * Extract a specific effect field and send it as input to a target gadget.
  *
@@ -99,10 +104,7 @@ export class Combiner<Target, Wired extends keyof InputOf<Target> = never> {
    * Defaults to extracting the 'changed' effect.
    * The source must have a 'changed' effect that matches the target input type.
    */
-  wire<
-    K extends Exclude<keyof InputOf<Target>, Wired>,
-    S extends Effects<{ changed: InputOf<Target>[K] }>
-  >(
+  wire<K extends AvailableKeys<Target, Wired>, S extends Effects<{ changed: InputOf<Target>[K] }>>(
     key: K,
     source: Gadget<S> & Tappable<S>
   ): Combiner<Target, Wired | K>;
@@ -110,37 +112,26 @@ export class Combiner<Target, Wired extends keyof InputOf<Target> = never> {
   /**
    * Wire a source gadget to a specific input key, extracting a specific effect field.
    */
-  wire<
-    K extends Exclude<keyof InputOf<Target>, Wired>,
-    S,
-    F extends keyof EffectsOf<S>
-  >(
+  wire<K extends AvailableKeys<Target, Wired>, S>(
     key: K,
     source: Gadget<S> & Tappable<S>,
-    field: F extends keyof EffectsOf<S>
-      ? EffectsOf<S>[F] extends InputOf<Target>[K]
-      ? F
-      : never
-      : never
+    field: keyof EffectsOf<S>
   ): Combiner<Target, Wired | K>;
 
   /**
    * Wire a source gadget to a specific input key with transformation.
    */
-  wire<
-    K extends Exclude<keyof InputOf<Target>, Wired>,
-    S,
-    F extends keyof EffectsOf<S>
-  >(
+  wire<K extends AvailableKeys<Target, Wired>, S, F extends keyof EffectsOf<S>>(
     key: K,
     source: Gadget<S> & Tappable<S>,
     field: F,
-    transform: (value: EffectsOf<S>[F]) => InputOf<Target>[K] | undefined
+    transform: (value: EffectsOf<S>[F]) => InputOf<Target>[K]
   ): Combiner<Target, Wired | K>;
 
-  wire<K extends Exclude<keyof InputOf<Target>, Wired>, S extends Effects<{ changed: InputOf<Target>[K] }>>(
+  // Implementation
+  wire<K extends AvailableKeys<Target, Wired>>(
     key: K,
-    source: Gadget<S> & Tappable<S>,
+    source: any,
     field: string = 'changed',
     transform?: (value: unknown) => unknown
   ): Combiner<Target, Wired | K> {
@@ -148,11 +139,11 @@ export class Combiner<Target, Wired extends keyof InputOf<Target> = never> {
       throw new Error(`Key "${String(key)}" is already wired`);
     }
 
-    const cleanup = source.tap((effect) => {
+    const cleanup = source.tap((effect: any) => {
       if (typeof effect === 'object' &&
         effect !== null &&
         field in effect) {
-        const value = (effect as Record<string, unknown>)[field];
+        const value = effect[field];
         if (value !== undefined) {
           const finalValue = transform ? transform(value) : value;
           if (finalValue !== undefined) {
