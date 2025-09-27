@@ -8,7 +8,7 @@
 import type { Gadget, StateOf, InputOf, Tappable } from 'port-graphs';
 import { useGadget } from './useGadget';
 
-type GadgetMapResult<M extends Record<string, Gadget<unknown> & Tappable<unknown>>> = {
+type GadgetMapResult<M> = {
   [K in keyof M]: M[K] extends Gadget<infer S> & Tappable<infer S>
   ? {
     state: StateOf<S>;
@@ -36,7 +36,7 @@ type GadgetMapResult<M extends Record<string, Gadget<unknown> & Tappable<unknown
  * @param gadgetMap - An object containing gadgets
  * @returns An object with the same keys, each containing state, send, and gadget
  */
-export function useGadgetMap<M extends Record<string, Gadget<unknown> & Tappable<unknown>>>(
+export function useGadgetMap<M extends Record<string, any>>(
   gadgetMap: M
 ): GadgetMapResult<M> {
   const result = {} as GadgetMapResult<M>;

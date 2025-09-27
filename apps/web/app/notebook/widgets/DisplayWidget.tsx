@@ -1,39 +1,35 @@
-import React, { useEffect } from 'react';
-import type { Gadget, Tappable, StateOf } from 'port-graphs';
+import React from 'react';
+import type { Gadget, Tappable, StateOf, SpecOf } from 'port-graphs';
 import { useGadget } from 'port-graphs-react';
 
-interface DisplayWidgetProps<S, G extends Gadget<S> & Tappable<S>> {
-  display: G;
-  cleanup?: () => void,
+interface GadgetDisplayProps<S, G extends Gadget<S> & Tappable<S>> {
+  gadget: G;
   className?: string;
-  formatter?: (state: StateOf<S>) => React.ReactNode;
+  formatter?: (state: StateOf<SpecOf<G>>) => React.ReactNode;
+  title?: string;
 }
 
-
-export function DisplayWidget<S, G extends Gadget<S> & Tappable<S>>({
-  display,
-  cleanup,
+/**
+ * Simple component to display a gadget's state
+ */
+export function GadgetDisplay<S, G extends Gadget<S> & Tappable<S>>({
+  gadget,
   className,
-  formatter
-}: {
-  display: G;
-  cleanup?: () => void,
-  className?: string;
-  formatter?: (state: StateOf<S>) => React.ReactNode;
-}) {
-  const [state] = useGadget<S, G>(display);
+  formatter,
+  title
+}: GadgetDisplayProps<S, G>) {
+  const [state] = useGadget<S, G>(gadget);
 
-  useEffect(() => {
-    return cleanup;
-  }, [cleanup]);
+  const content = formatter ? formatter(state) : (
+    <pre className="text-sm bg-gray-50 p-3 rounded overflow-auto">
+      {JSON.stringify(state, null, 2)}
+    </pre>
+  );
 
   return (
-    <div className={`p-4 ${className || ''}`}>
-      {formatter ? formatter(state) : (
-        <pre className="text-sm bg-gray-50 p-3 rounded overflow-auto">
-          {JSON.stringify(state, null, 2)}
-        </pre>
-      )}
+    <div className={className}>
+      {title && <h3 className="text-sm font-medium mb-2">{title}</h3>}
+      {content}
     </div>
   );
 }
