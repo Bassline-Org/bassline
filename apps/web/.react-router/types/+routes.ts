@@ -13,6 +13,9 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/notebook-demo": {
+    params: {};
+  };
   "/ui-gallery": {
     params: {};
   };
@@ -24,7 +27,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/ui-gallery" | "/home";
+    page: "/" | "/notebook-demo" | "/ui-gallery" | "/home";
+  };
+  "routes/notebook-demo.tsx": {
+    id: "routes/notebook-demo";
+    page: "/notebook-demo";
   };
   "routes/ui-gallery.tsx": {
     id: "routes/ui-gallery";

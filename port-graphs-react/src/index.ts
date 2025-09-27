@@ -8,8 +8,9 @@
 // Provider for global gadget state management
 export { GadgetProvider, useGadgetContext } from './GadgetProvider';
 
-// Core hook for typed gadgets
+// Core hooks for typed gadgets
 export { useGadget } from './useGadget';
+export { useGadgetMap } from './useGadgetMap';
 
 // Effect hooks for typed gadgets
 export { useGadgetEffect } from './useGadgetEffect';
