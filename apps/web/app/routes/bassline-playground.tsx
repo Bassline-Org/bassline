@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { Route } from "./+types/bassline-playground";
 import type { Node, Edge, Connection } from "reactflow";
 import {
@@ -35,6 +35,10 @@ const typeRegistry = {
   min: minCell,
   last: lastCell,
 };
+
+// Define empty nodeTypes and edgeTypes outside component to avoid React Flow warnings
+const nodeTypes = {};
+const edgeTypes = {};
 
 export default function BasslinePlayground() {
   // Create a bassline instance
@@ -86,7 +90,7 @@ export default function BasslinePlayground() {
   });
 
   // Update React Flow graph when state changes
-  const updateFlowGraph = (basslineState: typeof state) => {
+  const updateFlowGraph = useCallback((basslineState: typeof state) => {
     // Create nodes from instances
     const newNodes: Node[] = Object.entries(basslineState.instances).map(
       ([name, gadget], index) => {
@@ -142,7 +146,7 @@ export default function BasslinePlayground() {
 
     setNodes(newNodes);
     setEdges(newEdges);
-  };
+  }, [setNodes, setEdges]);
 
   const createInstance = () => {
     if (instanceName) {
@@ -206,6 +210,7 @@ export default function BasslinePlayground() {
     [bassline]
   );
 
+
   return (
     <div className="p-4">
       <h1 className="text-3xl font-bold mb-6">Bassline Playground</h1>
@@ -223,7 +228,10 @@ export default function BasslinePlayground() {
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               fitView
+              proOptions={{ hideAttribution: true }}
             >
               <Background />
               <Controls />
