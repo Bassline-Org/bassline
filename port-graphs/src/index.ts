@@ -6,12 +6,14 @@ export * from './patterns/cells';
 export * from './patterns/functions';
 export * from './patterns/ui';
 export * from './patterns/family';
+export * from './patterns/io';
 
 // Relations for wiring gadgets
 export * from './relations';
 
 // Meta-gadgets for contextual composition
 export * from './meta/bassline';
+export * from './meta/factoryBassline';
 
 // Shared utilities
 export * from './effects';

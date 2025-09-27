@@ -29,3 +29,9 @@ export { createReactFamily } from './createReactFamily';
 
 // Declarative wiring components
 export { GadgetContext, ProvideGadget, useCurrentGadget, useExplicitGadget } from './GadgetContext';
+
+// Bassline components
+export { BasslineProvider, useBassline } from './BasslineProvider';
+export { BasslineGraph } from './BasslineGraph';
+export { BasslineBuilder } from './BasslineBuilder';
+export { SaveLoadPanel } from './SaveLoadPanel';

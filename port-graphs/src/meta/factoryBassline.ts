@@ -139,7 +139,11 @@ export function factoryBassline(initialTypes: Record<string, Function> = {}) {
         }
 
         try {
-          const connection = patternFn(fromGadget, toGadget, config);
+          // Ensure fromGadget has tap method (is Tappable)
+          if (!('tap' in fromGadget)) {
+            return { connectionFailed: { id, from, to, reason: 'Source gadget is not tappable' } };
+          }
+          const connection = patternFn(fromGadget as any, toGadget, config);
           state.connections[id] = { cleanup: connection.cleanup, data: { from, to, pattern, config } };
           gadget.update(state);
           return { connected: { id, from, to, pattern } };
@@ -154,7 +158,7 @@ export function factoryBassline(initialTypes: Record<string, Function> = {}) {
           return { alreadyExists: { name, kind: 'pattern' } };
         }
 
-        state.patterns[name] = pattern;
+        state.patterns[name] = pattern as (from: any, to: any, config?: any) => { cleanup: () => void };
         gadget.update(state);
         return { patternAdded: { name } };
       },
