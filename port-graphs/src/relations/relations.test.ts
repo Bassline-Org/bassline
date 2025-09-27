@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { withTaps } from '../core/typed';
+import { describe, it, expect } from 'vitest';
+import { Actions, defGadget, Effects, Input, State, withTaps } from '../core/typed';
 import { maxCell, lastCell } from '../patterns/cells/typed-cells';
 import { fn } from '../patterns/functions/typed-functions';
-import { extract, transform, combine, relations } from './index';
+import { extract, transform, combine, relations, combiner } from './index';
 
 describe('Relations', () => {
   describe('extract', () => {
@@ -81,18 +81,17 @@ describe('Relations', () => {
   describe('combine', () => {
     it('should wire multiple sources to fn gadget', () => {
       const a = withTaps(lastCell(2));
-      const b = withTaps(lastCell(3));
+      const b = withTaps(lastCell(123));
 
       const sum = withTaps(fn(
         ({ x, y }: { x: number; y: number }) => x + y,
         ['x', 'y']
       )({ x: 2, y: 3 }));  // Provide initial values
 
-      const { cleanup } = combine({
-        x: a,
-        y: b
-      }, sum);
-
+      const { cleanup } = combiner(sum)
+        .wire('x', a)
+        .wire('y', b)
+        .build();
       // Initial values should compute
       expect(sum.current().result).toBe(5);
 
@@ -111,29 +110,26 @@ describe('Relations', () => {
       const a = withTaps(lastCell(2));
       const b = withTaps(lastCell(3));
 
-      // Mock gadget with custom effect
-      const customGadget = withTaps({
-        current: () => 5,
-        update: vi.fn(),
-        receive: vi.fn(),
-        emit: vi.fn(),
-        tap: (fn: any) => {
-          // Simulate emitting 'computed' effect
-          setTimeout(() => fn({ computed: 7 }), 0);
-          return () => { };
-        },
+      // Create a custom gadget that emits 'computed' effect
+      type CustomGadgetSpec = State<number> & Effects<{ changed: number, computed: number }> & Input<number> & Actions<{ computed: number }>;
+      const customGadgetBase = defGadget<CustomGadgetSpec>({
+        dispatch: (_state, input) => ({ computed: input }),
+        methods: {
+          computed: (gadget, value) => ({ changed: 7, computed: 7 })
+        }
       });
+      const customGadget = withTaps(customGadgetBase(7));
 
       const sum = withTaps(fn(
-        ({ x, y, z }: { x: number; y: number; z: number }) => x + y + z,
+        ({ x, y, z }: { x: number; y: number; z: number }) => x + y + Number(z),
         ['x', 'y', 'z']
       )({ x: 2, y: 3, z: 7 }));  // Provide initial values
 
-      const { cleanup } = combine({
-        x: a,
-        y: b,
-        z: [customGadget, 'computed'] as const
-      }, sum);
+      const { cleanup } = combiner(sum)
+        .wire('x', a)
+        .wire('y', b)
+        .wire('z', customGadget)
+        .build();
 
       // Let the mock effect propagate
       return new Promise<void>(resolve => {
@@ -171,6 +167,106 @@ describe('Relations', () => {
       a.receive(15);
       expect(b.current()).toBe(10); // No longer connected
       expect(c.current()).toBe(20); // No longer connected
+    });
+  });
+
+  describe('combiner builder', () => {
+    it('should wire gadgets with fluent API', () => {
+      const a = withTaps(lastCell(2));
+      const b = withTaps(lastCell(3));
+
+      const sum = withTaps(fn(
+        ({ x, y }: { x: number; y: number }) => x + y,
+        ['x', 'y']
+      )({ x: 2, y: 3 }));
+
+      const { cleanup } = combiner(sum)
+        .wire('x', a)
+        .wire('y', b)
+        .build();
+
+      expect(sum.current().result).toBe(5);
+
+      a.receive(10);
+      expect(sum.current().result).toBe(13);
+
+      b.receive(7);
+      expect(sum.current().result).toBe(17);
+
+      cleanup();
+    });
+
+    it('should support field extraction', () => {
+      const a = withTaps(lastCell(2));
+
+      // Create a gadget that emits a custom field
+      const customGadget = {
+        current: () => 7,
+        update: () => { },
+        receive: () => { },
+        emit: () => { },
+        tap: (fn: (effect: unknown) => void) => {
+          setTimeout(() => fn({ computed: 10 }), 0);
+          return () => { };
+        }
+      };
+
+      const sum = withTaps(fn(
+        ({ x, y }: { x: number; y: number }) => x + y,
+        ['x', 'y']
+      )({ x: 2, y: 10 }));
+
+      const { cleanup } = combiner(sum)
+        .wire('x', a)
+        .wire('y', customGadget as any, 'computed')
+        .build();
+
+      return new Promise<void>(resolve => {
+        setTimeout(() => {
+          expect(sum.current().result).toBe(12); // 2 + 10
+          cleanup();
+          resolve();
+        }, 10);
+      });
+    });
+
+    it('should support transformation', () => {
+      const a = withTaps(lastCell(5));
+      const b = withTaps(lastCell(3));
+
+      const sum = withTaps(fn(
+        ({ x, y }: { x: number; y: number }) => x + y,
+        ['x', 'y']
+      )({ x: 10, y: 3 }));
+
+      const { cleanup } = combiner(sum)
+        .wire('x', a, 'changed', (x) => typeof x === 'number' ? x * 2 : undefined)  // Transform x by doubling
+        .wire('y', b)
+        .build();
+
+      expect(sum.current().result).toBe(13); // (5 * 2) + 3
+
+      a.receive(10);
+      expect(sum.current().result).toBe(23); // (10 * 2) + 3
+
+      cleanup();
+    });
+
+    it('should throw error on duplicate wiring', () => {
+      const a = withTaps(lastCell(2));
+      const b = withTaps(lastCell(3));
+
+      const sum = withTaps(fn(
+        ({ x, y }: { x: number; y: number }) => x + y,
+        ['x', 'y']
+      )({ x: 2, y: 3 }));
+
+      expect(() => {
+        combiner(sum)
+          .wire('x', a)
+          .wire('x' as 'y', b)  // Should throw at runtime, cast to bypass compile check
+          .build();
+      }).toThrow('Key "x" is already wired');
     });
   });
 });

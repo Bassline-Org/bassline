@@ -5,7 +5,7 @@
  * They're just wiring patterns - no new gadget types, just clean ways to connect.
  */
 
-import type { Gadget, Tappable, EffectsOf, InputOf } from '../core/typed';
+import type { Gadget, Tappable, EffectsOf, InputOf, Effects } from '../core/typed';
 
 /**
  * Extract a specific effect field and send it as input to a target gadget.
@@ -61,29 +61,14 @@ export function transform<S1, S2, K extends keyof EffectsOf<S1>>(
   return { cleanup };
 }
 
-/**
- * Source specification for combine - either a gadget (defaults to 'changed')
- * or a tuple of [gadget, field] for explicit field selection.
- */
-type SourceSpec<S> =
-  | (Gadget<S> & Tappable<S>)
-  | readonly [Gadget<S> & Tappable<S>, keyof EffectsOf<S>];
-
-/**
- * Extract the gadget type from a SourceSpec
- */
-type GadgetFromSpec<Spec> = Spec extends readonly [infer G, any] ? G : Spec;
-
-/**
- * Extract the field name from a SourceSpec (defaults to 'changed')
- */
-type FieldFromSpec<Spec> = Spec extends readonly [Gadget<infer S> & Tappable<infer S>, infer K]
-  ? K extends keyof EffectsOf<S> ? K : 'changed'
-  : 'changed';
 
 /**
  * Wire multiple sources to a target gadget's named inputs.
  * Particularly useful with fn gadgets that expect named arguments.
+ *
+ * Sources can be:
+ * - A gadget (defaults to extracting 'changed' effect)
+ * - A tuple of [gadget, field] for explicit field selection
  *
  * @example
  * ```typescript
@@ -98,30 +83,182 @@ type FieldFromSpec<Spec> = Spec extends readonly [Gadget<infer S> & Tappable<inf
  * }, sum);
  * ```
  */
-export function combine<
-  Sources extends Record<keyof InputOf<Target>, SourceSpec<any>>,
-  Target
->(
-  sources: Sources,
-  target: Gadget<Target>
-): { cleanup: () => void } {
-  const cleanups: (() => void)[] = [];
 
-  for (const [key, source] of Object.entries(sources)) {
-    // Determine gadget and field from source spec
-    const [gadget, field] = Array.isArray(source)
-      ? source
-      : [source, 'changed' as const];
+/**
+ * Builder for wiring multiple gadgets to a target gadget's inputs.
+ * Provides type-safe, fluent API with autocomplete.
+ */
+export class Combiner<Target, Wired extends keyof InputOf<Target> = never> {
+  private cleanups: (() => void)[] = [];
+  private wiredKeys = new Set<string>();
 
-    // Type-safe tap with proper field extraction
-    const cleanup = (gadget as Tappable<any>).tap((effect: any) => {
-      if (field in effect && effect[field] !== undefined) {
-        // Send as partial input with the key
-        target.receive({ [key]: effect[field] } as InputOf<Target>);
+  constructor(private targetGadget: Gadget<Target>) { }
+
+  /**
+   * Wire a source gadget to a specific input key.
+   * Defaults to extracting the 'changed' effect.
+   * The source must have a 'changed' effect that matches the target input type.
+   */
+  wire<
+    K extends Exclude<keyof InputOf<Target>, Wired>,
+    S extends Effects<{ changed: InputOf<Target>[K] }>
+  >(
+    key: K,
+    source: Gadget<S> & Tappable<S>
+  ): Combiner<Target, Wired | K>;
+
+  /**
+   * Wire a source gadget to a specific input key, extracting a specific effect field.
+   */
+  wire<
+    K extends Exclude<keyof InputOf<Target>, Wired>,
+    S,
+    F extends keyof EffectsOf<S>
+  >(
+    key: K,
+    source: Gadget<S> & Tappable<S>,
+    field: F extends keyof EffectsOf<S>
+      ? EffectsOf<S>[F] extends InputOf<Target>[K]
+      ? F
+      : never
+      : never
+  ): Combiner<Target, Wired | K>;
+
+  /**
+   * Wire a source gadget to a specific input key with transformation.
+   */
+  wire<
+    K extends Exclude<keyof InputOf<Target>, Wired>,
+    S,
+    F extends keyof EffectsOf<S>
+  >(
+    key: K,
+    source: Gadget<S> & Tappable<S>,
+    field: F,
+    transform: (value: EffectsOf<S>[F]) => InputOf<Target>[K] | undefined
+  ): Combiner<Target, Wired | K>;
+
+  wire<K extends Exclude<keyof InputOf<Target>, Wired>, S extends Effects<{ changed: InputOf<Target>[K] }>>(
+    key: K,
+    source: Gadget<S> & Tappable<S>,
+    field: string = 'changed',
+    transform?: (value: unknown) => unknown
+  ): Combiner<Target, Wired | K> {
+    if (this.wiredKeys.has(key as string)) {
+      throw new Error(`Key "${String(key)}" is already wired`);
+    }
+
+    const cleanup = source.tap((effect) => {
+      if (typeof effect === 'object' &&
+        effect !== null &&
+        field in effect) {
+        const value = (effect as Record<string, unknown>)[field];
+        if (value !== undefined) {
+          const finalValue = transform ? transform(value) : value;
+          if (finalValue !== undefined) {
+            this.targetGadget.receive({ [key]: finalValue } as InputOf<Target>);
+          }
+        }
       }
     });
 
-    cleanups.push(cleanup);
+    this.cleanups.push(cleanup);
+    this.wiredKeys.add(key as string);
+
+    return this as any;
+  }
+
+  /**
+   * Build the final wiring and return cleanup function.
+   * This method provides compile-time checking that all required inputs are wired.
+   */
+  build(): { cleanup: () => void } {
+    return {
+      cleanup: () => this.cleanups.forEach(c => c())
+    };
+  }
+}
+
+/**
+ * Create a combiner for wiring gadgets to a target.
+ * Provides type-safe builder pattern with excellent autocomplete.
+ *
+ * @example
+ * ```typescript
+ * const sum = fn(({x, y}: {x: number, y: number}) => x + y, ['x', 'y']);
+ *
+ * // Basic usage - TypeScript knows 'x' and 'y' are required
+ * combiner(sum)
+ *   .wire('x', sensor1)      // After this, only 'y' is available
+ *   .wire('y', sensor2)      // After this, no more keys available
+ *   .build();
+ *
+ * // With field extraction
+ * combiner(sum)
+ *   .wire('x', sensor1, 'value')     // Extract 'value' field
+ *   .wire('y', sensor2, 'computed')  // Extract 'computed' field
+ *   .build();
+ *
+ * // With transformation
+ * combiner(sum)
+ *   .wire('x', sensor1, 'changed', x => x * 2)  // Double the value
+ *   .wire('y', sensor2)
+ *   .build();
+ * ```
+ */
+export function combiner<Target>(
+  targetGadget: Gadget<Target>
+): Combiner<Target, never> {
+  return new Combiner(targetGadget);
+}
+
+/**
+ * Wire multiple sources to a target gadget's named inputs.
+ * Simple function for backwards compatibility - prefer `combiner` for new code.
+ *
+ * @example
+ * ```typescript
+ * combine({
+ *   x: sensor1,
+ *   y: [sensor2, 'computed']
+ * }, sum);
+ * ```
+ */
+export function combine<Target>(
+  sourceMap: Record<string, unknown>,
+  targetGadget: Gadget<Target>
+): { cleanup: () => void } {
+  const cleanups: (() => void)[] = [];
+
+  for (const [key, source] of Object.entries(sourceMap)) {
+    let gadget: unknown;
+    let field: string;
+
+    if (Array.isArray(source) && source.length === 2) {
+      [gadget, field] = source;
+    } else {
+      gadget = source;
+      field = 'changed';
+    }
+
+    if (typeof gadget === 'object' &&
+      gadget !== null &&
+      'tap' in gadget &&
+      typeof (gadget as { tap: unknown }).tap === 'function') {
+
+      const cleanup = (gadget as Tappable<unknown>).tap((effect) => {
+        if (typeof effect === 'object' &&
+          effect !== null &&
+          field in effect) {
+          const value = (effect as Record<string, unknown>)[field];
+          if (value !== undefined) {
+            targetGadget.receive({ [key]: value } as InputOf<Target>);
+          }
+        }
+      });
+
+      cleanups.push(cleanup);
+    }
   }
 
   return {
