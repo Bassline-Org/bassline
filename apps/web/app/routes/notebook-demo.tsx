@@ -1,6 +1,6 @@
 import type { Route } from "./+types/notebook-demo";
-import React, { useEffect, useState } from 'react';
-import { GadgetProvider, useGadget, useGadgetMap } from 'port-graphs-react';
+import { useEffect, useState } from 'react';
+import { GadgetProvider, useGadgetMap } from 'port-graphs-react';
 import {
   withTaps,
   maxCell,
