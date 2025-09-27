@@ -1,93 +1,78 @@
-# Context: Gadget System Learnings
+# Context: Current Understanding of Gadget System Evolution
 
 ## Relations Module - Type-Safe Gadget Wiring
 
 ### What We Built
-- **`combiner`** - Builder pattern for wiring gadgets with compile-time type safety
-- **`extract`** - Extract specific effect field from source to target
-- **`transform`** - Extract, transform, then forward to target
-- **`relations`** - Wire multiple relations with single cleanup
+My understanding is that we've created a relations system that makes wiring gadgets together more declarative:
+- **`combiner`** - A builder pattern that seems to enforce type safety at compile time
+- **`extract`** - Appears to pull specific effect fields and forward them as input
+- **`transform`** - Like extract but applies a transformation function
+- **`relations`** - Seems to compose multiple wiring operations with unified cleanup
 
-### Key TypeScript Discoveries
+### TypeScript Learnings I've Observed
 
-#### 1. Overloading Must Constrain Generics
-**Wrong approach:**
-```typescript
-// All overloads accept any Gadget<S> - no actual constraints!
-wire<S>(source: Gadget<S> & Tappable<S>): ...
-wire<S, F>(source: Gadget<S> & Tappable<S>, field: F): ...
-```
+#### Overloading Constraints
+From what I can tell, TypeScript overloads need different generic constraints to actually be useful. Initially we had overloads that all accepted `Gadget<S>` with no real constraints, which defeated the purpose. The fix was to make each overload constrain `S` differently - like `S extends Effects<{ changed: InputOf<Target>[K] }>`.
 
-**Correct approach:**
-```typescript
-// First overload constrains S to have correct effect type
-wire<S extends Effects<{ changed: InputOf<Target>[K] }>>(
-  source: Gadget<S> & Tappable<S>
-): ...
+#### The `any` Problem
+I learned that using `Gadget<any>` breaks TypeScript's inference chain. It seems to cause variance issues where TypeScript can't reconcile `update(state: unknown)` with `update(state: number)`. The solution appears to be using proper generic constraints throughout.
 
-// Other overloads have different constraints
-wire<S, F extends keyof EffectsOf<S>>(
-  source: Gadget<S> & Tappable<S>,
-  field: F
-): ...
-```
+#### Type Helper Benefits
+We discovered that type helpers like `type AvailableKeys<Target, Wired> = Exclude<keyof InputOf<Target>, Wired>` make the code much cleaner than repeating complex type expressions everywhere.
 
-#### 2. Avoid `any` - It Breaks Inference
-- Using `Gadget<any>` prevents TypeScript from inferring the actual spec
-- Causes variance issues: `update(state: unknown)` vs `update(state: number)`
-- Solution: Use proper generics with constraints
+### React Integration Progress
 
-#### 3. Type Helpers for Cleaner Code
-```typescript
-type AvailableKeys<Target, Wired> = Exclude<keyof InputOf<Target>, Wired>;
-// Much cleaner than repeating Exclude<keyof InputOf<Target>, Wired> everywhere
-```
+#### What Works Now
+- **`useRelations`** hook - Appears to handle automatic cleanup of relations on unmount
+- **`Wire`** component - Provides JSX syntax for declarative wiring
+- **`useGadgetMap`** - Transforms gadget maps into `{state, send, gadget}` objects
 
-### Builder Pattern Implementation
-```typescript
-combiner(sumFn)
-  .wire('x', numberGadget)      // ✅ Type-safe
-  .wire('x', stringGadget)      // ❌ Compile error!
-  .wire('y', gadget, 'field')   // Extract specific field
-  .wire('z', gadget, 'field', transform)  // Transform
-  .build();
-```
+#### Integration Patterns
+The notebook demo now uses relations instead of manual tap management. The aggregation pattern uses `combiner` to wire sliders to a sum function. We've added a declarative wiring demo using `Wire` components.
 
-### Critical Lessons
+## Bassline Meta-Gadget System
 
-1. **TypeScript overloads need different constraints** - Otherwise they're pointless
-2. **Generic constraints are how you get type safety** - `S extends Effects<...>`
-3. **Builder patterns track state at type level** - `Wired` accumulates wired keys
-4. **Simplify when stuck** - We tried complex conditional types, but simple overloads worked better
-5. **Test your types!** - Create invalid cases to verify constraints actually work
+### Core Concept
+My understanding is that "bassline" represents the contextual truth - what gadget names mean, how they wire, what capabilities they have. It's implemented as a composition of gadgets themselves.
 
-### Files
-- `/port-graphs/src/relations/index.ts` - Relations module with combiner
-- `/port-graphs/src/relations/relations.test.ts` - Comprehensive tests
+### Architecture (as I understand it)
+A bassline appears to be composed of four table gadgets:
+1. **Namespace** - Maps names to factory functions
+2. **Registry** - Maps IDs to actual gadget instances
+3. **Connections** - Stores wiring information with cleanup functions
+4. **Patterns** - Maps pattern names to wiring functions
 
-## Notebook System Work
+### Key Design Decisions
 
-### What We Built
-- `useGadgetMap` hook - transforms gadget map to `{key: {state, send, gadget}}`
-- `GadgetDisplay<S>` - display component generic over spec, not gadget
-- Notebook demo at `/notebook-demo` with pattern examples
+#### Everything is Declarative Commands
+Rather than imperatively manipulating data structures, basslines receive commands:
+- `{ create: { id, type, args } }` - Creates instances from factories
+- `{ wire: { id, from, to, pattern } }` - Establishes connections
+- `{ registerFactory: { name, factory } }` - Adds to namespace
+- `{ destroy: id }` - Removes instances and their connections
 
-### Key Discoveries
-- **No widget abstraction needed** - gadgets + components are sufficient
-- **Spec is the type** - `GadgetDisplay<S>` takes `Gadget<S> & Tappable<S>`
-- **Patterns emerge from composition** - bidirectional sync, aggregation, shared state
+#### Tables All the Way Down
+We realized these are essentially just tables, so we use `lastTable` from the existing patterns rather than reimplementing table logic. This gives us merge semantics and change effects for free.
 
-### Important Code
-```typescript
-// useGadgetMap - clean multi-gadget access
-const g = useGadgetMap({a: gadgetA, b: gadgetB});
-// g.a.state, g.a.send, g.a.gadget
+#### Composition Through Effects
+Basslines can observe each other's effects to compose. When one bassline registers a factory, another can observe that and mirror it. This enables derived basslines that merge vocabularies from multiple sources.
 
-// GadgetDisplay - generic over spec
-function GadgetDisplay<S>({gadget}: {gadget: Gadget<S> & Tappable<S>})
-```
+### Current Testing Status
+From the tests, it appears that:
+- Basic operations work (create, wire, disconnect)
+- Dynamic factory registration works
+- Bassline composition by merging namespaces works
+- Custom wiring patterns can be added to derived basslines
+- One minor issue with table updates not immediately reflecting in tests
 
-### Files
-- `/port-graphs-react/src/useGadgetMap.ts` - the hook
-- `/apps/web/app/notebook/` - simplified display components
-- `/apps/web/app/routes/notebook-demo.tsx` - pattern gallery
+### Files Created/Modified
+- `/port-graphs/src/meta/bassline.ts` - The bassline implementation
+- `/port-graphs/src/meta/bassline.test.ts` - Test suite
+- `/port-graphs-react/src/useRelations.ts` - React hook for relations
+- `/port-graphs-react/src/Wire.tsx` - Declarative wiring component
+
+### Open Questions/Next Steps
+Based on the conversation, it seems like:
+- React integration for basslines hasn't been built yet (deliberately postponed)
+- The verbosity issues in the notebook demo could potentially be addressed using basslines
+- There might be opportunities to use basslines as a standard way to set up gadget contexts
