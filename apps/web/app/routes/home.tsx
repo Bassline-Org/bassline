@@ -115,10 +115,21 @@ export default function Home() {
         </p>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {/* Gadget Demo - NEW! */}
+          {/* Bassline Playground - NEW! */}
+          <Link to="/bassline-playground" className="block">
+            <div className="border border-blue-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-lg transition-all bg-blue-50">
+              <h2 className="text-xl font-semibold mb-2">🎮 Bassline Playground (NEW!)</h2>
+              <p className="text-slate-600 mb-4">
+                Build and test gadget networks with visual graph editor
+              </p>
+              <Button variant="default">Open Playground</Button>
+            </div>
+          </Link>
+
+          {/* Gadget Demo */}
           <Link to="/gadget-demo" className="block">
             <div className="border border-emerald-200 rounded-lg p-6 hover:border-emerald-300 hover:shadow-lg transition-all bg-emerald-50">
-              <h2 className="text-xl font-semibold mb-2">✨ Gadget Demo (NEW!)</h2>
+              <h2 className="text-xl font-semibold mb-2">✨ Gadget Demo</h2>
               <p className="text-slate-600 mb-4">
                 Interactive gadgets with React - bidirectional data flow
               </p>

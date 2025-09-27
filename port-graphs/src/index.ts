@@ -12,7 +12,6 @@ export * from './patterns/io';
 export * from './relations';
 
 // Meta-gadgets for contextual composition
-export * from './meta/bassline';
 export * from './meta/factoryBassline';
 
 // Shared utilities
