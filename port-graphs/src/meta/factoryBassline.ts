@@ -52,12 +52,12 @@ export type FactoryBasslineSpec =
 // Built-in connection patterns
 const builtInPatterns = {
   extract: (from: Gadget<any> & Tappable<any>, to: Gadget<any>, config?: { field?: string }) => {
-    const field = config?.field || 'changed';
+    const field = (config?.field || 'changed') as any;
     return extract(from, field, to);
   },
 
   transform: (from: Gadget<any> & Tappable<any>, to: Gadget<any>, config?: { field?: string; fn?: Function }) => {
-    const field = config?.field || 'changed';
+    const field = (config?.field || 'changed') as any;
     const fn = config?.fn || ((x: any) => x);
     return transform(from, field, fn, to);
   },
