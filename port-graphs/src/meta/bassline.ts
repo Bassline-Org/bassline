@@ -1,208 +1,239 @@
 /**
- * Bassline - A meta-gadget for managing gadget namespaces, instances, and connections
+ * Bassline - A gadget that builds relations between gadgets
  *
- * A bassline is the "baseline" context that defines:
- * - What gadgets can be created (namespace of factories)
- * - What gadget instances exist (registry)
- * - How gadgets are connected (connections)
- * - What wiring patterns are available (patterns)
+ * A bassline IS a gadget. It takes declarative descriptions of relations
+ * and builds actual connections using our existing primitives (extract, transform, etc).
  *
- * Basslines are themselves gadgets, so they can be composed, tapped, and wired.
+ * Internally it can compose other gadgets (tables, processors, etc) but externally
+ * it presents a clean gadget interface. Different basslines can have different
+ * internal semantics while maintaining the same interface.
  */
 
 import { defGadget, withTaps, type Gadget, type State, type Input, type Actions, type Effects } from '../core/typed';
-import { lastTable, TableSpec } from '../patterns/cells/tables';
+import { lastTable } from '../patterns/cells/tables';
 import { extract, transform } from '../relations';
 
 /**
- * Information about a connection between gadgets
+ * The bassline gadget specification
+ * This defines what a bassline can receive and emit
  */
-type ConnectionInfo = {
-  from: string;
-  to: string;
-  pattern: string;
-  cleanup: () => void;
-};
-
-/**
- * Bassline specification
- */
-type BasslineSpec =
+export type BasslineSpec =
   & State<{
-    namespace: Gadget<TableSpec<string, Function>>;
-    registry: Gadget<TableSpec<string, Gadget<unknown>>>;
-    connections: Gadget<TableSpec<string, ConnectionInfo>>;
-    patterns: Gadget<TableSpec<string, Function>>;
+    // Internal state - hidden from users
+    definitions: Map<string, Function>;
+    instances: Map<string, Gadget<unknown>>;
+    edges: Map<string, { from: string; to: string; metadata?: any }>;
+    relations: Map<string, { cleanup: () => void }>;
   }>
   & Input<
-    | { create: { id: string; type: string; args: unknown[] } }
-    | { wire: { id: string; from: string; to: string; pattern?: string; args?: unknown[] } }
-    | { disconnect: string }
-    | { registerFactory: { name: string; factory: Function } }
-    | { registerPattern: { name: string; pattern: Function } }
+    | { define: { name: string; factory: Function } }
+    | { create: { id: string; type: string; args?: unknown[] } }
+    | { wire: { id: string; from: string; to: string; field?: string; transform?: Function;[key: string]: any } }
+    | { unwire: string }
     | { destroy: string }
   >
   & Actions<{
-    create: { id: string; type: string; args: unknown[] };
-    wire: { id: string; from: string; to: string; pattern?: string; args?: unknown[] };
-    disconnect: string;
-    registerFactory: { name: string; factory: Function };
-    registerPattern: { name: string; pattern: Function };
+    define: { name: string; factory: Function };
+    create: { id: string; type: string; args?: unknown[] };
+    wire: { id: string; from: string; to: string; field?: string; transform?: Function;[key: string]: any };
+    unwire: string;
     destroy: string;
   }>
   & Effects<{
+    defined: { name: string };
     created: { id: string; type: string };
     wired: { id: string; from: string; to: string };
-    disconnected: { id: string };
+    unwired: { id: string };
     destroyed: { id: string };
-    factoryRegistered: { name: string };
-    patternRegistered: { name: string };
-    notFound: { type?: string; instance?: string; pattern?: string };
+    notFound: { type?: string; instance?: string };
   }>;
 
 /**
  * Create a bassline gadget
  *
- * @param config Initial configuration with factories and patterns
- * @returns A bassline gadget that manages gadget creation and wiring
+ * A bassline is a gadget that manages relations between other gadgets.
+ * It can be composed, tapped, and wired just like any other gadget.
  *
  * @example
  * ```typescript
- * const bassline = withTaps(basslineGadget({
- *   factories: { slider: sliderGadget, max: maxCell },
- *   patterns: { wire: extract }
- * }));
+ * const bassline = withTaps(basslineGadget());
  *
- * bassline.receive({ create: { id: 'input', type: 'slider', args: [50, 0, 100] } });
- * bassline.receive({ create: { id: 'output', type: 'max', args: [0] } });
- * bassline.receive({ wire: { id: 'link', from: 'input', to: 'output' } });
+ * // Define factories
+ * bassline.receive({ define: { name: 'max', factory: maxCell } });
+ *
+ * // Create instances
+ * bassline.receive({ create: { id: 'sensor', type: 'max', args: [0] } });
+ *
+ * // Wire them together
+ * bassline.receive({ wire: { id: 'link', from: 'sensor', to: 'display' } });
  * ```
  */
-export function basslineGadget(config: {
-  factories?: Record<string, Function>;
-  patterns?: Record<string, Function>;
-} = {}) {
-  // Create the table gadgets that store our state
-  const namespace = withTaps(lastTable(config.factories || {}));
-  const registry = withTaps(lastTable<string, Gadget<unknown>>({}));
-  const connections = withTaps(lastTable<string, ConnectionInfo>({}));
-  const patterns = withTaps(lastTable(config.patterns || {
-    extract: extract,
-    transform: transform
-  }));
-
+export function basslineGadget(initialDefinitions: Record<string, Function> = {}) {
   return defGadget<BasslineSpec>({
     dispatch: (state, input) => {
+      if ('define' in input) return { define: input.define };
       if ('create' in input) return { create: input.create };
       if ('wire' in input) return { wire: input.wire };
-      if ('disconnect' in input) return { disconnect: input.disconnect };
-      if ('registerFactory' in input) return { registerFactory: input.registerFactory };
-      if ('registerPattern' in input) return { registerPattern: input.registerPattern };
+      if ('unwire' in input) return { unwire: input.unwire };
       if ('destroy' in input) return { destroy: input.destroy };
       return null;
     },
     methods: {
-      create: (gadget, { id, type, args }) => {
-        const factories = gadget.current().namespace.current();
-        const factory = factories[type];
-        if (!factory) return { notFound: { type } };
+      define: (gadget, { name, factory }) => {
+        gadget.current().definitions.set(name, factory);
+        return { defined: { name } };
+      },
 
-        // Create the gadget instance with taps
+      create: (gadget, { id, type, args = [] }) => {
+        const factory = gadget.current().definitions.get(type);
+        if (!factory) {
+          return { notFound: { type } };
+        }
+
         const instance = withTaps(factory(...args));
-
-        // Send declarative command to registry
-        const currentRegistry = gadget.current().registry.current();
-        gadget.current().registry.receive({
-          ...currentRegistry,
-          [id]: instance
-        });
+        gadget.current().instances.set(id, instance);
 
         return { created: { id, type } };
       },
 
-      wire: (gadget, { id, from, to, pattern = 'extract', args = [] }) => {
-        const instances = gadget.current().registry.current();
-        const fromGadget = instances[from];
-        const toGadget = instances[to];
-        const patternFn = gadget.current().patterns.current()[pattern];
+      wire: (gadget, wireCmd) => {
+        const { id, from, to, ...metadata } = wireCmd;
+        const instances = gadget.current().instances;
+        const fromGadget = instances.get(from);
+        const toGadget = instances.get(to);
 
         if (!fromGadget) return { notFound: { instance: from } };
         if (!toGadget) return { notFound: { instance: to } };
-        if (!patternFn) return { notFound: { pattern } };
 
-        // Create the connection using the pattern
-        const relation = patternFn(fromGadget, ...args, toGadget);
+        // Store the edge description
+        gadget.current().edges.set(id, { from, to, metadata });
 
-        // Send declarative command to connections table
-        const currentConnections = gadget.current().connections.current();
-        gadget.current().connections.receive({
-          ...currentConnections,
-          [id]: { from, to, pattern, cleanup: relation.cleanup }
-        });
+        // Build the actual relation using our primitives
+        let relation;
+        if (metadata.transform && typeof metadata.transform === 'function') {
+          const field = metadata.field || 'changed';
+          relation = transform(fromGadget as any, field, metadata.transform, toGadget);
+        } else if (metadata.field) {
+          relation = extract(fromGadget as any, metadata.field, toGadget);
+        } else {
+          relation = extract(fromGadget as any, 'changed', toGadget);
+        }
 
+        gadget.current().relations.set(id, relation);
         return { wired: { id, from, to } };
       },
 
-      disconnect: (gadget, id) => {
-        const connection = gadget.current().connections.current()[id];
-        if (!connection) return { notFound: { instance: id } };
-
-        // Clean up the connection
-        connection.cleanup();
-
-        // Send declarative command to remove connection by sending null
-        gadget.current().connections.receive({ [id]: null });
-
-        return { disconnected: { id } };
-      },
-
-      registerFactory: (gadget, { name, factory }) => {
-        // Send declarative command to namespace
-        const current = gadget.current().namespace.current();
-        gadget.current().namespace.receive({
-          ...current,
-          [name]: factory
-        });
-
-        return { factoryRegistered: { name } };
-      },
-
-      registerPattern: (gadget, { name, pattern }) => {
-        // Send declarative command to patterns table
-        const current = gadget.current().patterns.current();
-        gadget.current().patterns.receive({
-          ...current,
-          [name]: pattern
-        });
-
-        return { patternRegistered: { name } };
+      unwire: (gadget, id) => {
+        const relation = gadget.current().relations.get(id);
+        if (relation) {
+          relation.cleanup();
+          gadget.current().relations.delete(id);
+          gadget.current().edges.delete(id);
+        }
+        return { unwired: { id } };
       },
 
       destroy: (gadget, id) => {
-        const instances = gadget.current().registry.current();
-        if (!instances[id]) return { notFound: { instance: id } };
+        const instances = gadget.current().instances;
+        if (!instances.has(id)) {
+          return { notFound: { instance: id } };
+        }
 
-        // First disconnect any connections involving this gadget
-        const connections = gadget.current().connections.current();
-        const connectionsToRemove: Partial<Record<string, null>> = {};
+        // Remove the instance
+        instances.delete(id);
 
-        Object.entries(connections).forEach(([connId, conn]) => {
-          if (conn.from === id || conn.to === id) {
-            conn.cleanup();
-            connectionsToRemove[connId] = null;
+        // Clean up any edges involving this instance
+        const edges = gadget.current().edges;
+        const relations = gadget.current().relations;
+        const toRemove: string[] = [];
+
+        edges.forEach((edge, edgeId) => {
+          if (edge.from === id || edge.to === id) {
+            toRemove.push(edgeId);
           }
         });
 
-        // Remove from registry by sending null for the key
-        gadget.current().registry.receive({ [id]: null });
-
-        // Remove related connections by sending null for their keys
-        if (Object.keys(connectionsToRemove).length > 0) {
-          gadget.current().connections.receive(connectionsToRemove);
-        }
+        toRemove.forEach(edgeId => {
+          const relation = relations.get(edgeId);
+          if (relation) {
+            relation.cleanup();
+            relations.delete(edgeId);
+          }
+          edges.delete(edgeId);
+        });
 
         return { destroyed: { id } };
       }
     }
-  })({ namespace, registry, connections, patterns });
+  })({
+    definitions: new Map(Object.entries(initialDefinitions)),
+    instances: new Map(),
+    edges: new Map(),
+    relations: new Map()
+  });
+}
+
+/**
+ * Create a bassline that uses table gadgets internally
+ * This is a different "flavor" that shows how internal implementation can vary
+ */
+export function tableBasslineGadget(config: {
+  factories?: Record<string, Function>;
+  patterns?: Record<string, Function>;
+} = {}) {
+  // Internal gadgets
+  const definitions = withTaps(lastTable<string, Function>(config.factories || {}));
+  const instances = withTaps(lastTable<string, Gadget<unknown>>({}));
+  const edges = withTaps(lastTable<string, any>({}));
+
+  // The bassline gadget that orchestrates the tables
+  const bassline = basslineGadget();
+
+  // Wire the internal tables to the bassline
+  // When definitions change, update the bassline
+  definitions.tap(({ added, removed }) => {
+    if (added) {
+      Object.entries(added).forEach(([name, factory]) => {
+        bassline.receive({ define: { name, factory } });
+      });
+    }
+  });
+
+  // This bassline variant stores state in tables but presents the same interface
+  return withTaps(defGadget<BasslineSpec>({
+    dispatch: (state, input) => {
+      // Forward to the internal bassline
+      bassline.receive(input as any);
+
+      // Also update tables for persistence/observability
+      if ('define' in input) {
+        definitions.receive({ [input.define.name]: input.define.factory });
+      }
+      if ('create' in input) {
+        const instance = bassline.current().instances.get(input.create.id);
+        if (instance) {
+          instances.receive({ [input.create.id]: instance });
+        }
+      }
+      if ('wire' in input) {
+        edges.receive({ [input.wire.id]: input.wire });
+      }
+      if ('unwire' in input) {
+        edges.receive({ [input.unwire]: null });
+      }
+      if ('destroy' in input) {
+        instances.receive({ [input.destroy]: null });
+      }
+
+      return null; // Actions handled by internal bassline
+    },
+    methods: {}
+  })(bassline.current()));
+}
+
+/**
+ * Helper to get a gadget instance from a bassline
+ */
+export function getInstance(bassline: Gadget<BasslineSpec>, id: string): Gadget<unknown> | undefined {
+  return bassline.current().instances.get(id);
 }
