@@ -1,11 +1,14 @@
 // Core typed API
-export * from './core/typed';;
+export * from './core/typed';
 
 // Typed patterns
 export * from './patterns/cells';
 export * from './patterns/functions';
 export * from './patterns/ui';
 export * from './patterns/family';
+
+// Relations for wiring gadgets
+export * from './relations';
 
 // Shared utilities
 export * from './effects';

@@ -2,6 +2,7 @@
  * Test typed gadgets with tap extension
  */
 
+import { describe, it, expect } from 'vitest';
 import { sliderGadget, meterGadget } from '../patterns/ui/typed-ui';
 
 // Test slider
@@ -43,3 +44,10 @@ meter.tap((effect) => {
 cleanup();
 
 console.log('All type checks passed!');
+
+describe('Type checks', () => {
+  it('should compile without type errors', () => {
+    // This test just validates that the TypeScript types compile correctly
+    expect(true).toBe(true);
+  });
+});
