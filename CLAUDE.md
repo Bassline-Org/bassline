@@ -1,5 +1,7 @@
 # CLAUDE.md - Port-Graphs/Gadgets System Guide
 
+**📝 Note**: Check `.claude/context.md` for recent work context and architectural decisions from previous sessions.
+
 ## Project Overview
 
 This is **Bassline** - a hyper-minimal propagation network model built around **gadgets**. Despite the repo name "port-graphs", this is actually an implementation of a more general and powerful model inspired by propagation networks (Sussman/Radul) but evolved into something more fundamental.
