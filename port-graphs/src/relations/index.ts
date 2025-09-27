@@ -212,59 +212,6 @@ export function combiner<Target>(
   return new Combiner(targetGadget);
 }
 
-/**
- * Wire multiple sources to a target gadget's named inputs.
- * Simple function for backwards compatibility - prefer `combiner` for new code.
- *
- * @example
- * ```typescript
- * combine({
- *   x: sensor1,
- *   y: [sensor2, 'computed']
- * }, sum);
- * ```
- */
-export function combine<Target>(
-  sourceMap: Record<string, unknown>,
-  targetGadget: Gadget<Target>
-): { cleanup: () => void } {
-  const cleanups: (() => void)[] = [];
-
-  for (const [key, source] of Object.entries(sourceMap)) {
-    let gadget: unknown;
-    let field: string;
-
-    if (Array.isArray(source) && source.length === 2) {
-      [gadget, field] = source;
-    } else {
-      gadget = source;
-      field = 'changed';
-    }
-
-    if (typeof gadget === 'object' &&
-      gadget !== null &&
-      'tap' in gadget &&
-      typeof (gadget as { tap: unknown }).tap === 'function') {
-
-      const cleanup = (gadget as Tappable<unknown>).tap((effect) => {
-        if (typeof effect === 'object' &&
-          effect !== null &&
-          field in effect) {
-          const value = (effect as Record<string, unknown>)[field];
-          if (value !== undefined) {
-            targetGadget.receive({ [key]: value } as InputOf<Target>);
-          }
-        }
-      });
-
-      cleanups.push(cleanup);
-    }
-  }
-
-  return {
-    cleanup: () => cleanups.forEach(c => c())
-  };
-}
 
 /**
  * Helper to wire multiple relations at once and get a single cleanup.
@@ -274,7 +221,7 @@ export function combine<Target>(
  * const flow = relations([
  *   () => extract(a, 'changed', b),
  *   () => transform(b, 'changed', x => x * 2, c),
- *   () => combine({x: a, y: b}, sum)
+ *   () => combiner(sum).wire('x', a).wire('y', b).build()
  * ]);
  *
  * // Later: flow.cleanup() to disconnect everything

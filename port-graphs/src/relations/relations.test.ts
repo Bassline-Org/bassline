@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { Actions, defGadget, Effects, Input, State, withTaps } from '../core/typed';
 import { maxCell, lastCell } from '../patterns/cells/typed-cells';
 import { fn } from '../patterns/functions/typed-functions';
-import { extract, transform, combine, relations, combiner } from './index';
+import { extract, transform, relations, combiner } from './index';
 
 describe('Relations', () => {
   describe('extract', () => {
@@ -78,7 +78,7 @@ describe('Relations', () => {
     });
   });
 
-  describe('combine', () => {
+  describe('combiner', () => {
     it('should wire multiple sources to fn gadget', () => {
       const a = withTaps(lastCell(2));
       const b = withTaps(lastCell(123));
