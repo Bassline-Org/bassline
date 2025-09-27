@@ -66,13 +66,53 @@ From the tests, it appears that:
 - One minor issue with table updates not immediately reflecting in tests
 
 ### Files Created/Modified
-- `/port-graphs/src/meta/bassline.ts` - The bassline implementation
-- `/port-graphs/src/meta/bassline.test.ts` - Test suite
+- `/port-graphs/src/meta/bassline.ts` - Full-featured bassline with registry, factories, and wiring
+- `/port-graphs/src/meta/bassline.test.ts` - Test suite showing bassline as a gadget
+- `/port-graphs/src/meta/otherBassline.ts` - Minimal bassline showing core concept
+- `/port-graphs/src/relations/index.ts` - Relations primitives (extract, transform, combiner)
 - `/port-graphs-react/src/useRelations.ts` - React hook for relations
 - `/port-graphs-react/src/Wire.tsx` - Declarative wiring component
 
-### Open Questions/Next Steps
-Based on the conversation, it seems like:
-- React integration for basslines hasn't been built yet (deliberately postponed)
-- The verbosity issues in the notebook demo could potentially be addressed using basslines
-- There might be opportunities to use basslines as a standard way to set up gadget contexts
+### Deeper Understanding of Basslines
+
+#### Basslines as Network Constitutions
+After further exploration, I understand that a bassline is fundamentally just **a gadget that builds and manages networks of gadgets**. It defines the "ground truth" or "constitution" for that particular network. What this means is completely open to interpretation:
+- One bassline might only allow monotonic gadgets
+- Another might enforce strict typing rules
+- Another might require authentication for connections
+- Each bassline defines its own rules and semantics
+
+#### Data Over Objects Philosophy
+Basslines prioritize data over object references. The network topology is data that can be serialized, persisted, and replayed. The tension between gadget identity (objects with methods and tap Sets) and data storage is intentional - different basslines solve this differently:
+- Some use ID registries
+- Some store descriptions and resolve at connection time
+- Some keep objects in closures outside state
+
+#### The Minimal Bassline Pattern
+The `otherBassline.ts` implementation shows that you don't even need identity tracking or registries. A minimal bassline can just:
+- Accept connection descriptions (which are already closures with cleanup)
+- Track cleanup functions
+- Provide a way to nuke all connections
+This demonstrates the absolute core of what a bassline is.
+
+#### Bassline Flavors
+Different basslines serve different purposes:
+- **Registry bassline** - Tracks named instances and factories (like our main implementation)
+- **Topology bassline** - Just tracks connections without caring about instances
+- **Monotonic bassline** - Only allows monotonically increasing connections
+- **Temporal bassline** - Connections with timeouts
+- **Semantic bassline** - Enforces type compatibility or other rules
+
+#### Meta-Bassline Patterns
+Since basslines are gadgets themselves:
+- Basslines can manage other basslines
+- Meta-basslines can observe and coordinate multiple networks
+- Basslines can modify their own rules based on observations
+- The meta-layer behaves identically to the normal layer
+
+#### Key Insights
+- Basslines are NOT infrastructure or frameworks
+- They're just gadgets with the convention of building networks
+- A bassline IS a gadget - it receives input, maintains state, emits effects
+- The uniformity (meta = normal) is what makes the system powerful
+- Different basslines = different "constitutions" for networks
