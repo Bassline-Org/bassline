@@ -5,7 +5,7 @@
  * but partial information that other gadgets can use to provide missing capabilities.
  */
 
-import { type State, type Input, type Actions, type Effects, type Gadget, defGadget, withTaps, type Tappable } from '../core/typed';
+import { type State, type Input, type Actions, type Effects, type Gadget, defGadget, type Tappable } from '../core/typed';
 import { extract, transform } from '../relations';
 
 export type FactoryBasslineSpec =
@@ -107,7 +107,8 @@ export function factoryBassline(initialTypes: Record<string, Function> = {}) {
         }
 
         try {
-          const instance = withTaps(factory(...args));
+          // Factory should return an already tappable gadget
+          const instance = factory(...args);
           state.instances[name] = instance;
           gadget.update(state);
           return { spawned: { name, type, instance } };

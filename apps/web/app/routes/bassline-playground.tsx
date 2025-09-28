@@ -1,13 +1,19 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import type { Route } from "./+types/bassline-playground";
 import type { Node, Edge, Connection } from "reactflow";
 import {
-  factoryBassline,
   maxCell,
   minCell,
   lastCell,
   withTaps,
+  factoryBassline,
+  type FactoryBasslineSpec,
+  type Gadget,
 } from "port-graphs";
+import {
+  useGadget,
+  useGadgetEffect,
+} from "port-graphs-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -22,28 +28,27 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Bassline Playground" },
     { name: "description", content: "Interactive bassline network builder" },
   ];
 }
 
-// Type registry for available gadget types
+// Type registry that returns pre-wrapped (tappable) gadgets
 const typeRegistry = {
-  max: maxCell,
-  min: minCell,
-  last: lastCell,
+  max: (...args: Parameters<typeof maxCell>) => withTaps(maxCell(...args)),
+  min: (...args: Parameters<typeof minCell>) => withTaps(minCell(...args)),
+  last: (...args: Parameters<typeof lastCell>) => withTaps(lastCell(...args)),
 };
 
 // Define empty nodeTypes and edgeTypes outside component to avoid React Flow warnings
 const nodeTypes = {};
 const edgeTypes = {};
 
-export default function BasslinePlayground() {
-  // Create a bassline instance
-  const [bassline] = useState(() => withTaps(factoryBassline(typeRegistry)));
-  const [state, setState] = useState(() => bassline.current());
+function BasslinePlaygroundContent({ bassline }: { bassline: Gadget<FactoryBasslineSpec> & { tap: any } }) {
+  // Use the bassline gadget - cast for proper type inference
+  const [state, send] = useGadget(bassline as Gadget<FactoryBasslineSpec>);
 
   // Track UI state
   const [selectedType, setSelectedType] = useState("max");
@@ -58,36 +63,32 @@ export default function BasslinePlayground() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  // Subscribe to bassline changes
-  useState(() => {
-    bassline.tap((effect) => {
-      const newState = bassline.current();
-      setState(newState);
-      updateFlowGraph(newState);
+  // Use gadget effect to track changes
+  useGadgetEffect(bassline, (effect) => {
+    updateFlowGraph(state);
 
-      // Track data flow for visualization
-      if ('connected' in effect && effect.connected) {
-        // Listen to the source gadget for changes
-        const source = newState.instances[effect.connected.from];
-        const target = newState.instances[effect.connected.to];
-        if (source && target) {
-          source.tap((sourceEffect: any) => {
-            if ('changed' in sourceEffect && sourceEffect.changed !== undefined) {
-              setFlowHistory(prev => [
-                ...prev.slice(-19), // Keep last 20 items
-                {
-                  from: effect.connected.from,
-                  to: effect.connected.to,
-                  value: sourceEffect.changed,
-                  timestamp: Date.now()
-                }
-              ]);
-            }
-          });
-        }
+    // Track data flow for visualization
+    if ('connected' in effect && effect.connected) {
+      // Listen to the source gadget for changes
+      const source = state.instances[effect.connected?.from];
+      const target = state.instances[effect.connected?.to];
+      if (source && target && 'tap' in source && typeof source.tap === 'function') {
+        (source as any).tap((sourceEffect: any) => {
+          if ('changed' in sourceEffect && sourceEffect.changed !== undefined) {
+            setFlowHistory(prev => [
+              ...prev.slice(-19), // Keep last 20 items
+              {
+                from: effect.connected!.from,
+                to: effect.connected!.to,
+                value: sourceEffect.changed,
+                timestamp: Date.now()
+              }
+            ]);
+          }
+        });
       }
-    });
-  });
+    }
+  }, [state]);
 
   // Update React Flow graph when state changes
   const updateFlowGraph = useCallback((basslineState: typeof state) => {
@@ -150,7 +151,7 @@ export default function BasslinePlayground() {
 
   const createInstance = () => {
     if (instanceName) {
-      bassline.receive({
+      send({
         spawn: {
           name: instanceName,
           type: selectedType,
@@ -163,7 +164,7 @@ export default function BasslinePlayground() {
 
   const createConnection = () => {
     if (fromInstance && toInstance) {
-      bassline.receive({
+      send({
         connect: {
           id: `${fromInstance}-${toInstance}-${Date.now()}`,
           from: fromInstance,
@@ -183,21 +184,19 @@ export default function BasslinePlayground() {
         const value = isNaN(Number(testValue)) ? testValue : Number(testValue);
         gadget.receive(value);
         setTestValue("");
-        // Force re-render to show new value
-        setState(bassline.current());
       }
     }
   };
 
   const deleteInstance = (name: string) => {
-    bassline.receive({ destroy: name });
+    send({ destroy: name });
   };
 
   // Handle React Flow connections
   const onConnect = useCallback(
     (params: Connection) => {
       if (params.source && params.target) {
-        bassline.receive({
+        send({
           connect: {
             id: `${params.source}-${params.target}-${Date.now()}`,
             from: params.source,
@@ -207,7 +206,7 @@ export default function BasslinePlayground() {
         });
       }
     },
-    [bassline]
+    [send]
   );
 
 
@@ -228,8 +227,8 @@ export default function BasslinePlayground() {
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
+              //nodeTypes={nodeTypes}
+              //edgeTypes={edgeTypes}
               fitView
               proOptions={{ hideAttribution: true }}
             >
@@ -410,19 +409,19 @@ export default function BasslinePlayground() {
                 className="w-full"
                 onClick={() => {
                   // Create example network
-                  bassline.receive({ spawn: { name: 'input', type: 'max', args: [0] } });
-                  bassline.receive({ spawn: { name: 'processor', type: 'min', args: [100] } });
-                  bassline.receive({ spawn: { name: 'output', type: 'last', args: [null] } });
+                  send({ spawn: { name: 'input', type: 'max', args: [0] } });
+                  send({ spawn: { name: 'processor', type: 'min', args: [100] } });
+                  send({ spawn: { name: 'output', type: 'last', args: [null] } });
 
                   setTimeout(() => {
-                    bassline.receive({
+                    send({
                       connect: {
                         id: 'link1',
                         from: 'input',
                         to: 'processor'
                       }
                     });
-                    bassline.receive({
+                    send({
                       connect: {
                         id: 'link2',
                         from: 'processor',
@@ -479,4 +478,11 @@ export default function BasslinePlayground() {
       </Card>
     </div>
   );
+}
+
+export default function BasslinePlayground() {
+  // Create the bassline instance directly
+  const [bassline] = useState(() => withTaps(factoryBassline(typeRegistry)));
+
+  return <BasslinePlaygroundContent bassline={bassline} />;
 }
