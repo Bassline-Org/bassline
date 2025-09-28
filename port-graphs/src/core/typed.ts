@@ -5,8 +5,8 @@
 export type SpecOf<T> = T extends { _spec?: infer Spec } ? Spec : never;
 export type State<S> = { state: S };
 export type Input<I> = { input: I };
-export type Actions<A> = { actions: A };
-export type Effects<E> = { effects: E };
+export type Actions<A extends Record<PropertyKey, unknown>> = { actions: A };
+export type Effects<E extends Record<PropertyKey, unknown>> = { effects: E };
 
 export type StateOf<S> = S extends State<infer S> ? S : never;
 export type InputOf<I> = I extends Input<infer I> ? I : never;
@@ -70,15 +70,22 @@ export function defGadget<Spec>(
 
         if (result !== null) {
           // Extract action name and context
-          const actionName = Object.keys(result)[0] as ActionNames<Spec>;
+          const actionNameRaw = Object.keys(result)[0];
+          type ActionName = typeof actionNameRaw extends keyof ActionsOf<Spec> ? typeof actionNameRaw : never;
+          const actionName = actionNameRaw as ActionName;
           const context = result[actionName];
 
           const method = config.methods[actionName];
-          if (method !== undefined) {
-            const effect = method(gadget, context);
-            if (effect !== undefined) {
-              gadget.emit(effect);
-            }
+          if (method === undefined) {
+            throw new Error(
+              `defGadget: Missing method for action "${String(actionName)}". ` +
+              `Available methods: ${Object.keys(config.methods).join(', ')}`
+            );
+          }
+
+          const effect = method(gadget, context as ActionsOf<Spec>[ActionName]);
+          if (effect !== undefined) {
+            gadget.emit(effect);
           }
         }
       },

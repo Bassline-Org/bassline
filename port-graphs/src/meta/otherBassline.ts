@@ -32,7 +32,7 @@ export type MinimalBasslineSpec<G extends Gadget<any>> =
 export const minimalBassline =
     <G extends Gadget<any>>(initial: InputOf<MinimalBasslineSpec<G>>) => {
         const bassline = defGadget<MinimalBasslineSpec<G>>({
-            dispatch: (state, input) => {
+            dispatch: (_state, input) => {
                 if ('gadgets' in input) return { addGadgets: input.gadgets };
                 if ('connections' in input) return { addConnections: input.connections };
                 if ('nuke' in input) return { nuke: null };
