@@ -27,11 +27,29 @@ export const ignore = () => ({ ignore: {} } as const);
 export const emit = <E>(event: E, data?: any) => ({ emit: { event, data } } as const);
 export const error = (msg: string) => ({ error: msg } as const);
 
-export const cellStep = <A, B>(check: Arrow<A, B, boolean>) =>
-    (curr: A, val: B) => check(curr, val) ? merge(val) : ignore();
+export const when = <A, B, C, D>(
+    { pred, ifTrue, ifFalse }: {
+        pred: Arrow<A, B, boolean>,
+        ifTrue: Arrow<A, B, C>,
+        ifFalse: Arrow<A, B, D>
+    }
+): Arrow<A, B, C | D> =>
+    (curr: A, val: B) => pred(curr, val) ? ifTrue(curr, val) : ifFalse(curr, val);
+
+function cellStep<A, B, C extends { merge: B }, D extends { ignore: {} }>(
+    pred: Arrow<A, B, boolean>,
+    ifTrue: Arrow<A, B, C> = (a, b) => ({ merge: b } as const) as C,
+    ifFalse: Arrow<A, B, D> = (a, b) => ({ ignore: {} } as const) as D
+): Arrow<A, B, C | D> {
+    return when({ pred, ifTrue, ifFalse });
+}
+
 export const maxStep = cellStep((curr: number, val: number) => val > curr);
 export const minStep = cellStep((curr: number, val: number) => val < curr);
-export const unionStep = <T>() => cellStep((curr: Set<T>, vals: Set<T>) => !vals.isSubsetOf(curr));
+export const unionStep = <T>() => cellStep(
+    (curr: Set<T>, vals: Set<T>) => !vals.isSubsetOf(curr),
+    (curr, vals) => ({ merge: curr.union(vals), isSet: true } as const),
+);
 
 const memory = <T>(initial: T) => {
     let current = initial;
@@ -62,3 +80,11 @@ const max = gadget(maxStep, memory(0), (step, context) => {
         }
     }
 })
+
+function chain<A, B, C>(
+    step: Arrow<A, B, C>,
+): Arrow<A, B, C>;
+function chain<A, B, C, D>(
+    step1: Arrow<A, B, C>,
+    step2: Arrow<B, C, D>,
+): Arrow<A, B, D>;
