@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { Actions, defGadget, derive, Effects, Gadget, Input, InputOf, Methods, SpecOf, State, Tappable, withTaps } from '../../core/typed';
+import { Actions, defGadget, derive, Effects, EffectsOf, Gadget, Input, InputOf, Methods, SpecOf, State, Tappable, withTaps } from '../../core/typed';
 import { maxCell } from './typed-cells';
 
 export type TableSpec<K extends PropertyKey, V> =
@@ -16,7 +16,7 @@ export type TableSpec<K extends PropertyKey, V> =
         noop: {};
     }>;
 
-export function tableMethods<K extends PropertyKey, V>(): Methods<TableSpec<K, V>> {
+export function tableMethods<K extends PropertyKey, V>(): Methods<Gadget<TableSpec<K, V>>> {
     return {
         merge: (gadget, { added, removed }) => {
             const current = gadget.current();
@@ -34,7 +34,6 @@ export function tableMethods<K extends PropertyKey, V>(): Methods<TableSpec<K, V
                 removed
             };
         },
-
         ignore: () => ({ noop: {} })
     };
 }
@@ -60,7 +59,7 @@ const getTableChanges = <K extends PropertyKey, V>(state: Record<K, V>, input: P
 export const lastTable = <K extends PropertyKey, V>(initial: Record<K, V>) => defGadget<TableSpec<K, V>>({
     dispatch: (state, input) => {
         const { added, removed, hasChanges } = getTableChanges(state, input);
-        return hasChanges ? { merge: { added, removed } } : { ignore: {} };
+        return hasChanges ? ['merge', { added, removed }] : ['ignore', {}];
     },
     methods: tableMethods()
 })(initial);
@@ -69,7 +68,7 @@ export const firstTable = <K extends PropertyKey, V>(initial: Record<K, V>) => {
     return defGadget<TableSpec<K, V>>({
         dispatch: (state, input) => {
             const { added, removed, hasChanges } = getTableChanges(state, input);
-            return hasChanges ? { merge: { added, removed } } : { ignore: {} };
+            return hasChanges ? ['merge', { added, removed }] : ['ignore', {}];
         },
         methods: {
             ...tableMethods(),
@@ -115,7 +114,7 @@ export const unionTable = <K extends PropertyKey, V>(initial: Record<K, Set<V>>)
                 }
             }
             const hasChanges = _.keys(added).length > 0 || _.keys(removed).length > 0;
-            return hasChanges ? { merge: { added, removed } } : { ignore: {} };
+            return hasChanges ? ['merge', { added, removed }] : ['ignore', {}];
         },
         methods: {
             ...tableMethods(),
@@ -143,17 +142,18 @@ export const unionTable = <K extends PropertyKey, V>(initial: Record<K, Set<V>>)
     })(initial);
 }
 
+type CommandInput<K extends keyof C, C> = [K, C[K]]
+type Commands<C extends Record<PropertyKey, unknown>> =
+    | Input<CommandInput<keyof C, C>>
+    & Actions<C>
+
 export type FamilyTableSpec<K extends PropertyKey, G extends Gadget> =
     & State<Record<K, G>>
-    & Input<Partial<{
-        send: Record<K, InputOf<SpecOf<G>>>,
-        create: K[],
-        delete: K[],
-        clear: true,
-    }>>
-    & Actions<{
-        merge: { added: Record<K, G>; removed: Record<K, G>; received: Record<K, InputOf<SpecOf<G>>>; cleared: boolean };
-        ignore: {};
+    & Commands<{
+        send: Record<K, InputOf<SpecOf<G>>>;
+        create: K[];
+        delete: K[];
+        clear: true;
     }>
     & Effects<{
         changed: Record<K, G>;
@@ -163,55 +163,53 @@ export type FamilyTableSpec<K extends PropertyKey, G extends Gadget> =
         noop: {};
     }>;
 
+type Fam = FamilyTableSpec<string, Gadget<TableSpec<string, number>>>;
+type FamGadget = Gadget<Fam>;
+type FamMethods = Methods<FamGadget>;
+
 export const defFamilyTable = <G extends Gadget, K extends PropertyKey = PropertyKey>(factory: () => G) => {
     return defGadget<FamilyTableSpec<K, G>>({
-        dispatch: (state, input) => {
-            const added = {} as Record<K, G>;
-            const removed = {} as Record<K, G>;
-            let cleared = false;
-            const received = {} as Record<K, InputOf<SpecOf<G>>>;
-            if (input.send) {
-                for (const key in input.send) {
-                    received[key] = input.send[key];
-                }
-            }
-            if (input.create) {
-                for (const i in input.create) {
-                    const key = input.create[i]!;
-                    if (state[key] === undefined) {
-                        added[key] = factory();
-                    }
-                }
-            }
-            if (input.delete) {
-                for (const key in input.delete) {
-                    removed[key] = state[key];
-                }
-            }
-            if (input.clear) {
-                cleared = true;
-            }
-            const hasChanges = _.keys(added).length > 0 || _.keys(removed).length > 0 || cleared;
-            return hasChanges ? { merge: { added, removed, received, cleared } } : { ignore: {} };
+        dispatch: (state, [action, context]) => {
+            return [action, context];
         },
         methods: {
-            merge: (gadget, { added, removed, received, cleared }) => {
-                const current = { ...gadget.current() };
-                for (const key in added) {
-                    current[key] = added[key];
+            send: (gadget, sends) => {
+                const current = gadget.current();
+                for (const [key, value] of Object.entries<InputOf<SpecOf<G>>>(sends)) {
+                    const gadget = current[key as K]!;
+                    gadget.receive(value);
                 }
-                for (const key in removed) {
-                    delete current[key];
+                return { received: sends };
+            },
+            create: (gadget, keys) => {
+                const current = gadget.current();
+                const added = {} as Record<K, G>;
+                for (const key of keys) {
+                    if (current[key as K] === undefined) {
+                        added[key as K] = factory();
+                    }
                 }
                 gadget.update({ ...current, ...added });
-                return {
-                    changed: { ...current, ...added },
-                    added,
-                    removed,
-                    cleared
-                };
+                return { added };
             },
-            ignore: () => ({ noop: {} })
+            delete: (gadget, keys) => {
+                const current = gadget.current();
+                const removed = {} as Record<K, G>;
+                for (const key of keys) {
+                    if (current[key as K] !== undefined) {
+                        removed[key as K] = current[key as K];
+                    }
+                }
+                return { removed };
+            },
+            clear: (gadget) => {
+                const current = gadget.current();
+                for (const key in current) {
+                    delete current[key as K];
+                }
+                gadget.update({} as Record<K, G>);
+                return { removed: current };
+            },
         }
     })({} as Record<K, G>);
 }

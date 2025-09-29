@@ -6,11 +6,11 @@ export type SpecOf<T> = T extends { _spec?: infer Spec } ? Spec : never;
 export type State<S> = { state: S };
 export type Input<I> = { input: I };
 export type Actions<A extends Record<PropertyKey, unknown>> = { actions: A };
-export type Effects<E extends Record<PropertyKey, unknown>> = { effects: E };
+export type Effects<E extends Record<PropertyKey, unknown>> = { effects: Partial<E> };
 
 export type StateOf<S> = S extends State<infer S> ? S : never;
 export type InputOf<I> = I extends Input<infer I> ? I : never;
-export type EffectsOf<E> = E extends Effects<infer E> ? E : never;
+export type EffectsOf<E> = E extends Effects<infer E> ? Partial<E> : never;
 export type ActionsOf<A> = A extends Actions<infer A> ? A : never;
 
 // ============================================
