@@ -1,262 +1,336 @@
 import {
-    defGadget,
-    customGadget,
+    // Core
+    gadget,
     run,
     memory,
+
+    // Effects
     merge,
     ignore,
     emit,
+
+    // Step functions
     cellStep,
     maxStep,
+    minStep,
     counterStep,
-    productStep,
-    unionStep,
-    appendStep,
-    mapInput,
+    alwaysMerge,
+
+    // Morphism combinators
+    contramapFirst,
+    contramapSecond,
     mapOutput,
-    filterInput
+    dimap,
+    pipe,
+
+    // Effect combinators
+    extractMerge,
+    whenMerged,
+    filterMerged,
+    filterEffect,
+
+    // Composition
+    parallel,
+    sequence,
+    choose,
+
+    // Lens combinators
+    lens,
+    prop,
+
+    // Examples
+    maxAbove,
+    doubledMax,
+    constrainedMax,
+    maxGadget
 } from "./transduce";
 
 // ============================================
-// Example 1: Basic Gadgets with Type Inference
+// Example 1: Basic Morphism Composition
 // ============================================
 
-// Cell - only updates when value changes
-const cell = defGadget(cellStep<string>, "hello");
-const runCell = run(cell);
+console.log("=== Basic Morphisms ===");
 
-runCell("hello");  // No change
-runCell("world");  // Updates to "world"
-runCell("world");  // No change
-console.log("Cell state:", (cell as any).source()); // "world"
-
-// Max tracker
-const max = defGadget(maxStep, 0);
-const runMax = run(max);
-
-runMax(5);   // Updates to 5
-runMax(3);   // Stays at 5
-runMax(10);  // Updates to 10
-console.log("Max:", (max as any).source()); // 10
-
-// Counter
-const counter = defGadget(counterStep, 0);
-const runCounter = run(counter);
-
-runCounter(5);   // 5
-runCounter(3);   // 8
-runCounter(10);  // 18
-console.log("Counter:", (counter as any).source()); // 18
-
-// ============================================
-// Example 2: Step Function Transformations
-// ============================================
-
-// Double inputs before counting
-const doubledCounter = defGadget(
-    mapInput((x: number) => x * 2, counterStep),
-    0
+// Transform input before step
+const celsiusToFahrenheit = contramapSecond(
+    (c: number) => (c * 9/5) + 32,
+    maxStep
 );
-const runDoubled = run(doubledCounter);
 
-runDoubled(5);   // Actually adds 10
-runDoubled(3);   // Actually adds 6
-console.log("Doubled counter:", (doubledCounter as any).source()); // 16
-
-// Filter only positive numbers
-const positiveMax = defGadget(
-    filterInput((x: number) => x > 0, maxStep),
-    -Infinity
-);
-const runPositive = run(positiveMax);
-
-runPositive(5);    // Updates to 5
-runPositive(-10);  // Ignored
-runPositive(3);    // Stays at 5
-runPositive(8);    // Updates to 8
-console.log("Positive max:", (positiveMax as any).source()); // 8
-
-// Transform output effects
-const loudCounter = defGadget(
-    mapOutput(
-        (effect) => {
-            console.log("LOUD EFFECT:", effect);
-            return effect;
-        },
-        counterStep
-    ),
-    0
-);
-run(loudCounter)(5); // Logs: LOUD EFFECT: { merge: 5 }
-
-// ============================================
-// Example 3: Custom Gadgets with Different Hosts
-// ============================================
-
-// External state source
-let externalState = 100;
-const externalGadget = customGadget(
-    counterStep,
-    () => externalState,  // Read from external
-    (output) => {          // Write to external
-        if ('merge' in output) {
-            externalState = output.merge;
+// Now maxStep works with Celsius input
+const tempGadget = gadget(celsiusToFahrenheit, memory(0), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            ctx.set(e.merge);
+            console.log(`New max temp (F): ${e.merge}`);
         }
     }
-);
+}));
 
-run(externalGadget)(50);
-console.log("External state:", externalState); // 150
+run(tempGadget)(20);  // 68°F
+run(tempGadget)(25);  // 77°F
+run(tempGadget)(15);  // 59°F (ignored)
 
-// Logging gadget
-const loggingMax = customGadget(
-    maxStep,
-    () => 0,
-    (output) => {
-        if ('merge' in output) {
-            console.log(`New maximum: ${output.merge}`);
-        } else if ('ignore' in output) {
-            console.log("Value ignored (not a new max)");
+// ============================================
+// Example 2: Effect Transformations
+// ============================================
+
+console.log("\n=== Effect Transformations ===");
+
+// Double the merged value
+const doubled = whenMerged(maxStep, (v: number) => v * 2);
+
+const doubledGadget = gadget(doubled, memory(0), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            ctx.set(e.merge);
+            console.log(`Doubled max: ${e.merge}`);
         }
     }
+}));
+
+run(doubledGadget)(5);   // 10
+run(doubledGadget)(3);   // ignored
+run(doubledGadget)(8);   // 16
+
+// ============================================
+// Example 3: Filtering Effects
+// ============================================
+
+console.log("\n=== Filtering Effects ===");
+
+// Only merge values above 10
+const filteredMax = filterMerged(
+    (v: number) => v > 10,
+    maxStep
 );
 
-const runLogging = run(loggingMax);
-runLogging(5);   // Logs: New maximum: 5
-runLogging(3);   // Logs: Value ignored (not a new max)
-runLogging(10);  // Logs: New maximum: 10
-
-// ============================================
-// Example 4: Collection Operations
-// ============================================
-
-// Set operations
-const set = defGadget(unionStep<string>, new Set<string>());
-const runSet = run(set);
-
-runSet(["apple", "banana"]);
-runSet(["banana", "cherry"]);  // Only adds cherry
-runSet(["apple"]);             // No change
-console.log("Set:", Array.from((set as any).source())); // ["apple", "banana", "cherry"]
-
-// List append
-const list = defGadget(appendStep<number>, []);
-const runList = run(list);
-
-runList(1);
-runList(2);
-runList(3);
-console.log("List:", (list as any).source()); // [1, 2, 3]
-
-// ============================================
-// Example 5: Complex Step Functions
-// ============================================
-
-// Step that validates input and emits different effects
-const validatingStep = (curr: number[], val: number) => {
-    if (val < 0) {
-        return emit('error', `Negative value: ${val}`);
+const filteredGadget = gadget(filteredMax, memory(0), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            ctx.set(e.merge);
+            console.log(`Filtered max: ${e.merge}`);
+        } else {
+            console.log("Value filtered out");
+        }
     }
-    if (val === 0) {
-        return ignore();
-    }
-    if (val > 100) {
-        return emit('warning', `Large value: ${val}`);
-    }
-    return merge([...curr, val]);
+}));
+
+run(filteredGadget)(5);   // filtered
+run(filteredGadget)(15);  // 15
+run(filteredGadget)(12);  // filtered (not > 15)
+run(filteredGadget)(20);  // 20
+
+// ============================================
+// Example 4: Nested State with Lenses
+// ============================================
+
+console.log("\n=== Nested State ===");
+
+type AppState = {
+    user: {
+        score: number;
+        name: string;
+    };
+    settings: {
+        theme: string;
+    };
 };
 
-const validator = customGadget(
-    validatingStep,
-    () => [] as number[],
-    (output) => {
-        if ('merge' in output) {
-            console.log("Valid values:", output.merge);
-        } else if ('emit' in output) {
-            const { event, data } = output.emit;
-            console.log(`Event [${event}]:`, data);
+// Focus maxStep on user.score
+const scoreStep = lens(
+    (s: AppState) => s.user.score,
+    (s, score) => ({ ...s, user: { ...s.user, score } }),
+    maxStep
+);
+
+const appGadget = gadget(scoreStep, memory<AppState>({
+    user: { score: 0, name: "Alice" },
+    settings: { theme: "dark" }
+}), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            // Note: we need to update the nested value properly
+            const current = ctx.get();
+            ctx.set({ ...current, user: { ...current.user, score: e.merge } });
+            console.log(`New high score: ${e.merge}`);
         }
+    }
+}));
+
+run(appGadget)(100);
+run(appGadget)(50);   // ignored
+run(appGadget)(150);
+
+// ============================================
+// Example 5: Parallel Composition
+// ============================================
+
+console.log("\n=== Parallel Composition ===");
+
+// Run max and min in parallel
+const maxAndMin = parallel(maxStep, minStep);
+
+const parallelGadget = gadget(maxAndMin, memory({ max: -Infinity, min: Infinity }), (step, ctx) => ({
+    source: () => ctx.get().max,  // Use max as "current state"
+    step,
+    sink: ([maxEffect, minEffect]) => {
+        const state = ctx.get();
+        if ('merge' in maxEffect) {
+            state.max = maxEffect.merge;
+            console.log(`New max: ${maxEffect.merge}`);
+        }
+        if ('merge' in minEffect) {
+            state.min = minEffect.merge;
+            console.log(`New min: ${minEffect.merge}`);
+        }
+        ctx.set(state);
+    }
+}));
+
+run(parallelGadget)(5);   // max: 5, min: 5
+run(parallelGadget)(10);  // max: 10
+run(parallelGadget)(3);   // min: 3
+run(parallelGadget)(7);   // nothing
+
+// ============================================
+// Example 6: Sequential with Bridge
+// ============================================
+
+console.log("\n=== Sequential Composition ===");
+
+// First step: check if value > current
+// Bridge: extract merge value or use 0
+// Second step: add to counter
+const sequenced = sequence(
+    maxStep,
+    (effect) => extractMerge(effect) || 0,
+    counterStep
+);
+
+const seqGadget = gadget(sequenced, memory(0), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            ctx.set(e.merge);
+            console.log(`Sequential result: ${e.merge}`);
+        }
+    }
+}));
+
+run(seqGadget)(5);   // 5 (max updates, adds 5)
+run(seqGadget)(3);   // 5 (max doesn't update, adds 0)
+run(seqGadget)(10);  // 15 (max updates to 10, adds 10)
+
+// ============================================
+// Example 7: Complex Transformations
+// ============================================
+
+console.log("\n=== Complex Transformations ===");
+
+// Compose multiple transformations
+const complex = pipe(
+    filterMerged((v: number) => v % 2 === 0, maxStep),  // Only even numbers
+    (effect) => {
+        const val = extractMerge(effect);
+        if (val && val > 50) {
+            return emit('high_value', val);
+        }
+        return effect;
     }
 );
 
-const runValidator = run(validator);
-runValidator(5);    // Valid values: [5]
-runValidator(0);    // Ignored
-runValidator(-3);   // Event [error]: Negative value: -3
-runValidator(150);  // Event [warning]: Large value: 150
-runValidator(10);   // Valid values: [5, 10]
+const complexGadget = gadget(complex, memory(0), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            ctx.set(e.merge);
+            console.log(`Even max: ${e.merge}`);
+        } else if ('emit' in e) {
+            console.log(`Event: ${e.emit.event} - ${e.emit.data}`);
+        } else if ('ignore' in e) {
+            console.log("Ignored (odd or not max)");
+        }
+    }
+}));
+
+run(complexGadget)(5);   // ignored (odd)
+run(complexGadget)(10);  // 10
+run(complexGadget)(7);   // ignored (odd)
+run(complexGadget)(8);   // ignored (not > 10)
+run(complexGadget)(60);  // Event: high_value
+run(complexGadget)(12);  // ignored (not > 60)
 
 // ============================================
-// Example 6: Composing Step Functions
+// Example 8: Choose Based on Condition
 // ============================================
 
-// Parse string to number, then run counter
-const parseAndCount = defGadget(
-    mapInput((s: string) => parseInt(s) || 0, counterStep),
-    0
+console.log("\n=== Conditional Choice ===");
+
+// Choose different steps based on a condition
+const conditional = choose(
+    (curr: number, val: number) => val >= 0,
+    maxStep,     // For positive numbers
+    minStep      // For negative numbers
 );
-const runParser = run(parseAndCount);
 
-runParser("5");    // Adds 5
-runParser("3");    // Adds 3
-runParser("abc");  // Adds 0 (parse fails)
-runParser("10");   // Adds 10
-console.log("Parsed count:", (parseAndCount as any).source()); // 18
+const choiceGadget = gadget(conditional, memory(0), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            ctx.set(e.merge);
+            console.log(`Choice result: ${e.merge}`);
+        }
+    }
+}));
 
-// Chain multiple transformations
-const complexStep = mapInput(
-    (s: string) => s.length,           // String to length
-    filterInput(
-        (n: number) => n > 3,          // Only process if length > 3
-        mapOutput(
-            (e) => ({ ...e, timestamp: Date.now() }), // Add timestamp
-            counterStep
-        )
-    )
-);
-
-const complex = defGadget(complexStep, 0);
-const runComplex = run(complex);
-
-runComplex("hi");       // Length 2, ignored
-runComplex("hello");    // Length 5, adds 5
-runComplex("world!");   // Length 6, adds 6
-console.log("Complex result:", (complex as any).source()); // 11
+run(choiceGadget)(5);    // max: 5
+run(choiceGadget)(-3);   // min: -3
+run(choiceGadget)(10);   // max: 10
+run(choiceGadget)(-5);   // min: -5
+run(choiceGadget)(7);    // ignored (not > 10)
 
 // ============================================
-// Example 7: Product Accumulator
+// Example 9: Full Dimap
 // ============================================
 
-const product = defGadget(productStep, 1);
-const runProduct = run(product);
+console.log("\n=== Full Dimap ===");
 
-runProduct(2);  // 2
-runProduct(3);  // 6
-runProduct(4);  // 24
-console.log("Product:", (product as any).source()); // 24
-
-// ============================================
-// Example 8: Memory Helper Pattern
-// ============================================
-
-const mem = memory({ count: 0, items: [] as string[] });
-
-const statefulGadget = customGadget(
-    (curr: typeof mem.get, val: string) => {
-        const state = mem.get();
-        return merge({
-            count: state.count + 1,
-            items: [...state.items, val]
-        });
+// Transform all three parts
+const scaled = dimap(
+    (s: number) => s / 10,        // Scale down state
+    (i: string) => parseInt(i),   // Parse string input
+    (e) => {                       // Transform effect
+        if ('merge' in e) {
+            return merge(e.merge * 10);  // Scale back up
+        }
+        return e;
     },
-    mem.get,
-    (output) => {
-        if ('merge' in output) {
-            mem.set(output.merge);
-        }
-    }
+    maxStep
 );
 
-run(statefulGadget)("first");
-run(statefulGadget)("second");
-console.log("Stateful:", mem.get()); // { count: 2, items: ["first", "second"] }
+const dimapGadget = gadget(scaled, memory(100), (step, ctx) => ({
+    source: ctx.get,
+    step,
+    sink: (e) => {
+        if ('merge' in e) {
+            ctx.set(e.merge);
+            console.log(`Scaled result: ${e.merge}`);
+        }
+    }
+}));
+
+run(dimapGadget)("15");  // 150 (parse 15, compare with 10, scale up)
+run(dimapGadget)("5");   // ignored (5 not > 10)
+run(dimapGadget)("20");  // 200
