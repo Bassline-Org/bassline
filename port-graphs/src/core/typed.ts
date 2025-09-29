@@ -29,17 +29,12 @@ export type Gadget<Spec = unknown> = {
 // Dispatch & Method Types
 // ============================================
 
-// Extract just the action names from a spec
-export type ActionNames<Spec> = keyof ActionsOf<Spec>;
-
 // The dispatch function returns action + context
-export type DispatchResult<Spec> = { [K in ActionNames<Spec>]: { [P in K]: ActionsOf<Spec>[K] } }[keyof ActionsOf<Spec>];
-
-// Method signature for a specific action
-export type Method<Spec, Action extends ActionNames<Spec>> = (gadget: Gadget<Spec>, context: ActionsOf<Spec>[Action]) => Partial<EffectsOf<Spec>>;
+//export type DispatchResult<Spec> = { [K in keyof ActionsOf<Spec>]: ActionsOf<Spec>[K] } & { length: 1 };
+export type DispatchResult<Spec> = [keyof ActionsOf<Spec>, ActionsOf<Spec>[keyof ActionsOf<Spec>]]
 
 // All methods for a spec
-export type Methods<Spec> = { [K in keyof ActionsOf<Spec>]: Method<Spec, K> }
+export type Methods<G> = { [K in keyof ActionsOf<SpecOf<G>>]: (gadget: G, context: Required<ActionsOf<SpecOf<G>>>[K]) => EffectsOf<SpecOf<G>> }
 
 // ============================================
 // Implementation Function
@@ -50,8 +45,8 @@ export function defGadget<Spec>(
     dispatch: (
       state: StateOf<Spec>,
       input: InputOf<Spec>
-    ) => DispatchResult<Spec> | null;
-    methods: Methods<Spec>;
+    ) => DispatchResult<Spec>
+    methods: Methods<Gadget<Spec>>;
   }
 ): (initial: StateOf<Spec>) => Gadget<Spec> {
 
@@ -66,27 +61,17 @@ export function defGadget<Spec>(
       },
 
       receive: (input) => {
-        const result = config.dispatch(gadget.current(), input);
-
-        if (result !== null) {
-          // Extract action name and context
-          const actionNameRaw = Object.keys(result)[0];
-          type ActionName = typeof actionNameRaw extends keyof ActionsOf<Spec> ? typeof actionNameRaw : never;
-          const actionName = actionNameRaw as ActionName;
-          const context = result[actionName];
-
-          const method = config.methods[actionName];
-          if (method === undefined) {
-            throw new Error(
-              `defGadget: Missing method for action "${String(actionName)}". ` +
-              `Available methods: ${Object.keys(config.methods).join(', ')}`
-            );
-          }
-
-          const effect = method(gadget, context as ActionsOf<Spec>[ActionName]);
-          if (effect !== undefined) {
-            gadget.emit(effect);
-          }
+        const [action, context] = config.dispatch(gadget.current(), input);
+        const method = config.methods[action];
+        if (method === undefined) {
+          throw new Error(
+            `defGadget: Missing method for action "${String(action)}". ` +
+            `Available methods: ${Object.keys(config.methods).join(', ')}`
+          );
+        }
+        const effect = method(gadget, context);
+        if (effect !== undefined) {
+          gadget.emit(effect);
         }
       },
 
@@ -94,7 +79,6 @@ export function defGadget<Spec>(
         // Default: effects go into the void
       }
     };
-
     return gadget;
   }
 }
@@ -186,7 +170,7 @@ export const derive = <S extends Effects<{ changed: StateOf<S> }>, Transformed>(
     & Effects<{ changed: Transformed }>
 
   const derived = defGadget<DerivedSpec>({
-    dispatch: (_state, input) => ({ update: input }),
+    dispatch: (_state, input) => ['update', input],
     methods: {
       update: (gadget, value) => {
         const transformed = transform(value);
