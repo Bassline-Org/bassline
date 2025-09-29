@@ -24,8 +24,7 @@
     "noUncheckedIndexedAccess": true,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
-    "exactOptionalPropertyTypes": true,
-    "noImplicitAny": false
+    "noImplicitAny": true
   },
   "include": [
     "src/**/*.ts"
