@@ -1,3 +1,7 @@
+// ================================================
+// Core
+// ================================================
+
 // @goose: Defines a new proto gadget from a step
 export function protoGadget<Step extends Arrow>(step: Step) {
     return {
@@ -25,11 +29,6 @@ export function realize<Step extends Arrow>(p: ProtoGadget<Step>, store: Store<S
     return g as typeof g;
 }
 
-type CellEffects<T> = {
-    merge?: T,
-    ignore?: {}
-}
-
 // @goose: Some default steps
 export const cellStep = <T, E extends CellEffects<T>>({
     predicate,
@@ -41,15 +40,18 @@ export const cellStep = <T, E extends CellEffects<T>>({
     ifFalse?: Arrow<T, T, E>
 }) => (a: T, b: T) => predicate(a, b) ? ifTrue(a, b) : ifFalse(a, b);
 
+// @goose: A semilattice ordered by the >= relation
 export const maxStep = cellStep({
-    predicate: (a: number, b: number) => a > b,
+    predicate: (a: number, b: number) => a >= b,
 })
 
+// @goose: A semilattice ordered by isSubsetOf relation
 export const unionStep = <T>() => cellStep({
     predicate: (a: Set<T>, b: Set<T>) => b.isSubsetOf(a),
     ifTrue: (a: Set<T>, b: Set<T>) => ({ merge: a.union(b) }),
 })
 
+// @goose: A semilattice ordered by intersection
 export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
     const intersection = a.intersection(b);
     if (intersection.size === 0) {
@@ -61,33 +63,31 @@ export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
     return { merge: intersection } as const;
 }
 
+// ================================================
+// Handlers
+// ================================================
+
+// @goose: Handler for merging values
+export const mergeHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+    if ('merge' in effects) g.update(effects.merge)
+}
+
+// @goose: Handler for contradiction
+export const contradictionHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+    if ('contradiction' in effects) console.log('contradiction!', effects.contradiction);
+}
+// @goose: Compose multiple handlers into a single handler
 export const composeHandlers = <Step extends Arrow>(
     ...handlers: Handler<Step>[]
 ): Handler<Step> => (g, effects) => {
     handlers.forEach(h => h(g, effects));
 };
 
-export const mergeHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
-    if ('merge' in effects) g.update(effects.merge)
-}
-export const contradictionHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
-    if ('contradiction' in effects) {
-        console.log('contradiction!', effects.contradiction);
-    }
-}
+// ================================================
+// Stores
+// ================================================
 
-export const protoMax = protoGadget(maxStep)
-    .handler(mergeHandler<typeof maxStep>());
-
-export const protoIntersection = <T>() => {
-    const step = intersectionStep<T>();
-    return protoGadget(step)
-        .handler(composeHandlers<typeof step>(
-            contradictionHandler<typeof step>(),
-            mergeHandler<typeof step>()
-        ));
-}
-
+// @goose: In memory store, most dumb store
 export const memoryStore = <T>(initial: T): Store<T> => {
     let state = initial;
     return {
@@ -102,20 +102,9 @@ export const quick = <Step extends Arrow>(
     initial: StateOf<Step>
 ) => realize(proto, memoryStore<StateOf<Step>>(initial));
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// ================================================
+// Types
+// ================================================
 export type Arrow<A = any, B = any, C = any> = (a: A, b: B) => C;
 export type StateOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? State : never;
 export type InputOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? Input : never;
@@ -133,3 +122,8 @@ export type Gadget<Step extends Arrow> =
     & ProtoGadget<Step>
     & Store<StateOf<Step>>
     & { receive(input: InputOf<Step>): void }
+
+export type CellEffects<T> = {
+    merge?: T,
+    ignore?: {}
+}
