@@ -68,18 +68,18 @@ export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
 // ================================================
 
 // @goose: Handler for merging values
-export const mergeHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+export const mergeHandler = <S extends Arrow, G extends Gadget<S>>(g: G, effects: EffectsOf<S>) => {
     if ('merge' in effects) g.update(effects.merge)
 }
 
 // @goose: Handler for contradiction
-export const contradictionHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+export const contradictionHandler = <S extends Arrow, G extends Gadget<S>>(g: G, effects: EffectsOf<S>) => {
     if ('contradiction' in effects) console.log('contradiction!', effects.contradiction);
 }
 // @goose: Compose multiple handlers into a single handler
-export const composeHandlers = <Step extends Arrow>(
-    ...handlers: Handler<Step>[]
-): Handler<Step> => (g, effects) => {
+export const composeHandlers = <S extends Arrow, G extends Gadget<S>>(
+    ...handlers: Handler<S, G>[]
+): Handler<S, G> => (g, effects) => {
     handlers.forEach(h => h(g, effects));
 };
 
