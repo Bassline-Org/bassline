@@ -1,36 +1,21 @@
-type Arrow<A = any, B = any, C = any> = (a: A, b: B) => C;
-type StateOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? State : never;
-type InputOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? Input : never;
-type EffectsOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? Effects : never;
-type Handler<F extends Arrow, G extends Gadget<F> = Gadget<F>> = (g: G, effects: EffectsOf<F>) => void;
-
-interface Store<State> {
-    current(): State;
-    update(updated: State): void;
-}
-type ProtoGadget<Step extends Arrow> = {
-    step: Step
-    handler: Handler<Step>
-}
-type Gadget<Step extends Arrow> =
-    & ProtoGadget<Step>
-    & Store<StateOf<Step>>
-    & { receive(input: InputOf<Step>): void }
-
-type Realize<Step extends Arrow> = (p: ProtoGadget<Step>, store: Store<StateOf<Step>>) => Gadget<Step>
-
-function protoGadget<Step extends Arrow>(step: Step, handler: Handler<Step>): ProtoGadget<Step> {
+// @goose: Defines a new proto gadget from a step
+export function protoGadget<Step extends Arrow>(step: Step) {
     return {
-        step,
-        handler
-    } as const satisfies ProtoGadget<Step>
+        handler(handler: Handler<Step>) {
+            return {
+                step,
+                handler,
+            } as const satisfies ProtoGadget<Step>
+        }
+    } as const
 }
 
-function realize<Step extends Arrow>(p: ProtoGadget<Step>, store: Store<StateOf<Step>>) {
+// @goose: Realizes a proto-gadget into a full gadget, by passing a store for state
+export function realize<Step extends Arrow>(p: ProtoGadget<Step>, store: Store<StateOf<Step>>) {
     const g = {
         receive(input) {
             const effects = g.step(g.current(), input);
-            if (effects) {
+            if (effects !== undefined) {
                 g.handler(g, effects)
             }
         },
@@ -44,20 +29,66 @@ type CellEffects<T> = {
     merge?: T,
     ignore?: {}
 }
-type Cell<T, E extends CellEffects<T> = CellEffects<T>> = Gadget<Arrow<T, T, E>>
 
-const maxStep = (a: number, b: number) => a > b ? { ignore: {} } : { merge: b }
-const unionStep = <T>() => (a: Set<T>, b: Set<T>) => b.isSubsetOf(a) ? { ignore: {} } : { merge: a.union(b) }
-const cellHandler = <T>() => (g: Cell<T>, effects: CellEffects<T>) => {
-    if (effects.merge !== undefined) g.update(effects.merge)
+// @goose: Some default steps
+export const cellStep = <T, E extends CellEffects<T>>({
+    predicate,
+    ifTrue = (a: T, b: T) => ({ merge: b } as E),
+    ifFalse = (a: T, b: T) => ({ ignore: {} } as E)
+}: {
+    predicate: Arrow<T, T, boolean>,
+    ifTrue?: Arrow<T, T, E>,
+    ifFalse?: Arrow<T, T, E>
+}) => (a: T, b: T) => predicate(a, b) ? ifTrue(a, b) : ifFalse(a, b);
+
+export const maxStep = cellStep({
+    predicate: (a: number, b: number) => a > b,
+})
+
+export const unionStep = <T>() => cellStep({
+    predicate: (a: Set<T>, b: Set<T>) => b.isSubsetOf(a),
+    ifTrue: (a: Set<T>, b: Set<T>) => ({ merge: a.union(b) }),
+})
+
+export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
+    const intersection = a.intersection(b);
+    if (intersection.size === 0) {
+        return { contradiction: { current: a, incoming: b } } as const;
+    }
+    if (intersection.size === a.size) {
+        return { ignore: {} } as const;
+    }
+    return { merge: intersection } as const;
 }
 
-const protoMax = protoGadget(
-    maxStep,
-    cellHandler()
-)
+export const composeHandlers = <Step extends Arrow>(
+    ...handlers: Handler<Step>[]
+): Handler<Step> => (g, effects) => {
+    handlers.forEach(h => h(g, effects));
+};
 
-const memoryStore = <T>(initial: T): Store<T> => {
+export const mergeHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+    if ('merge' in effects) g.update(effects.merge)
+}
+export const contradictionHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+    if ('contradiction' in effects) {
+        console.log('contradiction!', effects.contradiction);
+    }
+}
+
+export const protoMax = protoGadget(maxStep)
+    .handler(mergeHandler<typeof maxStep>());
+
+export const protoIntersection = <T>() => {
+    const step = intersectionStep<T>();
+    return protoGadget(step)
+        .handler(composeHandlers<typeof step>(
+            contradictionHandler<typeof step>(),
+            mergeHandler<typeof step>()
+        ));
+}
+
+export const memoryStore = <T>(initial: T): Store<T> => {
     let state = initial;
     return {
         current: () => state,
@@ -65,100 +96,40 @@ const memoryStore = <T>(initial: T): Store<T> => {
     } as const satisfies Store<T>
 }
 
-const a = realize(protoMax, memoryStore(5));
-const b = (() => {
-    const normal = cellHandler<number>();
-    const customHandler = (g: Cell<number>, e: CellEffects<number>) => {
-        normal(g, e);
-        console.log('my extra thing')
-        if (e.merge) a.receive(e.merge);
-    }
-    return realize({ ...protoMax, handler: customHandler }, memoryStore(0))
-})();
+// @goose: Quick realization with a default memory store
+export const quick = <Step extends Arrow>(
+    proto: ProtoGadget<Step>,
+    initial: StateOf<Step>
+) => realize(proto, memoryStore<StateOf<Step>>(initial));
 
-console.log('a: ', a.current());
-console.log('b: ', b.current());
-b.receive(10);
-console.log('a: ', a.current());
-console.log('b: ', b.current());
-b.receive(15);
-console.log('a: ', a.current());
-console.log('b: ', b.current());
-b.receive(5);
-console.log('a: ', a.current());
-console.log('b: ', b.current());
 
-// abstract class BaseGadget<Step extends Arrow> {
-//     _handler: (_effect: EffectsOf<Step>) => void = (e) => { throw new Error('Handler not set!') }
-//     constructor(
-//         public step: Step,
-//         public store: Store<StateOf<Step>>,
-//         handler?: typeof this._handler
-//     ) {
-//         if (handler) this.handler = handler.bind(this)
-//     }
-//     set handler(newHandler: typeof this._handler) { this._handler = newHandler.bind(this) }
-//     get handler() { return this._handler }
 
-//     current() { return this.store.current() }
-//     update(newState: StateOf<Step>): void { this.store.update(newState) }
-//     abstract receive(input: InputOf<Step>): void;
-// }
 
-// class Gadget<Step extends Arrow> extends BaseGadget<Step> {
-//     taps: Handler<Step>[] = [];
-//     tap(tapFn: Handler<Step>): () => void {
-//         const cleanup = () => this.taps = this.taps.filter(e => e !== tapFn);
-//         if (this.taps.includes(tapFn)) {
-//             return cleanup
-//         }
-//         this.taps.push(tapFn.bind(this));
-//         return cleanup;
-//     }
-//     runTaps(effect: EffectsOf<Step>) { this.taps.forEach(tap => tap.call(this, effect)) }
-//     receive(input: InputOf<Step>) {
-//         const effects = this.step(this.current(), input);
-//         if (effects === undefined) return;
-//         this.handler(effects)
-//         this.runTaps(effects)
-//     }
-// }
 
-// type CellEffects<T> = {
-//     merge?: T,
-//     ignore?: {}
-// }
 
-// type CellArrow<T> = Arrow<T, T, CellEffects<T>>
 
-// class Cell<T> extends Gadget<CellArrow<T>> {
-//     handler({ merge }: EffectsOf<CellArrow<T>>) {
-//         if (merge !== undefined) this.update(merge);
-//     }
-// }
 
-// class MaxCell extends Cell<number> {
-//     constructor(initial: number, store: Store<number> = new MemoryStore(initial)) {
-//         super(maxStep, store)
-//     }
-// }
 
-// const a = new MaxCell(0);
-// const b = new MaxCell(10);
 
-// a.tap((({ merge }) => {
-//     if (merge !== undefined) {
-//         console.log('a merged: ', merge)
-//         b.receive(merge)
-//     }
-// }));
 
-// b.tap(({ merge }) => {
-//     if (merge !== undefined) console.log('b merged!', merge)
-// })
 
-// a.receive(1);
-// a.receive(5);
-// a.receive(10);
-// a.receive(15);
-// a.receive(5);
+
+
+
+export type Arrow<A = any, B = any, C = any> = (a: A, b: B) => C;
+export type StateOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? State : never;
+export type InputOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? Input : never;
+export type EffectsOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? Effects : never;
+export type Handler<F extends Arrow, G extends Gadget<F> = Gadget<F>> = (g: G, effects: EffectsOf<F>) => void;
+export type Store<State> = {
+    current(): State;
+    update(updated: State): void;
+}
+export type ProtoGadget<Step extends Arrow> = {
+    step: Step
+    handler: Handler<Step>
+}
+export type Gadget<Step extends Arrow> =
+    & ProtoGadget<Step>
+    & Store<StateOf<Step>>
+    & { receive(input: InputOf<Step>): void }
