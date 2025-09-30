@@ -1,4 +1,7 @@
-// Core typed API
+// Core context.ts API (new model)
+export * from './core/context';
+
+// Core typed API (old model - for backward compatibility)
 export * from './core/typed';
 
 // Typed patterns

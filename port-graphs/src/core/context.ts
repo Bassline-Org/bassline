@@ -29,44 +29,16 @@ export function realize<Step extends Arrow>(p: ProtoGadget<Step>, store: Store<S
     return g as typeof g;
 }
 
-// @goose: A semilattice ordered by the >= relation
-export const maxStep = (a: number, b: number) => b >= a ? { merge: b } as const : { ignore: {} } as const;
-
-// @goose: A semilattice ordered by isSubsetOf relation
-export const unionStep = <T>() => (a: Set<T>, b: Set<T>) => b.isSubsetOf(a) ? { ignore: {} } as const : { merge: a.union(b) } as const;
-
-// @goose: A semilattice ordered by intersection
-export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
-    const intersection = a.intersection(b);
-    if (intersection.size === 0) {
-        return { contradiction: { current: a, incoming: b } } as const;
-    }
-    if (intersection.size === a.size) {
-        return { ignore: {} } as const;
-    }
-    return { merge: intersection } as const;
-}
-
-// ================================================
-// Handlers
-// ================================================
-
-// @goose: Handler for merging values
-export const mergeHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
-    if (effects && 'merge' in effects) g.update(effects.merge)
-}
-
-// @goose: Handler for contradiction
-export const contradictionHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
-    if (effects && 'contradiction' in effects) console.log('contradiction!', effects.contradiction);
-}
-
-// @goose: Compose multiple handlers into a single handler
-export const composeHandlers = <Step extends Arrow>(
-    ...handlers: Handler<Step>[]
-): Handler<Step> => (g, effects) => {
-    handlers.forEach(h => h(g, effects));
-};
+// @goose: Helper for building cell steps with a predicate
+export const cellStep = <T, E extends CellEffects<T>>({
+    predicate,
+    ifTrue = (a: T, b: T) => ({ merge: b } as E),
+    ifFalse = (a: T, b: T) => ({ ignore: {} } as E)
+}: {
+    predicate: Arrow<T, T, boolean>,
+    ifTrue?: Arrow<T, T, E>,
+    ifFalse?: Arrow<T, T, E>
+}) => (a: T, b: T) => predicate(a, b) ? ifTrue(a, b) : ifFalse(a, b);
 
 // ================================================
 // Stores
@@ -86,8 +58,6 @@ export const quick = <Step extends Arrow>(
     proto: ProtoGadget<Step>,
     initial: StateOf<Step>
 ) => realize(proto, memoryStore<StateOf<Step>>(initial));
-
-const fooProto = protoGadget(maxStep).handler(mergeHandler);
 
 // ================================================
 // Types

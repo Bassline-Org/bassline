@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
+import { protoGadget, quick, withTaps } from './context';
 import {
-    protoGadget,
-    quick,
-    withTaps,
     maxStep,
-    mergeHandler,
     unionStep,
     intersectionStep,
-    composeHandlers,
+} from '../patterns/cells/steps';
+import {
+    mergeHandler,
     contradictionHandler,
-} from './context';
+    composeHandlers,
+} from '../patterns/cells/handlers';
 
 describe('context.ts - Core Functionality', () => {
     describe('maxStep cell', () => {
