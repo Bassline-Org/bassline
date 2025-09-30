@@ -29,22 +29,11 @@ export function realize<Step extends Arrow>(p: ProtoGadget<Step>, store: Store<S
     return g as typeof g;
 }
 
-// @goose: Some default steps
-export const cellStep = <T, E extends CellEffects<T>>({
-    predicate,
-    ifTrue = (a: T, b: T) => ({ merge: b } as E),
-    ifFalse = (a: T, b: T) => ({ ignore: {} } as E)
-}: {
-    predicate: Arrow<T, T, boolean>,
-    ifTrue?: Arrow<T, T, E>,
-    ifFalse?: Arrow<T, T, E>
-}) => (a: T, b: T) => predicate(a, b) ? ifTrue(a, b) : ifFalse(a, b);
-
 // @goose: A semilattice ordered by the >= relation
 export const maxStep = (a: number, b: number) => b >= a ? { merge: b } as const : { ignore: {} } as const;
 
 // @goose: A semilattice ordered by isSubsetOf relation
-export const unionStep = <T>() => (a: Set<T>, b: Set<T>) => b.isSubsetOf(a) ? { merge: a.union(b) } as const : { ignore: {} } as const;
+export const unionStep = <T>() => (a: Set<T>, b: Set<T>) => b.isSubsetOf(a) ? { ignore: {} } as const : { merge: a.union(b) } as const;
 
 // @goose: A semilattice ordered by intersection
 export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
@@ -63,18 +52,19 @@ export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
 // ================================================
 
 // @goose: Handler for merging values
-export const mergeHandler = <S extends Arrow, G extends Gadget<S>>(g: G, effects: EffectsOf<S>) => {
-    if ('merge' in effects) g.update(effects.merge)
+export const mergeHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+    if (effects && 'merge' in effects) g.update(effects.merge)
 }
 
 // @goose: Handler for contradiction
-export const contradictionHandler = <S extends Arrow, G extends Gadget<S>>(g: G, effects: EffectsOf<S>) => {
-    if ('contradiction' in effects) console.log('contradiction!', effects.contradiction);
+export const contradictionHandler = <Step extends Arrow>() => (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+    if (effects && 'contradiction' in effects) console.log('contradiction!', effects.contradiction);
 }
+
 // @goose: Compose multiple handlers into a single handler
-export const composeHandlers = <S extends Arrow, G extends Gadget<S>>(
-    ...handlers: Handler<S, G>[]
-): Handler<S, G> => (g, effects) => {
+export const composeHandlers = <Step extends Arrow>(
+    ...handlers: Handler<Step>[]
+): Handler<Step> => (g, effects) => {
     handlers.forEach(h => h(g, effects));
 };
 
@@ -123,4 +113,47 @@ export type Gadget<Step extends Arrow> =
 export type CellEffects<T> = {
     merge?: T,
     ignore?: {}
+}
+
+// ================================================
+// Extensions
+// ================================================
+
+// @goose: Type for tap functions that observe effects
+export type TapFn<Step extends Arrow> = (effects: EffectsOf<Step>) => void;
+
+// @goose: Interface for tappable gadgets
+export type Tappable<Step extends Arrow> = {
+    tap(fn: TapFn<Step>): () => void;
+}
+
+// @goose: Type guard for tappable gadgets
+export function isTappable<Step extends Arrow>(
+    gadget: Gadget<Step>
+): gadget is Gadget<Step> & Tappable<Step> {
+    return 'tap' in gadget && typeof gadget.tap === 'function';
+}
+
+// @goose: Add tapping capability to a gadget by wrapping its handler
+export function withTaps<Step extends Arrow>(
+    gadget: Gadget<Step>
+): Gadget<Step> & Tappable<Step> {
+    if (isTappable(gadget)) return gadget;
+
+    const taps = new Set<TapFn<Step>>();
+    const originalHandler = gadget.handler;
+
+    // Wrap handler to broadcast effects to all taps
+    gadget.handler = (g: Gadget<Step>, effects: EffectsOf<Step>) => {
+        originalHandler(g, effects);
+        taps.forEach(fn => fn(effects));
+    };
+
+    // Add tap method
+    return Object.assign(gadget, {
+        tap: (fn: TapFn<Step>) => {
+            taps.add(fn);
+            return () => taps.delete(fn);
+        }
+    });
 }
