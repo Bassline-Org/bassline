@@ -1,10 +1,8 @@
-type Morphism<A, B> = (a: A) => B;
-
 type Arrow<A = any, B = any, C = any> = (a: A, b: B) => C;
 type StateOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? State : never;
 type InputOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? Input : never;
 type EffectsOf<F> = F extends Arrow<infer State, infer Input, infer Effects> ? Effects : never;
-type Handler<F extends Arrow, G extends Gadget<F> = Gadget<F>> = (this: G, effects: EffectsOf<F>) => void;
+type Handler<F extends Arrow, G extends Gadget<F> = Gadget<F>> = (g: G, effects: EffectsOf<F>) => void;
 
 interface Store<State> {
     current(): State;
@@ -33,7 +31,7 @@ function realize<Step extends Arrow>(p: ProtoGadget<Step>, store: Store<StateOf<
         receive(input) {
             const effects = g.step(g.current(), input);
             if (effects) {
-                g.handler(effects)
+                g.handler(g, effects)
             }
         },
         ...p,
@@ -50,10 +48,8 @@ type Cell<T, E extends CellEffects<T> = CellEffects<T>> = Gadget<Arrow<T, T, E>>
 
 const maxStep = (a: number, b: number) => a > b ? { ignore: {} } : { merge: b }
 const unionStep = <T>() => (a: Set<T>, b: Set<T>) => b.isSubsetOf(a) ? { ignore: {} } : { merge: a.union(b) }
-const cellHandler = <T>() => {
-    return function (this: Cell<T>, effects: CellEffects<T>) {
-        if (effects.merge !== undefined) this.update(effects.merge)
-    }
+const cellHandler = <T>() => (g: Cell<T>, effects: CellEffects<T>) => {
+    if (effects.merge !== undefined) g.update(effects.merge)
 }
 
 const protoMax = protoGadget(
@@ -70,15 +66,27 @@ const memoryStore = <T>(initial: T): Store<T> => {
 }
 
 const a = realize(protoMax, memoryStore(5));
-const b = realize(protoMax, memoryStore(0))
+const b = (() => {
+    const normal = cellHandler<number>();
+    const customHandler = (g: Cell<number>, e: CellEffects<number>) => {
+        normal(g, e);
+        console.log('my extra thing')
+        if (e.merge) a.receive(e.merge);
+    }
+    return realize({ ...protoMax, handler: customHandler }, memoryStore(0))
+})();
 
 console.log('a: ', a.current());
-a.receive(10);
+console.log('b: ', b.current());
+b.receive(10);
 console.log('a: ', a.current());
-a.receive(15);
+console.log('b: ', b.current());
+b.receive(15);
 console.log('a: ', a.current());
-a.receive(5);
+console.log('b: ', b.current());
+b.receive(5);
 console.log('a: ', a.current());
+console.log('b: ', b.current());
 
 // abstract class BaseGadget<Step extends Arrow> {
 //     _handler: (_effect: EffectsOf<Step>) => void = (e) => { throw new Error('Handler not set!') }
