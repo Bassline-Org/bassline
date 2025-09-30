@@ -2,6 +2,8 @@
 // Core
 // ================================================
 
+export * from './reactStore';
+
 // @goose: Defines a new proto gadget from a step
 export function protoGadget<Step extends Arrow>(step: Step) {
     return {
@@ -18,9 +20,9 @@ export function protoGadget<Step extends Arrow>(step: Step) {
 export function realize<Step extends Arrow>(p: ProtoGadget<Step>, store: Store<StateOf<Step>>) {
     const g = {
         receive(input) {
-            const effects = g.step(g.current(), input);
+            const effects = this.step(this.current(), input);
             if (effects !== undefined) {
-                g.handler(g, effects)
+                this.handler(this, effects)
             }
         },
         ...p,

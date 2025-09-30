@@ -7,7 +7,7 @@
  */
 
 import React, { createContext, useContext, useRef, useSyncExternalStore, useCallback } from 'react';
-import { Tappable, Gadget, withTaps, State, Input, StateOf, InputOf } from 'port-graphs';
+import { Tappable, Gadget, withTaps, StateOf, InputOf, Arrow } from 'port-graphs';
 
 // Registry entry for a typed gadget with its spec
 type GadgetEntry<S, G extends Gadget<S> = Gadget<S>> = {
@@ -80,7 +80,7 @@ export function useGadgetFromProvider<S, G extends Gadget<S> = Gadget<S>>(
     };
 
     // Override the update method to track state changes
-    gadget.update = (newState: S extends State<infer St> ? St : never) => {
+    gadget.update = (newState: StateOf<S>) => {
       const currentEntry = registry.get(gadget);
       if (currentEntry !== undefined) {
         currentEntry.state = newState;
@@ -98,7 +98,7 @@ export function useGadgetFromProvider<S, G extends Gadget<S> = Gadget<S>>(
   }
 
   // Use useSyncExternalStore for React 18+ concurrent features
-  const state = useSyncExternalStore<S extends State<infer St> ? St : never>(
+  const state = useSyncExternalStore<StateOf<S>>(
     // Subscribe
     (onStoreChange) => {
       entry.listeners.add(onStoreChange);
