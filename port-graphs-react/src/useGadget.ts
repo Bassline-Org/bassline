@@ -1,35 +1,48 @@
 /**
- * React hook for integrating typed gadgets with React state management
- *
- * This hook uses TypedGadget for full type safety and inference.
- * All gadgets are managed through the GadgetProvider for consistent state.
+ * React hook for using NEW system gadgets with automatic state management
  */
 
-import { Gadget, SpecOf, Tappable } from 'port-graphs';
-import { useGadgetFromProvider } from './GadgetProvider';
+import { useMemo, useSyncExternalStore, useState } from 'react';
+import { realize, reactStore, withTaps, StateOf, InputOf, Arrow, Tappable, Gadget } from 'port-graphs';
 
 /**
- * React hook for using typed gadgets with automatic state management.
+ * React hook for using gadgets with React state management.
  *
- * The hook automatically infers the exact types from the gadget's spec:
- * - State type from Spec['state']
- * - Input type from Spec['input']
- * - Effect type from Spec['effects']
+ * Accepts a gadget created with quick() or realize() and subscribes to its state changes.
  *
  * @example
- * // With a slider gadget
- * const slider = sliderGadget(50, 0, 100);
- * const [state, send, gadget] = useGadget(slider);
- * // state is SliderState
- * // send accepts SliderCommands
- * // gadget has tap method with typed effects
+ * ```tsx
+ * const gadget = withTaps(quick(sliderProto, { value: 50, min: 0, max: 100, step: 1 }));
+ * const [state, send] = useGadget(gadget);
+ * ```
  *
- * @param gadget - A TypedGadget with its spec
- * @returns Tuple of [state, send function, gadget with tap]
+ * @param gadget - A gadget (ideally tappable)
+ * @returns Tuple of [state, send function]
  */
+export function useGadget<Step extends Arrow>(
+  gadget: Gadget<Step> & Tappable<Step>
+): readonly [StateOf<Step>, (input: InputOf<Step>) => void] {
+  // Create listener set for React subscriptions
+  const [listeners] = useState(() => new Set<() => void>());
 
-export function useGadget<S, G extends Gadget<S> = Gadget<S>>(
-  gadget: G
-) {
-  return useGadgetFromProvider<S, G>(gadget);
+  // Subscribe to gadget state changes using useSyncExternalStore
+  const state = useSyncExternalStore(
+    (onStoreChange) => {
+      // Add React's change handler to our listener set
+      listeners.add(onStoreChange);
+
+      // Subscribe to gadget effects - when gadget emits, notify React
+      const cleanup = gadget.tap(() => {
+        listeners.forEach(fn => fn());
+      });
+
+      return () => {
+        listeners.delete(onStoreChange);
+        cleanup();
+      };
+    },
+    () => gadget.current()
+  );
+
+  return [state, gadget.receive.bind(gadget)] as const;
 }

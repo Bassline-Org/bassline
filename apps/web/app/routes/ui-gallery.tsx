@@ -13,18 +13,18 @@ import {
   useGadgetEffect
 } from 'port-graphs-react';
 import {
-  sliderGadget,
-  meterGadget,
-  toggleGadget,
-  textInputGadget,
-  numberInputGadget,
-  selectGadget,
-  buttonGadget,
-  checkboxGadget,
+  quick,
   withTaps,
-  type SpecOf,
+  sliderProto,
+  meterProto,
+  toggleProto,
+  textInputProto,
+  numberInputProto,
+  selectProto,
+  buttonProto,
+  checkboxProto,
+  lastProto
 } from 'port-graphs';
-import { lastTable } from 'port-graphs/cells';
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -33,30 +33,28 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
-// Create all our gadgets
-const nameInput = textInputGadget('', 'Enter your name...');
-const ageInput = numberInputGadget(25, 1, 120, 1);
-const volumeSlider = sliderGadget(50, 0, 100, 1);
-const volumeMeter = meterGadget(0, 100);
+// Create all our gadgets using NEW proto system
+const nameInput = withTaps(quick(textInputProto, { value: '', placeholder: 'Enter your name...' }));
+const ageInput = withTaps(quick(numberInputProto, { value: 25, min: 1, max: 120, step: 1 }));
+const volumeSlider = withTaps(quick(sliderProto, { value: 50, min: 0, max: 100, step: 1 }));
+const volumeMeter = withTaps(quick(meterProto, { value: 50, min: 0, max: 100 }));
 
-// Initialize meter to match slider and wire them together
-volumeMeter.receive({ display: 50 });
+// Wire slider and meter together
 volumeSlider.tap((effect) => {
-  if ('changed' in effect) {
-    volumeMeter.receive({ display: effect.changed });
+  if ('changed' in effect && effect.changed !== undefined) {
+    volumeMeter.receive({ display: effect.changed as number });
   }
 });
 
-const colorSelect = selectGadget(['Red', 'Green', 'Blue', 'Yellow'], 'Blue');
-const sizeSelect = selectGadget(['Small', 'Medium', 'Large'], 'Medium');
+const colorSelect = withTaps(quick(selectProto<string>(), { value: 'Blue', options: ['Red', 'Green', 'Blue', 'Yellow'], disabled: false }));
+const sizeSelect = withTaps(quick(selectProto<string>(), { value: 'Medium', options: ['Small', 'Medium', 'Large'], disabled: false }));
 
-const submitButton = buttonGadget('Submit Form');
-const resetButton = buttonGadget('Reset');
-const dangerButton = buttonGadget('Delete All');
+const submitButton = withTaps(quick(buttonProto, { label: 'Submit Form', disabled: false }));
+const resetButton = withTaps(quick(buttonProto, { label: 'Reset', disabled: false }));
+const dangerButton = withTaps(quick(buttonProto, { label: 'Delete All', disabled: false }));
 
-const emailCheck = checkboxGadget(false, 'Subscribe to newsletter');
-const termsCheck = checkboxGadget(false, 'I agree to terms and conditions');
-const darkModeToggle = toggleGadget();
+const emailCheck = withTaps(quick(checkboxProto, { checked: false, label: 'Subscribe to newsletter' }));
+const termsCheck = withTaps(quick(checkboxProto, { checked: false, label: 'I agree to terms and conditions' }));
 
 // Create a cell to collect form data
 const defaultFormData = {
@@ -69,21 +67,24 @@ const defaultFormData = {
   volume: 0,
   darkMode: false
 }
-const formDataCell = lastTable(defaultFormData);
+const formDataCell = withTaps(quick(lastProto(), defaultFormData));
 
 // Counter example
-const countDisplay = withTaps(numberInputGadget(0, -100, 100, 1));
-const incrementBtn = withTaps(buttonGadget('+1'));
-const decrementBtn = withTaps(buttonGadget('-1'));
-const resetCountBtn = withTaps(buttonGadget('Reset'));
+const countDisplay = withTaps(quick(numberInputProto, { value: 0, min: -100, max: 100, step: 1 }));
+const incrementBtn = withTaps(quick(buttonProto, { label: '+1', disabled: false }));
+const decrementBtn = withTaps(quick(buttonProto, { label: '-1', disabled: false }));
+const resetCountBtn = withTaps(quick(buttonProto, { label: 'Reset', disabled: false }));
+const darkModeToggle = withTaps(quick(toggleProto, { on: false }));
 
 function UIGalleryInner() {
-  const [darkMode] = useGadget<SpecOf<typeof darkModeToggle>>(darkModeToggle);
-  const [formData, updateFormData, formDataGadget] = useGadget<SpecOf<typeof formDataCell>>(formDataCell);
-  const [countState] = useGadget<SpecOf<typeof countDisplay>>(countDisplay);
+  const [darkMode] = useGadget(darkModeToggle);
+  const [formData, updateFormData, formDataGadget] = useGadget(formDataCell);
+  const [countState] = useGadget(countDisplay);
 
-  useGadgetEffect(formDataGadget, ({ changed }) => {
-    console.log('Form data changed:', changed);
+  useGadgetEffect(formDataGadget, (effects) => {
+    if ('changed' in effects && effects.changed !== undefined) {
+      console.log('Form data changed:', effects.changed);
+    }
   }, [formDataCell]);
 
   return (
@@ -93,9 +94,9 @@ function UIGalleryInner() {
           <h1 className="text-3xl font-bold">UI Component Gallery</h1>
           <div className="flex items-center gap-2">
             <span>Dark Mode</span>
-            <Toggle gadget={darkModeToggle} onToggle={(state) => {
+            <Toggle gadget={darkModeToggle} onChange={(state) => {
               console.log('Dark mode toggled:', state);
-              return updateFormData({ darkMode: state });
+              updateFormData({ darkMode: state });
             }} />
           </div>
         </div>
@@ -188,8 +189,8 @@ function UIGalleryInner() {
                 ageInput.receive({ set: 25 });
                 colorSelect.receive({ select: 'Blue' });
                 sizeSelect.receive({ select: 'Medium' });
-                emailCheck.receive({ uncheck: {} });
-                termsCheck.receive({ uncheck: {} });
+                emailCheck.receive({ set: false });
+                termsCheck.receive({ set: false });
                 volumeSlider.receive({ set: 50 });
               }} />
               <Button gadget={dangerButton} variant="danger" onClick={() => {

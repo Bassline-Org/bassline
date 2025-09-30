@@ -5,12 +5,12 @@
  * with automatic type inference from the MeterSpec.
  */
 
-import { type MeterSpec, type MeterState, Tappable, Gadget } from 'port-graphs';
+import { type MeterState, Tappable, Gadget, Arrow } from 'port-graphs';
 import { useGadget } from '../useGadget';
 
-export interface MeterProps<S extends MeterSpec, G extends Gadget<S> & Tappable<S>> {
+export interface MeterProps<Step extends Arrow> {
   /** The meter gadget instance */
-  gadget: G;
+  gadget: Gadget<Step> & Tappable<Step>;
   /** Optional CSS class name */
   className?: string;
   /** Display style for the meter */
@@ -46,7 +46,7 @@ export interface MeterProps<S extends MeterSpec, G extends Gadget<S> & Tappable<
  * }
  * ```
  */
-export function Meter<S extends MeterSpec, G extends Gadget<S> & Tappable<S>>(
+export function Meter<Step extends Arrow>(
   {
     gadget,
     className = '',
@@ -54,13 +54,11 @@ export function Meter<S extends MeterSpec, G extends Gadget<S> & Tappable<S>>(
     showPercentage = false,
     color = 'blue',
     animated = true
-  }: MeterProps<S, G>) {
-  // useGadget gives us perfect type inference
-  // state is MeterState
-  const [state] = useGadget<S, G>(gadget);
+  }: MeterProps<Step>) {
+  const [state] = useGadget(gadget);
 
   // Extract typed values from state
-  const { value, min, max, label } = state;
+  const { value, min, max, label } = state as MeterState;
 
   // Calculate percentage (0-100)
   const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));

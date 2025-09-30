@@ -7,6 +7,6 @@ export * from './steps';
 export * from './handlers';
 export * from './protos';
 
-// Keep old exports for reference (not exported from main index)
-// export * from './localStorage';
-// export * from './fileIO';
+// Keep old exports for reference (temporarily exported for demos)
+export * from './localStorage';
+export * from './fileIO';

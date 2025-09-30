@@ -2,43 +2,43 @@
  * React component for Checkbox gadget
  */
 
-import { type CheckboxSpec, type Tappable, EffectsOf, Gadget, InputOf } from 'port-graphs';
+import { type CheckboxState, type Tappable, Gadget, Arrow, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface CheckboxProps<S extends CheckboxSpec, G extends Gadget<S> & Tappable<S>> {
-  gadget: G;
+export interface CheckboxProps<Step extends Arrow> {
+  gadget: Gadget<Step> & Tappable<Step>;
   className?: string;
-  onChange?: (change: EffectsOf<S>['changed']) => void;
+  onChange?: (checked: boolean) => void;
 }
 
-export function Checkbox<S extends CheckboxSpec, G extends Gadget<S> & Tappable<S>>({
+export function Checkbox<Step extends Arrow>({
   gadget,
   className = '',
   onChange
-}: CheckboxProps<S, G>) {
-  const [state, send] = useGadget<S, G>(gadget);
+}: CheckboxProps<Step>) {
+  const [state, send] = useGadget(gadget);
 
-  useGadgetEffect(gadget, ({ changed }) => {
-    if (changed !== undefined) {
-      onChange?.(changed);
+  useGadgetEffect(gadget, (effects) => {
+    if ('changed' in effects && effects.changed !== undefined) {
+      onChange?.(effects.changed as boolean);
     }
   }, [onChange]);
 
-  if (!state) return null;
+  const { checked, disabled, label } = state as CheckboxState;
 
   return (
-    <label className={`flex items-center cursor-pointer ${state.disabled ? 'opacity-50' : ''} ${className}`}>
+    <label className={`flex items-center cursor-pointer ${disabled ? 'opacity-50' : ''} ${className}`}>
       <input
         type="checkbox"
-        checked={state.checked}
-        disabled={state.disabled}
-        onChange={() => send({ toggle: {} } as InputOf<S>)}
+        checked={checked}
+        disabled={disabled}
+        onChange={() => send({ toggle: {} } as InputOf<Step>)}
         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
       />
-      {state.label && (
+      {label && (
         <span className="ml-2 select-none">
-          {state.label}
+          {label}
         </span>
       )}
     </label>

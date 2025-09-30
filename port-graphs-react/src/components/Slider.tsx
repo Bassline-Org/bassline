@@ -2,17 +2,17 @@
  * Typed React component for Slider gadgets
  *
  * This component provides a fully typed interface for slider gadgets,
- * with automatic type inference from the SliderSpec.
+ * with automatic type inference from the gadget's Step type.
  */
 
 import React from 'react';
-import { type SliderSpec, type SliderState, Tappable, Gadget, EffectsOf, InputOf } from 'port-graphs';
+import { type SliderState, Tappable, Gadget, Arrow, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface SliderProps<S extends SliderSpec, G extends Gadget<S> & Tappable<S>> {
+export interface SliderProps<Step extends Arrow> {
   /** The slider gadget instance */
-  gadget: G;
+  gadget: Gadget<Step> & Tappable<Step>;
   /** Optional CSS class name */
   className?: string;
   /** Whether to show the current value */
@@ -23,7 +23,7 @@ export interface SliderProps<S extends SliderSpec, G extends Gadget<S> & Tappabl
   label?: string;
   /** Disable the slider */
   disabled?: boolean;
-  onChange?: (change: EffectsOf<S>['changed']) => void;
+  onChange?: (value: number) => void;
 }
 
 /**
@@ -36,7 +36,9 @@ export interface SliderProps<S extends SliderSpec, G extends Gadget<S> & Tappabl
  *
  * @example
  * ```tsx
- * const slider = sliderGadget(50, 0, 100, 5);
+ * import { quick, withTaps, sliderProto } from 'port-graphs';
+ *
+ * const slider = withTaps(quick(sliderProto, { value: 50, min: 0, max: 100, step: 1 }));
  *
  * function MyComponent() {
  *   return <Slider
@@ -48,7 +50,7 @@ export interface SliderProps<S extends SliderSpec, G extends Gadget<S> & Tappabl
  * }
  * ```
  */
-export function Slider<S extends SliderSpec, G extends Gadget<S> & Tappable<S>>({
+export function Slider<Step extends Arrow>({
   gadget,
   className = '',
   showValue = true,
@@ -56,25 +58,23 @@ export function Slider<S extends SliderSpec, G extends Gadget<S> & Tappable<S>>(
   label,
   disabled = false,
   onChange
-}: SliderProps<S, G>) {
-  // useGadget gives us perfect type inference
-  // state is SliderState, send accepts SliderCommands
-  const [state, send] = useGadget<S, G>(gadget);
+}: SliderProps<Step>) {
+  const [state, send] = useGadget(gadget);
 
-  useGadgetEffect(gadget, ({ changed }) => {
-    if (changed) {
-      onChange?.(changed);
+  useGadgetEffect(gadget, (effects) => {
+    if ('changed' in effects && effects.changed !== undefined) {
+      onChange?.(effects.changed as number);
     }
   }, [onChange]);
 
-  // Extract typed values from state
-  const { value, min, max, step } = state;
+  // Type assertion since Step is generic - user passes slider-compatible gadget
+  const { value, min, max, step } = state as SliderState;
 
   // Handle slider change with proper type
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(event.target.value);
     // Send typed command to gadget
-    send({ set: newValue } as InputOf<S>);
+    send({ set: newValue } as InputOf<Step>);
   };
 
   // Calculate percentage for display

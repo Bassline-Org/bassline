@@ -2,57 +2,57 @@
  * React component for Select gadget
  */
 
-import { type SelectSpec, type Tappable, EffectsOf, Gadget, InputOf, SpecOf, StateOf } from 'port-graphs';
+import { type SelectState, type Tappable, Gadget, Arrow, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface SelectProps<S extends SelectSpec<any>, G extends Gadget<S> & Tappable<S>> {
-  gadget: G;
+export interface SelectProps<T, Step extends Arrow> {
+  gadget: Gadget<Step> & Tappable<Step>;
   className?: string;
-  renderOption?: (option: StateOf<S>['value']) => React.ReactNode;
-  getOptionValue?: (option: StateOf<S>['value']) => string;
+  renderOption?: (option: T) => React.ReactNode;
+  getOptionValue?: (option: T) => string;
   placeholder?: string;
-  onChange?: (change: EffectsOf<S>['changed']) => void;
+  onChange?: (value: T) => void;
 }
 
-export function Select<S extends SelectSpec<any>, G extends Gadget<S> & Tappable<S>>({
+export function Select<T, Step extends Arrow>({
   gadget,
   className = '',
   renderOption = (opt) => String(opt),
   getOptionValue = (opt) => String(opt),
   placeholder = 'Select...',
   onChange
-}: SelectProps<S, G>) {
-  const [state, send] = useGadget<S>(gadget);
+}: SelectProps<T, Step>) {
+  const [state, send] = useGadget(gadget);
 
-  useGadgetEffect<S>(gadget, ({ changed }) => {
-    if (changed) {
-      onChange?.(changed as EffectsOf<S>['changed']);
+  useGadgetEffect(gadget, (effects) => {
+    if ('changed' in effects && effects.changed !== undefined) {
+      onChange?.(effects.changed as T);
     }
   }, [onChange]);
 
-  if (!state) return null;
+  const { value, options, disabled } = state as SelectState<T>;
 
   return (
     <select
-      value={state.value !== undefined ? getOptionValue(state.value) : ''}
-      disabled={state.disabled}
+      value={value !== undefined ? getOptionValue(value) : ''}
+      disabled={disabled}
       onChange={(e) => {
         const selectedValue = e.target.value;
-        const option = state.options.find(opt => getOptionValue(opt) === selectedValue);
+        const option = options.find(opt => getOptionValue(opt) === selectedValue);
         if (option !== undefined) {
-          send({ select: option } as InputOf<S>);
+          send({ select: option } as InputOf<Step>);
         }
       }}
-      className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+      className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
         } ${className}`}
     >
-      {state.value === undefined && (
+      {value === undefined && (
         <option value="" disabled>
           {placeholder}
         </option>
       )}
-      {state.options.map((option, idx) => (
+      {options.map((option, idx) => (
         <option key={idx} value={getOptionValue(option)}>
           {renderOption(option)}
         </option>

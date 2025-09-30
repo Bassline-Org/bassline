@@ -2,42 +2,42 @@
  * React component for TextInput gadget
  */
 
-import { type TextInputSpec, type Tappable, Gadget, InputOf, EffectsOf } from 'port-graphs';
+import { type TextInputState, type Tappable, Gadget, Arrow, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface TextInputProps<S extends TextInputSpec, G extends Gadget<S> & Tappable<S>> {
-  gadget: G,
+export interface TextInputProps<Step extends Arrow> {
+  gadget: Gadget<Step> & Tappable<Step>;
   className?: string;
   autoFocus?: boolean;
-  onChange?: (change: EffectsOf<S>['changed']) => void;
+  onChange?: (value: string) => void;
 }
 
-export function TextInput<S extends TextInputSpec, G extends Gadget<S> & Tappable<S>>({
+export function TextInput<Step extends Arrow>({
   gadget,
   className = '',
   autoFocus = false,
   onChange
-}: TextInputProps<S, G>) {
-  const [state, send] = useGadget<S, G>(gadget);
+}: TextInputProps<Step>) {
+  const [state, send] = useGadget(gadget);
 
-  useGadgetEffect(gadget, ({ changed }) => {
-    if (changed !== undefined) {
-      onChange?.(changed);
+  useGadgetEffect(gadget, (effects) => {
+    if ('changed' in effects && effects.changed !== undefined) {
+      onChange?.(effects.changed as string);
     }
   }, [onChange]);
 
-  if (!state) return null;
+  const { value, placeholder, disabled } = state as TextInputState;
 
   return (
     <input
       type="text"
-      value={state.value}
-      placeholder={state.placeholder}
-      disabled={state.disabled}
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled}
       autoFocus={autoFocus}
-      onChange={(e) => send({ set: e.target.value } as InputOf<S>)}
-      className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+      onChange={(e) => send({ set: e.target.value } as InputOf<Step>)}
+      className={`px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
         } ${className}`}
     />
   );

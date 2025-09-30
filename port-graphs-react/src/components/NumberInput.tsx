@@ -2,39 +2,39 @@
  * React component for NumberInput gadget
  */
 
-import { type NumberInputSpec, type Tappable, EffectsOf, Gadget, InputOf } from 'port-graphs';
+import { type NumberInputState, type Tappable, Gadget, Arrow, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface NumberInputProps<S extends NumberInputSpec, G extends Gadget<S> & Tappable<S>> {
-  gadget: G;
+export interface NumberInputProps<Step extends Arrow> {
+  gadget: Gadget<Step> & Tappable<Step>;
   className?: string;
   showButtons?: boolean;
-  onChange?: (change: EffectsOf<S>['changed']) => void;
+  onChange?: (value: number) => void;
 }
 
-export function NumberInput<S extends NumberInputSpec, G extends Gadget<S> & Tappable<S>>({
+export function NumberInput<Step extends Arrow>({
   gadget,
   className = '',
   showButtons = true,
   onChange
-}: NumberInputProps<S, G>) {
-  const [state, send] = useGadget<S, G>(gadget);
+}: NumberInputProps<Step>) {
+  const [state, send] = useGadget(gadget);
 
-  useGadgetEffect(gadget, ({ changed }) => {
-    if (changed) {
-      onChange?.(changed);
+  useGadgetEffect(gadget, (effects) => {
+    if ('changed' in effects && effects.changed !== undefined) {
+      onChange?.(effects.changed as number);
     }
   }, [onChange]);
 
-  if (!state) return null;
+  const { value, min, max, step, disabled } = state as NumberInputState;
 
   return (
     <div className={`inline-flex items-center ${className}`}>
       {showButtons && (
         <button
-          onClick={() => send({ decrement: {} } as InputOf<S>)}
-          disabled={state.disabled || (state.min !== undefined && state.value <= state.min)}
+          onClick={() => send({ decrement: {} } as InputOf<Step>)}
+          disabled={disabled || (min !== undefined && value <= min)}
           className="px-2 py-1 border rounded-l-md bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           −
@@ -42,24 +42,24 @@ export function NumberInput<S extends NumberInputSpec, G extends Gadget<S> & Tap
       )}
       <input
         type="number"
-        value={state.value}
-        min={state.min}
-        max={state.max}
-        step={state.step}
-        disabled={state.disabled}
+        value={value}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
         onChange={(e) => {
-          const value = parseFloat(e.target.value);
-          if (!isNaN(value)) {
-            send({ set: value } as InputOf<S>);
+          const newValue = parseFloat(e.target.value);
+          if (!isNaN(newValue)) {
+            send({ set: newValue } as InputOf<Step>);
           }
         }}
-        className={`px-3 py-1 border-y ${showButtons ? '' : 'border-x rounded-md'} text-center w-20 focus:outline-none focus:ring-2 focus:ring-blue-500 ${state.disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
+        className={`px-3 py-1 border-y ${showButtons ? '' : 'border-x rounded-md'} text-center w-20 focus:outline-none focus:ring-2 focus:ring-blue-500 ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
           }`}
       />
       {showButtons && (
         <button
-          onClick={() => send({ increment: {} } as InputOf<S>)}
-          disabled={state.disabled || (state.max !== undefined && state.value >= state.max)}
+          onClick={() => send({ increment: {} } as InputOf<Step>)}
+          disabled={disabled || (max !== undefined && value >= max)}
           className="px-2 py-1 border rounded-r-md bg-gray-50 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           +

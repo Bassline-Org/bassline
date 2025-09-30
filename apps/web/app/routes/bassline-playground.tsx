@@ -2,9 +2,10 @@ import { useState, useCallback } from "react";
 import type { Route } from "./+types/bassline-playground";
 import type { Node, Edge, Connection } from "reactflow";
 import {
-  maxCell,
-  minCell,
-  lastCell,
+  quick,
+  maxProto,
+  minProto,
+  lastProto,
   withTaps,
   factoryBassline,
   type FactoryBasslineSpec,
@@ -35,11 +36,11 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
-// Type registry that returns pre-wrapped (tappable) gadgets
+// Type registry that returns pre-wrapped (tappable) gadgets using NEW proto system
 const typeRegistry = {
-  max: (...args: Parameters<typeof maxCell>) => withTaps(maxCell(...args)),
-  min: (...args: Parameters<typeof minCell>) => withTaps(minCell(...args)),
-  last: (...args: Parameters<typeof lastCell>) => withTaps(lastCell(...args)),
+  max: (initialValue: number) => withTaps(quick(maxProto, initialValue)),
+  min: (initialValue: number) => withTaps(quick(minProto, initialValue)),
+  last: <T,>(initialValue: T) => withTaps(quick(lastProto<T>(), initialValue)),
 };
 
 // Define empty nodeTypes and edgeTypes outside component to avoid React Flow warnings

@@ -5,14 +5,14 @@
  * with automatic type inference from the ToggleSpec.
  */
 
-import { type ToggleSpec, Tappable, Gadget, EffectsOf, InputOf } from 'port-graphs';
+import { type ToggleState, Tappable, Gadget, Arrow, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useCallback } from 'react';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface ToggleProps<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>> {
+export interface ToggleProps<Step extends Arrow> {
   /** The toggle gadget instance */
-  gadget: G;
+  gadget: Gadget<Step> & Tappable<Step>;
   /** Optional CSS class name */
   className?: string;
   /** Display style for the toggle */
@@ -26,9 +26,9 @@ export interface ToggleProps<S extends ToggleSpec, G extends Gadget<S> & Tappabl
   /** Position of label relative to toggle */
   labelPosition?: 'left' | 'right';
   /** Optional callback to call when the toggle changes */
-  onChange?: (changed: EffectsOf<S>['changed']) => void;
+  onChange?: (changed: boolean) => void;
   /** Optional callback to call when the toggle is toggled */
-  onToggle?: (toggled: EffectsOf<S>['toggled']) => void;
+  onToggle?: () => void;
 }
 
 /**
@@ -53,7 +53,7 @@ export interface ToggleProps<S extends ToggleSpec, G extends Gadget<S> & Tappabl
  * }
  * ```
  */
-export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>({
+export function Toggle<Step extends Arrow>({
   gadget,
   className = '',
   variant = 'switch',
@@ -63,24 +63,21 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
   labelPosition = 'right',
   onChange,
   onToggle,
-}: ToggleProps<S, G>) {
-  // useGadget gives us perfect type inference
-  // state is ToggleState, send accepts ToggleCommands
-  const [state, send] = useGadget<S, G>(gadget);
-  const displayLabel = label || state.label;
+}: ToggleProps<Step>) {
+  const [state, send] = useGadget(gadget);
+  const { on, label: stateLabel } = state as ToggleState;
+  const displayLabel = label || stateLabel;
 
   const handleToggle = () => {
-    send({ toggle: {} } as InputOf<S>);
+    send({ toggle: {} } as InputOf<Step>);
   }
 
-  useGadgetEffect(gadget, ({ changed, toggled }) => {
-    if (changed !== undefined) {
-      console.log('Changed:', changed);
-      onChange?.(changed);
+  useGadgetEffect(gadget, (effects) => {
+    if ('changed' in effects && effects.changed !== undefined) {
+      onChange?.(effects.changed as boolean);
     }
-    if (toggled !== undefined) {
-      console.log('Toggled:', toggled);
-      onToggle?.(toggled);
+    if ('toggled' in effects && effects.toggled !== undefined) {
+      onToggle?.();
     }
   }, [onChange, onToggle]);
 
@@ -111,7 +108,7 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
           {labelPosition === 'left' && renderLabel()}
           <input
             type="checkbox"
-            checked={state.on}
+            checked={on}
             onChange={handleToggle}
             disabled={disabled}
             className={`checkbox-input ${getSizeClass()}`}
@@ -126,9 +123,9 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
         <button
           onClick={handleToggle}
           disabled={disabled}
-          className={`toggle-button ${className} ${getSizeClass()} ${state.on ? 'toggle-on' : 'toggle-off'} ${disabled ? 'toggle-disabled' : ''}`}
+          className={`toggle-button ${className} ${getSizeClass()} ${on ? 'toggle-on' : 'toggle-off'} ${disabled ? 'toggle-disabled' : ''}`}
         >
-          {displayLabel || (state.on ? 'ON' : 'OFF')}
+          {displayLabel || (on ? 'ON' : 'OFF')}
         </button>
       );
 
@@ -139,12 +136,12 @@ export function Toggle<S extends ToggleSpec, G extends Gadget<S> & Tappable<S>>(
           <div className={`switch-container ${getSizeClass()}`}>
             <input
               type="checkbox"
-              checked={state.on}
+              checked={on}
               onChange={handleToggle}
               disabled={disabled}
               className="switch-input"
             />
-            <div className={`switch-slider ${state.on ? 'switch-on' : 'switch-off'}`}>
+            <div className={`switch-slider ${on ? 'switch-on' : 'switch-off'}`}>
               <div className="switch-thumb" />
             </div>
           </div>

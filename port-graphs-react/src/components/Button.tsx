@@ -2,32 +2,32 @@
  * React component for Button gadget
  */
 
-import { type ButtonSpec, type Tappable, Gadget, EffectsOf, InputOf } from 'port-graphs';
+import { type ButtonState, type Tappable, Gadget, Arrow, InputOf } from 'port-graphs';
 import { useGadget } from '../useGadget';
 import { useGadgetEffect } from '../useGadgetEffect';
 
-export interface ButtonProps<S extends ButtonSpec, G extends Gadget<S> & Tappable<S>> {
-  gadget: G;
+export interface ButtonProps<Step extends Arrow> {
+  gadget: Gadget<Step> & Tappable<Step>;
   className?: string;
   variant?: 'primary' | 'secondary' | 'danger';
-  onClick?: (change: EffectsOf<S>['clicked']) => void;
+  onClick?: () => void;
 }
 
-export function Button<S extends ButtonSpec, G extends Gadget<S> & Tappable<S>>({
+export function Button<Step extends Arrow>({
   gadget,
   className = '',
   variant = 'primary',
   onClick
-}: ButtonProps<S, G>) {
-  const [state, send] = useGadget<S, G>(gadget);
+}: ButtonProps<Step>) {
+  const [state, send] = useGadget(gadget);
 
-  useGadgetEffect(gadget, ({ clicked }) => {
-    if (clicked) {
-      onClick?.(clicked);
+  useGadgetEffect(gadget, (effects) => {
+    if ('clicked' in effects && effects.clicked !== undefined) {
+      onClick?.();
     }
   }, [onClick]);
 
-  if (!state) return null;
+  const { label, disabled } = state as ButtonState;
 
   const variantClasses = {
     primary: 'bg-blue-500 hover:bg-blue-600 text-white',
@@ -37,14 +37,14 @@ export function Button<S extends ButtonSpec, G extends Gadget<S> & Tappable<S>>(
 
   return (
     <button
-      onClick={() => send({ click: {} } as InputOf<S>)}
-      disabled={state.disabled}
-      className={`px-4 py-2 rounded-md font-medium transition-colors ${state.disabled
+      onClick={() => send({ click: {} } as InputOf<Step>)}
+      disabled={disabled}
+      className={`px-4 py-2 rounded-md font-medium transition-colors ${disabled
         ? 'opacity-50 cursor-not-allowed bg-gray-200 text-gray-500'
         : variantClasses[variant]
         } ${className}`}
     >
-      {state.label}
+      {label}
     </button>
   );
 }

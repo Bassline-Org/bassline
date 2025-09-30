@@ -26,6 +26,6 @@ export * from './multi';
 // Core typed API (old model - not exported)
 // export * from './core/typed';
 
-// Meta-gadgets using old system (not exported)
-// export * from './meta/factoryBassline';
+// Meta-gadgets using old system (temporarily exported for demos)
+export * from './meta/factoryBassline';
 // export * from './patterns/family';

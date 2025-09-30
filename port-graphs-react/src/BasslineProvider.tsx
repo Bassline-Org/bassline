@@ -5,7 +5,7 @@
  */
 
 import React, { createContext, useContext, useMemo, ReactNode } from 'react';
-import { factoryBassline, localStorageGadget, withTaps, extract, type Gadget, type FactoryBasslineSpec } from 'port-graphs';
+import { factoryBassline, withTaps, extract, type Gadget, type FactoryBasslineSpec } from 'port-graphs';
 import { useRelations } from './useRelations';
 import { useGadget } from './useGadget';
 

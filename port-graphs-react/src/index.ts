@@ -25,7 +25,7 @@ export { Wire } from './Wire';
 export * from './components';
 
 // Family creation helper
-export { createReactFamily } from './createReactFamily';
+//export { createReactFamily } from './createReactFamily';
 
 // Declarative wiring components
 export { GadgetContext, ProvideGadget, useCurrentGadget, useExplicitGadget } from './GadgetContext';
