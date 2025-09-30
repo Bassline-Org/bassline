@@ -41,15 +41,10 @@ export const cellStep = <T, E extends CellEffects<T>>({
 }) => (a: T, b: T) => predicate(a, b) ? ifTrue(a, b) : ifFalse(a, b);
 
 // @goose: A semilattice ordered by the >= relation
-export const maxStep = cellStep({
-    predicate: (a: number, b: number) => a >= b,
-})
+export const maxStep = (a: number, b: number) => b >= a ? { merge: b } as const : { ignore: {} } as const;
 
 // @goose: A semilattice ordered by isSubsetOf relation
-export const unionStep = <T>() => cellStep({
-    predicate: (a: Set<T>, b: Set<T>) => b.isSubsetOf(a),
-    ifTrue: (a: Set<T>, b: Set<T>) => ({ merge: a.union(b) }),
-})
+export const unionStep = <T>() => (a: Set<T>, b: Set<T>) => b.isSubsetOf(a) ? { merge: a.union(b) } as const : { ignore: {} } as const;
 
 // @goose: A semilattice ordered by intersection
 export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
@@ -101,6 +96,8 @@ export const quick = <Step extends Arrow>(
     proto: ProtoGadget<Step>,
     initial: StateOf<Step>
 ) => realize(proto, memoryStore<StateOf<Step>>(initial));
+
+const fooProto = protoGadget(maxStep).handler(mergeHandler);
 
 // ================================================
 // Types
