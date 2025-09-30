@@ -1,22 +1,31 @@
-// Core context.ts API (new model)
+// ============================================
+// NEW SYSTEM: context.ts primitives (steps, handlers, protos)
+// ============================================
+
+// Core context.ts API
 export * from './core/context';
 
-// Core typed API (old model - for backward compatibility)
-export * from './core/typed';
-
-// Typed patterns
+// Pattern primitives
 export * from './patterns/cells';
+export * from './patterns/tables';
 export * from './patterns/functions';
 export * from './patterns/ui';
-export * from './patterns/family';
 export * from './patterns/io';
 
 // Relations for wiring gadgets
 export * from './relations';
 
-// Meta-gadgets for contextual composition
-export * from './meta/factoryBassline';
-
 // Shared utilities
 export * from './effects';
 export * from './multi';
+
+// ============================================
+// OLD SYSTEM: typed.ts (not exported - kept for internal use)
+// ============================================
+
+// Core typed API (old model - not exported)
+// export * from './core/typed';
+
+// Meta-gadgets using old system (not exported)
+// export * from './meta/factoryBassline';
+// export * from './patterns/family';

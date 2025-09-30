@@ -1,10 +1,9 @@
-
-// Export cell primitives
+// Export cell primitives (context.ts system)
 export * from './steps';
 export * from './handlers';
 export * from './protos';
 
-// Keep old exports for backward compatibility (temporary)
-export * from './typed-cells';
-export * from './typed-predicates';
-export * from './tables';
+// Old typed files (not exported - kept for internal use)
+// export * from './typed-cells';
+// export * from './typed-predicates';
+// export * from './tables';
