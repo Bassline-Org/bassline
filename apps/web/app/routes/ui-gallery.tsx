@@ -23,7 +23,8 @@ import {
   selectProto,
   buttonProto,
   checkboxProto,
-  lastProto
+  lastProto,
+  counterProto
 } from 'port-graphs';
 
 export function meta({ }: Route.MetaArgs) {
@@ -46,8 +47,8 @@ volumeSlider.tap((effect) => {
   }
 });
 
-const colorSelect = withTaps(quick(selectProto<string>(), { value: 'Blue', options: ['Red', 'Green', 'Blue', 'Yellow'], disabled: false }));
-const sizeSelect = withTaps(quick(selectProto<string>(), { value: 'Medium', options: ['Small', 'Medium', 'Large'], disabled: false }));
+const colorSelect = withTaps(quick(selectProto<string>(), { value: 'Blue', options: ['Red', 'Green', 'Blue', 'Yellow'] }));
+const sizeSelect = withTaps(quick(selectProto<string>(), { value: 'Medium', options: ['Small', 'Medium', 'Large'] }));
 
 const submitButton = withTaps(quick(buttonProto, { label: 'Submit Form', disabled: false }));
 const resetButton = withTaps(quick(buttonProto, { label: 'Reset', disabled: false }));
@@ -77,11 +78,11 @@ const resetCountBtn = withTaps(quick(buttonProto, { label: 'Reset', disabled: fa
 const darkModeToggle = withTaps(quick(toggleProto, { on: false }));
 
 function UIGalleryInner() {
-  const [darkMode] = useGadget(darkModeToggle);
-  const [formData, updateFormData, formDataGadget] = useGadget(formDataCell);
-  const [countState] = useGadget(countDisplay);
+  const [darkMode] = useGadget(toggleProto, { on: false });
+  const [formData, updateFormData] = useGadget(lastProto(), defaultFormData);
+  const [countState] = useGadget(numberInputProto, { value: 0, min: -100, max: 100, step: 1 });
 
-  useGadgetEffect(formDataGadget, (effects) => {
+  useGadgetEffect(formDataCell, (effects) => {
     if ('changed' in effects && effects.changed !== undefined) {
       console.log('Form data changed:', effects.changed);
     }

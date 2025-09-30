@@ -6,38 +6,33 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { Effects, Gadget, TapFn, Tappable } from 'port-graphs';
-import { useGadget } from './useGadget';
+import { Gadget, TapFn, Tappable, Arrow } from 'port-graphs';
 
 /**
  * React hook for subscribing to gadget effects with automatic cleanup.
  *
- * The hook automatically infers the effect type from the gadget's spec
- * and ensures the callback receives properly typed effects.
- *
  * @example
  * ```tsx
- * const slider = sliderGadget(50, 0, 100);
+ * const gadget = withTaps(quick(sliderProto, { value: 50, min: 0, max: 100, step: 1 }));
  *
  * function MyComponent() {
- *   // Effect is SliderSpec['effects']
- *   useGadgetEffect(slider, (effect) => {
- *     if ('changed' in effect) {
- *       console.log('Slider changed to:', effect.changed);
+ *   useGadgetEffect(gadget, (effects) => {
+ *     if ('changed' in effects) {
+ *       console.log('Slider changed to:', effects.changed);
  *     }
  *   });
  *
- *   return <Slider gadget={slider} />;
+ *   return <Slider gadget={gadget} />;
  * }
  * ```
  *
- * @param gadget - A TypedGadget with its spec
+ * @param gadget - A tappable gadget
  * @param callback - Function to call when effects are emitted
  * @param deps - Optional dependency array for the effect callback
  */
-export function useGadgetEffect<S>(
-  gadget: Gadget<S> & Tappable<S>,
-  callback: TapFn<S>,
+export function useGadgetEffect<Step extends Arrow>(
+  gadget: Gadget<Step> & Tappable<Step>,
+  callback: TapFn<Step>,
   deps?: React.DependencyList
 ) {
   const callbackRef = useRef(callback);

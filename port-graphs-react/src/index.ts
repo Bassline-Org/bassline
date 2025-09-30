@@ -30,8 +30,8 @@ export * from './components';
 // Declarative wiring components
 export { GadgetContext, ProvideGadget, useCurrentGadget, useExplicitGadget } from './GadgetContext';
 
-// Bassline components
-export { BasslineProvider, useBassline } from './BasslineProvider';
-export { BasslineGraph } from './BasslineGraph';
-export { BasslineBuilder } from './BasslineBuilder';
-export { SaveLoadPanel } from './SaveLoadPanel';
+// Bassline components (commented out - not yet migrated to NEW system)
+// export { BasslineProvider, useBassline } from './BasslineProvider';
+// export { BasslineGraph } from './BasslineGraph';
+// export { BasslineBuilder } from './BasslineBuilder';
+// export { SaveLoadPanel } from './SaveLoadPanel';
