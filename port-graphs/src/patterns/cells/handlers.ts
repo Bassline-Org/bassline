@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { Arrow, Gadget, Handler, CellEffects, protoGadget, memoryStore, quick, Store, HandlerContext, ProtoGadget } from '../../core/context';
+import { Arrow, Gadget, Handler, protoGadget, memoryStore, quick, Store, HandlerContext, ProtoGadget, CellActions } from '../../core/context';
 import { maxStep } from './steps';
 
 // ================================================
@@ -11,10 +11,10 @@ type Merge<T> = {
   changed?: T;
 }
 
-export const mergeHandler = <S>(g: HandlerContext<S>, effects: CellEffects<S>): Merge<S> => {
-  if ('merge' in effects && effects.merge !== undefined) {
-    g.update(effects.merge);
-    return { changed: effects.merge } as const;
+export const mergeHandler = <S>(g: HandlerContext<S>, actions: CellActions<S>): Merge<S> => {
+  if ('merge' in actions && actions.merge !== undefined) {
+    g.update(actions.merge);
+    return { changed: actions.merge } as const;
   }
   return {} as const;
 };
@@ -29,18 +29,38 @@ const proto = protoGadget(maxStep)
 const gadget = quick(proto, 0, exampleEmit);
 type Foo = typeof gadget.emit
 
-// // @goose: Handler for contradiction
-// export const contradictionHandler = <S, I, A extends CellEffects<S>, E>(g: Gadget<S, I, A, E>, effects: A) => {
-//   const contradiction = _.get(effects, 'contradiction');
-//   if (contradiction) {
-//     console.log('contradiction!', contradiction);
-//   }
-//   return {} as E;
-// };
+type Contradicts<S> = {
+  contradiction?: S;
+};
 
-// // @goose: Compose multiple handlers into a single handler
-// export const composeHandlers = <S, I, A extends CellEffects<S>, E>(
-//   ...handlers: Handler<A, E>[]
-// ): Handler<Step> => (g, effects) => {
-//   handlers.forEach(h => h(g, effects));
-// };
+// @goose: Handler for contradiction
+export const contradictionHandler = <S>(g: HandlerContext<S>, actions: Contradicts<S>) => {
+  const contradiction = _.get(actions, 'contradiction');
+  if (contradiction) {
+    console.log('contradiction!', contradiction);
+    return { oops: contradiction } as const;
+  }
+  return {} as const;
+};
+
+// @goose: Compose multiple handlers into a single handler
+export const composeHandlers = <S, A, E>(
+  ...handlers: Handler<S, A, E>[]
+): Handler<S, A, E> => (g, actions) => {
+  return handlers.map(h => h(g, actions)).filter(h => h !== undefined).reduce((acc, h) => {
+    return { ...acc, ...h };
+  }, {} as E);
+};
+
+const p = protoGadget((a: number, b: number) => {
+  if (a > b) {
+    return { merge: a } as const;
+  }
+  if (a < b) {
+    return { merge: b } as const;
+  }
+  return { contradiction: a } as const;
+})
+  .handler(composeHandlers(mergeHandler, contradictionHandler));
+
+const g = quick(p, 0, exampleEmit);

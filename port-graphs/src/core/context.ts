@@ -104,7 +104,7 @@ export type Gadget<S, I, A, E> =
     & Emit<E>
     & Receive<I>
 
-export type CellEffects<T> = {
+export type CellActions<T> = {
     merge?: T,
     ignore?: {}
 }
