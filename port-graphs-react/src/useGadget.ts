@@ -22,7 +22,7 @@ import { ProtoGadget, realize, reactStore, withTaps, StateOf, InputOf, Arrow, Ta
 export function useGadget<Step extends Arrow>(
   proto: ProtoGadget<Step>,
   initialState: StateOf<Step>
-): readonly [StateOf<Step>, (input: InputOf<Step>) => void] {
+): readonly [StateOf<Step>, (input: InputOf<Step>) => void, Gadget<Step> & Tappable<Step>] {
   // Create listener set for React subscriptions
   const [listeners] = useState(() => new Set<() => void>());
 
@@ -47,5 +47,5 @@ export function useGadget<Step extends Arrow>(
     () => gadget.current()
   );
 
-  return [state, gadget.receive.bind(gadget), gadget] as const;
+  return [state, (input: InputOf<Step>) => { gadget.receive(input) }, gadget] as const;
 }

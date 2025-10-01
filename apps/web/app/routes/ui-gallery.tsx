@@ -78,15 +78,15 @@ const resetCountBtn = withTaps(quick(buttonProto, { label: 'Reset', disabled: fa
 const darkModeToggle = withTaps(quick(toggleProto, { on: false }));
 
 function UIGalleryInner() {
-  const [darkMode] = useGadget(toggleProto, { on: false });
-  const [formData, updateFormData] = useGadget(lastProto(), defaultFormData);
-  const [countState] = useGadget(numberInputProto, { value: 0, min: -100, max: 100, step: 1 });
+  const [darkMode, , darkModeGadget] = useGadget(toggleProto, { on: false });
+  const [formData, updateFormData, formDataGadget] = useGadget(lastProto(), defaultFormData);
+  const [countState, , countDisplayGadget] = useGadget(numberInputProto, { value: 0, min: -100, max: 100, step: 1 });
 
-  useGadgetEffect(formDataCell, (effects) => {
+  useGadgetEffect(formDataGadget, (effects) => {
     if ('changed' in effects && effects.changed !== undefined) {
       console.log('Form data changed:', effects.changed);
     }
-  }, [formDataCell]);
+  }, [formDataGadget]);
 
   return (
     <div className={`min-h-screen p-8 ${darkMode?.on ? 'bg-gray-900 text-white' : 'bg-white'}`}>
