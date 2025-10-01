@@ -10,7 +10,7 @@
  * Uses Registry gadgets internally for storage (gadgets all the way down!)
  */
 
-import { quick, withTaps, Implements } from '../../core/context';
+import { quick, withTaps } from '../../core/context';
 import { Protocols } from '../../';
 import { registryProto } from '../cells';
 import { networkProto } from './protos';
