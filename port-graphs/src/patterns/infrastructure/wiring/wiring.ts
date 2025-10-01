@@ -92,7 +92,7 @@ export function wireHandler(
   return {};
 }
 
-export function errorHandler(
+export function wiringErrorHandler(
   _g: { current: () => WiringState },
   actions: WiringActions
 ): WiringEffects {
@@ -109,7 +109,7 @@ export function errorHandler(
 export const wiringProto = () =>
   protoGadget(wiringStep).handler((g, actions) => ({
     ...wireHandler(g, actions),
-    ...errorHandler(g, actions)
+    ...wiringErrorHandler(g, actions)
   }));
 
 // ================================================

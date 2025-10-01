@@ -23,16 +23,16 @@ export function mapColoringDemo() {
   const effects: any[] = [];
   csp.tap(e => {
     effects.push(e);
-    if ('variableDefined' in e) {
+    if ('variableDefined' in e && e.variableDefined) {
       console.log(`✓ Defined variable type: ${e.variableDefined.name}`);
     }
-    if ('created' in e) {
+    if ('created' in e && e.created) {
       console.log(`✓ Created variable: ${e.created.id}`);
     }
-    if ('related' in e) {
+    if ('related' in e && e.related) {
       console.log(`✓ Related variables: ${e.related.vars.join(', ')}`);
     }
-    if ('error' in e) {
+    if ('error' in e && e.error) {
       console.error(`✗ Error: ${e.error.type} - ${e.error.details}`);
     }
   });
@@ -87,10 +87,10 @@ export function mapColoringDemo() {
     ['nsw', 'v']
   ];
 
-  adjacencies.forEach(([r1, r2]) => {
+  adjacencies.forEach(pair => {
     csp.receive({
       relate: {
-        vars: [r1, r2],
+        vars: pair,
         constraint: notEqual
       }
     });

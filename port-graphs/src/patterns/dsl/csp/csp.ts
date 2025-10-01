@@ -146,10 +146,10 @@ export function createRelationHandler(
       // Create propagator gadget that applies constraint
       const propagator = withTaps(
         quick(
-          protoGadget<any>((state, input) => {
+          protoGadget((state: undefined, input: any) => {
             // When any variable changes, apply constraint
             return { propagate: input };
-          }).handler((gadget, actions) => {
+          }).handler((gadget, actions: { propagate: any }) => {
             if ('propagate' in actions) {
               // Get current domains from all variables
               const domains = varGadgets.map((v: any) => v.current());
@@ -206,7 +206,7 @@ export function createRelationHandler(
   return {};
 }
 
-export function errorHandler(
+export function cspErrorHandler(
   _g: { current: () => CSPState },
   actions: CSPActions
 ): Partial<CSPEffects> {
@@ -225,7 +225,7 @@ export const cspProto = () =>
     ...defineVariableHandler(g, actions),
     ...createVariableHandler(g, actions),
     ...createRelationHandler(g, actions),
-    ...errorHandler(g, actions)
+    ...cspErrorHandler(g, actions)
   }));
 
 // ================================================

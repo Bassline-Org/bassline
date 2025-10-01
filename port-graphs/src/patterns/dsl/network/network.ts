@@ -93,7 +93,7 @@ export const networkStep = (
 // Handlers - Forward to Infrastructure
 // ================================================
 
-export function defineHandler(
+export function networkDefineHandler(
   g: { current: () => NetworkState },
   actions: NetworkActions
 ): Partial<NetworkEffects> {
@@ -108,7 +108,7 @@ export function defineHandler(
   return {};
 }
 
-export function spawnHandler(
+export function networkSpawnHandler(
   g: { current: () => NetworkState },
   actions: NetworkActions
 ): Partial<NetworkEffects> {
@@ -123,7 +123,7 @@ export function spawnHandler(
   return {};
 }
 
-export function wireHandler(
+export function networkWireHandler(
   g: { current: () => NetworkState },
   actions: NetworkActions
 ): Partial<NetworkEffects> {
@@ -140,7 +140,7 @@ export function wireHandler(
   return {};
 }
 
-export function errorHandler(
+export function networkErrorHandler(
   _g: { current: () => NetworkState },
   actions: NetworkActions
 ): Partial<NetworkEffects> {
@@ -156,10 +156,10 @@ export function errorHandler(
 
 export const networkProto = () =>
   protoGadget(networkStep).handler((g, actions) => ({
-    ...defineHandler(g, actions),
-    ...spawnHandler(g, actions),
-    ...wireHandler(g, actions),
-    ...errorHandler(g, actions)
+    ...networkDefineHandler(g, actions),
+    ...networkSpawnHandler(g, actions),
+    ...networkWireHandler(g, actions),
+    ...networkErrorHandler(g, actions)
   }));
 
 // ================================================
