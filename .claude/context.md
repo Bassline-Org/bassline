@@ -1,5 +1,141 @@
 # Context: Current Understanding of Gadget System Evolution
 
+## Protocol System - Behavioral Contracts for Gadgets
+
+### The Core Philosophy
+
+**Effects define behavioral contracts, actions are implementation details.**
+
+When we write generic code that operates on gadgets, we don't care about:
+- How state is stored internally (implementation)
+- What actions the step chooses (private vocabulary)
+
+We only care about:
+- What inputs the gadget accepts (public commands)
+- What effects it emits (observable behavior)
+
+This separation enables **behavioral polymorphism** - code that works with ANY gadget implementing a particular protocol.
+
+### Protocol Helper Types
+
+Located in `src/core/context.ts`:
+
+```typescript
+// Constrain by what a gadget accepts
+type Accepts<I> = Gadget<any, I, any, any>
+
+// Constrain by what effects it emits (includes Tappable)
+type Emits<E extends Record<string, any>> = Gadget<any, any, any, E> & Tappable<E>
+
+// Full behavioral contract (input + effects)
+type Protocol<I, E extends Record<string, any>> = Gadget<any, I, any, E> & Tappable<E>
+
+// Define reusable protocol shapes
+interface ProtocolShape<I, E extends Record<string, any>> {
+  input: I;
+  effects: E;
+}
+
+// Convert protocol shape to gadget constraint
+type Implements<P extends ProtocolShape<any, any>> = ...
+
+// Compose two protocols
+type And<P1, P2> = ProtocolShape<P1['input'] | P2['input'], P1['effects'] & P2['effects']>
+```
+
+### Standard Protocols Library
+
+Located in `src/core/protocols.ts` - 11 common behavioral patterns:
+
+1. **`Valued<T>`** - Holds and emits value changes (cells, sliders, counters)
+2. **`Clearable`** - Can be reset (inputs, accumulators)
+3. **`Fallible`** - Can produce errors (validators, network requests)
+4. **`Validator<T>`** - Validates input against rules
+5. **`Requester<Req, Res>`** - Request/response pattern (HTTP, RPC)
+6. **`Aggregator<T, R>`** - Aggregates multiple inputs (sum, average)
+7. **`Temporal<T>`** - Timestamped changes (event logs, time series)
+8. **`Collection<T>`** - Manages items (lists, sets, registries)
+9. **`Toggleable`** - Can be enabled/disabled (UI controls, flags)
+10. **`Topology`** - Manages connections (basslines, routers)
+11. **`Registry<T>`** - Manages named items (namespaces, symbol tables)
+
+### Usage Patterns
+
+**Instead of constraining by implementation:**
+```typescript
+// Before: Exposes implementation details
+function mirror<S, I, A, E>(
+  source: Gadget<S, I, A, E> & Tappable<E>,
+  target: Gadget<S, I, A, E>
+) { ... }
+```
+
+**Constrain by behavioral contract:**
+```typescript
+// After: Only cares about behavior
+function mirror<T>(
+  source: Implements<Protocols.Valued<T>>,
+  target: Implements<Protocols.Valued<T>>
+) {
+  source.tap(({ changed }) => {
+    if (changed !== undefined) target.receive(changed);
+  });
+}
+```
+
+### Key Benefits
+
+1. **Self-documenting**: `Implements<Valued<T>>` tells you exactly what the gadget does
+2. **Behavioral polymorphism**: Works with cells, sliders, toggles - anything that emits `{ changed: T }`
+3. **Stable contracts**: Effect protocols are the public API, actions can change freely
+4. **Type safety**: Can't wire incompatible protocols
+5. **Composability**: `And<P1, P2>` builds complex contracts from simple pieces
+
+### Protocols vs Tappable
+
+`Tappable` is just another protocol - an optional capability:
+
+```typescript
+// Core protocol - base gadget interface
+interface CoreProtocol<I, E> { input: I; effects: E; }
+
+// Observable protocol - can be tapped
+interface Observable<E> extends ProtocolShape<never, E> { ... }
+
+// A gadget can implement multiple protocols
+type ObservableGadget<I, E> = Implements<CoreProtocol<I, E>> & Tappable<E>
+```
+
+Gadgets can opt into additional protocols: `Persistable`, `Serializable`, `Debuggable`, etc.
+
+### Basslines as Protocol Implementers
+
+Basslines are just gadgets implementing a specific protocol:
+
+```typescript
+interface BasslineProtocol {
+  input:
+    | { create: { id: string; type: string } }
+    | { wire: { from: string; to: string } }
+    | { destroy: string };
+  effects:
+    | { spawned: { id: string } }
+    | { connected: { from: string; to: string } }
+    | { destroyed: string };
+}
+
+type Bassline = Implements<BasslineProtocol>
+```
+
+Different basslines = different protocol combinations. The protocol lens makes explicit what was implicit.
+
+### The Paradigm Shift
+
+**Before**: "Gadgets are objects with methods and state"
+**After**: "Gadgets are behavioral contracts defined by their effects"
+
+Effects become first-class - they're not just "extra data," they're the **semantic layer** that defines what a gadget means behaviorally. Things that emit similar effects are behaviorally similar, even if their internal actions differ completely.
+
 ## Handler Architecture - Open Constraints with Record Effects
 
 ### The Type Theory Problem We Solved

@@ -1,9 +1,6 @@
 // ================================================
 // Core
 // ================================================
-
-export * from './reactStore';
-
 export function protoGadget<S, I, A>(step: Arrow<S, I, A>) {
     return {
         handler<E extends Record<string, any>>(handler: Handler<S, A, E>) {
@@ -166,8 +163,8 @@ export interface ProtocolShape<I, E extends Record<string, any>> {
 // Use this to constrain generic parameters to specific behavioral contracts
 export type Implements<P extends ProtocolShape<any, any>> =
     P extends ProtocolShape<infer I, infer E>
-        ? Protocol<I, E>
-        : never;
+    ? Protocol<I, E>
+    : never;
 
 // @goose: Compose two protocols (union of inputs, intersection of effects)
 // A gadget implementing And<P1, P2> accepts either P1 or P2 inputs

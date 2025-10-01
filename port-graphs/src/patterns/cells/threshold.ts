@@ -1,4 +1,4 @@
-import { Actions, defGadget, derive, Effects, Gadget, Input, Methods, SpecOf, State, withTaps } from '../../core/typed';
+import { Actions, defGadget, derive, Effects, Gadget, Input, Methods, SpecOf, State, withTaps } from '../../core/context';
 import { maxCell, unionCell } from './typed-cells';
 
 export const thresholdCell = <T>(predicate: (value: T) => T | null) => {

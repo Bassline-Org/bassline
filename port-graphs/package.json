@@ -1,7 +1,7 @@
 {
-  "name": "port-graphs",
+  "name": "@bassline/core",
   "version": "1.0.0",
-  "description": "Port-based graph data structure",
+  "description": "Core gadget primitives for Bassline - propagation network model",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -18,8 +18,12 @@
       "types": "./dist/patterns/functions/index.d.ts"
     },
     "./core": {
-      "import": "./dist/core/typed.js",
-      "types": "./dist/core/typed.d.ts"
+      "import": "./dist/core/context.js",
+      "types": "./dist/core/context.d.ts"
+    },
+    "./protocols": {
+      "import": "./dist/core/protocols.js",
+      "types": "./dist/core/protocols.d.ts"
     },
     "./effects": {
       "import": "./dist/effects/index.js",

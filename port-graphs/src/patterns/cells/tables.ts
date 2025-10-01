@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import { Actions, defGadget, derive, Effects, EffectsOf, Gadget, Input, InputOf, Methods, SpecOf, State, Tappable, withTaps } from '../../core/typed';
+import { Actions, defGadget, derive, Effects, EffectsOf, Gadget, Input, InputOf, Methods, SpecOf, State, Tappable, withTaps } from '../../core/context';
 import { maxCell } from './typed-cells';
 
 export type TableSpec<K extends PropertyKey, V> =
