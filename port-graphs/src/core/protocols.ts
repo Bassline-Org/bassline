@@ -254,3 +254,72 @@ export interface Registry<T> extends ProtocolShape<
     | { registered: { id: string } }
     | { unregistered: string }
 > { }
+
+/**
+ * A gadget that transforms input to output synchronously.
+ *
+ * Examples: map, filter, parse, format, compute
+ *
+ * @example
+ * ```typescript
+ * function chain<A, B, C>(
+ *   first: Implements<Transform<A, B>>,
+ *   second: Implements<Transform<B, C>>
+ * ) {
+ *   first.tap(({ computed }) => {
+ *     if (computed !== undefined) second.receive(computed);
+ *   });
+ * }
+ * ```
+ */
+export interface Transform<In, Out> extends ProtocolShape<
+    In,
+    { computed: Out }
+> { }
+
+/**
+ * A gadget that accepts partial arguments and computes when all required keys are present.
+ *
+ * Examples: multi-arg functions, builders, form submission
+ *
+ * @example
+ * ```typescript
+ * function curry<Args extends Record<string, any>, Out>(
+ *   fn: Implements<PartialFunction<Args, Out>>,
+ *   fixedArgs: Partial<Args>
+ * ) {
+ *   fn.receive(fixedArgs);  // Pre-apply some arguments
+ *   return fn;
+ * }
+ * ```
+ */
+export interface PartialFunction<Args extends Record<string, any>, Out> extends ProtocolShape<
+    Partial<Args>,
+    { computed: Out }
+> { }
+
+/**
+ * A gadget that can fail during transformation.
+ *
+ * Examples: parsers, validators, type coercions, network calls
+ *
+ * @example
+ * ```typescript
+ * function withFallback<In, Out>(
+ *   primary: Implements<FallibleTransform<In, Out>>,
+ *   fallback: (input: In) => Out
+ * ) {
+ *   primary.tap((effects) => {
+ *     if ('failed' in effects && effects.failed) {
+ *       const result = fallback(effects.failed.input);
+ *       // Use result somehow
+ *     }
+ *   });
+ * }
+ * ```
+ */
+export interface FallibleTransform<In, Out> extends ProtocolShape<
+    In,
+    | { computed: Out }
+    | { failed: { input: In; error: string } }
+> { }

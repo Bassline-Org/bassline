@@ -1,6 +1,6 @@
 /**
  * Test that the NEW API (context.ts system) exports work correctly
- * This tests what users will actually import from 'port-graphs'
+ * This tests what users will actually import from '@bassline/core'
  */
 
 import { describe, it, expect } from 'vitest';
@@ -17,37 +17,14 @@ import {
   minStep,
   lastStep,
   unionStep,
+  intersectionStep,
   mergeHandler,
+  contradictionHandler,
   maxProto,
   minProto,
   lastProto,
   unionProto,
-
-  // Table primitives
-  lastTableStep,
-  familyTableStep,
-  tableHandler,
-  lastTableProto,
-  familyTableProto,
-
-  // UI primitives
-  sliderStep,
-  toggleStep,
-  uiHandler,
-  sliderProto,
-  toggleProto,
-
-  // Function primitives
-  fnStep,
-  fnHandler,
-  fnProto,
-
-  // IO primitives
-  localStorageStep,
-  fileIOStep,
-  ioHandler,
-  localStorageProto,
-  fileIOProto,
+  intersectionProto,
 } from '../index';
 
 describe('NEW API exports', () => {
@@ -62,13 +39,16 @@ describe('NEW API exports', () => {
     expect(typeof minStep).toBe('function');
     expect(typeof lastStep).toBe('function');
     expect(typeof unionStep).toBe('function');
+    expect(typeof intersectionStep).toBe('function');
     expect(typeof mergeHandler).toBe('function');
+    expect(typeof contradictionHandler).toBe('function');
 
     // Protos
     expect(maxProto).toBeDefined();
     expect(minProto).toBeDefined();
     expect(lastProto).toBeDefined();
     expect(unionProto).toBeDefined();
+    expect(intersectionProto).toBeDefined();
   });
 
   it('should work with maxCell using proto', () => {
@@ -96,6 +76,20 @@ describe('NEW API exports', () => {
     expect(union.current()).toEqual(new Set([1, 2, 3]));
   });
 
+  it('should work with intersectionCell and handle contradictions', () => {
+    const intersection = withTaps(quick(intersectionProto<number>(), new Set([1, 2, 3])));
+
+    const emissions: any[] = [];
+    intersection.tap(e => emissions.push(e));
+
+    intersection.receive(new Set([2, 3, 4]));
+    expect(intersection.current()).toEqual(new Set([2, 3]));
+    expect(emissions[0]).toEqual({ changed: new Set([2, 3]) });
+
+    intersection.receive(new Set([7, 8])); // Empty intersection
+    expect(emissions.some(e => 'contradiction' in e)).toBe(true);
+  });
+
   it('should work with taps', () => {
     const max = withTaps(quick(maxProto, 0));
 
@@ -104,30 +98,6 @@ describe('NEW API exports', () => {
 
     max.receive(5);
     expect(emissions).toHaveLength(1);
-    expect(emissions[0]).toEqual({ merge: 5 });
-  });
-
-  it('should work with lastTable using proto', () => {
-    const table = withTaps(quick(lastTableProto<string, number>(), { a: 1, b: 2 }));
-
-    expect(table.current()).toEqual({ a: 1, b: 2 });
-
-    table.receive({ c: 3 });
-    expect(table.current()).toEqual({ a: 1, b: 2, c: 3 });
-
-    table.receive({ a: null }); // Remove 'a'
-    expect(table.current()).toEqual({ b: 2, c: 3 });
-  });
-
-  it('should work with slider using proto', () => {
-    const slider = withTaps(quick(sliderProto, { value: 50, min: 0, max: 100, step: 1 }));
-
-    expect(slider.current().value).toBe(50);
-
-    slider.receive({ set: 75 });
-    expect(slider.current().value).toBe(75);
-
-    slider.receive({ increment: {} });
-    expect(slider.current().value).toBe(76);
+    expect(emissions[0]).toEqual({ changed: 5 });
   });
 });
