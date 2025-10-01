@@ -6,7 +6,7 @@ export * from './reactStore';
 
 export function protoGadget<S, I, A>(step: Arrow<S, I, A>) {
     return {
-        handler<E>(handler: Handler<S, A, E>) {
+        handler<E extends Record<string, any>>(handler: Handler<S, A, E>) {
             return {
                 step,
                 handler,
@@ -16,7 +16,7 @@ export function protoGadget<S, I, A>(step: Arrow<S, I, A>) {
 }
 
 // @goose: Realizes a proto-gadget into a full gadget, by passing a store for state
-export function realize<S, I, A, E>(p: ProtoGadget<S, I, A, E>, store: Store<S>, emit: Emitter<E>) {
+export function realize<S, I, A, E extends Record<string, any>>(p: ProtoGadget<S, I, A, E>, store: Store<S>, emit: Emitter<E>) {
     const g = {
         emit,
         receive(input: I) {
@@ -35,7 +35,7 @@ export function realize<S, I, A, E>(p: ProtoGadget<S, I, A, E>, store: Store<S>,
 }
 
 // @goose: Helper for building cell steps with a predicate
-export const cellStep = <T, E extends CellEffects<T>>({
+export const cellStep = <T, E extends CellActions<T>>({
     predicate,
     ifTrue = (a: T, b: T) => ({ merge: b } as E),
     ifFalse = (a: T, b: T) => ({ ignore: {} } as E)
@@ -59,22 +59,49 @@ export const memoryStore = <T>(initial: T): Store<T> => {
 }
 
 // @goose: Quick realization with a default memory store
-export const quick = <S, I, A, E>(
+export const quick = <S, I, A, E extends Record<string, any>>(
     proto: ProtoGadget<S, I, A, E>,
     initial: S,
-    emit: Emitter<E> = (e: E) => { }
+    emit: Emitter<E> = (effects: Partial<E>) => { }
 ) => realize(proto, memoryStore<S>(initial), emit);
 
 // ================================================
 // Types
 // ================================================
+
+// @goose: Utility type to convert union to intersection
+export type UnionToIntersection<U> = (
+    U extends any ? (x: U) => void : never
+) extends (x: infer I) => void ? I : never;
+
+// @goose: Merge multiple effect records into a single record with optional fields
+// Each key becomes optional and its type is the union of all possible types for that key
+export type MergeEffects<E1, E2> = {
+    [K in keyof E1 | keyof E2]?:
+    (K extends keyof E1 ? E1[K] : never) |
+    (K extends keyof E2 ? E2[K] : never)
+};
+
 export type Arrow<A, B, C> = (a: A, b: B) => C;
 export type StateOf<F> = F extends Arrow<infer State, infer Input, infer Actions> ? State : never;
 export type InputOf<F> = F extends Arrow<infer State, infer Input, infer Actions> ? Input : never;
 export type ActionsOf<F> = F extends Arrow<infer State, infer Input, infer Actions> ? Actions : never;
+
+// @goose: Extract effects type from handler
+export type EffectsOf<H> = H extends Handler<any, any, infer E> ? E : never;
+
 export type HandlerContext<S> = Store<S>;
-export type Handler<S, A, E> = (g: HandlerContext<S>, actions: A) => E;
-export type Emitter<E> = (effects: E) => void;
+
+// @goose: Handler type with constrained record effects
+// - Actions: Can be any shape that extends AMin (open/contravariant)
+// - Effects: Must be a record type for clean composition (constrained)
+// Handlers return Partial<Effects> since any subset of effects can be emitted
+export type Handler<S, AMin, Effects extends Record<string, any>> = (
+    g: HandlerContext<S>,
+    actions: AMin
+) => Partial<Effects>;
+
+export type Emitter<E> = (effects: Partial<E>) => void;
 
 export type Store<State> = {
     current(): State;
@@ -91,13 +118,13 @@ export type Receive<I> = {
 export type Step<S, I, A> = {
     step: Arrow<S, I, A>
 }
-export type Handles<S, A, E> = {
+export type Handles<S, A, E extends Record<string, any>> = {
     handler: Handler<S, A, E>
 }
 
-export type ProtoGadget<S, I, A, E> = Step<S, I, A> & Handles<S, A, E>
+export type ProtoGadget<S, I, A, E extends Record<string, any>> = Step<S, I, A> & Handles<S, A, E>
 
-export type Gadget<S, I, A, E> =
+export type Gadget<S, I, A, E extends Record<string, any>> =
     & Step<S, I, A>
     & Handles<S, A, E>
     & Store<S>
@@ -114,7 +141,7 @@ export type CellActions<T> = {
 // ================================================
 
 // @goose: Type for tap functions that observe effects
-export type TapFn<A> = (actions: A) => void;
+export type TapFn<E> = (effects: Partial<E>) => void;
 
 // @goose: Interface for tappable gadgets
 export type Tappable<E> = {
@@ -122,14 +149,14 @@ export type Tappable<E> = {
 }
 
 // @goose: Type guard for tappable gadgets
-export function isTappable<S, I, A, E>(
+export function isTappable<S, I, A, E extends Record<string, any>>(
     gadget: Gadget<S, I, A, E>
 ): gadget is Gadget<S, I, A, E> & Tappable<E> {
     return 'tap' in gadget && typeof gadget.tap === 'function';
 }
 
 // @goose: Add tapping capability to a gadget by wrapping its handler
-export function withTaps<S, I, A, E>(
+export function withTaps<S, I, A, E extends Record<string, any>>(
     gadget: Gadget<S, I, A, E>
 ): Gadget<S, I, A, E> & Tappable<E> {
     if (isTappable(gadget)) return gadget;
@@ -137,7 +164,7 @@ export function withTaps<S, I, A, E>(
     const taps = new Set<TapFn<E>>();
     const originalEmit = gadget.emit;
 
-    gadget.emit = (effects: E) => {
+    gadget.emit = (effects: Partial<E>) => {
         originalEmit(effects);
         taps.forEach(fn => fn(effects));
     };
