@@ -1,3 +1,5 @@
+import _ from "lodash";
+
 export type Actions<T> = {
   merge?: T,
   ignore?: {},
@@ -47,6 +49,18 @@ export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
     return ignore();
   }
   return merge(intersection);
+};
+
+export type TableActions<K extends string, V> = Actions<Record<K, V>> & {
+  added?: K[],
+}
+
+export const firstTableStep = <K extends string, V>(a: Record<K, V>, b: Record<K, V>) => {
+  const difference = _.difference(_.keys(b), _.keys(a));
+  if (difference.length === 0) {
+    return ignore();
+  }
+  return { merge: _.merge(a, b), added: difference as K[] };
 };
 
 // ================================================

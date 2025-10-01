@@ -1,4 +1,4 @@
-import { protoGadget } from '../../core/context';
+import { Implements, protoGadget, quick, withTaps } from '../../core/context';
 import {
   maxStep,
   minStep,
@@ -8,8 +8,10 @@ import {
   unionStep,
   intersectionStep,
   registryStep,
+  firstTableStep,
 } from './steps';
-import { mergeHandler, contradictionHandler, registryHandler } from './handlers';
+import { mergeHandler, contradictionHandler, registryHandler, tableHandler } from './handlers';
+import { Valued } from '../../core/protocols';
 
 // ================================================
 // Proto-Gadgets (Pre-composed Step + Handler)
@@ -42,3 +44,10 @@ export const intersectionProto = <T>() =>
 // Registry proto
 export const registryProto = <T>() =>
   protoGadget(registryStep<T>()).handler(registryHandler);
+
+// Table proto
+export const firstTableProto = <K extends string, V>() =>
+  protoGadget(firstTableStep<K, V>).handler((g, actions) => ({
+    ...mergeHandler(g, actions),
+    ...tableHandler(g, actions),
+  }));

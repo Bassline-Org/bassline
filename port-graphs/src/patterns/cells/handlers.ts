@@ -1,5 +1,5 @@
 import { HandlerContext } from '../../core/context';
-import type { Actions, RegistryActions } from './steps';
+import type { Actions, RegistryActions, TableActions } from './steps';
 
 // ================================================
 // Cell Handlers
@@ -43,5 +43,15 @@ export function registryHandler<T>(
     return { unregistered: actions.unregistered.id };
   }
 
+  return {};
+}
+
+export function tableHandler<K extends string, V>(
+  _g: HandlerContext<Record<K, V>>,
+  actions: TableActions<K, V>
+): { added?: K[] } | {} {
+  if ('added' in actions && actions.added !== undefined) {
+    return { added: actions.added };
+  }
   return {};
 }

@@ -295,3 +295,8 @@ export interface FallibleTransform<In, Out> extends ProtocolShape<
     | { computed: Out }
     | { failed: { input: In; error: string } }
 > { }
+
+export interface Table<K extends string, V> extends ProtocolShape<
+    Record<K, V>,
+    { added: K[] } | { changed: Record<K, V> }
+> { }
