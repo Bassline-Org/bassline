@@ -8,7 +8,8 @@
  * ANY gadget implementing a behavioral contract.
  */
 
-import { Implements, ProtocolShape, Protocols } from '../../core/context';
+import { Implements, ProtocolShape } from '../../core/context';
+import { Protocols } from '../../';
 
 // ================================================
 // Generic Adapter (Works with Any Protocol)
