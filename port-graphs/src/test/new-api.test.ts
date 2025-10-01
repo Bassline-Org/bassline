@@ -30,13 +30,10 @@ import {
   transformStep,
   partialStep,
   fallibleStep,
-  requesterStep,
   functionHandler,
-  requesterHandler,
   transformProto,
   partialProto,
   fallibleProto,
-  requesterProto,
 } from '../index';
 
 describe('NEW API exports', () => {
@@ -117,15 +114,12 @@ describe('NEW API exports', () => {
     expect(typeof transformStep).toBe('function');
     expect(typeof partialStep).toBe('function');
     expect(typeof fallibleStep).toBe('function');
-    expect(typeof requesterStep).toBe('function');
     expect(typeof functionHandler).toBe('function');
-    expect(typeof requesterHandler).toBe('function');
 
     // Protos
     expect(typeof transformProto).toBe('function');
     expect(typeof partialProto).toBe('function');
     expect(typeof fallibleProto).toBe('function');
-    expect(typeof requesterProto).toBe('function');
   });
 
   it('should work with transformProto', () => {
@@ -139,27 +133,18 @@ describe('NEW API exports', () => {
     expect(emissions[0]).toEqual({ computed: 10 });
   });
 
-  it('should work with requesterProto', async () => {
-    const fetcher = withTaps(quick(
-      requesterProto(async (id: number) => {
-        await new Promise(resolve => setTimeout(resolve, 10));
-        return { id, name: 'User' };
-      }),
-      { lastRequest: undefined, lastResponse: undefined }
-    ));
+  it('should work with fallibleProto', () => {
+    const parse = withTaps(quick(fallibleProto(JSON.parse), undefined));
 
     const emissions: any[] = [];
-    fetcher.tap(e => emissions.push(e));
+    parse.tap(e => emissions.push(e));
 
-    fetcher.receive(123);
+    // Success case
+    parse.receive('{"x": 1}');
+    expect(emissions[0]).toEqual({ computed: { x: 1 } });
 
-    // Immediate: requested
-    expect(emissions[0]).toEqual({ requested: 123 });
-
-    // Wait for async
-    await new Promise(resolve => setTimeout(resolve, 20));
-
-    // Later: responded
-    expect(emissions[1]).toEqual({ responded: { id: 123, name: 'User' } });
+    // Failure case
+    parse.receive('bad json');
+    expect(emissions[1]).toHaveProperty('failed');
   });
 });

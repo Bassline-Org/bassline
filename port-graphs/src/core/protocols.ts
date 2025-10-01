@@ -84,34 +84,6 @@ export interface Validator<T> extends ProtocolShape<
 > { }
 
 /**
- * A gadget that makes requests and receives responses.
- *
- * Examples: HTTP clients, database queries, RPC calls, async operations
- *
- * @example
- * ```typescript
- * function withRetry<Req, Res>(
- *   requester: Implements<Requester<Req, Res>>,
- *   maxRetries: number
- * ) {
- *   let retries = 0;
- *   requester.tap(({ failed }) => {
- *     if (failed && retries < maxRetries) {
- *       retries++;
- *       requester.receive(failed.request);
- *     }
- *   });
- * }
- * ```
- */
-export interface Requester<Req, Res> extends ProtocolShape<
-    Req,
-    | { requested: Req }
-    | { responded: Res }
-    | { failed: { request: Req; error: string } }
-> { }
-
-/**
  * A gadget that aggregates multiple inputs into a result.
  *
  * Examples: sum, average, min/max, union, intersection

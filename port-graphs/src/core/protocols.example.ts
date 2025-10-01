@@ -85,41 +85,7 @@ function logValidationErrors<T>(
 }
 
 // ================================================
-// Example 4: Request/Response Pattern
-// ================================================
-
-/**
- * Retry failed requests up to maxRetries times.
- */
-function withRetry<Req, Res>(
-    requester: Implements<Protocols.Requester<Req, Res>>,
-    maxRetries: number
-) {
-    const retries = new Map<Req, number>();
-
-    requester.tap((effects) => {
-        if ('failed' in effects && effects.failed !== undefined) {
-            const count = retries.get(effects.failed.request) || 0;
-            if (count < maxRetries) {
-                retries.set(effects.failed.request, count + 1);
-                requester.receive(effects.failed.request);
-            } else {
-                console.error(`Request failed after ${maxRetries} retries:`, effects.failed.error);
-                retries.delete(effects.failed.request);
-            }
-        }
-    });
-
-    requester.tap((effects) => {
-        if ('responded' in effects && effects.responded !== undefined) {
-            // Clear retry count on success
-            // (We don't know the request, but it succeeded)
-        }
-    });
-}
-
-// ================================================
-// Example 5: Collections
+// Example 4: Collections
 // ================================================
 
 /**
@@ -152,7 +118,7 @@ function syncCollections<T>(
 }
 
 // ================================================
-// Example 6: Generic Aggregation
+// Example 5: Generic Aggregation
 // ================================================
 
 /**
@@ -172,7 +138,7 @@ function sumValues(
 }
 
 // ================================================
-// Example 7: Protocol-Based Type Constraints
+// Example 6: Protocol-Based Type Constraints
 // ================================================
 
 /**
