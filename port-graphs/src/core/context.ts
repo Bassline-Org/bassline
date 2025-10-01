@@ -137,6 +137,50 @@ export type CellActions<T> = {
 }
 
 // ================================================
+// Protocol Helpers - Behavioral Constraints
+// ================================================
+
+// @goose: Constrain a gadget by what it accepts as input
+// Use when you only care about what commands/data a gadget accepts
+export type Accepts<I> = Gadget<any, I, any, any>;
+
+// @goose: Constrain a gadget by what effects it emits
+// Use when you only care about observing a gadget's behavior
+// Note: Includes Tappable since observing requires tapping
+export type Emits<E extends Record<string, any>> =
+    Gadget<any, any, any, E> & Tappable<E>;
+
+// @goose: Constrain a gadget by its full behavioral contract (input + effects)
+// Use when you need to both send commands AND observe effects
+export type Protocol<I, E extends Record<string, any>> =
+    Gadget<any, I, any, E> & Tappable<E>;
+
+// @goose: Protocol shape - defines behavioral contract independently of implementation
+// This is the interface you implement to define reusable behavioral patterns
+export interface ProtocolShape<I, E extends Record<string, any>> {
+    input: I;
+    effects: E;
+}
+
+// @goose: Convert a protocol shape to a gadget constraint
+// Use this to constrain generic parameters to specific behavioral contracts
+export type Implements<P extends ProtocolShape<any, any>> =
+    P extends ProtocolShape<infer I, infer E>
+        ? Protocol<I, E>
+        : never;
+
+// @goose: Compose two protocols (union of inputs, intersection of effects)
+// A gadget implementing And<P1, P2> accepts either P1 or P2 inputs
+// and emits both P1 AND P2 effects
+export type And<
+    P1 extends ProtocolShape<any, any>,
+    P2 extends ProtocolShape<any, any>
+> = ProtocolShape<
+    P1['input'] | P2['input'],
+    P1['effects'] & P2['effects']
+>;
+
+// ================================================
 // Extensions
 // ================================================
 
