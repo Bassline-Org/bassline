@@ -248,4 +248,40 @@ describe('CSP DSL', () => {
     expect([...y.current()]).not.toContain(1);
     expect([...z.current()]).not.toContain(1);
   });
+
+  it('should introspect network structure', () => {
+    const csp = createCSPGadget();
+    const emissions: any[] = [];
+    csp.tap(e => emissions.push(e));
+
+    // Setup
+    csp.receive({
+      variable: {
+        name: 'color',
+        domain: () => withTaps(quick(intersectionProto(), new Set(['R', 'G', 'B'])))
+      }
+    });
+
+    csp.receive({ create: { id: 'v1', type: 'color' } });
+    csp.receive({ create: { id: 'v2', type: 'color' } });
+
+    // Introspect
+    csp.receive({ introspect: {} });
+
+    // Find introspection result
+    const introspected = emissions.find(e => 'introspected' in e)?.introspected;
+    expect(introspected).toBeDefined();
+
+    // Should have type definition
+    expect(introspected.types).toContainEqual({ name: 'color' });
+
+    // Should have variables
+    expect(introspected.variables).toHaveLength(2);
+    expect(introspected.variables.map(v => v.id)).toContain('v1');
+    expect(introspected.variables.map(v => v.id)).toContain('v2');
+
+    // Variables should have domains
+    const v1 = introspected.variables.find((v: any) => v.id === 'v1');
+    expect(v1?.domain).toEqual(new Set(['R', 'G', 'B']));
+  });
 });

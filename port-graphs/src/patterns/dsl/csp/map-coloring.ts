@@ -91,7 +91,7 @@ export function mapColoringDemo() {
     csp.receive({
       relate: {
         vars: pair,
-        constraint: notEqual
+        constraint: notEqual as (...domains: unknown[]) => unknown[]
       }
     });
   });

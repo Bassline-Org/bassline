@@ -42,6 +42,7 @@ export type NetworkState = {
   definitions: Implements<Protocols.Registry<GadgetFactory>>;
   spawning: ReturnType<typeof createSpawningGadget>;
   wiring: ReturnType<typeof createWiringGadget>;
+  instanceTypes: Implements<Protocols.Registry<string>>; // Maps instance ID → type name
 };
 
 // ================================================
@@ -113,10 +114,13 @@ export function networkSpawnHandler(
   actions: NetworkActions
 ): Partial<NetworkEffects> {
   if ('spawn' in actions) {
-    const { id, factory } = actions.spawn;
+    const { id, factory, type } = actions.spawn;
 
     // FORWARD to spawning gadget
     g.current().spawning.receive({ spawn: { id, factory } });
+
+    // Track which type this instance came from
+    g.current().instanceTypes.receive({ register: { id, value: type } });
 
     return { spawned: { id } };
   }
@@ -175,7 +179,8 @@ export function createNetworkGadget() {
   const initialState: NetworkState = {
     definitions: withTaps(quick(registryProto<GadgetFactory>(), new Map())),
     spawning: createSpawningGadget(),
-    wiring: createWiringGadget()
+    wiring: createWiringGadget(),
+    instanceTypes: withTaps(quick(registryProto<string>(), new Map()))
   };
 
   return withTaps(quick(networkProto(), initialState));

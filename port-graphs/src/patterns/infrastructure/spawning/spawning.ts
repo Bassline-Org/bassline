@@ -88,7 +88,7 @@ export function spawnHandler(
   return {};
 }
 
-export function spawningErrorHandler(
+export function errorHandler(
   _g: { current: () => SpawningState },
   actions: SpawningActions
 ): Partial<SpawningEffects> {
@@ -105,7 +105,7 @@ export function spawningErrorHandler(
 export const spawningProto = () =>
   protoGadget(spawningStep).handler((g, actions) => ({
     ...spawnHandler(g, actions),
-    ...spawningErrorHandler(g, actions)
+    ...errorHandler(g, actions)
   }));
 
 // ================================================

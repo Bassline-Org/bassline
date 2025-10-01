@@ -7,28 +7,40 @@
  * Compilation: Forwards to Network DSL
  */
 
-import { protoGadget, quick, withTaps } from '../../../core/context';
+import { protoGadget, quick, withTaps, type Implements } from '../../../core/context';
 import { createNetworkGadget } from '../network/network';
+import type { Valued } from '../../../core/protocols';
 
 // ================================================
 // Types
 // ================================================
 
+// Variables are gadgets that hold values and emit changes when they update
+// We use Valued<unknown> protocol - works with any value type
 export type CSPInput =
-  | { variable: { name: string; domain: () => any } }
-  | { create: { id: string; type: string; domain?: any } }
-  | { relate: { vars: string[]; constraint: (...domains: any[]) => any[] } };
+  | { variable: { name: string; domain: () => Implements<Valued<unknown>> } }
+  | { create: { id: string; type: string; domain?: unknown } }
+  | { relate: { vars: string[]; constraint: (...domains: unknown[]) => unknown[] } }
+  | { introspect: {} };
 
 export type CSPActions =
-  | { defineVariable: { name: string; domain: () => any } }
-  | { createVariable: { id: string; type: string; domain?: any; factory: () => any } }
-  | { createRelation: { vars: string[]; constraint: (...domains: any[]) => any[]; varGadgets: any[] } }
+  | { defineVariable: { name: string; domain: () => Implements<Valued<unknown>> } }
+  | { createVariable: { id: string; type: string; domain?: unknown; factory: () => Implements<Valued<unknown>> } }
+  | { createRelation: { vars: string[]; constraint: (...domains: unknown[]) => unknown[]; varGadgets: Implements<Valued<unknown>>[] } }
+  | { introspect: { state: CSPState } }
   | { error: { type: string; details: string } };
+
+export type CSPIntrospection = {
+  variables: { id: string; type: string; domain: unknown }[];
+  constraints: { id: string; vars: string[] }[];
+  types: { name: string }[];
+};
 
 export type CSPEffects = {
   variableDefined?: { name: string };
   created?: { id: string };
   related?: { vars: string[] };
+  introspected?: CSPIntrospection;
   error?: { type: string; details: string };
 };
 
@@ -78,6 +90,11 @@ export const cspStep = (state: CSPState, input: CSPInput): CSPActions => {
     }
 
     return { createRelation: { vars, constraint, varGadgets } };
+  }
+
+  // Introspection - return current state
+  if ('introspect' in input) {
+    return { introspect: { state } };
   }
 
   return { error: { type: 'unknown_command', details: 'Unknown CSP command' } };
@@ -144,15 +161,16 @@ export function createRelationHandler(
     // Define propagator factory
     const propagatorFactory = () => {
       // Create propagator gadget that applies constraint
+      type PropagatorActions = { propagate: unknown };
       const propagator = withTaps(
         quick(
-          protoGadget((state: undefined, input: any) => {
+          protoGadget((state: undefined, input: unknown) => {
             // When any variable changes, apply constraint
-            return { propagate: input };
-          }).handler((gadget, actions: { propagate: any }) => {
+            return { propagate: input } as PropagatorActions;
+          }).handler((gadget, actions: PropagatorActions) => {
             if ('propagate' in actions) {
               // Get current domains from all variables
-              const domains = varGadgets.map((v: any) => v.current());
+              const domains = varGadgets.map(v => v.current());
 
               // Apply constraint
               const refined = constraint(...domains);
@@ -206,6 +224,59 @@ export function createRelationHandler(
   return {};
 }
 
+export function introspectHandler(
+  g: { current: () => CSPState },
+  actions: CSPActions
+): Partial<CSPEffects> {
+  if ('introspect' in actions) {
+    const { state } = actions.introspect;
+    const network = state.network;
+    const definitions = network.current().definitions.current();
+    const instances = network.current().spawning.current().instances.current();
+    const connections = network.current().wiring.current().cleanups.current();
+
+    // Extract variable types
+    const types = (Array.from(definitions.keys()) as string[]).map(name => ({ name }));
+
+    // Extract variable instances with their current domains
+    const variables: { id: string; type: string; domain: unknown }[] = [];
+    const instanceTypes = network.current().instanceTypes.current();
+    instances.forEach((gadget: Implements<Valued<unknown>>, id: string) => {
+      // Check if it's a variable (has a current() method that returns a domain)
+      if (typeof gadget.current === 'function' && !id.startsWith('prop_')) {
+        const type = instanceTypes.get(id) || 'variable'; // Get actual type name
+        variables.push({
+          id,
+          type,
+          domain: gadget.current()
+        });
+      }
+    });
+
+    // Extract constraints (propagators)
+    const constraints: { id: string; vars: string[] }[] = [];
+    instances.forEach((gadget: Implements<Valued<unknown>>, id: string) => {
+      if (id.startsWith('prop_')) {
+        // Extract vars from propagator ID (not ideal, could be enhanced)
+        // For now, we'll just list the propagator
+        constraints.push({
+          id,
+          vars: [] // TODO: Track which variables this constrains
+        });
+      }
+    });
+
+    return {
+      introspected: {
+        types,
+        variables,
+        constraints
+      }
+    };
+  }
+  return {};
+}
+
 export function cspErrorHandler(
   _g: { current: () => CSPState },
   actions: CSPActions
@@ -225,6 +296,7 @@ export const cspProto = () =>
     ...defineVariableHandler(g, actions),
     ...createVariableHandler(g, actions),
     ...createRelationHandler(g, actions),
+    ...introspectHandler(g, actions),
     ...cspErrorHandler(g, actions)
   }));
 
