@@ -25,6 +25,18 @@ import {
   lastProto,
   unionProto,
   intersectionProto,
+
+  // Function primitives
+  transformStep,
+  partialStep,
+  fallibleStep,
+  requesterStep,
+  functionHandler,
+  requesterHandler,
+  transformProto,
+  partialProto,
+  fallibleProto,
+  requesterProto,
 } from '../index';
 
 describe('NEW API exports', () => {
@@ -99,5 +111,55 @@ describe('NEW API exports', () => {
     max.receive(5);
     expect(emissions).toHaveLength(1);
     expect(emissions[0]).toEqual({ changed: 5 });
+  });
+
+  it('should export function primitives', () => {
+    expect(typeof transformStep).toBe('function');
+    expect(typeof partialStep).toBe('function');
+    expect(typeof fallibleStep).toBe('function');
+    expect(typeof requesterStep).toBe('function');
+    expect(typeof functionHandler).toBe('function');
+    expect(typeof requesterHandler).toBe('function');
+
+    // Protos
+    expect(typeof transformProto).toBe('function');
+    expect(typeof partialProto).toBe('function');
+    expect(typeof fallibleProto).toBe('function');
+    expect(typeof requesterProto).toBe('function');
+  });
+
+  it('should work with transformProto', () => {
+    const double = withTaps(quick(transformProto((x: number) => x * 2), undefined));
+
+    const emissions: any[] = [];
+    double.tap(e => emissions.push(e));
+
+    double.receive(5);
+    expect(double.current()).toBe(10);
+    expect(emissions[0]).toEqual({ computed: 10 });
+  });
+
+  it('should work with requesterProto', async () => {
+    const fetcher = withTaps(quick(
+      requesterProto(async (id: number) => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        return { id, name: 'User' };
+      }),
+      { lastRequest: undefined, lastResponse: undefined }
+    ));
+
+    const emissions: any[] = [];
+    fetcher.tap(e => emissions.push(e));
+
+    fetcher.receive(123);
+
+    // Immediate: requested
+    expect(emissions[0]).toEqual({ requested: 123 });
+
+    // Wait for async
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    // Later: responded
+    expect(emissions[1]).toEqual({ responded: { id: 123, name: 'User' } });
   });
 });

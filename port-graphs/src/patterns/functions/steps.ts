@@ -159,3 +159,66 @@ export const fallibleStep = <In, Out>(fn: (input: In) => Out) =>
       };
     }
   };
+
+// ================================================
+// Requester Steps (Async Operations)
+// ================================================
+
+/**
+ * State type for requester gadgets.
+ * Tracks both the last request and last successful response.
+ */
+export type RequesterState<Req, Res> = {
+  lastRequest?: Req;
+  lastResponse?: Res;
+};
+
+/**
+ * Action type for requester gadgets.
+ * Unlike FunctionActions, this spawns async operations.
+ */
+export type RequesterActions<Req, Res> = {
+  executeRequest: {
+    request: Req;
+    fn: (req: Req) => Promise<Res>;
+  };
+  updateState?: RequesterState<Req, Res>;
+};
+
+/**
+ * Step for async request/response operations.
+ *
+ * State: { lastRequest?: Req, lastResponse?: Res }
+ * Input: Req (the request to execute)
+ * Actions: { executeRequest: { request, fn }, updateState }
+ *
+ * The handler will execute the async function and emit:
+ * 1. Immediately: { requested: Req }
+ * 2. Later: { responded: Res } OR { failed: { request, error } }
+ *
+ * This follows the fire-and-forget philosophy - no timing guarantees.
+ *
+ * @example
+ * ```typescript
+ * const fetchUser = requesterStep(async (id: number) => {
+ *   const response = await fetch(`/users/${id}`);
+ *   return response.json();
+ * });
+ *
+ * const actions = fetchUser({ lastRequest: undefined, lastResponse: undefined }, 123);
+ * // → { executeRequest: { request: 123, fn }, updateState: { lastRequest: 123 } }
+ * ```
+ */
+export const requesterStep = <Req, Res>(fn: (req: Req) => Promise<Res>) =>
+  (state: RequesterState<Req, Res>, input: Req): RequesterActions<Req, Res> => {
+    return {
+      executeRequest: {
+        request: input,
+        fn
+      },
+      updateState: {
+        lastRequest: input,
+        lastResponse: state.lastResponse  // Keep last response
+      }
+    };
+  };

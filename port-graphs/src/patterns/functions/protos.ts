@@ -1,6 +1,13 @@
 import { protoGadget } from '../../core/context';
-import { transformStep, partialStep, fallibleStep, type PartialState } from './steps';
-import { functionHandler } from './handlers';
+import {
+  transformStep,
+  partialStep,
+  fallibleStep,
+  requesterStep,
+  type PartialState,
+  type RequesterState
+} from './steps';
+import { functionHandler, requesterHandler } from './handlers';
 
 // ================================================
 // Function Proto-Gadgets
@@ -78,3 +85,41 @@ export const partialProto = <Args extends Record<string, any>, Out>(
  */
 export const fallibleProto = <In, Out>(fn: (input: In) => Out) =>
   protoGadget(fallibleStep(fn)).handler(functionHandler);
+
+/**
+ * Proto-gadget for async request/response operations.
+ *
+ * Implements: Requester<Req, Res>
+ *
+ * State: { lastRequest?: Req, lastResponse?: Res }
+ * Executes async function and emits three possible effects:
+ * - { requested: Req } - immediately when request starts
+ * - { responded: Res } - when async operation succeeds
+ * - { failed: { request, error } } - when async operation fails
+ *
+ * Uses requesterHandler which spawns async operations (fire-and-forget).
+ * No timing or delivery guarantees - follows bassline philosophy.
+ *
+ * @example
+ * ```typescript
+ * const fetchUser = withTaps(quick(
+ *   requesterProto(async (id: number) => {
+ *     const res = await fetch(`/api/users/${id}`);
+ *     return res.json();
+ *   }),
+ *   { lastRequest: undefined, lastResponse: undefined }
+ * ));
+ *
+ * fetchUser.tap(({ requested, responded, failed }) => {
+ *   if (requested) console.log('Fetching user:', requested);
+ *   if (responded) console.log('Got user:', responded);
+ *   if (failed) console.error('Failed:', failed.error);
+ * });
+ *
+ * fetchUser.receive(123);
+ * // → Immediately: { requested: 123 }
+ * // → Later: { responded: {...} } or { failed: {...} }
+ * ```
+ */
+export const requesterProto = <Req, Res>(fn: (req: Req) => Promise<Res>) =>
+  protoGadget(requesterStep(fn)).handler(requesterHandler<Req, Res>);
