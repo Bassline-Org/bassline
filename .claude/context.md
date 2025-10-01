@@ -1,5 +1,106 @@
 # Context: Current Understanding of Gadget System Evolution
 
+## Handler Architecture - Open Constraints with Record Effects
+
+### The Type Theory Problem We Solved
+We spent significant effort figuring out how to make handlers **compositional** while maintaining proper type inference. The challenge was making handlers:
+- **Open over actions** (accept any superset of required fields)
+- **Constrained over effects** (produce a known set of effect types)
+- **Polymorphic over state** (work with any state type `S`)
+- **Composable** (multiple handlers can be combined)
+
+### What Didn't Work
+
+#### Attempt 1: Generic Function Handlers
+```typescript
+type Handler<S, AMin, EMax> = <A extends AMin>(g, actions: A) => Partial<EMax>
+```
+**Problem**: Can't extract types from generic functions in TypeScript. `composeHandlers` can't infer what `AMin` and `EMax` are.
+
+#### Attempt 2: Factory Functions
+```typescript
+const mergeHandler = <S>(): Handler<S, MergeActions<S>, MergedEffects<S>> => (g, actions) => {...}
+```
+**Problem**: Calling `mergeHandler()` before passing to `.handler()` means TypeScript infers `S = unknown` too early.
+
+#### Attempt 3: Direct Generic Functions
+```typescript
+export function mergeHandler<S>(g, actions: MergeActions<S>): Partial<MergedEffects<S>>
+```
+**Problem**: Can't compose at the type level - no way to extract action/effect structure from generic function type.
+
+### What Works: Manual Composition with Reusable Functions
+
+**The Solution**: Don't try to compose handlers at the type level. Instead:
+
+1. **Define handlers as simple generic functions**:
+   ```typescript
+   export function mergeHandler<S>(
+     g: HandlerContext<S>,
+     actions: MergeActions<S>
+   ): Partial<MergedEffects<S>> {
+     if ('merge' in actions && actions.merge !== undefined) {
+       g.update(actions.merge);
+       return { changed: actions.merge };
+     }
+     return {};
+   }
+   ```
+
+2. **Call them explicitly in the handler passed to `.handler()`**:
+   ```typescript
+   protoGadget(step)
+     .handler((g, actions) => ({
+       ...mergeHandler(g, actions),
+       ...contradictionHandler(g, actions)
+     }))
+   ```
+
+3. **TypeScript infers everything correctly**:
+   - Step defines: `S = number`, `A = { merge: number } | { contradiction: number }`
+   - Handler gets typed as: `(g: HandlerContext<number>, actions: { merge: number } | { contradiction: number }) => ...`
+   - Individual handler calls are type-checked
+   - Effect type properly inferred as `Partial<{ changed?: number, oops?: number }>`
+
+### Key Constraints We Added
+
+#### Effects Must Be Records
+```typescript
+type Handler<S, AMin, Effects extends Record<string, any>> =
+  (g: HandlerContext<S>, actions: AMin) => Partial<Effects>
+```
+
+This constraint enables:
+- Clean merging via spread: `{ ...e1, ...e2 }`
+- Proper TypeScript inference
+- Natural representation of discrete events as keys
+
+#### MergeEffects Utility
+```typescript
+type MergeEffects<E1, E2> = {
+  [K in keyof E1 | keyof E2]?:
+    (K extends keyof E1 ? E1[K] : never) |
+    (K extends keyof E2 ? E2[K] : never)
+}
+```
+
+Merges two effect records into a single record with optional fields.
+
+### Why This Approach Wins
+
+1. **No `any` or `unknown`** - Full type safety throughout
+2. **Simple to understand** - No complex type machinery
+3. **Reusable handlers** - Individual handler functions can be used in multiple gadgets
+4. **Type inference works** - The `S` flows naturally from step → handler → gadget
+5. **Explicit composition** - Clear what handlers are being called
+6. **DRY code** - Handler logic isn't duplicated, just invoked explicitly
+
+### The Core Insight
+
+**Composition should happen at the value level, not the type level.** TypeScript can't extract type parameters from generic functions, so trying to build automatic handler composition is fighting the type system. Instead, make handlers simple reusable functions and compose them explicitly with spread syntax.
+
+# Context: Current Understanding of Gadget System Evolution
+
 ## Relations Module - Type-Safe Gadget Wiring
 
 ### What We Built
