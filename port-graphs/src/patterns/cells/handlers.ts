@@ -1,17 +1,17 @@
 import _ from 'lodash';
 import { HandlerContext } from '../../core/context';
+import type { Actions } from './steps';
 
 // ================================================
 // Cell Handlers
 // ================================================
-
 export function mergeHandler<S>(
   g: HandlerContext<S>,
-  actions: { merge?: S }
-): Partial<{ changed: S }> {
-  if ('merge' in actions && actions.merge !== undefined) {
+  actions: Actions<S>
+): { changed: S } | {} {
+  if (actions && 'merge' in actions && actions.merge !== undefined) {
     g.update(actions.merge);
-    return { changed: actions.merge };
+    return { changed: actions.merge } as const;
   }
   return {};
 }
@@ -19,12 +19,12 @@ export function mergeHandler<S>(
 // @goose: Handler for contradiction
 export function contradictionHandler<S>(
   _g: HandlerContext<S>,
-  actions: { contradiction?: S }
-): { oops?: S } {
+  actions: Actions<S>
+): { contradiction: { current: S, incoming: S } } | {} {
   const contradiction = _.get(actions, 'contradiction');
   if (contradiction) {
     console.log('contradiction!', contradiction);
-    return { oops: contradiction };
+    return { contradiction } as const;
   }
   return {};
 }

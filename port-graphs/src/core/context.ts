@@ -31,17 +31,6 @@ export function realize<S, I, A, E extends Record<string, any>>(p: ProtoGadget<S
     return g as typeof g;
 }
 
-// @goose: Helper for building cell steps with a predicate
-export const cellStep = <T, E extends CellActions<T>>({
-    predicate,
-    ifTrue = (a: T, b: T) => ({ merge: b } as E),
-    ifFalse = (a: T, b: T) => ({ ignore: {} } as E)
-}: {
-    predicate: Arrow<T, T, boolean>,
-    ifTrue?: Arrow<T, T, E>,
-    ifFalse?: Arrow<T, T, E>
-}) => (a: T, b: T) => predicate(a, b) ? ifTrue(a, b) : ifFalse(a, b);
-
 // ================================================
 // Stores
 // ================================================
@@ -108,7 +97,6 @@ export type Store<State> = {
 export type Emit<E> = {
     emit: Emitter<E>
 }
-
 export type Receive<I> = {
     receive(input: I): void
 }
@@ -127,11 +115,6 @@ export type Gadget<S, I, A, E extends Record<string, any>> =
     & Store<S>
     & Emit<E>
     & Receive<I>
-
-export type CellActions<T> = {
-    merge?: T,
-    ignore?: {}
-}
 
 // ================================================
 // Protocol Helpers - Behavioral Constraints
