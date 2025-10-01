@@ -49,21 +49,23 @@ describe('Function Gadgets', () => {
       type Args = { x: number; y: number };
       const add = quick(
         partialProto((args: Args) => args.x + args.y, ['x', 'y']),
-        {}
+        { args: {}, result: undefined }
       );
 
       add.receive({ x: 5 });
-      expect(add.current()).toEqual({ x: 5 });
+      expect(add.current().args).toEqual({ x: 5 });
+      expect(add.current().result).toBeUndefined();
 
       add.receive({ y: 3 });
-      expect(add.current()).toEqual({ x: 5, y: 3 });
+      expect(add.current().args).toEqual({ x: 5, y: 3 });
+      expect(add.current().result).toBe(8);
     });
 
     it('should emit computed effect only when ready', () => {
       type Args = { x: number; y: number };
       const multiply = withTaps(quick(
         partialProto((args: Args) => args.x * args.y, ['x', 'y']),
-        {}
+        { args: {}, result: undefined }
       ));
 
       const emissions: any[] = [];
@@ -80,7 +82,7 @@ describe('Function Gadgets', () => {
       type Args = { x: number; y: number };
       const add = withTaps(quick(
         partialProto((args: Args) => args.x + args.y, ['x', 'y']),
-        {}
+        { args: {}, result: undefined }
       ));
 
       const emissions: any[] = [];
@@ -97,22 +99,24 @@ describe('Function Gadgets', () => {
       type Args = { x: number; y: number; z: number };
       const sum = quick(
         partialProto((args: Args) => args.x + args.y + args.z, ['x', 'y', 'z']),
-        {}
+        { args: {}, result: undefined }
       );
 
       sum.receive({ x: 1 });
       sum.receive({ y: 2 });
-      expect(sum.current()).toEqual({ x: 1, y: 2 });
+      expect(sum.current().args).toEqual({ x: 1, y: 2 });
+      expect(sum.current().result).toBeUndefined();
 
       sum.receive({ z: 3 });
-      expect(sum.current()).toEqual({ x: 1, y: 2, z: 3 });
+      expect(sum.current().args).toEqual({ x: 1, y: 2, z: 3 });
+      expect(sum.current().result).toBe(6);
     });
 
     it('should handle all args provided at once', () => {
       type Args = { x: number; y: number };
       const add = withTaps(quick(
         partialProto((args: Args) => args.x + args.y, ['x', 'y']),
-        {}
+        { args: {}, result: undefined }
       ));
 
       const emissions: any[] = [];
@@ -216,7 +220,7 @@ describe('Function Gadgets', () => {
       type Args = { x: number; y: number };
       const add = withTaps(quick(
         partialProto((args: Args) => args.x + args.y, ['x', 'y']),
-        {}
+        { args: {}, result: undefined }
       ));
 
       // Has receive(Partial<Args>)

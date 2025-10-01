@@ -1,6 +1,6 @@
 import { protoGadget } from '../../core/context';
-import { transformStep, partialStep } from './steps';
-import { transformHandler, partialHandler, fallibleHandler } from './handlers';
+import { transformStep, partialStep, fallibleStep, type PartialState } from './steps';
+import { functionHandler } from './handlers';
 
 // ================================================
 // Function Proto-Gadgets
@@ -11,6 +11,9 @@ import { transformHandler, partialHandler, fallibleHandler } from './handlers';
  *
  * Implements: Transform<In, Out>
  *
+ * State: Out | undefined (last result)
+ * Uses universal functionHandler.
+ *
  * @example
  * ```typescript
  * const double = quick(transformProto((x: number) => x * 2), undefined);
@@ -20,39 +23,45 @@ import { transformHandler, partialHandler, fallibleHandler } from './handlers';
  * ```
  */
 export const transformProto = <In, Out>(fn: (input: In) => Out) =>
-  protoGadget(transformStep<In, Out>).handler(transformHandler(fn));
+  protoGadget(transformStep(fn)).handler(functionHandler);
 
 /**
  * Proto-gadget for partial function application.
  *
  * Implements: PartialFunction<Args, Out>
  *
- * Accumulates arguments until all required keys are present, then computes.
+ * State: { args: Partial<Args>, result?: Out }
+ * Accumulates arguments until all required keys present, then computes.
+ * Uses universal functionHandler.
  *
  * @example
  * ```typescript
  * type Args = { x: number; y: number };
  * const add = quick(
  *   partialProto((args: Args) => args.x + args.y, ['x', 'y']),
- *   {}
+ *   { args: {}, result: undefined }
  * );
  *
  * add.receive({ x: 5 });  // Accumulates
+ * console.log(add.current());  // { args: { x: 5 }, result: undefined }
+ *
  * add.receive({ y: 3 });  // Computes: 8
- * console.log(add.current());  // { x: 5, y: 3 }
+ * console.log(add.current());  // { args: { x: 5, y: 3 }, result: 8 }
  * ```
  */
 export const partialProto = <Args extends Record<string, any>, Out>(
   fn: (args: Args) => Out,
   requiredKeys: (keyof Args)[]
-) => protoGadget(partialStep<Args>(requiredKeys)).handler(partialHandler(fn));
+) => protoGadget(partialStep(fn, requiredKeys)).handler(functionHandler<PartialState<Args, Out>, Out>);
 
 /**
  * Proto-gadget for fallible transformations.
  *
  * Implements: FallibleTransform<In, Out>
  *
+ * State: Out | undefined (last successful result)
  * Wraps function execution in try/catch, emits { computed } or { failed }.
+ * Uses universal functionHandler.
  *
  * @example
  * ```typescript
@@ -68,4 +77,4 @@ export const partialProto = <Args extends Record<string, any>, Out>(
  * ```
  */
 export const fallibleProto = <In, Out>(fn: (input: In) => Out) =>
-  protoGadget(transformStep<In, Out>).handler(fallibleHandler(fn));
+  protoGadget(fallibleStep(fn)).handler(functionHandler);
