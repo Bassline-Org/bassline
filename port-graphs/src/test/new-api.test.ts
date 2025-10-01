@@ -18,13 +18,16 @@ import {
   lastStep,
   unionStep,
   intersectionStep,
+  registryStep,
   mergeHandler,
   contradictionHandler,
+  registryHandler,
   maxProto,
   minProto,
   lastProto,
   unionProto,
   intersectionProto,
+  registryProto,
 
   // Function primitives
   transformStep,
@@ -49,8 +52,10 @@ describe('NEW API exports', () => {
     expect(typeof lastStep).toBe('function');
     expect(typeof unionStep).toBe('function');
     expect(typeof intersectionStep).toBe('function');
+    expect(typeof registryStep).toBe('function');
     expect(typeof mergeHandler).toBe('function');
     expect(typeof contradictionHandler).toBe('function');
+    expect(typeof registryHandler).toBe('function');
 
     // Protos
     expect(maxProto).toBeDefined();
@@ -58,6 +63,7 @@ describe('NEW API exports', () => {
     expect(lastProto).toBeDefined();
     expect(unionProto).toBeDefined();
     expect(intersectionProto).toBeDefined();
+    expect(registryProto).toBeDefined();
   });
 
   it('should work with maxCell using proto', () => {
@@ -146,5 +152,33 @@ describe('NEW API exports', () => {
     // Failure case
     parse.receive('bad json');
     expect(emissions[1]).toHaveProperty('failed');
+  });
+
+  it('should work with registryProto', () => {
+    const registry = withTaps(quick(registryProto<string>(), new Map()));
+
+    const emissions: any[] = [];
+    registry.tap(e => emissions.push(e));
+
+    // Register a value
+    registry.receive({ register: { id: 'key1', value: 'value1' } });
+    expect(registry.current().get('key1')).toBe('value1');
+    expect(emissions[0]).toEqual({ registered: { id: 'key1' } });
+
+    // Register another value
+    registry.receive({ register: { id: 'key2', value: 'value2' } });
+    expect(registry.current().get('key2')).toBe('value2');
+    expect(emissions[1]).toEqual({ registered: { id: 'key2' } });
+
+    // Unregister a value
+    registry.receive({ unregister: 'key1' });
+    expect(registry.current().has('key1')).toBe(false);
+    expect(registry.current().has('key2')).toBe(true);
+    expect(emissions[2]).toEqual({ unregistered: 'key1' });
+
+    // Unregister non-existent value (should be ignored)
+    registry.receive({ unregister: 'nonexistent' });
+    expect(emissions.length).toBe(4); // Empty object emitted for ignored input
+    expect(emissions[3]).toEqual({}); // Ignore produces empty effect
   });
 });

@@ -48,3 +48,39 @@ export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
   }
   return merge(intersection);
 };
+
+// ================================================
+// Registry Cell Step
+// ================================================
+
+// @goose: Actions specific to registry operations
+export type RegistryActions<T> =
+  | { registered: { id: string; state: Map<string, T> } }
+  | { unregistered: { id: string; state: Map<string, T> } }
+  | { ignore: {} };
+
+// @goose: Registry table that stores key-value pairs
+// Implements the Registry<T> protocol
+export const registryStep = <T>() => (
+  state: Map<string, T>,
+  input: { register: { id: string; value: T } } | { unregister: string }
+): RegistryActions<T> => {
+  if ('register' in input) {
+    const { id, value } = input.register;
+    const newMap = new Map(state);
+    newMap.set(id, value);
+    return { registered: { id, state: newMap } };
+  }
+
+  if ('unregister' in input) {
+    const id = input.unregister;
+    if (!state.has(id)) {
+      return { ignore: {} }; // Can't unregister what doesn't exist
+    }
+    const newMap = new Map(state);
+    newMap.delete(id);
+    return { unregistered: { id, state: newMap } };
+  }
+
+  return { ignore: {} };
+};

@@ -7,8 +7,9 @@ import {
   ordinalStep,
   unionStep,
   intersectionStep,
+  registryStep,
 } from './steps';
-import { mergeHandler, contradictionHandler } from './handlers';
+import { mergeHandler, contradictionHandler, registryHandler } from './handlers';
 
 // ================================================
 // Proto-Gadgets (Pre-composed Step + Handler)
@@ -37,3 +38,7 @@ export const intersectionProto = <T>() =>
     ...mergeHandler(g, actions),
     ...contradictionHandler(g, actions)
   }));
+
+// Registry proto
+export const registryProto = <T>() =>
+  protoGadget(registryStep<T>()).handler(registryHandler);
