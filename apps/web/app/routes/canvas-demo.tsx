@@ -1,5 +1,5 @@
 import type { Route } from "./+types/canvas-demo";
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -12,6 +12,8 @@ import {
   type NodeTypes,
   type Connection as ReactFlowConnection,
   ConnectionMode,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useGadget } from 'port-graphs-react';
@@ -142,9 +144,9 @@ export default function CanvasDemo() {
         }
       }
     });
-    positions?.tap(({ changed }) => {
-      if (changed) {
-        console.log('changed', changed);
+    positions?.tap(({ added }) => {
+      if (added) {
+        console.log('added', added);
       }
     });
 
@@ -187,7 +189,18 @@ export default function CanvasDemo() {
     return { net, nodeTypes, positions, gadgets, connections, taps, currentView, visualState };
   }, []);
 
+  // Subscribe to visual state from network
   const [visual] = useGadget(network.visualState);
+
+  // React Flow's local state (for smooth interactions)
+  const [reactNodes, setReactNodes] = useState<Node[]>([]);
+  const [reactEdges, setReactEdges] = useState<Edge[]>([]);
+
+  // Sync: Visual state → React state (when network changes)
+  useEffect(() => {
+    setReactNodes(visual.result?.nodes ?? []);
+    setReactEdges(visual.result?.edges ?? []);
+  }, [visual]);
 
   // Interactive handlers
   const onConnect = useCallback((connection: ReactFlowConnection) => {
@@ -213,8 +226,6 @@ export default function CanvasDemo() {
     network.positions!.set({ [node.id]: node.position });
   }, [network.positions]);
 
-  console.log('visual', visual)
-
   return (
     <div className="h-screen w-screen">
       <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-lg shadow-lg">
@@ -223,21 +234,20 @@ export default function CanvasDemo() {
           Data-driven gadget network visualization
         </p>
         <div className="text-xs text-slate-500">
-          <div>Nodes: {visual.result?.nodes.length ?? 0}</div>
-          <div>Connections: {visual.result?.edges.length ?? 0}</div>
+          <div>Nodes: {reactNodes.length}</div>
+          <div>Connections: {reactEdges.length}</div>
         </div>
       </div>
 
 
 
       <ReactFlow
-        nodes={visual.result?.nodes}
-        edges={visual.result?.edges}
+        nodes={reactNodes}
+        edges={reactEdges}
         nodeTypes={nodeTypes}
+        onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
+        onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
         onConnect={onConnect}
-        onNodesChange={(changes) => {
-          console.log('changes', changes);
-        }}
         onEdgesDelete={onEdgesDelete}
         onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}
