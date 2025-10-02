@@ -3,7 +3,7 @@ import { Accepts, Implements, quick } from "../core/context";
 import { Valued } from "../core/protocols";
 import { intersectionProto, maxProto, minProto, ordinalProto, unionProto } from "../patterns/cells";
 
-interface SweetCell<T> {
+export interface SweetCell<T> {
     whenChanged(fn: (change: T) => void): Cleanup
     sync(target: Implements<Valued<T>>): Cleanup,
     syncWith<I>(target: Implements<Valued<I>>, forward: (input: T) => I, back: (input: I) => T): Cleanup;

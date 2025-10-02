@@ -35,13 +35,13 @@ function fanOut<I, O>(source: SweetFunction<I, O>) {
     } as const satisfies Fannable<I, O>
 }
 
-interface SweetFunction<In, Out> {
+export interface SweetFunction<In, Out> {
     whenComputed(fn: (output: Out) => void): Cleanup;
     call(input: In): void;
     fanOut(): Fannable<In, Out>,
 }
 
-interface SweetFallibleFunction<In, Out> extends SweetFunction<In, Out> {
+export interface SweetFallibleFunction<In, Out> extends SweetFunction<In, Out> {
     whenError(fn: (input: In, error: string) => void): Cleanup;
 }
 

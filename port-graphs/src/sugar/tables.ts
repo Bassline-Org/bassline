@@ -2,7 +2,7 @@ import { Implements, quick } from "../core/context";
 import { Table } from "../core/protocols";
 import { firstTableProto, lastTableProto } from "../patterns/cells";
 
-interface TableQuery<T> {
+export interface TableQuery<T> {
     table: Record<string, T>,
     where(fn: (entry: readonly [string, T]) => boolean): TableQuery<T>
     whereValues(fn: (val: T) => boolean): TableQuery<T>,

@@ -1,128 +1,308 @@
-# Port-Graphs React Integration
+# port-graphs-react
 
-React hooks for integrating port-graphs gadgets with React components, using React's state as the single source of truth.
+React integration for port-graphs sugar layer. Provides hooks that expose sugar gadgets to React components.
 
-## Key Concept
+## Key Concept: [value, gadget] Pattern
 
-The integration works by hijacking the gadget's `update()` and `current()` methods:
-- `update()` → calls React's `setState`
-- `current()` → reads from React state
+All hooks return `[value, gadget]` tuples where:
+- **value**: Current state for rendering
+- **gadget**: Gadget object for operations, wiring, and passing to other hooks
 
-This means React owns the state and triggers re-renders, while gadgets maintain their behavior and can participate in the network.
+**Why expose gadgets?** Because you need them for:
+- Creating derivations with `useDerive()`
+- Wiring gadgets together (`.sync()`, `.provide()`, `.fanOut()`)
+- Calling methods (`.receive()`, `.call()`)
+- Passing to other hooks and components
 
 ## Installation
 
 ```bash
-pnpm add port-graphs-react
+pnpm add port-graphs-react port-graphs
 ```
 
-## Basic Usage
+## Core Hooks
 
-### Simple Counter with MaxCell
+### `useGadget(gadget)` - Subscribe to Existing Gadget
+
+Use when you have a gadget defined outside the component (module-level, prop, or context).
 
 ```tsx
-import { useGadget } from 'port-graphs-react';
-import { maxCell } from 'port-graphs/patterns/cells/numeric';
+import { useGadget, cells } from 'port-graphs-react';
+
+// Module-level gadget
+const sharedCounter = cells.max(0);
 
 function Counter() {
-  const [count, send] = useGadget(
-    () => maxCell(0),
-    0
+  const [count, counter] = useGadget(sharedCounter);
+
+  return (
+    <button onClick={() => counter.receive(count + 1)}>
+      Count: {count}
+    </button>
+  );
+}
+```
+
+### `useLocalGadget(factory)` - Create Component-Local Gadget
+
+Use when you need a gadget that exists only within a single component.
+
+```tsx
+import { useLocalGadget, cells } from 'port-graphs-react';
+
+function Counter() {
+  const [count, counter] = useLocalGadget(() => cells.max(0));
+
+  return (
+    <button onClick={() => counter.receive(count + 1)}>
+      Count: {count}
+    </button>
+  );
+}
+```
+
+### `useDerive(sources, compute)` - Derived/Computed Values
+
+Create reactive computations that automatically update when any source changes.
+
+```tsx
+import { useLocalGadget, useDerive } from 'port-graphs-react';
+
+function Calculator() {
+  const [a, cellA] = useLocalGadget(() => cells.max(0));
+  const [b, cellB] = useLocalGadget(() => cells.max(0));
+
+  // Derive sum from multiple sources
+  const [sum] = useDerive(
+    { a: cellA, b: cellB },
+    ({ a, b }) => a + b
   );
 
   return (
     <div>
-      <p>Count: {count}</p>
-      <button onClick={() => send(count + 1)}>
-        Increment
-      </button>
-      <button onClick={() => send(10)}>
-        Set to 10
-      </button>
+      <input type="number" value={a}
+        onChange={e => cellA.receive(+e.target.value)} />
+      <input type="number" value={b}
+        onChange={e => cellB.receive(+e.target.value)} />
+      <div>Sum: {sum}</div>
     </div>
   );
 }
 ```
 
-### Handling Effects
+### `useTable(factory)` - Table Gadgets
 
 ```tsx
-import { useGadgetWithRef, useGadgetEffect } from 'port-graphs-react';
+import { useTable, table } from 'port-graphs-react';
 
-function MyComponent() {
-  const [state, send, gadget] = useGadgetWithRef(factory, initialState);
+function ContactList() {
+  const [contacts, contactTable] = useTable(() => table.max());
 
-  useGadgetEffect(gadget, (effect) => {
-    console.log('Gadget emitted:', effect);
-    // Handle side effects, navigate, etc.
-  }, []);
-
-  return <div>{/* ... */}</div>;
+  return (
+    <div>
+      <button onClick={() =>
+        contactTable.receive({ set: { '1': { name: 'Alice', age: 30 } } })
+      }>
+        Add Contact
+      </button>
+      {Object.entries(contacts).map(([id, contact]) => (
+        <div key={id}>{contact.name} - {contact.age}</div>
+      ))}
+    </div>
+  );
 }
 ```
 
-### Connecting Gadgets
+### `useFunction(factory)` - Function Gadgets
 
 ```tsx
-import { useGadgetWithRef, useGadgetConnection } from 'port-graphs-react';
+import { useFunction, fn } from 'port-graphs-react';
 
-function ConnectedGadgets() {
-  const [state1, send1, gadget1] = useGadgetWithRef(factory1, initial1);
-  const [state2, send2, gadget2] = useGadgetWithRef(factory2, initial2);
+function Doubler() {
+  const [result, doubler] = useFunction(() =>
+    fn.map((x: number) => x * 2)
+  );
 
-  // Wire gadget1's emissions to gadget2's receive
-  useGadgetConnection(gadget1, gadget2);
-
-  return <div>{/* ... */}</div>;
+  return (
+    <div>
+      <button onClick={() => doubler.call(5)}>
+        Double 5
+      </button>
+      <div>Result: {result}</div>
+    </div>
+  );
 }
 ```
 
-## API
+## Wiring Patterns
 
-### `useGadget<State, Incoming, Effect>(factory, initialState)`
+### Bidirectional Sync
 
-Creates a React-aware gadget with a simple API.
+Sync two gadgets so they stay in sync:
 
-- **factory**: Function that creates a gadget with initial state
-- **initialState**: Initial state for both React and the gadget
-- **Returns**: `[state, send]` tuple where `send` passes data to the gadget
+```tsx
+import { useLocalGadget, cells } from 'port-graphs-react';
+import { useEffect } from 'react';
 
-### `useGadgetWithRef<State, Incoming, Effect>(factory, initialState)`
+function SyncedInputs() {
+  const [value1, cell1] = useLocalGadget(() => cells.ordinal('Hello'));
+  const [value2, cell2] = useLocalGadget(() => cells.ordinal('Hello'));
 
-Advanced version that also exposes the gadget for wiring.
+  useEffect(() => {
+    const cleanup = cell1.sync(cell2);
+    return cleanup;
+  }, [cell1, cell2]);
 
-- **factory**: Function that creates a gadget with initial state
-- **initialState**: Initial state for both React and the gadget
-- **Returns**: `[state, send, gadget]` tuple
+  return (
+    <div>
+      <input value={value1[1]}
+        onChange={e => cell1.receive([value1[0] + 1, e.target.value])} />
+      <input value={value2[1]}
+        onChange={e => cell2.receive([value2[0] + 1, e.target.value])} />
+    </div>
+  );
+}
+```
 
-### `useGadgetEffect<State, Incoming, Effect>(gadget, handler, deps)`
+### One-Way Provide
 
-Intercepts gadget emissions.
+Provide values from one gadget to another:
 
-- **gadget**: The gadget to monitor
-- **handler**: Callback for handling emissions
-- **deps**: React dependency array
+```tsx
+useEffect(() => {
+  const cleanup = source.provide(target);
+  return cleanup;
+}, [source, target]);
+```
 
-### `useGadgetConnection(source, target, transform?)`
+### Function Fan-Out
 
-Connects two gadgets.
+Wire function outputs to multiple destinations:
 
-- **source**: Gadget whose emissions to capture
-- **target**: Gadget to receive the data
-- **transform**: Optional function to transform effects before sending
+```tsx
+function Pipeline() {
+  const [input, inputFunc] = useFunction(() => fn.map((x: number) => x * 2));
+  const [result1, func1] = useFunction(() => fn.map((x: number) => x + 10));
+  const [result2, func2] = useFunction(() => fn.map((x: number) => x - 5));
 
-## Benefits
+  useEffect(() => {
+    return inputFunc.fanOut()
+      .to(func1)
+      .to(func2)
+      .build();
+  }, [inputFunc, func1, func2]);
 
-1. **Single Source of Truth**: React owns the state
-2. **Automatic Re-renders**: State changes trigger React updates
-3. **Bidirectional Flow**: UI → Gadget → Network → UI
-4. **Type Safety**: Full TypeScript support
-5. **Network Integration**: Gadgets can still participate in the network
-6. **Clean Separation**: React rendering stays in React, gadget logic stays in gadgets
+  return (
+    <div>
+      <button onClick={() => inputFunc.call(5)}>Process 5</button>
+      <div>Branch 1: {result1}</div>
+      <div>Branch 2: {result2}</div>
+    </div>
+  );
+}
+```
+
+## Module-Level vs Component-Local
+
+**Module-Level** (shared across components):
+```tsx
+const sharedCounter = cells.max(0);
+
+function ComponentA() {
+  const [count] = useGadget(sharedCounter);
+  return <div>{count}</div>;
+}
+
+function ComponentB() {
+  const [count, counter] = useGadget(sharedCounter);
+  return <button onClick={() => counter.receive(count + 1)}>+1</button>;
+}
+```
+
+**Component-Local** (isolated to component):
+```tsx
+function Component() {
+  const [count, counter] = useLocalGadget(() => cells.max(0));
+  // This gadget is created and cleaned up with the component
+}
+```
+
+## Sugar API Reference
+
+### Cell Types
+- `cells.max(initial)` - Monotonically increasing numbers
+- `cells.min(initial)` - Monotonically decreasing numbers
+- `cells.union(initial)` - Set union (growing)
+- `cells.intersection(initial)` - Set intersection (shrinking)
+- `cells.ordinal(initial)` - `[version, value]` tuples with causality
+
+### Cell Methods
+- `.receive(value)` - Send value to cell
+- `.sync(target)` - Bidirectional sync with another cell
+- `.provide(target)` - One-way provide to target
+- `.whenChanged(fn)` - React to changes
+
+### Table Operations
+- `table.max()` - Table with max merge
+- `table.union()` - Table with union merge
+- `.receive({ set: { key: value } })` - Set entries
+- `.receive({ delete: ['key1', 'key2'] })` - Delete entries
+
+### Function Operations
+- `fn.map(f)` - Map function over input
+- `fn.filter(predicate)` - Filter with predicate
+- `fn.partial(f, keys)` - Partial application
+- `.call(input)` - Call function with input
+- `.fanOut()` - Create fan-out builder
 
 ## Examples
 
-See the `src/examples` directory for more complete examples including:
-- Counter with MaxCell
-- Form with validation
-- PubSub chat system
+See [src/examples](src/examples/) for complete working examples:
+- [Counter.tsx](src/examples/Counter.tsx) - Basic reactive state
+- [DerivedSum.tsx](src/examples/DerivedSum.tsx) - Multi-source derivations
+- [SyncedInputs.tsx](src/examples/SyncedInputs.tsx) - Bidirectional sync
+- [SharedState.tsx](src/examples/SharedState.tsx) - Module-level gadgets
+- [Pipeline.tsx](src/examples/Pipeline.tsx) - Function composition
+
+## Type Safety
+
+All hooks maintain full type safety through TypeScript inference:
+
+```tsx
+// TypeScript infers everything
+const [count, counter] = useLocalGadget(() => cells.max(0));
+// count: number
+// counter: SweetCell<number> & (full gadget type)
+
+const [sum] = useDerive(
+  { a: cellA, b: cellB },
+  ({ a, b }) => a + b
+);
+// sum: number | undefined
+```
+
+## Why This Design?
+
+**Q: Why return both value and gadget?**
+
+A: Because you need both!
+- **Value** for rendering UI
+- **Gadget** for operations (`.receive()`), wiring (`.sync()`), and passing to other hooks (`useDerive()`)
+
+**Q: Why not just return the value?**
+
+A: Then you couldn't:
+- Create derivations (requires gadget objects as sources)
+- Wire gadgets together (requires methods like `.sync()`)
+- Call gadget methods from event handlers
+- Pass gadgets to child components
+
+**Q: When should I use `useGadget` vs `useLocalGadget`?**
+
+A:
+- `useGadget` for existing gadgets (module-level, props, context)
+- `useLocalGadget` for component-local state
+
+## License
+
+MIT

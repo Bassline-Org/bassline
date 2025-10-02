@@ -11,3 +11,19 @@ export * as Protocols from './core/protocols';
 // Pattern primitives
 export * from './patterns/cells';
 export * from './patterns/functions';
+
+// ============================================
+// Sugar Layer - Ergonomic APIs
+// ============================================
+
+// Sugar cells
+export { cells, type SweetCell } from './sugar/cells';
+
+// Sugar tables
+export { table, type SweetTable } from './sugar/tables';
+
+// Sugar functions
+export { fn, type SweetFunction, type Fannable, derive, deriveFrom } from './sugar/functions';
+
+// Cleanup type
+export type { Cleanup } from './sugar/index';
