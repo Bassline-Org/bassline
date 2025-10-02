@@ -1,5 +1,5 @@
 import type { Route } from "./+types/canvas-demo";
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -10,7 +10,10 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
+  type Connection as ReactFlowConnection,
   ConnectionMode,
+  applyNodeChanges,
+  applyEdgeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useGadget } from 'port-graphs-react';
@@ -26,7 +29,6 @@ export function meta({ }: Route.MetaArgs) {
 }
 
 type NodeType = 'max' | 'min';
-type Position = { x: number; y: number };
 type Connection = { from: string; to: string };
 
 // Cell Node Component
@@ -35,7 +37,7 @@ function CellNode({ data }: { data: { gadget: SweetCell<number> & Implements<Val
 
   return (
     <>
-      <Handle id="a" type="target" position={Position.Right} />
+      <Handle id='out' position={Position.Right} type="source" />
       <div className="px-4 py-3 bg-white border-2 border-slate-300 rounded-lg shadow-md min-w-[120px]">
 
         <div className="text-xs font-semibold text-slate-500 mb-2">
@@ -57,7 +59,7 @@ function CellNode({ data }: { data: { gadget: SweetCell<number> & Implements<Val
           </button>
         </div>
       </div >
-      <Handle id="b" type="source" position={Position.Left} />
+      <Handle id='in' position={Position.Left} type="target" />
     </>
   );
 }
@@ -67,16 +69,20 @@ const nodeTypes: NodeTypes = {
 };
 
 export default function CanvasDemo() {
+  // React state for visual
+  const [reactNodes, setReactNodes] = useState<Node[]>([]);
+  const [reactEdges, setReactEdges] = useState<Edge[]>([]);
+
   // Create network tables
   const network = useMemo(() => {
-    const net = table.first<SweetTable<any>>({});
+    const net = table.first<SweetTable<any> & Implements<Valued<any>>>({});
 
     net.set({
       'nodeTypes': table.first<NodeType>({}),
-      'positions': table.first<Position>({}),
+      'positions': table.last<Position>({}),
       'gadgets': table.first<SweetCell<number> & Implements<Valued<number>>>({}),
-      'connections': table.first<Connection>({}),
-      'taps': table.first<Cleanup>({}),
+      'connections': table.last<Connection | null>({}),
+      'taps': table.last<Cleanup>({}),
     });
 
     const [nodeTypes, positions, gadgets, connections, taps] = net.getMany([
@@ -93,13 +99,20 @@ export default function CanvasDemo() {
       gadgets!.set({ [key]: factory(0) });
     });
 
-    // When connection is added, create the actual tap
+    // When connection is added, create the network tap
     connections!.whenAdded((id, conn) => {
-      const from = gadgets!.get(conn.from);
-      const to = gadgets!.get(conn.to);
-      if (from && to) {
-        const cleanup = from.provide(to);
-        taps!.set({ [id]: cleanup });
+      if (conn !== null && conn !== undefined) {
+        const from = gadgets!.get(conn.from);
+        const to = gadgets!.get(conn.to);
+        if (from && to) {
+          const cleanup = from.provide(to);
+          taps!.set({ [id]: cleanup });
+        }
+      }
+    });
+    positions?.tap(({ added }) => {
+      if (added) {
+        console.log('added', added);
       }
     });
 
@@ -124,33 +137,64 @@ export default function CanvasDemo() {
     return { net, nodeTypes, positions, gadgets, connections, taps };
   }, []);
 
-  // Subscribe to table updates to trigger re-renders
+  // Subscribe to table updates
   const [positionsData] = useGadget(network.positions!);
   const [nodeTypesData] = useGadget(network.nodeTypes!);
   const [gadgetsData] = useGadget(network.gadgets!);
   const [connectionsData] = useGadget(network.connections!);
 
-  // Derive React Flow nodes from tables
-  const nodes: Node[] = useMemo(() => {
-    return Object.entries(positionsData).map(([id, pos]) => ({
+
+  // Network → React sync: Update visual when network tables change
+  useEffect(() => {
+    const nodes = Object.entries(positionsData).map(([id, pos]) => ({
       id,
-      type: 'cell',
+      type: 'cell' as const,
       position: pos,
       data: {
         gadget: gadgetsData[id],
         nodeType: nodeTypesData[id],
       },
     }));
+    setReactNodes((oldNodes) => oldNodes.filter((node) => nodes.findIndex((n) => n.id === node.id) === -1).concat(nodes));
   }, [positionsData, nodeTypesData, gadgetsData]);
 
-  // Derive React Flow edges from connections table
-  const edges: Edge[] = useMemo(() => {
-    return Object.entries(connectionsData).map(([id, conn]) => ({
-      id,
-      source: conn.from,
-      target: conn.to,
-    }));
+  useEffect(() => {
+    const edges = Object.entries(connectionsData)
+      .map(([id, conn]) => {
+        if (conn === null || conn === undefined) return null;
+        return {
+          id,
+          source: conn.from,
+          target: conn.to,
+        };
+      })
+      .filter((e): e is Edge => e !== null);
+    setReactEdges(edges);
   }, [connectionsData]);
+
+  // Interactive handlers
+  const onConnect = useCallback((connection: ReactFlowConnection) => {
+    if (!connection.source || !connection.target) return;
+    const id = `${connection.source}-${connection.target}`;
+    network.connections!.set({ [id]: { from: connection.source, to: connection.target } });
+  }, [network.connections]);
+
+  const onEdgesDelete = useCallback((edgesToDelete: Edge[]) => {
+    edgesToDelete.forEach(edge => {
+      network.connections!.set({ [edge.id]: null });
+      // Cleanup the tap
+      const cleanup = network.taps!.get(edge.id);
+      if (cleanup) {
+        cleanup();
+        console.log('cleanup', cleanup);
+        network.taps!.set({ [edge.id]: null });
+      }
+    });
+  }, [network.connections, network.taps]);
+
+  const onNodeDragStop = useCallback((_event: any, node: Node) => {
+    network.positions!.set({ [node.id]: node.position });
+  }, [network.positions]);
 
   return (
     <div className="h-screen w-screen">
@@ -160,15 +204,20 @@ export default function CanvasDemo() {
           Data-driven gadget network visualization
         </p>
         <div className="text-xs text-slate-500">
-          <div>Nodes: {nodes.length}</div>
-          <div>Connections: {edges.length}</div>
+          <div>Nodes: {reactNodes.length}</div>
+          <div>Connections: {reactEdges.length}</div>
         </div>
       </div>
 
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={reactNodes}
+        edges={reactEdges}
         nodeTypes={nodeTypes}
+        onConnect={onConnect}
+        onNodesChange={(changes) => setReactNodes((oldNodes) => applyNodeChanges(changes, oldNodes))}
+        onEdgesChange={(changes) => setReactEdges((oldEdges) => applyEdgeChanges(changes, oldEdges))}
+        onEdgesDelete={onEdgesDelete}
+        onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}
         fitView
       >
