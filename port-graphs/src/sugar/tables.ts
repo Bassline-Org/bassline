@@ -86,11 +86,11 @@ export const table = {
         return sweetenTable(t) as typeof t & SweetTable<T>
     },
     flattenTable<
+        Sources extends { [K in keyof Args]: Implements<Valued<Args[K]>> },
         Args extends Readonly<Record<string, unknown>>,
-        Sources extends { [K in keyof Args]: Implements<Valued<Args[K]>> }
     >(
         source: Implements<Table<string, Sources>> & SweetTable<Sources>
-    ): [SweetTable<Args>, Cleanup] {
+    ) {
         return table.deriveRows(source, (row) => row, (values: Args) => values);
     },
     deriveRows<
@@ -102,7 +102,7 @@ export const table = {
         source: Implements<Table<string, SourceRow>> & SweetTable<SourceRow>,
         extractGadgets: (row: SourceRow) => Sources,
         transform: (values: Args) => TargetRow
-    ): [SweetTable<TargetRow>, Cleanup] {
+    ) {
         const aggregated = table.last<TargetRow>({});
         const cleanups = table.last<Cleanup>({});
 
@@ -130,7 +130,7 @@ export const table = {
         // Process existing rows
         const current = source.current();
         for (const key in current) {
-            processRow(key, current[key] as SourceRow);
+            processRow(key, current[key]);
         }
 
         // Subscribe to new rows
