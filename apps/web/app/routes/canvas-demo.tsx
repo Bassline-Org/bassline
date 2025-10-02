@@ -56,6 +56,20 @@ type EdgeValue = {
   from: string,
   to: string,
 }
+type FactoryRow = {
+  name: SCell<string>,
+  type: SCell<NodeType>,
+  icon: SCell<string>,
+  initialValue: SCell<any>,
+  create: SCell<(pos: Pos) => NodeRow>,
+}
+type FactoryValue = {
+  name: string,
+  type: NodeType,
+  icon: string,
+  initialValue: any,
+  create: (pos: Pos) => NodeRow,
+}
 
 // Cell Node Component
 function CellNode({ data: { gadget, type, originalGadget } }: { data: NodeValue & { originalGadget: SCell<unknown> } }) {
@@ -93,11 +107,13 @@ function CanvasView({
   nodes,
   edges,
   edgeValues,
+  factories,
 }: {
   nodeValues: Record<string, NodeValue>,
   nodes: STable<NodeRow>,
   edges: STable<EdgeRow>,
-  edgeValues: Record<string, EdgeValue>
+  edgeValues: Record<string, EdgeValue>,
+  factories: Record<string, FactoryValue>
 }) {
   const [reactNodes, setReactNodes] = useState<Node[]>([]);
   const [reactEdges, setReactEdges] = useState<Edge[]>([]);
@@ -173,10 +189,19 @@ function CanvasView({
             <span>Nodes: {reactNodes.length}</span>
             <span className="ml-3">Edges: {reactEdges.length}</span>
           </div>
-          <select
-            className="px-3 py-1 text-sm border rounded bg-white"
-          >
-          </select>
+          <div className="flex gap-2">
+            {Object.entries(factories).map(([id, factory]) => (
+              <button
+                key={id}
+                onClick={() => createNode(id, { x: 200, y: 200 })}
+                className="px-3 py-1 text-sm border rounded bg-white hover:bg-gray-100 flex items-center gap-1"
+                title={factory.name}
+              >
+                <span>{factory.icon}</span>
+                <span>{factory.type}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -203,6 +228,48 @@ function CanvasView({
   );
 }
 
+
+// Factory table - defines what node types can be created
+const factories = table.first<FactoryRow>({
+  max: {
+    name: cells.last('Max Cell'),
+    type: cells.last('max' as NodeType),
+    icon: cells.last('📈'),
+    initialValue: cells.last(0),
+    create: cells.last((pos: Pos) => ({
+      position: cells.last<XYPosition>(pos as XYPosition),
+      type: cells.last('max' as NodeType),
+      dims: cells.last<Dims>({ width: 100, height: 100 }),
+      gadget: cells.max(0),
+    })),
+  },
+  min: {
+    name: cells.last('Min Cell'),
+    type: cells.last('min' as NodeType),
+    icon: cells.last('📉'),
+    initialValue: cells.last(100),
+    create: cells.last((pos: Pos) => ({
+      position: cells.last<XYPosition>(pos as XYPosition),
+      type: cells.last('min' as NodeType),
+      dims: cells.last<Dims>({ width: 100, height: 100 }),
+      gadget: cells.min(100),
+    })),
+  },
+  union: {
+    name: cells.last('Union Cell'),
+    type: cells.last('union' as NodeType),
+    icon: cells.last('∪'),
+    initialValue: cells.last(new Set()),
+    create: cells.last((pos: Pos) => ({
+      position: cells.last<XYPosition>(pos as XYPosition),
+      type: cells.last('union' as NodeType),
+      dims: cells.last<Dims>({ width: 100, height: 100 }),
+      gadget: cells.union(new Set()),
+    })),
+  },
+});
+
+const [factoryValues] = table.flattenTable<FactoryRow, FactoryValue>(factories);
 
 const nodes = table.first<NodeRow>({} as Record<string, NodeRow>);
 const edges = table.first<EdgeRow>({} as Record<string, EdgeRow>);
@@ -247,9 +314,34 @@ edges.set({
   'c-b': { from: cells.last('c'), to: cells.last('b') },
 });
 
+// Helper: Create a new node using a factory
+let nodeCounter = 3; // a, b, c already exist
+function createNode(factoryId: string, position: Pos) {
+  const factory = factories.get(factoryId);
+  if (!factory) {
+    console.error(`Factory not found: ${factoryId}`);
+    return;
+  }
+
+  const nodeId = `node_${nodeCounter++}`;
+  const nodeRow = factory.create.current()(position);
+  nodes.set({ [nodeId]: nodeRow });
+  return nodeId;
+}
+
+// Helper: Delete a node and clean up its edges
+function deleteNode(nodeId: string) {
+  // TODO: Clean up edges that reference this node
+  // TODO: Call cleanup functions
+  // For now, just a placeholder
+  console.log(`Delete node: ${nodeId}`);
+}
+
 export default function CanvasDemo() {
   const [nodeValueState] = useGadget(nodeValues, ['added', 'changed']);
   const [edgeValueState] = useGadget(edgeValues, ['added', 'changed']);
+  const [factoryValueState] = useGadget(factoryValues, ['added', 'changed']);
+
   return (
     <div className="h-screen w-screen flex">
       <CanvasView
@@ -257,7 +349,7 @@ export default function CanvasDemo() {
         nodeValues={nodeValueState}
         edges={edges}
         edgeValues={edgeValueState}
-      //label="Left View"
+        factories={factoryValueState}
       />
 
       <div className="w-1 bg-gray-300" />
