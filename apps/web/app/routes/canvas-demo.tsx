@@ -33,13 +33,10 @@ type Connection = { from: string; to: string };
 type Position = { x: number; y: number };
 
 // View system types
-type NetworkTableState = SweetTable<any> & Implements<Valued<any>>;
-type NetworkTable = Implements<Table<string, NetworkTableState>>;
 type VisualState = {
   nodes: Node[];
   edges: Edge[];
 };
-type ViewFn = (network: NetworkTableState) => VisualState;
 
 // Shared helper for building visual state from network data
 function buildVisualState(
@@ -82,58 +79,19 @@ function buildVisualState(
   return { nodes, edges };
 }
 
-// Default view: show everything
-const allView: ViewFn = (network) => {
-  const positions = network['positions']?.current() ?? {};
-  const nodeTypes = network['nodeTypes']?.current() ?? {};
-  const gadgets = network['gadgets']?.current() ?? {};
-  const connections = network['connections']?.current() ?? {};
-
-  return buildVisualState(positions, nodeTypes, gadgets, connections);
-};
-
-// Type filter view: show only specified node types
-const typeFilterView = (allowedTypes: Set<NodeType>): ViewFn => (network) => {
-  const positions = network['positions']?.current() ?? {};
-  const nodeTypes = network['nodeTypes']?.current() ?? {};
-  const gadgets = network['gadgets']?.current() ?? {};
-  const connections = network['connections']?.current() ?? {};
-
-  return buildVisualState(
-    positions,
-    nodeTypes,
-    gadgets,
-    connections,
-    (id, type) => allowedTypes.has(type)
-  );
-};
-
-// Factory to create a canvas view system (currentViewId + visualState)
-function createCanvasViewSystem(
+// Helper to build visual state for a specific view
+function buildViewGadget(
   positions: SweetTable<Position>,
   nodeTypes: SweetTable<NodeType>,
   gadgets: SweetTable<SweetCell<number> & Implements<Valued<number>>>,
   connections: SweetTable<Connection | null>,
-  viewsTable: SweetTable<ViewFn>,
-  initialViewId: string
+  nodeFilter?: (id: string, nodeType: NodeType) => boolean
 ) {
-  // Current view ID cell
-  const currentViewId = cells.last<string>(initialViewId);
-
-  // Derive ViewFn from ID
-  const [viewFn] = deriveFrom(
-    { viewId: currentViewId, views: viewsTable },
-    ({ viewId, views }) => {
-      const view = views[viewId];
-      return view({
-        positions: positions,
-        nodeTypes: nodeTypes,
-        gadgets: gadgets,
-        connections: connections,
-      });
-    }
-  );
-  return { currentViewId, visualState: viewFn };
+  return deriveFrom(
+    { positions, nodeTypes, gadgets, connections },
+    ({ positions, nodeTypes, gadgets, connections }) =>
+      buildVisualState(positions, nodeTypes, gadgets, connections, nodeFilter)
+  )[0];
 }
 
 // Cell Node Component
@@ -174,10 +132,9 @@ const nodeTypes: NodeTypes = {
 };
 
 // Reusable Canvas View Component
-interface CanvasViewProps {
-  visualState: SweetCell<VisualState>;
-  currentViewId: SweetCell<string>;
-  viewsTable: SweetTable<ViewFn>;
+interface CanvasViewProps<ViewKeys extends string> {
+  currentViewId: SweetCell<ViewKeys>;
+  views: Record<ViewKeys, any>; // View gadgets
   network: {
     positions: SweetTable<Position>;
     connections: SweetTable<Connection | null>;
@@ -186,19 +143,21 @@ interface CanvasViewProps {
   label?: string;
 }
 
-function CanvasView({
-  visualState,
+function CanvasView<ViewKeys extends string>({
   currentViewId,
-  viewsTable,
+  views,
   network,
   label
-}: CanvasViewProps) {
-  // Subscribe to visual state
-  const [visual] = useGadget(visualState);
+}: CanvasViewProps<ViewKeys>) {
+  // Get current view ID
+  const [viewId, viewIdCell] = useGadget(currentViewId);
 
-  // Subscribe to view metadata
-  const [viewsData] = useGadget(viewsTable);
-  const [currentView, currentViewCell] = useGadget(currentViewId);
+  // Pick the active view gadget
+  const activeView = views[viewId];
+
+  // Subscribe to that view's computed state
+  const [state] = useGadget(activeView);
+  const visual = state?.result;
 
   // React Flow's local state (for smooth interactions)
   const [reactNodes, setReactNodes] = useState<Node[]>([]);
@@ -206,9 +165,9 @@ function CanvasView({
 
   // Sync: Visual state → React state (when network changes)
   useEffect(() => {
-    if (visual?.result) {
-      setReactNodes(visual.result.nodes);
-      setReactEdges(visual.result.edges);
+    if (visual) {
+      setReactNodes(visual.nodes);
+      setReactEdges(visual.edges);
     }
   }, [visual]);
 
@@ -247,11 +206,11 @@ function CanvasView({
             <span className="ml-3">Edges: {reactEdges.length}</span>
           </div>
           <select
-            value={currentView}
-            onChange={(e) => currentViewCell.receive(e.target.value)}
+            value={viewId}
+            onChange={(e) => viewIdCell.receive(e.target.value as ViewKeys)}
             className="px-3 py-1 text-sm border rounded bg-white"
           >
-            {Object.keys(viewsData).map(id => (
+            {Object.keys(views).map(id => (
               <option key={id} value={id}>
                 {id.charAt(0).toUpperCase() + id.slice(1)}
               </option>
@@ -345,33 +304,18 @@ export default function CanvasDemo() {
       'c-b': { from: 'c', to: 'b' },
     });
 
-    // Create views table with predefined views
-    const viewsTable = table.first<ViewFn>({});
-    viewsTable.set({
-      'all': allView,
-      'maxOnly': typeFilterView(new Set(['max'])),
-      'minOnly': typeFilterView(new Set(['min'])),
-    });
+    // Create view gadgets - each auto-recomputes when network changes
+    const views = {
+      all: buildViewGadget(positions!, nodeTypes!, gadgets!, connections!),
+      maxOnly: buildViewGadget(positions!, nodeTypes!, gadgets!, connections!,
+        (_, type) => type === 'max'),
+      minOnly: buildViewGadget(positions!, nodeTypes!, gadgets!, connections!,
+        (_, type) => type === 'min'),
+    };
 
-    // Create left canvas view system (starts with 'all' view)
-    const leftView = createCanvasViewSystem(
-      positions!,
-      nodeTypes!,
-      gadgets!,
-      connections!,
-      viewsTable,
-      'all'
-    );
-
-    // Create right canvas view system (starts with 'maxOnly' view)
-    const rightView = createCanvasViewSystem(
-      positions!,
-      nodeTypes!,
-      gadgets!,
-      connections!,
-      viewsTable,
-      'maxOnly'
-    );
+    // Current view selectors
+    const currentViewLeft = cells.last<keyof typeof views>('all');
+    const currentViewRight = cells.last<keyof typeof views>('maxOnly');
 
     return {
       net,
@@ -380,20 +324,17 @@ export default function CanvasDemo() {
       gadgets,
       connections,
       taps,
-      viewsTable,
-      currentViewLeft: leftView.currentViewId,
-      visualStateLeft: leftView.visualState,
-      currentViewRight: rightView.currentViewId,
-      visualStateRight: rightView.visualState,
+      views,
+      currentViewLeft,
+      currentViewRight,
     };
   }, []);
 
   return (
     <div className="h-screen w-screen flex">
       <CanvasView
-        visualState={network.visualStateLeft}
         currentViewId={network.currentViewLeft}
-        viewsTable={network.viewsTable}
+        views={network.views}
         network={{
           positions: network.positions,
           connections: network.connections,
@@ -405,9 +346,8 @@ export default function CanvasDemo() {
       <div className="w-1 bg-gray-300" />
 
       <CanvasView
-        visualState={network.visualStateRight}
         currentViewId={network.currentViewRight}
-        viewsTable={network.viewsTable}
+        views={network.views}
         network={{
           positions: network.positions,
           connections: network.connections,
