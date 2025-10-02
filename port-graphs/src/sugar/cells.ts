@@ -1,5 +1,5 @@
 import { Cleanup } from ".";
-import { Accepts, Emits, Gadget, Implements, quick, Store, Tappable } from "../core/context";
+import { Accepts, Implements, quick } from "../core/context";
 import { Valued } from "../core/protocols";
 import { intersectionProto, maxProto, minProto, unionProto } from "../patterns/cells";
 

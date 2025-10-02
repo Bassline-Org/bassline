@@ -1,7 +1,8 @@
 import { Cleanup } from ".";
 import { Accepts, Implements, quick } from "../core/context";
-import { Transform } from "../core/protocols";
+import { Transform, Valued } from "../core/protocols";
 import { fallibleProto, partialProto, transformProto } from "../patterns/functions";
+import { cells } from "./cells";
 
 export interface Fannable<I, O> {
     source: SweetFunction<I, O>
@@ -37,7 +38,7 @@ function fanOut<I, O>(source: SweetFunction<I, O>) {
 interface SweetFunction<In, Out> {
     whenComputed(fn: (output: Out) => void): Cleanup;
     call(input: In): void;
-    fanOut(): Fannable<In, Out>
+    fanOut(): Fannable<In, Out>,
 }
 
 interface SweetFallibleFunction<In, Out> extends SweetFunction<In, Out> {
@@ -133,3 +134,32 @@ a.call(123);
 cleanup();
 
 a.call(123);
+
+function derive<
+    Args extends Readonly<Record<string, unknown>>,
+    Sources extends { [key in keyof Args]: Implements<Valued<Args[key]>> },
+    R>(sources: Sources, body: (arg: Args) => R) {
+    const cleanups: Array<Cleanup> = [];
+    const func = fn.partial(body, Object.keys(sources));
+    for (const key in sources) {
+        const source = sources[key];
+        cleanups.push(source.tap(({ changed }) => changed && func.receive({ [key]: changed } as Partial<Args>)));
+    }
+    const initial = Object.fromEntries(Object.entries(sources).map(([k, c]) => [k, c.current()])) as Partial<Args>;
+    func.receive(initial);
+    return [func, () => { cleanups.forEach(c => c()) }] as const
+}
+
+const foo = cells.max(0);
+const bar = cells.max(0);
+
+const [derived, clean] = derive({ foo, bar }, ({ foo, bar }: { foo: number, bar: number }) => foo + bar);
+derived.whenComputed(res => console.log(res))
+
+foo.receive(10);
+bar.receive(20);
+
+clean()
+
+foo.receive(30);
+bar.receive(40);
