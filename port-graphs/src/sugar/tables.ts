@@ -30,7 +30,7 @@ export function tableQuery<T>(table: Record<string, T>): TableQuery<T> {
     } as const satisfies TableQuery<T>
 }
 
-export interface SweetTable<T> extends Implements<Table<string, T>> {
+export interface SweetTable<T> {
     get(key: string): T | undefined,
     getMany(keys: ReadonlyArray<string>): ReadonlyArray<T | undefined>
     set(vals: Record<string, T>): void,
@@ -40,21 +40,21 @@ export interface SweetTable<T> extends Implements<Table<string, T>> {
 
 export function sweetenTable<T>(gadget: Implements<Table<string, T>>) {
     if ('get' in gadget) {
-        return gadget as SweetTable<T>
+        return gadget as typeof g & SweetTable<T>
     }
-    return {
+    const g: typeof gadget & SweetTable<T> = {
         ...gadget,
-        get(key) {
+        get(key: string): T | undefined {
             return this.current()[key]
         },
-        getMany(keys) {
+        getMany(keys: ReadonlyArray<string>): ReadonlyArray<T | undefined> {
             const curr = this.current();
             return keys.map(k => curr[k] as T)
         },
-        set(vals) {
+        set(vals: Record<string, T>): void {
             return this.receive(vals)
         },
-        query() {
+        query(): TableQuery<T> {
             return tableQuery(this.current())
         },
         whenAdded(fn) {
@@ -69,16 +69,17 @@ export function sweetenTable<T>(gadget: Implements<Table<string, T>>) {
             });
             return cleanup;
         }
-    } as const satisfies SweetTable<T>
+    } as const
+    return g as typeof g & SweetTable<T>
 }
 
 export const table = {
     first<T>(initial: Record<string, T>) {
         const t = quick(firstTableProto<string, T>(), initial as Record<string, T>)
-        return sweetenTable(t)
+        return sweetenTable(t) as typeof t & SweetTable<T>
     },
     last<T>(initial: Record<string, T>) {
         const t = quick(lastTableProto<string, T>(), initial as Record<string, T>)
-        return sweetenTable(t)
+        return sweetenTable(t) as typeof t & SweetTable<T>
     }
 }

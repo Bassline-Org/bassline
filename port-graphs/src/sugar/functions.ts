@@ -1,8 +1,7 @@
+import { Cleanup } from ".";
 import { Accepts, Implements, quick } from "../core/context";
 import { Transform } from "../core/protocols";
 import { fallibleProto, partialProto, transformProto } from "../patterns/functions";
-
-type Cleanup = () => void;
 
 export interface Fannable<I, O> {
     source: SweetFunction<I, O>
@@ -35,7 +34,7 @@ function fanOut<I, O>(source: SweetFunction<I, O>) {
     } as const satisfies Fannable<I, O>
 }
 
-interface SweetFunction<In, Out> extends Implements<Transform<In, Out>> {
+interface SweetFunction<In, Out> {
     whenComputed(fn: (output: Out) => void): Cleanup;
     call(input: In): void;
     fanOut(): Fannable<In, Out>
@@ -47,11 +46,11 @@ interface SweetFallibleFunction<In, Out> extends SweetFunction<In, Out> {
 
 function sweetenTransform<I, O>(fn: Implements<Transform<I, O>>) {
     if ('whenComputed' in fn) {
-        return fn as SweetFunction<I, O>
+        return fn
     };
     return {
         ...fn,
-        whenComputed(fn) {
+        whenComputed(fn: (output: O) => void): Cleanup {
             const cleanup = this.tap(({ computed }) => {
                 if (computed !== undefined) {
                     fn(computed);
@@ -59,23 +58,23 @@ function sweetenTransform<I, O>(fn: Implements<Transform<I, O>>) {
             });
             return cleanup
         },
-        call(input) {
+        call(input: I) {
             this.receive(input);
         },
         fanOut() {
-            return fanOut(this)
+            return fanOut<I, O>(this)
         },
-    } as const satisfies SweetFunction<I, O>
+    } as const
 }
 
 export const fn = {
     map<I, O>(fn: (input: I) => O) {
         const f = quick(transformProto(fn), undefined);
-        return sweetenTransform(f)
+        return sweetenTransform(f) as typeof f & SweetFunction<I, O>
     },
     partial<I extends Record<string, unknown>, O>(fn: (input: I) => O, keys: Array<keyof I>) {
         const f = quick(partialProto(fn, keys), { args: {}, result: undefined });
-        return sweetenTransform(f)
+        return sweetenTransform(f) as typeof f & SweetFunction<I, O>
     },
     fallible<I, O>(fn: (input: I) => O) {
         const f = quick(fallibleProto(fn), undefined);
@@ -92,7 +91,7 @@ export const fn = {
                 });
                 return cleanup
             }
-        } as const satisfies SweetFallibleFunction<I, O>
+        } as const as typeof f & SweetFallibleFunction<I, O>
     }
 }
 
