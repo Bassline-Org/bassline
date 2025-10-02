@@ -63,20 +63,21 @@ export const firstTableStep = <K extends string, V>(a: Record<K, V>, b: Record<K
     return { ignore: {} }
   }
   const added = Object.fromEntries<V>(difference.map(k => [k as K, b[k as K]])) as Record<K, V>
-  return { merge: _.merge(a, b), added };
+  let merged: Record<K, V> = {} as Record<K, V>
+  _.merge(merged, a, b);
+  return { merge: merged, added };
 };
 
 export const lastTableStep = <K extends string, V>(a: Record<K, V>, b: Record<K, V>) => {
   if (_.isEmpty(a)) {
     return { merge: b, added: b };
   }
-  const merged = _.merge(a, b);
+  let merged: Record<K, V> = {} as Record<K, V>
+  _.merge(merged, a, b);
   if (_.isEqual(merged, a)) {
     return ignore();
   }
-  const difference = _.difference(_.keys(a), _.keys(b));
-  const added = Object.fromEntries(difference.map(k => [k, b[k as K]])) as Record<K, V>
-  return { merge: merged, added };
+  return { merge: merged, added: b };
 };
 
 // ================================================
