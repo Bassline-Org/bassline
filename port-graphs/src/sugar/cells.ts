@@ -1,10 +1,14 @@
 import { Cleanup } from ".";
-import { Emits, Gadget, Implements, quick, Store, Tappable } from "../core/context";
+import { Accepts, Emits, Gadget, Implements, quick, Store, Tappable } from "../core/context";
 import { Valued } from "../core/protocols";
 import { intersectionProto, maxProto, minProto, unionProto } from "../patterns/cells";
 
 interface SweetCell<T> {
     whenChanged(fn: (change: T) => void): Cleanup
+    sync(target: Implements<Valued<T>>): Cleanup,
+    syncWith<I>(target: Implements<Valued<I>>, forward: (input: T) => I, back: (input: I) => T): Cleanup;
+    provide(target: Accepts<T>): Cleanup,
+    provideWith<I>(target: Accepts<I>, transform: (input: T) => I): Cleanup
 }
 
 function sweetenCell<T>(cell: Implements<Valued<T>>) {
@@ -13,14 +17,34 @@ function sweetenCell<T>(cell: Implements<Valued<T>>) {
     }
     return {
         ...cell,
-        whenChanged(fn) {
+        sync(target: Implements<Valued<T>>): Cleanup {
+            const cleanups = [
+                this.tap(({ changed }) => changed && target.receive(changed)),
+                target.tap(({ changed }) => changed && this.receive(changed)),
+            ];
+            return () => cleanups.forEach(c => c())
+        },
+        syncWith<I>(target: Implements<Valued<I>>, forward: (input: T) => I, back: (input: I) => T): Cleanup {
+            const cleanups = [
+                this.tap(({ changed }) => changed && target.receive(forward(changed))),
+                target.tap(({ changed }) => changed && this.receive(back(changed))),
+            ];
+            return () => cleanups.forEach(c => c())
+        },
+        provide(target: Accepts<T>): Cleanup {
+            return this.tap(({ changed }) => changed && target.receive(changed))
+        },
+        provideWith<I>(target: Accepts<I>, transform: (input: T) => I): Cleanup {
+            return this.tap(({ changed }) => changed && target.receive(transform(changed)))
+        },
+        whenChanged(fn: (change: T) => void): Cleanup {
             return cell.tap(({ changed }) => {
                 if (changed !== undefined) {
                     fn(changed)
                 }
             })
         }
-    } as const satisfies SweetCell<T>
+    } as const
 }
 
 export const cells = {
@@ -46,9 +70,7 @@ const a = cells.union<number>();
 const b = cells.union<number>();
 const c = cells.intersection<number>([]);
 
-a.whenChanged(v => c.receive(v));
-b.whenChanged(v => c.receive(v));
-c.whenChanged(v => console.log('c changed: ', v));
+a.sync(c);
+b.sync(c);
 
-a.receive(new Set([1, 2, 3, 4, 5]));
-b.receive(new Set([3, 4, 5, 6, 7, 8, 9]));
+c.whenChanged(v => console.log('c changed: ', v));
