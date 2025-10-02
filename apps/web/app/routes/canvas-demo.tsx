@@ -21,6 +21,7 @@ import '@xyflow/react/dist/style.css';
 import { table, cells } from 'port-graphs';
 import type { SweetTable, SweetCell, Implements, Cleanup, Tappable } from 'port-graphs';
 import type { Table, Valued } from 'port-graphs/protocols';
+import { useGadget } from "port-graphs-react";
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -57,7 +58,7 @@ type EdgeValue = {
 }
 
 // Cell Node Component
-function CellNode({ data: { gadget, type } }: { data: NodeValue }) {
+function CellNode({ data: { gadget, type, originalGadget } }: { data: NodeValue & { originalGadget: SCell<unknown> } }) {
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
@@ -66,6 +67,12 @@ function CellNode({ data: { gadget, type } }: { data: NodeValue }) {
           {type.toUpperCase()} CELL
         </div>
         <div className="text-2xl font-bold text-center mb-2">{gadget}</div>
+        <button onClick={(e) => {
+          console.log('clicked: ', originalGadget.current());
+          originalGadget.receive(originalGadget.current() + 1);
+        }}>
+          Click me
+        </button>
       </div>
       <Handle id='in' position={Position.Left} type="target" />
     </>
@@ -91,7 +98,7 @@ function CanvasView({
   edgeValues: Record<string, EdgeValue>
 }) {
   // React Flow's local state (for smooth interactions)
-  const [reactNodes, setReactNodes] = useState<Node[]>(Object.entries(nodeValues).map(([k, v]) => ({ id: k, position: v.position as XYPosition, type: v.type, data: v })));
+  const [reactNodes, setReactNodes] = useState<Node[]>(Object.entries(nodeValues).map(([k, v]) => ({ id: k, position: v.position as XYPosition, type: v.type, data: { ...v, originalGadget: (nodes.get(k)!.gadget) } })));
   const [reactEdges, setReactEdges] = useState<Edge[]>(Object.entries(edgeValues).map(([k, v]) => ({ id: k, source: v.from, target: v.to } as Edge)));
 
   useEffect(() => {
@@ -107,9 +114,12 @@ function CanvasView({
   const onConnect = useCallback((connection: ReactFlowConnection) => {
     if (!connection.source || !connection.target) return;
     const id = `${connection.source}-${connection.target}`;
-    const { from, to } = edges.get(id)!;
-    from.receive(connection.source);
-    to.receive(connection.target);
+    edges.receive({
+      [id]: {
+        from: cells.last(connection.source),
+        to: cells.last(connection.target),
+      }
+    });
   }, [edges]);
 
   const onEdgesDelete = useCallback((e: Edge[]) => {
@@ -169,7 +179,7 @@ function CanvasView({
           onConnect={onConnect}
           onEdgesDelete={onEdgesDelete}
           onNodeDragStop={onNodeDragStop}
-          connectionMode={ConnectionMode.Loose}
+          //connectionMode={ConnectionMode.Loose}
           fitView
         >
           <Background />
@@ -181,72 +191,64 @@ function CanvasView({
   );
 }
 
+
+const nodes = table.first<NodeRow>({} as Record<string, NodeRow>);
+const edges = table.first<EdgeRow>({} as Record<string, EdgeRow>);
+const [nodeValues, c1] = table.flattenTable<NodeRow, NodeValue>(nodes);
+const [edgeValues, c2] = table.flattenTable<EdgeRow, EdgeValue>(edges);
+nodeValues.whenAdded((k, v) => {
+  console.log('nodeValues changed key:', k, ' value: ', v);
+});
+edgeValues.whenAdded((k, v) => {
+  const edge = edges.get(k)!
+  if (!edge.cleanup) {
+    const [from, to] = nodes.getMany([v.from, v.to])!;
+    const cleanup = (from?.gadget as SCell<unknown>).sync(to?.gadget as SCell<unknown>);
+    edge.cleanup = cleanup;
+  }
+  console.log('edge value changed key: ', k, ' value: ', v);
+});
+nodes.set({
+  'a': {
+    position: cells.last<XYPosition>({ x: 100, y: 100 }),
+    type: cells.last('max' as NodeType),
+    dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
+    gadget: cells.max(0),
+  },
+  'b': {
+    position: cells.last<XYPosition>({ x: 100, y: 300 }),
+    type: cells.last('max' as NodeType),
+    dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
+    gadget: cells.max(0),
+  },
+  'c': {
+    position: cells.last<XYPosition>({ x: 400, y: 200 }),
+    type: cells.last('max' as NodeType),
+    dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
+    gadget: cells.max(0),
+  },
+});
+
+// Initialize connections
+edges.set({
+  'a-b': { from: cells.last('a'), to: cells.last('b') },
+  'c-b': { from: cells.last('c'), to: cells.last('b') },
+});
+
 export default function CanvasDemo() {
-  // Create network tables
-  const network = useMemo(() => {
-    // Create tables - nodes with per-property gadgets, connections, and taps
-    const nodes = table.first<NodeRow>({} as Record<string, NodeRow>);
-    const edges = table.first<EdgeRow>({} as Record<string, EdgeRow>);
-    const [nodeValues, cleanup] = table.flattenTable<NodeRow, NodeValue>(nodes);
-    const [edgeValues, edgeCleanup] = table.flattenTable<EdgeRow, EdgeValue>(edges);
-
-    nodeValues.whenAdded((k, v) => {
-      console.log('nodeValues changed key:', k, ' value: ', v);
-    });
-    edgeValues.whenAdded((k, v) => {
-      const edge = edges.get(k)!
-      if (!edge.cleanup) {
-        const [from, to] = nodes.getMany([v.from, v.to])!;
-        const cleanup = (from?.gadget as SCell<unknown>).sync(to?.gadget as SCell<unknown>);
-        edge.cleanup = cleanup;
-      }
-      console.log('edge value changed key: ', k, ' value: ', v);
-    });
-    // Initialize test network - each property is a gadget!
-    nodes.set({
-      'a': {
-        position: cells.last<XYPosition>({ x: 100, y: 100 }),
-        type: cells.last('max' as NodeType),
-        dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
-        gadget: cells.max(),
-      },
-      'b': {
-        position: cells.last<XYPosition>({ x: 100, y: 300 }),
-        type: cells.last('max' as NodeType),
-        dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
-        gadget: cells.max(),
-      },
-      'c': {
-        position: cells.last<XYPosition>({ x: 400, y: 200 }),
-        type: cells.last('max' as NodeType),
-        dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
-        gadget: cells.max(),
-      },
-    });
-
-    // Initialize connections
-    edges.set({
-      'a-b': { from: cells.last('a'), to: cells.last('b') },
-      'c-b': { from: cells.last('c'), to: cells.last('b') },
-    });
-
-    return {
-      nodes,
-      nodeValues,
-      edges,
-      edgeValues,
-    } as const;
-  }, []);
-
+  const [nodeState] = useGadget(nodes, ['changed', 'added']);
+  const [edgeState] = useGadget(edges, ['changed', 'added']);
+  const [nodeValueState] = useGadget(nodeValues, ['added', 'changed']);
+  const [edgeValueState] = useGadget(edgeValues, ['added', 'changed']);
   return (
     <div className="h-screen w-screen flex">
       <CanvasView
         // currentViewId={network.currentViewLeft}
         // views={network.views}
-        nodes={network.nodes}
-        nodeValues={network.nodeValues.current()}
-        edges={network.edges}
-        edgeValues={network.edgeValues.current()}
+        nodes={nodes}
+        nodeValues={nodeValueState}
+        edges={edges}
+        edgeValues={edgeValueState}
       //label="Left View"
       />
 

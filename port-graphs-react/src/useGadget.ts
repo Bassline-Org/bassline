@@ -25,19 +25,23 @@
  */
 
 import { useSyncExternalStore } from 'react';
-import type { Implements } from 'port-graphs';
+import type { Emits, Implements, Tappable } from 'port-graphs';
 import { Valued } from 'port-graphs/protocols';
 
-export function useGadget<T, G extends Implements<Valued<T>>>(
-  gadget: G
-): readonly [T, G] {
+export function useGadget<T, G, E extends Record<string, unknown>>(
+  gadget: G & Implements<Valued<T>> & Tappable<E>,
+  effects: ReadonlyArray<keyof E> = []
+): readonly [T, typeof gadget] {
   const value = useSyncExternalStore(
     (callback) => {
       // Subscribe using gadget's .tap() method
       // Note: We tap the effects and call callback on { changed }
-      const cleanup = gadget.tap(({ changed }) => {
-        if (changed !== undefined) {
-          callback();
+      const cleanup = gadget.tap((e: Partial<E>) => {
+        for (const k in effects) {
+          if (k in e && e[k] !== undefined) {
+            callback();
+            break
+          }
         }
       });
       return cleanup;
