@@ -40,7 +40,6 @@ export function useGadget<T, G, E extends Record<string, unknown>>(
         for (const k in effects) {
           if (k in e && e[k] !== undefined) {
             callback();
-            break
           }
         }
       });

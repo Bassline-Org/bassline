@@ -97,9 +97,18 @@ function CanvasView({
   edges: STable<EdgeRow>,
   edgeValues: Record<string, EdgeValue>
 }) {
-  // React Flow's local state (for smooth interactions)
-  const [reactNodes, setReactNodes] = useState<Node[]>(Object.entries(nodeValues).map(([k, v]) => ({ id: k, position: v.position as XYPosition, type: v.type, data: { ...v, originalGadget: (nodes.get(k)!.gadget) } })));
-  const [reactEdges, setReactEdges] = useState<Edge[]>(Object.entries(edgeValues).map(([k, v]) => ({ id: k, source: v.from, target: v.to } as Edge)));
+  const [reactNodes, setReactNodes] = useState<Node[]>([]);
+  const [reactEdges, setReactEdges] = useState<Edge[]>([]);
+
+  useEffect(() => {
+    console.log('fuckinasdf')
+    setReactNodes((old) => Object.entries(nodeValues).map(([k, v]) => ({ id: k, position: v.position as XYPosition, type: v.type, data: { ...v, originalGadget: (nodes.get(k)!.gadget) } })))
+  }, [nodeValues]);
+
+  useEffect(() => {
+    console.log('asdflkjasdf;lkajsf')
+    setReactEdges((old) => Object.entries(edgeValues).map(([k, v]) => ({ id: k, source: v.from, target: v.to } as Edge)))
+  }, [edgeValues]);
 
   useEffect(() => {
     for (const key in reactNodes) {
@@ -143,10 +152,8 @@ function CanvasView({
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      {/* Header with view selector */}
       <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
         <div className="font-medium text-sm text-gray-700">
-          {/* { label || 'Canvas View'} */}
           'Canvas'
         </div>
         <div className="flex items-center gap-3">
@@ -155,15 +162,8 @@ function CanvasView({
             <span className="ml-3">Edges: {reactEdges.length}</span>
           </div>
           <select
-            // value={viewId}
-            // onChange={(e) => viewIdCell.receive(e.target.value as string)}
             className="px-3 py-1 text-sm border rounded bg-white"
           >
-            {/* {Object.keys(views).map(id => (
-              <option key={id} value={id}>
-                {id.charAt(0).toUpperCase() + id.slice(1)}
-              </option>
-            ))} */}
           </select>
         </div>
       </div>
@@ -243,8 +243,6 @@ export default function CanvasDemo() {
   return (
     <div className="h-screen w-screen flex">
       <CanvasView
-        // currentViewId={network.currentViewLeft}
-        // views={network.views}
         nodes={nodes}
         nodeValues={nodeValueState}
         edges={edges}
@@ -253,17 +251,6 @@ export default function CanvasDemo() {
       />
 
       <div className="w-1 bg-gray-300" />
-
-      {/* <CanvasView
-        currentViewId={network.currentViewRight}
-        views={network.views}
-        network={{
-          nodes: network.nodes,
-          connections: network.connections,
-          taps: network.taps,
-        }}
-        label="Right View"
-      /> */}
     </div>
   );
 }
