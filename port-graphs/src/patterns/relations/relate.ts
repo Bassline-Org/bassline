@@ -125,26 +125,3 @@ export function same<T>(source: Implements<Valued<T>>, target: Implements<Valued
     backward: (b) => b,
   });
 }
-
-const unionCell = () => quick(unionProto<string>(), new Set<string>());
-const intersectionCell = () => quick(intersectionProto<string>(), new Set<string>());
-
-const premises = unionCell();
-const nogoods = unionCell();
-const resolved = intersectionCell();
-
-type Args = { premises: Set<string>, nogoods: Set<string> };
-const resolverFn = () => quick(partialProto(({ nogoods, premises }: Args) => premises.difference(nogoods), ['premises', 'nogoods']), { args: { premises: new Set<string>(), nogoods: new Set<string>() } });
-const resolver = resolverFn();
-
-contributes(resolver, { premises, nogoods });
-
-computes(resolver, resolved);
-
-premises.receive(new Set<string>(['foo', 'bar', 'baz']));
-
-nogoods.receive(new Set<string>(['baz', 'qux']));
-
-premises.receive(new Set<string>(['foo', 'bar', 'baz', 'qux']));
-
-nogoods.receive(new Set(['bar']));

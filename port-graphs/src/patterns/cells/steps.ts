@@ -65,6 +65,17 @@ export const firstTableStep = <K extends string, V>(a: Record<K, V>, b: Record<K
   return { merge: _.merge(a, b), added: difference as K[] };
 };
 
+export const lastTableStep = <K extends string, V>(a: Record<K, V>, b: Record<K, V>) => {
+  if (_.isEmpty(a)) {
+    return { merge: b, added: _.keys(b) as K[] };
+  }
+  const merged = _.merge(a, b);
+  if (_.isEqual(merged, a)) {
+    return ignore();
+  }
+  return { merge: merged, added: _.difference(_.keys(a), _.keys(b)) as K[] };
+};
+
 // ================================================
 // Registry Cell Step
 // ================================================

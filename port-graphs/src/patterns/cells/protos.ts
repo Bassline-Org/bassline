@@ -9,6 +9,7 @@ import {
   intersectionStep,
   registryStep,
   firstTableStep,
+  lastTableStep,
 } from './steps';
 import { mergeHandler, contradictionHandler, registryHandler, tableHandler } from './handlers';
 import { Valued } from '../../core/protocols';
@@ -48,6 +49,12 @@ export const registryProto = <T>() =>
 // Table proto
 export const firstTableProto = <K extends string, V>() =>
   protoGadget(firstTableStep<K, V>).handler((g, actions) => ({
+    ...mergeHandler(g, actions),
+    ...tableHandler(g, actions),
+  }));
+
+export const lastTableProto = <K extends string, V>() =>
+  protoGadget(lastTableStep<K, V>).handler((g, actions) => ({
     ...mergeHandler(g, actions),
     ...tableHandler(g, actions),
   }));

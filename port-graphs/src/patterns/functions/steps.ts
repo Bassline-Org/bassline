@@ -37,7 +37,10 @@ export type FunctionActions<S, Out> = {
  * ```
  */
 export const transformStep = <In, Out>(fn: (input: In) => Out) =>
-  (_state: Out | undefined, input: In): FunctionActions<Out, Out> => {
+  (_state: Out | undefined, input: In | undefined): FunctionActions<Out, Out> => {
+    if (input === undefined) {
+      return {}
+    }
     const result = fn(input);  // RUN FUNCTION HERE
     return {
       updateState: result,
@@ -54,7 +57,7 @@ export const transformStep = <In, Out>(fn: (input: In) => Out) =>
  * Stores both accumulated arguments AND the last computed result.
  */
 export type PartialState<Args extends Record<string, any>, Out> = {
-  args: Partial<Args>;  // Accumulated arguments so far
+  args?: Partial<Args>;  // Accumulated arguments so far
   result?: Out;         // Last computed result (if any)
 };
 
@@ -89,28 +92,31 @@ export const partialStep = <Args extends Record<string, any>, Out>(
   requiredKeys: (keyof Args)[]
 ) => (
   state: PartialState<Args, Out>,
-  input: Partial<Args>
+  input: Partial<Args> | undefined
 ): FunctionActions<PartialState<Args, Out>, Out> => {
-  // Merge new input with accumulated args
-  const merged = { ...state.args, ...input };
+    if (input === undefined) {
+      return {}
+    }
+    // Merge new input with accumulated args
+    const merged = { ...state.args, ...input };
 
-  // Check if we have all required keys
-  const hasAll = requiredKeys.every(k => k in merged && merged[k] !== undefined);
+    // Check if we have all required keys
+    const hasAll = requiredKeys.every(k => k in merged && merged[k] !== undefined);
 
-  if (hasAll) {
-    // All args present - RUN FUNCTION HERE
-    const result = fn(merged as Args);
-    return {
-      updateState: { args: merged as Args, result },
-      emitComputed: result
-    };
-  } else {
-    // Still accumulating - update args but don't emit
-    return {
-      updateState: { args: merged, result: state.result }
-    };
-  }
-};
+    if (hasAll) {
+      // All args present - RUN FUNCTION HERE
+      const result = fn(merged as Args);
+      return {
+        updateState: { args: merged as Args, result },
+        emitComputed: result
+      };
+    } else {
+      // Still accumulating - update args but don't emit
+      return {
+        updateState: { args: merged, result: state.result }
+      };
+    }
+  };
 
 // ================================================
 // Fallible Transform Steps
@@ -142,7 +148,10 @@ export const partialStep = <Args extends Record<string, any>, Out>(
  * ```
  */
 export const fallibleStep = <In, Out>(fn: (input: In) => Out) =>
-  (_state: Out | undefined, input: In): FunctionActions<Out, Out> => {
+  (_state: Out | undefined, input: In | undefined): FunctionActions<Out, Out> => {
+    if (input === undefined) {
+      return {}
+    }
     try {
       const result = fn(input);  // RUN FUNCTION HERE
       return {
