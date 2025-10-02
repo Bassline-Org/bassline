@@ -67,11 +67,13 @@ function CellNode({ data: { gadget, type, originalGadget } }: { data: NodeValue 
           {type.toUpperCase()} CELL
         </div>
         <div className="text-2xl font-bold text-center mb-2">{gadget}</div>
-        <button onClick={(e) => {
-          console.log('clicked: ', originalGadget.current());
-          originalGadget.receive(originalGadget.current() + 1);
-        }}>
-          Click me
+        <button
+          onClick={() => {
+            originalGadget.receive(originalGadget.current() + 1);
+          }}
+          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          +1
         </button>
       </div>
       <Handle id='in' position={Position.Left} type="target" />
@@ -101,13 +103,20 @@ function CanvasView({
   const [reactEdges, setReactEdges] = useState<Edge[]>([]);
 
   useEffect(() => {
-    console.log('fuckinasdf')
-    setReactNodes((old) => Object.entries(nodeValues).map(([k, v]) => ({ id: k, position: v.position as XYPosition, type: v.type, data: { ...v, originalGadget: (nodes.get(k)!.gadget) } })))
-  }, [nodeValues]);
+    setReactNodes((old) => Object.entries(nodeValues).map(([k, v]) => ({
+      id: k,
+      position: v.position as XYPosition,
+      type: v.type,
+      data: { ...v, originalGadget: nodes.get(k)!.gadget }
+    })));
+  }, [nodeValues, nodes]);
 
   useEffect(() => {
-    console.log('asdflkjasdf;lkajsf')
-    setReactEdges((old) => Object.entries(edgeValues).map(([k, v]) => ({ id: k, source: v.from, target: v.to } as Edge)))
+    setReactEdges(Object.entries(edgeValues).map(([k, v]) => ({
+      id: k,
+      source: v.from,
+      target: v.to
+    } as Edge)));
   }, [edgeValues]);
 
   useEffect(() => {
@@ -197,8 +206,9 @@ const edges = table.first<EdgeRow>({} as Record<string, EdgeRow>);
 const [nodeValues, c1] = table.flattenTable<NodeRow, NodeValue>(nodes);
 const [edgeValues, c2] = table.flattenTable<EdgeRow, EdgeValue>(edges);
 nodeValues.whenAdded((k, v) => {
-  console.log('nodeValues changed key:', k, ' value: ', v);
+  // Node added to the flattened view
 });
+
 edgeValues.whenAdded((k, v) => {
   const edge = edges.get(k)!
   if (!edge.cleanup) {
@@ -206,7 +216,6 @@ edgeValues.whenAdded((k, v) => {
     const cleanup = (from?.gadget as SCell<unknown>).sync(to?.gadget as SCell<unknown>);
     edge.cleanup = cleanup;
   }
-  console.log('edge value changed key: ', k, ' value: ', v);
 });
 nodes.set({
   'a': {

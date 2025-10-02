@@ -35,11 +35,18 @@ export function useGadget<T, G, E extends Record<string, unknown>>(
   const value = useSyncExternalStore(
     (callback) => {
       // Subscribe using gadget's .tap() method
-      // Note: We tap the effects and call callback on { changed }
+      // Note: We tap the effects and call callback on any specified effect
       const cleanup = gadget.tap((e: Partial<E>) => {
-        for (const k in effects) {
-          if (k in e && e[k] !== undefined) {
+        // If no specific effects requested, trigger on any effect
+        if (effects.length === 0) {
+          callback();
+          return;
+        }
+        // Otherwise, check if any requested effect is present
+        for (const effect of effects) {
+          if (effect in e && e[effect] !== undefined) {
             callback();
+            return;
           }
         }
       });
