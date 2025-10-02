@@ -47,7 +47,7 @@ export function useDerive<
   source: Source,
   compute: (arg: Arg) => R
 ) {
-  const [derivedFunc, cleanup] = useMemo(() => derive(source, compute), [])
+  const [derivedFunc, cleanup] = useMemo(() => derive(source, compute), [source, compute])
   const result = useSyncExternalStore(
     (callback) => {
       const cleanup = derivedFunc.whenComputed(res => {
