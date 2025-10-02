@@ -1,5 +1,5 @@
 import type { Route } from "./+types/canvas-demo";
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useMemo, useCallback } from 'react';
 import {
   ReactFlow,
   Background,
@@ -12,14 +12,12 @@ import {
   type NodeTypes,
   type Connection as ReactFlowConnection,
   ConnectionMode,
-  applyNodeChanges,
-  applyEdgeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useGadget } from 'port-graphs-react';
-import { table, cells } from 'port-graphs';
+import { table, cells, deriveFrom } from 'port-graphs';
 import type { SweetTable, SweetCell, Implements, Cleanup } from 'port-graphs';
-import type { Valued } from 'port-graphs/protocols';
+import type { Table, Valued } from 'port-graphs/protocols';
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -30,6 +28,44 @@ export function meta({ }: Route.MetaArgs) {
 
 type NodeType = 'max' | 'min';
 type Connection = { from: string; to: string };
+
+// View system types
+type NetworkTableState = SweetTable<any> & Implements<Valued<any>>;
+type NetworkTable = Implements<Table<string, NetworkTableState>>;
+type VisualState = {
+  nodes: Node[];
+  edges: Edge[];
+};
+type ViewFn = (network: NetworkTableState) => VisualState;
+
+// Default view: show everything
+const allView: ViewFn = (network) => {
+  console.log('network', network);
+  const positions = network['positions']?.current() ?? {};
+  const nodeTypes = network['nodeTypes']?.current() ?? {};
+  const gadgets = network['gadgets']?.current() ?? {};
+  const connections = network['connections']?.current() ?? {};
+
+  const nodes = Object.entries(positions).map(([id, pos]) => ({
+    id,
+    position: pos as { x: number; y: number },
+    type: 'cell' as const,
+    data: {
+      gadget: gadgets[id] as SweetCell<number> & Implements<Valued<number>>,
+      nodeType: nodeTypes[id] as NodeType,
+    },
+  }));
+
+  const edges = Object.entries(connections)
+    .filter(([_, c]) => c !== null)
+    .map(([id, c]) => ({
+      id,
+      source: (c as Connection).from,
+      target: (c as Connection).to,
+    }));
+
+  return { nodes, edges };
+};
 
 // Cell Node Component
 function CellNode({ data }: { data: { gadget: SweetCell<number> & Implements<Valued<number>>; nodeType: NodeType } }) {
@@ -69,13 +105,9 @@ const nodeTypes: NodeTypes = {
 };
 
 export default function CanvasDemo() {
-  // React state for visual
-  const [reactNodes, setReactNodes] = useState<Node[]>([]);
-  const [reactEdges, setReactEdges] = useState<Edge[]>([]);
-
   // Create network tables
   const network = useMemo(() => {
-    const net = table.first<SweetTable<any> & Implements<Valued<any>>>({});
+    const net = table.first<NetworkTableState>({});
 
     net.set({
       'nodeTypes': table.first<NodeType>({}),
@@ -110,9 +142,9 @@ export default function CanvasDemo() {
         }
       }
     });
-    positions?.tap(({ added }) => {
-      if (added) {
-        console.log('added', added);
+    positions?.tap(({ changed }) => {
+      if (changed) {
+        console.log('changed', changed);
       }
     });
 
@@ -134,43 +166,28 @@ export default function CanvasDemo() {
       'c-b': { from: 'c', to: 'b' },
     });
 
-    return { net, nodeTypes, positions, gadgets, connections, taps };
+    // Create currentView cell
+    const currentView = cells.last<ViewFn>(allView);
+
+    // Create visualState that subscribes to individual tables
+    const [visualState] = deriveFrom(
+      {
+        positions: positions!,
+        nodeTypes: nodeTypes!,
+        gadgets: gadgets!,
+        connections: connections!,
+        viewFn: currentView,
+        network: net as Implements<Valued<NetworkTableState>>,
+      },
+      ({ positions, nodeTypes, gadgets, connections, viewFn, network }) => {
+        return viewFn(network);
+      }
+    );
+
+    return { net, nodeTypes, positions, gadgets, connections, taps, currentView, visualState };
   }, []);
 
-  // Subscribe to table updates
-  const [positionsData] = useGadget(network.positions!);
-  const [nodeTypesData] = useGadget(network.nodeTypes!);
-  const [gadgetsData] = useGadget(network.gadgets!);
-  const [connectionsData] = useGadget(network.connections!);
-
-
-  // Network → React sync: Update visual when network tables change
-  useEffect(() => {
-    const nodes = Object.entries(positionsData).map(([id, pos]) => ({
-      id,
-      type: 'cell' as const,
-      position: pos,
-      data: {
-        gadget: gadgetsData[id],
-        nodeType: nodeTypesData[id],
-      },
-    }));
-    setReactNodes((oldNodes) => oldNodes.filter((node) => nodes.findIndex((n) => n.id === node.id) === -1).concat(nodes));
-  }, [positionsData, nodeTypesData, gadgetsData]);
-
-  useEffect(() => {
-    const edges = Object.entries(connectionsData)
-      .map(([id, conn]) => {
-        if (conn === null || conn === undefined) return null;
-        return {
-          id,
-          source: conn.from,
-          target: conn.to,
-        };
-      })
-      .filter((e): e is Edge => e !== null);
-    setReactEdges(edges);
-  }, [connectionsData]);
+  const [visual] = useGadget(network.visualState);
 
   // Interactive handlers
   const onConnect = useCallback((connection: ReactFlowConnection) => {
@@ -196,6 +213,8 @@ export default function CanvasDemo() {
     network.positions!.set({ [node.id]: node.position });
   }, [network.positions]);
 
+  console.log('visual', visual)
+
   return (
     <div className="h-screen w-screen">
       <div className="absolute top-4 left-4 z-10 bg-white p-4 rounded-lg shadow-lg">
@@ -204,18 +223,21 @@ export default function CanvasDemo() {
           Data-driven gadget network visualization
         </p>
         <div className="text-xs text-slate-500">
-          <div>Nodes: {reactNodes.length}</div>
-          <div>Connections: {reactEdges.length}</div>
+          <div>Nodes: {visual.result?.nodes.length ?? 0}</div>
+          <div>Connections: {visual.result?.edges.length ?? 0}</div>
         </div>
       </div>
 
+
+
       <ReactFlow
-        nodes={reactNodes}
-        edges={reactEdges}
+        nodes={visual.result?.nodes}
+        edges={visual.result?.edges}
         nodeTypes={nodeTypes}
         onConnect={onConnect}
-        onNodesChange={(changes) => setReactNodes((oldNodes) => applyNodeChanges(changes, oldNodes))}
-        onEdgesChange={(changes) => setReactEdges((oldEdges) => applyEdgeChanges(changes, oldEdges))}
+        onNodesChange={(changes) => {
+          console.log('changes', changes);
+        }}
         onEdgesDelete={onEdgesDelete}
         onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}
@@ -225,6 +247,6 @@ export default function CanvasDemo() {
         <Controls />
         <MiniMap />
       </ReactFlow>
-    </div>
+    </div >
   );
 }
