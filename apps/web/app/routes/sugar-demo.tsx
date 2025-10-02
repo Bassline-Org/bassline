@@ -78,7 +78,7 @@ function DerivedSum() {
 
   const [sum] = useDerived(
     { a: cellA, b: cellB },
-    ({ a, b }: { a: number, b: number }) => a + b
+    ({ a, b }) => a + b
   );
 
   return (
