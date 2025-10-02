@@ -49,7 +49,7 @@ export const quick = <S, I, A, E extends Record<string, any>>(
     proto: ProtoGadget<S, I, A, E>,
     initial: S,
     emit: Emitter<E> = (effects: Partial<E>) => { }
-) => realize(proto, memoryStore<S>(initial), emit);
+) => withTaps(realize(proto, memoryStore<S>(initial), emit));
 
 // ================================================
 // Types

@@ -12,18 +12,18 @@ const contradiction = <T>(current: T, incoming: T) => ({ contradiction: { curren
 
 // @goose: A semilattice ordered by the >= relation
 export const maxStep = (a: number, b: number) =>
-  b >= a ? merge(b) : ignore();
+  b > a ? merge(b) : ignore();
 
 // @goose: Monotonically decreasing numbers
 export const minStep = (a: number, b: number) =>
-  b <= a ? merge(b) : ignore();
+  b < a ? merge(b) : ignore();
 
 // ================================================
 // Generic Cell Steps
 // ================================================
 
 // @goose: Always take new value
-export const lastStep = <T>() => (a: T, b: T) => merge(b);
+export const lastStep = <T>() => (a: T, b: T) => _.eq(a, b) ? ignore() : merge(b);
 
 // @goose: Never change after first value
 export const firstStep = <T>() => (a: T, b: T) => ignore();
@@ -41,6 +41,8 @@ export const unionStep = <T>() => (a: Set<T>, b: Set<T>) => b.isSubsetOf(a) ? ig
 
 // @goose: A semilattice ordered by intersection
 export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
+  if (a.size === 0 && b.size !== 0) return merge(b);
+
   const intersection = a.intersection(b);
   if (intersection.size === 0) {
     return contradiction(a, b);

@@ -9,8 +9,12 @@
  * multiple times is a no-op, so bidirectional loops naturally converge.
  */
 
-import type { Implements } from '../../core/context';
+import _ from 'lodash';
+import { Accepts, Emit, Emits, Handles, quick, Receive, Step, Store, Tappable, withTaps, type Implements } from '../../core/context';
 import type { Valued } from '../../core/protocols';
+import { firstTableProto, intersectionProto, lastProto, maxProto, unionProto } from '../cells';
+import { onChange, onComputed } from '../taps';
+import { FunctionActions, partialProto, PartialState } from '../functions';
 
 /**
  * Wire two Valued gadgets bidirectionally with constraint functions
@@ -43,7 +47,7 @@ import type { Valued } from '../../core/protocols';
  * c.receive(10); // a updates to 5
  * ```
  */
-export function relate<A, B>(
+export function related<A, B>(
   gadgetA: Implements<Valued<A>>,
   gadgetB: Implements<Valued<B>>,
   constraint: {
@@ -51,36 +55,8 @@ export function relate<A, B>(
     backward: (b: B) => A;
   }
 ): () => void {
-  // Track if we're currently propagating to prevent immediate echo
-  let propagating = false;
-
-  // Forward: A changes → update B
-  const cleanupA = gadgetA.tap(({ changed }) => {
-    if (changed !== undefined && !propagating) {
-      propagating = true;
-      try {
-        const newB = constraint.forward(changed);
-        gadgetB.receive(newB);
-      } finally {
-        propagating = false;
-      }
-    }
-  });
-
-  // Backward: B changes → update A
-  const cleanupB = gadgetB.tap(({ changed }) => {
-    if (changed !== undefined && !propagating) {
-      propagating = true;
-      try {
-        const newA = constraint.backward(changed);
-        gadgetA.receive(newA);
-      } finally {
-        propagating = false;
-      }
-    }
-  });
-
-  // Return combined cleanup
+  const cleanupA = forward(gadgetA, gadgetB, constraint.forward);
+  const cleanupB = forward(gadgetB, gadgetA, constraint.backward);
   return () => {
     cleanupA();
     cleanupB();
@@ -123,43 +99,52 @@ export function forward<A, B>(
   });
 }
 
-/**
- * Wire multiple source gadgets to a target using a combining function
- *
- * When any source changes → compute combine(sources) → send to target
- *
- * @param sources - Array of source gadgets
- * @param target - Target gadget
- * @param combine - Function that combines all source values
- * @returns Cleanup function that removes all taps
- *
- * @example
- * ```typescript
- * const a = withTaps(lastCell(3));
- * const b = withTaps(lastCell(5));
- * const sum = withTaps(lastCell(0));
- *
- * combine([a, b], sum, (sources) => {
- *   return sources[0].current() + sources[1].current();
- * });
- *
- * a.receive(4);  // sum becomes 9
- * b.receive(6);  // sum becomes 10
- * ```
- */
-export function combine<T, R>(
-  sources: Implements<Valued<T>>[],
-  target: Implements<Valued<R>>,
-  combiner: (sources: Implements<Valued<T>>[]) => R
-): () => void {
-  const cleanups = sources.map(source =>
-    source.tap(() => {
-      const result = combiner(sources);
-      target.receive(result);
-    })
-  );
+export function computes<A, B>(source: Emits<{ computed: A }>, target: Accepts<B>, transform?: (a: A) => B) {
+  return source.tap(({ computed }) => {
+    if (computed !== undefined) {
+      target.receive(transform ? transform(computed) : computed as B);
+    }
+  });
+}
 
+export function contributes<K extends string, T>(target: Accepts<Partial<Record<K, T>>>, sources: Record<K, Implements<Valued<T>>>) {
+  const cleanups: (() => void)[] = [];
+  for (const key in sources) {
+    const source = sources[key];
+    const cleanup = onChange(source, (changed) => target.receive({ [key]: changed } as Partial<Record<K, T>>));
+    cleanups.push(cleanup);
+  }
   return () => {
     cleanups.forEach(cleanup => cleanup());
   };
 }
+
+export function same<T>(source: Implements<Valued<T>>, target: Implements<Valued<T>>) {
+  return related(source, target, {
+    forward: (a) => a,
+    backward: (b) => b,
+  });
+}
+
+const unionCell = () => quick(unionProto<string>(), new Set<string>());
+const intersectionCell = () => quick(intersectionProto<string>(), new Set<string>());
+
+const premises = unionCell();
+const nogoods = unionCell();
+const resolved = intersectionCell();
+
+type Args = { premises: Set<string>, nogoods: Set<string> };
+const resolverFn = () => quick(partialProto(({ nogoods, premises }: Args) => premises.difference(nogoods), ['premises', 'nogoods']), { args: { premises: new Set<string>(), nogoods: new Set<string>() } });
+const resolver = resolverFn();
+
+contributes(resolver, { premises, nogoods });
+
+computes(resolver, resolved);
+
+premises.receive(new Set<string>(['foo', 'bar', 'baz']));
+
+nogoods.receive(new Set<string>(['baz', 'qux']));
+
+premises.receive(new Set<string>(['foo', 'bar', 'baz', 'qux']));
+
+nogoods.receive(new Set(['bar']));
