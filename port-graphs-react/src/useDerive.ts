@@ -34,7 +34,7 @@
  * ```
  */
 
-import { useMemo, useSyncExternalStore, useEffect } from 'react';
+import { useMemo, useSyncExternalStore, useEffect, useRef, useState } from 'react';
 import { derive, deriveFrom } from 'port-graphs';
 import type { Cleanup, Implements, SweetFunction } from 'port-graphs';
 import { Valued } from 'port-graphs/protocols';
@@ -50,10 +50,12 @@ export function useDerive<
   const [derivedFunc, cleanup] = useMemo(() => derive(source, compute), [])
   const result = useSyncExternalStore(
     (callback) => {
-      const cleanup = derivedFunc.whenComputed(() => callback());
+      const cleanup = derivedFunc.whenComputed(res => {
+        callback()
+      });
       return cleanup;
     },
-    () => derivedFunc.current()?.result
+    () => derivedFunc.current()
   );
   useEffect(() => {
     return cleanup;
@@ -72,22 +74,30 @@ export function useDerived<
   // Create the derived function and wiring once
   const [derivedFunc, cleanup] = useMemo(
     () => deriveFrom(sources, compute),
-    [] // Only create once - sources and compute shouldn't change
+    [sources, compute]
   );
 
   // Subscribe to computed results
+  const getSnapshot = () => {
+    const state = derivedFunc.current();
+    return state.result;
+  };
+
   const result = useSyncExternalStore(
     (callback) => {
-      const cleanup = derivedFunc.whenComputed(() => callback());
+      const cleanup = derivedFunc.whenComputed((res) => {
+        console.log('computed', res)
+        callback()
+      });
       return cleanup;
     },
-    () => derivedFunc.current()?.result
+    getSnapshot
   );
 
   // Cleanup wiring on unmount
   useEffect(() => {
     return cleanup;
-  }, [cleanup]);
+  }, []);
 
   return [result, derivedFunc] as const;
 }

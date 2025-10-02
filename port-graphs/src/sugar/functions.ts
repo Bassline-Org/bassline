@@ -70,7 +70,7 @@ function sweetenTransform<I, O>(fn: Implements<Transform<I, O>>) {
 
 export const fn = {
     map<I, O>(fn: (input: I) => O) {
-        const f = quick(transformProto(fn), undefined);
+        const f = quick(transformProto(fn), undefined as O | undefined);
         return sweetenTransform(f) as typeof f & SweetFunction<I, O>
     },
     partial<I extends Record<string, unknown>, O>(fn: (input: I) => O, keys: Array<keyof I>) {

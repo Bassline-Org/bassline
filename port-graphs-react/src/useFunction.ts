@@ -45,7 +45,8 @@ export function useFunction<I, O>(
       const cleanup = func.whenComputed(() => callback());
       return cleanup;
     },
-    () => func.current()
+    // @ts-ignore TODO: fix this
+    () => func.current()?.result
   );
 
   return [result, func] as const;

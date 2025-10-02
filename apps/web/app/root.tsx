@@ -7,7 +7,6 @@ import {
   ScrollRestoration,
 } from "react-router";
 import { Toaster } from 'sonner';
-import { GadgetProvider } from 'port-graphs-react';
 import type { Route } from "./+types/root";
 import "./app.css";
 import "./styles/scrollbar.css";
@@ -38,7 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
-        <Toaster 
+        <Toaster
           position="top-center"
           toastOptions={{
             duration: 3000,
@@ -51,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               error: 'bg-white text-slate-900 border-red-200',
             }
           }}
-          />
+        />
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -61,9 +60,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <GadgetProvider>
-      <Outlet />
-    </GadgetProvider>
+    // <GadgetProvider>
+    <Outlet />
+    // </GadgetProvider>
   );
 }
 

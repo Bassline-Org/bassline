@@ -32,9 +32,9 @@ import { useMemo, useSyncExternalStore } from 'react';
 import type { Implements } from 'port-graphs';
 import { Valued } from 'port-graphs/protocols';
 
-export function useLocalGadget<T, G extends Implements<Valued<T>>>(
-  factory: () => G
-): readonly [T, G] {
+export function useLocalGadget<T, G>(
+  factory: () => G & Implements<Valued<T>>
+): readonly [T, G & Implements<Valued<T>>] {
   // Create gadget once on mount
   const gadget = useMemo(factory, []);
 

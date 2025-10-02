@@ -7,7 +7,9 @@
   "include": [
     "src/index.ts",
     "src/core/**/*.ts",
-    "src/patterns/**/*.ts",
+    "src/patterns/cells/**/*.ts",
+    "src/patterns/functions/**/*.ts",
+    "src/patterns/ui/**/*.ts",
     "src/effects/**/*.ts",
     "src/semantics/**/*.ts",
     "src/multi.ts"
@@ -19,6 +21,7 @@
     "**/*.test.ts",
     "**/*.spec.ts",
     "src/test/**/*",
-    "src/old/**/*"
+    "src/old/**/*",
+    "src/patterns/dsl/**/*"
   ]
 }

@@ -22,6 +22,9 @@ type Pages = {
   "/notebook-demo": {
     params: {};
   };
+  "/sugar-demo": {
+    params: {};
+  };
   "/ui-gallery": {
     params: {};
   };
@@ -33,7 +36,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/bassline-playground" | "/bassline-playground/test" | "/notebook-demo" | "/ui-gallery" | "/home";
+    page: "/" | "/bassline-playground" | "/bassline-playground/test" | "/notebook-demo" | "/sugar-demo" | "/ui-gallery" | "/home";
   };
   "routes/bassline-playground.tsx": {
     id: "routes/bassline-playground";
@@ -46,6 +49,10 @@ type RouteFiles = {
   "routes/notebook-demo.tsx": {
     id: "routes/notebook-demo";
     page: "/notebook-demo";
+  };
+  "routes/sugar-demo.tsx": {
+    id: "routes/sugar-demo";
+    page: "/sugar-demo";
   };
   "routes/ui-gallery.tsx": {
     id: "routes/ui-gallery";
