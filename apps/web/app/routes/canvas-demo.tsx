@@ -6,6 +6,7 @@ import {
   Controls,
   MiniMap,
   Handle,
+  type XYPosition,
   Position,
   type Node,
   type Edge,
@@ -30,7 +31,20 @@ export function meta({ }: Route.MetaArgs) {
 
 type NodeType = 'max' | 'min';
 type Connection = { from: string; to: string };
-type Position = { x: number; y: number };
+
+// Node row type - each property is a gadget with its own merge semantics
+type NodeRow = {
+  position: Implements<Valued<XYPosition>>,  // cells.last - mutable
+  nodeType: Implements<Valued<NodeType>>,  // cells.first - immutable
+  value: SweetCell<number> & Implements<Valued<number>>,  // cells.max/min - accumulating
+};
+
+// Flattened node values
+type NodeValues = {
+  position: XYPosition;
+  nodeType: NodeType;
+  value: number;
+};
 
 // View system types
 type VisualState = {
@@ -40,25 +54,23 @@ type VisualState = {
 
 // Shared helper for building visual state from network data
 function buildVisualState(
-  positions: Record<string, Position>,
-  nodeTypes: Record<string, NodeType>,
-  gadgets: Record<string, SweetCell<number> & Implements<Valued<number>>>,
+  nodeValues: Record<string, NodeValues>,
   connections: Record<string, Connection | null>,
   nodeFilter?: (id: string, nodeType: NodeType) => boolean
 ): VisualState {
   // Get node IDs (filtered or all)
   const nodeIds = nodeFilter
-    ? Object.keys(positions).filter(id => nodeFilter(id, nodeTypes[id]))
-    : Object.keys(positions);
+    ? Object.keys(nodeValues).filter(id => nodeFilter(id, nodeValues[id]!.nodeType))
+    : Object.keys(nodeValues);
 
   // Build nodes
   const nodes = nodeIds.map(id => ({
     id,
-    position: positions[id],
+    position: nodeValues[id]!.position,
     type: 'cell' as const,
     data: {
-      gadget: gadgets[id],
-      nodeType: nodeTypes[id],
+      value: nodeValues[id]!.value,
+      nodeType: nodeValues[id]!.nodeType,
     },
   }));
 
@@ -81,47 +93,28 @@ function buildVisualState(
 
 // Helper to build visual state for a specific view
 function buildViewGadget(
-  positions: SweetTable<Position>,
-  nodeTypes: SweetTable<NodeType>,
-  gadgets: SweetTable<SweetCell<number> & Implements<Valued<number>>>,
-  connections: SweetTable<Connection | null>,
+  nodeValues: SweetTable<NodeValues> & Implements<Valued<NodeValues>>,
+  connections: SweetTable<Connection> & Implements<Valued<Connection>>,
   nodeFilter?: (id: string, nodeType: NodeType) => boolean
 ) {
   return deriveFrom(
-    { positions, nodeTypes, gadgets, connections },
-    ({ positions, nodeTypes, gadgets, connections }) =>
-      buildVisualState(positions, nodeTypes, gadgets, connections, nodeFilter)
+    { nodeValues, connections },
+    ({ nodeValues, connections }) =>
+      buildVisualState(nodeValues, connections, nodeFilter)
   )[0];
 }
 
 // Cell Node Component
-function CellNode({ data }: { data: { gadget: SweetCell<number> & Implements<Valued<number>>; nodeType: NodeType } }) {
-  const [value, gadget] = useGadget(data.gadget);
-
+function CellNode({ data }: { data: { value: number; nodeType: NodeType } }) {
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
       <div className="px-4 py-3 bg-white border-2 border-slate-300 rounded-lg shadow-md min-w-[120px]">
-
         <div className="text-xs font-semibold text-slate-500 mb-2">
           {data.nodeType.toUpperCase()} CELL
         </div>
-        <div className="text-2xl font-bold text-center mb-2">{value}</div>
-        <div className="flex gap-1">
-          <button
-            onClick={() => gadget.receive(value + 1)}
-            className="flex-1 px-2 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-          >
-            +
-          </button>
-          <button
-            onClick={() => gadget.receive(value - 1)}
-            className="flex-1 px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
-          >
-            −
-          </button>
-        </div>
-      </div >
+        <div className="text-2xl font-bold text-center mb-2">{data.value}</div>
+      </div>
       <Handle id='in' position={Position.Left} type="target" />
     </>
   );
@@ -136,7 +129,7 @@ interface CanvasViewProps<ViewKeys extends string> {
   currentViewId: SweetCell<ViewKeys>;
   views: Record<ViewKeys, any>; // View gadgets
   network: {
-    positions: SweetTable<Position>;
+    nodes: SweetTable<NodeRow>;
     connections: SweetTable<Connection | null>;
     taps: SweetTable<Cleanup>;
   };
@@ -190,8 +183,9 @@ function CanvasView<ViewKeys extends string>({
   }, [network.connections, network.taps]);
 
   const onNodeDragStop = useCallback((_event: any, node: Node) => {
-    network.positions.set({ [node.id]: node.position });
-  }, [network.positions]);
+    // Send new position to the position cell
+    network.nodes.get(node.id)?.position.receive(node.position);
+  }, [network.nodes]);
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -245,72 +239,60 @@ function CanvasView<ViewKeys extends string>({
 export default function CanvasDemo() {
   // Create network tables
   const network = useMemo(() => {
-    const net = table.first<NetworkTableState>({});
+    // Create tables - nodes with per-property gadgets, connections, and taps
+    const nodes = table.last<NodeRow>({});
+    const connections = table.last<Connection | null>({});
+    const taps = table.last<Cleanup>({});
 
-    net.set({
-      'nodeTypes': table.first<NodeType>({}),
-      'positions': table.last<Position>({}),
-      'gadgets': table.first<SweetCell<number> & Implements<Valued<number>>>({}),
-      'connections': table.last<Connection | null>({}),
-      'taps': table.last<Cleanup>({}),
+    // Initialize test network - each property is a gadget!
+    nodes.set({
+      'a': {
+        position: cells.last({ x: 100, y: 100 }),
+        nodeType: cells.last('max' as NodeType),
+        value: cells.max(0),
+      },
+      'b': {
+        position: cells.last({ x: 100, y: 300 }),
+        nodeType: cells.last('max' as NodeType),
+        value: cells.max(0),
+      },
+      'c': {
+        position: cells.last({ x: 400, y: 200 }),
+        nodeType: cells.last('min' as NodeType),
+        value: cells.min(Infinity),
+      },
     });
 
-    const [nodeTypes, positions, gadgets, connections, taps] = net.getMany([
-      'nodeTypes',
-      'positions',
-      'gadgets',
-      'connections',
-      'taps',
-    ]);
-
-    // When node type is added, create the gadget
-    nodeTypes!.whenAdded((key, type) => {
-      const factory = type === 'max' ? cells.max : cells.min;
-      gadgets!.set({ [key]: factory(0) });
-    });
-
-    // When connection is added, create the network tap
-    connections!.whenAdded((id, conn) => {
-      if (conn !== null && conn !== undefined) {
-        const from = gadgets!.get(conn.from);
-        const to = gadgets!.get(conn.to);
-        if (from && to) {
-          const cleanup = from.provide(to);
-          taps!.set({ [id]: cleanup });
-        }
-      }
-    });
-    positions?.tap(({ added }) => {
-      if (added) {
-        console.log('added', added);
-      }
-    });
-
-    // Initialize test network
-    nodeTypes!.set({
-      'a': 'max',
-      'b': 'max',
-      'c': 'min',  // Make one node min type to test filtering
-    });
-
-    positions!.set({
-      'a': { x: 100, y: 100 },
-      'b': { x: 100, y: 300 },
-      'c': { x: 400, y: 200 },
-    });
-
-    connections!.set({
+    // Initialize connections
+    connections.set({
       'a-b': { from: 'a', to: 'b' },
       'c-b': { from: 'c', to: 'b' },
     });
 
+    // Wire up connections - when connection added, tap from.value -> to.value
+    connections.whenAdded((id, conn) => {
+      if (conn) {
+        const fromNode = nodes.get(conn.from);
+        const toNode = nodes.get(conn.to);
+        if (fromNode && toNode) {
+          const cleanup = fromNode.value.tap(({ changed }) => {
+            if (changed !== undefined) {
+              toNode.value.receive(changed);
+            }
+          });
+          taps.set({ [id]: cleanup });
+        }
+      }
+    });
+
+    // Flatten nodes - subscribes to all property gadgets
+    const [nodeValues, cleanupNodes] = table.flattenTable(nodes);
+
     // Create view gadgets - each auto-recomputes when network changes
     const views = {
-      all: buildViewGadget(positions!, nodeTypes!, gadgets!, connections!),
-      maxOnly: buildViewGadget(positions!, nodeTypes!, gadgets!, connections!,
-        (_, type) => type === 'max'),
-      minOnly: buildViewGadget(positions!, nodeTypes!, gadgets!, connections!,
-        (_, type) => type === 'min'),
+      all: buildViewGadget(nodeValues, connections),
+      maxOnly: buildViewGadget(nodeValues, connections, (_, type) => type === 'max'),
+      minOnly: buildViewGadget(nodeValues, connections, (_, type) => type === 'min'),
     };
 
     // Current view selectors
@@ -318,10 +300,8 @@ export default function CanvasDemo() {
     const currentViewRight = cells.last<keyof typeof views>('maxOnly');
 
     return {
-      net,
-      nodeTypes,
-      positions,
-      gadgets,
+      nodes,
+      nodeValues,
       connections,
       taps,
       views,
@@ -336,7 +316,7 @@ export default function CanvasDemo() {
         currentViewId={network.currentViewLeft}
         views={network.views}
         network={{
-          positions: network.positions,
+          nodes: network.nodes,
           connections: network.connections,
           taps: network.taps,
         }}
@@ -349,7 +329,7 @@ export default function CanvasDemo() {
         currentViewId={network.currentViewRight}
         views={network.views}
         network={{
-          positions: network.positions,
+          nodes: network.nodes,
           connections: network.connections,
           taps: network.taps,
         }}
