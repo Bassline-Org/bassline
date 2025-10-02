@@ -135,7 +135,13 @@ cleanup();
 
 a.call(123);
 
-function derive<
+export function derive<Arg, R>(source: Implements<Valued<Arg>>, body: (input: Arg) => R) {
+    const func = fn.map(body);
+    func.receive(source.current());
+    return [func, source.tap(({ changed }) => changed && func.receive(changed))] as const
+}
+
+export function deriveFrom<
     Args extends Readonly<Record<string, unknown>>,
     Sources extends { [key in keyof Args]: Implements<Valued<Args[key]>> },
     R>(sources: Sources, body: (arg: Args) => R) {
@@ -150,16 +156,11 @@ function derive<
     return [func, () => { cleanups.forEach(c => c()) }] as const
 }
 
-const foo = cells.max(0);
-const bar = cells.max(0);
+const foo = cells.ordinal(0);
+const bar = cells.ordinal(0);
 
-const [derived, clean] = derive({ foo, bar }, ({ foo, bar }: { foo: number, bar: number }) => foo + bar);
+const [derived, clean] = deriveFrom({ foo, bar }, ({ foo: [, foo], bar: [, bar] }: { foo: [number, number], bar: [number, number] }) => foo + bar);
 derived.whenComputed(res => console.log(res))
 
-foo.receive(10);
-bar.receive(20);
-
-clean()
-
-foo.receive(30);
-bar.receive(40);
+foo.update([2, 10]);
+bar.update([3, 10]);

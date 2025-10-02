@@ -1,7 +1,7 @@
 import { Cleanup } from ".";
 import { Accepts, Implements, quick } from "../core/context";
 import { Valued } from "../core/protocols";
-import { intersectionProto, maxProto, minProto, unionProto } from "../patterns/cells";
+import { intersectionProto, maxProto, minProto, ordinalProto, unionProto } from "../patterns/cells";
 
 interface SweetCell<T> {
     whenChanged(fn: (change: T) => void): Cleanup
@@ -63,6 +63,10 @@ export const cells = {
     intersection<T>(initial: Array<T> = [] as Array<T>) {
         const c = quick(intersectionProto<T>(), new Set<T>(initial))
         return sweetenCell<Set<T>>(c) as typeof c & SweetCell<Set<T>>
+    },
+    ordinal<T>(initial: T) {
+        const c = quick(ordinalProto<T>(), [0, initial]);
+        return sweetenCell(c) as typeof c & SweetCell<[number, T]>
     }
 }
 
@@ -70,7 +74,9 @@ const a = cells.union<number>();
 const b = cells.union<number>();
 const c = cells.intersection<number>([]);
 
-a.sync(c);
-b.sync(c);
 
-c.whenChanged(v => console.log('c changed: ', v));
+
+//a.sync(c);
+//b.sync(c);
+
+//c.whenChanged(v => console.log('c changed: ', v));
