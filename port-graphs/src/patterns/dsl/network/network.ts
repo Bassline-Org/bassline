@@ -7,8 +7,6 @@
  * Compilation: Forwards to infrastructure gadgets (spawning, wiring)
  */
 
-import { quick, Implements } from '../../../core/context';
-import _ from 'lodash';
 import { table, SweetTable } from '../../../sugar/tables';
 
 const namespaces = table.first<SweetTable<number>>({})

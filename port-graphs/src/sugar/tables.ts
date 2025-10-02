@@ -8,6 +8,7 @@ interface TableQuery<T> {
     whereValues(fn: (val: T) => boolean): TableQuery<T>,
     whereKeys(fn: (key: string) => boolean): TableQuery<T>
 }
+
 export function tableQuery<T>(table: Record<string, T>): TableQuery<T> {
     return {
         table,
