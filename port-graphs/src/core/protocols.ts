@@ -298,5 +298,5 @@ export interface FallibleTransform<In, Out> extends ProtocolShape<
 
 export interface Table<K extends string, V> extends ProtocolShape<
     Record<K, V>,
-    { added: K[] } | { changed: Record<K, V> }
+    { added: Record<K, V> } | { changed: Record<K, V> }
 > { }

@@ -49,7 +49,7 @@ export function registryHandler<T>(
 export function tableHandler<K extends string, V>(
   _g: HandlerContext<Record<K, V>>,
   actions: TableActions<K, V>
-): { added?: K[] } | {} {
+): { added?: Record<K, V> } {
   if ('added' in actions && actions.added !== undefined) {
     return { added: actions.added };
   }

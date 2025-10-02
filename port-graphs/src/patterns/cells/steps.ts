@@ -54,26 +54,29 @@ export const intersectionStep = <T>() => (a: Set<T>, b: Set<T>) => {
 };
 
 export type TableActions<K extends string, V> = Actions<Record<K, V>> & {
-  added?: K[],
+  added?: Record<K, V>,
 }
 
 export const firstTableStep = <K extends string, V>(a: Record<K, V>, b: Record<K, V>) => {
   const difference = _.difference(_.keys(b), _.keys(a));
   if (difference.length === 0) {
-    return ignore();
+    return { ignore: {} }
   }
-  return { merge: _.merge(a, b), added: difference as K[] };
+  const added = Object.fromEntries<V>(difference.map(k => [k as K, b[k as K]])) as Record<K, V>
+  return { merge: _.merge(a, b), added };
 };
 
 export const lastTableStep = <K extends string, V>(a: Record<K, V>, b: Record<K, V>) => {
   if (_.isEmpty(a)) {
-    return { merge: b, added: _.keys(b) as K[] };
+    return { merge: b, added: b };
   }
   const merged = _.merge(a, b);
   if (_.isEqual(merged, a)) {
     return ignore();
   }
-  return { merge: merged, added: _.difference(_.keys(a), _.keys(b)) as K[] };
+  const difference = _.difference(_.keys(a), _.keys(b));
+  const added = Object.fromEntries(difference.map(k => [k, b[k as K]])) as Record<K, V>
+  return { merge: merged, added };
 };
 
 // ================================================

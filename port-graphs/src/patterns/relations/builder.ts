@@ -1,11 +1,11 @@
-import { Accepts, Emits, Implements, quick } from "../../core/context";
+import { Accepts, Emits, HandlerContext, Implements, quick } from "../../core/context";
 import { Valued } from "../../core/protocols";
-import { unionProto, intersectionProto } from "../cells";
+import { unionProto, intersectionProto, unionStep } from "../cells";
 import { partialProto, transformProto } from "../functions";
 import { onChange, onComputed } from "../taps";
 import { computes, contributes, forward, same } from "./relate";
 
-function builder() {
+export function relationsBuilder() {
     const cleanups: (() => void)[] = [];
     const b = {
         same<T>(source: Implements<Valued<T>>, target: Implements<Valued<T>>) {
@@ -37,33 +37,31 @@ function builder() {
     return b;
 }
 
-const unionCell = () => quick(unionProto<string>(), new Set<string>());
-const intersectionCell = () => quick(intersectionProto<string>(), new Set<string>());
+function test() {
+    const unionCell = () => quick(unionProto<string>(), new Set<string>());
+    const intersectionCell = () => quick(intersectionProto<string>(), new Set<string>());
 
-const premises = unionCell();
-const nogoods = unionCell();
-const believedPremises = intersectionCell();
+    const premises = unionCell();
+    const nogoods = unionCell();
+    const believedPremises = intersectionCell();
 
-onChange(believedPremises, (val) => console.log('believedPremises', val));
-onChange(premises, (val) => console.log('premises', val));
-onChange(nogoods, (val) => console.log('nogoods', val));
+    onChange(believedPremises, (val) => console.log('believedPremises', val));
+    onChange(premises, (val) => console.log('premises', val));
+    onChange(nogoods, (val) => console.log('nogoods', val));
 
-type Args = { premises: Set<string>, nogoods: Set<string> };
-const resolverFn = () => quick(
-    partialProto(
-        ({ nogoods, premises }: Args) => premises.difference(nogoods),
-        ['premises', 'nogoods'])
-    , {});
-const resolver = resolverFn();
+    type Args = { premises: Set<string>, nogoods: Set<string> };
+    const resolverFn = () => quick(
+        partialProto(
+            ({ nogoods, premises }: Args) => premises.difference(nogoods),
+            ['premises', 'nogoods'])
+        , {});
+    const resolver = resolverFn();
 
-const cleanup = builder()
-    .same(premises, believedPremises)
-    .contributes(resolver, { premises, nogoods })
-    .computes(resolver, believedPremises)
-    .build();
+    const cleanup = relationsBuilder()
+        .contributes(resolver, { premises, nogoods })
+        .computes(resolver, believedPremises)
+        .build();
 
-premises.receive(new Set<string>(['foo', 'bar', 'baz']));
-nogoods.receive(new Set<string>(['baz', 'qux']));
-
-premises.receive(new Set<string>(['foo', 'bar', 'baz', 'qux']));
-nogoods.receive(new Set(['bar']));
+    premises.receive(new Set<string>(['foo', 'bar', 'baz']));
+    nogoods.receive(new Set<string>(['bar', 'qux']));
+}
