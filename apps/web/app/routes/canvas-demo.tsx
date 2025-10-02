@@ -71,6 +71,61 @@ type FactoryValue = {
   create: (pos: Pos) => NodeRow,
 }
 
+// Gadget Inspector Component
+function GadgetInspector({
+  gadget,
+  label
+}: {
+  gadget: any,
+  label?: string
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!gadget) {
+    return <div className="text-sm text-gray-500">No gadget selected</div>;
+  }
+
+  const current = gadget.current?.() ?? gadget;
+  const isObject = current && typeof current === 'object' && !Array.isArray(current);
+  const hasGadgetProps = isObject && Object.values(current).some((v: any) => v && typeof v === 'object' && 'current' in v);
+
+  return (
+    <div className="border-l-2 border-gray-300 pl-2 py-1">
+      <div className="flex items-center gap-2">
+        {hasGadgetProps && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-xs w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded"
+          >
+            {expanded ? '−' : '+'}
+          </button>
+        )}
+        <div className="text-sm font-medium">{label || 'Gadget'}</div>
+        <div className="text-xs text-gray-600">
+          {typeof current === 'object' ? JSON.stringify(current).slice(0, 50) : String(current)}
+        </div>
+      </div>
+
+      {expanded && hasGadgetProps && (
+        <div className="ml-4 mt-2 space-y-2">
+          {Object.entries(current).map(([key, value]: [string, any]) => {
+            if (value && typeof value === 'object' && 'current' in value) {
+              return (
+                <GadgetInspector
+                  key={key}
+                  gadget={value}
+                  label={key}
+                />
+              );
+            }
+            return null;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Cell Node Component
 function CellNode({ data: { gadget, type, originalGadget } }: { data: NodeValue & { originalGadget: SCell<unknown> } }) {
   return (
@@ -117,6 +172,7 @@ function CanvasView({
 }) {
   const [reactNodes, setReactNodes] = useState<Node[]>([]);
   const [reactEdges, setReactEdges] = useState<Edge[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   useEffect(() => {
     setReactNodes(old =>
@@ -178,36 +234,43 @@ function CanvasView({
     nodes.get(node.id)?.position.receive(node.position);
   }, [nodes]);
 
-  return (
-    <div className="flex-1 flex flex-col h-full">
-      <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
-        <div className="font-medium text-sm text-gray-700">
-          'Canvas'
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-xs text-gray-500">
-            <span>Nodes: {reactNodes.length}</span>
-            <span className="ml-3">Edges: {reactEdges.length}</span>
-          </div>
-          <div className="flex gap-2">
-            {Object.entries(factories).map(([id, factory]) => (
-              <button
-                key={id}
-                onClick={() => createNode(id, { x: 200, y: 200 })}
-                className="px-3 py-1 text-sm border rounded bg-white hover:bg-gray-100 flex items-center gap-1"
-                title={factory.name}
-              >
-                <span>{factory.icon}</span>
-                <span>{factory.type}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+  const onNodeClick = useCallback((_event: any, node: Node) => {
+    setSelectedNodeId(node.id);
+  }, []);
 
-      {/* Canvas */}
-      <div className="flex-1 relative">
-        <ReactFlow
+  const selectedNode = selectedNodeId ? nodes.get(selectedNodeId) : null;
+
+  return (
+    <div className="flex-1 flex h-full">
+      {/* Main Canvas */}
+      <div className="flex-1 flex flex-col">
+        <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
+          <div className="font-medium text-sm text-gray-700">
+            Canvas
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-xs text-gray-500">
+              <span>Nodes: {reactNodes.length}</span>
+              <span className="ml-3">Edges: {reactEdges.length}</span>
+            </div>
+            <div className="flex gap-2">
+              {Object.entries(factories).map(([id, factory]) => (
+                <button
+                  key={id}
+                  onClick={() => createNode(id, { x: 200, y: 200 })}
+                  className="px-3 py-1 text-sm border rounded bg-white hover:bg-gray-100 flex items-center gap-1"
+                  title={factory.name}
+                >
+                  <span>{factory.icon}</span>
+                  <span>{factory.type}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 relative">
+          <ReactFlow
           nodes={reactNodes}
           edges={reactEdges}
           nodeTypes={nodeTypes}
@@ -216,6 +279,7 @@ function CanvasView({
           onConnect={onConnect}
           onEdgesDelete={onEdgesDelete}
           onNodeDragStop={onNodeDragStop}
+          onNodeClick={onNodeClick}
           //connectionMode={ConnectionMode.Loose}
           fitView
         >
@@ -223,6 +287,24 @@ function CanvasView({
           <Controls />
           <MiniMap />
         </ReactFlow>
+        </div>
+      </div>
+
+      {/* Inspector Panel */}
+      <div className="w-80 border-l bg-white flex flex-col overflow-hidden">
+        <div className="px-4 py-2 border-b bg-gray-50 font-medium text-sm">
+          Inspector
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          {selectedNodeId ? (
+            <div>
+              <div className="text-xs text-gray-500 mb-2">Node: {selectedNodeId}</div>
+              <GadgetInspector gadget={selectedNode} label="NodeRow" />
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500">Click a node to inspect</div>
+          )}
+        </div>
       </div>
     </div>
   );

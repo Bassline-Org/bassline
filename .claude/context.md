@@ -353,3 +353,519 @@ Since basslines are gadgets themselves:
 - A bassline IS a gadget - it receives input, maintains state, emits effects
 - The uniformity (meta = normal) is what makes the system powerful
 - Different basslines = different "constitutions" for networks
+
+---
+
+## Sugar API - Ergonomic Gadget Construction
+
+### What We Actually Use Daily
+
+The "sugar" layer (`port-graphs/src/sugar/`) provides the ergonomic APIs we build with. These wrap the proto-gadget system with friendly constructors.
+
+### Cell Constructors (`cells.*`)
+
+Located in `/port-graphs/src/sugar/cells.ts`:
+
+```typescript
+import { cells } from 'port-graphs';
+
+// Monotonic cells
+const count = cells.max(0);        // Only increases
+const temp = cells.min(100);       // Only decreases
+
+// Last-write-wins
+const name = cells.last('Alice');  // Always takes newest value
+const pos = cells.last({x: 0, y: 0});
+
+// Set operations
+const tags = cells.union(new Set(['a']));     // Set union (grows)
+const valid = cells.intersection(new Set());  // Set intersection (shrinks)
+
+// All return: Implements<Valued<T>> & SweetCell<T>
+// Can call: .current(), .receive(), .sync()
+```
+
+**Key Pattern**: Cells are gadgets with sweet helpers like `.sync()` for bidirectional wiring.
+
+### Table Constructors (`table.*`)
+
+Located in `/port-graphs/src/sugar/tables.ts`:
+
+```typescript
+import { table } from 'port-graphs';
+
+// Create tables (records of values)
+const data = table.first({ a: 1, b: 2 });   // First-write-wins
+const state = table.last({ x: 0, y: 0 });   // Last-write-wins
+
+// Update
+data.set({ c: 3 });                  // Merge
+data.get('a');                       // → 1
+data.query().whereKeys(k => k > 'a') // → { b: 2, c: 3 }
+
+// All return: Implements<Table<string, T>> & SweetTable<T>
+```
+
+**Sweet Helpers**: `.get()`, `.set()`, `.query()`, `.whenAdded()`
+
+### The Critical Pattern: `table.flattenTable()`
+
+**THE KEY TO META-CIRCULARITY**:
+
+```typescript
+// A table where each ROW is GADGET CELLS
+type NodeRow = {
+  position: SweetCell<{x: number, y: number}>,
+  type: SweetCell<'max' | 'min'>,
+  gadget: SweetCell<number>,
+}
+
+const nodes = table.first<NodeRow>({
+  a: {
+    position: cells.last({x: 100, y: 100}),
+    type: cells.last('max'),
+    gadget: cells.max(0),
+  },
+  b: {
+    position: cells.last({x: 200, y: 200}),
+    type: cells.last('min'),
+    gadget: cells.min(100),
+  },
+});
+
+// Flatten: Gadget table → Value table (LIVE!)
+const [nodeValues, cleanup] = table.flattenTable(nodes);
+
+// nodeValues is a table gadget that emits { changed, added } when ANY cell changes
+nodeValues.current() // → { a: {position: {x,y}, type: 'max', gadget: 0}, ... }
+
+// In React:
+const [state] = useGadget(nodeValues, ['changed', 'added']);
+// Re-renders when any gadget cell in any row updates!
+```
+
+**How It Works**:
+1. Uses `table.deriveRows()` internally
+2. For each row, creates a `fn.partial()` gadget that combines all cell values
+3. Taps each cell, calls the function when any cell changes
+4. Fans out to aggregated table
+5. Returns `[aggregatedTable, cleanupFn]`
+
+**This is the foundation of the visual editor** - gadget tables flatten to value tables for rendering!
+
+### Function Gadgets (`fn.*`)
+
+Located in `/port-graphs/src/sugar/functions.ts`:
+
+```typescript
+import { fn } from 'port-graphs';
+
+// Map function
+const double = fn.map((x: number) => x * 2);
+double.call(5);  // Emits { computed: 10 }
+
+// Partial application (for combining multiple sources)
+const sum = fn.partial(
+  (args: {a: number, b: number}) => args.a + args.b,
+  ['a', 'b']
+);
+sum.call({a: 5});      // Waits for 'b'
+sum.call({b: 3});      // Now emits { computed: 8 }
+
+// Fan out pattern
+const source = fn.map((x: number) => x * 2);
+const cleanup = source.fanOut()
+  .to(targetGadget)
+  .toWith(otherGadget, x => String(x))
+  .build();
+
+// All return: Implements<Transform<In, Out>> & SweetFunction<In, Out>
+```
+
+**Used by `flattenTable`** to combine cell values into row values!
+
+---
+
+## Table Flattening: The Meta-Circular Pattern
+
+### The Problem It Solves
+
+You have a table where each row contains **gadgets** (cells), and you need to render their **values** in React. But:
+- Gadgets update independently
+- React needs a single subscription point
+- You want automatic cleanup
+
+### The Solution
+
+```typescript
+// Step 1: Define row structure (gadgets)
+type NodeRow = {
+  position: SweetCell<Pos>,
+  type: SweetCell<NodeType>,
+  value: SweetCell<number>,
+}
+
+// Step 2: Create table of gadget rows
+const nodes = table.first<NodeRow>({});
+
+// Step 3: Add rows (each field is a gadget!)
+nodes.set({
+  'a': {
+    position: cells.last({x: 100, y: 100}),
+    type: cells.last('max'),
+    value: cells.max(0),
+  }
+});
+
+// Step 4: Flatten to value table
+const [nodeValues] = table.flattenTable(nodes);
+
+// Step 5: Subscribe in React
+const [state] = useGadget(nodeValues, ['changed', 'added']);
+// state = { a: { position: {x,y}, type: 'max', value: 0 } }
+
+// Step 6: Render
+{Object.entries(state).map(([id, node]) => (
+  <Node position={node.position} type={node.type} value={node.value} />
+))}
+
+// THE MAGIC: Edit a cell → nodeValues emits → React re-renders
+nodes.get('a').position.receive({x: 200, y: 100});
+// React component updates immediately!
+```
+
+### How It Actually Works
+
+From `/port-graphs/src/sugar/tables.ts:88-143`:
+
+1. **Creates a derived function for each row**:
+   ```typescript
+   const [derived, cleanup] = deriveFrom(
+     { position: row.position, type: row.type, value: row.value },
+     (vals) => vals  // Identity function for flatten
+   );
+   ```
+
+2. **Fans out to aggregated table**:
+   ```typescript
+   derived.fanOut()
+     .toWith(aggregated, (result) => ({ [key]: result }))
+     .build();
+   ```
+
+3. **Calls function with initial values**:
+   ```typescript
+   const initial = Object.fromEntries(
+     Object.entries(gadgets).map(([k, g]) => [k, g.current()])
+   );
+   derived.call(initial);  // Populate immediately
+   ```
+
+4. **Returns aggregated table + cleanup**:
+   ```typescript
+   return [aggregated, () => { /* cleanup all taps */ }];
+   ```
+
+**Result**: A live table that updates whenever any gadget cell changes!
+
+### Custom Derivations with `deriveRows`
+
+You can transform values during flattening:
+
+```typescript
+const [computedValues] = table.deriveRows(
+  nodes,
+  (row) => ({ position: row.position, value: row.value }),  // Extract gadgets
+  (vals) => ({                                              // Transform values
+    x: vals.position.x,
+    y: vals.position.y,
+    doubled: vals.value * 2,
+  })
+);
+```
+
+---
+
+## React Integration - Patterns & Pitfalls
+
+### The `useGadget` Hook
+
+Located in `/port-graphs-react/src/useGadget.ts`:
+
+```typescript
+const [state, gadget] = useGadget(myGadget, ['changed', 'added']);
+```
+
+**CRITICAL BUG FIX** (line 46):
+```typescript
+// ❌ WRONG - iterates array indices ("0", "1", "2")
+for (const k in effects) {
+  if (k in e && e[k] !== undefined) callback();
+}
+
+// ✅ CORRECT - iterates array values ("changed", "added")
+for (const effect of effects) {
+  if (effect in e && e[effect] !== undefined) callback();
+}
+```
+
+**Usage**:
+```typescript
+// Subscribe to specific effects
+const [nodeState] = useGadget(nodes, ['changed', 'added']);
+
+// Subscribe to all effects (pass empty array)
+const [state] = useGadget(gadget, []);
+```
+
+**How It Works**:
+- Uses React's `useSyncExternalStore` for concurrent mode safety
+- Taps the gadget on mount, cleans up on unmount
+- Calls callback when specified effects are emitted
+- Returns `[currentValue, gadget]` tuple
+
+### React Flow Integration - State Preservation
+
+**The Problem**: React Flow needs stable object references to track selection, drag state, etc. But our gadgets emit new data constantly.
+
+**The Solution**: Spread existing node/edge state BEFORE overwriting with gadget data:
+
+```typescript
+useEffect(() => {
+  setReactNodes(old =>
+    Object.entries(nodeValues).map(([id, newData]) => {
+      const existing = old.find(n => n.id === id);
+      return {
+        ...existing,        // ✅ Preserve React Flow internals
+        id,
+        position: newData.position,
+        type: newData.type,
+        data: newData,
+      };
+    })
+  );
+}, [nodeValues]);
+```
+
+**Why This Works**:
+- `...existing` preserves properties like `selected`, `dragging`, internal IDs
+- Overwriting specific fields updates only what changed
+- React Flow's diffing algorithm sees same object shape
+- No more jank during drag!
+
+### Avoiding Infinite Loops
+
+**DON'T DO THIS**:
+```typescript
+useEffect(() => {
+  // Updates gadget
+  gadget.receive(someValue);
+}, [gadget.current()]);  // ← Infinite loop!
+```
+
+**Gadget changes → useEffect runs → updates gadget → repeat ∞**
+
+**DO THIS INSTEAD**:
+```typescript
+// Only update gadgets on USER interaction
+const onDragStop = (node) => {
+  gadget.receive(node.position);  // User caused this
+};
+
+// Or use idempotent cells (no loop because same value = ignored)
+const position = cells.last({x, y});
+position.receive({x, y});  // No effect if same
+position.receive({x, y});  // Still no effect
+```
+
+**The Rule**: Let user interactions update gadgets, let gadget changes update UI. Never close the loop in useEffect.
+
+---
+
+## Meta-Circular Visual Editor Architecture
+
+### The Core Insight
+
+**Everything that defines the editor is itself gadgets in tables**:
+- Nodes → table of gadget rows ✅
+- Edges → table of gadget rows ✅
+- **Factories → table of gadget rows** ✅ ← THIS IS THE KEY!
+
+When factories are a gadget table, the UI that creates nodes is **data-driven** and **modifiable at runtime** through the same mechanisms!
+
+### Factory Table Pattern
+
+Located in `/apps/web/app/routes/canvas-demo.tsx:222-259`:
+
+```typescript
+type FactoryRow = {
+  name: SweetCell<string>,
+  type: SweetCell<NodeType>,
+  icon: SweetCell<string>,
+  initialValue: SweetCell<any>,
+  create: SweetCell<(pos: Pos) => NodeRow>,
+}
+
+const factories = table.first<FactoryRow>({
+  max: {
+    name: cells.last('Max Cell'),
+    type: cells.last('max'),
+    icon: cells.last('📈'),
+    initialValue: cells.last(0),
+    create: cells.last((pos) => ({
+      position: cells.last(pos),
+      type: cells.last('max'),
+      dims: cells.last({width: 100, height: 100}),
+      gadget: cells.max(0),
+    })),
+  },
+  // min, union, etc...
+});
+
+const [factoryValues] = table.flattenTable(factories);
+```
+
+**In React**:
+```typescript
+const [factoryState] = useGadget(factoryValues, ['changed', 'added']);
+
+// UI automatically updates from factory table!
+{Object.entries(factoryState).map(([id, factory]) => (
+  <button onClick={() => createNode(id, clickPos)}>
+    {factory.icon} {factory.type}
+  </button>
+))}
+
+// Create node using factory
+function createNode(factoryId: string, pos: Pos) {
+  const factory = factories.get(factoryId);
+  const nodeRow = factory.create.current()(pos);
+  nodes.set({ [generateId()]: nodeRow });
+}
+```
+
+**The Meta-Circular Magic**:
+1. Factory table defines what you can create
+2. UI renders from factory table
+3. Edit factory → `factories.get('max').name.receive('Super Max ⚡')`
+4. UI picker updates immediately!
+5. You can even add new factories at runtime!
+
+### Recursive Inspector Pattern
+
+**The Insight**: Gadgets are recursively inspectable - a `NodeRow` contains more gadgets!
+
+```typescript
+// A node row
+{
+  position: cells.last({x, y}),  // ← Gadget!
+  type: cells.last('max'),        // ← Gadget!
+  gadget: cells.max(5),           // ← Gadget!
+}
+
+// Inspector component (recursive)
+function GadgetInspector({ gadget, label }) {
+  const current = gadget.current?.() ?? gadget;
+  const hasGadgetProps = Object.values(current)
+    .some(v => v?.current);  // Detect sub-gadgets
+
+  return (
+    <div>
+      <div>{label}: {JSON.stringify(current).slice(0, 50)}</div>
+      {expanded && hasGadgetProps && (
+        <div>
+          {Object.entries(current).map(([key, val]) =>
+            val?.current ? (
+              <GadgetInspector gadget={val} label={key} />  // RECURSE!
+            ) : null
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Usage**:
+```typescript
+// Click node → show inspector
+const selectedNode = nodes.get(selectedNodeId);
+<GadgetInspector gadget={selectedNode} label="NodeRow" />
+
+// Expands to show:
+// NodeRow
+//   ├─ [+] position: {x: 100, y: 100}
+//   ├─ [+] type: "max"
+//   ├─ [+] dims: {width: 100, height: 100}
+//   └─ [+] gadget: 5
+```
+
+**Next Step**: Add control widgets (sliders, inputs) that call `.receive()` on sub-gadgets!
+
+### Complete Data Flow
+
+```
+User clicks factory button
+  ↓
+createNode(factoryId, pos)
+  ↓
+factory.create.current()(pos) → Creates NodeRow (gadget cells!)
+  ↓
+nodes.set({ [id]: nodeRow })
+  ↓
+nodeValues emits { added: {id: newNode} }
+  ↓
+useGadget triggers re-render
+  ↓
+Canvas shows new node
+  ↓
+User drags node
+  ↓
+onNodeDragStop → nodes.get(id).position.receive(newPos)
+  ↓
+Position cell emits { changed: newPos }
+  ↓
+nodeValues emits { changed: ... }
+  ↓
+React re-renders
+  ↓
+Node moves on canvas
+```
+
+**Perfect meta-circular loop** - UI controls gadgets, gadgets control UI!
+
+### Key Learnings
+
+1. **Tables of gadgets → Flattened values → React rendering**
+   - This is THE pattern for data-driven UIs
+
+2. **Everything as gadgets enables inspection**
+   - Factories are inspectable
+   - Nodes are inspectable
+   - Even views could be inspectable gadgets!
+
+3. **No bassline infrastructure needed**
+   - Simple helper functions work fine
+   - Just `createNode()`, `deleteNode()` manipulating tables
+   - Bassline adds value for undo/redo, persistence, remote sync
+
+4. **Recursive inspector reveals structure**
+   - "Gadgets all the way down"
+   - Each layer can have appropriate controls
+   - Meta-circularity emerges from uniformity
+
+5. **React Flow integration is straightforward**
+   - Spread existing state to preserve internals
+   - Don't close feedback loops in useEffect
+   - Let user actions drive gadget updates
+
+### Working Example
+
+See `/apps/web/app/routes/canvas-demo.tsx` for complete implementation with:
+- Factory table system
+- Node creation via factories
+- React Flow canvas integration
+- Recursive gadget inspector
+- Live updates throughout
+
+**This is real, working meta-circularity!**
