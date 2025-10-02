@@ -103,30 +103,33 @@ function CanvasView({
   const [reactEdges, setReactEdges] = useState<Edge[]>([]);
 
   useEffect(() => {
-    setReactNodes((old) => Object.entries(nodeValues).map(([k, v]) => ({
-      id: k,
-      position: v.position as XYPosition,
-      type: v.type,
-      data: { ...v, originalGadget: nodes.get(k)!.gadget }
-    })));
+    setReactNodes(old =>
+      Object.entries(nodeValues).map(([k, v]) => {
+        const existing = old.find(n => n.id === k);
+        return {
+          ...existing,
+          id: k,
+          position: v.position as XYPosition,
+          type: v.type,
+          data: { ...v, originalGadget: nodes.get(k)!.gadget }
+        };
+      })
+    );
   }, [nodeValues, nodes]);
 
   useEffect(() => {
-    setReactEdges(Object.entries(edgeValues).map(([k, v]) => ({
-      id: k,
-      source: v.from,
-      target: v.to
-    } as Edge)));
+    setReactEdges(old =>
+      Object.entries(edgeValues).map(([k, v]) => {
+        const existing = old.find(e => e.id === k);
+        return {
+          ...existing,
+          id: k,
+          source: v.from,
+          target: v.to
+        } as Edge;
+      })
+    );
   }, [edgeValues]);
-
-  useEffect(() => {
-    for (const key in reactNodes) {
-      const node = reactNodes[key]!;
-      const { dims, position } = nodes.get(node.id)!;
-      dims.receive({ height: node.height, width: node.width } as Dims);
-      position.receive(node.position);
-    }
-  }, [reactNodes]);
 
   // // Interaction handlers (forward to network)
   const onConnect = useCallback((connection: ReactFlowConnection) => {
@@ -245,8 +248,6 @@ edges.set({
 });
 
 export default function CanvasDemo() {
-  const [nodeState] = useGadget(nodes, ['changed', 'added']);
-  const [edgeState] = useGadget(edges, ['changed', 'added']);
   const [nodeValueState] = useGadget(nodeValues, ['added', 'changed']);
   const [edgeValueState] = useGadget(edgeValues, ['added', 'changed']);
   return (
