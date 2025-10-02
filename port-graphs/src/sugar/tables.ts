@@ -1,6 +1,9 @@
 import { Implements, quick } from "../core/context";
-import { Table } from "../core/protocols";
+import { Table, Valued } from "../core/protocols";
+import { cells } from "./cells";
 import { firstTableProto, lastTableProto } from "../patterns/cells";
+import { deriveFrom, fn } from "./functions";
+import { Cleanup } from ".";
 
 export interface TableQuery<T> {
     table: Record<string, T>,
@@ -81,5 +84,61 @@ export const table = {
     last<T>(initial: Record<string, T>) {
         const t = quick(lastTableProto<string, T>(), initial as Record<string, T>)
         return sweetenTable(t) as typeof t & SweetTable<T>
+    },
+    flattenTable<
+        Args extends Readonly<Record<string, unknown>>,
+        Sources extends { [K in keyof Args]: Implements<Valued<Args[K]>> }
+    >(
+        source: Implements<Table<string, Sources>> & SweetTable<Sources>
+    ): [SweetTable<Args>, Cleanup] {
+        return table.deriveRows(source, (row) => row, (values: Args) => values);
+    },
+    deriveRows<
+        SourceRow,
+        Args extends Readonly<Record<string, unknown>>,
+        Sources extends { [K in keyof Args]: Implements<Valued<Args[K]>> },
+        TargetRow
+    >(
+        source: Implements<Table<string, SourceRow>> & SweetTable<SourceRow>,
+        extractGadgets: (row: SourceRow) => Sources,
+        transform: (values: Args) => TargetRow
+    ): [SweetTable<TargetRow>, Cleanup] {
+        const aggregated = table.last<TargetRow>({});
+        const cleanups = table.last<Cleanup>({});
+
+        const processRow = (key: string, row: SourceRow) => {
+            const gadgets = extractGadgets(row);
+            const [derived, derivedCleanup] = deriveFrom(gadgets, transform);
+            const fanoutCleanup = derived.fanOut()
+                .toWith(aggregated, (result) => ({ [key]: result }))
+                .build();
+
+            // Critical: call() AFTER fanout setup to propagate initial value
+            const initialArgs = Object.fromEntries(
+                Object.entries(gadgets).map(([k, g]) => [k, g.current()])
+            ) as Args;
+            derived.call(initialArgs);
+
+            cleanups.set({
+                [key]: () => {
+                    derivedCleanup();
+                    fanoutCleanup();
+                }
+            });
+        };
+
+        // Process existing rows
+        const current = source.current();
+        for (const key in current) {
+            processRow(key, current[key] as SourceRow);
+        }
+
+        // Subscribe to new rows
+        const sourceCleanup = source.whenAdded(processRow);
+
+        return [aggregated, () => {
+            sourceCleanup();
+            Object.values(cleanups.current()).forEach(c => c());
+        }] as const;
     }
 }
