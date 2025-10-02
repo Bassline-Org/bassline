@@ -19,7 +19,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { table, cells } from 'port-graphs';
-import type { SweetTable, SweetCell, Implements, Cleanup } from 'port-graphs';
+import type { SweetTable, SweetCell, Implements, Cleanup, Tappable } from 'port-graphs';
 import type { Table, Valued } from 'port-graphs/protocols';
 
 export function meta({ }: Route.MetaArgs) {
@@ -38,25 +38,34 @@ type NodeValue = {
   position: Pos,
   type: NodeType,
   dims: Dims,
-  gadget: any
+  gadget: SCell<any>
 }
 type NodeRow = {
   position: SCell<Pos>,
   type: SCell<NodeType>,
   dims: SCell<Dims>,
-  gadget: any,
+  gadget: SCell<any>,
+}
+type EdgeRow = {
+  from: SCell<string>,
+  to: SCell<string>,
+  cleanup?: () => void
+}
+type EdgeValue = {
+  from: string,
+  to: string,
 }
 
 // Cell Node Component
-function CellNode({ data }: { data: NodeValue }) {
+function CellNode({ data: { gadget, type } }: { data: NodeValue }) {
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
       <div className="px-4 py-3 bg-white border-2 border-slate-300 rounded-lg shadow-md min-w-[120px]">
         <div className="text-xs font-semibold text-slate-500 mb-2">
-          {data.type.toUpperCase()} CELL
+          {type.toUpperCase()} CELL
         </div>
-        <div className="text-2xl font-bold text-center mb-2">{data.gadget}</div>
+        <div className="text-2xl font-bold text-center mb-2">{gadget}</div>
       </div>
       <Handle id='in' position={Position.Left} type="target" />
     </>
@@ -72,28 +81,50 @@ const nodeTypes: NodeTypes = {
 
 function CanvasView({
   nodeValues,
-  nodes
-}: { nodeValues: Record<string, NodeValue>, nodes: STable<NodeRow>, }) {
+  nodes,
+  edges,
+  edgeValues,
+}: {
+  nodeValues: Record<string, NodeValue>,
+  nodes: STable<NodeRow>,
+  edges: STable<EdgeRow>,
+  edgeValues: Record<string, EdgeValue>
+}) {
   // React Flow's local state (for smooth interactions)
   const [reactNodes, setReactNodes] = useState<Node[]>(Object.entries(nodeValues).map(([k, v]) => ({ id: k, position: v.position as XYPosition, type: v.type, data: v })));
-  const [reactEdges, setReactEdges] = useState<Edge[]>([]);
+  const [reactEdges, setReactEdges] = useState<Edge[]>(Object.entries(edgeValues).map(([k, v]) => ({ id: k, source: v.from, target: v.to } as Edge)));
+
+  useEffect(() => {
+    for (const key in reactNodes) {
+      const node = reactNodes[key]!;
+      const { dims, position } = nodes.get(node.id)!;
+      dims.receive({ height: node.height, width: node.width } as Dims);
+      position.receive(node.position);
+    }
+  }, [reactNodes]);
 
   // // Interaction handlers (forward to network)
-  // const onConnect = useCallback((connection: ReactFlowConnection) => {
-  //   if (!connection.source || !connection.target) return;
-  //   const id = `${connection.source}-${connection.target}`;
-  //   network.connections.set({ [id]: { from: connection.source, to: connection.target } });
-  // }, [network.connections]);
+  const onConnect = useCallback((connection: ReactFlowConnection) => {
+    if (!connection.source || !connection.target) return;
+    const id = `${connection.source}-${connection.target}`;
+    const { from, to } = edges.get(id)!;
+    from.receive(connection.source);
+    to.receive(connection.target);
+  }, [edges]);
 
-  // const onEdgesDelete = useCallback((edges: Edge[]) => {
-  //   edges.forEach(edge => {
-  //     network.connections.set({ [edge.id]: null });
-  //     const cleanup = network.taps.get(edge.id);
-  //     if (cleanup) {
-  //       cleanup();
-  //     }
-  //   });
-  // }, [network.connections, network.taps]);
+  const onEdgesDelete = useCallback((e: Edge[]) => {
+    e.forEach(e => {
+      const edge = edges.get(e.id)!;
+      const { from, to, cleanup } = edge;
+      from.receive('idk');
+      to.receive('idk');
+      if (cleanup) {
+        console.log('Cleaning up connection!');
+        cleanup();
+        delete edge.cleanup;
+      }
+    });
+  }, [edges]);
 
   const onNodeDragStop = useCallback((_event: any, node: Node) => {
     // Send new position to the position cell
@@ -135,8 +166,8 @@ function CanvasView({
           nodeTypes={nodeTypes}
           onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
           onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
-          //onConnect={onConnect}
-          //onEdgesDelete={onEdgesDelete}
+          onConnect={onConnect}
+          onEdgesDelete={onEdgesDelete}
           onNodeDragStop={onNodeDragStop}
           connectionMode={ConnectionMode.Loose}
           fitView
@@ -155,10 +186,22 @@ export default function CanvasDemo() {
   const network = useMemo(() => {
     // Create tables - nodes with per-property gadgets, connections, and taps
     const nodes = table.first<NodeRow>({} as Record<string, NodeRow>);
+    const edges = table.first<EdgeRow>({} as Record<string, EdgeRow>);
     const [nodeValues, cleanup] = table.flattenTable<NodeRow, NodeValue>(nodes);
-    const connections = table.last<Connection | null>({} as Record<string, Connection | null>);
-    const taps = table.last<Cleanup>({});
+    const [edgeValues, edgeCleanup] = table.flattenTable<EdgeRow, EdgeValue>(edges);
 
+    nodeValues.whenAdded((k, v) => {
+      console.log('nodeValues changed key:', k, ' value: ', v);
+    });
+    edgeValues.whenAdded((k, v) => {
+      const edge = edges.get(k)!
+      if (!edge.cleanup) {
+        const [from, to] = nodes.getMany([v.from, v.to])!;
+        const cleanup = (from?.gadget as SCell<unknown>).sync(to?.gadget as SCell<unknown>);
+        edge.cleanup = cleanup;
+      }
+      console.log('edge value changed key: ', k, ' value: ', v);
+    });
     // Initialize test network - each property is a gadget!
     nodes.set({
       'a': {
@@ -181,17 +224,17 @@ export default function CanvasDemo() {
       },
     });
 
-    // // Initialize connections
-    // connections.set({
-    //   'a-b': { from: 'a', to: 'b' },
-    //   'c-b': { from: 'c', to: 'b' },
-    // });
+    // Initialize connections
+    edges.set({
+      'a-b': { from: cells.last('a'), to: cells.last('b') },
+      'c-b': { from: cells.last('c'), to: cells.last('b') },
+    });
 
     return {
       nodes,
       nodeValues,
-      connections,
-      taps,
+      edges,
+      edgeValues,
     } as const;
   }, []);
 
@@ -200,13 +243,10 @@ export default function CanvasDemo() {
       <CanvasView
         // currentViewId={network.currentViewLeft}
         // views={network.views}
-        // network={{
-        // nodes: network.nodes,
-        // connections: network.connections,
-        // taps: network.taps,
-        // }}
         nodes={network.nodes}
         nodeValues={network.nodeValues.current()}
+        edges={network.edges}
+        edgeValues={network.edgeValues.current()}
       //label="Left View"
       />
 
