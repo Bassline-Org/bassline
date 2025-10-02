@@ -133,8 +133,7 @@ function createCanvasViewSystem(
       });
     }
   );
-  console.log('viewFn.result', viewFn.result);
-  return { currentViewId, visualState: viewFn.result };
+  return { currentViewId, visualState: viewFn };
 }
 
 // Cell Node Component

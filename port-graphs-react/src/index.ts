@@ -17,6 +17,6 @@
 // Core hooks
 export { useGadget } from './useGadget';
 export { useLocalGadget } from './useLocalGadget';
-export { useDerive } from './useDerive';
+export { useDerive, useDerived } from './useDerive';
 export { useTable } from './useTable';
 export { useFunction } from './useFunction';
