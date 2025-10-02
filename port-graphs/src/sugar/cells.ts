@@ -69,14 +69,3 @@ export const cells = {
         return sweetenCell(c) as typeof c & SweetCell<[number, T]>
     }
 }
-
-const a = cells.union<number>();
-const b = cells.union<number>();
-const c = cells.intersection<number>([]);
-
-
-
-//a.sync(c);
-//b.sync(c);
-
-//c.whenChanged(v => console.log('c changed: ', v));

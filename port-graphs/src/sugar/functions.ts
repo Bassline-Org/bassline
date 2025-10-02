@@ -96,45 +96,6 @@ export const fn = {
     }
 }
 
-const a = fn.map((x: number) => x * 2);
-const b = fn.map((x: number) => x * 3);
-const c = fn.map((x: number) => x * 4);
-const d = fn.map((x: string) => Number(x) * 5);
-
-const e = fn.partial((input: { a: number, b: number }) => input.a + input.b, ['a', 'b']);
-const canFail = fn.fallible((x: number): number => { throw new Error('oops') });
-
-canFail.whenError((input, reason) => {
-    console.log('failed with input: ', input, ' reason: ', reason);
-});
-
-e.whenComputed(res => {
-    console.log('e: ', res)
-})
-
-a.whenComputed(res => console.log('a computed: ', res))
-b.whenComputed(res => console.log('b computed: ', res))
-c.whenComputed((res) => console.log('c computed: ', res));
-d.whenComputed((res) => console.log('d computed: ', res));
-
-const cleanup = a.fanOut()
-    .to(b)
-    .to(c)
-    .toWith(d, x => String(x))
-    .toWith(e, x => ({ a: x }))
-    .to(canFail)
-    .build();
-
-b.fanOut()
-    .toWith(e, x => ({ b: x }))
-    .build();
-
-a.call(123);
-
-cleanup();
-
-a.call(123);
-
 export function derive<Arg, R>(source: Implements<Valued<Arg>>, body: (input: Arg) => R) {
     const func = fn.map(body);
     func.receive(source.current());
@@ -156,11 +117,41 @@ export function deriveFrom<
     return [func, () => { cleanups.forEach(c => c()) }] as const
 }
 
-const foo = cells.ordinal(0);
-const bar = cells.ordinal(0);
+// const a = fn.map((x: number) => x * 2);
+// const b = fn.map((x: number) => x * 3);
+// const c = fn.map((x: number) => x * 4);
+// const d = fn.map((x: string) => Number(x) * 5);
 
-const [derived, clean] = deriveFrom({ foo, bar }, ({ foo: [, foo], bar: [, bar] }: { foo: [number, number], bar: [number, number] }) => foo + bar);
-derived.whenComputed(res => console.log(res))
+// const e = fn.partial((input: { a: number, b: number }) => input.a + input.b, ['a', 'b']);
+// const canFail = fn.fallible((x: number): number => { throw new Error('oops') });
 
-foo.update([2, 10]);
-bar.update([3, 10]);
+// canFail.whenError((input, reason) => {
+//     console.log('failed with input: ', input, ' reason: ', reason);
+// });
+
+// e.whenComputed(res => {
+//     console.log('e: ', res)
+// })
+
+// a.whenComputed(res => console.log('a computed: ', res))
+// b.whenComputed(res => console.log('b computed: ', res))
+// c.whenComputed((res) => console.log('c computed: ', res));
+// d.whenComputed((res) => console.log('d computed: ', res));
+
+// const cleanup = a.fanOut()
+//     .to(b)
+//     .to(c)
+//     .toWith(d, x => String(x))
+//     .toWith(e, x => ({ a: x }))
+//     .to(canFail)
+//     .build();
+
+// b.fanOut()
+//     .toWith(e, x => ({ b: x }))
+//     .build();
+
+// a.call(123);
+
+// cleanup();
+
+// a.call(123);
