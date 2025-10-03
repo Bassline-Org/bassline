@@ -134,15 +134,41 @@ function InspectorNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } 
     const valueCleanup = targetGadget.tap(updateValue);
 
     if (targetGadget.metadata) {
-      const updateMeta = () => {
+      const cellTaps: Array<() => void> = [];
+
+      // Update snapshot without setting up new taps
+      const refreshSnapshot = () => {
         const snapshot = targetGadget.metadata.query().map(c => c.current()).table;
         setMetaSnapshot(snapshot);
       };
-      updateMeta();
-      const metaCleanup = targetGadget.metadata.whenChanged(updateMeta);
+
+      // Setup taps on all metadata cells
+      const setupTaps = () => {
+        // Clean up old cell taps
+        cellTaps.forEach(cleanup => cleanup());
+        cellTaps.length = 0;
+
+        // Tap each metadata cell for value changes
+        Object.values(targetGadget.metadata.query().table).forEach((cell: any) => {
+          const tap = cell.tap(() => refreshSnapshot());  // Just refresh, don't re-tap!
+          cellTaps.push(tap);
+        });
+      };
+
+      // Initial setup
+      refreshSnapshot();
+      setupTaps();
+
+      // When metadata structure changes (cells added/removed), re-setup taps
+      const metaCleanup = targetGadget.metadata.whenChanged(() => {
+        refreshSnapshot();
+        setupTaps();
+      });
+
       return () => {
         valueCleanup();
         metaCleanup();
+        cellTaps.forEach(cleanup => cleanup());
       };
     }
 
@@ -250,18 +276,43 @@ function InspectorPanel({
 
     // Watch target's metadata
     if (targetGadget.metadata) {
-      const updateMeta = () => {
+      const cellTaps: Array<() => void> = [];
+
+      // Update snapshot without setting up new taps
+      const refreshSnapshot = () => {
         const snapshot = targetGadget.metadata.query()
           .map(cell => cell.current())
           .table;
         setMetaSnapshot(snapshot);
       };
-      updateMeta();
-      const metaCleanup = targetGadget.metadata.whenChanged(updateMeta);
+
+      // Setup taps on all metadata cells
+      const setupTaps = () => {
+        // Clean up old cell taps
+        cellTaps.forEach(cleanup => cleanup());
+        cellTaps.length = 0;
+
+        // Tap each metadata cell for value changes
+        Object.values(targetGadget.metadata.query().table).forEach((cell: any) => {
+          const tap = cell.tap(() => refreshSnapshot());  // Just refresh, don't re-tap!
+          cellTaps.push(tap);
+        });
+      };
+
+      // Initial setup
+      refreshSnapshot();
+      setupTaps();
+
+      // When metadata structure changes (cells added/removed), re-setup taps
+      const metaCleanup = targetGadget.metadata.whenChanged(() => {
+        refreshSnapshot();
+        setupTaps();
+      });
 
       return () => {
         valueCleanup();
         metaCleanup();
+        cellTaps.forEach(cleanup => cleanup());
       };
     }
 
