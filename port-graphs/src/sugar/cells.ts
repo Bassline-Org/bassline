@@ -19,7 +19,7 @@ export type Metadata = {
     withPrefixSet(prefix: string, data: Record<string, any>, cell: (value: unknown) => Cell<unknown>): void
 }
 
-export function withMetadata<G extends Implements<Valued<any>>>(
+export function withMetadata<G extends object>(
     gadget: G,
     initial?: Record<string, Cell<unknown>>
 ): Metadata & G {

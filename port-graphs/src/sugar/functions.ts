@@ -3,6 +3,7 @@ import { Accepts, Implements, quick } from "../core/context";
 import { Transform, Valued } from "../core/protocols";
 import { fallibleProto, partialProto, transformProto } from "../patterns/functions";
 import { cells } from "./cells";
+import { tableQuery } from "./tables";
 
 export interface Fannable<I, O> {
     source: SweetFunction<I, O>
@@ -44,6 +45,19 @@ export interface SweetFunction<In, Out> {
 export interface SweetFallibleFunction<In, Out> extends SweetFunction<In, Out> {
     whenError(fn: (input: In, error: string) => void): Cleanup;
 }
+
+export type QueryStep =
+    | { type: 'whereKeys', fn: (key: string) => boolean }
+    | { type: 'whereValues', fn: (val: any) => boolean }
+    | { type: 'where', fn: (entry: readonly [string, any]) => boolean }
+    | { type: 'map', fn: (val: any) => any }
+    | { type: 'mapKeys', fn: (key: string) => string }
+    | { type: 'mapEntries', fn: (entry: readonly [string, any]) => readonly [string, any] };
+
+export type QueryInput = {
+    source: Record<string, any>,
+    steps: QueryStep[]
+};
 
 function sweetenTransform<I, O>(fn: Implements<Transform<I, O>>) {
     if ('whenComputed' in fn) {
@@ -93,6 +107,38 @@ export const fn = {
                 return cleanup
             }
         } as const as typeof f & SweetFallibleFunction<I, O>
+    },
+    query() {
+        const f = fn.partial<QueryInput, Record<string, any>>(
+            ({ source, steps }) => {
+                let q = tableQuery(source);
+                for (const step of steps) {
+                    switch (step.type) {
+                        case 'whereKeys':
+                            q = q.whereKeys(step.fn);
+                            break;
+                        case 'whereValues':
+                            q = q.whereValues(step.fn);
+                            break;
+                        case 'where':
+                            q = q.where(step.fn);
+                            break;
+                        case 'map':
+                            q = q.map(step.fn);
+                            break;
+                        case 'mapKeys':
+                            q = q.mapKeys(step.fn);
+                            break;
+                        case 'mapEntries':
+                            q = q.mapEntries(step.fn);
+                            break;
+                    }
+                }
+                return q.table;
+            },
+            ['source', 'steps']
+        );
+        return f;
     }
 }
 

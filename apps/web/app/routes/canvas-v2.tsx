@@ -15,7 +15,7 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { table, cells, setMetadata } from 'port-graphs';
+import { table, cells, setMetadata, fn, withMetadata } from 'port-graphs';
 import type { SweetTable, SweetCell, Implements, Metadata } from 'port-graphs';
 import type { Table, Valued } from 'port-graphs/protocols';
 import { useGadget } from "port-graphs-react";
@@ -27,6 +27,8 @@ import {
   CommandItem,
   CommandList,
 } from "~/components/ui/command";
+import { Badge } from "~/components/ui/badge";
+import { GadgetValueDisplay } from "~/components/GadgetValueDisplay";
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -49,7 +51,6 @@ const selection = cells.last<string | null>(null);
 const inspectorTab = cells.last<'value' | 'metadata' | 'connections'>('value');
 const inspectorCollapsed = cells.last(false);
 const inspector = cells.last<{ target: (NodeCell | SCell<any>) | null }>({ target: null });
-const viewMode = cells.last<'canvas' | 'graph'>('canvas');
 
 // Root table - unified namespace for everything in the system
 const root = table.first<NodeCell | SCell<any>>({
@@ -67,7 +68,6 @@ const root = table.first<NodeCell | SCell<any>>({
   'ui/inspector': inspector,
   'ui/inspector/tab': inspectorTab,
   'ui/inspector/collapsed': inspectorCollapsed,
-  'ui/view-mode': viewMode,
 });
 
 // Cell Node Component
@@ -76,18 +76,25 @@ function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
   const [value] = useGadget(nodeCell, ['changed']);
   const [selectedKey] = useGadget(selection);
   const type = nodeCell.metadata.get('ui/type')?.current() as NodeType;
+  const icon = nodeCell.metadata.get('ui/icon')?.current();
   const isSelected = selectedKey === nodeId;
 
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
-      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[120px] transition-all ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
+      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[140px] transition-all ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
         }`}>
-        <div className="text-xs font-semibold text-slate-500 mb-2">
-          {type?.toUpperCase()} CELL
+        <div className="flex items-center gap-2 mb-3">
+          {icon && <span className="text-lg">{icon}</span>}
+          <Badge variant="outline" className="text-xs font-semibold">
+            {type?.toUpperCase()}
+          </Badge>
         </div>
-        <div className="text-2xl font-bold text-center mb-2">
-          {type === 'union' ? `Set(${(value as Set<any>).size})` : String(value)}
+        <div className="mb-3 flex justify-center">
+          <GadgetValueDisplay
+            gadget={nodeCell}
+            options={{ inline: true, truncateLength: 30 }}
+          />
         </div>
         <div className="flex gap-1">
           <button
@@ -207,36 +214,44 @@ function InspectorNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } 
         </div>
 
         {targetGadget ? (
-          <div className="space-y-1 text-xs">
+          <div className="space-y-2 text-xs">
             <div className="font-mono text-purple-900 truncate text-[10px]">
               {findKeyInRoot(targetGadget) || 'metadata cell'}
             </div>
-            <div className="text-purple-700 truncate">
-              {String(targetValue).substring(0, 40)}
-            </div>
-            <div className="text-purple-600 text-[10px]">
-              {Object.keys(metaSnapshot).length} metadata fields
+
+            <div className="bg-white p-2 rounded border border-purple-200">
+              <GadgetValueDisplay
+                gadget={targetGadget}
+                options={{ inline: true, truncateLength: 35 }}
+              />
             </div>
 
-            {/* Metadata rows - clickable to update THIS inspector */}
-            <div className="max-h-24 overflow-y-auto space-y-0.5 mt-1">
-              {Object.entries(metaSnapshot).slice(0, 5).map(([key, val]) => (
-                <div
-                  key={key}
-                  className="text-[10px] cursor-pointer hover:bg-purple-200 p-0.5 rounded"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const metaCell = targetGadget.metadata?.get(key);
-                    if (metaCell) {
-                      inspectorGadget.receive({ target: metaCell });
-                    }
-                  }}
-                  title="Click to inspect this metadata cell"
-                >
-                  <span className="font-mono">{key}</span>: {String(val).substring(0, 15)}
+            {Object.keys(metaSnapshot).length > 0 && (
+              <div>
+                <div className="text-purple-600 text-[10px] mb-1">
+                  {Object.keys(metaSnapshot).length} metadata fields
                 </div>
-              ))}
-            </div>
+                <div className="max-h-24 overflow-y-auto space-y-0.5">
+                  {Object.entries(metaSnapshot).slice(0, 5).map(([key, val]) => (
+                    <div
+                      key={key}
+                      className="text-[10px] cursor-pointer hover:bg-purple-200 p-1 rounded flex items-start gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const metaCell = targetGadget.metadata?.get(key);
+                        if (metaCell) {
+                          inspectorGadget.receive({ target: metaCell });
+                        }
+                      }}
+                      title="Click to inspect this metadata cell"
+                    >
+                      <span className="font-mono text-purple-700">{key}:</span>
+                      <span className="truncate flex-1">{String(val).substring(0, 15)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-xs text-purple-500">
@@ -375,47 +390,60 @@ function InspectorPanel({
           <div className="space-y-4">
             <div>
               <div className="text-xs text-gray-500 mb-1">Inspecting</div>
-              <div className="text-sm font-mono">{selectedKey || 'metadata cell'}</div>
+              <Badge variant="outline" className="font-mono text-sm">
+                {selectedKey || 'metadata cell'}
+              </Badge>
             </div>
+
             <div>
-              <div className="text-xs text-gray-500 mb-1">Current Value</div>
-              <div className="text-lg font-bold">
-                {typeof targetValue === 'object' && targetValue !== null
-                  ? JSON.stringify(targetValue)
-                  : String(targetValue)}
+              <div className="text-xs text-gray-500 mb-2">Current Value</div>
+              <div className="border rounded-lg p-3 bg-gray-50">
+                <GadgetValueDisplay
+                  gadget={targetGadget}
+                  options={{ inline: false, maxDepth: 3 }}
+                />
               </div>
             </div>
-            <div>
-              <div className="text-xs text-gray-500 mb-1">Type</div>
-              <div className="text-sm">
-                {targetGadget.metadata?.get?.('meta/type')?.current() || 'unknown'}
+
+            {targetGadget.metadata?.get?.('meta/type') && (
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Type</div>
+                <Badge>{targetGadget.metadata.get('meta/type').current()}</Badge>
               </div>
-            </div>
-            {targetGadget.metadata && (
+            )}
+
+            {targetGadget.metadata && Object.keys(metaSnapshot).length > 0 && (
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-gray-700">Metadata</div>
-                {Object.entries(metaSnapshot).map(([key, value]) => (
-                  <div
-                    key={key}
-                    className="text-xs cursor-pointer hover:bg-blue-50 p-1 rounded transition-colors"
-                    onClick={() => {
-                      // Get the specific metadata cell and inspect it
-                      const metadataCell = targetGadget.metadata?.get(key);
-                      if (metadataCell) {
-                        inspector.receive({ target: metadataCell });
-                      }
-                    }}
-                    title="Click to inspect this metadata cell"
-                  >
-                    <span className="font-mono text-gray-600">{key}</span>
-                    <span className="text-gray-400 mx-1">:</span>
-                    <span className="text-gray-800">
-                      {typeof value === 'object' && value !== null
-                        ? JSON.stringify(value)
-                        : String(value)}
-                    </span>
-                  </div>
-                ))}
+                <div className="text-xs font-semibold text-gray-700">Metadata ({Object.keys(metaSnapshot).length})</div>
+                <div className="border rounded-lg overflow-hidden">
+                  {Object.entries(metaSnapshot).map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="text-xs cursor-pointer hover:bg-blue-50 p-2 border-b last:border-b-0 transition-colors"
+                      onClick={() => {
+                        const metadataCell = targetGadget.metadata?.get(key);
+                        if (metadataCell) {
+                          inspector.receive({ target: metadataCell });
+                        }
+                      }}
+                      title="Click to inspect this metadata cell"
+                    >
+                      <div className="font-mono text-gray-600 mb-1">{key}</div>
+                      <div className="text-gray-800 ml-2">
+                        {typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Set)
+                          ? <Badge variant="outline">Object</Badge>
+                          : typeof value === 'function'
+                          ? <Badge variant="outline">Function</Badge>
+                          : Array.isArray(value)
+                          ? <Badge variant="outline">Array({value.length})</Badge>
+                          : value instanceof Set
+                          ? <Badge variant="outline">Set({value.size})</Badge>
+                          : <span className="font-mono">{String(value)}</span>
+                        }
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -496,10 +524,15 @@ function CommandPalette({
     setOpen(false);
   };
 
-  const factoryKeys = keys.filter(k => k.startsWith('factory/'));
-  const nodeKeys = keys.filter(k => k.startsWith('node/'));
-  const edgeKeys = keys.filter(k => k.startsWith('edge/'));
-  const uiKeys = keys.filter(k => k.startsWith('ui/'));
+  // Group keys by namespace prefix
+  const keysByNamespace = keys.reduce((acc, key) => {
+    const namespace = key.split('/')[0];
+    if (!acc[namespace]) acc[namespace] = [];
+    acc[namespace].push(key);
+    return acc;
+  }, {} as Record<string, string[]>);
+
+  const namespaces = Object.keys(keysByNamespace).sort();
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -507,157 +540,35 @@ function CommandPalette({
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
 
-        {factoryKeys.length > 0 && (
-          <CommandGroup heading="Factories">
-            {factoryKeys.map(key => (
-              <CommandItem
-                key={key}
-                value={key}
-                onSelect={() => handleSelect(key)}
-              >
-                <span className="font-mono text-sm">{key}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
+        {namespaces.map(namespace => (
+          <CommandGroup key={namespace} heading={namespace.charAt(0).toUpperCase() + namespace.slice(1)}>
+            {keysByNamespace[namespace].map(key => {
+              const gadget = root.get(key);
+              const icon = gadget?.metadata?.get?.('ui/icon')?.current();
+              const type = gadget?.metadata?.get?.('ui/type')?.current();
 
-        {nodeKeys.length > 0 && (
-          <CommandGroup heading="Nodes">
-            {nodeKeys.map(key => (
-              <CommandItem
-                key={key}
-                value={key}
-                onSelect={() => handleSelect(key)}
-              >
-                <span className="font-mono text-sm">{key}</span>
-              </CommandItem>
-            ))}
+              return (
+                <CommandItem
+                  key={key}
+                  value={key}
+                  onSelect={() => handleSelect(key)}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    {icon && <span>{icon}</span>}
+                    <span className="font-mono text-sm flex-1">{key}</span>
+                    {type && (
+                      <Badge variant="outline" className="text-xs">
+                        {type}
+                      </Badge>
+                    )}
+                  </div>
+                </CommandItem>
+              );
+            })}
           </CommandGroup>
-        )}
-
-        {edgeKeys.length > 0 && (
-          <CommandGroup heading="Edges">
-            {edgeKeys.map(key => (
-              <CommandItem
-                key={key}
-                value={key}
-                onSelect={() => handleSelect(key)}
-              >
-                <span className="font-mono text-sm">{key}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        {uiKeys.length > 0 && (
-          <CommandGroup heading="UI State">
-            {uiKeys.map(key => (
-              <CommandItem
-                key={key}
-                value={key}
-                onSelect={() => handleSelect(key)}
-              >
-                <span className="font-mono text-sm">{key}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
+        ))}
       </CommandList>
     </CommandDialog>
-  );
-}
-
-// GraphView Component - Visualizes patterns as edges
-function GraphView({
-  root
-}: {
-  root: Implements<Table<string, NodeCell | SCell<any>>> & SweetTable<NodeCell | SCell<any>>
-}) {
-  const [reactNodes, setReactNodes] = useState<Node[]>([]);
-  const [reactEdges, setReactEdges] = useState<Edge[]>([]);
-
-  // Build nodes from node/* namespace
-  useEffect(() => {
-    const updateNodes = () => {
-      const snapshot = root.query().whereKeys(k => k.startsWith('node/')).table;
-      const nodes = Object.entries(snapshot).map(([id, cell]) => {
-        const nodeCell = cell as NodeCell;
-        const pos = nodeCell.metadata.get('ui/position')?.current() as Pos;
-        return {
-          id,
-          position: pos || { x: 0, y: 0 },
-          type: 'cell',
-          data: { nodeCell, nodeId: id }
-        };
-      });
-      setReactNodes(nodes);
-    };
-
-    updateNodes();
-    return root.whenChanged((id) => {
-      if (id.startsWith('node/')) updateNodes();
-    });
-  }, []);
-
-  // Build edges from pattern/* namespace
-  useEffect(() => {
-    const updateEdges = () => {
-      const patterns = root.query().whereKeys(k => k.startsWith('pattern/')).table;
-      const edges: Edge[] = [];
-
-      Object.entries(patterns).forEach(([patternId, cell]) => {
-        const patternData = cell.current();
-        const { type, source, target } = patternData;
-
-        if (type === 'namespace') {
-          // Find all nodes matching the source pattern
-          const sourcePattern = source.replace('*', '.*');
-          const regex = new RegExp(`^${sourcePattern}$`);
-
-          const matchingKeys = Object.keys(root.query().table).filter(key =>
-            regex.test(key) && key.startsWith('node/')
-          );
-
-          // Create edge for each match
-          matchingKeys.forEach((sourceKey, idx) => {
-            edges.push({
-              id: `${patternId}-${idx}`,
-              source: sourceKey,
-              target,
-              animated: true,
-              style: { stroke: '#9333ea', strokeWidth: 2 },
-              label: source,
-            });
-          });
-        }
-      });
-
-      setReactEdges(edges);
-    };
-
-    updateEdges();
-    return root.whenChanged((id) => {
-      if (id.startsWith('pattern/') || id.startsWith('node/')) updateEdges();
-    });
-  }, []);
-
-  const nodeTypes = {
-    cell: CellNode,
-    inspector: InspectorNode,
-  };
-
-  return (
-    <ReactFlow
-      nodes={reactNodes}
-      edges={reactEdges}
-      nodeTypes={nodeTypes}
-      fitView
-      className="bg-slate-50"
-    >
-      <Background />
-      <Controls />
-      <MiniMap />
-    </ReactFlow>
   );
 }
 
@@ -884,8 +795,6 @@ function Canvas({
     });
   }, []);
 
-  const [currentViewMode] = useGadget(viewMode);
-
   return (
     <div className="flex-1 flex h-full">
       {/* Command Palette */}
@@ -894,31 +803,7 @@ function Canvas({
       {/* Main Canvas */}
       <div className="flex-1 flex flex-col">
         <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="font-medium text-sm text-gray-700">Canvas V2</div>
-            <div className="flex gap-1 border rounded-md overflow-hidden">
-              <button
-                onClick={() => viewMode.receive('canvas')}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  currentViewMode === 'canvas'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                Canvas
-              </button>
-              <button
-                onClick={() => viewMode.receive('graph')}
-                className={`px-3 py-1 text-xs transition-colors ${
-                  currentViewMode === 'graph'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                Graph
-              </button>
-            </div>
-          </div>
+          <div className="font-medium text-sm text-gray-700">Canvas V2</div>
           <div className="flex gap-2">
             {availableFactories.map((factory) => (
               <button
@@ -958,26 +843,22 @@ function Canvas({
         </div>
 
         <div className="flex-1 relative">
-          {currentViewMode === 'canvas' ? (
-            <ReactFlow
-              nodes={reactNodes}
-              edges={reactEdges}
-              nodeTypes={nodeTypes}
-              onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
-              onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
-              onConnect={onConnect}
-              onEdgesDelete={onEdgesDelete}
-              onNodeDragStop={onNodeDragStop}
-              onNodeClick={onNodeClick}
-              fitView
-            >
-              <Background />
-              <Controls />
-              <MiniMap />
-            </ReactFlow>
-          ) : (
-            <GraphView root={root} />
-          )}
+          <ReactFlow
+            nodes={reactNodes}
+            edges={reactEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
+            onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
+            onConnect={onConnect}
+            onEdgesDelete={onEdgesDelete}
+            onNodeDragStop={onNodeDragStop}
+            onNodeClick={onNodeClick}
+            fitView
+          >
+            <Background />
+            <Controls />
+            <MiniMap />
+          </ReactFlow>
         </div>
       </div>
 
@@ -1012,6 +893,44 @@ function createNode(factory: { factory: (pos: Pos) => NodeCell }, position: Pos)
   root.set({ [nodeId]: nodeCell });
   return nodeId;
 }
+
+// Test query gadget - filters to max nodes only
+const testQuery = withMetadata(fn.query());
+const stepsCell = cells.last([
+  { type: 'whereKeys', fn: (k: string) => k.startsWith('node/') },
+  { type: 'whereValues', fn: (c: any) => c.metadata?.get('ui/type')?.current() === 'max' }
+]);
+
+// Wire root table to query source
+root.tap(({ changed }) => {
+  if (changed) {
+    testQuery.receive({ source: changed as Record<string, any> });
+  }
+});
+testQuery.receive({ source: root.current() });
+
+// Wire steps to query
+stepsCell.tap(({ changed }) => {
+  if (changed) {
+    testQuery.receive({ steps: changed as any[] });
+  }
+});
+testQuery.receive({ steps: stepsCell.current() });
+
+// Store query in root with metadata (if metadata exists)
+if (testQuery.metadata) {
+  testQuery.metadata.set({
+    'query/source-key': cells.last('root'),
+    'query/steps': stepsCell,
+    'query/description': cells.last('Find all max nodes')
+  });
+}
+root.set({ 'query/test-max-nodes': testQuery });
+
+// Log query results when they change
+testQuery.whenComputed((results) => {
+  console.log('Query results (max nodes):', Object.keys(results));
+});
 
 export default function CanvasV2() {
   return (
