@@ -49,6 +49,7 @@ const selection = cells.last<string | null>(null);
 const inspectorTab = cells.last<'value' | 'metadata' | 'connections'>('value');
 const inspectorCollapsed = cells.last(false);
 const inspector = cells.last<{ target: (NodeCell | SCell<any>) | null }>({ target: null });
+const viewMode = cells.last<'canvas' | 'graph'>('canvas');
 
 // Root table - unified namespace for everything in the system
 const root = table.first<NodeCell | SCell<any>>({
@@ -66,6 +67,7 @@ const root = table.first<NodeCell | SCell<any>>({
   'ui/inspector': inspector,
   'ui/inspector/tab': inspectorTab,
   'ui/inspector/collapsed': inspectorCollapsed,
+  'ui/view-mode': viewMode,
 });
 
 // Cell Node Component
@@ -565,6 +567,100 @@ function CommandPalette({
   );
 }
 
+// GraphView Component - Visualizes patterns as edges
+function GraphView({
+  root
+}: {
+  root: Implements<Table<string, NodeCell | SCell<any>>> & SweetTable<NodeCell | SCell<any>>
+}) {
+  const [reactNodes, setReactNodes] = useState<Node[]>([]);
+  const [reactEdges, setReactEdges] = useState<Edge[]>([]);
+
+  // Build nodes from node/* namespace
+  useEffect(() => {
+    const updateNodes = () => {
+      const snapshot = root.query().whereKeys(k => k.startsWith('node/')).table;
+      const nodes = Object.entries(snapshot).map(([id, cell]) => {
+        const nodeCell = cell as NodeCell;
+        const pos = nodeCell.metadata.get('ui/position')?.current() as Pos;
+        return {
+          id,
+          position: pos || { x: 0, y: 0 },
+          type: 'cell',
+          data: { nodeCell, nodeId: id }
+        };
+      });
+      setReactNodes(nodes);
+    };
+
+    updateNodes();
+    return root.whenChanged((id) => {
+      if (id.startsWith('node/')) updateNodes();
+    });
+  }, []);
+
+  // Build edges from pattern/* namespace
+  useEffect(() => {
+    const updateEdges = () => {
+      const patterns = root.query().whereKeys(k => k.startsWith('pattern/')).table;
+      const edges: Edge[] = [];
+
+      Object.entries(patterns).forEach(([patternId, cell]) => {
+        const patternData = cell.current();
+        const { type, source, target } = patternData;
+
+        if (type === 'namespace') {
+          // Find all nodes matching the source pattern
+          const sourcePattern = source.replace('*', '.*');
+          const regex = new RegExp(`^${sourcePattern}$`);
+
+          const matchingKeys = Object.keys(root.query().table).filter(key =>
+            regex.test(key) && key.startsWith('node/')
+          );
+
+          // Create edge for each match
+          matchingKeys.forEach((sourceKey, idx) => {
+            edges.push({
+              id: `${patternId}-${idx}`,
+              source: sourceKey,
+              target,
+              animated: true,
+              style: { stroke: '#9333ea', strokeWidth: 2 },
+              label: source,
+            });
+          });
+        }
+      });
+
+      setReactEdges(edges);
+    };
+
+    updateEdges();
+    return root.whenChanged((id) => {
+      if (id.startsWith('pattern/') || id.startsWith('node/')) updateEdges();
+    });
+  }, []);
+
+  const nodeTypes = {
+    cell: CellNode,
+    inspector: InspectorNode,
+  };
+
+  return (
+    <ReactFlow
+      nodes={reactNodes}
+      edges={reactEdges}
+      nodeTypes={nodeTypes}
+      fitView
+      className="bg-slate-50"
+    >
+      <Background />
+      <Controls />
+      <MiniMap />
+    </ReactFlow>
+  );
+}
+
 // Main Canvas Component
 function Canvas({
   root
@@ -631,6 +727,77 @@ function Canvas({
         source: conn.from,
         target: conn.to
       }]);
+    });
+  }, []);
+
+  // Pattern Auto-Wiring System
+  // Watches pattern/* namespace and creates/manages taps automatically
+  useEffect(() => {
+    const wirePattern = (patternId: string, patternCell: NodeCell) => {
+      const patternData = patternCell.current();
+      const { type, source, target, transform } = patternData;
+
+      if (type === 'namespace') {
+        // Match all keys in the source namespace pattern
+        const matchingKeys = Object.keys(root.query().table).filter(key => {
+          // Simple glob matching for patterns like "sensors/*"
+          const pattern = source.replace('*', '.*');
+          return new RegExp(`^${pattern}$`).test(key);
+        });
+
+        // Create taps for each matching source
+        const cleanups: Array<() => void> = [];
+        matchingKeys.forEach(sourceKey => {
+          const sourceGadget = root.get(sourceKey);
+          const targetGadget = root.get(target);
+
+          if (sourceGadget && targetGadget) {
+            const cleanup = sourceGadget.tap((effects: any) => {
+              if (effects.changed !== undefined) {
+                const value = transform ? transform(effects.changed) : effects.changed;
+                targetGadget.receive(value);
+              }
+            });
+            cleanups.push(cleanup);
+          }
+        });
+
+        // Store cleanup functions in pattern's metadata
+        if (cleanups.length > 0) {
+          patternCell.metadata.set({
+            'pattern/cleanups': cells.last(cleanups),
+            'pattern/active-sources': cells.last(matchingKeys)
+          });
+        }
+      }
+    };
+
+    // Wire existing patterns
+    const existingPatterns = root.query().whereKeys(k => k.startsWith('pattern/')).table;
+    Object.entries(existingPatterns).forEach(([id, cell]) => {
+      wirePattern(id, cell as NodeCell);
+    });
+
+    // Watch for new patterns
+    return root.whenAdded((id, cell) => {
+      if (id.startsWith('pattern/')) {
+        wirePattern(id, cell as NodeCell);
+      }
+    });
+  }, []);
+
+  // Pattern cleanup on deletion
+  useEffect(() => {
+    return root.whenRemoved?.((id, cell) => {
+      if (id.startsWith('pattern/')) {
+        const patternCell = cell as NodeCell;
+        const cleanupsCell = patternCell.metadata.get('pattern/cleanups');
+        const cleanups = cleanupsCell?.current() as Array<() => void> | undefined;
+
+        if (cleanups) {
+          cleanups.forEach(cleanup => cleanup());
+        }
+      }
     });
   }, []);
 
@@ -717,6 +884,8 @@ function Canvas({
     });
   }, []);
 
+  const [currentViewMode] = useGadget(viewMode);
+
   return (
     <div className="flex-1 flex h-full">
       {/* Command Palette */}
@@ -725,7 +894,31 @@ function Canvas({
       {/* Main Canvas */}
       <div className="flex-1 flex flex-col">
         <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
-          <div className="font-medium text-sm text-gray-700">Canvas V2</div>
+          <div className="flex items-center gap-3">
+            <div className="font-medium text-sm text-gray-700">Canvas V2</div>
+            <div className="flex gap-1 border rounded-md overflow-hidden">
+              <button
+                onClick={() => viewMode.receive('canvas')}
+                className={`px-3 py-1 text-xs transition-colors ${
+                  currentViewMode === 'canvas'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Canvas
+              </button>
+              <button
+                onClick={() => viewMode.receive('graph')}
+                className={`px-3 py-1 text-xs transition-colors ${
+                  currentViewMode === 'graph'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Graph
+              </button>
+            </div>
+          </div>
           <div className="flex gap-2">
             {availableFactories.map((factory) => (
               <button
@@ -738,26 +931,53 @@ function Canvas({
                 <span className="capitalize">{factory.name}</span>
               </button>
             ))}
+            <div className="border-l mx-2" />
+            <button
+              onClick={() => {
+                if (!selectedKey) {
+                  alert('Select a target node first');
+                  return;
+                }
+                // Create a test pattern: all max cells → selected node
+                const patternId = `pattern/${Date.now()}`;
+                const pattern = cells.last({
+                  type: 'namespace',
+                  source: 'factory/max',  // Test: just the max factory
+                  target: selectedKey,
+                  transform: null
+                });
+                root.set({ [patternId]: pattern });
+              }}
+              className="px-3 py-1 text-sm border rounded bg-purple-50 hover:bg-purple-100 border-purple-300 flex items-center gap-1"
+              title="Create namespace pattern (test)"
+            >
+              <span>🔗</span>
+              <span>Create Pattern</span>
+            </button>
           </div>
         </div>
 
         <div className="flex-1 relative">
-          <ReactFlow
-            nodes={reactNodes}
-            edges={reactEdges}
-            nodeTypes={nodeTypes}
-            onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
-            onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
-            onConnect={onConnect}
-            onEdgesDelete={onEdgesDelete}
-            onNodeDragStop={onNodeDragStop}
-            onNodeClick={onNodeClick}
-            fitView
-          >
-            <Background />
-            <Controls />
-            <MiniMap />
-          </ReactFlow>
+          {currentViewMode === 'canvas' ? (
+            <ReactFlow
+              nodes={reactNodes}
+              edges={reactEdges}
+              nodeTypes={nodeTypes}
+              onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
+              onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
+              onConnect={onConnect}
+              onEdgesDelete={onEdgesDelete}
+              onNodeDragStop={onNodeDragStop}
+              onNodeClick={onNodeClick}
+              fitView
+            >
+              <Background />
+              <Controls />
+              <MiniMap />
+            </ReactFlow>
+          ) : (
+            <GraphView root={root} />
+          )}
         </div>
       </div>
 
