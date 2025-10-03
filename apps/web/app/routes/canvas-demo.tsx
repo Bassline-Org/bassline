@@ -18,8 +18,8 @@ import {
   type Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { table, cells } from 'port-graphs';
-import type { SweetTable, SweetCell, Implements, Cleanup, Tappable } from 'port-graphs';
+import { table, cells, setMetadata } from 'port-graphs';
+import type { SweetTable, SweetCell, Implements, Cleanup, Tappable, Metadata } from 'port-graphs';
 import type { Table, Valued } from 'port-graphs/protocols';
 import { useGadget } from "port-graphs-react";
 
@@ -32,102 +32,63 @@ export function meta({ }: Route.MetaArgs) {
 
 type Pos = { x: number, y: number }
 type NodeType = 'max' | 'min' | 'union'
-type SCell<T> = Implements<Valued<T>> & SweetCell<T>;
+type SCell<T> = Implements<Valued<T>> & SweetCell<T> & Metadata;
 type STable<T> = Implements<Table<string, T>> & SweetTable<T>;
 type Dims = { width: number, height: number };
-type NodeValue = {
-  position: Pos,
-  type: NodeType,
-  dims: Dims,
-  gadget: SCell<any>
-}
-type NodeRow = {
-  position: SCell<Pos>,
-  type: SCell<NodeType>,
-  dims: SCell<Dims>,
-  gadget: SCell<any>,
-}
-type EdgeRow = {
-  from: SCell<string>,
-  to: SCell<string>,
-  cleanup?: () => void
-}
-type EdgeValue = {
+
+// Nodes are just gadgets with metadata
+// Metadata contains UI info (position, type, dims, etc.)
+type NodeGadget = SCell<any>;
+
+// Edge data tracks connections
+type EdgeData = {
   from: string,
   to: string,
+  cleanup?: () => void
 }
-type FactoryRow = {
-  name: SCell<string>,
-  type: SCell<NodeType>,
-  icon: SCell<string>,
-  initialValue: SCell<any>,
-  create: SCell<(pos: Pos) => NodeRow>,
-}
-type FactoryValue = {
+
+// Factory metadata
+type FactoryInfo = {
   name: string,
   type: NodeType,
   icon: string,
+  category: string,
+  description: string,
   initialValue: any,
-  create: (pos: Pos) => NodeRow,
+  create: (pos: Pos) => NodeGadget,
 }
 
-// Gadget Inspector Component
-function GadgetInspector({
-  gadget,
-  label
-}: {
-  gadget: any,
-  label?: string
-}) {
-  const [expanded, setExpanded] = useState(false);
+// Metadata Inspector Component
+function MetadataInspector({ gadget }: { gadget: NodeGadget }) {
+  const [metaTable] = useGadget(gadget.metadata, ['changed']);
 
-  if (!gadget) {
-    return <div className="text-sm text-gray-500">No gadget selected</div>;
+  if (!metaTable || Object.keys(metaTable).length === 0) {
+    return <div className="text-sm text-gray-500">No metadata</div>;
   }
 
-  const current = gadget.current?.() ?? gadget;
-  const isObject = current && typeof current === 'object' && !Array.isArray(current);
-  const hasGadgetProps = isObject && Object.values(current).some((v: any) => v && typeof v === 'object' && 'current' in v);
-
   return (
-    <div className="border-l-2 border-gray-300 pl-2 py-1">
-      <div className="flex items-center gap-2">
-        {hasGadgetProps && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-xs w-4 h-4 flex items-center justify-center hover:bg-gray-200 rounded"
-          >
-            {expanded ? '−' : '+'}
-          </button>
-        )}
-        <div className="text-sm font-medium">{label || 'Gadget'}</div>
-        <div className="text-xs text-gray-600">
-          {typeof current === 'object' ? JSON.stringify(current).slice(0, 50) : String(current)}
-        </div>
-      </div>
-
-      {expanded && hasGadgetProps && (
-        <div className="ml-4 mt-2 space-y-2">
-          {Object.entries(current).map(([key, value]: [string, any]) => {
-            if (value && typeof value === 'object' && 'current' in value) {
-              return (
-                <GadgetInspector
-                  key={key}
-                  gadget={value}
-                  label={key}
-                />
-              );
-            }
-            return null;
-          })}
-        </div>
-      )}
+    <div className="space-y-2">
+      <div className="text-xs font-semibold text-gray-700">Metadata</div>
+      {Object.entries(metaTable).map(([key, cell]) => {
+        const value = (cell as any).current();
+        return (
+          <div key={key} className="text-xs">
+            <span className="font-mono text-gray-600">{key}</span>
+            <span className="text-gray-400 mx-1">:</span>
+            <span className="text-gray-800">
+              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // Cell Node Component
-function CellNode({ data: { gadget, type, originalGadget } }: { data: NodeValue & { originalGadget: SCell<unknown> } }) {
+function CellNode({ data }: { data: { gadget: NodeGadget, type: NodeType, value: any } }) {
+  const { gadget, type, value } = data;
+
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
@@ -135,10 +96,10 @@ function CellNode({ data: { gadget, type, originalGadget } }: { data: NodeValue 
         <div className="text-xs font-semibold text-slate-500 mb-2">
           {type.toUpperCase()} CELL
         </div>
-        <div className="text-2xl font-bold text-center mb-2">{gadget}</div>
+        <div className="text-2xl font-bold text-center mb-2">{String(value)}</div>
         <button
           onClick={() => {
-            originalGadget.receive(originalGadget.current() + 1);
+            gadget.receive(gadget.current() + 1);
           }}
           className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
         >
@@ -158,87 +119,102 @@ const nodeTypes: NodeTypes = {
 };
 
 function CanvasView({
-  nodeValues,
   nodes,
   edges,
-  edgeValues,
   factories,
 }: {
-  nodeValues: Record<string, NodeValue>,
-  nodes: STable<NodeRow>,
-  edges: STable<EdgeRow>,
-  edgeValues: Record<string, EdgeValue>,
-  factories: Record<string, FactoryValue>
+  nodes: STable<NodeGadget>,
+  edges: STable<EdgeData>,
+  factories: FactoryInfo[]
 }) {
   const [reactNodes, setReactNodes] = useState<Node[]>([]);
   const [reactEdges, setReactEdges] = useState<Edge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
+  // Watch nodes table for changes
+  const [nodesState] = useGadget(nodes, ['added', 'changed']);
+
+  // Build React Flow nodes from gadgets + metadata
   useEffect(() => {
+    const nodeEntries = Object.entries(nodesState);
+
     setReactNodes(old =>
-      Object.entries(nodeValues).map(([k, v]) => {
-        const existing = old.find(n => n.id === k);
+      nodeEntries.map(([id, gadget]) => {
+        const existing = old.find(n => n.id === id);
+        const position = (gadget as NodeGadget).metadata.get('ui/position')?.current() as XYPosition;
+        const type = (gadget as NodeGadget).metadata.get('ui/type')?.current() as NodeType;
+        const value = (gadget as NodeGadget).current();
+
         return {
           ...existing,
-          id: k,
-          position: v.position as XYPosition,
-          type: v.type,
-          data: { ...v, originalGadget: nodes.get(k)!.gadget }
+          id,
+          position: position || { x: 0, y: 0 },
+          type: type || 'max',
+          data: { gadget, type, value }
         };
       })
     );
-  }, [nodeValues, nodes]);
+  }, [nodesState]);
+
+  // Watch edges table
+  const [edgesState] = useGadget(edges, ['added', 'changed']);
 
   useEffect(() => {
     setReactEdges(old =>
-      Object.entries(edgeValues).map(([k, v]) => {
-        const existing = old.find(e => e.id === k);
+      Object.entries(edgesState).map(([id, edgeData]) => {
+        const existing = old.find(e => e.id === id);
         return {
           ...existing,
-          id: k,
-          source: v.from,
-          target: v.to
+          id,
+          source: (edgeData as EdgeData).from,
+          target: (edgeData as EdgeData).to
         } as Edge;
       })
     );
-  }, [edgeValues]);
+  }, [edgesState]);
 
-  // // Interaction handlers (forward to network)
   const onConnect = useCallback((connection: ReactFlowConnection) => {
     if (!connection.source || !connection.target) return;
     const id = `${connection.source}-${connection.target}`;
-    edges.receive({
-      [id]: {
-        from: cells.last(connection.source),
-        to: cells.last(connection.target),
-      }
-    });
-  }, [edges]);
 
-  const onEdgesDelete = useCallback((e: Edge[]) => {
-    e.forEach(e => {
-      const edge = edges.get(e.id)!;
-      const { from, to, cleanup } = edge;
-      from.receive('idk');
-      to.receive('idk');
-      if (cleanup) {
-        console.log('Cleaning up connection!');
-        cleanup();
-        delete edge.cleanup;
+    // Create edge with cleanup
+    const edge: EdgeData = {
+      from: connection.source,
+      to: connection.target,
+    };
+
+    edges.set({ [id]: edge });
+
+    // Setup sync
+    const sourceGadget = nodes.get(connection.source);
+    const targetGadget = nodes.get(connection.target);
+    if (sourceGadget && targetGadget) {
+      const cleanup = sourceGadget.sync(targetGadget);
+      edges.get(id)!.cleanup = cleanup;
+    }
+  }, [edges, nodes]);
+
+  const onEdgesDelete = useCallback((deletedEdges: Edge[]) => {
+    deletedEdges.forEach(e => {
+      const edge = edges.get(e.id);
+      if (edge?.cleanup) {
+        edge.cleanup();
       }
     });
   }, [edges]);
 
   const onNodeDragStop = useCallback((_event: any, node: Node) => {
-    // Send new position to the position cell
-    nodes.get(node.id)?.position.receive(node.position);
+    const gadget = nodes.get(node.id);
+    if (gadget) {
+      gadget.metadata.get('ui/position')?.receive(node.position);
+    }
   }, [nodes]);
 
   const onNodeClick = useCallback((_event: any, node: Node) => {
     setSelectedNodeId(node.id);
   }, []);
 
-  const selectedNode = selectedNodeId ? nodes.get(selectedNodeId) : null;
+  const selectedGadget = selectedNodeId ? nodes.get(selectedNodeId) : null;
 
   return (
     <div className="flex-1 flex h-full">
@@ -254,15 +230,15 @@ function CanvasView({
               <span className="ml-3">Edges: {reactEdges.length}</span>
             </div>
             <div className="flex gap-2">
-              {Object.entries(factories).map(([id, factory]) => (
+              {factories.map((factory) => (
                 <button
-                  key={id}
-                  onClick={() => createNode(id, { x: 200, y: 200 })}
+                  key={factory.type}
+                  onClick={() => createNode(factory, { x: 200, y: 200 })}
                   className="px-3 py-1 text-sm border rounded bg-white hover:bg-gray-100 flex items-center gap-1"
-                  title={factory.name}
+                  title={factory.description}
                 >
                   <span>{factory.icon}</span>
-                  <span>{factory.type}</span>
+                  <span>{factory.name}</span>
                 </button>
               ))}
             </div>
@@ -271,22 +247,21 @@ function CanvasView({
 
         <div className="flex-1 relative">
           <ReactFlow
-          nodes={reactNodes}
-          edges={reactEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
-          onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
-          onConnect={onConnect}
-          onEdgesDelete={onEdgesDelete}
-          onNodeDragStop={onNodeDragStop}
-          onNodeClick={onNodeClick}
-          //connectionMode={ConnectionMode.Loose}
-          fitView
-        >
-          <Background />
-          <Controls />
-          <MiniMap />
-        </ReactFlow>
+            nodes={reactNodes}
+            edges={reactEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={(changes) => setReactNodes((old) => applyNodeChanges(changes, old))}
+            onEdgesChange={(changes) => setReactEdges((old) => applyEdgeChanges(changes, old))}
+            onConnect={onConnect}
+            onEdgesDelete={onEdgesDelete}
+            onNodeDragStop={onNodeDragStop}
+            onNodeClick={onNodeClick}
+            fitView
+          >
+            <Background />
+            <Controls />
+            <MiniMap />
+          </ReactFlow>
         </div>
       </div>
 
@@ -296,10 +271,23 @@ function CanvasView({
           Inspector
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          {selectedNodeId ? (
-            <div>
-              <div className="text-xs text-gray-500 mb-2">Node: {selectedNodeId}</div>
-              <GadgetInspector gadget={selectedNode} label="NodeRow" />
+          {selectedNodeId && selectedGadget ? (
+            <div className="space-y-4">
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Node ID</div>
+                <div className="text-sm font-mono">{selectedNodeId}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Current Value</div>
+                <div className="text-lg font-bold">{String(selectedGadget.current())}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Type</div>
+                <div className="text-sm">
+                  {selectedGadget.metadata.get('meta/type')?.current()}
+                </div>
+              </div>
+              <MetadataInspector gadget={selectedGadget} />
             </div>
           ) : (
             <div className="text-sm text-gray-500">Click a node to inspect</div>
@@ -310,131 +298,107 @@ function CanvasView({
   );
 }
 
+// Factory definitions with metadata
+const factories: FactoryInfo[] = [
+  {
+    name: 'Max Cell',
+    type: 'max',
+    icon: '📈',
+    category: 'cell/numeric',
+    description: 'Monotonically increasing number',
+    initialValue: 0,
+    create: (pos: Pos) => {
+      const gadget = cells.max(0);
+      setMetadata(gadget, 'ui/', {
+        position: pos,
+        type: 'max',
+        dims: { width: 100, height: 100 },
+      });
+      return gadget;
+    }
+  },
+  {
+    name: 'Min Cell',
+    type: 'min',
+    icon: '📉',
+    category: 'cell/numeric',
+    description: 'Monotonically decreasing number',
+    initialValue: 100,
+    create: (pos: Pos) => {
+      const gadget = cells.min(100);
+      setMetadata(gadget, 'ui/', {
+        position: pos,
+        type: 'min',
+        dims: { width: 100, height: 100 },
+      });
+      return gadget;
+    }
+  },
+  {
+    name: 'Union Cell',
+    type: 'union',
+    icon: '∪',
+    category: 'cell/set',
+    description: 'Set union - always grows',
+    initialValue: new Set(),
+    create: (pos: Pos) => {
+      const gadget = cells.union([]);
+      setMetadata(gadget, 'ui/', {
+        position: pos,
+        type: 'union',
+        dims: { width: 100, height: 100 },
+      });
+      return gadget;
+    }
+  },
+];
 
-// Factory table - defines what node types can be created
-const factories = table.first<FactoryRow>({
-  max: {
-    name: cells.last('Max Cell'),
-    type: cells.last('max' as NodeType),
-    icon: cells.last('📈'),
-    initialValue: cells.last(0),
-    create: cells.last((pos: Pos) => ({
-      position: cells.last<XYPosition>(pos as XYPosition),
-      type: cells.last('max' as NodeType),
-      dims: cells.last<Dims>({ width: 100, height: 100 }),
-      gadget: cells.max(0),
-    })),
-  },
-  min: {
-    name: cells.last('Min Cell'),
-    type: cells.last('min' as NodeType),
-    icon: cells.last('📉'),
-    initialValue: cells.last(100),
-    create: cells.last((pos: Pos) => ({
-      position: cells.last<XYPosition>(pos as XYPosition),
-      type: cells.last('min' as NodeType),
-      dims: cells.last<Dims>({ width: 100, height: 100 }),
-      gadget: cells.min(100),
-    })),
-  },
-  union: {
-    name: cells.last('Union Cell'),
-    type: cells.last('union' as NodeType),
-    icon: cells.last('∪'),
-    initialValue: cells.last(new Set()),
-    create: cells.last((pos: Pos) => ({
-      position: cells.last<XYPosition>(pos as XYPosition),
-      type: cells.last('union' as NodeType),
-      dims: cells.last<Dims>({ width: 100, height: 100 }),
-      gadget: cells.union(new Set()),
-    })),
-  },
-});
+// Nodes table: name → gadget (with metadata)
+const nodes = table.first<NodeGadget>({});
 
-const [factoryValues] = table.flattenTable<FactoryRow, FactoryValue>(factories);
+// Edges table: id → {from, to, cleanup?}
+const edges = table.first<EdgeData>({});
 
-const nodes = table.first<NodeRow>({} as Record<string, NodeRow>);
-const edges = table.first<EdgeRow>({} as Record<string, EdgeRow>);
-const [nodeValues, c1] = table.flattenTable<NodeRow, NodeValue>(nodes);
-const [edgeValues, c2] = table.flattenTable<EdgeRow, EdgeValue>(edges);
-nodeValues.whenAdded((k, v) => {
-  // Node added to the flattened view
-});
+// Initialize some nodes
+const initNodes: Record<string, NodeGadget> = {
+  'a': factories[0].create({ x: 100, y: 100 }),
+  'b': factories[0].create({ x: 100, y: 300 }),
+  'c': factories[0].create({ x: 400, y: 200 }),
+};
 
-edgeValues.whenAdded((k, v) => {
-  const edge = edges.get(k)!
-  if (!edge.cleanup) {
-    const [from, to] = nodes.getMany([v.from, v.to])!;
-    const cleanup = (from?.gadget as SCell<unknown>).sync(to?.gadget as SCell<unknown>);
-    edge.cleanup = cleanup;
-  }
-});
-nodes.set({
-  'a': {
-    position: cells.last<XYPosition>({ x: 100, y: 100 }),
-    type: cells.last('max' as NodeType),
-    dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
-    gadget: cells.max(0),
-  },
-  'b': {
-    position: cells.last<XYPosition>({ x: 100, y: 300 }),
-    type: cells.last('max' as NodeType),
-    dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
-    gadget: cells.max(0),
-  },
-  'c': {
-    position: cells.last<XYPosition>({ x: 400, y: 200 }),
-    type: cells.last('max' as NodeType),
-    dims: cells.last<Dims>({ width: 100, height: 100 } as Dims),
-    gadget: cells.max(0),
-  },
-});
+nodes.set(initNodes);
 
 // Initialize connections
 edges.set({
-  'a-b': { from: cells.last('a'), to: cells.last('b') },
-  'c-b': { from: cells.last('c'), to: cells.last('b') },
+  'a-b': { from: 'a', to: 'b' },
+  'c-b': { from: 'c', to: 'b' },
 });
 
-// Helper: Create a new node using a factory
-let nodeCounter = 3; // a, b, c already exist
-function createNode(factoryId: string, position: Pos) {
-  const factory = factories.get(factoryId);
-  if (!factory) {
-    console.error(`Factory not found: ${factoryId}`);
-    return;
-  }
+// Setup syncs for initial edges
+const aGadget = nodes.get('a')!;
+const bGadget = nodes.get('b')!;
+const cGadget = nodes.get('c')!;
 
+edges.get('a-b')!.cleanup = aGadget.sync(bGadget);
+edges.get('c-b')!.cleanup = cGadget.sync(bGadget);
+
+// Helper: Create a new node using a factory
+let nodeCounter = 3;
+function createNode(factory: FactoryInfo, position: Pos) {
   const nodeId = `node_${nodeCounter++}`;
-  const nodeRow = factory.create.current()(position);
-  nodes.set({ [nodeId]: nodeRow });
+  const gadget = factory.create(position);
+  nodes.set({ [nodeId]: gadget });
   return nodeId;
 }
 
-// Helper: Delete a node and clean up its edges
-function deleteNode(nodeId: string) {
-  // TODO: Clean up edges that reference this node
-  // TODO: Call cleanup functions
-  // For now, just a placeholder
-  console.log(`Delete node: ${nodeId}`);
-}
-
 export default function CanvasDemo() {
-  const [nodeValueState] = useGadget(nodeValues, ['added', 'changed']);
-  const [edgeValueState] = useGadget(edgeValues, ['added', 'changed']);
-  const [factoryValueState] = useGadget(factoryValues, ['added', 'changed']);
-
   return (
     <div className="h-screen w-screen flex">
       <CanvasView
         nodes={nodes}
-        nodeValues={nodeValueState}
         edges={edges}
-        edgeValues={edgeValueState}
-        factories={factoryValueState}
+        factories={factories}
       />
-
-      <div className="w-1 bg-gray-300" />
     </div>
   );
 }

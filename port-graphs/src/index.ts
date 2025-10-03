@@ -17,7 +17,7 @@ export * from './patterns/functions';
 // ============================================
 
 // Sugar cells
-export { cells, type SweetCell } from './sugar/cells';
+export { cells, type SweetCell, setMetadata, withMetadata, type Metadata } from './sugar/cells';
 
 // Sugar tables
 export { table, type SweetTable } from './sugar/tables';

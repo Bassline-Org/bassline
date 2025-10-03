@@ -45,11 +45,11 @@ nodes.set({
     },
 });
 
-const [fromNodes, cleanup] = table.flattenTable<NodeRow, NodeValue>(nodes);
+// const [fromNodes, cleanup] = table.flattenTable<NodeRow, NodeValue>(nodes);
 
-fromNodes.whenAdded((k, v) => {
-    console.log('from nodes added key: ', k, ' value: ', v);
-})
+// fromNodes.whenAdded((k, v) => {
+//     console.log('from nodes added key: ', k, ' value: ', v);
+// })
 
 nodes.set({
     baz: {
