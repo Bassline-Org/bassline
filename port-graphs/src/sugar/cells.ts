@@ -15,8 +15,8 @@ export interface SweetCell<T> {
 type Cell<T> = Implements<Valued<T>> & SweetCell<T>
 
 export type Metadata = {
-    metadata: ReturnType<typeof table.first<Cell<unknown>>>,
-    withPrefixSet(prefix: string, data: Record<string, unknown>, cell: (value: unknown) => Cell<unknown>): void
+    metadata: ReturnType<typeof table.first<Cell<any>>>,
+    withPrefixSet(prefix: string, data: Record<string, any>, cell: (value: unknown) => Cell<unknown>): void
 }
 
 export function withMetadata<G extends Implements<Valued<any>>>(
@@ -70,7 +70,7 @@ function sweetenCell<T>(cell: Implements<Valued<T>>) {
 
 // Helper to set metadata with cells.last as default wrapper
 export function setMetadata(
-    gadget: { metadata: ReturnType<typeof table.first> },
+    gadget: { metadata: ReturnType<typeof table.first<Cell<any>>> },
     prefix: string,
     data: Record<string, unknown>
 ): void {
@@ -86,31 +86,73 @@ const maxMeta: Record<string, Cell<unknown>> = {
     'meta/type': sweetenCell(quick(lastProto(), 'max')) as Cell<unknown>,
     'meta/category': sweetenCell(quick(lastProto(), 'cell/numeric')) as Cell<unknown>,
     'meta/description': sweetenCell(quick(lastProto(), 'Monotonically increasing number')) as Cell<unknown>,
+    'ui/icon': sweetenCell(quick(lastProto(), '📈')) as Cell<unknown>,
+    'ui/color': sweetenCell(quick(lastProto(), '#10b981')) as Cell<unknown>,
+    'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
+        const cell = cells.max(0);
+        setMetadata(cell, 'ui/', { position: pos, type: 'max' });
+        return cell;
+    })) as Cell<unknown>,
 };
 const minMeta: Record<string, Cell<unknown>> = {
     'meta/type': sweetenCell(quick(lastProto(), 'min')) as Cell<unknown>,
     'meta/category': sweetenCell(quick(lastProto(), 'cell/numeric')) as Cell<unknown>,
     'meta/description': sweetenCell(quick(lastProto(), 'Monotonically decreasing number')) as Cell<unknown>,
+    'ui/icon': sweetenCell(quick(lastProto(), '📉')) as Cell<unknown>,
+    'ui/color': sweetenCell(quick(lastProto(), '#ef4444')) as Cell<unknown>,
+    'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
+        const cell = cells.min(100);
+        setMetadata(cell, 'ui/', { position: pos, type: 'min' });
+        return cell;
+    })) as Cell<unknown>,
 };
 const unionMeta: Record<string, Cell<unknown>> = {
     'meta/type': sweetenCell(quick(lastProto(), 'union')) as Cell<unknown>,
     'meta/category': sweetenCell(quick(lastProto(), 'cell/set')) as Cell<unknown>,
     'meta/description': sweetenCell(quick(lastProto(), 'Set union - always growing')) as Cell<unknown>,
+    'ui/icon': sweetenCell(quick(lastProto(), '∪')) as Cell<unknown>,
+    'ui/color': sweetenCell(quick(lastProto(), '#3b82f6')) as Cell<unknown>,
+    'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
+        const cell = cells.union([]);
+        setMetadata(cell, 'ui/', { position: pos, type: 'union' });
+        return cell;
+    })) as Cell<unknown>,
 };
 const intersectionMeta: Record<string, Cell<unknown>> = {
     'meta/type': sweetenCell(quick(lastProto(), 'intersection')) as Cell<unknown>,
     'meta/category': sweetenCell(quick(lastProto(), 'cell/set')) as Cell<unknown>,
     'meta/description': sweetenCell(quick(lastProto(), 'Set intersection - always shrinking')) as Cell<unknown>,
+    'ui/icon': sweetenCell(quick(lastProto(), '∩')) as Cell<unknown>,
+    'ui/color': sweetenCell(quick(lastProto(), '#8b5cf6')) as Cell<unknown>,
+    'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
+        const cell = cells.intersection([]);
+        setMetadata(cell, 'ui/', { position: pos, type: 'intersection' });
+        return cell;
+    })) as Cell<unknown>,
 };
 const ordinalMeta: Record<string, Cell<unknown>> = {
     'meta/type': sweetenCell(quick(lastProto(), 'ordinal')) as Cell<unknown>,
     'meta/category': sweetenCell(quick(lastProto(), 'cell/versioned')) as Cell<unknown>,
     'meta/description': sweetenCell(quick(lastProto(), 'Versioned value with counter')) as Cell<unknown>,
+    'ui/icon': sweetenCell(quick(lastProto(), '#️⃣')) as Cell<unknown>,
+    'ui/color': sweetenCell(quick(lastProto(), '#f59e0b')) as Cell<unknown>,
+    'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
+        const cell = cells.ordinal(0);
+        setMetadata(cell, 'ui/', { position: pos, type: 'ordinal' });
+        return cell;
+    })) as Cell<unknown>,
 };
 const lastMeta: Record<string, Cell<unknown>> = {
     'meta/type': sweetenCell(quick(lastProto(), 'last')) as Cell<unknown>,
     'meta/category': sweetenCell(quick(lastProto(), 'cell/basic')) as Cell<unknown>,
     'meta/description': sweetenCell(quick(lastProto(), 'Last-write-wins cell')) as Cell<unknown>,
+    'ui/icon': sweetenCell(quick(lastProto(), '📝')) as Cell<unknown>,
+    'ui/color': sweetenCell(quick(lastProto(), '#6366f1')) as Cell<unknown>,
+    'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
+        const cell = cells.last(0);
+        setMetadata(cell, 'ui/', { position: pos, type: 'last' });
+        return cell;
+    })) as Cell<unknown>,
 };
 
 export const cells = {

@@ -6,7 +6,6 @@ import {
   Controls,
   MiniMap,
   Handle,
-  type XYPosition,
   Position,
   type Node,
   type Edge,
@@ -21,7 +20,7 @@ import type { SweetTable, SweetCell, Implements, Metadata } from 'port-graphs';
 import type { Table, Valued } from 'port-graphs/protocols';
 import { useGadget } from "port-graphs-react";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Canvas V2 - Bassline" },
     { name: "description", content: "Clean metadata-driven canvas" },
@@ -37,55 +36,15 @@ type SCell<T> = Implements<Valued<T>> & SweetCell<T> & Metadata;
 type NodeCell = SCell<any>;
 type EdgeCell = SCell<Connection>;
 
-// Factories
-type Factory = {
-  name: string,
-  type: NodeType,
-  icon: string,
-  create: (pos: Pos) => NodeCell,
-};
-
-const factories: Factory[] = [
-  {
-    name: 'Max',
-    type: 'max',
-    icon: '📈',
-    create: (pos) => {
-      const gadget = cells.max(0);
-      setMetadata(gadget, 'ui/', {
-        position: pos,
-        type: 'max',
-      });
-      return gadget;
-    }
-  },
-  {
-    name: 'Min',
-    type: 'min',
-    icon: '📉',
-    create: (pos) => {
-      const gadget = cells.min(100);
-      setMetadata(gadget, 'ui/', {
-        position: pos,
-        type: 'min',
-      });
-      return gadget;
-    }
-  },
-  {
-    name: 'Union',
-    type: 'union',
-    icon: '∪',
-    create: (pos) => {
-      const gadget = cells.union([]);
-      setMetadata(gadget, 'ui/', {
-        position: pos,
-        type: 'union',
-      });
-      return gadget;
-    }
-  },
-];
+// Factory Registry - organize factories using table with namespacing pattern
+const factoryRegistry = table.first<NodeCell>({
+  'factory/max': cells.max(0),
+  'factory/min': cells.min(100),
+  'factory/union': cells.union([]),
+  'factory/intersection': cells.intersection([]),
+  'factory/ordinal': cells.ordinal(0),
+  'factory/last': cells.last(0),
+});
 
 // Cell Node Component
 function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
@@ -251,6 +210,36 @@ function Canvas({
 
   const selectedNode = selectedNodeId ? nodes.get(selectedNodeId) : null;
 
+  // Query factory registry for available factories
+  const [availableFactories, setAvailableFactories] = useState<Array<{
+    key: string,
+    cell: NodeCell,
+    name: string,
+    icon: string,
+    color: string,
+    factory: (pos: Pos) => NodeCell
+  }>>([]);
+
+  useEffect(() => {
+    const updateFactories = () => {
+      const snapshot = factoryRegistry.query().table;
+      const factories = Object.entries(snapshot)
+        .filter(([_, cell]) => cell.metadata.get('ui/factory') !== undefined)
+        .map(([key, cell]) => ({
+          key,
+          cell,
+          name: (cell.metadata.get('meta/type')?.current() as string) || key,
+          icon: (cell.metadata.get('ui/icon')?.current() as string) || '•',
+          color: (cell.metadata.get('ui/color')?.current() as string) || '#6b7280',
+          factory: cell.metadata.get('ui/factory')?.current() as (pos: Pos) => NodeCell
+        }));
+      setAvailableFactories(factories);
+    };
+
+    updateFactories();
+    return factoryRegistry.whenChanged(updateFactories);
+  }, []);
+
   return (
     <div className="flex-1 flex h-full">
       {/* Main Canvas */}
@@ -258,14 +247,15 @@ function Canvas({
         <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
           <div className="font-medium text-sm text-gray-700">Canvas V2</div>
           <div className="flex gap-2">
-            {factories.map((factory) => (
+            {availableFactories.map((factory) => (
               <button
-                key={factory.type}
+                key={factory.key}
                 onClick={() => createNode(factory, { x: 200, y: 200 })}
                 className="px-3 py-1 text-sm border rounded bg-white hover:bg-gray-100 flex items-center gap-1"
+                style={{ borderColor: factory.color }}
               >
                 <span>{factory.icon}</span>
-                <span>{factory.name}</span>
+                <span className="capitalize">{factory.name}</span>
               </button>
             ))}
           </div>
@@ -330,13 +320,16 @@ function Canvas({
 const nodes = table.first<NodeCell>({});
 const edges = table.first<EdgeCell>({});
 
-// Initialize
-const initNodes: Record<string, NodeCell> = {
-  'a': factories[0].create({ x: 100, y: 100 }),
-  'b': factories[0].create({ x: 100, y: 300 }),
-  'c': factories[0].create({ x: 400, y: 200 }),
-};
-nodes.set(initNodes);
+// Initialize - query factory registry for a factory to use
+const maxFactory = factoryRegistry.get('factory/max')?.metadata.get('ui/factory')?.current() as (pos: Pos) => NodeCell;
+if (maxFactory) {
+  const initNodes: Record<string, NodeCell> = {
+    'a': maxFactory({ x: 100, y: 100 }),
+    'b': maxFactory({ x: 100, y: 300 }),
+    'c': maxFactory({ x: 400, y: 200 }),
+  };
+  nodes.set(initNodes);
+}
 
 // Initialize edges
 edges.set({
@@ -346,9 +339,9 @@ edges.set({
 
 // Helper
 let nodeCounter = 3;
-function createNode(factory: Factory, position: Pos) {
+function createNode(factory: { factory: (pos: Pos) => NodeCell }, position: Pos) {
   const nodeId = `node_${nodeCounter++}`;
-  const nodeCell = factory.create(position);
+  const nodeCell = factory.factory(position);
   nodes.set({ [nodeId]: nodeCell });
   return nodeId;
 }
