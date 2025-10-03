@@ -6,8 +6,10 @@ import { cells, Cleanup, SweetCell } from ".";
 
 export interface TableQuery<T> {
     table: Record<string, T>,
-    map<R>(fn: (entry: readonly [string, T]) => readonly [string, R]): TableQuery<R>
-    where(fn: (entry: readonly [string, T]) => boolean): TableQuery<T>
+    map<R>(fn: (entry: T) => R): TableQuery<R>,
+    mapKeys(fn: (key: string) => string): TableQuery<T>,
+    mapEntries(fn: (entry: readonly [string, T]) => readonly [string, T]): TableQuery<T>,
+    where(fn: (entry: readonly [string, T]) => boolean): TableQuery<T>,
     whereValues(fn: (val: T) => boolean): TableQuery<T>,
     whereKeys(fn: (key: string) => boolean): TableQuery<T>
 }
@@ -16,7 +18,13 @@ export function tableQuery<T>(table: Record<string, T>): TableQuery<T> {
     return {
         table,
         map(fn) {
-            return tableQuery(Object.fromEntries(Object.entries(this.table).map(([key, value]) => fn([key, value]))))
+            return tableQuery(Object.fromEntries(Object.entries(this.table).map(([key, value]) => [key, fn(value)])))
+        },
+        mapKeys(fn) {
+            return tableQuery(Object.fromEntries(Object.entries(this.table).map(([key, value]) => [fn(key), value])))
+        },
+        mapEntries(fn) {
+            return tableQuery(Object.fromEntries(Object.entries(this.table).map(fn)))
         },
         where(cb) {
             const entries = Object.entries<T>(this.table)
@@ -101,60 +109,4 @@ export const table = {
         const t = quick(lastTableProto<string, T>(), initial as Record<string, T>)
         return sweetenTable(t) as typeof t & SweetTable<T>
     },
-    flattenTable<
-        Sources extends { [K in keyof Args]: Implements<Valued<Args[K]>> },
-        Args extends Readonly<Record<string, unknown>>,
-    >(
-        source: Implements<Table<string, Sources>> & SweetTable<Sources>
-    ) {
-        return table.deriveRows(source, (row) => row, (values: Args) => values);
-    },
-    deriveRows<
-        SourceRow,
-        Args extends Readonly<Record<string, unknown>>,
-        Sources extends { [K in keyof Args]: Implements<Valued<Args[K]>> },
-        TargetRow
-    >(
-        source: Implements<Table<string, SourceRow>> & SweetTable<SourceRow>,
-        extractGadgets: (row: SourceRow) => Sources,
-        transform: (values: Args) => TargetRow
-    ) {
-        const aggregated = table.last<TargetRow>({});
-        const cleanups = table.last<Cleanup>({});
-
-        const processRow = (key: string, row: SourceRow) => {
-            const gadgets = extractGadgets(row);
-            const [derived, derivedCleanup] = deriveFrom(gadgets, transform);
-            const fanoutCleanup = derived.fanOut()
-                .toWith(aggregated, (result) => ({ [key]: result }))
-                .build();
-
-            // Critical: call() AFTER fanout setup to propagate initial value
-            const initialArgs = Object.fromEntries(
-                Object.entries(gadgets).map(([k, g]) => [k, g.current()])
-            ) as Args;
-            derived.call(initialArgs);
-
-            cleanups.set({
-                [key]: () => {
-                    derivedCleanup();
-                    fanoutCleanup();
-                }
-            });
-        };
-
-        // Process existing rows
-        const current = source.current();
-        for (const key in current) {
-            processRow(key, current[key]);
-        }
-
-        // Subscribe to new rows
-        const sourceCleanup = source.whenAdded(processRow);
-
-        return [aggregated, () => {
-            sourceCleanup();
-            Object.values(cleanups.current()).forEach(c => c());
-        }] as const;
-    }
 }
