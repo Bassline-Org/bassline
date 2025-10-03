@@ -34,8 +34,8 @@
  */
 
 import { useMemo, useSyncExternalStore } from 'react';
-import type { Implements, SweetTable } from 'port-graphs';
-import { Table, Valued } from 'port-graphs/protocols';
+import type { Implements, SweetTable } from '@bassline/core';
+import { Table, Valued } from '@bassline/core/protocols';
 
 
 type TableLike<T> = SweetTable<T> & Implements<Table<string, T>>

@@ -1,5 +1,5 @@
 /**
- * port-graphs-react - React integration for port-graphs sugar layer
+ * @bassline/core-react - React integration for @bassline/core sugar layer
  *
  * This package provides React hooks that expose sugar gadgets to React components.
  * All hooks return [value, gadget] tuples where:
@@ -20,3 +20,4 @@ export { useLocalGadget } from './useLocalGadget';
 export { useDerive, useDerived } from './useDerive';
 export { useTable } from './useTable';
 export { useFunction } from './useFunction';
+export { useTap } from './useTap';

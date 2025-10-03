@@ -31,7 +31,7 @@
  */
 
 import { useMemo, useSyncExternalStore } from 'react';
-import type { SweetFunction } from 'port-graphs';
+import type { SweetFunction } from '@bassline/core';
 
 export function useFunction<I, O>(
   factory: () => SweetFunction<I, O>

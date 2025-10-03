@@ -1,4 +1,3 @@
 packages:
   - 'apps/*'
-  - 'port-graphs'
-  - 'port-graphs-react'
+  - 'packages/*'

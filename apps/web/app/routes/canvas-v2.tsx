@@ -18,7 +18,7 @@ import '@xyflow/react/dist/style.css';
 import { table, cells, setMetadata, fn, withMetadata } from 'port-graphs';
 import type { SweetTable, SweetCell, Implements, Metadata } from 'port-graphs';
 import type { Table, Valued } from 'port-graphs/protocols';
-import { useGadget } from "port-graphs-react";
+import { useGadget, useTap } from "port-graphs-react";
 import {
   CommandDialog,
   CommandEmpty,
@@ -40,9 +40,7 @@ export function meta({ }: Route.MetaArgs) {
   ];
 }
 
-// Types
 type Pos = { x: number, y: number };
-type NodeType = 'max' | 'min' | 'union';
 type Connection = { from: string, to: string };
 
 type SCell<T> = Implements<Valued<T>> & SweetCell<T> & Metadata;
@@ -115,7 +113,6 @@ function CellNode({ data }: { data: { nodeCell, nodeId: string } }) {
 
 // Inspector Node Component - renders inspector as a canvas node
 function InspectorNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
-  const { nodeCell: inspectorGadget, nodeId } = data;
   const [selectedKey] = useGadget(selection);
 
   // Watch inspector's state (what it's targeting)
@@ -123,7 +120,6 @@ function InspectorNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } 
   const [targetValue, setTargetValue] = useState<any>(null);
   const [metaSnapshot, setMetaSnapshot] = useState<Record<string, any>>({});
 
-  // Watch inspector's value
   useEffect(() => {
     const update = () => setInspectorState(inspectorGadget.current());
     update();
@@ -535,6 +531,7 @@ function Canvas({
 }) {
   const [reactNodes, setReactNodes] = useState<Node[]>([]);
   const [reactEdges, setReactEdges] = useState<Edge[]>([]);
+  useTap
 
   // Watch for new nodes (namespace: node/*)
   useEffect(() => {

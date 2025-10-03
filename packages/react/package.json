@@ -1,7 +1,7 @@
 {
-  "name": "port-graphs-react",
+  "name": "@bassline/react",
   "version": "1.0.0",
-  "description": "React integration for port-graphs gadgets",
+  "description": "React integration for Bassline gadgets",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -15,7 +15,7 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "port-graphs": "workspace:*",
+    "@bassline/core": "workspace:*",
     "lodash": "^4.17.21"
   },
   "devDependencies": {

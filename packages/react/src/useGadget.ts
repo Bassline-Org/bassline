@@ -25,23 +25,18 @@
  */
 
 import { useSyncExternalStore } from 'react';
-import type { Emits, Implements, Tappable } from 'port-graphs';
-import { Valued } from 'port-graphs/protocols';
+import type { Emits, Implements, Tappable } from '@bassline/core';
+import { Valued } from '@bassline/core/protocols';
 
 export function useGadget<T, G, E extends Record<string, unknown>>(
   gadget: G & Implements<Valued<T>> & Tappable<E>,
-  effects: ReadonlyArray<keyof E> = []
+  effects: ReadonlyArray<keyof E> = ['changed']
 ): readonly [T, typeof gadget] {
   const value = useSyncExternalStore(
     (callback) => {
       // Subscribe using gadget's .tap() method
       // Note: We tap the effects and call callback on any specified effect
       const cleanup = gadget.tap((e: Partial<E>) => {
-        // If no specific effects requested, trigger on any effect
-        if (effects.length === 0) {
-          callback();
-          return;
-        }
         // Otherwise, check if any requested effect is present
         for (const effect of effects) {
           if (effect in e && e[effect] !== undefined) {

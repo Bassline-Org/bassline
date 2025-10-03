@@ -1,7 +1,7 @@
 /**
  * useDerive - Create a derived/computed value from multiple sources
  *
- * This hook wraps the derive() function from port-graphs sugar, allowing you to
+ * This hook wraps the derive() function from @bassline/core sugar, allowing you to
  * create reactive computations that automatically update when any source changes.
  *
  * The derive() function requires gadgets as sources (not just values), which is why
@@ -35,9 +35,9 @@
  */
 
 import { useMemo, useSyncExternalStore, useEffect, useRef, useState } from 'react';
-import { derive, deriveFrom } from 'port-graphs';
-import type { Cleanup, Implements, SweetFunction } from 'port-graphs';
-import { Valued } from 'port-graphs/protocols';
+import { derive, deriveFrom } from '@bassline/core';
+import type { Cleanup, Implements, SweetFunction } from '@bassline/core';
+import { Valued } from '@bassline/core/protocols';
 
 export function useDerive<
   Arg,

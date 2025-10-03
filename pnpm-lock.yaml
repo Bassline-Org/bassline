@@ -51,6 +51,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bassline/react':
+        specifier: workspace:*
+        version: link:../../packages/react
       '@dagrejs/dagre':
         specifier: ^1.1.5
         version: 1.1.5
@@ -132,12 +138,6 @@ importers:
       lucide-react:
         specifier: ^0.535.0
         version: 0.535.0(react@19.1.1)
-      port-graphs:
-        specifier: workspace:*
-        version: link:../../port-graphs
-      port-graphs-react:
-        specifier: workspace:*
-        version: link:../../port-graphs-react
       react:
         specifier: ^19.1.0
         version: 19.1.1
@@ -215,7 +215,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(jsdom@26.1.0)
 
-  port-graphs:
+  packages/core:
     dependencies:
       js-yaml:
         specifier: ^4.1.0
@@ -246,14 +246,14 @@ importers:
         specifier: ^8.18.3
         version: 8.18.3
 
-  port-graphs-react:
+  packages/react:
     dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
-      port-graphs:
-        specifier: workspace:*
-        version: link:../port-graphs
     devDependencies:
       '@testing-library/react':
         specifier: ^15.0.0
