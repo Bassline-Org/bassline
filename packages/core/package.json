@@ -34,7 +34,8 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "tsc --watch",
     "test": "vitest --run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf ./dist"
   },
   "license": "MIT",
   "devDependencies": {
@@ -47,7 +48,6 @@
     "ws": "^8.18.3"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0",
     "lodash": "^4.17.21"
   }
 }
