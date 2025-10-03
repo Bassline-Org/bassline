@@ -1,6 +1,6 @@
 import { Cleanup } from ".";
-import { Accepts, Implements, quick } from "../core/context";
-import { Valued } from "../core/protocols";
+import { Accepts, Implements, quick } from "../core";
+import { Valued } from "../core";
 import { intersectionProto, lastProto, maxProto, minProto, ordinalProto, unionProto } from "../patterns/cells";
 import { table } from "./tables";
 

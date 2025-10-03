@@ -1,8 +1,7 @@
-import { Accepts, Emits, HandlerContext, Implements, quick } from "../../core/context";
-import { Valued } from "../../core/protocols";
-import { unionProto, intersectionProto, unionStep } from "../cells";
-import { partialProto, transformProto } from "../functions";
-import { onChange, onComputed } from "../taps";
+import { Accepts, Emits, Implements, quick, Valued } from "../../core";
+import { unionProto, intersectionProto } from "../cells";
+import { partialProto } from "../functions";
+import { onChange } from "../taps";
 import { computes, contributes, forward, same } from "./relate";
 
 export function relationsBuilder() {

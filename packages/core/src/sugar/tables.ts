@@ -1,8 +1,5 @@
-import { Implements, quick } from "../core/context";
-import { Table, Valued } from "../core/protocols";
+import { Implements, quick, Table } from "../core";
 import { firstTableProto, lastTableProto } from "../patterns/cells";
-import { deriveFrom, fn } from "./functions";
-import { cells, Cleanup, SweetCell } from ".";
 
 export interface TableQuery<T> {
     table: Record<string, T>,

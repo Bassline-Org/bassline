@@ -1,5 +1,5 @@
-import { Implements } from "../../core/context";
-import { Table, Valued } from "../../core/protocols";
+import { Implements } from "../../core";
+import { Table, Valued } from "../../core";
 import { table, SweetTable, SweetCell, cells } from "../../sugar";
 
 const network = <T>() => table.first<T>({} as Record<string, T>)

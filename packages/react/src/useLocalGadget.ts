@@ -29,8 +29,7 @@
  */
 
 import { useMemo, useSyncExternalStore } from 'react';
-import type { Implements } from '@bassline/core';
-import { Valued } from '@bassline/core/protocols';
+import type { Implements, Valued } from '@bassline/core';
 
 export function useLocalGadget<T, G>(
   factory: () => G & Implements<Valued<T>>

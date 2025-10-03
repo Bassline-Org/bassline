@@ -2,7 +2,7 @@
  * Network Bassline Handlers - Individual, Reusable Handler Functions
  */
 
-import { HandlerContext } from '../../core/context';
+import { HandlerContext } from '../../core';
 import type { NetworkState, NetworkActions } from './steps';
 
 // ================================================

@@ -1,4 +1,4 @@
-import { protoGadget } from '../../core/context';
+import { protoGadget } from '../../core';
 import {
   transformStep,
   partialStep,

@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { relate, forward, combine } from './relate';
-import { withTaps, quick } from '../../core/context';
+import { withTaps, quick } from '../../core';
 import { lastProto } from '../cells';
 
 describe('relate() - Bidirectional Constraints', () => {

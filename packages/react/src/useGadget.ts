@@ -26,7 +26,7 @@
 
 import { useSyncExternalStore } from 'react';
 import type { Emits, Implements, Tappable } from '@bassline/core';
-import { Valued } from '@bassline/core/protocols';
+import { Valued } from '@bassline/core';
 
 export function useGadget<T, G, E extends Record<string, unknown>>(
   gadget: G & Implements<Valued<T>> & Tappable<E>,

@@ -1,4 +1,4 @@
-import { Implements, protoGadget, quick, withTaps } from '../../core/context';
+import { Implements, protoGadget, quick, withTaps } from '../../core';
 import {
   maxStep,
   minStep,
@@ -12,7 +12,7 @@ import {
   lastTableStep,
 } from './steps';
 import { mergeHandler, contradictionHandler, registryHandler, tableHandler } from './handlers';
-import { Valued } from '../../core/protocols';
+import { Valued } from '../../core';
 
 // ================================================
 // Proto-Gadgets (Pre-composed Step + Handler)

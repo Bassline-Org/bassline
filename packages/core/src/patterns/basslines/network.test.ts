@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createNetworkBassline } from './network';
-import { withTaps, quick } from '../../core/context';
+import { withTaps, quick } from '../../core';
 import { maxProto } from '../cells';
 import { transformProto } from '../functions';
 

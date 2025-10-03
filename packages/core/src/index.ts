@@ -3,9 +3,8 @@
 // ============================================
 
 // Core context.ts API
-export * from './core/context';
+export * from './core';
 
-// Standard behavioral protocols
 export * as Protocols from './core/protocols';
 
 // Pattern primitives

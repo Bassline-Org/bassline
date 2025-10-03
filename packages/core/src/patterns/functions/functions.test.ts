@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { quick, withTaps } from '../../core/context';
+import { quick, withTaps } from '../../core';
 import { transformProto, partialProto, fallibleProto } from './protos';
 
 describe('Function Gadgets', () => {

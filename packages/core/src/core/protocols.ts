@@ -9,8 +9,7 @@
 // Use these protocols to constrain generic functions and enable
 // behavioral polymorphism - write code that works with ANY gadget
 // implementing a particular protocol.
-
-import { ProtocolShape } from './context';
+import { ProtocolShape } from './types';
 
 /**
  * A gadget that holds and emits value changes.

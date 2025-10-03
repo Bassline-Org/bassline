@@ -1,8 +1,6 @@
 import { Cleanup } from ".";
-import { Accepts, Implements, quick } from "../core/context";
-import { Transform, Valued } from "../core/protocols";
+import { Accepts, Implements, quick, Transform, Valued } from "../core";
 import { fallibleProto, partialProto, transformProto } from "../patterns/functions";
-import { cells } from "./cells";
 import { tableQuery } from "./tables";
 
 export interface Fannable<I, O> {
@@ -95,8 +93,8 @@ export const fn = {
         const f = quick(fallibleProto(fn), undefined);
         return {
             ...sweetenTransform(f),
-            whenError(fn) {
-                const cleanup = this.tap((e) => {
+            whenError(fn: (input: I, error: string) => void) {
+                const cleanup = this.tap((e: Partial<{ failed: { input: I, error: string } }>) => {
                     if ('failed' in e) {
                         if (e.failed) {
                             const failure = e.failed as { input: I, error: string };
@@ -162,42 +160,3 @@ export function deriveFrom<
     func.receive(initial);
     return [func, () => { cleanups.forEach(c => c()) }] as const
 }
-
-// const a = fn.map((x: number) => x * 2);
-// const b = fn.map((x: number) => x * 3);
-// const c = fn.map((x: number) => x * 4);
-// const d = fn.map((x: string) => Number(x) * 5);
-
-// const e = fn.partial((input: { a: number, b: number }) => input.a + input.b, ['a', 'b']);
-// const canFail = fn.fallible((x: number): number => { throw new Error('oops') });
-
-// canFail.whenError((input, reason) => {
-//     console.log('failed with input: ', input, ' reason: ', reason);
-// });
-
-// e.whenComputed(res => {
-//     console.log('e: ', res)
-// })
-
-// a.whenComputed(res => console.log('a computed: ', res))
-// b.whenComputed(res => console.log('b computed: ', res))
-// c.whenComputed((res) => console.log('c computed: ', res));
-// d.whenComputed((res) => console.log('d computed: ', res));
-
-// const cleanup = a.fanOut()
-//     .to(b)
-//     .to(c)
-//     .toWith(d, x => String(x))
-//     .toWith(e, x => ({ a: x }))
-//     .to(canFail)
-//     .build();
-
-// b.fanOut()
-//     .toWith(e, x => ({ b: x }))
-//     .build();
-
-// a.call(123);
-
-// cleanup();
-
-// a.call(123);

@@ -1,4 +1,4 @@
-import { HandlerContext } from '../../core/context';
+import { HandlerContext } from '../../core';
 import type { FunctionActions } from './steps';
 
 // ================================================

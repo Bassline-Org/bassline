@@ -10,12 +10,8 @@
  */
 
 import _ from 'lodash';
-import { Accepts, Emit, Emits, Handles, quick, Receive, Step, Store, Tappable, withTaps, type Implements } from '../../core/context';
-import type { Valued } from '../../core/protocols';
-import { firstTableProto, intersectionProto, lastProto, maxProto, unionProto } from '../cells';
-import { onChange, onComputed } from '../taps';
-import { FunctionActions, partialProto, PartialState } from '../functions';
-
+import { Accepts, Emits, type Implements, Valued } from '../../core';
+import { onChange } from '../taps';
 /**
  * Wire two Valued gadgets bidirectionally with constraint functions
  *

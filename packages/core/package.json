@@ -17,10 +17,6 @@
       "import": "./dist/patterns/functions/index.js",
       "types": "./dist/patterns/functions/index.d.ts"
     },
-    "./core": {
-      "import": "./dist/core/context.js",
-      "types": "./dist/core/context.d.ts"
-    },
     "./protocols": {
       "import": "./dist/core/protocols.js",
       "types": "./dist/core/protocols.d.ts"

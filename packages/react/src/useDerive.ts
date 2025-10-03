@@ -34,10 +34,9 @@
  * ```
  */
 
-import { useMemo, useSyncExternalStore, useEffect, useRef, useState } from 'react';
+import { useMemo, useSyncExternalStore, useEffect } from 'react';
+import type { Implements, SweetFunction, Valued } from '@bassline/core';
 import { derive, deriveFrom } from '@bassline/core';
-import type { Cleanup, Implements, SweetFunction } from '@bassline/core';
-import { Valued } from '@bassline/core/protocols';
 
 export function useDerive<
   Arg,

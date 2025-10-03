@@ -2,7 +2,7 @@
  * Network Bassline Steps - Domain Logic with Validation
  */
 
-import { Implements } from '../../core/context';
+import { Implements } from '../../core';
 import { Protocols } from '../../';
 
 // ================================================

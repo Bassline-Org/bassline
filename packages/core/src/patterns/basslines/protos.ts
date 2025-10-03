@@ -2,7 +2,7 @@
  * Network Bassline Proto - Composed Handler
  */
 
-import { protoGadget } from '../../core/context';
+import { protoGadget } from '../../core';
 import { networkStep } from './steps';
 import {
   defineHandler,

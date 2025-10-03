@@ -1,5 +1,4 @@
-import { Emits, Implements } from "../core/context";
-import { PartialFunction, Valued } from "../core/protocols";
+import { Emits, Implements, Valued } from "../core";
 
 
 export function onChange<T>(source: Implements<Valued<T>>, callback: (value: T) => void) {
