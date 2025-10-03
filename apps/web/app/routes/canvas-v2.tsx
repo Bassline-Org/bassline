@@ -40,6 +40,7 @@ type EdgeCell = SCell<Connection>;
 const selection = cells.last<string | null>(null);
 const inspectorTab = cells.last<'value' | 'metadata' | 'connections'>('value');
 const inspectorCollapsed = cells.last(false);
+const inspector = cells.last<{ target: (NodeCell | SCell<any>) | null }>({ target: null });
 
 // Root table - unified namespace for everything in the system
 const root = table.first<NodeCell | SCell<any>>({
@@ -50,9 +51,11 @@ const root = table.first<NodeCell | SCell<any>>({
   'factory/intersection': cells.intersection([]),
   'factory/ordinal': cells.ordinal(0),
   'factory/last': cells.last(0),
+  'factory/inspector': cells.inspector({ target: null }),
 
   // UI state
   'ui/selection': selection,
+  'ui/inspector': inspector,
   'ui/inspector/tab': inspectorTab,
   'ui/inspector/collapsed': inspectorCollapsed,
 });
@@ -68,9 +71,8 @@ function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
-      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[120px] transition-all ${
-        isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
-      }`}>
+      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[120px] transition-all ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
+        }`}>
         <div className="text-xs font-semibold text-slate-500 mb-2">
           {type?.toUpperCase()} CELL
         </div>
@@ -100,41 +102,291 @@ function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
   );
 }
 
-// Metadata Inspector
-function MetadataInspector({ nodeCell }: { nodeCell: NodeCell }) {
+// Inspector Node Component - renders inspector as a canvas node
+function InspectorNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
+  const { nodeCell: inspectorGadget, nodeId } = data;
+  const [selectedKey] = useGadget(selection);
+
+  // Watch inspector's state (what it's targeting)
+  const [inspectorState, setInspectorState] = useState<{ target: any }>({ target: null });
+  const [targetValue, setTargetValue] = useState<any>(null);
   const [metaSnapshot, setMetaSnapshot] = useState<Record<string, any>>({});
 
+  // Watch inspector's value
   useEffect(() => {
-    const updateMeta = () => {
-      const snapshot = nodeCell.metadata.query()
-        .map(cell => cell.current())
-        .table;
-      setMetaSnapshot(snapshot);
-    };
+    const update = () => setInspectorState(inspectorGadget.current());
+    update();
+    return inspectorGadget.tap(update);
+  }, [inspectorGadget]);
 
-    updateMeta();
-    return nodeCell.metadata.whenChanged(updateMeta);
-  }, [nodeCell]);
+  const targetGadget = inspectorState?.target;
+
+  // Watch target's value and metadata
+  useEffect(() => {
+    if (!targetGadget) {
+      setTargetValue(null);
+      setMetaSnapshot({});
+      return;
+    }
+
+    const updateValue = () => setTargetValue(targetGadget.current());
+    updateValue();
+    const valueCleanup = targetGadget.tap(updateValue);
+
+    if (targetGadget.metadata) {
+      const updateMeta = () => {
+        const snapshot = targetGadget.metadata.query().map(c => c.current()).table;
+        setMetaSnapshot(snapshot);
+      };
+      updateMeta();
+      const metaCleanup = targetGadget.metadata.whenChanged(updateMeta);
+      return () => {
+        valueCleanup();
+        metaCleanup();
+      };
+    }
+
+    return valueCleanup;
+  }, [targetGadget]);
+
+  // Helper to find key in root
+  const findKeyInRoot = (gadget: any): string | null => {
+    const snapshot = root.query().table;
+    for (const [key, cell] of Object.entries(snapshot)) {
+      if (cell === gadget) return key;
+    }
+    return null;
+  };
+
+  const isSelected = selectedKey === nodeId;
 
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-semibold text-gray-700">Metadata</div>
-      {Object.entries(metaSnapshot).map(([key, value]) => (
-        <div key={key} className="text-xs">
-          <span className="font-mono text-gray-600">{key}</span>
-          <span className="text-gray-400 mx-1">:</span>
-          <span className="text-gray-800">
-            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-          </span>
+    <>
+      <Handle position={Position.Right} type="source" id="out" />
+      <div className={`px-3 py-2 bg-purple-50 border-2 rounded-lg shadow-lg min-w-[200px] max-w-[300px] transition-all ${isSelected ? 'ring-2 ring-purple-500 ring-offset-2 border-purple-500' : 'border-purple-300'
+        }`}>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">🔍</span>
+          <span className="text-xs font-bold text-purple-700">INSPECTOR</span>
         </div>
-      ))}
-    </div>
+
+        {targetGadget ? (
+          <div className="space-y-1 text-xs">
+            <div className="font-mono text-purple-900 truncate text-[10px]">
+              {findKeyInRoot(targetGadget) || 'metadata cell'}
+            </div>
+            <div className="text-purple-700 truncate">
+              {String(targetValue).substring(0, 40)}
+            </div>
+            <div className="text-purple-600 text-[10px]">
+              {Object.keys(metaSnapshot).length} metadata fields
+            </div>
+
+            {/* Metadata rows - clickable to update THIS inspector */}
+            <div className="max-h-24 overflow-y-auto space-y-0.5 mt-1">
+              {Object.entries(metaSnapshot).slice(0, 5).map(([key, val]) => (
+                <div
+                  key={key}
+                  className="text-[10px] cursor-pointer hover:bg-purple-200 p-0.5 rounded"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const metaCell = targetGadget.metadata?.get(key);
+                    if (metaCell) {
+                      inspectorGadget.receive({ target: metaCell });
+                    }
+                  }}
+                  title="Click to inspect this metadata cell"
+                >
+                  <span className="font-mono">{key}</span>: {String(val).substring(0, 15)}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-xs text-purple-500">
+            No target selected
+          </div>
+        )}
+      </div>
+      <Handle position={Position.Left} type="target" id="in" />
+    </>
   );
 }
 
 const nodeTypes: NodeTypes = {
   cell: CellNode,
+  inspector: InspectorNode,
 };
+
+// Inspector Panel Component with proper reactivity
+function InspectorPanel({
+  inspector,
+  selectedKey,
+  targetGadget,
+  root
+}: {
+  inspector: SCell<{ target: (NodeCell | SCell<any>) | null }>,
+  selectedKey: string | null,
+  targetGadget: (NodeCell | SCell<any>) | null,
+  root: ReturnType<typeof table.first<NodeCell | SCell<any>>>
+}) {
+  // Watch target's metadata for live updates
+  const [metaSnapshot, setMetaSnapshot] = useState<Record<string, any>>({});
+  const [targetValue, setTargetValue] = useState<any>(null);
+
+  useEffect(() => {
+    if (!targetGadget) {
+      setMetaSnapshot({});
+      setTargetValue(null);
+      return;
+    }
+
+    // Watch the target's value
+    const updateValue = () => {
+      setTargetValue(targetGadget.current());
+    };
+    updateValue();
+    const valueCleanup = targetGadget.tap(() => updateValue());
+
+    // Watch target's metadata
+    if (targetGadget.metadata) {
+      const updateMeta = () => {
+        const snapshot = targetGadget.metadata.query()
+          .map(cell => cell.current())
+          .table;
+        setMetaSnapshot(snapshot);
+      };
+      updateMeta();
+      const metaCleanup = targetGadget.metadata.whenChanged(updateMeta);
+
+      return () => {
+        valueCleanup();
+        metaCleanup();
+      };
+    }
+
+    return valueCleanup;
+  }, [targetGadget]);
+
+  const handlePopOut = useCallback(() => {
+    // Get the factory and create a new inspector
+    const factory = root.get('factory/inspector') as NodeCell;
+    const factoryFn = factory.metadata.get('ui/factory')?.current() as (pos: { x: number, y: number }) => NodeCell;
+
+    if (factoryFn) {
+      // Create at center of viewport
+      const newInspector = factoryFn({ x: 400, y: 300 });
+
+      // Set it to inspect the current target
+      if (targetGadget) {
+        newInspector.receive({ target: targetGadget });
+      }
+
+      // Add to root
+      const nodeId = `node/${Date.now()}`;
+      root.receive({ [nodeId]: newInspector });
+    }
+  }, [targetGadget]);
+
+  return (
+    <div className="w-80 border-l bg-white flex flex-col overflow-hidden">
+      <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
+        <div
+          className="font-medium text-sm cursor-pointer hover:text-gray-700"
+          onClick={() => {
+            const inspectorGadget = root.get('ui/inspector') as NodeCell;
+            inspector.receive({ target: inspectorGadget });
+          }}
+          title="Click to inspect the inspector itself"
+        >
+          Inspector {selectedKey && `(${selectedKey})`}
+        </div>
+        <button
+          onClick={handlePopOut}
+          className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors"
+          title="Pop out as canvas node"
+        >
+          🔍 Pop Out
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4">
+        {targetGadget ? (
+          <div className="space-y-4">
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Inspecting</div>
+              <div className="text-sm font-mono">{selectedKey || 'metadata cell'}</div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Current Value</div>
+              <div className="text-lg font-bold">
+                {typeof targetValue === 'object' && targetValue !== null
+                  ? JSON.stringify(targetValue)
+                  : String(targetValue)}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500 mb-1">Type</div>
+              <div className="text-sm">
+                {targetGadget.metadata?.get?.('meta/type')?.current() || 'unknown'}
+              </div>
+            </div>
+            {targetGadget.metadata && (
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-gray-700">Metadata</div>
+                {Object.entries(metaSnapshot).map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="text-xs cursor-pointer hover:bg-blue-50 p-1 rounded transition-colors"
+                    onClick={() => {
+                      // Get the specific metadata cell and inspect it
+                      const metadataCell = targetGadget.metadata?.get(key);
+                      if (metadataCell) {
+                        inspector.receive({ target: metadataCell });
+                      }
+                    }}
+                    title="Click to inspect this metadata cell"
+                  >
+                    <span className="font-mono text-gray-600">{key}</span>
+                    <span className="text-gray-400 mx-1">:</span>
+                    <span className="text-gray-800">
+                      {typeof value === 'object' && value !== null
+                        ? JSON.stringify(value)
+                        : String(value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500">
+            Click anything to inspect it
+            <div className="mt-4 space-y-1">
+              <div
+                className="text-xs text-blue-600 cursor-pointer hover:underline"
+                onClick={() => {
+                  const tabCell = root.get('ui/inspector/tab');
+                  inspector.receive({ target: tabCell });
+                }}
+              >
+                → Inspect inspector tab cell
+              </div>
+              <div
+                className="text-xs text-blue-600 cursor-pointer hover:underline"
+                onClick={() => {
+                  const selectionCell = root.get('ui/selection');
+                  inspector.receive({ target: selectionCell });
+                }}
+              >
+                → Inspect selection cell
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Main Canvas Component
 function Canvas({
@@ -157,7 +409,7 @@ function Canvas({
       setReactNodes(old => [...old, {
         id,
         position: pos || { x: 0, y: 0 },
-        type: 'cell',
+        type: type === 'inspector' ? 'inspector' : 'cell',
         data: { nodeCell, nodeId: id }
       }]);
     });
@@ -226,12 +478,33 @@ function Canvas({
   }, []);
 
   const onNodeClick = useCallback((_event: any, node: Node) => {
-    selection.receive(node.id);
+    const nodeGadget = root.get(node.id) as NodeCell;
+    selection.receive(node.id);  // Keep selection for visual feedback
+    inspector.receive({ target: nodeGadget });  // Set inspector to hold the gadget directly
   }, []);
 
-  // Read selection from the selection cell
+  // Read selection from the selection cell (for visual feedback)
   const [selectedKey] = useGadget(selection);
-  const selectedNode = selectedKey ? root.get(selectedKey) as NodeCell : null;
+
+  // Read inspector state to get what it's targeting
+  const [inspectorState] = useGadget(inspector);
+  const targetGadget = inspectorState?.target;
+
+  // Populate inspector's metadata with what it's viewing
+  useEffect(() => {
+    if (targetGadget?.metadata) {
+      // Put viewing state into inspector's own metadata
+      inspector.metadata.set({
+        'viewing/target': cells.last(selectedKey || 'unknown'),
+        'viewing/metadata': targetGadget.metadata  // Reference to the target's metadata table
+      });
+    } else if (!targetGadget) {
+      // Clear viewing metadata when nothing selected
+      inspector.metadata.set({
+        'viewing/target': cells.last(null),
+      });
+    }
+  }, [targetGadget, selectedKey]);
 
   // Query factory registry for available factories (namespace: factory/*)
   const [availableFactories, setAvailableFactories] = useState<Array<{
@@ -309,58 +582,12 @@ function Canvas({
       </div>
 
       {/* Inspector Panel */}
-      <div className="w-80 border-l bg-white flex flex-col overflow-hidden">
-        <div
-          className="px-4 py-2 border-b bg-gray-50 font-medium text-sm cursor-pointer hover:bg-gray-100"
-          onClick={() => selection.receive('ui/selection')}
-          title="Click to inspect the selection cell"
-        >
-          Inspector {selectedKey && `(${selectedKey})`}
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          {selectedNode ? (
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Key</div>
-                <div className="text-sm font-mono">{selectedKey}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Current Value</div>
-                <div className="text-lg font-bold">
-                  {typeof selectedNode.current() === 'object' && selectedNode.current() !== null
-                    ? JSON.stringify(selectedNode.current())
-                    : String(selectedNode.current())}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">Type</div>
-                <div className="text-sm">
-                  {selectedNode.metadata?.get?.('meta/type')?.current() || 'unknown'}
-                </div>
-              </div>
-              {selectedNode.metadata && <MetadataInspector nodeCell={selectedNode} />}
-            </div>
-          ) : (
-            <div className="text-sm text-gray-500">
-              Click anything to inspect it
-              <div className="mt-4 space-y-1">
-                <div
-                  className="text-xs text-blue-600 cursor-pointer hover:underline"
-                  onClick={() => selection.receive('ui/inspector/tab')}
-                >
-                  → Inspect inspector tab cell
-                </div>
-                <div
-                  className="text-xs text-blue-600 cursor-pointer hover:underline"
-                  onClick={() => selection.receive('ui/selection')}
-                >
-                  → Inspect selection cell
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      <InspectorPanel
+        inspector={inspector}
+        selectedKey={selectedKey}
+        targetGadget={targetGadget}
+        root={root}
+      />
     </div>
   );
 }

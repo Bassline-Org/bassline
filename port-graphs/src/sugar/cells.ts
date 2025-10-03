@@ -155,6 +155,19 @@ const lastMeta: Record<string, Cell<unknown>> = {
     })) as Cell<unknown>,
 };
 
+const inspectorMeta: Record<string, Cell<unknown>> = {
+    'meta/type': sweetenCell(quick(lastProto(), 'inspector')) as Cell<unknown>,
+    'meta/category': sweetenCell(quick(lastProto(), 'ui/tool')) as Cell<unknown>,
+    'meta/description': sweetenCell(quick(lastProto(), 'Inspector gadget for examining other gadgets')) as Cell<unknown>,
+    'ui/icon': sweetenCell(quick(lastProto(), '🔍')) as Cell<unknown>,
+    'ui/color': sweetenCell(quick(lastProto(), '#8b5cf6')) as Cell<unknown>,
+    'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
+        const inspector = cells.inspector({ target: null });
+        setMetadata(inspector, 'ui/', { position: pos, type: 'inspector' });
+        return inspector;
+    })) as Cell<unknown>,
+};
+
 export const cells = {
     min(initial: number = Infinity) {
         const c = quick(minProto, initial);
@@ -185,5 +198,10 @@ export const cells = {
         const c = quick(lastProto<T>(), initial);
         const sweet = sweetenCell(c) as typeof c & SweetCell<T>;
         return withMetadata(sweet, lastMeta);
+    },
+    inspector<T = any>(initial: { target: T | null } = { target: null }) {
+        const c = quick(lastProto<{ target: T | null }>(), initial);
+        const sweet = sweetenCell(c) as typeof c & SweetCell<{ target: T | null }>;
+        return withMetadata(sweet, inspectorMeta);
     }
 }
