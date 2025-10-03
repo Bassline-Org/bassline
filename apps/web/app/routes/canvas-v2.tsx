@@ -19,6 +19,14 @@ import { table, cells, setMetadata } from 'port-graphs';
 import type { SweetTable, SweetCell, Implements, Metadata } from 'port-graphs';
 import type { Table, Valued } from 'port-graphs/protocols';
 import { useGadget } from "port-graphs-react";
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "~/components/ui/command";
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -439,6 +447,124 @@ function InspectorPanel({
   );
 }
 
+// Command Palette Component
+function CommandPalette({
+  root,
+  selection,
+  inspector
+}: {
+  root: Implements<Table<string, NodeCell | SCell<any>>> & SweetTable<NodeCell | SCell<any>>,
+  selection: SCell<string | null>,
+  inspector: SCell<{ target: (NodeCell | SCell<any>) | null }>
+}) {
+  const [open, setOpen] = useState(false);
+  const [keys, setKeys] = useState<string[]>([]);
+
+  // ⌘K shortcut
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((open) => !open);
+      }
+    };
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, []);
+
+  // Load all keys from root
+  useEffect(() => {
+    if (open) {
+      const snapshot = root.query().table;
+      setKeys(Object.keys(snapshot).sort());
+    }
+  }, [open, root]);
+
+  // When key selected
+  const handleSelect = (key: string) => {
+    const gadget = root.get(key);
+    if (gadget) {
+      // Update selection if it's a node
+      if (key.startsWith('node/')) {
+        selection.receive(key);
+      }
+      // Always update inspector
+      inspector.receive({ target: gadget });
+    }
+    setOpen(false);
+  };
+
+  const factoryKeys = keys.filter(k => k.startsWith('factory/'));
+  const nodeKeys = keys.filter(k => k.startsWith('node/'));
+  const edgeKeys = keys.filter(k => k.startsWith('edge/'));
+  const uiKeys = keys.filter(k => k.startsWith('ui/'));
+
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput placeholder="Search all gadgets in the system..." />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+
+        {factoryKeys.length > 0 && (
+          <CommandGroup heading="Factories">
+            {factoryKeys.map(key => (
+              <CommandItem
+                key={key}
+                value={key}
+                onSelect={() => handleSelect(key)}
+              >
+                <span className="font-mono text-sm">{key}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {nodeKeys.length > 0 && (
+          <CommandGroup heading="Nodes">
+            {nodeKeys.map(key => (
+              <CommandItem
+                key={key}
+                value={key}
+                onSelect={() => handleSelect(key)}
+              >
+                <span className="font-mono text-sm">{key}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {edgeKeys.length > 0 && (
+          <CommandGroup heading="Edges">
+            {edgeKeys.map(key => (
+              <CommandItem
+                key={key}
+                value={key}
+                onSelect={() => handleSelect(key)}
+              >
+                <span className="font-mono text-sm">{key}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {uiKeys.length > 0 && (
+          <CommandGroup heading="UI State">
+            {uiKeys.map(key => (
+              <CommandItem
+                key={key}
+                value={key}
+                onSelect={() => handleSelect(key)}
+              >
+                <span className="font-mono text-sm">{key}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+      </CommandList>
+    </CommandDialog>
+  );
+}
+
 // Main Canvas Component
 function Canvas({
   root
@@ -593,6 +719,9 @@ function Canvas({
 
   return (
     <div className="flex-1 flex h-full">
+      {/* Command Palette */}
+      <CommandPalette root={root} selection={selection} inspector={inspector} />
+
       {/* Main Canvas */}
       <div className="flex-1 flex flex-col">
         <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">

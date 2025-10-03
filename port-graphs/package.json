@@ -1,5 +1,5 @@
 {
-  "name": "@bassline/core",
+  "name": "port-graphs",
   "version": "1.0.0",
   "description": "Core gadget primitives for Bassline - propagation network model",
   "module": "./dist/index.js",
