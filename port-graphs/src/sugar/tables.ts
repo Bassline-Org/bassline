@@ -1,12 +1,12 @@
 import { Implements, quick } from "../core/context";
 import { Table, Valued } from "../core/protocols";
-import { cells } from "./cells";
 import { firstTableProto, lastTableProto } from "../patterns/cells";
 import { deriveFrom, fn } from "./functions";
-import { Cleanup } from ".";
+import { cells, Cleanup, SweetCell } from ".";
 
 export interface TableQuery<T> {
     table: Record<string, T>,
+    map<R>(fn: (entry: readonly [string, T]) => readonly [string, R]): TableQuery<R>
     where(fn: (entry: readonly [string, T]) => boolean): TableQuery<T>
     whereValues(fn: (val: T) => boolean): TableQuery<T>,
     whereKeys(fn: (key: string) => boolean): TableQuery<T>
@@ -15,6 +15,9 @@ export interface TableQuery<T> {
 export function tableQuery<T>(table: Record<string, T>): TableQuery<T> {
     return {
         table,
+        map(fn) {
+            return tableQuery(Object.fromEntries(Object.entries(this.table).map(([key, value]) => fn([key, value]))))
+        },
         where(cb) {
             const entries = Object.entries<T>(this.table)
                 .filter(cb);
@@ -38,6 +41,7 @@ export interface SweetTable<T> {
     getMany(keys: ReadonlyArray<string>): ReadonlyArray<T | undefined>
     set(vals: Record<string, T>): void,
     query(): TableQuery<T>,
+    whenChanged(fn: (key: string, value: T) => void): () => void,
     whenAdded(fn: (key: string, value: T) => void): () => void;
 }
 
@@ -59,6 +63,18 @@ export function sweetenTable<T>(gadget: Implements<Table<string, T>>) {
         },
         query(): TableQuery<T> {
             return tableQuery(this.current())
+        },
+        whenChanged(fn) {
+            const cleanup = this.tap(e => {
+                if ('changed' in e && e.changed !== undefined) {
+                    for (const key in e.changed) {
+                        const value = e.changed[key];
+                        if (value === undefined) continue;
+                        fn(key, value);
+                    }
+                }
+            });
+            return cleanup;
         },
         whenAdded(fn) {
             const cleanup = this.tap(e => {
