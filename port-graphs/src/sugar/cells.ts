@@ -88,6 +88,11 @@ const maxMeta: Record<string, Cell<unknown>> = {
     'meta/description': sweetenCell(quick(lastProto(), 'Monotonically increasing number')) as Cell<unknown>,
     'ui/icon': sweetenCell(quick(lastProto(), '📈')) as Cell<unknown>,
     'ui/color': sweetenCell(quick(lastProto(), '#10b981')) as Cell<unknown>,
+    'ui/presets': sweetenCell(quick(lastProto(), [
+        { label: '0', input: 0, icon: '0️⃣' },
+        { label: '100', input: 100, icon: '💯' },
+        { label: '1000', input: 1000, icon: '🔢' },
+    ])) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const cell = cells.max(0);
         setMetadata(cell, 'ui/', { position: pos, type: 'max' });

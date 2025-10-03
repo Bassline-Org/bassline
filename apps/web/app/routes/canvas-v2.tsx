@@ -29,6 +29,8 @@ import {
 } from "~/components/ui/command";
 import { Badge } from "~/components/ui/badge";
 import { GadgetValueDisplay } from "~/components/GadgetValueDisplay";
+import { GadgetControls } from "~/components/GadgetControls";
+import { generateDefaultControls, getControlPresets } from "~/lib/generateControls";
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -73,16 +75,18 @@ const root = table.first<NodeCell | SCell<any>>({
 // Cell Node Component
 function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
   const { nodeCell, nodeId } = data;
-  const [value] = useGadget(nodeCell, ['changed']);
   const [selectedKey] = useGadget(selection);
   const type = nodeCell.metadata.get('ui/type')?.current() as NodeType;
   const icon = nodeCell.metadata.get('ui/icon')?.current();
   const isSelected = selectedKey === nodeId;
 
+  const controls = generateDefaultControls(nodeCell);
+  const presets = getControlPresets(nodeCell);
+
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
-      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[140px] transition-all ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
+      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[180px] max-w-[240px] transition-all ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
         }`}>
         <div className="flex items-center gap-2 mb-3">
           {icon && <span className="text-lg">{icon}</span>}
@@ -96,23 +100,12 @@ function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
             options={{ inline: true, truncateLength: 30 }}
           />
         </div>
-        <div className="flex gap-1">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (type === 'union') {
-                const newSet = new Set(value);
-                newSet.add(Math.random());
-                nodeCell.receive(newSet);
-              } else {
-                nodeCell.receive(value + 1);
-              }
-            }}
-            className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            +1
-          </button>
-        </div>
+        <GadgetControls
+          gadget={nodeCell}
+          controls={controls}
+          presets={presets}
+          compact
+        />
       </div>
       <Handle id='in' position={Position.Left} type="target" />
     </>
@@ -412,6 +405,15 @@ function InspectorPanel({
               </div>
             )}
 
+            <div>
+              <div className="text-xs text-gray-500 mb-2">Controls</div>
+              <GadgetControls
+                gadget={targetGadget}
+                controls={generateDefaultControls(targetGadget)}
+                presets={getControlPresets(targetGadget)}
+              />
+            </div>
+
             {targetGadget.metadata && Object.keys(metaSnapshot).length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-semibold text-gray-700">Metadata ({Object.keys(metaSnapshot).length})</div>
@@ -433,12 +435,12 @@ function InspectorPanel({
                         {typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Set)
                           ? <Badge variant="outline">Object</Badge>
                           : typeof value === 'function'
-                          ? <Badge variant="outline">Function</Badge>
-                          : Array.isArray(value)
-                          ? <Badge variant="outline">Array({value.length})</Badge>
-                          : value instanceof Set
-                          ? <Badge variant="outline">Set({value.size})</Badge>
-                          : <span className="font-mono">{String(value)}</span>
+                            ? <Badge variant="outline">Function</Badge>
+                            : Array.isArray(value)
+                              ? <Badge variant="outline">Array({value.length})</Badge>
+                              : value instanceof Set
+                                ? <Badge variant="outline">Set({value.size})</Badge>
+                                : <span className="font-mono">{String(value)}</span>
                         }
                       </div>
                     </div>
@@ -542,7 +544,7 @@ function CommandPalette({
 
         {namespaces.map(namespace => (
           <CommandGroup key={namespace} heading={namespace.charAt(0).toUpperCase() + namespace.slice(1)}>
-            {keysByNamespace[namespace].map(key => {
+            {keysByNamespace[namespace]?.map(key => {
               const gadget = root.get(key);
               const icon = gadget?.metadata?.get?.('ui/icon')?.current();
               const type = gadget?.metadata?.get?.('ui/type')?.current();
