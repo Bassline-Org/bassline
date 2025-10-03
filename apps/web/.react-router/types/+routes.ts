@@ -31,6 +31,9 @@ type Pages = {
   "/ui-gallery": {
     params: {};
   };
+  "/canvas-v2": {
+    params: {};
+  };
   "/home": {
     params: {};
   };
@@ -39,7 +42,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/bassline-playground" | "/bassline-playground/test" | "/notebook-demo" | "/canvas-demo" | "/sugar-demo" | "/ui-gallery" | "/home";
+    page: "/" | "/bassline-playground" | "/bassline-playground/test" | "/notebook-demo" | "/canvas-demo" | "/sugar-demo" | "/ui-gallery" | "/canvas-v2" | "/home";
   };
   "routes/bassline-playground.tsx": {
     id: "routes/bassline-playground";
@@ -64,6 +67,10 @@ type RouteFiles = {
   "routes/ui-gallery.tsx": {
     id: "routes/ui-gallery";
     page: "/ui-gallery";
+  };
+  "routes/canvas-v2.tsx": {
+    id: "routes/canvas-v2";
+    page: "/canvas-v2";
   };
   "routes/home.tsx": {
     id: "routes/home";
