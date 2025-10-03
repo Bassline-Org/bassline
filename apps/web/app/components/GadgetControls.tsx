@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { ControlConfig, ControlPreset } from 'port-graphs/sugar/controls';
+import type { ControlConfig, ControlPreset } from '@bassline/core/sugar';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -7,7 +7,7 @@ import { Slider } from '~/components/ui/slider';
 import { Switch } from '~/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
 import { Badge } from '~/components/ui/badge';
-import { useGadget } from 'port-graphs-react';
+import { useGadget } from '@bassline/react';
 import { generateDefaultControls, getControlPresets } from '~/lib/generateControls';
 
 interface GadgetControlsProps {

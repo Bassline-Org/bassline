@@ -1,3 +1,4 @@
+import { withMetadata } from ".";
 import { Implements, quick, Table } from "../core";
 import { firstTableProto, lastTableProto } from "../patterns/cells";
 

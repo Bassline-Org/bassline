@@ -28,6 +28,10 @@
     "./ui": {
       "import": "./dist/patterns/ui/index.js",
       "types": "./dist/patterns/ui/index.d.ts"
+    },
+    "./sugar": {
+      "import": "./dist/sugar/index.js",
+      "types": "./dist/sugar/index.d.ts"
     }
   },
   "scripts": {

@@ -24,13 +24,16 @@
  * ```
  */
 
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import type { Implements, Tappable, Valued } from '@bassline/core';
 
 export function useGadget<T, G, E extends Record<string, unknown>>(
-  gadget: G & Implements<Valued<T>> & Tappable<E>,
+  gadget: G & Implements<Valued<T>> & Tappable<E> | null,
   effects: ReadonlyArray<keyof E> = ['changed']
-): readonly [T, typeof gadget] {
+): readonly [T, (value: T) => void] {
+  if (!gadget) {
+    return [null as T, (value: T) => { }];
+  }
   const value = useSyncExternalStore(
     (callback) => {
       // Subscribe using gadget's .tap() method
@@ -44,10 +47,16 @@ export function useGadget<T, G, E extends Record<string, unknown>>(
           }
         }
       });
-      return cleanup;
+      return () => {
+        cleanup();
+      };
     },
     () => gadget.current()
   );
 
-  return [value, gadget] as const;
+  const send = useCallback((value: T) => {
+    gadget.receive(value);
+  }, [gadget]);
+
+  return [value, send] as const;
 }

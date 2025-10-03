@@ -15,10 +15,10 @@ import {
   applyEdgeChanges,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { table, cells, setMetadata, fn, withMetadata } from 'port-graphs';
-import type { SweetTable, SweetCell, Implements, Metadata } from 'port-graphs';
-import type { Table, Valued } from 'port-graphs/protocols';
-import { useGadget, useTap } from "port-graphs-react";
+import { table, cells, fn, withMetadata } from '@bassline/core';
+import type { SweetTable, SweetCell, Implements, Metadata } from '@bassline/core';
+import type { Table, Valued } from '@bassline/core';
+import { useGadget, useTap } from "@bassline/react";
 import {
   CommandDialog,
   CommandEmpty,

@@ -21,3 +21,4 @@ export { useDerive, useDerived } from './useDerive';
 export { useTable } from './useTable';
 export { useFunction } from './useFunction';
 export { useTap } from './useTap';
+export { useMetadata } from './useMetadata';

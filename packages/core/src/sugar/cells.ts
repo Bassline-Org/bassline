@@ -88,6 +88,7 @@ const maxMeta: Record<string, Cell<unknown>> = {
     'meta/description': sweetenCell(quick(lastProto(), 'Monotonically increasing number')) as Cell<unknown>,
     'ui/icon': sweetenCell(quick(lastProto(), '📈')) as Cell<unknown>,
     'ui/color': sweetenCell(quick(lastProto(), '#10b981')) as Cell<unknown>,
+    'views/inspector/type': sweetenCell(quick(lastProto(), 'numeric')) as Cell<unknown>,
     'ui/presets': sweetenCell(quick(lastProto(), [
         { label: '0', input: 0, icon: '0️⃣' },
         { label: '100', input: 100, icon: '💯' },
@@ -105,6 +106,7 @@ const minMeta: Record<string, Cell<unknown>> = {
     'meta/description': sweetenCell(quick(lastProto(), 'Monotonically decreasing number')) as Cell<unknown>,
     'ui/icon': sweetenCell(quick(lastProto(), '📉')) as Cell<unknown>,
     'ui/color': sweetenCell(quick(lastProto(), '#ef4444')) as Cell<unknown>,
+    'views/inspector/type': sweetenCell(quick(lastProto(), 'numeric')) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const cell = cells.min(100);
         setMetadata(cell, 'ui/', { position: pos, type: 'min', 'show-controls': false });
@@ -117,6 +119,7 @@ const unionMeta: Record<string, Cell<unknown>> = {
     'meta/description': sweetenCell(quick(lastProto(), 'Set union - always growing')) as Cell<unknown>,
     'ui/icon': sweetenCell(quick(lastProto(), '∪')) as Cell<unknown>,
     'ui/color': sweetenCell(quick(lastProto(), '#3b82f6')) as Cell<unknown>,
+    'views/inspector/type': sweetenCell(quick(lastProto(), 'set')) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const cell = cells.union([]);
         setMetadata(cell, 'ui/', { position: pos, type: 'union', 'show-controls': false });
@@ -166,6 +169,7 @@ const inspectorMeta: Record<string, Cell<unknown>> = {
     'meta/description': sweetenCell(quick(lastProto(), 'Inspector gadget for examining other gadgets')) as Cell<unknown>,
     'ui/icon': sweetenCell(quick(lastProto(), '🔍')) as Cell<unknown>,
     'ui/color': sweetenCell(quick(lastProto(), '#8b5cf6')) as Cell<unknown>,
+    'views/inspector/type': sweetenCell(quick(lastProto(), 'inspector')) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const inspector = cells.inspector({ target: null });
         setMetadata(inspector, 'ui/', { position: pos, type: 'inspector' });

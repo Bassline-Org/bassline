@@ -1,8 +1,8 @@
 import type { Route } from "./+types/sugar-demo";
 import { useEffect } from 'react';
-import { useLocalGadget } from 'port-graphs-react';
-import { cells } from 'port-graphs';
-import { useDerived } from "port-graphs-react/dist/useDerive";
+import { useLocalGadget } from '@bassline/react';
+import { cells } from '@bassline/core';
+import { useDerived } from "@bassline/react";
 
 export function meta({ }: Route.MetaArgs) {
   return [

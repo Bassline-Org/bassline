@@ -28,12 +28,12 @@
  * ```
  */
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { Implements, Valued } from '@bassline/core';
 
 export function useLocalGadget<T, G>(
   factory: () => G & Implements<Valued<T>>
-): readonly [T, G & Implements<Valued<T>>] {
+): readonly [T, (value: T) => void, G & Implements<Valued<T>>] {
   // Create gadget once on mount
   const gadget = useMemo(factory, []);
 
@@ -50,5 +50,9 @@ export function useLocalGadget<T, G>(
     () => gadget.current()
   );
 
-  return [value, gadget] as const;
+  const send = useCallback((value: T) => {
+    gadget.receive(value);
+  }, [gadget]);
+
+  return [value, send, gadget] as const;
 }
