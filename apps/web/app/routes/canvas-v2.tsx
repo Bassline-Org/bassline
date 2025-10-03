@@ -36,26 +36,41 @@ type SCell<T> = Implements<Valued<T>> & SweetCell<T> & Metadata;
 type NodeCell = SCell<any>;
 type EdgeCell = SCell<Connection>;
 
-// Factory Registry - organize factories using table with namespacing pattern
-const factoryRegistry = table.first<NodeCell>({
+// UI state cells
+const selection = cells.last<string | null>(null);
+const inspectorTab = cells.last<'value' | 'metadata' | 'connections'>('value');
+const inspectorCollapsed = cells.last(false);
+
+// Root table - unified namespace for everything in the system
+const root = table.first<NodeCell | SCell<any>>({
+  // Factory prototypes
   'factory/max': cells.max(0),
   'factory/min': cells.min(100),
   'factory/union': cells.union([]),
   'factory/intersection': cells.intersection([]),
   'factory/ordinal': cells.ordinal(0),
   'factory/last': cells.last(0),
+
+  // UI state
+  'ui/selection': selection,
+  'ui/inspector/tab': inspectorTab,
+  'ui/inspector/collapsed': inspectorCollapsed,
 });
 
 // Cell Node Component
 function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
   const { nodeCell, nodeId } = data;
   const [value] = useGadget(nodeCell, ['changed']);
+  const [selectedKey] = useGadget(selection);
   const type = nodeCell.metadata.get('ui/type')?.current() as NodeType;
+  const isSelected = selectedKey === nodeId;
 
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
-      <div className="px-4 py-3 bg-white border-2 border-slate-300 rounded-lg shadow-md min-w-[120px]">
+      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[120px] transition-all ${
+        isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
+      }`}>
         <div className="text-xs font-semibold text-slate-500 mb-2">
           {type?.toUpperCase()} CELL
         </div>
@@ -64,7 +79,8 @@ function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
         </div>
         <div className="flex gap-1">
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               if (type === 'union') {
                 const newSet = new Set(value);
                 newSet.add(Math.random());
@@ -122,19 +138,19 @@ const nodeTypes: NodeTypes = {
 
 // Main Canvas Component
 function Canvas({
-  nodes,
-  edges
+  root
 }: {
-  nodes: Implements<Table<string, NodeCell>> & SweetTable<NodeCell>,
-  edges: Implements<Table<string, EdgeCell>> & SweetTable<EdgeCell>
+  root: Implements<Table<string, NodeCell | SCell<any>>> & SweetTable<NodeCell | SCell<any>>
 }) {
   const [reactNodes, setReactNodes] = useState<Node[]>([]);
   const [reactEdges, setReactEdges] = useState<Edge[]>([]);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
-  // Watch for new nodes
+  // Watch for new nodes (namespace: node/*)
   useEffect(() => {
-    return nodes.whenAdded((id, nodeCell) => {
+    return root.whenAdded((id, cell) => {
+      if (!id.startsWith('node/')) return;
+
+      const nodeCell = cell as NodeCell;
       const pos = nodeCell.metadata.get('ui/position')?.current() as Pos;
       const type = nodeCell.metadata.get('ui/type')?.current() as NodeType;
 
@@ -149,8 +165,10 @@ function Canvas({
 
   // Watch for node value changes
   useEffect(() => {
-    return nodes.whenChanged(() => {
-      const snapshot = nodes.query().table;
+    return root.whenChanged((id) => {
+      if (!id.startsWith('node/')) return;
+
+      const snapshot = root.query().whereKeys(k => k.startsWith('node/')).table;
       setReactNodes(old => old.map(node => ({
         ...node,
         data: {
@@ -161,12 +179,15 @@ function Canvas({
     });
   }, []);
 
-  // Watch for new edges
+  // Watch for new edges (namespace: edge/*)
   useEffect(() => {
-    return edges.whenAdded((id, edgeCell) => {
+    return root.whenAdded((id, cell) => {
+      if (!id.startsWith('edge/')) return;
+
+      const edgeCell = cell as EdgeCell;
       const conn = edgeCell.current();
-      const source = nodes.get(conn.from);
-      const target = nodes.get(conn.to);
+      const source = root.get(conn.from) as NodeCell;
+      const target = root.get(conn.to) as NodeCell;
 
       if (source && target) {
         const cleanup = source.provide(target);
@@ -186,13 +207,13 @@ function Canvas({
 
   const onConnect = useCallback((connection: ReactFlowConnection) => {
     if (!connection.source || !connection.target) return;
-    const id = `${connection.source}-${connection.target}`;
-    edges.set({ [id]: cells.last({ from: connection.source, to: connection.target }) });
+    const id = `edge/${connection.source}-${connection.target}`;
+    root.set({ [id]: cells.last({ from: connection.source, to: connection.target }) });
   }, []);
 
   const onEdgesDelete = useCallback((deletedEdges: Edge[]) => {
     deletedEdges.forEach(e => {
-      const edgeCell = edges.get(e.id);
+      const edgeCell = root.get(e.id) as EdgeCell;
       const cleanupCell = edgeCell?.metadata?.get('edge/cleanup');
       const cleanup = cleanupCell?.current() as (() => void) | undefined;
       if (cleanup) cleanup();
@@ -200,17 +221,19 @@ function Canvas({
   }, []);
 
   const onNodeDragStop = useCallback((_event: any, node: Node) => {
-    const nodeCell = nodes.get(node.id);
+    const nodeCell = root.get(node.id) as NodeCell;
     nodeCell?.metadata.get('ui/position')?.receive(node.position);
   }, []);
 
   const onNodeClick = useCallback((_event: any, node: Node) => {
-    setSelectedNodeId(node.id);
+    selection.receive(node.id);
   }, []);
 
-  const selectedNode = selectedNodeId ? nodes.get(selectedNodeId) : null;
+  // Read selection from the selection cell
+  const [selectedKey] = useGadget(selection);
+  const selectedNode = selectedKey ? root.get(selectedKey) as NodeCell : null;
 
-  // Query factory registry for available factories
+  // Query factory registry for available factories (namespace: factory/*)
   const [availableFactories, setAvailableFactories] = useState<Array<{
     key: string,
     cell: NodeCell,
@@ -222,12 +245,12 @@ function Canvas({
 
   useEffect(() => {
     const updateFactories = () => {
-      const snapshot = factoryRegistry.query().table;
+      const snapshot = root.query().whereKeys(k => k.startsWith('factory/')).table;
       const factories = Object.entries(snapshot)
         .filter(([_, cell]) => cell.metadata.get('ui/factory') !== undefined)
         .map(([key, cell]) => ({
           key,
-          cell,
+          cell: cell as NodeCell,
           name: (cell.metadata.get('meta/type')?.current() as string) || key,
           icon: (cell.metadata.get('ui/icon')?.current() as string) || '•',
           color: (cell.metadata.get('ui/color')?.current() as string) || '#6b7280',
@@ -237,7 +260,11 @@ function Canvas({
     };
 
     updateFactories();
-    return factoryRegistry.whenChanged(updateFactories);
+    return root.whenChanged((id) => {
+      if (id.startsWith('factory/')) {
+        updateFactories();
+      }
+    });
   }, []);
 
   return (
@@ -283,32 +310,54 @@ function Canvas({
 
       {/* Inspector Panel */}
       <div className="w-80 border-l bg-white flex flex-col overflow-hidden">
-        <div className="px-4 py-2 border-b bg-gray-50 font-medium text-sm">
-          Inspector
+        <div
+          className="px-4 py-2 border-b bg-gray-50 font-medium text-sm cursor-pointer hover:bg-gray-100"
+          onClick={() => selection.receive('ui/selection')}
+          title="Click to inspect the selection cell"
+        >
+          Inspector {selectedKey && `(${selectedKey})`}
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           {selectedNode ? (
             <div className="space-y-4">
               <div>
-                <div className="text-xs text-gray-500 mb-1">Node ID</div>
-                <div className="text-sm font-mono">{selectedNodeId}</div>
+                <div className="text-xs text-gray-500 mb-1">Key</div>
+                <div className="text-sm font-mono">{selectedKey}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-500 mb-1">Current Value</div>
                 <div className="text-lg font-bold">
-                  {String(selectedNode.current())}
+                  {typeof selectedNode.current() === 'object' && selectedNode.current() !== null
+                    ? JSON.stringify(selectedNode.current())
+                    : String(selectedNode.current())}
                 </div>
               </div>
               <div>
                 <div className="text-xs text-gray-500 mb-1">Type</div>
                 <div className="text-sm">
-                  {selectedNode.metadata.get('meta/type')?.current()}
+                  {selectedNode.metadata?.get?.('meta/type')?.current() || 'unknown'}
                 </div>
               </div>
-              <MetadataInspector nodeCell={selectedNode} />
+              {selectedNode.metadata && <MetadataInspector nodeCell={selectedNode} />}
             </div>
           ) : (
-            <div className="text-sm text-gray-500">Click a node to inspect</div>
+            <div className="text-sm text-gray-500">
+              Click anything to inspect it
+              <div className="mt-4 space-y-1">
+                <div
+                  className="text-xs text-blue-600 cursor-pointer hover:underline"
+                  onClick={() => selection.receive('ui/inspector/tab')}
+                >
+                  → Inspect inspector tab cell
+                </div>
+                <div
+                  className="text-xs text-blue-600 cursor-pointer hover:underline"
+                  onClick={() => selection.receive('ui/selection')}
+                >
+                  → Inspect selection cell
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -316,40 +365,31 @@ function Canvas({
   );
 }
 
-// Global tables
-const nodes = table.first<NodeCell>({});
-const edges = table.first<EdgeCell>({});
-
-// Initialize - query factory registry for a factory to use
-const maxFactory = factoryRegistry.get('factory/max')?.metadata.get('ui/factory')?.current() as (pos: Pos) => NodeCell;
+// Initialize root with node instances and edges
+const maxFactory = root.get('factory/max')?.metadata.get('ui/factory')?.current() as (pos: Pos) => NodeCell;
 if (maxFactory) {
-  const initNodes: Record<string, NodeCell> = {
-    'a': maxFactory({ x: 100, y: 100 }),
-    'b': maxFactory({ x: 100, y: 300 }),
-    'c': maxFactory({ x: 400, y: 200 }),
-  };
-  nodes.set(initNodes);
+  root.set({
+    'node/a': maxFactory({ x: 100, y: 100 }),
+    'node/b': maxFactory({ x: 100, y: 300 }),
+    'node/c': maxFactory({ x: 400, y: 200 }),
+    'edge/a-b': cells.last({ from: 'node/a', to: 'node/b' }),
+    'edge/c-b': cells.last({ from: 'node/c', to: 'node/b' }),
+  });
 }
-
-// Initialize edges
-edges.set({
-  'a-b': cells.last({ from: 'a', to: 'b' }),
-  'c-b': cells.last({ from: 'c', to: 'b' }),
-});
 
 // Helper
 let nodeCounter = 3;
 function createNode(factory: { factory: (pos: Pos) => NodeCell }, position: Pos) {
-  const nodeId = `node_${nodeCounter++}`;
+  const nodeId = `node/node_${nodeCounter++}`;
   const nodeCell = factory.factory(position);
-  nodes.set({ [nodeId]: nodeCell });
+  root.set({ [nodeId]: nodeCell });
   return nodeId;
 }
 
 export default function CanvasV2() {
   return (
     <div className="h-screen w-screen flex">
-      <Canvas nodes={nodes} edges={edges} />
+      <Canvas root={root} />
     </div>
   );
 }
