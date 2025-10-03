@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { ControlConfig, ControlPreset } from 'port-graphs/sugar/controls';
 import { Button } from '~/components/ui/button';
 import { Input } from '~/components/ui/input';
@@ -7,10 +7,12 @@ import { Slider } from '~/components/ui/slider';
 import { Switch } from '~/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
 import { Badge } from '~/components/ui/badge';
+import { useGadget } from 'port-graphs-react';
+import { generateDefaultControls, getControlPresets } from '~/lib/generateControls';
 
 interface GadgetControlsProps {
   gadget: any;
-  controls: ControlConfig[];
+  controls?: ControlConfig[];
   presets?: ControlPreset[];
   compact?: boolean;
   className?: string;
@@ -18,9 +20,22 @@ interface GadgetControlsProps {
 
 /**
  * Renders interactive controls for a gadget based on control schema
+ * Controls are reactive - they update when the gadget value changes
  */
-export function GadgetControls({ gadget, controls, presets, compact = false, className = '' }: GadgetControlsProps) {
+export function GadgetControls({ gadget, controls: explicitControls, presets: explicitPresets, compact = false, className = '' }: GadgetControlsProps) {
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
+
+  // Subscribe to gadget changes for reactive controls
+  const [currentValue] = useGadget(gadget);
+
+  // Regenerate controls when value changes (if using auto-generated controls)
+  const controls = useMemo(() => {
+    if (explicitControls && explicitControls.length > 0) return explicitControls;
+    return generateDefaultControls(gadget, currentValue);
+  }, [gadget, currentValue, explicitControls]);
+
+  // Get presets (either explicit or from metadata)
+  const presets = explicitPresets || getControlPresets(gadget);
 
   const handleSend = (input: any | ((current: any) => any)) => {
     const value = typeof input === 'function' ? input(gadget.current()) : input;
@@ -177,8 +192,7 @@ export function GadgetControls({ gadget, controls, presets, compact = false, cla
 
           // Slider
           if (control.type === 'slider') {
-            const current = gadget.current();
-            const value = typeof current === 'number' ? current : control.min;
+            const value = typeof currentValue === 'number' ? currentValue : control.min;
             return (
               <div key={controlId} className="space-y-1">
                 <div className="flex items-center justify-between">
@@ -199,8 +213,7 @@ export function GadgetControls({ gadget, controls, presets, compact = false, cla
 
           // Toggle/Switch
           if (control.type === 'toggle') {
-            const current = gadget.current();
-            const checked = typeof current === 'boolean' ? current : false;
+            const checked = typeof currentValue === 'boolean' ? currentValue : false;
             return (
               <div key={controlId} className="flex items-center justify-between">
                 <Label className="text-sm">

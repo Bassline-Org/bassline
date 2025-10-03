@@ -95,7 +95,7 @@ const maxMeta: Record<string, Cell<unknown>> = {
     ])) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const cell = cells.max(0);
-        setMetadata(cell, 'ui/', { position: pos, type: 'max' });
+        setMetadata(cell, 'ui/', { position: pos, type: 'max', 'show-controls': false });
         return cell;
     })) as Cell<unknown>,
 };
@@ -107,7 +107,7 @@ const minMeta: Record<string, Cell<unknown>> = {
     'ui/color': sweetenCell(quick(lastProto(), '#ef4444')) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const cell = cells.min(100);
-        setMetadata(cell, 'ui/', { position: pos, type: 'min' });
+        setMetadata(cell, 'ui/', { position: pos, type: 'min', 'show-controls': false });
         return cell;
     })) as Cell<unknown>,
 };
@@ -119,7 +119,7 @@ const unionMeta: Record<string, Cell<unknown>> = {
     'ui/color': sweetenCell(quick(lastProto(), '#3b82f6')) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const cell = cells.union([]);
-        setMetadata(cell, 'ui/', { position: pos, type: 'union' });
+        setMetadata(cell, 'ui/', { position: pos, type: 'union', 'show-controls': false });
         return cell;
     })) as Cell<unknown>,
 };
@@ -131,7 +131,7 @@ const intersectionMeta: Record<string, Cell<unknown>> = {
     'ui/color': sweetenCell(quick(lastProto(), '#8b5cf6')) as Cell<unknown>,
     'ui/factory': sweetenCell(quick(lastProto(), (pos: { x: number, y: number }) => {
         const cell = cells.intersection([]);
-        setMetadata(cell, 'ui/', { position: pos, type: 'intersection' });
+        setMetadata(cell, 'ui/', { position: pos, type: 'intersection', 'show-controls': false });
         return cell;
     })) as Cell<unknown>,
 };

@@ -2,9 +2,11 @@ import type { ControlConfig } from 'port-graphs/sugar/controls';
 
 /**
  * Generate smart default controls based on gadget type and current value
+ * @param gadget - The gadget to generate controls for
+ * @param currentValue - Optional current value (if not provided, will call gadget.current())
  */
-export function generateDefaultControls(gadget: any): ControlConfig[] {
-  const current = gadget.current();
+export function generateDefaultControls(gadget: any, currentValue?: any): ControlConfig[] {
+  const current = currentValue !== undefined ? currentValue : gadget.current();
   const type = gadget.metadata?.get?.('ui/type')?.current();
   const metaType = gadget.metadata?.get?.('meta/type')?.current();
 

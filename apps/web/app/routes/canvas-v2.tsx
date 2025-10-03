@@ -1,5 +1,5 @@
 import type { Route } from "./+types/canvas-v2";
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -30,7 +30,8 @@ import {
 import { Badge } from "~/components/ui/badge";
 import { GadgetValueDisplay } from "~/components/GadgetValueDisplay";
 import { GadgetControls } from "~/components/GadgetControls";
-import { generateDefaultControls, getControlPresets } from "~/lib/generateControls";
+import { Label } from "~/components/ui/label";
+import { Switch } from "~/components/ui/switch";
 
 export function meta({ }: Route.MetaArgs) {
   return [
@@ -73,20 +74,20 @@ const root = table.first<NodeCell | SCell<any>>({
 });
 
 // Cell Node Component
-function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
+function CellNode({ data }: { data: { nodeCell, nodeId: string } }) {
   const { nodeCell, nodeId } = data;
   const [selectedKey] = useGadget(selection);
   const type = nodeCell.metadata.get('ui/type')?.current() as NodeType;
   const icon = nodeCell.metadata.get('ui/icon')?.current();
   const isSelected = selectedKey === nodeId;
 
-  const controls = generateDefaultControls(nodeCell);
-  const presets = getControlPresets(nodeCell);
+  // Check if controls should be shown on this node
+  const [showControls] = useGadget(nodeCell.metadata.get('ui/show-controls') || { current: () => false, tap: () => () => { } });
 
   return (
     <>
       <Handle id='out' position={Position.Right} type="source" />
-      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[180px] max-w-[240px] transition-all ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
+      <div className={`px-4 py-3 bg-white border-2 rounded-lg shadow-md min-w-[140px] ${showControls ? 'max-w-[240px]' : 'max-w-[180px]'} transition-all ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 border-blue-500' : 'border-slate-300'
         }`}>
         <div className="flex items-center gap-2 mb-3">
           {icon && <span className="text-lg">{icon}</span>}
@@ -94,18 +95,18 @@ function CellNode({ data }: { data: { nodeCell: NodeCell, nodeId: string } }) {
             {type?.toUpperCase()}
           </Badge>
         </div>
-        <div className="mb-3 flex justify-center">
+        <div className={`flex justify-center ${showControls ? 'mb-3' : 'mb-0'}`}>
           <GadgetValueDisplay
             gadget={nodeCell}
             options={{ inline: true, truncateLength: 30 }}
           />
         </div>
-        <GadgetControls
-          gadget={nodeCell}
-          controls={controls}
-          presets={presets}
-          compact
-        />
+        {showControls && (
+          <GadgetControls
+            gadget={nodeCell}
+            compact
+          />
+        )}
       </div>
       <Handle id='in' position={Position.Left} type="target" />
     </>
@@ -274,68 +275,8 @@ function InspectorPanel({
   targetGadget: (NodeCell | SCell<any>) | null,
   root: ReturnType<typeof table.first<NodeCell | SCell<any>>>
 }) {
-  // Watch target's metadata for live updates
-  const [metaSnapshot, setMetaSnapshot] = useState<Record<string, any>>({});
-  const [targetValue, setTargetValue] = useState<any>(null);
-
-  useEffect(() => {
-    if (!targetGadget) {
-      setMetaSnapshot({});
-      setTargetValue(null);
-      return;
-    }
-
-    // Watch the target's value
-    const updateValue = () => {
-      setTargetValue(targetGadget.current());
-    };
-    updateValue();
-    const valueCleanup = targetGadget.tap(() => updateValue());
-
-    // Watch target's metadata
-    if (targetGadget.metadata) {
-      const cellTaps: Array<() => void> = [];
-
-      // Update snapshot without setting up new taps
-      const refreshSnapshot = () => {
-        const snapshot = targetGadget.metadata.query()
-          .map(cell => cell.current())
-          .table;
-        setMetaSnapshot(snapshot);
-      };
-
-      // Setup taps on all metadata cells
-      const setupTaps = () => {
-        // Clean up old cell taps
-        cellTaps.forEach(cleanup => cleanup());
-        cellTaps.length = 0;
-
-        // Tap each metadata cell for value changes
-        Object.values(targetGadget.metadata.query().table).forEach((cell: any) => {
-          const tap = cell.tap(() => refreshSnapshot());  // Just refresh, don't re-tap!
-          cellTaps.push(tap);
-        });
-      };
-
-      // Initial setup
-      refreshSnapshot();
-      setupTaps();
-
-      // When metadata structure changes (cells added/removed), re-setup taps
-      const metaCleanup = targetGadget.metadata.whenChanged(() => {
-        refreshSnapshot();
-        setupTaps();
-      });
-
-      return () => {
-        valueCleanup();
-        metaCleanup();
-        cellTaps.forEach(cleanup => cleanup());
-      };
-    }
-
-    return valueCleanup;
-  }, [targetGadget]);
+  // Watch metadata table directly with useGadget - it's a gadget too!
+  const [metadataTable] = useGadget(targetGadget?.metadata || { current: () => ({}), tap: () => () => { } });
 
   const handlePopOut = useCallback(() => {
     // Get the factory and create a new inspector
@@ -406,45 +347,57 @@ function InspectorPanel({
             )}
 
             <div>
-              <div className="text-xs text-gray-500 mb-2">Controls</div>
-              <GadgetControls
-                gadget={targetGadget}
-                controls={generateDefaultControls(targetGadget)}
-                presets={getControlPresets(targetGadget)}
-              />
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs text-gray-500">Controls</div>
+                {targetGadget.metadata?.get('ui/show-controls') && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs">Show on node</Label>
+                    <Switch
+                      checked={targetGadget.metadata.get('ui/show-controls').current() ?? false}
+                      onCheckedChange={(val) => {
+                        targetGadget.metadata.get('ui/show-controls')?.receive(val);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <GadgetControls gadget={targetGadget} />
             </div>
 
-            {targetGadget.metadata && Object.keys(metaSnapshot).length > 0 && (
+            {targetGadget.metadata && Object.keys(metadataTable).length > 0 && (
               <div className="space-y-2">
-                <div className="text-xs font-semibold text-gray-700">Metadata ({Object.keys(metaSnapshot).length})</div>
+                <div className="text-xs font-semibold text-gray-700">Metadata ({Object.keys(metadataTable).length})</div>
                 <div className="border rounded-lg overflow-hidden">
-                  {Object.entries(metaSnapshot).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="text-xs cursor-pointer hover:bg-blue-50 p-2 border-b last:border-b-0 transition-colors"
-                      onClick={() => {
-                        const metadataCell = targetGadget.metadata?.get(key);
-                        if (metadataCell) {
-                          inspector.receive({ target: metadataCell });
-                        }
-                      }}
-                      title="Click to inspect this metadata cell"
-                    >
-                      <div className="font-mono text-gray-600 mb-1">{key}</div>
-                      <div className="text-gray-800 ml-2">
-                        {typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Set)
-                          ? <Badge variant="outline">Object</Badge>
-                          : typeof value === 'function'
-                            ? <Badge variant="outline">Function</Badge>
-                            : Array.isArray(value)
-                              ? <Badge variant="outline">Array({value.length})</Badge>
-                              : value instanceof Set
-                                ? <Badge variant="outline">Set({value.size})</Badge>
-                                : <span className="font-mono">{String(value)}</span>
-                        }
+                  {Object.entries(metadataTable).map(([key, cell]: [string, any]) => {
+                    const value = cell.current();
+                    return (
+                      <div
+                        key={key}
+                        className="text-xs cursor-pointer hover:bg-blue-50 p-2 border-b last:border-b-0 transition-colors"
+                        onClick={() => {
+                          const metadataCell = targetGadget.metadata?.get(key);
+                          if (metadataCell) {
+                            inspector.receive({ target: metadataCell });
+                          }
+                        }}
+                        title="Click to inspect this metadata cell"
+                      >
+                        <div className="font-mono text-gray-600 mb-1">{key}</div>
+                        <div className="text-gray-800 ml-2">
+                          {typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Set)
+                            ? <Badge variant="outline">Object</Badge>
+                            : typeof value === 'function'
+                              ? <Badge variant="outline">Function</Badge>
+                              : Array.isArray(value)
+                                ? <Badge variant="outline">Array({value.length})</Badge>
+                                : value instanceof Set
+                                  ? <Badge variant="outline">Set({value.size})</Badge>
+                                  : <span className="font-mono">{String(value)}</span>
+                          }
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
