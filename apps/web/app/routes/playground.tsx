@@ -1,5 +1,6 @@
 import { cells, table, withMetadata, type Implements, type SweetCell, type Valued } from "@bassline/core"
 import { useGadget, useMetadata } from "@bassline/react";
+import { Inspector } from "~/components/inspector";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 
 export function meta() {
@@ -9,122 +10,42 @@ export function meta() {
     ]
 }
 
-const a = cells.last(0);
-const b = cells.last(0);
-const c = cells.last(0);
-
 type Cell<T> = Implements<Valued<T>> & SweetCell<T>
-
-const rootMeta: Record<string, Cell<string>> = {
-    'meta/type': cells.last('core/table'),
-    'meta/category': cells.last('table'),
-    'meta/description': cells.last('The root table of my playground!'),
+const systemMeta: Record<string, Cell<string>> = {
+    'type': cells.last('core/table'),
+    'category': cells.last('table'),
+    'description': cells.last('The root table of my playground! This is basically the entry point for the entire system.'),
+    'author': cells.last('@goose :)'),
     'views/inspector/type': cells.last('table'),
-}
+};
 
-function TableInspector({ gadget }: { gadget: Implements<Valued<Record<string, any>>> }) {
-    const [state] = useGadget(gadget);
-    return (
-        <div>
-            <h1>Table Inspector</h1>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Key</TableHead>
-                        <TableHead>Value</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {Object.entries(state).map(([key, value]) => (
-                        <TableRow key={key}>
-                            <TableCell>{key}</TableCell>
-                            <TableCell>{JSON.stringify(value)}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    )
-}
+const groupsMeta: Record<string, Cell<string>> = {
+    'type': cells.last('core/table'),
+    'category': cells.last('table'),
+    'description': cells.last('The groups table for the system'),
+    'author': cells.last('@goose :)'),
+    'views/inspector/type': cells.last('table'),
+};
 
-function NumericInspector({ gadget }: { gadget: Implements<Valued<number>> }) {
-    const [state] = useGadget(gadget);
-    return (
-        <div>
-            <h1>Numeric Inspector</h1>
-            <p>Type: {state}</p>
-        </div>
-    )
-}
+const packagesMeta: Record<string, Cell<string>> = {
+    'type': cells.last('core/table'),
+    'category': cells.last('table'),
+    'description': cells.last('The packages table for the system'),
+    'author': cells.last('@goose :)'),
+    'views/inspector/type': cells.last('table'),
+};
 
-function SetInspector({ gadget }: { gadget: Implements<Valued<Set<any>>> }) {
-    const [state] = useGadget(gadget);
-    return (
-        <div>
-            <h1>Set Inspector</h1>
-            <p>Type: {state}</p>
-        </div>
-    )
-}
-
-function UnknownInspector({ key }: { key: string }) {
-    return (
-        <div>
-            <h1>Unknown Inspector</h1>
-            <p>Type: {key}</p>
-        </div>
-    )
-}
-
-const inspectors = {
-    table: TableInspector,
-    numeric: NumericInspector,
-    set: SetInspector,
-    unknown: UnknownInspector,
-}
-
-function Inspector({ gadget }: { gadget: Implements<Valued<any>> }) {
-    const meta = useMetadata(gadget);
-    if (!meta) return <UnknownInspector key="unknown" />;
-    const [type] = useGadget(meta['views/inspector/type']);
-    const SelectedInspector = inspectors[type] ?? UnknownInspector;
-    return <SelectedInspector gadget={gadget} key={type} />
-}
-
-// const root = withMetadata(table.first({
-//     a: a,
-//     b: b,
-//     c: c,
-// }), rootMeta as Record<string, Cell<unknown>>);
-
-const example = table.first({
-    number: cells.max(0),
-    set: cells.union([1, 2, 3]),
-    table: withMetadata(table.first({
-        a: cells.max(0),
-        b: cells.max(0),
-        c: cells.max(0),
-    }), rootMeta as Record<string, Cell<unknown>>),
-    unknown: cells.last('unknown'),
-})
-
-// const d = cells.last(0);
-// const e = cells.last(0);
-// const f = cells.last(0);
-
-// const alt = table.first({
-//     a: a,
-//     d: d,
-//     e: e,
-//     f: f,
-// })
+const systemTable = withMetadata(table.first({
+    'groups': withMetadata(table.first({}), groupsMeta as Record<string, Cell<unknown>>),
+    'packages': withMetadata(table.first({}), packagesMeta as Record<string, Cell<unknown>>),
+}), systemMeta as Record<string, Cell<unknown>>);
 
 export function CellTableEntry({ gadget, field }: { gadget: Implements<Valued<Record<string, Cell<any>>>>, field: string }) {
     const [state] = useGadget(gadget);
     return (
         <TableRow>
             <TableCell className="font-mono font-bold text-slate-600">{field}</TableCell>
-            <TableCell className="font-mono">{state}</TableCell>
+            <TableCell className="font-mono">{JSON.stringify(state)}</TableCell>
         </TableRow>
     )
 }
@@ -152,13 +73,14 @@ function NamespaceInspector({ name, g }: { name: string, g: Implements<Valued<Re
 }
 
 export default function Playground() {
-    const [state] = useGadget(example);
+    const [system] = useGadget(systemTable);
     return (
         <div>
-            <Inspector gadget={state['table']} />
-            <Inspector gadget={state['number']} />
-            <Inspector gadget={state['set']} />
-            <Inspector gadget={state['unknown']} />
+            {
+                Object.entries(system).map(([key, gadget]) => (
+                    <NamespaceInspector key={key} name={key} g={gadget} />
+                ))
+            }
         </div>
     )
 }
