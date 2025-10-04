@@ -13,16 +13,16 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/bassline-playground": {
-    params: {};
-  };
   "/playground": {
     params: {};
   };
-  "/sugar-demo": {
+  "/canvas-v2": {
     params: {};
   };
-  "/canvas-v2": {
+  "/inspect": {
+    params: {};
+  };
+  "/canvas": {
     params: {};
   };
   "/home": {
@@ -33,23 +33,23 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/bassline-playground" | "/playground" | "/sugar-demo" | "/canvas-v2" | "/home";
-  };
-  "routes/bassline-playground.tsx": {
-    id: "routes/bassline-playground";
-    page: "/bassline-playground";
+    page: "/" | "/playground" | "/canvas-v2" | "/inspect" | "/canvas" | "/home";
   };
   "routes/playground.tsx": {
     id: "routes/playground";
     page: "/playground";
   };
-  "routes/sugar-demo.tsx": {
-    id: "routes/sugar-demo";
-    page: "/sugar-demo";
-  };
   "routes/canvas-v2.tsx": {
     id: "routes/canvas-v2";
     page: "/canvas-v2";
+  };
+  "routes/inspect.tsx": {
+    id: "routes/inspect";
+    page: "/inspect";
+  };
+  "routes/canvas.tsx": {
+    id: "routes/canvas";
+    page: "/canvas";
   };
   "routes/home.tsx": {
     id: "routes/home";

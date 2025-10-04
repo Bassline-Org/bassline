@@ -1,4 +1,4 @@
-import { cells, table, withMetadata, type Implements, type SweetCell, type Valued } from "@bassline/core"
+import { cells, fn, table, withMetadata, type Implements, type SweetCell, type Valued } from "@bassline/core"
 import { useGadget, useMetadata } from "@bassline/react";
 import { Inspector } from "~/components/inspector";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
@@ -35,9 +35,33 @@ const packagesMeta: Record<string, Cell<string>> = {
     'views/inspector/type': cells.last('table'),
 };
 
-const systemTable = withMetadata(table.first({
-    'groups': withMetadata(table.first({}), groupsMeta as Record<string, Cell<unknown>>),
-    'packages': withMetadata(table.first({}), packagesMeta as Record<string, Cell<unknown>>),
+const groups = table.first({
+    'default': table.first({}),
+});
+
+const packages = table.first({
+    'cells': table.first({
+        'max': () => cells.max(0),
+        'min': () => cells.min(100),
+        'last': () => cells.last('Bassline!'),
+        'union': () => cells.union([]),
+        'intersection': () => cells.intersection([]),
+        'ordinal': () => cells.ordinal(0),
+        'inspector': () => cells.inspector({ target: null }),
+    }),
+    'tables': table.first({
+        'first': () => table.first({}),
+        'last': () => table.last({}),
+    }),
+    'functions': table.first({
+        'map': () => fn.map((x: number) => x + 1),
+        'partial': () => fn.partial((x, y) => x + y, ['x']),
+    }),
+});
+
+export const systemTable = withMetadata(table.first({
+    'groups': withMetadata(groups, groupsMeta as Record<string, Cell<unknown>>),
+    'packages': withMetadata(packages, packagesMeta as Record<string, Cell<unknown>>),
 }), systemMeta as Record<string, Cell<unknown>>);
 
 export function CellTableEntry({ gadget, field }: { gadget: Implements<Valued<Record<string, Cell<any>>>>, field: string }) {
@@ -46,7 +70,7 @@ export function CellTableEntry({ gadget, field }: { gadget: Implements<Valued<Re
         <TableRow>
             <TableCell className="font-mono font-bold text-slate-600">{field}</TableCell>
             <TableCell className="font-mono">{JSON.stringify(state)}</TableCell>
-        </TableRow>
+        </TableRow >
     )
 }
 
