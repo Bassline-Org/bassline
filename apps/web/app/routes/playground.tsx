@@ -2,6 +2,7 @@ import { cells, fn, table, withMetadata, type Implements, type SweetCell, type V
 import { useGadget, useMetadata } from "@bassline/react";
 import { Inspector } from "~/components/inspector";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
+import * as _ from "lodash";
 
 export function meta() {
     return [
@@ -63,6 +64,109 @@ export const systemTable = withMetadata(table.first({
     'groups': withMetadata(groups, groupsMeta as Record<string, Cell<unknown>>),
     'packages': withMetadata(packages, packagesMeta as Record<string, Cell<unknown>>),
 }), systemMeta as Record<string, Cell<unknown>>);
+
+window.systemTable = systemTable;
+window.lodash = _;
+
+// Add this to your app initialization
+window.devtoolsFormatters = window.devtoolsFormatters || [];
+window.devtoolsFormatters.push({
+    // Detect if this is a gadget
+    header(obj) {
+        // Check if it looks like a gadget
+        if (!obj || typeof obj !== 'object') return null;
+        if (!obj.receive || !obj.current || !obj.tap) return null;
+
+        // Get gadget info
+        const state = obj.current();
+        const type = obj.metadata?.get?.('ui/type')?.current?.() ||
+            obj.metadata?.get?.('meta/type')?.current?.() ||
+            'gadget';
+        const icon = obj.metadata?.get?.('ui/icon')?.current?.() || '◆';
+
+        // Format the current value (truncate if long)
+        let valueStr = '';
+        try {
+            if (state instanceof Set) {
+                valueStr = `Set(${state.size})`;
+            } else if (Array.isArray(state)) {
+                valueStr = `[${state.length} items]`;
+            } else if (typeof state === 'object' && state !== null) {
+                valueStr = `{${Object.keys(state).length} keys}`;
+            } else {
+                valueStr = String(state);
+            }
+            if (valueStr.length > 30) {
+                valueStr = valueStr.slice(0, 30) + '…';
+            }
+        } catch (e) {
+            valueStr = '?';
+        }
+
+        // Return JSONML format
+        return [
+            'div',
+            { style: 'display: flex; align-items: center; gap: 6px;' },
+            ['span', { style: 'font-size: 14px;' }, icon],
+            ['span', { style: 'color: #881391; font-weight: bold;' }, type],
+            ['span', { style: 'color: #444;' }, '→'],
+            ['span', { style: 'color: #1a1aa6; font-family: monospace;' }, valueStr]
+        ];
+    },
+
+    // Can we expand it?
+    hasBody(obj) {
+        return !!(obj?.receive && obj?.current);
+    },
+
+    // Expanded view
+    body(obj) {
+        const state = obj.current();
+        const metadata = obj.metadata?.query?.().table || {};
+
+        const sections = ['div', { style: 'padding-left: 16px;' }];
+
+        // Current state section
+        sections.push(
+            ['div', { style: 'margin: 4px 0;' },
+                ['span', { style: 'color: #666; font-weight: bold;' }, 'State: '],
+                ['object', { object: state }]  // Let DevTools format the value
+            ]
+        );
+
+        // Metadata section (if exists)
+        if (Object.keys(metadata).length > 0) {
+            sections.push(
+                ['div', { style: 'color: #666; font-weight: bold; margin-top: 8px;' },
+                    `Metadata (${Object.keys(metadata).length}):`
+                ]
+            );
+
+            for (const [key, cell] of Object.entries(metadata).slice(0, 10)) {
+                const value = cell.current?.();
+                sections.push(
+                    ['div',
+                        { style: 'margin-left: 12px; margin: 2px 0; display: flex; gap: 8px;' },
+                        ['span', { style: 'color: #0d7da5; font-family: monospace; min-width: 200px;' }, key + ':'],
+                        ['object', { object: value }]
+                    ]
+                );
+            }
+        }
+
+        // Actions you can take (clickable!)
+        sections.push(
+            ['div', { style: 'margin-top: 8px; padding-top: 8px; border-top: 1px solid #ccc;' },
+                ['span', { style: 'color: #666; font-size: 11px;' },
+                    'Tip: Store as global with right-click → "Store as global variable"'
+                ]
+            ]
+        );
+
+        return sections;
+    }
+});
+
 
 export function CellTableEntry({ gadget, field }: { gadget: Implements<Valued<Record<string, Cell<any>>>>, field: string }) {
     const [state] = useGadget(gadget);
