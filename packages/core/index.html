@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+
+<head>
+    <script type="importmap">
+        {
+            "imports": {
+                "es-toolkit": "https://esm.sh/es-toolkit@%5E1",
+                "@bassline": "./src/index.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import { createGadget, installGadgetFormatter, gadgetProto, installTaps } from "@bassline"
+        installGadgetFormatter();
+        installTaps();
+
+        const registry = new Map();
+        window.bassline.registry = registry
+
+        Object.assign(gadgetProto, {
+            register(name) {
+                registry.set(name, this);
+            }
+        });
+
+        function maxStep(current, input) {
+            if (input > current) {
+                this.update(input);
+            }
+        }
+
+        function minStep(current, input) {
+            if (input < current) {
+                this.update(input);
+            }
+        }
+
+        const max = createGadget(maxStep, 0);
+        console.log('max', max);
+        max.register('max');
+        max.tap((data) => {
+            const log = document.getElementById('emitLog');
+            const entry = document.createElement('li');
+            entry.innerHTML = String('max tapped', JSON.stringify(data));
+            log.appendChild(entry);
+        });
+        const min = createGadget(minStep, 100);
+        min.register('min');
+        min.tap((data) => {
+            const log = document.getElementById('emitLog');
+            const entry = document.createElement('li');
+            entry.innerHTML = String('min tapped', JSON.stringify(data));
+            log.appendChild(entry);
+        });
+        max.receive(5);
+        max.receive(10);
+        max.receive(8);
+    </script>
+</head>
+
+<body>
+    <h1>Logs</h1>
+    <ul id="emitLog">
+    </ul>
+</body>

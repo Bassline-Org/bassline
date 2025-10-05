@@ -2,56 +2,18 @@
   "name": "@bassline/core",
   "version": "1.0.0",
   "description": "Core gadget primitives for Bassline - propagation network model",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./cells": {
-      "import": "./dist/patterns/cells/index.js",
-      "types": "./dist/patterns/cells/index.d.ts"
-    },
-    "./functions": {
-      "import": "./dist/patterns/functions/index.js",
-      "types": "./dist/patterns/functions/index.d.ts"
-    },
-    "./protocols": {
-      "import": "./dist/core/protocols.js",
-      "types": "./dist/core/protocols.d.ts"
-    },
-    "./effects": {
-      "import": "./dist/effects/index.js",
-      "types": "./dist/effects/index.d.ts"
-    },
-    "./ui": {
-      "import": "./dist/patterns/ui/index.js",
-      "types": "./dist/patterns/ui/index.d.ts"
-    },
-    "./sugar": {
-      "import": "./dist/sugar/index.js",
-      "types": "./dist/sugar/index.d.ts"
-    }
-  },
+  "type": "module",
+  "module": "src/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "tsc --watch",
-    "test": "vitest --run",
-    "typecheck": "tsc --noEmit",
+    "dev": "node src/index.js",
     "clean": "rm -rf ./dist"
   },
   "license": "MIT",
-  "devDependencies": {
-    "@types/js-yaml": "^4.0.9",
-    "@types/lodash": "^4.17.20",
-    "@types/node": "^22.0.0",
-    "@types/ws": "^8.18.1",
-    "typescript": "^5.3.0",
-    "vitest": "^1.2.0",
-    "ws": "^8.18.3"
-  },
   "dependencies": {
+    "express": "^5.1.0",
     "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.17.12"
   }
 }
