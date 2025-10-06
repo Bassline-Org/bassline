@@ -7,7 +7,6 @@
 
 import { bl } from "../index.js";
 bl();
-import { Partial, Transform } from "../patterns/functions/index.js";
 
 function unary({ name, fn, override = false }) {
     if (bl().ops.unary[name] !== undefined && !override) {
@@ -15,14 +14,13 @@ function unary({ name, fn, override = false }) {
         console.log("Use override = true to overwrite this entry!");
         return;
     }
-    bl().ops.unary[name] = {
-        type: "unary",
-        name,
-        fn,
-        call(...args) {
-            return fn(...args);
-        },
-    };
+    function entry(...args) {
+        return this.fn(...args);
+    }
+    entry.type = "unary";
+    entry.name = name;
+    entry.fn = fn;
+    bl().ops.unary[name] = entry;
 }
 
 function named({ name, fn, requiredKeys, override = false }) {
@@ -31,15 +29,14 @@ function named({ name, fn, requiredKeys, override = false }) {
         console.log("Use override = true to overwrite this entry!");
         return;
     }
-    bl().ops.named[name] = {
-        type: "named",
-        name,
-        fn,
-        requiredKeys,
-        call(...args) {
-            return fn(...args);
-        },
-    };
+    function entry(...args) {
+        return this.fn(...args);
+    }
+    entry.type = "named";
+    entry.name = name;
+    entry.fn = fn;
+    entry.requiredKeys = requiredKeys;
+    bl().ops.named[name] = entry;
 }
 
 function varargs({ name, fn, override = false }) {
@@ -48,14 +45,13 @@ function varargs({ name, fn, override = false }) {
         console.log("Use override = true to overwrite this entry!");
         return;
     }
-    bl().ops.varargs[name] = {
-        type: "varargs",
-        name,
-        fn,
-        call(...args) {
-            return fn(...args);
-        },
-    };
+    function entry(...args) {
+        return this.fn(...args);
+    }
+    entry.type = "varargs";
+    entry.name = name;
+    entry.fn = fn;
+    bl().ops.varargs[name] = entry;
 }
 
 export function ops() {
