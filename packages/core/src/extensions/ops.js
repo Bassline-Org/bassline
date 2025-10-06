@@ -19,10 +19,8 @@ function unary({ name, fn, override = false }) {
         type: "unary",
         name,
         fn,
-        build: () => {
-            const func = new Transform({ fn });
-            func.op = name;
-            return func;
+        call(...args) {
+            return fn(...args);
         },
     };
 }
@@ -38,10 +36,8 @@ function named({ name, fn, requiredKeys, override = false }) {
         name,
         fn,
         requiredKeys,
-        build: () => {
-            const func = new Partial({ fn, requiredKeys });
-            func.op = name;
-            return func;
+        call(...args) {
+            return fn(...args);
         },
     };
 }
@@ -56,10 +52,8 @@ function varargs({ name, fn, override = false }) {
         type: "varargs",
         name,
         fn,
-        build: () => {
-            const func = new Partial({ fn });
-            func.op = name;
-            return func;
+        call(...args) {
+            return fn(...args);
         },
     };
 }
