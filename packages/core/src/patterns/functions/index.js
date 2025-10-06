@@ -11,7 +11,7 @@ export function transformStep(_current, input) {
     }
 }
 
-const functionProto = Object.create(gadgetProto);
+export const functionProto = Object.create(gadgetProto);
 functionProto.onError = function (error, inputs) {
     this.emit({ failed: { input: inputs, error: error } });
 };

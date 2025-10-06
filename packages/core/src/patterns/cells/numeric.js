@@ -1,35 +1,30 @@
 import { gadgetProto } from "../../gadget.js";
 
-/**
- * @param {any} input
- * @returns {number | undefined}
- */
 function asNumber(input) {
     if (typeof input === "number") return input;
     const cast = Number(input);
     if (isNaN(cast)) return undefined;
     return cast;
 }
+const numericProto = Object.create(gadgetProto);
+numericProto.validate = asNumber;
 
 function minStep(current, input) {
-    const validated = asNumber(input);
-    if (validated === undefined) return;
-    if (validated < current) this.update(validated);
+    if (input < current) this.update(input);
 }
 
 function maxStep(current, input) {
-    const validated = asNumber(input);
-    if (validated === undefined) return;
-    if (validated > current) this.update(validated);
+    if (input > current) this.update(input);
 }
 
 export function Max(initial) {
     this.step = maxStep.bind(this);
     this.update(initial);
 }
-Max.prototype = gadgetProto;
+Max.prototype = numericProto;
+
 export function Min(initial) {
     this.step = minStep.bind(this);
     this.update(initial);
 }
-Min.prototype = gadgetProto;
+Min.prototype = numericProto;

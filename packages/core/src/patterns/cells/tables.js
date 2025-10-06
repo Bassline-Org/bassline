@@ -1,15 +1,16 @@
 import { Gadget, gadgetProto } from "../../gadget.js";
 
 function entries(input) {
-    if (input instanceof Object) return Object.entries(input);
     if (Array.isArray(input) && input.length === 2) {
         return [[input[0], input[1]]];
     }
+    if (input instanceof Object) return Object.entries(input);
     if (input instanceof Map) return input.entries();
     return [];
 }
 
 export const tableProto = Object.create(gadgetProto);
+tableProto.validate = entries;
 tableProto.added = function (additions) {
     this.emit({ added: additions });
 };
@@ -36,12 +37,14 @@ tableProto.set = function (vals, shouldForward = true) {
 
 function firstTableStep(current, incoming) {
     const additions = [];
-    for (const [key, value] of entries(incoming)) {
+    for (const [key, value] of incoming) {
         if (current[key] === undefined) {
             additions.push([key, value]);
         }
     }
-    const merged = Object.fromEntries(entries(current).concat(additions));
+    const merged = Object.fromEntries(
+        Object.entries(current).concat(additions),
+    );
     this.update(merged);
     this.added(Object.fromEntries(additions));
 }

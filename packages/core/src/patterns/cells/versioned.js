@@ -1,4 +1,6 @@
-import { Gadget } from "../../gadget.js";
+import { gadgetProto } from "../../gadget.js";
+
+const versionedProto = Object.create(gadgetProto);
 
 function asOrdinal(input) {
     if (Array.isArray(input) && input.length === 2) {
@@ -13,6 +15,8 @@ function ordinalStep(current, input) {
     if (validated[0] > current[0]) this.update(validated);
 }
 
-export function ordinal(initial) {
-    return new Gadget(ordinalStep, [0, initial]);
+export function Ordinal(initial) {
+    this.step = ordinalStep.bind(this);
+    this.update([0, initial]);
 }
+Ordinal.prototype = versionedProto;

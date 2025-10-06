@@ -4,6 +4,7 @@ const setProto = Object.create(gadgetProto);
 setProto.contradiction = function ({ current, incoming }) {
     console.log("Contradiction! ", current, incoming);
 };
+setProto.validate = asSet;
 
 function asSet(input) {
     if (input instanceof Set) return input;
@@ -12,25 +13,20 @@ function asSet(input) {
 }
 
 function unionStep(current, input) {
-    const validated = asSet(input);
-    if (validated === undefined) return;
-    if (validated.isSubsetOf(current)) return;
-    this.update(current.union(validated));
+    if (input.isSubsetOf(current)) return;
+    this.update(current.union(input));
 }
 
 function intersectionStep(current, input) {
-    const validated = asSet(input);
-    if (validated === undefined) return;
+    if (input.isSubsetOf(current)) return;
     if (current.size === 0) {
-        this.update(validated);
+        this.update(input);
         return;
     }
-
-    const intersection = current.intersection(validated);
+    const intersection = current.intersection(input);
     if (intersection.size === 0) {
-        this.contradiction({ current, incoming: validated });
+        this.contradiction({ current, incoming: input });
     }
-
     if (intersection.size === current.size) return;
     this.update(intersection);
 }
