@@ -2,13 +2,8 @@
   "name": "@bassline/react",
   "version": "1.0.0",
   "description": "React integration for Bassline gadgets",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "module": "src/index.js",
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "test": "vitest --run",
-    "typecheck": "tsc --noEmit",
     "clean": "rm -rf ./dist && rm -rf ./node_modules"
   },
   "peerDependencies": {
@@ -16,8 +11,7 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "@bassline/core": "workspace:*",
-    "lodash": "^4.17.21"
+    "@bassline/core": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.2.79",

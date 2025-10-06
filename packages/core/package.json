@@ -9,11 +9,7 @@
     "clean": "rm -rf ./dist"
   },
   "license": "MIT",
-  "dependencies": {
-    "express": "^5.1.0",
-    "lodash": "^4.17.21"
-  },
   "devDependencies": {
-    "@types/lodash": "^4.17.12"
+    "express": "^5.1.0"
   }
 }
