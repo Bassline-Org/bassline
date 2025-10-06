@@ -1,4 +1,4 @@
-import { Gadget } from "../../gadget.js";
+import { Gadget, gadgetProto } from "../../gadget.js";
 
 function entries(input) {
     if (input instanceof Object) return Object.entries(input);
@@ -9,6 +9,31 @@ function entries(input) {
     return [];
 }
 
+export const tableProto = Object.create(gadgetProto);
+tableProto.added = function (additions) {
+    this.emit({ added: additions });
+};
+tableProto.get = function (key, shouldFlatten = false) {
+    const value = this.current()[key];
+    if (shouldFlatten && value instanceof Gadget) {
+        return value.current();
+    } else {
+        return value;
+    }
+};
+tableProto.set = function (vals, shouldForward = true) {
+    const toReceive = {};
+    for (const [key, value] of entries(vals)) {
+        const current = this.get(key);
+        if (current instanceof Gadget && shouldForward) {
+            current.receive(value);
+        } else {
+            toReceive[key] = value;
+        }
+    }
+    this.receive(toReceive);
+};
+
 function firstTableStep(current, incoming) {
     const additions = [];
     for (const [key, value] of entries(incoming)) {
@@ -18,26 +43,12 @@ function firstTableStep(current, incoming) {
     }
     const merged = Object.fromEntries(entries(current).concat(additions));
     this.update(merged);
-    this.added?.(Object.fromEntries(additions));
+    this.added(Object.fromEntries(additions));
 }
 
-function firstTable(initial, onAdded) {
-    const cell = new Gadget(firstTableStep, initial);
-    cell.added = onAdded || function (additions) {
-        console.log("added", additions);
-    };
-    return cell;
+export function First(initial, onAdded) {
+    this.step = firstTableStep.bind(this);
+    if (onAdded) this.added = onAdded;
+    this.update(initial);
 }
-
-const a = firstTable({
-    a: 1,
-    b: 2,
-    c: 3,
-});
-
-a.receive({
-    b: 5,
-    d: 6,
-});
-
-console.log(a.current());
+First.prototype = tableProto;

@@ -1,4 +1,4 @@
-import { Gadget, gadgetProto } from "../../gadget.js";
+import { gadgetProto } from "../../gadget.js";
 
 /**
  * @param {any} input
@@ -23,11 +23,13 @@ function maxStep(current, input) {
     if (validated > current) this.update(validated);
 }
 
-export default {
-    max(initial) {
-        return new Gadget(maxStep, initial);
-    },
-    min(initial) {
-        return new Gadget(minStep, initial);
-    },
-};
+export function Max(initial) {
+    this.step = maxStep.bind(this);
+    this.update(initial);
+}
+Max.prototype = gadgetProto;
+export function Min(initial) {
+    this.step = minStep.bind(this);
+    this.update(initial);
+}
+Min.prototype = gadgetProto;
