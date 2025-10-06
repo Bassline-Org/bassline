@@ -6,12 +6,13 @@
   "module": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./devtools": "./src/devtools.js",
     "./functions": "./src/patterns/functions/index.js",
     "./cells": "./src/patterns/cells/index.js",
     "./relations": "./src/patterns/relations/index.js",
-    "./taps": "./src/taps.js",
-    "./metadata": "./src/metadata.js"
+    "./taps": "./src/extensions/taps.js",
+    "./metadata": "./src/extensions/metadata.js",
+    "./registry": "./src/extensions/registry.js",
+    "./devtools": "./src/extensions/devtools.js"
   },
   "scripts": {
     "dev": "node src/index.js",

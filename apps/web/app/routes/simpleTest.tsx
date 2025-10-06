@@ -1,6 +1,6 @@
 import { numeric } from "@bassline/core/cells";
 import { useLocalGadget } from "@bassline/react";
-import { installDevtools } from "@bassline/core/devtools";
+import { installDevtools } from "../../../../packages/core/src/extensions/devtools";
 installDevtools();
 
 const max = new numeric.Max(0);

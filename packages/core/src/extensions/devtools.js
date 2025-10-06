@@ -1,4 +1,4 @@
-import { gadgetProto, StateSymbol } from "./gadget.js";
+const { gadgetProto, StateSymbol } = globalThis.bassline;
 
 export function installDevtools() {
     // Extend the prototype with debugging info
@@ -195,7 +195,6 @@ export function installDevtools() {
                     "• Use temp1.__inspect() for debug info",
                 ],
             ]);
-
             return sections;
         },
     };

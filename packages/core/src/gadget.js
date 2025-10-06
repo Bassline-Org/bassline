@@ -55,14 +55,12 @@ export function Gadget(step, initial) {
 Gadget.prototype = gadgetProto;
 
 export function installBassline() {
-    if (typeof globalThis !== "undefined") {
+    if (
+        typeof globalThis !== "undefined"
+    ) {
         globalThis.bassline = globalThis.bassline || {};
-        globalThis.bassline.core = globalThis.bassline.core || {};
-        globalThis.bassline.core = {
-            ...globalThis.bassline.core,
-            Gadget,
-            StateSymbol,
-            gadgetProto,
-        };
+        globalThis.bassline.Gadget = Gadget;
+        globalThis.bassline.StateSymbol = StateSymbol;
+        globalThis.bassline.gadgetProto = gadgetProto;
     }
 }
