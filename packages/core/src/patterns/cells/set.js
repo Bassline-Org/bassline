@@ -1,4 +1,9 @@
-import { Gadget } from "../../gadget.js";
+import { gadgetProto } from "../../gadget.js";
+
+const setProto = Object.create(gadgetProto);
+setProto.contradiction = function ({ current, incoming }) {
+    console.log("Contradiction! ", current, incoming);
+};
 
 function asSet(input) {
     if (input instanceof Set) return input;
@@ -23,21 +28,22 @@ function intersectionStep(current, input) {
 
     const intersection = current.intersection(validated);
     if (intersection.size === 0) {
-        const handler = this.contradiction;
-        if (handler === undefined) throw new Error("No contradiction handler!");
-        handler(current, validated);
+        this.contradiction({ current, incoming: validated });
     }
 
     if (intersection.size === current.size) return;
     this.update(intersection);
 }
 
-export function intersection(initial, onContradiction) {
-    const cell = new Gadget(intersectionStep, new Set(initial));
-    cell.contradiction = onContradiction;
-    return cell;
+export function Intersection(initial = new Set(), onContradiction) {
+    this.step = intersectionStep.bind(this);
+    if (onContradiction) this.contradiction = onContradiction;
+    this.update(initial);
 }
+Intersection.prototype = setProto;
 
-export function union(initial) {
-    return new Gadget(unionStep, new Set(initial));
+export function Union(initial = new Set()) {
+    this.step = unionStep.bind(this);
+    this.update(initial);
 }
+Union.prototype = setProto;
