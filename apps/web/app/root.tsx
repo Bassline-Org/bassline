@@ -10,6 +10,8 @@ import { Toaster } from 'sonner';
 import type { Route } from "./+types/root";
 import "./app.css";
 import "./styles/scrollbar.css";
+import { installReact } from "@bassline/react";
+installReact();
 
 // Preloading is now handled by the SoundSystemProvider
 

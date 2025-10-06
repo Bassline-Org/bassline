@@ -16,6 +16,9 @@ type Pages = {
   "/playground": {
     params: {};
   };
+  "/simpleTest": {
+    params: {};
+  };
   "/canvas-v2": {
     params: {};
   };
@@ -33,11 +36,15 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/playground" | "/canvas-v2" | "/inspect" | "/canvas" | "/home";
+    page: "/" | "/playground" | "/simpleTest" | "/canvas-v2" | "/inspect" | "/canvas" | "/home";
   };
   "routes/playground.tsx": {
     id: "routes/playground";
     page: "/playground";
+  };
+  "routes/simpleTest.tsx": {
+    id: "routes/simpleTest";
+    page: "/simpleTest";
   };
   "routes/canvas-v2.tsx": {
     id: "routes/canvas-v2";

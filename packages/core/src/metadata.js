@@ -11,7 +11,7 @@ export function installMetadata() {
     Object.assign(gadgetProto, {
         get metadata() {
             if (this[metadataSymbol] === undefined) {
-                this[metadataSymbol] = First();
+                this[metadataSymbol] = new First();
             }
             return this[metadataSymbol];
         },
