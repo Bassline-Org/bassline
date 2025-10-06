@@ -49,7 +49,7 @@ function firstTableStep(current, incoming) {
     this.added(Object.fromEntries(additions));
 }
 
-export function First(initial, onAdded) {
+export function First(initial = {}, onAdded) {
     this.step = firstTableStep.bind(this);
     if (onAdded) this.added = onAdded;
     this.update(initial);

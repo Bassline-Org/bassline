@@ -2,7 +2,11 @@
   "name": "@bassline/react",
   "version": "1.0.0",
   "description": "React integration for Bassline gadgets",
+  "type": "module",
   "module": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
   "scripts": {
     "clean": "rm -rf ./dist && rm -rf ./node_modules"
   },
@@ -16,10 +20,8 @@
   "devDependencies": {
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
-    "@types/lodash": "^4.17.20",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "typescript": "^5.3.3",
     "vitest": "^1.6.0"
   }
 }

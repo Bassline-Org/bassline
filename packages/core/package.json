@@ -4,6 +4,15 @@
   "description": "Core gadget primitives for Bassline - propagation network model",
   "type": "module",
   "module": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./devtools": "./src/devtools.js",
+    "./functions": "./src/patterns/functions/index.js",
+    "./cells": "./src/patterns/cells/index.js",
+    "./relations": "./src/patterns/relations/index.js",
+    "./taps": "./src/taps.js",
+    "./metadata": "./src/metadata.js"
+  },
   "scripts": {
     "dev": "node src/index.js",
     "clean": "rm -rf ./dist"
