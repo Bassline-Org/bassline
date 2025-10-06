@@ -1,140 +1,203 @@
-# Bassline Gadgets
+# @bassline/core
 
-I know this repo is called port-graphs, but alas, nothing in here directly relates to port graphs!
-
-This is an implementation of our hyper minimal propagation network model built around **gadgets** - simple, composable units that can receive data, process it internally, and emit effects into a conceptual void.
-
-## Core Philosophy
-
-The beauty of this system lies in its **intentional simplicity** and **semantic openness**. We don't define how gadgets communicate with each other - instead, we provide a minimal protocol for doing useful work and leave the rest open for creative extension.
-
-This enables powerful mechanical constructions:
-- **Direct wiring** - gadgets can be connected by plugging into their events
-- **Semantic routing** - build meta-gadgets that implement communication patterns like Linda-style tuplespaces
-- **Composable behaviors** - complex systems emerge from simple, focused gadgets
+The core gadget protocol and pattern library. ~28 lines of core code.
 
 ## What is a Gadget?
 
-A gadget is a simple stateful unit with three core capabilities:
+A gadget is a simple stateful unit with a minimal protocol:
 
-1. **Receive** - accepts incoming data
-2. **Consider** - decides what to do based on current state and incoming data  
-3. **Emit** - produces effects (like state changes) into the void
+```javascript
+{
+  receive(input)      // Accept input, validate, step, handle
+  validate(input)     // Validate input (default: pass-through)
+  current()           // Get current state (from Symbol-protected storage)
+  update(newState)    // Update state (internal use only!)
+  step(state, input)  // User-defined: state + input -> action
+  handle(action)      // User-defined: execute action
+  emit(data)          // Emit effects (no-op by default!)
+}
+```
 
-```typescript
-// A gadget that keeps track of the maximum value seen
-const maxGadget = createGadget((current: number, incoming: number) => {
-  if (incoming > current) return 'merge';
-  return 'ignore';
-})({
-  'merge': (gadget, current, incoming) => {
-    const result = Math.max(current, incoming);
-    gadget.update(result);
-    return changed(result);
-  },
-  'ignore': () => noop()
+**Critical**: `emit()` goes nowhere by default. Communication is semantic, not baked in.
+
+## Creating Gadgets
+
+```javascript
+import { Gadget } from "@bassline/core";
+
+// Define step function: (state, input) -> action
+function step(state, input) {
+  if (input > state) return input;  // Only accept increases
+  return undefined;  // Reject decreases
+}
+
+// Create gadget with initial state
+const gadget = new Gadget(step, 0);
+
+// Use it
+gadget.receive(5);   // Accepted
+gadget.current();    // 5
+gadget.receive(3);   // Rejected
+```
+
+## Taps Extension (Mechanical Wiring)
+
+```javascript
+import { installTaps } from "@bassline/core/taps";
+
+// Install taps extension (modifies gadgetProto)
+installTaps();
+
+// Now all gadgets can be tapped
+const cleanup = gadget.tap(effects => {
+  console.log("Effects:", effects);
 });
 
-// Create an instance with initial value
-const max = maxGadget(10);
-max.receive(20); // Updates to 20, emits changed(20)
-max.receive(5);  // Ignores, emits noop()
+// Specific effect tapping
+gadget.tapOn("changed", ({ old, newState }) => {
+  console.log(`Changed from ${old} to ${newState}`);
+});
+
+// Cleanup when done
+cleanup();
 ```
 
-## Simple Gadgets, Powerful Patterns
+Taps are **fire-and-forget** - they can be sync or async, and the emitting gadget doesn't care about timing or delivery guarantees.
 
-### Set Operations
-```typescript
-// Union cell - merges sets, keeping all unique elements
-const union = unionCell(new Set([1, 2, 3]));
-union.receive(new Set([2, 3, 4])); // Results in Set([1, 2, 3, 4])
+## Lattice Operations (Cells)
 
-// Intersection cell - finds common elements
-const intersection = intersectionCell(new Set([1, 2, 3]));
-intersection.receive(new Set([2, 3, 4])); // Results in Set([2, 3])
+Cells implement different merge strategies for moving up a lattice:
+
+```javascript
+import { numeric, set, tables } from "@bassline/core/patterns";
+
+// Numeric cells
+const max = new numeric.Max(0);    // Monotonically increasing
+const min = new numeric.Min(100);  // Monotonically decreasing
+
+// Set cells
+const union = new set.Union([]);         // Set union (growing)
+const intersection = new set.Intersection([]); // Set intersection (shrinking)
+
+// Table cells
+const last = new tables.Last(0);   // Always take newest value
+const first = new tables.First(0); // Keep first value, ignore rest
 ```
 
-### Numeric Operations
-```typescript
-const max = maxCell(0);
-const min = minCell(100);
+## Common Patterns
 
-max.receive(50); // Updates to 50
-min.receive(25); // Updates to 25
+### Bidirectional Sync
+
+```javascript
+import { numeric } from "@bassline/core/cells";
+import { installTaps } from "@bassline/core/taps";
+
+installTaps();
+
+const a = new numeric.Max(0);
+const b = new numeric.Max(0);
+
+a.tapOn("changed", ({ newState }) => b.receive(newState));
+b.tapOn("changed", ({ newState }) => a.receive(newState));
 ```
 
-## Mechanical Construction: Wires
+### Async Propagation
 
-The system provides simple mechanical ways to connect gadgets:
+```javascript
+const source = new numeric.Max(0);
+const delayed = new tables.Last(0);
 
-```typescript
-// Direct one-way connection
-wires.directed(sourceGadget, targetGadget);
-
-// Bidirectional connection  
-wires.bi(gadgetA, gadgetB);
-```
-
-Wires work by intercepting the `emit` method and routing `changed` effects to the target gadget's `receive` method. This is pure mechanical construction - no special communication protocol needed.
-
-## Semantic Extensions: Meta-Gadgets
-
-The real power comes from building gadgets that implement communication patterns. For example, a Linda-style tuplespace:
-
-```typescript
-// A meta-gadget that implements semantic routing
-const tuplespace = createGadget((current: Map<string, any[]>, incoming: {op: 'in' | 'out' | 'read', pattern: string, data?: any}) => {
-  // Implementation would route based on semantic patterns
-  return 'route';
-})({
-  'route': (gadget, current, incoming) => {
-    // Semantic routing logic here
-    return changed({routed: true});
+source.tap(async ({ changed }) => {
+  if (changed !== undefined) {
+    await new Promise(r => setTimeout(r, 100));
+    delayed.receive(changed.newState);
   }
 });
 ```
 
-This tuplespace gadget itself is just a gadget that consumes effects from other gadgets - a meta-gadget that provides semantic meaning to the mechanical connections.
+### Custom Gadget Classes
 
-## Effects System
+```javascript
+import { Gadget } from "@bassline/core";
 
-Gadgets communicate through a simple effect protocol:
+class Counter extends Gadget {
+  constructor(initial = 0) {
+    super((state, input) => this.step(state, input), initial);
+  }
 
-- `changed(value)` - state was updated
-- `noop()` - nothing happened  
-- `contradiction(current, incoming)` - conflicting data received
-- `creation(gadget)` - new gadget created
+  step(state, input) {
+    if (input.increment) return state + 1;
+    if (input.decrement) return state - 1;
+    return undefined;
+  }
 
-**Effects are just data** - they're partial data that results from whatever internally was happening with a particular gadget. Just like how values aren't tied to a particular interpretation, effects aren't tied to particular handlers. We don't say "this must be handled by a disk read" - we just treat it as data and don't care about it after that, because it's not important for the emitting gadget to care!
-
-This is what makes meta-gadgets so powerful: they can consume and operate on effects just like traditional gadgets operate on their normal data.
-
-```typescript
-// A meta-gadget that filters effects
-const effectFilter = createGadget((current: any[], incoming: any[]) => {
-  // Process effects as regular data
-  const filtered = incoming.filter(effect => effect[0] !== 'noop');
-  return filtered.length > 0 ? 'merge' : 'ignore';
-})({
-  'merge': (gadget, current, incoming) => {
-    const result = [...current, ...incoming];
-    gadget.update(result);
-    return changed(result);
-  },
-  'ignore': () => noop()
-});
+  handle(newState) {
+    this.update(newState);
+  }
+}
 ```
 
-The effect system is intentionally minimal and extensible. You can define your own effects and wire gadgets to respond to them however you want.
+## Extension Pattern
 
-## Why This Matters
+All extensions follow this pattern:
 
-This design enables:
+```javascript
+import { gadgetProto } from "@bassline/core";
 
-1. **Composability** - complex behaviors from simple, focused gadgets
-2. **Extensibility** - new communication patterns without changing core protocol
-3. **Mechanical Construction** - direct wiring without semantic coupling
-4. **Semantic Freedom** - implement any communication pattern as a gadget
-5. **Type Safety** - full TypeScript support with inference
+export function installMyExtension() {
+  // Check if already installed
+  if (gadgetProto.myMethod !== undefined) {
+    return;
+  }
 
-The system doesn't prescribe how gadgets should work together - it just provides the minimal tools needed to build whatever communication patterns you need.
+  // Add methods to prototype
+  Object.assign(gadgetProto, {
+    myMethod() {
+      // Now all gadgets have this method
+    }
+  });
+}
+```
+
+## Pattern Libraries
+
+**Cells** (`patterns/cells/`):
+- `numeric`: Max, Min for monotonic numbers
+- `set`: Union, Intersection for set operations
+- `tables`: First, Last, table merge strategies
+- `versioned`: Version-tracked values
+
+**Functions** (`patterns/functions/`):
+- Function composition
+- Partial application
+
+**Relations** (`patterns/relations/`):
+- Relational data patterns
+
+## No Bundler Needed
+
+Vanilla ES modules with no build step:
+
+```json
+{
+  "name": "@bassline/core",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./taps": "./src/taps.js",
+    "./metadata": "./src/metadata.js",
+    "./patterns": "./src/patterns/index.js",
+    "./cells": "./src/patterns/cells/index.js",
+    "./devtools": "./src/devtools.js"
+  }
+}
+```
+
+## Philosophy
+
+The core is intentionally minimal (~28 lines). Complexity emerges from composition, not the primitive.
+
+Effects and taps are **fire-and-forget** - this isn't a limitation, it's what enables the model to work across any transport (memory, network, IPC) without changes.
+
+See [../../CLAUDE.md](../../CLAUDE.md) for the complete guide.

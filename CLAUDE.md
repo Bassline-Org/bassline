@@ -1,4 +1,4 @@
-# CLAUDE.md - Port-Graphs/Gadgets System Guide
+# CLAUDE.md - Bassline System Guide
 
 **📝 Note**: Check `.claude/context.md` for recent work context and architectural decisions from previous sessions.
 
@@ -8,397 +8,314 @@ This is **Bassline** - a hyper-minimal propagation network model built around **
 
 **Core Philosophy**: We don't define how gadgets communicate - we provide a minimal protocol for doing useful work and leave communication semantically open. This is intentional and critical to the design.
 
+## Why JavaScript (Not TypeScript)
+
+**The system is written in vanilla JavaScript, not TypeScript.** This is a deliberate choice:
+
+- Our behaviors are highly dynamic (prototype manipulation, runtime composition, meta-programming)
+- Static typing fought against the dynamic nature of the gadget model
+- TypeScript ceremony added complexity without proportional value for this use case
+- JavaScript lets us focus on the primitive without type gymnastics
+
+**Future**: We may add type definitions later for library consumers, but the core implementation will remain JavaScript. The system's power comes from its runtime flexibility, not compile-time guarantees.
+
 ## Critical Design Principles
 
 1. **Semantic Openness**: `emit()` goes nowhere by default. Communication is NOT baked into the model.
 2. **Partial Information**: Everything is partial information moving up a lattice via ACI (Associative, Commutative, Idempotent) operations.
-3. **Mechanical Simplicity**: Core is ~50 lines. Complexity emerges from composition, not the primitive.
+3. **Mechanical Simplicity**: Core is ~28 lines (gadget.js). Taps are an extension (~27 lines). Complexity emerges from composition, not the primitive.
 4. **Fire-and-Forget Everything**: Both effects AND taps are fire-and-forget - no delivery or timing guarantees.
 5. **Effects as Data**: Effects are just data about what happened internally - no prescribed handlers.
 6. **Meta-Gadgets**: Routing/communication patterns are themselves gadgets operating on effects.
+7. **Runtime Flexibility**: Prototype-based composition enables emergent behaviors impossible with static types.
 
 ## Architecture
 
 ```
-port-graphs/                 # Core library
-├── src/
-│   ├── core/
-│   │   └── typed.ts        # THE CORE - defGadget, Gadget interface, type machinery
-│   ├── patterns/
-│   │   ├── cells/          # ACI merge strategies (max, min, union, intersection, tables)
-│   │   ├── functions/      # Function gadgets with partial application
-│   │   └── ui/            # UI gadgets (slider, button, checkbox, etc.)
-│   ├── effects/           # Standard effect constructors
-│   └── multi.ts           # Multimethod dispatch utility
-
-port-graphs-react/          # React integration
-├── src/
-│   ├── GadgetProvider.tsx # Global gadget state registry
-│   ├── useGadget.ts      # Core hook - hijacks update/current for React
-│   ├── useGadgetEffect.ts # Tap into gadget effects
-│   └── components/        # React components for UI gadgets
+packages/
+├── core/                    # Core library (~454 LOC without devtools)
+│   └── src/
+│       ├── gadget.js        # THE CORE - 28 lines of gadget protocol
+│       ├── taps.js          # Taps extension - 27 lines
+│       ├── metadata.js      # Metadata extension
+│       ├── devtools.js      # Developer utilities
+│       └── patterns/
+│           ├── cells/       # ACI merge strategies
+│           │   ├── numeric.js    # Max, Min (30 LOC)
+│           │   ├── set.js        # Union, Intersection (45 LOC)
+│           │   ├── tables.js     # First, Last, table operations (57 LOC)
+│           │   └── versioned.js  # Versioned values (22 LOC)
+│           ├── functions/   # Function composition (113 LOC)
+│           └── relations/   # Relational patterns (104 LOC)
+│
+└── react/                   # React integration (~59 LOC)
+    └── src/
+        └── index.js         # Prototype extensions for React hooks
 ```
+
+**Total runtime code**: ~513 LOC (core + react, excluding devtools)
 
 ## Core Concepts
 
 ### 1. Gadget Anatomy
 
-```typescript
-type Gadget<Spec> = {
-  current: () => StateOf<Spec>;      // Get current state
-  update: (state: StateOf<Spec>) => void;  // Update state
-  receive: (data: InputOf<Spec>) => void;  // Accept input
-  emit: (effect: Partial<EffectsOf<Spec>>) => void;  // Emit effects (goes nowhere by default!)
+```javascript
+// The gadget protocol (from gadgetProto)
+{
+  receive(input)      // Accept input, validate, step, handle
+  validate(input)     // Validate input (default: pass-through)
+  current()           // Get current state (from Symbol-protected storage)
+  update(newState)    // Update state (internal use only!)
+  step(state, input)  // User-defined: state + input -> action
+  handle(action)      // User-defined: execute action
+  emit(data)          // Emit effects (no-op by default!)
 }
 ```
 
-**Critical**: Both `emit()` and `tap()` are fire-and-forget. No delivery guarantees, no timing guarantees. This is intentional.
+**Critical**: `emit()` goes nowhere by default. Communication is semantic, not baked in.
 
-### 2. Spec Composition
+### 2. Creating Gadgets
 
-Specs are built by composing type-level pieces:
+```javascript
+import { Gadget } from "@bassline/core";
 
-```typescript
-type MySpec = 
-  & State<T>        // What state it holds
-  & Input<I>        // What input it accepts
-  & Actions<A>      // What internal actions can occur
-  & Effects<E>      // What effects it can emit
+// Define step function: (state, input) -> action
+function step(state, input) {
+  if (input > state) return input;  // Only accept increases
+  return undefined;  // Reject decreases
+}
+
+// Create gadget with initial state
+const gadget = new Gadget(step, 0);
+
+// Use it
+gadget.receive(5);   // Accepted
+gadget.current();    // 5
+gadget.receive(3);   // Rejected
 ```
 
-### 3. The defGadget Pattern
+### 3. Taps Extension (Mechanical Wiring)
 
-```typescript
-defGadget<Spec>({
-  dispatch: (state, input) => /* return action or null */,
-  methods: {
-    actionName: (gadget, context) => /* return effects */
-  }
-})
+```javascript
+import { installTaps } from "@bassline/core/taps";
+
+// Install taps extension (modifies gadgetProto)
+installTaps();
+
+// Now all gadgets can be tapped
+const cleanup = gadget.tap(effects => {
+  console.log("Effects:", effects);
+});
+
+// Specific effect tapping
+gadget.tapOn("changed", ({ old, newState }) => {
+  console.log(`Changed from ${old} to ${newState}`);
+});
+
+// Cleanup when done
+cleanup();
 ```
 
-**Key Insight**: dispatch decides WHAT to do, methods define HOW to do it.
+Taps are **fire-and-forget** - they can be sync or async, and the emitting gadget doesn't care about timing or delivery guarantees. This uniformity means the same gadget works in-memory, over network, or across processes without modification.
 
 ### 4. Lattice Operations (Cells)
 
 Cells implement different merge strategies for moving up a lattice:
-- `maxCell`: Monotonically increasing numbers
-- `minCell`: Monotonically decreasing numbers
-- `unionCell`: Set union (always growing)
-- `intersectionCell`: Set intersection (always shrinking)
-- `lastCell`: Always take newest value
-- `firstCell`: Keep first value, ignore rest
 
-### 5. Tapping (Mechanical Wiring)
+```javascript
+import { numeric, set, tables } from "@bassline/core/patterns";
 
-```typescript
-withTaps(gadget) // Makes a gadget tappable
-gadget.tap(effect => /* do something */) // Returns cleanup function
+// Numeric cells
+const max = new numeric.Max(0);    // Monotonically increasing
+const min = new numeric.Min(100);  // Monotonically decreasing
+
+// Set cells
+const union = new set.Union([]);         // Set union (growing)
+const intersection = new set.Intersection([]); // Set intersection (shrinking)
+
+// Table cells
+const last = new tables.Last(0);   // Always take newest value
+const first = new tables.First(0); // Keep first value, ignore rest
 ```
 
-This is how we do mechanical wiring without baking communication into the model. Taps are **fire-and-forget** just like effects - they can be synchronous or asynchronous, and the emitting gadget doesn't care about timing or delivery guarantees. This uniformity means the same gadget works in-memory, over network, or across processes without modification.
+### 5. React Integration
 
-## TypeScript Type Safety Standards
+```javascript
+import { installReact } from "@bassline/react";
+import { numeric } from "@bassline/core/cells";
 
-### ABSOLUTE RULES - NO EXCEPTIONS
+// Install React hooks (modifies gadgetProto)
+installReact();
 
-**NEVER USE `any`** - If you're reaching for `any`, you're doing it wrong. Period.
+// Now all gadgets have React hooks!
+function Component() {
+  const gadget = useMemo(() => new numeric.Max(0), []);
 
-**NO LAZY TYPE ASSERTIONS** - Absolutely forbidden:
-- ❌ `as any`
-- ❌ `as unknown as SomeType`  
-- ❌ `// @ts-ignore`
-- ❌ `// @ts-expect-error` (unless in test files specifically testing type errors)
-- ❌ Non-null assertions (`!`) without explicit guards
+  // useState pattern (familiar API)
+  const [count, send] = gadget.useState();
 
-### Type Safety Requirements
+  // Or use separately
+  const count = gadget.useCurrent();
+  const send = gadget.useSend();
 
-1. **Let TypeScript Infer** - The gadget system is designed for maximum inference:
-   ```typescript
-   // ✅ GOOD - TypeScript infers everything
-   const gadget = sliderGadget(50, 0, 100);
-   
-   // ❌ BAD - Unnecessary annotations
-   const gadget: Gadget<SliderSpec> = sliderGadget(50, 0, 100);
-   ```
+  // Computed values
+  const doubled = gadget.useComputed(n => n * 2);
 
-3. **Leverage the Type System**:
-   ```typescript
-   // ✅ Use conditional types and mapped types
-   // THIS ALREADY EXISTS!
-   type StateOf<S> = S extends State<infer St> ? St : never;
-   
-   // ✅ Use discriminated unions for commands
-   type Commands = 
-     | { type: 'set'; value: number }
-     | { type: 'increment' }
-   ```
+  // Effect tapping
+  gadget.useTap(effects => {
+    console.log("Effects:", effects);
+  });
 
-4. **Generic Constraints Are Your Friend**:
-  ALMOST ALL CODE SHOULD BE GENERIC OVER A SPEC FOR GADGETS!
-   ```typescript
-   // ✅ Proper constraints
-   function connect<S, G extends Gadget<S> & Tappable<S>>(gadget: G) {
-     // Full type safety maintained
-   }
-   ```
-
-### Why This Matters
-
-The entire gadget system is built on **compile-time guarantees**. When you use `any` or lazy assertions:
-- You break the inference chain
-- You lose the benefits of the typed dispatch system
-- You make refactoring dangerous
-- You defeat the entire purpose of the typed architecture
-
-### If You're Stuck
-
-If you find yourself wanting to use `any`:
-1. **Stop and reconsider the design** - The need for `any` usually indicates a design problem
-2. **Use proper generics** - Our system supports complex generic constraints
-3. **Use discriminated unions** - For variant types
-4. **Ask for help** - Better to spend time getting types right than shipping unsafe code
-
-### Common Patterns That Maintain Safety
-
-```typescript
-// Function that works with any gadget spec
-function processGadget<S>(gadget: Gadget<S>) {
-  // TypeScript knows the relationships
-  const state = gadget.current();  // StateOf<S>
+  return <button onClick={() => send(count + 1)}>{count}</button>;
 }
-
-// Extracting types from existing gadgets
-type MyGadgetSpec = SpecOf<typeof myGadget>;
-
-// Building complex specs via composition
-type ComplexSpec = 
-  & State<MyState>
-  & Input<MyInput>
-  & Actions<MyActions>
-  & Effects<MyEffects>;
 ```
 
-**Remember**: The ~50 line core gives us incredible type safety through inference. Don't throw that away with lazy typing. The types ARE the documentation, they ARE the guardrails, and they ARE what makes this system powerful.
+**Key Innovation**: No wrapper components, no providers, no context. Just install once and every gadget gets React hooks for free via prototype extension.
 
 ## Working with the Codebase
 
-### Creating New Gadgets
+### Creating Custom Gadgets
 
-**ALWAYS** follow this pattern for new gadgets:
+Pattern for custom step functions:
 
-```typescript
-// 1. Define the spec with all four components
-export type MyGadgetSpec = 
-  & State<{/* state shape */}>
-  & Input</* union of command types */>
-  & Actions<{/* internal actions */}>
-  & Effects<{/* possible effects */}>
-
-// 2. Create the gadget factory
-export function myGadget(/* params */) {
-  const baseGadget = defGadget<MyGadgetSpec>({
-    dispatch: (state, input) => {
-      // Examine input and state, return action name or null
-      // This should be PURE - no side effects!
-    },
-    methods: {
-      // One method per action
-      actionName: (gadget, context) => {
-        // Can call gadget.update() here
-        // Return effects (or undefined)
-      }
-    }
-  })(/* initial state */);
-  
-  // ALWAYS wrap with taps for composability
-  // Note: taps are also fire-and-forget, can be sync or async
-  return withTaps(baseGadget);
-}
-```
-
-### Adding React Components
-
-For new UI gadget components:
-
-```typescript
-// 1. Props interface with gadget and callbacks
-export interface MyComponentProps<S extends MySpec, G extends Gadget<S> & Tappable<S>> {
-  gadget: G;
-  className?: string;
-  onChange?: (value: EffectsOf<S>['changed']) => void;
+```javascript
+function counterStep(state, input) {
+  // Examine input and decide what to do
+  if (input.increment) return state + 1;
+  if (input.decrement) return state - 1;
+  if (input.set !== undefined) return input.set;
+  return undefined; // Reject unknown inputs
 }
 
-// 2. Component using useGadget hook
-export function MyComponent<S extends MySpec, G extends Gadget<S> & Tappable<S>>({
-  gadget,
-  onChange
-}: MyComponentProps<S, G>) {
-  const [state, send] = useGadget<S, G>(gadget);
-  
-  useGadgetEffect(gadget, ({ changed }) => {
-    if (changed !== undefined) {
-      onChange?.(changed);
-    }
-  }, [onChange]);
-  
-  // Render based on state, send commands on interaction
-}
+const counter = new Gadget(counterStep, 0);
+counter.receive({ increment: true });
 ```
 
-### Type Inference Rules
+### Gadget Classes (for Complex Behavior)
 
-1. **Let TypeScript infer whenever possible** - avoid explicit type annotations
-2. **Use `SpecOf<T>` to extract specs** from gadget instances
-3. **Use `StateOf`, `InputOf`, `EffectsOf`** to extract parts of specs
-4. **Generic constraints should be minimal** - usually just `Gadget<S>`
+```javascript
+import { Gadget } from "@bassline/core";
 
-### Command Patterns for UI
-
-UI gadgets should use tagged unions for commands:
-
-```typescript
-type Commands = 
-  | { set: T }           // Set to specific value
-  | { increment: {} }    // Increment by step
-  | { toggle: {} }       // Toggle boolean
-  | { configure: {...} } // Update configuration
-  | { enable: {} }       // Enable interaction
-  | { disable: {} }      // Disable interaction
-```
-
-### Effect Naming Conventions
-
-- `changed`: State was updated with new value
-- `validated`: Input was modified to meet constraints  
-- `configured`: Configuration was updated
-- `cleared`: State was reset/cleared
-- `noop`: Nothing happened (input ignored)
-- `contradiction`: Conflicting data received
-
-## Extension Patterns
-
-### 1. Meta-Gadgets (Semantic Routing)
-
-```typescript
-// Meta-gadgets consume effects as data
-const router = defGadget<RouterSpec>({
-  dispatch: (state, effect) => {
-    // Route based on effect type
-    if ('changed' in effect) return { route: effect.changed };
-    return { ignore: {} };
-  },
-  methods: {
-    route: (gadget, value) => {
-      // Semantic routing logic
-    }
+class Counter extends Gadget {
+  constructor(initial = 0) {
+    super((state, input) => this.step(state, input), initial);
   }
-});
+
+  step(state, input) {
+    if (input.increment) return state + 1;
+    if (input.decrement) return state - 1;
+    return undefined;
+  }
+
+  handle(newState) {
+    this.update(newState);
+  }
+}
 ```
 
-### 2. Family Tables (Dynamic Collections)
+### Extension Pattern (Install Functions)
 
-Use `defFamilyTable` for managing collections of gadgets:
+All extensions follow this pattern:
 
-```typescript
-const family = defFamilyTable(() => createGadget());
-family.receive({ create: ['key1', 'key2'] });
-family.receive({ send: { key1: someInput } });
+```javascript
+import { gadgetProto } from "@bassline/core";
+
+export function installMyExtension() {
+  // Check if already installed
+  if (gadgetProto.myMethod !== undefined) {
+    return;
+  }
+
+  // Add methods to prototype
+  Object.assign(gadgetProto, {
+    myMethod() {
+      // Now all gadgets have this method
+    }
+  });
+}
 ```
 
-### 3. Derived Gadgets
+### Pattern Libraries
 
-```typescript
-const derived = derive(source, state => transform(state));
-// Automatically connected via taps
-```
+**Cells** (`patterns/cells/`):
+- `numeric`: Max, Min for monotonic numbers
+- `set`: Union, Intersection for set operations
+- `tables`: First, Last, table merge strategies
+- `versioned`: Version-tracked values
 
-## Testing Guidelines
+**Functions** (`patterns/functions/`):
+- Function composition
+- Partial application
+- (~113 LOC)
 
-1. **Test dispatch logic separately** from methods
-2. **Test effects emission** not internal state changes
-3. **Test composition** by wiring gadgets and checking propagation
-4. **Use withTaps in tests** to observe effects
-5. **Handle async taps in tests** with proper awaits
-
-```typescript
-// Sync testing
-const gadget = withTaps(myGadget());
-let emitted: any;
-gadget.tap(e => emitted = e);
-gadget.receive(input);
-expect(emitted).toEqual({ changed: expected });
-
-// Async testing
-const gadget = withTaps(myGadget());
-const emissions: any[] = [];
-gadget.tap(async e => {
-  await someAsyncOp();
-  emissions.push(e);
-});
-gadget.receive(input);
-await new Promise(r => setTimeout(r, 100));
-expect(emissions).toContain({ changed: expected });
-```
-
-## Performance Considerations
-
-1. **Gadgets are lightweight** - create many without concern
-2. **Taps are fire-and-forget** - can be sync or async, no guarantees about timing
-3. **React integration uses useSyncExternalStore** for concurrent mode
-4. **WeakMap for registry** prevents memory leaks
+**Relations** (`patterns/relations/`):
+- Relational data patterns
+- (~104 LOC)
 
 ## Common Patterns
 
 ### Bidirectional Sync
 
-```typescript
-const a = withTaps(maxCell(0));
-const b = withTaps(maxCell(0));
+```javascript
+import { numeric } from "@bassline/core/cells";
+import { installTaps } from "@bassline/core/taps";
 
-a.tap(({ changed }) => changed && b.receive(changed));
-b.tap(({ changed }) => changed && a.receive(changed));
+installTaps();
+
+const a = new numeric.Max(0);
+const b = new numeric.Max(0);
+
+a.tapOn("changed", ({ newState }) => b.receive(newState));
+b.tapOn("changed", ({ newState }) => a.receive(newState));
 ```
 
 ### Async Propagation
 
-```typescript
-const source = withTaps(maxCell(0));
-const delayed = withTaps(lastCell(0));
+```javascript
+const source = new numeric.Max(0);
+const delayed = new tables.Last(0);
 
-// Async tap for delayed propagation
 source.tap(async ({ changed }) => {
   if (changed !== undefined) {
     await new Promise(r => setTimeout(r, 100));
-    delayed.receive(changed);
+    delayed.receive(changed.newState);
   }
-});
-```
-
-### Validation Chain
-
-```typescript
-const input = withTaps(textInputGadget());
-const valid = withTaps(predicateCell(isEmail));
-
-input.tap(({ changed }) => valid.receive(changed));
-valid.tap(({ changed }) => {
-  if (changed) console.log('Valid email!');
 });
 ```
 
 ### Aggregation
 
-```typescript
-const nums = [1, 2, 3].map(n => withTaps(maxCell(n)));
-const sum = withTaps(lastCell(0));
+```javascript
+const nums = [1, 2, 3].map(n => new numeric.Max(n));
+const sum = new tables.Last(0);
 
 nums.forEach(n => {
   n.tap(() => {
-    const total = nums.reduce((a, g) => a + g.current(), 0);
+    const total = nums.reduce((acc, g) => acc + g.current(), 0);
     sum.receive(total);
   });
 });
+```
+
+### React Usage
+
+```javascript
+import { numeric } from "@bassline/core/cells";
+
+const max = new numeric.Max(0);
+
+export default function SimpleTest() {
+  const [count, update] = max.useState();
+  const computed = max.useComputed(count => count * 2);
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => update(count + 1)}>Increment</button>
+      <div>Computed: {computed}</div>
+    </div>
+  );
+}
 ```
 
 ## Philosophy Reminders
@@ -408,21 +325,26 @@ nums.forEach(n => {
 - **Keep gadgets focused** - combine simple gadgets rather than making complex ones
 - **Embrace partial information** - not knowing everything is a feature
 - **Communication is just another gadget** - routers, channels, spaces are all gadgets
+- **Prototype extensions over wrappers** - modify gadgetProto, don't wrap gadgets
 
 ## Debugging Tips
 
 1. **Tap everything during development**:
-```typescript
+```javascript
 gadget.tap(e => console.log('Effect:', e));
 ```
 
-2. **Check dispatch logic first** - most bugs are in deciding what action to take
+2. **Check step logic first** - most bugs are in deciding what action to take
 
-3. **Verify state updates** in methods before emitting effects
+3. **Use devtools** (if available):
+```javascript
+import { installBassline } from "@bassline/core/devtools";
+installBassline(); // Adds window.bassline
+```
 
 4. **Build trace gadgets for time-travel debugging**:
-```typescript
-const tracer = withTaps(lastTable({}));
+```javascript
+const tracer = new tables.Last({});
 gadget.tap(effect => {
   const timestamp = Date.now();
   tracer.receive({ [timestamp]: { state: gadget.current(), effect } });
@@ -432,86 +354,87 @@ gadget.tap(effect => {
 
 ## Anti-Patterns to Avoid
 
-❌ **Don't** put communication logic in gadget methods
-❌ **Don't** make effects dependent on external state  
-❌ **Don't** use async operations inside dispatch/methods (async taps are fine)
+❌ **Don't** put communication logic in gadget step/handle methods
+❌ **Don't** make effects dependent on external state
+❌ **Don't** use async operations inside step/handle (async taps are fine!)
 ❌ **Don't** mutate state directly - always use gadget.update()
-❌ **Don't** forget to wrap with withTaps()
+❌ **Don't** forget to install extensions before using them
 ❌ **Don't** create circular dependencies without careful thought about termination
 ❌ **Don't** assume taps execute synchronously or in order
 
 ## Advanced Patterns
 
 ### Async Taps
-```typescript
+```javascript
 // Taps can be async - fire-and-forget works across async boundaries
 gadget.tap(async (effect) => {
   if ('changed' in effect) {
-    await fetch('/api/log', { 
-      method: 'POST', 
-      body: JSON.stringify(effect) 
+    await fetch('/api/log', {
+      method: 'POST',
+      body: JSON.stringify(effect)
     });
   }
 });
 
 // Or spawn background processing
 gadget.tap(effect => {
-  setTimeout(() => otherGadget.receive(effect.changed), 1000);
-});
-```
-
-### Temporal Gadgets
-```typescript
-// Gadgets that track time-based state
-const temporal = defGadget<TemporalSpec>({
-  dispatch: (state, input) => {
-    const now = Date.now();
-    if (now - state.lastUpdate > 1000) {
-      return { update: { ...input, timestamp: now } };
-    }
-    return { throttle: {} };
-  }
-});
-```
-
-### Cryptographic Gadgets
-```typescript
-// Gadgets operating on encrypted partial information
-const encrypted = defGadget<EncryptedSpec>({
-  dispatch: (state, input) => {
-    // Operate on encrypted values without decrypting
-    return { merge: homomorphicAdd(state, input) };
-  }
-});
-```
-
-### Constraint Propagation
-```typescript
-// Gadgets that emit constraints, not values
-const constraint = defGadget<ConstraintSpec>({
-  dispatch: (state, input) => {
-    if (satisfies(input, state.constraints)) {
-      return { propagate: deriveNewConstraints(input) };
-    }
-    return { contradiction: {} };
-  }
+  setTimeout(() => otherGadget.receive(effect.changed?.newState), 1000);
 });
 ```
 
 ### Distributed Gadgets
-```typescript
+```javascript
 // Fire-and-forget taps naturally support distributed systems
-const local = withTaps(maxCell(0));
+const local = new numeric.Max(0);
 
 // Could be across network, IPC, WebSocket, etc.
 local.tap(({ changed }) => {
   if (changed !== undefined) {
-    websocket.send(JSON.stringify({ type: 'sync', value: changed }));
+    websocket.send(JSON.stringify({ type: 'sync', value: changed.newState }));
   }
 });
 
 // No changes needed to the gadget model - distribution is just async taps
 ```
+
+### Custom Extensions
+
+```javascript
+// Example: Add logging to all gadgets
+export function installLogging() {
+  const originalReceive = gadgetProto.receive;
+
+  Object.assign(gadgetProto, {
+    receive(input) {
+      console.log(`[${this.constructor.name}] receive:`, input);
+      return originalReceive.call(this, input);
+    }
+  });
+}
+```
+
+## No Bundler Needed
+
+The core and React packages are vanilla ES modules with no build step:
+
+**package.json for @bassline/core:**
+```json
+{
+  "name": "@bassline/core",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./taps": "./src/taps.js",
+    "./metadata": "./src/metadata.js",
+    "./patterns": "./src/patterns/index.js",
+    "./cells": "./src/patterns/cells/index.js",
+    "./devtools": "./src/devtools.js"
+  }
+}
+```
+
+Consuming apps (like Vite) handle bundling. We ship source.
 
 ## Remember
 
@@ -519,4 +442,8 @@ This system's power comes from its **minimalism** and **semantic openness**. The
 
 Both effects and taps are **fire-and-forget** - this isn't a limitation, it's what enables the model to work across any transport (memory, network, IPC) without changes. Timing and delivery are concerns for meta-gadgets if needed, not the core model.
 
+The prototype-based extension system means **one install, universal behavior**. No wrappers, no providers, no ceremony.
+
 The goal is to do more than anyone else in the world not by having more features, but by having the right primitive that composes infinitely.
+
+**Stats**: ~28 lines for the core protocol, ~513 total runtime LOC including all patterns and React integration.
