@@ -1,3 +1,4 @@
+const { gadgetProto } = bl();
 export const idSymbol = Symbol("bassline-id");
 
 export function getGadgetById(id) {
@@ -18,15 +19,15 @@ export function installRegistry() {
      * Use the getGadgetById function instead to access gadgets by id.
      * Or access the id property of the gadget to get the id!
      */
-    globalThis.bassline.registry = globalThis.bassline.registry ||
+    globalThis.bassline.registry = bl().registry ||
         new Map();
 
-    Object.assign(globalThis.bassline.gadgetProto, {
+    Object.assign(gadgetProto, {
         id() {
             if (this[idSymbol] === undefined) {
                 this[idSymbol] = Date.now().toString(36);
                 console.log("Setting id", this[idSymbol]);
-                globalThis.bassline.registry.set(
+                bl().registry.set(
                     this[idSymbol],
                     new WeakRef(this),
                 );

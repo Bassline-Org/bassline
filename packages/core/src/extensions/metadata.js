@@ -1,4 +1,4 @@
-const { gadgetProto } = globalThis.bassline;
+const { gadgetProto } = bl();
 
 import { First } from "../patterns/cells/tables.js";
 

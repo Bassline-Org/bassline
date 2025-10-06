@@ -1,4 +1,4 @@
-const { gadgetProto } = globalThis.bassline;
+const { gadgetProto } = bl();
 
 function asNumber(input) {
     if (typeof input === "number") return input;

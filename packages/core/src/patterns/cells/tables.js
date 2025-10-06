@@ -1,4 +1,4 @@
-const { Gadget, gadgetProto } = globalThis.bassline;
+const { Gadget, gadgetProto } = bl();
 
 function entries(input) {
     if (Array.isArray(input) && input.length === 2) {

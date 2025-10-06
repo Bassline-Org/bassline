@@ -1,4 +1,4 @@
-const { gadgetProto } = globalThis.bassline;
+const { gadgetProto } = bl();
 
 export function installTaps() {
     if (gadgetProto.tap !== undefined) {

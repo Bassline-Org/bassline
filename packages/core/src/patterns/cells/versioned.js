@@ -1,4 +1,4 @@
-const { gadgetProto } = globalThis.bassline;
+const { gadgetProto } = bl();
 
 const versionedProto = Object.create(gadgetProto);
 

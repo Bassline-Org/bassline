@@ -1,4 +1,4 @@
-const { gadgetProto } = globalThis.bassline;
+const { gadgetProto } = bl();
 
 const setProto = Object.create(gadgetProto);
 setProto.contradiction = function ({ current, incoming }) {

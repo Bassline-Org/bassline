@@ -1,4 +1,4 @@
-const { gadgetProto, StateSymbol } = globalThis.bassline;
+const { gadgetProto, StateSymbol } = bl();
 
 export function installDevtools() {
     // Extend the prototype with debugging info

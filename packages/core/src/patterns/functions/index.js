@@ -1,4 +1,4 @@
-const { gadgetProto } = globalThis.bassline;
+const { gadgetProto } = bl();
 
 export function transformStep(_current, input) {
     const validated = this.validateInput(input);
