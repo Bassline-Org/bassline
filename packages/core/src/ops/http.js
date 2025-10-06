@@ -34,3 +34,28 @@ export function installHttpOps() {
         requiredKeys: ["url"],
     });
 }
+
+export default {
+    async httpGet(url) {
+        const res = await fetch(url);
+        return await res.json();
+    },
+    async httpPost({ url, body }) {
+        const res = await fetch(url, {
+            method: "POST",
+            body: JSON.stringify(body),
+        });
+        return await res.json();
+    },
+    async httpPut({ url, body }) {
+        const res = await fetch(url, {
+            method: "PUT",
+            body: JSON.stringify(body),
+        });
+        return await res.json();
+    },
+    async httpDelete({ url }) {
+        const res = await fetch(url, { method: "DELETE" });
+        return await res.json();
+    },
+};

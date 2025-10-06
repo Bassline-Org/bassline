@@ -29,3 +29,40 @@ export function installMathOps() {
         fn: (args) => Object.values(args).reduce((a, b) => a * b, 1),
     });
 }
+
+export default {
+    inc(x) {
+        return x + 1;
+    },
+    dec(x) {
+        return x - 1;
+    },
+    neg(x) {
+        return -x;
+    },
+    abs(x) {
+        return Math.abs(x);
+    },
+    add({ a, b }) {
+        return a + b;
+    },
+    sub({ a, b }) {
+        return a - b;
+    },
+    mul({ a, b }) {
+        return a * b;
+    },
+    div({ a, b }) {
+        return a / b;
+    },
+    sum(args) {
+        return Object.values(args).reduce((a, b) => a + b, 0);
+    },
+    average(args) {
+        return Object.values(args).reduce((a, b) => a + b, 0) /
+            Object.values(args).length;
+    },
+    product(args) {
+        return Object.values(args).reduce((a, b) => a * b, 1);
+    },
+};

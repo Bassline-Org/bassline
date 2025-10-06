@@ -74,3 +74,8 @@ export function FirstWithCells(initial = {}, factory = Ordinal, onAdded) {
     this.update(initial);
 }
 FirstWithCells.prototype = tableProto;
+
+export default {
+    First,
+    FirstWithCells,
+};

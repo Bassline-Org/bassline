@@ -28,3 +28,8 @@ export function Min(initial) {
     this.update(initial);
 }
 Min.prototype = numericProto;
+
+export default {
+    Max,
+    Min,
+};

@@ -20,3 +20,33 @@ export function installArrayOps() {
         requiredKeys: ["a", "b"],
     });
 }
+
+export default {
+    asArray(arr) {
+        return Array.isArray(arr) ? arr : [arr];
+    },
+    length(arr) {
+        return arr.length;
+    },
+    first(arr) {
+        return arr[0];
+    },
+    last(arr) {
+        return arr[arr.length - 1];
+    },
+    rest(arr) {
+        return arr.slice(1);
+    },
+    butlast(arr) {
+        return arr.slice(0, -1);
+    },
+    iota(n) {
+        return Array.from({ length: n }, (_, i) => i);
+    },
+    nth(arr, n) {
+        return arr[n];
+    },
+    concat(a, b) {
+        return a.concat(b);
+    },
+};

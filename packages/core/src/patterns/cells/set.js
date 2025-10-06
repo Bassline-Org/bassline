@@ -43,3 +43,8 @@ export function Union(initial = new Set()) {
     this.update(initial);
 }
 Union.prototype = setProto;
+
+export default {
+    Union,
+    Intersection,
+};

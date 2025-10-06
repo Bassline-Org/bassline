@@ -21,3 +21,21 @@ export function installLogicOps() {
         fn: (args) => Object.values(args).some(Boolean),
     });
 }
+
+export default {
+    and({ a, b }) {
+        return a && b;
+    },
+    or({ a, b }) {
+        return a || b;
+    },
+    xor({ a, b }) {
+        return !!(a ^ b);
+    },
+    every(args) {
+        return Object.values(args).every(Boolean);
+    },
+    some(args) {
+        return Object.values(args).some(Boolean);
+    },
+};

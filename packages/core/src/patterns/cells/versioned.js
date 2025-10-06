@@ -20,3 +20,7 @@ export function Ordinal(initial) {
     this.update([0, initial]);
 }
 Ordinal.prototype = versionedProto;
+
+export default {
+    Ordinal,
+};

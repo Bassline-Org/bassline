@@ -114,3 +114,8 @@ export function Partial(
     this.update({ args: {}, result: undefined });
 }
 Partial.prototype = functionProto;
+
+export default {
+    Transform,
+    Partial,
+};

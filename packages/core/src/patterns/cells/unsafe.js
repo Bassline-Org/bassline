@@ -12,3 +12,7 @@ export function Last(initial) {
     this.update(initial);
 }
 Last.prototype = unsafeProto;
+
+export default {
+    Last,
+};
