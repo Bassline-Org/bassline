@@ -33,9 +33,13 @@ export function installPackage(gadgetPackage) {
     const { gadgets } = gadgetPackage;
     for (const [name, value] of Object.entries(gadgets)) {
         const pkg = value.prototype.pkg;
+        // We set the constructor to the value itself so it has the correct name
+        value.prototype.constructor = value;
+        console.log(`Installing: ${pkg}.${name}`);
         ensurePath(pkg);
         const context = bl().gadgets[pkg];
         context[name] = value;
+        console.log(`Installed: ${pkg}.${name}`);
     }
 }
 
@@ -45,20 +49,23 @@ function ensurePath(path) {
     }
 }
 
+export function fromSpec(spec) {
+    const { pkg, gadget, state } = spec;
+    const construct = bl().gadgets[pkg][gadget];
+    const cell = new construct(state);
+    return cell;
+}
+
 Object.assign(bl().gadgetProto, {
     toSpec() {
         return {
             pkg: this.pkg,
-            constructor: this.constructor.name,
+            gadget: this.constructor.name,
             state: this.current(),
         };
-    },
-    fromSpec(spec) {
-        const { pkg, constructor, state } = spec;
-        const cell = new bl().gadgets[pkg][constructor](state);
-        return cell;
     },
 });
 
 globalThis.bl = bl;
 globalThis.bassline.installPackage = installPackage;
+globalThis.bassline.fromSpec = fromSpec;
