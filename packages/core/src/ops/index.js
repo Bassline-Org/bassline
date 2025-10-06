@@ -1,16 +1,18 @@
 import { bl } from "../index.js";
 bl();
 import { ops } from "../extensions/ops.js";
-ops();
+const { def, unary, named, varargs } = ops();
 
 import { installCoreOps } from "./core.js";
 import { installMathOps } from "./math.js";
 import { installLogicOps } from "./logic.js";
 import { installArrayOps } from "./array.js";
+import { installHttpOps } from "./http.js";
 
 export function installDefaultOps() {
     installCoreOps();
     installMathOps();
     installLogicOps();
     installArrayOps();
+    installHttpOps();
 }
