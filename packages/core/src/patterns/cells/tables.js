@@ -1,3 +1,7 @@
+import { bl } from "../../index.js";
+bl();
+import { Ordinal } from "./versioned.js";
+
 const { Gadget, gadgetProto } = bl();
 
 function entries(input) {
@@ -55,3 +59,18 @@ export function First(initial = {}, onAdded) {
     this.update(initial);
 }
 First.prototype = tableProto;
+
+export function FirstWithCells(initial = {}, factory = Ordinal, onAdded) {
+    const originalValidate = this.validate;
+    this.validate = function (input) {
+        const validated = originalValidate.call(this, input);
+        if (validated === undefined) return undefined;
+        return validated.map(([key, value]) =>
+            value instanceof Gadget ? [key, value] : [key, new factory(value)]
+        );
+    };
+    this.step = firstTableStep.bind(this);
+    if (onAdded) this.added = onAdded;
+    this.update(initial);
+}
+FirstWithCells.prototype = tableProto;

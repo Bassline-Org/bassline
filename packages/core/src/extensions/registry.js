@@ -23,6 +23,15 @@ export function installRegistry() {
         new Map();
 
     Object.assign(gadgetProto, {
+        /**
+         * @description Set the id of the gadget
+         * @param {*} id - The id to set
+         * This is used internally to manually set the id of a gadget, IE for deserialization
+         */
+        _setId(id) {
+            this[idSymbol] = id;
+            bl().registry.set(id, new WeakRef(this));
+        },
         id() {
             if (this[idSymbol] === undefined) {
                 this[idSymbol] = Date.now().toString(36);
