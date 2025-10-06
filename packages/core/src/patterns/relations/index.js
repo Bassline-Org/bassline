@@ -75,7 +75,8 @@ function installGadgetRelations() {
             return cleanup;
         },
         asArgument(arg, fn) {
-            if (fn instanceof Partial || fn instanceof Transform) {
+            if (!(fn instanceof Partial || fn instanceof Transform)) {
+                console.log(fn.prototype);
                 throw new Error("fn must be a Partial or Transform");
             }
             if (!fn.requiredKeys.includes(arg)) {

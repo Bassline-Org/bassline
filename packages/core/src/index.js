@@ -7,4 +7,5 @@ export function bl() {
     }
     return globalThis.bassline;
 }
+
 globalThis.bl = bl;

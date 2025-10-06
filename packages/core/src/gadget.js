@@ -39,7 +39,7 @@ export const gadgetProto = {
     update(newState) {
         const old = this.current();
         this[StateSymbol] = newState;
-        this.emit({ changed: { old, newState } });
+        this.emit({ changed: newState, delta: { old, newState } });
     },
     /**
      * Emit effects

@@ -1,3 +1,5 @@
+import { bl } from "../../index.js";
+
 const { gadgetProto } = bl();
 
 export function transformStep(_current, input) {
@@ -12,6 +14,7 @@ export function transformStep(_current, input) {
 }
 
 export const functionProto = Object.create(gadgetProto);
+
 functionProto.onError = function (error, inputs) {
     this.emit({ failed: { input: inputs, error: error } });
 };
@@ -37,7 +40,7 @@ export function Transform(
     if (fn.length !== 1) {
         throw new Error("Transform must take one argument");
     }
-    this.step = transformStep;
+    this.step = transformStep.bind(this);
     this.fn = fn;
     if (validateInput) this.validateInput = validateInput;
     if (onError) this.onError = onError;
@@ -66,21 +69,21 @@ export function partialStep(current, input) {
     if (validated === undefined) return;
     const args = { ...current.args };
     const updatedKeys = [];
-    for (const key in validated) {
-        if (args[key] === validated[key]) continue;
-        args[key] = validated[key];
+    for (const [key, value] of Object.entries(validated)) {
+        if (args[key] === value) continue;
+        args[key] = value;
         updatedKeys.push(key);
     }
     if (this.isReady(args) && updatedKeys.length > 0) {
         try {
             const result = this.fn(args);
-            this.update({ args, result });
+            this.update({ ...current, args, result });
             this.emit({ computed: result });
         } catch (error) {
             this.onError(error, args);
         }
     } else {
-        this.update({ args, result: this.current.result });
+        this.update({ ...current, args });
     }
 }
 
@@ -102,7 +105,7 @@ export function Partial(
     if (fn.length !== 1) {
         throw new Error("Partial must take one argument");
     }
-    this.step = partialStep;
+    this.step = partialStep.bind(this);
     this.fn = fn;
     if (requiredKeys) this.requiredKeys = requiredKeys;
     if (validateInput) this.validateInput = validateInput;
