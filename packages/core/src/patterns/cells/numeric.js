@@ -1,13 +1,15 @@
 const { gadgetProto } = bl();
 
+const numericProto = Object.create(gadgetProto);
+numericProto.validate = asNumber;
+numericProto.pkg = "core.cells.numeric";
+
 function asNumber(input) {
     if (typeof input === "number") return input;
     const cast = Number(input);
     if (isNaN(cast)) return undefined;
     return cast;
 }
-const numericProto = Object.create(gadgetProto);
-numericProto.validate = asNumber;
 
 function minStep(current, input) {
     if (input < current) this.update(input);
@@ -30,6 +32,8 @@ export function Min(initial) {
 Min.prototype = numericProto;
 
 export default {
-    Max,
-    Min,
+    gadgets: {
+        Max,
+        Min,
+    },
 };

@@ -14,6 +14,7 @@ function entries(input) {
 }
 
 export const tableProto = Object.create(gadgetProto);
+tableProto.pkg = "core.cells.tables";
 tableProto.validate = entries;
 tableProto.added = function (additions) {
     this.emit({ added: additions });
@@ -76,6 +77,8 @@ export function FirstWithCells(initial = {}, factory = Ordinal, onAdded) {
 FirstWithCells.prototype = tableProto;
 
 export default {
-    First,
-    FirstWithCells,
+    gadgets: {
+        First,
+        FirstWithCells,
+    },
 };

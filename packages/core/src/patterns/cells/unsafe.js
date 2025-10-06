@@ -1,6 +1,7 @@
 const { gadgetProto } = bl();
 
 export const unsafeProto = Object.create(gadgetProto);
+unsafeProto.pkg = "core.cells.unsafe";
 
 export function Last(initial) {
     this.step = function (current, input) {
@@ -14,5 +15,7 @@ export function Last(initial) {
 Last.prototype = unsafeProto;
 
 export default {
-    Last,
+    gadgets: {
+        Last,
+    },
 };

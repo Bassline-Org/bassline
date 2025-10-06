@@ -1,4 +1,13 @@
-export * as numeric from "./numeric";
-export * as set from "./set";
-export * as tables from "./tables";
-export * as versioned from "./versioned";
+import numeric from "./numeric.js";
+import set from "./set.js";
+import tables from "./tables.js";
+import versioned from "./versioned.js";
+
+export default {
+    gadgets: {
+        ...numeric.gadgets,
+        ...set.gadgets,
+        ...tables.gadgets,
+        ...versioned.gadgets,
+    },
+};

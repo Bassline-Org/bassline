@@ -1,7 +1,7 @@
 const { gadgetProto } = bl();
 
-const versionedProto = Object.create(gadgetProto);
-
+export const versionedProto = Object.create(gadgetProto);
+versionedProto.pkg = "core.cells.versioned";
 function asOrdinal(input) {
     if (Array.isArray(input) && input.length === 2) {
         return input;
@@ -22,5 +22,7 @@ export function Ordinal(initial) {
 Ordinal.prototype = versionedProto;
 
 export default {
-    Ordinal,
+    gadgets: {
+        Ordinal,
+    },
 };

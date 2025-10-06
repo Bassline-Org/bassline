@@ -14,6 +14,7 @@ export function transformStep(_current, input) {
 }
 
 export const functionProto = Object.create(gadgetProto);
+functionProto.pkg = "core.functions";
 
 functionProto.onError = function (error, inputs) {
     this.emit({ failed: { input: inputs, error: error } });
@@ -116,6 +117,8 @@ export function Partial(
 Partial.prototype = functionProto;
 
 export default {
-    Transform,
-    Partial,
+    gadgets: {
+        Transform,
+        Partial,
+    },
 };

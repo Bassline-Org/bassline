@@ -5,6 +5,7 @@ setProto.contradiction = function ({ current, incoming }) {
     console.log("Contradiction! ", current, incoming);
 };
 setProto.validate = asSet;
+setProto.pkg = "core.cells.set";
 
 function asSet(input) {
     if (input instanceof Set) return input;
@@ -45,6 +46,8 @@ export function Union(initial = new Set()) {
 Union.prototype = setProto;
 
 export default {
-    Union,
-    Intersection,
+    gadgets: {
+        Union,
+        Intersection,
+    },
 };
