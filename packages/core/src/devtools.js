@@ -201,8 +201,8 @@ export function installDevtools() {
     };
 
     // Install the formatter
-    window.devtoolsFormatters = window.devtoolsFormatters || [];
-    window.devtoolsFormatters.push(gadgetFormatter);
+    globalThis.devtoolsFormatters = globalThis.devtoolsFormatters || [];
+    globalThis.devtoolsFormatters.push(gadgetFormatter);
 
     console.log(
         "%c🎨 Gadget Formatter Installed!",

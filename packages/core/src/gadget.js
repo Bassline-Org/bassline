@@ -55,8 +55,11 @@ export function Gadget(step, initial) {
 Gadget.prototype = gadgetProto;
 
 export function installBassline() {
-    if (typeof window !== "undefined") {
-        window.bassline = {
+    if (typeof globalThis !== "undefined") {
+        globalThis.bassline = globalThis.bassline || {};
+        globalThis.bassline.core = globalThis.bassline.core || {};
+        globalThis.bassline.core = {
+            ...globalThis.bassline.core,
             Gadget,
             StateSymbol,
             gadgetProto,
