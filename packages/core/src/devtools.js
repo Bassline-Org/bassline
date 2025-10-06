@@ -1,6 +1,6 @@
 import { gadgetProto, StateSymbol } from "./gadget.js";
 
-export function installGadgetFormatter() {
+export function installDevtools() {
     // Extend the prototype with debugging info
     Object.assign(gadgetProto, {
         // Get debug info without exposing internals
@@ -215,4 +215,4 @@ export function installGadgetFormatter() {
 }
 
 // Export for manual installation
-export default installGadgetFormatter;
+export default installDevtools;
