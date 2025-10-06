@@ -1,4 +1,4 @@
-import { Gadget, gadgetProto } from "../../gadget.js";
+const { Gadget, gadgetProto } = globalThis.bassline;
 
 function entries(input) {
     if (Array.isArray(input) && input.length === 2) {

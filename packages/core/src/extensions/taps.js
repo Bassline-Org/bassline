@@ -1,4 +1,4 @@
-import { gadgetProto } from "./gadget.js";
+const { gadgetProto } = globalThis.bassline;
 
 export function installTaps() {
     if (gadgetProto.tap !== undefined) {

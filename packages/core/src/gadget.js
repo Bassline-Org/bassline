@@ -44,8 +44,9 @@ export const gadgetProto = {
     /**
      * Emit effects
      * @param {any} data - Data to emit
+     * Does nothing by default, open for extension!
      */
-    emit(data) {},
+    emit(_data) {},
 };
 
 export function Gadget(step, initial) {

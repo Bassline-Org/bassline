@@ -1,4 +1,4 @@
-import { gadgetProto } from "../../gadget.js";
+const { gadgetProto } = globalThis.bassline;
 
 const setProto = Object.create(gadgetProto);
 setProto.contradiction = function ({ current, incoming }) {

@@ -1,5 +1,6 @@
-import { gadgetProto } from "./gadget.js";
-import { First } from "./patterns/cells/tables.js";
+const { gadgetProto } = globalThis.bassline;
+
+import { First } from "../patterns/cells/tables.js";
 
 const metadataSymbol = Symbol("bassline-metadata");
 

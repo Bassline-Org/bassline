@@ -1,6 +1,6 @@
-import { installTaps } from "../../taps.js";
-import { gadgetProto } from "../../gadget.js";
+import { installTaps } from "../../extensions/taps.js";
 import { functionProto, Partial, Transform } from "../functions/index.js";
+const { gadgetProto } = globalThis.bassline;
 
 export function installRelations() {
     if (gadgetProto.tap === undefined) {

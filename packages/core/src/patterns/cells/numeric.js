@@ -1,4 +1,4 @@
-import { gadgetProto } from "../../gadget.js";
+const { gadgetProto } = globalThis.bassline;
 
 function asNumber(input) {
     if (typeof input === "number") return input;
