@@ -50,6 +50,9 @@ function ensurePath(path) {
 }
 
 export function fromSpec(spec) {
+    if (Array.isArray(spec)) {
+        return spec.map((s) => fromSpec(s));
+    }
     const { pkg, name, state } = spec;
     if (!name) {
         throw new Error(`Name is required for spec: ${spec}`);

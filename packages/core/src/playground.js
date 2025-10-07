@@ -5,6 +5,7 @@ installTaps();
 
 import cells from "./patterns/cells/index.js";
 import functions from "./patterns/functions/index.js";
+
 installPackage(cells);
 installPackage(functions);
 
@@ -40,21 +41,26 @@ constant.tapOn("computed", (computed) => {
 
 constant.receive(20);
 
-const getSpec = {
-    pkg: "@bassline/fn/http",
-    name: "get",
-};
-
-const getter = bl().fromSpec(getSpec);
-getter.tapOn("computed", (computed) => {
-    console.log(computed);
-});
-
-const url = "https://api.sampleapis.com/futurama/info";
-
-getter.receive({
-    url,
-    headers: {
-        "Accept": "application/json",
+const tableOfCells = bl().fromSpec({
+    pkg: "@bassline/cells/tables",
+    name: "firstWithCells",
+    state: {
+        a: {
+            pkg: "@bassline/cells/numeric",
+            name: "max",
+            state: 0,
+        },
     },
 });
+
+const tocSpec = tableOfCells.toSpec();
+
+console.log(tocSpec);
+
+const tableOfCellsFromSpec = bl().fromSpec(tocSpec);
+
+tableOfCellsFromSpec.set({ a: 10 }, true);
+
+console.log(tableOfCellsFromSpec.current());
+
+console.log(tableOfCellsFromSpec.toSpec());

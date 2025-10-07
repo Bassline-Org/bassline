@@ -18,7 +18,6 @@ Object.assign(constant, {
         return this.current();
     },
 });
-
 const car = Object.create(transform);
 Object.assign(car, {
     pkg,

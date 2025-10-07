@@ -15,7 +15,7 @@ Object.assign(tableProto, {
     },
     get(key, shouldFlatten = false) {
         const value = this.current()[key];
-        if (shouldFlatten && value instanceof gadgetProto) {
+        if (shouldFlatten && gadgetProto.isPrototypeOf(value)) {
             return value.current();
         } else {
             return value;
@@ -25,7 +25,7 @@ Object.assign(tableProto, {
         const toReceive = {};
         for (const [key, value] of entries(vals)) {
             const current = this.get(key);
-            if (current instanceof gadgetProto && shouldForward) {
+            if (gadgetProto.isPrototypeOf(current) && shouldForward) {
                 current.receive(value);
             }
         }
@@ -56,17 +56,55 @@ function firstTableStep(current, incoming) {
 export const firstWithCells = Object.create(first);
 Object.assign(firstWithCells, {
     validate(input) {
-        const validated = this.prototype.validate.call(this, input);
+        const proto = Object.getPrototypeOf(firstWithCells);
+        const validated = proto.validate.call(this, input);
         if (validated === undefined) return undefined;
         return validated.map(([key, value]) =>
-            value instanceof gadgetProto
+            gadgetProto.isPrototypeOf(value)
                 ? [key, value]
                 : [key, this.factory.spawn(value)]
         );
     },
+    toSpec() {
+        const curr = {};
+        for (const [key, value] of Object.entries(this.current())) {
+            if (value.toSpec) {
+                curr[key] = value.toSpec();
+            } else {
+                curr[key] = value;
+            }
+        }
+
+        return {
+            pkg: this.pkg,
+            name: this.name,
+            state: curr,
+        };
+    },
+    spawn(state) {
+        const entries = Object.entries(state)
+            .map(([key, value]) => {
+                if (isSpec(value)) {
+                    return [key, bl().fromSpec(value)];
+                } else {
+                    return [key, value];
+                }
+            });
+        const obj = Object.fromEntries(entries);
+        const instance = Object.create(this);
+        instance.update(obj);
+        return instance;
+    },
     factory: ordinal,
     name: "firstWithCells",
 });
+
+function isSpec(value) {
+    if (value["pkg"] === undefined) return false;
+    if (value["name"] === undefined) return false;
+    if (value["state"] === undefined) return false;
+    return true;
+}
 
 function entries(input) {
     if (Array.isArray(input) && input.length === 2) {
