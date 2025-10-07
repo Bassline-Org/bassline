@@ -10,7 +10,7 @@ export function bl() {
 
 /**
  * Installs a package into the running system
- * Packges are objects with a gadgets property
+ * Packges are objects with an optional gadgets property, and an optional functions property
  * The gadgets property is an object with the gadget constructors to install
  * Each constructor must have a pkg property on it's prototype
  * @param {*} gadgetPackage - The package to install
@@ -31,10 +31,9 @@ export function bl() {
  */
 export function installPackage(gadgetPackage) {
     const { gadgets } = gadgetPackage;
-    for (const [name, value] of Object.entries(gadgets)) {
-        const pkg = value.prototype.pkg;
-        // We set the constructor to the value itself so it has the correct name
-        value.prototype.constructor = value;
+    for (const value of Object.values(gadgets)) {
+        const pkg = value.pkg;
+        const name = value.name;
         console.log(`Installing: ${pkg}.${name}`);
         ensurePath(pkg);
         const context = bl().gadgets[pkg];
@@ -50,17 +49,22 @@ function ensurePath(path) {
 }
 
 export function fromSpec(spec) {
-    const { pkg, gadget, state } = spec;
-    const construct = bl().gadgets[pkg][gadget];
-    const cell = new construct(state);
-    return cell;
+    const { pkg, name, state } = spec;
+    if (!name) {
+        throw new Error(`Name is required for spec: ${spec}`);
+    }
+    if (!pkg) {
+        throw new Error(`Pkg is required for spec: ${spec}`);
+    }
+    const gadget = bl().gadgets[pkg][name];
+    return gadget.spawn(state);
 }
 
 Object.assign(bl().gadgetProto, {
     toSpec() {
         return {
             pkg: this.pkg,
-            gadget: this.constructor.name,
+            name: this.name,
             state: this.current(),
         };
     },

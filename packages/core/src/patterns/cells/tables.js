@@ -1,44 +1,41 @@
 import { bl } from "../../index.js";
 bl();
-import { Ordinal } from "./versioned.js";
+import { ordinal } from "./versioned.js";
 
-const { Gadget, gadgetProto } = bl();
-
-function entries(input) {
-    if (Array.isArray(input) && input.length === 2) {
-        return [[input[0], input[1]]];
-    }
-    if (input instanceof Object) return Object.entries(input);
-    if (input instanceof Map) return input.entries();
-    return [];
-}
+const { gadgetProto } = bl();
 
 export const tableProto = Object.create(gadgetProto);
-tableProto.pkg = "core.cells.tables";
-tableProto.validate = entries;
-tableProto.added = function (additions) {
-    this.emit({ added: additions });
-};
-tableProto.get = function (key, shouldFlatten = false) {
-    const value = this.current()[key];
-    if (shouldFlatten && value instanceof Gadget) {
-        return value.current();
-    } else {
-        return value;
-    }
-};
-tableProto.set = function (vals, shouldForward = true) {
-    const toReceive = {};
-    for (const [key, value] of entries(vals)) {
-        const current = this.get(key);
-        if (current instanceof Gadget && shouldForward) {
-            current.receive(value);
+Object.assign(tableProto, {
+    pkg: "core.cells.tables",
+    validate: entries,
+    added(additions) {
+        this.emit({ added: additions });
+    },
+    get(key, shouldFlatten = false) {
+        const value = this.current()[key];
+        if (shouldFlatten && value instanceof gadgetProto) {
+            return value.current();
         } else {
-            toReceive[key] = value;
+            return value;
         }
-    }
-    this.receive(toReceive);
-};
+    },
+    set(vals, shouldForward = true) {
+        const toReceive = {};
+        for (const [key, value] of entries(vals)) {
+            const current = this.get(key);
+            if (current instanceof gadgetProto && shouldForward) {
+                current.receive(value);
+            }
+        }
+        this.receive(toReceive);
+    },
+});
+
+export const first = Object.create(tableProto);
+Object.assign(first, {
+    step: firstTableStep,
+    name: "first",
+});
 
 function firstTableStep(current, incoming) {
     const additions = [];
@@ -54,31 +51,33 @@ function firstTableStep(current, incoming) {
     this.added(Object.fromEntries(additions));
 }
 
-export function First(initial = {}, onAdded) {
-    this.step = firstTableStep.bind(this);
-    if (onAdded) this.added = onAdded;
-    this.update(initial);
-}
-First.prototype = tableProto;
-
-export function FirstWithCells(initial = {}, factory = Ordinal, onAdded) {
-    const originalValidate = this.validate;
-    this.validate = function (input) {
-        const validated = originalValidate.call(this, input);
+export const firstWithCells = Object.create(first);
+Object.assign(firstWithCells, {
+    validate(input) {
+        const validated = this.prototype.validate.call(this, input);
         if (validated === undefined) return undefined;
         return validated.map(([key, value]) =>
-            value instanceof Gadget ? [key, value] : [key, new factory(value)]
+            value instanceof gadgetProto
+                ? [key, value]
+                : [key, this.factory.spawn(value)]
         );
-    };
-    this.step = firstTableStep.bind(this);
-    if (onAdded) this.added = onAdded;
-    this.update(initial);
+    },
+    factory: ordinal,
+    name: "firstWithCells",
+});
+
+function entries(input) {
+    if (Array.isArray(input) && input.length === 2) {
+        return [[input[0], input[1]]];
+    }
+    if (input instanceof Object) return Object.entries(input);
+    if (input instanceof Map) return input.entries();
+    return [];
 }
-FirstWithCells.prototype = tableProto;
 
 export default {
     gadgets: {
-        First,
-        FirstWithCells,
+        first,
+        firstWithCells,
     },
 };

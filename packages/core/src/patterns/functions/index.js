@@ -2,31 +2,32 @@ import { bl } from "../../index.js";
 
 const { gadgetProto } = bl();
 
-export function transformStep(_current, input) {
-    const validated = this.validateInput(input);
+export function transformStep(current, input) {
+    const { validateInput, fn, onError } = current;
+    const validated = validateInput.call(this, input);
     if (validated === undefined) return;
     try {
-        const result = this.fn(validated);
+        const result = fn.call(this, validated);
         this.emit({ computed: result });
     } catch (error) {
-        this.onError(error, validated);
+        onError.call(this, error, validated);
     }
 }
 
 export const functionProto = Object.create(gadgetProto);
-functionProto.pkg = "core.functions";
-
-functionProto.onError = function (error, inputs) {
-    this.emit({ failed: { input: inputs, error: error } });
-};
-functionProto.validateInput = function (input) {
-    return input;
-};
-functionProto.requiredKeys = [];
-functionProto.isReady = function (args) {
-    if (this.requiredKeys.length === 0) return true;
-    return this.requiredKeys.every((key) => args[key] !== undefined);
-};
+Object.assign(functionProto, {
+    pkg: "core.functions",
+    onError(error, inputs) {
+        this.emit({ failed: { input: inputs, error: error } });
+    },
+    validateInput(input) {
+        return input;
+    },
+    isReady(args) {
+        const { requiredKeys } = this.current();
+        return requiredKeys.every((key) => args[key] !== undefined);
+    },
+});
 
 export function Transform(
     {

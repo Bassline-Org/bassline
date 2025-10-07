@@ -1,7 +1,16 @@
 const { gadgetProto } = bl();
 
 export const versionedProto = Object.create(gadgetProto);
-versionedProto.pkg = "core.cells.versioned";
+Object.assign(versionedProto, {
+    pkg: "core.cells.versioned",
+});
+
+export const ordinal = Object.create(versionedProto);
+Object.assign(ordinal, {
+    step: ordinalStep,
+    name: "ordinal",
+});
+
 function asOrdinal(input) {
     if (Array.isArray(input) && input.length === 2) {
         return input;
@@ -15,14 +24,8 @@ function ordinalStep(current, input) {
     if (validated[0] > current[0]) this.update(validated);
 }
 
-export function Ordinal(initial) {
-    this.step = ordinalStep.bind(this);
-    this.update([0, initial]);
-}
-Ordinal.prototype = versionedProto;
-
 export default {
     gadgets: {
-        Ordinal,
+        ordinal,
     },
 };

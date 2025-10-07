@@ -1,21 +1,23 @@
 const { gadgetProto } = bl();
 
 export const unsafeProto = Object.create(gadgetProto);
-unsafeProto.pkg = "core.cells.unsafe";
+Object.assign(unsafeProto, {
+    pkg: "core.cells.unsafe",
+});
 
-export function Last(initial) {
-    this.step = function (current, input) {
+const last = Object.create(unsafeProto);
+Object.assign(last, {
+    step(current, input) {
         if (input === current) {
             return;
         }
         this.update(input);
-    };
-    this.update(initial);
-}
-Last.prototype = unsafeProto;
+    },
+    name: "last",
+});
 
 export default {
     gadgets: {
-        Last,
+        last,
     },
 };

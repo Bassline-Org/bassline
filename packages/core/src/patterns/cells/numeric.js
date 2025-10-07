@@ -1,8 +1,26 @@
 const { gadgetProto } = bl();
 
 const numericProto = Object.create(gadgetProto);
-numericProto.validate = asNumber;
-numericProto.pkg = "core.cells.numeric";
+Object.assign(numericProto, {
+    pkg: "core.cells.numeric",
+    validate: asNumber,
+});
+
+export const max = Object.create(numericProto);
+Object.assign(max, {
+    step(current, input) {
+        if (input > current) this.update(input);
+    },
+    name: "max",
+});
+
+export const min = Object.create(numericProto);
+Object.assign(min, {
+    step(current, input) {
+        if (input < current) this.update(input);
+    },
+    name: "min",
+});
 
 function asNumber(input) {
     if (typeof input === "number") return input;
@@ -11,29 +29,9 @@ function asNumber(input) {
     return cast;
 }
 
-function minStep(current, input) {
-    if (input < current) this.update(input);
-}
-
-function maxStep(current, input) {
-    if (input > current) this.update(input);
-}
-
-export function Max(initial) {
-    this.step = maxStep.bind(this);
-    this.update(initial);
-}
-Max.prototype = numericProto;
-
-export function Min(initial) {
-    this.step = minStep.bind(this);
-    this.update(initial);
-}
-Min.prototype = numericProto;
-
 export default {
     gadgets: {
-        Max,
-        Min,
+        max,
+        min,
     },
 };

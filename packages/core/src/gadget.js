@@ -47,20 +47,18 @@ export const gadgetProto = {
      * Does nothing by default, open for extension!
      */
     emit(_data) {},
+    spawn(initial) {
+        const g = Object.create(this);
+        g.update(initial);
+        return g;
+    },
 };
-
-export function Gadget(step, initial) {
-    this.step = step;
-    this.update(initial);
-}
-Gadget.prototype = gadgetProto;
 
 export function installBassline() {
     if (
         typeof globalThis !== "undefined"
     ) {
         globalThis.bassline = globalThis.bassline || {};
-        globalThis.bassline.Gadget = Gadget;
         globalThis.bassline.StateSymbol = StateSymbol;
         globalThis.bassline.gadgetProto = gadgetProto;
         globalThis.bassline.gadgets = globalThis.bassline.gadgets || {};
