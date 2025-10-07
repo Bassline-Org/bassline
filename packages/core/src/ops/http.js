@@ -40,6 +40,10 @@ export default {
         const res = await fetch(url);
         return await res.json();
     },
+    async httpDelete(url) {
+        const res = await fetch(url, { method: "DELETE" });
+        return await res.json();
+    },
     async httpPost({ url, body }) {
         const res = await fetch(url, {
             method: "POST",
@@ -52,10 +56,6 @@ export default {
             method: "PUT",
             body: JSON.stringify(body),
         });
-        return await res.json();
-    },
-    async httpDelete({ url }) {
-        const res = await fetch(url, { method: "DELETE" });
         return await res.json();
     },
 };

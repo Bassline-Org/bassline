@@ -5,8 +5,10 @@ installTaps();
 
 import cells from "./patterns/cells/index.js";
 import core from "./patterns/functions/core.js";
+import http from "./patterns/functions/http.js";
 installPackage(cells);
 installPackage(core);
+installPackage(http);
 
 const spec = {
     pkg: "core.cells.numeric",
@@ -39,3 +41,22 @@ constant.tapOn("computed", (computed) => {
 });
 
 constant.receive(20);
+
+const getSpec = {
+    pkg: "core.functions.http",
+    name: "get",
+};
+
+const getter = bl().fromSpec(getSpec);
+getter.tapOn("computed", (computed) => {
+    console.log(computed);
+});
+
+const url = "https://api.sampleapis.com/futurama/info";
+
+getter.receive({
+    url,
+    headers: {
+        "Accept": "application/json",
+    },
+});

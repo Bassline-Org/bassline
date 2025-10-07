@@ -5,7 +5,13 @@ const { gadgetProto } = bl();
 export function transformStep(_current, input) {
     try {
         const result = this.fn(input);
-        this.emit({ computed: result });
+        if (result instanceof Promise) {
+            result.then((result) => {
+                this.emit({ computed: result });
+            });
+        } else {
+            this.emit({ computed: result });
+        }
     } catch (error) {
         this.onError(error, input);
     }
@@ -66,8 +72,15 @@ export function partialStep(current, input) {
     if (shouldCompute) {
         try {
             const result = this.fn(args);
-            this.update({ ...current, args, result });
-            this.emit({ computed: result });
+            if (result instanceof Promise) {
+                result.then((result) => {
+                    this.update({ ...current, args, result });
+                    this.emit({ computed: result });
+                });
+            } else {
+                this.update({ ...current, args, result });
+                this.emit({ computed: result });
+            }
         } catch (error) {
             this.onError(error, input);
         }
