@@ -59,7 +59,7 @@ export function fromSpec(spec) {
     if (Array.isArray(spec)) {
         return spec.map((s) => fromSpec(s));
     }
-    const { pkg, name, state } = spec;
+    const { pkg, name, state, id } = spec;
     if (!name) {
         throw new Error(`Name is required for spec: ${spec}`);
     }
@@ -76,7 +76,11 @@ export function fromSpec(spec) {
             `Gadget ${name} not found in package ${pkg}! Did you install it?`,
         );
     }
-    return proto.spawn(state);
+    const g = proto.spawn(state);
+    if (id && globalThis.bassline.registry !== undefined) {
+        g._setId(id);
+    }
+    return g;
 }
 
 Object.assign(bl().gadgetProto, {

@@ -81,7 +81,7 @@ Object.assign(firstWithCells, {
             state: curr,
         };
     },
-    spawn(state) {
+    afterSpawn(state) {
         const entries = Object.entries(state)
             .map(([key, value]) => {
                 if (isSpec(value)) {
@@ -91,9 +91,7 @@ Object.assign(firstWithCells, {
                 }
             });
         const obj = Object.fromEntries(entries);
-        const instance = Object.create(this);
-        instance.update(obj);
-        return instance;
+        this.update(obj);
     },
     factory: ordinal,
     name: "firstWithCells",

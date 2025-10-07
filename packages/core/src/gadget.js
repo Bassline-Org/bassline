@@ -46,8 +46,11 @@ export const gadgetProto = {
     emit(_data) {},
     spawn(initial) {
         const g = Object.create(this);
-        g.update(initial);
+        g.afterSpawn(initial);
         return g;
+    },
+    afterSpawn(initial) {
+        this.update(initial);
     },
 };
 

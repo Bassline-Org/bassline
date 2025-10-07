@@ -35,13 +35,17 @@ export function installRegistry() {
         id() {
             if (this[idSymbol] === undefined) {
                 this[idSymbol] = Date.now().toString(36);
-                console.log("Setting id", this[idSymbol]);
                 bl().registry.set(
                     this[idSymbol],
                     new WeakRef(this),
                 );
             }
             return this[idSymbol];
+        },
+        asRef() {
+            return {
+                id: this.id(),
+            };
         },
     });
 }
