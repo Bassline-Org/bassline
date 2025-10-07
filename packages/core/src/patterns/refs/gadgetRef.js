@@ -12,21 +12,22 @@ Object.assign(gadgetRef, {
         if (typeof id !== "string") return undefined;
         return { id };
     },
-    resolve({ id }) {
-        if (this.current()?.resolved) return;
-        this.update({ ...this.current(), id });
+    shouldResolve(state, input) {
+        if (state.id) return false;
+        if (input.id) return true;
+        return false;
+    },
+    tryResolve(state, { id }) {
+        const { resolve } = state;
+        this.update({ ...state, id });
         withRetry(
             () => getGadgetById(id),
-        ).then((gadget) => {
-            this.update({ ...this.current(), id, gadget, resolved: true });
-            this.emit({ resolved: { id, gadget } });
-        }).catch((error) => {
-            this.error(error, { id });
-        });
+        ).then(resolve);
     },
     minState() {
         return {
             id: this.current()?.id,
         };
     },
+    isGadgetRef: true,
 });

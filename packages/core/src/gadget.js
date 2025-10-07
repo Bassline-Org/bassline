@@ -52,6 +52,7 @@ export const gadgetProto = {
     afterSpawn(initial) {
         this.update(initial);
     },
+    isGadget: true,
 };
 
 export function installBassline() {

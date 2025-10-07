@@ -16,16 +16,10 @@ Object.assign(file, {
         if (typeof path !== "string") return undefined;
         return { path };
     },
-    resolve({ path }) {
-        this.update({ ...this.current(), path });
-        withRetry(
+    tryResolve({ path }) {
+        return withRetry(
             async () => await fs.readFile(path, "utf-8"),
-        ).then((content) => {
-            this.update({ ...this.current(), path, content, resolved: true });
-            this.emit({ resolved: { path, content } });
-        }).catch((error) => {
-            this.error(error, { path });
-        });
+        );
     },
     minState() {
         return {

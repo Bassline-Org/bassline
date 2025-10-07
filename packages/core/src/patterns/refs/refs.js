@@ -4,22 +4,37 @@ const { gadgetProto } = bl();
 export const refProto = Object.create(gadgetProto);
 Object.assign(refProto, {
     step(state, input) {
-        if (this.shouldResolve(input)) {
+        if (this.shouldResolve(state, input)) {
             console.log("resolving", input);
-            this.resolve(input);
+            this.tryResolve(input)
+                .then(this.onResolve)
+                .catch((e) => this.onError(e, input));
         }
     },
-    shouldResolve(_input) {
-        const { resolved } = this.current() || {};
-        if (resolved) return false;
+    shouldResolve(state, input) {
         return true;
     },
-    afterSpawn(input) {
-        this.receive(input);
+    onResolve(resolved) {
+        this.update({ ...this.current(), resolved });
+        this.emit({ resolved });
     },
-    error(error, input) {
+    onError(error, input) {
         console.error("Error in ref", error, input);
         this.emit({ error: { input, error } });
+    },
+    onSpawn(initial) {
+        this.update({
+            ...initial,
+            ...Promise.withResolvers(),
+        });
+        this.receive(initial);
+    },
+    promise() {
+        return this.current().promise;
+    },
+    minState() {
+        const { promise, resolve, reject, ...rest } = this.current();
+        return { ...rest };
     },
     toSpec() {
         return {
