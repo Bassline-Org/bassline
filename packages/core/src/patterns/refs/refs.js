@@ -3,37 +3,44 @@ const { gadgetProto } = bl();
 
 export const refProto = Object.create(gadgetProto);
 Object.assign(refProto, {
-    step(state, input) {
-        if (this.shouldResolve(state, input)) {
-            console.log("resolving", input);
-            this.tryResolve(input)
-                .then(this.onResolve)
-                .catch((e) => this.onError(e, input));
-        }
-    },
-    shouldResolve(state, input) {
-        return true;
-    },
-    onResolve(resolved) {
-        this.update({ ...this.current(), resolved });
-        this.emit({ resolved });
-    },
-    onError(error, input) {
-        console.error("Error in ref", error, input);
-        this.emit({ error: { input, error } });
-    },
-    onSpawn(initial) {
-        this.update({
-            ...initial,
-            ...Promise.withResolvers(),
-        });
+    afterSpawn(initial) {
+        const { promise, resolve, reject } = Promise.withResolvers();
+        this.promise = promise;
+        this.resolve = resolve;
+        this.reject = reject;
+
+        this.update({ resolving: false });
         this.receive(initial);
     },
-    promise() {
-        return this.current().promise;
+    step(state, input) {
+        if (state.resolved !== undefined) return;
+        if (state.resolving) return;
+
+        const newState = { ...state, ...input };
+        if (this.canResolve(newState)) {
+            this.update({ ...newState, resolving: true });
+            Promise.resolve(this.tryResolve(newState))
+                .then((resolved) => {
+                    this.update({ ...newState, resolved, resolving: false });
+                    this.emit({ resolved });
+                    this.resolve(resolved);
+                })
+                .catch((error) => {
+                    this.update({ ...newState, resolving: false });
+                    this.emit({ error });
+                    this.reject(error);
+                });
+        } else {
+            this.update({ ...newState });
+        }
+    },
+    canResolve(state, input) {
+        if (state.resolved !== undefined) return true;
+        if (state.resolving) return true;
+        return false;
     },
     minState() {
-        const { promise, resolve, reject, ...rest } = this.current();
+        const { resolved, ...rest } = this.current();
         return { ...rest };
     },
     toSpec() {

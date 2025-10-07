@@ -40,7 +40,25 @@ const spec = [
         },
         id: "maxRef",
     },
+    {
+        pkg: "@bassline/refs",
+        name: "file",
+        state: {
+            path: "/tmp/foo.txt",
+        },
+        id: "fileRef",
+    },
 ];
 
 const spawned = bl().fromSpec(spec);
-const [max, first, firstWithCells, maxRef] = spawned;
+const [max, first, firstWithCells, maxRef, fileRef] = spawned;
+
+maxRef.promise
+    .then((gadget) => {
+        console.log("gadget", gadget);
+    });
+
+fileRef.promise
+    .then((file) => {
+        console.log("file", file);
+    });

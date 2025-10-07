@@ -9,20 +9,17 @@ Object.assign(gadgetRef, {
     name: "gadgetRef",
     validate(input) {
         const id = input?.id;
-        if (typeof id !== "string") return undefined;
+        if (typeof id !== "string") return;
         return { id };
     },
-    shouldResolve(state, input) {
-        if (state.id) return false;
-        if (input.id) return true;
+    canResolve({ id }) {
+        if (id !== undefined) return true;
         return false;
     },
-    tryResolve(state, { id }) {
-        const { resolve } = state;
-        this.update({ ...state, id });
-        withRetry(
+    tryResolve({ id }) {
+        return withRetry(
             () => getGadgetById(id),
-        ).then(resolve);
+        );
     },
     minState() {
         return {

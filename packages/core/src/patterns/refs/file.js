@@ -16,6 +16,10 @@ Object.assign(file, {
         if (typeof path !== "string") return undefined;
         return { path };
     },
+    canResolve({ path }) {
+        if (path !== undefined) return true;
+        return false;
+    },
     tryResolve({ path }) {
         return withRetry(
             async () => await fs.readFile(path, "utf-8"),
