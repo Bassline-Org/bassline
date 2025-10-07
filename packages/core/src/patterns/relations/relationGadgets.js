@@ -9,21 +9,34 @@ Object.assign(wire, {
         if (reset) {
             return { reset };
         }
-        if (source.isGadgetRef && target.isGadgetRef) {
+        if (source?.isGadgetRef && target?.isGadgetRef) {
             return { bind: { source, target } };
         }
     },
-    step(state, { bind, target, reset }) {
+    step(state, { bind, reset }) {
+        if (state.resolving) return;
+
         if (reset) {
             const { cleanup } = state;
             cleanup?.();
+            this.update({ resolving: false, resolved: false });
         }
-        if (bind && state.source && state.target) {
-            return;
-        }
+
+        if (state.resolved) return;
+
+        if (bind === undefined) return;
+
         const { source, target } = bind;
-        Promise.all([source.promise(), target.promise()])
+        this.update({ ...state, resolving: true });
+        Promise.all([source.promise, target.promise])
             .then(() => {
+                this.update({
+                    ...state,
+                    source,
+                    target,
+                    resolving: false,
+                    resolved: true,
+                });
                 const cleanup = source.tapOn(
                     "changed",
                     (c) => target.receive(c),
@@ -31,11 +44,25 @@ Object.assign(wire, {
                 this.update({ ...state, source, target, cleanup });
             });
     },
-    minState() {
+    afterSpawn(initial) {
+        this.update({ resolving: false, resolved: false });
+        this.receive({ ...initial });
+    },
+    toSpec() {
         const { source, target } = this.current();
         return {
-            source: source,
-            target: target,
+            pkg: this.pkg,
+            name: this.name,
+            state: {
+                source: source.toSpec(),
+                target: target.toSpec(),
+            },
         };
     },
 });
+
+export default {
+    gadgets: {
+        wire,
+    },
+};
