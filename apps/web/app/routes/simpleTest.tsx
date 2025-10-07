@@ -1,15 +1,20 @@
-import { numeric } from "@bassline/core/cells";
 import { useLocalGadget } from "@bassline/react";
 import { installDevtools } from "@bassline/core/devtools";
+import { bl, installPackage } from "@bassline/core";
+import cells from "@bassline/core/cells";
+
+bl();
+
+installPackage(cells);
 
 installDevtools();
 
-const max = new numeric.Max(0);
+const max = cells.gadgets.max.spawn(0);
 export default function SimpleTest() {
     const [count, update] = max.useState();
-    const [local, localUpdate] = useLocalGadget(() => new numeric.Max(0));
+    const [local, localUpdate] = useLocalGadget(() => cells.gadgets.max.spawn(0));
     const computed = max.useComputed((count) => count * 2);
-    const metadata = max.useMetadata();
+    //const metadata = max.useMetadata();
     max.useTap(() => {
         console.log("max tapped", max);
     });
@@ -24,7 +29,7 @@ export default function SimpleTest() {
             <button onClick={() => localUpdate(local + 1)}>Increment Local</button>
             <button onClick={() => localUpdate(local - 1)}>Decrement Local</button>
             <div> Computed: {computed} </div>
-            <div> Metadata: {metadata} </div>
+            {/* <div> Metadata: {metadata} </div> */}
         </div>
     )
 }

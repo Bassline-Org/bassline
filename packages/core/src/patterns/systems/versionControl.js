@@ -55,11 +55,15 @@ function exampleUsage() {
     latest.receive("world");
 
     version.receive(1);
+    // [1, "world"]
 
     latest.receive("world2");
+    // output [1, "world"]
     latest.receive("world3");
+    // output [1, "world"]
 
     version.receive(2);
+    // output [2, "world3"]
 
     output.receive([3, "world4"]);
 

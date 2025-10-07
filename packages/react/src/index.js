@@ -1,6 +1,6 @@
 import { gadgetProto } from "@bassline/core";
 import { installTaps } from "@bassline/core/taps";
-import { installMetadata } from "@bassline/core/metadata";
+//import { installMetadata } from "@bassline/core/metadata";
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
 export function useLocalGadget(factory) {
@@ -14,7 +14,7 @@ export function installReact() {
     }
 
     installTaps();
-    installMetadata();
+    //installMetadata();
 
     Object.assign(gadgetProto, {
         useCurrent() {

@@ -1,20 +1,20 @@
 const { gadgetProto } = bl();
 
-import { First } from "../patterns/cells/tables.js";
+import { tables } from "../patterns/cells/tables.js";
 
 const metadataSymbol = Symbol("bassline-metadata");
 
-export function installMetadata() {
-    if (gadgetProto.metadata !== undefined) {
-        return;
-    }
+// export function installMetadata() {
+//     if (gadgetProto.metadata !== undefined) {
+//         return;
+//     }
 
-    Object.assign(gadgetProto, {
-        get metadata() {
-            if (this[metadataSymbol] === undefined) {
-                this[metadataSymbol] = new First();
-            }
-            return this[metadataSymbol];
-        },
-    });
-}
+//     Object.assign(gadgetProto, {
+//         get metadata() {
+//             if (this[metadataSymbol] === undefined) {
+//                 this[metadataSymbol] = tables.first.spawn({});
+//             }
+//             return this[metadataSymbol];
+//         },
+//     });
+// }

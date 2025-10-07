@@ -30,20 +30,24 @@ last.tapOn("changed", (c) => console.log("last changed", c));
 
 const file = bl().fromSpec(fileSpec);
 
-const wire = relations.gadgets.wire.spawn({});
-file.receive({ path: "/tmp/foo.txt" });
+//file.tapOn("resolved", (c) => console.log("file resolved", c));
 
-wire.receive({
-    source: file.asRef(),
-    target: last.asRef(),
-});
+//const wire = relations.gadgets.wire.spawn({});
+//file.receive({ path: "/tmp/foo.txt" });
 
-wire.promise.then(async (val) => {
-    await new Promise((res) =>
-        setTimeout(() => {
-            const wireSpec = wire.toSpec();
-            console.log("wireSpec", wireSpec);
-            res(true);
-        }, 5000)
-    );
-});
+//console.log("file: ", file.toSpec());
+
+// wire.receive({
+//     source: file.asRef(),
+//     target: last.asRef(),
+// });
+
+// wire.promise.then(async (val) => {
+//     await new Promise((res) =>
+//         setTimeout(() => {
+//             const wireSpec = wire.toSpec();
+//             console.log("wireSpec", wireSpec);
+//             res(true);
+//         }, 5000)
+//     );
+// });
