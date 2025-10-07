@@ -37,15 +37,15 @@ export function installPackage(gadgetPackage) {
         const name = value.name;
         console.log(`Installing: ${pkg}.${name}`);
         ensurePath(pkg);
-        const context = bl().gadgets[pkg];
+        const context = bl().packages[pkg];
         context[name] = value;
         console.log(`Installed: ${pkg}.${name}`);
     }
 }
 
 function ensurePath(path) {
-    if (bl().gadgets[path] === undefined) {
-        bl().gadgets[path] = {};
+    if (bl().packages[path] === undefined) {
+        bl().packages[path] = {};
     }
 }
 
@@ -60,7 +60,7 @@ export function fromSpec(spec) {
     if (!pkg) {
         throw new Error(`Pkg is required for spec: ${spec}`);
     }
-    const pkgContext = bl().gadgets[pkg];
+    const pkgContext = bl().packages[pkg];
     if (!pkgContext) {
         throw new Error(`Package ${pkg} not found! Did you install it?`);
     }

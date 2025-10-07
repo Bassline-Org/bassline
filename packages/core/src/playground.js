@@ -9,58 +9,34 @@ import functions from "./patterns/functions/index.js";
 installPackage(cells);
 installPackage(functions);
 
-const spec = {
-    pkg: "@bassline/cells/numeric",
-    name: "max",
-    state: 69,
-};
-
-const fromSpec = bl().fromSpec(spec);
-console.log(fromSpec.current());
-
-const tableSpec = {
-    pkg: "@bassline/cells/tables",
-    name: "first",
-    state: {},
-};
-
-const firstTable = bl().fromSpec(tableSpec);
-firstTable.receive({ a: 1, b: 2 });
-
-console.log(firstTable.current());
-
-const constant = bl().fromSpec({
-    pkg: "@bassline/fn/core",
-    name: "constant",
-    state: 10,
-});
-
-constant.tapOn("computed", (computed) => {
-    console.log(computed);
-});
-
-constant.receive(20);
-
-const tableOfCells = bl().fromSpec({
-    pkg: "@bassline/cells/tables",
-    name: "firstWithCells",
-    state: {
-        a: {
-            pkg: "@bassline/cells/numeric",
-            name: "max",
-            state: 0,
+const spec = [
+    {
+        pkg: "@bassline/cells/numeric",
+        name: "max",
+        state: 69,
+    },
+    {
+        pkg: "@bassline/cells/tables",
+        name: "first",
+        state: {},
+    },
+    {
+        pkg: "@bassline/cells/tables",
+        name: "firstWithCells",
+        state: {
+            a: { pkg: "@bassline/cells/numeric", name: "max", state: 0 },
         },
     },
-});
+];
 
-const tocSpec = tableOfCells.toSpec();
+const spawned = bl().fromSpec(spec);
+const [max, first, firstWithCells] = spawned;
 
-console.log(tocSpec);
+console.log(max.current());
+console.log(first.current());
+console.log(firstWithCells.current());
 
-const tableOfCellsFromSpec = bl().fromSpec(tocSpec);
+firstWithCells.set({ a: 10 });
 
-tableOfCellsFromSpec.set({ a: 10 }, true);
-
-console.log(tableOfCellsFromSpec.current());
-
-console.log(tableOfCellsFromSpec.toSpec());
+const asSpec = spawned.map((s) => s.toSpec());
+console.log(asSpec);

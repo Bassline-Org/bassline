@@ -58,6 +58,6 @@ export function installBassline() {
         globalThis.bassline = globalThis.bassline || {};
         globalThis.bassline.StateSymbol = StateSymbol;
         globalThis.bassline.gadgetProto = gadgetProto;
-        globalThis.bassline.gadgets = globalThis.bassline.gadgets || {};
+        globalThis.bassline.packages = globalThis.bassline.packages || {};
     }
 }
