@@ -9,10 +9,7 @@ export const gadgetProto = {
     receive(input) {
         const validated = this.validate(input);
         if (validated === undefined) return;
-        const action = this.step(this.current(), validated);
-        if (action !== undefined) {
-            this.handle(action);
-        }
+        this.step(this.current(), validated);
     },
     /**
      * Validate input, or returns undefined if invalid
