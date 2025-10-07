@@ -32,15 +32,21 @@ export function bl() {
  */
 export function installPackage(gadgetPackage) {
     const { gadgets } = gadgetPackage;
+    console.log(`Installing...`);
+    let lastPkg;
     for (const value of Object.values(gadgets)) {
         const pkg = value.pkg;
         const name = value.name;
-        console.log(`Installing: ${pkg}.${name}`);
+        if (pkg !== lastPkg) {
+            console.log(`Installing ${pkg}:`);
+            lastPkg = pkg;
+        }
+        console.log(`  ${name}`);
         ensurePath(pkg);
         const context = bl().packages[pkg];
         context[name] = value;
-        console.log(`Installed: ${pkg}.${name}`);
     }
+    console.log("Done!");
 }
 
 function ensurePath(path) {
