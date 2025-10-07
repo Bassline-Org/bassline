@@ -1,4 +1,5 @@
 const { gadgetProto } = bl();
+import { gadgetRef } from "../patterns/refs/gadgetRef.js";
 export const idSymbol = Symbol("bassline-id");
 
 export function getGadgetById(id) {
@@ -43,9 +44,9 @@ export function installRegistry() {
             return this[idSymbol];
         },
         asRef() {
-            return {
+            return gadgetRef.spawn({
                 id: this.id(),
-            };
+            });
         },
     });
 }

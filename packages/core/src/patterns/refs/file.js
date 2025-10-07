@@ -13,21 +13,24 @@ Object.assign(file, {
     name: "file",
     validate(input) {
         const path = input?.path;
-        if (typeof path !== "string") return undefined;
+        if (typeof path !== "string") return;
         return { path };
     },
-    canResolve({ path }) {
-        if (path !== undefined) return true;
-        return false;
+    enuf(next) {
+        return next.path !== undefined;
     },
-    tryResolve({ path }) {
-        return withRetry(
+    async compute({ path }) {
+        return await withRetry(
             async () => await fs.readFile(path, "utf-8"),
         );
     },
-    minState() {
+    toSpec() {
         return {
-            path: this.current()?.path,
+            pkg: this.pkg,
+            name: this.name,
+            state: {
+                path: this.current()?.path,
+            },
         };
     },
 });

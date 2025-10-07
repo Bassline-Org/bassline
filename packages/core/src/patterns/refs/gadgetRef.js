@@ -12,19 +12,21 @@ Object.assign(gadgetRef, {
         if (typeof id !== "string") return;
         return { id };
     },
-    canResolve({ id }) {
-        if (id !== undefined) return true;
-        return false;
+    enuf(next) {
+        return next.id !== undefined;
     },
-    tryResolve({ id }) {
-        return withRetry(
+    async compute({ id }) {
+        return await withRetry(
             () => getGadgetById(id),
         );
     },
-    minState() {
+    toSpec() {
         return {
-            id: this.current()?.id,
+            pkg: this.pkg,
+            name: this.name,
+            state: {
+                id: this.current()?.id,
+            },
         };
     },
-    isGadgetRef: true,
 });

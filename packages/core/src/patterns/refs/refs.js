@@ -6,49 +6,41 @@ Object.assign(refProto, {
     afterSpawn(initial) {
         const { promise, resolve, reject } = Promise.withResolvers();
         this.promise = promise;
+        this.promise
+            .then((resolved) => {
+                this.handleResolved(resolved);
+            })
+            .catch((error) => {
+                this.handleError(error);
+            });
         this.resolve = resolve;
         this.reject = reject;
-
-        this.update({ resolving: false });
-        this.receive(initial);
+        this.update({});
+        this.receive({ ...initial });
+    },
+    handleResolved(resolved) {
+        this.update({ ...this.current(), resolved });
+        this.emit({ resolved });
+    },
+    handleError(error) {
+        this.update({ ...this.current(), error });
+        this.emit({ error });
     },
     step(state, input) {
-        if (state.resolved !== undefined) return;
-        if (state.resolving) return;
-
-        const newState = { ...state, ...input };
-        if (this.canResolve(newState)) {
-            this.update({ ...newState, resolving: true });
-            Promise.resolve(this.tryResolve(newState))
+        if (state.resolved) return;
+        const next = this.join(state, input);
+        if (this.enuf(next)) {
+            Promise.resolve(this.compute(next))
                 .then((resolved) => {
-                    this.update({ ...newState, resolved, resolving: false });
-                    this.emit({ resolved });
                     this.resolve(resolved);
                 })
                 .catch((error) => {
-                    this.update({ ...newState, resolving: false });
-                    this.emit({ error });
                     this.reject(error);
                 });
-        } else {
-            this.update({ ...newState });
         }
     },
-    canResolve(state, input) {
-        if (state.resolved !== undefined) return true;
-        if (state.resolving) return true;
-        return false;
-    },
-    minState() {
-        const { resolved, ...rest } = this.current();
-        return { ...rest };
-    },
-    toSpec() {
-        return {
-            pkg: this.pkg,
-            name: this.name,
-            state: this.minState(),
-        };
+    join(state, input) {
+        return { ...input, ...state };
     },
 });
 

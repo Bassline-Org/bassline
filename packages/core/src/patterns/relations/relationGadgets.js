@@ -1,52 +1,35 @@
 import { gadgetProto } from "../../gadget.js";
 import { gadgetRef } from "../refs/gadgetRef.js";
+import { refProto } from "../refs/refs.js";
 
-export const wire = Object.create(gadgetProto);
+function isGadgetRef(gadget) {
+    if (gadget === undefined) return false;
+    return gadgetRef.isPrototypeOf(gadget);
+}
+
+export const wire = Object.create(refProto);
 Object.assign(wire, {
     pkg: "@bassline/relations",
     name: "wire",
-    validate({ source, target, reset }) {
-        if (reset) {
-            return { reset };
+    validate(input) {
+        const validated = {};
+        if (isGadgetRef(input.source)) {
+            validated.source = input.source;
         }
-        if (source?.isGadgetRef && target?.isGadgetRef) {
-            return { bind: { source, target } };
+        if (isGadgetRef(input.target)) {
+            validated.target = input.target;
         }
+        if (Object.keys(validated).length === 0) return;
+        return validated;
     },
-    step(state, { bind, reset }) {
-        if (state.resolving) return;
-
-        if (reset) {
-            const { cleanup } = state;
-            cleanup?.();
-            this.update({ resolving: false, resolved: false });
-        }
-
-        if (state.resolved) return;
-
-        if (bind === undefined) return;
-
-        const { source, target } = bind;
-        this.update({ ...state, resolving: true });
-        Promise.all([source.promise, target.promise])
-            .then(() => {
-                this.update({
-                    ...state,
-                    source,
-                    target,
-                    resolving: false,
-                    resolved: true,
-                });
-                const cleanup = source.tapOn(
-                    "changed",
-                    (c) => target.receive(c),
-                );
-                this.update({ ...state, source, target, cleanup });
-            });
+    enuf({ source, target }) {
+        return source !== undefined && target !== undefined;
     },
-    afterSpawn(initial) {
-        this.update({ resolving: false, resolved: false });
-        this.receive({ ...initial });
+    async compute({ source, target }) {
+        const [s, t] = await Promise.all([source.promise, target.promise]);
+        const cleanup = s.tapOn("changed", (c) => t.receive(c));
+        t.receive(s.current());
+        return cleanup;
     },
     toSpec() {
         const { source, target } = this.current();
@@ -54,8 +37,8 @@ Object.assign(wire, {
             pkg: this.pkg,
             name: this.name,
             state: {
-                source: source.toSpec(),
-                target: target.toSpec(),
+                source: source?.toSpec(),
+                target: target?.toSpec(),
             },
         };
     },

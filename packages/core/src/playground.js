@@ -15,90 +15,115 @@ installPackage(functions);
 installPackage(refs);
 installPackage(relations);
 
-const spec = [
-    {
-        pkg: "@bassline/cells/numeric",
-        name: "max",
-        state: 69,
-        id: "max",
-    },
-    {
-        pkg: "@bassline/cells/tables",
-        name: "first",
-        state: {},
-    },
-    {
-        pkg: "@bassline/cells/tables",
-        name: "firstWithCells",
-        state: {
-            a: { pkg: "@bassline/cells/numeric", name: "max", state: 0 },
-        },
-    },
-    {
-        pkg: "@bassline/refs",
-        name: "gadgetRef",
-        state: {
-            id: "max",
-        },
-        id: "maxRef",
-    },
-    {
-        pkg: "@bassline/refs",
-        name: "file",
-        state: {
-            path: "/tmp/foo.txt",
-        },
-        id: "fileRef",
-    },
-];
+const fileSpec = {
+    pkg: "@bassline/refs",
+    name: "file",
+    state: {},
+};
+const lastSpec = {
+    pkg: "@bassline/cells/unsafe",
+    name: "last",
+    state: {},
+};
+const last = bl().fromSpec(lastSpec);
+last.tapOn("changed", (c) => console.log("last changed", c));
 
-const otherSpec = [
-    {
-        pkg: "@bassline/relations",
-        name: "wire",
-        state: {},
-    },
-    {
-        pkg: "@bassline/cells/numeric",
-        name: "max",
-        state: 0,
-        id: "max",
-    },
-    {
-        pkg: "@bassline/cells/numeric",
-        name: "max",
-        state: 0,
-        id: "max2",
-    },
-];
+const file = bl().fromSpec(fileSpec);
 
-const spawned = bl().fromSpec(otherSpec);
-const [wire, max, max2] = spawned;
-
-max.tapOn("changed", console.log);
-max2.tapOn("changed", console.log);
-
-wire.receive({
-    source: max.asRef(),
-    target: max2.asRef(),
+const wire = relations.gadgets.wire.spawn({
+    source: file.asRef(),
+    target: last.asRef(),
+});
+wire.promise.then((wire) => {
+    console.log("wire", wire);
 });
 
-wire.tapOn("changed", console.log);
+file.receive({ path: "/tmp/foo.txt" });
 
-max.receive(10);
+// const spec = [
+//     {
+//         pkg: "@bassline/cells/numeric",
+//         name: "max",
+//         state: 69,
+//         id: "max",
+//     },
+//     {
+//         pkg: "@bassline/cells/tables",
+//         name: "first",
+//         state: {},
+//     },
+//     {
+//         pkg: "@bassline/cells/tables",
+//         name: "firstWithCells",
+//         state: {
+//             a: { pkg: "@bassline/cells/numeric", name: "max", state: 0 },
+//         },
+//     },
+//     {
+//         pkg: "@bassline/refs",
+//         name: "gadgetRef",
+//         state: {
+//             id: "max",
+//         },
+//         id: "maxRef",
+//     },
+//     {
+//         pkg: "@bassline/refs",
+//         name: "file",
+//         state: {
+//             path: "/tmp/foo.txt",
+//         },
+//         id: "fileRef",
+//     },
+// ];
 
-console.log(max2.current());
-console.log(wire.current());
+// const otherSpec = [
+//     {
+//         pkg: "@bassline/relations",
+//         name: "wire",
+//         state: {},
+//     },
+//     {
+//         pkg: "@bassline/cells/numeric",
+//         name: "max",
+//         state: 0,
+//         id: "max",
+//     },
+//     {
+//         pkg: "@bassline/cells/numeric",
+//         name: "max",
+//         state: 0,
+//         id: "max2",
+//     },
+// ];
 
-// const spawned = bl().fromSpec(spec);
-// const [max, first, firstWithCells, maxRef, fileRef] = spawned;
+// const spawned = bl().fromSpec(otherSpec);
+// const [wire, max, max2] = spawned;
 
-// maxRef.promise
-//     .then((gadget) => {
-//         console.log("gadget", gadget);
-//     });
+// max.tapOn("changed", console.log);
+// max2.tapOn("changed", console.log);
 
-// fileRef.promise
-//     .then((file) => {
-//         console.log("file", file);
-//     });
+// wire.receive({
+//     source: max.asRef(),
+//     target: max2.asRef(),
+// });
+
+// wire.tapOn("changed", console.log);
+
+// max.receive(10);
+
+// console.log(max2.current());
+// console.log(wire.current());
+
+// // const spawned = bl().fromSpec(spec);
+// // const [max, first, firstWithCells, maxRef, fileRef] = spawned;
+
+// // maxRef.promise
+// //     .then((gadget) => {
+// //         console.log("gadget", gadget);
+// //     });
+
+// // fileRef.promise
+// //     .then((file) => {
+// //         console.log("file", file);
+// //     });
