@@ -5,7 +5,7 @@ Object.assign(setProto, {
     pkg: "core.cells.set",
     validate: asSet,
     contradiction({ current, incoming }) {
-        console.log("Contradiction! ", current, incoming);
+        console.error("Contradiction! ", current, incoming);
     },
 });
 
