@@ -30,6 +30,7 @@ Object.assign(refProto, {
         if (state.resolved) return;
         const next = this.join(state, input);
         if (this.enuf(next)) {
+            this.update({ ...this.current(), ...next });
             Promise.resolve(this.compute(next))
                 .then((resolved) => {
                     this.resolve(resolved);

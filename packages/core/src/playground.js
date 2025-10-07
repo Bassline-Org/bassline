@@ -30,100 +30,20 @@ last.tapOn("changed", (c) => console.log("last changed", c));
 
 const file = bl().fromSpec(fileSpec);
 
-const wire = relations.gadgets.wire.spawn({
+const wire = relations.gadgets.wire.spawn({});
+file.receive({ path: "/tmp/foo.txt" });
+
+wire.receive({
     source: file.asRef(),
     target: last.asRef(),
 });
-wire.promise.then((wire) => {
-    console.log("wire", wire);
+
+wire.promise.then(async (val) => {
+    await new Promise((res) =>
+        setTimeout(() => {
+            const wireSpec = wire.toSpec();
+            console.log("wireSpec", wireSpec);
+            res(true);
+        }, 5000)
+    );
 });
-
-file.receive({ path: "/tmp/foo.txt" });
-
-// const spec = [
-//     {
-//         pkg: "@bassline/cells/numeric",
-//         name: "max",
-//         state: 69,
-//         id: "max",
-//     },
-//     {
-//         pkg: "@bassline/cells/tables",
-//         name: "first",
-//         state: {},
-//     },
-//     {
-//         pkg: "@bassline/cells/tables",
-//         name: "firstWithCells",
-//         state: {
-//             a: { pkg: "@bassline/cells/numeric", name: "max", state: 0 },
-//         },
-//     },
-//     {
-//         pkg: "@bassline/refs",
-//         name: "gadgetRef",
-//         state: {
-//             id: "max",
-//         },
-//         id: "maxRef",
-//     },
-//     {
-//         pkg: "@bassline/refs",
-//         name: "file",
-//         state: {
-//             path: "/tmp/foo.txt",
-//         },
-//         id: "fileRef",
-//     },
-// ];
-
-// const otherSpec = [
-//     {
-//         pkg: "@bassline/relations",
-//         name: "wire",
-//         state: {},
-//     },
-//     {
-//         pkg: "@bassline/cells/numeric",
-//         name: "max",
-//         state: 0,
-//         id: "max",
-//     },
-//     {
-//         pkg: "@bassline/cells/numeric",
-//         name: "max",
-//         state: 0,
-//         id: "max2",
-//     },
-// ];
-
-// const spawned = bl().fromSpec(otherSpec);
-// const [wire, max, max2] = spawned;
-
-// max.tapOn("changed", console.log);
-// max2.tapOn("changed", console.log);
-
-// wire.receive({
-//     source: max.asRef(),
-//     target: max2.asRef(),
-// });
-
-// wire.tapOn("changed", console.log);
-
-// max.receive(10);
-
-// console.log(max2.current());
-// console.log(wire.current());
-
-// // const spawned = bl().fromSpec(spec);
-// // const [max, first, firstWithCells, maxRef, fileRef] = spawned;
-
-// // maxRef.promise
-// //     .then((gadget) => {
-// //         console.log("gadget", gadget);
-// //     });
-
-// // fileRef.promise
-// //     .then((file) => {
-// //         console.log("file", file);
-// //     });
