@@ -1,8 +1,9 @@
 const { gadgetProto } = bl();
 
+const pkg = "@bassline/cells/set";
 const setProto = Object.create(gadgetProto);
 Object.assign(setProto, {
-    pkg: "core.cells.set",
+    pkg,
     validate: asSet,
     contradiction({ current, incoming }) {
         console.error("Contradiction! ", current, incoming);

@@ -10,22 +10,23 @@ export function bl() {
 
 /**
  * Installs a package into the running system
- * Packges are objects with an optional gadgets property, and an optional functions property
+ * Packges are objects with an optional gadgets property
  * The gadgets property is an object with the gadget constructors to install
  * Each constructor must have a pkg property on it's prototype
  * @param {*} gadgetPackage - The package to install
  * @example
  * import { installPackage } from "@bassline/core";
  *
- * const myCellProto = Object.create(bl().gadgetProto);
- * myCellProto.pkg = "my.package";
+ * const myCell = Object.create(bl().gadgetProto);
+ * Object.assign(myCell, {
+ *     pkg: "my.package",
+ *     name: "myCell",
+ *     step(c, i) { ... }
+ * });
  *
- * function MyCellConstructor(initial) { ... }
- * MyCellConstructor.prototype = myCellProto;
  * installPackage({
  *     gadgets: {
- *         MyCellConstructor,
- *         MyOtherCellConstructor,
+ *         myCell
  *     },
  * });
  */
@@ -56,8 +57,17 @@ export function fromSpec(spec) {
     if (!pkg) {
         throw new Error(`Pkg is required for spec: ${spec}`);
     }
-    const gadget = bl().gadgets[pkg][name];
-    return gadget.spawn(state);
+    const pkgContext = bl().gadgets[pkg];
+    if (!pkgContext) {
+        throw new Error(`Package ${pkg} not found! Did you install it?`);
+    }
+    const proto = pkgContext[name];
+    if (!proto) {
+        throw new Error(
+            `Gadget ${name} not found in package ${pkg}! Did you install it?`,
+        );
+    }
+    return proto.spawn(state);
 }
 
 Object.assign(bl().gadgetProto, {

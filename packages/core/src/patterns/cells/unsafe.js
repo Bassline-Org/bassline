@@ -1,8 +1,10 @@
 const { gadgetProto } = bl();
 
+const pkg = "@bassline/cells/unsafe";
+
 export const unsafeProto = Object.create(gadgetProto);
 Object.assign(unsafeProto, {
-    pkg: "core.cells.unsafe",
+    pkg,
 });
 
 const last = Object.create(unsafeProto);

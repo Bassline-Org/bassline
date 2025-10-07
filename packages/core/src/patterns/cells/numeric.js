@@ -1,8 +1,10 @@
 const { gadgetProto } = bl();
 
+const pkg = "@bassline/cells/numeric";
+
 const numericProto = Object.create(gadgetProto);
 Object.assign(numericProto, {
-    pkg: "core.cells.numeric",
+    pkg,
     validate: asNumber,
 });
 

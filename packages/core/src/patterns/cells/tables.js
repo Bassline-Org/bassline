@@ -4,9 +4,11 @@ import { ordinal } from "./versioned.js";
 
 const { gadgetProto } = bl();
 
+const pkg = "@bassline/cells/tables";
+
 export const tableProto = Object.create(gadgetProto);
 Object.assign(tableProto, {
-    pkg: "core.cells.tables",
+    pkg,
     validate: entries,
     added(additions) {
         this.emit({ added: additions });

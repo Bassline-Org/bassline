@@ -4,14 +4,12 @@ bl();
 installTaps();
 
 import cells from "./patterns/cells/index.js";
-import core from "./patterns/functions/core.js";
-import http from "./patterns/functions/http.js";
+import functions from "./patterns/functions/index.js";
 installPackage(cells);
-installPackage(core);
-installPackage(http);
+installPackage(functions);
 
 const spec = {
-    pkg: "core.cells.numeric",
+    pkg: "@bassline/cells/numeric",
     name: "max",
     state: 69,
 };
@@ -20,7 +18,7 @@ const fromSpec = bl().fromSpec(spec);
 console.log(fromSpec.current());
 
 const tableSpec = {
-    pkg: "core.cells.tables",
+    pkg: "@bassline/cells/tables",
     name: "first",
     state: {},
 };
@@ -31,7 +29,7 @@ firstTable.receive({ a: 1, b: 2 });
 console.log(firstTable.current());
 
 const constant = bl().fromSpec({
-    pkg: "core.functions",
+    pkg: "@bassline/fn/core",
     name: "constant",
     state: 10,
 });
@@ -43,7 +41,7 @@ constant.tapOn("computed", (computed) => {
 constant.receive(20);
 
 const getSpec = {
-    pkg: "core.functions.http",
+    pkg: "@bassline/fn/http",
     name: "get",
 };
 

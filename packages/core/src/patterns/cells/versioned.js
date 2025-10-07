@@ -1,8 +1,10 @@
 const { gadgetProto } = bl();
 
+const pkg = "@bassline/cells/versioned";
+
 export const versionedProto = Object.create(gadgetProto);
 Object.assign(versionedProto, {
-    pkg: "core.cells.versioned",
+    pkg,
 });
 
 export const ordinal = Object.create(versionedProto);

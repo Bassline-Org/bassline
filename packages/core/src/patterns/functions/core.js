@@ -1,6 +1,6 @@
 import { partial, transform } from "./functions.js";
 
-const pkg = "core.functions";
+const pkg = "@bassline/fn/core";
 const identity = Object.create(transform);
 Object.assign(identity, {
     pkg,

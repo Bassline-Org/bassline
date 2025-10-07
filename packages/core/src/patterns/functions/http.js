@@ -1,6 +1,6 @@
 import { partial, transform } from "./functions.js";
 
-const pkg = "core.functions.http";
+const pkg = "@bassline/fn/http";
 
 const httpGet = Object.create(transform);
 Object.assign(httpGet, {
