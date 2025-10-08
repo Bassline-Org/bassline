@@ -1,31 +1,11 @@
-import { bl } from "../../index.js";
-import { installTaps } from "../../extensions/taps.js";
+import { createRefType } from "./refs.js";
 import fs from "fs/promises";
-installTaps();
-const { gadgetProto } = bl();
-import { refProto, withRetry } from "./refs.js";
-import { pick } from "../../utils.js";
 
 const pkg = "@bassline/refs";
 
-export const file = Object.create(refProto);
-Object.assign(file, {
-    pkg,
+export const file = createRefType({
     name: "file",
-    validate(input) {
-        const path = input?.path;
-        if (typeof path !== "string") return;
-        return { path };
-    },
-    enuf(next) {
-        return next.path !== undefined;
-    },
-    async compute({ path }) {
-        return await withRetry(
-            async () => await fs.readFile(path, "utf-8"),
-        );
-    },
-    stateSpec() {
-        return pick(this.current(), ["path"]);
-    },
+    pkg,
+    keyFields: ["path"],
+    resolver: async (path) => await fs.readFile(path, "utf-8"),
 });

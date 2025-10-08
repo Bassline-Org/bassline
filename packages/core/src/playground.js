@@ -77,9 +77,29 @@ setTimeout(() => {
     }, 500);
 }, 1000);
 
-//file.tapOn("resolved", (c) => console.log("file resolved", c));
+// Demo: Creating a custom ref type is trivial now!
+import { createRefType } from "./patterns/refs/refs.js";
 
-//const wire = relations.gadgets.wire.spawn({});
+console.log("\n=== Custom Ref Type Demo ===");
+
+// Create a simple key-value store ref
+const kvStore = new Map([
+    ["user1", { name: "Alice", role: "admin" }],
+    ["user2", { name: "Bob", role: "user" }],
+]);
+
+const kvRef = createRefType({
+    name: "kvRef",
+    keyFields: ["key"],
+    resolver: (key) => kvStore.get(key),
+});
+kvRef.pkg = "@demo/refs";
+
+const userRef = kvRef.spawn({ key: "user1" });
+userRef.promise.then((user) => {
+    console.log("User resolved:", user);
+    console.log("✅ Custom ref type demo complete!\n");
+});
 //file.receive({ path: "/tmp/foo.txt" });
 
 //console.log("file: ", file.toSpec());
