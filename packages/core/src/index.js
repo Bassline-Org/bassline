@@ -88,8 +88,11 @@ Object.assign(bl().gadgetProto, {
         return {
             pkg: this.pkg,
             name: this.name,
-            state: this.current(),
+            state: this.stateSpec(),
         };
+    },
+    stateSpec() {
+        return this.current();
     },
 });
 

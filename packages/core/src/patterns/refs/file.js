@@ -4,6 +4,7 @@ import fs from "fs/promises";
 installTaps();
 const { gadgetProto } = bl();
 import { refProto, withRetry } from "./refs.js";
+import { pick } from "../../utils.js";
 
 const pkg = "@bassline/refs";
 
@@ -24,13 +25,7 @@ Object.assign(file, {
             async () => await fs.readFile(path, "utf-8"),
         );
     },
-    toSpec() {
-        return {
-            pkg: this.pkg,
-            name: this.name,
-            state: {
-                path: this.current()?.path,
-            },
-        };
+    stateSpec() {
+        return pick(this.current(), ["path"]);
     },
 });

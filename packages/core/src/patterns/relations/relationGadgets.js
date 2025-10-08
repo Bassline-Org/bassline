@@ -31,15 +31,11 @@ Object.assign(wire, {
         t.receive(s.current());
         return cleanup;
     },
-    toSpec() {
+    stateSpec() {
         const { source, target } = this.current();
         return {
-            pkg: this.pkg,
-            name: this.name,
-            state: {
-                source: source?.toSpec(),
-                target: target?.toSpec(),
-            },
+            source: source?.toSpec(),
+            target: target?.toSpec(),
         };
     },
 });

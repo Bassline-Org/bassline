@@ -65,21 +65,16 @@ Object.assign(firstWithCells, {
                 : [key, this.factory.spawn(value)]
         );
     },
-    toSpec() {
+    stateSpec() {
         const curr = {};
         for (const [key, value] of Object.entries(this.current())) {
-            if (value.toSpec) {
-                curr[key] = value.toSpec();
+            if (value.stateSpec) {
+                curr[key] = value.stateSpec();
             } else {
                 curr[key] = value;
             }
         }
-
-        return {
-            pkg: this.pkg,
-            name: this.name,
-            state: curr,
-        };
+        return curr;
     },
     afterSpawn(state) {
         const entries = Object.entries(state)
@@ -98,10 +93,11 @@ Object.assign(firstWithCells, {
 });
 
 function isSpec(value) {
-    if (value["pkg"] === undefined) return false;
-    if (value["name"] === undefined) return false;
-    if (value["state"] === undefined) return false;
-    return true;
+    return (
+        isNil(value["pkg"]) ||
+        isNil(value["name"]) ||
+        isNil(value["state"])
+    );
 }
 
 function entries(input) {

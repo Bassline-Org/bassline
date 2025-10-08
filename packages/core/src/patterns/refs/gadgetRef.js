@@ -1,5 +1,6 @@
 import { refProto, withRetry } from "./refs.js";
 import { getGadgetById } from "../../extensions/registry.js";
+import { isNotNil, isString, pick } from "../../utils.js";
 
 const pkg = "@bassline/refs";
 
@@ -8,25 +9,19 @@ Object.assign(gadgetRef, {
     pkg,
     name: "gadgetRef",
     validate(input) {
-        const id = input?.id;
-        if (typeof id !== "string") return;
-        return { id };
+        const valid = pick(input, ["id"]);
+        if (!isString(valid.id)) return;
+        return valid;
     },
     enuf(next) {
-        return next.id !== undefined;
+        return isNotNil(next.id);
     },
     async compute({ id }) {
         return await withRetry(
             () => getGadgetById(id),
         );
     },
-    toSpec() {
-        return {
-            pkg: this.pkg,
-            name: this.name,
-            state: {
-                id: this.current()?.id,
-            },
-        };
+    stateSpec() {
+        return pick(this.current(), ["id"]);
     },
 });
