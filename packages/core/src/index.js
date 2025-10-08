@@ -1,4 +1,8 @@
 export * from "./gadget.js";
+export * from "./compoundProto.js";
+export * from "./packageLoader.js";
+export * from "./packageExporter.js";
+export * from "./packageResolver.js";
 import { installBassline } from "./gadget.js";
 import { defaultPackageResolver } from "./packageResolver.js";
 

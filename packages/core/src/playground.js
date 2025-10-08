@@ -1,6 +1,7 @@
 import { bl, installPackage } from "./index.js";
 import { installTaps } from "./extensions/taps.js";
 import { installRegistry } from "./extensions/registry.js";
+import { createCompoundProto } from "./compoundProto.js";
 bl();
 installTaps();
 installRegistry();
@@ -105,21 +106,77 @@ userRef.promise.then((user) => {
     console.log("User resolved:", user);
     console.log("✅ Custom ref type demo complete!\n");
 });
-//file.receive({ path: "/tmp/foo.txt" });
+// === Testing Compound Proto Factory ===
+console.log("\n=== Testing Compound Proto Factory ===");
 
-//console.log("file: ", file.toSpec());
+// Define a reusable "threshold filter" template
+const thresholdFilterTemplate = {
+    imports: {
+        cells: "@bassline/cells/numeric",
+        unsafe: "@bassline/cells/unsafe",
+        wire: "@bassline/relations",
+    },
+    gadgets: {
+        threshold: { type: "cells.max", state: "$parameters.threshold" },
+        input: { type: "cells.max", state: 0 },
+        output: { type: "unsafe.last", state: 0 },
+        wire1: {
+            type: "wire.wire",
+            state: {
+                source: { ref: "input" },
+                target: { ref: "output" },
+            },
+        },
+    },
+    interface: {
+        inputs: { value: "input", min: "threshold" },
+        outputs: { result: "output" },
+    },
+};
 
-// wire.receive({
-//     source: file.asRef(),
-//     target: last.asRef(),
-// });
+// Create a reusable proto from the template
+const thresholdFilter = createCompoundProto(thresholdFilterTemplate, {
+    name: "thresholdFilter",
+    pkg: "@demo/filters",
+    parameters: {
+        threshold: 10, // Default threshold
+    },
+});
 
-// wire.promise.then(async (val) => {
-//     await new Promise((res) =>
-//         setTimeout(() => {
-//             const wireSpec = wire.toSpec();
-//             console.log("wireSpec", wireSpec);
-//             res(true);
-//         }, 5000)
-//     );
-// });
+// Install it so we can use it via fromSpec
+installPackage({
+    name: "@demo/filters",
+    gadgets: { thresholdFilter },
+});
+
+// Now we can spawn instances with different thresholds!
+const filter50 = thresholdFilter.spawn({ threshold: 50 });
+const filter100 = thresholdFilter.spawn({ threshold: 100 });
+
+filter50.tap((effects) => {
+    console.log("Filter50 emitted:", effects);
+});
+
+filter100.tap((effects) => {
+    console.log("Filter100 emitted:", effects);
+});
+
+// Test after resolution
+setTimeout(() => {
+    console.log("\nTesting filter50 (threshold=50):");
+    filter50.receive({ value: 30 });
+    setTimeout(() => filter50.receive({ value: 75 }), 100);
+
+    setTimeout(() => {
+        console.log("\nTesting filter100 (threshold=100):");
+        filter100.receive({ value: 80 });
+        setTimeout(() => filter100.receive({ value: 150 }), 100);
+
+        setTimeout(() => {
+            console.log("\n✅ Compound proto factory test complete!");
+            console.log(
+                "Successfully created reusable compound proto with parameters!",
+            );
+        }, 500);
+    }, 500);
+}, 1000);

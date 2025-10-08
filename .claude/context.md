@@ -869,3 +869,223 @@ See `/apps/web/app/routes/canvas-demo.tsx` for complete implementation with:
 - Live updates throughout
 
 **This is real, working meta-circularity!**
+
+---
+
+## Package Description Language - Full Meta-Circularity Achieved
+
+### The Breakthrough
+
+We now have a complete meta-circular system where compound gadgets can be:
+1. **Created** as data (compound specs)
+2. **Exported** as package definitions (JSON)
+3. **Loaded** back into the system as reusable types
+4. **Instantiated** via `fromSpec()` just like built-in gadgets
+
+This closes the loop - the system can now describe and extend itself using its own primitives!
+
+### Implementation Files
+
+**Created**: 2025-10-08
+
+#### Core Modules
+
+1. **[compoundProto.js](../packages/core/src/compoundProto.js)** - Compound proto factory
+   - `createCompoundProto(template, options)` - Creates reusable compound protos
+   - Parameter resolution (`$parameters.name`)
+   - Template + state merging
+   - Extends base `compound` proto
+
+2. **[packageLoader.js](../packages/core/src/packageLoader.js)** - Package loading system
+   - `loadPackage(packageDef)` - Install packages from definitions
+   - `loadPackageFromFile(path)` - Load from JSON files
+   - Supports package-level imports
+   - Creates compound protos for each gadget definition
+
+3. **[packageExporter.js](../packages/core/src/packageExporter.js)** - Package export utilities
+   - `exportAsPackage(spec, options)` - Convert specs to package definitions
+   - `savePackage(packageDef, path)` - Save as JSON
+   - `parameterizeSpec(spec, paramMap)` - Convert values to parameter references
+
+4. **[packageResolver.js](../packages/core/src/packageResolver.js)** - Type resolution system (previously created)
+   - Enables short-form specs: `{ type: "cells.max" }` instead of `{ pkg: "@bassline/cells/numeric", name: "max" }`
+   - Import aliasing and parent chaining
+
+### Package Definition Schema
+
+```json
+{
+  "name": "@acme/filters",
+  "version": "1.0.0",
+  "description": "Custom filtering gadgets",
+  "imports": {
+    "cells": "@bassline/cells/numeric",
+    "unsafe": "@bassline/cells/unsafe",
+    "wire": "@bassline/relations"
+  },
+  "gadgets": {
+    "valueFilter": {
+      "description": "Filters values below a threshold",
+      "parameters": {
+        "threshold": 50
+      },
+      "template": {
+        "gadgets": {
+          "minValue": { "type": "cells.max", "state": "$parameters.threshold" },
+          "input": { "type": "cells.max", "state": 0 },
+          "filtered": { "type": "unsafe.last", "state": 0 },
+          "wire1": {
+            "type": "wire.wire",
+            "state": {
+              "source": { "ref": "input" },
+              "target": { "ref": "filtered" }
+            }
+          }
+        },
+        "interface": {
+          "inputs": { "value": "input", "threshold": "minValue" },
+          "outputs": { "output": "filtered" }
+        }
+      }
+    }
+  }
+}
+```
+
+### End-to-End Flow
+
+```javascript
+// 1. Create a compound gadget
+const myCompound = bl().fromSpec({
+  pkg: "@bassline/compound",
+  name: "compound",
+  state: {
+    imports: { cells: "@bassline/cells/numeric" },
+    gadgets: {
+      threshold: { type: "cells.max", state: 50 },
+      input: { type: "cells.max", state: 0 }
+    }
+  }
+});
+
+// 2. Parameterize and export
+const parameterized = parameterizeSpec(myCompound.toSpec(), {
+  "state.gadgets.threshold.state": "threshold"
+});
+
+const packageDef = exportAsPackage(parameterized, {
+  name: "@acme/filters",
+  gadgetName: "valueFilter",
+  parameters: { threshold: 50 }
+});
+
+// 3. Save to file
+await savePackage(packageDef, "/tmp/acme-filters.json");
+
+// 4. Load from file
+await loadPackageFromFile("/tmp/acme-filters.json");
+
+// 5. Create instances with different parameters
+const resolver = createPackageResolver();
+resolver.import("acme", "@acme/filters");
+
+const filter100 = bl().fromSpec(
+  { type: "acme.valueFilter", state: { threshold: 100 } },
+  resolver
+);
+
+const filter200 = bl().fromSpec(
+  { type: "acme.valueFilter", state: { threshold: 200 } },
+  resolver
+);
+
+// 6. Use them!
+filter100.receive({ value: 150 });
+filter200.receive({ value: 250 });
+```
+
+### Key Features
+
+#### Parameter Resolution
+Templates can reference parameters using `$parameters.name`:
+```javascript
+{
+  gadgets: {
+    threshold: { type: "cells.max", state: "$parameters.threshold" }
+  }
+}
+```
+
+At spawn time, `$parameters.threshold` resolves to:
+1. Value from spawn state (`{ threshold: 100 }`)
+2. Default from parameter definition (`parameters: { threshold: 50 }`)
+3. Error if neither exists
+
+#### Package-Level Imports
+Imports defined at package level are merged with template imports:
+```json
+{
+  "imports": { "cells": "@bassline/cells/numeric" },
+  "gadgets": {
+    "myGadget": {
+      "template": {
+        "imports": { "wire": "@bassline/relations" },
+        // Has access to BOTH cells and wire
+      }
+    }
+  }
+}
+```
+
+#### Reusable Compound Protos
+Once loaded, compound gadgets behave identically to built-in gadgets:
+```javascript
+// Built-in gadget
+const max = bl().fromSpec({ type: "cells.max", state: 0 });
+
+// Loaded compound gadget (identical API!)
+const filter = bl().fromSpec({ type: "acme.valueFilter", state: { threshold: 50 } });
+```
+
+### Testing
+
+Full end-to-end test in [test-package-system.js](../packages/core/src/test-package-system.js) demonstrates:
+- Creating compound gadgets
+- Parameterizing specs
+- Exporting to package definitions
+- Saving to JSON files
+- Loading from files
+- Creating instances via `fromSpec()`
+- Using instances with different parameters
+
+All tests pass ✅
+
+### Meta-Circular Implications
+
+This completes the fundamental loop:
+
+1. **Gadgets define behavior** (via step/emit)
+2. **Compounds compose gadgets** (via specs)
+3. **Packages define reusable compounds** (via templates)
+4. **The system loads packages** (via `loadPackage`)
+5. **Loaded compounds are gadgets** (via `createCompoundProto`)
+6. **Gadgets can create packages** (via `exportAsPackage`)
+
+The system can now:
+- Describe itself as data (package definitions)
+- Load new capabilities from data (package files)
+- Export runtime structures as reusable types (compound → package)
+- Compose meta-gadgets that manipulate packages (package managers as gadgets!)
+
+### Next Possibilities
+
+With this foundation, we can now build:
+
+1. **Visual package editor** - Edit compound structures, export as packages
+2. **Package repositories** - Gadgets that manage collections of packages
+3. **Runtime package loading** - Load packages from URLs/network
+4. **Package composition** - Packages that combine other packages
+5. **Live editing** - Modify running compounds, export as new types
+6. **Meta-packages** - Packages that generate other packages
+
+The uniformity is preserved - all of these are just gadgets operating on gadget data!
