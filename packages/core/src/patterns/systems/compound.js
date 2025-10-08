@@ -1,6 +1,10 @@
 import { bl } from "../../index.js";
 import { createScope } from "./scope.js";
 import { localRef } from "../refs/localRef.js";
+import {
+    createPackageResolver,
+    defaultPackageResolver,
+} from "../../packageResolver.js";
 
 const { gadgetProto, fromSpec } = bl();
 
@@ -12,17 +16,37 @@ Object.assign(compound, {
     name: "compound",
 
     afterSpawn(spec) {
-        const { gadgets, interface: iface } = spec;
+        const { gadgets, interface: iface, imports } = spec;
 
-        // Create scope (can have parent for nested compounds)
+        // Create gadget scope (for localRefs)
         const scope = createScope(this.parentScope);
         this.scope = scope;
 
-        // Single pass: spawn all gadgets and register in scope
+        // Create package resolver (for type resolution)
+        const resolver = createPackageResolver(
+            this.parentResolver || defaultPackageResolver,
+        );
+        this.resolver = resolver;
+
+        // Process imports
+        if (imports) {
+            for (const [alias, fullPath] of Object.entries(imports)) {
+                resolver.import(alias, fullPath);
+            }
+        }
+
+        // Single pass: spawn all gadgets with resolver and register in scope
         for (const [name, gadgetSpec] of Object.entries(gadgets || {})) {
             // Expand { ref: "name" } sugar syntax
             const expanded = this.expandRefs(gadgetSpec);
-            const gadget = fromSpec(expanded);
+
+            // Spawn with our resolver (supports short-form specs)
+            const gadget = fromSpec(expanded, resolver);
+
+            // If it's a nested compound, provide parent resolver
+            if (compound.isPrototypeOf(gadget)) {
+                gadget.parentResolver = resolver;
+            }
 
             // Register in scope
             scope.set(name, gadget);
@@ -62,9 +86,11 @@ Object.assign(compound, {
         if (!iface) return;
 
         // Forward outputs - tap gadgets and re-emit under port names
-        for (const [portName, localName] of Object.entries(
-            iface.outputs || {},
-        )) {
+        for (
+            const [portName, localName] of Object.entries(
+                iface.outputs || {},
+            )
+        ) {
             const gadget = this.scope.get(localName);
             if (gadget?.tap) {
                 gadget.tap((effects) => {
@@ -79,9 +105,11 @@ Object.assign(compound, {
         if (!iface) return;
 
         // Route to input ports
-        for (const [portName, localName] of Object.entries(
-            iface.inputs || {},
-        )) {
+        for (
+            const [portName, localName] of Object.entries(
+                iface.inputs || {},
+            )
+        ) {
             if (input[portName] !== undefined) {
                 const gadget = scope.get(localName);
                 if (gadget?.receive) {
@@ -99,6 +127,13 @@ Object.assign(compound, {
             gadgets[name] = gadget.toSpec();
         }
 
-        return { gadgets, interface: iface };
+        // Include imports in serialization
+        const imports = this.resolver?.getImports();
+
+        return {
+            gadgets,
+            interface: iface,
+            ...(imports && Object.keys(imports).length > 0 ? { imports } : {}),
+        };
     },
 });

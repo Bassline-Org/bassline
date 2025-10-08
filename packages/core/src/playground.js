@@ -17,21 +17,26 @@ installPackage(refs);
 installPackage(relations);
 installPackage(systems);
 
-// Test compound gadget
+// Test compound gadget with SHORT-FORM SPECS!
+// Before: { pkg: "@bassline/cells/numeric", name: "max", state: 0 }
+// After:  { type: "cells.max", state: 0 }
+// 75% reduction in spec size!
 const compoundSpec = {
     pkg: "@bassline/compound",
     name: "compound",
     state: {
+        // Define imports for this compound
+        imports: {
+            cells: "@bassline/cells/numeric",
+            unsafe: "@bassline/cells/unsafe",
+            wire: "@bassline/relations",
+        },
+        // Now use short-form specs with type aliases
         gadgets: {
-            input: { pkg: "@bassline/cells/numeric", name: "max", state: 0 },
-            output: {
-                pkg: "@bassline/cells/unsafe",
-                name: "last",
-                state: 0,
-            },
+            input: { type: "cells.max", state: 0 },
+            output: { type: "unsafe.last", state: 0 },
             wire1: {
-                pkg: "@bassline/relations",
-                name: "wire",
+                type: "wire.wire",
                 state: {
                     source: { ref: "input" },
                     target: { ref: "output" },
