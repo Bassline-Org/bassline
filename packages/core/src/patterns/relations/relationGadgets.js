@@ -1,10 +1,9 @@
 import { gadgetProto } from "../../gadget.js";
-import { gadgetRef } from "../refs/gadgetRef.js";
 import { refProto } from "../refs/refs.js";
 
-function isGadgetRef(gadget) {
+function isRef(gadget) {
     if (gadget === undefined) return false;
-    return gadgetRef.isPrototypeOf(gadget);
+    return refProto.isPrototypeOf(gadget);
 }
 
 export const wire = Object.create(refProto);
@@ -13,10 +12,10 @@ Object.assign(wire, {
     name: "wire",
     validate(input) {
         const validated = {};
-        if (isGadgetRef(input.source)) {
+        if (isRef(input.source)) {
             validated.source = input.source;
         }
-        if (isGadgetRef(input.target)) {
+        if (isRef(input.target)) {
             validated.target = input.target;
         }
         if (Object.keys(validated).length === 0) return;

@@ -16,9 +16,13 @@ Object.assign(gadgetRef, {
     enuf(next) {
         return isNotNil(next.id);
     },
-    async compute({ id }) {
+    getResolver(state) {
+        // Use global registry as resolver
+        return { get: getGadgetById };
+    },
+    async compute({ id }, resolver) {
         return await withRetry(
-            () => getGadgetById(id),
+            () => resolver.get(id),
         );
     },
     stateSpec() {

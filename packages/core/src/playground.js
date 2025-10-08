@@ -9,26 +9,73 @@ import cells from "./patterns/cells/index.js";
 import functions from "./patterns/functions/index.js";
 import refs from "./patterns/refs/index.js";
 import relations from "./patterns/relations/relationGadgets.js";
+import systems from "./patterns/systems/index.js";
 
 installPackage(cells);
 installPackage(functions);
 installPackage(refs);
 installPackage(relations);
+installPackage(systems);
 
-const fileSpec = {
-    pkg: "@bassline/refs",
-    name: "file",
-    state: {},
+// Test compound gadget
+const compoundSpec = {
+    pkg: "@bassline/compound",
+    name: "compound",
+    state: {
+        gadgets: {
+            input: { pkg: "@bassline/cells/numeric", name: "max", state: 0 },
+            output: {
+                pkg: "@bassline/cells/unsafe",
+                name: "last",
+                state: 0,
+            },
+            wire1: {
+                pkg: "@bassline/relations",
+                name: "wire",
+                state: {
+                    source: { ref: "input" },
+                    target: { ref: "output" },
+                },
+            },
+        },
+        interface: {
+            inputs: { value: "input" },
+            outputs: { result: "output" },
+        },
+    },
 };
-const lastSpec = {
-    pkg: "@bassline/cells/unsafe",
-    name: "last",
-    state: {},
-};
-const last = bl().fromSpec(lastSpec);
-last.tapOn("changed", (c) => console.log("last changed", c));
 
-const file = bl().fromSpec(fileSpec);
+console.log("\n=== Testing Compound Gadget ===");
+const myCompound = bl().fromSpec(compoundSpec);
+
+myCompound.tap((effects) => {
+    console.log("Compound emitted:", effects);
+});
+
+// Give async resolution time to complete
+setTimeout(() => {
+    console.log("Sending value: 42");
+    myCompound.receive({ value: 42 });
+
+    setTimeout(() => {
+        console.log("Sending value: 100");
+        myCompound.receive({ value: 100 });
+
+        setTimeout(() => {
+            console.log("Sending value: 50 (should be rejected by max cell)");
+            myCompound.receive({ value: 50 });
+
+            setTimeout(() => {
+                const scope = myCompound.current().scope;
+                console.log("\nFinal state:");
+                console.log("  input:", scope.get("input").current());
+                console.log("  output:", scope.get("output").current());
+                console.log("\n✅ Compound gadget test complete!");
+                process.exit(0);
+            }, 500);
+        }, 500);
+    }, 500);
+}, 1000);
 
 //file.tapOn("resolved", (c) => console.log("file resolved", c));
 

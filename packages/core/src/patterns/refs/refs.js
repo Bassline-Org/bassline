@@ -31,17 +31,27 @@ Object.assign(refProto, {
         const next = this.join(state, input);
         if (this.enuf(next)) {
             this.update({ ...this.current(), ...next });
-            Promise.resolve(this.compute(next))
+
+            // Get resolver for this ref type
+            const resolver = this.getResolver(next);
+
+            Promise.resolve(this.compute(next, resolver))
                 .then((resolved) => {
                     this.resolve(resolved);
                 })
                 .catch((error) => {
                     this.reject(error);
                 });
+        } else {
+            this.update(next);
         }
     },
     join(state, input) {
-        return { ...input, ...state };
+        return { ...state, ...input };
+    },
+    // Override in subclasses to provide resolver
+    getResolver(state) {
+        return undefined;
     },
 });
 
