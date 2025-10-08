@@ -6,7 +6,7 @@ import {
     defaultPackageResolver,
 } from "../../packageResolver.js";
 
-const { gadgetProto, fromSpec } = bl();
+const { gadgetProto } = bl();
 
 const pkg = "@bassline/compound";
 
@@ -41,7 +41,7 @@ Object.assign(compound, {
             const expanded = this.expandRefs(gadgetSpec);
 
             // Spawn with our resolver (supports short-form specs)
-            const gadget = fromSpec(expanded, resolver);
+            const gadget = bl().fromSpec(expanded, resolver);
 
             // If it's a nested compound, provide parent resolver
             if (compound.isPrototypeOf(gadget)) {

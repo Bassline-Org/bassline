@@ -62,17 +62,18 @@ export function loadPackage(packageDef) {
             },
         };
 
-        // Create the proto
+        // Create the proto with full metadata
         const proto = createCompoundProto(mergedTemplate, {
             name: gadgetName,
             pkg: name,
             parameters,
+            metadata: {
+                packageName: name,
+                version,
+                description: gadgetDesc || description,
+                packageDescription: description,
+            },
         });
-
-        // Add description metadata if provided
-        if (gadgetDesc) {
-            proto.description = gadgetDesc;
-        }
 
         packageContext.gadgets[gadgetName] = proto;
 

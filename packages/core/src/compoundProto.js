@@ -9,13 +9,14 @@ import { compound } from "./patterns/systems/compound.js";
  * @param {Object} options.parameters - Parameter definitions with defaults
  * @returns {Object} A new proto extending compound
  */
-export function createCompoundProto(template, { name, pkg, parameters = {} }) {
+export function createCompoundProto(template, { name, pkg, parameters = {}, metadata = {} }) {
     const compoundProto = Object.create(compound);
 
     Object.assign(compoundProto, {
         name,
         pkg,
         parameters,
+        metadata, // Store package metadata (version, description, etc.)
 
         afterSpawn(state) {
             // Resolve parameter references in template

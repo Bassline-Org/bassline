@@ -1077,6 +1077,89 @@ The system can now:
 - Export runtime structures as reusable types (compound → package)
 - Compose meta-gadgets that manipulate packages (package managers as gadgets!)
 
+### Critical Improvements (2025-10-08 Session 2)
+
+After initial implementation, we fixed three critical gaps:
+
+#### 1. Ref Sugar Serialization (FIXED ✅)
+**Problem**: `{ ref: "name" }` syntax was being expanded to full localRef specs during serialization.
+
+**Solution**: Override `localRef.toSpec()` to return `{ ref: name }` instead of full spec.
+
+**Files Modified**:
+- [localRef.js:12-28](../packages/core/src/patterns/refs/localRef.js#L12-L28)
+
+**Result**: Wire specs now serialize cleanly:
+```json
+{
+  "source": { "ref": "input" },
+  "target": { "ref": "output" }
+}
+```
+
+#### 2. Auto-Parameter Extraction (ADDED ✅)
+**Problem**: Manual `parameterizeSpec()` required tedious path specifications like `"state.gadgets.threshold.state": "threshold"`.
+
+**Solution**: Added `detectParameters()` and `extractParameters()` that auto-detect primitive values and suggest parameterization.
+
+**Files Modified**:
+- [packageExporter.js:119-223](../packages/core/src/packageExporter.js#L119-L223)
+
+**Usage**:
+```javascript
+// Old way (manual)
+const parameterized = parameterizeSpec(spec, {
+  "state.gadgets.threshold.state": "threshold"
+});
+const params = { threshold: 50 };
+
+// New way (automatic!)
+const { spec: parameterized, parameters } = extractParameters(spec, {
+  include: ["threshold"]  // Just name the gadgets
+});
+// Automatically extracts: { threshold: 50 }
+```
+
+#### 3. Package Metadata Tracking (ADDED ✅)
+**Problem**: No way to trace which package/version a gadget came from.
+
+**Solution**: Store metadata on compound protos and expose via `gadget.getMetadata()`.
+
+**Files Modified**:
+- [compoundProto.js:12](../packages/core/src/compoundProto.js#L12)
+- [packageLoader.js:65-76](../packages/core/src/packageLoader.js#L65-L76)
+- [gadget.js:55-61](../packages/core/src/gadget.js#L55-L61)
+
+**Result**: Every loaded gadget carries its provenance:
+```javascript
+const metadata = gadget.getMetadata();
+// { packageName, version, description, packageDescription }
+```
+
+#### 4. Module Loading Fix (FIXED ✅)
+**Problem**: `fromSpec` was destructured from `bl()` at module load time, but wasn't available yet.
+
+**Solution**: Access `bl().fromSpec` lazily instead of destructuring.
+
+**Files Modified**:
+- [compound.js:9,44](../packages/core/src/patterns/systems/compound.js#L9,L44)
+
+### Demo Files
+
+Complete working demonstrations:
+- [test-package-system.js](../packages/core/src/test-package-system.js) - Original end-to-end test
+- [test-auto-params.js](../packages/core/src/test-auto-params.js) - Auto-parameter extraction demo
+- [test-metadata.js](../packages/core/src/test-metadata.js) - Metadata tracking demo
+- [demo-complete-workflow.js](../packages/core/src/demo-complete-workflow.js) - **Complete workflow showing all features**
+
+### System Status: READY FOR USE ✅
+
+The package description language system is now production-ready with:
+- ✅ Clean serialization (ref sugar preserved)
+- ✅ Automatic parameter extraction (no manual paths)
+- ✅ Full package provenance tracking
+- ✅ End-to-end meta-circularity working
+
 ### Next Possibilities
 
 With this foundation, we can now build:

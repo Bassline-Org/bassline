@@ -52,6 +52,13 @@ export const gadgetProto = {
     afterSpawn(initial) {
         this.update(initial);
     },
+    /**
+     * Get package metadata for this gadget (if available)
+     * @returns {Object|null} Metadata object or null
+     */
+    getMetadata() {
+        return this.metadata || null;
+    },
 };
 
 export function installBassline() {
