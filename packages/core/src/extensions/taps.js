@@ -13,7 +13,7 @@ export function installTaps() {
             return () => this.taps.delete(fn);
         },
         emit(data) {
-            originalEmit.bind(this, data);
+            originalEmit.call(this, data);
             this.taps?.forEach((fn) => fn(data));
         },
         tapOn(key, fn) {
