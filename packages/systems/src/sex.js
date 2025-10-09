@@ -1,7 +1,6 @@
 /// Sex: Sequential EXecution
-/// Just a simple gadget that accepts in an array of actions and executes them sequentially
-/// It doesn't store any persistent state, but during execution, it will keep a local environment
-/// This can store gadgets and things
+/// Execute sequential actions in an environment
+/// Useful for building compound gadgets
 import { bl, fromSpec } from "@bassline/core"; // ← Need to import fromSpec
 
 const { gadgetProto } = bl();
@@ -17,18 +16,19 @@ Object.assign(sex, {
         return undefined;
     },
     afterSpawn(initial) {
+        this.update({});
         this.receive(initial);
     },
 
-    step(_state, input) {
-        this.execute(input).catch((err) => {
+    step(state, input) {
+        this.execute(state, input).catch((err) => {
             console.error("Sexecution failed:", err);
         });
     },
 
-    async execute(actions) {
+    async execute(state, actions) {
         const env = {
-            spawned: {},
+            spawned: { ...state },
             vals: {},
             activeRefs: [],
             activeVals: [],
@@ -37,6 +37,7 @@ Object.assign(sex, {
             await this.handleAction(env, action, ...rest);
         }
 
+        this.update(env.spawned);
         this.emit({ completed: { ...env, timestamp: Date.now() } });
     },
 
@@ -44,6 +45,10 @@ Object.assign(sex, {
         switch (action) {
             case "spawn": {
                 const [localName, spec] = rest;
+                if (env.spawned[localName]) {
+                    console.warn(`${localName} already spawned, ignoring`);
+                    break;
+                }
                 const substitutedSpec = this.substituteInObject(env, spec);
                 const g = await fromSpec(substitutedSpec);
                 env.spawned[localName] = g;

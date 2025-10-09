@@ -232,3 +232,42 @@ describe("sex - vals", () => {
         executor.receive(actions);
     });
 });
+
+describe("sex - compound", () => {
+    it("should spawn gadgets in a compound", async () => {
+        const init = [
+            ["spawn", "counter", {
+                pkg: "@bassline/cells/numeric",
+                name: "max",
+                state: 42,
+            }],
+        ];
+        const s = sex.spawn(init);
+        await new Promise((resolve) => {
+            const cleanup = s.tapOn("completed", (env) => {
+                const counter = s.current()["counter"];
+                expect(counter.current()).toBe(42);
+                cleanup();
+                resolve();
+            });
+        });
+        const second = [
+            ["send", "counter", 100],
+        ];
+        await new Promise((resolve) => {
+            const counter = s.current()["counter"];
+            expect(counter.current()).toBe(42);
+            const cleanup = counter.tapOn("changed", (newValue) => {
+                expect(newValue).toBe(100);
+                cleanup();
+            });
+            const cleanup2 = s.tapOn("completed", (env) => {
+                const counter = s.current()["counter"];
+                expect(counter.current()).toBe(100);
+                cleanup2();
+                resolve();
+            });
+            s.receive(second);
+        });
+    });
+});
