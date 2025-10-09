@@ -7,8 +7,12 @@
   "exports": {
     ".": "./src/index.js"
   },
-  "peerDependencies": {
-    "@bassline/core": "^1.0.0"
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "license": "MIT"
 }

@@ -10,9 +10,12 @@ Object.assign(setProto, {
     contradiction({ current, incoming }) {
         console.error("Contradiction! ", current, incoming);
     },
+    afterSpawn(initial = new Set()) {
+        this.update(initial);
+    },
 });
 
-const union = Object.create(setProto);
+export const union = Object.create(setProto);
 Object.assign(union, {
     step(current, input) {
         if (input.isSubsetOf(current)) return;
@@ -21,7 +24,7 @@ Object.assign(union, {
     name: "union",
 });
 
-const intersection = Object.create(setProto);
+export const intersection = Object.create(setProto);
 Object.assign(intersection, {
     step(current, input) {
         if (input.isSubsetOf(current)) return;
@@ -31,7 +34,7 @@ Object.assign(intersection, {
         }
         const intersection = current.intersection(input);
         if (intersection.size === 0) {
-            this.contradiction({ current, incoming: input });
+            return this.contradiction({ current, incoming: input });
         }
         this.update(intersection);
     },

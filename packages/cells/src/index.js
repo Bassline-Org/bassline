@@ -15,9 +15,6 @@ const cellsPackage = {
     },
 };
 
-// Auto-install on import
-installPackage(cellsPackage);
-
 // Export for manual use
 export default cellsPackage;
 

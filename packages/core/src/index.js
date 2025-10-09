@@ -4,10 +4,12 @@ import { scope } from "./scope.js";
 export function installBassline() {
     if (globalThis.bassline === undefined) {
         globalThis.bl = bl;
-        globalThis.bassline.gadgetProto = gadgetProto;
-        globalThis.bassline.installPackage = installPackage;
-        globalThis.bassline.fromSpec = fromSpec;
-        globalThis.bassline.packages = scope();
+        globalThis.bassline = {
+            gadgetProto,
+            installPackage,
+            fromSpec,
+            packages: scope(),
+        };
     }
 }
 
@@ -41,6 +43,10 @@ export function bl() {
  * });
  */
 export function installPackage(gadgetPackage) {
+    if (globalThis.bassline === undefined) {
+        installBassline();
+    }
+
     const { gadgets } = gadgetPackage;
     console.log(`Installing...`);
     let lastPkg;
