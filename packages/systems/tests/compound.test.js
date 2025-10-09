@@ -4,6 +4,7 @@ import systems from "../src/index.js";
 import cells from "@bassline/cells";
 import refs from "@bassline/refs";
 import { describe, expect, it } from "vitest";
+import { localRef } from "@bassline/refs";
 
 installPackage(systems);
 installPackage(cells);
@@ -107,6 +108,10 @@ describe("compound", () => {
             expect(a.current()).toEqual(420);
             expect(b.current()).toEqual(10);
             expect(c.current()).toEqual(69);
+            newFromSpec.current().enter(async () => {
+                const foo = localRef.spawn({ name: "foo" });
+                expect(await foo.promise).toBeDefined();
+            });
         }
     });
 });

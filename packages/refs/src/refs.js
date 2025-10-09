@@ -75,9 +75,7 @@ Object.assign(ref, {
         return Object.keys(valid).length > 0 ? valid : undefined;
     },
     enuf(state) {
-        // Need all key fields
-        const hasAllKeys = this.keyFields.every((f) => state[f] !== undefined);
-        return hasAllKeys;
+        return this.keyFields.every((f) => state[f] !== undefined);
     },
     async compute(state) {
         const key = this.keyFields.length === 1
@@ -86,12 +84,11 @@ Object.assign(ref, {
                 (obj, f) => ({ ...obj, [f]: state[f] }),
                 {},
             );
-        console.log("key: ", key);
         const val = this.resolver.get
-            ? await this.resolver.get(key)
-            : await this.resolver(key);
+            ? this.resolver.get(key)
+            : this.resolver(key);
         console.log("value: ", val);
-        return val;
+        return await val;
     },
     stateSpec() {
         const spec = {};

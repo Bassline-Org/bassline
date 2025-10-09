@@ -43,7 +43,10 @@ describe("refs", () => {
 
     it("Should work with scopes", async () => {
         const s = scope();
-        const ref = localRef.spawn({ name: "foo", scope: s });
+        let ref;
+        s.enter(() => {
+            ref = localRef.spawn({ name: "foo" });
+        });
         const raced = Promise.race([
             ref.promise,
             new Promise((resolve) => setTimeout(() => resolve("timeout"), 100)),
