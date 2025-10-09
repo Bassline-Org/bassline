@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@bassline/core": "workspace:*",
-    "@bassline/cells": "workspace:*"
+    "@bassline/cells": "workspace:*",
+    "@bassline/refs": "workspace:*"
   }
 }

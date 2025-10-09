@@ -2,10 +2,12 @@ import { bl, fromSpec, installPackage } from "@bassline/core";
 import { compound, defineCompound } from "../src/compound.js";
 import systems from "../src/index.js";
 import cells from "@bassline/cells";
+import refs from "@bassline/refs";
 import { describe, expect, it } from "vitest";
 
 installPackage(systems);
 installPackage(cells);
+installPackage(refs);
 
 const example = defineCompound({
     pkg: "@bassline/systems",

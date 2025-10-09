@@ -1,6 +1,6 @@
 import { bl } from "@bassline/core";
 
-const refProto = Object.create(bl().gadgetProto);
+export const refProto = Object.create(bl().gadgetProto);
 Object.assign(refProto, {
     afterSpawn(initial) {
         const { promise, resolve, reject } = Promise.withResolvers();
@@ -14,7 +14,7 @@ Object.assign(refProto, {
             });
         this.resolve = resolve;
         this.reject = reject;
-        this.update({});
+        this.update({ ...this.current(), ...initial });
         this.receive({ ...initial });
     },
     handleResolved(resolved) {
@@ -29,12 +29,8 @@ Object.assign(refProto, {
         if (state.resolved) return;
         const next = this.join(state, input);
         if (this.enuf(next)) {
-            this.update({ ...this.current(), ...next });
-
-            // Get resolver for this ref type
-            const resolver = this.getResolver(next);
-
-            Promise.resolve(this.compute(next, resolver))
+            this.update(next);
+            Promise.resolve(this.compute(next))
                 .then((resolved) => {
                     this.resolve(resolved);
                 })
@@ -47,10 +43,6 @@ Object.assign(refProto, {
     },
     join(state, input) {
         return { ...state, ...input };
-    },
-    // Override in subclasses to provide resolver
-    getResolver(state) {
-        return undefined;
     },
 });
 
@@ -72,9 +64,6 @@ export async function withRetry(
 export const ref = Object.create(refProto);
 Object.assign(ref, {
     keyFields: ["key"],
-    resolverField: null,
-    implicitResolver: null,
-
     validate(input) {
         const valid = {};
         // Collect key fields
@@ -83,47 +72,28 @@ Object.assign(ref, {
                 valid[field] = input[field];
             }
         }
-
-        if (this.resolverField && input[this.resolverField] !== undefined) {
-            valid[this.resolverField] = input[this.resolverField];
-        }
-
         return Object.keys(valid).length > 0 ? valid : undefined;
     },
-
     enuf(state) {
         // Need all key fields
         const hasAllKeys = this.keyFields.every((f) => state[f] !== undefined);
-
-        // And either implicit resolver or explicit resolver field
-        const hasResolver = this.implicitResolver !== null ||
-            (this.resolverField && state[this.resolverField] !== undefined);
-
-        return hasAllKeys && hasResolver;
+        return hasAllKeys;
     },
-
-    getResolver(state) {
-        // Use implicit resolver if available, otherwise get from state
-        return this.implicitResolver || state[this.resolverField];
-    },
-
-    async compute(state, resolver) {
-        // Get the key (single field or composite)
+    async compute(state) {
         const key = this.keyFields.length === 1
             ? state[this.keyFields[0]]
             : this.keyFields.reduce(
                 (obj, f) => ({ ...obj, [f]: state[f] }),
                 {},
             );
-
-        // Use resolver.get if available, otherwise call resolver directly
-        const getValue = resolver.get ? (k) => resolver.get(k) : resolver;
-
-        return await withRetry(() => getValue(key));
+        console.log("key: ", key);
+        const val = this.resolver.get
+            ? await this.resolver.get(key)
+            : await this.resolver(key);
+        console.log("value: ", val);
+        return val;
     },
-
     stateSpec() {
-        // Only serialize key fields, not resolver
         const spec = {};
         for (const field of this.keyFields) {
             const value = this.current()[field];
@@ -135,27 +105,22 @@ Object.assign(ref, {
     },
 });
 
-/**
- * Factory for creating ref types
- * @param {Object} config - Configuration
- * @param {string} config.name - Name of the ref type
- * @param {string[]} config.keyFields - Fields to accumulate (e.g., ["id"], ["name"], ["path"])
- * @param {Object|Function} config.resolver - Implicit resolver (optional)
- * @param {string} config.resolverField - Field name for explicit resolver (optional)
- * @returns {Object} A new ref prototype
- */
 export function createRefType(
-    { name, pkg = "@bassline/refs", keyFields, resolver, resolverField },
+    {
+        name,
+        pkg = "@bassline/refs",
+        keyFields,
+        resolver,
+        ...rest
+    },
 ) {
     const refType = Object.create(ref);
     Object.assign(refType, {
         name,
         keyFields,
         pkg,
-        implicitResolver: resolver
-            ? (typeof resolver === "function" ? { get: resolver } : resolver)
-            : null,
-        resolverField: resolverField || null,
+        resolver,
+        ...rest,
     });
     return refType;
 }
