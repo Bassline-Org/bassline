@@ -8,15 +8,16 @@ export const localRef = createRefType({
     name: "localRef",
     pkg,
     keyFields: ["name"],
-    async resolver(args) {
-        if (this.scope === undefined) {
-            this.scope = currentScope();
-        }
+    afterSpawn(initial) {
+        this.scope = currentScope();
+        refProto.afterSpawn.call(this, initial);
+    },
+    resolver(args) {
         const s = this.scope;
         if (s === null) {
             throw new Error("No scope found");
         } else {
-            return await s.get(args.name);
+            return s.get(args.name);
         }
     },
 });

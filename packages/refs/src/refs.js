@@ -78,16 +78,13 @@ Object.assign(ref, {
         return this.keyFields.every((f) => state[f] !== undefined);
     },
     async compute(state) {
-        const key = this.keyFields.length === 1
-            ? state[this.keyFields[0]]
-            : this.keyFields.reduce(
-                (obj, f) => ({ ...obj, [f]: state[f] }),
-                {},
-            );
+        const args = this.keyFields.reduce(
+            (obj, f) => ({ ...obj, [f]: state[f] }),
+            {},
+        );
         const val = this.resolver.get
-            ? this.resolver.get(key)
-            : this.resolver(key);
-        console.log("value: ", val);
+            ? this.resolver.get(args)
+            : this.resolver(args);
         return await val;
     },
     stateSpec() {

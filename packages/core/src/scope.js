@@ -6,7 +6,7 @@ export function currentScope() {
 
 const scopeProto = {
     __promises: {},
-    async get(name) {
+    get(name) {
         const val = this[name];
         if (val === undefined) {
             return new Promise((resolve) => {
@@ -18,7 +18,7 @@ const scopeProto = {
                 }
             });
         } else {
-            return await val;
+            return val;
         }
     },
     async set(name, value) {

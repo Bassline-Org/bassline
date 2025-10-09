@@ -109,8 +109,8 @@ describe("compound", () => {
             expect(b.current()).toEqual(10);
             expect(c.current()).toEqual(69);
             newFromSpec.current().enter(async () => {
-                const foo = localRef.spawn({ name: "foo" });
-                expect(await foo.promise).toBeDefined();
+                const foo = localRef.spawn({ name: "a" });
+                expect(await foo.promise).toBe(a);
             });
         }
     });
