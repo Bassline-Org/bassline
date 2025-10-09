@@ -1,5 +1,4 @@
-import { installPackage } from "@bassline/core";
-import { compound } from "./compound.js";
+import { compound, defineCompound } from "./compound.js";
 
 const systemsPackage = {
     gadgets: {
@@ -7,13 +6,8 @@ const systemsPackage = {
     },
 };
 
-// Auto-install on import
-installPackage(systemsPackage);
-
 // Export for manual use
 export default systemsPackage;
 
 // Also export individual gadgets and utilities
-export { compound };
-export { createScope } from "./scope.js";
-export { createCompoundProto } from "./compoundProto.js";
+export { compound, defineCompound };

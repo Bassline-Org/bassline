@@ -9,8 +9,12 @@
     "./compound": "./src/compound.js",
     "./scope": "./src/scope.js"
   },
-  "peerDependencies": {
-    "@bassline/core": "^1.0.0",
-    "@bassline/refs": "^1.0.0"
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "@bassline/cells": "workspace:*"
   }
 }

@@ -319,12 +319,12 @@ importers:
 
   packages/systems:
     dependencies:
+      '@bassline/cells':
+        specifier: workspace:*
+        version: link:../cells
       '@bassline/core':
-        specifier: ^1.0.0
+        specifier: workspace:*
         version: link:../core
-      '@bassline/refs':
-        specifier: ^1.0.0
-        version: link:../refs
 
   packages/taps:
     dependencies:

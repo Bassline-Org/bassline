@@ -1,6 +1,5 @@
-import { bl, createPackageResolver, defaultPackageResolver } from "@bassline/core";
-import { createScope } from "./scope.js";
-import { localRef } from "@bassline/refs";
+import { bl, fromSpec } from "@bassline/core";
+import { scope } from "@bassline/core";
 
 const { gadgetProto } = bl();
 
@@ -10,126 +9,83 @@ export const compound = Object.create(gadgetProto);
 Object.assign(compound, {
     pkg,
     name: "compound",
-
-    afterSpawn(spec) {
-        const { gadgets, interface: iface, imports } = spec;
-
-        // Create gadget scope (for localRefs)
-        const scope = createScope(this.parentScope);
-        this.scope = scope;
-
-        // Create package resolver (for type resolution)
-        const resolver = createPackageResolver(
-            this.parentResolver || defaultPackageResolver,
-        );
-        this.resolver = resolver;
-
-        // Process imports
-        if (imports) {
-            for (const [alias, fullPath] of Object.entries(imports)) {
-                resolver.import(alias, fullPath);
-            }
-        }
-
-        // Single pass: spawn all gadgets with resolver and register in scope
-        for (const [name, gadgetSpec] of Object.entries(gadgets || {})) {
-            // Expand { ref: "name" } sugar syntax
-            const expanded = this.expandRefs(gadgetSpec);
-
-            // Spawn with our resolver (supports short-form specs)
-            const gadget = bl().fromSpec(expanded, resolver);
-
-            // If it's a nested compound, provide parent resolver
-            if (compound.isPrototypeOf(gadget)) {
-                gadget.parentResolver = resolver;
-            }
-
-            // Register in scope
-            scope.set(name, gadget);
-        }
-
-        // Second pass: provide scope to localRefs only
-        for (const gadget of scope.values()) {
-            if (localRef.isPrototypeOf(gadget)) {
-                gadget.receive({ scope });
-            }
-        }
-
-        this.setupInterface(iface);
-        this.update({ scope, interface: iface });
+    defaultState() {
+        return {};
     },
-
-    expandRefs(obj) {
-        // Sugar: { ref: "name" } → spawned localRef instance with scope
-        if (obj?.ref !== undefined) {
-            const ref = localRef.spawn({ name: obj.ref });
-            // Provide scope immediately
-            ref.receive({ scope: this.scope });
-            return ref;
-        }
-
-        // Recursively expand objects
-        if (typeof obj === "object" && obj !== null && !Array.isArray(obj)) {
-            return Object.fromEntries(
-                Object.entries(obj).map(([k, v]) => [k, this.expandRefs(v)]),
-            );
-        }
-
-        return obj;
-    },
-
-    setupInterface(iface) {
-        if (!iface) return;
-
-        // Forward outputs - tap gadgets and re-emit under port names
-        for (
-            const [portName, localName] of Object.entries(
-                iface.outputs || {},
-            )
-        ) {
-            const gadget = this.scope.get(localName);
-            if (gadget?.tap) {
-                gadget.tap((effects) => {
-                    this.emit({ [portName]: effects });
-                });
-            }
-        }
-    },
-
-    receive(input) {
-        const { scope, interface: iface } = this.current();
-        if (!iface) return;
-
-        // Route to input ports
-        for (
-            const [portName, localName] of Object.entries(
-                iface.inputs || {},
-            )
-        ) {
-            if (input[portName] !== undefined) {
-                const gadget = scope.get(localName);
-                if (gadget?.receive) {
-                    gadget.receive(input[portName]);
+    afterSpawn(initial) {
+        const initialState = { ...this.defaultState(), ...initial };
+        const s = scope();
+        s.enter(() => {
+            for (const [name, value] of Object.entries(initialState)) {
+                if (value?.pkg && value?.name) {
+                    const gadget = fromSpec(value);
+                    s.set(name, gadget);
+                } else {
+                    console.warn(
+                        `${name}: expected gadget or spec, got ${typeof value}. ` +
+                            `Wrap primitives in gadgets (e.g., unsafe.last.spawn(${value}))`,
+                    );
                 }
             }
-        }
+        });
+        this.update(s);
     },
-
+    step(state, input) {
+        state.enter(() => {
+            for (const [name, value] of Object.entries(input)) {
+                if (name === "bind" && state[name] === undefined) {
+                    for (const [k, v] of Object.entries(value) || []) {
+                        // if it's a gadget, bind it in the scope
+                        if (gadgetProto.isPrototypeOf(v)) {
+                            state.set(k, v);
+                            continue;
+                        }
+                        // if it's a spec, create a gadget from it
+                        if (v.pkg && v.name) {
+                            state.set(k, fromSpec(v));
+                            continue;
+                        }
+                    }
+                    continue;
+                }
+                const gadget = state.get(name);
+                Promise.resolve(gadget).then((g) => {
+                    g.receive(value);
+                });
+            }
+        });
+    },
+    validate(input) {
+        if (typeof input !== "object" || input === null) return undefined;
+        return input;
+    },
     stateSpec() {
-        const { scope, interface: iface } = this.current();
+        const scope = this.current();
         const gadgets = {};
 
-        for (const [name, gadget] of scope.entries()) {
+        for (const [name, gadget] of Object.entries(scope)) {
+            if (name.startsWith("_")) continue;
             gadgets[name] = gadget.toSpec();
         }
 
-        // Include imports in serialization
-        const imports = this.resolver?.getImports();
-
-        return {
-            gadgets,
-            interface: iface,
-            ...(imports && Object.keys(imports).length > 0 ? { imports } : {}),
-        };
+        return gadgets;
+    },
+    async get(name) {
+        return await this.current().get(name);
+    },
+    async getMany(names) {
+        return await Promise.all(names.map((name) => this.get(name)));
     },
 });
+
+export function defineCompound({ pkg, name, state }) {
+    const g = Object.create(compound);
+    Object.assign(g, {
+        pkg,
+        name,
+        defaultState() {
+            return state;
+        },
+    });
+    return g;
+}
