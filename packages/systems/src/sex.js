@@ -23,6 +23,7 @@ Object.assign(sex, {
     step(state, input) {
         this.execute(state, input).catch((err) => {
             console.error("Sexecution failed:", err);
+            this.emit({ error: { err, input, state, timestamp: Date.now() } });
         });
     },
 
