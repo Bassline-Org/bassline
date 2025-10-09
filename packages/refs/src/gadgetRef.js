@@ -7,5 +7,7 @@ export const gadgetRef = createRefType({
     name: "gadgetRef",
     pkg,
     keyFields: ["id"],
-    resolver: getGadgetById,
+    resolver: {
+        get: getGadgetById,
+    },
 });

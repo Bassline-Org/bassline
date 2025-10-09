@@ -1,21 +1,6 @@
 import { bl } from "@bassline/core";
-// Lazy getter for gadgetProto to avoid circular dependency during module init
-let _gadgetProto;
-function getGadgetProto() {
-    if (!_gadgetProto) {
-        _gadgetProto = bl().gadgetProto;
-    }
-    return _gadgetProto;
-}
 
-export const refProto = {
-    get __proto__() {
-        return getGadgetProto();
-    },
-    set __proto__(v) {
-        // Ignore sets
-    },
-};
+const refProto = Object.create(bl().gadgetProto);
 Object.assign(refProto, {
     afterSpawn(initial) {
         const { promise, resolve, reject } = Promise.withResolvers();
@@ -92,7 +77,6 @@ Object.assign(ref, {
 
     validate(input) {
         const valid = {};
-
         // Collect key fields
         for (const field of this.keyFields) {
             if (input[field] !== undefined) {
@@ -100,7 +84,6 @@ Object.assign(ref, {
             }
         }
 
-        // Collect resolver if it's an explicit field
         if (this.resolverField && input[this.resolverField] !== undefined) {
             valid[this.resolverField] = input[this.resolverField];
         }

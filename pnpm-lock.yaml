@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      lodash:
-        specifier: ^4.17.21
-        version: 4.17.21
     devDependencies:
       '@chromatic-com/storybook':
         specifier: ^4.1.1
@@ -236,7 +232,7 @@ importers:
   packages/cells:
     dependencies:
       '@bassline/core':
-        specifier: ^1.0.0
+        specifier: workspace:*
         version: link:../core
 
   packages/core: {}
@@ -289,12 +285,16 @@ importers:
 
   packages/refs:
     dependencies:
-      '@bassline/cells':
-        specifier: ^1.0.0
-        version: link:../cells
       '@bassline/core':
-        specifier: ^1.0.0
+        specifier: workspace:*
         version: link:../core
+    devDependencies:
+      '@bassline/cells':
+        specifier: workspace:*
+        version: link:../cells
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.9)(jsdom@26.1.0)
 
   packages/registry:
     dependencies:

@@ -38,8 +38,5 @@
     "storybook": "^9.1.7",
     "typescript": "^5.3.3",
     "vitest": "^3.2.4"
-  },
-  "dependencies": {
-    "lodash": "^4.17.21"
   }
 }

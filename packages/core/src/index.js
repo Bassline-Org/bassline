@@ -1,5 +1,6 @@
 import { gadgetProto } from "./gadget.js";
 import { scope } from "./scope.js";
+export { scope } from "./scope.js";
 
 export function installBassline() {
     if (globalThis.bassline === undefined) {

@@ -1,4 +1,3 @@
-import { installPackage } from "@bassline/core";
 import numeric from "./numeric.js";
 import set from "./set.js";
 import tables from "./tables.js";

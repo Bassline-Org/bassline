@@ -3,7 +3,7 @@ const scopeProto = {
     async get(name) {
         const val = this[name];
         if (val === undefined) {
-            this[name] = new Promise((resolve) => {
+            return new Promise((resolve) => {
                 const existing = this.__promises[name];
                 if (existing === undefined) {
                     this.__promises[name] = [resolve];
@@ -11,8 +11,9 @@ const scopeProto = {
                     existing.push(resolve);
                 }
             });
+        } else {
+            return await val;
         }
-        return await this[name];
     },
     async set(name, value) {
         this[name] = await value;

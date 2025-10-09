@@ -11,8 +11,14 @@
     "./webRef": "./src/webRef.js",
     "./file": "./src/file.js"
   },
-  "peerDependencies": {
-    "@bassline/core": "^1.0.0",
-    "@bassline/cells": "^1.0.0"
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "@bassline/cells": "workspace:*"
   }
 }
