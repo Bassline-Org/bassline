@@ -16,6 +16,9 @@ type Pages = {
   "/playground": {
     params: {};
   };
+  "/sex-editor": {
+    params: {};
+  };
   "/simpleTest": {
     params: {};
   };
@@ -39,11 +42,15 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/playground" | "/simpleTest" | "/canvas-v2" | "/builder" | "/inspect" | "/canvas" | "/home";
+    page: "/" | "/playground" | "/sex-editor" | "/simpleTest" | "/canvas-v2" | "/builder" | "/inspect" | "/canvas" | "/home";
   };
   "routes/playground.tsx": {
     id: "routes/playground";
     page: "/playground";
+  };
+  "routes/sex-editor.tsx": {
+    id: "routes/sex-editor";
+    page: "/sex-editor";
   };
   "routes/simpleTest.tsx": {
     id: "routes/simpleTest";

@@ -1,5 +1,5 @@
-import { gadgetProto } from "../../gadget.js";
-import { refProto } from "../refs/refs.js";
+import { bl } from "@bassline/core";
+import { refProto } from "@bassline/refs";
 
 function isRef(gadget) {
     if (gadget === undefined) return false;

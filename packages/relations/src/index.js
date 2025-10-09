@@ -1,6 +1,7 @@
-import { bl } from "@bassline/core";
+import { bl, installPackage } from "@bassline/core";
 import { installTaps } from "@bassline/taps";
 import { functionProto, Partial, Transform } from "@bassline/functions";
+import scopedWirePackage, { scopedWire } from "./scopedWire.js";
 
 export function installRelations() {
     const { gadgetProto } = bl();
@@ -14,6 +15,7 @@ export function installRelations() {
     }
     installFunctionRelations();
     installGadgetRelations();
+    installPackage(scopedWirePackage);
 }
 
 function installFunctionRelations() {
@@ -112,3 +114,6 @@ function installGadgetRelations() {
 
 // Auto-install on import
 installRelations();
+
+// Export scopedWire for direct use
+export { scopedWire };

@@ -1,7 +1,9 @@
-import { gadgetProto } from "@bassline/core";
+import { bl } from "@bassline/core";
 import { installTaps } from "@bassline/taps";
 //import { installMetadata } from "@bassline/core/metadata";
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+
+const { gadgetProto } = bl();
 
 export function useLocalGadget(factory) {
     const gadget = useMemo(factory, []);
