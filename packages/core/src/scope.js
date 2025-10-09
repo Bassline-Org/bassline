@@ -1,3 +1,9 @@
+let __currentScope = null;
+
+export function currentScope() {
+    return __currentScope;
+}
+
 const scopeProto = {
     __promises: {},
     async get(name) {
@@ -21,6 +27,15 @@ const scopeProto = {
             resolve(value);
         }
         delete this.__promises[name];
+    },
+    enter(fn) {
+        const oldScope = currentScope();
+        __currentScope = this;
+        try {
+            fn();
+        } finally {
+            __currentScope = oldScope;
+        }
     },
 };
 
