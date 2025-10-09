@@ -1,8 +1,111 @@
 # Context: Bassline JavaScript Implementation
 
-## Current State (2025-10-08)
+## Current State (2025-10-09)
 
-The system has been **restructured into separate packages** and **rewritten in vanilla JavaScript** (no TypeScript). The core philosophy remains the same, but the implementation is now simpler and more dynamic.
+**Major milestone**: The **Sex Editor** is now functional! This is the visual development environment for Bassline - a REPL for gadget networks.
+
+The system has been restructured into separate packages and rewritten in vanilla JavaScript (no TypeScript). The core philosophy remains the same, but the implementation is now simpler and more dynamic.
+
+## Sex Editor - The Bassline IDE
+
+Location: `apps/web/app/routes/sex-editor.tsx`
+
+This is now the **primary development interface** for Bassline. Think: Jupyter notebooks for gadget networks, DevTools for propagation systems.
+
+### Three-Panel Layout
+
+**Left: Explorer**
+- Tree view of spawned gadgets with nesting support
+- Click to select and inspect
+- Icons: 🔢 numeric, 📝 tables, 📦 sex, 🔗 wire
+- Shows inline state preview
+
+**Center: Tabbed Workspace**
+- **Actions Tab**: JSON editor for sex action arrays
+  - Example dropdown with common patterns
+  - Execute button (or Cmd+Enter)
+- **History Tab**: Log of executed actions with timestamps
+  - Click to copy back to editor
+  - Clear button
+- **Effects Tab**: Live log of all effects from all gadgets
+  - Auto-taps every gadget in workspace
+  - Shows gadget name, effect type, timestamp
+
+**Right: Inspector**
+- Shows selected gadget's package, name, state
+- **Smart input**: Auto-parses types
+  - Type `42` → number
+  - Type `hello` → string
+  - Type `true` → boolean
+  - Type `{"x":1}` → JSON
+  - No manual quotes needed!
+
+### Keyboard Shortcuts
+- `Cmd+Enter` / `Ctrl+Enter`: Execute actions
+- `Cmd+S` / `Ctrl+S`: Save workspace
+
+### Save/Load Modes
+
+When loading a workspace, three options:
+1. **Add to current** - Execute actions in current workspace (compositional!)
+2. **As nested workspace** - Spawn as new sex gadget (modular!)
+3. **Replace current** - Kill all, then load (clean slate)
+
+**This makes workspaces infinitely composable** - load workspaces inside workspaces!
+
+## Sex Gadget (`packages/systems/src/sex.js`)
+
+Sequential execution environment for building gadget networks.
+
+### Actions DSL
+
+**Core Actions**:
+- `["spawn", name, spec]` - Create gadget in namespace
+- `["send", name, value]` - Send value to gadget
+- `["val", name, value]` - Define value binding
+- `["withVals", [names], action]` - Execute with val scope
+- `["ref", [names], action]` - Execute with ref scope
+
+**Substitution Rules**:
+- In `ref` scope: strings → gadget instances
+- In `withVals` scope: `{ "$val": "name" }` → bound value
+- Outside scopes: no substitution
+
+**Example**:
+```javascript
+[
+  ["val", "initial", 42],
+  ["withVals", ["initial"],
+    ["spawn", "counter", {
+      pkg: "@bassline/cells/numeric",
+      name: "max",
+      state: { "$val": "initial" }
+    }]
+  ]
+]
+```
+
+### Serialization Pattern
+
+`sex.stateSpec()` converts spawned gadgets back to spawn actions:
+```javascript
+stateSpec() {
+  const spawned = this.current();
+  const actions = [];
+  for (const [name, gadget] of Object.entries(spawned)) {
+    actions.push(["spawn", name, gadget.toSpec()]);
+  }
+  return actions;
+}
+```
+
+Now `sex.toSpec()` returns executable action arrays. **The spec IS the program** that creates the state!
+
+This makes workspaces:
+- **Versionable** - Git tracks action sequences
+- **Shareable** - JSON files run anywhere
+- **Composable** - Load inside other workspaces
+- **Reproducible** - Same actions = same state
 
 ## Package Structure
 
@@ -12,13 +115,13 @@ packages/
 ├── cells/        - ACI merge strategies (max, min, union, intersection, first, last)
 ├── taps/         - Observation extension (tap, tapOn, emit)
 ├── functions/    - Function composition (map, partial, math, logic, array, http)
-├── relations/    - Gadget wiring utilities
-├── systems/      - Compound gadgets (meta-circularity)
+├── relations/    - Gadget wiring (scopedWire)
+├── systems/      - Sequential execution (sex) - **compound deleted**
 ├── refs/         - Reference types (localRef, gadgetRef, fileRef, webRef)
 ├── metadata/     - Metadata extension
 ├── devtools/     - Developer utilities
 ├── registry/     - Global gadget registry
-└── react/        - React integration (useGadget hook)
+└── react/        - React integration (hooks added to gadgetProto)
 ```
 
 All packages are **vanilla JavaScript ES modules** with no build step. Each package **auto-installs on import**.
@@ -52,6 +155,23 @@ export const gadgetProto = {
   },
   afterSpawn(initial) {
     this.update(initial);
+  },
+  kill() {
+    this.emit({ killed: true });
+    this.onKill();
+  },
+  onKill() {
+    this[StateSymbol] = null;
+  },
+  toSpec() {
+    return {
+      pkg: this.pkg,
+      name: this.name,
+      state: this.stateSpec(),
+    };
+  },
+  stateSpec() {
+    return this.current();
   }
 };
 ```
@@ -62,51 +182,14 @@ export const gadgetProto = {
 
 Three key functions in [packages/core/src/index.js](../packages/core/src/index.js):
 
-1. **`bl()`** - Access global bassline runtime:
-```javascript
-import { bl } from "@bassline/core";
-const { gadgetProto, packages, fromSpec } = bl();
-```
-
-2. **`installPackage(pkg)`** - Install gadgets:
-```javascript
-import { installPackage } from "@bassline/core";
-
-const myProto = Object.create(bl().gadgetProto);
-Object.assign(myProto, {
-  pkg: "@myapp/gadgets",
-  name: "counter",
-  step(state, input) {
-    if (input.increment) this.update(state + 1);
-  }
-});
-
-installPackage({
-  gadgets: { counter: myProto }
-});
-```
-
-3. **`fromSpec(spec, resolver)`** - Create gadgets from data:
-```javascript
-const gadget = bl().fromSpec({
-  pkg: "@bassline/cells/numeric",
-  name: "max",
-  state: 0
-});
-
-// Or with type resolution:
-const gadget = bl().fromSpec(
-  { type: "cells.max", state: 0 },
-  resolver
-);
-```
+1. **`bl()`** - Access global bassline runtime
+2. **`installPackage(pkg)`** - Install gadgets
+3. **`fromSpec(spec)`** - Create gadgets from data
 
 ### Auto-Install Pattern
 
 All packages follow this pattern:
-
 ```javascript
-// packages/[name]/src/index.js
 import { installPackage } from "@bassline/core";
 import myGadget from "./myGadget.js";
 
@@ -114,72 +197,54 @@ const package = {
   gadgets: { myGadget }
 };
 
-// Auto-install on import
 installPackage(package);
-
 export default package;
-export * from "./myGadget.js";
 ```
 
-This means `import "@bassline/cells"` automatically makes all cell gadgets available via `bl().packages["@bassline/cells/numeric"].max`.
+This means `import "@bassline/cells"` automatically registers all cell gadgets.
 
 ### The Taps Extension
 
 Located in [packages/taps/src/index.js](../packages/taps/src/index.js):
 
+Modifies `gadgetProto` to add observation:
 ```javascript
-export function installTaps() {
-  const { gadgetProto } = bl();
-
-  const originalEmit = gadgetProto.emit;
-  Object.assign(gadgetProto, {
-    tap(fn) {
-      if (this.taps === undefined) this.taps = new Set();
-      this.taps.add(fn);
-      return () => this.taps.delete(fn);
-    },
-    emit(data) {
-      originalEmit.call(this, data);
-      this.taps?.forEach(fn => fn(data));
-    },
-    tapOn(key, fn) {
-      return this.tap(effects => {
-        if (effects[key] !== undefined) {
-          fn(effects[key]);
-        }
-      });
-    }
-  });
-}
-
-// Auto-install
-installTaps();
+Object.assign(gadgetProto, {
+  tap(fn) {
+    if (this.taps === undefined) this.taps = new Set();
+    this.taps.add(fn);
+    return () => this.taps.delete(fn);
+  },
+  emit(data) {
+    originalEmit.call(this, data);
+    this.taps?.forEach(fn => fn(data));
+  },
+  tapOn(key, fn) {
+    return this.tap(effects => {
+      if (effects[key] !== undefined) {
+        fn(effects[key]);
+      }
+    });
+  }
+});
 ```
 
 **Fire-and-forget**: Taps don't guarantee delivery or timing. This enables distribution without changes to the gadget model.
 
 ### Cell Patterns
 
-All cells follow the same pattern. Example from [packages/cells/src/numeric.js](../packages/cells/src/numeric.js):
+Example from [packages/cells/src/numeric.js](../packages/cells/src/numeric.js):
 
 ```javascript
-import { bl } from "@bassline/core";
-
-const max = Object.create(bl().gadgetProto);
+export const max = Object.create(gadgetProto);
 Object.assign(max, {
   pkg: "@bassline/cells/numeric",
   name: "max",
-  step(state, input) {
-    if (input > state) {
-      this.update(input);
-    }
+  step(current, input) {
+    if (input > current) this.update(input);
     // Otherwise reject (do nothing)
   }
 });
-
-export default {
-  gadgets: { max }
-};
 ```
 
 Available cells:
@@ -189,270 +254,178 @@ Available cells:
 - **Versioned**: Version-tracked values
 - **Unsafe**: `last` (no merge, always replace)
 
-### Compound Gadgets (Meta-Circularity)
-
-Located in [packages/systems/src/compound.js](../packages/systems/src/compound.js):
-
-Compound gadgets are **gadgets composed of other gadgets**. They enable meta-circularity:
-
-```javascript
-import { bl } from "@bassline/core";
-import "@bassline/systems";
-
-const compound = bl().fromSpec({
-  pkg: "@bassline/systems",
-  name: "compound",
-  state: {
-    imports: { cells: "@bassline/cells/numeric" },
-    gadgets: {
-      threshold: { type: "cells.max", state: 50 },
-      input: { type: "cells.max", state: 0 }
-    },
-    interface: {
-      inputs: { value: "input", min: "threshold" },
-      outputs: { output: "input" }
-    }
-  }
-});
-
-// Access internal gadgets
-compound.current().gadgets.threshold.receive(100);
-```
-
-### Package Description Language
-
-The system can **export compound gadgets as reusable packages**:
-
-```javascript
-import { exportAsPackage, savePackage, loadPackageFromFile } from "@bassline/core";
-
-// 1. Create a compound
-const myCompound = bl().fromSpec({
-  pkg: "@bassline/systems",
-  name: "compound",
-  state: { /* ... */ }
-});
-
-// 2. Export as package
-const packageDef = exportAsPackage(myCompound.toSpec(), {
-  name: "@myapp/filters",
-  gadgetName: "valueFilter"
-});
-
-// 3. Save to file
-await savePackage(packageDef, "./my-filter.json");
-
-// 4. Load from file
-await loadPackageFromFile("./my-filter.json");
-
-// 5. Use like any built-in gadget
-const filter = bl().fromSpec({
-  pkg: "@myapp/filters",
-  name: "valueFilter",
-  state: { threshold: 100 }
-});
-```
-
-**This closes the meta-circular loop**: Gadgets → Compounds → Packages → Loaded Gadgets
-
 ### React Integration
 
 Located in [packages/react/src/index.js](../packages/react/src/index.js):
 
-Simple hook-based integration:
+`installReact()` adds hooks directly to gadgetProto:
+```javascript
+Object.assign(gadgetProto, {
+  useCurrent() {
+    return useSyncExternalStore(
+      (callback) => this.tapOn("changed", () => callback()),
+      () => this.current()
+    );
+  },
+  useSend() {
+    return useCallback((value) => this.receive(value), [this]);
+  },
+  useState() {
+    return [this.useCurrent(), this.useSend()];
+  }
+});
+```
+
+Now **every gadget** has React hooks. No providers, no wrappers!
+
+## Key Patterns
+
+### ScopedWire Gadget
+
+`packages/relations/src/scopedWire.js` - Elegant incremental assembly:
 
 ```javascript
-import { useGadget } from "@bassline/react";
-import { bl } from "@bassline/core";
-import "@bassline/cells";
+step(state = {}, input) {
+  // If already wired, do nothing
+  if (state.source && state.target) return;
 
-function Component() {
-  const gadget = useMemo(() =>
-    bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 }),
-    []
-  );
+  // Merge new input
+  const next = { ...state, ...input };
 
-  // Subscribe to specific effects
-  const [count] = useGadget(gadget, ["changed"]);
-
-  return (
-    <button onClick={() => gadget.receive(count + 1)}>
-      Count: {count}
-    </button>
-  );
+  // If we now have both, wire them
+  if (next.source && next.target) {
+    const cleanup = next.source.tap((e) => next.target.receive(e));
+    this.update(next);
+    this.cleanup = cleanup;
+  }
 }
 ```
 
-The `useGadget(gadget, effects)` hook:
-- Uses `useSyncExternalStore` internally
-- Subscribes to gadget via `tap()`
-- Re-renders when specified effects are emitted
-- Returns `[currentValue, gadget]`
+Can receive source/target in separate calls! Accumulates until it has both. **Partial information at the gadget level**.
 
-## Key Architectural Decisions
+### Smart Input Parsing
 
-### Why JavaScript, Not TypeScript?
-
-The system was originally TypeScript but we discovered:
-- **Dynamic behaviors** (prototype manipulation, runtime composition) fight static typing
-- **Type ceremony** added complexity without proportional value
-- **JavaScript's flexibility** enables emergent behaviors impossible with static types
-- The system's power comes from **runtime flexibility**, not compile-time guarantees
-
-We may add `.d.ts` files later for library consumers, but the core will remain JavaScript.
-
-### Why Prototype Pattern?
-
-Every gadget is created via `Object.create(proto)` and `spawn()`:
-- **No classes** - simpler, more flexible
-- **Shared behavior** - all instances inherit from the same proto
-- **Extension via modification** - `Object.assign(gadgetProto, {...})` adds methods to all gadgets
-- **Meta-circular** - protos are data, can be serialized and loaded
-
-### Why Auto-Install?
-
-Each package calls `installPackage()` on import:
-- **Zero configuration** - just import and use
-- **Side-effect imports** - `import "@bassline/taps"` is valid
-- **Global registration** - available via `bl().packages`
-- **Developer ergonomics** - no manual setup
-
-### Why Fire-and-Forget?
-
-Both effects and taps are fire-and-forget:
-- **Uniformity** - same model works in-memory, over network, across processes
-- **Simplicity** - no delivery guarantees or timing coordination
-- **Distribution-ready** - async taps work identically to sync taps
-- **Meta-gadgets** - timing/delivery concerns live in meta-gadgets if needed
-
-## Common Patterns
-
-### Creating Custom Gadgets
-
+Type inference for effortless value sending:
 ```javascript
-import { bl, installPackage } from "@bassline/core";
-
-const counterProto = Object.create(bl().gadgetProto);
-Object.assign(counterProto, {
-  pkg: "@myapp/gadgets",
-  name: "counter",
-  step(state, input) {
-    if (input.increment) this.update(state + 1);
-    if (input.decrement) this.update(state - 1);
-    if (input.set !== undefined) this.update(input.set);
-  }
-});
-
-installPackage({
-  gadgets: { counter: counterProto }
-});
-
-const counter = bl().fromSpec({
-  pkg: "@myapp/gadgets",
-  name: "counter",
-  state: 0
-});
+function smartParse(input: string) {
+  try { return JSON.parse(input); } catch {}
+  if (input === "true") return true;
+  if (input === "false") return false;
+  if (!isNaN(Number(input)) && input.trim() !== "") return Number(input);
+  return input;
+}
 ```
 
-### Wiring Gadgets Together
+### Effects Logging
 
+Auto-tap all gadgets to track effects:
 ```javascript
-import { bl } from "@bassline/core";
-import "@bassline/cells";
-import "@bassline/taps";
-
-const source = bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-const target = bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-
-// Wire via tap
-source.tapOn("changed", newValue => target.receive(newValue));
-
-source.receive(5);  // target also becomes 5
+useEffect(() => {
+  const cleanups = [];
+  Object.entries(workspace).forEach(([name, gadget]) => {
+    const cleanup = gadget.tap((effect) => {
+      effectsLogCell.receive([
+        ...effectsLogCell.current(),
+        { timestamp: Date.now(), gadgetName: name, effect }
+      ]);
+    });
+    cleanups.push(cleanup);
+  });
+  return () => cleanups.forEach(c => c());
+}, [workspace]);
 ```
 
-### Bidirectional Sync
-
-```javascript
-const a = bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-const b = bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-
-a.tapOn("changed", v => b.receive(v));
-b.tapOn("changed", v => a.receive(v));
-
-a.receive(10);  // Both become 10
-```
-
-### Async Propagation
-
-```javascript
-const source = bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-const delayed = bl().fromSpec({ pkg: "@bassline/cells/unsafe", name: "last", state: 0 });
-
-source.tap(async ({ changed }) => {
-  if (changed !== undefined) {
-    await new Promise(r => setTimeout(r, 100));
-    delayed.receive(changed);
-  }
-});
-```
+Complete observability - see every effect in real-time.
 
 ## Anti-Patterns to Avoid
 
-❌ **Don't put communication in step()** - communication should be via taps, not in the gadget logic
+❌ **Don't put communication in step()** - communication via taps, not in gadget logic
 ❌ **Don't mutate state directly** - always use `this.update()`
 ❌ **Don't assume taps are synchronous** - they can be async
-❌ **Don't create circular deps without termination** - bidirectional sync with non-idempotent cells will loop forever
-❌ **Don't use async in step()** - step should be synchronous, use async taps instead
+❌ **Don't create circular deps without termination** - use monotonic cells for cycles
+❌ **Don't use async in step()** - step should be sync, use async taps
+
+## Philosophy Reminders
+
+- **Sex is a shell for gadgets** - Like bash for processes, sex for gadget networks
+- **Workspaces are programs** - Specs are executable, versionable, shareable
+- **Composition over complexity** - Load workspaces inside workspaces
+- **Fire-and-forget everywhere** - Effects and taps have no delivery guarantees
+- **Everything is data** - Actions, specs, effects - all just JSON
+- **The editor IS the runtime** - No separation between dev and prod
+- **Cycles are great** - They represent redundancy, multiple paths to compute
+- **Don't fight the model** - If something feels hard, you're probably baking in too much
 
 ## Files to Know
 
+### Sex Editor
+- `apps/web/app/routes/sex-editor.tsx` - Main editor component (~700 lines)
+- `apps/web/app/routes/home.tsx` - Landing page
+
 ### Core System
-- [packages/core/src/gadget.js](../packages/core/src/gadget.js) - The gadget protocol (~60 lines)
-- [packages/core/src/index.js](../packages/core/src/index.js) - bl(), installPackage(), fromSpec()
-- [packages/core/src/packageLoader.js](../packages/core/src/packageLoader.js) - Load packages from JSON
-- [packages/core/src/packageExporter.js](../packages/core/src/packageExporter.js) - Export gadgets as packages
-- [packages/core/src/packageResolver.js](../packages/core/src/packageResolver.js) - Type resolution
+- `packages/core/src/gadget.js` - The gadget protocol (~95 lines)
+- `packages/core/src/index.js` - bl(), installPackage(), fromSpec()
+- `packages/core/src/scope.js` - Scope with promise resolution
 
 ### Extensions
-- [packages/taps/src/index.js](../packages/taps/src/index.js) - Observation via tap/tapOn
-- [packages/metadata/src/index.js](../packages/metadata/src/index.js) - Metadata extension
-- [packages/devtools/src/index.js](../packages/devtools/src/index.js) - Developer utilities
-- [packages/registry/src/index.js](../packages/registry/src/index.js) - Global registry
+- `packages/taps/src/index.js` - Observation via tap/tapOn (~40 lines)
+- `packages/react/src/index.js` - React hooks on gadgetProto
 
-### Patterns
-- [packages/cells/src/numeric.js](../packages/cells/src/numeric.js) - Max, Min
-- [packages/cells/src/set.js](../packages/cells/src/set.js) - Union, Intersection
-- [packages/cells/src/tables.js](../packages/cells/src/tables.js) - First, Last
-- [packages/cells/src/unsafe.js](../packages/cells/src/unsafe.js) - Last (no merge)
-- [packages/systems/src/compound.js](../packages/systems/src/compound.js) - Compound gadgets
-- [packages/refs/src/localRef.js](../packages/refs/src/localRef.js) - Local references
+### Systems
+- `packages/systems/src/sex.js` - Sequential execution (~150 lines)
+- `packages/systems/src/index.js` - installSystems(), bl().rootSex
 
-### React
-- [packages/react/src/index.js](../packages/react/src/index.js) - useGadget hook
+### Relations
+- `packages/relations/src/scopedWire.js` - Wire gadget
+- `packages/relations/src/index.js` - Relations utilities
 
-## What Changed from TypeScript Version
+### Cells
+- `packages/cells/src/numeric.js` - Max, Min
+- `packages/cells/src/tables.js` - First, Last
+- `packages/cells/src/unsafe.js` - Last (no merge)
 
-1. **No types** - Removed all TypeScript type annotations
-2. **No generics** - No `<S, I, A, E>` type parameters
-3. **No interfaces** - Removed Protocol interfaces, Implements, Emits helpers
-4. **Simpler protos** - Just objects with methods, no complex type machinery
-5. **Runtime-first** - Focus on what works at runtime, not what type-checks
-6. **Dynamic composition** - Leverage JavaScript's flexibility for meta-programming
+## Current Status
 
-The **core philosophy remains identical**, just without static type constraints.
+✅ Sex editor functional and usable
+✅ Save/load with composition modes
+✅ Smart input parsing
+✅ Effects logging and history tracking
+✅ Keyboard shortcuts
+✅ Sex serialization fixed
+✅ ScopedWire incremental assembly
 
-## Next Steps
+**The system is self-hosting ready** - use the sex editor to build Bassline!
 
-The system is now:
-- ✅ Restructured into separate packages
-- ✅ Rewritten in vanilla JavaScript
-- ✅ Meta-circular (package description language working)
-- ✅ Auto-installing (zero config)
-- ✅ React-integrated (useGadget hook)
+## How to Use the Sex Editor
 
-Possible directions:
-- Visual package editor (edit compounds, export as packages)
-- Package repositories (gadgets managing packages)
-- Runtime package loading (load from URLs)
-- Live editing (modify running compounds)
-- Network distribution (gadgets across WebSockets/HTTP)
+1. Start dev server: `pnpm dev` in `apps/web`
+2. Navigate to `http://localhost:5173/sex-editor`
+3. Write sex actions in Actions tab (or pick example)
+4. Hit Execute (Cmd+Enter)
+5. Watch Explorer update with spawned gadgets
+6. Click gadgets to inspect
+7. Use Quick Send with smart parsing
+8. Check History/Effects tabs
+9. Save (Cmd+S) to export JSON
+10. Load to add/nest/replace
+
+## Next Steps / Ideas
+
+### Phase 2: Advanced Editor
+- Context menu on tree nodes
+- Visual wire editor (drag connections)
+- Command palette (Cmd+K)
+- Undo/redo
+- Syntax highlighting
+
+### Phase 3: Meta-Circular
+- Export workspace as package
+- Package marketplace
+- Live collaboration
+- Visual package builder
+
+### Phase 4: Distribution
+- Network transports (WebSocket, HTTP)
+- Persistent storage (IndexedDB, Postgres)
+- Worker execution (off main thread)
+- Time-travel debugging

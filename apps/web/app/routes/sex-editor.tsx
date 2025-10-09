@@ -201,11 +201,12 @@ function StateInspector({
     const [inputValue, setInputValue] = inputGadget.useState();
 
     // Always call hooks - use null gadget if not provided
-    const emptyGadget = useMemo(() => fromSpec({
-        pkg: "@bassline/cells/unsafe",
-        name: "last",
-        state: null
-    }), []);
+    const emptyGadget = useMemo(() =>
+        fromSpec({
+            pkg: "@bassline/cells/unsafe",
+            name: "last",
+            state: null,
+        }), []);
     const state = (gadget || emptyGadget).useCurrent();
 
     useEffect(() => () => {
@@ -222,15 +223,27 @@ function StateInspector({
     }
 
     const handleSend = () => {
-        try {
-            const parsed = JSON.parse(inputValue);
-            gadget.receive(parsed);
-            setInputValue("");
-        } catch (e) {
-            // Try sending as raw string
-            gadget.receive(inputValue);
-            setInputValue("");
-        }
+        // Smart input parsing - infer types automatically
+        const smartParse = (input: string) => {
+            // Try JSON first
+            try {
+                return JSON.parse(input);
+            } catch {}
+
+            // Infer type
+            if (input === "true") return true;
+            if (input === "false") return false;
+            if (!isNaN(Number(input)) && input.trim() !== "") {
+                return Number(input);
+            }
+
+            // Default to string
+            return input;
+        };
+
+        const value = smartParse(inputValue);
+        gadget.receive(value);
+        setInputValue("");
     };
 
     return (
@@ -317,18 +330,113 @@ export default function SexEditor() {
     );
     const [actions, setActions] = actionsCell.useState();
 
+    // Active tab
+    const activeTabCell = useMemo(
+        () =>
+            fromSpec({
+                pkg: "@bassline/cells/unsafe",
+                name: "last",
+                state: "actions",
+            }),
+        [],
+    );
+    const [activeTab, setActiveTab] = activeTabCell.useState();
+
+    // Action history
+    const historyCell = useMemo(
+        () =>
+            fromSpec({
+                pkg: "@bassline/cells/unsafe",
+                name: "last",
+                state: [] as Array<{ timestamp: number; actions: any }>,
+            }),
+        [],
+    );
+    const [history] = historyCell.useState();
+
+    // Effects log
+    const effectsLogCell = useMemo(
+        () =>
+            fromSpec({
+                pkg: "@bassline/cells/unsafe",
+                name: "last",
+                state: [] as Array<
+                    { timestamp: number; gadgetName: string; effect: any }
+                >,
+            }),
+        [],
+    );
+    const [effectsLog] = effectsLogCell.useState();
+
+    // Tap all gadgets to log effects
+    useEffect(() => {
+        const cleanups: Array<() => void> = [];
+
+        const tapGadget = (name: string, gadget: any) => {
+            const cleanup = gadget.tap((effect: any) => {
+                effectsLogCell.receive([
+                    ...effectsLogCell.current(),
+                    { timestamp: Date.now(), gadgetName: name, effect },
+                ]);
+            });
+            cleanups.push(cleanup);
+        };
+
+        Object.entries(workspace).forEach(([name, gadget]) => {
+            tapGadget(name, gadget);
+        });
+
+        return () => {
+            cleanups.forEach((c) => c());
+        };
+    }, [workspace, effectsLogCell]);
+
+    // Keyboard shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Cmd+Enter or Ctrl+Enter: Execute
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                handleExecute();
+            }
+            // Cmd+S or Ctrl+S: Save
+            if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+                e.preventDefault();
+                handleSave();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [actions, rootSex]); // Re-create handler when these change
+
     // Kill gadgets on unmount
     useEffect(() => {
         return () => {
             selectionCell.kill();
             actionsCell.kill();
+            activeTabCell.kill();
+            historyCell.kill();
+            effectsLogCell.kill();
         };
-    }, [selectionCell, actionsCell]);
+    }, [
+        selectionCell,
+        actionsCell,
+        activeTabCell,
+        historyCell,
+        effectsLogCell,
+    ]);
 
     const handleExecute = () => {
         try {
             const parsed = JSON.parse(actions);
             rootSex.receive(parsed);
+
+            // Add to history
+            historyCell.receive([
+                ...(history || []),
+                { timestamp: Date.now(), actions: parsed },
+            ]);
         } catch (e) {
             alert(`Invalid JSON: ${e}`);
         }
@@ -364,11 +472,11 @@ export default function SexEditor() {
                 // Ask user how to load
                 const mode = prompt(
                     "How do you want to load this workspace?\n\n" +
-                    "1. Add to current (executes actions here)\n" +
-                    "2. As nested workspace (name it)\n" +
-                    "3. Replace current (clears first)\n\n" +
-                    "Enter 1, 2, or 3:",
-                    "1"
+                        "1. Add to current (executes actions here)\n" +
+                        "2. As nested workspace (name it)\n" +
+                        "3. Replace current (clears first)\n\n" +
+                        "Enter 1, 2, or 3:",
+                    "1",
                 );
 
                 if (!mode) return; // Cancelled
@@ -378,7 +486,10 @@ export default function SexEditor() {
                     rootSex.receive(spec.state);
                 } else if (mode === "2") {
                     // Spawn as nested workspace
-                    const name = prompt("Name for this workspace:", "workspace");
+                    const name = prompt(
+                        "Name for this workspace:",
+                        "workspace",
+                    );
                     if (!name) return;
                     rootSex.receive([["spawn", name, spec]]);
                 } else if (mode === "3") {
@@ -425,40 +536,198 @@ export default function SexEditor() {
                     </div>
                 </div>
 
-                {/* Center: Actions */}
-                <div className="flex flex-col p-4 overflow-hidden">
-                    <div className="mb-2 flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-gray-700 uppercase">
+                {/* Center: Tabbed Interface */}
+                <div className="flex flex-col overflow-hidden">
+                    {/* Tabs */}
+                    <div className="flex border-b bg-gray-50">
+                        <button
+                            onClick={() => setActiveTab("actions")}
+                            className={`px-4 py-2 text-sm font-medium ${
+                                activeTab === "actions"
+                                    ? "border-b-2 border-blue-500 text-blue-600"
+                                    : "text-gray-600 hover:text-gray-900"
+                            }`}
+                        >
                             Actions
-                        </h2>
-                        <div className="flex gap-2 items-center">
-                            <select
-                                className="text-xs border rounded px-2 py-1"
-                                onChange={(e) => {
-                                    const example = EXAMPLES[
-                                        e.target
-                                            .value as keyof typeof EXAMPLES
-                                    ];
-                                    if (example) setActions(example);
-                                }}
-                                defaultValue=""
-                            >
-                                <option value="">Load Example...</option>
-                                {Object.keys(EXAMPLES).map((key) => (
-                                    <option key={key} value={key}>
-                                        {key}
-                                    </option>
-                                ))}
-                            </select>
-                            <Button onClick={handleExecute}>Execute</Button>
-                        </div>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("history")}
+                            className={`px-4 py-2 text-sm font-medium ${
+                                activeTab === "history"
+                                    ? "border-b-2 border-blue-500 text-blue-600"
+                                    : "text-gray-600 hover:text-gray-900"
+                            }`}
+                        >
+                            History ({history?.length ?? 0})
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("effects")}
+                            className={`px-4 py-2 text-sm font-medium ${
+                                activeTab === "effects"
+                                    ? "border-b-2 border-blue-500 text-blue-600"
+                                    : "text-gray-600 hover:text-gray-900"
+                            }`}
+                        >
+                            Effects ({effectsLog?.length ?? 0})
+                        </button>
                     </div>
-                    <Textarea
-                        value={actions || "[]"}
-                        onChange={(e) => setActions(e.target.value)}
-                        className="flex-1 font-mono text-sm"
-                        placeholder="Enter actions as JSON array..."
-                    />
+
+                    {/* Tab Content */}
+                    <div className="flex-1 overflow-hidden">
+                        {activeTab === "actions" && (
+                            <div className="h-full flex flex-col p-4">
+                                <div className="mb-2 flex gap-2 items-center justify-end">
+                                    <select
+                                        className="text-xs border rounded px-2 py-1"
+                                        onChange={(e) => {
+                                            const example = EXAMPLES[
+                                                e.target
+                                                    .value as keyof typeof EXAMPLES
+                                            ];
+                                            if (example) setActions(example);
+                                        }}
+                                        defaultValue=""
+                                    >
+                                        <option value="">
+                                            Load Example...
+                                        </option>
+                                        {Object.keys(EXAMPLES).map((key) => (
+                                            <option key={key} value={key}>
+                                                {key}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <Button onClick={handleExecute}>
+                                        Execute
+                                    </Button>
+                                </div>
+                                <Textarea
+                                    value={actions || "[]"}
+                                    onChange={(
+                                        e: React.ChangeEvent<
+                                            HTMLTextAreaElement
+                                        >,
+                                    ) => setActions(e.target.value)}
+                                    className="flex-1 font-mono text-sm"
+                                    placeholder="Enter actions as JSON array..."
+                                />
+                            </div>
+                        )}
+
+                        {activeTab === "history" && (
+                            <div className="h-full overflow-y-auto p-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="text-sm font-semibold text-gray-700">
+                                        Execution History
+                                    </h3>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => historyCell.receive([])}
+                                    >
+                                        Clear
+                                    </Button>
+                                </div>
+                                {!history || history.length === 0
+                                    ? (
+                                        <div className="text-sm text-gray-500">
+                                            No actions executed yet
+                                        </div>
+                                    )
+                                    : (
+                                        <div className="space-y-2">
+                                            {[...history].reverse().map(
+                                                (entry, idx) => {
+                                                    const time = new Date(
+                                                        entry.timestamp,
+                                                    ).toLocaleTimeString();
+                                                    const actionStr = JSON
+                                                        .stringify(
+                                                            entry.actions,
+                                                            null,
+                                                            2,
+                                                        );
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            className="border rounded p-2 hover:bg-gray-50 cursor-pointer"
+                                                            onClick={() =>
+                                                                setActions(
+                                                                    actionStr,
+                                                                )}
+                                                        >
+                                                            <div className="text-xs text-gray-500 mb-1">
+                                                                {time}
+                                                            </div>
+                                                            <pre className="text-xs font-mono overflow-auto">
+                                                        {actionStr}
+                                                            </pre>
+                                                        </div>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                    )}
+                            </div>
+                        )}
+
+                        {activeTab === "effects" && (
+                            <div className="h-full overflow-y-auto p-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="text-sm font-semibold text-gray-700">
+                                        Effects Log
+                                    </h3>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            effectsLogCell.receive([])}
+                                    >
+                                        Clear
+                                    </Button>
+                                </div>
+                                {!effectsLog || effectsLog.length === 0
+                                    ? (
+                                        <div className="text-sm text-gray-500">
+                                            No effects emitted yet
+                                        </div>
+                                    )
+                                    : (
+                                        <div className="space-y-1">
+                                            {[...effectsLog].reverse().map(
+                                                (entry, idx) => {
+                                                    const time = new Date(
+                                                        entry.timestamp,
+                                                    ).toLocaleTimeString();
+                                                    const effectKeys = Object
+                                                        .keys(entry.effect)
+                                                        .join(", ");
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            className="text-xs font-mono border-b pb-1"
+                                                        >
+                                                            <span className="text-gray-500">
+                                                                {time}
+                                                            </span>
+                                                            {" - "}
+                                                            <span className="font-semibold text-blue-600">
+                                                                {entry
+                                                                    .gadgetName}
+                                                            </span>
+                                                            {" → "}
+                                                            <span className="text-green-600">
+                                                                {effectKeys}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                },
+                                            )}
+                                        </div>
+                                    )}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Right: Inspector */}
