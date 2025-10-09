@@ -52,15 +52,12 @@ describe("sex (sequential execution)", () => {
         ];
 
         const executor = sex.spawn(actions);
-
         await new Promise((resolve) => {
             executor.tapOn("completed", (env) => {
                 expect(env.spawned.counter.current()).toBe(10);
                 resolve();
             });
         });
-
-        executor.receive(actions);
     });
 
     it("should substitute refs in nested state", async () => {
@@ -74,7 +71,7 @@ describe("sex (sequential execution)", () => {
                 pkg: "@bassline/cells/tables",
                 name: "first",
                 state: {
-                    input: "source", // This should be replaced with gadget
+                    foo: "source",
                 },
             }]],
         ];
@@ -85,7 +82,149 @@ describe("sex (sequential execution)", () => {
             executor.tapOn("completed", (env) => {
                 expect(env.spawned.dependent).toBeDefined();
                 const depState = env.spawned.dependent.current();
-                expect(depState.input).toBe(env.spawned.source);
+                expect(depState.foo).toBe(env.spawned.source);
+                resolve();
+            });
+        });
+    });
+});
+
+describe("sex - vals", () => {
+    it("should define and substitute vals", async () => {
+        const actions = [
+            ["val", "initial", 42],
+            ["withVals", ["initial"], ["spawn", "counter", {
+                pkg: "@bassline/cells/numeric",
+                name: "max",
+                state: { $val: "initial" },
+            }]],
+        ];
+
+        const executor = sex.spawn(actions);
+
+        await new Promise((resolve) => {
+            executor.tapOn("completed", (env) => {
+                expect(env.vals.initial).toBe(42);
+                expect(env.spawned.counter.current()).toBe(42);
+                resolve();
+            });
+        });
+
+        executor.receive(actions);
+    });
+
+    it("should substitute multiple vals", async () => {
+        const actions = [
+            ["val", "min", 0],
+            ["val", "max", 100],
+            ["withVals", ["min", "max"], ["spawn", "range", {
+                pkg: "@bassline/cells/tables",
+                name: "first",
+                state: {
+                    min: { $val: "min" },
+                    max: { $val: "max" },
+                },
+            }]],
+        ];
+
+        const executor = sex.spawn(actions);
+
+        await new Promise((resolve) => {
+            executor.tapOn("completed", (env) => {
+                const state = env.spawned.range.current();
+                expect(state.min).toBe(0);
+                expect(state.max).toBe(100);
+                resolve();
+            });
+        });
+
+        executor.receive(actions);
+    });
+
+    it("should substitute vals in deeply nested objects", async () => {
+        const actions = [
+            ["val", "threshold", 50],
+            ["withVals", ["threshold"], ["spawn", "config", {
+                pkg: "@bassline/cells/tables",
+                name: "first",
+                state: {
+                    settings: {
+                        limits: {
+                            upper: { $val: "threshold" },
+                        },
+                    },
+                },
+            }]],
+        ];
+
+        const executor = sex.spawn(actions);
+
+        await new Promise((resolve) => {
+            executor.tapOn("completed", (env) => {
+                const state = env.spawned.config.current();
+                expect(state.settings.limits.upper).toBe(50);
+                resolve();
+            });
+        });
+
+        executor.receive(actions);
+    });
+
+    it("should combine refs and vals", async () => {
+        const actions = [
+            ["val", "multiplier", 2],
+            ["spawn", "source", {
+                pkg: "@bassline/cells/numeric",
+                name: "max",
+                state: 10,
+            }],
+            ["ref", ["source"], ["withVals", ["multiplier"], [
+                "spawn",
+                "processor",
+                {
+                    pkg: "@bassline/cells/tables",
+                    name: "first",
+                    state: {
+                        input: "source",
+                        factor: { $val: "multiplier" },
+                    },
+                },
+            ]]],
+        ];
+
+        const executor = sex.spawn(actions);
+
+        await new Promise((resolve) => {
+            executor.tapOn("completed", (env) => {
+                const state = env.spawned.processor.current();
+                expect(state.input).toBe(env.spawned.source);
+                expect(state.factor).toBe(2);
+                resolve();
+            });
+        });
+
+        executor.receive(actions);
+    });
+
+    it("should not substitute vals outside withVals scope", async () => {
+        const actions = [
+            ["val", "secret", 999],
+            ["spawn", "public", {
+                pkg: "@bassline/cells/tables",
+                name: "first",
+                state: {
+                    value: { $val: "secret" },
+                },
+            }],
+        ];
+
+        const executor = sex.spawn(actions);
+
+        await new Promise((resolve) => {
+            executor.tapOn("completed", (env) => {
+                const state = env.spawned.public.current();
+                // Should NOT be substituted (not in withVals scope)
+                expect(state.value).toEqual({ $val: "secret" });
                 resolve();
             });
         });
