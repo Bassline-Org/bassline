@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/builder";
-import { bl } from "@bassline/core";
-import { installReact } from "@bassline/react";
-import "@bassline/taps";  // Auto-installs
-import cells from "@bassline/cells";  // Auto-installs
 import {
+  bl,
   exportAsPackage,
   extractParameters,
-} from "@bassline/core/packageExporter";
-
+  loadPackage,
+} from "@bassline/core";
 bl();
+import { installReact } from "@bassline/react";
+import "@bassline/taps"; // Auto-installs
+import cells from "@bassline/cells"; // Auto-installs
+
 installReact();
 
 export function meta({}: Route.MetaArgs) {
@@ -100,8 +101,6 @@ function BuilderUI({ workspace }: { workspace: any }) {
 
     const text = await file.text();
     const pkg = JSON.parse(text);
-
-    const { loadPackage } = await import("@bassline/core/packageLoader");
     loadPackage(pkg);
 
     setFactories((prev) => [
@@ -117,11 +116,6 @@ function BuilderUI({ workspace }: { workspace: any }) {
   };
 
   const handleSpawn = async (factory: any, customParams: any) => {
-    const { bl } = await import("@bassline/core");
-    const { createPackageResolver } = await import(
-      "@bassline/core/packageResolver"
-    );
-
     const resolver = createPackageResolver();
     resolver.import("demo", factory.name);
 

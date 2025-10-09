@@ -12,6 +12,9 @@
     "clean": "rm -rf ./dist"
   },
   "license": "MIT",
+  "dependencies": {
+    "@bassline/systems": "workspace:*"
+  },
   "devDependencies": {
     "express": "^5.1.0"
   }

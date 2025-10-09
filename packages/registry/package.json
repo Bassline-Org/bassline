@@ -8,7 +8,9 @@
     ".": "./src/index.js"
   },
   "peerDependencies": {
-    "@bassline/core": "^1.0.0",
-    "@bassline/refs": "^1.0.0"
+    "@bassline/core": "^1.0.0"
+  },
+  "dependencies": {
+    "@bassline/refs": "workspace:*"
   }
 }

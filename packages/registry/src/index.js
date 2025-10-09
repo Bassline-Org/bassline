@@ -3,11 +3,6 @@ import { gadgetRef } from "@bassline/refs";
 
 export const idSymbol = Symbol("bassline-id");
 
-export function getGadgetById(id) {
-    const entry = globalThis.bassline.registry.get(id);
-    return entry instanceof WeakRef ? entry.deref() : entry;
-}
-
 export function installRegistry() {
     const { gadgetProto } = bl();
 

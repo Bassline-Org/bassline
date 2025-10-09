@@ -19,3 +19,6 @@ export default refsPackage;
 
 // Also export individual gadgets
 export { file, gadgetRef, localRef };
+
+// Export utilities
+export { getGadgetById } from "./utils.js";

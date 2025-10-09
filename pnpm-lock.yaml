@@ -51,12 +51,30 @@ importers:
 
   apps/web:
     dependencies:
+      '@bassline/cells':
+        specifier: workspace:*
+        version: link:../../packages/cells
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@bassline/devtools':
+        specifier: workspace:*
+        version: link:../../packages/devtools
       '@bassline/react':
         specifier: workspace:*
         version: link:../../packages/react
+      '@bassline/refs':
+        specifier: workspace:*
+        version: link:../../packages/refs
+      '@bassline/registry':
+        specifier: workspace:*
+        version: link:../../packages/registry
+      '@bassline/systems':
+        specifier: workspace:*
+        version: link:../../packages/systems
+      '@bassline/taps':
+        specifier: workspace:*
+        version: link:../../packages/taps
       '@dagrejs/dagre':
         specifier: ^1.1.5
         version: 1.1.5
@@ -219,6 +237,10 @@ importers:
         version: link:../core
 
   packages/core:
+    dependencies:
+      '@bassline/systems':
+        specifier: workspace:*
+        version: link:../systems
     devDependencies:
       express:
         specifier: ^5.1.0
@@ -285,7 +307,7 @@ importers:
         specifier: ^1.0.0
         version: link:../core
       '@bassline/refs':
-        specifier: ^1.0.0
+        specifier: workspace:*
         version: link:../refs
 
   packages/relations:
