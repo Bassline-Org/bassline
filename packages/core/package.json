@@ -8,14 +8,9 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "dev": "node src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf ./dist"
   },
-  "license": "MIT",
-  "dependencies": {
-    "@bassline/systems": "workspace:*"
-  },
-  "devDependencies": {
-    "express": "^5.1.0"
-  }
+  "license": "MIT"
 }

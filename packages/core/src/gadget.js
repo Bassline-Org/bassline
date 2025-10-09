@@ -52,22 +52,23 @@ export const gadgetProto = {
     afterSpawn(initial) {
         this.update(initial);
     },
+
     /**
-     * Get package metadata for this gadget (if available)
-     * @returns {Object|null} Metadata object or null
+     * Serializes a gadget into a re-hydratable spec
+     * @returns {Object} - Gadget spec
      */
-    getMetadata() {
-        return this.metadata || null;
+    toSpec() {
+        return {
+            pkg: this.pkg,
+            name: this.name,
+            state: this.stateSpec(),
+        };
+    },
+    /**
+     * Serialzies the state of a gadget into a re-hydratable spec
+     * @returns {Object} - Gadget state
+     */
+    stateSpec() {
+        return this.current();
     },
 };
-
-export function installBassline() {
-    if (
-        typeof globalThis !== "undefined"
-    ) {
-        globalThis.bassline = globalThis.bassline || {};
-        globalThis.bassline.StateSymbol = StateSymbol;
-        globalThis.bassline.gadgetProto = gadgetProto;
-        globalThis.bassline.packages = globalThis.bassline.packages || {};
-    }
-}

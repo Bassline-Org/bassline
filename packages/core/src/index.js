@@ -1,9 +1,15 @@
-export * from "./gadget.js";
-export * from "./packageLoader.js";
-export * from "./packageExporter.js";
-export * from "./packageResolver.js";
-import { installBassline } from "./gadget.js";
-import { defaultPackageResolver } from "./packageResolver.js";
+import { gadgetProto } from "./gadget.js";
+import { scope } from "./scope.js";
+
+export function installBassline() {
+    if (globalThis.bassline === undefined) {
+        globalThis.bl = bl;
+        globalThis.bassline.gadgetProto = gadgetProto;
+        globalThis.bassline.installPackage = installPackage;
+        globalThis.bassline.fromSpec = fromSpec;
+        globalThis.bassline.packages = scope();
+    }
+}
 
 export function bl() {
     if (globalThis.bassline === undefined) {
@@ -41,22 +47,15 @@ export function installPackage(gadgetPackage) {
     for (const value of Object.values(gadgets)) {
         const pkg = value.pkg;
         const name = value.name;
+        const key = `${pkg}/${name}`;
         if (pkg !== lastPkg) {
             console.log(`Installing ${pkg}:`);
             lastPkg = pkg;
         }
         console.log(`  ${name}`);
-        ensurePath(pkg);
-        const context = bl().packages[pkg];
-        context[name] = value;
+        bl().packages.set(key, value);
     }
     console.log("Done!");
-}
-
-function ensurePath(path) {
-    if (bl().packages[path] === undefined) {
-        bl().packages[path] = {};
-    }
 }
 
 /**
@@ -67,75 +66,37 @@ function ensurePath(path) {
  *
  * Supports two spec formats:
  * - Long form: { pkg: "@bassline/cells", name: "max", state: 0 }
- * - Short form: { type: "cells.max", state: 0 } (requires imports in resolver)
+ * - Short form: { type: "cells.max", state: 0 }
  */
-export function fromSpec(spec, resolver = defaultPackageResolver) {
+export async function fromSpec(spec, resolver = bl().packages) {
     if (Array.isArray(spec)) {
-        return spec.map((s) => fromSpec(s, resolver));
+        return await Promise.all(spec.map((s) => fromSpec(s, resolver)));
     }
 
-    let pkg, name;
-    const { state, id } = spec;
+    const { pkg, name, state, id } = spec;
 
-    // Short form: { type: "cells.max", state: ... }
-    if (spec.type) {
-        try {
-            ({ pkg, name } = resolver.resolve(spec.type));
-        } catch (error) {
-            throw new Error(
-                `Could not resolve type "${spec.type}": ${error.message}`,
-            );
-        }
-    } // Long form: { pkg: "...", name: "...", state: ... }
-    else {
-        pkg = spec.pkg;
-        name = spec.name;
-
-        if (!name) {
-            throw new Error(
-                `Name is required for spec: ${JSON.stringify(spec)}`,
-            );
-        }
-        if (!pkg) {
-            throw new Error(
-                `Pkg is required for spec: ${JSON.stringify(spec)}`,
-            );
-        }
-    }
-
-    const pkgContext = bl().packages[pkg];
-    if (!pkgContext) {
-        throw new Error(`Package ${pkg} not found! Did you install it?`);
-    }
-
-    const proto = pkgContext[name];
-    if (!proto) {
+    if (!name) {
         throw new Error(
-            `Gadget ${name} not found in package ${pkg}! Did you install it?`,
+            `Name is required for spec: ${JSON.stringify(spec)}`,
+        );
+    }
+    if (!pkg) {
+        throw new Error(
+            `Pkg is required for spec: ${JSON.stringify(spec)}`,
         );
     }
 
+    const key = `${pkg}/${name}`;
+    const proto = await bl().packages.get(key);
+    if (!proto) {
+        throw new Error(`Gadget ${key} not found! Did you install it?`);
+    }
+
     const g = proto.spawn(state);
+
     if (id && globalThis.bassline.registry !== undefined) {
         g._setId(id);
     }
 
     return g;
 }
-
-Object.assign(bl().gadgetProto, {
-    toSpec() {
-        return {
-            pkg: this.pkg,
-            name: this.name,
-            state: this.stateSpec(),
-        };
-    },
-    stateSpec() {
-        return this.current();
-    },
-});
-
-globalThis.bl = bl;
-globalThis.bassline.installPackage = installPackage;
-globalThis.bassline.fromSpec = fromSpec;
