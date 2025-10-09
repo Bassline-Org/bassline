@@ -5,19 +5,7 @@
   "type": "module",
   "module": "src/index.js",
   "exports": {
-    ".": "./src/index.js",
-    "./functions": "./src/patterns/functions/index.js",
-    "./cells": "./src/patterns/cells/index.js",
-    "./relations": "./src/patterns/relations/index.js",
-    "./taps": "./src/extensions/taps.js",
-    "./metadata": "./src/extensions/metadata.js",
-    "./registry": "./src/extensions/registry.js",
-    "./devtools": "./src/extensions/devtools.js",
-    "./ops": "./src/extensions/ops.js",
-    "./ops/core": "./src/ops/core.js",
-    "./ops/math": "./src/ops/math.js",
-    "./ops/logic": "./src/ops/logic.js",
-    "./ops/array": "./src/ops/array.js"
+    ".": "./src/index.js"
   },
   "scripts": {
     "dev": "node src/index.js",

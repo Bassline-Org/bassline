@@ -1,0 +1,16 @@
+{
+  "name": "@bassline/systems",
+  "version": "1.0.0",
+  "description": "System patterns for Bassline - compound gadgets, scope, version control",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./compound": "./src/compound.js",
+    "./scope": "./src/scope.js"
+  },
+  "peerDependencies": {
+    "@bassline/core": "^1.0.0",
+    "@bassline/refs": "^1.0.0"
+  }
+}

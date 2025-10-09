@@ -1,4 +1,4 @@
-import { createCompoundProto } from "./compoundProto.js";
+import { createCompoundProto } from "@bassline/systems";
 import { installPackage, bl } from "./index.js";
 import fs from "fs/promises";
 

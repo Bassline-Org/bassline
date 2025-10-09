@@ -1,0 +1,15 @@
+{
+  "name": "@bassline/relations",
+  "version": "1.0.0",
+  "description": "Relations patterns for Bassline gadgets",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "@bassline/core": "^1.0.0",
+    "@bassline/taps": "^1.0.0",
+    "@bassline/functions": "^1.0.0"
+  }
+}

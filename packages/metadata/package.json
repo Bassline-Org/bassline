@@ -1,0 +1,14 @@
+{
+  "name": "@bassline/metadata",
+  "version": "1.0.0",
+  "description": "Metadata extension for Bassline gadgets",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "@bassline/core": "^1.0.0",
+    "@bassline/cells": "^1.0.0"
+  }
+}

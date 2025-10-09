@@ -1,0 +1,14 @@
+{
+  "name": "@bassline/registry",
+  "version": "1.0.0",
+  "description": "Registry extension for Bassline - track gadgets by ID",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "@bassline/core": "^1.0.0",
+    "@bassline/refs": "^1.0.0"
+  }
+}

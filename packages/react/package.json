@@ -15,7 +15,8 @@
     "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
-    "@bassline/core": "workspace:*"
+    "@bassline/core": "workspace:*",
+    "@bassline/taps": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.2.79",

@@ -212,17 +212,47 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(jsdom@26.1.0)
 
+  packages/cells:
+    dependencies:
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+
   packages/core:
     devDependencies:
       express:
         specifier: ^5.1.0
         version: 5.1.0
 
+  packages/devtools:
+    dependencies:
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+
+  packages/functions:
+    dependencies:
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+
+  packages/metadata:
+    dependencies:
+      '@bassline/cells':
+        specifier: ^1.0.0
+        version: link:../cells
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+
   packages/react:
     dependencies:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/taps':
+        specifier: workspace:*
+        version: link:../taps
     devDependencies:
       '@types/react':
         specifier: ^18.2.79
@@ -239,6 +269,51 @@ importers:
       vitest:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.9)
+
+  packages/refs:
+    dependencies:
+      '@bassline/cells':
+        specifier: ^1.0.0
+        version: link:../cells
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+
+  packages/registry:
+    dependencies:
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+      '@bassline/refs':
+        specifier: ^1.0.0
+        version: link:../refs
+
+  packages/relations:
+    dependencies:
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+      '@bassline/functions':
+        specifier: ^1.0.0
+        version: link:../functions
+      '@bassline/taps':
+        specifier: ^1.0.0
+        version: link:../taps
+
+  packages/systems:
+    dependencies:
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
+      '@bassline/refs':
+        specifier: ^1.0.0
+        version: link:../refs
+
+  packages/taps:
+    dependencies:
+      '@bassline/core':
+        specifier: ^1.0.0
+        version: link:../core
 
 packages:
 

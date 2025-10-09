@@ -1,5 +1,5 @@
 import { gadgetProto } from "@bassline/core";
-import { installTaps } from "@bassline/core/taps";
+import { installTaps } from "@bassline/taps";
 //import { installMetadata } from "@bassline/core/metadata";
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 

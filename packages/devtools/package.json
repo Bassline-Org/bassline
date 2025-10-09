@@ -1,0 +1,13 @@
+{
+  "name": "@bassline/devtools",
+  "version": "1.0.0",
+  "description": "Developer tools and formatters for Bassline gadgets",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "@bassline/core": "^1.0.0"
+  }
+}

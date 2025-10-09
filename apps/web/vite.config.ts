@@ -17,6 +17,9 @@ export default defineConfig({
   optimizeDeps: {
     include: ['events']
   },
+  ssr: {
+    external: ['@bassline/core', '@bassline/react']
+  },
   server: {
     watch: {
       // Watch the source directories of workspace packages

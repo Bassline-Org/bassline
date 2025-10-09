@@ -22,6 +22,9 @@ type Pages = {
   "/canvas-v2": {
     params: {};
   };
+  "/builder": {
+    params: {};
+  };
   "/inspect": {
     params: {};
   };
@@ -36,7 +39,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/playground" | "/simpleTest" | "/canvas-v2" | "/inspect" | "/canvas" | "/home";
+    page: "/" | "/playground" | "/simpleTest" | "/canvas-v2" | "/builder" | "/inspect" | "/canvas" | "/home";
   };
   "routes/playground.tsx": {
     id: "routes/playground";
@@ -49,6 +52,10 @@ type RouteFiles = {
   "routes/canvas-v2.tsx": {
     id: "routes/canvas-v2";
     page: "/canvas-v2";
+  };
+  "routes/builder.tsx": {
+    id: "routes/builder";
+    page: "/builder";
   };
   "routes/inspect.tsx": {
     id: "routes/inspect";

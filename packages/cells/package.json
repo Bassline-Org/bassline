@@ -1,0 +1,14 @@
+{
+  "name": "@bassline/cells",
+  "version": "1.0.0",
+  "description": "Cell patterns for Bassline - ACI merge strategies for monotonic data",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "@bassline/core": "^1.0.0"
+  },
+  "license": "MIT"
+}
