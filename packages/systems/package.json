@@ -16,6 +16,7 @@
   "dependencies": {
     "@bassline/core": "workspace:*",
     "@bassline/cells": "workspace:*",
-    "@bassline/refs": "workspace:*"
+    "@bassline/refs": "workspace:*",
+    "@bassline/taps": "workspace:*"
   }
 }

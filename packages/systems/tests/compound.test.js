@@ -88,7 +88,7 @@ describe("compound", () => {
         }
 
         {
-            const newFromSpec = await fromSpec({
+            const newFromSpec = fromSpec({
                 pkg: "@bassline/systems",
                 name: "example2",
                 state: {
@@ -97,21 +97,42 @@ describe("compound", () => {
                         name: "max",
                         state: 420,
                     },
+                    bar: {
+                        pkg: "@bassline/refs",
+                        name: "localRef",
+                        state: {
+                            name: "a",
+                        },
+                    },
+                    another: {
+                        pkg: "@bassline/refs",
+                        name: "localRef",
+                        state: {
+                            name: "foo",
+                        },
+                    },
                 },
             });
             console.log("newFromSpec: ", newFromSpec);
-            const [a, b, c] = await newFromSpec.getMany([
+            const [a, b, c, bar] = await newFromSpec.getMany([
                 "a",
                 "b",
                 "c",
+                "bar",
             ]);
             expect(a.current()).toEqual(420);
             expect(b.current()).toEqual(10);
             expect(c.current()).toEqual(69);
+            expect(await bar.promise).toEqual(a);
             newFromSpec.current().enter(async () => {
+                const another = newFromSpec.get("another");
+                expect(another).toBeInstanceOf(Promise);
                 const foo = localRef.spawn({ name: "a" });
+                newFromSpec.current().set("foo", foo);
                 expect(await foo.promise).toBe(a);
             });
+            const another = newFromSpec.get("another");
+            expect(await another.promise).toBe(await newFromSpec.get("foo"));
         }
     });
 });

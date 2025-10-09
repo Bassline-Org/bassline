@@ -328,6 +328,9 @@ importers:
       '@bassline/refs':
         specifier: workspace:*
         version: link:../refs
+      '@bassline/taps':
+        specifier: workspace:*
+        version: link:../taps
 
   packages/taps:
     dependencies:

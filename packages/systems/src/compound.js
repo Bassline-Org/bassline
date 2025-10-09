@@ -1,5 +1,6 @@
 import { bl, fromSpec } from "@bassline/core";
 import { scope } from "@bassline/core";
+import { localRef } from "@bassline/refs";
 
 const { gadgetProto } = bl();
 
@@ -70,11 +71,11 @@ Object.assign(compound, {
 
         return gadgets;
     },
-    async get(name) {
-        return await this.current().get(name);
+    get(name) {
+        return this.current().get(name);
     },
-    async getMany(names) {
-        return await Promise.all(names.map((name) => this.get(name)));
+    getMany(names) {
+        return names.map((name) => this.get(name));
     },
 });
 

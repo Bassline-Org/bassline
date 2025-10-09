@@ -9,33 +9,48 @@ const scopeProto = {
     get(name) {
         const val = this[name];
         if (val === undefined) {
-            return new Promise((resolve) => {
-                const existing = this.__promises[name];
-                if (existing === undefined) {
-                    this.__promises[name] = [resolve];
-                } else {
-                    existing.push(resolve);
-                }
-            });
+            const existing = this.__promises[name];
+            if (existing) {
+                return existing;
+            } else {
+                const p = new Promise((resolve) => {
+                    this.__promises[name] = resolve;
+                }).then((v) => {
+                    this[name] = v;
+                    delete this.__promises[name];
+                    return v;
+                });
+                this.__promises[name] = p;
+                return p;
+            }
         } else {
             return val;
         }
     },
-    async set(name, value) {
-        this[name] = await value;
-        for (const resolve of this.__promises[name] || []) {
-            resolve(value);
+    set(name, value) {
+        if (value instanceof Promise) {
+            return value.then((v) => this.set(name, v));
         }
-        delete this.__promises[name];
+
+        const resolver = this.__promises[name];
+        if (typeof resolver === "function") {
+            resolver(value);
+            return value;
+        }
+        this[name] = value;
     },
     enter(fn) {
         const oldScope = currentScope();
         __currentScope = this;
-        try {
-            fn();
-        } finally {
-            __currentScope = oldScope;
+        const result = fn();
+        if (result instanceof Promise) {
+            return result.then((v) => {
+                __currentScope = oldScope;
+                return v;
+            });
         }
+        __currentScope = oldScope;
+        return result;
     },
 };
 

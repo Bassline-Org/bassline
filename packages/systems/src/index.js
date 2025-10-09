@@ -1,8 +1,10 @@
 import { compound, defineCompound } from "./compound.js";
+import { sex } from "./sex.js";
 
 const systemsPackage = {
     gadgets: {
         compound,
+        sex,
     },
 };
 
@@ -10,4 +12,4 @@ const systemsPackage = {
 export default systemsPackage;
 
 // Also export individual gadgets and utilities
-export { compound, defineCompound };
+export { compound, defineCompound, sex };

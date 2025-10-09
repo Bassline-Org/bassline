@@ -68,18 +68,17 @@ export function installPackage(gadgetPackage) {
 /**
  * Creates a gadget from a spec
  * @param {Object|Array} spec - Gadget spec or array of specs
- * @param {Object} resolver - Package resolver for type resolution (optional)
+ * @param {Object} overrides - Overrides to apply to the spec
  * @returns {Object|Array} Spawned gadget(s)
  *
  * Supports two spec formats:
  * - Long form: { pkg: "@bassline/cells", name: "max", state: 0 }
  * - Short form: { type: "cells.max", state: 0 }
  */
-export async function fromSpec(spec, resolver = bl().packages) {
+export function fromSpec(spec) {
     if (Array.isArray(spec)) {
-        return await Promise.all(spec.map((s) => fromSpec(s, resolver)));
+        return spec.map((s) => fromSpec(s));
     }
-
     const { pkg, name, state, id } = spec;
 
     if (!name) {
@@ -94,16 +93,33 @@ export async function fromSpec(spec, resolver = bl().packages) {
     }
 
     const key = `${pkg}/${name}`;
-    const proto = await bl().packages.get(key);
+    const proto = bl().packages.get(key);
+    if (proto instanceof Promise) {
+        return proto.then((p) => {
+            if (!p) {
+                throw new Error(`Gadget ${key} not found! Did you install it?`);
+            }
+            for (const scopeName of scopes) {
+                const s = bl().scopes[scopeName];
+                if (!s) {
+                    bl().scopes.set(scopeName, scope());
+                } else {
+                    s;
+                }
+            }
+            const g = p.spawn(state, scopes);
+            if (id && globalThis.bassline.registry !== undefined) {
+                g._setId(id);
+            }
+            return g;
+        });
+    }
     if (!proto) {
         throw new Error(`Gadget ${key} not found! Did you install it?`);
     }
-
     const g = proto.spawn(state);
-
     if (id && globalThis.bassline.registry !== undefined) {
         g._setId(id);
     }
-
     return g;
 }
