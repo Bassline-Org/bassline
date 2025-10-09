@@ -49,10 +49,30 @@ export const gadgetProto = {
         g.afterSpawn(initial);
         return g;
     },
+
+    /**
+     * Lifecycle hook called after spawning a gadget
+     * By default it updates the state to the initial state
+     * @param {*} initial
+     */
     afterSpawn(initial) {
         this.update(initial);
     },
+    /**
+     * Kills a gadget, invokes the cleanup hook after emitting the killed effect
+     */
+    kill() {
+        this.emit({ killed: true });
+        this.onKill();
+    },
 
+    /**
+     * Lifecycle hook called after killing a gadget
+     * By default it sets the state to null
+     */
+    onKill() {
+        this[StateSymbol] = null;
+    },
     /**
      * Serializes a gadget into a re-hydratable spec
      * @returns {Object} - Gadget spec

@@ -14,8 +14,8 @@ const scopeProto = {
         }
         return await this[name];
     },
-    set(name, value) {
-        this[name] = value;
+    async set(name, value) {
+        this[name] = await value;
         for (const resolve of this.__promises[name] || []) {
             resolve(value);
         }
