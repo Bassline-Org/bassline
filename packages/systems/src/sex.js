@@ -133,4 +133,16 @@ Object.assign(sex, {
         }
         return result;
     },
+
+    stateSpec() {
+        // Convert current spawned gadgets back to spawn actions
+        const spawned = this.current();
+        const actions = [];
+
+        for (const [name, gadget] of Object.entries(spawned)) {
+            actions.push(["spawn", name, gadget.toSpec()]);
+        }
+
+        return actions;
+    },
 });

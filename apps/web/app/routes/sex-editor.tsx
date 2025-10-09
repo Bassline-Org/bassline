@@ -189,7 +189,6 @@ function StateInspector({
 }: {
     gadget: any;
 }) {
-    const state = gadget?.useCurrent();
     const inputGadget = useMemo(
         () =>
             fromSpec({
@@ -201,7 +200,18 @@ function StateInspector({
     );
     const [inputValue, setInputValue] = inputGadget.useState();
 
-    useEffect(() => () => inputGadget.kill(), [inputGadget]);
+    // Always call hooks - use null gadget if not provided
+    const emptyGadget = useMemo(() => fromSpec({
+        pkg: "@bassline/cells/unsafe",
+        name: "last",
+        state: null
+    }), []);
+    const state = (gadget || emptyGadget).useCurrent();
+
+    useEffect(() => () => {
+        inputGadget.kill();
+        if (!gadget) emptyGadget.kill();
+    }, [inputGadget, gadget, emptyGadget]);
 
     if (!gadget) {
         return (
@@ -266,15 +276,21 @@ function StateInspector({
 }
 
 export default function SexEditor() {
-    // Root sex gadget
-    const rootSex = useMemo(() => {
-        return fromSpec({
+    // Root sex gadget holder - holds reference to the current sex gadget
+    const rootSexCell = useMemo(() => {
+        const initialSex = fromSpec({
             pkg: "@bassline/systems",
             name: "sex",
             state: [],
         });
+        return fromSpec({
+            pkg: "@bassline/cells/unsafe",
+            name: "last",
+            state: initialSex,
+        });
     }, []);
 
+    const [rootSex] = rootSexCell.useState();
     const workspace = rootSex.useCurrent();
 
     // Selection gadget
@@ -340,9 +356,39 @@ export default function SexEditor() {
             const text = await file.text();
             try {
                 const spec = JSON.parse(text);
-                // Replace rootSex by spawning new one and updating
-                const loaded = fromSpec(spec);
-                rootSex.receive(loaded.current());
+                if (!spec.state || !Array.isArray(spec.state)) {
+                    alert("Invalid sex spec: state must be an action array");
+                    return;
+                }
+
+                // Ask user how to load
+                const mode = prompt(
+                    "How do you want to load this workspace?\n\n" +
+                    "1. Add to current (executes actions here)\n" +
+                    "2. As nested workspace (name it)\n" +
+                    "3. Replace current (clears first)\n\n" +
+                    "Enter 1, 2, or 3:",
+                    "1"
+                );
+
+                if (!mode) return; // Cancelled
+
+                if (mode === "1") {
+                    // Add to current workspace
+                    rootSex.receive(spec.state);
+                } else if (mode === "2") {
+                    // Spawn as nested workspace
+                    const name = prompt("Name for this workspace:", "workspace");
+                    if (!name) return;
+                    rootSex.receive([["spawn", name, spec]]);
+                } else if (mode === "3") {
+                    // Replace current - kill all gadgets first
+                    const current = rootSex.current();
+                    Object.values(current).forEach((g: any) => g.kill?.());
+                    rootSex.receive(spec.state);
+                } else {
+                    alert("Invalid option. Choose 1, 2, or 3.");
+                }
             } catch (e) {
                 alert(`Failed to load: ${e}`);
             }
@@ -408,7 +454,7 @@ export default function SexEditor() {
                         </div>
                     </div>
                     <Textarea
-                        value={actions}
+                        value={actions || "[]"}
                         onChange={(e) => setActions(e.target.value)}
                         className="flex-1 font-mono text-sm"
                         placeholder="Enter actions as JSON array..."
