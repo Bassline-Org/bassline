@@ -33,27 +33,66 @@ This is **Bassline** - a hyper-minimal propagation network model built around **
 
 ```
 packages/
-├── core/                    # Core library (~454 LOC without devtools)
+├── core/                    # Core primitives (gadget protocol, package system)
 │   └── src/
-│       ├── gadget.js        # THE CORE - 28 lines of gadget protocol
-│       ├── taps.js          # Taps extension - 27 lines
-│       ├── metadata.js      # Metadata extension
-│       ├── devtools.js      # Developer utilities
-│       └── patterns/
-│           ├── cells/       # ACI merge strategies
-│           │   ├── numeric.js    # Max, Min (30 LOC)
-│           │   ├── set.js        # Union, Intersection (45 LOC)
-│           │   ├── tables.js     # First, Last, table operations (57 LOC)
-│           │   └── versioned.js  # Versioned values (22 LOC)
-│           ├── functions/   # Function composition (113 LOC)
-│           └── relations/   # Relational patterns (104 LOC)
+│       ├── gadget.js        # THE CORE - ~60 lines of gadget protocol
+│       ├── index.js         # Package installation, fromSpec, bl()
+│       ├── packageLoader.js # Load packages from JSON definitions
+│       ├── packageExporter.js # Export gadgets as packages
+│       └── packageResolver.js # Type resolution system
 │
-└── react/                   # React integration (~59 LOC)
+├── cells/                   # ACI merge strategies (lattice operations)
+│   └── src/
+│       ├── numeric.js       # Max, Min (monotonic numbers)
+│       ├── set.js           # Union, Intersection (set operations)
+│       ├── tables.js        # First, Last (table merge strategies)
+│       ├── versioned.js     # Version-tracked values
+│       └── unsafe.js        # Last (no merge, always replace)
+│
+├── taps/                    # Observation extension (~40 lines)
+│   └── src/
+│       └── index.js         # tap(), tapOn(), emit() with Set-based distribution
+│
+├── functions/               # Function composition patterns
+│   └── src/
+│       ├── core.js          # Map, partial application
+│       ├── math.js          # Mathematical operations
+│       ├── logic.js         # Logical operations
+│       ├── array.js         # Array operations
+│       └── http.js          # HTTP request handling
+│
+├── relations/               # Gadget wiring utilities
+│   └── src/
+│       ├── index.js         # Wire, connect helpers
+│       └── relationGadgets.js # Wire gadget implementation
+│
+├── systems/                 # Compound gadgets (meta-circularity)
+│   └── src/
+│       ├── compound.js      # Compound gadget proto
+│       ├── compoundProto.js # Factory for creating compound protos
+│       ├── scope.js         # Scoped gadget resolution
+│       └── versionControl.js # Version tracking
+│
+├── refs/                    # Reference types (local, file, web, gadget)
+│   └── src/
+│       ├── localRef.js      # Local scope references
+│       ├── gadgetRef.js     # References to other gadgets
+│       ├── fileRef.js       # File system references
+│       └── webRef.js        # HTTP/URL references
+│
+├── metadata/                # Metadata extension
+├── devtools/                # Developer utilities
+├── registry/                # Global gadget registry
+└── react/                   # React integration
     └── src/
-        └── index.js         # Prototype extensions for React hooks
+        └── index.js         # useGadget, useTap hooks
 ```
 
-**Total runtime code**: ~513 LOC (core + react, excluding devtools)
+**Key Features**:
+- Vanilla JavaScript (no build step)
+- Auto-install on import (each package calls `installPackage()`)
+- Meta-circular (gadgets describe gadgets via package system)
+- Prototype-based extensions (one install, universal behavior)
 
 ## Core Concepts
 
@@ -76,31 +115,58 @@ packages/
 
 ### 2. Creating Gadgets
 
+Gadgets are created via the prototype pattern using `spawn()`:
+
 ```javascript
-import { Gadget } from "@bassline/core";
+import { bl } from "@bassline/core";
+import "@bassline/cells";  // Auto-installs max gadget
 
-// Define step function: (state, input) -> action
-function step(state, input) {
-  if (input > state) return input;  // Only accept increases
-  return undefined;  // Reject decreases
-}
+// Using installed gadgets
+const { packages } = bl();
+const maxProto = packages["@bassline/cells/numeric"].max;
+const gadget = maxProto.spawn(0);
 
-// Create gadget with initial state
-const gadget = new Gadget(step, 0);
+// Or use fromSpec (recommended)
+const gadget2 = bl().fromSpec({
+  pkg: "@bassline/cells/numeric",
+  name: "max",
+  state: 0
+});
 
 // Use it
 gadget.receive(5);   // Accepted
 gadget.current();    // 5
-gadget.receive(3);   // Rejected
+gadget.receive(3);   // Rejected (max only accepts increases)
+```
+
+**Custom Gadgets**:
+
+```javascript
+import { bl } from "@bassline/core";
+
+const counterProto = Object.create(bl().gadgetProto);
+Object.assign(counterProto, {
+  pkg: "@myapp/gadgets",
+  name: "counter",
+  step(state, input) {
+    if (input.increment) {
+      this.update(state + 1);
+    } else if (input.decrement) {
+      this.update(state - 1);
+    }
+  }
+});
+
+const counter = counterProto.spawn(0);
+counter.receive({ increment: true });  // 1
+counter.receive({ increment: true });  // 2
+counter.receive({ decrement: true });  // 1
 ```
 
 ### 3. Taps Extension (Mechanical Wiring)
 
 ```javascript
-import { installTaps } from "@bassline/core/taps";
-
-// Install taps extension (modifies gadgetProto)
-installTaps();
+import "@bassline/taps";  // Auto-installs on import!
 
 // Now all gadgets can be tapped
 const cleanup = gadget.tap(effects => {
@@ -108,8 +174,8 @@ const cleanup = gadget.tap(effects => {
 });
 
 // Specific effect tapping
-gadget.tapOn("changed", ({ old, newState }) => {
-  console.log(`Changed from ${old} to ${newState}`);
+gadget.tapOn("changed", newValue => {
+  console.log(`Changed to ${newValue}`);
 });
 
 // Cleanup when done
@@ -123,104 +189,113 @@ Taps are **fire-and-forget** - they can be sync or async, and the emitting gadge
 Cells implement different merge strategies for moving up a lattice:
 
 ```javascript
-import { numeric, set, tables } from "@bassline/core/patterns";
+import { bl } from "@bassline/core";
+import "@bassline/cells";
 
-// Numeric cells
-const max = new numeric.Max(0);    // Monotonically increasing
-const min = new numeric.Min(100);  // Monotonically decreasing
+const { fromSpec } = bl();
+
+// Numeric cells (monotonic)
+const max = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
+const min = fromSpec({ pkg: "@bassline/cells/numeric", name: "min", state: 100 });
 
 // Set cells
-const union = new set.Union([]);         // Set union (growing)
-const intersection = new set.Intersection([]); // Set intersection (shrinking)
+const union = fromSpec({ pkg: "@bassline/cells/set", name: "union", state: new Set() });
+const intersection = fromSpec({ pkg: "@bassline/cells/set", name: "intersection", state: new Set() });
 
 // Table cells
-const last = new tables.Last(0);   // Always take newest value
-const first = new tables.First(0); // Keep first value, ignore rest
+const last = fromSpec({ pkg: "@bassline/cells/tables", name: "last", state: {} });
+const first = fromSpec({ pkg: "@bassline/cells/tables", name: "first", state: {} });
+
+// Unsafe (no merge, always replace)
+const unsafe = fromSpec({ pkg: "@bassline/cells/unsafe", name: "last", state: 0 });
 ```
 
 ### 5. React Integration
 
 ```javascript
-import { installReact } from "@bassline/react";
-import { numeric } from "@bassline/core/cells";
+import { useMemo } from "react";
+import { bl } from "@bassline/core";
+import { useGadget } from "@bassline/react";
+import "@bassline/cells";
 
-// Install React hooks (modifies gadgetProto)
-installReact();
-
-// Now all gadgets have React hooks!
 function Component() {
-  const gadget = useMemo(() => new numeric.Max(0), []);
+  const gadget = useMemo(() =>
+    bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 }),
+    []
+  );
 
-  // useState pattern (familiar API)
-  const [count, send] = gadget.useState();
+  // Subscribe to changed effect
+  const [count] = useGadget(gadget, ["changed"]);
 
-  // Or use separately
-  const count = gadget.useCurrent();
-  const send = gadget.useSend();
-
-  // Computed values
-  const doubled = gadget.useComputed(n => n * 2);
-
-  // Effect tapping
-  gadget.useTap(effects => {
-    console.log("Effects:", effects);
-  });
-
-  return <button onClick={() => send(count + 1)}>{count}</button>;
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={() => gadget.receive(count + 1)}>Increment</button>
+    </div>
+  );
 }
 ```
 
-**Key Innovation**: No wrapper components, no providers, no context. Just install once and every gadget gets React hooks for free via prototype extension.
+**Key Innovation**: Simple hook-based integration. `useGadget(gadget, effects)` subscribes to specific effects and re-renders when they occur.
 
 ## Working with the Codebase
 
 ### Creating Custom Gadgets
 
-Pattern for custom step functions:
+All gadgets follow the prototype pattern:
 
 ```javascript
-function counterStep(state, input) {
-  // Examine input and decide what to do
-  if (input.increment) return state + 1;
-  if (input.decrement) return state - 1;
-  if (input.set !== undefined) return input.set;
-  return undefined; // Reject unknown inputs
-}
+import { bl, installPackage } from "@bassline/core";
 
-const counter = new Gadget(counterStep, 0);
-counter.receive({ increment: true });
-```
+// 1. Create proto extending gadgetProto
+const counterProto = Object.create(bl().gadgetProto);
 
-### Gadget Classes (for Complex Behavior)
-
-```javascript
-import { Gadget } from "@bassline/core";
-
-class Counter extends Gadget {
-  constructor(initial = 0) {
-    super((state, input) => this.step(state, input), initial);
-  }
+// 2. Define package/name and step function
+Object.assign(counterProto, {
+  pkg: "@myapp/gadgets",
+  name: "counter",
 
   step(state, input) {
-    if (input.increment) return state + 1;
-    if (input.decrement) return state - 1;
-    return undefined;
+    // Decide what to do based on input
+    if (input.increment) {
+      this.update(state + 1);
+    } else if (input.decrement) {
+      this.update(state - 1);
+    } else if (input.set !== undefined) {
+      this.update(input.set);
+    }
+    // If no match, do nothing (reject input)
   }
+});
 
-  handle(newState) {
-    this.update(newState);
-  }
-}
+// 3. Install the gadget
+installPackage({
+  gadgets: { counter: counterProto }
+});
+
+// 4. Use it
+const counter = bl().fromSpec({
+  pkg: "@myapp/gadgets",
+  name: "counter",
+  state: 0
+});
+
+counter.receive({ increment: true });  // 1
+counter.receive({ increment: true });  // 2
+counter.receive({ set: 10 });          // 10
+counter.receive({ decrement: true });  // 9
 ```
 
 ### Extension Pattern (Install Functions)
 
-All extensions follow this pattern:
+Extensions modify `gadgetProto` to add methods to all gadgets:
 
 ```javascript
-import { gadgetProto } from "@bassline/core";
+import { bl } from "@bassline/core";
 
 export function installMyExtension() {
+  const { gadgetProto } = bl();
+
   // Check if already installed
   if (gadgetProto.myMethod !== undefined) {
     return;
@@ -230,55 +305,97 @@ export function installMyExtension() {
   Object.assign(gadgetProto, {
     myMethod() {
       // Now all gadgets have this method
+      console.log("Extended!", this.current());
     }
   });
 }
+
+// Auto-install on import (common pattern)
+installMyExtension();
 ```
 
-### Pattern Libraries
+### Available Packages
 
-**Cells** (`patterns/cells/`):
-- `numeric`: Max, Min for monotonic numbers
-- `set`: Union, Intersection for set operations
-- `tables`: First, Last, table merge strategies
-- `versioned`: Version-tracked values
+**@bassline/core** - Core protocol and package system
+- `bl()` - Access global bassline runtime
+- `installPackage(pkg)` - Install gadget packages
+- `fromSpec(spec)` - Create gadgets from specifications
+- Package loading/exporting for meta-circularity
 
-**Functions** (`patterns/functions/`):
-- Function composition
-- Partial application
-- (~113 LOC)
+**@bassline/cells** - ACI merge strategies
+- `numeric` - Max, Min (monotonic numbers)
+- `set` - Union, Intersection (set operations)
+- `tables` - First, Last (table merge strategies)
+- `versioned` - Version-tracked values
+- `unsafe` - Last-write-wins (no merge)
 
-**Relations** (`patterns/relations/`):
-- Relational data patterns
-- (~104 LOC)
+**@bassline/taps** - Observation extension
+- `tap(fn)` - Subscribe to all effects
+- `tapOn(key, fn)` - Subscribe to specific effect
+- Auto-installs on import
+
+**@bassline/functions** - Function composition
+- Map, partial application
+- Math, logic, array operations
+- HTTP request handling
+
+**@bassline/relations** - Gadget wiring
+- `wire` - Connect gadgets together
+- Connection management
+
+**@bassline/systems** - Compound gadgets
+- `compound` - Compose gadgets into systems
+- Meta-circular package description
+
+**@bassline/refs** - Reference types
+- `localRef` - Local scope references
+- `gadgetRef` - References to other gadgets
+- `fileRef`, `webRef` - External references
+
+**@bassline/react** - React hooks
+- `useGadget(gadget, effects)` - Subscribe and re-render
+- Works with any gadget
+
+**@bassline/metadata** - Metadata extension
+**@bassline/devtools** - Developer utilities
+**@bassline/registry** - Global gadget registry
 
 ## Common Patterns
 
 ### Bidirectional Sync
 
 ```javascript
-import { numeric } from "@bassline/core/cells";
-import { installTaps } from "@bassline/core/taps";
+import { bl } from "@bassline/core";
+import "@bassline/cells";
+import "@bassline/taps";
 
-installTaps();
+const { fromSpec } = bl();
 
-const a = new numeric.Max(0);
-const b = new numeric.Max(0);
+const a = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
+const b = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
 
-a.tapOn("changed", ({ newState }) => b.receive(newState));
-b.tapOn("changed", ({ newState }) => a.receive(newState));
+a.tapOn("changed", (newValue) => b.receive(newValue));
+b.tapOn("changed", (newValue) => a.receive(newValue));
+
+a.receive(5);  // Both a and b become 5
 ```
 
 ### Async Propagation
 
 ```javascript
-const source = new numeric.Max(0);
-const delayed = new tables.Last(0);
+import { bl } from "@bassline/core";
+import "@bassline/cells";
+import "@bassline/taps";
+
+const { fromSpec } = bl();
+
+const source = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
+const delayed = fromSpec({ pkg: "@bassline/cells/unsafe", name: "last", state: 0 });
 
 source.tap(async ({ changed }) => {
   if (changed !== undefined) {
     await new Promise(r => setTimeout(r, 100));
-    delayed.receive(changed.newState);
+    delayed.receive(changed);
   }
 });
 ```
@@ -286,8 +403,16 @@ source.tap(async ({ changed }) => {
 ### Aggregation
 
 ```javascript
-const nums = [1, 2, 3].map(n => new numeric.Max(n));
-const sum = new tables.Last(0);
+import { bl } from "@bassline/core";
+import "@bassline/cells";
+import "@bassline/taps";
+
+const { fromSpec } = bl();
+
+const nums = [1, 2, 3].map(n =>
+  fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: n })
+);
+const sum = fromSpec({ pkg: "@bassline/cells/unsafe", name: "last", state: 0 });
 
 nums.forEach(n => {
   n.tap(() => {
@@ -295,27 +420,6 @@ nums.forEach(n => {
     sum.receive(total);
   });
 });
-```
-
-### React Usage
-
-```javascript
-import { numeric } from "@bassline/core/cells";
-
-const max = new numeric.Max(0);
-
-export default function SimpleTest() {
-  const [count, update] = max.useState();
-  const computed = max.useComputed(count => count * 2);
-
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => update(count + 1)}>Increment</button>
-      <div>Computed: {computed}</div>
-    </div>
-  );
-}
 ```
 
 ## Philosophy Reminders
@@ -415,26 +519,67 @@ export function installLogging() {
 
 ## No Bundler Needed
 
-The core and React packages are vanilla ES modules with no build step:
+All packages are vanilla ES modules with no build step:
 
-**package.json for @bassline/core:**
+**Package structure:**
 ```json
 {
-  "name": "@bassline/core",
+  "name": "@bassline/[package]",
   "type": "module",
   "main": "./src/index.js",
   "exports": {
-    ".": "./src/index.js",
-    "./taps": "./src/taps.js",
-    "./metadata": "./src/metadata.js",
-    "./patterns": "./src/patterns/index.js",
-    "./cells": "./src/patterns/cells/index.js",
-    "./devtools": "./src/devtools.js"
+    ".": "./src/index.js"
   }
 }
 ```
 
-Consuming apps (like Vite) handle bundling. We ship source.
+Each package auto-installs on import. Consuming apps (like Vite) handle bundling. We ship source directly.
+
+## Meta-Circularity: Package Description Language
+
+The system can describe and extend itself using its own primitives:
+
+```javascript
+import { bl } from "@bassline/core";
+import "@bassline/systems";
+
+// Create a compound gadget (gadgets composed of other gadgets)
+const myCompound = bl().fromSpec({
+  pkg: "@bassline/systems",
+  name: "compound",
+  state: {
+    imports: { cells: "@bassline/cells/numeric" },
+    gadgets: {
+      threshold: { type: "cells.max", state: 50 },
+      input: { type: "cells.max", state: 0 }
+    }
+  }
+});
+
+// Export it as a reusable package definition
+import { exportAsPackage, savePackage } from "@bassline/core";
+
+const packageDef = exportAsPackage(myCompound.toSpec(), {
+  name: "@myapp/filters",
+  gadgetName: "valueFilter"
+});
+
+await savePackage(packageDef, "./my-filter.json");
+
+// Load it back and use it
+import { loadPackageFromFile } from "@bassline/core";
+
+await loadPackageFromFile("./my-filter.json");
+
+// Now it's available like any built-in gadget
+const filter = bl().fromSpec({
+  pkg: "@myapp/filters",
+  name: "valueFilter",
+  state: { threshold: 100 }
+});
+```
+
+**This closes the loop**: The system can now describe itself as data, load new capabilities from data, and export runtime structures as reusable types.
 
 ## Remember
 
@@ -445,5 +590,3 @@ Both effects and taps are **fire-and-forget** - this isn't a limitation, it's wh
 The prototype-based extension system means **one install, universal behavior**. No wrappers, no providers, no ceremony.
 
 The goal is to do more than anyone else in the world not by having more features, but by having the right primitive that composes infinitely.
-
-**Stats**: ~28 lines for the core protocol, ~513 total runtime LOC including all patterns and React integration.
