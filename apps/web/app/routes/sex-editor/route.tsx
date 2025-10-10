@@ -15,6 +15,7 @@ import { HistoryPanel } from "./components/HistoryPanel";
 import { EffectsPanel } from "./components/EffectsPanel";
 import { Toolbar } from "./components/Toolbar";
 import { SnapshotsPanel } from "./components/SnapshotsPanel";
+import { CanvasView } from "./components/CanvasView";
 
 import type { GadgetSpec, ContextMenuState } from "./types";
 
@@ -71,7 +72,7 @@ export default function SexEditor() {
 
     // UI state (React state for ephemeral UI)
     const [actions, setActions] = useState("[]");
-    const [activeTab, setActiveTab] = useState("actions");
+    const [activeTab, setActiveTab] = useState("canvas");
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
     // History gadget
@@ -430,6 +431,16 @@ export default function SexEditor() {
                 <div className="flex flex-col overflow-hidden">
                     <div className="flex border-b bg-gray-50">
                         <button
+                            onClick={() => setActiveTab("canvas")}
+                            className={`px-4 py-2 text-sm font-medium ${
+                                activeTab === "canvas"
+                                    ? "border-b-2 border-blue-500 text-blue-600"
+                                    : "text-gray-600 hover:text-gray-900"
+                            }`}
+                        >
+                            Canvas
+                        </button>
+                        <button
                             onClick={() => setActiveTab("actions")}
                             className={`px-4 py-2 text-sm font-medium ${
                                 activeTab === "actions"
@@ -472,6 +483,14 @@ export default function SexEditor() {
                     </div>
 
                     <div className="flex-1 overflow-hidden">
+                        {activeTab === "canvas" && (
+                            <CanvasView
+                                workspace={workspace}
+                                rootSex={rootSex}
+                                selectionCell={selectionCell}
+                            />
+                        )}
+
                         {activeTab === "actions" && (
                             <ActionEditor
                                 actions={actions}
@@ -513,7 +532,7 @@ export default function SexEditor() {
                     <h2 className="text-sm font-semibold text-gray-700 p-4 pb-0 uppercase">
                         Inspector
                     </h2>
-                    <Inspector gadget={selected} />
+                    <Inspector gadget={selected} workspace={workspace} />
                 </div>
             </div>
 

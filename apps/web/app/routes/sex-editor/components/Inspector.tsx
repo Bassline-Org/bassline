@@ -24,6 +24,28 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
         if (!gadget) emptyGadget.kill();
     }, [gadget, emptyGadget]);
 
+    // Find all connections to/from this gadget (must be before early return)
+    const connections = useMemo(() => {
+        if (!gadget) return { incoming: [], outgoing: [] };
+
+        const incoming: Array<{ name: string; source: any }> = [];
+        const outgoing: Array<{ name: string; target: any }> = [];
+
+        Object.entries(workspace).forEach(([name, g]) => {
+            if (g.pkg === "@bassline/relations" && g.name === "scopedWire") {
+                const wireState = g.current();
+                if (wireState?.source === gadget) {
+                    outgoing.push({ name, target: wireState.target });
+                }
+                if (wireState?.target === gadget) {
+                    incoming.push({ name, source: wireState.source });
+                }
+            }
+        });
+
+        return { incoming, outgoing };
+    }, [workspace, gadget]);
+
     if (!gadget) {
         return (
             <div className="p-4 text-gray-500 text-sm">
@@ -59,26 +81,6 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
     // Check if this is a wire gadget
     const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
     const wireInfo = isWire ? state : null;
-
-    // Find all connections to/from this gadget
-    const connections = useMemo(() => {
-        const incoming: Array<{ name: string; source: any }> = [];
-        const outgoing: Array<{ name: string; target: any }> = [];
-
-        Object.entries(workspace).forEach(([name, g]) => {
-            if (g.pkg === "@bassline/relations" && g.name === "scopedWire") {
-                const wireState = g.current();
-                if (wireState?.source === gadget) {
-                    outgoing.push({ name, target: wireState.target });
-                }
-                if (wireState?.target === gadget) {
-                    incoming.push({ name, source: wireState.source });
-                }
-            }
-        });
-
-        return { incoming, outgoing };
-    }, [workspace, gadget]);
 
     return (
         <div className="p-4 space-y-4">
