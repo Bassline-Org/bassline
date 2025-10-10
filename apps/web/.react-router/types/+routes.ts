@@ -13,25 +13,7 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/playground": {
-    params: {};
-  };
   "/sex-editor": {
-    params: {};
-  };
-  "/simpleTest": {
-    params: {};
-  };
-  "/canvas-v2": {
-    params: {};
-  };
-  "/builder": {
-    params: {};
-  };
-  "/inspect": {
-    params: {};
-  };
-  "/canvas": {
     params: {};
   };
   "/home": {
@@ -42,35 +24,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/playground" | "/sex-editor" | "/simpleTest" | "/canvas-v2" | "/builder" | "/inspect" | "/canvas" | "/home";
+    page: "/" | "/sex-editor" | "/home";
   };
-  "routes/playground.tsx": {
-    id: "routes/playground";
-    page: "/playground";
-  };
-  "routes/sex-editor.tsx": {
+  "routes/sex-editor/route.tsx": {
     id: "routes/sex-editor";
     page: "/sex-editor";
-  };
-  "routes/simpleTest.tsx": {
-    id: "routes/simpleTest";
-    page: "/simpleTest";
-  };
-  "routes/canvas-v2.tsx": {
-    id: "routes/canvas-v2";
-    page: "/canvas-v2";
-  };
-  "routes/builder.tsx": {
-    id: "routes/builder";
-    page: "/builder";
-  };
-  "routes/inspect.tsx": {
-    id: "routes/inspect";
-    page: "/inspect";
-  };
-  "routes/canvas.tsx": {
-    id: "routes/canvas";
-    page: "/canvas";
   };
   "routes/home.tsx": {
     id: "routes/home";
