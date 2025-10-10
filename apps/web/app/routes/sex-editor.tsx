@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { bl, fromSpec, installPackage } from "@bassline/core";
 import cells from "@bassline/cells";
 import { installSystems } from "@bassline/systems";
@@ -74,14 +74,73 @@ const EXAMPLES = {
 ]`,
 };
 
+function PackageBrowser({ onSpawn }: { onSpawn: (spec: any) => void }) {
+    const { packages } = bl();
+
+    // packages is a scope object with keys like "@bassline/cells/numeric/max"
+    const packageList: Array<{ pkg: string; name: string; proto: any }> = [];
+
+    // Iterate over all properties (excluding __promises and prototype methods)
+    for (const key in packages) {
+        if (key === '__promises' || !packages.hasOwnProperty(key)) continue;
+
+        const proto = packages[key];
+        // key format: "@bassline/cells/numeric/max"
+        const lastSlash = key.lastIndexOf('/');
+        const name = key.substring(lastSlash + 1);
+        const pkg = key.substring(0, lastSlash);
+
+        packageList.push({ pkg, name, proto });
+    }
+
+    return (
+        <div className="space-y-1">
+            <div className="text-xs text-gray-500 uppercase mb-2 px-2">
+                Available Gadgets ({packageList.length})
+            </div>
+            {packageList.length === 0 ? (
+                <div className="text-xs text-gray-500 px-2">
+                    No packages installed
+                </div>
+            ) : (
+                packageList.map(({ pkg, name, proto }) => {
+                    const icon = getIconForPackage(pkg);
+                    return (
+                        <button
+                            key={`${pkg}/${name}`}
+                            onClick={() => onSpawn({ pkg, name, state: proto.defaultState || null })}
+                            className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 flex items-center gap-2 text-sm"
+                        >
+                            <span>{icon}</span>
+                            <span className="font-mono text-xs text-gray-700">{name}</span>
+                        </button>
+                    );
+                })
+            )}
+        </div>
+    );
+}
+
+function getIconForPackage(pkg: string): string {
+    if (pkg.includes("systems")) return "📦";
+    if (pkg.includes("numeric")) return "🔢";
+    if (pkg.includes("tables")) return "📝";
+    if (pkg.includes("set")) return "🎯";
+    if (pkg.includes("relations")) return "🔗";
+    if (pkg.includes("unsafe")) return "⚠️";
+    return "◆";
+}
+
 function ExplorerTree({
     spawned,
     selected,
     onSelect,
+    onContextMenu,
 }: {
     spawned: Record<string, any>;
     selected: any;
     onSelect: (gadget: any) => void;
+    onContextMenu?: (e: React.MouseEvent, name: string, gadget: any) => void;
 }) {
     return (
         <div className="space-y-1">
@@ -92,6 +151,7 @@ function ExplorerTree({
                     gadget={gadget}
                     selected={selected}
                     onSelect={onSelect}
+                    {...(onContextMenu ? { onContextMenu } : {})}
                 />
             ))}
         </div>
@@ -103,11 +163,13 @@ function TreeNode({
     gadget,
     selected,
     onSelect,
+    onContextMenu,
 }: {
     name: string;
     gadget: any;
     selected: any;
     onSelect: (gadget: any) => void;
+    onContextMenu?: (e: React.MouseEvent, name: string, gadget: any) => void;
 }) {
     const state = gadget.useCurrent();
     const isSex = gadget.pkg === "@bassline/systems" && gadget.name === "sex";
@@ -134,6 +196,10 @@ function TreeNode({
         <div>
             <div
                 onClick={() => onSelect(gadget)}
+                onContextMenu={(e) => {
+                    e.preventDefault();
+                    onContextMenu?.(e, name, gadget);
+                }}
                 className={`px-2 py-1 rounded cursor-pointer hover:bg-gray-100 flex items-center gap-2 ${
                     isSelected ? "bg-blue-100" : ""
                 }`}
@@ -159,6 +225,7 @@ function TreeNode({
                         spawned={state}
                         selected={selected}
                         onSelect={onSelect}
+                        {...(onContextMenu ? { onContextMenu } : {})}
                     />
                 </div>
             )}
@@ -189,16 +256,8 @@ function StateInspector({
 }: {
     gadget: any;
 }) {
-    const inputGadget = useMemo(
-        () =>
-            fromSpec({
-                pkg: "@bassline/cells/unsafe",
-                name: "last",
-                state: "",
-            }),
-        [],
-    );
-    const [inputValue, setInputValue] = inputGadget.useState();
+    // Use regular React state for simple UI interactions
+    const [inputValue, setInputValue] = useState("");
 
     // Always call hooks - use null gadget if not provided
     const emptyGadget = useMemo(() =>
@@ -210,9 +269,8 @@ function StateInspector({
     const state = (gadget || emptyGadget).useCurrent();
 
     useEffect(() => () => {
-        inputGadget.kill();
         if (!gadget) emptyGadget.kill();
-    }, [inputGadget, gadget, emptyGadget]);
+    }, [gadget, emptyGadget]);
 
     if (!gadget) {
         return (
@@ -289,6 +347,9 @@ function StateInspector({
 }
 
 export default function SexEditor() {
+    // Prevent double-prompt in React StrictMode
+    const hasLoadedRef = useRef(false);
+
     // Root sex gadget holder - holds reference to the current sex gadget
     const rootSexCell = useMemo(() => {
         const initialSex = fromSpec({
@@ -318,29 +379,9 @@ export default function SexEditor() {
     );
     const [selected, setSelected] = selectionCell.useState();
 
-    // Actions being composed
-    const actionsCell = useMemo(
-        () =>
-            fromSpec({
-                pkg: "@bassline/cells/unsafe",
-                name: "last",
-                state: "[]",
-            }),
-        [],
-    );
-    const [actions, setActions] = actionsCell.useState();
-
-    // Active tab
-    const activeTabCell = useMemo(
-        () =>
-            fromSpec({
-                pkg: "@bassline/cells/unsafe",
-                name: "last",
-                state: "actions",
-            }),
-        [],
-    );
-    const [activeTab, setActiveTab] = activeTabCell.useState();
+    // Use regular React state for simple UI
+    const [actions, setActions] = useState("[]");
+    const [activeTab, setActiveTab] = useState("actions");
 
     // Action history
     const historyCell = useMemo(
@@ -391,6 +432,52 @@ export default function SexEditor() {
         };
     }, [workspace, effectsLogCell]);
 
+    // Auto-save to localStorage (debounced)
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            try {
+                const spec = rootSex.toSpec();
+                localStorage.setItem("bassline-workspace", JSON.stringify(spec));
+            } catch (e) {
+                console.error("Failed to auto-save:", e);
+            }
+        }, 1000); // 1 second debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [workspace, rootSex]);
+
+    // Auto-load from localStorage on mount
+    useEffect(() => {
+        // Prevent double-run in React StrictMode
+        if (hasLoadedRef.current) return;
+        hasLoadedRef.current = true;
+
+        const saved = localStorage.getItem("bassline-workspace");
+        if (saved) {
+            try {
+                const spec = JSON.parse(saved);
+                if (spec.state && Array.isArray(spec.state) && spec.state.length > 0) {
+                    // Use setTimeout to avoid blocking render
+                    setTimeout(() => {
+                        const shouldLoad = confirm(
+                            "Found saved workspace. Load it?\n\n" +
+                            "Click OK to restore, or Cancel to start fresh.",
+                        );
+                        if (shouldLoad) {
+                            rootSex.receive(spec.state);
+                        } else {
+                            // Clear saved workspace if user declines
+                            localStorage.removeItem("bassline-workspace");
+                        }
+                    }, 100);
+                }
+            } catch (e) {
+                console.error("Failed to load saved workspace:", e);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Only run once on mount - rootSex is stable
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -414,15 +501,11 @@ export default function SexEditor() {
     useEffect(() => {
         return () => {
             selectionCell.kill();
-            actionsCell.kill();
-            activeTabCell.kill();
             historyCell.kill();
             effectsLogCell.kill();
         };
     }, [
         selectionCell,
-        actionsCell,
-        activeTabCell,
         historyCell,
         effectsLogCell,
     ]);
@@ -493,9 +576,8 @@ export default function SexEditor() {
                     if (!name) return;
                     rootSex.receive([["spawn", name, spec]]);
                 } else if (mode === "3") {
-                    // Replace current - kill all gadgets first
-                    const current = rootSex.current();
-                    Object.values(current).forEach((g: any) => g.kill?.());
+                    // Replace current - use clear command
+                    rootSex.receive([["clear"]]);
                     rootSex.receive(spec.state);
                 } else {
                     alert("Invalid option. Choose 1, 2, or 3.");
@@ -507,16 +589,138 @@ export default function SexEditor() {
         input.click();
     };
 
+    const handleNewWorkspace = () => {
+        const confirmed = confirm(
+            "Clear current workspace and start fresh?\n\n" +
+            "Current workspace will be lost (unless saved).",
+        );
+        if (confirmed) {
+            rootSex.receive([["clear"]]);
+            localStorage.removeItem("bassline-workspace");
+        }
+    };
+
+    const handleSpawnFromBrowser = (spec: any) => {
+        // Auto-generate name based on gadget type
+        const baseName = spec.name;
+        let counter = 1;
+        let name = baseName;
+        while (workspace[name]) {
+            name = `${baseName}_${counter}`;
+            counter++;
+        }
+
+        // Spawn the gadget
+        rootSex.receive([["spawn", name, spec]]);
+    };
+
+    // Context menu state - use regular React state
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; name: string; gadget: any } | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = () => setContextMenu(null);
+        document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
+    }, []);
+
+    const handleContextMenu = (e: React.MouseEvent, name: string, gadget: any) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, name, gadget });
+    };
+
+    const handleDelete = () => {
+        if (!contextMenu) return;
+        const confirmed = confirm(`Delete gadget "${contextMenu.name}"?`);
+        if (confirmed) {
+            rootSex.receive([["clear", contextMenu.name]]);
+            setContextMenu(null);
+        }
+    };
+
+    const handleRename = () => {
+        if (!contextMenu) return;
+        const newName = prompt(`Rename "${contextMenu.name}" to:`, contextMenu.name);
+        if (newName && newName !== contextMenu.name) {
+            rootSex.receive([["rename", contextMenu.name, newName]]);
+            setContextMenu(null);
+        }
+    };
+
+    const handleDuplicate = () => {
+        if (!contextMenu) return;
+        const spec = contextMenu.gadget.toSpec();
+        const baseName = contextMenu.name;
+        let counter = 1;
+        let name = `${baseName}_copy`;
+        while (workspace[name]) {
+            name = `${baseName}_copy_${counter}`;
+            counter++;
+        }
+        rootSex.receive([["spawn", name, spec]]);
+        setContextMenu(null);
+    };
+
+    const handleExportAsPackage = () => {
+        const pkgName = prompt(
+            "Package name (e.g., @myapp/gadgets):",
+            "@myapp/gadgets",
+        );
+        if (!pkgName) return;
+
+        const gadgetName = prompt(
+            "Gadget name:",
+            "myGadget",
+        );
+        if (!gadgetName) return;
+
+        // Create a snapshot of current workspace
+        rootSex.receive([["snapshot", "export"]]);
+
+        // Build package definition
+        const packageDef = {
+            name: pkgName,
+            gadgets: {
+                [gadgetName]: {
+                    pkg: pkgName,
+                    name: gadgetName,
+                    // The state is the action array from snapshot
+                    defaultState: rootSex.snapshots?.export || [],
+                    // Metadata
+                    meta: {
+                        description: `Exported from sex editor at ${new Date().toISOString()}`,
+                        exports: Object.keys(workspace),
+                    },
+                },
+            },
+        };
+
+        // Download as JSON
+        const json = JSON.stringify(packageDef, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${gadgetName}.package.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     return (
         <div className="h-screen flex flex-col">
             <div className="bg-gray-900 text-white px-4 py-2 flex items-center justify-between">
                 <h1 className="text-lg font-semibold">Sex Editor</h1>
                 <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={handleNewWorkspace}>
+                        New
+                    </Button>
                     <Button size="sm" variant="outline" onClick={handleSave}>
                         Save
                     </Button>
                     <Button size="sm" variant="outline" onClick={handleLoad}>
                         Load
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleExportAsPackage}>
+                        Export Package
                     </Button>
                 </div>
             </div>
@@ -524,15 +728,33 @@ export default function SexEditor() {
             <div className="flex-1 grid grid-cols-[250px_1fr_300px] overflow-hidden">
                 {/* Left: Explorer */}
                 <div className="border-r overflow-y-auto bg-gray-50">
-                    <div className="p-4">
-                        <h2 className="text-sm font-semibold text-gray-700 mb-2 uppercase">
-                            Explorer
-                        </h2>
-                        <ExplorerTree
-                            spawned={workspace}
-                            selected={selected}
-                            onSelect={setSelected}
-                        />
+                    <div className="p-4 space-y-6">
+                        {/* Package Browser */}
+                        <div>
+                            <h2 className="text-sm font-semibold text-gray-700 mb-2 uppercase">
+                                Packages
+                            </h2>
+                            <PackageBrowser onSpawn={handleSpawnFromBrowser} />
+                        </div>
+
+                        {/* Workspace */}
+                        <div>
+                            <h2 className="text-sm font-semibold text-gray-700 mb-2 uppercase">
+                                Workspace ({Object.keys(workspace).length})
+                            </h2>
+                            {Object.keys(workspace).length === 0 ? (
+                                <div className="text-xs text-gray-500 px-2">
+                                    No gadgets spawned yet
+                                </div>
+                            ) : (
+                                <ExplorerTree
+                                    spawned={workspace}
+                                    selected={selected}
+                                    onSelect={setSelected}
+                                    onContextMenu={handleContextMenu}
+                                />
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -738,6 +960,35 @@ export default function SexEditor() {
                     <StateInspector gadget={selected} />
                 </div>
             </div>
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <div
+                    className="fixed bg-white border border-gray-300 rounded shadow-lg py-1 z-50"
+                    style={{ left: contextMenu.x, top: contextMenu.y }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        onClick={handleRename}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+                    >
+                        Rename
+                    </button>
+                    <button
+                        onClick={handleDuplicate}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm"
+                    >
+                        Duplicate
+                    </button>
+                    <hr className="my-1" />
+                    <button
+                        onClick={handleDelete}
+                        className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-600"
+                    >
+                        Delete
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
