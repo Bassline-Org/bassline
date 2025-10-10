@@ -18,7 +18,7 @@ import { WireNode } from "./WireNode";
 
 interface CanvasViewProps {
     workspace: Record<string, any>;
-    rootSex: any;
+    currentSex: any;
     selectionCell: any;
     onNavigateInto: (name: string, gadget: any) => void;
 }
@@ -55,7 +55,7 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
     return { nodes: layoutedNodes, edges };
 }
 
-export function CanvasView({ workspace, rootSex, selectionCell, onNavigateInto }: CanvasViewProps) {
+export function CanvasView({ workspace, currentSex, selectionCell, onNavigateInto }: CanvasViewProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [isInitialized, setIsInitialized] = useState(false);
@@ -206,31 +206,31 @@ export function CanvasView({ workspace, rootSex, selectionCell, onNavigateInto }
             const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
             const wireName = `${connection.source}To${capitalize(connection.target)}`;
             console.log('[Canvas] Creating wire:', { wireName, source: connection.source, target: connection.target });
-            rootSex.receive([
+            currentSex.receive([
                 ["wire", wireName, connection.source, connection.target],
             ]);
         },
-        [rootSex]
+        [currentSex]
     );
 
     // Handle node deletion
     const onNodesDelete = useCallback(
         (deleted: Node[]) => {
             deleted.forEach((node) => {
-                rootSex.receive([["clear", node.id]]);
+                currentSex.receive([["clear", node.id]]);
             });
         },
-        [rootSex]
+        [currentSex]
     );
 
     // Handle edge deletion
     const onEdgesDelete = useCallback(
         (deleted: Edge[]) => {
             deleted.forEach((edge) => {
-                rootSex.receive([["clear", edge.id]]);
+                currentSex.receive([["clear", edge.id]]);
             });
         },
-        [rootSex]
+        [currentSex]
     );
 
     // Handle node selection

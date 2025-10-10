@@ -522,7 +522,7 @@ export default function SexEditor() {
                                 <div className="flex-1">
                                     <CanvasView
                                         workspace={workspace}
-                                        rootSex={rootSex}
+                                        currentSex={currentSex}
                                         selectionCell={selectionCell}
                                         onNavigateInto={handleNavigateInto}
                                     />

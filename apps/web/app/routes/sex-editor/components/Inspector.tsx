@@ -10,6 +10,7 @@ interface InspectorProps {
 export function Inspector({ gadget, workspace }: InspectorProps) {
     // Use regular React state for simple UI interactions
     const [inputValue, setInputValue] = useState("");
+    const [effects, setEffects] = useState<Array<{ timestamp: number; effect: any }>>([]);
 
     // Always call hooks - use null gadget if not provided
     const emptyGadget = useMemo(() =>
@@ -20,8 +21,21 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
         }), []);
     const state = (gadget || emptyGadget).useCurrent();
 
-    useEffect(() => () => {
-        if (!gadget) emptyGadget.kill();
+    // Tap selected gadget to collect effects history
+    useEffect(() => {
+        if (!gadget) {
+            setEffects([]);
+            emptyGadget.kill();
+            return;
+        }
+
+        const cleanup = gadget.tap((effect: any) => {
+            setEffects(prev => [...prev.slice(-4), { timestamp: Date.now(), effect }]);
+        });
+
+        return () => {
+            cleanup();
+        };
     }, [gadget, emptyGadget]);
 
     // Find all connections to/from this gadget (must be before early return)
@@ -167,6 +181,25 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                     {JSON.stringify(state, null, 2)}
                 </pre>
             </div>
+            {effects.length > 0 && (
+                <div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">
+                        Recent Effects ({effects.length})
+                    </div>
+                    <div className="space-y-1 max-h-32 overflow-auto">
+                        {effects.map(({ timestamp, effect }, i) => (
+                            <div key={timestamp + i} className="font-mono text-xs bg-purple-50 p-1.5 rounded">
+                                <div className="text-purple-600 font-semibold">
+                                    {Object.keys(effect).join(", ")}
+                                </div>
+                                <pre className="text-purple-700 text-xs mt-0.5 whitespace-pre-wrap break-all">
+                                    {JSON.stringify(effect, null, 2)}
+                                </pre>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             {!isWire && (
                 <div>
                     <div className="text-xs text-gray-500 uppercase mb-1">
@@ -184,6 +217,50 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                         <Button size="sm" onClick={handleSend}>
                             Send
                         </Button>
+                    </div>
+                    <div className="flex gap-1 mt-2 flex-wrap">
+                        <button
+                            onClick={() => { setInputValue("0"); setTimeout(handleSend, 0); }}
+                            className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                        >
+                            0
+                        </button>
+                        <button
+                            onClick={() => { setInputValue("1"); setTimeout(handleSend, 0); }}
+                            className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                        >
+                            1
+                        </button>
+                        <button
+                            onClick={() => { setInputValue("true"); setTimeout(handleSend, 0); }}
+                            className="px-2 py-0.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded"
+                        >
+                            true
+                        </button>
+                        <button
+                            onClick={() => { setInputValue("false"); setTimeout(handleSend, 0); }}
+                            className="px-2 py-0.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded"
+                        >
+                            false
+                        </button>
+                        <button
+                            onClick={() => { setInputValue("null"); setTimeout(handleSend, 0); }}
+                            className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                        >
+                            null
+                        </button>
+                        <button
+                            onClick={() => { setInputValue("{}"); setTimeout(handleSend, 0); }}
+                            className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                        >
+                            &#123;&#125;
+                        </button>
+                        <button
+                            onClick={() => { setInputValue("[]"); setTimeout(handleSend, 0); }}
+                            className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+                        >
+                            []
+                        </button>
                     </div>
                 </div>
             )}
