@@ -5,6 +5,8 @@ import { BigNumberView } from "./views/BigNumberView";
 import { LineChartView } from "./views/LineChartView";
 import { TableView } from "./views/TableView";
 import { GaugeView } from "./views/GaugeView";
+import { DashboardView } from "./views/DashboardView";
+import { SexTableView } from "./views/SexTableView";
 
 // Map of view names to components
 const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
@@ -12,6 +14,8 @@ const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
     lineChart: LineChartView,
     table: TableView,
     gauge: GaugeView,
+    dashboard: DashboardView,
+    sexTable: SexTableView,
 };
 
 function getIcon(gadget: any): string {
@@ -73,10 +77,11 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
     // Otherwise render default box view
     const icon = getIcon(gadget);
     const preview = getPreview(state);
-    const isSex = gadget.pkg === "@bassline/systems" && gadget.name === "sex";
+    // Check if gadget has stateSpec() - semantic signal for "has internal workspace"
+    const isNavigable = typeof gadget.stateSpec === "function";
 
     const handleDoubleClick = () => {
-        if (isSex && onNavigateInto) {
+        if (isNavigable && onNavigateInto) {
             onNavigateInto(name, gadget);
         }
     };
@@ -87,7 +92,7 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
             className={`bg-white border-2 rounded shadow-md min-w-[180px] ${
                 selected ? "border-blue-500 ring-2 ring-blue-300" : "border-gray-300"
             } ${isFlashing ? styles.flash : ""} ${
-                isSex ? "cursor-pointer hover:border-purple-400 hover:shadow-lg transition-all" : ""
+                isNavigable ? "cursor-pointer hover:border-purple-400 hover:shadow-lg transition-all" : ""
             }`}
         >
             {/* Connection handles */}
@@ -99,7 +104,7 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
                 <div className="flex items-center gap-2">
                     <span className="text-lg">{icon}</span>
                     <span className="font-semibold text-sm truncate">{name}</span>
-                    {isSex && <span className="text-xs text-purple-500">↴</span>}
+                    {isNavigable && <span className="text-xs text-purple-500">↴</span>}
                 </div>
                 <div className="text-xs text-gray-500 font-mono truncate">
                     {gadget.pkg}/{gadget.name}

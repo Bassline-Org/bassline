@@ -26,6 +26,8 @@ import { BigNumberView } from "./components/views/BigNumberView";
 import { LineChartView } from "./components/views/LineChartView";
 import { TableView } from "./components/views/TableView";
 import { GaugeView } from "./components/views/GaugeView";
+import { DashboardView } from "./components/views/DashboardView";
+import { SexTableView } from "./components/views/SexTableView";
 
 import type { ContextMenuState, GadgetSpec } from "./types";
 
@@ -42,6 +44,8 @@ registerView("bigNumber", BigNumberView, { description: "Large KPI display for n
 registerView("lineChart", LineChartView, { description: "Time series line chart" });
 registerView("table", TableView, { description: "Data table for arrays and objects" });
 registerView("gauge", GaugeView, { description: "Circular gauge for numeric values" });
+registerView("dashboard", DashboardView, { description: "Dashboard view for sex gadgets" });
+registerView("sexTable", SexTableView, { description: "Table view for sex gadgets" });
 
 export function meta() {
     return [
@@ -690,8 +694,8 @@ export default function SexEditor() {
     };
 
     const handleNavigateInto = (name: string, gadget: any) => {
-        // Only navigate into sex gadgets
-        if (gadget.pkg === "@bassline/systems" && gadget.name === "sex") {
+        // Only navigate into gadgets with stateSpec (sex or imported sex-like gadgets)
+        if (typeof gadget.stateSpec === "function") {
             const currentStack = navigationStack ||
                 [{ sex: rootSex, name: "root" }];
             navigationStackCell.receive([

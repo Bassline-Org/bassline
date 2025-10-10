@@ -47,7 +47,8 @@ function TreeNode({
     onContextMenu,
 }: TreeNodeProps) {
     const state = gadget.useCurrent();
-    const isSex = gadget.pkg === "@bassline/systems" && gadget.name === "sex";
+    // Check if gadget has stateSpec() - semantic signal for "has internal workspace"
+    const isNavigable = typeof gadget.stateSpec === "function";
     const [isFlashing, setIsFlashing] = useState(false);
 
     // Local gadget for expansion state
@@ -89,7 +90,7 @@ function TreeNode({
                     isSelected ? "bg-blue-100" : ""
                 } ${isFlashing ? styles.flash : ""}`}
             >
-                {isSex && (
+                {isNavigable && (
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -104,7 +105,7 @@ function TreeNode({
                 <span className="font-mono text-sm font-semibold">{name}</span>
                 <span className="text-xs text-gray-500">{preview}</span>
             </div>
-            {isSex && isExpanded && (
+            {isNavigable && isExpanded && (
                 <div className="ml-6 mt-1">
                     <WorkspaceTree
                         spawned={state}
@@ -119,7 +120,8 @@ function TreeNode({
 }
 
 function getIcon(gadget: any): string {
-    if (gadget.pkg === "@bassline/systems") return "📦";
+    // Check for navigable gadgets (sex or any with stateSpec)
+    if (typeof gadget.stateSpec === "function") return "📦";
     if (gadget.pkg === "@bassline/cells/numeric") return "🔢";
     if (gadget.pkg === "@bassline/cells/tables") return "📝";
     if (gadget.pkg === "@bassline/relations") return "🔗";
