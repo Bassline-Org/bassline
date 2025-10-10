@@ -14,6 +14,7 @@ import {
 } from "@xyflow/react";
 import dagre from "@dagrejs/dagre";
 import { GadgetNode } from "./GadgetNode";
+import { WireNode } from "./WireNode";
 
 interface CanvasViewProps {
     workspace: Record<string, any>;
@@ -23,6 +24,7 @@ interface CanvasViewProps {
 
 const nodeTypes: NodeTypes = {
     gadgetNode: GadgetNode,
+    wireNode: WireNode,
 };
 
 // Auto-layout using dagre
@@ -52,14 +54,6 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
     return { nodes: layoutedNodes, edges };
 }
 
-// Helper to find gadget name from gadget reference
-function findGadgetName(workspace: Record<string, any>, gadget: any): string | null {
-    for (const [name, g] of Object.entries(workspace)) {
-        if (g === gadget) return name;
-    }
-    return null;
-}
-
 export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -71,23 +65,25 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
 
         const initialNodes: Node[] = Object.entries(workspace)
             .filter(([name]) => name !== "__layout")
-            .map(([name, gadget]) => ({
-                id: name,
-                type: "gadgetNode",
-                position: { x: 0, y: 0 }, // Will be set by dagre
-                data: { name, gadget },
-            }));
+            .map(([name, gadget]) => {
+                const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
+                return {
+                    id: name,
+                    type: isWire ? "wireNode" : "gadgetNode",
+                    position: { x: 0, y: 0 }, // Will be set by dagre
+                    data: { name, gadget, isWire },
+                };
+            });
 
         const initialEdges: Edge[] = Object.entries(workspace)
             .filter(([_, g]) => g.pkg === "@bassline/relations" && g.name === "scopedWire")
             .map(([name, wireGadget]) => {
                 const state = wireGadget.current();
-                const sourceName = findGadgetName(workspace, state.source);
-                const targetName = findGadgetName(workspace, state.target);
+                // Use stored names instead of ref lookup!
                 return {
                     id: name,
-                    source: sourceName || "",
-                    target: targetName || "",
+                    source: state.sourceName || "",
+                    target: state.targetName || "",
                     type: "smoothstep",
                     animated: true,
                     data: { wireGadget },
@@ -100,7 +96,26 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
             initialEdges
         );
 
-        setNodes(layoutedNodes);
+        // Auto-position wire nodes at edge midpoints
+        const finalNodes = layoutedNodes.map(node => {
+            if (node.data.isWire) {
+                const state = node.data.gadget.current();
+                const sourceNode = layoutedNodes.find(n => n.id === state.sourceName);
+                const targetNode = layoutedNodes.find(n => n.id === state.targetName);
+                if (sourceNode && targetNode) {
+                    return {
+                        ...node,
+                        position: {
+                            x: (sourceNode.position.x + targetNode.position.x) / 2,
+                            y: (sourceNode.position.y + targetNode.position.y) / 2,
+                        }
+                    };
+                }
+            }
+            return node;
+        });
+
+        setNodes(finalNodes);
         setEdges(layoutedEdges);
         setIsInitialized(true);
     }, [workspace, isInitialized, setNodes, setEdges]);
@@ -129,15 +144,19 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
             let updatedNodes = nodes.filter((n) => !removedGadgets.includes(n.id));
 
             // Add new nodes with auto-layout position
-            const newNodes: Node[] = addedGadgets.map((name) => ({
-                id: name,
-                type: "gadgetNode",
-                position: {
-                    x: Math.random() * 400,
-                    y: Math.random() * 400,
-                }, // Random for now
-                data: { name, gadget: workspace[name] },
-            }));
+            const newNodes: Node[] = addedGadgets.map((name) => {
+                const gadget = workspace[name];
+                const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
+                return {
+                    id: name,
+                    type: isWire ? "wireNode" : "gadgetNode",
+                    position: {
+                        x: Math.random() * 400,
+                        y: Math.random() * 400,
+                    }, // Random for now
+                    data: { name, gadget, isWire },
+                };
+            });
 
             updatedNodes = [...updatedNodes, ...newNodes];
             setNodes(updatedNodes);
@@ -148,12 +167,11 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
             .filter(([_, g]) => g.pkg === "@bassline/relations" && g.name === "scopedWire")
             .map(([name, wireGadget]) => {
                 const state = wireGadget.current();
-                const sourceName = findGadgetName(workspace, state.source);
-                const targetName = findGadgetName(workspace, state.target);
+                // Use stored names instead of ref lookup!
                 return {
                     id: name,
-                    source: sourceName || "",
-                    target: targetName || "",
+                    source: state.sourceName || "",
+                    target: state.targetName || "",
                     type: "smoothstep" as const,
                     animated: true,
                     data: { wireGadget },
@@ -176,7 +194,17 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
     // Handle new connections (drag from handle to handle)
     const onConnect = useCallback(
         (connection: Connection) => {
-            const wireName = `wire_${Date.now()}`;
+            console.log('[Canvas] onConnect called:', connection);
+
+            if (!connection.source || !connection.target) {
+                console.error('[Canvas] Invalid connection - missing source or target:', connection);
+                return;
+            }
+
+            // Generate descriptive wire name: sourceTo + Target (camelCase)
+            const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+            const wireName = `${connection.source}To${capitalize(connection.target)}`;
+            console.log('[Canvas] Creating wire:', { wireName, source: connection.source, target: connection.target });
             rootSex.receive([
                 ["wire", wireName, connection.source, connection.target],
             ]);
@@ -224,6 +252,11 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
                 onEdgesDelete={onEdgesDelete}
                 onNodeClick={onNodeClick}
                 nodeTypes={nodeTypes}
+                nodesDraggable={true}
+                nodesConnectable={true}
+                nodesFocusable={true}
+                edgesFocusable={true}
+                elementsSelectable={true}
                 fitView
                 minZoom={0.1}
                 maxZoom={2}

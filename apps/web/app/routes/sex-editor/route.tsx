@@ -105,10 +105,19 @@ export default function SexEditor() {
 
         const tapGadget = (name: string, gadget: any) => {
             const cleanup = gadget.tap((effect: any) => {
-                effectsLogCell.receive([
-                    ...effectsLogCell.current(),
-                    { timestamp: Date.now(), gadgetName: name, effect },
-                ]);
+                // Safety check - effectsLogCell might be killed during cleanup
+                try {
+                    const currentLog = effectsLogCell.current();
+                    if (Array.isArray(currentLog)) {
+                        effectsLogCell.receive([
+                            ...currentLog,
+                            { timestamp: Date.now(), gadgetName: name, effect },
+                        ]);
+                    }
+                } catch (e) {
+                    // Ignore errors during cleanup
+                    console.warn('[EffectsLog] Failed to log effect during cleanup:', e);
+                }
             });
             cleanups.push(cleanup);
         };
@@ -407,23 +416,7 @@ export default function SexEditor() {
                             <PackageBrowser onSpawn={handleSpawnFromBrowser} />
                         </div>
 
-                        <div>
-                            <h2 className="text-sm font-semibold text-gray-700 mb-2 uppercase">
-                                Workspace ({Object.keys(workspace).length})
-                            </h2>
-                            {Object.keys(workspace).length === 0 ? (
-                                <div className="text-xs text-gray-500 px-2">
-                                    No gadgets spawned yet
-                                </div>
-                            ) : (
-                                <WorkspaceTree
-                                    spawned={workspace}
-                                    selected={selected}
-                                    onSelect={setSelected}
-                                    onContextMenu={handleContextMenu}
-                                />
-                            )}
-                        </div>
+                        {/* Workspace tree removed - canvas is the primary workspace view */}
                     </div>
                 </div>
 

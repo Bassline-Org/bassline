@@ -151,12 +151,18 @@ Object.assign(sex, {
     },
 
     stateSpec() {
-        // Convert current spawned gadgets back to spawn actions
+        // Convert current spawned gadgets back to spawn/wire actions
         const spawned = this.current();
         const actions = [];
 
         for (const [name, gadget] of Object.entries(spawned)) {
-            actions.push(["spawn", name, gadget.toSpec()]);
+            // Wire gadgets become wire commands (not spawn)
+            if (gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire") {
+                const state = gadget.current();
+                actions.push(["wire", name, state.sourceName, state.targetName]);
+            } else {
+                actions.push(["spawn", name, gadget.toSpec()]);
+            }
         }
 
         return actions;
@@ -319,6 +325,8 @@ Object.assign(sex, {
      * @param {string} targetName - Target gadget name
      */
     async wire(env, wireName, sourceName, targetName) {
+        console.log('[sex.wire] Creating wire:', { wireName, sourceName, targetName, spawned: Object.keys(env.spawned) });
+
         // Check if wire name already exists
         if (env.spawned[wireName]) {
             this.emit({
@@ -357,14 +365,20 @@ Object.assign(sex, {
             return;
         }
 
-        // Spawn the wire gadget
+        // Spawn the wire gadget with both refs (runtime) and names (serialization)
         const wireGadget = await fromSpec({
             pkg: "@bassline/relations",
             name: "scopedWire",
-            state: { source, target },
+            state: {
+                source,      // Gadget ref for runtime tapping
+                target,      // Gadget ref for runtime tapping
+                sourceName,  // Name for serialization/canvas
+                targetName   // Name for serialization/canvas
+            },
         });
 
         env.spawned[wireName] = wireGadget;
+        console.log('[sex.wire] Wire created successfully:', { wireName, wireState: wireGadget.current() });
         this.emit({ wired: { wireName, sourceName, targetName } });
         return { wireName, sourceName, targetName };
     },
