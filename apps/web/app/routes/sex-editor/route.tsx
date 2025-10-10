@@ -14,6 +14,7 @@ import { ActionEditor } from "./components/ActionEditor";
 import { HistoryPanel } from "./components/HistoryPanel";
 import { EffectsPanel } from "./components/EffectsPanel";
 import { Toolbar } from "./components/Toolbar";
+import { SnapshotsPanel } from "./components/SnapshotsPanel";
 
 import type { GadgetSpec, ContextMenuState } from "./types";
 
@@ -166,13 +167,25 @@ export default function SexEditor() {
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Cmd/Ctrl + Enter = Execute
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
                 handleExecute();
             }
+            // Cmd/Ctrl + S = Save
             if ((e.metaKey || e.ctrlKey) && e.key === "s") {
                 e.preventDefault();
                 handleSave();
+            }
+            // Cmd/Ctrl + Shift + S = Snapshot
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "S") {
+                e.preventDefault();
+                handleSnapshot();
+            }
+            // Cmd/Ctrl + Shift + R = Show snapshots
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "R") {
+                e.preventDefault();
+                setActiveTab("snapshots");
             }
         };
 
@@ -363,6 +376,14 @@ export default function SexEditor() {
         URL.revokeObjectURL(url);
     };
 
+    const handleSnapshot = () => {
+        const label = prompt("Snapshot label:", `snap-${Date.now()}`);
+        if (label) {
+            rootSex.receive([["snapshot", label]]);
+            setActiveTab("snapshots"); // Switch to snapshots tab
+        }
+    };
+
     return (
         <div className="h-screen flex flex-col">
             <Toolbar
@@ -370,6 +391,7 @@ export default function SexEditor() {
                 onSave={handleSave}
                 onLoad={handleLoad}
                 onExport={handleExportAsPackage}
+                onSnapshot={handleSnapshot}
             />
 
             <div className="flex-1 grid grid-cols-[250px_1fr_300px] overflow-hidden">
@@ -436,6 +458,16 @@ export default function SexEditor() {
                         >
                             Effects ({effectsLog?.length ?? 0})
                         </button>
+                        <button
+                            onClick={() => setActiveTab("snapshots")}
+                            className={`px-4 py-2 text-sm font-medium ${
+                                activeTab === "snapshots"
+                                    ? "border-b-2 border-blue-500 text-blue-600"
+                                    : "text-gray-600 hover:text-gray-900"
+                            }`}
+                        >
+                            Snapshots ({Object.keys(rootSex.snapshots || {}).length})
+                        </button>
                     </div>
 
                     <div className="flex-1 overflow-hidden">
@@ -459,6 +491,17 @@ export default function SexEditor() {
                             <EffectsPanel
                                 effectsLog={effectsLog}
                                 onClear={() => effectsLogCell.receive([])}
+                            />
+                        )}
+
+                        {activeTab === "snapshots" && (
+                            <SnapshotsPanel
+                                snapshots={rootSex.snapshots || {}}
+                                onRestore={(label) => rootSex.receive([["restore", label]])}
+                                onDelete={(label) => {
+                                    delete rootSex.snapshots[label];
+                                    rootSex.emit({ snapshotDeleted: label });
+                                }}
                             />
                         )}
                     </div>
