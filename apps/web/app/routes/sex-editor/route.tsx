@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bl, fromSpec, installPackage } from "@bassline/core";
 import cells from "@bassline/cells";
 import { installSystems } from "@bassline/systems";
@@ -164,6 +164,40 @@ export default function SexEditor() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Handlers (must be defined before useEffect that uses them)
+    const handleExecute = useCallback(() => {
+        try {
+            const parsed = JSON.parse(actions);
+            rootSex.receive(parsed);
+            historyCell.receive([
+                ...(history || []),
+                { timestamp: Date.now(), actions: parsed },
+            ]);
+        } catch (e) {
+            alert(`Invalid JSON: ${e}`);
+        }
+    }, [actions, rootSex, historyCell, history]);
+
+    const handleSave = useCallback(() => {
+        const spec = rootSex.toSpec();
+        const json = JSON.stringify(spec, null, 2);
+        const blob = new Blob([json], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "workspace.json";
+        a.click();
+        URL.revokeObjectURL(url);
+    }, [rootSex]);
+
+    const handleSnapshot = useCallback(() => {
+        const label = prompt("Snapshot label:", `snap-${Date.now()}`);
+        if (label) {
+            rootSex.receive([["snapshot", label]]);
+            setActiveTab("snapshots"); // Switch to snapshots tab
+        }
+    }, [rootSex]);
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -191,7 +225,7 @@ export default function SexEditor() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [actions, rootSex]);
+    }, [handleExecute, handleSave, handleSnapshot]);
 
     // Context menu close on click
     useEffect(() => {
@@ -209,32 +243,7 @@ export default function SexEditor() {
         };
     }, [selectionCell, historyCell, effectsLogCell]);
 
-    // Handlers
-    const handleExecute = () => {
-        try {
-            const parsed = JSON.parse(actions);
-            rootSex.receive(parsed);
-            historyCell.receive([
-                ...(history || []),
-                { timestamp: Date.now(), actions: parsed },
-            ]);
-        } catch (e) {
-            alert(`Invalid JSON: ${e}`);
-        }
-    };
-
-    const handleSave = () => {
-        const spec = rootSex.toSpec();
-        const json = JSON.stringify(spec, null, 2);
-        const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "workspace.json";
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
+    // Other handlers (non-useCallback)
     const handleLoad = () => {
         const input = document.createElement("input");
         input.type = "file";
@@ -374,14 +383,6 @@ export default function SexEditor() {
         a.download = `${gadgetName}.package.json`;
         a.click();
         URL.revokeObjectURL(url);
-    };
-
-    const handleSnapshot = () => {
-        const label = prompt("Snapshot label:", `snap-${Date.now()}`);
-        if (label) {
-            rootSex.receive([["snapshot", label]]);
-            setActiveTab("snapshots"); // Switch to snapshots tab
-        }
     };
 
     return (

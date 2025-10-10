@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fromSpec } from "@bassline/core";
+import styles from "./WorkspaceTree.module.css";
 
 interface WorkspaceTreeProps {
     spawned: Record<string, any>;
@@ -47,6 +48,7 @@ function TreeNode({
 }: TreeNodeProps) {
     const state = gadget.useCurrent();
     const isSex = gadget.pkg === "@bassline/systems" && gadget.name === "sex";
+    const [isFlashing, setIsFlashing] = useState(false);
 
     // Local gadget for expansion state
     const expanded = useMemo(
@@ -62,6 +64,15 @@ function TreeNode({
 
     useEffect(() => () => expanded.kill(), [expanded]);
 
+    // Flash animation on receive
+    useEffect(() => {
+        const cleanup = gadget.tap(() => {
+            setIsFlashing(true);
+            setTimeout(() => setIsFlashing(false), 300);
+        });
+        return cleanup;
+    }, [gadget]);
+
     const isSelected = selected === gadget;
     const icon = getIcon(gadget);
     const preview = getPreview(state);
@@ -76,7 +87,7 @@ function TreeNode({
                 }}
                 className={`px-2 py-1 rounded cursor-pointer hover:bg-gray-100 flex items-center gap-2 ${
                     isSelected ? "bg-blue-100" : ""
-                }`}
+                } ${isFlashing ? styles.flash : ""}`}
             >
                 {isSex && (
                     <button

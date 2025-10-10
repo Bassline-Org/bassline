@@ -4,9 +4,10 @@ import { Button } from "~/components/ui/button";
 
 interface InspectorProps {
     gadget: any;
+    workspace: Record<string, any>;
 }
 
-export function Inspector({ gadget }: InspectorProps) {
+export function Inspector({ gadget, workspace }: InspectorProps) {
     // Use regular React state for simple UI interactions
     const [inputValue, setInputValue] = useState("");
 
@@ -59,6 +60,26 @@ export function Inspector({ gadget }: InspectorProps) {
     const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
     const wireInfo = isWire ? state : null;
 
+    // Find all connections to/from this gadget
+    const connections = useMemo(() => {
+        const incoming: Array<{ name: string; source: any }> = [];
+        const outgoing: Array<{ name: string; target: any }> = [];
+
+        Object.entries(workspace).forEach(([name, g]) => {
+            if (g.pkg === "@bassline/relations" && g.name === "scopedWire") {
+                const wireState = g.current();
+                if (wireState?.source === gadget) {
+                    outgoing.push({ name, target: wireState.target });
+                }
+                if (wireState?.target === gadget) {
+                    incoming.push({ name, source: wireState.source });
+                }
+            }
+        });
+
+        return { incoming, outgoing };
+    }, [workspace, gadget]);
+
     return (
         <div className="p-4 space-y-4">
             <div>
@@ -78,6 +99,61 @@ export function Inspector({ gadget }: InspectorProps) {
                     </div>
                     <div className="font-mono text-xs bg-blue-50 text-blue-700 p-2 rounded">
                         {wireInfo.source?.pkg}/{wireInfo.source?.name} → {wireInfo.target?.pkg}/{wireInfo.target?.name}
+                    </div>
+                </div>
+            )}
+            {!isWire && (connections.incoming.length > 0 || connections.outgoing.length > 0) && (
+                <div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">
+                        Connections
+                    </div>
+                    <div className="space-y-2">
+                        {connections.incoming.length > 0 && (
+                            <div>
+                                <div className="text-xs font-semibold text-gray-600 mb-1">
+                                    ← Incoming ({connections.incoming.length})
+                                </div>
+                                <div className="space-y-1">
+                                    {connections.incoming.map(({ name, source }) => {
+                                        // Find workspace name for source
+                                        const sourceName = Object.entries(workspace).find(
+                                            ([, g]) => g === source
+                                        )?.[0];
+                                        return (
+                                            <div
+                                                key={name}
+                                                className="font-mono text-xs bg-green-50 text-green-700 p-1.5 rounded"
+                                            >
+                                                {sourceName || "unknown"} → this
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        {connections.outgoing.length > 0 && (
+                            <div>
+                                <div className="text-xs font-semibold text-gray-600 mb-1">
+                                    → Outgoing ({connections.outgoing.length})
+                                </div>
+                                <div className="space-y-1">
+                                    {connections.outgoing.map(({ name, target }) => {
+                                        // Find workspace name for target
+                                        const targetName = Object.entries(workspace).find(
+                                            ([, g]) => g === target
+                                        )?.[0];
+                                        return (
+                                            <div
+                                                key={name}
+                                                className="font-mono text-xs bg-blue-50 text-blue-700 p-1.5 rounded"
+                                            >
+                                                this → {targetName || "unknown"}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -7,6 +7,14 @@ interface EffectsPanelProps {
 }
 
 export function EffectsPanel({ effectsLog, onClear }: EffectsPanelProps) {
+    const formatEffectValue = (value: any): string => {
+        if (value === null || value === undefined) return String(value);
+        if (typeof value === "object") {
+            return JSON.stringify(value, null, 0).slice(0, 50);
+        }
+        return String(value).slice(0, 50);
+    };
+
     return (
         <div className="h-full overflow-y-auto p-4">
             <div className="flex justify-between items-center mb-2">
@@ -22,28 +30,35 @@ export function EffectsPanel({ effectsLog, onClear }: EffectsPanelProps) {
                     No effects emitted yet
                 </div>
             ) : (
-                <div className="space-y-1">
+                <div className="space-y-2">
                     {[...effectsLog].reverse().map((entry, idx) => {
                         const time = new Date(
                             entry.timestamp,
                         ).toLocaleTimeString();
-                        const effectKeys = Object.keys(entry.effect).join(
-                            ", ",
-                        );
+
                         return (
                             <div
                                 key={idx}
-                                className="text-xs font-mono border-b pb-1"
+                                className="text-xs font-mono border rounded p-2 bg-gray-50"
                             >
-                                <span className="text-gray-500">{time}</span>
-                                {" - "}
-                                <span className="font-semibold text-blue-600">
-                                    {entry.gadgetName}
-                                </span>
-                                {" → "}
-                                <span className="text-green-600">
-                                    {effectKeys}
-                                </span>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-gray-400">{time}</span>
+                                    <span className="font-semibold text-blue-600">
+                                        {entry.gadgetName}
+                                    </span>
+                                </div>
+                                <div className="pl-2 space-y-0.5">
+                                    {Object.entries(entry.effect).map(([key, value]) => (
+                                        <div key={key} className="flex gap-2">
+                                            <span className="text-green-600 font-medium">
+                                                {key}:
+                                            </span>
+                                            <span className="text-gray-600">
+                                                {formatEffectValue(value)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         );
                     })}
