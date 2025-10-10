@@ -28,9 +28,10 @@ This is now the **primary development interface** for Bassline. Think: Figma mee
 The editor uses **React Flow** (@xyflow/react) for the canvas and is split into components:
 
 **route.tsx** - Main orchestrator
-- Manages `rootSex` (top-level workspace)
-- Tracks `navigationStack` (path through nested sex workspaces)
-- Calculates `currentSex` (active workspace being edited)
+- Manages multiple workspace tabs (array of `{ id, name, sexCell }`)
+- Tracks active workspace via `activeWorkspaceId`
+- Each tab has independent `rootSex`, `navigationStack`, and `undoStack`
+- Provides tab management (`handleNewTab`, `handleCloseTab`, `handleRenameTab`)
 - Provides navigation handlers (`handleNavigateInto`, `handleNavigateToLevel`)
 
 **CanvasView.tsx** - Graph editor
@@ -89,6 +90,50 @@ handleNavigateToLevel(index) {
 ```
 
 **Why this matters**: All canvas operations (spawn, delete, wire) must use `currentSex`, not `rootSex`. Using rootSex breaks operations in nested workspaces.
+
+### Multi-Workspace Tabs
+
+**Feature**: Multiple independent workspaces in browser-style tabs. Each tab has its own:
+- Independent sex gadget (action array)
+- Separate navigation stack (for nested workspaces)
+- Independent undo/redo history
+- Customizable name (editable)
+
+**Architecture**:
+```typescript
+interface Workspace {
+    id: string;           // Unique ID (e.g., "workspace-1234567890")
+    name: string;         // User-visible name (e.g., "My Pattern")
+    sexCell: any;         // Gadget wrapping the sex instance
+}
+
+const [workspaces, setWorkspaces] = useState<Workspace[]>([...]);
+const [activeWorkspaceId, setActiveWorkspaceId] = useState('default');
+```
+
+**Persistence**: All workspaces auto-save to `localStorage.bassline-workspaces`:
+```json
+{
+  "workspaces": [
+    { "id": "default", "name": "Workspace 1", "spec": {...} },
+    { "id": "workspace-123", "name": "Pattern Library", "spec": {...} }
+  ],
+  "activeWorkspaceId": "default"
+}
+```
+
+**Tab Bar UI**: Browser-style tabs with:
+- Click tab to switch
+- Edit icon (✏️) to rename
+- Close icon (✕) to delete
+- Keyboard shortcut hints (⌘1, ⌘2, etc.)
+- "+ New" button to create tabs
+
+**Use Cases**:
+- **Pattern Library**: One tab for reusable patterns, another for current project
+- **Multiple Projects**: Work on different gadget networks simultaneously
+- **Experiments**: Try variations without losing original
+- **Teaching**: Prepare examples in separate tabs
 
 ### Wire Serialization Pattern
 
@@ -197,6 +242,9 @@ if (actions.length > 0) {
 This pattern is **essential** for multi-selection operations (delete, duplicate, copy/paste).
 
 ### Keyboard Shortcuts (Current)
+- **Cmd+T** - New workspace tab
+- **Cmd+W** - Close current workspace tab
+- **Cmd+1-9** - Switch to workspace tab 1-9
 - **Cmd+K** - Command Palette (spawn gadgets via fuzzy search)
 - **Cmd+Z** - Undo (rollback to previous state)
 - **Cmd+Shift+Z** - Redo (redo forward)

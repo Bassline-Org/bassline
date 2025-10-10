@@ -44,21 +44,85 @@ export default function SexEditor() {
     const hasLoadedRef = useRef(false);
     const canvasRef = useRef<CanvasViewHandle>(null);
 
-    // Root sex gadget
-    const rootSexCell = useMemo(() => {
+    // Multi-workspace tabs
+    interface Workspace {
+        id: string;
+        name: string;
+        sexCell: any;
+    }
+
+    const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
         const initialSex = fromSpec({
             pkg: "@bassline/systems",
             name: "sex",
             state: [],
         });
-        return fromSpec({
+        const sexCell = fromSpec({
             pkg: "@bassline/cells/unsafe",
             name: "last",
             state: initialSex,
         });
-    }, []);
+        return [{
+            id: 'default',
+            name: 'Workspace 1',
+            sexCell
+        }];
+    });
 
-    const [rootSex] = rootSexCell.useState();
+    const [activeWorkspaceId, setActiveWorkspaceId] = useState('default');
+    const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId)!;
+    const [rootSex] = activeWorkspace.sexCell.useState();
+
+    // Tab management handlers
+    const handleNewTab = useCallback(() => {
+        const id = `workspace-${Date.now()}`;
+        const initialSex = fromSpec({
+            pkg: "@bassline/systems",
+            name: "sex",
+            state: [],
+        });
+        const sexCell = fromSpec({
+            pkg: "@bassline/cells/unsafe",
+            name: "last",
+            state: initialSex,
+        });
+        const newWorkspace: Workspace = {
+            id,
+            name: `Workspace ${workspaces.length + 1}`,
+            sexCell
+        };
+        setWorkspaces([...workspaces, newWorkspace]);
+        setActiveWorkspaceId(id);
+    }, [workspaces]);
+
+    const handleCloseTab = useCallback((tabId: string) => {
+        if (workspaces.length === 1) {
+            alert("Cannot close the last workspace");
+            return;
+        }
+        const confirmed = confirm("Close this workspace? Unsaved changes will be lost.");
+        if (!confirmed) return;
+
+        const newWorkspaces = workspaces.filter(w => w.id !== tabId);
+        setWorkspaces(newWorkspaces);
+
+        // Switch to another tab if closing active tab
+        if (tabId === activeWorkspaceId) {
+            setActiveWorkspaceId(newWorkspaces[0]!.id);
+        }
+    }, [workspaces, activeWorkspaceId]);
+
+    const handleRenameTab = useCallback((tabId: string) => {
+        const workspace = workspaces.find(w => w.id === tabId);
+        if (!workspace) return;
+
+        const newName = prompt("Rename workspace:", workspace.name);
+        if (!newName || newName === workspace.name) return;
+
+        setWorkspaces(workspaces.map(w =>
+            w.id === tabId ? { ...w, name: newName } : w
+        ));
+    }, [workspaces]);
 
     // Navigation stack - track path through nested workspaces
     const navigationStackCell = useMemo(
@@ -207,14 +271,21 @@ export default function SexEditor() {
         return () => clearTimeout(timeoutId);
     }, [workspace, currentSex, undoStack, undoIndex, undoStackCell]);
 
-    // Auto-save to localStorage
+    // Auto-save workspaces to localStorage
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             try {
-                const spec = rootSex.toSpec();
+                const workspacesData = workspaces.map(ws => ({
+                    id: ws.id,
+                    name: ws.name,
+                    spec: ws.sexCell.current().toSpec(),
+                }));
                 localStorage.setItem(
-                    "bassline-workspace",
-                    JSON.stringify(spec),
+                    "bassline-workspaces",
+                    JSON.stringify({
+                        workspaces: workspacesData,
+                        activeWorkspaceId,
+                    }),
                 );
             } catch (e) {
                 console.error("Failed to auto-save:", e);
@@ -222,35 +293,46 @@ export default function SexEditor() {
         }, 1000);
 
         return () => clearTimeout(timeoutId);
-    }, [workspace, rootSex]);
+    }, [workspaces, activeWorkspaceId]);
 
     // Auto-load from localStorage on mount
     useEffect(() => {
         if (hasLoadedRef.current) return;
         hasLoadedRef.current = true;
 
-        const saved = localStorage.getItem("bassline-workspace");
+        const saved = localStorage.getItem("bassline-workspaces");
         if (saved) {
             try {
-                const spec = JSON.parse(saved);
-                if (
-                    spec.state && Array.isArray(spec.state) &&
-                    spec.state.length > 0
-                ) {
+                const data = JSON.parse(saved);
+                if (data.workspaces && data.workspaces.length > 0) {
                     setTimeout(() => {
                         const shouldLoad = confirm(
-                            "Found saved workspace. Load it?\n\n" +
+                            "Found saved workspaces. Load them?\n\n" +
                                 "Click OK to restore, or Cancel to start fresh.",
                         );
                         if (shouldLoad) {
-                            rootSex.receive(spec.state);
+                            const restoredWorkspaces = data.workspaces.map((wsData: any) => {
+                                const sex = fromSpec(wsData.spec);
+                                const sexCell = fromSpec({
+                                    pkg: "@bassline/cells/unsafe",
+                                    name: "last",
+                                    state: sex,
+                                });
+                                return {
+                                    id: wsData.id,
+                                    name: wsData.name,
+                                    sexCell,
+                                };
+                            });
+                            setWorkspaces(restoredWorkspaces);
+                            setActiveWorkspaceId(data.activeWorkspaceId || restoredWorkspaces[0].id);
                         } else {
-                            localStorage.removeItem("bassline-workspace");
+                            localStorage.removeItem("bassline-workspaces");
                         }
                     }, 100);
                 }
             } catch (e) {
-                console.error("Failed to load saved workspace:", e);
+                console.error("Failed to load saved workspaces:", e);
             }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -366,8 +448,26 @@ export default function SexEditor() {
                 return;
             }
 
+            // Cmd/Ctrl + T = New Tab
+            if ((e.metaKey || e.ctrlKey) && e.key === "t") {
+                e.preventDefault();
+                handleNewTab();
+            }
+            // Cmd/Ctrl + W = Close Tab
+            else if ((e.metaKey || e.ctrlKey) && e.key === "w") {
+                e.preventDefault();
+                handleCloseTab(activeWorkspaceId);
+            }
+            // Cmd/Ctrl + 1-9 = Switch to tab
+            else if ((e.metaKey || e.ctrlKey) && e.key >= "1" && e.key <= "9") {
+                e.preventDefault();
+                const index = parseInt(e.key) - 1;
+                if (index < workspaces.length) {
+                    setActiveWorkspaceId(workspaces[index]!.id);
+                }
+            }
             // Cmd/Ctrl + Z = Undo
-            if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "z") {
+            else if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "z") {
                 e.preventDefault();
                 handleUndo();
             } // Cmd/Ctrl + Shift + Z = Redo
@@ -451,9 +551,13 @@ export default function SexEditor() {
         handleRedo,
         handleCopy,
         handlePaste,
+        handleNewTab,
+        handleCloseTab,
         workspace,
         currentSex,
         canvasRef,
+        workspaces,
+        activeWorkspaceId,
     ]);
 
     // Context menu close on click
@@ -536,7 +640,7 @@ export default function SexEditor() {
         );
         if (confirmed) {
             rootSex.receive([["clear"]]);
-            localStorage.removeItem("bassline-workspace");
+            localStorage.removeItem("bassline-workspaces");
         }
     };
 
@@ -676,6 +780,59 @@ export default function SexEditor() {
                 onExport={handleExportAsPackage}
                 onSnapshot={handleSnapshot}
             />
+
+            {/* Workspace Tabs */}
+            <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 border-b overflow-x-auto">
+                {workspaces.map((ws, index) => (
+                    <div
+                        key={ws.id}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-t text-sm ${
+                            ws.id === activeWorkspaceId
+                                ? "bg-white border-t border-x text-gray-900 font-medium"
+                                : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                        }`}
+                    >
+                        <button
+                            onClick={() => setActiveWorkspaceId(ws.id)}
+                            className="flex-1"
+                        >
+                            {ws.name}
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleRenameTab(ws.id);
+                            }}
+                            className="text-xs text-gray-500 hover:text-gray-700 px-1"
+                            title="Rename workspace"
+                        >
+                            ✏️
+                        </button>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleCloseTab(ws.id);
+                            }}
+                            className="text-xs text-gray-500 hover:text-red-600 px-1"
+                            title="Close workspace"
+                        >
+                            ✕
+                        </button>
+                        {index < 9 && (
+                            <span className="text-xs text-gray-400 ml-1">
+                                ⌘{index + 1}
+                            </span>
+                        )}
+                    </div>
+                ))}
+                <button
+                    onClick={handleNewTab}
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded"
+                    title="New workspace (⌘T)"
+                >
+                    + New
+                </button>
+            </div>
 
             <div
                 className={`flex-1 grid overflow-hidden ${
