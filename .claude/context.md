@@ -140,8 +140,74 @@ step(state = {}, input) {
 
 **Why**: `update()` bypasses `receive()` → `validate()` → `step()`, so tap setup never happens.
 
+### Batch Action Pattern (Sex Operations)
+
+**CRITICAL**: Always batch multiple actions into a single `receive()` call, not individual calls:
+
+```javascript
+// ❌ WRONG - Multiple receive() calls
+items.forEach(item => {
+    sex.receive([["action", item]]);
+});
+
+// ✅ CORRECT - Single receive() with action array
+const actions = items.map(item => ["action", item]);
+sex.receive(actions);
+```
+
+**Why this matters**:
+- **Atomicity**: All actions succeed/fail together as one transaction
+- **Undo**: Single undo undoes entire batch (not one-by-one)
+- **Performance**: One re-render instead of many
+- **Sex design**: Action arrays are the fundamental primitive
+
+**Examples in Sex Editor**:
+
+```javascript
+// Delete multiple nodes (CanvasView.tsx)
+const onNodesDelete = useCallback(
+    (deleted: Node[]) => {
+        const actions = deleted.map((node) => ["clear", node.id]);
+        currentSex.receive(actions);  // Batch delete
+    },
+    [currentSex]
+);
+
+// Duplicate multiple selections (route.tsx)
+const actions: any[] = [];
+selectedNodes.forEach((node) => {
+    // ... generate unique name ...
+    actions.push(["spawn", name, spec]);
+});
+if (actions.length > 0) {
+    currentSex.receive(actions);  // Batch spawn
+}
+
+// Paste multiple gadgets (route.tsx)
+const actions: any[] = [];
+specsArray.forEach((spec) => {
+    // ... generate unique name ...
+    actions.push(["spawn", name, spec]);
+});
+if (actions.length > 0) {
+    currentSex.receive(actions);  // Batch spawn
+}
+```
+
+This pattern is **essential** for multi-selection operations (delete, duplicate, copy/paste).
+
 ### Keyboard Shortcuts (Current)
+- **Cmd+K** - Command Palette (spawn gadgets via fuzzy search)
+- **Cmd+Z** - Undo (rollback to previous state)
+- **Cmd+Shift+Z** - Redo (redo forward)
+- **Cmd+C** - Copy selected nodes to clipboard
+- **Cmd+V** - Paste gadgets from clipboard
+- **Cmd+D** - Duplicate selected nodes
+- **Cmd+L** - Auto-layout with dagre
+- **Cmd+/** - Toggle inspector panel
+- **Cmd+S** - Save workspace to file
 - **Delete** - Delete selected nodes/edges
+- **Escape** - Deselect all / close modals / blur inputs
 - **Double-click** - Navigate into sex nodes
 - **Drag** - Pan canvas
 - **Scroll** - Zoom
@@ -498,7 +564,7 @@ Complete observability - see every effect in real-time.
 ✅ Canvas-based visual editor with React Flow
 ✅ Nested workspace navigation (double-click sex nodes)
 ✅ Breadcrumb navigation (click to go back)
-✅ Auto-layout with dagre algorithm
+✅ Auto-layout with dagre algorithm (Cmd+L)
 ✅ Drag-and-drop gadget spawning
 ✅ Visual wire creation (connect nodes)
 ✅ Inspector with quick send and effects history
@@ -506,8 +572,13 @@ Complete observability - see every effect in real-time.
 ✅ Wire serialization (refs + names pattern)
 ✅ ScopedWire afterSpawn pattern (receive not update)
 ✅ currentSex vs rootSex pattern (operations target correct level)
+✅ **Command Palette** (Cmd+K) - Fuzzy search all gadgets
+✅ **Undo/Redo** (Cmd+Z/Cmd+Shift+Z) - Time-travel through changes
+✅ **Copy/Paste** (Cmd+C/Cmd+V) - Build gadget libraries
+✅ **Batch Actions** - Multi-select delete/duplicate/paste
+✅ **Keyboard-First Workflow** - Rarely need mouse!
 
-**The system is visual and intuitive** - use the canvas to build Bassline!
+**The system is visual, intuitive, and FAST** - use the canvas to build Bassline!
 
 ## How to Use the Sex Editor
 

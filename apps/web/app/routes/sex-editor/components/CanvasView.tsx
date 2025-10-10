@@ -243,9 +243,8 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
     // Handle node deletion
     const onNodesDelete = useCallback(
         (deleted: Node[]) => {
-            deleted.forEach((node) => {
-                currentSex.receive([["clear", node.id]]);
-            });
+            const actions = deleted.map((node) => ["clear", node.id]);
+            currentSex.receive(actions);
         },
         [currentSex]
     );
@@ -253,9 +252,8 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
     // Handle edge deletion
     const onEdgesDelete = useCallback(
         (deleted: Edge[]) => {
-            deleted.forEach((edge) => {
-                currentSex.receive([["clear", edge.id]]);
-            });
+            const actions = deleted.map((edge) => ["clear", edge.id]);
+            currentSex.receive(actions);
         },
         [currentSex]
     );

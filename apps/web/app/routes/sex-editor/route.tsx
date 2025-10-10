@@ -19,7 +19,7 @@ import { CanvasView, type CanvasViewHandle } from "./components/CanvasView";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { CommandPalette } from "./components/CommandPalette";
 
-import type { GadgetSpec, ContextMenuState } from "./types";
+import type { ContextMenuState, GadgetSpec } from "./types";
 
 // Install packages
 bl();
@@ -73,7 +73,8 @@ export default function SexEditor() {
     const [navigationStack] = navigationStackCell.useState();
 
     // Current workspace is the last item in navigation stack
-    const currentFrame = navigationStack?.[navigationStack.length - 1] || { sex: rootSex, name: "root" };
+    const currentFrame = navigationStack?.[navigationStack.length - 1] ||
+        { sex: rootSex, name: "root" };
     const currentSex = currentFrame.sex;
     const workspace = currentSex.useCurrent();
 
@@ -92,7 +93,9 @@ export default function SexEditor() {
     // UI state (React state for ephemeral UI)
     const [actions, setActions] = useState("[]");
     const [activeTab, setActiveTab] = useState("canvas");
-    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(
+        null,
+    );
     const [isPaletteOpen, setIsPaletteOpen] = useState(false);
     const [showInspector, setShowInspector] = useState(true);
 
@@ -150,7 +153,10 @@ export default function SexEditor() {
                     }
                 } catch (e) {
                     // Ignore errors during cleanup
-                    console.warn('[EffectsLog] Failed to log effect during cleanup:', e);
+                    console.warn(
+                        "[EffectsLog] Failed to log effect during cleanup:",
+                        e,
+                    );
                 }
             });
             cleanups.push(cleanup);
@@ -175,7 +181,9 @@ export default function SexEditor() {
 
                 // Only capture if state actually changed
                 const lastSnapshot = undoStack[undoIndex];
-                const lastJson = lastSnapshot ? JSON.stringify(lastSnapshot) : null;
+                const lastJson = lastSnapshot
+                    ? JSON.stringify(lastSnapshot)
+                    : null;
 
                 if (specJson !== lastJson) {
                     // Truncate future history when making new changes after undo
@@ -204,7 +212,10 @@ export default function SexEditor() {
         const timeoutId = setTimeout(() => {
             try {
                 const spec = rootSex.toSpec();
-                localStorage.setItem("bassline-workspace", JSON.stringify(spec));
+                localStorage.setItem(
+                    "bassline-workspace",
+                    JSON.stringify(spec),
+                );
             } catch (e) {
                 console.error("Failed to auto-save:", e);
             }
@@ -222,11 +233,14 @@ export default function SexEditor() {
         if (saved) {
             try {
                 const spec = JSON.parse(saved);
-                if (spec.state && Array.isArray(spec.state) && spec.state.length > 0) {
+                if (
+                    spec.state && Array.isArray(spec.state) &&
+                    spec.state.length > 0
+                ) {
                     setTimeout(() => {
                         const shouldLoad = confirm(
                             "Found saved workspace. Load it?\n\n" +
-                            "Click OK to restore, or Cancel to start fresh.",
+                                "Click OK to restore, or Cancel to start fresh.",
                         );
                         if (shouldLoad) {
                             rootSex.receive(spec.state);
@@ -297,8 +311,8 @@ export default function SexEditor() {
     const handleCopy = useCallback(() => {
         const selectedNodes = canvasRef.current?.getSelectedNodes() || [];
         const specs = selectedNodes
-            .filter(n => !n.data?.["isWire"])
-            .map(n => {
+            .filter((n) => !n.data?.["isWire"])
+            .map((n) => {
                 const gadget = n.data?.["gadget"] as any;
                 return gadget?.toSpec();
             })
@@ -317,6 +331,7 @@ export default function SexEditor() {
             // Handle both single spec and array of specs
             const specsArray = Array.isArray(specs) ? specs : [specs];
 
+            const actions: any[] = [];
             specsArray.forEach((spec: any) => {
                 if (spec && spec.pkg && spec.name) {
                     const baseName = spec.name;
@@ -325,9 +340,12 @@ export default function SexEditor() {
                     while (workspace[name]) {
                         name = `${baseName}_${counter++}`;
                     }
-                    currentSex.receive([["spawn", name, spec]]);
+                    actions.push(["spawn", name, spec]);
                 }
             });
+            if (actions.length > 0) {
+                currentSex.receive(actions);
+            }
         } catch (e) {
             console.error("Paste failed:", e);
         }
@@ -337,7 +355,10 @@ export default function SexEditor() {
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             // Don't intercept when typing in inputs/textareas
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+            if (
+                e.target instanceof HTMLInputElement ||
+                e.target instanceof HTMLTextAreaElement
+            ) {
                 // Allow Escape to blur inputs
                 if (e.key === "Escape") {
                     (e.target as HTMLElement).blur();
@@ -349,31 +370,28 @@ export default function SexEditor() {
             if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "z") {
                 e.preventDefault();
                 handleUndo();
-            }
-            // Cmd/Ctrl + Shift + Z = Redo
+            } // Cmd/Ctrl + Shift + Z = Redo
             else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "z") {
                 e.preventDefault();
                 handleRedo();
-            }
-            // Cmd/Ctrl + C = Copy
+            } // Cmd/Ctrl + C = Copy
             else if ((e.metaKey || e.ctrlKey) && e.key === "c") {
                 e.preventDefault();
                 handleCopy();
-            }
-            // Cmd/Ctrl + V = Paste
+            } // Cmd/Ctrl + V = Paste
             else if ((e.metaKey || e.ctrlKey) && e.key === "v") {
                 e.preventDefault();
                 handlePaste();
-            }
-            // Cmd/Ctrl + K = Command Palette
+            } // Cmd/Ctrl + K = Command Palette
             else if ((e.metaKey || e.ctrlKey) && e.key === "k") {
                 e.preventDefault();
                 setIsPaletteOpen(true);
-            }
-            // Cmd/Ctrl + D = Duplicate selected node
+            } // Cmd/Ctrl + D = Duplicate selected node
             else if ((e.metaKey || e.ctrlKey) && e.key === "d") {
                 e.preventDefault();
-                const selectedNodes = canvasRef.current?.getSelectedNodes() || [];
+                const selectedNodes = canvasRef.current?.getSelectedNodes() ||
+                    [];
+                const actions: any[] = [];
                 selectedNodes.forEach((node) => {
                     if (!node.data?.["isWire"]) {
                         const gadget = node.data?.["gadget"] as any;
@@ -385,42 +403,38 @@ export default function SexEditor() {
                             name = `${baseName}_copy_${counter}`;
                             counter++;
                         }
-                        currentSex.receive([["spawn", name, spec]]);
+                        actions.push(["spawn", name, spec]);
                     }
                 });
-            }
-            // Cmd/Ctrl + L = Auto-layout
+                if (actions.length > 0) {
+                    currentSex.receive(actions);
+                }
+            } // Cmd/Ctrl + L = Auto-layout
             else if ((e.metaKey || e.ctrlKey) && e.key === "l") {
                 e.preventDefault();
                 canvasRef.current?.autoLayout();
-            }
-            // Cmd/Ctrl + / = Toggle inspector
+            } // Cmd/Ctrl + / = Toggle inspector
             else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
                 e.preventDefault();
-                setShowInspector(prev => !prev);
-            }
-            // Escape = Deselect all
+                setShowInspector((prev) => !prev);
+            } // Escape = Deselect all
             else if (e.key === "Escape") {
                 e.preventDefault();
                 canvasRef.current?.deselectAll();
                 setIsPaletteOpen(false);
-            }
-            // Cmd/Ctrl + Enter = Execute
+            } // Cmd/Ctrl + Enter = Execute
             else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
                 handleExecute();
-            }
-            // Cmd/Ctrl + S = Save
+            } // Cmd/Ctrl + S = Save
             else if ((e.metaKey || e.ctrlKey) && e.key === "s") {
                 e.preventDefault();
                 handleSave();
-            }
-            // Cmd/Ctrl + Shift + S = Snapshot
+            } // Cmd/Ctrl + Shift + S = Snapshot
             else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "S") {
                 e.preventDefault();
                 handleSnapshot();
-            }
-            // Cmd/Ctrl + Shift + R = Show snapshots
+            } // Cmd/Ctrl + Shift + R = Show snapshots
             else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "R") {
                 e.preventDefault();
                 setActiveTab("snapshots");
@@ -429,7 +443,18 @@ export default function SexEditor() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [handleExecute, handleSave, handleSnapshot, handleUndo, handleRedo, handleCopy, handlePaste, workspace, currentSex, canvasRef]);
+    }, [
+        handleExecute,
+        handleSave,
+        handleSnapshot,
+        handleUndo,
+        handleRedo,
+        handleCopy,
+        handlePaste,
+        workspace,
+        currentSex,
+        canvasRef,
+    ]);
 
     // Context menu close on click
     useEffect(() => {
@@ -447,7 +472,13 @@ export default function SexEditor() {
             navigationStackCell.kill();
             undoStackCell.kill();
         };
-    }, [selectionCell, historyCell, effectsLogCell, navigationStackCell, undoStackCell]);
+    }, [
+        selectionCell,
+        historyCell,
+        effectsLogCell,
+        navigationStackCell,
+        undoStackCell,
+    ]);
 
     // Other handlers (non-useCallback)
     const handleLoad = () => {
@@ -479,7 +510,10 @@ export default function SexEditor() {
                 if (mode === "1") {
                     rootSex.receive(spec.state);
                 } else if (mode === "2") {
-                    const name = prompt("Name for this workspace:", "workspace");
+                    const name = prompt(
+                        "Name for this workspace:",
+                        "workspace",
+                    );
                     if (!name) return;
                     rootSex.receive([["spawn", name, spec]]);
                 } else if (mode === "3") {
@@ -498,7 +532,7 @@ export default function SexEditor() {
     const handleNewWorkspace = () => {
         const confirmed = confirm(
             "Clear current workspace and start fresh?\n\n" +
-            "Current workspace will be lost (unless saved).",
+                "Current workspace will be lost (unless saved).",
         );
         if (confirmed) {
             rootSex.receive([["clear"]]);
@@ -532,7 +566,8 @@ export default function SexEditor() {
     const handleNavigateInto = (name: string, gadget: any) => {
         // Only navigate into sex gadgets
         if (gadget.pkg === "@bassline/systems" && gadget.name === "sex") {
-            const currentStack = navigationStack || [{ sex: rootSex, name: "root" }];
+            const currentStack = navigationStack ||
+                [{ sex: rootSex, name: "root" }];
             navigationStackCell.receive([
                 ...currentStack,
                 { sex: gadget, name, parentSex: currentSex },
@@ -542,13 +577,18 @@ export default function SexEditor() {
 
     const handleNavigateToLevel = (index: number) => {
         // Navigate back to a specific level in the stack
-        const currentStack = navigationStack || [{ sex: rootSex, name: "root" }];
+        const currentStack = navigationStack ||
+            [{ sex: rootSex, name: "root" }];
         if (index >= 0 && index < currentStack.length) {
             navigationStackCell.receive(currentStack.slice(0, index + 1));
         }
     };
 
-    const handleContextMenu = (e: React.MouseEvent, name: string, gadget: any) => {
+    const handleContextMenu = (
+        e: React.MouseEvent,
+        name: string,
+        gadget: any,
+    ) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, name, gadget });
     };
@@ -564,7 +604,10 @@ export default function SexEditor() {
 
     const handleRename = () => {
         if (!contextMenu) return;
-        const newName = prompt(`Rename "${contextMenu.name}" to:`, contextMenu.name);
+        const newName = prompt(
+            `Rename "${contextMenu.name}" to:`,
+            contextMenu.name,
+        );
         if (newName && newName !== contextMenu.name) {
             rootSex.receive([["rename", contextMenu.name, newName]]);
             setContextMenu(null);
@@ -605,7 +648,9 @@ export default function SexEditor() {
                     name: gadgetName,
                     defaultState: rootSex.snapshots?.export || [],
                     meta: {
-                        description: `Exported from sex editor at ${new Date().toISOString()}`,
+                        description: `Exported from sex editor at ${
+                            new Date().toISOString()
+                        }`,
                         exports: Object.keys(workspace),
                     },
                 },
@@ -632,9 +677,13 @@ export default function SexEditor() {
                 onSnapshot={handleSnapshot}
             />
 
-            <div className={`flex-1 grid overflow-hidden ${
-                showInspector ? "grid-cols-[250px_1fr_300px]" : "grid-cols-[250px_1fr]"
-            }`}>
+            <div
+                className={`flex-1 grid overflow-hidden ${
+                    showInspector
+                        ? "grid-cols-[250px_1fr_300px]"
+                        : "grid-cols-[250px_1fr]"
+                }`}
+            >
                 {/* Left: Explorer */}
                 <div className="border-r overflow-y-auto bg-gray-50">
                     <div className="p-4 space-y-6">
@@ -700,7 +749,8 @@ export default function SexEditor() {
                                     : "text-gray-600 hover:text-gray-900"
                             }`}
                         >
-                            Snapshots ({Object.keys(rootSex.snapshots || {}).length})
+                            Snapshots ({Object.keys(rootSex.snapshots || {})
+                                .length})
                         </button>
                     </div>
 
@@ -708,7 +758,8 @@ export default function SexEditor() {
                         {activeTab === "canvas" && (
                             <div className="h-full flex flex-col">
                                 <Breadcrumb
-                                    navigationStack={navigationStack || [{ sex: rootSex, name: "root" }]}
+                                    navigationStack={navigationStack ||
+                                        [{ sex: rootSex, name: "root" }]}
                                     onNavigateToLevel={handleNavigateToLevel}
                                 />
                                 <div className="flex-1">
@@ -749,7 +800,8 @@ export default function SexEditor() {
                         {activeTab === "snapshots" && (
                             <SnapshotsPanel
                                 snapshots={rootSex.snapshots || {}}
-                                onRestore={(label) => rootSex.receive([["restore", label]])}
+                                onRestore={(label) =>
+                                    rootSex.receive([["restore", label]])}
                                 onDelete={(label) => {
                                     delete rootSex.snapshots[label];
                                     rootSex.emit({ snapshotDeleted: label });
