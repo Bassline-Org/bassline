@@ -23,8 +23,10 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
 
     // Tap selected gadget to collect effects history
     useEffect(() => {
+        // Clear effects immediately on every gadget change
+        setEffects([]);
+
         if (!gadget) {
-            setEffects([]);
             emptyGadget.kill();
             return;
         }
@@ -60,6 +62,36 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
         return { incoming, outgoing };
     }, [workspace, gadget]);
 
+    // Smart input parsing - infer types automatically
+    const smartParse = (input: string) => {
+        // Try JSON first
+        try {
+            return JSON.parse(input);
+        } catch {}
+
+        // Infer type
+        if (input === "true") return true;
+        if (input === "false") return false;
+        if (!isNaN(Number(input)) && input.trim() !== "") {
+            return Number(input);
+        }
+
+        // Default to string
+        return input;
+    };
+
+    const handleSend = () => {
+        const value = smartParse(inputValue);
+        gadget.receive(value);
+        setInputValue("");
+    };
+
+    const handleQuickSend = (value: string) => {
+        const parsed = smartParse(value);
+        gadget.receive(parsed);
+        setInputValue("");
+    };
+
     if (!gadget) {
         return (
             <div className="p-4 text-gray-500 text-sm">
@@ -67,30 +99,6 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
             </div>
         );
     }
-
-    const handleSend = () => {
-        // Smart input parsing - infer types automatically
-        const smartParse = (input: string) => {
-            // Try JSON first
-            try {
-                return JSON.parse(input);
-            } catch {}
-
-            // Infer type
-            if (input === "true") return true;
-            if (input === "false") return false;
-            if (!isNaN(Number(input)) && input.trim() !== "") {
-                return Number(input);
-            }
-
-            // Default to string
-            return input;
-        };
-
-        const value = smartParse(inputValue);
-        gadget.receive(value);
-        setInputValue("");
-    };
 
     // Check if this is a wire gadget
     const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
@@ -220,43 +228,43 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                     </div>
                     <div className="flex gap-1 mt-2 flex-wrap">
                         <button
-                            onClick={() => { setInputValue("0"); setTimeout(handleSend, 0); }}
+                            onClick={() => handleQuickSend("0")}
                             className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
                         >
                             0
                         </button>
                         <button
-                            onClick={() => { setInputValue("1"); setTimeout(handleSend, 0); }}
+                            onClick={() => handleQuickSend("1")}
                             className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
                         >
                             1
                         </button>
                         <button
-                            onClick={() => { setInputValue("true"); setTimeout(handleSend, 0); }}
+                            onClick={() => handleQuickSend("true")}
                             className="px-2 py-0.5 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded"
                         >
                             true
                         </button>
                         <button
-                            onClick={() => { setInputValue("false"); setTimeout(handleSend, 0); }}
+                            onClick={() => handleQuickSend("false")}
                             className="px-2 py-0.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 rounded"
                         >
                             false
                         </button>
                         <button
-                            onClick={() => { setInputValue("null"); setTimeout(handleSend, 0); }}
+                            onClick={() => handleQuickSend("null")}
                             className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
                         >
                             null
                         </button>
                         <button
-                            onClick={() => { setInputValue("{}"); setTimeout(handleSend, 0); }}
+                            onClick={() => handleQuickSend("{}")}
                             className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
                         >
                             &#123;&#125;
                         </button>
                         <button
-                            onClick={() => { setInputValue("[]"); setTimeout(handleSend, 0); }}
+                            onClick={() => handleQuickSend("[]")}
                             className="px-2 py-0.5 text-xs bg-gray-100 hover:bg-gray-200 rounded"
                         >
                             []

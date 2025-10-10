@@ -2,56 +2,160 @@
 
 ## Current State (2025-10-09)
 
-**Major milestone**: The **Sex Editor** is now functional! This is the visual development environment for Bassline - a REPL for gadget networks.
+**Major milestone**: The **Sex Editor** is now a **canvas-based IDE** with nested workspace navigation! This is the visual development environment for Bassline - think Figma for gadget networks.
 
 The system has been restructured into separate packages and rewritten in vanilla JavaScript (no TypeScript). The core philosophy remains the same, but the implementation is now simpler and more dynamic.
 
+### Recent Canvas Architecture Update
+
+The sex editor has been transformed from a three-panel text-based interface into a **canvas-based visual IDE** using React Flow. Key features:
+
+- **Graph Canvas**: Drag-and-drop nodes and edges
+- **Nested Workspaces**: Double-click sex nodes to navigate inside
+- **Breadcrumb Navigation**: Click to navigate back up workspace hierarchy
+- **Auto-layout**: dagre algorithm for automatic graph layout
+- **Inspector Panel**: Interactive gadget inspection with quick send
+- **Sidebar**: Package browser with gadget spawning
+
 ## Sex Editor - The Bassline IDE
 
-Location: `apps/web/app/routes/sex-editor.tsx`
+Location: `apps/web/app/routes/sex-editor/route.tsx`
 
-This is now the **primary development interface** for Bassline. Think: Jupyter notebooks for gadget networks, DevTools for propagation systems.
+This is now the **primary development interface** for Bassline. Think: Figma meets Jupyter notebooks for gadget networks.
 
-### Three-Panel Layout
+### Canvas-Based Architecture
 
-**Left: Explorer**
-- Tree view of spawned gadgets with nesting support
-- Click to select and inspect
-- Icons: 🔢 numeric, 📝 tables, 📦 sex, 🔗 wire
-- Shows inline state preview
+The editor uses **React Flow** (@xyflow/react) for the canvas and is split into components:
 
-**Center: Tabbed Workspace**
-- **Actions Tab**: JSON editor for sex action arrays
-  - Example dropdown with common patterns
-  - Execute button (or Cmd+Enter)
-- **History Tab**: Log of executed actions with timestamps
-  - Click to copy back to editor
-  - Clear button
-- **Effects Tab**: Live log of all effects from all gadgets
-  - Auto-taps every gadget in workspace
-  - Shows gadget name, effect type, timestamp
+**route.tsx** - Main orchestrator
+- Manages `rootSex` (top-level workspace)
+- Tracks `navigationStack` (path through nested sex workspaces)
+- Calculates `currentSex` (active workspace being edited)
+- Provides navigation handlers (`handleNavigateInto`, `handleNavigateToLevel`)
 
-**Right: Inspector**
-- Shows selected gadget's package, name, state
-- **Smart input**: Auto-parses types
-  - Type `42` → number
-  - Type `hello` → string
-  - Type `true` → boolean
-  - Type `{"x":1}` → JSON
-  - No manual quotes needed!
+**CanvasView.tsx** - Graph editor
+- Receives `currentSex` (CRITICAL: not rootSex!)
+- Converts workspace to nodes/edges
+- Handles canvas operations (connect, delete, drag)
+- **All operations must target currentSex** to work in nested scopes
 
-### Keyboard Shortcuts
-- `Cmd+Enter` / `Ctrl+Enter`: Execute actions
-- `Cmd+S` / `Ctrl+S`: Save workspace
+**GadgetNode.tsx** - Visual gadget representation
+- Shows gadget icon, name, state preview
+- Double-click sex nodes to navigate inside
+- Visual indicators (↴ symbol, purple hover) for navigable nodes
+- Flash animation on state changes
 
-### Save/Load Modes
+**Inspector.tsx** - Gadget introspection panel
+- Quick send with smart parsing (JSON, booleans, numbers)
+- Quick value buttons (0, 1, true, false, null, {}, [])
+- Effects history (last 5 effects, per-gadget)
+- Connection display (incoming/outgoing wires)
 
-When loading a workspace, three options:
-1. **Add to current** - Execute actions in current workspace (compositional!)
-2. **As nested workspace** - Spawn as new sex gadget (modular!)
-3. **Replace current** - Kill all, then load (clean slate)
+**Breadcrumb.tsx** - Navigation path
+- Shows: root › workspace › nested
+- Click to navigate back to any level
+- Highlights current workspace
 
-**This makes workspaces infinitely composable** - load workspaces inside workspaces!
+**Sidebar.tsx** - Package browser
+- Lists all installed packages
+- Drag or click to spawn gadgets
+- Icons per gadget type
+
+### Navigation Stack Pattern
+
+**Critical Architecture**: Navigation uses a stack to track the path through nested workspaces:
+
+```typescript
+// Stack structure
+const navigationStack = [
+  { sex: rootSex, name: "root" },
+  { sex: nestedSex, name: "workspace1", parentSex: rootSex },
+  { sex: deeperSex, name: "workspace2", parentSex: nestedSex }
+];
+
+// Current workspace is always the last item
+const currentFrame = navigationStack[navigationStack.length - 1];
+const currentSex = currentFrame.sex;
+
+// Navigate into: append to stack
+handleNavigateInto(name, gadget) {
+  navigationStackCell.receive([...stack, { sex: gadget, name, parentSex: currentSex }]);
+}
+
+// Navigate back: slice stack
+handleNavigateToLevel(index) {
+  navigationStackCell.receive(stack.slice(0, index + 1));
+}
+```
+
+**Why this matters**: All canvas operations (spawn, delete, wire) must use `currentSex`, not `rootSex`. Using rootSex breaks operations in nested workspaces.
+
+### Wire Serialization Pattern
+
+**Critical Detail**: Wires store BOTH gadget refs (runtime) AND names (persistence):
+
+```javascript
+// When creating wire via sex.wire()
+await fromSpec({
+  pkg: "@bassline/relations",
+  name: "scopedWire",
+  state: {
+    source,      // Gadget instance (for tapping)
+    target,      // Gadget instance (for tapping)
+    sourceName,  // String name (for serialization/canvas)
+    targetName   // String name (for serialization/canvas)
+  }
+});
+
+// Canvas uses names to display edges
+edges.push({
+  id: wireName,
+  source: wireState.sourceName,  // NOT wireState.source!
+  target: wireState.targetName
+});
+```
+
+### Critical Lifecycle Pattern
+
+**scopedWire afterSpawn**: Must call `receive()` not just `update()` to trigger step() for tap setup:
+
+```javascript
+afterSpawn(initial) {
+  this.update({});         // Initialize to empty state first
+  this.receive(initial);   // Then receive to trigger step()
+}
+
+step(state = {}, input) {
+  const { source, target } = state;
+  if (source && target) return;  // Already wired
+
+  const next = { ...state, ...input };
+  if (next.source && next.target) {
+    const cleanup = next.source.tap((e) => next.target.receive(e));
+    this.update(next);
+    this.cleanup = cleanup;
+  }
+}
+```
+
+**Why**: `update()` bypasses `receive()` → `validate()` → `step()`, so tap setup never happens.
+
+### Keyboard Shortcuts (Current)
+- **Delete** - Delete selected nodes/edges
+- **Double-click** - Navigate into sex nodes
+- **Drag** - Pan canvas
+- **Scroll** - Zoom
+- **Click breadcrumb** - Navigate back
+
+### Planned Enhancements
+See [.claude/sex-editor-roadmap.md](./.sex-editor-roadmap.md) for full enhancement plan:
+- Command Palette (Cmd+K)
+- More keyboard shortcuts (Cmd+D, Escape, Cmd+W, etc.)
+- Context menus
+- Sidebar redesign
+- Canvas polish (minimap, controls, grid)
+- Smart wire creation
+- Visual enhancements (effect flow, state diff)
 
 ## Sex Gadget (`packages/systems/src/sex.js`)
 
@@ -358,8 +462,13 @@ Complete observability - see every effect in real-time.
 
 ## Files to Know
 
-### Sex Editor
-- `apps/web/app/routes/sex-editor.tsx` - Main editor component (~700 lines)
+### Sex Editor (Canvas-Based)
+- `apps/web/app/routes/sex-editor/route.tsx` - Main orchestrator
+- `apps/web/app/routes/sex-editor/components/CanvasView.tsx` - React Flow canvas
+- `apps/web/app/routes/sex-editor/components/GadgetNode.tsx` - Visual node component
+- `apps/web/app/routes/sex-editor/components/Inspector.tsx` - Gadget inspector panel
+- `apps/web/app/routes/sex-editor/components/Breadcrumb.tsx` - Navigation breadcrumbs
+- `apps/web/app/routes/sex-editor/components/Sidebar.tsx` - Package browser
 - `apps/web/app/routes/home.tsx` - Landing page
 
 ### Core System
@@ -386,46 +495,50 @@ Complete observability - see every effect in real-time.
 
 ## Current Status
 
-✅ Sex editor functional and usable
-✅ Save/load with composition modes
-✅ Smart input parsing
-✅ Effects logging and history tracking
-✅ Keyboard shortcuts
-✅ Sex serialization fixed
-✅ ScopedWire incremental assembly
+✅ Canvas-based visual editor with React Flow
+✅ Nested workspace navigation (double-click sex nodes)
+✅ Breadcrumb navigation (click to go back)
+✅ Auto-layout with dagre algorithm
+✅ Drag-and-drop gadget spawning
+✅ Visual wire creation (connect nodes)
+✅ Inspector with quick send and effects history
+✅ Smart input parsing (JSON, booleans, numbers)
+✅ Wire serialization (refs + names pattern)
+✅ ScopedWire afterSpawn pattern (receive not update)
+✅ currentSex vs rootSex pattern (operations target correct level)
 
-**The system is self-hosting ready** - use the sex editor to build Bassline!
+**The system is visual and intuitive** - use the canvas to build Bassline!
 
 ## How to Use the Sex Editor
 
 1. Start dev server: `pnpm dev` in `apps/web`
 2. Navigate to `http://localhost:5173/sex-editor`
-3. Write sex actions in Actions tab (or pick example)
-4. Hit Execute (Cmd+Enter)
-5. Watch Explorer update with spawned gadgets
-6. Click gadgets to inspect
-7. Use Quick Send with smart parsing
-8. Check History/Effects tabs
-9. Save (Cmd+S) to export JSON
-10. Load to add/nest/replace
+3. **Spawn gadgets** from left sidebar (click or drag to canvas)
+4. **Wire gadgets** by dragging from one node to another
+5. **Navigate nested workspaces** by double-clicking sex nodes
+6. **Navigate back** by clicking breadcrumbs
+7. **Select gadgets** to inspect in right panel
+8. **Quick send values** using inspector input or quick buttons
+9. **Delete nodes/edges** by selecting and pressing Delete
+10. **Auto-layout** by clicking the layout button
 
-## Next Steps / Ideas
+## Next Steps
 
-### Phase 2: Advanced Editor
-- Context menu on tree nodes
-- Visual wire editor (drag connections)
-- Command palette (Cmd+K)
-- Undo/redo
-- Syntax highlighting
+See [.claude/sex-editor-roadmap.md](./.sex-editor-roadmap.md) for comprehensive enhancement plan.
 
-### Phase 3: Meta-Circular
-- Export workspace as package
-- Package marketplace
-- Live collaboration
-- Visual package builder
+### Immediate Priorities
+1. ✅ ~~Fix Inspector bugs~~ (quick buttons + effects clearing)
+2. 🚀 **Command Palette** (Cmd+K) - HIGHEST IMPACT
+3. ⌨️ Keyboard shortcuts (Delete, Cmd+D, Escape, etc.)
+4. 🖱️ Context menus (right-click nodes/canvas/wires)
+5. 📚 Sidebar redesign (collapsible packages, search, favorites)
 
-### Phase 4: Distribution
-- Network transports (WebSocket, HTTP)
-- Persistent storage (IndexedDB, Postgres)
-- Worker execution (off main thread)
-- Time-travel debugging
+### Future Phases
+- Canvas polish (minimap, controls, grid, animations)
+- Smart wire creation (auto-wire, suggestions)
+- Visual enhancements (effect flow, state diff, heat map)
+- Multi-selection operations
+- Collaboration (export/import, share via link)
+- Persistence (localStorage, named workspaces)
+- Developer tools (console, profiler, debugger)
+- Distribution (WebSocket, HTTP, workers)

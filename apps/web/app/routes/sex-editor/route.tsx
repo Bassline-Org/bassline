@@ -17,6 +17,7 @@ import { Toolbar } from "./components/Toolbar";
 import { SnapshotsPanel } from "./components/SnapshotsPanel";
 import { CanvasView } from "./components/CanvasView";
 import { Breadcrumb } from "./components/Breadcrumb";
+import { CommandPalette } from "./components/CommandPalette";
 
 import type { GadgetSpec, ContextMenuState } from "./types";
 
@@ -91,6 +92,7 @@ export default function SexEditor() {
     const [actions, setActions] = useState("[]");
     const [activeTab, setActiveTab] = useState("canvas");
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+    const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
     // History gadget
     const historyCell = useMemo(
@@ -228,6 +230,11 @@ export default function SexEditor() {
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Cmd/Ctrl + K = Command Palette
+            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+                e.preventDefault();
+                setIsPaletteOpen(true);
+            }
             // Cmd/Ctrl + Enter = Execute
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
@@ -337,6 +344,18 @@ export default function SexEditor() {
             counter++;
         }
         currentSex.receive([["spawn", name, spec]]);
+    };
+
+    const handleSpawnFromPalette = (pkg: string, name: string) => {
+        const spec: GadgetSpec = { pkg, name, state: null };
+        const baseName = name;
+        let counter = 1;
+        let gadgetName = baseName;
+        while (workspace[gadgetName]) {
+            gadgetName = `${baseName}_${counter}`;
+            counter++;
+        }
+        currentSex.receive([["spawn", gadgetName, spec]]);
     };
 
     const handleNavigateInto = (name: string, gadget: any) => {
@@ -603,6 +622,14 @@ export default function SexEditor() {
                     </button>
                 </div>
             )}
+
+            {/* Command Palette */}
+            <CommandPalette
+                isOpen={isPaletteOpen}
+                onClose={() => setIsPaletteOpen(false)}
+                onSpawn={handleSpawnFromPalette}
+                packages={bl().packages}
+            />
         </div>
     );
 }
