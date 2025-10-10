@@ -179,17 +179,21 @@ export function PipelineBuilder({ isOpen, onClose, onComplete, packages }: Pipel
             name: stage.customName,
         })));
 
-        // Wrap pipeline in a sex gadget so names are scoped internally
-        const { fromSpec } = await import("@bassline/core") as any;
-        const pipelineGadget = fromSpec({
-            pkg: "@bassline/systems",
-            name: "sex",
-            state: actions
+        // Add all pipeline actions directly to workspace with unique name prefix
+        // This makes stages and wires appear on the canvas
+        const prefix = `p${Date.now()}_`;
+        const uniqueActions = actions.map(([cmd, name, ...rest]) => {
+            if (cmd === "wire") {
+                // Wire: ["wire", wireName, sourceName, targetName, options]
+                const [sourceName, targetName, options] = rest;
+                return ["wire", prefix + name, prefix + sourceName, prefix + targetName, options];
+            } else {
+                // Spawn and other commands
+                return [cmd, prefix + name, ...rest];
+            }
         });
 
-        // Add to workspace with unique name
-        const name = `pipeline_${Date.now()}`;
-        onComplete([["spawn", name, pipelineGadget.toSpec()]]);
+        onComplete(uniqueActions);
 
         onClose();
         setStages([]);

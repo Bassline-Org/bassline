@@ -24,14 +24,16 @@ export function pipeline(stages, options = {}) {
     const actions = [];
     const wirePrefix = options.wirePrefix || "wire";
 
+    // First, spawn all gadgets
     stages.forEach((stage, i) => {
         const name = stage.name || `stage${i}`;
-
-        // Spawn the stage gadget
         actions.push(["spawn", name, stage.spec]);
+    });
 
-        // Wire to next stage (if not last)
+    // Then, create all wires (after all gadgets exist)
+    stages.forEach((stage, i) => {
         if (i < stages.length - 1) {
+            const name = stage.name || `stage${i}`;
             const nextName = stages[i + 1].name || `stage${i + 1}`;
             const wireName = `${wirePrefix}${i}`;
             const wireOptions = {};

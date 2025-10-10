@@ -61,18 +61,24 @@ export const PipelineBuilderView = memo(({ data, selected }: NodeProps) => {
     // Get available function gadgets
     const functionGadgets = useMemo(() => {
         const gadgets: Array<{ pkg: string; name: string; fullKey: string }> = [];
-        const packages = (window as any).bassline?.packages;
+        const bl = (window as any).bl;
 
-        if (packages) {
-            for (const [key, proto] of packages.entries()) {
-                if (key.startsWith("@bassline/fn/")) {
-                    const parts = key.split('/');
-                    const fnName = parts.pop();
-                    const pkg = parts.join('/');
-                    if (fnName && pkg) {
-                        gadgets.push({ pkg, name: fnName, fullKey: key });
+        if (bl) {
+            const packages = bl().packages;
+            if (packages) {
+                Object.entries(packages).forEach(([key, proto]) => {
+                    if (key.startsWith('__') || typeof proto === 'function') {
+                        return;
                     }
-                }
+                    if (key.startsWith("@bassline/fn/")) {
+                        const parts = key.split('/');
+                        const name = parts.pop();
+                        const pkg = parts.join('/');
+                        if (name && pkg) {
+                            gadgets.push({ pkg, name, fullKey: key });
+                        }
+                    }
+                });
             }
         }
 
