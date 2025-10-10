@@ -96,6 +96,19 @@ export default function SexEditor() {
     const [isPaletteOpen, setIsPaletteOpen] = useState(false);
     const [showInspector, setShowInspector] = useState(true);
 
+    // Undo/Redo state
+    const undoStackCell = useMemo(
+        () =>
+            fromSpec({
+                pkg: "@bassline/cells/unsafe",
+                name: "last",
+                state: [],
+            }),
+        [],
+    );
+    const [undoStack] = undoStackCell.useState();
+    const [undoIndex, setUndoIndex] = useState(-1);
+
     // History gadget
     const historyCell = useMemo(
         () =>
@@ -151,6 +164,40 @@ export default function SexEditor() {
             cleanups.forEach((c) => c());
         };
     }, [workspace, effectsLogCell]);
+
+    // Capture undo snapshots when workspace changes
+    useEffect(() => {
+        // Debounce snapshot capture
+        const timeoutId = setTimeout(() => {
+            try {
+                const spec = currentSex.stateSpec();
+                const specJson = JSON.stringify(spec);
+
+                // Only capture if state actually changed
+                const lastSnapshot = undoStack[undoIndex];
+                const lastJson = lastSnapshot ? JSON.stringify(lastSnapshot) : null;
+
+                if (specJson !== lastJson) {
+                    // Truncate future history when making new changes after undo
+                    const newStack = undoStack.slice(0, undoIndex + 1);
+                    newStack.push(spec);
+
+                    // Limit stack size to 50 snapshots
+                    if (newStack.length > 50) {
+                        newStack.shift();
+                    } else {
+                        setUndoIndex(newStack.length - 1);
+                    }
+
+                    undoStackCell.receive(newStack);
+                }
+            } catch (e) {
+                console.error("Failed to capture snapshot:", e);
+            }
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(timeoutId);
+    }, [workspace, currentSex, undoStack, undoIndex, undoStackCell]);
 
     // Auto-save to localStorage
     useEffect(() => {
@@ -229,6 +276,63 @@ export default function SexEditor() {
         }
     }, [rootSex]);
 
+    // Undo/Redo handlers
+    const handleUndo = useCallback(() => {
+        if (undoIndex > 0) {
+            const prevSpec = undoStack[undoIndex - 1];
+            currentSex.receive(prevSpec);
+            setUndoIndex(undoIndex - 1);
+        }
+    }, [undoIndex, undoStack, currentSex]);
+
+    const handleRedo = useCallback(() => {
+        if (undoIndex < undoStack.length - 1) {
+            const nextSpec = undoStack[undoIndex + 1];
+            currentSex.receive(nextSpec);
+            setUndoIndex(undoIndex + 1);
+        }
+    }, [undoIndex, undoStack, currentSex]);
+
+    // Copy/Paste handlers
+    const handleCopy = useCallback(() => {
+        const selectedNodes = canvasRef.current?.getSelectedNodes() || [];
+        const specs = selectedNodes
+            .filter(n => !n.data?.["isWire"])
+            .map(n => {
+                const gadget = n.data?.["gadget"] as any;
+                return gadget?.toSpec();
+            })
+            .filter(Boolean);
+
+        if (specs.length > 0) {
+            navigator.clipboard.writeText(JSON.stringify(specs, null, 2));
+        }
+    }, [canvasRef]);
+
+    const handlePaste = useCallback(async () => {
+        try {
+            const text = await navigator.clipboard.readText();
+            const specs = JSON.parse(text);
+
+            // Handle both single spec and array of specs
+            const specsArray = Array.isArray(specs) ? specs : [specs];
+
+            specsArray.forEach((spec: any) => {
+                if (spec && spec.pkg && spec.name) {
+                    const baseName = spec.name;
+                    let name = baseName;
+                    let counter = 1;
+                    while (workspace[name]) {
+                        name = `${baseName}_${counter++}`;
+                    }
+                    currentSex.receive([["spawn", name, spec]]);
+                }
+            });
+        } catch (e) {
+            console.error("Paste failed:", e);
+        }
+    }, [workspace, currentSex]);
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -241,8 +345,28 @@ export default function SexEditor() {
                 return;
             }
 
+            // Cmd/Ctrl + Z = Undo
+            if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "z") {
+                e.preventDefault();
+                handleUndo();
+            }
+            // Cmd/Ctrl + Shift + Z = Redo
+            else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "z") {
+                e.preventDefault();
+                handleRedo();
+            }
+            // Cmd/Ctrl + C = Copy
+            else if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+                e.preventDefault();
+                handleCopy();
+            }
+            // Cmd/Ctrl + V = Paste
+            else if ((e.metaKey || e.ctrlKey) && e.key === "v") {
+                e.preventDefault();
+                handlePaste();
+            }
             // Cmd/Ctrl + K = Command Palette
-            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+            else if ((e.metaKey || e.ctrlKey) && e.key === "k") {
                 e.preventDefault();
                 setIsPaletteOpen(true);
             }
@@ -305,7 +429,7 @@ export default function SexEditor() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [handleExecute, handleSave, handleSnapshot, workspace, currentSex, canvasRef]);
+    }, [handleExecute, handleSave, handleSnapshot, handleUndo, handleRedo, handleCopy, handlePaste, workspace, currentSex, canvasRef]);
 
     // Context menu close on click
     useEffect(() => {
@@ -321,8 +445,9 @@ export default function SexEditor() {
             historyCell.kill();
             effectsLogCell.kill();
             navigationStackCell.kill();
+            undoStackCell.kill();
         };
-    }, [selectionCell, historyCell, effectsLogCell, navigationStackCell]);
+    }, [selectionCell, historyCell, effectsLogCell, navigationStackCell, undoStackCell]);
 
     // Other handlers (non-useCallback)
     const handleLoad = () => {

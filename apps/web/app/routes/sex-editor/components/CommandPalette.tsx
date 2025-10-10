@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 
 interface CommandPaletteProps {
     isOpen: boolean;
@@ -33,21 +33,32 @@ export function CommandPalette({ isOpen, onClose, onSpawn, packages }: CommandPa
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Extract all gadgets from packages
-    const allGadgets: GadgetOption[] = [];
-    if (packages) {
-        Object.entries(packages).forEach(([pkgName, pkg]: [string, any]) => {
-            if (pkg.gadgets) {
-                Object.keys(pkg.gadgets).forEach((gadgetName) => {
-                    allGadgets.push({
-                        pkg: pkgName,
-                        name: gadgetName,
-                        icon: getIcon(pkgName),
+    // Extract all gadgets from packages (flat scope structure)
+    const allGadgets = useMemo(() => {
+        const gadgets: GadgetOption[] = [];
+        if (packages) {
+            Object.entries(packages).forEach(([key, proto]) => {
+                // Skip scope prototype methods
+                if (key.startsWith('__') || typeof proto === 'function') {
+                    return;
+                }
+
+                // Parse key format: "@bassline/cells/max" → pkg: "@bassline/cells", name: "max"
+                const parts = key.split('/');
+                const name = parts.pop();
+                const pkg = parts.join('/');
+
+                if (name && pkg) {
+                    gadgets.push({
+                        pkg,
+                        name,
+                        icon: getIcon(pkg),
                     });
-                });
-            }
-        });
-    }
+                }
+            });
+        }
+        return gadgets;
+    }, [packages]);
 
     // Fuzzy filter gadgets based on query
     const filteredGadgets = allGadgets.filter((gadget) => {
