@@ -51,12 +51,23 @@ export const gadgetProto = {
     },
 
     /**
+     * Returns the default state for this gadget type
+     * Override in specific gadgets to provide sensible defaults
+     * @returns {*} Default state value
+     */
+    defaultState() {
+        return null;
+    },
+
+    /**
      * Lifecycle hook called after spawning a gadget
      * By default it updates the state to the initial state
+     * If no initial state is provided, uses defaultState()
      * @param {*} initial
      */
     afterSpawn(initial) {
-        this.update(initial);
+        const state = initial !== undefined ? initial : this.defaultState();
+        this.update(state);
     },
     /**
      * Kills a gadget, invokes the cleanup hook after emitting the killed effect

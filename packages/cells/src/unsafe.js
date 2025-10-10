@@ -18,6 +18,9 @@ Object.assign(last, {
         this.update(input);
     },
     name: "last",
+    defaultState() {
+        return null;
+    },
 });
 
 export default {

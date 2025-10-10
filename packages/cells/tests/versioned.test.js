@@ -8,7 +8,7 @@ installPackage(cells);
 describe("versioned cell tests", () => {
     it("should create a versioned cell", () => {
         const cell = ordinal.spawn();
-        expect(cell.current()).toBeUndefined();
+        expect(cell.current()).toBeNull();
     });
     it("should update with a new value", () => {
         const cell = ordinal.spawn([0, 0]);

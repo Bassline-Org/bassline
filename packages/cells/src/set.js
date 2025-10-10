@@ -10,8 +10,12 @@ Object.assign(setProto, {
     contradiction({ current, incoming }) {
         console.error("Contradiction! ", current, incoming);
     },
-    afterSpawn(initial = new Set()) {
-        this.update(initial);
+    defaultState() {
+        return new Set();
+    },
+    afterSpawn(initial) {
+        const state = initial !== undefined ? initial : this.defaultState();
+        this.update(state);
     },
 });
 

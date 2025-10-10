@@ -7,12 +7,12 @@ installPackage(cells);
 
 describe("max cell tests", () => {
     it("should create a max cell", () => {
-        const cell = max.spawn(0);
-        expect(cell.current()).toBe(0);
+        const cell = max.spawn();
+        expect(cell.current()).toBe(-Infinity);
     });
 
     it("should update with increasing numbers", () => {
-        const cell = max.spawn(0);
+        const cell = max.spawn();
         cell.receive(1);
         expect(cell.current()).toBe(1);
     });

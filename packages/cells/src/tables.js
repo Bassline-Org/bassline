@@ -11,6 +11,9 @@ export const tableProto = Object.create(gadgetProto);
 Object.assign(tableProto, {
     pkg,
     validate: entries,
+    defaultState() {
+        return {};
+    },
     added(additions) {
         this.emit({ added: additions });
     },

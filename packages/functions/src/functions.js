@@ -27,12 +27,18 @@ Object.assign(functionProto, {
 export const transform = Object.create(functionProto);
 Object.assign(transform, {
     step: transformStep,
+    defaultState() {
+        return undefined;
+    },
 });
 
 export const partial = Object.create(functionProto);
 Object.assign(partial, {
     step: partialStep,
     validate: asFunctionArgs,
+    defaultState() {
+        return { args: {} };
+    },
     isReady(args) {
         return this.requiredKeys.every((key) => args[key] !== undefined);
     },

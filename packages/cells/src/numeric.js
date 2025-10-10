@@ -16,6 +16,9 @@ Object.assign(max, {
         if (input > current) this.update(input);
     },
     name: "max",
+    defaultState() {
+        return -Infinity;
+    },
 });
 
 export const min = Object.create(numericProto);
@@ -24,6 +27,9 @@ Object.assign(min, {
         if (input < current) this.update(input);
     },
     name: "min",
+    defaultState() {
+        return Infinity;
+    },
 });
 
 function asNumber(input) {
