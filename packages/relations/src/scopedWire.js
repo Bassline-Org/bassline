@@ -80,7 +80,7 @@ Object.assign(scopedWire, {
             const cleanup = next.source.tap((e) => {
                 const keys = this.current().keys;
 
-                // Filter effects based on keys configuration
+                // Filter/extract effects based on keys configuration
                 if (keys && Array.isArray(keys) && keys.length > 0) {
                     const filtered = {};
                     keys.forEach(key => {
@@ -90,8 +90,10 @@ Object.assign(scopedWire, {
                     });
                     // Only forward if we have matching keys
                     if (Object.keys(filtered).length > 0) {
-                        console.log('[scopedWire.tap] Forwarding filtered effect:', filtered);
-                        next.target.receive(filtered);
+                        // Extract value if single key, otherwise forward filtered object
+                        const toForward = keys.length === 1 ? filtered[keys[0]] : filtered;
+                        console.log('[scopedWire.tap] Forwarding:', toForward);
+                        next.target.receive(toForward);
                     } else {
                         console.log('[scopedWire.tap] No matching keys in effect:', e, 'keys:', keys);
                     }
