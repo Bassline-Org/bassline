@@ -157,9 +157,17 @@ Object.assign(sex, {
 
         for (const [name, gadget] of Object.entries(spawned)) {
             // Wire gadgets become wire commands (not spawn)
-            if (gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire") {
+            if (
+                gadget.pkg === "@bassline/relations" &&
+                gadget.name === "scopedWire"
+            ) {
                 const state = gadget.current();
-                actions.push(["wire", name, state.sourceName, state.targetName]);
+                actions.push([
+                    "wire",
+                    name,
+                    state.sourceName,
+                    state.targetName,
+                ]);
             } else {
                 actions.push(["spawn", name, gadget.toSpec()]);
             }
@@ -292,10 +300,9 @@ Object.assign(sex, {
             if (state === null || state === undefined) {
                 preview = "null";
             } else if (typeof state === "object") {
-                preview =
-                    Object.keys(state).length === 0
-                        ? "{}"
-                        : `{${Object.keys(state).length}}`;
+                preview = Object.keys(state).length === 0
+                    ? "{}"
+                    : `{${Object.keys(state).length}}`;
             } else {
                 const str = String(state);
                 preview = str.length > 20 ? str.slice(0, 20) + "..." : str;
@@ -325,7 +332,12 @@ Object.assign(sex, {
      * @param {string} targetName - Target gadget name
      */
     async wire(env, wireName, sourceName, targetName) {
-        console.log('[sex.wire] Creating wire:', { wireName, sourceName, targetName, spawned: Object.keys(env.spawned) });
+        console.log("[sex.wire] Creating wire:", {
+            wireName,
+            sourceName,
+            targetName,
+            spawned: Object.keys(env.spawned),
+        });
 
         // Check if wire name already exists
         if (env.spawned[wireName]) {
@@ -370,15 +382,18 @@ Object.assign(sex, {
             pkg: "@bassline/relations",
             name: "scopedWire",
             state: {
-                source,      // Gadget ref for runtime tapping
-                target,      // Gadget ref for runtime tapping
-                sourceName,  // Name for serialization/canvas
-                targetName   // Name for serialization/canvas
+                source, // Gadget ref for runtime tapping
+                target, // Gadget ref for runtime tapping
+                sourceName, // Name for serialization/canvas
+                targetName, // Name for serialization/canvas
             },
         });
 
         env.spawned[wireName] = wireGadget;
-        console.log('[sex.wire] Wire created successfully:', { wireName, wireState: wireGadget.current() });
+        console.log("[sex.wire] Wire created successfully:", {
+            wireName,
+            wireState: wireGadget.current(),
+        });
         this.emit({ wired: { wireName, sourceName, targetName } });
         return { wireName, sourceName, targetName };
     },

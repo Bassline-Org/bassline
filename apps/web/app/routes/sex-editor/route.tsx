@@ -63,14 +63,14 @@ export default function SexEditor() {
             state: initialSex,
         });
         return [{
-            id: 'default',
-            name: 'Workspace 1',
-            sexCell
+            id: "default",
+            name: "Workspace 1",
+            sexCell,
         }];
     });
 
-    const [activeWorkspaceId, setActiveWorkspaceId] = useState('default');
-    const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId)!;
+    const [activeWorkspaceId, setActiveWorkspaceId] = useState("default");
+    const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)!;
     const [rootSex] = activeWorkspace.sexCell.useState();
 
     // Tab management handlers
@@ -89,7 +89,7 @@ export default function SexEditor() {
         const newWorkspace: Workspace = {
             id,
             name: `Workspace ${workspaces.length + 1}`,
-            sexCell
+            sexCell,
         };
         setWorkspaces([...workspaces, newWorkspace]);
         setActiveWorkspaceId(id);
@@ -100,10 +100,12 @@ export default function SexEditor() {
             alert("Cannot close the last workspace");
             return;
         }
-        const confirmed = confirm("Close this workspace? Unsaved changes will be lost.");
+        const confirmed = confirm(
+            "Close this workspace? Unsaved changes will be lost.",
+        );
         if (!confirmed) return;
 
-        const newWorkspaces = workspaces.filter(w => w.id !== tabId);
+        const newWorkspaces = workspaces.filter((w) => w.id !== tabId);
         setWorkspaces(newWorkspaces);
 
         // Switch to another tab if closing active tab
@@ -113,15 +115,15 @@ export default function SexEditor() {
     }, [workspaces, activeWorkspaceId]);
 
     const handleRenameTab = useCallback((tabId: string) => {
-        const workspace = workspaces.find(w => w.id === tabId);
+        const workspace = workspaces.find((w) => w.id === tabId);
         if (!workspace) return;
 
         const newName = prompt("Rename workspace:", workspace.name);
         if (!newName || newName === workspace.name) return;
 
-        setWorkspaces(workspaces.map(w =>
-            w.id === tabId ? { ...w, name: newName } : w
-        ));
+        setWorkspaces(
+            workspaces.map((w) => w.id === tabId ? { ...w, name: newName } : w),
+        );
     }, [workspaces]);
 
     // Navigation stack - track path through nested workspaces
@@ -240,6 +242,10 @@ export default function SexEditor() {
         // Debounce snapshot capture
         const timeoutId = setTimeout(() => {
             try {
+                if (!undoStack || !Array.isArray(undoStack)) {
+                    return; // Skip if undoStack not initialized
+                }
+
                 const spec = currentSex.stateSpec();
                 const specJson = JSON.stringify(spec);
 
@@ -275,7 +281,7 @@ export default function SexEditor() {
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             try {
-                const workspacesData = workspaces.map(ws => ({
+                const workspacesData = workspaces.map((ws) => ({
                     id: ws.id,
                     name: ws.name,
                     spec: ws.sexCell.current().toSpec(),
@@ -311,21 +317,26 @@ export default function SexEditor() {
                                 "Click OK to restore, or Cancel to start fresh.",
                         );
                         if (shouldLoad) {
-                            const restoredWorkspaces = data.workspaces.map((wsData: any) => {
-                                const sex = fromSpec(wsData.spec);
-                                const sexCell = fromSpec({
-                                    pkg: "@bassline/cells/unsafe",
-                                    name: "last",
-                                    state: sex,
-                                });
-                                return {
-                                    id: wsData.id,
-                                    name: wsData.name,
-                                    sexCell,
-                                };
-                            });
+                            const restoredWorkspaces = data.workspaces.map(
+                                (wsData: any) => {
+                                    const sex = fromSpec(wsData.spec);
+                                    const sexCell = fromSpec({
+                                        pkg: "@bassline/cells/unsafe",
+                                        name: "last",
+                                        state: sex,
+                                    });
+                                    return {
+                                        id: wsData.id,
+                                        name: wsData.name,
+                                        sexCell,
+                                    };
+                                },
+                            );
                             setWorkspaces(restoredWorkspaces);
-                            setActiveWorkspaceId(data.activeWorkspaceId || restoredWorkspaces[0].id);
+                            setActiveWorkspaceId(
+                                data.activeWorkspaceId ||
+                                    restoredWorkspaces[0].id,
+                            );
                         } else {
                             localStorage.removeItem("bassline-workspaces");
                         }
@@ -452,21 +463,18 @@ export default function SexEditor() {
             if ((e.metaKey || e.ctrlKey) && e.key === "t") {
                 e.preventDefault();
                 handleNewTab();
-            }
-            // Cmd/Ctrl + W = Close Tab
+            } // Cmd/Ctrl + W = Close Tab
             else if ((e.metaKey || e.ctrlKey) && e.key === "w") {
                 e.preventDefault();
                 handleCloseTab(activeWorkspaceId);
-            }
-            // Cmd/Ctrl + 1-9 = Switch to tab
+            } // Cmd/Ctrl + 1-9 = Switch to tab
             else if ((e.metaKey || e.ctrlKey) && e.key >= "1" && e.key <= "9") {
                 e.preventDefault();
                 const index = parseInt(e.key) - 1;
                 if (index < workspaces.length) {
                     setActiveWorkspaceId(workspaces[index]!.id);
                 }
-            }
-            // Cmd/Ctrl + Z = Undo
+            } // Cmd/Ctrl + Z = Undo
             else if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === "z") {
                 e.preventDefault();
                 handleUndo();
@@ -734,8 +742,13 @@ export default function SexEditor() {
 
     const handleExportAsPackage = () => {
         // Get workspace name from active tab
-        const currentWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
-        const defaultPkgName = `@my/${currentWorkspace?.name.toLowerCase().replace(/\s+/g, '-') || 'workspace'}`;
+        const currentWorkspace = workspaces.find((w) =>
+            w.id === activeWorkspaceId
+        );
+        const defaultPkgName = `@my/${
+            currentWorkspace?.name.toLowerCase().replace(/\s+/g, "-") ||
+            "workspace"
+        }`;
 
         const pkgName = prompt(
             "Package name (e.g., @myapp/patterns):",
@@ -743,7 +756,11 @@ export default function SexEditor() {
         );
         if (!pkgName) return;
 
-        const gadgetName = prompt("Gadget name:", currentWorkspace?.name.toLowerCase().replace(/\s+/g, '-') || "myWorkspace");
+        const gadgetName = prompt(
+            "Gadget name:",
+            currentWorkspace?.name.toLowerCase().replace(/\s+/g, "-") ||
+                "myWorkspace",
+        );
         if (!gadgetName) return;
 
         // Use stateSpec (action array) as the true state representation
@@ -763,7 +780,9 @@ export default function SexEditor() {
             // Default state is the action array
             defaultState: stateSpec,
             meta: {
-                description: `Exported from Sex Editor on ${new Date().toISOString()}`,
+                description: `Exported from Sex Editor on ${
+                    new Date().toISOString()
+                }`,
                 created: new Date().toISOString(),
                 workspace: currentWorkspace?.name || "Unknown",
                 gadgets: Object.keys(workspace),
@@ -785,7 +804,9 @@ export default function SexEditor() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${pkgName.replace('@', '').replace('/', '-')}-${gadgetName}.package.json`;
+        a.download = `${
+            pkgName.replace("@", "").replace("/", "-")
+        }-${gadgetName}.package.json`;
         a.click();
         URL.revokeObjectURL(url);
 
@@ -793,10 +814,10 @@ export default function SexEditor() {
         setTimeout(() => {
             alert(
                 `✅ Package exported!\n\n` +
-                `Package: ${pkgName}\n` +
-                `Gadget: ${gadgetName}\n` +
-                `Contains: ${Object.keys(workspace).length} gadgets\n\n` +
-                `You can now import this package to spawn this workspace anywhere!`
+                    `Package: ${pkgName}\n` +
+                    `Gadget: ${gadgetName}\n` +
+                    `Contains: ${Object.keys(workspace).length} gadgets\n\n` +
+                    `You can now import this package to spawn this workspace anywhere!`,
             );
         }, 100);
     };
@@ -813,7 +834,10 @@ export default function SexEditor() {
                 const packageDef = JSON.parse(text);
 
                 // Validate package structure
-                if (!packageDef.gadgets || typeof packageDef.gadgets !== 'object') {
+                if (
+                    !packageDef.gadgets ||
+                    typeof packageDef.gadgets !== "object"
+                ) {
                     alert("Invalid package: missing 'gadgets' field");
                     return;
                 }
@@ -825,29 +849,81 @@ export default function SexEditor() {
                     return;
                 }
 
-                const [gadgetName, gadgetProto] = gadgetEntries[0] as [string, any];
+                const [gadgetName, gadgetProto] = gadgetEntries[0] as [
+                    string,
+                    any,
+                ];
 
-                if (!gadgetProto.defaultState || !Array.isArray(gadgetProto.defaultState)) {
-                    alert(`Invalid gadget '${gadgetName}': missing or invalid defaultState`);
+                if (
+                    !gadgetProto.defaultState ||
+                    !Array.isArray(gadgetProto.defaultState)
+                ) {
+                    alert(
+                        `Invalid gadget '${gadgetName}': missing or invalid defaultState`,
+                    );
                     return;
                 }
 
-                const gadgetCount = gadgetProto.meta?.gadgetCount || gadgetProto.defaultState.length;
-                const gadgetList = gadgetProto.meta?.gadgets?.join(', ') || 'unknown';
+                const gadgetCount = gadgetProto.meta?.gadgetCount ||
+                    gadgetProto.defaultState.length;
+                const gadgetList = gadgetProto.meta?.gadgets?.join(", ") ||
+                    "unknown";
 
                 const confirmed = confirm(
                     `Import package: ${packageDef.name}\n\n` +
-                    `Gadget: ${gadgetName}\n` +
-                    `Contains: ${gadgetCount} gadgets (${gadgetList})\n` +
-                    `Created: ${gadgetProto.meta?.created || 'unknown'}\n\n` +
-                    `This will install the gadget and spawn it in the current workspace.\n\n` +
-                    `Continue?`
+                        `Gadget: ${gadgetName}\n` +
+                        `Contains: ${gadgetCount} gadgets (${gadgetList})\n` +
+                        `Created: ${
+                            gadgetProto.meta?.created || "unknown"
+                        }\n\n` +
+                        `This will install the gadget and spawn it in the current workspace.\n\n` +
+                        `Continue?`,
                 );
 
                 if (!confirmed) return;
 
-                // Install the package
-                installPackage(packageDef);
+                // Create proper gadget prototypes from package definition
+                const processedGadgets: Record<string, any> = {};
+
+                for (const [name, gadgetDefRaw] of gadgetEntries) {
+                    const gadgetDef = gadgetDefRaw as any;
+
+                    // Get the base proto (sex in this case)
+                    const basePkg = gadgetDef.extends || "@bassline/core";
+                    const baseProto = basePkg === "@bassline/systems/sex"
+                        ? bl().packages.get("@bassline/systems/sex")
+                        : bl().gadgetProto;
+
+                    if (!baseProto) {
+                        throw new Error(`Base prototype ${basePkg} not found`);
+                    }
+
+                    // Create new prototype extending base
+                    const newProto = Object.create(baseProto);
+                    const defaultState = gadgetDef.defaultState;
+
+                    Object.assign(newProto, {
+                        pkg: gadgetDef.pkg,
+                        name: gadgetDef.name,
+                        // Override afterSpawn to use defaultState
+                        afterSpawn(initial: any) {
+                            const state = initial !== undefined
+                                ? initial
+                                : defaultState;
+                            // Call parent's update and receive (inherited from baseProto)
+                            baseProto.update.call(this, {});
+                            baseProto.receive.call(this, state);
+                        },
+                    });
+
+                    processedGadgets[name] = newProto;
+                }
+
+                // Install the processed package
+                installPackage({
+                    name: packageDef.name,
+                    gadgets: processedGadgets,
+                });
 
                 // Spawn the gadget in current workspace
                 const baseName = gadgetName;
@@ -857,7 +933,7 @@ export default function SexEditor() {
                     name = `${baseName}_${counter++}`;
                 }
 
-                // Spawn using the package/gadget name
+                // Spawn using the installed gadget
                 currentSex.receive([[
                     "spawn",
                     name,
@@ -865,15 +941,14 @@ export default function SexEditor() {
                         pkg: gadgetProto.pkg,
                         name: gadgetProto.name,
                         state: gadgetProto.defaultState,
-                    }
+                    },
                 ]]);
 
                 alert(
                     `✅ Package imported and spawned!\n\n` +
-                    `Instance name: ${name}\n` +
-                    `Double-click to explore the ${gadgetCount} gadgets inside.`
+                        `Instance name: ${name}\n` +
+                        `Double-click to explore the ${gadgetCount} gadgets inside.`,
                 );
-
             } catch (e) {
                 alert(`Failed to import package: ${e}`);
             }

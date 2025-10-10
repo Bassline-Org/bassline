@@ -10,6 +10,7 @@ interface InspectorProps {
 export function Inspector({ gadget, workspace }: InspectorProps) {
     // Use regular React state for simple UI interactions
     const [inputValue, setInputValue] = useState("");
+    const [keysInputValue, setKeysInputValue] = useState("");
     const [effects, setEffects] = useState<Array<{ timestamp: number; effect: any }>>([]);
 
     // Always call hooks - use null gadget if not provided
@@ -39,6 +40,15 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
             cleanup();
         };
     }, [gadget, emptyGadget]);
+
+    // Sync keysInputValue with gadget state for wires
+    useEffect(() => {
+        if (gadget && gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire") {
+            const wireState = gadget.current();
+            const keys = wireState.keys || [];
+            setKeysInputValue(keys.join(', '));
+        }
+    }, [gadget, state]);
 
     // Find all connections to/from this gadget (must be before early return)
     const connections = useMemo(() => {
@@ -117,14 +127,49 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                 <div className="font-mono text-sm">{gadget.name}</div>
             </div>
             {isWire && wireInfo && (
-                <div>
-                    <div className="text-xs text-gray-500 uppercase mb-1">
-                        Connection
+                <>
+                    <div>
+                        <div className="text-xs text-gray-500 uppercase mb-1">
+                            Connection
+                        </div>
+                        <div className="font-mono text-xs bg-blue-50 text-blue-700 p-2 rounded">
+                            {wireInfo.source?.pkg}/{wireInfo.source?.name} → {wireInfo.target?.pkg}/{wireInfo.target?.name}
+                        </div>
                     </div>
-                    <div className="font-mono text-xs bg-blue-50 text-blue-700 p-2 rounded">
-                        {wireInfo.source?.pkg}/{wireInfo.source?.name} → {wireInfo.target?.pkg}/{wireInfo.target?.name}
+                    <div>
+                        <div className="text-xs text-gray-500 uppercase mb-1">
+                            Forward Keys
+                        </div>
+                        <input
+                            type="text"
+                            value={keysInputValue}
+                            placeholder="all (leave empty for all)"
+                            onChange={(e) => {
+                                setKeysInputValue(e.target.value);
+                            }}
+                            onBlur={() => {
+                                const newKeys = keysInputValue
+                                    .split(',')
+                                    .map(k => k.trim())
+                                    .filter(k => k.length > 0);
+                                gadget.receive({ keys: newKeys.length > 0 ? newKeys : null });
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const newKeys = keysInputValue
+                                        .split(',')
+                                        .map(k => k.trim())
+                                        .filter(k => k.length > 0);
+                                    gadget.receive({ keys: newKeys.length > 0 ? newKeys : null });
+                                }
+                            }}
+                            className="w-full px-2 py-1 text-sm border rounded font-mono"
+                        />
+                        <div className="text-xs text-gray-500 mt-1">
+                            Examples: <span className="font-mono">changed</span>, <span className="font-mono">computed</span>, <span className="font-mono">changed, delta</span>
+                        </div>
                     </div>
-                </div>
+                </>
             )}
             {!isWire && (connections.incoming.length > 0 || connections.outgoing.length > 0) && (
                 <div>

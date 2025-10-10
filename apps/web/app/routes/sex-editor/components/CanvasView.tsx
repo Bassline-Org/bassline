@@ -107,6 +107,9 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
             .filter(([_, g]) => g.pkg === "@bassline/relations" && g.name === "scopedWire")
             .map(([name, wireGadget]) => {
                 const state = wireGadget.current();
+                const keys = state.keys;
+                const hasKeys = keys && Array.isArray(keys) && keys.length > 0;
+
                 // Use stored names instead of ref lookup!
                 return {
                     id: name,
@@ -114,6 +117,9 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
                     target: state.targetName || "",
                     type: "smoothstep",
                     animated: true,
+                    label: hasKeys ? keys.join(', ') : undefined,
+                    labelStyle: { fontSize: 10, fontWeight: 500 },
+                    style: hasKeys ? { strokeDasharray: '5,5' } : undefined,
                     data: { wireGadget },
                 };
             })
@@ -195,6 +201,9 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
             .filter(([_, g]) => g.pkg === "@bassline/relations" && g.name === "scopedWire")
             .map(([name, wireGadget]) => {
                 const state = wireGadget.current();
+                const keys = state.keys;
+                const hasKeys = keys && Array.isArray(keys) && keys.length > 0;
+
                 // Use stored names instead of ref lookup!
                 return {
                     id: name,
@@ -202,6 +211,9 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
                     target: state.targetName || "",
                     type: "smoothstep" as const,
                     animated: true,
+                    label: hasKeys ? keys.join(', ') : undefined,
+                    labelStyle: { fontSize: 10, fontWeight: 500 },
+                    style: hasKeys ? { strokeDasharray: '5,5' } : undefined,
                     data: { wireGadget },
                 };
             })
