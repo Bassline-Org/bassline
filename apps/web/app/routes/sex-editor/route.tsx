@@ -733,31 +733,50 @@ export default function SexEditor() {
     };
 
     const handleExportAsPackage = () => {
+        // Get workspace name from active tab
+        const currentWorkspace = workspaces.find(w => w.id === activeWorkspaceId);
+        const defaultPkgName = `@my/${currentWorkspace?.name.toLowerCase().replace(/\s+/g, '-') || 'workspace'}`;
+
         const pkgName = prompt(
-            "Package name (e.g., @myapp/gadgets):",
-            "@myapp/gadgets",
+            "Package name (e.g., @myapp/patterns):",
+            defaultPkgName,
         );
         if (!pkgName) return;
 
-        const gadgetName = prompt("Gadget name:", "myGadget");
+        const gadgetName = prompt("Gadget name:", currentWorkspace?.name.toLowerCase().replace(/\s+/g, '-') || "myWorkspace");
         if (!gadgetName) return;
 
-        rootSex.receive([["snapshot", "export"]]);
+        // Use stateSpec (action array) as the true state representation
+        const stateSpec = rootSex.stateSpec();
+
+        if (stateSpec.length === 0) {
+            alert("Workspace is empty! Add some gadgets first.");
+            return;
+        }
+
+        // Create gadget prototype object
+        const gadgetProto = {
+            pkg: pkgName,
+            name: gadgetName,
+            // The gadget extends sex
+            extends: "@bassline/systems/sex",
+            // Default state is the action array
+            defaultState: stateSpec,
+            meta: {
+                description: `Exported from Sex Editor on ${new Date().toISOString()}`,
+                created: new Date().toISOString(),
+                workspace: currentWorkspace?.name || "Unknown",
+                gadgets: Object.keys(workspace),
+                gadgetCount: Object.keys(workspace).length,
+            },
+        };
 
         const packageDef = {
             name: pkgName,
+            version: "1.0.0",
+            description: `Package containing ${gadgetName} gadget`,
             gadgets: {
-                [gadgetName]: {
-                    pkg: pkgName,
-                    name: gadgetName,
-                    defaultState: rootSex.snapshots?.export || [],
-                    meta: {
-                        description: `Exported from sex editor at ${
-                            new Date().toISOString()
-                        }`,
-                        exports: Object.keys(workspace),
-                    },
-                },
+                [gadgetName]: gadgetProto,
             },
         };
 
@@ -766,9 +785,100 @@ export default function SexEditor() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${gadgetName}.package.json`;
+        a.download = `${pkgName.replace('@', '').replace('/', '-')}-${gadgetName}.package.json`;
         a.click();
         URL.revokeObjectURL(url);
+
+        // Show success message
+        setTimeout(() => {
+            alert(
+                `✅ Package exported!\n\n` +
+                `Package: ${pkgName}\n` +
+                `Gadget: ${gadgetName}\n` +
+                `Contains: ${Object.keys(workspace).length} gadgets\n\n` +
+                `You can now import this package to spawn this workspace anywhere!`
+            );
+        }, 100);
+    };
+
+    const handleImportPackage = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+            const text = await file.text();
+            try {
+                const packageDef = JSON.parse(text);
+
+                // Validate package structure
+                if (!packageDef.gadgets || typeof packageDef.gadgets !== 'object') {
+                    alert("Invalid package: missing 'gadgets' field");
+                    return;
+                }
+
+                // Get first gadget from package
+                const gadgetEntries = Object.entries(packageDef.gadgets);
+                if (gadgetEntries.length === 0) {
+                    alert("Package contains no gadgets!");
+                    return;
+                }
+
+                const [gadgetName, gadgetProto] = gadgetEntries[0] as [string, any];
+
+                if (!gadgetProto.defaultState || !Array.isArray(gadgetProto.defaultState)) {
+                    alert(`Invalid gadget '${gadgetName}': missing or invalid defaultState`);
+                    return;
+                }
+
+                const gadgetCount = gadgetProto.meta?.gadgetCount || gadgetProto.defaultState.length;
+                const gadgetList = gadgetProto.meta?.gadgets?.join(', ') || 'unknown';
+
+                const confirmed = confirm(
+                    `Import package: ${packageDef.name}\n\n` +
+                    `Gadget: ${gadgetName}\n` +
+                    `Contains: ${gadgetCount} gadgets (${gadgetList})\n` +
+                    `Created: ${gadgetProto.meta?.created || 'unknown'}\n\n` +
+                    `This will install the gadget and spawn it in the current workspace.\n\n` +
+                    `Continue?`
+                );
+
+                if (!confirmed) return;
+
+                // Install the package
+                installPackage(packageDef);
+
+                // Spawn the gadget in current workspace
+                const baseName = gadgetName;
+                let name = baseName;
+                let counter = 1;
+                while (workspace[name]) {
+                    name = `${baseName}_${counter++}`;
+                }
+
+                // Spawn using the package/gadget name
+                currentSex.receive([[
+                    "spawn",
+                    name,
+                    {
+                        pkg: gadgetProto.pkg,
+                        name: gadgetProto.name,
+                        state: gadgetProto.defaultState,
+                    }
+                ]]);
+
+                alert(
+                    `✅ Package imported and spawned!\n\n` +
+                    `Instance name: ${name}\n` +
+                    `Double-click to explore the ${gadgetCount} gadgets inside.`
+                );
+
+            } catch (e) {
+                alert(`Failed to import package: ${e}`);
+            }
+        };
+        input.click();
     };
 
     return (
@@ -778,6 +888,7 @@ export default function SexEditor() {
                 onSave={handleSave}
                 onLoad={handleLoad}
                 onExport={handleExportAsPackage}
+                onImport={handleImportPackage}
                 onSnapshot={handleSnapshot}
             />
 

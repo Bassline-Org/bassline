@@ -5,10 +5,11 @@ interface ToolbarProps {
     onSave: () => void;
     onLoad: () => void;
     onExport: () => void;
+    onImport: () => void;
     onSnapshot: () => void;
 }
 
-export function Toolbar({ onNew, onSave, onLoad, onExport, onSnapshot }: ToolbarProps) {
+export function Toolbar({ onNew, onSave, onLoad, onExport, onImport, onSnapshot }: ToolbarProps) {
     return (
         <div className="bg-gray-900 text-white px-4 py-2 flex items-center justify-between">
             <h1 className="text-lg font-semibold">Sex Editor</h1>
@@ -27,7 +28,10 @@ export function Toolbar({ onNew, onSave, onLoad, onExport, onSnapshot }: Toolbar
                     📸 Snapshot
                 </Button>
                 <Button size="sm" variant="outline" onClick={onExport}>
-                    Export Package
+                    📦 Export
+                </Button>
+                <Button size="sm" variant="outline" onClick={onImport}>
+                    📥 Import
                 </Button>
             </div>
         </div>

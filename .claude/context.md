@@ -135,6 +135,67 @@ const [activeWorkspaceId, setActiveWorkspaceId] = useState('default');
 - **Experiments**: Try variations without losing original
 - **Teaching**: Prepare examples in separate tabs
 
+### Export/Import Package Workflow (Meta-Circular Power!)
+
+**The system can describe itself using itself** - workspaces become reusable gadgets!
+
+**Export Workflow**:
+1. Build gadget network in workspace (use any gadgets, create patterns)
+2. Click **"📦 Export"** button in toolbar
+3. Enter package name (e.g., `@my/patterns`) and gadget name
+4. Downloads `.package.json` file containing:
+   - Action array (`stateSpec()`) as the gadget's default state
+   - Metadata (created date, gadget list, count)
+   - Extends `@bassline/systems/sex` (it's a sex gadget!)
+
+**Package Structure**:
+```json
+{
+  "name": "@my/patterns",
+  "version": "1.0.0",
+  "gadgets": {
+    "myPattern": {
+      "pkg": "@my/patterns",
+      "name": "myPattern",
+      "extends": "@bassline/systems/sex",
+      "defaultState": [
+        ["spawn", "counter", { "pkg": "@bassline/cells/numeric", "name": "max", "state": 0 }],
+        ["spawn", "logger", { "pkg": "@bassline/cells/unsafe", "name": "last", "state": null }],
+        ["wire", "wire1", "counter", "logger"]
+      ],
+      "meta": {
+        "description": "Exported from Sex Editor on 2025-10-09",
+        "workspace": "My Pattern",
+        "gadgets": ["counter", "logger", "wire1"],
+        "gadgetCount": 3
+      }
+    }
+  }
+}
+```
+
+**Import Workflow**:
+1. Click **"📥 Import"** button in toolbar
+2. Select `.package.json` file
+3. Confirms with preview (package name, gadget count, created date)
+4. **Installs package** via `installPackage()`
+5. **Spawns gadget** in current workspace
+6. Double-click to explore the nested gadgets inside!
+
+**Why This is Revolutionary**:
+- **Workspaces ARE gadgets** - no distinction
+- **Gadgets describe gadgets** - pure meta-circularity
+- **IDE becomes package factory** - build once, reuse everywhere
+- **Action arrays are code** - the spec IS the program
+- **Fractal composition** - packages contain packages contain packages...
+
+**Use Cases**:
+- Create pattern library in one tab, export, import in another project
+- Share gadget networks as JSON files (git-trackable!)
+- Build reusable components for common workflows
+- Teaching: Export examples as packages students can import
+- Versioning: Export snapshots at different development stages
+
 ### Wire Serialization Pattern
 
 **Critical Detail**: Wires store BOTH gadget refs (runtime) AND names (persistence):
