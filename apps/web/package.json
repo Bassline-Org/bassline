@@ -11,6 +11,7 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@bassline/builders": "workspace:*",
     "@bassline/cells": "workspace:*",
     "@bassline/core": "workspace:*",
     "@bassline/devtools": "workspace:*",

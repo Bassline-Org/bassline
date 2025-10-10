@@ -1,0 +1,11 @@
+{
+  "name": "@bassline/builders",
+  "version": "0.0.1",
+  "description": "Action builder functions for declarative sex gadget composition",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {}
+}

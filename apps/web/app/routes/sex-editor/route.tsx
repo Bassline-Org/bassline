@@ -20,6 +20,7 @@ import { SnapshotsPanel } from "./components/SnapshotsPanel";
 import { CanvasView, type CanvasViewHandle } from "./components/CanvasView";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { CommandPalette } from "./components/CommandPalette";
+import { PipelineBuilder } from "./components/PipelineBuilder";
 
 // Import view components for registration
 import { BigNumberView } from "./components/views/BigNumberView";
@@ -187,6 +188,7 @@ export default function SexEditor() {
         null,
     );
     const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+    const [isPipelineBuilderOpen, setIsPipelineBuilderOpen] = useState(false);
     const [showInspector, setShowInspector] = useState(true);
 
     // Undo/Redo state
@@ -518,6 +520,10 @@ export default function SexEditor() {
             else if ((e.metaKey || e.ctrlKey) && e.key === "k") {
                 e.preventDefault();
                 setIsPaletteOpen(true);
+            } // Cmd/Ctrl + P = Pipeline Builder
+            else if ((e.metaKey || e.ctrlKey) && e.key === "p") {
+                e.preventDefault();
+                setIsPipelineBuilderOpen(true);
             } // Cmd/Ctrl + D = Duplicate selected node
             else if ((e.metaKey || e.ctrlKey) && e.key === "d") {
                 e.preventDefault();
@@ -697,6 +703,11 @@ export default function SexEditor() {
             counter++;
         }
         currentSex.receive([["spawn", gadgetName, spec]]);
+    };
+
+    const handlePipelineComplete = (actions: any[]) => {
+        // Send the pipeline actions to the current sex gadget
+        currentSex.receive(actions);
     };
 
     const handleNavigateInto = (name: string, gadget: any) => {
@@ -1223,6 +1234,14 @@ export default function SexEditor() {
                 isOpen={isPaletteOpen}
                 onClose={() => setIsPaletteOpen(false)}
                 onSpawn={handleSpawnFromPalette}
+                packages={bl().packages}
+            />
+
+            {/* Pipeline Builder */}
+            <PipelineBuilder
+                isOpen={isPipelineBuilderOpen}
+                onClose={() => setIsPipelineBuilderOpen(false)}
+                onComplete={handlePipelineComplete}
                 packages={bl().packages}
             />
         </div>

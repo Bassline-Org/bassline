@@ -162,12 +162,24 @@ Object.assign(sex, {
                 gadget.name === "scopedWire"
             ) {
                 const state = gadget.current();
-                actions.push([
+                const wireAction = [
                     "wire",
                     name,
                     state.sourceName,
                     state.targetName,
-                ]);
+                ];
+
+                // Include options if present (keys, etc.)
+                const options = {};
+                if (state.keys !== undefined) {
+                    options.keys = state.keys;
+                }
+                // Add other options as needed
+                if (Object.keys(options).length > 0) {
+                    wireAction.push(options);
+                }
+
+                actions.push(wireAction);
             } else {
                 actions.push(["spawn", name, gadget.toSpec()]);
             }
@@ -330,12 +342,14 @@ Object.assign(sex, {
      * @param {string} wireName - Name for the wire gadget
      * @param {string} sourceName - Source gadget name
      * @param {string} targetName - Target gadget name
+     * @param {Object} [options] - Wire options (keys, transform, etc.)
      */
-    async wire(env, wireName, sourceName, targetName) {
+    async wire(env, wireName, sourceName, targetName, options = {}) {
         console.log("[sex.wire] Creating wire:", {
             wireName,
             sourceName,
             targetName,
+            options,
             spawned: Object.keys(env.spawned),
         });
 
@@ -386,6 +400,7 @@ Object.assign(sex, {
                 target, // Gadget ref for runtime tapping
                 sourceName, // Name for serialization/canvas
                 targetName, // Name for serialization/canvas
+                ...options, // Pass through keys and other options
             },
         });
 
@@ -394,8 +409,8 @@ Object.assign(sex, {
             wireName,
             wireState: wireGadget.current(),
         });
-        this.emit({ wired: { wireName, sourceName, targetName } });
-        return { wireName, sourceName, targetName };
+        this.emit({ wired: { wireName, sourceName, targetName, options } });
+        return { wireName, sourceName, targetName, options };
     },
 
     /**

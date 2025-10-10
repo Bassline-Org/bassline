@@ -50,6 +50,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@bassline/builders':
+        specifier: workspace:*
+        version: link:../../packages/builders
       '@bassline/cells':
         specifier: workspace:*
         version: link:../../packages/cells
@@ -240,6 +243,8 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)(jsdom@26.1.0)
+
+  packages/builders: {}
 
   packages/cells:
     dependencies:
