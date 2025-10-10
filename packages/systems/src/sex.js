@@ -312,6 +312,64 @@ Object.assign(sex, {
     },
 
     /**
+     * Create a wire connection between two gadgets
+     * @param {Object} env - Execution environment
+     * @param {string} wireName - Name for the wire gadget
+     * @param {string} sourceName - Source gadget name
+     * @param {string} targetName - Target gadget name
+     */
+    async wire(env, wireName, sourceName, targetName) {
+        // Check if wire name already exists
+        if (env.spawned[wireName]) {
+            this.emit({
+                error: {
+                    message: `Wire already exists: ${wireName}`,
+                    command: "wire",
+                    wireName,
+                },
+            });
+            return;
+        }
+
+        // Check if source and target exist
+        const source = env.spawned[sourceName];
+        const target = env.spawned[targetName];
+
+        if (!source) {
+            this.emit({
+                error: {
+                    message: `Source gadget not found: ${sourceName}`,
+                    command: "wire",
+                    sourceName,
+                },
+            });
+            return;
+        }
+
+        if (!target) {
+            this.emit({
+                error: {
+                    message: `Target gadget not found: ${targetName}`,
+                    command: "wire",
+                    targetName,
+                },
+            });
+            return;
+        }
+
+        // Spawn the wire gadget
+        const wireGadget = await fromSpec({
+            pkg: "@bassline/relations",
+            name: "scopedWire",
+            state: { source, target },
+        });
+
+        env.spawned[wireName] = wireGadget;
+        this.emit({ wired: { wireName, sourceName, targetName } });
+        return { wireName, sourceName, targetName };
+    },
+
+    /**
      * List available commands
      * @param {Object} _env - Execution environment (unused)
      */

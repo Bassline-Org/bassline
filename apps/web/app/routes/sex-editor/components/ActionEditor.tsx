@@ -12,6 +12,57 @@ const EXAMPLES = {
     "Send to Gadget": `[
   ["send", "counter", 42]
 ]`,
+    "Simple Wire": `[
+  ["spawn", "sensor", {
+    "pkg": "@bassline/cells/numeric",
+    "name": "max",
+    "state": 0
+  }],
+  ["spawn", "display", {
+    "pkg": "@bassline/cells/unsafe",
+    "name": "last",
+    "state": 0
+  }],
+  ["wire", "sensorToDisplay", "sensor", "display"]
+]`,
+    "Function Pipeline": `[
+  ["spawn", "input", {
+    "pkg": "@bassline/cells/numeric",
+    "name": "max",
+    "state": 0
+  }],
+  ["spawn", "doubler", {
+    "pkg": "@bassline/fn/math",
+    "name": "mul",
+    "state": { "args": { "b": 2 } }
+  }],
+  ["spawn", "output", {
+    "pkg": "@bassline/cells/unsafe",
+    "name": "last",
+    "state": 0
+  }],
+  ["wire", "inputToDoubler", "input", "doubler"],
+  ["wire", "doublerToOutput", "doubler", "output"]
+]`,
+    "Fan-out": `[
+  ["spawn", "source", {
+    "pkg": "@bassline/cells/numeric",
+    "name": "max",
+    "state": 0
+  }],
+  ["spawn", "target1", {
+    "pkg": "@bassline/cells/unsafe",
+    "name": "last",
+    "state": 0
+  }],
+  ["spawn", "target2", {
+    "pkg": "@bassline/cells/unsafe",
+    "name": "last",
+    "state": 0
+  }],
+  ["wire", "wire1", "source", "target1"],
+  ["wire", "wire2", "source", "target2"]
+]`,
     "Nested Workspace": `[
   ["spawn", "workspace", {
     "pkg": "@bassline/systems",
@@ -28,23 +79,6 @@ const EXAMPLES = {
       "state": { "$val": "initial" }
     }
   ]]
-]`,
-    "Multiple Gadgets": `[
-  ["spawn", "counter1", {
-    "pkg": "@bassline/cells/numeric",
-    "name": "max",
-    "state": 0
-  }],
-  ["spawn", "counter2", {
-    "pkg": "@bassline/cells/numeric",
-    "name": "max",
-    "state": 10
-  }],
-  ["spawn", "display", {
-    "pkg": "@bassline/cells/unsafe",
-    "name": "last",
-    "state": "hello"
-  }]
 ]`,
 };
 

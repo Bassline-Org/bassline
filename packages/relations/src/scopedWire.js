@@ -1,5 +1,4 @@
 import { bl } from "@bassline/core";
-import { StateSymbol } from "@bassline/core/gadget";
 
 const { gadgetProto } = bl();
 
@@ -43,7 +42,7 @@ Object.assign(scopedWire, {
     },
     onKill() {
         this.cleanup?.();
-        this[StateSymbol] = null;
+        this.update({});
     },
 });
 

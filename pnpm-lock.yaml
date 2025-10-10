@@ -59,6 +59,9 @@ importers:
       '@bassline/devtools':
         specifier: workspace:*
         version: link:../../packages/devtools
+      '@bassline/functions':
+        specifier: workspace:*
+        version: link:../../packages/functions
       '@bassline/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -68,6 +71,9 @@ importers:
       '@bassline/registry':
         specifier: workspace:*
         version: link:../../packages/registry
+      '@bassline/relations':
+        specifier: workspace:*
+        version: link:../../packages/relations
       '@bassline/systems':
         specifier: workspace:*
         version: link:../../packages/systems

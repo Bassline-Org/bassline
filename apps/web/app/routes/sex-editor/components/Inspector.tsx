@@ -55,6 +55,10 @@ export function Inspector({ gadget }: InspectorProps) {
         setInputValue("");
     };
 
+    // Check if this is a wire gadget
+    const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
+    const wireInfo = isWire ? state : null;
+
     return (
         <div className="p-4 space-y-4">
             <div>
@@ -67,6 +71,16 @@ export function Inspector({ gadget }: InspectorProps) {
                 <div className="text-xs text-gray-500 uppercase mb-1">Name</div>
                 <div className="font-mono text-sm">{gadget.name}</div>
             </div>
+            {isWire && wireInfo && (
+                <div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">
+                        Connection
+                    </div>
+                    <div className="font-mono text-xs bg-blue-50 text-blue-700 p-2 rounded">
+                        {wireInfo.source?.pkg}/{wireInfo.source?.name} → {wireInfo.target?.pkg}/{wireInfo.target?.name}
+                    </div>
+                </div>
+            )}
             <div>
                 <div className="text-xs text-gray-500 uppercase mb-1">
                     State
@@ -75,24 +89,26 @@ export function Inspector({ gadget }: InspectorProps) {
                     {JSON.stringify(state, null, 2)}
                 </pre>
             </div>
-            <div>
-                <div className="text-xs text-gray-500 uppercase mb-1">
-                    Quick Send
+            {!isWire && (
+                <div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">
+                        Quick Send
+                    </div>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                            placeholder="JSON or value"
+                            className="flex-1 px-2 py-1 text-sm border rounded"
+                        />
+                        <Button size="sm" onClick={handleSend}>
+                            Send
+                        </Button>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                        placeholder="JSON or value"
-                        className="flex-1 px-2 py-1 text-sm border rounded"
-                    />
-                    <Button size="sm" onClick={handleSend}>
-                        Send
-                    </Button>
-                </div>
-            </div>
+            )}
         </div>
     );
 }

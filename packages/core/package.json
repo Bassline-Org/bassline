@@ -5,7 +5,8 @@
   "type": "module",
   "module": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./gadget": "./src/gadget.js"
   },
   "scripts": {
     "test": "vitest run",

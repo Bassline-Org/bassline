@@ -4,6 +4,8 @@ import cells from "@bassline/cells";
 import { installSystems } from "@bassline/systems";
 import systems from "@bassline/systems";
 import { installReact } from "@bassline/react";
+import functions from "@bassline/functions";
+import "@bassline/relations";
 
 import { PackageBrowser } from "./components/PackageBrowser";
 import { WorkspaceTree } from "./components/WorkspaceTree";
@@ -21,6 +23,7 @@ installSystems();
 installReact();
 installPackage(cells);
 installPackage(systems);
+installPackage(functions);
 
 export function meta() {
     return [

@@ -112,6 +112,7 @@ function getIcon(gadget: any): string {
     if (gadget.pkg === "@bassline/cells/numeric") return "🔢";
     if (gadget.pkg === "@bassline/cells/tables") return "📝";
     if (gadget.pkg === "@bassline/relations") return "🔗";
+    if (gadget.pkg?.startsWith("@bassline/fn")) return "🔧";
     return "◆";
 }
 
