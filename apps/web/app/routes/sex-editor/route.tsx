@@ -6,6 +6,8 @@ import systems from "@bassline/systems";
 import { installReact } from "@bassline/react";
 import functions from "@bassline/functions";
 import "@bassline/relations";
+import "@bassline/views"; // Install view extension
+import { registerView } from "@bassline/views";
 
 import { PackageBrowser } from "./components/PackageBrowser";
 import { WorkspaceTree } from "./components/WorkspaceTree";
@@ -19,6 +21,12 @@ import { CanvasView, type CanvasViewHandle } from "./components/CanvasView";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { CommandPalette } from "./components/CommandPalette";
 
+// Import view components for registration
+import { BigNumberView } from "./components/views/BigNumberView";
+import { LineChartView } from "./components/views/LineChartView";
+import { TableView } from "./components/views/TableView";
+import { GaugeView } from "./components/views/GaugeView";
+
 import type { ContextMenuState, GadgetSpec } from "./types";
 
 // Install packages
@@ -28,6 +36,12 @@ installReact();
 installPackage(cells);
 installPackage(systems);
 installPackage(functions);
+
+// Register view components
+registerView("bigNumber", BigNumberView, { description: "Large KPI display for numeric values" });
+registerView("lineChart", LineChartView, { description: "Time series line chart" });
+registerView("table", TableView, { description: "Data table for arrays and objects" });
+registerView("gauge", GaugeView, { description: "Circular gauge for numeric values" });
 
 export function meta() {
     return [

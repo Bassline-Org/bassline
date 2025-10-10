@@ -1,0 +1,16 @@
+{
+  "name": "@bassline/views",
+  "version": "0.0.1",
+  "description": "View registry extension for Bassline gadgets - semantic visualization",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "keywords": ["bassline", "views", "visualization", "gadgets"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  }
+}

@@ -126,6 +126,51 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                 <div className="text-xs text-gray-500 uppercase mb-1">Name</div>
                 <div className="font-mono text-sm">{gadget.name}</div>
             </div>
+
+            {/* View Selector (if gadget supports views) */}
+            {!isWire && gadget.getView && (
+                <div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">
+                        View Mode
+                    </div>
+                    <select
+                        value={gadget.getView()}
+                        onChange={(e) => gadget.setView(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border rounded bg-white"
+                    >
+                        {gadget.getAvailableViews().map((v: string) => (
+                            <option key={v} value={v}>
+                                {v === "default" ? "Default (JSON Box)" : v}
+                            </option>
+                        ))}
+                    </select>
+
+                    {/* Suggested views based on data shape */}
+                    {gadget.getSuggestedViews && gadget.getSuggestedViews().length > 1 && (
+                        <div className="mt-2">
+                            <div className="text-xs text-gray-500 mb-1">
+                                Suggested:
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                                {gadget.getSuggestedViews().map((v: string) => (
+                                    <button
+                                        key={v}
+                                        onClick={() => gadget.setView(v)}
+                                        className={`px-2 py-0.5 text-xs rounded ${
+                                            gadget.getView() === v
+                                                ? "bg-blue-500 text-white"
+                                                : "bg-blue-100 hover:bg-blue-200 text-blue-700"
+                                        }`}
+                                    >
+                                        {v}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {isWire && wireInfo && (
                 <>
                     <div>

@@ -1,6 +1,18 @@
 import { memo, useEffect, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import styles from "./WorkspaceTree.module.css";
+import { BigNumberView } from "./views/BigNumberView";
+import { LineChartView } from "./views/LineChartView";
+import { TableView } from "./views/TableView";
+import { GaugeView } from "./views/GaugeView";
+
+// Map of view names to components
+const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
+    bigNumber: BigNumberView,
+    lineChart: LineChartView,
+    table: TableView,
+    gauge: GaugeView,
+};
 
 function getIcon(gadget: any): string {
     if (gadget.pkg === "@bassline/systems") return "📦";
@@ -30,16 +42,35 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
     const { name, gadget, onNavigateInto } = data;
     const state = gadget.useCurrent();
     const [isFlashing, setIsFlashing] = useState(false);
+    const [viewName, setViewName] = useState(
+        gadget.getView ? gadget.getView() : "default"
+    );
 
     // Flash animation on receive
     useEffect(() => {
-        const cleanup = gadget.tap(() => {
+        const cleanup = gadget.tap((effect: any) => {
             setIsFlashing(true);
             setTimeout(() => setIsFlashing(false), 300);
+
+            // Listen for view changes
+            if (effect.viewChanged) {
+                setViewName(effect.viewChanged.to);
+            }
         });
         return cleanup;
     }, [gadget]);
 
+    // Check if gadget has a custom view
+    const ViewComponent = viewName !== "default"
+        ? VIEW_COMPONENTS[viewName]
+        : null;
+
+    // If custom view exists, render it
+    if (ViewComponent) {
+        return <ViewComponent data={data} selected={selected} />;
+    }
+
+    // Otherwise render default box view
     const icon = getIcon(gadget);
     const preview = getPreview(state);
     const isSex = gadget.pkg === "@bassline/systems" && gadget.name === "sex";
