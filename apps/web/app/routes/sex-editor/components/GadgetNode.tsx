@@ -27,7 +27,7 @@ function getPreview(state: any): string {
 }
 
 export const GadgetNode = memo(({ data, selected }: NodeProps) => {
-    const { name, gadget } = data;
+    const { name, gadget, onNavigateInto } = data;
     const state = gadget.useCurrent();
     const [isFlashing, setIsFlashing] = useState(false);
 
@@ -42,12 +42,22 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
 
     const icon = getIcon(gadget);
     const preview = getPreview(state);
+    const isSex = gadget.pkg === "@bassline/systems" && gadget.name === "sex";
+
+    const handleDoubleClick = () => {
+        if (isSex && onNavigateInto) {
+            onNavigateInto(name, gadget);
+        }
+    };
 
     return (
         <div
+            onDoubleClick={handleDoubleClick}
             className={`bg-white border-2 rounded shadow-md min-w-[180px] ${
                 selected ? "border-blue-500 ring-2 ring-blue-300" : "border-gray-300"
-            } ${isFlashing ? styles.flash : ""}`}
+            } ${isFlashing ? styles.flash : ""} ${
+                isSex ? "cursor-pointer hover:border-purple-400 hover:shadow-lg transition-all" : ""
+            }`}
         >
             {/* Connection handles */}
             <Handle type="target" position={Position.Top} className="!bg-blue-500" />
@@ -58,6 +68,7 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
                 <div className="flex items-center gap-2">
                     <span className="text-lg">{icon}</span>
                     <span className="font-semibold text-sm truncate">{name}</span>
+                    {isSex && <span className="text-xs text-purple-500">↴</span>}
                 </div>
                 <div className="text-xs text-gray-500 font-mono truncate">
                     {gadget.pkg}/{gadget.name}

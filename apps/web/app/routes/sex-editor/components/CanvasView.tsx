@@ -20,6 +20,7 @@ interface CanvasViewProps {
     workspace: Record<string, any>;
     rootSex: any;
     selectionCell: any;
+    onNavigateInto: (name: string, gadget: any) => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -54,7 +55,7 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
     return { nodes: layoutedNodes, edges };
 }
 
-export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProps) {
+export function CanvasView({ workspace, rootSex, selectionCell, onNavigateInto }: CanvasViewProps) {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [isInitialized, setIsInitialized] = useState(false);
@@ -71,7 +72,7 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
                     id: name,
                     type: isWire ? "wireNode" : "gadgetNode",
                     position: { x: 0, y: 0 }, // Will be set by dagre
-                    data: { name, gadget, isWire },
+                    data: { name, gadget, isWire, onNavigateInto },
                 };
             });
 
@@ -154,7 +155,7 @@ export function CanvasView({ workspace, rootSex, selectionCell }: CanvasViewProp
                         x: Math.random() * 400,
                         y: Math.random() * 400,
                     }, // Random for now
-                    data: { name, gadget, isWire },
+                    data: { name, gadget, isWire, onNavigateInto },
                 };
             });
 

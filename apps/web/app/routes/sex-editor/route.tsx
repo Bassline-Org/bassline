@@ -16,6 +16,7 @@ import { EffectsPanel } from "./components/EffectsPanel";
 import { Toolbar } from "./components/Toolbar";
 import { SnapshotsPanel } from "./components/SnapshotsPanel";
 import { CanvasView } from "./components/CanvasView";
+import { Breadcrumb } from "./components/Breadcrumb";
 
 import type { GadgetSpec, ContextMenuState } from "./types";
 
@@ -56,7 +57,23 @@ export default function SexEditor() {
     }, []);
 
     const [rootSex] = rootSexCell.useState();
-    const workspace = rootSex.useCurrent();
+
+    // Navigation stack - track path through nested workspaces
+    const navigationStackCell = useMemo(
+        () =>
+            fromSpec({
+                pkg: "@bassline/cells/unsafe",
+                name: "last",
+                state: [{ sex: rootSex, name: "root" }],
+            }),
+        [rootSex],
+    );
+    const [navigationStack] = navigationStackCell.useState();
+
+    // Current workspace is the last item in navigation stack
+    const currentFrame = navigationStack?.[navigationStack.length - 1] || { sex: rootSex, name: "root" };
+    const currentSex = currentFrame.sex;
+    const workspace = currentSex.useCurrent();
 
     // Selection gadget
     const selectionCell = useMemo(
@@ -250,8 +267,9 @@ export default function SexEditor() {
             selectionCell.kill();
             historyCell.kill();
             effectsLogCell.kill();
+            navigationStackCell.kill();
         };
-    }, [selectionCell, historyCell, effectsLogCell]);
+    }, [selectionCell, historyCell, effectsLogCell, navigationStackCell]);
 
     // Other handlers (non-useCallback)
     const handleLoad = () => {
@@ -318,7 +336,26 @@ export default function SexEditor() {
             name = `${baseName}_${counter}`;
             counter++;
         }
-        rootSex.receive([["spawn", name, spec]]);
+        currentSex.receive([["spawn", name, spec]]);
+    };
+
+    const handleNavigateInto = (name: string, gadget: any) => {
+        // Only navigate into sex gadgets
+        if (gadget.pkg === "@bassline/systems" && gadget.name === "sex") {
+            const currentStack = navigationStack || [{ sex: rootSex, name: "root" }];
+            navigationStackCell.receive([
+                ...currentStack,
+                { sex: gadget, name, parentSex: currentSex },
+            ]);
+        }
+    };
+
+    const handleNavigateToLevel = (index: number) => {
+        // Navigate back to a specific level in the stack
+        const currentStack = navigationStack || [{ sex: rootSex, name: "root" }];
+        if (index >= 0 && index < currentStack.length) {
+            navigationStackCell.receive(currentStack.slice(0, index + 1));
+        }
     };
 
     const handleContextMenu = (e: React.MouseEvent, name: string, gadget: any) => {
@@ -477,11 +514,20 @@ export default function SexEditor() {
 
                     <div className="flex-1 overflow-hidden">
                         {activeTab === "canvas" && (
-                            <CanvasView
-                                workspace={workspace}
-                                rootSex={rootSex}
-                                selectionCell={selectionCell}
-                            />
+                            <div className="h-full flex flex-col">
+                                <Breadcrumb
+                                    navigationStack={navigationStack || [{ sex: rootSex, name: "root" }]}
+                                    onNavigateToLevel={handleNavigateToLevel}
+                                />
+                                <div className="flex-1">
+                                    <CanvasView
+                                        workspace={workspace}
+                                        rootSex={rootSex}
+                                        selectionCell={selectionCell}
+                                        onNavigateInto={handleNavigateInto}
+                                    />
+                                </div>
+                            </div>
                         )}
 
                         {activeTab === "actions" && (
