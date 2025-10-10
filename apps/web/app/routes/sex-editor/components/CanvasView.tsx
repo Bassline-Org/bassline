@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useImperativeHandle, forwardRef } from "react";
 import {
     ReactFlow,
     Background,
@@ -6,7 +6,6 @@ import {
     MiniMap,
     useNodesState,
     useEdgesState,
-    addEdge,
     type Node,
     type Edge,
     type Connection,
@@ -21,6 +20,13 @@ interface CanvasViewProps {
     currentSex: any;
     selectionCell: any;
     onNavigateInto: (name: string, gadget: any) => void;
+}
+
+export interface CanvasViewHandle {
+    autoLayout: () => void;
+    getSelectedNodes: () => Node[];
+    getSelectedEdges: () => Edge[];
+    deselectAll: () => void;
 }
 
 const nodeTypes: NodeTypes = {
@@ -55,10 +61,31 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
     return { nodes: layoutedNodes, edges };
 }
 
-export function CanvasView({ workspace, currentSex, selectionCell, onNavigateInto }: CanvasViewProps) {
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const [isInitialized, setIsInitialized] = useState(false);
+const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
+    ({ workspace, currentSex, selectionCell, onNavigateInto }, ref) => {
+        const [nodes, setNodes, onNodesChange] = useNodesState([]);
+        const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+        const [isInitialized, setIsInitialized] = useState(false);
+
+        // Expose imperative methods to parent
+        useImperativeHandle(ref, () => ({
+            autoLayout: () => {
+                const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(nodes, edges);
+                setNodes(layoutedNodes);
+                setEdges(layoutedEdges);
+            },
+            getSelectedNodes: () => {
+                return nodes.filter(n => n.selected);
+            },
+            getSelectedEdges: () => {
+                return edges.filter(e => e.selected);
+            },
+            deselectAll: () => {
+                setNodes(nodes.map(n => ({ ...n, selected: false })));
+                setEdges(edges.map(e => ({ ...e, selected: false })));
+                selectionCell.receive(null);
+            }
+        }), [nodes, edges, selectionCell, setNodes, setEdges]);
 
     // Transform workspace to initial nodes/edges with auto-layout
     useEffect(() => {
@@ -272,4 +299,12 @@ export function CanvasView({ workspace, currentSex, selectionCell, onNavigateInt
             </ReactFlow>
         </div>
     );
+});
+
+CanvasViewInner.displayName = "CanvasView";
+
+// Wrapper to provide ReactFlowProvider context
+export function CanvasView(props: CanvasViewProps & { canvasRef?: React.Ref<CanvasViewHandle> }) {
+    const { canvasRef, ...rest } = props;
+    return <CanvasViewInner {...rest} ref={canvasRef} />;
 }

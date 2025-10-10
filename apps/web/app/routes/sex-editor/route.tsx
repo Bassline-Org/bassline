@@ -15,7 +15,7 @@ import { HistoryPanel } from "./components/HistoryPanel";
 import { EffectsPanel } from "./components/EffectsPanel";
 import { Toolbar } from "./components/Toolbar";
 import { SnapshotsPanel } from "./components/SnapshotsPanel";
-import { CanvasView } from "./components/CanvasView";
+import { CanvasView, type CanvasViewHandle } from "./components/CanvasView";
 import { Breadcrumb } from "./components/Breadcrumb";
 import { CommandPalette } from "./components/CommandPalette";
 
@@ -42,6 +42,7 @@ export function meta() {
 export default function SexEditor() {
     // Prevent double-prompt in React StrictMode
     const hasLoadedRef = useRef(false);
+    const canvasRef = useRef<CanvasViewHandle>(null);
 
     // Root sex gadget
     const rootSexCell = useMemo(() => {
@@ -93,6 +94,7 @@ export default function SexEditor() {
     const [activeTab, setActiveTab] = useState("canvas");
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
     const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+    const [showInspector, setShowInspector] = useState(true);
 
     // History gadget
     const historyCell = useMemo(
@@ -230,28 +232,72 @@ export default function SexEditor() {
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't intercept when typing in inputs/textareas
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                // Allow Escape to blur inputs
+                if (e.key === "Escape") {
+                    (e.target as HTMLElement).blur();
+                }
+                return;
+            }
+
             // Cmd/Ctrl + K = Command Palette
             if ((e.metaKey || e.ctrlKey) && e.key === "k") {
                 e.preventDefault();
                 setIsPaletteOpen(true);
             }
+            // Cmd/Ctrl + D = Duplicate selected node
+            else if ((e.metaKey || e.ctrlKey) && e.key === "d") {
+                e.preventDefault();
+                const selectedNodes = canvasRef.current?.getSelectedNodes() || [];
+                selectedNodes.forEach((node) => {
+                    if (!node.data?.["isWire"]) {
+                        const gadget = node.data?.["gadget"] as any;
+                        const spec = gadget.toSpec();
+                        const baseName = node.data?.["name"] as string;
+                        let counter = 1;
+                        let name = `${baseName}_copy`;
+                        while (workspace[name]) {
+                            name = `${baseName}_copy_${counter}`;
+                            counter++;
+                        }
+                        currentSex.receive([["spawn", name, spec]]);
+                    }
+                });
+            }
+            // Cmd/Ctrl + L = Auto-layout
+            else if ((e.metaKey || e.ctrlKey) && e.key === "l") {
+                e.preventDefault();
+                canvasRef.current?.autoLayout();
+            }
+            // Cmd/Ctrl + / = Toggle inspector
+            else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+                e.preventDefault();
+                setShowInspector(prev => !prev);
+            }
+            // Escape = Deselect all
+            else if (e.key === "Escape") {
+                e.preventDefault();
+                canvasRef.current?.deselectAll();
+                setIsPaletteOpen(false);
+            }
             // Cmd/Ctrl + Enter = Execute
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+            else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                 e.preventDefault();
                 handleExecute();
             }
             // Cmd/Ctrl + S = Save
-            if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+            else if ((e.metaKey || e.ctrlKey) && e.key === "s") {
                 e.preventDefault();
                 handleSave();
             }
             // Cmd/Ctrl + Shift + S = Snapshot
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "S") {
+            else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "S") {
                 e.preventDefault();
                 handleSnapshot();
             }
             // Cmd/Ctrl + Shift + R = Show snapshots
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "R") {
+            else if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "R") {
                 e.preventDefault();
                 setActiveTab("snapshots");
             }
@@ -259,7 +305,7 @@ export default function SexEditor() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [handleExecute, handleSave, handleSnapshot]);
+    }, [handleExecute, handleSave, handleSnapshot, workspace, currentSex, canvasRef]);
 
     // Context menu close on click
     useEffect(() => {
@@ -461,7 +507,9 @@ export default function SexEditor() {
                 onSnapshot={handleSnapshot}
             />
 
-            <div className="flex-1 grid grid-cols-[250px_1fr_300px] overflow-hidden">
+            <div className={`flex-1 grid overflow-hidden ${
+                showInspector ? "grid-cols-[250px_1fr_300px]" : "grid-cols-[250px_1fr]"
+            }`}>
                 {/* Left: Explorer */}
                 <div className="border-r overflow-y-auto bg-gray-50">
                     <div className="p-4 space-y-6">
@@ -544,6 +592,7 @@ export default function SexEditor() {
                                         currentSex={currentSex}
                                         selectionCell={selectionCell}
                                         onNavigateInto={handleNavigateInto}
+                                        canvasRef={canvasRef}
                                     />
                                 </div>
                             </div>
@@ -586,12 +635,14 @@ export default function SexEditor() {
                 </div>
 
                 {/* Right: Inspector */}
-                <div className="border-l overflow-y-auto bg-gray-50">
-                    <h2 className="text-sm font-semibold text-gray-700 p-4 pb-0 uppercase">
-                        Inspector
-                    </h2>
-                    <Inspector gadget={selected} workspace={workspace} />
-                </div>
+                {showInspector && (
+                    <div className="border-l overflow-y-auto bg-gray-50">
+                        <h2 className="text-sm font-semibold text-gray-700 p-4 pb-0 uppercase">
+                            Inspector
+                        </h2>
+                        <Inspector gadget={selected} workspace={workspace} />
+                    </div>
+                )}
             </div>
 
             {/* Context Menu */}
