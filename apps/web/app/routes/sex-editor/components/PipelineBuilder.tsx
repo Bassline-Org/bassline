@@ -172,13 +172,25 @@ export function PipelineBuilder({ isOpen, onClose, onComplete, packages }: Pipel
         }
     };
 
-    const handleBuild = () => {
+    const handleBuild = async () => {
         const actions = pipeline(stages.map(stage => ({
             spec: stage.spec,
             extract: stage.extract,
             name: stage.customName,
         })));
-        onComplete(actions);
+
+        // Wrap pipeline in a sex gadget so names are scoped internally
+        const { fromSpec } = await import("@bassline/core") as any;
+        const pipelineGadget = fromSpec({
+            pkg: "@bassline/systems",
+            name: "sex",
+            state: actions
+        });
+
+        // Add to workspace with unique name
+        const name = `pipeline_${Date.now()}`;
+        onComplete([["spawn", name, pipelineGadget.toSpec()]]);
+
         onClose();
         setStages([]);
     };

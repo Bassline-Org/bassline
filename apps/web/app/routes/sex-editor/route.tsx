@@ -32,6 +32,7 @@ import { SexTableView } from "./components/views/SexTableView";
 import { ButtonView } from "./components/views/ButtonView";
 import { SliderView } from "./components/views/SliderView";
 import { ToggleView } from "./components/views/ToggleView";
+import { PipelineBuilderView } from "./components/views/PipelineBuilderView";
 
 import type { ContextMenuState, GadgetSpec } from "./types";
 
@@ -53,6 +54,7 @@ registerView("sexTable", SexTableView, { description: "Table view for sex gadget
 registerView("button", ButtonView, { description: "Interactive button control" });
 registerView("slider", SliderView, { description: "Numeric slider control" });
 registerView("toggle", ToggleView, { description: "Boolean toggle switch" });
+registerView("pipelineBuilder", PipelineBuilderView, { description: "Visual pipeline builder for function composition" });
 
 export function meta() {
     return [
