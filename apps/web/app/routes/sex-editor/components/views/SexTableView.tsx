@@ -5,13 +5,16 @@ export const SexTableView = memo(({ data }: NodeProps) => {
     const { gadget } = data; // This is a sex gadget
     const workspace = gadget.useCurrent(); // All spawned gadgets
 
-    const [sortKey, setSortKey] = useState<"name" | "pkg" | "type" | "view">("name");
+    const [sortKey, setSortKey] = useState<"name" | "pkg" | "type" | "view">(
+        "name",
+    );
     const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
     // Prepare table data
     const rows = Object.entries(workspace)
         .map(([name, g]) => {
-            const isWire = g.pkg === "@bassline/relations" && g.name === "scopedWire";
+            const isWire = g.pkg === "@bassline/relations" &&
+                g.name === "scopedWire";
             const state = g.current();
 
             return {
@@ -48,9 +51,12 @@ export const SexTableView = memo(({ data }: NodeProps) => {
         <div className="w-full h-full bg-white overflow-auto">
             <div className="p-6">
                 <div className="mb-4">
-                    <h2 className="text-2xl font-bold text-gray-800">Workspace Table View</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        Workspace Table View
+                    </h2>
                     <p className="text-sm text-gray-500 mt-1">
-                        {rows.length} gadget{rows.length !== 1 ? "s" : ""} in workspace
+                        {rows.length} gadget{rows.length !== 1 ? "s" : ""}{" "}
+                        in workspace
                     </p>
                 </div>
 

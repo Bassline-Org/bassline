@@ -111,6 +111,10 @@ export function fromSpec(spec) {
             if (id && globalThis.bassline.registry !== undefined) {
                 g._setId(id);
             }
+            // Restore view if present
+            if (spec.view && g.setView) {
+                g.setView(spec.view);
+            }
             return g;
         });
     }
@@ -120,6 +124,10 @@ export function fromSpec(spec) {
     const g = proto.spawn(state);
     if (id && globalThis.bassline.registry !== undefined) {
         g._setId(id);
+    }
+    // Restore view if present
+    if (spec.view && g.setView) {
+        g.setView(spec.view);
     }
     return g;
 }

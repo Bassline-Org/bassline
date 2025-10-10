@@ -28,6 +28,9 @@ import { TableView } from "./components/views/TableView";
 import { GaugeView } from "./components/views/GaugeView";
 import { DashboardView } from "./components/views/DashboardView";
 import { SexTableView } from "./components/views/SexTableView";
+import { ButtonView } from "./components/views/ButtonView";
+import { SliderView } from "./components/views/SliderView";
+import { ToggleView } from "./components/views/ToggleView";
 
 import type { ContextMenuState, GadgetSpec } from "./types";
 
@@ -46,6 +49,9 @@ registerView("table", TableView, { description: "Data table for arrays and objec
 registerView("gauge", GaugeView, { description: "Circular gauge for numeric values" });
 registerView("dashboard", DashboardView, { description: "Dashboard view for sex gadgets" });
 registerView("sexTable", SexTableView, { description: "Table view for sex gadgets" });
+registerView("button", ButtonView, { description: "Interactive button control" });
+registerView("slider", SliderView, { description: "Numeric slider control" });
+registerView("toggle", ToggleView, { description: "Boolean toggle switch" });
 
 export function meta() {
     return [

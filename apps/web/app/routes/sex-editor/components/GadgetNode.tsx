@@ -7,6 +7,9 @@ import { TableView } from "./views/TableView";
 import { GaugeView } from "./views/GaugeView";
 import { DashboardView } from "./views/DashboardView";
 import { SexTableView } from "./views/SexTableView";
+import { ButtonView } from "./views/ButtonView";
+import { SliderView } from "./views/SliderView";
+import { ToggleView } from "./views/ToggleView";
 
 // Map of view names to components
 const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
@@ -16,6 +19,9 @@ const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
     gauge: GaugeView,
     dashboard: DashboardView,
     sexTable: SexTableView,
+    button: ButtonView,
+    slider: SliderView,
+    toggle: ToggleView,
 };
 
 function getIcon(gadget: any): string {
