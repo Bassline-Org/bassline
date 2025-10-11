@@ -51,7 +51,7 @@ export class Evaluator {
         return value;
     }
 
-    eval(value, stack) {
+    eval(value) {
         if (value instanceof Num) {
             return value.value;
         }
@@ -63,7 +63,7 @@ export class Evaluator {
         if (value instanceof Word) {
             if (value.isSetter()) {
                 const name = value.getName();
-                const nextValue = this.step(stack);
+                const nextValue = this.step();
                 return this.setWord(name, nextValue);
             }
 
@@ -74,7 +74,7 @@ export class Evaluator {
 
             const handler = this.dialectWords[value.value];
             if (handler) {
-                return handler.call(this, stack);
+                return handler.call(this);
             }
 
             // Otherwise it's just a symbol
@@ -83,7 +83,7 @@ export class Evaluator {
 
         // Paths evaluate root and apply refinements
         if (value instanceof Path) {
-            let result = this.eval(new Word(value.root), stack);
+            let result = this.eval(new Word(value.root));
 
             // Apply each refinement
             for (const refinement of value.items) {
@@ -92,6 +92,7 @@ export class Evaluator {
                 } else if (typeof result === "object" && result !== null) {
                     result = result[refinement];
                 } else {
+                    console.log("node: ", value);
                     throw new Error(`Cannot refine ${typeof result}`);
                 }
             }
@@ -100,34 +101,34 @@ export class Evaluator {
         }
 
         if (value instanceof Paren) {
-            let result;
-            for (const v in value.items) {
-                result = this.eval(v, stack);
-            }
-            return result;
+            const evaluator = new Evaluator(value.items, this.env);
+            return evaluator.run();
         }
-        if (value instanceof Tag) return value;
-        if (value instanceof Url) return value;
-        if (value instanceof Tuple) return value;
-        if (value instanceof Block) return value;
+        if (
+            value instanceof Tag ||
+            value instanceof Url ||
+            value instanceof Tuple ||
+            value instanceof Block
+        ) {
+            return value;
+        }
 
         throw new Error(`Cannot evaluate: ${value}`);
     }
 
-    step(stack) {
+    step() {
         const value = this.next();
         if (value === undefined) return undefined;
-        return this.eval(value, stack);
+        const result = this.eval(value);
+        this.lastResult = result;
+        return result;
     }
 
     run() {
-        let result;
-        let stack = [];
         while (this.hasMore()) {
-            result = this.step(stack);
-            stack.push(result);
+            this.step();
         }
-        return result;
+        return this.lastResult;
     }
 }
 
@@ -136,48 +137,62 @@ export function installDialect(words, grammarObj = GrammarProto) {
 }
 
 const coreDialect = {
-    print(stack) {
-        const value = this.step(stack);
+    print() {
+        const value = this.step();
         console.log(value);
         return value;
     },
 
-    do(_stack) {
+    do() {
         const block = this.step();
         if (!(block instanceof Block)) {
             throw new Error("do expects a block");
         }
 
-        const evaluator = new Evaluator(block.items, {
-            env: this.env,
-            dialect: this.dialectWords,
-        });
+        const evaluator = new Evaluator(block.items, this.env);
         return evaluator.run();
     },
 
     if() {
         const condition = this.step();
         const thenBlock = this.step();
+        const elseBlock = this.step();
 
         if (!(thenBlock instanceof Block)) {
-            throw new Error("if expects a block");
+            throw new Error("if: no then block provided!", thenBlock);
+        }
+        if (!(elseBlock instanceof Block)) {
+            throw new Error("if: no else block provided!", elseBlock);
         }
 
         if (condition) {
-            const evaluator = new Evaluator(thenBlock.items, { env: this.env });
-            evaluator.dialectWords = this.dialectWords;
+            const evaluator = new Evaluator(thenBlock.items, this.env);
+            return evaluator.run();
+        } else {
+            const evaluator = new Evaluator(elseBlock.items, this.env);
             return evaluator.run();
         }
-
-        return undefined;
     },
 
-    context(stack) {
-        const block = this.step(stack);
+    context() {
+        const block = this.step();
         const env = Object.create(this.env);
         const evaluator = new Evaluator(block.items, env);
         evaluator.run();
         return evaluator.env;
+    },
+
+    ["+"]() {
+        return this.lastResult + this.step();
+    },
+    ["*"]() {
+        return this.lastResult * this.step();
+    },
+    ["-"]() {
+        return this.lastResult - this.step();
+    },
+    ["/"]() {
+        return this.lastResult / this.step();
     },
 };
 
@@ -199,9 +214,19 @@ const source = `
   print :ctx/foo
   print :ctx/baz
   print :ctx/foo/bar
+  print (:a + :b)
+  print (:a * :b)
+  print (:a - :b)
+  print (:a / :b)
+  if :a [
+    print "a is truthy"
+  ] [
+    print "a is falsy"
+  ]
 `;
 
 const parsed = parse(source);
 //console.log("parsed: ", parsed);
 const evaluator = new Evaluator(parsed);
-evaluator.run();
+const result = evaluator.run();
+console.log("result: ", result);

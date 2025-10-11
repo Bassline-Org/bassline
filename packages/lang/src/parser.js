@@ -43,7 +43,7 @@ export function parse(source) {
             }
         }
         next(); // skip closing "
-        stop = pos;
+        const stop = pos;
         const s = new Str(value);
         s.start = start;
         s.stop = stop;
@@ -130,7 +130,7 @@ export function parse(source) {
         }
 
         // Path (contains / but not a URL)
-        if (word.includes("/")) {
+        if (word.includes("/") && word.length > 1) {
             const segments = word.split("/");
             const path = new Path(segments[0], segments.slice(1));
             path.start = start;
