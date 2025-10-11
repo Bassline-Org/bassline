@@ -130,7 +130,6 @@ export function parse(source) {
             return url;
         }
 
-        // Path (contains / but not a URL)
         if (word.includes("/") && word.length > 1) {
             const segments = word.split("/");
             const root = new Word(segments[0]);

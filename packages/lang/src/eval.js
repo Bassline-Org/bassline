@@ -3,6 +3,7 @@ import {
     Num,
     Paren,
     Path,
+    Scalar,
     Series,
     Str,
     Tag,
@@ -14,16 +15,30 @@ import { parse } from "./parser.js";
 
 export const GrammarProto = {};
 
-export function createGrammar() {
-    return Object.create(GrammarProto);
+function assert(pred, msg) {
+    if (!pred) {
+        throw new Error(`Assertion failed: ${msg}`);
+    }
+}
+
+function isNil(value) {
+    return value === undefined || value === null;
+}
+
+function notNil(value) {
+    return !isNil(value);
+}
+
+function assertIs(value, type) {
+    assert(value instanceof type, `Expected ${type}, got ${value}`);
 }
 
 export class Evaluator {
     constructor(values, env = {}) {
         this.values = values;
         this.pos = 0;
-        this.env = env;
-        this.dialectWords = createGrammar();
+        this.env = Object.create(GrammarProto);
+        Object.assign(this.env, env);
     }
 
     peek() {
@@ -47,6 +62,7 @@ export class Evaluator {
         if (name in this.env) {
             return this.env[name];
         }
+        console.log(this.env);
         throw new Error(`Undefined word: ${name}`);
     }
 
@@ -55,7 +71,27 @@ export class Evaluator {
         return value;
     }
 
+    resolveRefinement(head, tail) {
+        if (head instanceof Promise) {
+            return head.then((v) => resolveRefinement(v, tail));
+        }
+        if (tail instanceof Series) {
+            const key = this.eval(tail.first);
+            const result = head.get ? head.get(key) : head[key];
+            return resolveRefinement(result, tail.rest);
+        }
+        if (tail instanceof Scalar) {
+            const key = this.eval(tail.value);
+            return head.get ? head.get(key) : head[key];
+        }
+        throw new Error(`Cannot resolve refinement: ${tail}`);
+    }
+
     eval(value) {
+        if (value instanceof Promise) {
+            return value.then((v) => this.eval(v));
+        }
+
         if (value instanceof Num) {
             return value.value;
         }
@@ -65,6 +101,9 @@ export class Evaluator {
         }
 
         if (value instanceof Word) {
+            if (value.isQuoted()) {
+                return value.value;
+            }
             if (value.isSetter()) {
                 const name = value.getName();
                 const nextValue = this.step();
@@ -76,31 +115,19 @@ export class Evaluator {
                 return this.getWord(name);
             }
 
-            const handler = this.dialectWords[value.value];
-            if (handler) {
-                return handler.call(this);
+            const binding = this.env[value.value];
+            if (typeof binding === "function") {
+                return binding.call(this);
             }
-
-            // Otherwise it's just a symbol
-            return value.value;
+            if (binding === undefined) {
+                console.log("undefined word: ", value);
+                throw new Error(`Undefined word: ${value}`);
+            }
+            return binding;
         }
 
-        // Paths evaluate root and apply refinements
         if (value instanceof Path) {
-            let result = this.eval(value.root);
-            for (const refinement of value.items) {
-                if (result instanceof Series) {
-                    const refinementValue = this.eval(refinement);
-                    result = result.at(refinementValue);
-                } else if (typeof result === "object" && result !== null) {
-                    result = result[this.eval(refinement)];
-                } else {
-                    console.log("node: ", value);
-                    throw new Error(`Cannot refine ${typeof result}`);
-                }
-            }
-
-            return result;
+            return this.resolveRefinement(this.eval(value.first), value.rest);
         }
 
         if (value instanceof Paren) {
@@ -128,6 +155,10 @@ export class Evaluator {
         return result;
     }
 
+    stepTimes(n) {
+        return Array.from({ length: n }, () => this.step());
+    }
+
     run() {
         while (this.hasMore()) {
             this.step();
@@ -136,13 +167,16 @@ export class Evaluator {
     }
 }
 
-export function installDialect(words, grammarObj = GrammarProto) {
-    Object.assign(grammarObj, words);
+export function installDialect(words) {
+    Object.assign(GrammarProto, {
+        ...words,
+    });
 }
 
 const coreDialect = {
     print() {
         const value = this.step();
+        assert(notNil(value), "print required a value!");
         console.log(value);
         return value;
     },
@@ -155,6 +189,12 @@ const coreDialect = {
 
         const evaluator = new Evaluator(block.items, this.env);
         return evaluator.run();
+    },
+
+    reduce() {
+        const block = this.step();
+        block.items = block.items.map((item) => this.eval(item));
+        return block;
     },
 
     if() {
@@ -213,6 +253,13 @@ const coreDialect = {
         return f(a);
     },
 
+    ["true"]() {
+        return true;
+    },
+    ["false"]() {
+        return false;
+    },
+
     ["+"]() {
         return this.lastResult + this.step();
     },
@@ -253,8 +300,11 @@ const source = `
   print "should be before goog"
 `;
 
-const parsed = parse(source);
-//console.log("parsed: ", parsed);
+const otherSource = `
+    drucken: [print]
+    do drucken
+`;
+const parsed = parse(otherSource);
 const evaluator = new Evaluator(parsed);
 const result = evaluator.run();
 console.log("result: ", result);

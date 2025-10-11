@@ -1,18 +1,12 @@
-export class Scalar {}
-
-export class Num extends Scalar {
+export class Scalar {
     constructor(value) {
-        super();
         this.value = value;
     }
 }
 
-export class Word extends Scalar {
-    constructor(value) {
-        super();
-        this.value = value;
-    }
+export class Num extends Scalar {}
 
+export class Word extends Scalar {
     isSetter() {
         return this.value.endsWith(":");
     }
@@ -20,10 +14,13 @@ export class Word extends Scalar {
     isGetter() {
         return this.value.startsWith(":");
     }
+    isQuoted() {
+        return this.value.startsWith("'");
+    }
 
     getName() {
         if (this.isSetter()) return this.value.slice(0, -1);
-        if (this.isGetter()) return this.value.slice(1);
+        if (this.isGetter() || this.isQuoted()) return this.value.slice(1);
         return this.value;
     }
 }
@@ -33,31 +30,31 @@ export class Series {
         this.items = items;
     }
 
-    at(key) {
+    get first() {
+        return this.items[0];
+    }
+
+    get rest() {
+        return this.items.slice(1);
+    }
+
+    get(key) {
         return this.items[key];
     }
 
-    length() {
+    get length() {
         return this.items.length;
     }
 }
 
-export class Tuple extends Series {
-    constructor(segments) {
-        super(segments);
-    }
-}
+export class Tuple extends Series {}
 
-export class Block extends Series {
-    constructor(items) {
-        super(items);
-    }
-}
+export class Block extends Series {}
 export class Paren extends Block {}
 
 export class Str extends Series {
     constructor(value) {
-        super([...value]);
+        super(value);
         this.value = value;
     }
 }
@@ -89,10 +86,8 @@ export class Tag extends Series {
 
 export class Url extends Series {
     constructor(value) {
-        // Try to parse as full URL with //
         const match = value.match(/^([a-z][a-z0-9+.-]*):\/\/([^\/]+)(\/.*)?$/i);
         if (!match) {
-            // Try simple scheme: format (like mailto:)
             const simpleMatch = value.match(/^([a-z][a-z0-9+.-]*):(.*)$/i);
             if (simpleMatch) {
                 super({
@@ -113,13 +108,4 @@ export class Url extends Series {
     }
 }
 
-export class Path extends Series {
-    constructor(root, refinements) {
-        super(refinements);
-        this.root = root;
-    }
-
-    segments() {
-        return [this.root, ...this.items];
-    }
-}
+export class Path extends Series {}
