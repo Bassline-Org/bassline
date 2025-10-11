@@ -1,92 +1,16 @@
+import {
+    Block,
+    Num,
+    Paren,
+    Path,
+    Series,
+    Str,
+    Tag,
+    Tuple,
+    Url,
+    Word,
+} from "./nodes.js";
 import { parse } from "./parser.js";
-
-export class Scalar {}
-
-export class Num extends Scalar {
-    constructor(value) {
-        super();
-        this.value = value;
-    }
-}
-
-export class Word extends Scalar {
-    constructor(value) {
-        super();
-        this.value = value;
-    }
-}
-
-export class Series {
-    constructor(items) {
-        this.items = items;
-    }
-
-    at(key) {
-        return this.items[key];
-    }
-
-    length() {
-        return this.items.length;
-    }
-}
-export class Tuple extends Series {}
-export class Block extends Series {}
-export class Tag extends Series {
-    constructor(raw) {
-        const match = raw.match(/<(\w+)(.*)>/);
-        const tagName = match[1];
-        const attrString = match[2];
-
-        const attrs = { _tag: tagName };
-        const attrRegex = /(\w+)=["']([^"']+)["']/g;
-        let attrMatch;
-        while ((attrMatch = attrRegex.exec(attrString))) {
-            attrs[attrMatch[1]] = attrMatch[2];
-        }
-
-        super(attrs);
-        this.tag = tagName;
-        this.attrs = attrs;
-    }
-
-    at(key) {
-        return this.items[key];
-    }
-}
-
-export class Url extends Series {
-    constructor(value) {
-        const match = value.match(/^([a-z][a-z0-9+.-]*):\/\/([^\/]+)(\/.*)?$/i);
-        if (!match) {
-            const simpleMatch = value.match(/^([a-z][a-z0-9+.-]*):(.*)$/i);
-            if (simpleMatch) {
-                super({ scheme: simpleMatch[1], rest: simpleMatch[2] });
-            } else {
-                super({ value });
-            }
-        } else {
-            super({
-                scheme: match[1],
-                host: match[2],
-                path: match[3] || "/",
-            });
-        }
-        this.value = value;
-    }
-
-    at(key) {
-        return this.items[key];
-    }
-}
-
-export class Path extends Series {
-    constructor(root, refinements) {
-        super(refinements);
-        this.root = root;
-    }
-}
-
-export class Str extends Series {}
 
 export const GrammarProto = {};
 
@@ -94,12 +18,12 @@ export function createGrammar() {
     return Object.create(GrammarProto);
 }
 
-class Evaluator {
-    pos = 0;
-    constructor(parsed, env = {}) {
-        this.values = parsed;
+export class Evaluator {
+    constructor(values, env = {}) {
+        this.values = values;
+        this.pos = 0;
+        this.env = env;
         this.dialectWords = createGrammar();
-        this.env = Object.create(env);
     }
 
     peek() {
@@ -107,136 +31,177 @@ class Evaluator {
     }
 
     next() {
-        if (this.peek() === undefined) return undefined;
+        if (this.pos >= this.values.length) return undefined;
         return this.values[this.pos++];
     }
 
     hasMore() {
-        return this.peek() !== undefined;
+        return this.pos < this.values.length;
     }
 
-    getWord(word) {
-        return this.env[word];
+    getWord(name) {
+        if (name in this.env) {
+            return this.env[name];
+        }
+        throw new Error(`Undefined word: ${name}`);
     }
 
-    setWord(word) {
-        const value = this.step();
-        this.env[word] = value;
+    setWord(name, value) {
+        this.env[name] = value;
         return value;
     }
 
-    step(env) {
-        return this.eval(this.next(), env);
+    eval(value, stack) {
+        if (value instanceof Num) {
+            return value.value;
+        }
+
+        if (value instanceof Str) {
+            return value.value;
+        }
+
+        if (value instanceof Word) {
+            if (value.isSetter()) {
+                const name = value.getName();
+                const nextValue = this.step(stack);
+                return this.setWord(name, nextValue);
+            }
+
+            if (value.isGetter()) {
+                const name = value.getName();
+                return this.getWord(name);
+            }
+
+            const handler = this.dialectWords[value.value];
+            if (handler) {
+                return handler.call(this, stack);
+            }
+
+            // Otherwise it's just a symbol
+            return value.value;
+        }
+
+        // Paths evaluate root and apply refinements
+        if (value instanceof Path) {
+            let result = this.eval(new Word(value.root), stack);
+
+            // Apply each refinement
+            for (const refinement of value.items) {
+                if (result instanceof Series) {
+                    result = result.at(refinement);
+                } else if (typeof result === "object" && result !== null) {
+                    result = result[refinement];
+                } else {
+                    throw new Error(`Cannot refine ${typeof result}`);
+                }
+            }
+
+            return result;
+        }
+
+        if (value instanceof Paren) {
+            let result;
+            for (const v in value.items) {
+                result = this.eval(v, stack);
+            }
+            return result;
+        }
+        if (value instanceof Tag) return value;
+        if (value instanceof Url) return value;
+        if (value instanceof Tuple) return value;
+        if (value instanceof Block) return value;
+
+        throw new Error(`Cannot evaluate: ${value}`);
     }
 
-    evalWord(value) {
-        if (value.endsWith(":")) {
-            const word = value.slice(0, -1);
-            return this.setWord(word);
-        }
-        if (value.startsWith(":")) {
-            const word = value.slice(1);
-            return this.getWord(word);
-        }
-        return value;
+    step(stack) {
+        const value = this.next();
+        if (value === undefined) return undefined;
+        return this.eval(value, stack);
     }
 
-    evalPrimitive(parsed) {
-        return parsed.value;
-    }
-
-    evalParen({ items }) {
-        return items.map((v) => this.eval(v));
-    }
-
-    evalBlock({ items }) {
-        return new Block(items);
-    }
-
-    evalUrl({ value }) {
-        return new Url(value);
-    }
-
-    evalPath({ items }) {
-        const root = items[0];
-        const refinements = items.slice(1);
-        const rootValue = this.eval(root);
-        const refinementValues = refinements.map((v) => this.eval(v));
-        return new Path(rootValue, refinementValues);
-    }
-
-    evalTag({ value }) {
-        return new Tag(value);
-    }
-
-    evalTuple({ value }) {
-        return new Tuple(value);
-    }
-
-    eval(parsed) {
-        const { type, primitive } = parsed;
-        if (primitive) {
-            return this.evalPrimitive(parsed);
-        }
-        if (type === "word") {
-            return this.evalWord(parsed);
-        }
-        if (type === "paren") {
-            return this.evalParen(parsed);
-        }
-        if (type === "block") {
-            return this.evalBlock(parsed);
-        }
-        if (type === "url") {
-            return this.evalUrl(parsed);
-        }
-        if (type === "path") {
-            return this.evalPath(parsed);
-        }
-        if (type === "tag") {
-            return this.evalTag(parsed);
-        }
-        if (type === "tuple") {
-            return this.evalTuple(parsed);
-        }
-        throw new Error(`Unknown type: ${type}`);
-    }
     run() {
         let result;
+        let stack = [];
         while (this.hasMore()) {
-            result = this.step();
+            result = this.step(stack);
+            stack.push(result);
         }
         return result;
     }
 }
 
-Object.assign(GrammarProto, {
-    print() {
-        const v = this.step();
-        console.log(v);
+export function installDialect(words, grammarObj = GrammarProto) {
+    Object.assign(grammarObj, words);
+}
+
+const coreDialect = {
+    print(stack) {
+        const value = this.step(stack);
+        console.log(value);
+        return value;
     },
-    do() {
-        const v = this.step();
-        if (v instanceof Block) {
-            const evaluator = new Evaluator(v.items, this.env);
-            return evaluator.run();
-        } else {
-            throw new Error("do block expected");
+
+    do(_stack) {
+        const block = this.step();
+        if (!(block instanceof Block)) {
+            throw new Error("do expects a block");
         }
+
+        const evaluator = new Evaluator(block.items, {
+            env: this.env,
+            dialect: this.dialectWords,
+        });
+        return evaluator.run();
     },
-});
+
+    if() {
+        const condition = this.step();
+        const thenBlock = this.step();
+
+        if (!(thenBlock instanceof Block)) {
+            throw new Error("if expects a block");
+        }
+
+        if (condition) {
+            const evaluator = new Evaluator(thenBlock.items, { env: this.env });
+            evaluator.dialectWords = this.dialectWords;
+            return evaluator.run();
+        }
+
+        return undefined;
+    },
+
+    context(stack) {
+        const block = this.step(stack);
+        const env = Object.create(this.env);
+        const evaluator = new Evaluator(block.items, env);
+        evaluator.run();
+        return evaluator.env;
+    },
+};
+
+installDialect(coreDialect);
 
 const source = `
-  foo: do [
-    a: 123
-    b: 456
-    print :a
-    print :b
-    :a
+  a: 10
+  b: 20
+  url: https://google.com
+  print :a
+  print :b
+  ctx: context [
+    foo: context [
+        bar: :a
+    ]
+    baz: :b
   ]
-  print :foo
-  `;
-const ast = parse(source);
-const evaluator = new Evaluator(ast);
+  print :ctx
+  print :ctx/foo
+  print :ctx/baz
+  print :ctx/foo/bar
+`;
 
+const parsed = parse(source);
+//console.log("parsed: ", parsed);
+const evaluator = new Evaluator(parsed);
 evaluator.run();
