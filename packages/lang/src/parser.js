@@ -21,6 +21,7 @@ export function parse(raw) {
         next(); // skip closing "
         return {
             type: "string",
+            primitive: true,
             value,
         };
     }
@@ -63,6 +64,7 @@ export function parse(raw) {
         if (/^-?\d+(\.\d+)?$/.test(word)) {
             return {
                 type: "number",
+                primitive: true,
                 value: Number(word),
             };
         }

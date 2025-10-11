@@ -115,58 +115,91 @@ class Evaluator {
         return this.peek() !== undefined;
     }
 
-    getWord(word, env) {
-        return env[word];
+    getWord(word) {
+        return this.env[word];
     }
 
-    setWord(word, env) {
+    setWord(word) {
         const value = this.step();
-        env[word] = value;
+        this.env[word] = value;
         return value;
     }
 
-    step(env = this.env) {
+    step(env) {
         return this.eval(this.next(), env);
     }
 
-    eval(parsed, env = this.env) {
-        const { type, value, items } = parsed;
-        switch (type) {
-            case "word":
-                if (value.endsWith(":")) {
-                    const word = value.slice(0, -1);
-                    return this.setWord(word, env);
-                }
-                if (value.startsWith(":")) {
-                    const word = value.slice(1);
-                    return this.getWord(word, env);
-                }
-                if (this.dialectWords[value]) {
-                    return this.dialectWords[value].call(this, env);
-                }
-                return new Word(value);
-            case "paren":
-                return items.map((v) => this.eval(v, env));
-            case "block":
-                return new Block(items);
-            case "number":
-                return new Num(value);
-            case "string":
-                return new Str(value);
-            case "url":
-                return new Url(value);
-            case "path":
-                const [root, ...refinements] = value.split("/");
-                const rootValue = this.eval(root, env);
-                const refinementValues =
-                    (Array.isArray(refinements) ? refinements : [refinements])
-                        .map((v) => this.eval(v, env));
-                return new Path(rootValue, refinementValues);
-            case "tag":
-                return new Tag(value);
-            case "tuple":
-                return new Tuple(value);
+    evalWord(value) {
+        if (value.endsWith(":")) {
+            const word = value.slice(0, -1);
+            return this.setWord(word);
         }
+        if (value.startsWith(":")) {
+            const word = value.slice(1);
+            return this.getWord(word);
+        }
+        return value;
+    }
+
+    evalPrimitive(parsed) {
+        return parsed.value;
+    }
+
+    evalParen({ items }) {
+        return items.map((v) => this.eval(v));
+    }
+
+    evalBlock({ items }) {
+        return new Block(items);
+    }
+
+    evalUrl({ value }) {
+        return new Url(value);
+    }
+
+    evalPath({ items }) {
+        const root = items[0];
+        const refinements = items.slice(1);
+        const rootValue = this.eval(root);
+        const refinementValues = refinements.map((v) => this.eval(v));
+        return new Path(rootValue, refinementValues);
+    }
+
+    evalTag({ value }) {
+        return new Tag(value);
+    }
+
+    evalTuple({ value }) {
+        return new Tuple(value);
+    }
+
+    eval(parsed) {
+        const { type, primitive } = parsed;
+        if (primitive) {
+            return this.evalPrimitive(parsed);
+        }
+        if (type === "word") {
+            return this.evalWord(parsed);
+        }
+        if (type === "paren") {
+            return this.evalParen(parsed);
+        }
+        if (type === "block") {
+            return this.evalBlock(parsed);
+        }
+        if (type === "url") {
+            return this.evalUrl(parsed);
+        }
+        if (type === "path") {
+            return this.evalPath(parsed);
+        }
+        if (type === "tag") {
+            return this.evalTag(parsed);
+        }
+        if (type === "tuple") {
+            return this.evalTuple(parsed);
+        }
+        throw new Error(`Unknown type: ${type}`);
     }
     run() {
         let result;
@@ -206,4 +239,4 @@ const source = `
 const ast = parse(source);
 const evaluator = new Evaluator(ast);
 
-const result = evaluator.run();
+evaluator.run();
