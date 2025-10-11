@@ -83,12 +83,11 @@ export class Evaluator {
 
         // Paths evaluate root and apply refinements
         if (value instanceof Path) {
-            let result = this.eval(new Word(value.root));
-
-            // Apply each refinement
+            let result = this.eval(value.root);
             for (const refinement of value.items) {
                 if (result instanceof Series) {
-                    result = result.at(refinement);
+                    const refinementValue = this.eval(refinement);
+                    result = result.at(refinementValue);
                 } else if (typeof result === "object" && result !== null) {
                     result = result[refinement];
                 } else {
@@ -104,6 +103,7 @@ export class Evaluator {
             const evaluator = new Evaluator(value.items, this.env);
             return evaluator.run();
         }
+
         if (
             value instanceof Tag ||
             value instanceof Url ||
@@ -181,6 +181,10 @@ const coreDialect = {
         evaluator.run();
         return evaluator.env;
     },
+    import() {
+        const path = this.step();
+        return import(path);
+    },
 
     ["+"]() {
         return this.lastResult + this.step();
@@ -202,27 +206,16 @@ const source = `
   a: 10
   b: 20
   url: https://google.com
-  print :a
-  print :b
+  tag: <link href="asdfasdf">
   ctx: context [
     foo: context [
         bar: :a
     ]
     baz: :b
   ]
-  print :ctx
-  print :ctx/foo
-  print :ctx/baz
-  print :ctx/foo/bar
-  print (:a + :b)
-  print (:a * :b)
-  print (:a - :b)
-  print (:a / :b)
-  if :a [
-    print "a is truthy"
-  ] [
-    print "a is falsy"
-  ]
+  print :tag
+  print :tag/href
+  module: import "./nodes.js"
 `;
 
 const parsed = parse(source);

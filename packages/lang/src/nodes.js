@@ -65,13 +65,6 @@ export class Str extends Series {
 export class Tag extends Series {
     constructor(raw) {
         const match = raw.match(/<(\w+)(.*)>/);
-        if (!match) {
-            super({});
-            this.tag = "";
-            this.raw = raw;
-            return;
-        }
-
         const tagName = match[1];
         const attrString = match[2].trim();
 

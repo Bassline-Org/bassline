@@ -57,10 +57,11 @@ export function parse(source) {
             value += next();
         }
         value += next(); // include closing >
-        stop = pos;
+        const stop = pos;
         const t = new Tag(value);
         t.start = start;
         t.stop = stop;
+        return t;
     }
 
     function parseBlock() {
@@ -132,7 +133,9 @@ export function parse(source) {
         // Path (contains / but not a URL)
         if (word.includes("/") && word.length > 1) {
             const segments = word.split("/");
-            const path = new Path(segments[0], segments.slice(1));
+            const root = new Word(segments[0]);
+            const refinements = segments.slice(1).map((s) => new Word(s));
+            const path = new Path(root, refinements);
             path.start = start;
             path.stop = stop;
             return path;
