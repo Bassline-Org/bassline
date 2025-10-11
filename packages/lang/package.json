@@ -1,0 +1,13 @@
+{
+    "name": "@bassline/lang",
+    "version": "1.0.0",
+    "description": "Language for Bassline",
+    "type": "module",
+    "module": "src/index.js",
+    "exports": {
+      ".": "./src/index.js"
+    },
+    "scripts": {
+    },
+    "license": "MIT"
+  }
