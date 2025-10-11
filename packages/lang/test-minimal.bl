@@ -1,0 +1,5 @@
+max: fn [a b] [
+    if [a > b] [
+        print "gt"
+    ]
+]

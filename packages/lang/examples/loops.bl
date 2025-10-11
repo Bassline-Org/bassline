@@ -1,0 +1,69 @@
+; Loop constructs example
+
+print "=== LOOP ==="
+loop 3 [
+    print "hello"
+]
+
+print ""
+print "=== REPEAT ==="
+repeat i 5 [
+    print i
+]
+
+print ""
+print "=== WHILE ==="
+x: 0
+while [(x < 5)] [
+    print x
+    x: (x + 1)
+]
+
+print ""
+print "=== FOREACH ==="
+foreach color ["red" "green" "blue"] [
+    print color
+]
+
+print ""
+print "=== BREAK ==="
+repeat i 10 [
+    print i
+    if [(i = 3)] [break] []
+]
+
+print ""
+print "=== CONTINUE ==="
+repeat i 5 [
+    if [(i = 3)] [continue] []
+    print i
+]
+
+print ""
+print "=== EITHER ==="
+x: 10
+result: either [(x > 5)] ["big"] ["small"]
+print result
+
+print ""
+print "=== SWITCH ==="
+day: 3
+switch day [
+    1 [print "Monday"]
+    2 [print "Tuesday"]
+    3 [print "Wednesday"]
+    4 [print "Thursday"]
+    5 [print "Friday"]
+]
+
+print ""
+print "=== CASE ==="
+num: 50
+case [
+    [(num < 10)] [print "small"]
+    [(num < 100)] [print "medium"]
+    [(num < 1000)] [print "large"]
+]
+
+print ""
+print "Done!"

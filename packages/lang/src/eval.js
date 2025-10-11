@@ -1,4 +1,5 @@
 import {
+    BasslineFunction,
     Block,
     File,
     Num,
@@ -63,16 +64,23 @@ export class Evaluator {
         if (head instanceof Promise) {
             return head.then((v) => this.resolveRefinement(v, tail));
         }
-        if (tail instanceof Series) {
-            const key = this.eval(tail.first);
+
+        // tail is an array of remaining path segments
+        if (Array.isArray(tail) && tail.length > 0) {
+            const [first, ...rest] = tail;
+            // Get the key name without evaluating
+            const key = first instanceof Word
+                ? first.getName()
+                : this.eval(first);
             const result = head.get ? head.get(key) : head[key];
-            return this.resolveRefinement(result, tail.rest);
+            if (rest.length > 0) {
+                return this.resolveRefinement(result, rest);
+            }
+            return result;
         }
-        if (tail instanceof Scalar) {
-            const key = this.eval(tail.value);
-            return head.get ? head.get(key) : head[key];
-        }
-        throw new Error(`Cannot resolve refinement: ${tail}`);
+
+        // No more segments, return head
+        return head;
     }
 
     eval(value) {
@@ -106,6 +114,11 @@ export class Evaluator {
             }
 
             const binding = this.getWord(value.value);
+            // Handle BasslineFunction
+            if (binding instanceof BasslineFunction) {
+                return binding.callWith(this);
+            }
+            // Handle dialect words (JavaScript functions)
             if (typeof binding === "function") {
                 return binding.call(this);
             }
@@ -114,7 +127,16 @@ export class Evaluator {
 
         if (value instanceof Path) {
             const first = this.eval(value.first);
-            return this.resolveRefinement(first, value.rest);
+            const result = this.resolveRefinement(first, value.rest);
+            // If the path resolves to a BasslineFunction, call it
+            if (result instanceof BasslineFunction) {
+                return result.callWith(this);
+            }
+            // If it's a dialect word (JavaScript function), call it
+            if (typeof result === "function") {
+                return result.call(this);
+            }
+            return result;
         }
 
         if (value instanceof Paren) {
@@ -238,6 +260,210 @@ const coreDialect = {
         }
     },
 
+    /// Loop constructs
+    loop() {
+        const count = this.step();
+        const block = this.step();
+        assert(typeof count === "number", "loop requires a number");
+        assert(block instanceof Block, "loop requires a block");
+
+        let result;
+        for (let i = 0; i < count; i++) {
+            try {
+                result = this.run(block.items, this.env);
+            } catch (e) {
+                if (e.isBreak) {
+                    break;
+                } else if (e.isContinue) {
+                    continue;
+                }
+                throw e;
+            }
+        }
+        return result;
+    },
+
+    repeat() {
+        // Get the word WITHOUT evaluating it
+        if (this.values.length === 0) throw new Error("repeat requires a word");
+        const [word, ...rest1] = this.values;
+        this.values = rest1;
+        assert(word instanceof Word, "repeat requires a word");
+
+        const count = this.step();
+        const block = this.step();
+        assert(typeof count === "number", "repeat requires a number");
+        assert(block instanceof Block, "repeat requires a block");
+
+        const varName = word.getName();
+        let result;
+        for (let i = 1; i <= count; i++) {
+            this.setWord(varName, i);
+            try {
+                result = this.run(block.items, this.env);
+            } catch (e) {
+                if (e.isBreak) {
+                    break;
+                } else if (e.isContinue) {
+                    continue;
+                }
+                throw e;
+            }
+        }
+        return result;
+    },
+
+    while() {
+        const conditionBlock = this.step();
+        const bodyBlock = this.step();
+        assert(
+            conditionBlock instanceof Block,
+            "while requires a condition block",
+        );
+        assert(bodyBlock instanceof Block, "while requires a body block");
+
+        let result;
+        while (this.run(conditionBlock.items, this.env)) {
+            try {
+                result = this.run(bodyBlock.items, this.env);
+            } catch (e) {
+                if (e.isBreak) {
+                    break;
+                } else if (e.isContinue) {
+                    continue;
+                }
+                throw e;
+            }
+        }
+        return result;
+    },
+
+    foreach() {
+        // Get the word WITHOUT evaluating it
+        if (this.values.length === 0) {
+            throw new Error("foreach requires a word");
+        }
+        const [word, ...rest1] = this.values;
+        this.values = rest1;
+        assert(word instanceof Word, "foreach requires a word");
+
+        const series = this.step();
+        const block = this.step();
+        assert(block instanceof Block, "foreach requires a block");
+
+        const varName = word.getName();
+        let result;
+
+        // Handle different series types
+        let items;
+        if (series instanceof Block) {
+            items = series.items;
+        } else if (Array.isArray(series)) {
+            items = series;
+        } else {
+            throw new Error("foreach requires a series (block or array)");
+        }
+
+        for (const item of items) {
+            this.setWord(varName, this.eval(item));
+            try {
+                result = this.run(block.items, this.env);
+            } catch (e) {
+                if (e.isBreak) {
+                    break;
+                } else if (e.isContinue) {
+                    continue;
+                }
+                throw e;
+            }
+        }
+        return result;
+    },
+
+    forever() {
+        const block = this.step();
+        assert(block instanceof Block, "forever requires a block");
+
+        let result;
+        while (true) {
+            try {
+                result = this.run(block.items, this.env);
+            } catch (e) {
+                if (e.isBreak) {
+                    break;
+                } else if (e.isContinue) {
+                    continue;
+                }
+                throw e;
+            }
+        }
+        return result;
+    },
+
+    break() {
+        const err = new Error("break");
+        err.isBreak = true;
+        throw err;
+    },
+
+    continue() {
+        const err = new Error("continue");
+        err.isContinue = true;
+        throw err;
+    },
+
+    /// Conditional selection
+    either() {
+        const condition = this.step();
+        const thenBlock = this.step();
+        const elseBlock = this.step();
+        assert(thenBlock instanceof Block, "either requires a then block");
+        assert(elseBlock instanceof Block, "either requires an else block");
+
+        if (condition) {
+            return this.run(thenBlock.items, this.env);
+        } else {
+            return this.run(elseBlock.items, this.env);
+        }
+    },
+
+    switch() {
+        const value = this.step();
+        const casesBlock = this.step();
+        assert(casesBlock instanceof Block, "switch requires a cases block");
+
+        const cases = casesBlock.items;
+        for (let i = 0; i < cases.length; i += 2) {
+            const caseValue = this.eval(cases[i]);
+            if (caseValue === value) {
+                const action = cases[i + 1];
+                if (action instanceof Block) {
+                    return this.run(action.items, this.env);
+                }
+                return this.eval(action);
+            }
+        }
+        return undefined;
+    },
+
+    case() {
+        const casesBlock = this.step();
+        assert(casesBlock instanceof Block, "case requires a cases block");
+
+        const cases = casesBlock.items;
+        for (let i = 0; i < cases.length; i += 2) {
+            const condition = this.eval(cases[i]);
+            if (condition) {
+                const action = cases[i + 1];
+                if (action instanceof Block) {
+                    return this.run(action.items, this.env);
+                }
+                return this.eval(action);
+            }
+        }
+        return undefined;
+    },
+
     context() {
         const block = this.step();
         const newEnv = Object.create(this.env);
@@ -302,22 +528,9 @@ const coreDialect = {
         const argListBlock = this.step();
         const body = this.step();
         const argList = argListBlock.items.map((item) => item.getName());
-        const closureEnv = this.env; // Capture lexical env
 
-        // Return function that gets called by the CALLING evaluator
-        return function () {
-            // Create NEW env that extends the closure
-            const fnEnv = Object.create(closureEnv);
-
-            // Bind arguments from the calling evaluator
-            argList.forEach((arg) => {
-                const nextArg = this.step();
-                fnEnv[arg] = nextArg;
-            });
-
-            // Evaluate function body with captured closure + bound args
-            return this.run(body.items, fnEnv);
-        };
+        // Return a BasslineFunction domain object
+        return new BasslineFunction(argList, body, this.env);
     },
 
     does() {
@@ -360,6 +573,20 @@ const coreDialect = {
     },
     ["/"]() {
         return this.lastResult / this.step();
+    },
+
+    /// Comparison ops
+    [">"]() {
+        return this.lastResult > this.step();
+    },
+    [">="]() {
+        return this.lastResult >= this.step();
+    },
+    ["<"]() {
+        return this.lastResult < this.step();
+    },
+    ["<="]() {
+        return this.lastResult <= this.step();
     },
 
     /// Async primitives

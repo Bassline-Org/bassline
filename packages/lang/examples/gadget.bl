@@ -1,0 +1,12 @@
+a: 123
+b: 123
+
+g: context [
+    max: fn [a b] [
+        if [(a > b)] [
+            print "gt"
+        ] [ print "lt" ]
+    ]
+]
+
+g/max a 123123

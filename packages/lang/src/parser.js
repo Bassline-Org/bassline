@@ -61,20 +61,6 @@ export function parse(source) {
         return s;
     }
 
-    function parseTag() {
-        let start = pos;
-        let value = "";
-        while (peek() !== ">") {
-            value += next();
-        }
-        value += next(); // include closing >
-        const stop = pos;
-        const t = new Tag(value);
-        t.start = start;
-        t.stop = stop;
-        return t;
-    }
-
     function parseBlock() {
         const start = pos;
         next(); // skip [
@@ -98,6 +84,9 @@ export function parse(source) {
         const items = [];
         while (true) {
             skipWhitespace();
+            if (pos >= source.length) {
+                throw new Error("Unclosed parenthesis - reached end of input");
+            }
             if (peek() === ")") break;
             items.push(parseValue());
         }
@@ -186,8 +175,6 @@ export function parse(source) {
                     rest: simpleMatch[2],
                 };
             } else {
-                console.log(word);
-                console.log(simpleMatch);
                 throw new Error(`Invalid URL at position ${start}`);
             }
         }
@@ -202,6 +189,11 @@ export function parse(source) {
             word += next();
         }
         const stop = pos;
+
+        // If we didn't consume anything, we have an unexpected character
+        if (word === "") {
+            throw new Error(`Unexpected character at position ${pos}: '${peek()}'`);
+        }
 
         // Number (integer or decimal)
         if (/^-?\d+(\.\d+)?$/.test(word)) {
@@ -235,7 +227,7 @@ export function parse(source) {
             const segments = word.split("/");
             const root = new Word(segments[0]);
             const refinements = segments.slice(1).map((s) => new Word(s));
-            const path = new Path(root, refinements);
+            const path = new Path([root, ...refinements]);
             path.start = start;
             path.stop = stop;
             return path;
@@ -295,8 +287,19 @@ export function parse(source) {
         if (char === "(") return parseParen();
         if (char === "[") return parseBlock();
         if (char === '"') return parseString();
-        if (char === "<") return parseTag();
         if (char === "%") return parseFile();
+
+        // Handle < and > as operators (words), not tags
+        if (char === "<" || char === ">") {
+            const start = pos;
+            const op = next();
+            const stop = pos;
+            const w = new Word(op);
+            w.start = start;
+            w.stop = stop;
+            return w;
+        }
+
         return parseWord();
     }
 

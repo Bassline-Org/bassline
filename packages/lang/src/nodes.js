@@ -88,3 +88,27 @@ export class File extends Scalar {
         return `%${this.path}`;
     }
 }
+
+export class BasslineFunction {
+    constructor(argList, body, closureEnv) {
+        this.argList = argList; // Array of argument names (strings)
+        this.body = body; // Block node
+        this.closureEnv = closureEnv; // Environment object
+    }
+
+    // Execute this function with the given evaluator
+    // Consumes arguments from evaluator's value stack
+    callWith(evaluator) {
+        // Create function environment extending closure
+        const fnEnv = Object.create(this.closureEnv);
+
+        // Bind arguments by consuming from evaluator
+        this.argList.forEach((argName) => {
+            const argValue = evaluator.step();
+            fnEnv[argName] = argValue;
+        });
+
+        // Execute function body in this environment
+        return evaluator.run(this.body.items, fnEnv);
+    }
+}
