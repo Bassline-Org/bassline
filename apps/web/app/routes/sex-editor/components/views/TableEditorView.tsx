@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Button } from "~/components/ui/button";
 
@@ -11,10 +11,14 @@ interface Row {
 
 export const TableEditorView = memo(({ data, selected }: NodeProps) => {
     const { name, gadget } = data;
-    const value = gadget.useCurrent() || {};
+    const rawValue = gadget.useCurrent();
+
+    // Ensure value is always an object
+    const value = (rawValue && typeof rawValue === "object" && !Array.isArray(rawValue)) ? rawValue : {};
 
     // Convert object to rows
     const objectToRows = (obj: Record<string, any>): Row[] => {
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return [];
         return Object.entries(obj).map(([key, val]) => ({
             id: Math.random().toString(36).slice(2),
             key,
@@ -31,6 +35,11 @@ export const TableEditorView = memo(({ data, selected }: NodeProps) => {
     };
 
     const [rows, setRows] = useState<Row[]>(() => objectToRows(value));
+
+    // Sync rows when gadget state changes externally
+    useEffect(() => {
+        setRows(objectToRows(value));
+    }, [value]);
 
     const rowsToObject = (rows: Row[]): Record<string, any> => {
         const obj: Record<string, any> = {};

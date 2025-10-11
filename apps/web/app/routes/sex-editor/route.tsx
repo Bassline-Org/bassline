@@ -34,6 +34,9 @@ import { SliderView } from "./components/views/SliderView";
 import { ToggleView } from "./components/views/ToggleView";
 import { PipelineBuilderView } from "./components/views/PipelineBuilderView";
 import { TableEditorView } from "./components/views/TableEditorView";
+import { NumberInputView } from "./components/views/NumberInputView";
+import { TextInputView } from "./components/views/TextInputView";
+import { ArrayEditorView } from "./components/views/ArrayEditorView";
 
 import type { ContextMenuState, GadgetSpec } from "./types";
 
@@ -57,6 +60,9 @@ registerView("slider", SliderView, { description: "Numeric slider control" });
 registerView("toggle", ToggleView, { description: "Boolean toggle switch" });
 registerView("pipelineBuilder", PipelineBuilderView, { description: "Visual pipeline builder for function composition" });
 registerView("tableEditor", TableEditorView, { description: "Editable table for objects (best for last cells)" });
+registerView("numberInput", NumberInputView, { description: "Editable number input with +/- controls (best for last cells)" });
+registerView("textInput", TextInputView, { description: "Editable text area (best for last cells)" });
+registerView("arrayEditor", ArrayEditorView, { description: "Editable array with add/remove/reorder (best for last cells)" });
 
 export function meta() {
     return [

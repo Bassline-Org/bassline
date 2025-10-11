@@ -74,6 +74,40 @@ if (gadgetProto.setView) {
             const state = this.current();
             const suggestions = ["default"];
 
+            // Check if this is a last cell (mutable scratch workspace)
+            const isLastCell = this.pkg === "@bassline/cells/unsafe" && this.name === "last";
+
+            // Last cells get EDITABLE views suggested first
+            if (isLastCell) {
+                // Number → numberInput, slider
+                if (typeof state === "number") {
+                    if (viewRegistry.has("numberInput")) suggestions.push("numberInput");
+                    if (viewRegistry.has("slider")) suggestions.push("slider");
+                    if (viewRegistry.has("gauge")) suggestions.push("gauge");
+                }
+                // String → textInput
+                else if (typeof state === "string") {
+                    if (viewRegistry.has("textInput")) suggestions.push("textInput");
+                }
+                // Boolean → toggle
+                else if (typeof state === "boolean") {
+                    if (viewRegistry.has("toggle")) suggestions.push("toggle");
+                }
+                // Array → arrayEditor, table
+                else if (Array.isArray(state)) {
+                    if (viewRegistry.has("arrayEditor")) suggestions.push("arrayEditor");
+                    if (viewRegistry.has("table")) suggestions.push("table");
+                }
+                // Object → tableEditor, table
+                else if (typeof state === "object" && state !== null) {
+                    if (viewRegistry.has("tableEditor")) suggestions.push("tableEditor");
+                    if (viewRegistry.has("table")) suggestions.push("table");
+                }
+
+                return suggestions;
+            }
+
+            // Other cells get READ-ONLY views
             // Numeric data → bigNumber, gauge
             if (typeof state === "number") {
                 if (viewRegistry.has("bigNumber")) {

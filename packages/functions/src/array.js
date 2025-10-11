@@ -9,7 +9,7 @@ Object.assign(asArray, {
     fn: (arr) => Array.isArray(arr) ? arr : [arr],
     inputs: "any",
     outputs: {
-        computed: { type: "array", description: "Input as array" }
+        computed: { type: "array", description: "Input as array" },
     },
 });
 
@@ -20,7 +20,7 @@ Object.assign(length, {
     fn: (arr) => arr.length,
     inputs: "array",
     outputs: {
-        computed: { type: "number", description: "Array length" }
+        computed: { type: "number", description: "Array length" },
     },
 });
 
@@ -31,7 +31,7 @@ Object.assign(first, {
     fn: (arr) => arr[0],
     inputs: "array",
     outputs: {
-        computed: { type: "any", description: "First element" }
+        computed: { type: "any", description: "First element" },
     },
 });
 
@@ -42,7 +42,7 @@ Object.assign(last, {
     fn: (arr) => arr[arr.length - 1],
     inputs: "array",
     outputs: {
-        computed: { type: "any", description: "Last element" }
+        computed: { type: "any", description: "Last element" },
     },
 });
 
@@ -53,7 +53,7 @@ Object.assign(rest, {
     fn: (arr) => arr.slice(1),
     inputs: "array",
     outputs: {
-        computed: { type: "array", description: "Array without first element" }
+        computed: { type: "array", description: "Array without first element" },
     },
 });
 
@@ -64,7 +64,7 @@ Object.assign(butlast, {
     fn: (arr) => arr.slice(0, -1),
     inputs: "array",
     outputs: {
-        computed: { type: "array", description: "Array without last element" }
+        computed: { type: "array", description: "Array without last element" },
     },
 });
 
@@ -75,7 +75,7 @@ Object.assign(iota, {
     fn: (n) => Array.from({ length: n }, (_, i) => i),
     inputs: "number",
     outputs: {
-        computed: { type: "array", description: "Array [0..n-1]" }
+        computed: { type: "array", description: "Array [0..n-1]" },
     },
 });
 
@@ -87,10 +87,10 @@ Object.assign(nth, {
     fn: ({ arr, n }) => arr[n],
     inputs: {
         arr: { type: "array", description: "Array to index" },
-        n: { type: "number", defaultFormValue: 0, description: "Index" }
+        n: { type: "number", defaultFormValue: 0, description: "Index" },
     },
     outputs: {
-        computed: { type: "any", description: "Element at index n" }
+        computed: { type: "any", description: "Element at index n" },
     },
 });
 
@@ -102,10 +102,10 @@ Object.assign(concat, {
     fn: ({ a, b }) => a.concat(b),
     inputs: {
         a: { type: "array", description: "First array" },
-        b: { type: "array", description: "Second array" }
+        b: { type: "array", description: "Second array" },
     },
     outputs: {
-        computed: { type: "array", description: "Concatenated array" }
+        computed: { type: "array", description: "Concatenated array" },
     },
 });
 

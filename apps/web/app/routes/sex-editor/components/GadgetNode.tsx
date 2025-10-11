@@ -11,6 +11,10 @@ import { ButtonView } from "./views/ButtonView";
 import { SliderView } from "./views/SliderView";
 import { ToggleView } from "./views/ToggleView";
 import { PipelineBuilderView } from "./views/PipelineBuilderView";
+import { TableEditorView } from "./views/TableEditorView";
+import { NumberInputView } from "./views/NumberInputView";
+import { TextInputView } from "./views/TextInputView";
+import { ArrayEditorView } from "./views/ArrayEditorView";
 
 // Map of view names to components
 const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
@@ -24,6 +28,10 @@ const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
     slider: SliderView,
     toggle: ToggleView,
     pipelineBuilder: PipelineBuilderView,
+    tableEditor: TableEditorView,
+    numberInput: NumberInputView,
+    textInput: TextInputView,
+    arrayEditor: ArrayEditorView,
 };
 
 function getIcon(gadget: any): string {
@@ -113,8 +121,13 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
     // Otherwise render default box view
     const icon = getIcon(gadget);
     const preview = getPreview(state);
-    // Check if gadget has stateSpec() - semantic signal for "has internal workspace"
-    const isNavigable = typeof gadget.stateSpec === "function";
+    // Compound gadgets have stateSpec(), but exclude simple cells
+    const isSimpleCell = gadget.pkg === "@bassline/cells/numeric"
+        || gadget.pkg === "@bassline/cells/unsafe"
+        || gadget.pkg === "@bassline/cells/tables"
+        || gadget.pkg === "@bassline/cells/set"
+        || gadget.pkg === "@bassline/cells/versioned";
+    const isNavigable = typeof gadget.stateSpec === "function" && !isSimpleCell;
 
     const handleDoubleClick = () => {
         if (isNavigable && onNavigateInto) {
