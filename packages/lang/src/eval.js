@@ -102,8 +102,9 @@ export class Evaluator {
 
         if (value instanceof Word) {
             if (value.isQuoted()) {
-                return value.value;
+                return value.getName();
             }
+
             if (value.isSetter()) {
                 const name = value.getName();
                 const nextValue = this.step();
@@ -253,11 +254,53 @@ const coreDialect = {
         return f(a);
     },
 
+    get() {
+        const key = this.step();
+        assert(
+            typeof key === "string" || typeof key === "number",
+            "set requires a string or number key",
+        );
+        return this.getWord(key);
+    },
+
+    set() {
+        const key = this.step();
+        console.log("Set: ", key);
+        console.log("Key: ", typeof key);
+        assert(
+            typeof key === "string" || typeof key === "number",
+            "set requires a string or number key",
+        );
+        const value = this.step();
+        this.setWord(key, value);
+        return value;
+    },
+
+    ["symbol"]() {
+        const n = this.next();
+        assertIs(n, Word);
+        return n.getName();
+    },
+
+    ["="]() {
+        return this.lastResult === this.step();
+    },
+
     ["true"]() {
         return true;
     },
     ["false"]() {
         return false;
+    },
+    ["not"]() {
+        return !this.step();
+    },
+
+    ["and"]() {
+        return this.lastResult && this.step();
+    },
+    ["or"]() {
+        return this.lastResult || this.step();
     },
 
     ["+"]() {
@@ -301,8 +344,13 @@ const source = `
 `;
 
 const otherSource = `
-    drucken: [print]
-    do drucken
+    print true and false
+    print true and true
+    print false and false
+    print not true
+    print not false
+    print not true or false
+    print true and not false
 `;
 const parsed = parse(otherSource);
 const evaluator = new Evaluator(parsed);

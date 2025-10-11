@@ -39,6 +39,9 @@ export class Series {
     }
 
     get(key) {
+        if (this[key]) {
+            return this[key];
+        }
         return this.items[key];
     }
 
@@ -60,50 +63,15 @@ export class Str extends Series {
 }
 
 export class Tag extends Series {
-    constructor(raw) {
-        const match = raw.match(/<(\w+)(.*)>/);
-        const tagName = match[1];
-        const attrString = match[2].trim();
-
-        const attrs = {};
-        const attrRegex = /(\w+)=["']([^"']+)["']|(\w+)/g;
-        let attrMatch;
-        while ((attrMatch = attrRegex.exec(attrString))) {
-            if (attrMatch[1]) {
-                // name="value" format
-                attrs[attrMatch[1]] = attrMatch[2];
-            } else if (attrMatch[3]) {
-                // boolean attribute
-                attrs[attrMatch[3]] = true;
-            }
-        }
-
+    constructor(tagName, attrs) {
         super(attrs);
-        this.tag = tagName;
-        this.raw = raw;
+        this.tagName = tagName;
     }
 }
 
 export class Url extends Series {
-    constructor(value) {
-        const match = value.match(/^([a-z][a-z0-9+.-]*):\/\/([^\/]+)(\/.*)?$/i);
-        if (!match) {
-            const simpleMatch = value.match(/^([a-z][a-z0-9+.-]*):(.*)$/i);
-            if (simpleMatch) {
-                super({
-                    scheme: simpleMatch[1],
-                    rest: simpleMatch[2],
-                });
-            } else {
-                super({ value });
-            }
-        } else {
-            super({
-                scheme: match[1],
-                host: match[2],
-                path: match[3] || "/",
-            });
-        }
+    constructor(value, components) {
+        super(components);
         this.value = value;
     }
 }

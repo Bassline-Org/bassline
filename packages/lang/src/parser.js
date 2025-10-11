@@ -25,6 +25,10 @@ export function parse(source) {
         while (pos < source.length && /\s/.test(peek())) pos++;
     }
 
+    function isWhitespace(char) {
+        return /\s/.test(char);
+    }
+
     function parseString() {
         let start = pos;
         next(); // skip opening "
@@ -98,6 +102,92 @@ export function parse(source) {
         return b;
     }
 
+    // In parser.js
+    function parseTag() {
+        let start = pos;
+        next(); // skip
+
+        // Parse tag name
+        let tagName = "";
+        while (peek() !== ">" && peek() !== " " && !isWhitespace(peek())) {
+            tagName += next();
+        }
+
+        skipWhitespace();
+
+        // Parse attributes
+        const attrs = {};
+        while (peek() !== ">") {
+            skipWhitespace();
+            if (peek() === ">") break;
+
+            // Attribute name
+            let attrName = "";
+            while (peek() !== "=" && peek() !== ">" && !isWhitespace(peek())) {
+                attrName += next();
+            }
+
+            skipWhitespace();
+
+            if (peek() === "=") {
+                next(); // skip =
+                skipWhitespace();
+                const quote = next(); // " or '
+                let attrValue = "";
+                while (peek() !== quote) {
+                    attrValue += next();
+                }
+                next(); // skip closing quote
+                attrs[attrName] = attrValue;
+            } else {
+                // Boolean attribute
+                attrs[attrName] = true;
+            }
+        }
+
+        next(); // skip >
+        const stop = pos;
+
+        const t = new Tag(tagName, attrs);
+        t.start = start;
+        t.stop = stop;
+        return t;
+    }
+
+    function parseUrl(word) {
+        while (pos < source.length && !/[\s\[\]<>()"]/.test(peek())) {
+            word += next();
+        }
+
+        // Parse URL components here
+        const fullMatch = word.match(
+            /^([a-z][a-z0-9+.-]*):\/\/([^\/]+)(\/.*)?$/i,
+        );
+
+        let components;
+        if (fullMatch) {
+            components = {
+                scheme: fullMatch[1],
+                host: fullMatch[2],
+                path: fullMatch[3] || "/",
+            };
+        } else {
+            const simpleMatch = word.match(/^([a-z][a-z0-9+.-]*):(.*)$/i);
+            if (simpleMatch) {
+                components = {
+                    scheme: simpleMatch[1],
+                    rest: simpleMatch[2],
+                };
+            } else {
+                console.log(word);
+                console.log(simpleMatch);
+                throw new Error(`Invalid URL at position ${start}`);
+            }
+        }
+
+        return new Url(word, components);
+    }
+
     function parseWord() {
         let word = "";
         const start = pos;
@@ -114,9 +204,13 @@ export function parse(source) {
             return num;
         }
 
-        // Tuple (e.g., 1.2.3.4 or 255.0.0)
+        // Tuple (3+ segments: 1.2.3.4 or 255.0.0)
         if (/^\d+(\.\d+){2,}$/.test(word)) {
-            const tup = new Tuple(word.split(".").map((s) => parseInt(s)));
+            const segments = word.split(".").map((s) => parseInt(s));
+
+            validateTuple(segments);
+
+            const tup = new Tuple(segments);
             tup.start = start;
             tup.stop = stop;
             return tup;
@@ -124,7 +218,7 @@ export function parse(source) {
 
         // URL (any scheme:// or scheme: pattern)
         if (/^[a-z][a-z0-9+.-]*:\/\//i.test(word)) {
-            const url = new Url(word);
+            const url = parseUrl(word);
             url.start = start;
             url.stop = stop;
             return url;
@@ -166,4 +260,22 @@ export function parse(source) {
     }
 
     return values;
+}
+
+function validateTuple(segments) {
+    // Must have 3-10 segments
+    if (segments.length < 3 || segments.length > 10) {
+        throw new Error(
+            `Tuple must have 3-10 segments, got ${segments.length}`,
+        );
+    }
+
+    // Each segment must be 0-255 (8-bit unsigned)
+    for (const seg of segments) {
+        if (!Number.isInteger(seg) || seg < 0 || seg > 255) {
+            throw new Error(
+                `Tuple segment must be integer 0-255, got ${seg}`,
+            );
+        }
+    }
 }
