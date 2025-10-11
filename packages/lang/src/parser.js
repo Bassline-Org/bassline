@@ -1,5 +1,6 @@
 import {
     Block,
+    File,
     Num,
     Paren,
     Path,
@@ -23,6 +24,12 @@ export function parse(source) {
 
     function skipWhitespace() {
         while (pos < source.length && /\s/.test(peek())) pos++;
+        // Skip comments (;... until end of line)
+        if (peek() === ';') {
+            while (pos < source.length && peek() !== '\n') pos++;
+            if (peek() === '\n') pos++; // Skip newline
+            skipWhitespace(); // Continue skipping whitespace after comment
+        }
     }
 
     function isWhitespace(char) {
@@ -241,6 +248,46 @@ export function parse(source) {
         return wordNode;
     }
 
+    function parseFile() {
+        const start = pos;
+        next(); // skip %
+
+        // Check for quoted file path
+        if (peek() === '"') {
+            next(); // skip opening quote
+            let path = "";
+            while (peek() !== '"') {
+                if (peek() === "\\") {
+                    next(); // skip escape
+                    const escaped = next();
+                    if (escaped === "n") path += "\n";
+                    else if (escaped === "t") path += "\t";
+                    else if (escaped === "r") path += "\r";
+                    else path += escaped;
+                } else {
+                    path += next();
+                }
+            }
+            next(); // skip closing quote
+            const stop = pos;
+            const f = new File(path);
+            f.start = start;
+            f.stop = stop;
+            return f;
+        }
+
+        // Unquoted file path
+        let path = "";
+        while (pos < source.length && !/[\s\[\]<>()"]/.test(peek())) {
+            path += next();
+        }
+        const stop = pos;
+        const f = new File(path);
+        f.start = start;
+        f.stop = stop;
+        return f;
+    }
+
     function parseValue() {
         skipWhitespace();
         const char = peek();
@@ -249,6 +296,7 @@ export function parse(source) {
         if (char === "[") return parseBlock();
         if (char === '"') return parseString();
         if (char === "<") return parseTag();
+        if (char === "%") return parseFile();
         return parseWord();
     }
 

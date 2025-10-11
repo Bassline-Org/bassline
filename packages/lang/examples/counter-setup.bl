@@ -1,0 +1,2 @@
+counter: 0
+print "Counter initialized to 0"

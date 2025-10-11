@@ -77,3 +77,14 @@ export class Url extends Series {
 }
 
 export class Path extends Series {}
+
+export class File extends Scalar {
+    constructor(path) {
+        super(path);
+        this.path = path;
+    }
+
+    toString() {
+        return `%${this.path}`;
+    }
+}

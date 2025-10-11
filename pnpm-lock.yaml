@@ -266,6 +266,15 @@ importers:
         specifier: ^1.0.0
         version: link:../core
 
+  packages/lang:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+      ws:
+        specifier: ^8.0.0
+        version: 8.18.3
+
   packages/metadata:
     dependencies:
       '@bassline/cells':
@@ -6111,7 +6120,6 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
-    dev: true
 
   /xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}

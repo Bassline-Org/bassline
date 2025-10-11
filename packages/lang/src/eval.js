@@ -1,5 +1,6 @@
 import {
     Block,
+    File,
     Num,
     Paren,
     Path,
@@ -11,6 +12,8 @@ import {
     Url,
     Word,
 } from "./nodes.js";
+import { parse } from "./parser.js";
+import * as fs from "fs";
 
 export const GrammarProto = {};
 
@@ -122,7 +125,8 @@ export class Evaluator {
             value instanceof Tag ||
             value instanceof Url ||
             value instanceof Tuple ||
-            value instanceof Block
+            value instanceof Block ||
+            value instanceof File
         ) {
             return value;
         }
@@ -166,6 +170,15 @@ export class Evaluator {
 
         return result; // Might be a promise
     }
+
+    fork() {
+        // Create child evaluator with isolated state
+        const child = Object.create(this);
+        child.values = [];
+        child.env = this.env; // Share environment (no new scope)
+        child.lastResult = undefined;
+        return child;
+    }
 }
 
 export function installDialect(words) {
@@ -175,11 +188,13 @@ export function installDialect(words) {
 }
 
 const coreDialect = {
-    print() {
+    async print() {
         const value = this.step();
         assert(notNil(value), "print required a value!");
-        console.log(value);
-        return value;
+        // Await if promise, otherwise print directly
+        const toPrint = value instanceof Promise ? await value : value;
+        console.log(toPrint);
+        return toPrint;
     },
 
     do() {
@@ -387,6 +402,95 @@ const coreDialect = {
         // Run in background without awaiting
         this.run(block.items, this.env);
         return undefined;
+    },
+
+    async seq() {
+        const block = this.step(); // Consume block synchronously
+        if (!(block instanceof Block)) {
+            throw new Error("seq expects a block");
+        }
+
+        // Execute items sequentially using fork
+        // Give child all remaining items so it can consume what it needs
+        let result;
+        let index = 0;
+        while (index < block.items.length) {
+            const child = this.fork();
+            const remaining = block.items.slice(index);
+            result = child.run(remaining, child.env);
+
+            // Figure out how many items were consumed
+            const consumed = remaining.length - child.values.length;
+            index += consumed;
+
+            // Await promises before continuing to next item
+            if (result instanceof Promise) {
+                result = await result;
+            }
+        }
+        return result;
+    },
+
+    fork() {
+        const block = this.step(); // Consume block synchronously
+        if (!(block instanceof Block)) {
+            throw new Error("fork expects a block");
+        }
+
+        // Create child evaluator and run block in isolation
+        const child = this.fork();
+        return child.run(block.items, child.env);
+    },
+
+    /// File operations (synchronous, like REBOL)
+    read() {
+        const file = this.step();
+        const path = file instanceof File ? file.path : file;
+        return fs.readFileSync(path, "utf-8");
+    },
+
+    write() {
+        const file = this.step();
+        const content = this.step();
+        const path = file instanceof File ? file.path : file;
+        fs.writeFileSync(path, content, "utf-8");
+        return file;
+    },
+
+    ["exists?"]() {
+        const file = this.step();
+        const path = file instanceof File ? file.path : file;
+        try {
+            fs.accessSync(path);
+            return true;
+        } catch {
+            return false;
+        }
+    },
+
+    delete() {
+        const file = this.step();
+        const path = file instanceof File ? file.path : file;
+        fs.unlinkSync(path);
+        return file;
+    },
+
+    ["dir?"]() {
+        const file = this.step();
+        const path = file instanceof File ? file.path : file;
+        try {
+            const stats = fs.statSync(path);
+            return stats.isDirectory();
+        } catch {
+            return false;
+        }
+    },
+
+    load() {
+        const file = this.step();
+        const path = file instanceof File ? file.path : file;
+        const content = fs.readFileSync(path, "utf-8");
+        return this.run(parse(content));
     },
 };
 

@@ -1,0 +1,8 @@
+; Create some async operations
+p1: timeout 100
+p2: timeout 200
+
+print "Waiting for all timeouts..."
+results: await (all [p1 p2])
+
+print "All complete!"
