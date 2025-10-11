@@ -35,11 +35,17 @@ Object.assign(sex, {
         }
         return undefined;
     },
-    afterSpawn(initial) {
+    async afterSpawn(initial) {
         this.update({});
-        this.receive(initial);
 
-        // Set up output port taps after initial commands execute
+        // If initial is an array of commands, execute them and wait
+        if (initial && Array.isArray(initial)) {
+            await this.execute({}, initial);
+        } else if (initial) {
+            this.receive(initial);
+        }
+
+        // Set up output port taps after commands have executed
         this.setupOutputTaps();
     },
 
@@ -133,6 +139,25 @@ Object.assign(sex, {
                 break;
             }
 
+            case "get": {
+                const [localName, path] = rest;
+                try {
+                    const resolved = this.resolvePath(env, path);
+                    env.spawned[localName] = resolved;
+                    this.emit({ got: { localName, path } });
+                } catch (error) {
+                    this.emit({
+                        error: {
+                            message: `Failed to resolve path: ${path}`,
+                            command: "get",
+                            path,
+                            error: error.message,
+                        },
+                    });
+                }
+                break;
+            }
+
             case "val": {
                 const [localName, value] = rest;
                 env.vals[localName] = value;
@@ -198,6 +223,39 @@ Object.assign(sex, {
             }
         }
     },
+    resolvePath(env, path) {
+        if (typeof path !== "string") {
+            throw new Error("Path must be a string");
+        }
+
+        const parts = path.split(".");
+        if (parts.length === 0) {
+            throw new Error("Empty path");
+        }
+
+        // Start with the root gadget from spawned
+        let current = env.spawned[parts[0]];
+        if (!current) {
+            throw new Error(`Root gadget not found: ${parts[0]}`);
+        }
+
+        // Traverse the path
+        for (let i = 1; i < parts.length; i++) {
+            const state = current.current();
+            if (!state || typeof state !== "object") {
+                throw new Error(
+                    `Cannot traverse path at ${parts.slice(0, i).join(".")}: state is not an object`,
+                );
+            }
+            current = state[parts[i]];
+            if (!current) {
+                throw new Error(`Path not found: ${parts.slice(0, i + 1).join(".")}`);
+            }
+        }
+
+        return current;
+    },
+
     substituteInObject(env, obj) {
         // Handle arrays
         if (Array.isArray(obj)) {
@@ -208,6 +266,15 @@ Object.assign(sex, {
         if (typeof obj !== "object" || obj === null) {
             // Check if it's an active ref (string)
             if (typeof obj === "string" && env.activeRefs.includes(obj)) {
+                // Support path syntax (e.g., "a.foo")
+                if (obj.includes(".")) {
+                    try {
+                        return this.resolvePath(env, obj);
+                    } catch (error) {
+                        console.error(`Failed to resolve path ${obj}:`, error.message);
+                        throw error;
+                    }
+                }
                 return env.spawned[obj];
             }
             // Otherwise return as-is

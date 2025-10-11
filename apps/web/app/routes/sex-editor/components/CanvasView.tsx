@@ -291,6 +291,33 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
         [currentSex]
     );
 
+    // Listen for port changes and update nodes to force re-render
+    useEffect(() => {
+        if (!isInitialized) return;
+
+        const cleanups = Object.values(workspace)
+            .map((gadget: any) => {
+                if (!gadget.tap) return null;
+                return gadget.tap((effect: any) => {
+                    if (effect.portsChanged) {
+                        // Find node with this gadget and update its data to trigger re-render
+                        setNodes((nodes) =>
+                            nodes.map((n) =>
+                                n.data.gadget === gadget
+                                    ? { ...n, data: { ...n.data, _revision: Date.now() } }
+                                    : n
+                            )
+                        );
+                    }
+                });
+            })
+            .filter(Boolean);
+
+        return () => {
+            cleanups.forEach((cleanup) => cleanup?.());
+        };
+    }, [workspace, isInitialized, setNodes]);
+
     // Handle edge deletion
     const onEdgesDelete = useCallback(
         (deleted: Edge[]) => {

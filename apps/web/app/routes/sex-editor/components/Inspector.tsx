@@ -405,11 +405,22 @@ function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<stri
     const [showAddOutput, setShowAddOutput] = useState(false);
     const [newInputPort, setNewInputPort] = useState({ name: "", routes_to: "", type: "any" });
     const [newOutputPort, setNewOutputPort] = useState({ name: "", routes_from: "", effects: "", type: "any" });
+    const [ports, setPorts] = useState({ inputs: gadget.inputs || {}, outputs: gadget.outputs || {} });
 
     const state = gadget.useCurrent();
     const internalGadgets = Object.keys(state || {}).filter(key =>
         state[key] && typeof state[key] === 'object' && 'receive' in state[key]
     );
+
+    // Listen for port changes and update local state
+    useEffect(() => {
+        const cleanup = gadget.tap((effect: any) => {
+            if (effect.portsChanged) {
+                setPorts({ inputs: gadget.inputs || {}, outputs: gadget.outputs || {} });
+            }
+        });
+        return cleanup;
+    }, [gadget]);
 
     const handleAddInput = () => {
         if (!newInputPort.name || !newInputPort.routes_to) return;
@@ -423,6 +434,7 @@ function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<stri
         };
 
         gadget.inputs = newInputs;
+        gadget.emit({ portsChanged: { inputs: gadget.inputs, outputs: gadget.outputs } });
         setNewInputPort({ name: "", routes_to: "", type: "any" });
         setShowAddInput(false);
     };
@@ -431,6 +443,7 @@ function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<stri
         const newInputs = { ...gadget.inputs };
         delete newInputs[portName];
         gadget.inputs = Object.keys(newInputs).length > 0 ? newInputs : undefined;
+        gadget.emit({ portsChanged: { inputs: gadget.inputs, outputs: gadget.outputs } });
     };
 
     const handleAddOutput = () => {
@@ -449,6 +462,7 @@ function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<stri
 
         gadget.outputs = newOutputs;
         gadget.setupOutputTaps?.();
+        gadget.emit({ portsChanged: { inputs: gadget.inputs, outputs: gadget.outputs } });
         setNewOutputPort({ name: "", routes_from: "", effects: "", type: "any" });
         setShowAddOutput(false);
     };
@@ -458,6 +472,7 @@ function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<stri
         delete newOutputs[portName];
         gadget.outputs = Object.keys(newOutputs).length > 0 ? newOutputs : undefined;
         gadget.setupOutputTaps?.();
+        gadget.emit({ portsChanged: { inputs: gadget.inputs, outputs: gadget.outputs } });
     };
 
     return (
@@ -518,7 +533,7 @@ function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<stri
                 )}
 
                 <div className="space-y-1">
-                    {gadget.inputs && Object.entries(gadget.inputs).map(([portName, spec]: [string, any]) => (
+                    {ports.inputs && Object.entries(ports.inputs).map(([portName, spec]: [string, any]) => (
                         <div key={portName} className="flex items-center gap-2">
                             <div className="flex-1 font-mono text-xs bg-blue-50 text-blue-700 p-1.5 rounded">
                                 <div className="flex justify-between">
@@ -605,7 +620,7 @@ function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<stri
                 )}
 
                 <div className="space-y-1">
-                    {gadget.outputs && Object.entries(gadget.outputs).map(([portName, spec]: [string, any]) => (
+                    {ports.outputs && Object.entries(ports.outputs).map(([portName, spec]: [string, any]) => (
                         <div key={portName} className="flex items-center gap-2">
                             <div className="flex-1 font-mono text-xs bg-green-50 text-green-700 p-1.5 rounded">
                                 <div className="flex justify-between">
