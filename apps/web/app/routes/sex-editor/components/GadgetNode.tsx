@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import styles from "./WorkspaceTree.module.css";
+import { NodeWrapper } from "./NodeWrapper";
 import { BigNumberView } from "./views/BigNumberView";
 import { LineChartView } from "./views/LineChartView";
 import { TableView } from "./views/TableView";
@@ -33,6 +34,13 @@ const VIEW_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
     textInput: TextInputView,
     arrayEditor: ArrayEditorView,
 };
+
+// Full-control views render their own structure (ports, frame, etc.)
+const FULL_CONTROL_VIEWS = new Set([
+    "dashboard",
+    "sexTable",
+    "pipelineBuilder"
+]);
 
 function getIcon(gadget: any): string {
     if (gadget.pkg === "@bassline/systems") return "📦";
@@ -115,7 +123,17 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
 
     // If custom view exists, render it
     if (ViewComponent) {
-        return <ViewComponent data={data} selected={selected} />;
+        // Full-control views render everything themselves
+        if (FULL_CONTROL_VIEWS.has(viewName)) {
+            return <ViewComponent data={data} selected={selected} />;
+        }
+
+        // Embedded views render content only - wrap with NodeWrapper for structure
+        return (
+            <NodeWrapper gadget={gadget} name={name} selected={selected}>
+                <ViewComponent data={data} selected={selected} />
+            </NodeWrapper>
+        );
     }
 
     // Otherwise render default box view

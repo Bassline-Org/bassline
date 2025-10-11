@@ -1,6 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
-import { BothPorts } from "./viewUtils";
 
 export const TextInputView = memo(({ data, selected }: NodeProps) => {
     const { name, gadget } = data;
@@ -11,6 +10,11 @@ export const TextInputView = memo(({ data, selected }: NodeProps) => {
     const value = typeof state === "string" ? state : String(state ?? "");
 
     const [inputValue, setInputValue] = useState(value);
+
+    // Sync input value when gadget state changes externally
+    useEffect(() => {
+        setInputValue(value);
+    }, [value]);
 
     // Auto-resize textarea to fit content
     useEffect(() => {
@@ -38,42 +42,22 @@ export const TextInputView = memo(({ data, selected }: NodeProps) => {
     };
 
     return (
-        <div
-            className={`bg-white border-2 rounded-lg shadow-lg min-w-[320px] max-w-[500px] ${
-                selected
-                    ? "border-teal-500 ring-2 ring-teal-300"
-                    : "border-teal-400"
-            }`}
-        >
-            <BothPorts />
+        <div className="p-3 space-y-2">
+            <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                placeholder="Enter text..."
+                className="w-full px-3 py-2 text-sm border-2 border-teal-200 rounded-lg focus:border-teal-500 focus:outline-none resize-none font-mono"
+                rows={1}
+                style={{ minHeight: "60px" }}
+            />
 
-            {/* Header */}
-            <div className="bg-teal-100 px-3 py-2 border-b border-teal-300 rounded-t-lg">
-                <div className="text-sm font-medium text-teal-700">{name || "text"}</div>
-            </div>
-
-            {/* Content */}
-            <div className="p-3 space-y-2">
-                <textarea
-                    ref={textareaRef}
-                    value={inputValue}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Enter text..."
-                    className="w-full px-3 py-2 text-sm border-2 border-teal-200 rounded-lg focus:border-teal-500 focus:outline-none resize-none font-mono"
-                    rows={1}
-                    style={{ minHeight: "60px" }}
-                />
-
-                <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>{inputValue.length} characters</span>
-                    <span className="text-gray-400">⌘↵ to submit</span>
-                </div>
-
-                <div className="text-xs text-gray-400 font-mono truncate text-center">
-                    {gadget.pkg}/{gadget.name}
-                </div>
+            <div className="flex justify-between items-center text-xs text-gray-500">
+                <span>{inputValue.length} characters</span>
+                <span className="text-gray-400">⌘↵ to submit</span>
             </div>
         </div>
     );

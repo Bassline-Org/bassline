@@ -1,5 +1,5 @@
 import { memo, useState, useEffect } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import type { NodeProps } from "@xyflow/react";
 import { Button } from "~/components/ui/button";
 
 interface Row {
@@ -9,8 +9,8 @@ interface Row {
     type: "string" | "number" | "boolean" | "json";
 }
 
-export const TableEditorView = memo(({ data, selected }: NodeProps) => {
-    const { name, gadget } = data;
+export const TableEditorView = memo(({ data }: NodeProps) => {
+    const { gadget } = data;
     const rawValue = gadget.useCurrent();
 
     // Ensure value is always an object
@@ -134,112 +134,88 @@ export const TableEditorView = memo(({ data, selected }: NodeProps) => {
     };
 
     return (
-        <div className="rounded-lg bg-white border-2 border-gray-300" style={{ minWidth: 400 }}>
-            {/* Input port - left side */}
-            <Handle
-                type="target"
-                position={Position.Left}
-                style={{ top: "50%" }}
-                className="w-3 h-3 bg-blue-500 border-2 border-white"
-            />
-
-            {/* Header */}
-            <div className="bg-gray-100 px-3 py-2 border-b border-gray-300 rounded-t-lg">
-                <div className="text-sm font-medium text-gray-700">{name || "table"}</div>
-            </div>
-
-            {/* Table Editor */}
-            <div className="p-2">
-                {rows.length === 0 ? (
-                    <div className="text-center py-4">
-                        <div className="text-gray-500 text-sm mb-2">No entries yet</div>
-                        <Button size="sm" onClick={handleAddRow}>
-                            Add First Entry
-                        </Button>
+        <div className="p-2">
+            {rows.length === 0 ? (
+                <div className="text-center py-4">
+                    <div className="text-gray-500 text-sm mb-2">No entries yet</div>
+                    <Button size="sm" onClick={handleAddRow}>
+                        Add First Entry
+                    </Button>
+                </div>
+            ) : (
+                <>
+                    <div className="bg-gray-50 px-2 py-1 flex items-center text-xs font-semibold text-gray-600 border rounded-t">
+                        <div className="flex-1">Key</div>
+                        <div className="flex-1">Value</div>
+                        <div className="w-20">Type</div>
+                        <div className="w-8"></div>
                     </div>
-                ) : (
-                    <>
-                        <div className="bg-gray-50 px-2 py-1 flex items-center text-xs font-semibold text-gray-600 border rounded-t">
-                            <div className="flex-1">Key</div>
-                            <div className="flex-1">Value</div>
-                            <div className="w-20">Type</div>
-                            <div className="w-8"></div>
-                        </div>
-                        <div className="divide-y border-l border-r max-h-64 overflow-auto">
-                            {rows.map((row) => {
-                                const displayValue = row.type === "json"
-                                    ? JSON.stringify(row.value)
-                                    : row.type === "boolean"
-                                        ? String(row.value)
-                                        : row.value;
+                    <div className="divide-y border-l border-r max-h-64 overflow-auto">
+                        {rows.map((row) => {
+                            const displayValue = row.type === "json"
+                                ? JSON.stringify(row.value)
+                                : row.type === "boolean"
+                                    ? String(row.value)
+                                    : row.value;
 
-                                return (
-                                    <div key={row.id} className="flex items-center p-2 gap-2 hover:bg-gray-50">
-                                        <input
-                                            type="text"
-                                            value={row.key}
-                                            onChange={(e) => handleKeyChange(row.id, e.target.value)}
+                            return (
+                                <div key={row.id} className="flex items-center p-2 gap-2 hover:bg-gray-50">
+                                    <input
+                                        type="text"
+                                        value={row.key}
+                                        onChange={(e) => handleKeyChange(row.id, e.target.value)}
+                                        onBlur={handleBlur}
+                                        placeholder="key"
+                                        className="flex-1 px-2 py-1 text-sm border rounded font-mono"
+                                    />
+                                    {row.type === "boolean" ? (
+                                        <select
+                                            value={String(row.value)}
+                                            onChange={(e) => handleValueChange(row.id, e.target.value)}
                                             onBlur={handleBlur}
-                                            placeholder="key"
+                                            className="flex-1 px-2 py-1 text-sm border rounded"
+                                        >
+                                            <option value="true">true</option>
+                                            <option value="false">false</option>
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type={row.type === "number" ? "number" : "text"}
+                                            value={displayValue}
+                                            onChange={(e) => handleValueChange(row.id, e.target.value)}
+                                            onBlur={handleBlur}
+                                            placeholder="value"
                                             className="flex-1 px-2 py-1 text-sm border rounded font-mono"
                                         />
-                                        {row.type === "boolean" ? (
-                                            <select
-                                                value={String(row.value)}
-                                                onChange={(e) => handleValueChange(row.id, e.target.value)}
-                                                onBlur={handleBlur}
-                                                className="flex-1 px-2 py-1 text-sm border rounded"
-                                            >
-                                                <option value="true">true</option>
-                                                <option value="false">false</option>
-                                            </select>
-                                        ) : (
-                                            <input
-                                                type={row.type === "number" ? "number" : "text"}
-                                                value={displayValue}
-                                                onChange={(e) => handleValueChange(row.id, e.target.value)}
-                                                onBlur={handleBlur}
-                                                placeholder="value"
-                                                className="flex-1 px-2 py-1 text-sm border rounded font-mono"
-                                            />
-                                        )}
-                                        <select
-                                            value={row.type}
-                                            onChange={(e) => handleTypeChange(row.id, e.target.value as Row["type"])}
-                                            className="w-20 px-1 py-1 text-xs border rounded"
-                                        >
-                                            <option value="string">str</option>
-                                            <option value="number">num</option>
-                                            <option value="boolean">bool</option>
-                                            <option value="json">json</option>
-                                        </select>
-                                        <button
-                                            onClick={() => handleDeleteRow(row.id)}
-                                            className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded"
-                                            title="Delete row"
-                                        >
-                                            ×
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="p-2 border-l border-r border-b bg-gray-50 rounded-b">
-                            <Button size="sm" onClick={handleAddRow} className="w-full">
-                                + Add Row
-                            </Button>
-                        </div>
-                    </>
-                )}
-            </div>
-
-            {/* Output port - right side */}
-            <Handle
-                type="source"
-                position={Position.Right}
-                style={{ top: "50%" }}
-                className="w-3 h-3 bg-green-500 border-2 border-white"
-            />
+                                    )}
+                                    <select
+                                        value={row.type}
+                                        onChange={(e) => handleTypeChange(row.id, e.target.value as Row["type"])}
+                                        className="w-20 px-1 py-1 text-xs border rounded"
+                                    >
+                                        <option value="string">str</option>
+                                        <option value="number">num</option>
+                                        <option value="boolean">bool</option>
+                                        <option value="json">json</option>
+                                    </select>
+                                    <button
+                                        onClick={() => handleDeleteRow(row.id)}
+                                        className="w-8 h-8 flex items-center justify-center text-red-600 hover:bg-red-50 rounded"
+                                        title="Delete row"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="p-2 border-l border-r border-b bg-gray-50 rounded-b">
+                        <Button size="sm" onClick={handleAddRow} className="w-full">
+                            + Add Row
+                        </Button>
+                    </div>
+                </>
+            )}
         </div>
     );
 });

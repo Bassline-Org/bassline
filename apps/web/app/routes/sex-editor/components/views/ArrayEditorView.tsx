@@ -1,7 +1,6 @@
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Button } from "~/components/ui/button";
-import { BothPorts } from "./viewUtils";
 
 interface Item {
     id: string;
@@ -34,6 +33,11 @@ export const ArrayEditorView = memo(({ data, selected }: NodeProps) => {
     };
 
     const [items, setItems] = useState<Item[]>(() => arrayToItems(value));
+
+    // Sync items when gadget state changes externally
+    useEffect(() => {
+        setItems(arrayToItems(value));
+    }, [value]);
 
     const itemsToArray = (items: Item[]): any[] => {
         return items.map(item => item.value);
@@ -132,122 +136,99 @@ export const ArrayEditorView = memo(({ data, selected }: NodeProps) => {
     };
 
     return (
-        <div
-            className={`rounded-lg bg-white border-2 shadow-lg ${
-                selected
-                    ? "border-orange-500 ring-2 ring-orange-300"
-                    : "border-orange-400"
-            }`}
-            style={{ minWidth: 400 }}
-        >
-            <BothPorts />
-
-            {/* Header */}
-            <div className="bg-orange-100 px-3 py-2 border-b border-orange-300 rounded-t-lg">
-                <div className="text-sm font-medium text-orange-700">
-                    {name || "array"} ({items.length} items)
+        <div className="p-2">
+            {items.length === 0 ? (
+                <div className="text-center py-4">
+                    <div className="text-gray-500 text-sm mb-2">Empty array</div>
+                    <Button size="sm" onClick={handleAddItem}>
+                        Add First Item
+                    </Button>
                 </div>
-            </div>
+            ) : (
+                <>
+                    <div className="bg-orange-50 px-2 py-1 flex items-center text-xs font-semibold text-orange-600 border rounded-t">
+                        <div className="w-8">#</div>
+                        <div className="flex-1">Value</div>
+                        <div className="w-20">Type</div>
+                        <div className="w-16"></div>
+                    </div>
+                    <div className="divide-y border-l border-r max-h-96 overflow-auto">
+                        {items.map((item, idx) => {
+                            const displayValue = item.type === "json"
+                                ? JSON.stringify(item.value)
+                                : item.type === "boolean"
+                                    ? String(item.value)
+                                    : item.value;
 
-            {/* Array Editor */}
-            <div className="p-2">
-                {items.length === 0 ? (
-                    <div className="text-center py-4">
-                        <div className="text-gray-500 text-sm mb-2">Empty array</div>
-                        <Button size="sm" onClick={handleAddItem}>
-                            Add First Item
+                            return (
+                                <div key={item.id} className="flex items-center p-2 gap-2 hover:bg-orange-50">
+                                    <div className="w-8 text-xs text-gray-500 font-mono">{idx}</div>
+                                    {item.type === "boolean" ? (
+                                        <select
+                                            value={String(item.value)}
+                                            onChange={(e) => handleValueChange(item.id, e.target.value)}
+                                            onBlur={handleBlur}
+                                            className="flex-1 px-2 py-1 text-sm border rounded"
+                                        >
+                                            <option value="true">true</option>
+                                            <option value="false">false</option>
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type={item.type === "number" ? "number" : "text"}
+                                            value={displayValue}
+                                            onChange={(e) => handleValueChange(item.id, e.target.value)}
+                                            onBlur={handleBlur}
+                                            placeholder="value"
+                                            className="flex-1 px-2 py-1 text-sm border rounded font-mono"
+                                        />
+                                    )}
+                                    <select
+                                        value={item.type}
+                                        onChange={(e) => handleTypeChange(item.id, e.target.value as Item["type"])}
+                                        className="w-20 px-1 py-1 text-xs border rounded"
+                                    >
+                                        <option value="string">str</option>
+                                        <option value="number">num</option>
+                                        <option value="boolean">bool</option>
+                                        <option value="json">json</option>
+                                    </select>
+                                    <div className="w-16 flex gap-1">
+                                        <button
+                                            onClick={() => handleMoveUp(item.id)}
+                                            disabled={idx === 0}
+                                            className="w-6 h-6 flex items-center justify-center text-orange-600 hover:bg-orange-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                                            title="Move up"
+                                        >
+                                            ↑
+                                        </button>
+                                        <button
+                                            onClick={() => handleMoveDown(item.id)}
+                                            disabled={idx === items.length - 1}
+                                            className="w-6 h-6 flex items-center justify-center text-orange-600 hover:bg-orange-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
+                                            title="Move down"
+                                        >
+                                            ↓
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteItem(item.id)}
+                                            className="w-6 h-6 flex items-center justify-center text-red-600 hover:bg-red-50 rounded"
+                                            title="Delete"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="p-2 border-l border-r border-b bg-orange-50 rounded-b">
+                        <Button size="sm" onClick={handleAddItem} className="w-full">
+                            + Add Item
                         </Button>
                     </div>
-                ) : (
-                    <>
-                        <div className="bg-orange-50 px-2 py-1 flex items-center text-xs font-semibold text-orange-600 border rounded-t">
-                            <div className="w-8">#</div>
-                            <div className="flex-1">Value</div>
-                            <div className="w-20">Type</div>
-                            <div className="w-16"></div>
-                        </div>
-                        <div className="divide-y border-l border-r max-h-96 overflow-auto">
-                            {items.map((item, idx) => {
-                                const displayValue = item.type === "json"
-                                    ? JSON.stringify(item.value)
-                                    : item.type === "boolean"
-                                        ? String(item.value)
-                                        : item.value;
-
-                                return (
-                                    <div key={item.id} className="flex items-center p-2 gap-2 hover:bg-orange-50">
-                                        <div className="w-8 text-xs text-gray-500 font-mono">{idx}</div>
-                                        {item.type === "boolean" ? (
-                                            <select
-                                                value={String(item.value)}
-                                                onChange={(e) => handleValueChange(item.id, e.target.value)}
-                                                onBlur={handleBlur}
-                                                className="flex-1 px-2 py-1 text-sm border rounded"
-                                            >
-                                                <option value="true">true</option>
-                                                <option value="false">false</option>
-                                            </select>
-                                        ) : (
-                                            <input
-                                                type={item.type === "number" ? "number" : "text"}
-                                                value={displayValue}
-                                                onChange={(e) => handleValueChange(item.id, e.target.value)}
-                                                onBlur={handleBlur}
-                                                placeholder="value"
-                                                className="flex-1 px-2 py-1 text-sm border rounded font-mono"
-                                            />
-                                        )}
-                                        <select
-                                            value={item.type}
-                                            onChange={(e) => handleTypeChange(item.id, e.target.value as Item["type"])}
-                                            className="w-20 px-1 py-1 text-xs border rounded"
-                                        >
-                                            <option value="string">str</option>
-                                            <option value="number">num</option>
-                                            <option value="boolean">bool</option>
-                                            <option value="json">json</option>
-                                        </select>
-                                        <div className="w-16 flex gap-1">
-                                            <button
-                                                onClick={() => handleMoveUp(item.id)}
-                                                disabled={idx === 0}
-                                                className="w-6 h-6 flex items-center justify-center text-orange-600 hover:bg-orange-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
-                                                title="Move up"
-                                            >
-                                                ↑
-                                            </button>
-                                            <button
-                                                onClick={() => handleMoveDown(item.id)}
-                                                disabled={idx === items.length - 1}
-                                                className="w-6 h-6 flex items-center justify-center text-orange-600 hover:bg-orange-100 rounded disabled:text-gray-300 disabled:cursor-not-allowed"
-                                                title="Move down"
-                                            >
-                                                ↓
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteItem(item.id)}
-                                                className="w-6 h-6 flex items-center justify-center text-red-600 hover:bg-red-50 rounded"
-                                                title="Delete"
-                                            >
-                                                ×
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="p-2 border-l border-r border-b bg-orange-50 rounded-b">
-                            <Button size="sm" onClick={handleAddItem} className="w-full">
-                                + Add Item
-                            </Button>
-                        </div>
-                    </>
-                )}
-            </div>
-
-            <div className="text-xs text-gray-400 font-mono truncate text-center pb-2">
-                {gadget.pkg}/{gadget.name}
-            </div>
+                </>
+            )}
         </div>
     );
 });
