@@ -30,6 +30,10 @@ export class Evaluator {
         return this.values[this.pos];
     }
 
+    peekNext() {
+        return this.values[this.pos + 1];
+    }
+
     next() {
         if (this.pos >= this.values.length) return undefined;
         return this.values[this.pos++];
@@ -89,7 +93,7 @@ export class Evaluator {
                     const refinementValue = this.eval(refinement);
                     result = result.at(refinementValue);
                 } else if (typeof result === "object" && result !== null) {
-                    result = result[refinement];
+                    result = result[this.eval(refinement)];
                 } else {
                     console.log("node: ", value);
                     throw new Error(`Cannot refine ${typeof result}`);
@@ -181,9 +185,32 @@ const coreDialect = {
         evaluator.run();
         return evaluator.env;
     },
-    import() {
+
+    async fetch() {
+        const url = this.step();
+        return await fetch(url.value);
+    },
+
+    async waitFor() {
+        const promise = this.step();
+        const body = this.step();
+        await promise;
+        const evaluator = new Evaluator(body.items, this.env);
+        return evaluator.run();
+    },
+
+    async import() {
         const path = this.step();
-        return import(path);
+        return await import(path);
+    },
+
+    async js() {
+        const fn = this.step();
+        const arg = this.step();
+        const [f, a] = await Promise.all([fn, arg]);
+        console.log("fn: ", f);
+        console.log("arg: ", a);
+        return f(a);
     },
 
     ["+"]() {
@@ -215,7 +242,15 @@ const source = `
   ]
   print :tag
   print :tag/href
-  module: import "./nodes.js"
+  mod: import "./parser.js"
+  goog: fetch https://google.com
+  waitFor :goog [
+    print :goog
+  ]
+  waitFor :mod [
+    print :mod
+  ]
+  print "should be before goog"
 `;
 
 const parsed = parse(source);
