@@ -9,6 +9,26 @@ export const sex = Object.create(gadgetProto);
 Object.assign(sex, {
     name: "sex",
     pkg: "@bassline/systems",
+
+    // Override toSpec to include inputs/outputs
+    toSpec() {
+        const spec = {
+            pkg: this.pkg,
+            name: this.name,
+            state: this.stateSpec(),
+        };
+
+        // Include inputs/outputs if defined
+        if (this.inputs) {
+            spec.inputs = this.inputs;
+        }
+        if (this.outputs) {
+            spec.outputs = this.outputs;
+        }
+
+        return spec;
+    },
+
     validate(input) {
         if (Array.isArray(input)) {
             return input;
@@ -18,9 +38,66 @@ Object.assign(sex, {
     afterSpawn(initial) {
         this.update({});
         this.receive(initial);
+
+        // Set up output port taps after initial commands execute
+        this.setupOutputTaps();
+    },
+
+    setupOutputTaps() {
+        // Clean up existing taps if any
+        if (this._outputTaps) {
+            this._outputTaps.forEach(cleanup => cleanup());
+        }
+        this._outputTaps = [];
+
+        // Set up new taps based on outputs spec
+        if (this.outputs) {
+            const state = this.current();
+
+            for (const [portName, spec] of Object.entries(this.outputs)) {
+                if (spec.routes_from && spec.effects) {
+                    const sourceGadget = state[spec.routes_from];
+
+                    if (sourceGadget) {
+                        const cleanup = sourceGadget.tap((effect) => {
+                            // Check if any of the specified effects are in this emission
+                            for (const effectKey of spec.effects) {
+                                if (effect[effectKey] !== undefined) {
+                                    // Re-emit on external port name
+                                    this.emit({ [portName]: effect[effectKey] });
+                                }
+                            }
+                        });
+
+                        this._outputTaps.push(cleanup);
+                    } else {
+                        console.warn(`[sex] Output port "${portName}" routes from unknown gadget: ${spec.routes_from}`);
+                    }
+                }
+            }
+        }
     },
 
     step(state, input) {
+        // Check if object input with named fields (port routing)
+        if (typeof input === 'object' && !Array.isArray(input) && input !== null) {
+            // Route each field to internal gadgets based on inputs spec
+            for (const [portName, value] of Object.entries(input)) {
+                const inputSpec = this.inputs?.[portName];
+
+                if (inputSpec?.routes_to) {
+                    const targetGadget = state[inputSpec.routes_to];
+                    if (targetGadget) {
+                        targetGadget.receive(value);
+                    } else {
+                        console.warn(`[sex] Input port "${portName}" routes to unknown gadget: ${inputSpec.routes_to}`);
+                    }
+                }
+            }
+            return; // Input handled via routing
+        }
+
+        // Otherwise treat as command array
         this.execute(state, input).catch((err) => {
             console.error("Sexecution failed:", err);
             this.emit({ error: { err, input, state, timestamp: Date.now() } });

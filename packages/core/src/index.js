@@ -129,5 +129,16 @@ export function fromSpec(spec) {
     if (spec.view && g.setView) {
         g.setView(spec.view);
     }
+    // Apply inputs/outputs if present in spec
+    if (spec.inputs) {
+        g.inputs = spec.inputs;
+    }
+    if (spec.outputs) {
+        g.outputs = spec.outputs;
+        // Re-initialize output taps if gadget supports it
+        if (g.setupOutputTaps) {
+            g.setupOutputTaps();
+        }
+    }
     return g;
 }

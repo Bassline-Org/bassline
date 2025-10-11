@@ -144,10 +144,17 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                                         return (
                                             <div
                                                 key={portName}
-                                                className="font-mono text-xs bg-blue-50 text-blue-700 p-1.5 rounded flex justify-between"
+                                                className="font-mono text-xs bg-blue-50 text-blue-700 p-1.5 rounded"
                                             >
-                                                <span className="font-semibold">{portName}</span>
-                                                <span className="text-blue-500">{spec.type}</span>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="font-semibold">{portName}</span>
+                                                    <span className="text-blue-500">{spec.type}</span>
+                                                </div>
+                                                {spec.routes_to && (
+                                                    <div className="text-blue-500 text-[10px] mt-0.5">
+                                                        → {spec.routes_to}
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -163,16 +170,33 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                                     {Object.entries(gadget.outputs).map(([portName, spec]: [string, any]) => (
                                         <div
                                             key={portName}
-                                            className="font-mono text-xs bg-green-50 text-green-700 p-1.5 rounded flex justify-between"
+                                            className="font-mono text-xs bg-green-50 text-green-700 p-1.5 rounded"
                                         >
-                                            <span className="font-semibold">{portName}</span>
-                                            <span className="text-green-500">{spec.type}</span>
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-semibold">{portName}</span>
+                                                <span className="text-green-500">{spec.type}</span>
+                                            </div>
+                                            {spec.routes_from && (
+                                                <div className="text-green-500 text-[10px] mt-0.5">
+                                                    ← {spec.routes_from} [{spec.effects?.join(', ')}]
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* Port Editor for Sex Gadgets */}
+            {!isWire && gadget.pkg === "@bassline/systems" && gadget.name === "sex" && (
+                <div>
+                    <div className="text-xs text-gray-500 uppercase mb-2">
+                        Port Configuration
+                    </div>
+                    <PortEditor gadget={gadget} workspace={workspace} />
                 </div>
             )}
 
@@ -372,6 +396,238 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function PortEditor({ gadget, workspace }: { gadget: any; workspace: Record<string, any> }) {
+    const [showAddInput, setShowAddInput] = useState(false);
+    const [showAddOutput, setShowAddOutput] = useState(false);
+    const [newInputPort, setNewInputPort] = useState({ name: "", routes_to: "", type: "any" });
+    const [newOutputPort, setNewOutputPort] = useState({ name: "", routes_from: "", effects: "", type: "any" });
+
+    const state = gadget.useCurrent();
+    const internalGadgets = Object.keys(state || {}).filter(key =>
+        state[key] && typeof state[key] === 'object' && 'receive' in state[key]
+    );
+
+    const handleAddInput = () => {
+        if (!newInputPort.name || !newInputPort.routes_to) return;
+
+        const newInputs = {
+            ...(gadget.inputs || {}),
+            [newInputPort.name]: {
+                type: newInputPort.type,
+                routes_to: newInputPort.routes_to
+            }
+        };
+
+        gadget.inputs = newInputs;
+        setNewInputPort({ name: "", routes_to: "", type: "any" });
+        setShowAddInput(false);
+    };
+
+    const handleRemoveInput = (portName: string) => {
+        const newInputs = { ...gadget.inputs };
+        delete newInputs[portName];
+        gadget.inputs = Object.keys(newInputs).length > 0 ? newInputs : undefined;
+    };
+
+    const handleAddOutput = () => {
+        if (!newOutputPort.name || !newOutputPort.routes_from || !newOutputPort.effects) return;
+
+        const effects = newOutputPort.effects.split(',').map(e => e.trim()).filter(e => e);
+
+        const newOutputs = {
+            ...(gadget.outputs || {}),
+            [newOutputPort.name]: {
+                type: newOutputPort.type,
+                routes_from: newOutputPort.routes_from,
+                effects
+            }
+        };
+
+        gadget.outputs = newOutputs;
+        gadget.setupOutputTaps?.();
+        setNewOutputPort({ name: "", routes_from: "", effects: "", type: "any" });
+        setShowAddOutput(false);
+    };
+
+    const handleRemoveOutput = (portName: string) => {
+        const newOutputs = { ...gadget.outputs };
+        delete newOutputs[portName];
+        gadget.outputs = Object.keys(newOutputs).length > 0 ? newOutputs : undefined;
+        gadget.setupOutputTaps?.();
+    };
+
+    return (
+        <div className="space-y-3">
+            {/* Input Ports */}
+            <div>
+                <div className="flex justify-between items-center mb-2">
+                    <div className="text-xs font-semibold text-gray-600">Input Ports</div>
+                    <Button
+                        size="sm"
+                        onClick={() => setShowAddInput(!showAddInput)}
+                        className="text-xs px-2 py-1 h-6"
+                    >
+                        + Add
+                    </Button>
+                </div>
+
+                {showAddInput && (
+                    <div className="bg-blue-50 p-2 rounded space-y-2 mb-2">
+                        <input
+                            type="text"
+                            placeholder="Port name"
+                            value={newInputPort.name}
+                            onChange={(e) => setNewInputPort({ ...newInputPort, name: e.target.value })}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                        />
+                        <select
+                            value={newInputPort.routes_to}
+                            onChange={(e) => setNewInputPort({ ...newInputPort, routes_to: e.target.value })}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                        >
+                            <option value="">Select internal gadget...</option>
+                            {internalGadgets.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={newInputPort.type}
+                            onChange={(e) => setNewInputPort({ ...newInputPort, type: e.target.value })}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                        >
+                            <option value="any">any</option>
+                            <option value="number">number</option>
+                            <option value="string">string</option>
+                            <option value="boolean">boolean</option>
+                            <option value="array">array</option>
+                            <option value="object">object</option>
+                        </select>
+                        <div className="flex gap-2">
+                            <Button size="sm" onClick={handleAddInput} className="text-xs flex-1">
+                                Add Input Port
+                            </Button>
+                            <Button size="sm" onClick={() => setShowAddInput(false)} className="text-xs">
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="space-y-1">
+                    {gadget.inputs && Object.entries(gadget.inputs).map(([portName, spec]: [string, any]) => (
+                        <div key={portName} className="flex items-center gap-2">
+                            <div className="flex-1 font-mono text-xs bg-blue-50 text-blue-700 p-1.5 rounded">
+                                <div className="flex justify-between">
+                                    <span className="font-semibold">{portName}</span>
+                                    <span className="text-blue-500">{spec.type}</span>
+                                </div>
+                                {spec.routes_to && (
+                                    <div className="text-blue-500 text-[10px] mt-0.5">
+                                        → {spec.routes_to}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => handleRemoveInput(portName)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Output Ports */}
+            <div>
+                <div className="flex justify-between items-center mb-2">
+                    <div className="text-xs font-semibold text-gray-600">Output Ports</div>
+                    <Button
+                        size="sm"
+                        onClick={() => setShowAddOutput(!showAddOutput)}
+                        className="text-xs px-2 py-1 h-6"
+                    >
+                        + Add
+                    </Button>
+                </div>
+
+                {showAddOutput && (
+                    <div className="bg-green-50 p-2 rounded space-y-2 mb-2">
+                        <input
+                            type="text"
+                            placeholder="Port name"
+                            value={newOutputPort.name}
+                            onChange={(e) => setNewOutputPort({ ...newOutputPort, name: e.target.value })}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                        />
+                        <select
+                            value={newOutputPort.routes_from}
+                            onChange={(e) => setNewOutputPort({ ...newOutputPort, routes_from: e.target.value })}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                        >
+                            <option value="">Select internal gadget...</option>
+                            {internalGadgets.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                            ))}
+                        </select>
+                        <input
+                            type="text"
+                            placeholder="Effect keys (comma-separated)"
+                            value={newOutputPort.effects}
+                            onChange={(e) => setNewOutputPort({ ...newOutputPort, effects: e.target.value })}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                        />
+                        <select
+                            value={newOutputPort.type}
+                            onChange={(e) => setNewOutputPort({ ...newOutputPort, type: e.target.value })}
+                            className="w-full px-2 py-1 text-xs border rounded"
+                        >
+                            <option value="any">any</option>
+                            <option value="number">number</option>
+                            <option value="string">string</option>
+                            <option value="boolean">boolean</option>
+                            <option value="array">array</option>
+                            <option value="object">object</option>
+                        </select>
+                        <div className="flex gap-2">
+                            <Button size="sm" onClick={handleAddOutput} className="text-xs flex-1">
+                                Add Output Port
+                            </Button>
+                            <Button size="sm" onClick={() => setShowAddOutput(false)} className="text-xs">
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="space-y-1">
+                    {gadget.outputs && Object.entries(gadget.outputs).map(([portName, spec]: [string, any]) => (
+                        <div key={portName} className="flex items-center gap-2">
+                            <div className="flex-1 font-mono text-xs bg-green-50 text-green-700 p-1.5 rounded">
+                                <div className="flex justify-between">
+                                    <span className="font-semibold">{portName}</span>
+                                    <span className="text-green-500">{spec.type}</span>
+                                </div>
+                                {spec.routes_from && (
+                                    <div className="text-green-500 text-[10px] mt-0.5">
+                                        ← {spec.routes_from} [{spec.effects?.join(', ')}]
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => handleRemoveOutput(portName)}
+                                className="text-red-600 hover:text-red-800 text-sm"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </div>
         </div>
     );
 }
