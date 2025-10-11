@@ -10,6 +10,13 @@ Object.assign(and, {
     fn({ a, b }) {
         return a && b;
     },
+    inputs: {
+        a: { type: "boolean", defaultFormValue: false, description: "First operand" },
+        b: { type: "boolean", defaultFormValue: false, description: "Second operand" }
+    },
+    outputs: {
+        computed: { type: "boolean", description: "Logical AND result" }
+    },
 });
 
 const or = Object.create(partial);
@@ -19,6 +26,13 @@ Object.assign(or, {
     requiredKeys: ["a", "b"],
     fn({ a, b }) {
         return a || b;
+    },
+    inputs: {
+        a: { type: "boolean", defaultFormValue: false, description: "First operand" },
+        b: { type: "boolean", defaultFormValue: false, description: "Second operand" }
+    },
+    outputs: {
+        computed: { type: "boolean", description: "Logical OR result" }
     },
 });
 
@@ -30,6 +44,13 @@ Object.assign(xor, {
     fn({ a, b }) {
         return !!(a ^ b);
     },
+    inputs: {
+        a: { type: "boolean", defaultFormValue: false, description: "First operand" },
+        b: { type: "boolean", defaultFormValue: false, description: "Second operand" }
+    },
+    outputs: {
+        computed: { type: "boolean", description: "Logical XOR result" }
+    },
 });
 
 const every = Object.create(partial);
@@ -40,6 +61,12 @@ Object.assign(every, {
     fn(args) {
         return Object.values(args).every(Boolean);
     },
+    inputs: {
+        args: { type: "any", description: "Values to check (variadic)" }
+    },
+    outputs: {
+        computed: { type: "boolean", description: "True if all values are truthy" }
+    },
 });
 
 const some = Object.create(partial);
@@ -49,6 +76,12 @@ Object.assign(some, {
     requiredKeys: ["args"],
     fn(args) {
         return Object.values(args).some(Boolean);
+    },
+    inputs: {
+        args: { type: "any", description: "Values to check (variadic)" }
+    },
+    outputs: {
+        computed: { type: "boolean", description: "True if any value is truthy" }
     },
 });
 

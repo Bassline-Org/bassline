@@ -8,6 +8,10 @@ Object.assign(identity, {
     fn(x) {
         return x;
     },
+    inputs: "any",
+    outputs: {
+        computed: { type: "any", description: "Input value unchanged" }
+    },
 });
 
 const constant = Object.create(transform);
@@ -17,6 +21,10 @@ Object.assign(constant, {
     fn(x) {
         return this.current();
     },
+    inputs: "any",
+    outputs: {
+        computed: { type: "any", description: "Constant value (ignores input)" }
+    },
 });
 const car = Object.create(transform);
 Object.assign(car, {
@@ -24,6 +32,10 @@ Object.assign(car, {
     name: "car",
     fn([a, _]) {
         return a;
+    },
+    inputs: "array",
+    outputs: {
+        computed: { type: "any", description: "First element of pair" }
     },
 });
 
@@ -34,6 +46,10 @@ Object.assign(cdr, {
     fn([_, b]) {
         return b;
     },
+    inputs: "array",
+    outputs: {
+        computed: { type: "any", description: "Second element of pair" }
+    },
 });
 
 const not = Object.create(transform);
@@ -42,6 +58,10 @@ Object.assign(not, {
     name: "not",
     fn(x) {
         return !x;
+    },
+    inputs: "any",
+    outputs: {
+        computed: { type: "boolean", description: "Logical negation" }
     },
 });
 
@@ -53,6 +73,13 @@ Object.assign(obj, {
         return { [key]: value };
     },
     requiredKeys: ["key", "value"],
+    inputs: {
+        key: { type: "string", description: "Object key" },
+        value: { type: "any", description: "Object value" }
+    },
+    outputs: {
+        computed: { type: "object", description: "Object with single key-value pair" }
+    },
 });
 
 const get = Object.create(partial);
@@ -63,6 +90,13 @@ Object.assign(get, {
         return obj[key];
     },
     requiredKeys: ["obj", "key"],
+    inputs: {
+        obj: { type: "object", description: "Object to access" },
+        key: { type: "string", description: "Key to retrieve" }
+    },
+    outputs: {
+        computed: { type: "any", description: "Value at key" }
+    },
 });
 
 const cons = Object.create(partial);
@@ -73,6 +107,13 @@ Object.assign(cons, {
         return [car, cdr];
     },
     requiredKeys: ["car", "cdr"],
+    inputs: {
+        car: { type: "any", description: "First element" },
+        cdr: { type: "any", description: "Second element" }
+    },
+    outputs: {
+        computed: { type: "array", description: "Two-element array" }
+    },
 });
 
 const gate = Object.create(partial);
@@ -83,6 +124,13 @@ Object.assign(gate, {
         return control ? value : undefined;
     },
     requiredKeys: ["control", "value"],
+    inputs: {
+        control: { type: "boolean", defaultFormValue: false, description: "Control signal" },
+        value: { type: "any", description: "Value to pass through" }
+    },
+    outputs: {
+        computed: { type: "any", description: "Value if control is true, undefined otherwise" }
+    },
 });
 
 export default {

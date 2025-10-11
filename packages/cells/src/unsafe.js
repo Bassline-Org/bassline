@@ -21,6 +21,10 @@ Object.assign(last, {
     defaultState() {
         return null;
     },
+    inputs: "any",
+    outputs: {
+        changed: { type: "any", description: "New value (last write wins)" }
+    },
 });
 
 export default {

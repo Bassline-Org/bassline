@@ -26,6 +26,12 @@ Object.assign(union, {
         this.update(current.union(input));
     },
     name: "union",
+    inputs: "set",
+    outputs: {
+        changed: { type: "set", description: "New union result" },
+        accepted: { type: "boolean", description: "True if input added new elements" },
+        rejected: { type: "boolean", description: "True if input was subset" }
+    },
 });
 
 export const intersection = Object.create(setProto);
@@ -43,6 +49,13 @@ Object.assign(intersection, {
         this.update(intersection);
     },
     name: "intersection",
+    inputs: "set",
+    outputs: {
+        changed: { type: "set", description: "New intersection result" },
+        accepted: { type: "boolean", description: "True if input refined the set" },
+        rejected: { type: "boolean", description: "True if input was subset" },
+        contradiction: { type: "object", description: "Contradiction detected" }
+    },
 });
 
 function asSet(input) {

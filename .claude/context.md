@@ -668,6 +668,72 @@ Complete observability - see every effect in real-time.
 - `packages/cells/src/tables.js` - First, Last
 - `packages/cells/src/unsafe.js` - Last (no merge)
 
+## Port-Based Interface System (2025-10-10)
+
+**Major ergonomics improvement**: Simplified port declarations for visual wiring!
+
+### Simple Port Format
+
+Gadgets now declare inputs/outputs with a clean, type-hint-based format:
+
+```javascript
+// Single-value inputs (string type)
+inputs: "number"
+
+// Multi-field inputs (object of specs)
+inputs: {
+  a: { type: "number", defaultFormValue: 0, description: "First addend" },
+  b: { type: "number", defaultFormValue: 0, description: "Second addend" }
+}
+
+// Outputs (always object of specs)
+outputs: {
+  computed: { type: "number", description: "Sum of a and b" }
+}
+```
+
+### Wire Behavior
+
+**Single-value inputs** (`inputs: "number"`) receive raw values:
+- `inc.computed → max.value` sends `5` (raw number)
+
+**Multi-field inputs** (`inputs: { a: {...}, b: {...} }`) receive wrapped fields:
+- `inc.computed → add.a` sends `{ a: 5 }` (wrapped for partial function)
+
+Wire detection logic:
+```javascript
+const isSingleValueInput = typeof targetInputs !== 'object' || targetInputs === null;
+```
+
+### Visual Representation
+
+**GadgetNode.tsx** displays ports:
+- Input ports on left (color-coded by type)
+- Output ports on right (color-coded by type)
+- Main input/output handles for backwards compatibility
+- Port labels showing field names
+
+**Port Colors**:
+- `number`: blue (#3b82f6)
+- `string`: green (#10b981)
+- `boolean`: yellow (#eab308)
+- `error`: red (#ef4444)
+- `any`: gray (#6b7280)
+
+### Default State Fix
+
+**Fixed PackageBrowser.tsx**: Now calls `defaultState()` as a function instead of accessing the property:
+```typescript
+// Before: state: proto.defaultState || null  (❌ passes function itself!)
+// After:  state: proto.defaultState ? proto.defaultState() : null  (✓ calls it!)
+```
+
+All gadgets now spawn with proper default values:
+- `max`: -Infinity
+- `min`: Infinity
+- `transform`: undefined
+- `partial`: { args: {} }
+
 ## Current Status
 
 ✅ Canvas-based visual editor with React Flow
@@ -676,9 +742,11 @@ Complete observability - see every effect in real-time.
 ✅ Auto-layout with dagre algorithm (Cmd+L)
 ✅ Drag-and-drop gadget spawning
 ✅ Visual wire creation (connect nodes)
+✅ **Port-based wiring** - Visual ports on nodes, smart extraction
 ✅ Inspector with quick send and effects history
+✅ Inspector shows port metadata and wire configuration
 ✅ Smart input parsing (JSON, booleans, numbers)
-✅ Wire serialization (refs + names pattern)
+✅ Wire serialization (refs + names + ports pattern)
 ✅ ScopedWire afterSpawn pattern (receive not update)
 ✅ currentSex vs rootSex pattern (operations target correct level)
 ✅ **Command Palette** (Cmd+K) - Fuzzy search all gadgets
