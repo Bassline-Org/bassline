@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import styles from "../WorkspaceTree.module.css";
+import { BothPorts } from "./viewUtils";
 
 export const ToggleView = memo(({ data, selected }: NodeProps) => {
     const { name, gadget } = data;
@@ -42,9 +43,10 @@ export const ToggleView = memo(({ data, selected }: NodeProps) => {
                 selected ? "border-amber-500 ring-2 ring-amber-300" : "border-amber-400"
             } ${isFlashing ? styles.flash : ""}`}
         >
-            {/* Connection handles */}
+            {/* Connection handles - top/bottom for legacy, left/right for ports */}
             <Handle type="target" position={Position.Top} className="!bg-amber-500" />
             <Handle type="source" position={Position.Bottom} className="!bg-amber-500" />
+            <BothPorts />
 
             {/* Content */}
             <div className="p-6">

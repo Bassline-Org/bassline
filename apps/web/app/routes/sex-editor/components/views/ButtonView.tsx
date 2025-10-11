@@ -2,6 +2,7 @@ import { memo, useEffect, useState } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import styles from "../WorkspaceTree.module.css";
+import { BothPorts } from "./viewUtils";
 
 export const ButtonView = memo(({ data, selected }: NodeProps) => {
     const { name, gadget } = data;
@@ -46,9 +47,10 @@ export const ButtonView = memo(({ data, selected }: NodeProps) => {
                 selected ? "border-blue-300 ring-2 ring-blue-200" : "border-blue-700"
             } ${isFlashing ? styles.flash : ""}`}
         >
-            {/* Connection handles */}
+            {/* Connection handles - top/bottom for legacy, left/right for ports */}
             <Handle type="target" position={Position.Top} className="!bg-blue-500" />
             <Handle type="source" position={Position.Bottom} className="!bg-blue-500" />
+            <BothPorts />
 
             {/* Button content */}
             <div className="p-4">
