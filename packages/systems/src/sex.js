@@ -169,10 +169,16 @@ Object.assign(sex, {
                     state.targetName,
                 ];
 
-                // Include options if present (keys, etc.)
+                // Include options if present (keys, sourcePort, targetPort, etc.)
                 const options = {};
                 if (state.keys !== undefined) {
                     options.keys = state.keys;
+                }
+                if (state.sourcePort !== undefined) {
+                    options.sourcePort = state.sourcePort;
+                }
+                if (state.targetPort !== undefined) {
+                    options.targetPort = state.targetPort;
                 }
                 // Add other options as needed
                 if (Object.keys(options).length > 0) {

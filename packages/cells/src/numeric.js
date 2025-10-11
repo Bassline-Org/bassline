@@ -19,6 +19,12 @@ Object.assign(max, {
     defaultState() {
         return -Infinity;
     },
+    inputs: "number",
+    outputs: {
+        changed: { type: "number", description: "New maximum value" },
+        accepted: { type: "boolean", description: "True if input was greater" },
+        rejected: { type: "boolean", description: "True if input was not greater" }
+    },
 });
 
 export const min = Object.create(numericProto);
@@ -29,6 +35,12 @@ Object.assign(min, {
     name: "min",
     defaultState() {
         return Infinity;
+    },
+    inputs: "number",
+    outputs: {
+        changed: { type: "number", description: "New minimum value" },
+        accepted: { type: "boolean", description: "True if input was less" },
+        rejected: { type: "boolean", description: "True if input was not less" }
     },
 });
 

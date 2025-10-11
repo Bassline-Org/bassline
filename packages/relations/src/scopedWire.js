@@ -35,7 +35,17 @@ Object.assign(scopedWire, {
             isValid = true;
         }
 
-        // Accept keys configuration
+        // Accept port-based configuration (new way)
+        if (input.sourcePort && typeof input.sourcePort === 'string') {
+            valid.sourcePort = input.sourcePort;
+            isValid = true;
+        }
+        if (input.targetPort && typeof input.targetPort === 'string') {
+            valid.targetPort = input.targetPort;
+            isValid = true;
+        }
+
+        // Accept keys configuration (old way, backwards compat)
         if (input.keys !== undefined) {
             valid.keys = input.keys;
             isValid = true;
@@ -55,14 +65,14 @@ Object.assign(scopedWire, {
     },
 
     step(state = {}, input) {
-        console.log('[scopedWire.step] Called with:', { state, input, hasSource: !!state.source, hasTarget: !!state.target, keys: input.keys });
+        console.log('[scopedWire.step] Called with:', { state, input, hasSource: !!state.source, hasTarget: !!state.target, sourcePort: input.sourcePort, targetPort: input.targetPort, keys: input.keys });
 
         const { source, target } = state;
 
-        // If already wired and only keys changed, just update state
-        if (source && target && input.keys !== undefined) {
-            console.log('[scopedWire.step] Already wired, updating keys only');
-            this.update({ ...state, keys: input.keys });
+        // If already wired and only configuration changed, just update state
+        if (source && target && (input.keys !== undefined || input.sourcePort !== undefined || input.targetPort !== undefined)) {
+            console.log('[scopedWire.step] Already wired, updating configuration only');
+            this.update({ ...state, ...input });
             return;
         }
 
@@ -73,34 +83,71 @@ Object.assign(scopedWire, {
         }
 
         const next = { ...state, ...input };
-        console.log('[scopedWire.step] Next state:', { hasSource: !!next.source, hasTarget: !!next.target, hasSourceName: !!next.sourceName, hasTargetName: !!next.targetName, keys: next.keys });
+        console.log('[scopedWire.step] Next state:', {
+            hasSource: !!next.source,
+            hasTarget: !!next.target,
+            hasSourceName: !!next.sourceName,
+            hasTargetName: !!next.targetName,
+            sourcePort: next.sourcePort,
+            targetPort: next.targetPort,
+            keys: next.keys
+        });
 
         if (next.source && next.target) {
             console.log('[scopedWire.step] Setting up tap from source to target');
-            const cleanup = next.source.tap((e) => {
-                const keys = this.current().keys;
+            const cleanup = next.source.tap((effects) => {
+                const { sourcePort, targetPort, keys } = this.current();
 
-                // Filter/extract effects based on keys configuration
-                if (keys && Array.isArray(keys) && keys.length > 0) {
+                // Port-based extraction (new way)
+                if (sourcePort) {
+                    const value = effects[sourcePort];
+                    console.log('[scopedWire.tap] Port extraction:', { sourcePort, value, targetPort });
+
+                    if (value !== undefined) {
+                        if (targetPort) {
+                            // Check if target has single-value input (inputs is a string/primitive)
+                            // vs multi-field input (inputs is an object)
+                            const targetInputs = next.target.inputs;
+                            const isSingleValueInput = typeof targetInputs !== 'object' || targetInputs === null;
+
+                            if (isSingleValueInput) {
+                                // Single-value input: send raw value (e.g., max cell, inc function)
+                                console.log('[scopedWire.tap] Single-value input, sending raw:', value);
+                                next.target.receive(value);
+                            } else {
+                                // Multi-field input: wrap as named field (e.g., add function)
+                                console.log('[scopedWire.tap] Multi-field input, sending as field:', { [targetPort]: value });
+                                next.target.receive({ [targetPort]: value });
+                            }
+                        } else {
+                            // Send raw value
+                            console.log('[scopedWire.tap] Sending raw value:', value);
+                            next.target.receive(value);
+                        }
+                    }
+                }
+                // Keys-based extraction (old way, backwards compat)
+                else if (keys && Array.isArray(keys) && keys.length > 0) {
                     const filtered = {};
                     keys.forEach(key => {
-                        if (e[key] !== undefined) {
-                            filtered[key] = e[key];
+                        if (effects[key] !== undefined) {
+                            filtered[key] = effects[key];
                         }
                     });
                     // Only forward if we have matching keys
                     if (Object.keys(filtered).length > 0) {
                         // Extract value if single key, otherwise forward filtered object
                         const toForward = keys.length === 1 ? filtered[keys[0]] : filtered;
-                        console.log('[scopedWire.tap] Forwarding:', toForward);
+                        console.log('[scopedWire.tap] Keys extraction, forwarding:', toForward);
                         next.target.receive(toForward);
                     } else {
-                        console.log('[scopedWire.tap] No matching keys in effect:', e, 'keys:', keys);
+                        console.log('[scopedWire.tap] No matching keys in effect:', effects, 'keys:', keys);
                     }
-                } else {
-                    // No keys specified → forward everything
-                    console.log('[scopedWire.tap] Forwarding all effects:', e);
-                    next.target.receive(e);
+                }
+                // No extraction - forward everything
+                else {
+                    console.log('[scopedWire.tap] Forwarding all effects:', effects);
+                    next.target.receive(effects);
                 }
             });
             this.update(next);

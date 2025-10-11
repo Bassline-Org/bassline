@@ -39,7 +39,7 @@ export function PackageBrowser({ onSpawn }: PackageBrowserProps) {
                     return (
                         <button
                             key={`${pkg}/${name}`}
-                            onClick={() => onSpawn({ pkg, name, state: proto.defaultState || null })}
+                            onClick={() => onSpawn({ pkg, name, state: proto.defaultState ? proto.defaultState() : null })}
                             className="w-full text-left px-2 py-1 rounded hover:bg-blue-50 flex items-center gap-2 text-sm"
                         >
                             <span>{icon}</span>

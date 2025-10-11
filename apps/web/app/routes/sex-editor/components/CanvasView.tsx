@@ -241,12 +241,42 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
                 return;
             }
 
-            // Generate descriptive wire name: sourceTo + Target (camelCase)
+            // Extract port handles (which port was connected)
+            const sourcePort = connection.sourceHandle; // e.g., "computed" or "__main_output__"
+            const targetPort = connection.targetHandle; // e.g., "a" or "__main__"
+
+            // Build wire options based on port info
+            const wireOptions: any = {};
+
+            // Always extract from source port (unless it's the main output)
+            if (sourcePort && sourcePort !== '__main_output__') {
+                wireOptions.sourcePort = sourcePort;
+            }
+
+            // Only wrap in field if targeting specific port (not main input)
+            if (targetPort && targetPort !== '__main__') {
+                wireOptions.targetPort = targetPort;
+            }
+
+            // Generate descriptive wire name
             const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-            const wireName = `${connection.source}To${capitalize(connection.target)}`;
-            console.log('[Canvas] Creating wire:', { wireName, source: connection.source, target: connection.target });
+            const portSuffix = sourcePort && sourcePort !== '__main_output__'
+                ? `_${sourcePort}`
+                : '';
+            const targetSuffix = targetPort && targetPort !== '__main__'
+                ? `_${targetPort}`
+                : '';
+            const wireName = `${connection.source}${portSuffix}To${capitalize(connection.target)}${targetSuffix}`;
+
+            console.log('[Canvas] Creating wire:', {
+                wireName,
+                source: connection.source,
+                target: connection.target,
+                wireOptions
+            });
+
             currentSex.receive([
-                ["wire", wireName, connection.source, connection.target],
+                ["wire", wireName, connection.source, connection.target, wireOptions],
             ]);
         },
         [currentSex]

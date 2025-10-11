@@ -50,6 +50,34 @@ function getPreview(state: any): string {
     return str.length > 20 ? str.slice(0, 20) + "..." : str;
 }
 
+function getPortColor(type: string): string {
+    const colors: Record<string, string> = {
+        number: "#3b82f6",
+        string: "#10b981",
+        boolean: "#eab308",
+        error: "#ef4444",
+        any: "#6b7280",
+    };
+    return colors[type] || colors.any;
+}
+
+function getInputPorts(gadget: any): Array<[string, any]> {
+    if (!gadget.inputs) return [];
+
+    // Check if it's a single-value input (string/primitive type)
+    if (typeof gadget.inputs !== 'object' || gadget.inputs === null) {
+        return [["value", { type: gadget.inputs }]];
+    }
+
+    // Multi-field input (object of port specs)
+    return Object.entries(gadget.inputs);
+}
+
+function getOutputPorts(gadget: any): Array<[string, any]> {
+    if (!gadget.outputs) return [];
+    return Object.entries(gadget.outputs);
+}
+
 export const GadgetNode = memo(({ data, selected }: NodeProps) => {
     const { name, gadget, onNavigateInto } = data;
     const state = gadget.useCurrent();
@@ -94,18 +122,75 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
         }
     };
 
+    const inputPorts = getInputPorts(gadget);
+    const outputPorts = getOutputPorts(gadget);
+
     return (
         <div
             onDoubleClick={handleDoubleClick}
-            className={`bg-white border-2 rounded shadow-md min-w-[180px] ${
+            className={`bg-white border-2 rounded shadow-md min-w-[180px] relative ${
                 selected ? "border-blue-500 ring-2 ring-blue-300" : "border-gray-300"
             } ${isFlashing ? styles.flash : ""} ${
                 isNavigable ? "cursor-pointer hover:border-purple-400 hover:shadow-lg transition-all" : ""
             }`}
         >
-            {/* Connection handles */}
-            <Handle type="target" position={Position.Top} className="!bg-blue-500" />
-            <Handle type="source" position={Position.Bottom} className="!bg-green-500" />
+            {/* Input Ports (Left side) */}
+            {inputPorts.map(([portName, spec], index) => {
+                const yPos = 30 + (index * 25); // Start at 30px, 25px spacing
+                return (
+                    <Handle
+                        key={`input-${portName}`}
+                        type="target"
+                        position={Position.Left}
+                        id={portName}
+                        style={{
+                            top: `${yPos}px`,
+                            background: getPortColor(spec.type),
+                            width: "10px",
+                            height: "10px",
+                            border: "2px solid white",
+                        }}
+                        title={`${portName} (${spec.type})${spec.description ? ': ' + spec.description : ''}`}
+                    />
+                );
+            })}
+
+            {/* Main input handle (for whole-gadget connections) */}
+            <Handle
+                type="target"
+                position={Position.Top}
+                id="__main__"
+                className="!bg-blue-500"
+            />
+
+            {/* Output Ports (Right side) */}
+            {outputPorts.map(([portName, spec], index) => {
+                const yPos = 30 + (index * 25); // Start at 30px, 25px spacing
+                return (
+                    <Handle
+                        key={`output-${portName}`}
+                        type="source"
+                        position={Position.Right}
+                        id={portName}
+                        style={{
+                            top: `${yPos}px`,
+                            background: getPortColor(spec.type),
+                            width: "10px",
+                            height: "10px",
+                            border: "2px solid white",
+                        }}
+                        title={`${portName} (${spec.type})${spec.description ? ': ' + spec.description : ''}`}
+                    />
+                );
+            })}
+
+            {/* Main output handle (kept for backwards compat) */}
+            <Handle
+                type="source"
+                position={Position.Bottom}
+                id="__main_output__"
+                className="!bg-green-500"
+            />
 
             {/* Node content */}
             <div className="p-3 space-y-1">
@@ -120,6 +205,22 @@ export const GadgetNode = memo(({ data, selected }: NodeProps) => {
                 <div className="text-xs text-gray-700 font-mono bg-gray-50 p-1 rounded truncate">
                     {preview}
                 </div>
+
+                {/* Port labels (optional - can be removed if too cluttered) */}
+                {(inputPorts.length > 0 || outputPorts.length > 0) && (
+                    <div className="text-[10px] text-gray-400 flex justify-between mt-2">
+                        <div>
+                            {inputPorts.map(([name]) => (
+                                <div key={name}>{name}</div>
+                            ))}
+                        </div>
+                        <div className="text-right">
+                            {outputPorts.map(([name]) => (
+                                <div key={name}>{name}</div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -19,6 +19,16 @@ export const gadgetProto = {
     validate(input) {
         return input;
     },
+    /**
+     * Input port declarations (for UI visualization)
+     * Override to describe what inputs this gadget accepts
+     */
+    inputs: undefined,
+    /**
+     * Output port declarations (for UI visualization)
+     * Override to describe what effects this gadget emits
+     */
+    outputs: undefined,
     [StateSymbol]: null,
     /**
      * Get current state

@@ -127,6 +127,55 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                 <div className="font-mono text-sm">{gadget.name}</div>
             </div>
 
+            {/* Port Information (if gadget has ports) */}
+            {!isWire && (gadget.inputs || gadget.outputs) && (
+                <div>
+                    <div className="text-xs text-gray-500 uppercase mb-1">Ports</div>
+                    <div className="space-y-2">
+                        {gadget.inputs && (
+                            <div>
+                                <div className="text-xs font-semibold text-gray-600 mb-1">
+                                    Inputs
+                                </div>
+                                <div className="space-y-1">
+                                    {Object.entries(gadget.inputs).map(([portName, spec]: [string, any]) => {
+                                        // Skip metadata if inputs is a single-value input
+                                        if (portName === 'type' || portName === 'description') return null;
+                                        return (
+                                            <div
+                                                key={portName}
+                                                className="font-mono text-xs bg-blue-50 text-blue-700 p-1.5 rounded flex justify-between"
+                                            >
+                                                <span className="font-semibold">{portName}</span>
+                                                <span className="text-blue-500">{spec.type}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        {gadget.outputs && (
+                            <div>
+                                <div className="text-xs font-semibold text-gray-600 mb-1">
+                                    Outputs
+                                </div>
+                                <div className="space-y-1">
+                                    {Object.entries(gadget.outputs).map(([portName, spec]: [string, any]) => (
+                                        <div
+                                            key={portName}
+                                            className="font-mono text-xs bg-green-50 text-green-700 p-1.5 rounded flex justify-between"
+                                        >
+                                            <span className="font-semibold">{portName}</span>
+                                            <span className="text-green-500">{spec.type}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* View Selector (if gadget supports views) */}
             {!isWire && gadget.getView && (
                 <div>
@@ -178,42 +227,67 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
                             Connection
                         </div>
                         <div className="font-mono text-xs bg-blue-50 text-blue-700 p-2 rounded">
-                            {wireInfo.source?.pkg}/{wireInfo.source?.name} → {wireInfo.target?.pkg}/{wireInfo.target?.name}
+                            {wireInfo.sourceName || "unknown"} → {wireInfo.targetName || "unknown"}
                         </div>
                     </div>
-                    <div>
-                        <div className="text-xs text-gray-500 uppercase mb-1">
-                            Forward Keys
+
+                    {/* Port-based configuration (new way) */}
+                    {(wireInfo.sourcePort || wireInfo.targetPort) && (
+                        <div>
+                            <div className="text-xs text-gray-500 uppercase mb-1">
+                                Port Configuration
+                            </div>
+                            <div className="space-y-2">
+                                {wireInfo.sourcePort && (
+                                    <div className="font-mono text-xs bg-green-50 text-green-700 p-2 rounded">
+                                        Extract: <span className="font-semibold">{wireInfo.sourcePort}</span>
+                                    </div>
+                                )}
+                                {wireInfo.targetPort && (
+                                    <div className="font-mono text-xs bg-purple-50 text-purple-700 p-2 rounded">
+                                        As field: <span className="font-semibold">{wireInfo.targetPort}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <input
-                            type="text"
-                            value={keysInputValue}
-                            placeholder="all (leave empty for all)"
-                            onChange={(e) => {
-                                setKeysInputValue(e.target.value);
-                            }}
-                            onBlur={() => {
-                                const newKeys = keysInputValue
-                                    .split(',')
-                                    .map(k => k.trim())
-                                    .filter(k => k.length > 0);
-                                gadget.receive({ keys: newKeys.length > 0 ? newKeys : null });
-                            }}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
+                    )}
+
+                    {/* Keys-based configuration (old way, backwards compat) */}
+                    {wireInfo.keys && (
+                        <div>
+                            <div className="text-xs text-gray-500 uppercase mb-1">
+                                Forward Keys (Legacy)
+                            </div>
+                            <input
+                                type="text"
+                                value={keysInputValue}
+                                placeholder="all (leave empty for all)"
+                                onChange={(e) => {
+                                    setKeysInputValue(e.target.value);
+                                }}
+                                onBlur={() => {
                                     const newKeys = keysInputValue
                                         .split(',')
                                         .map(k => k.trim())
                                         .filter(k => k.length > 0);
                                     gadget.receive({ keys: newKeys.length > 0 ? newKeys : null });
-                                }
-                            }}
-                            className="w-full px-2 py-1 text-sm border rounded font-mono"
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                            Examples: <span className="font-mono">changed</span>, <span className="font-mono">computed</span>, <span className="font-mono">changed, delta</span>
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        const newKeys = keysInputValue
+                                            .split(',')
+                                            .map(k => k.trim())
+                                            .filter(k => k.length > 0);
+                                        gadget.receive({ keys: newKeys.length > 0 ? newKeys : null });
+                                    }
+                                }}
+                                className="w-full px-2 py-1 text-sm border rounded font-mono"
+                            />
+                            <div className="text-xs text-gray-500 mt-1">
+                                Examples: <span className="font-mono">changed</span>, <span className="font-mono">computed</span>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </>
             )}
             {!isWire && (connections.incoming.length > 0 || connections.outgoing.length > 0) && (
