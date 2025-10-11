@@ -219,6 +219,15 @@ const coreDialect = {
         }
     },
 
+    when() {
+        const condition = this.step();
+        const thenBlock = this.step();
+        if (condition) {
+            const evaluator = new Evaluator(thenBlock.items, this.env);
+            return evaluator.run();
+        }
+    },
+
     context() {
         const block = this.step();
         const env = Object.create(this.env);
@@ -254,6 +263,7 @@ const coreDialect = {
         return f(a);
     },
 
+    /// Environment ops
     get() {
         const key = this.step();
         assert(
@@ -262,7 +272,6 @@ const coreDialect = {
         );
         return this.getWord(key);
     },
-
     set() {
         const key = this.step();
         console.log("Set: ", key);
@@ -282,10 +291,31 @@ const coreDialect = {
         return n.getName();
     },
 
-    ["="]() {
-        return this.lastResult === this.step();
+    fn() {
+        // A list of words
+        const argList = this.step().items.map((item) => item.getName());
+        // The body of the fn
+        const body = this.step();
+        const env = Object.create(this.env);
+        return () => {
+            const evaluator = new Evaluator(body.items, env);
+            argList.forEach((arg) => {
+                const nextArg = this.peekNext();
+                assert(
+                    nextArg,
+                    `Not Enough arguments passed fn!
+                    expected ${argList.length} arguments, got ${
+                        argList.length - 1
+                    }
+                    `,
+                );
+                evaluator.setWord(arg, this.step());
+            });
+            return evaluator.run();
+        };
     },
 
+    /// Logics
     ["true"]() {
         return true;
     },
@@ -295,7 +325,6 @@ const coreDialect = {
     ["not"]() {
         return !this.step();
     },
-
     ["and"]() {
         return this.lastResult && this.step();
     },
@@ -303,6 +332,10 @@ const coreDialect = {
         return this.lastResult || this.step();
     },
 
+    /// Math ops
+    ["="]() {
+        return this.lastResult === this.step();
+    },
     ["+"]() {
         return this.lastResult + this.step();
     },
@@ -320,39 +353,13 @@ const coreDialect = {
 installDialect(coreDialect);
 
 const source = `
-  a: 10
-  b: 20
-  url: https://google.com
-  tag: <link href="asdfasdf">
-  ctx: context [
-    foo: context [
-        bar: :a
+    foo: fn [a b] [
+        a + b
     ]
-    baz: :b
-  ]
-  print :tag
-  print :tag/href
-  mod: import "./parser.js"
-  goog: fetch https://google.com
-  waitFor :goog [
-    print :goog
-  ]
-  waitFor :mod [
-    print :mod
-  ]
-  print "should be before goog"
+    
+    foo 10
 `;
 
-const otherSource = `
-    print true and false
-    print true and true
-    print false and false
-    print not true
-    print not false
-    print not true or false
-    print true and not false
-`;
-const parsed = parse(otherSource);
-const evaluator = new Evaluator(parsed);
+const evaluator = new Evaluator(parse(source));
 const result = evaluator.run();
 console.log("result: ", result);
