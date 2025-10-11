@@ -116,12 +116,39 @@ Object.assign(sex, {
             vals: {},
             activeRefs: [],
             activeVals: [],
+            references: {},  // Track references to prevent killing on clear
         };
+
+        // Phase 1: spawn + val (setup - create all gadgets and values)
         for (const [action, ...rest] of actions) {
-            await this.handleAction(env, action, ...rest);
+            if (action === "spawn" || action === "val") {
+                await this.handleAction(env, action, ...rest);
+            }
+        }
+
+        // Phase 2: get (references - now all gadgets exist)
+        for (const [action, ...rest] of actions) {
+            if (action === "get") {
+                await this.handleAction(env, action, ...rest);
+            }
+        }
+
+        // Phase 3: wire + send (connections - now all refs exist)
+        for (const [action, ...rest] of actions) {
+            if (action === "wire" || action === "send") {
+                await this.handleAction(env, action, ...rest);
+            }
+        }
+
+        // Phase 4: other commands (clear, rename, ref/withVals scopes, etc.)
+        for (const [action, ...rest] of actions) {
+            if (!["spawn", "val", "get", "wire", "send"].includes(action)) {
+                await this.handleAction(env, action, ...rest);
+            }
         }
 
         this.update(env.spawned);
+        this.references = env.references;  // Store for serialization and clear checking
         this.emit({ completed: { ...env, timestamp: Date.now() } });
     },
 
@@ -144,6 +171,7 @@ Object.assign(sex, {
                 try {
                     const resolved = this.resolvePath(env, path);
                     env.spawned[localName] = resolved;
+                    env.references[localName] = path;  // Track that this is a reference, not owned
                     this.emit({ got: { localName, path } });
                 } catch (error) {
                     this.emit({
@@ -295,11 +323,17 @@ Object.assign(sex, {
     },
 
     stateSpec() {
-        // Convert current spawned gadgets back to spawn/wire actions
+        // Convert current spawned gadgets back to spawn/get/wire actions
         const spawned = this.current();
         const actions = [];
 
+        // Phase 1: Spawn commands for owned gadgets
         for (const [name, gadget] of Object.entries(spawned)) {
+            // Skip references - they'll be serialized as get commands
+            if (this.references && this.references[name]) {
+                continue;
+            }
+
             // Wire gadgets become wire commands (not spawn)
             if (
                 gadget.pkg === "@bassline/relations" &&
@@ -335,6 +369,13 @@ Object.assign(sex, {
             }
         }
 
+        // Phase 2: Get commands for references
+        if (this.references) {
+            for (const [name, path] of Object.entries(this.references)) {
+                actions.push(["get", name, path]);
+            }
+        }
+
         return actions;
     },
 
@@ -347,14 +388,29 @@ Object.assign(sex, {
      */
     clear(env, name) {
         if (name && env.spawned[name]) {
+            // Check if it's a reference - if so, just remove reference, don't kill
+            if (env.references && env.references[name]) {
+                delete env.references[name];
+                delete env.spawned[name];
+                this.emit({ cleared: name, wasReference: true });
+                return name;
+            }
+
+            // Otherwise it's owned - safe to kill
             env.spawned[name].kill?.();
             delete env.spawned[name];
             this.emit({ cleared: name });
             return name;
         } else if (!name) {
-            // Clear all
-            Object.values(env.spawned).forEach((g) => {
-                g.kill?.();
+            // Clear all - only kill owned gadgets, not references
+            Object.keys(env.spawned).forEach((key) => {
+                if (env.references && env.references[key]) {
+                    // Just remove reference
+                    delete env.references[key];
+                } else {
+                    // Kill owned gadget
+                    env.spawned[key]?.kill();
+                }
             });
             env.spawned = {};
             this.emit({ cleared: "all" });
