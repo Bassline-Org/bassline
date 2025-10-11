@@ -11,7 +11,6 @@ import {
     Url,
     Word,
 } from "./nodes.js";
-import { parse } from "./parser.js";
 
 export const GrammarProto = {};
 
@@ -34,35 +33,15 @@ function assertIs(value, type) {
 }
 
 export class Evaluator {
-    constructor(values, env = {}) {
-        this.values = values;
-        this.pos = 0;
-        this.env = Object.create(GrammarProto);
-        Object.assign(this.env, env);
-    }
-
-    peek() {
-        return this.values[this.pos];
-    }
-
-    peekNext() {
-        return this.values[this.pos + 1];
-    }
-
-    next() {
-        if (this.pos >= this.values.length) return undefined;
-        return this.values[this.pos++];
-    }
-
-    hasMore() {
-        return this.pos < this.values.length;
+    constructor() {
+        // Only store global scope
+        this.globalEnv = Object.create(GrammarProto);
     }
 
     getWord(name) {
         if (name in this.env) {
             return this.env[name];
         }
-        console.log(this.env);
         throw new Error(`Undefined word: ${name}`);
     }
 
@@ -73,12 +52,12 @@ export class Evaluator {
 
     resolveRefinement(head, tail) {
         if (head instanceof Promise) {
-            return head.then((v) => resolveRefinement(v, tail));
+            return head.then((v) => this.resolveRefinement(v, tail));
         }
         if (tail instanceof Series) {
             const key = this.eval(tail.first);
             const result = head.get ? head.get(key) : head[key];
-            return resolveRefinement(result, tail.rest);
+            return this.resolveRefinement(result, tail.rest);
         }
         if (tail instanceof Scalar) {
             const key = this.eval(tail.value);
@@ -108,7 +87,8 @@ export class Evaluator {
             if (value.isSetter()) {
                 const name = value.getName();
                 const nextValue = this.step();
-                return this.setWord(name, nextValue);
+                this.setWord(name, nextValue);
+                return nextValue;
             }
 
             if (value.isGetter()) {
@@ -116,24 +96,20 @@ export class Evaluator {
                 return this.getWord(name);
             }
 
-            const binding = this.env[value.value];
+            const binding = this.getWord(value.value);
             if (typeof binding === "function") {
                 return binding.call(this);
-            }
-            if (binding === undefined) {
-                console.log("undefined word: ", value);
-                throw new Error(`Undefined word: ${value}`);
             }
             return binding;
         }
 
         if (value instanceof Path) {
-            return this.resolveRefinement(this.eval(value.first), value.rest);
+            const first = this.eval(value.first);
+            return this.resolveRefinement(first, value.rest);
         }
 
         if (value instanceof Paren) {
-            const evaluator = new Evaluator(value.items, this.env);
-            return evaluator.run();
+            return this.run(value.items, this.env);
         }
 
         if (
@@ -149,22 +125,39 @@ export class Evaluator {
     }
 
     step() {
-        const value = this.next();
-        if (value === undefined) return undefined;
+        if (this.values.length === 0) return undefined;
+        const [value, ...rest] = this.values;
+        this.values = rest;
         const result = this.eval(value);
         this.lastResult = result;
         return result;
     }
 
-    stepTimes(n) {
-        return Array.from({ length: n }, () => this.step());
-    }
+    run(values, env = null) {
+        // Save current state
+        const saved = {
+            values: this.values,
+            env: this.env,
+            lastResult: this.lastResult,
+        };
 
-    run() {
-        while (this.hasMore()) {
+        // Set up new evaluation context
+        this.values = values;
+        this.env = env || this.globalEnv;
+        this.lastResult = undefined;
+
+        // Run evaluation
+        while (this.values.length > 0) {
             this.step();
         }
-        return this.lastResult;
+        const result = this.lastResult;
+
+        // Restore previous state
+        this.values = saved.values;
+        this.env = saved.env;
+        this.lastResult = saved.lastResult;
+
+        return result;
     }
 }
 
@@ -187,9 +180,7 @@ const coreDialect = {
         if (!(block instanceof Block)) {
             throw new Error("do expects a block");
         }
-
-        const evaluator = new Evaluator(block.items, this.env);
-        return evaluator.run();
+        return this.run(block.items, this.env);
     },
 
     reduce() {
@@ -211,11 +202,9 @@ const coreDialect = {
         }
 
         if (condition) {
-            const evaluator = new Evaluator(thenBlock.items, this.env);
-            return evaluator.run();
+            return this.run(thenBlock.items, this.env);
         } else {
-            const evaluator = new Evaluator(elseBlock.items, this.env);
-            return evaluator.run();
+            return this.run(elseBlock.items, this.env);
         }
     },
 
@@ -223,17 +212,15 @@ const coreDialect = {
         const condition = this.step();
         const thenBlock = this.step();
         if (condition) {
-            const evaluator = new Evaluator(thenBlock.items, this.env);
-            return evaluator.run();
+            return this.run(thenBlock.items, this.env);
         }
     },
 
     context() {
         const block = this.step();
-        const env = Object.create(this.env);
-        const evaluator = new Evaluator(block.items, env);
-        evaluator.run();
-        return evaluator.env;
+        const newEnv = Object.create(this.env);
+        this.run(block.items, newEnv);
+        return newEnv;
     },
 
     async fetch() {
@@ -245,8 +232,7 @@ const coreDialect = {
         const promise = this.step();
         const body = this.step();
         await promise;
-        const evaluator = new Evaluator(body.items, this.env);
-        return evaluator.run();
+        return this.run(body.items, this.env);
     },
 
     async import() {
@@ -258,8 +244,6 @@ const coreDialect = {
         const fn = this.step();
         const arg = this.step();
         const [f, a] = await Promise.all([fn, arg]);
-        console.log("fn: ", f);
-        console.log("arg: ", a);
         return f(a);
     },
 
@@ -268,14 +252,13 @@ const coreDialect = {
         const key = this.step();
         assert(
             typeof key === "string" || typeof key === "number",
-            "set requires a string or number key",
+            "get requires a string or number key",
         );
         return this.getWord(key);
     },
+
     set() {
         const key = this.step();
-        console.log("Set: ", key);
-        console.log("Key: ", typeof key);
         assert(
             typeof key === "string" || typeof key === "number",
             "set requires a string or number key",
@@ -286,32 +269,40 @@ const coreDialect = {
     },
 
     ["symbol"]() {
-        const n = this.next();
+        if (this.values.length === 0) return undefined;
+        const [n, ...rest] = this.values;
+        this.values = rest;
         assertIs(n, Word);
         return n.getName();
     },
 
     fn() {
-        // A list of words
-        const argList = this.step().items.map((item) => item.getName());
-        // The body of the fn
+        const argListBlock = this.step();
         const body = this.step();
-        const env = Object.create(this.env);
-        return () => {
-            const evaluator = new Evaluator(body.items, env);
+        const argList = argListBlock.items.map((item) => item.getName());
+        const closureEnv = this.env; // Capture lexical env
+
+        // Return function that gets called by the CALLING evaluator
+        return function () {
+            // Create NEW env that extends the closure
+            const fnEnv = Object.create(closureEnv);
+
+            // Bind arguments from the calling evaluator
             argList.forEach((arg) => {
-                const nextArg = this.peekNext();
-                assert(
-                    nextArg,
-                    `Not Enough arguments passed fn!
-                    expected ${argList.length} arguments, got ${
-                        argList.length - 1
-                    }
-                    `,
-                );
-                evaluator.setWord(arg, this.step());
+                const nextArg = this.step();
+                fnEnv[arg] = nextArg;
             });
-            return evaluator.run();
+
+            // Evaluate function body with captured closure + bound args
+            return this.run(body.items, fnEnv);
+        };
+    },
+
+    does() {
+        const body = this.step();
+        const capturedEnv = this.env;
+        return () => {
+            return this.run(body.items, capturedEnv);
         };
     },
 
@@ -351,15 +342,3 @@ const coreDialect = {
 };
 
 installDialect(coreDialect);
-
-const source = `
-    foo: fn [a b] [
-        a + b
-    ]
-    
-    foo 10
-`;
-
-const evaluator = new Evaluator(parse(source));
-const result = evaluator.run();
-console.log("result: ", result);
