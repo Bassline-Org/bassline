@@ -39,6 +39,9 @@ export class Evaluator {
     }
 
     getWord(name) {
+        if (name instanceof Promise) {
+            return name.then((v) => this.getWord(v));
+        }
         if (name in this.env) {
             return this.env[name];
         }
@@ -46,6 +49,9 @@ export class Evaluator {
     }
 
     setWord(name, value) {
+        if (name instanceof Promise) {
+            return name.then((v) => this.setWord(v, value));
+        }
         this.env[name] = value;
         return value;
     }
@@ -68,7 +74,7 @@ export class Evaluator {
 
     eval(value) {
         if (value instanceof Promise) {
-            return value.then((v) => this.eval(v));
+            return value.then(async (v) => await this.eval(v));
         }
 
         if (value instanceof Num) {
@@ -125,16 +131,17 @@ export class Evaluator {
     }
 
     step() {
+        // NOT async - keep promises as values!
         if (this.values.length === 0) return undefined;
         const [value, ...rest] = this.values;
         this.values = rest;
-        const result = this.eval(value);
+        const result = this.eval(value); // Don't await
         this.lastResult = result;
         return result;
     }
 
     run(values, env = null) {
-        // Save current state
+        // NOT async - returns promise if last value is promise
         const saved = {
             values: this.values,
             env: this.env,
@@ -148,7 +155,7 @@ export class Evaluator {
 
         // Run evaluation
         while (this.values.length > 0) {
-            this.step();
+            this.step(); // Don't await
         }
         const result = this.lastResult;
 
@@ -157,7 +164,7 @@ export class Evaluator {
         this.env = saved.env;
         this.lastResult = saved.lastResult;
 
-        return result;
+        return result; // Might be a promise
     }
 }
 
@@ -240,11 +247,11 @@ const coreDialect = {
         return await import(path);
     },
 
-    async js() {
+    js() {
         const fn = this.step();
         const arg = this.step();
-        const [f, a] = await Promise.all([fn, arg]);
-        return f(a);
+        // Don't await - just call
+        return fn(arg);
     },
 
     /// Environment ops
@@ -301,7 +308,7 @@ const coreDialect = {
     does() {
         const body = this.step();
         const capturedEnv = this.env;
-        return () => {
+        return async () => {
             return this.run(body.items, capturedEnv);
         };
     },
@@ -338,6 +345,48 @@ const coreDialect = {
     },
     ["/"]() {
         return this.lastResult / this.step();
+    },
+
+    /// Async primitives
+    async await() {
+        const promise = this.step();
+        return await promise;
+    },
+
+    all() {
+        const block = this.step();
+        const promises = block.items.map((item) => this.eval(item));
+        return Promise.all(promises);
+    },
+
+    race() {
+        const block = this.step();
+        const promises = block.items.map((item) => this.eval(item));
+        return Promise.race(promises);
+    },
+
+    any() {
+        const block = this.step();
+        const promises = block.items.map((item) => this.eval(item));
+        return Promise.any(promises);
+    },
+
+    settled() {
+        const block = this.step();
+        const promises = block.items.map((item) => this.eval(item));
+        return Promise.allSettled(promises);
+    },
+
+    timeout() {
+        const ms = this.step();
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    },
+
+    background() {
+        const block = this.step();
+        // Run in background without awaiting
+        this.run(block.items, this.env);
+        return undefined;
     },
 };
 

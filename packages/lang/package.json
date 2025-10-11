@@ -8,6 +8,7 @@
       ".": "./src/index.js"
     },
     "scripts": {
+      "test": "vitest run"
     },
     "license": "MIT"
   }
