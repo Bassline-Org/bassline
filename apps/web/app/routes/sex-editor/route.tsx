@@ -1205,7 +1205,12 @@ export default function SexEditor() {
                         <h2 className="text-sm font-semibold text-gray-700 p-4 pb-0 uppercase">
                             Inspector
                         </h2>
-                        <Inspector gadget={selected} workspace={workspace} />
+                        <Inspector
+                            gadget={selected}
+                            workspace={workspace}
+                            currentSex={currentSex}
+                            {...(selected ? { gadgetName: Object.keys(workspace).find(k => workspace[k] === selected) } : {})}
+                        />
                     </div>
                 )}
             </div>

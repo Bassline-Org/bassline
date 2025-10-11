@@ -5,9 +5,11 @@ import { Button } from "~/components/ui/button";
 interface InspectorProps {
     gadget: any;
     workspace: Record<string, any>;
+    currentSex?: any;
+    gadgetName?: string | undefined;
 }
 
-export function Inspector({ gadget, workspace }: InspectorProps) {
+export function Inspector({ gadget, workspace, currentSex, gadgetName }: InspectorProps) {
     // Use regular React state for simple UI interactions
     const [inputValue, setInputValue] = useState("");
     const [keysInputValue, setKeysInputValue] = useState("");
@@ -114,8 +116,29 @@ export function Inspector({ gadget, workspace }: InspectorProps) {
     const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
     const wireInfo = isWire ? state : null;
 
+    // Check if this is a reference
+    const isReference = currentSex && gadgetName && currentSex.references?.[gadgetName];
+    const referencePath = isReference ? currentSex.references[gadgetName] : null;
+
     return (
         <div className="p-4 space-y-4">
+            {/* Reference Information */}
+            {isReference && (
+                <div className="p-3 bg-purple-50 border border-purple-200 rounded">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">🔗</span>
+                        <div className="text-sm font-semibold text-purple-700">Reference</div>
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">Points to:</div>
+                    <div className="font-mono text-sm bg-white p-2 rounded border border-purple-100">
+                        {referencePath}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2 italic">
+                        This is a reference to another gadget. Deleting this will not affect the original.
+                    </div>
+                </div>
+            )}
+
             <div>
                 <div className="text-xs text-gray-500 uppercase mb-1">
                     Package

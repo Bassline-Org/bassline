@@ -14,6 +14,7 @@ import {
 import dagre from "@dagrejs/dagre";
 import { GadgetNode } from "./GadgetNode";
 import { WireNode } from "./WireNode";
+import { ReferenceNode } from "./ReferenceNode";
 
 interface CanvasViewProps {
     workspace: Record<string, any>;
@@ -32,6 +33,7 @@ export interface CanvasViewHandle {
 const nodeTypes: NodeTypes = {
     gadgetNode: GadgetNode,
     wireNode: WireNode,
+    referenceNode: ReferenceNode,
 };
 
 // Auto-layout using dagre
@@ -95,11 +97,19 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
             .filter(([name]) => name !== "__layout")
             .map(([name, gadget]) => {
                 const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
+                const isReference = currentSex.references?.[name];
+                const referencePath = isReference ? currentSex.references[name] : null;
+
+                // Determine node type
+                let nodeType = "gadgetNode";
+                if (isWire) nodeType = "wireNode";
+                else if (isReference) nodeType = "referenceNode";
+
                 return {
                     id: name,
-                    type: isWire ? "wireNode" : "gadgetNode",
+                    type: nodeType,
                     position: { x: 0, y: 0 }, // Will be set by dagre
-                    data: { name, gadget, isWire, onNavigateInto },
+                    data: { name, gadget, isWire, isReference, referencePath, onNavigateInto },
                 };
             });
 
@@ -181,14 +191,22 @@ const CanvasViewInner = forwardRef<CanvasViewHandle, CanvasViewProps>(
             const newNodes: Node[] = addedGadgets.map((name) => {
                 const gadget = workspace[name];
                 const isWire = gadget.pkg === "@bassline/relations" && gadget.name === "scopedWire";
+                const isReference = currentSex.references?.[name];
+                const referencePath = isReference ? currentSex.references[name] : null;
+
+                // Determine node type
+                let nodeType = "gadgetNode";
+                if (isWire) nodeType = "wireNode";
+                else if (isReference) nodeType = "referenceNode";
+
                 return {
                     id: name,
-                    type: isWire ? "wireNode" : "gadgetNode",
+                    type: nodeType,
                     position: {
                         x: Math.random() * 400,
                         y: Math.random() * 400,
                     }, // Random for now
-                    data: { name, gadget, isWire, onNavigateInto },
+                    data: { name, gadget, isWire, isReference, referencePath, onNavigateInto },
                 };
             });
 
