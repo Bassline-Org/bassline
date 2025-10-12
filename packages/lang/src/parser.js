@@ -167,6 +167,7 @@ const program = sequenceOf([
 // ===== Export =====
 export function parse(source) {
     const result = program.run(source);
+    console.log("parsed: ", result);
 
     if (result.isError) {
         throw new Error(

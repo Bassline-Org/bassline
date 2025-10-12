@@ -4,6 +4,7 @@ import { GLOBAL } from "../context.js";
 import { normalize } from "../spelling.js";
 import { ReCell } from "./base.js";
 import { series } from "./series.js";
+import { makeFunc } from "./index.js";
 
 /**
  * Native function cell - built-in operations implemented in JavaScript
@@ -101,6 +102,9 @@ function mold(cell) {
  * This is a function so it executes after NativeCell is defined
  */
 export const NATIVES = {
+    "func": new NativeCell("func", [":spec", ":body"], ([spec, body]) => {
+        return makeFunc(spec, body);
+    }),
     // Arithmetic
     "+": new NativeCell("+", ["a", "b"], ([a, b]) => {
         if (!(a instanceof NumberCell) || !(b instanceof NumberCell)) {
