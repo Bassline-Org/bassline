@@ -7,7 +7,117 @@ import { series } from "./series.js";
 import { makeFunc } from "./index.js";
 import { makeObject } from "./objects.js";
 import { bind } from "../bind.js";
+import {
+    BlockCell,
+    GetWordCell,
+    LitWordCell,
+    make,
+    NoneCell,
+    NumberCell,
+    ParenCell,
+    PathCell,
+    RefinementCell,
+    SetWordCell,
+    StringCell,
+    WordCell,
+} from "./index.js";
 
+// Update the existing mold helper to be more comprehensive:
+function mold(cell) {
+    if (cell instanceof NoneCell) {
+        return "none";
+    }
+
+    if (cell instanceof NumberCell) {
+        return String(cell.value);
+    }
+
+    // Strings with proper escaping
+    if (cell instanceof StringCell) {
+        const str = cell.buffer.data.join("");
+        const escaped = str
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, "\\n")
+            .replace(/\t/g, "\\t")
+            .replace(/\r/g, "\\r");
+        return '"' + escaped + '"';
+    }
+
+    // Word types
+    if (cell instanceof SetWordCell) {
+        return String(cell.spelling.description || cell.spelling) + ":";
+    }
+    if (cell instanceof GetWordCell) {
+        return ":" + String(cell.spelling.description || cell.spelling);
+    }
+    if (cell instanceof LitWordCell) {
+        return "'" + String(cell.spelling.description || cell.spelling);
+    }
+    if (cell instanceof WordCell) {
+        return String(cell.spelling.description || cell.spelling);
+    }
+    if (cell instanceof RefinementCell) {
+        return "/" + String(cell.spelling.description || cell.spelling);
+    }
+
+    // Series types
+    if (cell instanceof BlockCell) {
+        const items = [];
+        let pos = cell.head();
+        while (!pos.isTail()) {
+            items.push(mold(pos.first()));
+            pos = pos.next();
+        }
+        return "[" + items.join(" ") + "]";
+    }
+
+    if (cell instanceof ParenCell) {
+        const items = [];
+        let pos = cell.head();
+        while (!pos.isTail()) {
+            items.push(mold(pos.first()));
+            pos = pos.next();
+        }
+        return "(" + items.join(" ") + ")";
+    }
+
+    if (cell instanceof PathCell) {
+        const items = [];
+        let pos = cell.head();
+        while (!pos.isTail()) {
+            // For paths, don't use full mold, just get the word/number
+            const part = pos.first();
+            if (part instanceof NumberCell) {
+                items.push(String(part.value));
+            } else if (part instanceof WordCell || part.typeName === "word") {
+                items.push(String(part.spelling.description || part.spelling));
+            } else {
+                items.push(mold(part));
+            }
+            pos = pos.next();
+        }
+        return items.join("/");
+    }
+
+    // Objects (contexts)
+    if (cell instanceof Context) {
+        return "#[object!]"; // Or could do make object! [...]
+    }
+
+    // Functions
+    if (cell.typeName === "function") {
+        return "#[function!]";
+    }
+
+    // Natives
+    if (cell.typeName === "native") {
+        return "#[native!]";
+    }
+
+    // Fallback
+    return `#[${cell.typeName}!]`;
+}
 /**
  * Native function cell - built-in operations implemented in JavaScript
  */
@@ -99,38 +209,6 @@ function composeBlock(block, evaluator) {
 }
 
 /**
- * Convert a cell to a displayable string (simplified mold)
- */
-function mold(cell) {
-    if (cell instanceof NoneCell) {
-        return "none";
-    }
-    if (cell instanceof NumberCell) {
-        return String(cell.value);
-    }
-    if (cell.typeName === "string") {
-        // For strings, show the characters
-        return '"' + cell.buffer.data.join("") + '"';
-    }
-    if (cell instanceof BlockCell) {
-        const items = [];
-        let pos = cell.head();
-        while (!pos.isTail()) {
-            items.push(mold(pos.first()));
-            pos = pos.next();
-        }
-        return "[" + items.join(" ") + "]";
-    }
-    if (cell.typeName === "word") {
-        return String(cell.spelling.description || cell.spelling);
-    }
-    if (cell.typeName === "function") {
-        return "#[function!]";
-    }
-    return `#[${cell.typeName}!]`;
-}
-
-/**
  * Create and return all native functions
  * This is a function so it executes after NativeCell is defined
  */
@@ -138,6 +216,10 @@ export const NATIVES = {
     "func": new NativeCell("func", [":spec", ":body"], ([spec, body]) => {
         return makeFunc(spec, body);
     }),
+    "mold": new NativeCell("mold", ["value"], ([value]) => {
+        return make.string(mold(value));
+    }),
+
     "make": new NativeCell(
         "make",
         [":type", "spec"],
