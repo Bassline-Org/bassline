@@ -472,7 +472,7 @@ describe("Native Functions", () => {
 
             const code = make.block([
                 make.word("function?", GLOBAL),
-                make.word("f", ctx),
+                make.getWord("f", ctx),  // Use GET-WORD to pass function value without applying
             ]);
 
             expect(doBlock(code).value).toBe(1);

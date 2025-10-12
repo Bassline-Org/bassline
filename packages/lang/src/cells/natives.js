@@ -36,11 +36,12 @@ export class NativeCell extends ReCell {
             const shouldEvaluate = !argSpec.startsWith(":");
 
             if (shouldEvaluate) {
-                // Just evaluate - don't step (which would apply functions)
+                // Step through to fully evaluate (applies functions if needed)
                 const cell = series.first(pos);
-                args.push(evaluator.evaluate(cell));
-                totalConsumed += 1;
-                pos = pos.next();
+                const result = cell.step(pos, evaluator);
+                args.push(result.value);
+                totalConsumed += result.consumed;
+                pos = pos.skip(result.consumed);
             } else {
                 // Don't evaluate - pass the cell directly
                 args.push(series.first(pos));
