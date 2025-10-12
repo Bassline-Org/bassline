@@ -9,13 +9,10 @@ export function bind(wordCell, context) {
         });
     }
     if (series.isSeries(wordCell)) {
-        const newData = wordCell.buffer.data.map((elem) => bind(elem, context));
-        const newBuffer = new SeriesBuffer(newData);
-
-        return new ReCell(wordCell.type, {
-            buffer: newBuffer,
-            index: wordCell.index,
-        });
+        for (let i = 0; i < wordCell.buffer.data.length; i++) {
+            wordCell.buffer.data[i] = bind(wordCell.buffer.data[i], context);
+        }
+        return wordCell;
     }
     return wordCell;
 }
