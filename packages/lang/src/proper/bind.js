@@ -3,10 +3,20 @@ import { normalize } from "./spelling.js";
 
 export function bind(wordCell, context) {
     if (isAnyWord(wordCell)) {
-        return new ReCell(wordCell.type, {
-            spelling: normalize(wordCell.spelling),
-            binding: context,
-        });
+        // Check if this word exists in the target context
+        // If not, return the word unchanged (ineffective bind)
+        const existsInContext = context.get(wordCell.spelling) !== undefined;
+
+        if (existsInContext) {
+            // Effective bind: word exists in context, rebind it
+            return new ReCell(wordCell.type, {
+                spelling: normalize(wordCell.spelling),
+                binding: context,
+            });
+        } else {
+            // Ineffective bind: word doesn't exist, return unchanged
+            return wordCell;
+        }
     }
     if (series.isSeries(wordCell)) {
         for (let i = 0; i < wordCell.buffer.data.length; i++) {

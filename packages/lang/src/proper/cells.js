@@ -1,4 +1,5 @@
 import { normalize } from "./spelling.js";
+import { makeObject } from "./object.js";
 /**
  * An "enum" that lists off every type of cell in the system
  */
@@ -15,6 +16,8 @@ export const TYPE = {
     BINARY: 9,
     PAREN: 10,
     PATH: 11,
+    OBJECT: 12,
+    FUNCTION: 13,
 };
 
 export class ReCell {
@@ -114,6 +117,12 @@ export const make = {
             buffer,
             index: 0,
         });
+    },
+    object(spec) {
+        return makeObject(spec);
+    },
+    fn(rfunc) {
+        return new ReCell(TYPE.FUNCTION, { fn: rfunc });
     },
 };
 

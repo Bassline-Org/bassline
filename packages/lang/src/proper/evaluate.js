@@ -4,6 +4,7 @@ import { make, series } from "./cells.js";
 import { normalize } from "./spelling.js";
 import { Context } from "./context.js";
 import { bind } from "./bind.js";
+import { callFunction } from "./function.js";
 
 export function evaluate(cell) {
     switch (cell.type) {
@@ -20,7 +21,9 @@ export function evaluate(cell) {
             return lookup(cell);
         case TYPE.SET_WORD:
             throw new Error("SET_WORD! cannot be evaluated alone - use do()");
-            // THESE ALL JUST EVALUATE TO THEMSELVES
+
+        // THESE ALL JUST EVALUATE TO THEMSELVES
+        case TYPE.FUNCTION:
         case TYPE.NUMBER:
         case TYPE.STRING:
         case TYPE.BLOCK:
@@ -43,6 +46,7 @@ export function doBlock(cell) {
     while (pos < cell.buffer.length) {
         const current = cell.buffer.data[pos];
 
+        // Handle SET_WORD: assign next value to the word
         if (current.type === TYPE.SET_WORD) {
             if (pos + 1 >= cell.buffer.length) {
                 throw new Error("SET_WORD! at end of block");
@@ -54,9 +58,39 @@ export function doBlock(cell) {
             const value = evaluate(cell.buffer.data[pos]);
             current.binding.set(current.spelling, value);
             result = value;
-        } else {
-            result = evaluate(current);
+            pos++;
+            continue;
         }
+
+        // Evaluate current position
+        console.log("evaluating", current);
+        const value = evaluate(current);
+        console.log("evaluated", value);
+
+        if (value.type === TYPE.FUNCTION) {
+            console.log("value is a function", value);
+            const fn = value.fn;
+            const args = [];
+
+            // Collect arguments
+            for (let i = 0; i < fn.spec.length; i++) {
+                pos++;
+                if (pos >= cell.buffer.length) {
+                    throw new Error(
+                        `Not enough arguments for function (expected ${fn.spec.length}, got ${i})`,
+                    );
+                }
+                // Evaluate each argument
+                args.push(evaluate(cell.buffer.data[pos]));
+            }
+
+            // Call the function
+            result = callFunction(value, args);
+        } else {
+            // Not a function, just use the evaluated value
+            result = value;
+        }
+
         pos++;
     }
 
