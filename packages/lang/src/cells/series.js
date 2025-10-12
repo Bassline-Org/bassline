@@ -1,4 +1,6 @@
 import { ReCell } from "./base.js";
+import { Context } from "../context.js";
+import { NumberCell } from "./primitives.js";
 
 /**
  * Shared buffer for series - mutable data structure
@@ -144,7 +146,70 @@ export class ParenCell extends SeriesBase {
  * PATH! - series of values for navigation
  */
 export class PathCell extends SeriesBase {
-    // TODO: Path evaluation
+    evaluate(evaluator) {
+        if (this.isTail()) {
+            throw new Error("Cannot evaluate empty path");
+        }
+
+        // Start with first element
+        let value = evaluator.evaluate(this.first());
+        let pos = this.next();
+
+        // Navigate through path segments
+        while (!pos.isTail()) {
+            const selector = pos.first();
+
+            // If value is a Context (object), select from it
+            if (value instanceof Context) {
+                if (selector.typeName === "word") {
+                    value = value.get(selector.spelling);
+                    if (value === undefined) {
+                        throw new Error(
+                            `Path: field ${
+                                String(selector.spelling)
+                            } not found in object`,
+                        );
+                    }
+                } else {
+                    throw new Error(
+                        `Path: cannot select from object with ${selector.typeName}`,
+                    );
+                }
+            } else if (isSeries(value)) {
+                // Numeric index into series
+                if (selector instanceof NumberCell) {
+                    // REBOL uses 1-based indexing
+                    const index = Math.floor(selector.value) - 1;
+                    if (index < 0 || index >= value.buffer.length) {
+                        throw new Error(
+                            `Path: index ${selector.value} out of range`,
+                        );
+                    }
+                    value = value.buffer.data[index];
+                } else {
+                    throw new Error(
+                        `Path: cannot index series with ${selector.typeName}`,
+                    );
+                }
+            } else {
+                throw new Error(`Path: cannot select from ${value.typeName}`);
+            }
+            pos = pos.next();
+        }
+
+        return value;
+    }
+    step(codeStream, evaluator) {
+        const value = this.evaluate(evaluator);
+
+        // If the value is applicable (like a function), delegate to it
+        if (value.isApplicable && value.isApplicable()) {
+            return value.step(codeStream, evaluator);
+        }
+
+        // Otherwise, just return the value
+        return { value, consumed: 1 };
+    }
 }
 
 /**

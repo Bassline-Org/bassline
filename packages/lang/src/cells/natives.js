@@ -5,6 +5,7 @@ import { normalize } from "../spelling.js";
 import { ReCell } from "./base.js";
 import { series } from "./series.js";
 import { makeFunc } from "./index.js";
+import { makeObject } from "./objects.js";
 
 /**
  * Native function cell - built-in operations implemented in JavaScript
@@ -105,6 +106,20 @@ export const NATIVES = {
     "func": new NativeCell("func", [":spec", ":body"], ([spec, body]) => {
         return makeFunc(spec, body);
     }),
+    "make": new NativeCell(
+        "make",
+        [":type", ":spec"],
+        ([type, spec], evaluator) => {
+            // For now, only support 'object!'
+            if (
+                type.typeName === "word" &&
+                type.spelling === normalize("object!")
+            ) {
+                return makeObject(spec, evaluator);
+            }
+            throw new Error(`make: unsupported type ${type.typeName}`);
+        },
+    ),
     // Arithmetic
     "+": new NativeCell("+", ["a", "b"], ([a, b]) => {
         if (!(a instanceof NumberCell) || !(b instanceof NumberCell)) {
