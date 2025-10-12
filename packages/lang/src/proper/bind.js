@@ -1,4 +1,4 @@
-import { isAnyWord, ReCell, series, TYPE } from "./cells.js";
+import { isAnyWord, ReCell, series, SeriesBuffer, TYPE } from "./cells.js";
 import { normalize } from "./spelling.js";
 
 export function bind(wordCell, context) {
@@ -14,21 +14,20 @@ export function bind(wordCell, context) {
 
         return new ReCell(wordCell.type, {
             buffer: newBuffer,
-            index: cell.index,
+            index: wordCell.index,
         });
     }
     return wordCell;
 }
 
 export function lookup(wordCell) {
-    const spelling = normalize(wordCell.spelling);
-    if (isAnyWord(wordCell)) {
+    if (!isAnyWord(wordCell)) {
         throw new Error(
-            `${wordCell} is not a word cell! You can only lookup the bound value of an anyWord! Got: ${wordCell.type}`,
+            `${wordCell} is not asa word cell! You can only lookup the bound value of an anyWord! Got: ${wordCell.type}`,
         );
     }
     if (!wordCell.binding) {
-        throw new Error(`${spelling} has no context`);
+        throw new Error(`${wordCell.spelling} has no context`);
     }
-    return wordCell.binding.get(spelling);
+    return wordCell.binding.get(wordCell.spelling);
 }
