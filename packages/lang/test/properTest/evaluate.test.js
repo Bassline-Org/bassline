@@ -24,7 +24,7 @@ describe("doBlock", () => {
         const result = doBlock(blk);
 
         expect(result.value).toBe(42);
-        expect(ctx.get(normalize("x")).value).toBe(42);
+        expect(ctx.get("x").value).toBe(42);
     });
 
     it("returns last value with multiple expressions", () => {
@@ -39,13 +39,13 @@ describe("doBlock", () => {
         const result = doBlock(blk);
 
         expect(result.value).toBe(2);
-        expect(ctx.get(normalize("x")).value).toBe(1);
-        expect(ctx.get(normalize("y")).value).toBe(2);
+        expect(ctx.get("x").value).toBe(1);
+        expect(ctx.get("y").value).toBe(2);
     });
 
     it("assigns looked-up values", () => {
         const ctx = new Context();
-        ctx.set(normalize("x"), make.num(100));
+        ctx.set("x", make.num(100));
 
         const blk = make.block([
             make.setWord("y", ctx),
@@ -55,7 +55,7 @@ describe("doBlock", () => {
         const result = doBlock(blk);
 
         expect(result.value).toBe(100);
-        expect(ctx.get(normalize("y")).value).toBe(100);
+        expect(ctx.get("y").value).toBe(100);
     });
 
     it("throws on SET_WORD at end of block", () => {
@@ -85,7 +85,7 @@ describe("doBlock", () => {
 describe("use", () => {
     it("creates local context and evaluates body", () => {
         const globalCtx = new Context();
-        globalCtx.set(normalize("x"), make.num(99));
+        globalCtx.set("x", make.num(99));
 
         // use ["a"] [a: 42]
         const body = make.block([
@@ -97,12 +97,12 @@ describe("use", () => {
 
         expect(result.value).toBe(42);
         // Global x should be unchanged
-        expect(globalCtx.get(normalize("x")).value).toBe(99);
+        expect(globalCtx.get("x").value).toBe(99);
     });
 
     it("shadows outer variables", () => {
         const globalCtx = new Context();
-        globalCtx.set(normalize("x"), make.num(10));
+        globalCtx.set("x", make.num(10));
 
         // Build: x: 5 (bound to global)
         const outerBody = make.block([
@@ -110,7 +110,7 @@ describe("use", () => {
             make.num(5),
         ]);
         doBlock(outerBody);
-        expect(globalCtx.get(normalize("x")).value).toBe(5);
+        expect(globalCtx.get("x").value).toBe(5);
 
         // use ["x"] [x: 42]
         const useBody = make.block([
@@ -121,12 +121,12 @@ describe("use", () => {
         use(["x"], useBody);
 
         // Global x should still be 5
-        expect(globalCtx.get(normalize("x")).value).toBe(5);
+        expect(globalCtx.get("x").value).toBe(5);
     });
 
     it("works with empty word list", () => {
         const ctx = new Context();
-        ctx.set(normalize("x"), make.num(10));
+        ctx.set("x", make.num(10));
 
         const body = make.block([
             make.word("x", ctx),
