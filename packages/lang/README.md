@@ -168,6 +168,77 @@ fork [
 
 `fork` creates a child evaluator with its own values stack but shared environment. Useful for parallel execution without state corruption.
 
+### Control Flow
+
+#### Loops
+
+```rebol
+; Loop N times
+loop 3 [
+    print "hello"
+]
+
+; Repeat with counter variable
+repeat i 5 [
+    print i  ; 1, 2, 3, 4, 5
+]
+
+; While loop
+x: 0
+while [(x < 5)] [
+    print x
+    x: (x + 1)
+]
+
+; Foreach over series
+foreach item [red green blue] [
+    print item
+]
+
+; Infinite loop (use break to exit)
+forever [
+    print "infinite"
+    break
+]
+```
+
+#### Loop Control
+
+```rebol
+; Break out of loop
+repeat i 10 [
+    if [(i > 5)] [break]
+    print i
+]
+
+; Continue to next iteration
+repeat i 5 [
+    if [(i = 3)] [continue]
+    print i  ; Skips 3
+]
+```
+
+#### Conditional Selection
+
+```rebol
+; Either - inline if/else
+result: either [(x > 5)] ["big"] ["small"]
+
+; Switch - match against multiple values
+switch color [
+    red [print "stop"]
+    yellow [print "caution"]
+    green [print "go"]
+]
+
+; Case - test multiple conditions
+case [
+    [(x < 0)] [print "negative"]
+    [(x = 0)] [print "zero"]
+    [(x > 0)] [print "positive"]
+]
+```
+
 ### Word Semantics
 
 ```rebol
@@ -194,6 +265,7 @@ See `examples/` directory:
 - `files.bl` - File operations (read, write, exists?, delete)
 - `seq-async.bl` - Sequential async execution with seq
 - `seq-parallel.bl` - Combining seq with parallel primitives
+- `loops.bl` - Loop constructs (loop, repeat, while, foreach, forever)
 - `counter-setup.bl` - Persistent state (daemon)
 
 ## Development
@@ -212,11 +284,32 @@ pnpm daemon
 
 ## Architecture
 
-- **Parser** (`src/parser.js`): REBOL-style syntax → AST
+- **Parser** (`src/parser.js`): REBOL-style syntax → AST (built with [Arcsecond](https://github.com/francisrstokes/arcsecond) parser combinators)
 - **Evaluator** (`src/eval.js`): Synchronous execution with fork-based isolation
 - **Nodes** (`src/nodes.js`): AST node types (homoiconic)
 - **Daemon** (`src/daemon.js`): WebSocket server for persistent execution
 - **CLI** (`src/cli.js`): Local and daemon execution
+
+### Parser
+
+The parser uses [Arcsecond](https://github.com/francisrstokes/arcsecond) parser combinators to parse REBOL-style syntax into AST nodes. Key features:
+
+- **Homoiconic**: Parser creates AST nodes that ARE the data
+- **Free-form whitespace**: Only serves as delimiter
+- **Comments**: `;` starts line comments
+- **No operator precedence**: Left-to-right evaluation (use parens for grouping)
+- **Rich datatypes**: Numbers, strings, words, blocks, paths, files, tuples, URLs
+
+Datatypes:
+- **Numbers**: `123`, `-45`, `3.14`
+- **Strings**: `"hello"`, `"line1\nline2"`
+- **Words**: `print`, `my-var`, `+`, `>`, `<`
+- **Blocks**: `[1 2 3]`, `[print hello]`
+- **Parens**: `(1 + 2)` (for grouping/precedence)
+- **Paths**: `obj/prop`, `g/max`
+- **Files**: `%test.txt`, `%"file with spaces.txt"`
+- **Tuples**: `1.2.3.4` (IP addresses, versions)
+- **URLs**: `http://example.com`, `https://example.com/path`
 
 ### Execution Model
 

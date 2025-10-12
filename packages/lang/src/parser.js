@@ -1,332 +1,224 @@
 import {
+    char,
+    choice,
+    digit,
+    digits,
+    endOfInput,
+    everyCharUntil,
+    letter,
+    many,
+    many1,
+    recursiveParser,
+    regex,
+    sequenceOf,
+    str,
+    whitespace,
+} from "arcsecond/index.mjs";
+import {
     Block,
     File,
     Num,
     Paren,
     Path,
     Str,
-    Tag,
     Tuple,
     Url,
     Word,
 } from "./nodes.js";
 
+// ===== Helper Parsers =====
+
+// Comments start with ; and go to end of line
+const comment = sequenceOf([
+    char(";"),
+    regex(/^[^\n]*/),
+]).map(() => null);
+
+// Whitespace and comments (optional)
+const ws = many(
+    choice([
+        whitespace.map(() => null),
+        comment,
+    ]),
+).map(() => null);
+
+// Word delimiters
+const isDelimiter = (c) => /[ \t\n\r\[\](){}";]/.test(c) || c === undefined;
+
+// ===== Number Parser =====
+const number = choice([
+    // Negative decimal: -123.45
+    sequenceOf([char("-"), digits, char("."), digits]).map(
+        ([sign, int, dot, dec]) =>
+            new Num(parseFloat(`${sign}${int}${dot}${dec}`)),
+    ),
+    // Positive decimal: 123.45
+    sequenceOf([digits, char("."), digits]).map(
+        ([int, dot, dec]) => new Num(parseFloat(`${int}${dot}${dec}`)),
+    ),
+    // Negative integer: -123
+    sequenceOf([char("-"), digits]).map(
+        ([sign, int]) => new Num(parseFloat(`${sign}${int}`)),
+    ),
+    // Positive integer: 123
+    digits.map((int) => new Num(parseFloat(int))),
+]).errorMap(() => "Expected number");
+
+// ===== String Parser =====
+const escapeSequence = sequenceOf([char("\\"), regex(/^./)]).map(
+    ([_, escaped]) => {
+        if (escaped === "n") return "\n";
+        if (escaped === "t") return "\t";
+        if (escaped === "r") return "\r";
+        if (escaped === '"') return '"';
+        if (escaped === "\\") return "\\";
+        return escaped;
+    },
+);
+
+const stringChar = choice([
+    escapeSequence,
+    regex(/^[^"\\]/), // any char except " and \
+]);
+
+const stringLiteral = sequenceOf([
+    char('"'),
+    many(stringChar),
+    char('"'),
+])
+    .map(([_, chars, __]) => new Str(chars.join("")))
+    .errorMap(() => "Expected string");
+
+// ===== Word Parser =====
+// Words are greedy - they consume until they hit a delimiter
+// For paths, we need wordChars to NOT include /
+const wordCharsNoSlash = regex(/^[^ \t\n\r\[\](){}";/]+/);
+
+// But must NOT start with a digit (that would be a number/tuple/path)
+const word = regex(
+    /^[^ \t\n\r\[\](){}";0-9/][^ \t\n\r\[\](){}";/]*|^[+\-*/=<>!?]+/,
+)
+    .map((chars) => new Word(chars))
+    .errorMap(() => "Expected word");
+
+// ===== File Parser =====
+// Files start with % followed by path (unquoted or quoted)
+const unquotedFilePath = regex(/^[^ \t\n\r\[\](){}";]+/);
+
+const quotedFilePath = sequenceOf([
+    char('"'),
+    many(stringChar),
+    char('"'),
+]).map(([_, chars, __]) => chars.join(""));
+
+const file = sequenceOf([
+    char("%"),
+    choice([quotedFilePath, unquotedFilePath]),
+])
+    .map(([_, path]) => new File(path))
+    .errorMap(() => "Expected file path");
+
+// ===== Forward declarations for recursive parsers =====
+// Create recursive parser for values
+const value = recursiveParser(() => valueParser);
+
+// ===== Block Parser =====
+const blockParser = sequenceOf([
+    char("["),
+    ws,
+    many(sequenceOf([value, ws]).map(([v, _]) => v)),
+    char("]"),
+])
+    .map(([_, __, items, ___]) => new Block(items))
+    .errorMap(() => "Expected block");
+
+// ===== Paren Parser =====
+const parenParser = sequenceOf([
+    char("("),
+    ws,
+    many(sequenceOf([value, ws]).map(([v, _]) => v)),
+    char(")"),
+])
+    .map(([_, __, items, ___]) => new Paren(items))
+    .errorMap(() => "Expected paren");
+
+// ===== Path Parser =====
+// Paths are parsed as: word/word/word or word/123
+const pathParser = sequenceOf([
+    wordCharsNoSlash,
+    many1(sequenceOf([char("/"), wordCharsNoSlash])),
+])
+    .map(([first, segments]) => {
+        const parts = [new Word(first)];
+        segments.forEach(([_, segment]) => {
+            // Check if segment is a number
+            if (/^-?\d+(\.\d+)?$/.test(segment)) {
+                parts.push(new Num(parseFloat(segment)));
+            } else {
+                parts.push(new Word(segment));
+            }
+        });
+        return new Path(parts);
+    })
+    .errorMap(() => "Expected path");
+
+// ===== Tuple Parser =====
+// Tuples are numbers separated by dots: 1.2.3.4 (at least 3 segments)
+const tupleParser = sequenceOf([
+    digits,
+    char("."),
+    digits,
+    many1(sequenceOf([char("."), digits])),
+])
+    .map(([first, _, second, segments]) => {
+        const numbers = [parseInt(first, 10), parseInt(second, 10)];
+        segments.forEach(([_, num]) => {
+            numbers.push(parseInt(num, 10));
+        });
+        return new Tuple(numbers);
+    })
+    .errorMap(() => "Expected tuple");
+
+// ===== URL Parser =====
+// URLs start with http:// or https://
+const urlParser = sequenceOf([
+    choice([str("https://"), str("http://")]),
+    regex(/^[^ \t\n\r\[\](){}";]+/),
+])
+    .map(([protocol, rest]) => new Url(protocol + rest))
+    .errorMap(() => "Expected URL");
+
+// ===== Value Parser (Main Entry Point) =====
+const valueParser = choice([
+    urlParser, // Must come before path (http:// vs word/word)
+    tupleParser, // Must come before number (1.2.3 vs 1.2)
+    file, // Must come before word (% prefix)
+    pathParser, // Must come before word (contains /)
+    number,
+    stringLiteral,
+    blockParser,
+    parenParser,
+    word,
+]);
+
+// ===== Top-level Parser =====
+const program = sequenceOf([
+    ws,
+    many(
+        sequenceOf([value, ws]).map(([v, _]) => v),
+    ),
+    endOfInput,
+]).map(([_, values, __]) => values);
+
+// ===== Export =====
 export function parse(source) {
-    let pos = 0;
+    const result = program.run(source);
 
-    function peek() {
-        return source[pos];
-    }
-
-    function next() {
-        return source[pos++];
-    }
-
-    function skipWhitespace() {
-        while (pos < source.length && /\s/.test(peek())) pos++;
-        // Skip comments (;... until end of line)
-        if (peek() === ';') {
-            while (pos < source.length && peek() !== '\n') pos++;
-            if (peek() === '\n') pos++; // Skip newline
-            skipWhitespace(); // Continue skipping whitespace after comment
-        }
-    }
-
-    function isWhitespace(char) {
-        return /\s/.test(char);
-    }
-
-    function parseString() {
-        let start = pos;
-        next(); // skip opening "
-        let value = "";
-        while (peek() !== '"') {
-            if (peek() === "\\") {
-                next(); // skip escape
-                const escaped = next();
-                // Handle escape sequences
-                if (escaped === "n") value += "\n";
-                else if (escaped === "t") value += "\t";
-                else if (escaped === "r") value += "\r";
-                else value += escaped;
-            } else {
-                value += next();
-            }
-        }
-        next(); // skip closing "
-        const stop = pos;
-        const s = new Str(value);
-        s.start = start;
-        s.stop = stop;
-        return s;
-    }
-
-    function parseBlock() {
-        const start = pos;
-        next(); // skip [
-        const items = [];
-        while (true) {
-            skipWhitespace();
-            if (peek() === "]") break;
-            items.push(parseValue());
-        }
-        next(); // skip ]
-        const stop = pos;
-        const b = new Block(items);
-        b.start = start;
-        b.stop = stop;
-        return b;
-    }
-
-    function parseParen() {
-        const start = pos;
-        next(); // skip (
-        const items = [];
-        while (true) {
-            skipWhitespace();
-            if (pos >= source.length) {
-                throw new Error("Unclosed parenthesis - reached end of input");
-            }
-            if (peek() === ")") break;
-            items.push(parseValue());
-        }
-        next(); // skip )
-        const stop = pos;
-        const b = new Paren(items);
-        b.start = start;
-        b.stop = stop;
-        return b;
-    }
-
-    // In parser.js
-    function parseTag() {
-        let start = pos;
-        next(); // skip
-
-        // Parse tag name
-        let tagName = "";
-        while (peek() !== ">" && peek() !== " " && !isWhitespace(peek())) {
-            tagName += next();
-        }
-
-        skipWhitespace();
-
-        // Parse attributes
-        const attrs = {};
-        while (peek() !== ">") {
-            skipWhitespace();
-            if (peek() === ">") break;
-
-            // Attribute name
-            let attrName = "";
-            while (peek() !== "=" && peek() !== ">" && !isWhitespace(peek())) {
-                attrName += next();
-            }
-
-            skipWhitespace();
-
-            if (peek() === "=") {
-                next(); // skip =
-                skipWhitespace();
-                const quote = next(); // " or '
-                let attrValue = "";
-                while (peek() !== quote) {
-                    attrValue += next();
-                }
-                next(); // skip closing quote
-                attrs[attrName] = attrValue;
-            } else {
-                // Boolean attribute
-                attrs[attrName] = true;
-            }
-        }
-
-        next(); // skip >
-        const stop = pos;
-
-        const t = new Tag(tagName, attrs);
-        t.start = start;
-        t.stop = stop;
-        return t;
-    }
-
-    function parseUrl(word) {
-        while (pos < source.length && !/[\s\[\]<>()"]/.test(peek())) {
-            word += next();
-        }
-
-        // Parse URL components here
-        const fullMatch = word.match(
-            /^([a-z][a-z0-9+.-]*):\/\/([^\/]+)(\/.*)?$/i,
-        );
-
-        let components;
-        if (fullMatch) {
-            components = {
-                scheme: fullMatch[1],
-                host: fullMatch[2],
-                path: fullMatch[3] || "/",
-            };
-        } else {
-            const simpleMatch = word.match(/^([a-z][a-z0-9+.-]*):(.*)$/i);
-            if (simpleMatch) {
-                components = {
-                    scheme: simpleMatch[1],
-                    rest: simpleMatch[2],
-                };
-            } else {
-                throw new Error(`Invalid URL at position ${start}`);
-            }
-        }
-
-        return new Url(word, components);
-    }
-
-    function parseWord() {
-        let word = "";
-        const start = pos;
-        while (pos < source.length && !/[\s\[\]<>()"]/.test(peek())) {
-            word += next();
-        }
-        const stop = pos;
-
-        // If we didn't consume anything, we have an unexpected character
-        if (word === "") {
-            throw new Error(`Unexpected character at position ${pos}: '${peek()}'`);
-        }
-
-        // Number (integer or decimal)
-        if (/^-?\d+(\.\d+)?$/.test(word)) {
-            const num = new Num(parseFloat(word));
-            num.start = start;
-            num.stop = stop;
-            return num;
-        }
-
-        // Tuple (3+ segments: 1.2.3.4 or 255.0.0)
-        if (/^\d+(\.\d+){2,}$/.test(word)) {
-            const segments = word.split(".").map((s) => parseInt(s));
-
-            validateTuple(segments);
-
-            const tup = new Tuple(segments);
-            tup.start = start;
-            tup.stop = stop;
-            return tup;
-        }
-
-        // URL (any scheme:// or scheme: pattern)
-        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(word)) {
-            const url = parseUrl(word);
-            url.start = start;
-            url.stop = stop;
-            return url;
-        }
-
-        if (word.includes("/") && word.length > 1) {
-            const segments = word.split("/");
-            const root = new Word(segments[0]);
-            const refinements = segments.slice(1).map((s) => new Word(s));
-            const path = new Path([root, ...refinements]);
-            path.start = start;
-            path.stop = stop;
-            return path;
-        }
-
-        // Word
-        const wordNode = new Word(word);
-        wordNode.start = start;
-        wordNode.stop = stop;
-        return wordNode;
-    }
-
-    function parseFile() {
-        const start = pos;
-        next(); // skip %
-
-        // Check for quoted file path
-        if (peek() === '"') {
-            next(); // skip opening quote
-            let path = "";
-            while (peek() !== '"') {
-                if (peek() === "\\") {
-                    next(); // skip escape
-                    const escaped = next();
-                    if (escaped === "n") path += "\n";
-                    else if (escaped === "t") path += "\t";
-                    else if (escaped === "r") path += "\r";
-                    else path += escaped;
-                } else {
-                    path += next();
-                }
-            }
-            next(); // skip closing quote
-            const stop = pos;
-            const f = new File(path);
-            f.start = start;
-            f.stop = stop;
-            return f;
-        }
-
-        // Unquoted file path
-        let path = "";
-        while (pos < source.length && !/[\s\[\]<>()"]/.test(peek())) {
-            path += next();
-        }
-        const stop = pos;
-        const f = new File(path);
-        f.start = start;
-        f.stop = stop;
-        return f;
-    }
-
-    function parseValue() {
-        skipWhitespace();
-        const char = peek();
-
-        if (char === "(") return parseParen();
-        if (char === "[") return parseBlock();
-        if (char === '"') return parseString();
-        if (char === "%") return parseFile();
-
-        // Handle < and > as operators (words), not tags
-        if (char === "<" || char === ">") {
-            const start = pos;
-            const op = next();
-            const stop = pos;
-            const w = new Word(op);
-            w.start = start;
-            w.stop = stop;
-            return w;
-        }
-
-        return parseWord();
-    }
-
-    const values = [];
-    while (pos < source.length) {
-        skipWhitespace();
-        if (pos >= source.length) break;
-        values.push(parseValue());
-    }
-
-    return values;
-}
-
-function validateTuple(segments) {
-    // Must have 3-10 segments
-    if (segments.length < 3 || segments.length > 10) {
+    if (result.isError) {
         throw new Error(
-            `Tuple must have 3-10 segments, got ${segments.length}`,
+            `Parse error at position ${result.index}: ${result.error}`,
         );
     }
 
-    // Each segment must be 0-255 (8-bit unsigned)
-    for (const seg of segments) {
-        if (!Number.isInteger(seg) || seg < 0 || seg > 255) {
-            throw new Error(
-                `Tuple segment must be integer 0-255, got ${seg}`,
-            );
-        }
-    }
+    return result.result;
 }

@@ -1,23 +1,24 @@
 {
-    "name": "@bassline/lang",
-    "version": "1.0.0",
-    "description": "Language for Bassline",
-    "type": "module",
-    "module": "src/index.js",
-    "exports": {
-      ".": "./src/index.js"
-    },
-    "bin": {
-      "bassline-daemon": "./src/daemon.js",
-      "bassline": "./src/cli.js"
-    },
-    "dependencies": {
-      "@bassline/core": "workspace:*",
-      "ws": "^8.0.0"
-    },
-    "scripts": {
-      "test": "vitest run",
-      "daemon": "node src/daemon.js"
-    },
-    "license": "MIT"
-  }
+  "name": "@bassline/lang",
+  "version": "1.0.0",
+  "description": "Language for Bassline",
+  "type": "module",
+  "module": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "bin": {
+    "bassline-daemon": "./src/daemon.js",
+    "bassline": "./src/cli.js"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "arcsecond": "^5.0.0",
+    "ws": "^8.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "daemon": "node src/daemon.js"
+  },
+  "license": "MIT"
+}
