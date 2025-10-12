@@ -48,6 +48,6 @@ if (args.length === 0) {
     } catch (e) {
         console.error(`Error running ${filename}:`);
         console.error(e.message);
-        process.exit(1);
+        //process.exit(1);
     }
 }

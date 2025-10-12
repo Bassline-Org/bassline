@@ -1,5 +1,4 @@
-; client.bl
-conn: connect "localhost" 8080
+conn: connect "localhost" 8081
 
 on conn 'message [
     print "Got:"

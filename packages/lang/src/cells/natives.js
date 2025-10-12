@@ -9,9 +9,11 @@ import {
     ParenCell,
     PathCell,
     RefinementCell,
+    SetWordCell,
     StringCell,
     WordCell,
 } from "./index.js";
+import net from "net";
 import { isSeries } from "./series.js";
 import { Context, GLOBAL } from "../context.js";
 import { normalize } from "../spelling.js";
@@ -20,7 +22,7 @@ import { series } from "./series.js";
 import { makeObject } from "./objects.js";
 import { execSync, spawn } from "child_process";
 import fs from "fs";
-import { bind } from "../bind.js";
+import { bind, bindAll } from "../bind.js";
 import { isAnyWord } from "./words.js";
 import { deepCopy } from "../copy.js";
 import { Evaluator } from "../evaluator.js";
@@ -395,8 +397,6 @@ export const NATIVES = {
         if (!(port instanceof NumberCell)) {
             throw new Error("listen: port must be a number");
         }
-
-        const net = require("net");
         const portNum = port.value;
 
         const server = net.createServer();
@@ -475,7 +475,6 @@ export const NATIVES = {
             throw new Error("connect: port must be a number");
         }
 
-        const net = require("net");
         const hostStr = host.buffer.data.join("");
         const portNum = port.value;
 
@@ -907,6 +906,7 @@ export const NATIVES = {
             sourceStr = fs.readFileSync(sourceStr, "utf8");
         }
 
+        console.log("Loading file:", sourceStr);
         // Parse to cells (unbound)
         return parse(sourceStr);
     }),
@@ -919,6 +919,7 @@ export const NATIVES = {
 
             // If it's a filename, read it
             if (str.endsWith(".bl")) {
+                console.log("Reading file:", str);
                 const source = fs.readFileSync(str, "utf8");
                 block = parse(source);
             } else {
@@ -932,7 +933,8 @@ export const NATIVES = {
         prescan(block, GLOBAL);
 
         // Now bind and execute
-        bind(block, GLOBAL);
+        bindAll(block, GLOBAL);
+        console.log("Context:", GLOBAL);
         return evaluator.doBlock(block);
     }),
 

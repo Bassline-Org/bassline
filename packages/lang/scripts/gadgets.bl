@@ -1,5 +1,5 @@
-defgadget: func [spec] [
-    obj: make object! [
+defgadget: func [spec-block] [
+    make object! compose [
         state: none
         connections: []
         receive: none
@@ -10,8 +10,6 @@ defgadget: func [spec] [
             append connections target
             target
         ]
+        (spec-block)  ; Insert spec block contents directly
     ]
-    obj/state: spec/state
-    obj/receive: spec/receive
-    obj
 ]

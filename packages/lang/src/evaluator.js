@@ -19,7 +19,6 @@ export class Evaluator {
         return cell.evaluate(this);
     }
 
-    // evaluator.js
     doBlock(blockCell) {
         // If it's not a series, just evaluate it
         if (!isSeries(blockCell)) {

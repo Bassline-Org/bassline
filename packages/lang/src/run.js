@@ -1,15 +1,14 @@
-// src/run.js
 import { parse } from "./parser.js";
-import { bind } from "./bind.js";
+import { bind, bindAll } from "./bind.js";
 import { doBlock } from "./evaluator.js";
 import { GLOBAL } from "./context.js";
-import { isSeries, make, SetWordCell } from "./cells/index.js";
+import { isAnyWord, isSeries, make } from "./cells/index.js";
 
 /**
  * Scan a cell for SET-WORDs and pre-create bindings
  */
 export function prescan(cell, context) {
-    if (cell instanceof SetWordCell) {
+    if (isAnyWord(cell)) {
         // Create binding for this SET-WORD if it doesn't exist
         if (context.get(cell.spelling) === undefined) {
             context.set(cell.spelling, make.none());
