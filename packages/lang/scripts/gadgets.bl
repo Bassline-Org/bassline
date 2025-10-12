@@ -10,6 +10,6 @@ defgadget: func [spec-block] [
             append connections target
             target
         ]
-        (spec-block)  ; Insert spec block contents directly
+        spec-block
     ]
 ]
