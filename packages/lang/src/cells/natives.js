@@ -1,26 +1,27 @@
-import { BlockCell, make, NoneCell, NumberCell, ParenCell } from "./index.js";
-import { isSeries } from "./series.js";
-import { GLOBAL } from "../context.js";
-import { normalize } from "../spelling.js";
-import { ReCell } from "./base.js";
-import { series } from "./series.js";
-import { makeFunc } from "./index.js";
-import { makeObject } from "./objects.js";
-import { bind } from "../bind.js";
 import {
     BlockCell,
     GetWordCell,
     LitWordCell,
     make,
+    makeFunc,
     NoneCell,
     NumberCell,
     ParenCell,
     PathCell,
     RefinementCell,
-    SetWordCell,
     StringCell,
     WordCell,
 } from "./index.js";
+import { isSeries } from "./series.js";
+import { Context, GLOBAL } from "../context.js";
+import { normalize } from "../spelling.js";
+import { ReCell } from "./base.js";
+import { series } from "./series.js";
+import { makeObject } from "./objects.js";
+import { execSync, spawn } from "child_process";
+import { bind } from "../bind.js";
+import { isAnyWord } from "./words.js";
+import { deepCopy } from "../copy.js";
 
 // Update the existing mold helper to be more comprehensive:
 function mold(cell) {
@@ -233,6 +234,157 @@ export const NATIVES = {
             }
 
             throw new Error(`make: unsupported type ${type.typeName}`);
+        },
+    ),
+    "spawn-async": new NativeCell(
+        "spawn-async",
+        [":body"],
+        ([body], evaluator) => {
+            // Execute body asynchronously (non-blocking)
+            if (!isSeries(body)) {
+                throw new Error("spawn-async: body must be a block");
+            }
+
+            // Bind body to current context
+            const bodyCopy = deepCopy(body);
+            bind(bodyCopy, GLOBAL);
+
+            // Execute in next tick (simple async)
+            setImmediate(() => {
+                try {
+                    evaluator.doBlock(bodyCopy);
+                } catch (e) {
+                    console.error("Async task error:", e);
+                }
+            });
+
+            return make.none();
+        },
+    ),
+    "shell": new NativeCell("shell", ["command"], ([command]) => {
+        if (!(command instanceof StringCell)) {
+            throw new Error("shell: command must be a string");
+        }
+
+        const cmd = command.buffer.data.join("");
+
+        try {
+            const output = execSync(cmd, { encoding: "utf8" });
+            return make.string(output);
+        } catch (e) {
+            throw new Error(`shell: command failed: ${e.message}`);
+        }
+    }),
+
+    "spawn": new NativeCell("spawn", ["command"], ([command]) => {
+        if (!(command instanceof StringCell)) {
+            throw new Error("spawn: command must be a string");
+        }
+
+        const cmd = command.buffer.data.join("");
+
+        // Parse command and args
+        const parts = cmd.split(" ");
+        const proc = spawn(parts[0], parts.slice(1));
+
+        // Return process object
+        const procObj = new Context();
+        procObj.set(normalize("pid"), make.num(proc.pid));
+
+        // Add methods to write/read
+        procObj.set(
+            normalize("write"),
+            new NativeCell("write", ["data"], ([data]) => {
+                const str = data.buffer.data.join("");
+                proc.stdin.write(str + "\n");
+                return make.none();
+            }),
+        );
+
+        // Store output
+        let output = "";
+        proc.stdout.on("data", (data) => {
+            output += data.toString();
+        });
+
+        procObj.set(
+            normalize("read"),
+            new NativeCell("read", [], () => {
+                const result = output;
+                output = ""; // Clear buffer
+                return make.string(result);
+            }),
+        );
+
+        return procObj;
+    }),
+    "wait": new NativeCell("wait", ["seconds"], ([seconds]) => {
+        if (!(seconds instanceof NumberCell)) {
+            throw new Error("wait: argument must be a number");
+        }
+
+        // Synchronous sleep (blocks)
+        const ms = seconds.value * 1000;
+        const start = Date.now();
+        while (Date.now() - start < ms) {
+            // Busy wait (not ideal but simple)
+        }
+
+        return make.none();
+    }),
+
+    "forever": new NativeCell("forever", [":body"], ([body], evaluator) => {
+        if (!isSeries(body)) {
+            throw new Error("forever: body must be a block");
+        }
+
+        const bodyCopy = deepCopy(body);
+        bind(bodyCopy, GLOBAL);
+
+        // Run forever (blocking)
+        // Can break with error or external signal
+        while (true) {
+            evaluator.doBlock(bodyCopy);
+        }
+    }),
+    "foreach": new NativeCell(
+        "foreach",
+        [":word", "series", ":body"],
+        ([word, series, body], evaluator) => {
+            if (!isSeries(series)) {
+                throw new Error("foreach: second argument must be a series");
+            }
+            if (!isAnyWord(word)) {
+                throw new Error("foreach: first argument must be a word");
+            }
+            if (!isSeries(body)) {
+                throw new Error("foreach: body must be a block");
+            }
+
+            // Create context for iteration variable
+            const loopContext = new Context();
+            loopContext.set(word.spelling, make.none());
+
+            // Bind body to loop context
+            const bodyCopy = deepCopy(body);
+            bind(bodyCopy, loopContext);
+
+            let result = make.none();
+            let pos = series.head();
+
+            while (!pos.isTail()) {
+                const element = pos.first();
+
+                // Set iteration variable
+                loopContext.set(word.spelling, element);
+
+                // Execute body
+                result = evaluator.doBlock(bodyCopy);
+
+                pos = pos.next();
+            }
+
+            return result;
         },
     ),
     "reduce": new NativeCell("reduce", [":block"], ([block], evaluator) => {
