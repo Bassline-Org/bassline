@@ -19,26 +19,20 @@ export class Evaluator {
         return cell.evaluate(this);
     }
 
-    /**
-     * Execute a block of code
-     * @param {BlockCell} blockCell
-     * @returns {ReCell}
-     */
+    // evaluator.js
     doBlock(blockCell) {
-        // If it's not a series or not a block, just evaluate it
-        if (!isSeries(blockCell) || !(blockCell instanceof BlockCell)) {
+        // If it's not a series, just evaluate it
+        if (!isSeries(blockCell)) {
             return this.evaluate(blockCell);
         }
 
+        // Now we know it's a series - execute it
         let result = make.none();
         let pos = blockCell;
 
         while (!pos.isTail()) {
             const cell = pos.first();
-
-            // Step this cell - it knows how to execute itself
             const { value, consumed } = cell.step(pos, this);
-
             result = value;
             pos = pos.skip(consumed);
         }

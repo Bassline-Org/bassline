@@ -133,9 +133,6 @@ export class StringCell extends SeriesBase {
     }
 }
 
-/**
- * PAREN! - immediately evaluated code
- */
 export class ParenCell extends SeriesBase {
     evaluate(evaluator) {
         // Parens evaluate their contents
