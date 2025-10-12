@@ -1,5 +1,9 @@
 import { TYPE } from "./cells.js";
 import { lookup } from "./bind.js";
+import { make, series } from "./cells.js";
+import { normalize } from "./spelling.js";
+import { Context } from "./context.js";
+import { bind } from "./bind.js";
 
 export function evaluate(cell) {
     switch (cell.type) {
@@ -43,6 +47,9 @@ export function doBlock(cell) {
             if (pos + 1 >= cell.buffer.length) {
                 throw new Error("SET_WORD! at end of block");
             }
+            if (!current.binding) {
+                throw new Error(`${String(current.spelling)} has no context`);
+            }
             pos++;
             const value = evaluate(cell.buffer.data[pos]);
             current.binding.set(current.spelling, value);
@@ -54,4 +61,19 @@ export function doBlock(cell) {
     }
 
     return result;
+}
+
+export function use(wordsArray, bodyCell) {
+    if (wordsArray.length > 0) {
+        // Create new context with all words set to none
+        const newContext = new Context();
+        for (const wordString of wordsArray) {
+            newContext.set(normalize(wordString), make.none());
+        }
+
+        // Bind body to new context (mutates the body's buffer!)
+        bind(bodyCell, newContext);
+    }
+
+    return doBlock(bodyCell);
 }

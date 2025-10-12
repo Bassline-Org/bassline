@@ -39,6 +39,9 @@ export class SeriesBuffer {
 }
 
 export const make = {
+    none() {
+        return new ReCell(TYPE.NONE, {});
+    },
     num(number = 0) {
         return new ReCell(TYPE.NUMBER, { value: number });
     },
