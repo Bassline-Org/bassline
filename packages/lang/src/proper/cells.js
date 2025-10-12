@@ -6,11 +6,15 @@ export const TYPE = {
     NONE: 0,
     NUMBER: 1,
     WORD: 2,
-    BLOCK: 3,
-    STRING: 4,
-    BINARY: 5,
-    PAREN: 6,
-    PATH: 7,
+    SET_WORD: 3,
+    GET_WORD: 4,
+    LIT_WORD: 5,
+    REFINEMENT: 6,
+    BLOCK: 7,
+    STRING: 8,
+    BINARY: 9,
+    PAREN: 10,
+    PATH: 11,
 };
 
 export class ReCell {
@@ -44,13 +48,39 @@ export const make = {
             binding,
         });
     },
+    setWord(spelling, binding) {
+        return new ReCell(TYPE.SET_WORD, {
+            spelling: normalize(spelling),
+            binding,
+        });
+    },
+
+    getWord(spelling, binding) {
+        return new ReCell(TYPE.GET_WORD, {
+            spelling: normalize(spelling),
+            binding,
+        });
+    },
+
+    litWord(spelling, binding) {
+        return new ReCell(TYPE.LIT_WORD, {
+            spelling: normalize(spelling),
+            binding,
+        });
+    },
+
+    refinement(spelling) {
+        return new ReCell(TYPE.REFINEMENT, {
+            spelling: normalize(spelling),
+        });
+    },
+
     // Series constructors
-    block(values = [], binding) {
+    block(values = []) {
         const buffer = new SeriesBuffer(values);
         return new ReCell(TYPE.BLOCK, {
             buffer,
             index: 0,
-            binding,
         });
     },
     string(str = "") {
@@ -68,23 +98,67 @@ export const make = {
             index: 0,
         });
     },
-
-    paren(values = [], binding) {
+    paren(values = []) {
         const buffer = new SeriesBuffer(values);
         return new ReCell(TYPE.PAREN, {
             buffer,
             index: 0,
-            binding,
         });
     },
-
-    path(values = [], binding) {
+    path(values = []) {
         const buffer = new SeriesBuffer(values);
         return new ReCell(TYPE.PATH, {
             buffer,
             index: 0,
-            binding,
         });
+    },
+};
+
+// Helper to check if cell is a word-like type
+export function isWordType(cell) {
+    return cell.type === TYPE.WORD ||
+        cell.type === TYPE.SET_WORD ||
+        cell.type === TYPE.GET_WORD ||
+        cell.type === TYPE.LIT_WORD ||
+        cell.type === TYPE.REFINEMENT;
+}
+
+// Helper to check if cell is any-word (not refinement)
+export function isAnyWord(cell) {
+    return cell.type === TYPE.WORD ||
+        cell.type === TYPE.SET_WORD ||
+        cell.type === TYPE.GET_WORD ||
+        cell.type === TYPE.LIT_WORD;
+}
+
+// Convert between word types (useful for parsing/manipulation)
+export const wordConvert = {
+    toWord(wordCell) {
+        if (!isAnyWord(wordCell)) {
+            throw new Error("Not a word type");
+        }
+        return make.word(wordCell.spelling, wordCell.binding);
+    },
+
+    toSetWord(wordCell) {
+        if (!isAnyWord(wordCell)) {
+            throw new Error("Not a word type");
+        }
+        return make.setWord(wordCell.spelling, wordCell.binding);
+    },
+
+    toGetWord(wordCell) {
+        if (!isAnyWord(wordCell)) {
+            throw new Error("Not a word type");
+        }
+        return make.getWord(wordCell.spelling, wordCell.binding);
+    },
+
+    toLitWord(wordCell) {
+        if (!isAnyWord(wordCell)) {
+            throw new Error("Not a word type");
+        }
+        return make.litWord(wordCell.spelling, wordCell.binding);
     },
 };
 
@@ -109,7 +183,6 @@ export const series = {
         return new ReCell(cell.type, {
             buffer: cell.buffer, // Same buffer!
             index: newIndex,
-            binding: cell.binding,
         });
     },
 
@@ -123,7 +196,6 @@ export const series = {
         return new ReCell(cell.type, {
             buffer: cell.buffer,
             index: newIndex,
-            binding: cell.binding,
         });
     },
 
@@ -140,7 +212,6 @@ export const series = {
         return new ReCell(cell.type, {
             buffer: cell.buffer,
             index: newIndex,
-            binding: cell.binding,
         });
     },
 
@@ -153,7 +224,6 @@ export const series = {
         return new ReCell(cell.type, {
             buffer: cell.buffer,
             index: 0,
-            binding: cell.binding,
         });
     },
 
@@ -166,7 +236,6 @@ export const series = {
         return new ReCell(cell.type, {
             buffer: cell.buffer,
             index: cell.buffer.length,
-            binding: cell.binding,
         });
     },
 
