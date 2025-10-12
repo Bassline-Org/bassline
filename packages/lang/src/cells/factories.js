@@ -1,4 +1,4 @@
-import { NoneCell, NumberCell } from "./primitives.js";
+import { NoneCell, NumberCell, FileCell, TupleCell, UrlCell } from "./primitives.js";
 import {
     GetWordCell,
     LitWordCell,
@@ -72,5 +72,18 @@ export const make = {
 
     fn(rfunc) {
         return new FunctionCell(rfunc).freeze();
+    },
+
+    // Intrinsic types (self-evaluating, no binding)
+    file(path) {
+        return new FileCell(path).freeze();
+    },
+
+    tuple(numbers) {
+        return new TupleCell(numbers).freeze();
+    },
+
+    url(urlString) {
+        return new UrlCell(urlString).freeze();
     },
 };

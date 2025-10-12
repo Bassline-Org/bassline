@@ -1,70 +1,48 @@
+// parser.js
 import {
     char,
     choice,
-    digit,
     digits,
     endOfInput,
-    everyCharUntil,
-    letter,
     many,
     many1,
     recursiveParser,
     regex,
     sequenceOf,
-    str,
     whitespace,
 } from "arcsecond/index.mjs";
-import {
-    Block,
-    File,
-    Num,
-    Paren,
-    Path,
-    Str,
-    Tuple,
-    Url,
-    Word,
-} from "./nodes.js";
+import { make } from "./cells/index.js";
 
-// ===== Helper Parsers =====
-
-// Comments start with ; and go to end of line
+// ===== Comments and Whitespace =====
 const comment = sequenceOf([
     char(";"),
     regex(/^[^\n]*/),
 ]).map(() => null);
 
-// Whitespace and comments (optional)
 const ws = many(
-    choice([
-        whitespace.map(() => null),
-        comment,
-    ]),
+    choice([whitespace.map(() => null), comment]),
 ).map(() => null);
 
-// Word delimiters
-const isDelimiter = (c) => /[ \t\n\r\[\](){}";]/.test(c) || c === undefined;
-
-// ===== Number Parser =====
+// ===== Numbers =====
 const number = choice([
-    // Negative decimal: -123.45
+    // Negative decimal
     sequenceOf([char("-"), digits, char("."), digits]).map(
         ([sign, int, dot, dec]) =>
-            new Num(parseFloat(`${sign}${int}${dot}${dec}`)),
+            make.num(parseFloat(`${sign}${int}${dot}${dec}`)),
     ),
-    // Positive decimal: 123.45
+    // Positive decimal
     sequenceOf([digits, char("."), digits]).map(
-        ([int, dot, dec]) => new Num(parseFloat(`${int}${dot}${dec}`)),
+        ([int, dot, dec]) => make.num(parseFloat(`${int}${dot}${dec}`)),
     ),
-    // Negative integer: -123
+    // Negative integer
     sequenceOf([char("-"), digits]).map(
-        ([sign, int]) => new Num(parseFloat(`${sign}${int}`)),
+        ([sign, int]) => make.num(parseFloat(`${sign}${int}`)),
     ),
-    // Positive integer: 123
-    digits.map((int) => new Num(parseFloat(int))),
+    // Positive integer
+    digits.map((int) => make.num(parseFloat(int))),
 ]).errorMap(() => "Expected number");
 
-// ===== String Parser =====
+// ===== Strings =====
 const escapeSequence = sequenceOf([char("\\"), regex(/^./)]).map(
     ([_, escaped]) => {
         if (escaped === "n") return "\n";
@@ -78,137 +56,113 @@ const escapeSequence = sequenceOf([char("\\"), regex(/^./)]).map(
 
 const stringChar = choice([
     escapeSequence,
-    regex(/^[^"\\]/), // any char except " and \
+    regex(/^[^"\\]/),
 ]);
 
 const stringLiteral = sequenceOf([
     char('"'),
     many(stringChar),
     char('"'),
-])
-    .map(([_, chars, __]) => new Str(chars.join("")))
+]).map(([_, chars, __]) => make.string(chars.join("")))
     .errorMap(() => "Expected string");
 
-// ===== Word Parser =====
-// Words are greedy - they consume until they hit a delimiter
-// For paths, we need wordChars to NOT include /
+// ===== Words =====
+// Word characters (no slash for path parsing)
 const wordCharsNoSlash = regex(/^[^ \t\n\r\[\](){}";/]+/);
 
-// But must NOT start with a digit (that would be a number/tuple/path)
+// All word types with syntax markers
 const word = regex(
-    /^[^ \t\n\r\[\](){}";0-9/][^ \t\n\r\[\](){}";/]*|^[+\-*/=<>!?]+/,
+    /^[':]?[^ \t\n\r\[\](){}";0-9/][^ \t\n\r\[\](){}";/]*:?|^[+\-*/=<>!?]+:?/,
 )
-    .map((chars) => new Word(chars))
+    .map((spelling) => {
+        // SET-WORD: ends with : (but doesn't start with :)
+        if (spelling.endsWith(":") && !spelling.startsWith(":")) {
+            return make.setWord(spelling.slice(0, -1)); // Unbound
+        }
+
+        // GET-WORD: starts with :
+        if (spelling.startsWith(":")) {
+            const name = spelling.slice(1).replace(/:$/, ""); // Remove trailing : if any
+            return make.getWord(name); // Unbound
+        }
+
+        // LIT-WORD: starts with '
+        if (spelling.startsWith("'")) {
+            return make.litWord(spelling.slice(1)); // Unbound
+        }
+
+        // Regular WORD
+        return make.word(spelling); // Unbound
+    })
     .errorMap(() => "Expected word");
 
-// ===== File Parser =====
-// Files start with % followed by path (unquoted or quoted)
-const unquotedFilePath = regex(/^[^ \t\n\r\[\](){}";]+/);
+// REFINEMENT: /word (standalone)
+const refinement = sequenceOf([
+    char("/"),
+    regex(/^[^ \t\n\r\[\](){}";/0-9][^ \t\n\r\[\](){}";/]*/),
+]).map(([_, name]) => make.refinement(name))
+    .errorMap(() => "Expected refinement");
 
-const quotedFilePath = sequenceOf([
-    char('"'),
-    many(stringChar),
-    char('"'),
-]).map(([_, chars, __]) => chars.join(""));
-
-const file = sequenceOf([
-    char("%"),
-    choice([quotedFilePath, unquotedFilePath]),
-])
-    .map(([_, path]) => new File(path))
-    .errorMap(() => "Expected file path");
-
-// ===== Forward declarations for recursive parsers =====
-// Create recursive parser for values
+// Forward declare for recursion
 const value = recursiveParser(() => valueParser);
 
-// ===== Block Parser =====
+// ===== Blocks =====
 const blockParser = sequenceOf([
     char("["),
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char("]"),
-])
-    .map(([_, __, items, ___]) => new Block(items))
+]).map(([_, __, items, ___]) => make.block(items))
     .errorMap(() => "Expected block");
 
-// ===== Paren Parser =====
+// ===== Parens =====
 const parenParser = sequenceOf([
     char("("),
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char(")"),
-])
-    .map(([_, __, items, ___]) => new Paren(items))
+]).map(([_, __, items, ___]) => make.paren(items))
     .errorMap(() => "Expected paren");
 
-// ===== Path Parser =====
-// Paths are parsed as: word/word/word or word/123
+// ===== Paths =====
+// Paths are word/word/word or word/number/word, etc.
+// Each segment becomes an element in the path series
 const pathParser = sequenceOf([
     wordCharsNoSlash,
     many1(sequenceOf([char("/"), wordCharsNoSlash])),
-])
-    .map(([first, segments]) => {
-        const parts = [new Word(first)];
-        segments.forEach(([_, segment]) => {
-            // Check if segment is a number
-            if (/^-?\d+(\.\d+)?$/.test(segment)) {
-                parts.push(new Num(parseFloat(segment)));
-            } else {
-                parts.push(new Word(segment));
-            }
-        });
-        return new Path(parts);
-    })
-    .errorMap(() => "Expected path");
+]).map(([first, segments]) => {
+    const parts = [make.word(first)]; // First element (unbound word)
 
-// ===== Tuple Parser =====
-// Tuples are numbers separated by dots: 1.2.3.4 (at least 3 segments)
-const tupleParser = sequenceOf([
-    digits,
-    char("."),
-    digits,
-    many1(sequenceOf([char("."), digits])),
-])
-    .map(([first, _, second, segments]) => {
-        const numbers = [parseInt(first, 10), parseInt(second, 10)];
-        segments.forEach(([_, num]) => {
-            numbers.push(parseInt(num, 10));
-        });
-        return new Tuple(numbers);
-    })
-    .errorMap(() => "Expected tuple");
+    segments.forEach(([_, segment]) => {
+        // Check if segment is a number
+        if (/^-?\d+(\.\d+)?$/.test(segment)) {
+            parts.push(make.num(parseFloat(segment)));
+        } else {
+            // It's a word (could be refinement-style but in path context)
+            parts.push(make.word(segment)); // Unbound
+        }
+    });
 
-// ===== URL Parser =====
-// URLs start with http:// or https://
-const urlParser = sequenceOf([
-    choice([str("https://"), str("http://")]),
-    regex(/^[^ \t\n\r\[\](){}";]+/),
-])
-    .map(([protocol, rest]) => new Url(protocol + rest))
-    .errorMap(() => "Expected URL");
+    return make.path(parts);
+}).errorMap(() => "Expected path");
 
-// ===== Value Parser (Main Entry Point) =====
+// ===== Value Parser (Main) =====
 const valueParser = choice([
-    urlParser, // Must come before path (http:// vs word/word)
-    tupleParser, // Must come before number (1.2.3 vs 1.2)
-    file, // Must come before word (% prefix)
     pathParser, // Must come before word (contains /)
-    number,
+    refinement, // Must come before word (starts with /)
+    number, // Must come before word (starts with digits)
     stringLiteral,
     blockParser,
     parenParser,
-    word,
+    word, // Last - catches everything else
 ]);
 
-// ===== Top-level Parser =====
+// ===== Program =====
 const program = sequenceOf([
     ws,
-    many(
-        sequenceOf([value, ws]).map(([v, _]) => v),
-    ),
+    many(sequenceOf([value, ws]).map(([v, _]) => v)),
     endOfInput,
-]).map(([_, values, __]) => values);
+]).map(([_, values, __]) => make.block(values)); // Return as block!
 
 // ===== Export =====
 export function parse(source) {
@@ -220,5 +174,5 @@ export function parse(source) {
         );
     }
 
-    return result.result;
+    return result.result; // Returns a BlockCell
 }
