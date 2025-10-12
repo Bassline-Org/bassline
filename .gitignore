@@ -93,3 +93,4 @@ bassline-web/.env.test
 
 *storybook.log
 storybook-static
+apps/bassline-vscode/bassline-0.1.0.vsix
