@@ -1,0 +1,11 @@
+; client.bl
+conn: connect "localhost" 8080
+
+on conn 'message [
+    print "Got:"
+    print data
+]
+
+conn/send 5
+wait 1
+conn/send 10

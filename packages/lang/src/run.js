@@ -8,7 +8,7 @@ import { isSeries, make, SetWordCell } from "./cells/index.js";
 /**
  * Scan a cell for SET-WORDs and pre-create bindings
  */
-function prescan(cell, context) {
+export function prescan(cell, context) {
     if (cell instanceof SetWordCell) {
         // Create binding for this SET-WORD if it doesn't exist
         if (context.get(cell.spelling) === undefined) {

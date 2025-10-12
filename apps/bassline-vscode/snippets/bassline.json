@@ -1,0 +1,50 @@
+{
+    "Function Definition": {
+      "prefix": "func",
+      "body": [
+        "func [${1:args}] [",
+        "\t$0",
+        "]"
+      ],
+      "description": "Define a function"
+    },
+    "Gadget Definition": {
+      "prefix": "gadget",
+      "body": [
+        "defgadget [",
+        "\tstate: [${1:initial-state}]",
+        "\treceive: func [${2:value}] [",
+        "\t\t$0",
+        "\t]",
+        "]"
+      ],
+      "description": "Define a gadget"
+    },
+    "Object": {
+      "prefix": "obj",
+      "body": [
+        "make object! [",
+        "\t$0",
+        "]"
+      ],
+      "description": "Create an object"
+    },
+    "Foreach Loop": {
+      "prefix": "foreach",
+      "body": [
+        "foreach ${1:item} ${2:series} [",
+        "\t$0",
+        "]"
+      ],
+      "description": "Foreach loop"
+    },
+    "Event Handler": {
+      "prefix": "on",
+      "body": [
+        "on ${1:emitter} '${2:event} [",
+        "\t$0",
+        "]"
+      ],
+      "description": "Event handler"
+    }
+  }

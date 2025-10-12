@@ -19,9 +19,13 @@ import { ReCell } from "./base.js";
 import { series } from "./series.js";
 import { makeObject } from "./objects.js";
 import { execSync, spawn } from "child_process";
+import fs from "fs";
 import { bind } from "../bind.js";
 import { isAnyWord } from "./words.js";
 import { deepCopy } from "../copy.js";
+import { Evaluator } from "../evaluator.js";
+import { parse } from "../parser.js";
+import { prescan } from "../run.js";
 
 // Update the existing mold helper to be more comprehensive:
 function mold(cell) {
@@ -387,6 +391,229 @@ export const NATIVES = {
             return result;
         },
     ),
+    "listen": new NativeCell("listen", ["port"], ([port]) => {
+        if (!(port instanceof NumberCell)) {
+            throw new Error("listen: port must be a number");
+        }
+
+        const net = require("net");
+        const portNum = port.value;
+
+        const server = net.createServer();
+        const serverObj = new Context();
+
+        server.on("connection", (socket) => {
+            let buffer = "";
+
+            socket.on("data", (data) => {
+                buffer += data.toString();
+
+                // Process complete messages (newline delimited)
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || ""; // Keep incomplete line
+
+                lines.forEach((line) => {
+                    if (line.trim()) {
+                        try {
+                            // Parse and emit message event
+                            const msg = parse(line);
+                            bind(msg, GLOBAL);
+
+                            // Get evaluator from somewhere... this is tricky
+                            // For now, store raw message
+                            const msgData = make.block([msg.first()]);
+
+                            // Emit to server's message handlers
+                            const handlersKey = normalize(`__handlers_message`);
+                            const handlers = serverObj.get(handlersKey);
+
+                            if (handlers && isSeries(handlers)) {
+                                let pos = handlers.head();
+                                while (!pos.isTail()) {
+                                    const handler = pos.first();
+                                    const eventCtx = new Context();
+                                    eventCtx.set(
+                                        normalize("data"),
+                                        msg.first(),
+                                    );
+
+                                    const handlerCopy = deepCopy(handler);
+                                    bind(handlerCopy, eventCtx);
+
+                                    // Need evaluator... store for async use
+                                    const globalEval = new Evaluator();
+                                    globalEval.doBlock(handlerCopy);
+
+                                    pos = pos.next();
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Parse error:", e.message);
+                        }
+                    }
+                });
+            });
+
+            socket.on("error", (err) => {
+                console.error("Socket error:", err.message);
+            });
+        });
+
+        server.listen(portNum, () => {
+            console.log(`Server listening on port ${portNum}`);
+        });
+
+        serverObj.set(normalize("port"), make.num(portNum));
+
+        return serverObj;
+    }),
+    "connect": new NativeCell("connect", ["host", "port"], ([host, port]) => {
+        if (!(host instanceof StringCell)) {
+            throw new Error("connect: host must be a string");
+        }
+        if (!(port instanceof NumberCell)) {
+            throw new Error("connect: port must be a number");
+        }
+
+        const net = require("net");
+        const hostStr = host.buffer.data.join("");
+        const portNum = port.value;
+
+        const socket = net.connect(portNum, hostStr);
+        const connObj = new Context();
+
+        let buffer = "";
+
+        socket.on("data", (data) => {
+            buffer += data.toString();
+
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+
+            lines.forEach((line) => {
+                if (line.trim()) {
+                    try {
+                        const msg = parse(line);
+                        bind(msg, GLOBAL);
+
+                        const handlersKey = normalize(`__handlers_message`);
+                        const handlers = connObj.get(handlersKey);
+
+                        if (handlers && isSeries(handlers)) {
+                            let pos = handlers.head();
+                            while (!pos.isTail()) {
+                                const handler = pos.first();
+                                const eventCtx = new Context();
+                                eventCtx.set(normalize("data"), msg.first());
+
+                                const handlerCopy = deepCopy(handler);
+                                bind(handlerCopy, eventCtx);
+
+                                const globalEval = new Evaluator();
+                                globalEval.doBlock(handlerCopy);
+
+                                pos = pos.next();
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Parse error:", e.message);
+                    }
+                }
+            });
+        });
+
+        socket.on("connect", () => {
+            console.log("Connected to server");
+        });
+
+        socket.on("error", (err) => {
+            console.error("Connection error:", err.message);
+        });
+
+        // Send method
+        connObj.set(
+            normalize("send"),
+            new NativeCell("send", ["data"], ([data]) => {
+                const str = mold(data);
+                socket.write(str + "\n");
+                return make.none();
+            }).freeze(),
+        );
+
+        return connObj;
+    }),
+
+    "on": new NativeCell(
+        "on",
+        ["emitter", ":event", ":handler"],
+        ([emitter, event, handler], evaluator) => {
+            if (!(emitter instanceof Context)) {
+                throw new Error("on: first argument must be an object");
+            }
+
+            const eventName = String(
+                event.spelling.description || event.spelling,
+            );
+            const handlersKey = normalize(`__handlers_${eventName}`);
+
+            // Get or create handlers list
+            let handlers = emitter.get(handlersKey);
+            if (!handlers) {
+                handlers = make.block([]);
+                emitter.set(handlersKey, handlers);
+            }
+
+            // Add handler (clone it for binding later)
+            const handlerCopy = deepCopy(handler);
+            handlers.buffer.data.push(handlerCopy);
+
+            return make.none();
+        },
+    ),
+
+    "emit": new NativeCell(
+        "emit",
+        ["emitter", ":event", "data"],
+        ([emitter, event, data], evaluator) => {
+            if (!(emitter instanceof Context)) {
+                throw new Error("emit: first argument must be an object");
+            }
+
+            const eventName = String(
+                event.spelling.description || event.spelling,
+            );
+            const handlersKey = normalize(`__handlers_${eventName}`);
+            const handlers = emitter.get(handlersKey);
+
+            if (handlers && isSeries(handlers)) {
+                let pos = handlers.head();
+                while (!pos.isTail()) {
+                    const handler = pos.first();
+
+                    // Create context with event data
+                    const eventCtx = new Context();
+                    eventCtx.set(normalize("data"), data);
+
+                    // Bind handler to event context, then execute
+                    const handlerCopy = deepCopy(handler);
+                    bind(handlerCopy, eventCtx);
+
+                    try {
+                        evaluator.doBlock(handlerCopy);
+                    } catch (e) {
+                        console.error(
+                            `Event handler error (${eventName}):`,
+                            e.message,
+                        );
+                    }
+
+                    pos = pos.next();
+                }
+            }
+
+            return make.none();
+        },
+    ),
     "reduce": new NativeCell("reduce", [":block"], ([block], evaluator) => {
         if (!isSeries(block)) {
             throw new Error("reduce: argument must be a block");
@@ -665,9 +892,48 @@ export const NATIVES = {
         return value;
     }),
 
+    "load": new NativeCell("load", ["source"], ([source]) => {
+        // Parse string or read file
+        let sourceStr;
+
+        if (source instanceof StringCell) {
+            sourceStr = source.buffer.data.join("");
+        } else {
+            throw new Error("load: argument must be a string");
+        }
+
+        // Check if it looks like a filename
+        if (sourceStr.endsWith(".bl")) {
+            sourceStr = fs.readFileSync(sourceStr, "utf8");
+        }
+
+        // Parse to cells (unbound)
+        return parse(sourceStr);
+    }),
+
     "do": new NativeCell("do", ["code"], ([code], evaluator) => {
-        bind(code, GLOBAL);
-        return evaluator.doBlock(code);
+        let block;
+
+        if (code instanceof StringCell) {
+            const str = code.buffer.data.join("");
+
+            // If it's a filename, read it
+            if (str.endsWith(".bl")) {
+                const source = fs.readFileSync(str, "utf8");
+                block = parse(source);
+            } else {
+                block = parse(str);
+            }
+        } else {
+            block = code;
+        }
+
+        // IMPORTANT: Prescan before binding!
+        prescan(block, GLOBAL);
+
+        // Now bind and execute
+        bind(block, GLOBAL);
+        return evaluator.doBlock(block);
     }),
 
     "quote": new NativeCell("quote", [":value"], ([value]) => {

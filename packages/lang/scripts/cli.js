@@ -12,7 +12,6 @@ const args = process.argv.slice(2);
 if (args.length === 0) {
     console.log("Bassline REPL - Type expressions to evaluate");
     console.log("Press Ctrl+D to exit\n");
-
     const r = repl.start({
         prompt: ">> ",
         eval: (cmd, context, filename, callback) => {
@@ -20,7 +19,9 @@ if (args.length === 0) {
                 const result = run(cmd.trim());
                 callback(null, result);
             } catch (e) {
-                callback(null, `Error: ${e.message}`);
+                // Don't crash, just show error
+                console.error(`Error: ${e.message}`);
+                callback(null, undefined);
             }
         },
         writer: (output) => {

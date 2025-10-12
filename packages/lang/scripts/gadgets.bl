@@ -1,0 +1,17 @@
+defgadget: func [spec] [
+    obj: make object! [
+        state: none
+        connections: []
+        receive: none
+        emit: func [data] [
+            foreach connections [c] [c/receive data]
+        ]
+        connect: func [target] [
+            append connections target
+            target
+        ]
+    ]
+    obj/state: spec/state
+    obj/receive: spec/receive
+    obj
+]
