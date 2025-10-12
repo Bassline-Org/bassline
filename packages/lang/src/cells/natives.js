@@ -1,4 +1,4 @@
-import { BlockCell, make, NoneCell, NumberCell } from "./index.js";
+import { BlockCell, make, NoneCell, NumberCell, ParenCell } from "./index.js";
 import { isSeries } from "./series.js";
 import { GLOBAL } from "../context.js";
 import { normalize } from "../spelling.js";
@@ -6,6 +6,7 @@ import { ReCell } from "./base.js";
 import { series } from "./series.js";
 import { makeFunc } from "./index.js";
 import { makeObject } from "./objects.js";
+import { bind } from "../bind.js";
 
 /**
  * Native function cell - built-in operations implemented in JavaScript
@@ -65,6 +66,37 @@ function isTrue(cell) {
     if (cell instanceof NumberCell && cell.value === 0) return false;
     return true;
 }
+/**
+ * Recursively compose a block
+ * - Parens get evaluated and their result spliced in
+ * - Nested blocks get composed recursively
+ * - Everything else stays literal
+ */
+function composeBlock(block, evaluator) {
+    const results = [];
+    let pos = block.head();
+
+    while (!pos.isTail()) {
+        const cell = pos.first();
+
+        if (cell instanceof ParenCell) {
+            // Evaluate paren and include result
+            const result = evaluator.doBlock(cell);
+            results.push(result);
+        } else if (cell instanceof BlockCell) {
+            // Recursively compose nested blocks
+            const composed = composeBlock(cell, evaluator);
+            results.push(composed);
+        } else {
+            // Everything else stays literal (unevaluated)
+            results.push(cell);
+        }
+
+        pos = pos.next();
+    }
+
+    return make.block(results);
+}
 
 /**
  * Convert a cell to a displayable string (simplified mold)
@@ -108,18 +140,47 @@ export const NATIVES = {
     }),
     "make": new NativeCell(
         "make",
-        [":type", ":spec"],
+        [":type", "spec"],
         ([type, spec], evaluator) => {
-            // For now, only support 'object!'
+            // Check if type is the word 'object!'
             if (
                 type.typeName === "word" &&
                 type.spelling === normalize("object!")
             ) {
                 return makeObject(spec, evaluator);
             }
+
             throw new Error(`make: unsupported type ${type.typeName}`);
         },
     ),
+    "reduce": new NativeCell("reduce", [":block"], ([block], evaluator) => {
+        if (!isSeries(block)) {
+            throw new Error("reduce: argument must be a block");
+        }
+
+        const results = [];
+        let pos = block.head();
+
+        while (!pos.isTail()) {
+            const cell = pos.first();
+            const result = cell.step(pos, evaluator);
+            results.push(result.value);
+            pos = pos.skip(result.consumed);
+        }
+
+        const resultBlock = make.block(results);
+        bind(resultBlock, GLOBAL);
+        return resultBlock;
+    }),
+    "compose": new NativeCell("compose", [":block"], ([block], evaluator) => {
+        if (!isSeries(block)) {
+            throw new Error("compose: argument must be a block");
+        }
+
+        const composed = composeBlock(block, evaluator);
+        bind(composed, GLOBAL);
+        return composed;
+    }),
     // Arithmetic
     "+": new NativeCell("+", ["a", "b"], ([a, b]) => {
         if (!(a instanceof NumberCell) || !(b instanceof NumberCell)) {
@@ -370,7 +431,8 @@ export const NATIVES = {
         return value;
     }),
 
-    "do": new NativeCell("do", [":code"], ([code], evaluator) => {
+    "do": new NativeCell("do", ["code"], ([code], evaluator) => {
+        bind(code, GLOBAL);
         return evaluator.doBlock(code);
     }),
 
