@@ -1,7 +1,12 @@
-import { ReCell } from "./cells.js";
+import { ReCell, TYPE } from "./cells.js";
+import { InvalidBind } from "./errors.js";
 import { normalize } from "./spelling.js";
 
 export function bind(wordCell, context) {
+    if (wordCell.type !== TYPE.WORD) {
+        throw new InvalidBind(wordCell);
+    }
+
     return new ReCell(wordCell.type, {
         spelling: normalize(wordCell.spelling),
         binding: context,
