@@ -23,14 +23,19 @@ export function bindAll(cell, context) {
 }
 
 /**
- * Bind a word (or block of words) to a context.
- * Creates new cells with new bindings.
+ * Bind a word (or block of words) to the context of a known word.
  *
- * For words: returns new word with context binding
- * For series: mutates buffer by replacing words with rebound versions
- * For other cells: returns unchanged
+ * For words: Attempts to return a word with the same spelling as the original
+ * If we can't, it returns the original word, and doesn't bind it (Inneffective bind)
+ * If we can, it returns a new word with the same spelling, bound to the context of the known word.
+ * For series: mutates buffer by attempting to bind each word to the context of the known word.
+ * For other cells: returns the original cell
  */
-export function bind(cell, context) {
+export function bind(cell, knownWord) {
+    if (!knownWord) throw new Error("Known word is required");
+    if (!knownWord.binding) throw new Error("Known word must have a binding!");
+
+    const context = knownWord.binding;
     if (isAnyWord(cell)) {
         // Check if this word exists in the target context
         // If not, return unchanged (ineffective bind)
@@ -40,8 +45,6 @@ export function bind(cell, context) {
             // Effective bind: word exists in context, create new word with new binding
             const CellClass = cell.constructor;
             const boundCell = new CellClass(cell.spelling, context).freeze();
-            //console.log("bound word:", cell.spelling, boundCell.binding);
-            //context.set(cell.spelling, boundCell);
             return boundCell;
         } else {
             // Ineffective bind: word doesn't exist, return unchanged
@@ -52,25 +55,10 @@ export function bind(cell, context) {
     if (isSeries(cell)) {
         // Rebind all words in the series buffer
         for (let i = 0; i < cell.buffer.data.length; i++) {
-            cell.buffer.data[i] = bind(cell.buffer.data[i], context);
+            cell.buffer.data[i] = bind(cell.buffer.data[i], knownWord);
         }
         return cell;
     }
 
     return cell;
-}
-
-/**
- * Look up a word's value in its binding
- */
-export function lookup(wordCell) {
-    if (!isAnyWord(wordCell)) {
-        throw new Error(
-            `Cannot lookup non-word cell! Got: ${wordCell.typeName}`,
-        );
-    }
-    if (!wordCell.binding) {
-        throw new Error(`${String(wordCell.spelling)} has no context`);
-    }
-    return wordCell.binding.get(wordCell.spelling);
 }

@@ -109,9 +109,9 @@ class SeriesBase extends ReCell {
     pick(n) {
         const targetIndex = this.index + n - 1;
         if (targetIndex < 0 || targetIndex >= this.buffer.length) {
-            return null; // REBOL returns none, we'll handle this
+            return make.none();
         }
-        return this.buffer.data[targetIndex];
+        return this.at(targetIndex);
     }
 }
 

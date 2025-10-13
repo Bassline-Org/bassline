@@ -23,13 +23,12 @@ class WordBase extends ReCell {
  * WORD! - evaluates to its bound value
  */
 export class WordCell extends WordBase {
-    evaluate(evaluator) {
-        const value = this.lookup();
-        return value;
+    evaluate(_evaluator) {
+        return this.lookup();
     }
 
     step(codeStream, evaluator) {
-        const value = this.evaluate(evaluator);
+        const value = this.lookup();
 
         // If the value is applicable (like a function), delegate to it
         if (value.isApplicable && value.isApplicable()) {
@@ -46,7 +45,7 @@ export class WordCell extends WordBase {
  * Example: x: 42
  */
 export class SetWordCell extends WordBase {
-    evaluate(evaluator) {
+    evaluate(_evaluator) {
         throw new Error("SET_WORD cannot be evaluated alone - use in context");
     }
 
@@ -77,7 +76,7 @@ export class SetWordCell extends WordBase {
  * Example: :x
  */
 export class GetWordCell extends WordBase {
-    evaluate(evaluator) {
+    evaluate(_evaluator) {
         return this.lookup();
     }
 }
@@ -87,7 +86,7 @@ export class GetWordCell extends WordBase {
  * Example: 'x
  */
 export class LitWordCell extends WordBase {
-    evaluate(evaluator) {
+    evaluate(_evaluator) {
         return new WordCell(this.spelling, this.binding);
     }
 }
@@ -101,24 +100,6 @@ export class RefinementCell extends WordBase {
         super(spelling, undefined); // Refinements don't have bindings
     }
 }
-
-/**
- * Convert between word types
- */
-export const wordConvert = {
-    toWord(wordCell) {
-        return new WordCell(wordCell.spelling, wordCell.binding);
-    },
-    toSetWord(wordCell) {
-        return new SetWordCell(wordCell.spelling, wordCell.binding);
-    },
-    toGetWord(wordCell) {
-        return new GetWordCell(wordCell.spelling, wordCell.binding);
-    },
-    toLitWord(wordCell) {
-        return new LitWordCell(wordCell.spelling, wordCell.binding);
-    },
-};
 
 /**
  * Check if a cell is any word type

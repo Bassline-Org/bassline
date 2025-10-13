@@ -19,5 +19,4 @@ export {
     RefinementCell,
     SetWordCell,
     WordCell,
-    wordConvert,
 } from "./words.js";
