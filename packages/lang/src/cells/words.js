@@ -1,9 +1,10 @@
 import { ReCell } from "./base.js";
 import { normalize } from "../utils.js";
 import { NoneCell } from "./primitives.js";
+import { GLOBAL } from "../context.js";
 
 class WordBase extends ReCell {
-    constructor(spelling, binding) {
+    constructor(spelling, binding = GLOBAL) {
         super();
         this.spelling = normalize(spelling);
         this.binding = binding;
@@ -17,7 +18,15 @@ class WordBase extends ReCell {
         if (!this.binding) {
             throw new Error(`${String(this.spelling)} has no context`);
         }
-        return this.binding.get(this.spelling);
+        const value = this.binding.get(this.spelling);
+        if (!value) {
+            throw new Error(
+                `${String(this.spelling)} has no value in: ${
+                    JSON.stringify(this.binding, null, 2)
+                }`,
+            );
+        }
+        return value;
     }
 }
 

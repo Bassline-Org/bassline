@@ -1,6 +1,4 @@
-export { make } from "./factories.js";
-//export { NATIVES, setupNatives } from "./natives.js";
-export { FunctionCell, makeFunc, RFunction } from "./functions.js";
+export { RFunction } from "./functions.js";
 export {
     BinaryCell,
     BlockCell,

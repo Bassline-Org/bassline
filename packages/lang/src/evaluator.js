@@ -42,9 +42,6 @@ export function evaluate(source, context = GLOBAL) {
         }
     } catch (e) {
         console.error(`=== EVALUATOR ERROR ===`);
-        //console.error(`stream: \n${JSON.stringify(stream, null, 2)}\n`);
-        //console.error(`control: \n${JSON.stringify(controller)}\n`);
-        //console.error(`result: \n${JSON.stringify(controller.result)}\n`);
         throw e;
     }
     return controller.result;
@@ -99,25 +96,39 @@ nativeType("object!", (word, spec) => {
     return obj;
 });
 nativeType("func!", (word, spec) => {
-    const obj = new ObjectCell();
+    const functionContext = new Context();
+    const args = spec.at(0);
+    const body = spec.at(1);
 });
+const SYSTEM = new ObjectCell();
+SYSTEM.context = GLOBAL;
+GLOBAL.set("system", SYSTEM);
 
 nativeFn("make", make);
 nativeFn("load", load);
 nativeFn("print", (c, w) => {
     console.log(c.evalNext());
 });
+nativeFn("bind", (c, w) => {
+    const words = c.evalNext();
+    if (!w.binding) {
+        throw new Error("Invalid BIND! No binding!", this, w);
+    }
+    return words.buffer.map((word) => bind(word, w));
+});
+nativeFn("do", (c, w) => {
+    const block = c.evalNext();
+    return evaluate(block, w.binding);
+});
 
 const example = `
 a: 123
 foo: make object! [
-    x: a
+    self/a: 456
 ]
-print x
-print foo/x
-foo/x: 456
-print foo/x
-print x
+words: [ a ]
+print (bind words system)
+print (bind words foo)
 `;
 
 const result = parse(example);

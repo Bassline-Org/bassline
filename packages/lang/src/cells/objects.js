@@ -1,11 +1,20 @@
+import { bind } from "../bind.js";
 import { Context } from "../context.js";
 import { ReCell } from "./base.js";
 
 export class ObjectCell extends ReCell {
     constructor() {
         super();
-        this.context = new Context();
-        this.context.set("self", this);
+        this.__context = new Context();
+    }
+
+    set context(newContext) {
+        this.__context = newContext;
+        this.__context.set("self", this);
+    }
+
+    get context() {
+        return this.__context;
     }
 
     typeName() {

@@ -2,8 +2,6 @@ import {
     BlockCell,
     GetWordCell,
     LitWordCell,
-    make,
-    makeFunc,
     NoneCell,
     NumberCell,
     ParenCell,
