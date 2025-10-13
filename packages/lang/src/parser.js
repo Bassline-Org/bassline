@@ -1,4 +1,3 @@
-// parser.js
 import {
     char,
     choice,
@@ -10,7 +9,7 @@ import {
     regex,
     sequenceOf,
     whitespace,
-} from "arcsecond/index.mjs";
+} from "arcsecond/index.js";
 import { make } from "./cells/index.js";
 
 // ===== Comments and Whitespace =====
@@ -71,35 +70,29 @@ const stringLiteral = sequenceOf([
 const wordCharsNoSlash = regex(/^[^ \t\n\r\[\](){}";/]+/);
 
 // All word types with syntax markers
-const word = regex(
-    /^[':]?[^ \t\n\r\[\](){}";0-9/][^ \t\n\r\[\](){}";/]*:?|^[+\-*/=<>!?]+:?/,
-)
-    .map((spelling) => {
-        // SET-WORD: ends with : (but doesn't start with :)
-        if (spelling.endsWith(":") && !spelling.startsWith(":")) {
-            return make.setWord(spelling.slice(0, -1)); // Unbound
+const word = sequenceOf([
+    regex(/^[:']?/),
+    wordCharsNoSlash,
+    regex(/^:?/),
+])
+    .map(([get, spelling, set]) => {
+        if (get === ":") {
+            return make.getWord(spelling);
         }
-
-        // GET-WORD: starts with :
-        if (spelling.startsWith(":")) {
-            const name = spelling.slice(1).replace(/:$/, ""); // Remove trailing : if any
-            return make.getWord(name); // Unbound
+        if (get === "'") {
+            return make.litWord(spelling);
         }
-
-        // LIT-WORD: starts with '
-        if (spelling.startsWith("'")) {
-            return make.litWord(spelling.slice(1)); // Unbound
+        if (set) {
+            return make.setWord(spelling);
         }
-
-        // Regular WORD
-        return make.word(spelling); // Unbound
+        return make.word(spelling);
     })
     .errorMap(() => "Expected word");
 
 // REFINEMENT: /word (standalone)
 const refinement = sequenceOf([
     char("/"),
-    regex(/^[^ \t\n\r\[\](){}";/0-9][^ \t\n\r\[\](){}";/]*/),
+    wordCharsNoSlash,
 ]).map(([_, name]) => make.refinement(name))
     .errorMap(() => "Expected refinement");
 
@@ -146,7 +139,6 @@ const pathParser = sequenceOf([
     return make.path(parts);
 }).errorMap(() => "Expected path");
 
-// ===== Value Parser (Main) =====
 const valueParser = choice([
     pathParser, // Must come before word (contains /)
     refinement, // Must come before word (starts with /)
@@ -162,7 +154,7 @@ const program = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     endOfInput,
-]).map(([_, values, __]) => make.block(values)); // Return as block!
+]).map(([_, values, __]) => values); // Return as block!
 
 // ===== Export =====
 export function parse(source) {
@@ -170,7 +162,9 @@ export function parse(source) {
 
     if (result.isError) {
         throw new Error(
-            `Parse error at position ${result.index}: ${result.error}`,
+            `Parse Error! ${result.error} at position ${result.index} near "${
+                source.slice(result.index, result.index + 10)
+            }"`,
         );
     }
 
