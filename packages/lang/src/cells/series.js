@@ -117,16 +117,19 @@ class SeriesBase extends ReCell {
 
 /**
  * BLOCK! - executable code and data
+ * Self-evaluating, inherits from SeriesBase
  */
-export class BlockCell extends SeriesBase {
-    // Self-evaluating, inherits from SeriesBase
-}
+export class BlockCell extends SeriesBase {}
 
 /**
  * STRING! - text data
  */
 export class StringCell extends SeriesBase {}
 
+/**
+ * PAREN! - executable code and data
+ * Eagerly evaluates it's contents
+ */
 export class ParenCell extends SeriesBase {
     evaluate(control) {
         let result = null;
@@ -147,9 +150,9 @@ export class PathCell extends SeriesBase {
             throw new Error("Cannot evaluate empty path");
         }
 
-        // Start with first element
-        let value = evaluator.evaluate(this.first());
-        let pos = this.next();
+        // Get the root value
+        let root = this.first().evaluate(control);
+        //return this.buffer.data.reduce((context, selectorCell) => {})
 
         // Navigate through path segments
         while (!pos.isTail()) {

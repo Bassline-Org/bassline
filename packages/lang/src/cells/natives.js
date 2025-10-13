@@ -22,7 +22,6 @@ import { series } from "./series.js";
 //import { makeObject } from "./objects.js";
 import { execSync, spawn } from "child_process";
 import fs from "fs";
-import { bind, bindAll } from "../bind.js";
 import { isAnyWord } from "./words.js";
 import { deepCopy } from "../copy.js";
 //import { Evaluator } from "../evaluator.js";
@@ -129,7 +128,7 @@ function mold(cell) {
 /**
  * Native function cell - built-in operations implemented in JavaScript
  */
-export class NativeCell extends ApplicableCell {
+export class NativeFn extends ApplicableCell {
     isNativeCell = true;
     constructor(fn) {
         super();
@@ -148,9 +147,29 @@ export class NativeCell extends ApplicableCell {
 }
 
 export function nativeFn(name, fn) {
-    const native = new NativeCell(fn);
+    const native = new NativeFn(fn);
     GLOBAL.set(name, native);
     return native;
+}
+
+/**
+ * Registers a new native type, for use with make!
+ * @param {*} name
+ * @param {*} builder - A function with two arguments: the spec and the word
+ * @returns {void}
+ */
+export function nativeType(name, builder) {
+    let typeName = name;
+    if (!typeName.endsWith("!")) {
+        typeName += "!";
+    }
+    if (builder.length !== 2) {
+        throw new Error(
+            `Data type builder must take exactly two arguments! Received a function with ${builder.length} arguments!`,
+        );
+    }
+    builder.isNativeType = true;
+    GLOBAL.set(typeName, builder);
 }
 
 // /**

@@ -1,22 +1,35 @@
 import { parse } from "./parser.js";
-import { isAnyWord, StringCell } from "./cells/index.js";
-import { GLOBAL } from "./context.js";
-import { nativeFn } from "./cells/natives.js";
+import { isAnyWord, isSeries, StringCell } from "./cells/index.js";
+import { Context, GLOBAL } from "./context.js";
+import { bind } from "./bind.js";
+import { nativeFn, nativeType } from "./cells/natives.js";
+import { ObjectCell } from "./cells/objects.js";
 
 /**
  * Parses and evalutes a source code string
- * @param {*} source
+ * @param {*} source - The source code or an array of cells
+ * @param {*} context - The context to evaluate in
  * @returns {ReCell} Result of evaluation
  */
-export function evaluate(source) {
-    let stream = parse(source);
+export function evaluate(source, context = GLOBAL) {
+    let stream = source;
+    if (isSeries(source)) {
+        stream = source.buffer.data;
+    }
+    if (typeof source === "string") {
+        stream = parse(source);
+    }
     let cursor = 0;
     const controller = {
         peek: (offset = 0) => stream[cursor + offset],
+        evalNext: () => {
+            const cell = controller.next();
+            return cell.evaluate(controller);
+        },
         next: () => {
             const cell = stream[cursor++];
             if (isAnyWord(cell) && !cell.binding) {
-                cell.binding = GLOBAL;
+                cell.binding = context;
             }
             return cell;
         },
@@ -28,40 +41,13 @@ export function evaluate(source) {
             controller.result = cell.evaluate(controller);
         }
     } catch (e) {
+        console.error(`=== EVALUATOR ERROR ===`);
         console.error(`stream: \n${JSON.stringify(stream, null, 2)}\n`);
         console.error(`control: \n${JSON.stringify(controller)}\n`);
         console.error(`result: \n${JSON.stringify(controller.result)}\n`);
         throw e;
     }
     return controller.result;
-}
-
-export function evaluator(arr) {
-    let cursor = 0;
-    let stream = arr;
-    return {
-        peek: (offset = 0) => stream[cursor + offset],
-        seek: (count) => {
-            cursor += count;
-            return stream[cursor];
-        },
-        next: () => {
-            const cell = stream[cursor++];
-            if (isAnyWord(cell) && !cell.binding) {
-                cell.binding = GLOBAL;
-            }
-            return cell;
-        },
-        queue: (cell) => {
-            if (Array.isArray(cell)) {
-                cursor += cell.length;
-                stream = [...cell, ...stream];
-            } else {
-                cursor++;
-                stream = [cell, ...stream];
-            }
-        },
-    };
 }
 
 function load(control, word) {
@@ -82,16 +68,45 @@ function load(control, word) {
     return evaluate(source);
 }
 
+/**
+ * MAKE - creates a new data type instance
+ * This is used for building native data types, such as objects
+ * This is a low level operation, and probably you should use something else
+ * @param {*} control The evaluator control object
+ * @param {*} word The make word, (used for context binding)
+ * @returns The new data type instance
+ */
+export function make(control, word) {
+    const builder = control.evalNext();
+    if (!builder) {
+        throw new Error("Invalid MAKE No next cell!", this, word, builder);
+    }
+    const spec = control.evalNext();
+    if (!spec) {
+        throw new Error("Invalid MAKE No spec cell!", this, word, spec);
+    }
+    return builder(word, spec);
+}
+
+nativeType("object!", (word, spec) => {
+    const obj = new ObjectCell();
+    // @goose first we bind the spec, in the context of the word
+    // This gives us the right bindings for whatever outside of the object
+    const boundSpec = bind(spec, word);
+    // Then we evaluate the spec in the context of the object
+    // This gives us access to the object's self reference & local bindings
+    evaluate(boundSpec, obj.context);
+    return obj;
+});
+
+nativeFn("make", make);
 nativeFn("load", load);
 nativeFn("print", (c, w) => {
-    const next = c.next();
-    console.log(next);
-    console.log(next.evaluate(c));
+    console.log(c.evalNext());
 });
 
 const example = `
-foo: 123
-print "hi mom!"
+foo: make object! [ x: 123 ]
 print foo
 `;
 

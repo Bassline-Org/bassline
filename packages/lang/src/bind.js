@@ -1,28 +1,6 @@
 import { isAnyWord, isSeries } from "./cells/index.js";
 
 /**
- * Bind unconditionally - all words get bound regardless of whether they exist
- */
-export function bindAll(cell, context) {
-    if (isAnyWord(cell)) {
-        const CellClass = cell.constructor;
-        const boundCell = new CellClass(cell.spelling, context).freeze();
-        //console.log("bound word:", cell.spelling, boundCell.binding);
-        //context.set(cell.spelling, boundCell);
-        return boundCell;
-    }
-
-    if (isSeries(cell)) {
-        for (let i = 0; i < cell.buffer.data.length; i++) {
-            cell.buffer.data[i] = bindAll(cell.buffer.data[i], context);
-        }
-        return cell;
-    }
-
-    return cell;
-}
-
-/**
  * Bind a word (or block of words) to the context of a known word.
  *
  * For words: Attempts to return a word with the same spelling as the original

@@ -1,5 +1,5 @@
 import { parse } from "./parser.js";
-import { bind, bindAll } from "./bind.js";
+import { bind } from "./bind.js";
 import { GLOBAL } from "./context.js";
 import { isAnyWord, isSeries, make } from "./cells/index.js";
 

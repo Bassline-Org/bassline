@@ -1,3 +1,4 @@
+import { NativeFn } from "./cells/natives.js";
 import { normalize } from "./spelling.js";
 
 export class Context {

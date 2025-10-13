@@ -36,6 +36,9 @@ export class WordCell extends WordBase {
         if (value.isNativeCell) {
             return value.evaluate(control, this);
         }
+        if (value.isNativeType) {
+            return value;
+        }
         return value.evaluate(control);
     }
 }
