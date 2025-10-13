@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { make } from "../src/cells/index.js";
 import { Context, GLOBAL } from "../src/context.js";
 import { doBlock } from "../src/evaluator.js";
-import { normalize } from "../src/spelling.js";
+import { normalize } from "../src/utils.js";
 import { setupNatives } from "../src/cells/natives.js";
 import { makeFunc } from "../src/cells/functions.js";
 
@@ -426,7 +426,7 @@ describe("Native Functions", () => {
 
             doBlock(code);
             expect(blk.buffer.length).toBe(3);
-            expect(blk.buffer.data[2].value).toBe(3);
+            expect(blk.buffer[2].value).toBe(3);
         });
     });
 
@@ -472,7 +472,7 @@ describe("Native Functions", () => {
 
             const code = make.block([
                 make.word("function?", GLOBAL),
-                make.getWord("f", ctx),  // Use GET-WORD to pass function value without applying
+                make.getWord("f", ctx), // Use GET-WORD to pass function value without applying
             ]);
 
             expect(doBlock(code).value).toBe(1);

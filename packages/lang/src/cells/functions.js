@@ -2,7 +2,7 @@ import { ReCell } from "./base.js";
 import { Context } from "../context.js";
 import { NoneCell } from "./primitives.js";
 import { bind } from "../bind.js";
-import { deepCopy } from "../copy.js";
+import { deepCopy } from "../utils.js";
 import { isAnyWord, SetWordCell } from "./words.js";
 import { isSeries, series } from "./series.js";
 

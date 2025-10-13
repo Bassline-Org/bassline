@@ -9,8 +9,8 @@ describe("REDUCE", () => {
             reduce [+ 1 1 + 2 2]
         `);
         expect(result).toBeInstanceOf(BlockCell);
-        expect(result.buffer.data[0].value).toBe(2);
-        expect(result.buffer.data[1].value).toBe(4);
+        expect(result.buffer[0].value).toBe(2);
+        expect(result.buffer[1].value).toBe(4);
     });
 
     it("evaluates word lookups", () => {
@@ -18,8 +18,8 @@ describe("REDUCE", () => {
             x: 42
             reduce [x x]
         `);
-        expect(result.buffer.data[0].value).toBe(42);
-        expect(result.buffer.data[1].value).toBe(42);
+        expect(result.buffer[0].value).toBe(42);
+        expect(result.buffer[1].value).toBe(42);
     });
 
     it("evaluates function calls", () => {
@@ -27,8 +27,8 @@ describe("REDUCE", () => {
             double: func [n] [* n 2]
             reduce [double 5 double 10]
         `);
-        expect(result.buffer.data[0].value).toBe(10);
-        expect(result.buffer.data[1].value).toBe(20);
+        expect(result.buffer[0].value).toBe(10);
+        expect(result.buffer[1].value).toBe(20);
     });
 
     it("handles mixed values", () => {
@@ -36,19 +36,19 @@ describe("REDUCE", () => {
             x: 10
             reduce [x + x 5 * 2 3]
         `);
-        expect(result.buffer.data.length).toBe(3); // Not 4!
-        expect(result.buffer.data[0].value).toBe(10);
-        expect(result.buffer.data[1].value).toBe(15);
-        expect(result.buffer.data[2].value).toBe(6);
+        expect(result.buffer.length).toBe(3); // Not 4!
+        expect(result.buffer[0].value).toBe(10);
+        expect(result.buffer[1].value).toBe(15);
+        expect(result.buffer[2].value).toBe(6);
     });
 
     it("handles nested blocks literally", () => {
         const result = run(`
             reduce [[1 2] [3 4]]
         `);
-        expect(result.buffer.data.length).toBe(2);
-        expect(result.buffer.data[0]).toBeInstanceOf(BlockCell);
-        expect(result.buffer.data[1]).toBeInstanceOf(BlockCell);
+        expect(result.buffer.length).toBe(2);
+        expect(result.buffer[0]).toBeInstanceOf(BlockCell);
+        expect(result.buffer[1]).toBeInstanceOf(BlockCell);
     });
 });
 
@@ -57,15 +57,15 @@ describe("COMPOSE", () => {
         const result = run(`
             compose [a (+ 1 1) b (+ 2 2)]
         `);
-        expect(result.buffer.data.length).toBe(4);
+        expect(result.buffer.length).toBe(4);
         // 'a' stays as word
-        expect(result.buffer.data[0].typeName).toBe("word");
+        expect(result.buffer[0].typeName).toBe("word");
         // (+ 1 1) becomes 2
-        expect(result.buffer.data[1].value).toBe(2);
+        expect(result.buffer[1].value).toBe(2);
         // 'b' stays as word
-        expect(result.buffer.data[2].typeName).toBe("word");
+        expect(result.buffer[2].typeName).toBe("word");
         // (+ 2 2) becomes 4
-        expect(result.buffer.data[3].value).toBe(4);
+        expect(result.buffer[3].value).toBe(4);
     });
 
     it("leaves words unevaluated", () => {
@@ -73,22 +73,22 @@ describe("COMPOSE", () => {
             x: 42
             compose [x: (x)]
         `);
-        expect(result.buffer.data.length).toBe(2);
+        expect(result.buffer.length).toBe(2);
         // x: stays as set-word
-        expect(result.buffer.data[0].typeName).toBe("setword");
+        expect(result.buffer[0].typeName).toBe("setword");
         // (x) becomes 42
-        expect(result.buffer.data[1].value).toBe(42);
+        expect(result.buffer[1].value).toBe(42);
     });
 
     it("composes nested blocks", () => {
         const result = run(`
             compose [a [b (+ 1 1) c] d]
         `);
-        const nested = result.buffer.data[1];
+        const nested = result.buffer[1];
         expect(nested).toBeInstanceOf(BlockCell);
-        expect(nested.buffer.data[0].typeName).toBe("word"); // b
-        expect(nested.buffer.data[1].value).toBe(2); // (+ 1 1)
-        expect(nested.buffer.data[2].typeName).toBe("word"); // c
+        expect(nested.buffer[0].typeName).toBe("word"); // b
+        expect(nested.buffer[1].value).toBe(2); // (+ 1 1)
+        expect(nested.buffer[2].typeName).toBe("word"); // c
     });
 
     it("builds dynamic code", () => {
@@ -134,11 +134,11 @@ describe("Metaprogramming Patterns", () => {
             ]
             data
         `);
-        expect(result.buffer.data.length).toBe(4);
+        expect(result.buffer.length).toBe(4);
         // sum: [10 20]
-        expect(result.buffer.data[1]).toBeInstanceOf(BlockCell);
+        expect(result.buffer[1]).toBeInstanceOf(BlockCell);
         // total: 30
-        expect(result.buffer.data[3].value).toBe(30);
+        expect(result.buffer[3].value).toBe(30);
     });
 
     it("builds gadget-style messages", () => {
@@ -154,10 +154,10 @@ describe("Metaprogramming Patterns", () => {
             ]
             msg
         `);
-        expect(result.buffer.data.length).toBe(6);
-        expect(result.buffer.data[0].typeName).toBe("word"); // 'gadget-id
-        expect(result.buffer.data[1].value).toBe(42); // 42
-        expect(result.buffer.data[2].typeName).toBe("word"); // 'value
-        expect(result.buffer.data[3].value).toBe(100); // 100
+        expect(result.buffer.length).toBe(6);
+        expect(result.buffer[0].typeName).toBe("word"); // 'gadget-id
+        expect(result.buffer[1].value).toBe(42); // 42
+        expect(result.buffer[2].typeName).toBe("word"); // 'value
+        expect(result.buffer[3].value).toBe(100); // 100
     });
 });

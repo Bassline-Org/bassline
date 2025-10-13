@@ -1,5 +1,5 @@
 import { ReCell } from "./base.js";
-import { normalize } from "../spelling.js";
+import { normalize } from "../utils.js";
 
 class WordBase extends ReCell {
     constructor(spelling, binding) {

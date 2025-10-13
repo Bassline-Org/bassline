@@ -4,8 +4,8 @@ import { Context } from "../src/context.js";
 import { bind } from "../src/bind.js";
 import { doBlock } from "../src/evaluator.js";
 import { makeFunc } from "../src/cells/functions.js";
-import { normalize } from "../src/spelling.js";
-import { deepCopy } from "../src/copy.js";
+import { normalize } from "../src/utils.js";
+import { deepCopy } from "../src/utils.js";
 
 describe("Class-Based Cells", () => {
     describe("Cell Protocol", () => {

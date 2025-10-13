@@ -16,8 +16,8 @@ import {
     LitWordCell,
     NumberCell,
     ParenCell,
+    PathCell,
     RefinementCell,
-    SeriesBuffer,
     SetWordCell,
     StringCell,
     WordCell,
@@ -78,33 +78,41 @@ const stringLiteral = sequenceOf([
 
 // ===== Words =====
 // Word characters (no slash for path parsing)
-const wordCharsNoSlash = regex(/^[^ \t\n\r\[\](){}";:\/]+/);
+const wordChars = regex(/^[^ \t\n\r\[\](){}";:\/]+/);
 
-// All word types with syntax markers
-const word = sequenceOf([
-    regex(/^[:']?/),
-    wordCharsNoSlash,
-    regex(/^:?/),
-])
-    .map(([get, spelling, set]) => {
-        if (get === ":") {
-            return new GetWordCell(spelling);
-        }
-        if (get === "'") {
-            return new LitWordCell(spelling);
-        }
-        if (set) {
-            return new SetWordCell(spelling);
-        }
-        return new WordCell(spelling);
-    })
-    .errorMap(() => "Expected word");
+// 'word
+const litWord = sequenceOf([
+    char("'"),
+    wordChars,
+]).map(([_, spelling]) => new LitWordCell(spelling))
+    .errorMap(() => "Expected lit word");
 
-// REFINEMENT: /word (standalone)
+// :word
+const getWord = sequenceOf([
+    char(":"),
+    wordChars,
+]).map(([_, spelling]) => new GetWordCell(spelling))
+    .errorMap(() => "Expected get word");
+
+// word:
+const setWord = sequenceOf([
+    wordChars,
+    char(":"),
+]).map(([_, spelling]) => new SetWordCell(spelling))
+    .errorMap(() => "Expected set word");
+
+// word
+const normalWord = sequenceOf([
+    wordChars,
+]).map(([spelling]) => new WordCell(spelling))
+    .errorMap(() => "Expected normal word");
+
+const word = choice([normalWord, setWord, litWord, getWord]);
+
 const refinement = sequenceOf([
     char("/"),
-    wordCharsNoSlash,
-]).map(([_, name]) => new RefinementCell(name))
+    wordChars,
+]).map(([_, spelling]) => new RefinementCell(spelling))
     .errorMap(() => "Expected refinement");
 
 // Forward declare for recursion
@@ -116,7 +124,7 @@ const blockParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char("]"),
-]).map(([_, __, items, ___]) => new BlockCell(new SeriesBuffer(items)))
+]).map(([_, __, items, ___]) => new BlockCell(items))
     .errorMap(() => "Expected block");
 
 // ===== Parens =====
@@ -125,33 +133,43 @@ const parenParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char(")"),
-]).map(([_, __, items, ___]) => new ParenCell(new SeriesBuffer(items)))
+]).map(([_, __, items, ___]) => new ParenCell(items))
     .errorMap(() => "Expected paren");
 
-// ===== Paths =====
-// Paths are word/word/word or word/number/word, etc.
-// Each segment becomes an element in the path series
-const pathParser = sequenceOf([
-    wordCharsNoSlash,
-    many1(sequenceOf([char("/"), wordCharsNoSlash])),
-]).map(([first, segments]) => {
-    const parts = [new WordCell(first)]; // First element (unbound word)
+// :word/word/word
+const getPath = sequenceOf([
+    char(":"),
+    word,
+    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
+]).map(([_, word, segments]) => new GetPathCell([word, ...segments]));
 
-    segments.forEach(([_, segment]) => {
-        // Check if segment is a number
-        if (/^-?\d+(\.\d+)?$/.test(segment)) {
-            parts.push(new NumberCell(parseFloat(segment)));
-        } else {
-            // It's a word (could be refinement-style but in path context)
-            parts.push(new WordCell(segment)); // Unbound
-        }
-    });
+// word/word/word:
+const setPath = sequenceOf([
+    word,
+    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
+    word,
+    char(":"),
+]).map(([word, segments, word2]) =>
+    new SetPathCell([word, ...segments, word2])
+);
 
-    return new PathCell(new SeriesBuffer(parts));
-}).errorMap(() => "Expected path");
+// 'word/word/word
+const litPath = sequenceOf([
+    char("'"),
+    word,
+    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
+]).map(([_, word, segments]) => new LitPathCell([word, ...segments]));
+
+// word/word/word
+const normalPath = sequenceOf([
+    word,
+    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
+]).map(([word, segments]) => new PathCell([word, ...segments]));
+
+const path = choice([setPath, getPath, litPath, normalPath]);
 
 const valueParser = choice([
-    pathParser, // Must come before word (contains /)
+    path, // Must come before word (contains /)
     refinement, // Must come before word (starts with /)
     number, // Must come before word (starts with digits)
     stringLiteral,

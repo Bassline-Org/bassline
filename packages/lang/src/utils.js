@@ -14,7 +14,7 @@ export function deepCopy(cell) {
 
     // Series need new buffers with recursively copied contents
     if (isSeries(cell)) {
-        const newData = cell.buffer.data.map((item) => deepCopy(item));
+        const newData = cell.buffer.map((item) => deepCopy(item));
         const newBuffer = new SeriesBuffer(newData);
 
         const CellClass = cell.constructor;
@@ -24,4 +24,8 @@ export function deepCopy(cell) {
     // Everything else (numbers, none, etc.) is immutable
     // and can be returned as-is
     return cell;
+}
+export function normalize(str) {
+    if (typeof str === "symbol") return str;
+    return Symbol.for(str.trim().toUpperCase());
 }

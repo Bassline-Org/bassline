@@ -9,72 +9,72 @@ import { GLOBAL } from "../src/context.js";
 describe("MOLD - Serialization", () => {
     it("molds numbers", () => {
         const result = run("mold 42");
-        expect(result.buffer.data.join("")).toBe("42");
+        expect(result.buffer.join("")).toBe("42");
     });
 
     it("molds decimals", () => {
         const result = run("mold 3.14");
-        expect(result.buffer.data.join("")).toBe("3.14");
+        expect(result.buffer.join("")).toBe("3.14");
     });
 
     it("molds strings", () => {
         const result = run('mold "hello"');
-        expect(result.buffer.data.join("")).toBe('"hello"');
+        expect(result.buffer.join("")).toBe('"hello"');
     });
 
     it("molds strings with escapes", () => {
         const result = run('mold "hello\\nworld"');
-        expect(result.buffer.data.join("")).toBe('"hello\\nworld"');
+        expect(result.buffer.join("")).toBe('"hello\\nworld"');
     });
 
     it("molds words", () => {
         const result = run("mold 'test");
-        expect(result.buffer.data.join("")).toBe("TEST");
+        expect(result.buffer.join("")).toBe("TEST");
     });
 
     it("molds set-words", () => {
         const result = run("mold first [x:]");
-        expect(result.buffer.data.join("")).toBe("X:");
+        expect(result.buffer.join("")).toBe("X:");
     });
 
     it("molds get-words", () => {
         const result = run("mold first [:x]");
-        expect(result.buffer.data.join("")).toBe(":X");
+        expect(result.buffer.join("")).toBe(":X");
     });
 
     it("molds lit-words", () => {
         const result = run("mold ''x");
-        expect(result.buffer.data.join("")).toBe("'X");
+        expect(result.buffer.join("")).toBe("'X");
     });
 
     it("molds empty blocks", () => {
         const result = run("mold []");
-        expect(result.buffer.data.join("")).toBe("[]");
+        expect(result.buffer.join("")).toBe("[]");
     });
 
     it("molds blocks with values", () => {
         const result = run("mold [1 2 3]");
-        expect(result.buffer.data.join("")).toBe("[1 2 3]");
+        expect(result.buffer.join("")).toBe("[1 2 3]");
     });
 
     it("molds nested blocks", () => {
         const result = run("mold [[1 2] [3 4]]");
-        expect(result.buffer.data.join("")).toBe("[[1 2] [3 4]]");
+        expect(result.buffer.join("")).toBe("[[1 2] [3 4]]");
     });
 
     it("molds parens", () => {
         const result = run("mold first [(1 + 2)]");
-        expect(result.buffer.data.join("")).toBe("(1 + 2)");
+        expect(result.buffer.join("")).toBe("(1 + 2)");
     });
 
     it("molds paths", () => {
         const result = run("mold first [obj/field]");
-        expect(result.buffer.data.join("")).toBe("OBJ/FIELD");
+        expect(result.buffer.join("")).toBe("OBJ/FIELD");
     });
 
     it("molds mixed content", () => {
         const result = run('mold [x: 42 "hello"]');
-        expect(result.buffer.data.join("")).toBe('[X: 42 "hello"]');
+        expect(result.buffer.join("")).toBe('[X: 42 "hello"]');
     });
 });
 
@@ -86,7 +86,7 @@ describe("MOLD/LOAD Round-trip", () => {
 
         // Mold it
         const molded = run(`mold ${source}`);
-        const moldedStr = molded.buffer.data.join("");
+        const moldedStr = molded.buffer.join("");
 
         // Load it back
         const reloaded = parse(moldedStr);
@@ -131,7 +131,7 @@ describe("Serialization Use Cases", () => {
             msg: reduce ['gadget-id gadgetId 'value value]
             mold msg
         `);
-        const serialized = result.buffer.data.join("");
+        const serialized = result.buffer.join("");
         expect(serialized).toBe("[GADGET-ID 42 VALUE 100]");
     });
 
@@ -154,7 +154,7 @@ describe("Serialization Use Cases", () => {
             spec: [x: 10 y: 20]
             mold spec
         `);
-        const serialized = result.buffer.data.join("");
+        const serialized = result.buffer.join("");
         expect(serialized).toBe("[X: 10 Y: 20]");
     });
 });

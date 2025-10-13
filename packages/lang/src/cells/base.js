@@ -26,7 +26,7 @@ export class ReCell {
      * @returns {string}
      */
     get typeName() {
-        return this.constructor.name.replace("Cell", "").toLowerCase();
+        return `${this.constructor.name}!`;
     }
 }
 

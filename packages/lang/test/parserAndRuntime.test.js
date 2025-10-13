@@ -149,7 +149,7 @@ describe("Integration: Control Flow", () => {
             ]
             test 15
         `);
-        expect(result.buffer.data.join("")).toBe("big");
+        expect(result.buffer.join("")).toBe("big");
     });
 
     it("while loop", () => {

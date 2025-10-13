@@ -2,7 +2,7 @@
 import { readFileSync } from "fs";
 import { run } from "../src/run.js";
 import { GLOBAL } from "../src/context.js";
-import { normalize } from "../src/spelling.js";
+import { normalize } from "../src/utils.js";
 import { make } from "../src/cells/index.js";
 import * as repl from "node:repl";
 

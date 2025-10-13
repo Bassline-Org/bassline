@@ -32,8 +32,8 @@ export function bind(cell, knownWord) {
 
     if (isSeries(cell)) {
         // Rebind all words in the series buffer
-        for (let i = 0; i < cell.buffer.data.length; i++) {
-            cell.buffer.data[i] = bind(cell.buffer.data[i], knownWord);
+        for (let i = 0; i < cell.buffer.length; i++) {
+            cell.buffer[i] = bind(cell.buffer[i], knownWord);
         }
         return cell;
     }

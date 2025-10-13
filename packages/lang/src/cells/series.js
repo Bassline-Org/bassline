@@ -3,29 +3,15 @@ import { Context } from "../context.js";
 import { NumberCell } from "./primitives.js";
 
 /**
- * Shared buffer for series - mutable data structure
- */
-export class SeriesBuffer {
-    constructor(data = []) {
-        this.data = data;
-    }
-
-    get length() {
-        return this.data.length;
-    }
-}
-
-/**
  * Base class for all series types
  */
 class SeriesBase extends ReCell {
     constructor(buffer, index = 0) {
         super();
-        this.buffer = buffer instanceof SeriesBuffer
-            ? buffer
-            : new SeriesBuffer(buffer);
+        this.buffer = buffer;
         this.index = index;
     }
+    isSeries = true;
 
     // Series are self-evaluating
     // evaluate() inherits from ReCell
@@ -100,7 +86,7 @@ class SeriesBase extends ReCell {
         if (this.index >= this.buffer.length) {
             throw new Error("Out of range or past end");
         }
-        return this.buffer.data[this.index];
+        return this.buffer[this.index];
     }
 
     /**
@@ -133,7 +119,7 @@ export class StringCell extends SeriesBase {}
 export class ParenCell extends SeriesBase {
     evaluate(control) {
         let result = null;
-        for (const cell of this.buffer.data) {
+        for (const cell of this.buffer) {
             result = cell.evaluate(control);
         }
         return result;
@@ -145,58 +131,45 @@ export class ParenCell extends SeriesBase {
  */
 export class PathCell extends SeriesBase {
     evaluate(control) {
-        throw new Error("I haven't implemented this yet! Bad goose!");
-        if (this.isTail()) {
-            throw new Error("Cannot evaluate empty path");
-        }
+        const [root, ...segments] = this.buffer;
+        const rootValue = root.evaluate(root);
+        return segments.reduce((value, segment) => {
+            const key = segment instanceof NumberCell
+                ? segment.evaluate(control)
+                : segment.spelling;
+            return value.at(key);
+        }, rootValue);
+    }
+}
 
-        // Get the root value
-        let root = this.first().evaluate(control);
-        //return this.buffer.data.reduce((context, selectorCell) => {})
+/// Get path, evaluates to the value from the literal value of the root
+export class GetPathCell extends SeriesBase {
+    evaluate(control) {
+        const [root, ...segments] = this.buffer;
+        return segments.reduce((value, segment) => {
+            return value.get(segment.evaluate(control));
+        }, root);
+    }
+}
 
-        // Navigate through path segments
-        while (!pos.isTail()) {
-            const selector = pos.first();
+/// Lit path, evaluates to itself
+export class LitPathCell extends SeriesBase {
+    evaluate(control) {
+        return this;
+    }
+}
 
-            // If value is a Context (object), select from it
-            if (value instanceof Context) {
-                if (selector.typeName === "word") {
-                    value = value.get(selector.spelling);
-                    if (value === undefined) {
-                        throw new Error(
-                            `Path: field ${
-                                String(selector.spelling)
-                            } not found in object`,
-                        );
-                    }
-                } else {
-                    throw new Error(
-                        `Path: cannot select from object with ${selector.typeName}`,
-                    );
-                }
-            } else if (isSeries(value)) {
-                // Numeric index into series
-                if (selector instanceof NumberCell) {
-                    // REBOL uses 1-based indexing
-                    const index = Math.floor(selector.value) - 1;
-                    if (index < 0 || index >= value.buffer.length) {
-                        throw new Error(
-                            `Path: index ${selector.value} out of range`,
-                        );
-                    }
-                    value = value.buffer.data[index];
-                } else {
-                    throw new Error(
-                        `Path: cannot index series with ${selector.typeName}`,
-                    );
-                }
-            } else {
-                throw new Error(`Path: cannot select from ${value.typeName}`);
+/// Set path, evaluates by setting the value at the end of the path
+export class SetPathCell extends SeriesBase {
+    evaluate(control) {
+        const [root, ...segments] = this.buffer;
+        const rootValue = root.evaluate(root);
+        return segments.reduce((value, segment, index) => {
+            if (index === segments.length - 1) {
+                return value.set(segment.evaluate(control), value);
             }
-            pos = pos.next();
-        }
-
-        return value;
+            return value.get(segment.evaluate(control));
+        }, rootValue);
     }
 }
 
@@ -206,27 +179,3 @@ export class PathCell extends SeriesBase {
 export class BinaryCell extends SeriesBase {
     // Self-evaluating
 }
-
-/**
- * Check if a cell is a series type
- */
-export function isSeries(cell) {
-    return cell instanceof SeriesBase;
-}
-
-/**
- * Series utilities - operates on any series cell
- */
-export const series = {
-    isSeries,
-
-    next: (cell) => cell.next(),
-    back: (cell) => cell.back(),
-    skip: (cell, n) => cell.skip(n),
-    head: (cell) => cell.head(),
-    tail: (cell) => cell.tail(),
-    isTail: (cell) => cell.isTail(),
-    length: (cell) => cell.length(),
-    first: (cell) => cell.first(),
-    pick: (cell, n) => cell.pick(n),
-};

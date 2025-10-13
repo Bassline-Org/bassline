@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { run } from "../src/run.js";
 import { Context } from "../src/context.js";
-import { normalize } from "../src/spelling.js";
+import { normalize } from "../src/utils.js";
 
 describe("Objects", () => {
     it("creates simple object", () => {

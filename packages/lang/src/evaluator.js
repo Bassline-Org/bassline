@@ -14,7 +14,7 @@ import { ObjectCell } from "./cells/objects.js";
 export function evaluate(source, context = GLOBAL) {
     let stream = source;
     if (isSeries(source)) {
-        stream = source.buffer.data;
+        stream = source.buffer;
     }
     if (typeof source === "string") {
         stream = parse(source);
@@ -64,7 +64,7 @@ function load(control, word) {
             path,
         );
     }
-    const source = fs.readFileSync(path.buffer.data, "utf8");
+    const source = fs.readFileSync(path.buffer, "utf8");
     return evaluate(source);
 }
 
@@ -98,6 +98,9 @@ nativeType("object!", (word, spec) => {
     evaluate(boundSpec, obj.context);
     return obj;
 });
+nativeType("func!", (word, spec) => {
+    const obj = new ObjectCell();
+});
 
 nativeFn("make", make);
 nativeFn("load", load);
@@ -106,8 +109,13 @@ nativeFn("print", (c, w) => {
 });
 
 const example = `
-foo: make object! [ x: 123 ]
-print foo
+a: 123
+foo: make object! [
+    x: a
+    y: make object! [
+        z: 456
+    ]
+]
 `;
 
 const result = evaluate(example);

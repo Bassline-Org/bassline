@@ -16,14 +16,14 @@ import {
 import net from "net";
 import { isSeries } from "./series.js";
 import { Context, GLOBAL } from "../context.js";
-import { normalize } from "../spelling.js";
+import { normalize } from "../utils.js";
 import { ApplicableCell, ReCell } from "./base.js";
 import { series } from "./series.js";
 //import { makeObject } from "./objects.js";
 import { execSync, spawn } from "child_process";
 import fs from "fs";
 import { isAnyWord } from "./words.js";
-import { deepCopy } from "../copy.js";
+import { deepCopy } from "../utils.js";
 //import { Evaluator } from "../evaluator.js";
 import { parse } from "../parser.js";
 import { prescan } from "../run.js";
@@ -40,7 +40,7 @@ function mold(cell) {
 
     // Strings with proper escaping
     if (cell instanceof StringCell) {
-        const str = cell.buffer.data.join("");
+        const str = cell.buffer.join("");
         const escaped = str
             .replace(/\\/g, "\\\\")
             .replace(/"/g, '\\"')
@@ -270,7 +270,7 @@ export function nativeType(name, builder) {
 //             throw new Error("shell: command must be a string");
 //         }
 
-//         const cmd = command.buffer.data.join("");
+//         const cmd = command.buffer.join("");
 
 //         try {
 //             const output = execSync(cmd, { encoding: "utf8" });
@@ -285,7 +285,7 @@ export function nativeType(name, builder) {
 //             throw new Error("spawn: command must be a string");
 //         }
 
-//         const cmd = command.buffer.data.join("");
+//         const cmd = command.buffer.join("");
 
 //         // Parse command and args
 //         const parts = cmd.split(" ");
@@ -299,7 +299,7 @@ export function nativeType(name, builder) {
 //         procObj.set(
 //             normalize("write"),
 //             new NativeCell("write", ["data"], ([data]) => {
-//                 const str = data.buffer.data.join("");
+//                 const str = data.buffer.join("");
 //                 proc.stdin.write(str + "\n");
 //                 return make.none();
 //             }),
@@ -473,7 +473,7 @@ export function nativeType(name, builder) {
 //             throw new Error("connect: port must be a number");
 //         }
 
-//         const hostStr = host.buffer.data.join("");
+//         const hostStr = host.buffer.join("");
 //         const portNum = port.value;
 
 //         const socket = net.connect(portNum, hostStr);
@@ -562,7 +562,7 @@ export function nativeType(name, builder) {
 
 //             // Add handler (clone it for binding later)
 //             const handlerCopy = deepCopy(handler);
-//             handlers.buffer.data.push(handlerCopy);
+//             handlers.buffer.push(handlerCopy);
 
 //             return make.none();
 //         },
@@ -848,7 +848,7 @@ export function nativeType(name, builder) {
 //             if (!isSeries(s)) {
 //                 throw new Error(`append: requires series`);
 //             }
-//             s.buffer.data.push(value);
+//             s.buffer.push(value);
 //             return s;
 //         },
 //     ),
@@ -894,7 +894,7 @@ export function nativeType(name, builder) {
 //         let sourceStr;
 
 //         if (source instanceof StringCell) {
-//             sourceStr = source.buffer.data.join("");
+//             sourceStr = source.buffer.join("");
 //         } else {
 //             throw new Error("load: argument must be a string");
 //         }
@@ -913,7 +913,7 @@ export function nativeType(name, builder) {
 //         let block;
 
 //         if (code instanceof StringCell) {
-//             const str = code.buffer.data.join("");
+//             const str = code.buffer.join("");
 
 //             // If it's a filename, read it
 //             if (str.endsWith(".bl")) {
