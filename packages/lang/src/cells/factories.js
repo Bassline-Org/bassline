@@ -12,7 +12,7 @@ import {
     BlockCell,
     ParenCell,
     PathCell,
-    SeriesBuffer,
+    //SeriesBuffer,
     StringCell,
 } from "./series.js";
 import { FunctionCell } from "./functions.js";

@@ -1,4 +1,4 @@
-import { isAnyWord, isSeries, SeriesBuffer } from "./cells/index.js";
+import { isAnyWord } from "./cells/index.js";
 
 /**
  * Deep copy a cell.
@@ -13,9 +13,8 @@ export function deepCopy(cell) {
     }
 
     // Series need new buffers with recursively copied contents
-    if (isSeries(cell)) {
-        const newData = cell.buffer.map((item) => deepCopy(item));
-        const newBuffer = new SeriesBuffer(newData);
+    if (cell.isSeries) {
+        const newBuffer = cell.buffer.map((item) => deepCopy(item));
 
         const CellClass = cell.constructor;
         return new CellClass(newBuffer, cell.index).freeze();

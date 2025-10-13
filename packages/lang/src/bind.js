@@ -1,4 +1,4 @@
-import { isAnyWord, isSeries } from "./cells/index.js";
+import { isAnyWord } from "./cells/index.js";
 
 /**
  * Bind a word (or block of words) to the context of a known word.
@@ -30,7 +30,7 @@ export function bind(cell, knownWord) {
         }
     }
 
-    if (isSeries(cell)) {
+    if (cell.isSeries) {
         // Rebind all words in the series buffer
         for (let i = 0; i < cell.buffer.length; i++) {
             cell.buffer[i] = bind(cell.buffer[i], knownWord);

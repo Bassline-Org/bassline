@@ -11,4 +11,10 @@ export class ObjectCell extends ReCell {
     typeName() {
         return "object!";
     }
+    get(spelling) {
+        return this.context.get(spelling);
+    }
+    set(spelling, cell) {
+        return this.context.set(spelling, cell);
+    }
 }

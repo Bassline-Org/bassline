@@ -14,19 +14,8 @@ import {
     WordCell,
 } from "./index.js";
 import net from "net";
-import { isSeries } from "./series.js";
 import { Context, GLOBAL } from "../context.js";
-import { normalize } from "../utils.js";
-import { ApplicableCell, ReCell } from "./base.js";
-import { series } from "./series.js";
-//import { makeObject } from "./objects.js";
-import { execSync, spawn } from "child_process";
-import fs from "fs";
-import { isAnyWord } from "./words.js";
-import { deepCopy } from "../utils.js";
-//import { Evaluator } from "../evaluator.js";
-import { parse } from "../parser.js";
-import { prescan } from "../run.js";
+import { ApplicableCell } from "./base.js";
 
 // Update the existing mold helper to be more comprehensive:
 function mold(cell) {

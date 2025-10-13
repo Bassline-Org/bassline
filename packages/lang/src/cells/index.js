@@ -4,11 +4,11 @@ export { FunctionCell, makeFunc, RFunction } from "./functions.js";
 export {
     BinaryCell,
     BlockCell,
-    isSeries,
+    GetPathCell,
+    LitPathCell,
     ParenCell,
     PathCell,
-    series,
-    SeriesBuffer,
+    SetPathCell,
     StringCell,
 } from "./series.js";
 export {

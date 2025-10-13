@@ -4,7 +4,7 @@ import { NoneCell } from "./primitives.js";
 import { bind } from "../bind.js";
 import { deepCopy } from "../utils.js";
 import { isAnyWord, SetWordCell } from "./words.js";
-import { isSeries, series } from "./series.js";
+//import { series } from "./series.js";
 
 /**
  * Mutable function object that holds the function's state
@@ -113,7 +113,7 @@ export class FunctionCell extends ReCell {
 function scanForSetWords(cell, setWords) {
     if (cell instanceof SetWordCell) {
         setWords.add(cell.spelling);
-    } else if (isSeries(cell)) {
+    } else if (cell.isSeries) {
         // Recursively scan subblocks
         let pos = cell.head();
         while (!pos.isTail()) {
@@ -129,7 +129,7 @@ function scanForSetWords(cell, setWords) {
 function extractParams(specBlock) {
     const params = [];
 
-    if (!specBlock || !isSeries(specBlock)) {
+    if (!specBlock || !specBlock.isSeries) {
         return params;
     }
 

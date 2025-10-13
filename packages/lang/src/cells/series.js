@@ -1,10 +1,8 @@
 import { ReCell } from "./base.js";
 import { Context } from "../context.js";
 import { NumberCell } from "./primitives.js";
+import { bind } from "../bind.js";
 
-/**
- * Base class for all series types
- */
 class SeriesBase extends ReCell {
     constructor(buffer, index = 0) {
         super();
@@ -12,92 +10,17 @@ class SeriesBase extends ReCell {
         this.index = index;
     }
     isSeries = true;
-
-    // Series are self-evaluating
-    // evaluate() inherits from ReCell
-
-    /**
-     * Create a new series cell at a different position
-     * Same buffer, different index
-     */
-    at(newIndex) {
-        return new this.constructor(this.buffer, newIndex);
-    }
-
-    /**
-     * Move to next position
-     */
-    next() {
-        const newIndex = Math.min(this.index + 1, this.buffer.length);
-        return this.at(newIndex);
-    }
-
-    /**
-     * Move back one position
-     */
-    back() {
-        const newIndex = Math.max(0, this.index - 1);
-        return this.at(newIndex);
-    }
-
-    /**
-     * Skip n positions (can be negative)
-     */
-    skip(n) {
-        const newIndex = Math.max(
-            0,
-            Math.min(this.index + n, this.buffer.length),
-        );
-        return this.at(newIndex);
-    }
-
-    /**
-     * Go to head
-     */
-    head() {
-        return this.at(0);
-    }
-
-    /**
-     * Go to tail (past the end)
-     */
-    tail() {
-        return this.at(this.buffer.length);
-    }
-
-    /**
-     * Check if at tail
-     */
-    isTail() {
-        return this.index >= this.buffer.length;
-    }
-
-    /**
-     * Get length from current position to tail
-     */
-    length() {
-        return Math.max(0, this.buffer.length - this.index);
-    }
-
-    /**
-     * Access current value
-     */
-    first() {
-        if (this.index >= this.buffer.length) {
-            throw new Error("Out of range or past end");
+    get(index) {
+        if (this.buffer[index]) {
+            return new this.constructor(this.buffer, index);
         }
-        return this.buffer[this.index];
+        return make.none();
     }
-
-    /**
-     * Pick value at offset (1-based like REBOL)
-     */
-    pick(n) {
-        const targetIndex = this.index + n - 1;
-        if (targetIndex < 0 || targetIndex >= this.buffer.length) {
-            return make.none();
+    set(index, value) {
+        if (this.buffer[index]) {
+            this.buffer[index] = value;
         }
-        return this.at(targetIndex);
+        return this;
     }
 }
 
@@ -130,45 +53,38 @@ export class ParenCell extends SeriesBase {
  * PATH! - series of values for navigation
  */
 export class PathCell extends SeriesBase {
-    evaluate(control) {
+    getKeyOf(value) {
+        return value.spelling ?? value.value;
+    }
+    evaluate(control, context) {
         const [root, ...segments] = this.buffer;
-        const rootValue = root.evaluate(root);
+        const rootValue = root.evaluate(control, context);
         return segments.reduce((value, segment) => {
-            const key = segment instanceof NumberCell
-                ? segment.evaluate(control)
-                : segment.spelling;
-            return value.at(key);
+            const segmentValue = segment.evaluate(control, value);
+            return value.get(this.getKeyOf(segmentValue));
         }, rootValue);
     }
 }
 
 /// Get path, evaluates to the value from the literal value of the root
-export class GetPathCell extends SeriesBase {
-    evaluate(control) {
-        const [root, ...segments] = this.buffer;
-        return segments.reduce((value, segment) => {
-            return value.get(segment.evaluate(control));
-        }, root);
-    }
-}
+export class GetPathCell extends PathCell {}
 
 /// Lit path, evaluates to itself
-export class LitPathCell extends SeriesBase {
-    evaluate(control) {
-        return this;
-    }
-}
+export class LitPathCell extends PathCell {}
 
 /// Set path, evaluates by setting the value at the end of the path
-export class SetPathCell extends SeriesBase {
-    evaluate(control) {
+export class SetPathCell extends PathCell {
+    evaluate(control, context) {
         const [root, ...segments] = this.buffer;
-        const rootValue = root.evaluate(root);
+        const rootValue = root.evaluate(control, context);
+        const newValue = control.evalNext();
         return segments.reduce((value, segment, index) => {
+            const key = this.getKeyOf(segment.evaluate(control, value));
             if (index === segments.length - 1) {
-                return value.set(segment.evaluate(control), value);
+                return value.set(key, newValue);
+            } else {
+                return value.get(key);
             }
-            return value.get(segment.evaluate(control));
         }, rootValue);
     }
 }

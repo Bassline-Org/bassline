@@ -1,5 +1,5 @@
 import { parse } from "./parser.js";
-import { isAnyWord, isSeries, StringCell } from "./cells/index.js";
+import { isAnyWord, StringCell } from "./cells/index.js";
 import { Context, GLOBAL } from "./context.js";
 import { bind } from "./bind.js";
 import { nativeFn, nativeType } from "./cells/natives.js";
@@ -13,7 +13,7 @@ import { ObjectCell } from "./cells/objects.js";
  */
 export function evaluate(source, context = GLOBAL) {
     let stream = source;
-    if (isSeries(source)) {
+    if (source.isSeries) {
         stream = source.buffer;
     }
     if (typeof source === "string") {
@@ -24,7 +24,7 @@ export function evaluate(source, context = GLOBAL) {
         peek: (offset = 0) => stream[cursor + offset],
         evalNext: () => {
             const cell = controller.next();
-            return cell.evaluate(controller);
+            return cell.evaluate(controller, context);
         },
         next: () => {
             const cell = stream[cursor++];
@@ -38,13 +38,13 @@ export function evaluate(source, context = GLOBAL) {
     try {
         while (controller.peek() !== undefined) {
             const cell = controller.next();
-            controller.result = cell.evaluate(controller);
+            controller.result = cell.evaluate(controller, context);
         }
     } catch (e) {
         console.error(`=== EVALUATOR ERROR ===`);
-        console.error(`stream: \n${JSON.stringify(stream, null, 2)}\n`);
-        console.error(`control: \n${JSON.stringify(controller)}\n`);
-        console.error(`result: \n${JSON.stringify(controller.result)}\n`);
+        //console.error(`stream: \n${JSON.stringify(stream, null, 2)}\n`);
+        //console.error(`control: \n${JSON.stringify(controller)}\n`);
+        //console.error(`result: \n${JSON.stringify(controller.result)}\n`);
         throw e;
     }
     return controller.result;
@@ -112,11 +112,16 @@ const example = `
 a: 123
 foo: make object! [
     x: a
-    y: make object! [
-        z: 456
-    ]
 ]
+print x
+print foo/x
+foo/x: 456
+print foo/x
+print x
 `;
 
-const result = evaluate(example);
+const result = parse(example);
 console.log(result);
+
+const result2 = evaluate(result);
+console.log(result2);

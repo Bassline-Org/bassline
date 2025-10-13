@@ -17,7 +17,7 @@ export class ReCell {
      * @param {StreamController} control - The stream controller
      * @returns {ReCell} The evaluated result
      */
-    evaluate(control) {
+    evaluate(control, context) {
         return this;
     }
 

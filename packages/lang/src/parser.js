@@ -1,23 +1,30 @@
 import {
+    anythingExcept,
     char,
     choice,
     digits,
     endOfInput,
+    lookAhead,
     many,
     many1,
+    possibly,
     recursiveParser,
     regex,
     sequenceOf,
     whitespace,
 } from "arcsecond/index.js";
+
 import {
     BlockCell,
+    GetPathCell,
     GetWordCell,
+    LitPathCell,
     LitWordCell,
     NumberCell,
     ParenCell,
     PathCell,
     RefinementCell,
+    SetPathCell,
     SetWordCell,
     StringCell,
     WordCell,
@@ -98,7 +105,7 @@ const getWord = sequenceOf([
 const setWord = sequenceOf([
     wordChars,
     char(":"),
-]).map(([_, spelling]) => new SetWordCell(spelling))
+]).map(([spelling, _]) => new SetWordCell(spelling))
     .errorMap(() => "Expected set word");
 
 // word
@@ -107,7 +114,7 @@ const normalWord = sequenceOf([
 ]).map(([spelling]) => new WordCell(spelling))
     .errorMap(() => "Expected normal word");
 
-const word = choice([normalWord, setWord, litWord, getWord]);
+const word = choice([setWord, litWord, getWord, normalWord]);
 
 const refinement = sequenceOf([
     char("/"),
@@ -136,46 +143,59 @@ const parenParser = sequenceOf([
 ]).map(([_, __, items, ___]) => new ParenCell(items))
     .errorMap(() => "Expected paren");
 
+const pathSegment = choice([
+    number,
+    wordChars.map((segment) => new LitWordCell(segment)),
+]);
+
 // :word/word/word
 const getPath = sequenceOf([
     char(":"),
-    word,
-    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
-]).map(([_, word, segments]) => new GetPathCell([word, ...segments]));
+    wordChars,
+    lookAhead(char("/")),
+    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
+]).map(([_, word, __, segments]) =>
+    new GetPathCell([new GetWordCell(word), ...segments])
+);
 
 // word/word/word:
 const setPath = sequenceOf([
-    word,
-    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
-    word,
+    wordChars,
+    lookAhead(char("/")),
+    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
     char(":"),
-]).map(([word, segments, word2]) =>
-    new SetPathCell([word, ...segments, word2])
+]).map(([word, _, segments, __]) =>
+    new SetPathCell([new WordCell(word), ...segments])
 );
 
 // 'word/word/word
 const litPath = sequenceOf([
     char("'"),
-    word,
-    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
-]).map(([_, word, segments]) => new LitPathCell([word, ...segments]));
+    wordChars,
+    lookAhead(char("/")),
+    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
+]).map(([_, word, __, segments]) =>
+    new LitPathCell([new LitWordCell(word), ...segments])
+);
 
 // word/word/word
 const normalPath = sequenceOf([
-    word,
-    many1(sequenceOf([char("/"), word]).map(([v, _]) => v)),
-]).map(([word, segments]) => new PathCell([word, ...segments]));
+    wordChars,
+    lookAhead(char("/")),
+    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
+]).map(([word, _, segments]) =>
+    new PathCell([new WordCell(word), ...segments])
+);
 
-const path = choice([setPath, getPath, litPath, normalPath]);
+const path = choice([getPath, litPath, setPath, normalPath]);
 
 const valueParser = choice([
-    path, // Must come before word (contains /)
-    refinement, // Must come before word (starts with /)
-    number, // Must come before word (starts with digits)
+    number,
     stringLiteral,
     blockParser,
     parenParser,
-    word, // Last - catches everything else
+    path,
+    word,
 ]);
 
 // ===== Program =====
@@ -188,11 +208,13 @@ const program = sequenceOf([
 export function parse(source) {
     const result = program.run(source);
     if (result.isError) {
-        throw new Error(
-            `Parse Error! ${result.error} at position ${result.index} near "${
-                source.slice(result.index, result.index + 10)
-            }"`,
+        console.error(
+            `Parse Error at position ${result.index}: ${result.error}`,
         );
+        console.error(
+            `Near: "${source.slice(result.index, result.index + 20)}..."`,
+        );
+        throw result.error;
     }
     return result.result;
 }

@@ -1,5 +1,6 @@
 import { ReCell } from "./base.js";
 import { normalize } from "../utils.js";
+import { NoneCell } from "./primitives.js";
 
 class WordBase extends ReCell {
     constructor(spelling, binding) {
@@ -24,9 +25,13 @@ class WordBase extends ReCell {
  * WORD! - evaluates to its bound value
  */
 export class WordCell extends WordBase {
-    evaluate(control) {
+    evaluate(control, context) {
+        if (!this.binding) {
+            this.binding = context;
+        }
         const value = this.lookup();
         if (!value) {
+            return new NoneCell();
             throw new Error(
                 `${String(this.spelling)} has no value in: ${
                     JSON.stringify(this.binding, null, 2)
@@ -48,7 +53,10 @@ export class WordCell extends WordBase {
  * Example: x: 42
  */
 export class SetWordCell extends WordBase {
-    evaluate(control) {
+    evaluate(control, context) {
+        if (!this.binding) {
+            this.binding = context;
+        }
         const next = control.next();
         if (!next) {
             throw new Error("Invalid SET_WORD: expected a value!");
@@ -70,7 +78,10 @@ export class SetWordCell extends WordBase {
  * Example: :x
  */
 export class GetWordCell extends WordBase {
-    evaluate(_control) {
+    evaluate(_control, context) {
+        if (!this.binding) {
+            this.binding = context;
+        }
         return this.lookup();
     }
 }
@@ -80,7 +91,10 @@ export class GetWordCell extends WordBase {
  * Example: 'x
  */
 export class LitWordCell extends WordBase {
-    evaluate(_control) {
+    evaluate(_control, context) {
+        if (!this.binding) {
+            this.binding = context;
+        }
         return new WordCell(this.spelling, this.binding);
     }
 }
