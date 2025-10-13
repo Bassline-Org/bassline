@@ -1,5 +1,5 @@
 export { make } from "./factories.js";
-export { NATIVES, setupNatives } from "./natives.js";
+//export { NATIVES, setupNatives } from "./natives.js";
 export { FunctionCell, makeFunc, RFunction } from "./functions.js";
 export {
     BinaryCell,
@@ -11,12 +11,18 @@ export {
     SeriesBuffer,
     StringCell,
 } from "./series.js";
-export { NoneCell, NumberCell } from "./primitives.js";
+export {
+    FileCell,
+    NoneCell,
+    NumberCell,
+    RefinementCell,
+    TupleCell,
+    UrlCell,
+} from "./primitives.js";
 export {
     GetWordCell,
     isAnyWord,
     LitWordCell,
-    RefinementCell,
     SetWordCell,
     WordCell,
 } from "./words.js";

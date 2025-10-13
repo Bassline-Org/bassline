@@ -136,9 +136,12 @@ export class StringCell extends SeriesBase {
 }
 
 export class ParenCell extends SeriesBase {
-    evaluate(evaluator) {
-        // Parens evaluate their contents
-        return evaluator.doBlock(this);
+    evaluate(control) {
+        let result = null;
+        for (const cell of this.buffer.data) {
+            result = cell.evaluate(control);
+        }
+        return result;
     }
 }
 
@@ -146,7 +149,8 @@ export class ParenCell extends SeriesBase {
  * PATH! - series of values for navigation
  */
 export class PathCell extends SeriesBase {
-    evaluate(evaluator) {
+    evaluate(control) {
+        throw new Error("I haven't implemented this yet! Bad goose!");
         if (this.isTail()) {
             throw new Error("Cannot evaluate empty path");
         }
@@ -198,17 +202,6 @@ export class PathCell extends SeriesBase {
         }
 
         return value;
-    }
-    step(codeStream, evaluator) {
-        const value = this.evaluate(evaluator);
-
-        // If the value is applicable (like a function), delegate to it
-        if (value.isApplicable && value.isApplicable()) {
-            return value.step(codeStream, evaluator);
-        }
-
-        // Otherwise, just return the value
-        return { value, consumed: 1 };
     }
 }
 

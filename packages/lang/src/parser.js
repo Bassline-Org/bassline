@@ -156,10 +156,17 @@ const program = sequenceOf([
     endOfInput,
 ]).map(([_, values, __]) => values); // Return as block!
 
-// ===== Export =====
+const source = `
+"hello"
+foo: 123
+bar: 456
+aBlock: [
+    do [ print "hello" ]
+]
+`;
+
 export function parse(source) {
     const result = program.run(source);
-
     if (result.isError) {
         throw new Error(
             `Parse Error! ${result.error} at position ${result.index} near "${
@@ -167,6 +174,33 @@ export function parse(source) {
             }"`,
         );
     }
-
-    return result.result; // Returns a BlockCell
+    let stream = result.result;
+    return [
+        stream,
+        {
+            peek: () => stream[0],
+            next: () => stream.shift(),
+            take: (count) => {
+                const taken = [];
+                for (let i = 0; i < count; i++) {
+                    taken.push(stream.shift());
+                }
+                return taken;
+            },
+            queue: (cell) => {
+                if (Array.isArray(cell)) {
+                    stream = [...cell, ...stream];
+                } else {
+                    stream = [cell, ...stream];
+                }
+            },
+        },
+    ];
 }
+
+const [stream, control] = parse(source);
+while (stream.length > 0) {
+    const cell = control.next();
+    cell.evaluate(control);
+}
+console.log(parsed);

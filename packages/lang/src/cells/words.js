@@ -23,20 +23,9 @@ class WordBase extends ReCell {
  * WORD! - evaluates to its bound value
  */
 export class WordCell extends WordBase {
-    evaluate(_evaluator) {
-        return this.lookup();
-    }
-
-    step(codeStream, evaluator) {
+    evaluate(control) {
         const value = this.lookup();
-
-        // If the value is applicable (like a function), delegate to it
-        if (value.isApplicable && value.isApplicable()) {
-            return value.step(codeStream, evaluator);
-        }
-
-        // Otherwise, just return the value
-        return { value, consumed: 1 };
+        return value.evaluate(control);
     }
 }
 
@@ -45,29 +34,12 @@ export class WordCell extends WordBase {
  * Example: x: 42
  */
 export class SetWordCell extends WordBase {
-    evaluate(_evaluator) {
-        throw new Error("SET_WORD cannot be evaluated alone - use in context");
-    }
-
-    step(codeStream, evaluator) {
-        // Consume myself and the next value
-        const series = evaluator.series;
-        const next = series.next(codeStream);
-
-        if (series.isTail(next)) {
-            throw new Error("SET_WORD at end of block");
+    evaluate(control) {
+        const next = control.next();
+        if (!next) {
+            throw new Error("Invalid SET_WORD: expected a value!");
         }
-
-        // Step the next cell to get its value
-        const result = series.first(next).step(next, evaluator);
-
-        // Assign to this word
-        this.binding.set(this.spelling, result.value);
-
-        return {
-            value: result.value,
-            consumed: 1 + result.consumed, // Me + what the value consumed
-        };
+        return next.evaluate(control);
     }
 }
 
@@ -76,7 +48,7 @@ export class SetWordCell extends WordBase {
  * Example: :x
  */
 export class GetWordCell extends WordBase {
-    evaluate(_evaluator) {
+    evaluate(_control) {
         return this.lookup();
     }
 }
@@ -86,18 +58,8 @@ export class GetWordCell extends WordBase {
  * Example: 'x
  */
 export class LitWordCell extends WordBase {
-    evaluate(_evaluator) {
+    evaluate(_control) {
         return new WordCell(this.spelling, this.binding);
-    }
-}
-
-/**
- * REFINEMENT! - path refinements
- * Example: /local
- */
-export class RefinementCell extends WordBase {
-    constructor(spelling) {
-        super(spelling, undefined); // Refinements don't have bindings
     }
 }
 

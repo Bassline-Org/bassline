@@ -47,3 +47,13 @@ export class UrlCell extends ReCell {
         this.url = url; // Static string
     }
 }
+
+/**
+ * Refinement cell - represents specification of something or path segment (/local)
+ */
+export class RefinementCell extends ReCell {
+    constructor(spelling) {
+        super();
+        this.spelling = spelling;
+    }
+}

@@ -1,11 +1,12 @@
-import { NoneCell, NumberCell, FileCell, TupleCell, UrlCell } from "./primitives.js";
 import {
-    GetWordCell,
-    LitWordCell,
+    FileCell,
+    NoneCell,
+    NumberCell,
     RefinementCell,
-    SetWordCell,
-    WordCell,
-} from "./words.js";
+    TupleCell,
+    UrlCell,
+} from "./primitives.js";
+import { GetWordCell, LitWordCell, SetWordCell, WordCell } from "./words.js";
 import {
     BinaryCell,
     BlockCell,
