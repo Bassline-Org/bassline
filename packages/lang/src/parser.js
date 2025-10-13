@@ -10,7 +10,23 @@ import {
     sequenceOf,
     whitespace,
 } from "arcsecond/index.js";
-import { make } from "./cells/index.js";
+import {
+    BlockCell,
+    GetWordCell,
+    isAnyWord,
+    LitWordCell,
+    make,
+    NumberCell,
+    ParenCell,
+    RefinementCell,
+    SeriesBuffer,
+    SetWordCell,
+    StringCell,
+    WordCell,
+} from "./cells/index.js";
+import { GLOBAL } from "./context.js";
+import { NativeCell } from "./cells/natives.js";
+import { bind } from "./bind.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([
@@ -27,18 +43,18 @@ const number = choice([
     // Negative decimal
     sequenceOf([char("-"), digits, char("."), digits]).map(
         ([sign, int, dot, dec]) =>
-            make.num(parseFloat(`${sign}${int}${dot}${dec}`)),
+            new NumberCell(parseFloat(`${sign}${int}${dot}${dec}`)),
     ),
     // Positive decimal
     sequenceOf([digits, char("."), digits]).map(
-        ([int, dot, dec]) => make.num(parseFloat(`${int}${dot}${dec}`)),
+        ([int, dot, dec]) => new NumberCell(parseFloat(`${int}${dot}${dec}`)),
     ),
     // Negative integer
     sequenceOf([char("-"), digits]).map(
-        ([sign, int]) => make.num(parseFloat(`${sign}${int}`)),
+        ([sign, int]) => new NumberCell(parseFloat(`${sign}${int}`)),
     ),
     // Positive integer
-    digits.map((int) => make.num(parseFloat(int))),
+    digits.map((int) => new NumberCell(parseFloat(int))),
 ]).errorMap(() => "Expected number");
 
 // ===== Strings =====
@@ -62,12 +78,12 @@ const stringLiteral = sequenceOf([
     char('"'),
     many(stringChar),
     char('"'),
-]).map(([_, chars, __]) => make.string(chars.join("")))
+]).map(([_, chars, __]) => new StringCell(chars.join("")))
     .errorMap(() => "Expected string");
 
 // ===== Words =====
 // Word characters (no slash for path parsing)
-const wordCharsNoSlash = regex(/^[^ \t\n\r\[\](){}";/]+/);
+const wordCharsNoSlash = regex(/^[^ \t\n\r\[\](){}";:\/]+/);
 
 // All word types with syntax markers
 const word = sequenceOf([
@@ -77,15 +93,15 @@ const word = sequenceOf([
 ])
     .map(([get, spelling, set]) => {
         if (get === ":") {
-            return make.getWord(spelling);
+            return new GetWordCell(spelling);
         }
         if (get === "'") {
-            return make.litWord(spelling);
+            return new LitWordCell(spelling);
         }
         if (set) {
-            return make.setWord(spelling);
+            return new SetWordCell(spelling);
         }
-        return make.word(spelling);
+        return new WordCell(spelling);
     })
     .errorMap(() => "Expected word");
 
@@ -93,7 +109,7 @@ const word = sequenceOf([
 const refinement = sequenceOf([
     char("/"),
     wordCharsNoSlash,
-]).map(([_, name]) => make.refinement(name))
+]).map(([_, name]) => new RefinementCell(name))
     .errorMap(() => "Expected refinement");
 
 // Forward declare for recursion
@@ -105,7 +121,7 @@ const blockParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char("]"),
-]).map(([_, __, items, ___]) => make.block(items))
+]).map(([_, __, items, ___]) => new BlockCell(new SeriesBuffer(items)))
     .errorMap(() => "Expected block");
 
 // ===== Parens =====
@@ -114,7 +130,7 @@ const parenParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char(")"),
-]).map(([_, __, items, ___]) => make.paren(items))
+]).map(([_, __, items, ___]) => new ParenCell(new SeriesBuffer(items)))
     .errorMap(() => "Expected paren");
 
 // ===== Paths =====
@@ -124,19 +140,19 @@ const pathParser = sequenceOf([
     wordCharsNoSlash,
     many1(sequenceOf([char("/"), wordCharsNoSlash])),
 ]).map(([first, segments]) => {
-    const parts = [make.word(first)]; // First element (unbound word)
+    const parts = [new WordCell(first)]; // First element (unbound word)
 
     segments.forEach(([_, segment]) => {
         // Check if segment is a number
         if (/^-?\d+(\.\d+)?$/.test(segment)) {
-            parts.push(make.num(parseFloat(segment)));
+            parts.push(new NumberCell(parseFloat(segment)));
         } else {
             // It's a word (could be refinement-style but in path context)
-            parts.push(make.word(segment)); // Unbound
+            parts.push(new WordCell(segment)); // Unbound
         }
     });
 
-    return make.path(parts);
+    return new PathCell(new SeriesBuffer(parts));
 }).errorMap(() => "Expected path");
 
 const valueParser = choice([
@@ -159,10 +175,7 @@ const program = sequenceOf([
 const source = `
 "hello"
 foo: 123
-bar: 456
-aBlock: [
-    do [ print "hello" ]
-]
+'foo
 `;
 
 export function parse(source) {
@@ -174,23 +187,30 @@ export function parse(source) {
             }"`,
         );
     }
+    let cursor = 0;
     let stream = result.result;
     return [
         stream,
         {
-            peek: () => stream[0],
-            next: () => stream.shift(),
+            peek: (offset = 0) => stream[cursor + offset],
+            seek: (count) => {
+                cursor += count;
+                return stream[cursor];
+            },
+            next: () => stream[cursor++],
             take: (count) => {
                 const taken = [];
                 for (let i = 0; i < count; i++) {
-                    taken.push(stream.shift());
+                    taken.push(stream[cursor++]);
                 }
                 return taken;
             },
             queue: (cell) => {
                 if (Array.isArray(cell)) {
+                    cursor += cell.length;
                     stream = [...cell, ...stream];
                 } else {
+                    cursor++;
                     stream = [cell, ...stream];
                 }
             },
@@ -198,9 +218,18 @@ export function parse(source) {
     ];
 }
 
-const [stream, control] = parse(source);
-while (stream.length > 0) {
-    const cell = control.next();
-    cell.evaluate(control);
+export function load(source) {
+    const [stream, control] = parse(source);
+    let result = null;
+    while (stream.length > 0) {
+        if (control.peek() === undefined) break;
+        const cell = control.next();
+        if (isAnyWord(cell)) {
+            cell.binding = GLOBAL;
+        }
+        result = cell.evaluate(control);
+    }
+    return result;
 }
-console.log(parsed);
+
+console.log(load(source));

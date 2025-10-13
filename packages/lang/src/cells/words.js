@@ -19,6 +19,7 @@ class WordBase extends ReCell {
         return this.binding.get(this.spelling);
     }
 }
+
 /**
  * WORD! - evaluates to its bound value
  */
@@ -39,7 +40,12 @@ export class SetWordCell extends WordBase {
         if (!next) {
             throw new Error("Invalid SET_WORD: expected a value!");
         }
-        return next.evaluate(control);
+        if (!this.binding) {
+            throw new Error(`${String(this.spelling)} has no context`);
+        }
+        const value = next.evaluate(control);
+        this.binding.set(this.spelling, value);
+        return value;
     }
 }
 
