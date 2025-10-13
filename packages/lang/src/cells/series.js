@@ -125,15 +125,7 @@ export class BlockCell extends SeriesBase {
 /**
  * STRING! - text data
  */
-export class StringCell extends SeriesBase {
-    constructor(strOrBuffer, index = 0) {
-        if (typeof strOrBuffer === "string") {
-            super(new SeriesBuffer(Array.from(strOrBuffer)), index);
-        } else {
-            super(strOrBuffer, index);
-        }
-    }
-}
+export class StringCell extends SeriesBase {}
 
 export class ParenCell extends SeriesBase {
     evaluate(control) {

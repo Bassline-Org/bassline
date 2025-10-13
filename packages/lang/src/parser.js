@@ -13,9 +13,7 @@ import {
 import {
     BlockCell,
     GetWordCell,
-    isAnyWord,
     LitWordCell,
-    make,
     NumberCell,
     ParenCell,
     RefinementCell,
@@ -24,9 +22,6 @@ import {
     StringCell,
     WordCell,
 } from "./cells/index.js";
-import { GLOBAL } from "./context.js";
-import { NativeCell } from "./cells/natives.js";
-import { bind } from "./bind.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([
@@ -172,12 +167,6 @@ const program = sequenceOf([
     endOfInput,
 ]).map(([_, values, __]) => values); // Return as block!
 
-const source = `
-"hello"
-foo: 123
-'foo
-`;
-
 export function parse(source) {
     const result = program.run(source);
     if (result.isError) {
@@ -187,49 +176,5 @@ export function parse(source) {
             }"`,
         );
     }
-    let cursor = 0;
-    let stream = result.result;
-    return [
-        stream,
-        {
-            peek: (offset = 0) => stream[cursor + offset],
-            seek: (count) => {
-                cursor += count;
-                return stream[cursor];
-            },
-            next: () => stream[cursor++],
-            take: (count) => {
-                const taken = [];
-                for (let i = 0; i < count; i++) {
-                    taken.push(stream[cursor++]);
-                }
-                return taken;
-            },
-            queue: (cell) => {
-                if (Array.isArray(cell)) {
-                    cursor += cell.length;
-                    stream = [...cell, ...stream];
-                } else {
-                    cursor++;
-                    stream = [cell, ...stream];
-                }
-            },
-        },
-    ];
+    return result.result;
 }
-
-export function load(source) {
-    const [stream, control] = parse(source);
-    let result = null;
-    while (stream.length > 0) {
-        if (control.peek() === undefined) break;
-        const cell = control.next();
-        if (isAnyWord(cell)) {
-            cell.binding = GLOBAL;
-        }
-        result = cell.evaluate(control);
-    }
-    return result;
-}
-
-console.log(load(source));

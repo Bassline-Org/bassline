@@ -26,6 +26,16 @@ class WordBase extends ReCell {
 export class WordCell extends WordBase {
     evaluate(control) {
         const value = this.lookup();
+        if (!value) {
+            throw new Error(
+                `${String(this.spelling)} has no value in: ${
+                    JSON.stringify(this.binding, null, 2)
+                }`,
+            );
+        }
+        if (value.isNativeCell) {
+            return value.evaluate(control, this);
+        }
         return value.evaluate(control);
     }
 }
@@ -42,6 +52,9 @@ export class SetWordCell extends WordBase {
         }
         if (!this.binding) {
             throw new Error(`${String(this.spelling)} has no context`);
+        }
+        if (next.isNativeCell) {
+            throw new Error("Cannot assign to native cell! " + next.spelling);
         }
         const value = next.evaluate(control);
         this.binding.set(this.spelling, value);

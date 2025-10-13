@@ -130,10 +130,27 @@ function mold(cell) {
  * Native function cell - built-in operations implemented in JavaScript
  */
 export class NativeCell extends ApplicableCell {
-    constructor(name) {
+    isNativeCell = true;
+    constructor(fn) {
         super();
-        this.name = name;
+        this.fn = fn;
     }
+    evaluate(control, word) {
+        if (!this.fn) {
+            throw new Error(
+                "No evaluation set for this native function! " + word.spelling,
+                "Please set it properly: ",
+                this,
+            );
+        }
+        return this.fn(control, word);
+    }
+}
+
+export function nativeFn(name, fn) {
+    const native = new NativeCell(fn);
+    GLOBAL.set(name, native);
+    return native;
 }
 
 // /**
