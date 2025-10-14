@@ -119,17 +119,14 @@ export class NativeFn extends ApplicableCell {
     isNativeCell = true;
     constructor(fn) {
         super();
+        if (!fn || (typeof fn !== "function")) {
+            throw new Error("NativeFn called without a function!");
+        }
         this.fn = fn;
     }
-    evaluate(control, word) {
-        if (!this.fn) {
-            throw new Error(
-                "No evaluation set for this native function! " + word.spelling,
-                "Please set it properly: ",
-                this,
-            );
-        }
-        return this.fn(control, word);
+
+    evaluate(stream) {
+        return this.fn(stream);
     }
 }
 

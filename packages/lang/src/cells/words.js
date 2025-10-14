@@ -1,13 +1,10 @@
 import { ReCell } from "./base.js";
 import { normalize } from "../utils.js";
-import { NoneCell } from "./primitives.js";
-import { GLOBAL } from "../context.js";
 
 class WordBase extends ReCell {
-    constructor(spelling, binding = GLOBAL) {
+    constructor(spelling) {
         super();
         this.spelling = normalize(spelling);
-        this.binding = binding;
     }
 
     /**
@@ -15,6 +12,7 @@ class WordBase extends ReCell {
      * @returns {ReCell}
      */
     lookup() {
+        //console.log("lookup", this.spelling, this.binding);
         if (!this.binding) {
             throw new Error(`${String(this.spelling)} has no context`);
         }
@@ -34,13 +32,10 @@ class WordBase extends ReCell {
  * WORD! - evaluates to its bound value
  */
 export class WordCell extends WordBase {
-    evaluate(control, context) {
-        if (!this.binding) {
-            this.binding = context;
-        }
+    evaluate(stream) {
+        //console.log("Word evaluate", this.spelling, this.binding, stream);
         const value = this.lookup();
         if (!value) {
-            return new NoneCell();
             throw new Error(
                 `${String(this.spelling)} has no value in: ${
                     JSON.stringify(this.binding, null, 2)
@@ -48,12 +43,12 @@ export class WordCell extends WordBase {
             );
         }
         if (value.isNativeCell) {
-            return value.evaluate(control, this);
+            return value.evaluate(stream);
         }
         if (value.isNativeType) {
             return value;
         }
-        return value.evaluate(control);
+        return value.evaluate(stream);
     }
 }
 
@@ -62,23 +57,17 @@ export class WordCell extends WordBase {
  * Example: x: 42
  */
 export class SetWordCell extends WordBase {
-    evaluate(control, context) {
-        if (!this.binding) {
-            this.binding = context;
-        }
-        const next = control.next();
+    evaluate(stream) {
+        const next = stream.evalNext();
         if (!next) {
             throw new Error("Invalid SET_WORD: expected a value!");
         }
         if (!this.binding) {
             throw new Error(`${String(this.spelling)} has no context`);
         }
-        if (next.isNativeCell) {
-            throw new Error("Cannot assign to native cell! " + next.spelling);
-        }
-        const value = next.evaluate(control);
-        this.binding.set(this.spelling, value);
-        return value;
+        this.binding.set(this.spelling, next);
+        console.log("BINDING: ", this.binding);
+        return next;
     }
 }
 
@@ -87,9 +76,9 @@ export class SetWordCell extends WordBase {
  * Example: :x
  */
 export class GetWordCell extends WordBase {
-    evaluate(_control, context) {
+    evaluate(_stream) {
         if (!this.binding) {
-            this.binding = context;
+            throw new Error(`${String(this.spelling)} has no context`);
         }
         return this.lookup();
     }
@@ -100,11 +89,12 @@ export class GetWordCell extends WordBase {
  * Example: 'x
  */
 export class LitWordCell extends WordBase {
-    evaluate(_control, context) {
+    evaluate(_stream) {
         if (!this.binding) {
-            this.binding = context;
+            throw new Error(`${String(this.spelling)} has no context`);
         }
-        return new WordCell(this.spelling, this.binding);
+        const cell = new WordCell(this.spelling);
+        return bind(cell, this);
     }
 }
 

@@ -1,7 +1,6 @@
 import { ReCell } from "./base.js";
-import { Context } from "../context.js";
 import { NumberCell } from "./primitives.js";
-import { bind } from "../bind.js";
+import { WordCell } from "./words.js";
 
 class SeriesBase extends ReCell {
     constructor(buffer, index = 0) {
@@ -10,17 +9,48 @@ class SeriesBase extends ReCell {
         this.index = index;
     }
     isSeries = true;
-    get(index) {
-        if (this.buffer[index]) {
-            return new this.constructor(this.buffer, index);
+    /**
+     * Navigate by key (for paths)
+     * @param {number|Symbol} key - Index or word
+     */
+    get(key) {
+        if (typeof key === "number") {
+            return this.buffer[key - 1];
         }
-        return make.none();
+
+        // Symbol: SELECT - find key, return next
+        if (typeof key === "symbol") {
+            for (let i = 0; i < this.buffer.length - 1; i++) {
+                const cell = this.buffer[i];
+                if (cell instanceof WordCell && cell.spelling === key) {
+                    return this.buffer[i + 1];
+                }
+            }
+            return new NoneCell();
+        }
+
+        throw new Error(`Cannot index series with ${typeof key}`);
     }
-    set(index, value) {
-        if (this.buffer[index]) {
-            this.buffer[index] = value;
+
+    set(key, value) {
+        if (typeof key === "number") {
+            this.buffer[key - 1] = value;
+            return this;
         }
-        return this;
+
+        if (typeof key === "symbol") {
+            for (let i = 0; i < this.buffer.length - 1; i++) {
+                const cell = this.buffer[i];
+                if (cell instanceof WordCell && cell.spelling === key) {
+                    this.buffer[i + 1] = value;
+                    return this;
+                }
+            }
+            this.buffer.push(key, value);
+            return this;
+        }
+
+        throw new Error(`Cannot set series with ${typeof key}`);
     }
 }
 
@@ -40,10 +70,10 @@ export class StringCell extends SeriesBase {}
  * Eagerly evaluates it's contents
  */
 export class ParenCell extends SeriesBase {
-    evaluate(control) {
+    evaluate(stream) {
         let result = null;
         for (const cell of this.buffer) {
-            result = cell.evaluate(control);
+            result = cell.evaluate(stream);
         }
         return result;
     }
@@ -53,16 +83,34 @@ export class ParenCell extends SeriesBase {
  * PATH! - series of values for navigation
  */
 export class PathCell extends SeriesBase {
-    getKeyOf(value) {
-        return value.spelling ?? value.value;
-    }
-    evaluate(control, context) {
+    evaluate(stream) {
         const [root, ...segments] = this.buffer;
-        const rootValue = root.evaluate(control, context);
-        return segments.reduce((value, segment) => {
-            const segmentValue = segment.evaluate(control, value);
-            return value.get(this.getKeyOf(segmentValue));
-        }, rootValue);
+
+        let current = root.evaluate(stream);
+        console.log("ROOT: ", current);
+
+        for (const segment of segments) {
+            const key = this.getKey(segment);
+            console.log("KEY: ", key);
+            console.log("CURRENT: ", current);
+            current = current.get(key);
+
+            if (!current) {
+                throw new Error(`Path navigation failed`, this, segment);
+            }
+        }
+
+        return current;
+    }
+
+    getKey(cell) {
+        if (cell.value) {
+            return cell.value;
+        }
+        if (cell.spelling) {
+            return cell.spelling;
+        }
+        throw new Error(`Invalid path key: ${cell.typeName}`);
     }
 }
 
@@ -74,18 +122,21 @@ export class LitPathCell extends PathCell {}
 
 /// Set path, evaluates by setting the value at the end of the path
 export class SetPathCell extends PathCell {
-    evaluate(control, context) {
+    evaluate(stream) {
         const [root, ...segments] = this.buffer;
-        const rootValue = root.evaluate(control, context);
-        const newValue = control.evalNext();
-        return segments.reduce((value, segment, index) => {
-            const key = this.getKeyOf(segment.evaluate(control, value));
-            if (index === segments.length - 1) {
-                return value.set(key, newValue);
-            } else {
-                return value.get(key);
+
+        let current = root.evaluate(stream);
+
+        for (const segment of segments) {
+            const key = this.getKey(segment);
+            current = current.get(key);
+            if (!current) {
+                throw new Error(`Path navigation failed`, this, segment);
             }
-        }, rootValue);
+        }
+        const newValue = stream.evalNext();
+        current.binding.set(current.spelling, newValue);
+        return newValue;
     }
 }
 

@@ -1,29 +1,37 @@
-import { bind } from "../bind.js";
 import { Context } from "../context.js";
 import { ReCell } from "./base.js";
+import { WordCell } from "./words.js";
 
 export class ObjectCell extends ReCell {
     constructor() {
         super();
-        this.__context = new Context();
+        this.context = new Context();
+        this.context.set("self", this);
+        this.isObject = true;
     }
 
-    set context(newContext) {
-        this.__context = newContext;
-        this.__context.set("self", this);
+    self() {
+        const cell = new WordCell("self");
+        cell.binding = this.context;
+        return cell;
     }
 
-    get context() {
-        return this.__context;
+    /**
+     * Navigate by key (for paths)
+     * @param {Symbol} key - Word spelling
+     */
+    get(key) {
+        if (typeof key !== "symbol") {
+            throw new Error(`Cannot index object with ${typeof key}`);
+        }
+        return this.context.get(key);
     }
 
-    typeName() {
-        return "object!";
-    }
-    get(spelling) {
-        return this.context.get(spelling);
-    }
-    set(spelling, cell) {
-        return this.context.set(spelling, cell);
+    set(key, value) {
+        if (typeof key !== "symbol") {
+            throw new Error(`Cannot set object field with ${typeof key}`);
+        }
+        this.context.set(key, value);
+        return this;
     }
 }
