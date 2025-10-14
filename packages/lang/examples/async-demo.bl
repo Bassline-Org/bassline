@@ -1,0 +1,57 @@
+; Async Operations Demo
+; Demonstrates non-blocking async execution
+
+print "=== Async Demo ==="
+
+; Create a non-blocking async task
+print "Creating async task..."
+task: async [
+    ; Simulate some async work
+    fetch "https://api.github.com/repos/octocat/Hello-World"
+]
+
+; Task returns immediately, we can do other work
+print "Task created! Doing other work..."
+x: + 1 2
+print "x =" x
+
+; Check task status
+print "Task status:" (status task)
+
+; Inspect task handle
+print "Task handle:" (inspect task)
+
+; Check all tasks
+print "Task stats:" (inspect task-stats)
+
+; Wait for result
+print "Awaiting task result..."
+result: await task
+
+; Check status again
+print "Task status after await:" (status task)
+
+; Parse and display result
+data: parse-json result
+name: get data "name"
+stars: get data "stargazers_count"
+
+print "Repository:" name
+print "Stars:" stars
+
+; Create multiple async tasks
+print ""
+print "=== Multiple Async Tasks ==="
+
+t1: async [+ 10 20]
+t2: async [* 5 6]
+t3: async [- 100 30]
+
+print "Created 3 tasks"
+print "Stats:" (inspect task-stats)
+
+r1: await t1
+r2: await t2
+r3: await t3
+
+print "Results:" r1 r2 r3

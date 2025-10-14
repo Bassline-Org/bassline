@@ -1,0 +1,65 @@
+; Remote Bassline Demo
+; Demonstrates connecting to a remote Bassline daemon and executing code
+
+print "=== Remote Bassline Demo ==="
+print ""
+
+; First, start the daemon in another terminal:
+; $ pnpm daemon
+; or
+; $ node packages/lang/src/daemon.js
+
+print "Connecting to Bassline daemon on ws://localhost:8080..."
+
+; Connect to the daemon
+server: remote connect "ws://localhost:8080"
+
+print "Connected! Server handle:" (inspect server)
+print ""
+
+; Execute simple arithmetic on the server
+print "=== Remote Execution ==="
+task1: remote exec server [+ 10 20]
+print "Task created for: + 10 20"
+result1: await task1
+print "Result:" result1
+print ""
+
+; Execute more complex code
+print "=== Complex Remote Execution ==="
+task2: remote exec server [
+    x: * 5 6
+    y: + x 10
+    y
+]
+print "Task created for complex calculation"
+result2: await task2
+print "Result:" result2
+print ""
+
+; Multiple async remote tasks
+print "=== Multiple Async Remote Tasks ==="
+t1: remote exec server [+ 1 2]
+t2: remote exec server [* 3 4]
+t3: remote exec server [- 10 5]
+
+print "Created 3 remote tasks"
+print "Task stats:" (inspect task-stats)
+print ""
+
+r1: await t1
+r2: await t2
+r3: await t3
+
+print "Results:" r1 r2 r3
+print ""
+
+; Check REMOTE_PEERS
+print "=== Remote Peers ==="
+print "Connected peers:" (inspect REMOTE_PEERS)
+print ""
+
+; Disconnect
+print "Disconnecting..."
+remote disconnect server
+print "Disconnected!"
