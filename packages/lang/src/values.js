@@ -28,6 +28,11 @@ export class SetWord extends Word {
         return `${this.spelling.description}:`;
     }
 }
+export class LitWord extends Word {
+    toJSON() {
+        return `'${this.spelling.description}`;
+    }
+}
 
 export class Compound extends Value {
     constructor(items) {

@@ -1,0 +1,50 @@
+; Bassline REPL Demo
+; Demonstrates serialization, reflection, and safe evaluation
+
+; Create some values
+x: 5
+y: 10
+result: + x y
+
+; Serialize values with mold
+print "Molding a number:"
+print (mold result)
+
+print "Molding a block:"
+print (mold [1 2 3 x: 5])
+
+; Create a context with data
+mydata: context
+in mydata [
+  name: "Bassline"
+  version: 1
+  active: true
+]
+
+print "Molding a context:"
+print (mold mydata)
+
+; Type predicates
+print "Type checking:"
+print (num? x)
+print (block? [1 2 3])
+print (context? mydata)
+
+; System reflection
+print "System is a context:"
+print (context? system)
+
+; Create a function
+add: func [a b] [+ a b]
+
+print "Calling a function:"
+temp: add 10 20
+print temp
+final: + temp 5
+print final
+
+; Functions are contexts
+print "Function word in block:"
+print (mold [add])
+
+print (mold system)

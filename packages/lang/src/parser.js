@@ -9,7 +9,7 @@ import {
     sequenceOf,
     whitespace,
 } from "arcsecond/index.js";
-import { Block, Num, Paren, SetWord, Str, Word } from "./values.js";
+import { Block, LitWord, Num, Paren, SetWord, Str, Word } from "./values.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([
@@ -52,7 +52,14 @@ const stringLiteral = sequenceOf([
 
 // ===== Words =====
 // Word characters (allow everything except whitespace and delimiters)
-const wordChars = regex(/^[^ \t\n\r\[\](){}";:]+/);
+const wordChars = regex(/^[^ \t\n\r\[\](){}";:']+/);
+
+// 'word (literal word)
+const litWord = sequenceOf([
+    char("'"),
+    wordChars,
+]).map(([_, spelling]) => new LitWord(spelling))
+    .errorMap(() => "Expected literal word");
 
 // word:
 const setWord = sequenceOf([
@@ -67,7 +74,7 @@ const normalWord = sequenceOf([
 ]).map(([spelling]) => new Word(spelling))
     .errorMap(() => "Expected normal word");
 
-const word = choice([setWord, normalWord]);
+const word = choice([setWord, litWord, normalWord]);
 
 // Forward declare for recursion
 const value = recursiveParser(() => valueParser);

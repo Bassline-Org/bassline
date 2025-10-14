@@ -1,160 +1,186 @@
-// test/serialization.test.js
-import { describe, expect, it } from "vitest";
-import { run } from "../src/run.js";
+import { describe, it, expect } from "vitest";
 import { parse } from "../src/parser.js";
-import { doBlock } from "../src/evaluator.js";
-import { bind } from "../src/bind.js";
-import { GLOBAL } from "../src/context.js";
+import { ex, createPreludeContext } from "../src/prelude.js";
 
-describe("MOLD - Serialization", () => {
-    it("molds numbers", () => {
-        const result = run("mold 42");
-        expect(result.buffer.join("")).toBe("42");
+describe("Mold - Serialization", () => {
+    it("should mold numbers", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse("mold 42"));
+        expect(result.value).toBe("42");
     });
 
-    it("molds decimals", () => {
-        const result = run("mold 3.14");
-        expect(result.buffer.join("")).toBe("3.14");
+    it("should mold strings", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse('mold "hello"'));
+        expect(result.value).toBe('"hello"');
     });
 
-    it("molds strings", () => {
-        const result = run('mold "hello"');
-        expect(result.buffer.join("")).toBe('"hello"');
+    it("should mold strings with quotes", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse('mold "say \\"hi\\""'));
+        expect(result.value).toBe('"say \\"hi\\""');
     });
 
-    it("molds strings with escapes", () => {
-        const result = run('mold "hello\\nworld"');
-        expect(result.buffer.join("")).toBe('"hello\\nworld"');
+    it("should mold unevaluated words from blocks", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse("mold [x]"));
+        expect(result.value).toBe("[X]");
     });
 
-    it("molds words", () => {
-        const result = run("mold 'test");
-        expect(result.buffer.join("")).toBe("TEST");
+    it("should mold unevaluated set words from blocks", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse("mold [x:]"));
+        expect(result.value).toBe("[X:]");
     });
 
-    it("molds set-words", () => {
-        const result = run("mold first [x:]");
-        expect(result.buffer.join("")).toBe("X:");
+    it("should mold unevaluated lit words from blocks", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse("mold ['x]"));
+        expect(result.value).toBe("['X]");
     });
 
-    it("molds get-words", () => {
-        const result = run("mold first [:x]");
-        expect(result.buffer.join("")).toBe(":X");
+    it("should mold blocks", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse("mold [1 2 3]"));
+        expect(result.value).toBe("[1 2 3]");
     });
 
-    it("molds lit-words", () => {
-        const result = run("mold ''x");
-        expect(result.buffer.join("")).toBe("'X");
+    it("should mold nested blocks", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse("mold [x: [1 2] y: [3 4]]"));
+        expect(result.value).toBe("[X: [1 2] Y: [3 4]]");
     });
 
-    it("molds empty blocks", () => {
-        const result = run("mold []");
-        expect(result.buffer.join("")).toBe("[]");
+    it("should mold result of paren evaluation", () => {
+        const ctx = createPreludeContext();
+        // Parens evaluate, so mold gets the result (3)
+        const result = ex(ctx, parse("mold (+ 1 2)"));
+        expect(result.value).toBe("3");
     });
 
-    it("molds blocks with values", () => {
-        const result = run("mold [1 2 3]");
-        expect(result.buffer.join("")).toBe("[1 2 3]");
+    it("should mold unevaluated paren from block", () => {
+        const ctx = createPreludeContext();
+        // Inside a block, parens don't evaluate
+        const result = ex(ctx, parse("mold [(+ 1 2)]"));
+        expect(result.value).toBe("[(+ 1 2)]");
     });
 
-    it("molds nested blocks", () => {
-        const result = run("mold [[1 2] [3 4]]");
-        expect(result.buffer.join("")).toBe("[[1 2] [3 4]]");
+    it("should mold empty context", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("myctx: context"));
+        const result = ex(ctx, parse("mold myctx"));
+        expect(result.value).toBe("context");
     });
 
-    it("molds parens", () => {
-        const result = run("mold first [(1 + 2)]");
-        expect(result.buffer.join("")).toBe("(1 + 2)");
+    it("should mold context with bindings", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("myctx: context"));
+        ex(ctx, parse("in myctx [x: 5 y: 10]"));
+        const result = ex(ctx, parse("mold myctx"));
+        // Should produce valid context reconstruction code
+        expect(result.value).toBe("in (context) [X: 5 Y: 10]");
     });
 
-    it("molds paths", () => {
-        const result = run("mold first [obj/field]");
-        expect(result.buffer.join("")).toBe("OBJ/FIELD");
+    it("should mold function word in block", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("add: func [a b] [+ a b]"));
+        const result = ex(ctx, parse("mold [add]"));
+        // Inside block, add is unevaluated Word
+        expect(result.value).toBe("[ADD]");
     });
 
-    it("molds mixed content", () => {
-        const result = run('mold [x: 42 "hello"]');
-        expect(result.buffer.join("")).toBe('[X: 42 "hello"]');
+    it("should handle JS primitives", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("x: + 1 2")); // Evaluates to Num
+        const result = ex(ctx, parse("mold x"));
+        expect(result.value).toBe("3");
+    });
+
+    it("should handle booleans", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("x: true"));
+        const result = ex(ctx, parse("mold x"));
+        expect(result.value).toBe("true");
+
+        ex(ctx, parse("y: false"));
+        const result2 = ex(ctx, parse("mold y"));
+        expect(result2.value).toBe("false");
+    });
+
+    it("should handle none", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("x: none"));
+        const result = ex(ctx, parse("mold x"));
+        expect(result.value).toBe("none");
+    });
+
+    it("should mold native word in block", () => {
+        const ctx = createPreludeContext();
+        const result = ex(ctx, parse("mold [+]"));
+        expect(result.value).toBe("[+]");
     });
 });
 
-describe("MOLD/LOAD Round-trip", () => {
-    function roundtrip(source) {
-        // Parse original
-        const original = parse(source);
-        bind(original, GLOBAL);
-
-        // Mold it
-        const molded = run(`mold ${source}`);
-        const moldedStr = molded.buffer.join("");
-
-        // Load it back
-        const reloaded = parse(moldedStr);
-        bind(reloaded, GLOBAL);
-
-        return { original, reloaded, moldedStr };
-    }
-
-    it("round-trips numbers", () => {
-        const { moldedStr } = roundtrip("42");
-        expect(moldedStr).toBe("42");
+describe("Mold - Round-trip", () => {
+    it("should round-trip numbers", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("x: 42"));
+        const molded = ex(ctx, parse("mold x"));
+        const parsed = parse(molded.value);
+        const result = ex(ctx, parsed);
+        expect(result.value).toBe(42);
     });
 
-    it("round-trips strings", () => {
-        const { moldedStr } = roundtrip('"hello world"');
-        expect(moldedStr).toBe('"hello world"');
+    it("should round-trip strings", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse('x: "hello world"'));
+        const molded = ex(ctx, parse("mold x"));
+        const parsed = parse(molded.value);
+        const result = ex(ctx, parsed);
+        expect(result.value).toBe("hello world");
     });
 
-    it("round-trips blocks", () => {
-        const { moldedStr } = roundtrip("[1 2 3]");
-        expect(moldedStr).toBe("[1 2 3]");
+    it("should round-trip blocks", () => {
+        const ctx = createPreludeContext();
+        const molded = ex(ctx, parse("mold [1 2 3]"));
+        // molded.value is "[1 2 3]" - parse this string
+        const parsed = parse(molded.value);
+        // Parsed is a Block wrapping a Str "[1 2 3]", we need the first item which is a Block
+        const block = parsed.items[0];
+        expect(block.items.length).toBe(3);
+        expect(block.items[0].value).toBe(1);
+        expect(block.items[1].value).toBe(2);
+        expect(block.items[2].value).toBe(3);
     });
 
-    it("round-trips complex structures", () => {
-        const { moldedStr } = roundtrip('[x: 42 y: "test"]');
-        expect(moldedStr).toBe('[X: 42 Y: "test"]');
+    it("should round-trip contexts", () => {
+        const ctx = createPreludeContext();
+        ex(ctx, parse("original: context"));
+        ex(ctx, parse("in original [x: 5 y: 10]"));
+        const molded = ex(ctx, parse("mold original"));
+
+        // Molded should be "in (context) [X: 5 Y: 10]"
+        expect(molded.value).toBe("in (context) [X: 5 Y: 10]");
+
+        // Create another context the same way and verify mold produces same output
+        ex(ctx, parse("copy: context"));
+        ex(ctx, parse("in copy [x: 5 y: 10]"));
+        const copyMolded = ex(ctx, parse("mold copy"));
+
+        expect(copyMolded.value).toBe(molded.value);
     });
 
-    it("can execute round-tripped code", () => {
-        const code = "[+ 2 3]";
-        const { reloaded } = roundtrip(code);
-        const result = doBlock(reloaded.first());
-        expect(result.value).toBe(5);
-    });
-});
+    it("should round-trip complex nested structures", () => {
+        const ctx = createPreludeContext();
+        const molded = ex(ctx, parse('mold [x: 5 data: [1 2 3] msg: "test"]'));
 
-describe("Serialization Use Cases", () => {
-    it("serializes gadget messages", () => {
-        const result = run(`
-            gadgetId: 42
-            value: 100
-            msg: reduce ['gadget-id gadgetId 'value value]
-            mold msg
-        `);
-        const serialized = result.buffer.join("");
-        expect(serialized).toBe("[GADGET-ID 42 VALUE 100]");
-    });
+        // Parse it back - molded.value is the string representation
+        const parsed = parse(molded.value);
+        const block = parsed.items[0]; // First item is the block
+        expect(block.items.length).toBe(6); // x: 5 data: [1 2 3] msg: "test"
 
-    it("can deserialize and process messages", () => {
-        const result = run(`
-            ; Create and serialize
-            msg: reduce ['op '+ 'args [10 20]]
-            serialized: mold msg
-            
-            ; Deserialize (parse)
-            ; In real usage: received: load serialized
-            ; For now just verify structure
-            first msg
-        `);
-        expect(result.typeName).toBe("word");
-    });
-
-    it("serializes object specs", () => {
-        const result = run(`
-            spec: [x: 10 y: 20]
-            mold spec
-        `);
-        const serialized = result.buffer.join("");
-        expect(serialized).toBe("[X: 10 Y: 20]");
+        // Should be valid block when evaluated
+        const result = ex(ctx, block);
+        expect(result.value).toBe("test"); // Last value
     });
 });

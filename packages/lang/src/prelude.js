@@ -1,14 +1,14 @@
 import { Context } from "./context.js";
 import { evalValue, native } from "./natives.js";
 import { isa, isSelfEvaluating } from "./utils.js";
-import { Block, Num, SetWord, Word } from "./values.js";
+import { Block, LitWord, Num, Paren, SetWord, Str, Word } from "./values.js";
 import { gadgetNative } from "./dialects/gadget.js";
 import { linkNative } from "./dialects/link.js";
 
 // Main evaluator for prelude (top-level bassline code)
 export function ex(context, code) {
-    if (!isa(code, Block)) {
-        throw new Error("ex can only be called with a block!");
+    if (!isa(code, Block) && !isa(code, Paren)) {
+        throw new Error("ex can only be called with a block or paren!");
     }
 
     let result;
@@ -37,6 +37,10 @@ export function ex(context, code) {
             // If callable (native or dialect), invoke it
             if (value?.call) {
                 result = value.call(stream, context);
+            }
+            // If it's a function, call it
+            else if (value?._function) {
+                result = callFunction(value, stream, context);
             } else {
                 result = value;
             }
@@ -50,15 +54,50 @@ export function ex(context, code) {
 // Evaluate next value from stream
 function evalNext(stream, context) {
     const val = stream.next();
+
+    // Paren forces evaluation
+    if (isa(val, Paren)) {
+        return ex(context, val);
+    }
+
     if (isa(val, Word)) {
         const resolved = context.get(val.spelling);
         // If it's callable, call it
         if (resolved?.call) {
             return resolved.call(stream, context);
         }
+        // If it's a function, call it
+        if (resolved?._function) {
+            return callFunction(resolved, stream, context);
+        }
         return resolved;
     }
     return val; // Self-evaluating
+}
+
+// Call a function (context) with arguments
+function callFunction(funcContext, stream, evalContext) {
+    // Create new context extending the function
+    const callContext = new Context(funcContext);
+
+    // Bind arguments
+    funcContext._argNames.forEach((argName, i) => {
+        const shouldEval = funcContext._argEval[i];
+
+        if (shouldEval) {
+            // Evaluate argument in calling context
+            const argValue = evalNext(stream, evalContext);
+            callContext.set(argName, argValue);
+        } else {
+            // Pass literally - just consume from stream
+            const argValue = stream.next();
+            callContext.set(argName, argValue);
+        }
+    });
+
+    // Execute body in call context
+    const body = funcContext.get(Symbol.for("BODY"));
+    return ex(callContext, body);
 }
 
 // Create a prelude context with built-in natives
@@ -227,6 +266,9 @@ export function createPreludeContext() {
     context.set("true", true);
     context.set("false", false);
 
+    // --- Special values ---
+    context.set("none", null);
+
     // --- Context manipulation ---
 
     // context
@@ -254,6 +296,58 @@ export function createPreludeContext() {
         }),
     );
 
+    // --- Functions ---
+
+    // func <args-block> <body-block>
+    // Create a function context
+    context.set(
+        "func",
+        native((stream, context) => {
+            const argsBlock = stream.next();
+            const bodyBlock = stream.next();
+
+            if (!isa(argsBlock, Block)) {
+                throw new Error("func expects a block of arguments");
+            }
+            if (!isa(bodyBlock, Block)) {
+                throw new Error("func expects a body block");
+            }
+
+            // Create function context extending current scope
+            const funcContext = new Context(context);
+            funcContext._function = true;
+            funcContext._argNames = [];
+            funcContext._argEval = []; // Track which args to evaluate
+
+            // Process argument list
+            const argStream = argsBlock.stream();
+            while (!argStream.done()) {
+                const arg = argStream.next();
+
+                if (isa(arg, LitWord)) {
+                    // 'x - literal arg, don't evaluate
+                    funcContext.set(arg.spelling, null);
+                    funcContext._argNames.push(arg.spelling);
+                    funcContext._argEval.push(false);
+                } else if (isa(arg, Word)) {
+                    // x - normal arg, evaluate
+                    funcContext.set(arg.spelling, null);
+                    funcContext._argNames.push(arg.spelling);
+                    funcContext._argEval.push(true);
+                } else {
+                    throw new Error(
+                        `Invalid argument in func: ${arg.constructor.name}`,
+                    );
+                }
+            }
+
+            // Store body
+            funcContext.set("body", bodyBlock);
+
+            return funcContext;
+        }),
+    );
+
     // --- Utilities ---
 
     // print <value>
@@ -261,10 +355,170 @@ export function createPreludeContext() {
     context.set(
         "print",
         native((stream, context) => {
-            const value = evalValue(stream.next(), context);
-            console.log(value);
+            const value = evalNext(stream, context);
+            // Unwrap for display
+            if (isa(value, Num) || isa(value, Str)) {
+                console.log(value.value);
+            } else {
+                console.log(value);
+            }
         }),
     );
 
+    // --- Serialization ---
+
+    // mold <value>
+    // Serialize a value to valid Bassline code
+    context.set(
+        "mold",
+        native((stream, context) => {
+            // Evaluate the argument to get the actual value
+            const value = evalNext(stream, context);
+            return new Str(moldValue(value));
+        }),
+    );
+
+    // --- Type Predicates ---
+
+    context.set(
+        "block?",
+        native((stream, _context) => {
+            const value = stream.next();
+            return isa(value, Block);
+        }),
+    );
+
+    context.set(
+        "paren?",
+        native((stream, _context) => {
+            const value = stream.next();
+            return isa(value, Paren);
+        }),
+    );
+
+    context.set(
+        "word?",
+        native((stream, _context) => {
+            const value = stream.next();
+            return isa(value, Word);
+        }),
+    );
+
+    context.set(
+        "num?",
+        native((stream, _context) => {
+            const value = stream.next();
+            return isa(value, Num);
+        }),
+    );
+
+    context.set(
+        "str?",
+        native((stream, _context) => {
+            const value = stream.next();
+            return isa(value, Str);
+        }),
+    );
+
+    context.set(
+        "context?",
+        native((stream, context) => {
+            const value = evalNext(stream, context);
+            return value instanceof Context;
+        }),
+    );
+
+    // --- Reflection ---
+
+    // system - reference to the prelude context itself
+    context.set("system", context);
+
     return context;
+}
+
+// Serialize a value to valid Bassline code
+function moldValue(val) {
+    // Bassline value types
+    if (isa(val, Num)) {
+        return String(val.value);
+    }
+
+    if (isa(val, Str)) {
+        // Escape quotes in string
+        const escaped = val.value.replace(/"/g, '\\"');
+        return `"${escaped}"`;
+    }
+
+    if (isa(val, LitWord)) {
+        return `'${val.spelling.description}`;
+    }
+
+    if (isa(val, SetWord)) {
+        return `${val.spelling.description}:`;
+    }
+
+    if (isa(val, Word)) {
+        return val.spelling.description;
+    }
+
+    if (isa(val, Block)) {
+        const inner = val.items.map(moldValue).join(" ");
+        return `[${inner}]`;
+    }
+
+    if (isa(val, Paren)) {
+        const inner = val.items.map(moldValue).join(" ");
+        return `(${inner})`;
+    }
+
+    // Context serialization
+    if (val instanceof Context) {
+        const bindings = [];
+        for (const [sym, value] of val.bindings) {
+            const spelling = sym.description;
+            // Skip internal function metadata and system self-reference
+            if (
+                spelling === "_FUNCTION" ||
+                spelling === "_ARGNAMES" ||
+                spelling === "_ARGEVAL" ||
+                spelling === "SYSTEM"
+            ) {
+                continue;
+            }
+            bindings.push(`${spelling}: ${moldValue(value)}`);
+        }
+
+        // Generate code that recreates the context
+        // If empty: just "context"
+        if (bindings.length === 0) {
+            return "context";
+        }
+        // If has bindings: "in (context) [bindings...]"
+        return `in (context) [${bindings.join(" ")}]`;
+    }
+
+    // JS primitives (from evaluation results)
+    if (typeof val === "number") {
+        return String(val);
+    }
+
+    if (typeof val === "string") {
+        const escaped = val.replace(/"/g, '\\"');
+        return `"${escaped}"`;
+    }
+
+    if (typeof val === "boolean") {
+        return val ? "true" : "false";
+    }
+
+    if (val === null || val === undefined) {
+        return "none";
+    }
+
+    // Complex objects (gadgets, natives, etc.)
+    if (val?.call) {
+        return "#[native]";
+    }
+
+    return "#[object]";
 }
