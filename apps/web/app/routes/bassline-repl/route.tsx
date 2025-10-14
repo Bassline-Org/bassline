@@ -82,20 +82,14 @@ export default function BasslineRepl() {
     useEffect(() => {
         const pollData = async () => {
             try {
-                console.log("[Polling] Starting poll cycle...");
-
                 // Poll async tasks
                 const tasksResult = await repl.eval("keys ASYNC_TASKS");
-                console.log("[Polling] ASYNC_TASKS keys result:", tasksResult);
                 if (tasksResult.ok && tasksResult.value?.items) {
-                    // items are Str objects with .value property
                     const taskIds = tasksResult.value.items.map((item: any) => item.value);
-                    console.log("[Polling] Found task IDs:", taskIds);
                     const tasks: AsyncTask[] = [];
 
                     for (const taskId of taskIds) {
                         const taskResult = await repl.eval(`get ASYNC_TASKS "${taskId}"`);
-                        console.log(`[Polling] Task ${taskId} data:`, taskResult);
                         if (taskResult.ok && taskResult.value) {
                             const id = taskResult.value.get?.(Symbol.for("ID"))?.value || taskId;
                             const name = taskResult.value.get?.(Symbol.for("NAME"))?.value || "Unknown";
@@ -108,24 +102,18 @@ export default function BasslineRepl() {
                         }
                     }
 
-                    console.log("[Polling] Setting asyncTasks state:", tasks);
                     setAsyncTasks(tasks);
                 }
 
                 // Poll remote peers
                 const peersResult = await repl.eval("keys REMOTE_PEERS");
-                console.log("[Polling] REMOTE_PEERS keys result:", peersResult);
                 if (peersResult.ok && peersResult.value?.items) {
-                    // items are Str objects with .value property
                     const peerUrls = peersResult.value.items.map((item: any) => item.value);
-                    console.log("[Polling] Found peer URLs:", peerUrls);
                     const peers: RemotePeer[] = [];
 
                     for (const url of peerUrls) {
                         const peerResult = await repl.eval(`get REMOTE_PEERS "${url}"`);
-                        console.log(`[Polling] Peer ${url} data:`, peerResult);
                         if (peerResult.ok && peerResult.value) {
-                            // peerResult.value is a Context, use .get() method
                             const statusValue = peerResult.value.get("status");
                             const connectedAtValue = peerResult.value.get("connected-at");
 
@@ -136,7 +124,6 @@ export default function BasslineRepl() {
                         }
                     }
 
-                    console.log("[Polling] Setting remotePeers state:", peers);
                     setRemotePeers(peers);
                 }
             } catch (error) {

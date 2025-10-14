@@ -2,6 +2,7 @@ import { createContext, useContext, useState, ReactNode, useMemo } from "react";
 
 interface REPLContextValue {
     repl: any;
+    rawRepl: any; // Unwrapped repl for read-only operations
     version: number;
 }
 
@@ -29,7 +30,7 @@ export function REPLProvider({ children, repl }: REPLProviderProps) {
     }, [repl]);
 
     return (
-        <REPLContext.Provider value={{ repl: wrappedRepl, version }}>
+        <REPLContext.Provider value={{ repl: wrappedRepl, rawRepl: repl, version }}>
             {children}
         </REPLContext.Provider>
     );

@@ -1,13 +1,13 @@
-; Simple Counter Test
-; Test reactive button clicks
+; Simple Counter - Reactive UI Demo
 
 counter: 0
 
-print "Initial counter:" counter
-
 view [
-    text "Count: " (to-string counter)
-    button "+" on-click [set counter counter + 1]
+    row [
+        text "Count:"
+        badge (to-string counter) "info"
+        button "+" on-click [counter: (+ counter 1)]
+        button "-" on-click [counter: (- counter 1)]
+        button "Reset" on-click [counter: 0]
+    ]
 ]
-
-print "Counter created. Click the + button to increment!"
