@@ -6,6 +6,7 @@ import { AsyncTasksPanel, type AsyncTask } from "./components/AsyncTasksPanel";
 import { RemotePeersPanel, type RemotePeer } from "./components/RemotePeersPanel";
 import { StatusBar } from "./components/StatusBar";
 import { createRepl } from "@bassline/lang/repl";
+import { REPLProvider } from "../../lib/repl-context";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -275,9 +276,10 @@ export default function BasslineRepl() {
     );
 
     return (
-        <div className="h-screen flex bg-slate-50">
-            {/* Main REPL area */}
-            <div className="flex-1 flex flex-col min-w-0">
+        <REPLProvider repl={repl}>
+            <div className="h-screen flex bg-slate-50">
+                {/* Main REPL area */}
+                <div className="flex-1 flex flex-col min-w-0">
                 {/* Header */}
                 <div className="border-b bg-white px-6 py-3">
                     <div className="flex items-center justify-between">
@@ -326,14 +328,7 @@ export default function BasslineRepl() {
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Output area */}
                     <div ref={outputRef} className="flex-1 overflow-auto px-6 py-4">
-                        <ReplOutput
-                            history={history}
-                            repl={repl}
-                            onViewAction={() => {
-                                // Force re-render by updating state
-                                setHistory([...history]);
-                            }}
-                        />
+                        <ReplOutput history={history} />
                     </div>
 
                     {/* Input area */}
@@ -359,5 +354,6 @@ export default function BasslineRepl() {
                 </div>
             )}
         </div>
+        </REPLProvider>
     );
 }

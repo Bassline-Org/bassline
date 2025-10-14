@@ -893,7 +893,8 @@ export function createPreludeContext() {
                         const eventName = arg.spelling.description.toLowerCase();
                         const actionBlock = viewStream.next();
                         if (isa(actionBlock, Block)) {
-                            handlers[eventName] = actionBlock;
+                            // Store handler as executable source string using mold
+                            handlers[eventName] = moldValue(actionBlock);
                         }
                         continue;
                     }

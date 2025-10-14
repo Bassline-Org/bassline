@@ -1,0 +1,13 @@
+; Simple Counter Test
+; Test reactive button clicks
+
+counter: 0
+
+print "Initial counter:" counter
+
+view [
+    text "Count: " (to-string counter)
+    button "+" on-click [set counter counter + 1]
+]
+
+print "Counter created. Click the + button to increment!"
