@@ -5,21 +5,21 @@ import { Block, LitWord, Num, Paren, SetWord, Str, Word } from "./values.js";
 import { gadgetNative } from "./dialects/gadget.js";
 import { linkNative } from "./dialects/link.js";
 import {
-    createTask,
-    getTask,
-    getAllTasks,
-    getTaskStatus,
     awaitTask,
     cancelTask,
+    createTask,
+    getAllTasks,
+    getTask,
     getTaskStats,
+    getTaskStatus,
 } from "./async.js";
 import {
     createContact,
-    serializeContact,
-    deserializeContact,
-    validateContact,
-    hasCapability,
     describeContact,
+    deserializeContact,
+    hasCapability,
+    serializeContact,
+    validateContact,
 } from "./contact.js";
 
 // Main evaluator for prelude (top-level bassline code)
@@ -869,15 +869,17 @@ export function createPreludeContext() {
                 // Get lowercase component name (case-insensitive)
                 const name = componentName.spelling.description.toLowerCase();
 
-                // Parse component arguments
+                // Parse component arguments and event handlers
                 const args = [];
+                const handlers = {};
+
                 while (!viewStream.done()) {
                     const next = viewStream.peek();
 
                     // If it's a word that looks like a component name, stop
                     if (
                         isa(next, Word) &&
-                        ["text", "button", "input", "row", "column"].includes(
+                        ["text", "button", "input", "row", "column", "panel"].includes(
                             next.spelling.description.toLowerCase(),
                         )
                     ) {
@@ -886,13 +888,23 @@ export function createPreludeContext() {
 
                     const arg = viewStream.next();
 
+                    // Check for event handler keywords (on-click, on-change, etc.)
+                    if (isa(arg, Word) && arg.spelling.description.toLowerCase().startsWith("on-")) {
+                        const eventName = arg.spelling.description.toLowerCase();
+                        const actionBlock = viewStream.next();
+                        if (isa(actionBlock, Block)) {
+                            handlers[eventName] = actionBlock;
+                        }
+                        continue;
+                    }
+
                     // Evaluate the argument
                     if (isa(arg, Block)) {
-                        // Blocks are kept as-is (for button actions)
+                        // Blocks are kept as-is (for legacy button actions or nested views)
                         args.push({ type: "block", value: arg });
                     } else if (isa(arg, Paren)) {
                         // Parens are evaluated
-                        const result = ex(context, arg);
+                        const result = await ex(context, arg);
                         args.push({ type: "value", value: result });
                     } else if (isa(arg, Word)) {
                         // Words are looked up
@@ -909,6 +921,7 @@ export function createPreludeContext() {
                 components.push({
                     component: name,
                     args,
+                    handlers,
                 });
             }
 
@@ -980,7 +993,11 @@ export function createPreludeContext() {
             if (data instanceof Context) {
                 const obj = {};
                 for (const [sym, value] of data.bindings) {
-                    obj[sym.description] = isa(value, Num) ? value.value : isa(value, Str) ? value.value : value;
+                    obj[sym.description] = isa(value, Num)
+                        ? value.value
+                        : isa(value, Str)
+                        ? value.value
+                        : value;
                 }
                 body = JSON.stringify(obj);
             } else {
@@ -1042,7 +1059,9 @@ export function createPreludeContext() {
             const delimiter = evalValue(stream.next(), context);
 
             const strVal = isa(str, Str) ? str.value : String(str);
-            const delim = isa(delimiter, Str) ? delimiter.value : String(delimiter);
+            const delim = isa(delimiter, Str)
+                ? delimiter.value
+                : String(delimiter);
 
             const parts = strVal.split(delim);
             return new Block(parts.map((p) => new Str(p)));
@@ -1057,7 +1076,9 @@ export function createPreludeContext() {
             const list = await evalNext(stream, context);
             const delimiter = evalValue(stream.next(), context);
 
-            const delim = isa(delimiter, Str) ? delimiter.value : String(delimiter);
+            const delim = isa(delimiter, Str)
+                ? delimiter.value
+                : String(delimiter);
 
             let items;
             if (isa(list, Block)) {
@@ -1229,7 +1250,7 @@ export function createPreludeContext() {
     // Helper to update ASYNC_TASKS context with current tasks
     function updateAsyncTasksContext() {
         const tasks = getAllTasks();
-        tasks.forEach(task => {
+        tasks.forEach((task) => {
             const taskContext = new Context();
             taskContext.set("id", new Str(task.id));
             taskContext.set("name", new Str(task.name));
@@ -1237,7 +1258,10 @@ export function createPreludeContext() {
             taskContext.set("startTime", new Num(task.startTime));
             if (task.endTime) {
                 taskContext.set("endTime", new Num(task.endTime));
-                taskContext.set("duration", new Num(task.endTime - task.startTime));
+                taskContext.set(
+                    "duration",
+                    new Num(task.endTime - task.startTime),
+                );
             }
             asyncTasksContext.set(task.id, taskContext);
         });
@@ -1393,7 +1417,7 @@ export function createPreludeContext() {
     const runtimeContact = createContact(
         typeof window !== "undefined" ? "Browser REPL" : "Bassline Runtime",
         [], // No endpoints yet
-        {}
+        {},
     );
 
     // Helper to convert contact to Bassline Context
@@ -1403,11 +1427,15 @@ export function createPreludeContext() {
         contactContext.set("name", new Str(contact.name));
 
         // Endpoints as block of strings
-        const endpointsBlock = new Block(contact.endpoints.map(e => new Str(e)));
+        const endpointsBlock = new Block(
+            contact.endpoints.map((e) => new Str(e)),
+        );
         contactContext.set("endpoints", endpointsBlock);
 
         // Capabilities as block of strings
-        const capabilitiesBlock = new Block(contact.capabilities.map(c => new Str(c)));
+        const capabilitiesBlock = new Block(
+            contact.capabilities.map((c) => new Str(c)),
+        );
         contactContext.set("capabilities", capabilitiesBlock);
 
         contactContext.set("timestamp", new Num(contact.timestamp));
@@ -1434,10 +1462,12 @@ export function createPreludeContext() {
             id: isa(id, Str) ? id.value : String(id),
             name: isa(name, Str) ? name.value : String(name),
             endpoints: endpoints && isa(endpoints, Block)
-                ? endpoints.items.map(e => isa(e, Str) ? e.value : String(e))
+                ? endpoints.items.map((e) => isa(e, Str) ? e.value : String(e))
                 : [],
             capabilities: capabilities && isa(capabilities, Block)
-                ? capabilities.items.map(c => isa(c, Str) ? c.value : String(c))
+                ? capabilities.items.map((c) =>
+                    isa(c, Str) ? c.value : String(c)
+                )
                 : [],
             timestamp: Date.now(),
         };
@@ -1458,7 +1488,7 @@ export function createPreludeContext() {
 
             let endpointsArray = [];
             if (isa(endpoints, Block)) {
-                endpointsArray = endpoints.items.map(e =>
+                endpointsArray = endpoints.items.map((e) =>
                     isa(e, Str) ? e.value : String(e)
                 );
             }
@@ -1515,7 +1545,9 @@ export function createPreludeContext() {
             }
 
             const contact = contextToContact(contactCtx);
-            const capStr = isa(capability, Str) ? capability.value : String(capability);
+            const capStr = isa(capability, Str)
+                ? capability.value
+                : String(capability);
             return hasCapability(contact, capStr);
         }),
     );
@@ -1577,7 +1609,9 @@ export function createPreludeContext() {
             const command = stream.next();
 
             if (!isa(command, Word)) {
-                throw new Error("remote expects a command (connect, exec, disconnect)");
+                throw new Error(
+                    "remote expects a command (connect, exec, disconnect)",
+                );
             }
 
             const commandStr = command.spelling.description.toLowerCase();
@@ -1591,22 +1625,31 @@ export function createPreludeContext() {
                 } else if (urlOrContact instanceof Context) {
                     // Extract URL from contact endpoints
                     const endpoints = urlOrContact.get(Symbol.for("ENDPOINTS"));
-                    if (endpoints && isa(endpoints, Block) && endpoints.items.length > 0) {
+                    if (
+                        endpoints && isa(endpoints, Block) &&
+                        endpoints.items.length > 0
+                    ) {
                         url = endpoints.items[0].value;
                     } else {
                         throw new Error("Contact has no endpoints");
                     }
                 } else {
-                    throw new Error("remote connect expects a URL string or contact");
+                    throw new Error(
+                        "remote connect expects a URL string or contact",
+                    );
                 }
 
                 // Only available in browser
                 if (typeof WebSocket === "undefined") {
-                    throw new Error("WebSocket not available in this environment");
+                    throw new Error(
+                        "WebSocket not available in this environment",
+                    );
                 }
 
                 // Import WebSocket client dynamically
-                const { createRPCClient } = await import("./transports/websocket-client.js");
+                const { createRPCClient } = await import(
+                    "./transports/websocket-client.js"
+                );
 
                 // Create connection
                 const rpcClient = createRPCClient(url, {
@@ -1626,6 +1669,7 @@ export function createPreludeContext() {
                         const peerHandle = new Context();
                         peerHandle.set("url", new Str(url));
                         peerHandle.set("status", new Str("connected"));
+                        peerHandle.set("connected-at", new Num(Date.now()));
                         peerHandle._rpcClient = rpcClient;
 
                         // Store in REMOTE_PEERS
@@ -1645,8 +1689,12 @@ export function createPreludeContext() {
                 const peerHandle = await evalNext(stream, context);
                 const codeBlock = stream.next();
 
-                if (!(peerHandle instanceof Context) || !peerHandle._rpcClient) {
-                    throw new Error("remote exec expects a peer handle from remote connect");
+                if (
+                    !(peerHandle instanceof Context) || !peerHandle._rpcClient
+                ) {
+                    throw new Error(
+                        "remote exec expects a peer handle from remote connect",
+                    );
                 }
 
                 if (!isa(codeBlock, Block)) {
@@ -1655,7 +1703,7 @@ export function createPreludeContext() {
 
                 // Serialize the code block to Bassline code string
                 const code = codeBlock.items
-                    .map(item => {
+                    .map((item) => {
                         if (isa(item, Num)) return String(item.value);
                         if (isa(item, Str)) return `"${item.value}"`;
                         if (isa(item, Word)) return item.spelling.description;
@@ -1665,10 +1713,14 @@ export function createPreludeContext() {
 
                 // Execute on remote via RPC
                 const task = createTask(async () => {
-                    const result = await peerHandle._rpcClient.call("eval", { code });
+                    const result = await peerHandle._rpcClient.call("eval", {
+                        code,
+                    });
 
                     if (!result.ok) {
-                        throw new Error(result.error || "Remote execution failed");
+                        throw new Error(
+                            result.error || "Remote execution failed",
+                        );
                     }
 
                     return deserializeRPCValue(result.value);
@@ -1685,7 +1737,9 @@ export function createPreludeContext() {
             } else if (commandStr === "disconnect") {
                 const peerHandle = await evalNext(stream, context);
 
-                if (!(peerHandle instanceof Context) || !peerHandle._rpcClient) {
+                if (
+                    !(peerHandle instanceof Context) || !peerHandle._rpcClient
+                ) {
                     throw new Error("remote disconnect expects a peer handle");
                 }
 
@@ -1752,7 +1806,10 @@ function basslineToJs(value) {
         }
         return obj;
     }
-    if (typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
+    if (
+        typeof value === "boolean" || typeof value === "number" ||
+        typeof value === "string"
+    ) {
         return value;
     }
     if (value === null || value === undefined) {

@@ -31,6 +31,24 @@ export function createRepl() {
             }
         },
 
+        /**
+         * Execute a Block directly (for UI event handlers)
+         * @param {Block} block - Block object to execute
+         * @returns {Promise<{ ok: true, value: any } | { ok: false, error: string }>}
+         */
+        async execBlock(block) {
+            try {
+                const result = await ex(context, block);
+                return { ok: true, value: result };
+            } catch (error) {
+                return {
+                    ok: false,
+                    error: error.message,
+                    stack: error.stack,
+                };
+            }
+        },
+
         // Expose context for direct access if needed
         context,
     };

@@ -1,0 +1,20 @@
+; Test script for verifying remote peer UI polling
+; This demonstrates what the UI should see when querying REMOTE_PEERS
+
+; First, let's see what's in REMOTE_PEERS
+print "Current remote peers:"
+keys REMOTE_PEERS
+
+; If you've connected to a peer, you can query it like this:
+; peer: get REMOTE_PEERS "ws://localhost:8080"
+; print peer
+
+; To see the structure:
+; print "URL:" get peer "url"
+; print "Status:" get peer "status"
+; print "Connected at:" get peer "connected-at"
+
+; The UI polling does this:
+; 1. Get all peer URLs: keys REMOTE_PEERS
+; 2. For each URL, get the peer handle: get REMOTE_PEERS "url"
+; 3. Extract status and connected-at from the peer handle

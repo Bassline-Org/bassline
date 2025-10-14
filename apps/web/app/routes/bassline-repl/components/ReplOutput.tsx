@@ -8,19 +8,23 @@ interface OutputEntry {
 
 interface ReplOutputProps {
     history: OutputEntry[];
+    repl?: any;
+    onViewAction?: () => void;
 }
 
 interface ValueRendererProps {
     value: any;
     depth?: number;
+    repl?: any;
+    onViewAction?: () => void;
 }
 
-function ValueRenderer({ value, depth = 0 }: ValueRendererProps) {
+function ValueRenderer({ value, depth = 0, repl, onViewAction }: ValueRendererProps) {
     const [expanded, setExpanded] = useState(depth < 2);
 
     // Check if this is an inspected value (from inspect native)
     if (value && typeof value === "object" && value.type) {
-        return <InspectedValue value={value} depth={depth} expanded={expanded} setExpanded={setExpanded} />;
+        return <InspectedValue value={value} depth={depth} expanded={expanded} setExpanded={setExpanded} repl={repl} onViewAction={onViewAction} />;
     }
 
     // Handle Bassline value types (non-inspected)
@@ -108,9 +112,11 @@ interface InspectedValueProps {
     depth: number;
     expanded: boolean;
     setExpanded: (expanded: boolean) => void;
+    repl?: any;
+    onViewAction?: () => void;
 }
 
-function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueProps) {
+function InspectedValue({ value, depth, expanded, setExpanded, repl, onViewAction }: InspectedValueProps) {
     switch (value.type) {
         case "num":
             return <span className="text-blue-600">{value.value}</span>;
@@ -147,7 +153,7 @@ function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueP
                         {value.items.map((item: any, i: number) => (
                             <div key={i} className="flex gap-2">
                                 <span className="text-slate-400">{i}:</span>
-                                <ValueRenderer value={item} depth={depth + 1} />
+                                <ValueRenderer value={item} depth={depth + 1} repl={repl} onViewAction={onViewAction} />
                             </div>
                         ))}
                     </div>
@@ -165,7 +171,7 @@ function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueP
                         {value.items.map((item: any, i: number) => (
                             <div key={i} className="flex gap-2">
                                 <span className="text-slate-400">{i}:</span>
-                                <ValueRenderer value={item} depth={depth + 1} />
+                                <ValueRenderer value={item} depth={depth + 1} repl={repl} onViewAction={onViewAction} />
                             </div>
                         ))}
                     </div>
@@ -183,7 +189,7 @@ function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueP
                         {value.bindings.map((binding: any, i: number) => (
                             <div key={i} className="flex gap-2">
                                 <span className="text-purple-600 font-semibold">{binding.name}:</span>
-                                <ValueRenderer value={binding.value} depth={depth + 1} />
+                                <ValueRenderer value={binding.value} depth={depth + 1} repl={repl} onViewAction={onViewAction} />
                             </div>
                         ))}
                         {value.parent && (
@@ -225,7 +231,7 @@ function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueP
                                             <span className="text-purple-600 font-semibold">
                                                 {binding.name}:
                                             </span>
-                                            <ValueRenderer value={binding.value} depth={depth + 1} />
+                                            <ValueRenderer value={binding.value} depth={depth + 1} repl={repl} onViewAction={onViewAction} />
                                         </div>
                                     ))}
                                 </div>
@@ -298,7 +304,7 @@ function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueP
             return <div className="text-red-600">Error: {value.message}</div>;
 
         case "view":
-            return <ViewRenderer view={value} />;
+            return <ViewRenderer view={value} repl={repl} onViewAction={onViewAction} />;
 
         default:
             return <span className="text-slate-400">{value.type}</span>;
@@ -307,9 +313,11 @@ function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueP
 
 interface ViewRendererProps {
     view: any;
+    repl?: any;
+    onViewAction?: () => void;
 }
 
-function ViewRenderer({ view }: ViewRendererProps) {
+function ViewRenderer({ view, repl, onViewAction }: ViewRendererProps) {
     if (!view.components || view.components.length === 0) {
         return <div className="text-slate-400 text-sm">Empty view</div>;
     }
@@ -317,7 +325,7 @@ function ViewRenderer({ view }: ViewRendererProps) {
     return (
         <div className="border rounded-lg p-4 bg-white shadow-sm space-y-2">
             {view.components.map((comp: any, i: number) => (
-                <ViewComponent key={i} component={comp} />
+                <ViewComponent key={i} component={comp} repl={repl} onViewAction={onViewAction} />
             ))}
         </div>
     );
@@ -325,10 +333,12 @@ function ViewRenderer({ view }: ViewRendererProps) {
 
 interface ViewComponentProps {
     component: any;
+    repl?: any;
+    onViewAction?: () => void;
 }
 
-function ViewComponent({ component }: ViewComponentProps) {
-    const { component: name, args } = component;
+function ViewComponent({ component, repl, onViewAction }: ViewComponentProps) {
+    const { component: name, args, handlers = {} } = component;
 
     // Helper to extract value from arg
     const getValue = (arg: any) => {
@@ -353,12 +363,32 @@ function ViewComponent({ component }: ViewComponentProps) {
 
         case "button": {
             const label = getValue(args[0]) || "Button";
-            const action = args[1]?.value; // Block for action
+            // Check for on-click handler first, fall back to legacy block arg
+            const action = handlers["on-click"] || args[1]?.value;
 
-            const handleClick = () => {
-                if (action) {
-                    console.log("Button clicked, action:", action);
-                    // TODO: Execute action block
+            const handleClick = async () => {
+                if (action && repl) {
+                    try {
+                        console.log("Button clicked, executing action:", action);
+                        // action is a serialized block (array like ["BLOCK", "SET", "COUNTER", ...])
+                        // Convert it back to Bassline source code
+                        if (Array.isArray(action) && action[0] === "BLOCK") {
+                            // Reconstruct the source code string
+                            const items = action.slice(1); // Remove "BLOCK" prefix
+                            const code = items.join(" ");
+                            console.log("Executing code:", code);
+                            await repl.eval(code);
+                        } else if (action.constructor?.name === "Block") {
+                            // It's still a proper Block object
+                            await repl.execBlock(action);
+                        }
+                        // Trigger re-render
+                        if (onViewAction) {
+                            onViewAction();
+                        }
+                    } catch (error) {
+                        console.error("Error executing button action:", error);
+                    }
                 }
             };
 
@@ -373,10 +403,33 @@ function ViewComponent({ component }: ViewComponentProps) {
         }
 
         case "input": {
+            const [value, setValue] = useState("");
             const placeholder = getValue(args[0]) || "Enter text...";
+            const onChange = handlers["on-change"];
+
+            const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+                const newValue = e.target.value;
+                setValue(newValue);
+
+                if (onChange && repl) {
+                    try {
+                        // Set 'value' variable in context before executing handler
+                        await repl.eval(`value: "${newValue}"`);
+                        await repl.eval(onChange);
+                        if (onViewAction) {
+                            onViewAction();
+                        }
+                    } catch (error) {
+                        console.error("Error executing input change handler:", error);
+                    }
+                }
+            };
+
             return (
                 <input
                     type="text"
+                    value={value}
+                    onChange={handleChange}
                     placeholder={placeholder}
                     className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
@@ -420,7 +473,7 @@ function ExpandableContainer({ summary, expanded, onToggle, children }: Expandab
     );
 }
 
-export function ReplOutput({ history }: ReplOutputProps) {
+export function ReplOutput({ history, repl, onViewAction }: ReplOutputProps) {
     if (history.length === 0) {
         return (
             <div className="text-slate-400 text-sm">
@@ -459,7 +512,7 @@ export function ReplOutput({ history }: ReplOutputProps) {
                     {/* Output */}
                     <div className="pl-8">
                         {entry.result.ok ? (
-                            <ValueRenderer value={entry.result.value} />
+                            <ValueRenderer value={entry.result.value} repl={repl} onViewAction={onViewAction} />
                         ) : (
                             <div className="text-red-600">
                                 Error: {entry.result.error}

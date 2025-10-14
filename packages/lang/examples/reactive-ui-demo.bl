@@ -1,0 +1,46 @@
+; ============================================
+; Bassline Language - Reactive UI Demo
+; ============================================
+
+print "=== REACTIVE UI - Interactive Counter ==="
+
+; Initialize counter
+counter: 0
+
+; Create a reactive view with on-click handler
+view [
+    text "Count: " (to-string counter)
+    button "+" on-click [set counter counter + 1]
+    button "-" on-click [set counter counter - 1]
+    button "Reset" on-click [set counter 0]
+]
+
+print "Click the buttons to update the counter!"
+print "The view should re-render automatically."
+
+; === INPUT EXAMPLE ===
+
+print ""
+print "=== INPUT EXAMPLE ==="
+
+name: ""
+
+view [
+    text "Enter your name:"
+    input "Type here..." on-change [print "Hello, " value "!"]
+    text "Your name is: " name
+]
+
+; === COUNTER WITH INPUT ===
+
+print ""
+print "=== COUNTER WITH CUSTOM INCREMENT ==="
+
+increment-by: 1
+
+view [
+    text "Counter: " (to-string counter)
+    text "Increment by:"
+    input "1" on-change [set increment-by (to-number value)]
+    button "Add" on-click [set counter counter + increment-by]
+]
