@@ -1,33 +1,23 @@
 import {
-    anythingExcept,
     char,
     choice,
     digits,
     endOfInput,
-    lookAhead,
     many,
-    many1,
-    possibly,
     recursiveParser,
     regex,
     sequenceOf,
     whitespace,
 } from "arcsecond/index.js";
-
 import {
-    BlockCell,
-    GetPathCell,
-    GetWordCell,
-    LitPathCell,
-    LitWordCell,
-    NumberCell,
-    ParenCell,
-    PathCell,
-    RefinementCell,
-    SetPathCell,
-    SetWordCell,
-    StringCell,
-    WordCell,
+    Block,
+    GetWord,
+    LitWord,
+    Num,
+    Paren,
+    SetWord,
+    Str,
+    Word,
 } from "./cells/index.js";
 
 // ===== Comments and Whitespace =====
@@ -42,21 +32,7 @@ const ws = many(
 
 // ===== Numbers =====
 const number = choice([
-    // Negative decimal
-    sequenceOf([char("-"), digits, char("."), digits]).map(
-        ([sign, int, dot, dec]) =>
-            new NumberCell(parseFloat(`${sign}${int}${dot}${dec}`)),
-    ),
-    // Positive decimal
-    sequenceOf([digits, char("."), digits]).map(
-        ([int, dot, dec]) => new NumberCell(parseFloat(`${int}${dot}${dec}`)),
-    ),
-    // Negative integer
-    sequenceOf([char("-"), digits]).map(
-        ([sign, int]) => new NumberCell(parseFloat(`${sign}${int}`)),
-    ),
-    // Positive integer
-    digits.map((int) => new NumberCell(parseFloat(int))),
+    digits.map((int) => new Num({ value: Number(int) })),
 ]).errorMap(() => "Expected number");
 
 // ===== Strings =====
@@ -80,7 +56,7 @@ const stringLiteral = sequenceOf([
     char('"'),
     many(stringChar),
     char('"'),
-]).map(([_, chars, __]) => new StringCell(chars.join("")))
+]).map(([_, chars, __]) => new Str({ value: chars.join("") }))
     .errorMap(() => "Expected string");
 
 // ===== Words =====
@@ -91,36 +67,30 @@ const wordChars = regex(/^[^ \t\n\r\[\](){}";:\/]+/);
 const litWord = sequenceOf([
     char("'"),
     wordChars,
-]).map(([_, spelling]) => new LitWordCell(spelling))
+]).map(([_, spelling]) => new LitWord({ spelling }))
     .errorMap(() => "Expected lit word");
 
 // :word
 const getWord = sequenceOf([
     char(":"),
     wordChars,
-]).map(([_, spelling]) => new GetWordCell(spelling))
+]).map(([_, spelling]) => new GetWord({ spelling }))
     .errorMap(() => "Expected get word");
 
 // word:
 const setWord = sequenceOf([
     wordChars,
     char(":"),
-]).map(([spelling, _]) => new SetWordCell(spelling))
+]).map(([spelling, _]) => new SetWord({ spelling }))
     .errorMap(() => "Expected set word");
 
 // word
 const normalWord = sequenceOf([
     wordChars,
-]).map(([spelling]) => new WordCell(spelling))
+]).map(([spelling]) => new Word({ spelling }))
     .errorMap(() => "Expected normal word");
 
 const word = choice([setWord, litWord, getWord, normalWord]);
-
-const refinement = sequenceOf([
-    char("/"),
-    wordChars,
-]).map(([_, spelling]) => new RefinementCell(spelling))
-    .errorMap(() => "Expected refinement");
 
 // Forward declare for recursion
 const value = recursiveParser(() => valueParser);
@@ -131,7 +101,7 @@ const blockParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char("]"),
-]).map(([_, __, items, ___]) => new BlockCell(items))
+]).map(([_, __, items, ___]) => new Block({ value: items }))
     .errorMap(() => "Expected block");
 
 // ===== Parens =====
@@ -140,61 +110,14 @@ const parenParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char(")"),
-]).map(([_, __, items, ___]) => new ParenCell(items))
+]).map(([_, __, items, ___]) => new Paren({ value: items }))
     .errorMap(() => "Expected paren");
-
-const pathSegment = choice([
-    number,
-    wordChars.map((segment) => new LitWordCell(segment)),
-]);
-
-// :word/word/word
-const getPath = sequenceOf([
-    char(":"),
-    wordChars,
-    lookAhead(char("/")),
-    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
-]).map(([_, word, __, segments]) =>
-    new GetPathCell([new GetWordCell(word), ...segments])
-);
-
-// word/word/word:
-const setPath = sequenceOf([
-    wordChars,
-    lookAhead(char("/")),
-    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
-    char(":"),
-]).map(([word, _, segments, __]) =>
-    new SetPathCell([new WordCell(word), ...segments])
-);
-
-// 'word/word/word
-const litPath = sequenceOf([
-    char("'"),
-    wordChars,
-    lookAhead(char("/")),
-    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
-]).map(([_, word, __, segments]) =>
-    new LitPathCell([new LitWordCell(word), ...segments])
-);
-
-// word/word/word
-const normalPath = sequenceOf([
-    wordChars,
-    lookAhead(char("/")),
-    many1(sequenceOf([char("/"), pathSegment]).map(([_, segment]) => segment)),
-]).map(([word, _, segments]) =>
-    new PathCell([new WordCell(word), ...segments])
-);
-
-const path = choice([getPath, litPath, setPath, normalPath]);
 
 const valueParser = choice([
     number,
     stringLiteral,
     blockParser,
     parenParser,
-    path,
     word,
 ]);
 

@@ -13,5 +13,3 @@ export class Context {
         this.bindings.set(normalize(spelling), cell);
     }
 }
-
-export const GLOBAL = new Context();

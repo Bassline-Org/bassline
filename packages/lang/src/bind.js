@@ -1,4 +1,4 @@
-import { BlockCell, isAnyWord } from "./cells/index.js";
+import { AnyWord, Block } from "./cells/index.js";
 import { GLOBAL } from "./context.js";
 
 /**
@@ -51,13 +51,4 @@ export function bind(words, knownWord) {
     }
 
     return words;
-}
-
-export function loadBinding(tree, context = GLOBAL) {
-    for (const cell of tree) {
-        if (isAnyWord(cell)) {
-            cell.binding = context;
-        }
-        if (cell.isSeries) loadBinding(cell.buffer, context);
-    }
 }
