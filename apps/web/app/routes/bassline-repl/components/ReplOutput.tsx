@@ -493,6 +493,37 @@ function ViewComponent({ component }: ViewComponentProps) {
             return <hr className="border-t border-slate-200 my-2" />;
         }
 
+        case "foreach": {
+            // foreach <collection> <item-name> <template-block>
+            const collection = getValue(evaledArgs[0]);
+            const itemName = getValue(args[1]); // Word/string from args, not evaledArgs
+            const templateBlock = args[2]?.value; // Block object
+
+            if (!collection || !Array.isArray(collection)) {
+                return <span className="text-red-600">foreach: collection must be an array</span>;
+            }
+
+            if (!templateBlock) {
+                return <span className="text-red-600">foreach: missing template block</span>;
+            }
+
+            // For each item, we need to parse the template with the item bound to itemName
+            // Since we don't have scoped evaluation yet, we'll render a simplified version
+            return (
+                <div className="flex flex-col gap-1">
+                    {collection.map((item, idx) => {
+                        // For now, just render the item value
+                        // TODO: Parse template block with item in scope
+                        return (
+                            <div key={idx} className="text-slate-900">
+                                {String(item)}
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
         case "row": {
             // Render children in a horizontal row
             return (

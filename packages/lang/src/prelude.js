@@ -863,6 +863,30 @@ export function createPreludeContext() {
             const name = componentName.spelling.description.toLowerCase();
             const isLayoutComponent = layoutComponents.includes(name);
 
+            // Special handling for foreach
+            if (name === "foreach") {
+                // foreach <collection-expr> <item-name> [template-block]
+                const collectionExpr = viewStream.next();
+                const itemName = viewStream.next();
+                const templateBlock = viewStream.next();
+
+                if (!isa(templateBlock, Block)) {
+                    throw new Error("foreach expects a block template");
+                }
+
+                // Store foreach metadata for React to expand
+                components.push({
+                    component: "foreach",
+                    args: [
+                        { type: "expr", code: moldValue(collectionExpr) },
+                        { type: "value", value: itemName },
+                        { type: "block", value: templateBlock },
+                    ],
+                    handlers: {},
+                });
+                continue;
+            }
+
             // Parse component arguments and event handlers
             const args = [];
             const handlers = {};
@@ -873,7 +897,18 @@ export function createPreludeContext() {
                 // If it's a word that looks like a component name, stop
                 if (
                     isa(next, Word) &&
-                    ["text", "button", "input", "checkbox", "badge", "separator", "row", "column", "panel"].includes(
+                    [
+                        "text",
+                        "button",
+                        "input",
+                        "checkbox",
+                        "badge",
+                        "separator",
+                        "row",
+                        "column",
+                        "panel",
+                        "foreach",
+                    ].includes(
                         next.spelling.description.toLowerCase(),
                     )
                 ) {
@@ -883,12 +918,17 @@ export function createPreludeContext() {
                 const arg = viewStream.next();
 
                 // Check for event handler keywords (on-click, on-change, etc.)
-                if (isa(arg, Word) && arg.spelling.description.toLowerCase().startsWith("on-")) {
+                if (
+                    isa(arg, Word) &&
+                    arg.spelling.description.toLowerCase().startsWith("on-")
+                ) {
                     const eventName = arg.spelling.description.toLowerCase();
                     const actionBlock = viewStream.next();
                     if (isa(actionBlock, Block)) {
                         // Extract inner code without block delimiters
-                        const inner = actionBlock.items.map(moldValue).join(" ");
+                        const inner = actionBlock.items.map(moldValue).join(
+                            " ",
+                        );
                         handlers[eventName] = inner;
                     }
                     continue;
