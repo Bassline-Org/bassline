@@ -13,7 +13,7 @@ describe("Gadget Dialect", () => {
         `);
 
         const context = createPreludeContext();
-        ex(context, code);
+        await ex(context, code);
 
         const counterProto = context.get(Symbol.for("COUNTER"));
         expect(counterProto).toBeDefined();
@@ -34,7 +34,7 @@ describe("Gadget Dialect", () => {
         `);
 
         const context = createPreludeContext();
-        ex(context, code);
+        await ex(context, code);
 
         const instance = context.get(Symbol.for("C"));
         expect(instance).toBeDefined();
@@ -53,7 +53,7 @@ describe("Gadget Dialect", () => {
         `);
 
         const context = createPreludeContext();
-        ex(context, code);
+        await ex(context, code);
 
         const instance = context.get(Symbol.for("C"));
         expect(instance.current()).toBe(10);
@@ -72,7 +72,7 @@ describe("Gadget Dialect", () => {
         `);
 
         const context = createPreludeContext();
-        ex(context, code);
+        await ex(context, code);
 
         const instance = context.get(Symbol.for("C"));
         expect(instance.current()).toBe(5);
@@ -91,7 +91,7 @@ describe("Gadget Dialect", () => {
         `);
 
         const context = createPreludeContext();
-        ex(context, code);
+        await ex(context, code);
 
         const result = context.get(Symbol.for("RESULT"));
         expect(result).toBe(42);
@@ -183,7 +183,7 @@ describe("Full Integration", () => {
         `);
 
         const context = createPreludeContext();
-        ex(context, code);
+        await ex(context, code);
 
         const a = context.get(Symbol.for("A"));
         const b = context.get(Symbol.for("B"));

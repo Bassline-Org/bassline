@@ -15,12 +15,12 @@ export function createRepl() {
         /**
          * Safely evaluate Bassline code
          * @param {string} input - Bassline code to evaluate
-         * @returns {{ ok: true, value: any } | { ok: false, error: string }}
+         * @returns {Promise<{ ok: true, value: any } | { ok: false, error: string }>}
          */
-        eval(input) {
+        async eval(input) {
             try {
                 const ast = parse(input);
-                const result = ex(context, ast);
+                const result = await ex(context, ast);
                 return { ok: true, value: result };
             } catch (error) {
                 return {

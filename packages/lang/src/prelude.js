@@ -6,7 +6,7 @@ import { gadgetNative } from "./dialects/gadget.js";
 import { linkNative } from "./dialects/link.js";
 
 // Main evaluator for prelude (top-level bassline code)
-export function ex(context, code) {
+export async function ex(context, code) {
     if (!isa(code, Block) && !isa(code, Paren)) {
         throw new Error("ex can only be called with a block or paren!");
     }
@@ -25,7 +25,7 @@ export function ex(context, code) {
 
         // Assignment: var: value
         if (isa(current, SetWord)) {
-            result = evalNext(stream, context);
+            result = await evalNext(stream, context);
             context.set(current.spelling, result);
             continue;
         }
@@ -36,10 +36,10 @@ export function ex(context, code) {
 
             // If callable (native or dialect), invoke it
             if (value?.call) {
-                result = value.call(stream, context);
+                result = await value.call(stream, context);
             } // If it's a function, call it
             else if (value?._function) {
-                result = callFunction(value, stream, context);
+                result = await callFunction(value, stream, context);
             } else {
                 result = value;
             }
@@ -51,23 +51,23 @@ export function ex(context, code) {
 }
 
 // Evaluate next value from stream
-function evalNext(stream, context) {
+async function evalNext(stream, context) {
     const val = stream.next();
 
     // Paren forces evaluation
     if (isa(val, Paren)) {
-        return ex(context, val);
+        return await ex(context, val);
     }
 
     if (isa(val, Word)) {
         const resolved = context.get(val.spelling);
         // If it's callable, call it
         if (resolved?.call) {
-            return resolved.call(stream, context);
+            return await resolved.call(stream, context);
         }
         // If it's a function, call it
         if (resolved?._function) {
-            return callFunction(resolved, stream, context);
+            return await callFunction(resolved, stream, context);
         }
         return resolved;
     }
@@ -75,28 +75,29 @@ function evalNext(stream, context) {
 }
 
 // Call a function (context) with arguments
-function callFunction(funcContext, stream, evalContext) {
+async function callFunction(funcContext, stream, evalContext) {
     // Create new context extending the function
     const callContext = new Context(funcContext);
 
     // Bind arguments
-    funcContext._argNames.forEach((argName, i) => {
+    for (let i = 0; i < funcContext._argNames.length; i++) {
+        const argName = funcContext._argNames[i];
         const shouldEval = funcContext._argEval[i];
 
         if (shouldEval) {
             // Evaluate argument in calling context
-            const argValue = evalNext(stream, evalContext);
+            const argValue = await evalNext(stream, evalContext);
             callContext.set(argName, argValue);
         } else {
             // Pass literally - just consume from stream
             const argValue = stream.next();
             callContext.set(argName, argValue);
         }
-    });
+    }
 
     // Execute body in call context
     const body = funcContext.get(Symbol.for("BODY"));
-    return ex(callContext, body);
+    return await ex(callContext, body);
 }
 
 // Create a prelude context with built-in natives
@@ -119,7 +120,7 @@ export function createPreludeContext() {
     // Spawns a gadget instance from a prototype
     context.set(
         "spawn",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const proto = evalValue(stream.next(), context);
             const stateArg = stream.peek();
 
@@ -140,7 +141,7 @@ export function createPreludeContext() {
     // Send a value to a gadget (calls receive)
     context.set(
         "send",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const gadget = evalValue(stream.next(), context);
             const input = evalValue(stream.next(), context);
             gadget.receive(input);
@@ -151,7 +152,7 @@ export function createPreludeContext() {
     // Get current state of a gadget
     context.set(
         "current",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const gadget = evalValue(stream.next(), context);
             return gadget.current();
         }),
@@ -162,7 +163,7 @@ export function createPreludeContext() {
     // + <a> <b>
     context.set(
         "+",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return new Num(a + b);
@@ -172,7 +173,7 @@ export function createPreludeContext() {
     // - <a> <b>
     context.set(
         "-",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return new Num(a - b);
@@ -182,7 +183,7 @@ export function createPreludeContext() {
     // * <a> <b>
     context.set(
         "*",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return new Num(a * b);
@@ -192,7 +193,7 @@ export function createPreludeContext() {
     // / <a> <b>
     context.set(
         "/",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return new Num(a / b);
@@ -203,7 +204,7 @@ export function createPreludeContext() {
     // Modulo (remainder)
     context.set(
         "%",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return new Num(a % b);
@@ -215,7 +216,7 @@ export function createPreludeContext() {
     // = <a> <b>
     context.set(
         "=",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return a === b;
@@ -225,7 +226,7 @@ export function createPreludeContext() {
     // < <a> <b>
     context.set(
         "<",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return a < b;
@@ -235,7 +236,7 @@ export function createPreludeContext() {
     // > <a> <b>
     context.set(
         ">",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return a > b;
@@ -245,7 +246,7 @@ export function createPreludeContext() {
     // <= <a> <b>
     context.set(
         "<=",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return a <= b;
@@ -255,7 +256,7 @@ export function createPreludeContext() {
     // >= <a> <b>
     context.set(
         ">=",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return a >= b;
@@ -265,7 +266,7 @@ export function createPreludeContext() {
     // not= <a> <b>
     context.set(
         "not=",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const a = evalValue(stream.next(), context);
             const b = evalValue(stream.next(), context);
             return a !== b;
@@ -285,13 +286,13 @@ export function createPreludeContext() {
     // Iterate over a block, binding each item to word
     context.set(
         "foreach",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const itemWord = stream.next();
             if (!isa(itemWord, Word)) {
                 throw new Error("foreach expects a word as first argument");
             }
 
-            const series = evalNext(stream, context);
+            const series = await evalNext(stream, context);
             const body = stream.next();
 
             if (!isa(body, Block)) {
@@ -323,7 +324,7 @@ export function createPreludeContext() {
     // Repeat body n times
     context.set(
         "repeat",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const n = evalValue(stream.next(), context);
             const body = stream.next();
 
@@ -344,7 +345,7 @@ export function createPreludeContext() {
     // Loop while condition is true
     context.set(
         "while",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const conditionBlock = stream.next();
             const body = stream.next();
 
@@ -371,8 +372,8 @@ export function createPreludeContext() {
     // Execute body if condition is true
     context.set(
         "if",
-        native((stream, context) => {
-            const condition = evalNext(stream, context);
+        native(async (stream, context) => {
+            const condition = await evalNext(stream, context);
             const body = stream.next();
 
             if (!isa(body, Block)) {
@@ -392,8 +393,8 @@ export function createPreludeContext() {
     // Execute true-body if condition is true, else false-body
     context.set(
         "either",
-        native((stream, context) => {
-            const condition = evalNext(stream, context);
+        native(async (stream, context) => {
+            const condition = await evalNext(stream, context);
             const trueBody = stream.next();
             const falseBody = stream.next();
 
@@ -418,8 +419,8 @@ export function createPreludeContext() {
     // Get first element of a block
     context.set(
         "first",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
             if (isa(series, Block)) {
                 return series.items[0];
             }
@@ -434,8 +435,8 @@ export function createPreludeContext() {
     // Get last element of a block
     context.set(
         "last",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
             if (isa(series, Block)) {
                 return series.items[series.items.length - 1];
             }
@@ -450,8 +451,8 @@ export function createPreludeContext() {
     // Get length of a block or string
     context.set(
         "length",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
             if (isa(series, Block)) {
                 return new Num(series.items.length);
             }
@@ -472,9 +473,9 @@ export function createPreludeContext() {
     // Append value to a block (creates new block)
     context.set(
         "append",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
-            const value = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
+            const value = await evalNext(stream, context);
 
             if (isa(series, Block)) {
                 return new Block([...series.items, value]);
@@ -490,9 +491,9 @@ export function createPreludeContext() {
     // Insert value at beginning of block (creates new block)
     context.set(
         "insert",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
-            const value = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
+            const value = await evalNext(stream, context);
 
             if (isa(series, Block)) {
                 return new Block([value, ...series.items]);
@@ -508,8 +509,8 @@ export function createPreludeContext() {
     // Get slice of block starting at index (1-based)
     context.set(
         "at",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
             const index = evalValue(stream.next(), context);
 
             if (isa(series, Block)) {
@@ -526,8 +527,8 @@ export function createPreludeContext() {
     // Get element at index (1-based)
     context.set(
         "pick",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
             const index = evalValue(stream.next(), context);
 
             if (isa(series, Block)) {
@@ -544,8 +545,8 @@ export function createPreludeContext() {
     // Check if series is empty
     context.set(
         "empty?",
-        native((stream, context) => {
-            const series = evalNext(stream, context);
+        native(async (stream, context) => {
+            const series = await evalNext(stream, context);
             if (isa(series, Block)) {
                 return series.items.length === 0;
             }
@@ -577,9 +578,9 @@ export function createPreludeContext() {
     // Evaluate block in the given context
     context.set(
         "in",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const targetContext = evalValue(stream.next(), context);
-            const block = evalNext(stream, context);
+            const block = await evalNext(stream, context);
 
             if (!isa(block, Block)) {
                 throw new Error("in expects a block as second argument");
@@ -595,7 +596,7 @@ export function createPreludeContext() {
     // Create a function context
     context.set(
         "func",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const argsBlock = stream.next();
             const bodyBlock = stream.next();
 
@@ -647,8 +648,8 @@ export function createPreludeContext() {
     // Print a value to console
     context.set(
         "print",
-        native((stream, context) => {
-            const value = evalNext(stream, context);
+        native(async (stream, context) => {
+            const value = await evalNext(stream, context);
             // Unwrap for display
             if (isa(value, Num) || isa(value, Str)) {
                 console.log(value.value);
@@ -664,9 +665,9 @@ export function createPreludeContext() {
     // Serialize a value to valid Bassline code
     context.set(
         "mold",
-        native((stream, context) => {
+        native(async (stream, context) => {
             // Evaluate the argument to get the actual value
-            const value = evalNext(stream, context);
+            const value = await evalNext(stream, context);
             return new Str(moldValue(value));
         }),
     );
@@ -675,7 +676,7 @@ export function createPreludeContext() {
 
     context.set(
         "block?",
-        native((stream, _context) => {
+        native(async (stream, _context) => {
             const value = stream.next();
             return isa(value, Block);
         }),
@@ -683,7 +684,7 @@ export function createPreludeContext() {
 
     context.set(
         "paren?",
-        native((stream, _context) => {
+        native(async (stream, _context) => {
             const value = stream.next();
             return isa(value, Paren);
         }),
@@ -691,7 +692,7 @@ export function createPreludeContext() {
 
     context.set(
         "word?",
-        native((stream, _context) => {
+        native(async (stream, _context) => {
             const value = stream.next();
             return isa(value, Word);
         }),
@@ -699,7 +700,7 @@ export function createPreludeContext() {
 
     context.set(
         "num?",
-        native((stream, _context) => {
+        native(async (stream, _context) => {
             const value = stream.next();
             return isa(value, Num);
         }),
@@ -707,7 +708,7 @@ export function createPreludeContext() {
 
     context.set(
         "str?",
-        native((stream, _context) => {
+        native(async (stream, _context) => {
             const value = stream.next();
             return isa(value, Str);
         }),
@@ -715,8 +716,8 @@ export function createPreludeContext() {
 
     context.set(
         "context?",
-        native((stream, context) => {
-            const value = evalNext(stream, context);
+        native(async (stream, context) => {
+            const value = await evalNext(stream, context);
             return value instanceof Context;
         }),
     );
@@ -726,8 +727,8 @@ export function createPreludeContext() {
     // inspect - deep inspection of any value
     context.set(
         "inspect",
-        native((stream, context) => {
-            const value = evalNext(stream, context);
+        native(async (stream, context) => {
+            const value = await evalNext(stream, context);
             return inspectValue(value);
         }),
     );
@@ -735,7 +736,7 @@ export function createPreludeContext() {
     // help - list available functions or get help for a specific function
     context.set(
         "help",
-        native((stream, context) => {
+        native(async (stream, context) => {
             // Check if there's an argument (function name to get help for)
             const next = stream.peek();
 
@@ -829,7 +830,7 @@ export function createPreludeContext() {
     // Create a view description from a block
     context.set(
         "view",
-        native((stream, context) => {
+        native(async (stream, context) => {
             const block = stream.next();
 
             if (!isa(block, Block)) {
@@ -905,8 +906,8 @@ export function createPreludeContext() {
     // Convert value to string representation
     context.set(
         "to-string",
-        native((stream, context) => {
-            const value = evalNext(stream, context);
+        native(async (stream, context) => {
+            const value = await evalNext(stream, context);
 
             if (isa(value, Num)) {
                 return new Str(String(value.value));
@@ -927,10 +928,339 @@ export function createPreludeContext() {
         }),
     );
 
+    // --- HTTP Operations ---
+
+    // fetch <url>
+    // HTTP GET request, returns response body as string
+    context.set(
+        "fetch",
+        native(async (stream, context) => {
+            const url = evalValue(stream.next(), context);
+            const urlStr = isa(url, Str) ? url.value : String(url);
+
+            try {
+                const response = await fetch(urlStr);
+                const text = await response.text();
+                return new Str(text);
+            } catch (error) {
+                throw new Error(`fetch failed: ${error.message}`);
+            }
+        }),
+    );
+
+    // post <url> <data>
+    // HTTP POST request with JSON body
+    context.set(
+        "post",
+        native(async (stream, context) => {
+            const url = evalValue(stream.next(), context);
+            const data = await evalNext(stream, context);
+
+            const urlStr = isa(url, Str) ? url.value : String(url);
+
+            // Convert data to JSON
+            let body;
+            if (data instanceof Context) {
+                const obj = {};
+                for (const [sym, value] of data.bindings) {
+                    obj[sym.description] = isa(value, Num) ? value.value : isa(value, Str) ? value.value : value;
+                }
+                body = JSON.stringify(obj);
+            } else {
+                body = JSON.stringify(data);
+            }
+
+            try {
+                const response = await fetch(urlStr, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body,
+                });
+                const text = await response.text();
+                return new Str(text);
+            } catch (error) {
+                throw new Error(`post failed: ${error.message}`);
+            }
+        }),
+    );
+
+    // --- JSON Operations ---
+
+    // parse-json <str>
+    // Parse JSON string into Bassline values
+    context.set(
+        "parse-json",
+        native(async (stream, context) => {
+            const str = evalValue(stream.next(), context);
+            const jsonStr = isa(str, Str) ? str.value : String(str);
+
+            try {
+                const parsed = JSON.parse(jsonStr);
+                return jsToBassline(parsed, context);
+            } catch (error) {
+                throw new Error(`parse-json failed: ${error.message}`);
+            }
+        }),
+    );
+
+    // to-json <value>
+    // Convert Bassline value to JSON string
+    context.set(
+        "to-json",
+        native(async (stream, context) => {
+            const value = await evalNext(stream, context);
+            const jsValue = basslineToJs(value);
+            return new Str(JSON.stringify(jsValue));
+        }),
+    );
+
+    // --- String Operations ---
+
+    // split <str> <delimiter>
+    // Split string by delimiter
+    context.set(
+        "split",
+        native(async (stream, context) => {
+            const str = evalValue(stream.next(), context);
+            const delimiter = evalValue(stream.next(), context);
+
+            const strVal = isa(str, Str) ? str.value : String(str);
+            const delim = isa(delimiter, Str) ? delimiter.value : String(delimiter);
+
+            const parts = strVal.split(delim);
+            return new Block(parts.map((p) => new Str(p)));
+        }),
+    );
+
+    // join <list> <delimiter>
+    // Join list items with delimiter
+    context.set(
+        "join",
+        native(async (stream, context) => {
+            const list = await evalNext(stream, context);
+            const delimiter = evalValue(stream.next(), context);
+
+            const delim = isa(delimiter, Str) ? delimiter.value : String(delimiter);
+
+            let items;
+            if (isa(list, Block)) {
+                items = list.items;
+            } else if (Array.isArray(list)) {
+                items = list;
+            } else {
+                throw new Error("join expects a block or array");
+            }
+
+            const strings = items.map((item) => {
+                if (isa(item, Str)) return item.value;
+                if (isa(item, Num)) return String(item.value);
+                return String(item);
+            });
+
+            return new Str(strings.join(delim));
+        }),
+    );
+
+    // trim <str>
+    // Remove leading/trailing whitespace
+    context.set(
+        "trim",
+        native(async (stream, context) => {
+            const str = evalValue(stream.next(), context);
+            const strVal = isa(str, Str) ? str.value : String(str);
+            return new Str(strVal.trim());
+        }),
+    );
+
+    // uppercase <str>
+    // Convert to uppercase
+    context.set(
+        "uppercase",
+        native(async (stream, context) => {
+            const str = evalValue(stream.next(), context);
+            const strVal = isa(str, Str) ? str.value : String(str);
+            return new Str(strVal.toUpperCase());
+        }),
+    );
+
+    // lowercase <str>
+    // Convert to lowercase
+    context.set(
+        "lowercase",
+        native(async (stream, context) => {
+            const str = evalValue(stream.next(), context);
+            const strVal = isa(str, Str) ? str.value : String(str);
+            return new Str(strVal.toLowerCase());
+        }),
+    );
+
+    // --- Context/Map Operations ---
+
+    // get <context> <key>
+    // Get value from context by key name
+    context.set(
+        "get",
+        native(async (stream, context) => {
+            const ctx = await evalNext(stream, context);
+            const key = evalValue(stream.next(), context);
+
+            if (!(ctx instanceof Context)) {
+                throw new Error("get expects a context as first argument");
+            }
+
+            const keyStr = isa(key, Str) ? key.value : String(key);
+            return ctx.get(Symbol.for(keyStr.toUpperCase()));
+        }),
+    );
+
+    // set <context> <key> <value>
+    // Set value in context (returns new context)
+    context.set(
+        "set",
+        native(async (stream, context) => {
+            const ctx = await evalNext(stream, context);
+            const key = evalValue(stream.next(), context);
+            const value = await evalNext(stream, context);
+
+            if (!(ctx instanceof Context)) {
+                throw new Error("set expects a context as first argument");
+            }
+
+            const keyStr = isa(key, Str) ? key.value : String(key);
+
+            // Create new context with updated value
+            const newCtx = new Context(ctx.parent);
+            for (const [sym, val] of ctx.bindings) {
+                newCtx.bindings.set(sym, val);
+            }
+            newCtx.set(keyStr, value);
+
+            return newCtx;
+        }),
+    );
+
+    // keys <context>
+    // Get all keys from context
+    context.set(
+        "keys",
+        native(async (stream, context) => {
+            const ctx = await evalNext(stream, context);
+
+            if (!(ctx instanceof Context)) {
+                throw new Error("keys expects a context");
+            }
+
+            const keyNames = [];
+            for (const [sym] of ctx.bindings) {
+                const name = sym.description;
+                // Skip internal metadata
+                if (name.startsWith("_") || name === "SYSTEM") continue;
+                keyNames.push(new Str(name));
+            }
+
+            return new Block(keyNames);
+        }),
+    );
+
+    // values <context>
+    // Get all values from context
+    context.set(
+        "values",
+        native(async (stream, context) => {
+            const ctx = await evalNext(stream, context);
+
+            if (!(ctx instanceof Context)) {
+                throw new Error("values expects a context");
+            }
+
+            const vals = [];
+            for (const [sym, value] of ctx.bindings) {
+                const name = sym.description;
+                // Skip internal metadata
+                if (name.startsWith("_") || name === "SYSTEM") continue;
+                vals.push(value);
+            }
+
+            return new Block(vals);
+        }),
+    );
+
+    // has? <context> <key>
+    // Check if context has key
+    context.set(
+        "has?",
+        native(async (stream, context) => {
+            const ctx = await evalNext(stream, context);
+            const key = evalValue(stream.next(), context);
+
+            if (!(ctx instanceof Context)) {
+                throw new Error("has? expects a context as first argument");
+            }
+
+            const keyStr = isa(key, Str) ? key.value : String(key);
+            const result = ctx.bindings.has(Symbol.for(keyStr.toUpperCase()));
+            return result;
+        }),
+    );
+
     // system - reference to the prelude context itself
     context.set("system", context);
 
     return context;
+}
+
+// Helper: Convert JS value to Bassline value
+function jsToBassline(value, parentContext) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    if (typeof value === "number") {
+        return new Num(value);
+    }
+    if (typeof value === "string") {
+        return new Str(value);
+    }
+    if (typeof value === "boolean") {
+        return value;
+    }
+    if (Array.isArray(value)) {
+        return new Block(value.map((v) => jsToBassline(v, parentContext)));
+    }
+    if (typeof value === "object") {
+        const ctx = new Context(parentContext);
+        for (const [key, val] of Object.entries(value)) {
+            ctx.set(key, jsToBassline(val, parentContext));
+        }
+        return ctx;
+    }
+    return value;
+}
+
+// Helper: Convert Bassline value to JS value
+function basslineToJs(value) {
+    if (isa(value, Num)) {
+        return value.value;
+    }
+    if (isa(value, Str)) {
+        return value.value;
+    }
+    if (isa(value, Block)) {
+        return value.items.map(basslineToJs);
+    }
+    if (value instanceof Context) {
+        const obj = {};
+        for (const [sym, val] of value.bindings) {
+            obj[sym.description] = basslineToJs(val);
+        }
+        return obj;
+    }
+    if (typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
+        return value;
+    }
+    if (value === null || value === undefined) {
+        return null;
+    }
+    return value;
 }
 
 // Deep inspection of a value for UI display

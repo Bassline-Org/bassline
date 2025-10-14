@@ -71,8 +71,8 @@ export default function BasslineRepl() {
         }
     }, [history]);
 
-    const handleExecute = (code: string) => {
-        const result = repl.eval(code);
+    const handleExecute = async (code: string) => {
+        const result = await repl.eval(code);
         setHistory([...history, { code, result }]);
         setHistoryIndex(-1); // Reset history navigation
         return result;
@@ -130,12 +130,12 @@ export default function BasslineRepl() {
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 const code = e.target?.result as string;
                 if (!code) return;
 
                 // Execute the loaded code
-                const result = repl.eval(code);
+                const result = await repl.eval(code);
                 setHistory([...history, { code, result }]);
             };
             reader.readAsText(file);
