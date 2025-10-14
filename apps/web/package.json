@@ -23,6 +23,7 @@
     "@bassline/systems": "workspace:*",
     "@bassline/taps": "workspace:*",
     "@bassline/views": "workspace:*",
+    "@bassline/lang": "workspace:*",
     "@dagrejs/dagre": "^1.1.5",
     "@radix-ui/react-context-menu": "^2.2.15",
     "@radix-ui/react-dialog": "^1.1.14",

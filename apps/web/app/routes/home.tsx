@@ -32,6 +32,20 @@ export default function Home() {
                             <Button variant="default">Open Sex Editor</Button>
                         </div>
                     </Link>
+
+                    {/* Bassline REPL */}
+                    <Link to="/bassline-repl" className="block">
+                        <div className="border border-blue-200 rounded-lg p-6 hover:border-blue-300 hover:shadow-lg transition-all bg-blue-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                💬 Bassline REPL
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Interactive Bassline language environment -
+                                evaluate code, explore the system
+                            </p>
+                            <Button variant="default">Open REPL</Button>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>
