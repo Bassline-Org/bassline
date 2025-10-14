@@ -9,16 +9,7 @@ import {
     sequenceOf,
     whitespace,
 } from "arcsecond/index.js";
-import {
-    Block,
-    GetWord,
-    LitWord,
-    Num,
-    Paren,
-    SetWord,
-    Str,
-    Word,
-} from "./cells/index.js";
+import { Block, Num, Paren, SetWord, Str, Word } from "./values.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([
@@ -32,7 +23,7 @@ const ws = many(
 
 // ===== Numbers =====
 const number = choice([
-    digits.map((int) => new Num({ value: Number(int) })),
+    digits.map((int) => new Num(Number(int))),
 ]).errorMap(() => "Expected number");
 
 // ===== Strings =====
@@ -56,41 +47,27 @@ const stringLiteral = sequenceOf([
     char('"'),
     many(stringChar),
     char('"'),
-]).map(([_, chars, __]) => new Str({ value: chars.join("") }))
+]).map(([_, chars, __]) => new Str(String(chars.join(""))))
     .errorMap(() => "Expected string");
 
 // ===== Words =====
 // Word characters (no slash for path parsing)
 const wordChars = regex(/^[^ \t\n\r\[\](){}";:\/]+/);
 
-// 'word
-const litWord = sequenceOf([
-    char("'"),
-    wordChars,
-]).map(([_, spelling]) => new LitWord({ spelling }))
-    .errorMap(() => "Expected lit word");
-
-// :word
-const getWord = sequenceOf([
-    char(":"),
-    wordChars,
-]).map(([_, spelling]) => new GetWord({ spelling }))
-    .errorMap(() => "Expected get word");
-
 // word:
 const setWord = sequenceOf([
     wordChars,
     char(":"),
-]).map(([spelling, _]) => new SetWord({ spelling }))
+]).map(([spelling, _]) => new SetWord(spelling))
     .errorMap(() => "Expected set word");
 
 // word
 const normalWord = sequenceOf([
     wordChars,
-]).map(([spelling]) => new Word({ spelling }))
+]).map(([spelling]) => new Word(spelling))
     .errorMap(() => "Expected normal word");
 
-const word = choice([setWord, litWord, getWord, normalWord]);
+const word = choice([setWord, normalWord]);
 
 // Forward declare for recursion
 const value = recursiveParser(() => valueParser);
@@ -101,7 +78,7 @@ const blockParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char("]"),
-]).map(([_, __, items, ___]) => new Block({ value: items }))
+]).map(([_, __, items, ___]) => new Block(items))
     .errorMap(() => "Expected block");
 
 // ===== Parens =====
@@ -110,7 +87,7 @@ const parenParser = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     char(")"),
-]).map(([_, __, items, ___]) => new Paren({ value: items }))
+]).map(([_, __, items, ___]) => new Paren(items))
     .errorMap(() => "Expected paren");
 
 const valueParser = choice([
@@ -126,7 +103,7 @@ const program = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     endOfInput,
-]).map(([_, values, __]) => values); // Return as block!
+]).map(([_, values, __]) => new Block(values)); // Return as block!
 
 export function parse(source) {
     const result = program.run(source);
