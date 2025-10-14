@@ -330,65 +330,24 @@ interface ViewComponentProps {
 }
 
 function ViewComponent({ component }: ViewComponentProps) {
-    const { repl, rawRepl, version } = useREPL();
-    const { component: name, args, handlers = {} } = component;
-    const [evaledArgs, setEvaledArgs] = useState<any[]>([]);
+    const { repl } = useREPL();
 
-    // Re-evaluate expressions whenever version changes
-    useEffect(() => {
-        const evaluateArgs = async () => {
-            const results = await Promise.all(
-                args.map(async (arg: any) => {
-                    if (arg.type === "expr") {
-                        // Use rawRepl to avoid incrementing version on reads
-                        const result = await rawRepl.eval(arg.code);
-                        if (result.ok) {
-                            return result.value;
-                        }
-                        return null;
-                    } else if (arg.type === "value") {
-                        return arg.value;
-                    } else if (arg.type === "view") {
-                        // Nested view objects - pass through
-                        return arg.value;
-                    } else if (arg.type === "block") {
-                        return arg.value;
-                    }
-                    return null;
-                })
-            );
-            setEvaledArgs(results);
-        };
-        evaluateArgs();
-    }, [version, args, rawRepl]);
+    // Component data is now pre-evaluated and structured from view.js
+    const { type, value, label, action, onChange, checked, variant, children } = component;
 
-    // Helper to extract value from evaluated arg
-    const getValue = (val: any) => {
-        // Handle Bassline types
-        if (val && typeof val === "object") {
-            if (val.constructor?.name === "Num") return val.value;
-            if (val.constructor?.name === "Str") return val.value;
-        }
-        return val;
-    };
-
-    switch (name) {
+    switch (type) {
         case "text": {
-            // Concatenate all string arguments from evaluated args
-            const text = evaledArgs.map(getValue).filter((v: any) => v !== null).join("");
-            return <div className="text-slate-900">{text}</div>;
+            return <div className="text-slate-900">{value || ""}</div>;
         }
 
         case "button": {
-            const label = getValue(evaledArgs[0]) || "Button";
-            const action = handlers["on-click"];
-
             const handleClick = async () => {
                 if (action && repl) {
                     try {
-                        if (typeof action === "string") {
-                            await repl.eval(action);
-                        }
+                        // Execute the Bassline block
+                        const { moldValue } = await import("@bassline/lang/prelude/helpers");
+                        const code = moldValue(action);
+                        await repl.eval(code);
                     } catch (error) {
                         console.error("Error executing button action:", error);
                     }
@@ -400,26 +359,25 @@ function ViewComponent({ component }: ViewComponentProps) {
                     onClick={handleClick}
                     className="px-4 py-2 bg-violet-600 text-white rounded hover:bg-violet-700 transition-colors"
                 >
-                    {label}
+                    {label || "Button"}
                 </button>
             );
         }
 
         case "input": {
-            const [value, setValue] = useState("");
-            const placeholder = getValue(args[0]) || "Enter text...";
-            const onChange = handlers["on-change"];
+            const [inputValue, setInputValue] = useState(value || "");
 
             const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                 const newValue = e.target.value;
-                setValue(newValue);
+                setInputValue(newValue);
 
                 if (onChange && repl) {
                     try {
                         // Set 'value' variable in context before executing handler
                         await repl.eval(`value: "${newValue}"`);
-                        await repl.eval(onChange);
-                        // Re-render happens automatically via version tracking
+                        const { moldValue } = await import("@bassline/lang/prelude/helpers");
+                        const code = moldValue(onChange);
+                        await repl.eval(code);
                     } catch (error) {
                         console.error("Error executing input change handler:", error);
                     }
@@ -429,27 +387,27 @@ function ViewComponent({ component }: ViewComponentProps) {
             return (
                 <input
                     type="text"
-                    value={value}
+                    value={inputValue}
                     onChange={handleChange}
-                    placeholder={placeholder}
+                    placeholder={value || "Enter text..."}
                     className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
             );
         }
 
         case "checkbox": {
-            const [checked, setChecked] = useState(false);
-            const label = getValue(evaledArgs[0]) || "";
-            const onChange = handlers["on-change"];
+            const [isChecked, setIsChecked] = useState(checked || false);
 
             const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
                 const newChecked = e.target.checked;
-                setChecked(newChecked);
+                setIsChecked(newChecked);
 
                 if (onChange && repl) {
                     try {
                         await repl.eval(`checked: ${newChecked}`);
-                        await repl.eval(onChange);
+                        const { moldValue } = await import("@bassline/lang/prelude/helpers");
+                        const code = moldValue(onChange);
+                        await repl.eval(code);
                     } catch (error) {
                         console.error("Error executing checkbox change handler:", error);
                     }
@@ -460,7 +418,7 @@ function ViewComponent({ component }: ViewComponentProps) {
                 <label className="flex items-center gap-2 cursor-pointer">
                     <input
                         type="checkbox"
-                        checked={checked}
+                        checked={isChecked}
                         onChange={handleChange}
                         className="w-4 h-4 text-violet-600 rounded focus:ring-2 focus:ring-violet-500"
                     />
@@ -470,9 +428,6 @@ function ViewComponent({ component }: ViewComponentProps) {
         }
 
         case "badge": {
-            const label = getValue(evaledArgs[0]) || "";
-            const variant = getValue(evaledArgs[1]) || "default";
-
             const variantMap: Record<string, string> = {
                 default: "bg-slate-100 text-slate-800",
                 success: "bg-green-100 text-green-800",
@@ -480,11 +435,11 @@ function ViewComponent({ component }: ViewComponentProps) {
                 error: "bg-red-100 text-red-800",
                 info: "bg-blue-100 text-blue-800",
             };
-            const variantClasses = variantMap[variant] || "bg-slate-100 text-slate-800";
+            const variantClasses = variantMap[variant || "default"] || "bg-slate-100 text-slate-800";
 
             return (
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${variantClasses}`}>
-                    {label}
+                    {label || ""}
                 </span>
             );
         }
@@ -493,92 +448,53 @@ function ViewComponent({ component }: ViewComponentProps) {
             return <hr className="border-t border-slate-200 my-2" />;
         }
 
-        case "foreach": {
-            // foreach <collection> <item-name> <template-block>
-            const collection = getValue(evaledArgs[0]);
-            const itemName = getValue(args[1]); // Word/string from args, not evaledArgs
-            const templateBlock = args[2]?.value; // Block object
-
-            if (!collection || !Array.isArray(collection)) {
-                return <span className="text-red-600">foreach: collection must be an array</span>;
-            }
-
-            if (!templateBlock) {
-                return <span className="text-red-600">foreach: missing template block</span>;
-            }
-
-            // For each item, we need to parse the template with the item bound to itemName
-            // Since we don't have scoped evaluation yet, we'll render a simplified version
-            return (
-                <div className="flex flex-col gap-1">
-                    {collection.map((item, idx) => {
-                        // For now, just render the item value
-                        // TODO: Parse template block with item in scope
-                        return (
-                            <div key={idx} className="text-slate-900">
-                                {String(item)}
-                            </div>
-                        );
-                    })}
-                </div>
-            );
-        }
-
         case "row": {
-            // Render children in a horizontal row
+            // Children are pre-evaluated component structures
             return (
                 <div className="flex flex-row gap-2 items-center">
-                    {evaledArgs.map((value, i) => {
-                        const val = getValue(value);
-                        if (value && typeof value === "object" && value.type === "view") {
-                            return <ViewRenderer key={i} view={value} />;
-                        }
-                        return <span key={i}>{String(val)}</span>;
-                    })}
+                    {(children || []).map((child: any, i: number) => (
+                        <ViewComponent key={i} component={child} />
+                    ))}
                 </div>
             );
         }
 
         case "column": {
-            // Render children in a vertical column
+            // Children are pre-evaluated component structures
             return (
                 <div className="flex flex-col gap-2">
-                    {evaledArgs.map((value, i) => {
-                        const val = getValue(value);
-                        if (value && typeof value === "object" && value.type === "view") {
-                            return <ViewRenderer key={i} view={value} />;
-                        }
-                        return <span key={i}>{String(val)}</span>;
-                    })}
+                    {(children || []).map((child: any, i: number) => (
+                        <ViewComponent key={i} component={child} />
+                    ))}
                 </div>
             );
         }
 
         case "panel": {
-            // Render children in a bordered panel with optional title
-            const title = getValue(evaledArgs[0]);
-            const childrenStart = title && typeof title === "string" ? 1 : 0;
-
             return (
                 <div className="border rounded-lg p-4 bg-white shadow-sm">
-                    {title && typeof title === "string" && (
-                        <h3 className="font-semibold mb-3 text-lg">{title}</h3>
-                    )}
                     <div className="space-y-2">
-                        {evaledArgs.slice(childrenStart).map((value, i) => {
-                            const val = getValue(value);
-                            if (value && typeof value === "object" && value.type === "view") {
-                                return <ViewRenderer key={i} view={value} />;
-                            }
-                            return <span key={i}>{String(val)}</span>;
-                        })}
+                        {(children || []).map((child: any, i: number) => (
+                            <ViewComponent key={i} component={child} />
+                        ))}
                     </div>
                 </div>
             );
         }
 
+        case "fragment": {
+            // Fragment is just a container for children
+            return (
+                <>
+                    {(children || []).map((child: any, i: number) => (
+                        <ViewComponent key={i} component={child} />
+                    ))}
+                </>
+            );
+        }
+
         default:
-            return <div className="text-slate-400 text-sm">Unknown component: {name}</div>;
+            return <div className="text-slate-400 text-sm">Unknown component: {type}</div>;
     }
 }
 

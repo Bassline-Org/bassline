@@ -1,63 +1,91 @@
-; ============================================
-; Bassline Language - View Dialect Demo
-; ============================================
+; VIEW Dialect Demo - Context-Based Component Constructors
 
-print "=== VIEW DIALECT - Level 1: Static Views ==="
-
-; Simple text view
-view [text "Hello World"]
-
-; Multiple components
-view [
-  text "Welcome to Bassline"
-  text "This is a view!"
+; Example 1: Simple components
+simple-view: view [
+    text "Hello World"
+    button "Click Me" [print "Button clicked!"]
+    separator
+    badge "New" "success"
 ]
 
-; Buttons
-view [
-  text "Click the button:"
-  button "Say Hello"
+; Example 2: Layouts
+layout-view: view [
+    column [
+        text "Vertical Layout"
+        row [
+            text "Item 1"
+            text "Item 2"
+            text "Item 3"
+        ]
+        panel [
+            text "Inside a panel"
+            separator
+            text "More content"
+        ]
+    ]
 ]
 
-; Input fields
-view [
-  text "Enter your name:"
-  input "Type here..."
+; Example 3: Foreach with dynamic items
+items: [1 2 3 4 5]
+
+foreach-view: view [
+    column [
+        text "Numbers:"
+        (foreach item items [
+            text (to-string item)
+        ])
+    ]
 ]
 
-; --- Level 2: Dynamic Values ---
+; Example 4: Foreach with nested components
+names: ["Alice" "Bob" "Charlie"]
 
-print "=== Level 2: Dynamic Values ==="
-
-; Reference variables
-name: "Bassline"
-version: 1
-
-view [
-  text "System: " name
-  text "Version: " (to-string version)
+names-view: view [
+    column [
+        text "Team Members:"
+        (foreach name names [
+            row [
+                badge (name) "info"
+                text "- Team member"
+            ]
+        ])
+    ]
 ]
 
-; Use expressions
-x: 10
-y: 20
+; Example 5: Conditional rendering with if
+show-details?: true
 
-view [
-  text "x = " (to-string x)
-  text "y = " (to-string y)
-  text "x + y = " (to-string (+ x y))
+conditional-view: view [
+    column [
+        text "Main Content"
+        (if show-details? [
+            panel [
+                text "These are the details"
+                separator
+                text "More information here"
+            ]
+        ])
+    ]
 ]
 
-; --- Level 3: Interactive (Coming Soon!) ---
+; Example 6: Combining foreach and conditionals
+scores: [85 92 78 65 95]
 
-print "=== Level 3: Interactive (TODO) ==="
-
-; This will work once we wire up button actions
-counter: 0
-
-view [
-  text "Count: " (to-string counter)
-  button "Increment"
+scores-view: view [
+    column [
+        text "Score Report:"
+        (foreach score scores [
+            (either (> score 80) [
+                row [
+                    text (to-string score)
+                    badge "Pass" "success"
+                ]
+            ] [
+                row [
+                    text (to-string score)
+                    badge "Review" "warning"
+                ]
+            ])
+        ])
+    ]
 ]
-
-print "=== END VIEW DEMO ==="

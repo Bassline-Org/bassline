@@ -6,6 +6,7 @@ import { ex, evalNext } from "../evaluator.js";
 export function installControlFlow(context) {
     // foreach <word> <series> <body>
     // Iterate over a block, binding each item to word
+    // Returns an array of all results
     context.set(
         "foreach",
         native(async (stream, context) => {
@@ -30,15 +31,16 @@ export function installControlFlow(context) {
                 throw new Error("foreach expects a block or array to iterate");
             }
 
-            let result;
+            const results = [];
             for (const item of items) {
                 // Bind item to the word in context
                 context.set(itemWord.spelling, item);
                 // Execute body
-                result = ex(context, body);
+                const result = await ex(context, body);
+                results.push(result);
             }
 
-            return result; // Return last result
+            return results; // Return array of all results
         }),
     );
 

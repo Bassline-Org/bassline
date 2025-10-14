@@ -1,155 +1,244 @@
+import { Context } from "../context.js";
 import { native } from "../natives.js";
 import { isa } from "../utils.js";
-import { Block, Word, Paren, Str, Num } from "../values.js";
-import { moldValue } from "./helpers.js";
+import { Block, Paren, Word } from "../values.js";
+import { ex, evalNext } from "../evaluator.js";
+import { basslineToJs } from "./helpers.js";
 
-// Helper function to parse a Block into view components
-function parseViewBlock(block) {
+// Helper: Convert a value to component data structure(s)
+async function resolveToComponents(value, viewContext) {
+    // Already a component object
+    if (value && typeof value === "object" && value.type && !isa(value, Block) && !isa(value, Paren)) {
+        return [value];
+    }
+
+    // Block - parse as VIEW
+    if (isa(value, Block)) {
+        return await parseViewBlock(value, viewContext);
+    }
+
+    // Array (from foreach, map, etc.) - resolve each item
+    if (Array.isArray(value)) {
+        const results = [];
+        for (const item of value) {
+            const resolved = await resolveToComponents(item, viewContext);
+            results.push(...resolved);
+        }
+        return results;
+    }
+
+    // Literal value - render as text
+    const jsValue = basslineToJs(value);
+    if (jsValue !== null && jsValue !== undefined) {
+        return [{ type: "text", value: String(jsValue) }];
+    }
+
+    return [];
+}
+
+// Parse a block as VIEW components using the VIEW context
+async function parseViewBlock(block, viewContext) {
     const components = [];
-    const viewStream = block.stream();
-    const layoutComponents = ["row", "column", "panel"];
+    const stream = block.stream();
 
-    while (!viewStream.done()) {
-        const componentName = viewStream.next();
+    while (!stream.done()) {
+        const current = stream.next();
 
-        if (!isa(componentName, Word)) {
-            // Skip non-words (could be values)
+        // Paren - evaluate in VIEW context and convert result to components
+        if (isa(current, Paren)) {
+            const result = await ex(viewContext, current);
+            const resolved = await resolveToComponents(result, viewContext);
+            components.push(...resolved);
             continue;
         }
 
-        // Get lowercase component name (case-insensitive)
-        const name = componentName.spelling.description.toLowerCase();
-        const isLayoutComponent = layoutComponents.includes(name);
-
-        // Special handling for foreach
-        if (name === "foreach") {
-            // foreach <collection-expr> <item-name> [template-block]
-            const collectionExpr = viewStream.next();
-            const itemName = viewStream.next();
-            const templateBlock = viewStream.next();
-
-            if (!isa(templateBlock, Block)) {
-                throw new Error("foreach expects a block template");
+        // Word - lookup in VIEW context and call if it's a component constructor
+        if (isa(current, Word)) {
+            const value = viewContext.get(current.spelling);
+            if (value?.call) {
+                // It's a native function - call it
+                const component = await value.call(stream, viewContext);
+                const resolved = await resolveToComponents(component, viewContext);
+                components.push(...resolved);
+            } else if (value !== undefined) {
+                // It's a value reference
+                const resolved = await resolveToComponents(value, viewContext);
+                components.push(...resolved);
             }
-
-            // Store foreach metadata for React to expand
-            components.push({
-                component: "foreach",
-                args: [
-                    { type: "expr", code: moldValue(collectionExpr) },
-                    { type: "value", value: itemName },
-                    { type: "block", value: templateBlock },
-                ],
-                handlers: {},
-            });
             continue;
         }
 
-        // Parse component arguments and event handlers
-        const args = [];
-        const handlers = {};
-
-        while (!viewStream.done()) {
-            const next = viewStream.peek();
-
-            // If it's a word that looks like a component name, stop
-            if (
-                isa(next, Word) &&
-                [
-                    "text",
-                    "button",
-                    "input",
-                    "checkbox",
-                    "badge",
-                    "separator",
-                    "row",
-                    "column",
-                    "panel",
-                    "foreach",
-                ].includes(
-                    next.spelling.description.toLowerCase(),
-                )
-            ) {
-                break;
+        // Block - parse as nested VIEW fragment
+        if (isa(current, Block)) {
+            const nested = await parseViewBlock(current, viewContext);
+            if (nested.length > 0) {
+                components.push({
+                    type: "fragment",
+                    children: nested
+                });
             }
-
-            const arg = viewStream.next();
-
-            // Check for event handler keywords (on-click, on-change, etc.)
-            if (
-                isa(arg, Word) &&
-                arg.spelling.description.toLowerCase().startsWith("on-")
-            ) {
-                const eventName = arg.spelling.description.toLowerCase();
-                const actionBlock = viewStream.next();
-                if (isa(actionBlock, Block)) {
-                    // Extract inner code without block delimiters
-                    const inner = actionBlock.items.map(moldValue).join(
-                        " ",
-                    );
-                    handlers[eventName] = inner;
-                }
-                continue;
-            }
-
-            // Store arguments as evaluable expressions for reactivity
-            if (isa(arg, Block)) {
-                // For layout components, recursively parse Block args as nested views
-                if (isLayoutComponent) {
-                    const nestedView = {
-                        type: "view",
-                        components: parseViewBlock(arg),
-                    };
-                    args.push({ type: "view", value: nestedView });
-                } else {
-                    // For other components, keep as block
-                    args.push({ type: "block", value: arg });
-                }
-            } else if (isa(arg, Paren)) {
-                // Store Parens as molded code for re-evaluation on each render
-                const molded = moldValue(arg);
-                args.push({ type: "expr", code: molded });
-            } else if (isa(arg, Word)) {
-                // Store Words as references for re-evaluation on each render
-                const molded = moldValue(arg);
-                args.push({ type: "expr", code: molded });
-            } else if (isa(arg, Str) || isa(arg, Num)) {
-                // Literals are evaluated once and stored
-                args.push({ type: "value", value: arg });
-            } else {
-                args.push({ type: "value", value: arg });
-            }
+            continue;
         }
 
-        components.push({
-            component: name,
-            args,
-            handlers,
-        });
+        // Other values (literals) - convert to text
+        const resolved = await resolveToComponents(current, viewContext);
+        components.push(...resolved);
     }
 
     return components;
 }
 
+// Bind component constructor functions to VIEW context
+function bindComponentConstructors(viewContext) {
+    // text <value>
+    // Render a text node
+    viewContext.set("text", native(async (stream, context) => {
+        const value = await evalNext(stream, context);
+        const jsValue = basslineToJs(value);
+        return {
+            type: "text",
+            value: String(jsValue ?? "")
+        };
+    }));
+
+    // button <label> <action>
+    // Render a button with click handler
+    viewContext.set("button", native(async (stream, context) => {
+        const label = await evalNext(stream, context);
+        const action = stream.next(); // Keep as Bassline block for later execution
+
+        return {
+            type: "button",
+            label: String(basslineToJs(label) ?? ""),
+            action: action // Block to execute on click
+        };
+    }));
+
+    // input <value> <on-change>
+    // Render an input field
+    viewContext.set("input", native(async (stream, context) => {
+        const value = await evalNext(stream, context);
+        const onChange = stream.next(); // Block to execute on change
+
+        return {
+            type: "input",
+            value: String(basslineToJs(value) ?? ""),
+            onChange: onChange
+        };
+    }));
+
+    // checkbox <checked> <on-change>
+    // Render a checkbox
+    viewContext.set("checkbox", native(async (stream, context) => {
+        const checked = await evalNext(stream, context);
+        const onChange = stream.next(); // Block to execute on change
+
+        return {
+            type: "checkbox",
+            checked: Boolean(basslineToJs(checked)),
+            onChange: onChange
+        };
+    }));
+
+    // badge <label> [variant]
+    // Render a badge/tag component
+    viewContext.set("badge", native(async (stream, context) => {
+        const label = await evalNext(stream, context);
+
+        // Optional variant
+        let variant = "default";
+        if (!stream.done()) {
+            const next = stream.peek();
+            // Check if next looks like another component name
+            if (!isa(next, Word) || !["text", "button", "input", "checkbox", "badge", "separator", "row", "column", "panel"].includes(next.spelling.description.toLowerCase())) {
+                const variantValue = await evalNext(stream, context);
+                variant = String(basslineToJs(variantValue) ?? "default");
+            }
+        }
+
+        return {
+            type: "badge",
+            label: String(basslineToJs(label) ?? ""),
+            variant: variant
+        };
+    }));
+
+    // separator
+    // Render a horizontal line
+    viewContext.set("separator", native(async (stream, context) => {
+        return {
+            type: "separator"
+        };
+    }));
+
+    // row [children...]
+    // Horizontal layout
+    viewContext.set("row", native(async (stream, context) => {
+        const block = stream.next();
+        if (!isa(block, Block)) {
+            throw new Error("row expects a block of children");
+        }
+
+        const children = await parseViewBlock(block, context);
+        return {
+            type: "row",
+            children: children
+        };
+    }));
+
+    // column [children...]
+    // Vertical layout
+    viewContext.set("column", native(async (stream, context) => {
+        const block = stream.next();
+        if (!isa(block, Block)) {
+            throw new Error("column expects a block of children");
+        }
+
+        const children = await parseViewBlock(block, context);
+        return {
+            type: "column",
+            children: children
+        };
+    }));
+
+    // panel [children...]
+    // Container panel
+    viewContext.set("panel", native(async (stream, context) => {
+        const block = stream.next();
+        if (!isa(block, Block)) {
+            throw new Error("panel expects a block of children");
+        }
+
+        const children = await parseViewBlock(block, context);
+        return {
+            type: "panel",
+            children: children
+        };
+    }));
+}
+
 export function installView(context) {
     // view <block>
     // Create a view description from a block
-    context.set(
-        "view",
-        native(async (stream, context) => {
-            const block = stream.next();
+    context.set("view", native(async (stream, context) => {
+        const block = stream.next();
 
-            if (!isa(block, Block)) {
-                throw new Error("view expects a block");
-            }
+        if (!isa(block, Block)) {
+            throw new Error("view expects a block");
+        }
 
-            // Parse the view block into a view description
-            const components = parseViewBlock(block);
+        // Create VIEW context extending parent context
+        const viewContext = new Context(context);
 
-            return {
-                type: "view",
-                components,
-            };
-        }),
-    );
+        // Bind component constructors to VIEW context
+        bindComponentConstructors(viewContext);
+
+        // Parse the block using the VIEW context
+        const components = await parseViewBlock(block, viewContext);
+
+        return {
+            type: "view",
+            components: components
+        };
+    }));
 }

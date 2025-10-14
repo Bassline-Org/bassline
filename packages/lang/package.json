@@ -6,7 +6,8 @@
   "module": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./repl": "./src/repl.js"
+    "./repl": "./src/repl.js",
+    "./prelude/helpers": "./src/prelude/helpers.js"
   },
   "bin": {
     "bassline-daemon": "./src/daemon.js",
