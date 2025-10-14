@@ -297,8 +297,104 @@ function InspectedValue({ value, depth, expanded, setExpanded }: InspectedValueP
         case "error":
             return <div className="text-red-600">Error: {value.message}</div>;
 
+        case "view":
+            return <ViewRenderer view={value} />;
+
         default:
             return <span className="text-slate-400">{value.type}</span>;
+    }
+}
+
+interface ViewRendererProps {
+    view: any;
+}
+
+function ViewRenderer({ view }: ViewRendererProps) {
+    if (!view.components || view.components.length === 0) {
+        return <div className="text-slate-400 text-sm">Empty view</div>;
+    }
+
+    return (
+        <div className="border rounded-lg p-4 bg-white shadow-sm space-y-2">
+            {view.components.map((comp: any, i: number) => (
+                <ViewComponent key={i} component={comp} />
+            ))}
+        </div>
+    );
+}
+
+interface ViewComponentProps {
+    component: any;
+}
+
+function ViewComponent({ component }: ViewComponentProps) {
+    const { component: name, args } = component;
+
+    // Helper to extract value from arg
+    const getValue = (arg: any) => {
+        if (arg.type === "value") {
+            const val = arg.value;
+            // Handle Bassline types
+            if (val && typeof val === "object") {
+                if (val.constructor?.name === "Num") return val.value;
+                if (val.constructor?.name === "Str") return val.value;
+            }
+            return val;
+        }
+        return null;
+    };
+
+    switch (name) {
+        case "text": {
+            // Concatenate all string arguments
+            const text = args.map(getValue).filter((v: any) => v !== null).join("");
+            return <div className="text-slate-900">{text}</div>;
+        }
+
+        case "button": {
+            const label = getValue(args[0]) || "Button";
+            const action = args[1]?.value; // Block for action
+
+            const handleClick = () => {
+                if (action) {
+                    console.log("Button clicked, action:", action);
+                    // TODO: Execute action block
+                }
+            };
+
+            return (
+                <button
+                    onClick={handleClick}
+                    className="px-4 py-2 bg-violet-600 text-white rounded hover:bg-violet-700 transition-colors"
+                >
+                    {label}
+                </button>
+            );
+        }
+
+        case "input": {
+            const placeholder = getValue(args[0]) || "Enter text...";
+            return (
+                <input
+                    type="text"
+                    placeholder={placeholder}
+                    className="px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+            );
+        }
+
+        case "row": {
+            // TODO: Render children in a row
+            return <div className="flex gap-2">Row layout (TODO)</div>;
+        }
+
+        case "column": {
+            // TODO: Render children in a column
+            return <div className="flex flex-col gap-2">Column layout (TODO)</div>;
+        }
+
+        default:
+            return <div className="text-slate-400 text-sm">Unknown component: {name}</div>;
     }
 }
 
