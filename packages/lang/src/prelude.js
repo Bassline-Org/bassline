@@ -37,8 +37,7 @@ export function ex(context, code) {
             // If callable (native or dialect), invoke it
             if (value?.call) {
                 result = value.call(stream, context);
-            }
-            // If it's a function, call it
+            } // If it's a function, call it
             else if (value?._function) {
                 result = callFunction(value, stream, context);
             } else {
@@ -286,7 +285,7 @@ export function createPreludeContext() {
         "in",
         native((stream, context) => {
             const targetContext = evalValue(stream.next(), context);
-            const block = stream.next();
+            const block = evalNext(stream, context);
 
             if (!isa(block, Block)) {
                 throw new Error("in expects a block as second argument");
@@ -430,10 +429,218 @@ export function createPreludeContext() {
 
     // --- Reflection ---
 
+    // inspect - deep inspection of any value
+    context.set(
+        "inspect",
+        native((stream, context) => {
+            const value = evalNext(stream, context);
+            return inspectValue(value);
+        }),
+    );
+
+    // help - list available functions or get help for a specific function
+    context.set(
+        "help",
+        native((stream, context) => {
+            // Check if there's an argument (function name to get help for)
+            const next = stream.peek();
+
+            if (next === undefined) {
+                // No argument - list all available functions
+                const functions = [];
+                for (const [sym] of context.bindings) {
+                    const spelling = sym.description;
+                    // Skip internal metadata
+                    if (spelling.startsWith("_")) continue;
+                    functions.push(spelling);
+                }
+
+                // Sort alphabetically
+                functions.sort();
+
+                return {
+                    type: "help",
+                    topic: "all",
+                    functions,
+                };
+            }
+
+            // Get help for specific function
+            const nameValue = stream.next();
+            let name;
+
+            if (isa(nameValue, Word)) {
+                name = nameValue.spelling.description;
+            } else {
+                return { type: "error", message: "help expects a word" };
+            }
+
+            const normalized = Symbol.for(name.toUpperCase());
+            if (!context.bindings.has(normalized)) {
+                return {
+                    type: "help",
+                    topic: name,
+                    found: false,
+                    message: `No function found: ${name}`,
+                };
+            }
+
+            const value = context.bindings.get(normalized);
+
+            // Return help info based on what it is
+            if (value?.call) {
+                return {
+                    type: "help",
+                    topic: name,
+                    found: true,
+                    kind: "native",
+                    description: "Built-in native function",
+                };
+            }
+
+            if (
+                value instanceof Context &&
+                value.bindings.has(Symbol.for("_FUNCTION"))
+            ) {
+                const argNames = value.bindings.get(Symbol.for("_ARGNAMES")) ||
+                    [];
+                const argEval = value.bindings.get(Symbol.for("_ARGEVAL")) ||
+                    [];
+
+                return {
+                    type: "help",
+                    topic: name,
+                    found: true,
+                    kind: "function",
+                    args: argNames.map((argName, i) => ({
+                        name: argName.description,
+                        literal: !argEval[i],
+                    })),
+                };
+            }
+
+            return {
+                type: "help",
+                topic: name,
+                found: true,
+                kind: "value",
+                valueType: typeof value,
+            };
+        }),
+    );
+
     // system - reference to the prelude context itself
     context.set("system", context);
 
     return context;
+}
+
+// Deep inspection of a value for UI display
+function inspectValue(val) {
+    // Bassline value types
+    if (isa(val, Num)) {
+        return { type: "num", value: val.value };
+    }
+
+    if (isa(val, Str)) {
+        return { type: "str", value: val.value };
+    }
+
+    if (isa(val, LitWord)) {
+        return { type: "lit-word", spelling: val.spelling.description };
+    }
+
+    if (isa(val, SetWord)) {
+        return { type: "set-word", spelling: val.spelling.description };
+    }
+
+    if (isa(val, Word)) {
+        return { type: "word", spelling: val.spelling.description };
+    }
+
+    if (isa(val, Block)) {
+        return {
+            type: "block",
+            items: val.items.map(inspectValue),
+        };
+    }
+
+    if (isa(val, Paren)) {
+        return {
+            type: "paren",
+            items: val.items.map(inspectValue),
+        };
+    }
+
+    // Context inspection
+    if (val instanceof Context) {
+        const bindings = [];
+        const isFunction = val.bindings.has(Symbol.for("_FUNCTION"));
+
+        for (const [sym, value] of val.bindings) {
+            const spelling = sym.description;
+            // Skip internal metadata and system self-reference
+            if (
+                spelling === "_FUNCTION" ||
+                spelling === "_ARGNAMES" ||
+                spelling === "_ARGEVAL" ||
+                spelling === "SYSTEM"
+            ) {
+                continue;
+            }
+            bindings.push({
+                name: spelling,
+                value: inspectValue(value),
+            });
+        }
+
+        if (isFunction) {
+            // For functions, also show argument info
+            const argNames = val.bindings.get(Symbol.for("_ARGNAMES")) || [];
+            const argEval = val.bindings.get(Symbol.for("_ARGEVAL")) || [];
+
+            return {
+                type: "function",
+                args: argNames.map((name, i) => ({
+                    name: name.description,
+                    literal: !argEval[i],
+                })),
+                bindings,
+                parent: val.parent ? "[parent context]" : null,
+            };
+        }
+
+        return {
+            type: "context",
+            bindings,
+            parent: val.parent ? "[parent context]" : null,
+        };
+    }
+
+    // JS primitives (from evaluation results)
+    if (typeof val === "number") {
+        return { type: "num", value: val };
+    }
+
+    if (typeof val === "string") {
+        return { type: "str", value: val };
+    }
+
+    if (typeof val === "boolean") {
+        return { type: "bool", value: val };
+    }
+
+    if (val === null || val === undefined) {
+        return { type: "none" };
+    }
+
+    // Complex objects (natives, etc.)
+    if (val?.call) {
+        return { type: "native" };
+    }
+
+    // Generic object
+    return { type: "object", value: String(val) };
 }
 
 // Serialize a value to valid Bassline code
