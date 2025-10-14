@@ -1,7 +1,7 @@
 import { Context } from "./context.js";
 import { evalValue, native } from "./natives.js";
 import { isa, isSelfEvaluating } from "./utils.js";
-import { Block, SetWord, Word } from "./values.js";
+import { Block, Num, SetWord, Word } from "./values.js";
 import { gadgetNative } from "./dialects/gadget.js";
 import { linkNative } from "./dialects/link.js";
 
@@ -116,6 +116,141 @@ export function createPreludeContext() {
         native((stream, context) => {
             const gadget = evalValue(stream.next(), context);
             return gadget.current();
+        }),
+    );
+
+    // --- Arithmetic ---
+
+    // + <a> <b>
+    context.set(
+        "+",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return new Num(a + b);
+        }),
+    );
+
+    // - <a> <b>
+    context.set(
+        "-",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return new Num(a - b);
+        }),
+    );
+
+    // * <a> <b>
+    context.set(
+        "*",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return new Num(a * b);
+        }),
+    );
+
+    // / <a> <b>
+    context.set(
+        "/",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return new Num(a / b);
+        }),
+    );
+
+    // --- Comparison ---
+
+    // = <a> <b>
+    context.set(
+        "=",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return a === b;
+        }),
+    );
+
+    // < <a> <b>
+    context.set(
+        "<",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return a < b;
+        }),
+    );
+
+    // > <a> <b>
+    context.set(
+        ">",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return a > b;
+        }),
+    );
+
+    // <= <a> <b>
+    context.set(
+        "<=",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return a <= b;
+        }),
+    );
+
+    // >= <a> <b>
+    context.set(
+        ">=",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return a >= b;
+        }),
+    );
+
+    // not= <a> <b>
+    context.set(
+        "not=",
+        native((stream, context) => {
+            const a = evalValue(stream.next(), context);
+            const b = evalValue(stream.next(), context);
+            return a !== b;
+        }),
+    );
+
+    // --- Boolean values ---
+    context.set("true", true);
+    context.set("false", false);
+
+    // --- Context manipulation ---
+
+    // context
+    // Create a new empty context
+    context.set(
+        "context",
+        native((_stream, context) => {
+            return new Context(context); // Parent is current context
+        }),
+    );
+
+    // in <context> <block>
+    // Evaluate block in the given context
+    context.set(
+        "in",
+        native((stream, context) => {
+            const targetContext = evalValue(stream.next(), context);
+            const block = stream.next();
+
+            if (!isa(block, Block)) {
+                throw new Error("in expects a block as second argument");
+            }
+
+            return ex(targetContext, block);
         }),
     );
 

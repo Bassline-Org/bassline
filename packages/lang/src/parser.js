@@ -51,8 +51,8 @@ const stringLiteral = sequenceOf([
     .errorMap(() => "Expected string");
 
 // ===== Words =====
-// Word characters (no slash for path parsing)
-const wordChars = regex(/^[^ \t\n\r\[\](){}";:\/]+/);
+// Word characters (allow everything except whitespace and delimiters)
+const wordChars = regex(/^[^ \t\n\r\[\](){}";:]+/);
 
 // word:
 const setWord = sequenceOf([

@@ -12,9 +12,12 @@ export function native(fn) {
 
 // Evaluate a value - resolve words, extract scalars
 export function evalValue(val, context) {
+    // Resolve words first
     if (isa(val, Word)) {
-        return context.get(val.spelling);
+        val = context.get(val.spelling);
     }
+
+    // Then unwrap scalars
     if (isa(val, Num)) {
         return val.value;
     }
