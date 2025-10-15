@@ -1,0 +1,227 @@
+; Conditionals in Bassline
+; Using if and either for conditional logic
+
+; Basic if - execute block only if condition is true
+x: 10
+if (> x 5) [
+    print "x is greater than 5"
+]
+
+; If with false condition (nothing happens)
+y: 3
+if (> y 10) [
+    print "This won't print"
+]
+
+; If with result
+age: 25
+status: if (>= age 18) ["adult"]
+; status is "adult"
+
+; If with false condition returns none
+status: if (< age 18) ["minor"]
+; status is none (condition was false)
+
+; Either - if-else (execute one of two blocks)
+score: 85
+result: either (>= score 60) [
+    "Pass"
+] [
+    "Fail"
+]
+; result is "Pass"
+
+; Either with complex expressions
+temperature: 75
+weather: either (> temperature 70) [
+    "It's warm outside"
+] [
+    "It's cool outside"
+]
+; weather is "It's warm outside"
+
+; Nested conditionals
+grade: 92
+letter: either (>= grade 90) [
+    "A"
+] [
+    either (>= grade 80) [
+        "B"
+    ] [
+        either (>= grade 70) [
+            "C"
+        ] [
+            "F"
+        ]
+    ]
+]
+; letter is "A"
+
+; Using conditionals with variables
+balance: 100
+withdraw: 30
+can-withdraw: >= balance withdraw
+
+either can-withdraw [
+    balance: - balance withdraw
+    print "Withdrawal successful"
+] [
+    print "Insufficient funds"
+]
+
+; Conditionals in loops
+numbers: [1 2 3 4 5 6 7 8 9 10]
+even-numbers: foreach n numbers [
+    either (= (% n 2) 0) [
+        n
+    ] [
+        none
+    ]
+]
+; even-numbers contains values and nones
+
+; Multiple conditions with and/or patterns
+; (Using nested either statements)
+username: "alice"
+password: "secret123"
+is-valid-user: = username "alice"
+is-valid-pass: = password "secret123"
+
+; Simulate AND - both must be true
+login-result: either is-valid-user [
+    either is-valid-pass [
+        "Login successful"
+    ] [
+        "Invalid password"
+    ]
+] [
+    "Invalid username"
+]
+
+; Checking for equality
+value: 42
+message: either (= value 42) [
+    "The answer!"
+] [
+    "Not quite..."
+]
+
+; Comparing strings
+name: "Alice"
+greeting: either (= name "Alice") [
+    "Welcome back, Alice!"
+] [
+    "Hello, stranger!"
+]
+
+; Using comparison operators
+a: 10
+b: 20
+
+; Greater than
+if (> b a) [print "b is greater than a"]
+
+; Less than
+if (< a b) [print "a is less than b"]
+
+; Greater than or equal
+if (>= a 10) [print "a is at least 10"]
+
+; Less than or equal
+if (<= b 20) [print "b is at most 20"]
+
+; Checking for none/null
+optional-value: none
+has-value: either (= optional-value none) [
+    false
+] [
+    true
+]
+
+; Conditionals in VIEW
+count: 5
+threshold: 10
+
+status-view: view [
+    column [
+        text "Current count:"
+        text (to-string count)
+        separator
+        (either (>= count threshold) [
+            row [
+                badge "Complete" "success"
+                text "- Goal reached!"
+            ]
+        ] [
+            row [
+                badge "In Progress" "warning"
+                text "- Keep going!"
+            ]
+        ])
+    ]
+]
+
+; Conditional rendering in lists
+items: [
+    ["Apple" 1.99 true]
+    ["Banana" 0.99 true]
+    ["Orange" 1.49 false]
+]
+
+item-list: view [
+    column [
+        text "Available Items:"
+        separator
+        (foreach item items [
+            name: at item 0
+            price: at item 1
+            in-stock: at item 2
+
+            either in-stock [
+                row [
+                    text (name)
+                    text " - $"
+                    text (to-string price)
+                    badge "In Stock" "success"
+                ]
+            ] [
+                row [
+                    text (name)
+                    badge "Out of Stock" "warning"
+                ]
+            ]
+        ])
+    ]
+]
+
+; Complex condition example - access control
+user-role: "admin"
+is-owner: true
+can-delete: false
+
+; Check multiple conditions
+can-delete: either (= user-role "admin") [
+    true
+] [
+    either is-owner [
+        true
+    ] [
+        false
+    ]
+]
+
+; Using conditionals for validation
+email: "user@example.com"
+is-valid-email: either (> (length email) 5) [
+    true
+] [
+    false
+]
+
+; Conditionals with blocks
+has-items: true
+items: either has-items [
+    [1 2 3 4 5]
+] [
+    []
+]

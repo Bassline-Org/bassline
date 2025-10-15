@@ -150,7 +150,7 @@ function bindComponentConstructors(viewContext) {
         if (!stream.done()) {
             const next = stream.peek();
             // Check if next looks like another component name
-            if (!isa(next, Word) || !["text", "button", "input", "checkbox", "badge", "separator", "row", "column", "panel"].includes(next.spelling.description.toLowerCase())) {
+            if (!isa(next, Word) || !["text", "button", "input", "checkbox", "badge", "separator", "row", "column", "panel", "table"].includes(next.spelling.description.toLowerCase())) {
                 const variantValue = await evalNext(stream, context);
                 variant = String(basslineToJs(variantValue) ?? "default");
             }
@@ -213,6 +213,76 @@ function bindComponentConstructors(viewContext) {
         return {
             type: "panel",
             children: children
+        };
+    }));
+
+    // table <headers> <rows>
+    // Render a data table
+    // headers: block of column names
+    // rows: block of blocks (each inner block is a row)
+    viewContext.set("table", native(async (stream, context) => {
+        const headersValue = await evalNext(stream, context);
+        const rowsValue = await evalNext(stream, context);
+
+        // Convert headers to array of strings
+        let headers = [];
+        if (isa(headersValue, Block)) {
+            headers = headersValue.items.map(item => String(basslineToJs(item) ?? ""));
+        } else if (Array.isArray(headersValue)) {
+            headers = headersValue.map(item => String(basslineToJs(item) ?? ""));
+        }
+
+        // Convert rows to array of arrays
+        let rows = [];
+        if (isa(rowsValue, Block)) {
+            rows = rowsValue.items.map(rowItem => {
+                if (isa(rowItem, Block)) {
+                    return rowItem.items.map(cell => basslineToJs(cell));
+                } else if (Array.isArray(rowItem)) {
+                    return rowItem.map(cell => basslineToJs(cell));
+                }
+                return [basslineToJs(rowItem)];
+            });
+        } else if (Array.isArray(rowsValue)) {
+            rows = rowsValue.map(rowItem => {
+                if (isa(rowItem, Block)) {
+                    return rowItem.items.map(cell => basslineToJs(cell));
+                } else if (Array.isArray(rowItem)) {
+                    return rowItem.map(cell => basslineToJs(cell));
+                }
+                return [basslineToJs(rowItem)];
+            });
+        }
+
+        return {
+            type: "table",
+            headers: headers,
+            rows: rows
+        };
+    }));
+
+    // code <code-string> [language]
+    // Render a code block with optional syntax highlighting
+    viewContext.set("code", native(async (stream, context) => {
+        const codeValue = await evalNext(stream, context);
+        const code = String(basslineToJs(codeValue) ?? "");
+
+        // Optional language parameter
+        let language = "plaintext";
+        if (!stream.done()) {
+            const next = stream.peek();
+            // Check if next looks like another component name
+            const componentNames = ["text", "button", "input", "checkbox", "badge", "separator", "row", "column", "panel", "table", "code"];
+            if (!isa(next, Word) || !componentNames.includes(next.spelling.description.toLowerCase())) {
+                const langValue = await evalNext(stream, context);
+                language = String(basslineToJs(langValue) ?? "plaintext");
+            }
+        }
+
+        return {
+            type: "code",
+            code: code,
+            language: language
         };
     }));
 }

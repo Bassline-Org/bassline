@@ -101,14 +101,11 @@ export function installReflection(context) {
                 };
             }
 
-            if (
-                value instanceof Context &&
-                value.bindings.has(Symbol.for("_FUNCTION"))
-            ) {
-                const argNames = value.bindings.get(Symbol.for("_ARGNAMES")) ||
-                    [];
-                const argEval = value.bindings.get(Symbol.for("_ARGEVAL")) ||
-                    [];
+            if (value instanceof Context && value._function) {
+                const argNames = value._argNames || [];
+                const argEval = value._argEval || [];
+                const doc = value.get(Symbol.for("DOC"));
+                const examples = value.get(Symbol.for("EXAMPLES"));
 
                 return {
                     type: "help",
@@ -119,6 +116,8 @@ export function installReflection(context) {
                         name: argName.description,
                         literal: !argEval[i],
                     })),
+                    doc: doc ? (isa(doc, Str) ? doc.value : String(doc)) : null,
+                    examples: examples,
                 };
             }
 
@@ -129,6 +128,85 @@ export function installReflection(context) {
                 kind: "value",
                 valueType: typeof value,
             };
+        }),
+    );
+
+    // doc <function> <doc-string>
+    // Add documentation to a function
+    context.set(
+        "doc",
+        native(async (stream, context) => {
+            const funcName = stream.next();
+            const docString = await evalNext(stream, context);
+
+            if (!isa(funcName, Word)) {
+                throw new Error(
+                    "doc expects a function name as first argument",
+                );
+            }
+
+            const name = funcName.spelling;
+            const func = context.get(name);
+
+            if (!func || !(func instanceof Context) || !func._function) {
+                throw new Error(`${name.description} is not a function`);
+            }
+
+            // Set documentation
+            func.set(Symbol.for("DOC"), docString);
+
+            return func;
+        }),
+    );
+
+    // describe 'word
+    // Get detailed description of a function or value (takes literal word)
+    context.set(
+        "describe",
+        native(async (stream, context) => {
+            const nameValue = stream.next();
+
+            if (!isa(nameValue, Word)) {
+                throw new Error("describe expects a word argument");
+            }
+
+            const name = nameValue.spelling;
+            const value = context.get(name);
+
+            if (!value) {
+                return new Str(`${name.description} is not defined.`);
+            }
+
+            // For functions, show signature + doc
+            if (value instanceof Context && value._function) {
+                const argNames = value._argNames || [];
+                const argEval = value._argEval || [];
+                const doc = value.get(Symbol.for("DOC"));
+
+                const argList = argNames.map((name, i) =>
+                    argEval[i] ? name.description : `'${name.description}`
+                ).join(" ");
+
+                const signature = `${name.description}: func [${argList}]`;
+                const docText = doc
+                    ? (isa(doc, Str) ? doc.value : String(doc))
+                    : "No documentation available.";
+
+                const description = `${signature}\n\n${docText}`;
+                return new Str(description);
+            }
+
+            // For native functions
+            if (value?.call) {
+                return new Str(
+                    `${name.description}: Built-in native function\n\nNo documentation available.`,
+                );
+            }
+
+            // For other values, show type and molded representation
+            const molded = moldValue(value);
+            const typeStr = value.constructor?.name || typeof value;
+            return new Str(`${name.description}: ${typeStr}\n\nValue: ${molded}`);
         }),
     );
 }

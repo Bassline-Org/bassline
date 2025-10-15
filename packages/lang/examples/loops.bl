@@ -1,69 +1,283 @@
-; Loop constructs example
+; Loops in Bassline
+; Using foreach, repeat, and while
 
-print "=== LOOP ==="
-loop 3 [
-    print "hello"
+; ========================================
+; FOREACH - Iterate over a series
+; ========================================
+
+; Basic foreach - iterate over numbers
+numbers: [1 2 3 4 5]
+foreach n numbers [
+    print n
+]
+; Prints: 1, 2, 3, 4, 5
+
+; Foreach with transformation
+doubled: foreach n numbers [
+    * n 2
+]
+; doubled is [2 4 6 8 10]
+
+; Foreach over strings
+names: ["Alice" "Bob" "Carol"]
+greetings: foreach name names [
+    message: "Hello, "
+    append message name
+]
+; greetings is ["Hello, Alice", "Hello, Bob", "Hello, Carol"]
+
+; Foreach with index tracking
+items: ["a" "b" "c"]
+index: 0
+indexed: foreach item items [
+    result: [index item]
+    index: + index 1
+    result
+]
+; indexed is [[0 "a"], [1 "b"], [2 "c"]]
+
+; Foreach with accumulation
+sum: 0
+numbers: [1 2 3 4 5]
+foreach n numbers [
+    sum: + sum n
+    sum
+]
+; sum is 15
+
+; Foreach with conditionals
+scores: [85 92 78 65 95]
+high-scores: foreach score scores [
+    either (>= score 80) [
+        score
+    ] [
+        none
+    ]
+]
+; high-scores contains scores >= 80 and none values
+
+; Foreach with nested data
+people: [
+    ["Alice" 30]
+    ["Bob" 25]
+    ["Carol" 35]
 ]
 
-print ""
-print "=== REPEAT ==="
-repeat i 5 [
-    print i
+ages: foreach person people [
+    at person 1
+]
+; ages is [30, 25, 35]
+
+; Foreach for side effects (mutation)
+counter: 0
+items: [1 2 3 4 5]
+foreach item items [
+    counter: + counter 1
+]
+; counter is 5 (counted all items)
+
+; ========================================
+; REPEAT - Execute a block n times
+; ========================================
+
+; Basic repeat
+repeat 3 [
+    print "Hello"
+]
+; Prints "Hello" 3 times
+
+; Repeat with counter
+counter: 0
+repeat 5 [
+    counter: + counter 1
+]
+; counter is 5
+
+; Repeat for building sequences
+result: []
+repeat 4 [
+    append result "item"
+]
+; result is ["item" "item" "item" "item"]
+
+; Repeat with calculations
+total: 0
+repeat 10 [
+    total: + total 1
+]
+; total is 10
+
+; ========================================
+; WHILE - Loop while condition is true
+; ========================================
+
+; Basic while loop
+count: 0
+while [< count 5] [
+    count: + count 1
+]
+; count is 5
+
+; While with complex condition
+balance: 100
+while [>= balance 10] [
+    balance: - balance 10
+]
+; balance is 0 (subtracted 10 until < 10)
+
+; While for searching
+items: [1 3 5 7 9]
+index: 0
+found: false
+target: 5
+
+while [(< index (length items))] [
+    current: at items index
+    either (= current target) [
+        found: true
+        index: length items  ; Exit loop
+    ] [
+        index: + index 1
+    ]
+]
+; found is true
+
+; While with accumulation
+sum: 0
+i: 1
+while [<= i 10] [
+    sum: + sum i
+    i: + i 1
+]
+; sum is 55 (1+2+...+10)
+
+; ========================================
+; NESTED LOOPS
+; ========================================
+
+; Nested foreach
+matrix: [
+    [1 2 3]
+    [4 5 6]
+    [7 8 9]
 ]
 
-print ""
-print "=== WHILE ==="
-x: 0
-while [(x < 5)] [
-    print x
-    x: (x + 1)
+all-values: foreach row matrix [
+    foreach value row [
+        value
+    ]
+]
+; all-values is [[1 2 3] [4 5 6] [7 8 9]] (nested arrays)
+
+; Foreach inside repeat
+results: []
+repeat 3 [
+    items: [1 2 3]
+    row: foreach n items [
+        * n 2
+    ]
+    append results row
+]
+; results has 3 copies of [2 4 6]
+
+; ========================================
+; PRACTICAL EXAMPLES
+; ========================================
+
+; Example 1: Filter and transform
+data: [10 15 20 25 30 35 40]
+filtered: foreach n data [
+    either (> n 20) [
+        * n 2
+    ] [
+        none
+    ]
+]
+; filtered contains doubled values > 20 and nones
+
+; Example 2: Compute statistics
+values: [23 45 67 12 89 34 56]
+sum: 0
+count: 0
+foreach v values [
+    sum: + sum v
+    count: + count 1
+]
+average: / sum count
+; average is mean of values
+
+; Example 3: Generate sequence
+fibonacci: [1 1]
+repeat 8 [
+    len: length fibonacci
+    a: at fibonacci (- len 2)
+    b: at fibonacci (- len 1)
+    next: + a b
+    append fibonacci next
+]
+; fibonacci is [1 1 2 3 5 8 13 21 34 55]
+
+; Example 4: Process batches
+items: [1 2 3 4 5 6 7 8 9 10]
+batch-size: 3
+batch-count: 0
+processed: 0
+
+while [< processed (length items)] [
+    batch-count: + batch-count 1
+    processed: + processed batch-size
+]
+; batch-count is 4 (10 items / 3 per batch, rounded up)
+
+; Example 5: Building a table
+rows: [
+    ["Alice" 85]
+    ["Bob" 92]
+    ["Carol" 78]
 ]
 
-print ""
-print "=== FOREACH ==="
-foreach color ["red" "green" "blue"] [
-    print color
+formatted: foreach row rows [
+    name: at row 0
+    score: at row 1
+    grade: either (>= score 90) [
+        "A"
+    ] [
+        either (>= score 80) [
+            "B"
+        ] [
+            "C"
+        ]
+    ]
+    [name score grade]
 ]
+; formatted has name, score, and computed grade
 
-print ""
-print "=== BREAK ==="
-repeat i 10 [
-    print i
-    if [(i = 3)] [break] []
+; Example 6: Countdown
+countdown: []
+n: 10
+while [> n 0] [
+    append countdown n
+    n: - n 1
 ]
+; countdown is [10 9 8 7 6 5 4 3 2 1]
 
-print ""
-print "=== CONTINUE ==="
-repeat i 5 [
-    if [(i = 3)] [continue] []
-    print i
+; Example 7: Loop with early termination simulation
+target-sum: 50
+sum: 0
+i: 1
+while [< sum target-sum] [
+    sum: + sum i
+    i: + i 1
 ]
+; sum is first value >= 50
 
-print ""
-print "=== EITHER ==="
-x: 10
-result: either [(x > 5)] ["big"] ["small"]
-print result
-
-print ""
-print "=== SWITCH ==="
-day: 3
-switch day [
-    1 [print "Monday"]
-    2 [print "Tuesday"]
-    3 [print "Wednesday"]
-    4 [print "Thursday"]
-    5 [print "Friday"]
+; Example 8: Generate multiplication table
+multiplier: 5
+table: []
+repeat 10 [
+    i: length table
+    i: + i 1
+    product: * multiplier i
+    append table product
 ]
-
-print ""
-print "=== CASE ==="
-num: 50
-case [
-    [(num < 10)] [print "small"]
-    [(num < 100)] [print "medium"]
-    [(num < 1000)] [print "large"]
-]
-
-print ""
-print "Done!"
+; table is [5 10 15 20 25 30 35 40 45 50]

@@ -493,6 +493,64 @@ function ViewComponent({ component }: ViewComponentProps) {
             );
         }
 
+        case "table": {
+            const { headers, rows } = component;
+
+            return (
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 border border-slate-200">
+                        {headers && headers.length > 0 && (
+                            <thead className="bg-slate-50">
+                                <tr>
+                                    {headers.map((header: string, i: number) => (
+                                        <th
+                                            key={i}
+                                            className="px-4 py-2 text-left text-xs font-medium text-slate-700 uppercase tracking-wider"
+                                        >
+                                            {header}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                        )}
+                        <tbody className="bg-white divide-y divide-slate-200">
+                            {(rows || []).map((row: any[], rowIndex: number) => (
+                                <tr key={rowIndex} className="hover:bg-slate-50">
+                                    {row.map((cell: any, cellIndex: number) => (
+                                        <td
+                                            key={cellIndex}
+                                            className="px-4 py-2 text-sm text-slate-900 whitespace-nowrap"
+                                        >
+                                            {String(cell ?? "")}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        case "code": {
+            const { code, language } = component;
+
+            return (
+                <div className="relative">
+                    {language && language !== "plaintext" && (
+                        <div className="absolute top-2 right-2 px-2 py-1 bg-slate-700 text-slate-300 text-xs rounded">
+                            {language}
+                        </div>
+                    )}
+                    <pre className="bg-slate-900 text-slate-100 p-4 rounded-lg overflow-x-auto">
+                        <code className={`language-${language || "plaintext"}`}>
+                            {code || ""}
+                        </code>
+                    </pre>
+                </div>
+            );
+        }
+
         default:
             return <div className="text-slate-400 text-sm">Unknown component: {type}</div>;
     }

@@ -1,0 +1,132 @@
+; Variables in Bassline
+; How to create, assign, and use variables
+
+; Basic assignment
+x: 42
+; x now holds the value 42
+
+; String assignment
+name: "Alice"
+; name now holds the string "Alice"
+
+; Block assignment
+numbers: [1 2 3 4 5]
+; numbers holds a block of values
+
+; Using variables in expressions
+a: 10
+b: 5
+sum: + a b
+; sum is 15
+
+; Reassignment (variables are mutable)
+count: 0
+count: + count 1
+count: + count 1
+; count is now 2
+
+; Variable naming
+user-name: "Bob"           ; Kebab-case (preferred)
+userAge: 30                ; camelCase (works)
+total_count: 100           ; snake_case (works)
+; All naming styles work, kebab-case is idiomatic
+
+; Variables can hold any type
+value: 42                  ; Number
+value: "text"              ; Now a string
+value: [1 2 3]             ; Now a block
+value: true                ; Now a boolean
+; Variables are dynamically typed
+
+; Using variables in blocks
+items: [1 2 3]
+first: at items 0
+; first is 1
+
+; Variables in function calls
+text: "hello world"
+upper: uppercase text
+; upper is "HELLO WORLD"
+
+; Compound expressions
+base: 10
+multiplier: 5
+offset: 3
+result: + (* base multiplier) offset
+; result is 53 (10 * 5 + 3)
+
+; Variables in conditionals
+age: 25
+is-adult: >= age 18
+; is-adult is true
+
+; Variables holding blocks
+data: [
+    ["Alice" 30]
+    ["Bob" 25]
+    ["Carol" 35]
+]
+
+; Nested variable usage
+person: at data 0
+person-name: at person 0
+; person-name is "Alice"
+
+; Variables in loops
+sum: 0
+numbers: [1 2 3 4 5]
+foreach n numbers [
+    sum: + sum n
+]
+; sum is 15 (1+2+3+4+5)
+
+; Shadowing - inner scope hides outer scope
+outer: 10
+result: either true [
+    outer: 20        ; This creates a new binding in inner scope
+    outer            ; Returns 20
+] [
+    outer
+]
+; outer is still 10 in outer scope
+; result is 20
+
+; Variables as configuration
+max-retries: 3
+timeout: 5000
+api-url: "https://api.example.com"
+
+; Boolean variables
+is-logged-in: true
+has-permission: false
+is-valid: true
+
+; None/null value
+missing: none
+; missing holds the none value
+
+; Complex data in variables
+user: [
+    name: "Alice"
+    age: 30
+    active: true
+]
+
+; Function results in variables
+double: func [x] [* x 2]
+result: double 21
+; result is 42
+
+; Variables for VIEW state
+counter: 0
+message: "Click the button"
+
+counter-view: view [
+    column [
+        text (message)
+        text (to-string counter)
+        button "Increment" [
+            counter: + counter 1
+        ]
+    ]
+]

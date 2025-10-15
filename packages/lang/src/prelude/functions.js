@@ -47,8 +47,13 @@ export function installFunctions(context) {
                 }
             }
 
-            // Store body
-            funcContext.set("body", bodyBlock);
+            // Store body using Symbol (consistent with evaluator)
+            funcContext.set(Symbol.for("BODY"), bodyBlock);
+
+            // Support for documentation
+            // Functions can have doc and examples set in their body
+            funcContext.set(Symbol.for("DOC"), null);
+            funcContext.set(Symbol.for("EXAMPLES"), null);
 
             return funcContext;
         }),

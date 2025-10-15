@@ -1,0 +1,197 @@
+; Code Block Component Demo
+; Demonstrates the code component for displaying code snippets
+
+; Example 1: Simple code block (no language specified)
+simple-code: view [
+    column [
+        text "Example Output:"
+        code "Hello, World!"
+    ]
+]
+
+; Example 2: JavaScript code
+js-code: "function greet(name) {
+  return `Hello, ${name}!`;
+}
+
+greet('Alice');"
+
+js-example: view [
+    column [
+        text "JavaScript Function Example"
+        separator
+        code (js-code) "javascript"
+    ]
+]
+
+; Example 3: Bassline code
+bassline-code: "add: func [x y] [+ x y]
+result: add 5 3
+print result"
+
+bassline-example: view [
+    column [
+        text "Bassline Code Example"
+        separator
+        code (bassline-code) "bassline"
+    ]
+]
+
+; Example 4: Python code
+python-code: "def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+print(fibonacci(10))"
+
+python-example: view [
+    column [
+        text "Python Recursive Function"
+        separator
+        code (python-code) "python"
+    ]
+]
+
+; Example 5: SQL code
+sql-code: "SELECT users.name, orders.total
+FROM users
+JOIN orders ON users.id = orders.user_id
+WHERE orders.total > 100
+ORDER BY orders.total DESC;"
+
+sql-example: view [
+    column [
+        text "SQL Query Example"
+        separator
+        code (sql-code) "sql"
+    ]
+]
+
+; Example 6: Multiple code blocks with explanations
+tutorial: view [
+    column [
+        text "Tutorial: Creating Functions in Bassline"
+        separator
+
+        text "Step 1: Basic function definition"
+        code "greet: func [name] [
+    print name
+]" "bassline"
+
+        separator
+        text "Step 2: Function with return value"
+        code "add: func [x y] [
+    + x y
+]
+
+result: add 5 3  ; Returns 8" "bassline"
+
+        separator
+        text "Step 3: Function with literal argument"
+        code "make-label: func ['word] [
+    to-string word
+]
+
+label: make-label MyLabel  ; Returns \"MyLabel\"" "bassline"
+    ]
+]
+
+; Example 7: Code comparison
+comparison: view [
+    panel [
+        column [
+            text "Code Comparison: Before vs After"
+            separator
+
+            row [
+                column [
+                    text "Before (Imperative):"
+                    code "result: []
+foreach item items [
+    if (> item 10) [
+        append result item
+    ]
+]" "bassline"
+                ]
+
+                column [
+                    text "After (Functional):"
+                    code "result: filter items [
+    > item 10
+]" "bassline"
+                ]
+            ]
+        ]
+    ]
+]
+
+; Example 8: API Documentation with code examples
+api-docs: view [
+    column [
+        badge "API Documentation" "info"
+        separator
+
+        text "Function: foreach"
+        text "Iterate over a series, binding each item to a word."
+        separator
+
+        text "Syntax:"
+        code "foreach <word> <series> <body>" "plaintext"
+
+        separator
+        text "Example Usage:"
+        code "numbers: [1 2 3 4 5]
+doubled: foreach n numbers [
+    * n 2
+]
+; Result: [2 4 6 8 10]" "bassline"
+
+        separator
+        text "Return Value:"
+        text "Returns an array of all results from executing the body for each item."
+    ]
+]
+
+; Example 9: Error example
+error-example: view [
+    column [
+        text "Common Error: Undefined Variable"
+        separator
+
+        text "This will cause an error:"
+        code "result: add x y  ; Error: x is not defined" "bassline"
+
+        separator
+        text "Correct approach:"
+        code "x: 5
+y: 3
+result: add x y  ; Works correctly" "bassline"
+    ]
+]
+
+; Example 10: Mixed content - combining code with other components
+mixed-demo: view [
+    panel [
+        column [
+            row [
+                badge "Code Example" "success"
+                text "- Function Definition"
+            ]
+            separator
+
+            code "multiply: func [a b] [* a b]" "bassline"
+
+            separator
+            row [
+                button "Run Example" [print "Running..."]
+                button "Copy Code" [print "Copied!"]
+            ]
+
+            separator
+            text "Output:"
+            code "multiply 6 7
+; => 42" "plaintext"
+        ]
+    ]
+]
