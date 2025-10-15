@@ -1,0 +1,15 @@
+make-gadget: func [] [
+  current: none
+  body: func [input] [
+    if (none? current) [
+        current: input
+    ]
+    if (> input current) [
+        current: input
+    ]
+  ]
+  body
+]
+
+foo: make-gadget
+inspect foo

@@ -273,9 +273,15 @@ importers:
 
   packages/lang:
     dependencies:
+      '@bassline/cells':
+        specifier: workspace:*
+        version: link:../cells
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/taps':
+        specifier: workspace:*
+        version: link:../taps
       arcsecond:
         specifier: ^5.0.0
         version: 5.0.0
