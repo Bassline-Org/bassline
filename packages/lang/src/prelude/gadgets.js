@@ -1,6 +1,6 @@
 import { native } from "../natives.js";
 import { isa } from "../utils.js";
-import { Block } from "../values.js";
+import { Block, SetWord, Word } from "../values.js";
 import { evalNext, ex } from "../evaluator.js";
 import { basslineToJs, jsToBassline } from "./helpers.js";
 import { Context } from "../context.js";
@@ -21,7 +21,7 @@ export function installGadgets(context) {
     context.set("INTERSECTION", cells.intersection);
     context.set("FIRST", cells.first);
     context.set("LAST", cells.last);
-    context.set("UNSAFE-LAST", cells.unsafeLast);
+    context.set("UNSAFE-LAST", cells.last);
 
     // gadget <proto> <initial-state>
     // Create a gadget from a prototype with initial state
@@ -155,4 +155,307 @@ export function installGadgets(context) {
             ],
         }),
     );
+
+    // gadget-system <block>
+    // Create a gadget system with declarations and tap handlers
+    context.set(
+        "gadget-system",
+        native(async (stream, context) => {
+            const block = stream.next();
+
+            if (!isa(block, Block)) {
+                throw new Error("gadget-system expects a block");
+            }
+
+            // Create child context extending parent
+            const gsContext = new Context(context);
+
+            // Track created gadgets and taps for cleanup
+            const gadgets = new Map();
+            const cleanups = [];
+
+            // Bind gadget-system functions
+            bindGadgetSystemFunctions(gsContext, context, gadgets, cleanups);
+
+            // Execute the block - special bindings handle everything
+            await ex(gsContext, block);
+
+            // Copy gadget bindings from child context to parent context
+            // Only copy bindings that were created in THIS context (not inherited from parent)
+            for (const [key, value] of gsContext.bindings) {
+                // Skip if this binding exists in parent (inherited, not created here)
+                if (context.bindings.has(key)) {
+                    continue;
+                }
+
+                // Copy bindings that look like gadgets (have tap/receive/current)
+                if (value && typeof value === 'object' && value.tap && value.receive && value.current) {
+                    context.set(key.description, value);
+                    gadgets.set(key.description, value);
+                }
+            }
+
+            // Store metadata in parent context
+            // Use a different symbol to avoid conflicts
+            context.set(Symbol.for("BASSLINE-GADGET-SYSTEM-META"), {
+                gadgets,
+                cleanups,
+            });
+
+            // Return combined cleanup function as a Bassline native
+            return native(async (stream, ctx) => {
+                cleanups.forEach((c) => c());
+                for (const [key] of gadgets.entries()) {
+                    // Remove from context bindings
+                    const normalized = context.bindings.keys();
+                    for (const k of normalized) {
+                        if (k.description === key) {
+                            context.bindings.delete(k);
+                            break;
+                        }
+                    }
+                }
+            });
+        }, {
+            doc: "Creates a gadget system with declarative gadget creation and tap handlers. Returns cleanup function.",
+            args: ["block"],
+            examples: [
+                "cleanup: gadget-system [",
+                "  counter: max 0",
+                "  on counter [print (current counter)]",
+                "]",
+                "receive counter 5",
+                "cleanup  ; Tears down system",
+            ],
+        }),
+    );
+}
+
+// Helper: Bind special functions for gadget-system context
+function bindGadgetSystemFunctions(gsContext, parentContext, gadgets, cleanups) {
+    // Cell type constructors - create and auto-register gadgets
+    const createConstructor = (proto, typeName) => {
+        return native(async (stream, context) => {
+            const initialState = await evalNext(stream, context);
+            const jsState = basslineToJs(initialState);
+            const gadget = proto.spawn(jsState);
+
+            // Store gadget for later reference
+            return gadget;
+        });
+    };
+
+    // Bind all cell types
+    gsContext.set("max", createConstructor(cells.max, "max"));
+    gsContext.set("min", createConstructor(cells.min, "min"));
+    gsContext.set("union", createConstructor(cells.union, "union"));
+    gsContext.set("intersection", createConstructor(cells.intersection, "intersection"));
+    gsContext.set("first", createConstructor(cells.first, "first"));
+    gsContext.set("last", createConstructor(cells.last, "last"));
+    gsContext.set("unsafe-last", createConstructor(cells.last, "unsafe-last"));
+
+    // Tap functions
+
+    // on <gadget> <handler>
+    gsContext.set("on", native(async (stream, context) => {
+        const gadget = await evalNext(stream, context);
+        const handler = stream.next();
+
+        if (!gadget || !gadget.tap) {
+            throw new Error("on expects a gadget as first argument");
+        }
+
+        if (!isa(handler, Block)) {
+            throw new Error("on expects a block as handler");
+        }
+
+        const cleanup = gadget.tap(async (effects) => {
+            const tapContext = new Context(context);
+            tapContext.set(Symbol.for("EFFECTS"), jsToBassline(effects, tapContext));
+            if (effects.changed !== undefined) {
+                tapContext.set(Symbol.for("CHANGED"), jsToBassline(effects.changed, tapContext));
+            }
+            await ex(tapContext, handler);
+        });
+
+        cleanups.push(cleanup);
+        return cleanup;
+    }));
+
+    // filter <gadget> <condition> <handler>
+    gsContext.set("filter", native(async (stream, context) => {
+        const gadget = await evalNext(stream, context);
+        const condition = stream.next();
+        const handler = stream.next();
+
+        if (!gadget || !gadget.tap) {
+            throw new Error("filter expects a gadget as first argument");
+        }
+
+        if (!isa(condition, Block)) {
+            throw new Error("filter expects a block as condition");
+        }
+
+        if (!isa(handler, Block)) {
+            throw new Error("filter expects a block as handler");
+        }
+
+        const cleanup = gadget.tap(async (effects) => {
+            const tapContext = new Context(context);
+            tapContext.set(Symbol.for("EFFECTS"), jsToBassline(effects, tapContext));
+            if (effects.changed !== undefined) {
+                tapContext.set(Symbol.for("CHANGED"), jsToBassline(effects.changed, tapContext));
+            }
+
+            const condResult = await ex(tapContext, condition);
+            if (basslineToJs(condResult)) {
+                await ex(tapContext, handler);
+            }
+        });
+
+        cleanups.push(cleanup);
+        return cleanup;
+    }));
+
+    // debounce <gadget> <ms> <handler>
+    gsContext.set("debounce", native(async (stream, context) => {
+        const gadget = await evalNext(stream, context);
+        const ms = basslineToJs(await evalNext(stream, context));
+        const handler = stream.next();
+
+        if (!gadget || !gadget.tap) {
+            throw new Error("debounce expects a gadget as first argument");
+        }
+
+        if (!isa(handler, Block)) {
+            throw new Error("debounce expects a block as handler");
+        }
+
+        let timer = null;
+        const cleanup = gadget.tap(async (effects) => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(async () => {
+                const tapContext = new Context(context);
+                tapContext.set(Symbol.for("EFFECTS"), jsToBassline(effects, tapContext));
+                if (effects.changed !== undefined) {
+                    tapContext.set(Symbol.for("CHANGED"), jsToBassline(effects.changed, tapContext));
+                }
+                await ex(tapContext, handler);
+            }, ms);
+        });
+
+        const fullCleanup = () => {
+            if (timer) clearTimeout(timer);
+            cleanup();
+        };
+        cleanups.push(fullCleanup);
+        return fullCleanup;
+    }));
+
+    // throttle <gadget> <ms> <handler>
+    gsContext.set("throttle", native(async (stream, context) => {
+        const gadget = await evalNext(stream, context);
+        const ms = basslineToJs(await evalNext(stream, context));
+        const handler = stream.next();
+
+        if (!gadget || !gadget.tap) {
+            throw new Error("throttle expects a gadget as first argument");
+        }
+
+        if (!isa(handler, Block)) {
+            throw new Error("throttle expects a block as handler");
+        }
+
+        let lastRun = 0;
+        const cleanup = gadget.tap(async (effects) => {
+            const now = Date.now();
+            if (now - lastRun >= ms) {
+                lastRun = now;
+                const tapContext = new Context(context);
+                tapContext.set(Symbol.for("EFFECTS"), jsToBassline(effects, tapContext));
+                if (effects.changed !== undefined) {
+                    tapContext.set(Symbol.for("CHANGED"), jsToBassline(effects.changed, tapContext));
+                }
+                await ex(tapContext, handler);
+            }
+        });
+
+        cleanups.push(cleanup);
+        return cleanup;
+    }));
+
+    // pipe <gadget-list> <handler>
+    gsContext.set("pipe", native(async (stream, context) => {
+        const gadgetList = stream.next();
+        const handler = stream.next();
+
+        if (!isa(gadgetList, Block)) {
+            throw new Error("pipe expects a block of gadgets as first argument");
+        }
+
+        if (!isa(handler, Block)) {
+            throw new Error("pipe expects a block as handler");
+        }
+
+        // Set up tap for each gadget
+        for (const gadgetName of gadgetList.items) {
+            const gadget = await evalNext(gadgetName, context);
+            if (!gadget || !gadget.tap) {
+                throw new Error(`pipe: ${gadgetName} is not a gadget`);
+            }
+
+            const cleanup = gadget.tap(async (effects) => {
+                const tapContext = new Context(context);
+                tapContext.set(Symbol.for("GADGET-NAME"), gadgetName);
+                tapContext.set(Symbol.for("EFFECTS"), jsToBassline(effects, tapContext));
+                if (effects.changed !== undefined) {
+                    tapContext.set(Symbol.for("CHANGED"), jsToBassline(effects.changed, tapContext));
+                }
+                await ex(tapContext, handler);
+            });
+
+            cleanups.push(cleanup);
+        }
+
+        return () => {}; // Cleanups already tracked
+    }));
+
+    // take <gadget> <count> <handler>
+    gsContext.set("take", native(async (stream, context) => {
+        const gadget = await evalNext(stream, context);
+        const maxCount = basslineToJs(await evalNext(stream, context));
+        const handler = stream.next();
+
+        if (!gadget || !gadget.tap) {
+            throw new Error("take expects a gadget as first argument");
+        }
+
+        if (!isa(handler, Block)) {
+            throw new Error("take expects a block as handler");
+        }
+
+        let count = 0;
+        let cleanup;
+
+        cleanup = gadget.tap(async (effects) => {
+            if (count >= maxCount) {
+                return;
+            }
+            count++;
+
+            const tapContext = new Context(context);
+            tapContext.set(Symbol.for("EFFECTS"), jsToBassline(effects, tapContext));
+            if (effects.changed !== undefined) {
+                tapContext.set(Symbol.for("CHANGED"), jsToBassline(effects.changed, tapContext));
+            }
+            await ex(tapContext, handler);
+
+            if (count >= maxCount) {
+                cleanup();
+            }
+        });
+
+        cleanups.push(cleanup);
+        return cleanup;
+    }));
 }

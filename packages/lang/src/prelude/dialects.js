@@ -1,7 +1,4 @@
-import { linkNative } from "../dialects/link.js";
-
 export function installDialects(context) {
-    // link [block]
-    // Create connections between gadgets
-    context.set("link", linkNative);
+    // Dialects will be added here
+    // Currently no dialects installed
 }
