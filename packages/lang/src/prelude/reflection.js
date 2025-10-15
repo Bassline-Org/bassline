@@ -92,12 +92,19 @@ export function installReflection(context) {
 
             // Return help info based on what it is
             if (value?.call) {
+                const doc = value[Symbol.for("DOC")];
+                const args = value[Symbol.for("ARGS")];
+                const examples = value[Symbol.for("EXAMPLES")];
+
                 return {
                     type: "help",
                     topic: name,
                     found: true,
                     kind: "native",
-                    description: "Built-in native function",
+                    args: args ? args.map(arg => ({ name: arg, literal: false })) : [],
+                    doc: doc || null,
+                    examples: examples || null,
+                    description: doc || "Built-in native function",
                 };
             }
 
@@ -198,6 +205,28 @@ export function installReflection(context) {
 
             // For native functions
             if (value?.call) {
+                const doc = value[Symbol.for("DOC")];
+                const args = value[Symbol.for("ARGS")];
+                const examples = value[Symbol.for("EXAMPLES")];
+
+                if (doc || args) {
+                    // Format native with documentation
+                    const argList = args ? args.join(" ") : "";
+                    const signature = `${name.description}: native [${argList}]`;
+                    const docText = doc || "No documentation available.";
+
+                    let output = `${signature}\n\n${docText}`;
+
+                    if (examples && examples.length > 0) {
+                        output += "\n\nExamples:";
+                        for (const example of examples) {
+                            output += `\n  ${example}`;
+                        }
+                    }
+
+                    return new Str(output);
+                }
+
                 return new Str(
                     `${name.description}: Built-in native function\n\nNo documentation available.`,
                 );

@@ -1,7 +1,7 @@
-import { native, evalValue } from "../natives.js";
+import { evalValue, native } from "../natives.js";
 import { isa } from "../utils.js";
 import { Block, Num, Str } from "../values.js";
-import { evalNext } from "../evaluator.js";
+import { evalNext, ex } from "../evaluator.js";
 
 export function installSeries(context) {
     // first <series>
@@ -149,6 +149,40 @@ export function installSeries(context) {
                 return series.length === 0;
             }
             return false;
+        }),
+    );
+
+    // reduce <block>
+    // Evaluate each element in a block and return a new block with results
+    context.set(
+        "reduce",
+        native(async (stream, context) => {
+            const blockValue = await evalNext(stream, context);
+
+            if (!isa(blockValue, Block)) {
+                console.log(blockValue);
+                throw new Error("reduce expects a block");
+            }
+
+            const results = [];
+            for (const item of blockValue.items) {
+                // Evaluate each item in the context
+                const result = await ex(context, item);
+                results.push(result);
+            }
+
+            return new Block(results);
+        }, {
+            doc: "Evaluates each element in a block and returns a new block containing the results.",
+            args: ["block"],
+            examples: [
+                "x: 5",
+                "y: 10",
+                "reduce [x y (+ x y)]  ; => [5 10 15]",
+                'name: "Alice"',
+                "age: 30",
+                'reduce [name age]  ; => ["Alice" 30]',
+            ],
         }),
     );
 }

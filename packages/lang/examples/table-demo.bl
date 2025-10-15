@@ -29,7 +29,7 @@ product-data: foreach item products [
     price: at item 1
     quantity: at item 2
     total: * price quantity
-    [name price quantity total]
+    reduce [name price quantity total]
 ]
 
 product-table: view [
@@ -55,7 +55,7 @@ score-data: foreach student scores [
     test2: at student 2
     test3: at student 3
     avg: / (+ (+ test1 test2) test3) 3
-    [name test1 test2 test3 avg]
+    reduce [name test1 test2 test3 avg]
 ]
 
 scores-table: view [

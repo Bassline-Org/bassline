@@ -2,12 +2,28 @@ import { isa } from "./utils.js";
 import { Block, Num, Str, Word } from "./values.js";
 
 // Helper to create native callable functions
-export function native(fn) {
-    return {
+// Optionally accepts metadata: { doc, args, examples }
+export function native(fn, metadata) {
+    const nativeObj = {
         call(stream, context) {
             return fn(stream, context);
         },
     };
+
+    // Attach metadata as Symbol properties if provided
+    if (metadata) {
+        if (metadata.doc) {
+            nativeObj[Symbol.for("DOC")] = metadata.doc;
+        }
+        if (metadata.args) {
+            nativeObj[Symbol.for("ARGS")] = metadata.args;
+        }
+        if (metadata.examples) {
+            nativeObj[Symbol.for("EXAMPLES")] = metadata.examples;
+        }
+    }
+
+    return nativeObj;
 }
 
 // Evaluate a value - resolve words, extract scalars
