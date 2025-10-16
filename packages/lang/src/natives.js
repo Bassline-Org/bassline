@@ -5,6 +5,9 @@ export class NativeFn extends Context {
         super();
         this.fn = fn;
     }
+    mold() {
+        return "native";
+    }
 }
 
 // Helper to create native callable functions

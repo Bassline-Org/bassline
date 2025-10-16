@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useMemo } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
 interface REPLContextValue {
     repl: any;
@@ -9,7 +9,7 @@ interface REPLContextValue {
 const REPLContext = createContext<REPLContextValue | null>(null);
 
 interface REPLProviderProps {
-    children: ReactNode;
+    children: React.ReactNode;
     repl: any;
 }
 
@@ -30,7 +30,9 @@ export function REPLProvider({ children, repl }: REPLProviderProps) {
     }, [repl]);
 
     return (
-        <REPLContext.Provider value={{ repl: wrappedRepl, rawRepl: repl, version }}>
+        <REPLContext.Provider
+            value={{ repl: wrappedRepl, rawRepl: repl, version }}
+        >
             {children}
         </REPLContext.Provider>
     );

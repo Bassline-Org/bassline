@@ -11,7 +11,7 @@ import { installSeries } from "./prelude/series.js";
 import { installContextOps } from "./prelude/context-ops.js";
 import { installFunctions } from "./prelude/functions.js";
 import { installTypes } from "./prelude/types.js";
-//import { installStrings } from "./prelude/strings.js";
+import { installStrings } from "./prelude/strings.js";
 //import { installHttp } from "./prelude/http.js";
 //import { installJson } from "./prelude/json.js";
 import { installReflection } from "./prelude/reflection.js";
@@ -40,7 +40,7 @@ export function createPreludeContext() {
     installTypes(context);
     installReflection(context);
     //    installView(context);
-    //    installStrings(context);
+    installStrings(context);
     //    installHttp(context);
     //    installJson(context);
     //    installAsyncOps(context);

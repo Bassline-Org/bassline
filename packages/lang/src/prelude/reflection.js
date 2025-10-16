@@ -3,7 +3,6 @@ import { Context } from "../context.js";
 import { isa } from "../utils.js";
 import { Word } from "../values.js";
 import { evalNext } from "../evaluator.js";
-import { inspectValue, moldValue } from "./helpers.js";
 
 export function installReflection(context) {
     // print <value>
@@ -24,16 +23,7 @@ export function installReflection(context) {
         native(async (stream, context) => {
             // Evaluate the argument to get the actual value
             const value = await evalNext(stream, context);
-            return value.mold();
-        }),
-    );
-
-    // inspect - deep inspection of any value
-    context.set(
-        "inspect",
-        native(async (stream, context) => {
-            const value = await evalNext(stream, context);
-            return inspectValue(value);
+            return value?.mold ? value.mold() : String(value);
         }),
     );
 

@@ -13,7 +13,6 @@ export function installTypes(context) {
             return isa(value, Block);
         }),
     );
-
     context.set(
         "word?",
         native(async (stream, context) => {
@@ -21,7 +20,6 @@ export function installTypes(context) {
             return isa(value, Word);
         }),
     );
-
     context.set(
         "num?",
         native(async (stream, context) => {
@@ -29,7 +27,6 @@ export function installTypes(context) {
             return typeof value === "number";
         }),
     );
-
     context.set(
         "str?",
         native(async (stream, context) => {

@@ -51,9 +51,16 @@ export class Context extends Value {
 
     mold() {
         return `context [${
-            Array.from(this.bindings.entries()).map(([key, value]) =>
-                `${key.description}: ${value.mold ? value.mold() : value}`
-            ).join(" ")
+            Array.from(this.bindings.entries())
+                .filter(([key, value]) =>
+                    (value !== this) &&
+                    !(value?.constructor?.name === "NativeFn")
+                )
+                .map(([key, value]) =>
+                    `${key.description}: ${
+                        value?.mold?.() ?? JSON.stringify(value)
+                    }`
+                ).join(" ")
         }]`;
     }
 }
