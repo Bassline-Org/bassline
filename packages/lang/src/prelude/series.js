@@ -4,48 +4,6 @@ import { Block } from "../values.js";
 import { evalNext, ex } from "../evaluator.js";
 
 export function installSeries(context) {
-    // first <series>
-    // Get first element of a block
-    context.set(
-        "first",
-        native(async (stream, context) => {
-            const series = await evalNext(stream, context);
-            if (isa(series, Block)) {
-                return series.items[0];
-            }
-            throw new Error("first expects a block");
-        }),
-    );
-
-    // last <series>
-    // Get last element of a block
-    context.set(
-        "last",
-        native(async (stream, context) => {
-            const series = await evalNext(stream, context);
-            if (isa(series, Block)) {
-                return series.items[series.items.length - 1];
-            }
-            throw new Error("last expects a block");
-        }),
-    );
-
-    // length <series>
-    // Get length of a block or string
-    context.set(
-        "length",
-        native(async (stream, context) => {
-            const series = await evalNext(stream, context);
-            if (isa(series, Block)) {
-                return new Num(series.items.length);
-            }
-            if (typeof series === "string") {
-                return series.length;
-            }
-            throw new Error("length expects a block");
-        }),
-    );
-
     // append <series> <value>
     // Append value to a block (creates new block)
     context.set(

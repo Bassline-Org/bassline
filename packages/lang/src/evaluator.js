@@ -53,29 +53,3 @@ export async function evalNext(stream, context) {
 
     return val;
 }
-
-// Call a function (context) with arguments
-export async function callFunction(funcContext, stream, evalContext) {
-    // Create new context extending the function
-    const callContext = new Context(funcContext);
-
-    // Bind arguments
-    for (let i = 0; i < funcContext._argNames.length; i++) {
-        const argName = funcContext._argNames[i];
-        const shouldEval = funcContext._argEval[i];
-
-        if (shouldEval) {
-            // Evaluate argument in calling context
-            const argValue = await evalNext(stream, evalContext);
-            callContext.set(argName, argValue);
-        } else {
-            // Pass literally - just consume from stream
-            const argValue = stream.next();
-            callContext.set(argName, argValue);
-        }
-    }
-
-    // Execute body in call context
-    const body = funcContext.get(Symbol.for("BODY"));
-    return await ex(callContext, body);
-}

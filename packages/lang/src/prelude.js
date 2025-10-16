@@ -18,7 +18,7 @@ import { installReflection } from "./prelude/reflection.js";
 //import { installView } from "./prelude/view.js";
 //import { installGadgets } from "./prelude/gadgets.js";
 //import { installDialects } from "./prelude/dialects.js";
-//import { installAsyncOps } from "./prelude/async-ops.js";
+import { installAsyncOps } from "./prelude/async-ops.js";
 //import { installContactOps } from "./prelude/contact-ops.js";
 //import { installRemoteOps } from "./prelude/remote-ops.js";
 import { installArrayOps } from "./prelude/array-ops.js";
@@ -43,7 +43,7 @@ export function createPreludeContext() {
     installStrings(context);
     //    installHttp(context);
     //    installJson(context);
-    //    installAsyncOps(context);
+    installAsyncOps(context);
     //    installContactOps(context);
 
     // Install remote ops (needs access to async update function)

@@ -2,7 +2,6 @@ import { Context } from "../context.js";
 import { isa } from "../utils.js";
 import { Block } from "../values.js";
 
-// Helper: Convert JS value to Bassline value
 export function jsToBassline(value, parentContext) {
     if (Array.isArray(value)) {
         return new Block(value.map((v) => jsToBassline(v, parentContext)));
