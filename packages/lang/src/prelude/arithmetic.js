@@ -1,4 +1,4 @@
-import { native, evalValue } from "../natives.js";
+import { evalValue, native } from "../natives.js";
 import { Num } from "../values.js";
 
 export function installArithmetic(context) {
@@ -15,8 +15,8 @@ export function installArithmetic(context) {
             examples: [
                 "+ 5 3  ; => 8",
                 "+ 10 -3  ; => 7",
-                "+ 2.5 1.5  ; => 4"
-            ]
+                "+ 2.5 1.5  ; => 4",
+            ],
         }),
     );
 
@@ -33,8 +33,8 @@ export function installArithmetic(context) {
             examples: [
                 "- 10 3  ; => 7",
                 "- 5 10  ; => -5",
-                "- 100 25  ; => 75"
-            ]
+                "- 100 25  ; => 75",
+            ],
         }),
     );
 
@@ -51,8 +51,8 @@ export function installArithmetic(context) {
             examples: [
                 "* 6 7  ; => 42",
                 "* 5 -2  ; => -10",
-                "* 2.5 4  ; => 10"
-            ]
+                "* 2.5 4  ; => 10",
+            ],
         }),
     );
 
@@ -69,8 +69,8 @@ export function installArithmetic(context) {
             examples: [
                 "/ 15 3  ; => 5",
                 "/ 10 4  ; => 2.5",
-                "/ 100 10  ; => 10"
-            ]
+                "/ 100 10  ; => 10",
+            ],
         }),
     );
 
@@ -88,8 +88,8 @@ export function installArithmetic(context) {
             examples: [
                 "% 17 5  ; => 2",
                 "% 10 3  ; => 1",
-                "% 20 4  ; => 0"
-            ]
+                "% 20 4  ; => 0",
+            ],
         }),
     );
 }

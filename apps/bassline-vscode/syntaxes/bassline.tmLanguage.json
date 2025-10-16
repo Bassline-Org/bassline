@@ -75,10 +75,6 @@
           {
             "name": "constant.other.litword.bassline",
             "match": "'[a-zA-Z_][a-zA-Z0-9_-]*"
-          },
-          {
-            "name": "entity.name.tag.refinement.bassline",
-            "match": "/[a-zA-Z_][a-zA-Z0-9_-]*"
           }
         ]
       }

@@ -1,4 +1,4 @@
-import { native, evalValue } from "../natives.js";
+import { evalValue, native } from "../natives.js";
 import { Context } from "../context.js";
 import { isa } from "../utils.js";
 import { Block, Str } from "../values.js";
@@ -19,7 +19,7 @@ export function installContextOps(context) {
     context.set(
         "in",
         native(async (stream, context) => {
-            const targetContext = evalValue(stream.next(), context);
+            const targetContext = await evalValue(stream.next(), context);
             const block = await evalNext(stream, context);
 
             if (!isa(block, Block)) {

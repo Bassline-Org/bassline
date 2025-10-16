@@ -24,7 +24,10 @@ export function detectCapabilities() {
         capabilities.push("storage"); // localStorage
     }
 
-    if (typeof process !== "undefined" && process.versions && process.versions.node) {
+    if (
+        typeof process !== "undefined" && process.versions &&
+        process.versions.node
+    ) {
         capabilities.push("node");
         capabilities.push("file-system");
     }
@@ -82,7 +85,9 @@ export function deserializeContact(json) {
 
         // Validate required fields
         if (!contact.id || !contact.name) {
-            throw new Error("Invalid contact: missing required fields (id, name)");
+            throw new Error(
+                "Invalid contact: missing required fields (id, name)",
+            );
         }
 
         // Ensure arrays exist

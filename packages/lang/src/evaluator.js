@@ -1,11 +1,12 @@
 import { Context } from "./context.js";
 import { isa, isSelfEvaluating } from "./utils.js";
-import { Block, Paren, SetWord, Word } from "./values.js";
+import { Block, LitWord, Paren, SetWord, Word } from "./values.js";
 
 // Main evaluator for prelude (top-level bassline code)
 export async function ex(context, code) {
     if (!isa(code, Block) && !isa(code, Paren)) {
-        throw new Error("ex can only be called with a block or paren!");
+        const block = new Block([code]);
+        return await ex(context, block);
     }
 
     let result;
@@ -17,6 +18,11 @@ export async function ex(context, code) {
         // Self-evaluating values (numbers, strings, blocks)
         if (isSelfEvaluating(current)) {
             result = current;
+            continue;
+        }
+
+        if (isa(current, LitWord)) {
+            result = new Word(current.spelling);
             continue;
         }
 

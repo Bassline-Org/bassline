@@ -21,6 +21,7 @@ import { installDialects } from "./prelude/dialects.js";
 import { installAsyncOps } from "./prelude/async-ops.js";
 import { installContactOps } from "./prelude/contact-ops.js";
 import { installRemoteOps } from "./prelude/remote-ops.js";
+import { installArrayOps } from "./prelude/array-ops.js";
 
 // Create a prelude context with built-in natives
 export function createPreludeContext() {
@@ -28,6 +29,7 @@ export function createPreludeContext() {
 
     // Install all standard library modules
     installDialects(context);
+    installArrayOps(context);
     installGadgets(context);
     installArithmetic(context);
     installComparison(context);

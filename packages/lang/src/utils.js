@@ -1,6 +1,8 @@
 import { Block, Scalar } from "./values.js";
 export function normalize(str) {
-    if (typeof str === "symbol") return str;
+    if (typeof str === "symbol") {
+        return Symbol.for(str.description.trim().toUpperCase());
+    }
     return Symbol.for(str.trim().toUpperCase());
 }
 
@@ -34,10 +36,14 @@ export class Stream {
     expect(type, spelling = null) {
         const val = this.next();
         if (!isa(val, type)) {
-            throw new Error(`Expected ${type.name}, got ${val?.constructor.name}`);
+            throw new Error(
+                `Expected ${type.name}, got ${val?.constructor.name}`,
+            );
         }
         if (spelling && val.spelling !== normalize(spelling)) {
-            throw new Error(`Expected ${spelling}, got ${val.spelling.description}`);
+            throw new Error(
+                `Expected ${spelling}, got ${val.spelling.description}`,
+            );
         }
         return val;
     }
