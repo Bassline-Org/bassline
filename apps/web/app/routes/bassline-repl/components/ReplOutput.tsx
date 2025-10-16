@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { SyntaxHighlight } from "./SyntaxHighlight";
 import { useREPL } from "../../../lib/repl-context";
 import { Block, Word } from "@bassline/lang/values";
+import { Fn, NativeFn } from "@bassline/lang/natives";
 import { Context } from "@bassline/lang/context";
+
 interface OutputEntry {
     code: string;
     result: { ok: boolean; value?: any; error?: string };
@@ -77,7 +79,7 @@ function InspectedValue(
                 onToggle={() => setExpanded(!expanded)}
             >
                 <div className="ml-4 mt-1 space-y-1">
-                    {value.bindings.entries().map((
+                    {Array.from(value.bindings.entries()).map((
                         [key, binding]: [Symbol, any],
                         i: number,
                     ) => (
@@ -90,6 +92,11 @@ function InspectedValue(
                     ))}
                 </div>
             </ExpandableContainer>
+        );
+    }
+    if (value instanceof Word) {
+        return (
+            <span className="text-slate-400">{value.spelling.description}</span>
         );
     }
     return <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>;

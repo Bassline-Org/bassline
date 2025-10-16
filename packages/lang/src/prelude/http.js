@@ -1,4 +1,4 @@
-import { native, evalValue } from "../natives.js";
+import { evalValue, native } from "../natives.js";
 import { Context } from "../context.js";
 import { isa } from "../utils.js";
 import { Num, Str } from "../values.js";

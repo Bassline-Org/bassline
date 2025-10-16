@@ -1,34 +1,21 @@
-import { native, NativeFn } from "../natives.js";
-import { Context } from "../context.js";
-import { evalNext, ex } from "../evaluator.js";
-import { GetWord } from "../values.js";
+import { Fn, native } from "../natives.js";
+import { evalNext } from "../evaluator.js";
 
 export function installFunctions(context) {
-    // func <args-block> <body-block>
-    // Create a function context
+    // fn <args-block> <body-block>
     context.set(
-        "call",
+        "fn",
         native(async (stream, context) => {
-            const func = await evalNext(stream, context);
-            if (func instanceof NativeFn) {
-                console.log("native func");
-                return await func.fn(stream, context);
-            }
-            if (func instanceof Context) {
-                const args = func.get("args");
-                const body = func.get("body");
-                const callContext = new Context(context);
-                for (const arg of args.items) {
-                    if (arg instanceof GetWord) {
-                        const value = await evalNext(stream, context);
-                        callContext.set(arg.spelling, value);
-                    } else {
-                        const value = await evalNext(stream, context);
-                        callContext.set(arg.spelling, value);
-                    }
-                }
-                return await ex(callContext, body);
-            }
+            const args = await evalNext(stream, context);
+            const body = await evalNext(stream, context);
+            return new Fn(context, args, body);
+        }),
+    );
+    context.set(
+        "fn?",
+        native(async (stream, context) => {
+            const value = await evalNext(stream, context);
+            return value instanceof Fn;
         }),
     );
 }

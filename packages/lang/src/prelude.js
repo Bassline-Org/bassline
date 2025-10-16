@@ -1,13 +1,12 @@
 import { Context } from "./context.js";
 
 // Import evaluator functions
-export { callFunction, evalNext, ex } from "./evaluator.js";
+export { evalNext, ex } from "./evaluator.js";
 
 // Import all standard library modules
 import { installArithmetic } from "./prelude/arithmetic.js";
 import { installComparison } from "./prelude/comparison.js";
 import { installControlFlow } from "./prelude/control-flow.js";
-import { installSeries } from "./prelude/series.js";
 import { installContextOps } from "./prelude/context-ops.js";
 import { installFunctions } from "./prelude/functions.js";
 import { installTypes } from "./prelude/types.js";
@@ -22,41 +21,36 @@ import { installAsyncOps } from "./prelude/async-ops.js";
 //import { installContactOps } from "./prelude/contact-ops.js";
 //import { installRemoteOps } from "./prelude/remote-ops.js";
 import { installArrayOps } from "./prelude/array-ops.js";
+import { evalNext, ex } from "./evaluator.js";
+import { native } from "./natives.js";
 
 // Create a prelude context with built-in natives
 export function createPreludeContext() {
     const context = new Context();
-
-    // Install all standard library modules
-    //    installDialects(context);
     installArrayOps(context);
-    //    installGadgets(context);
     installArithmetic(context);
     installComparison(context);
     installControlFlow(context);
-    installSeries(context);
     installContextOps(context);
     installFunctions(context);
     installTypes(context);
     installReflection(context);
-    //    installView(context);
     installStrings(context);
-    //    installHttp(context);
-    //    installJson(context);
     installAsyncOps(context);
-    //    installContactOps(context);
-
-    // Install remote ops (needs access to async update function)
-    // Remote ops will create tasks but async context is managed internally
-    //    installRemoteOps(context, () => {}); // Async updater is internal to async-ops
 
     // Special values
     context.set("true", true);
     context.set("false", false);
     context.set("none", null);
-
     // system - reference to the prelude context itself
     context.set("system", context);
+    context.set(
+        "ex",
+        native(async (stream, context) => {
+            const code = await evalNext(stream, context);
+            return await ex(context, code);
+        }),
+    );
 
     return context;
 }

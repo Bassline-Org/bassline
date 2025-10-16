@@ -4,43 +4,6 @@ import { Block, Word } from "../values.js";
 import { evalNext, ex } from "../evaluator.js";
 
 export function installControlFlow(context) {
-    // // foreach <word> <series> <body>
-    // // Iterate over a block, binding each item to word
-    // // Returns an array of all results
-    // context.set(
-    //     "foreach",
-    //     native(async (stream, context) => {
-    //         const itemWord = await evalNext(stream, context);
-
-    //         const series = await evalNext(stream, context);
-    //         const body = stream.next();
-
-    //         if (!isa(body, Block)) {
-    //             throw new Error("foreach expects a block as body");
-    //         }
-
-    //         let items;
-    //         if (isa(series, Block)) {
-    //             items = series.items;
-    //         } else if (Array.isArray(series)) {
-    //             items = series;
-    //         } else {
-    //             throw new Error("foreach expects a block or array to iterate");
-    //         }
-
-    //         const results = [];
-    //         for (const item of items) {
-    //             // Bind item to the word in context
-    //             context.set(itemWord.spelling, item);
-    //             // Execute body
-    //             const result = await ex(context, body);
-    //             results.push(result);
-    //         }
-
-    //         return results; // Return array of all results
-    //     }),
-    // );
-
     // while <condition> <body>
     // Loop while condition is true
     context.set(
