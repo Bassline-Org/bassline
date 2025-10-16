@@ -1,6 +1,6 @@
-import { native } from "../natives.js";
+import { native } from "../datatypes/functions.js";
 import { isa } from "../utils.js";
-import { Block } from "../values.js";
+import { Block } from "../datatypes/core.js";
 import { evalNext } from "../evaluator.js";
 
 export function installStrings(context) {

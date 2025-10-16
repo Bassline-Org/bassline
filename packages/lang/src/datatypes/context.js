@@ -1,5 +1,5 @@
-import { normalize } from "./utils.js";
-import { Value } from "./values.js";
+import { normalize } from "../utils.js";
+import { Value } from "./core.js";
 
 export class Context extends Value {
     constructor(parent = null) {

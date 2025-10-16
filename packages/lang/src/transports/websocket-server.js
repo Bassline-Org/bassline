@@ -5,6 +5,7 @@
  */
 
 import { WebSocketServer } from "ws";
+import { parse } from "../parser.js";
 
 /**
  * Create a WebSocket server
@@ -48,11 +49,14 @@ export function createWebSocketServer(port, options = {}) {
                 ws.on("message", (data) => {
                     try {
                         const message = data.toString();
-                        handlers.message.forEach(handler => {
+                        handlers.message.forEach((handler) => {
                             try {
                                 handler(clientInfo, message);
                             } catch (error) {
-                                console.error("Error in message handler:", error);
+                                console.error(
+                                    "Error in message handler:",
+                                    error,
+                                );
                             }
                         });
                     } catch (error) {
@@ -63,19 +67,25 @@ export function createWebSocketServer(port, options = {}) {
                 // Handle client disconnect
                 ws.on("close", () => {
                     clients.delete(clientId);
-                    handlers.disconnect.forEach(handler => {
+                    handlers.disconnect.forEach((handler) => {
                         try {
                             handler(clientInfo);
                         } catch (error) {
-                            console.error("Error in disconnect handler:", error);
+                            console.error(
+                                "Error in disconnect handler:",
+                                error,
+                            );
                         }
                     });
                 });
 
                 // Handle errors
                 ws.on("error", (error) => {
-                    console.error(`WebSocket error for client ${clientId}:`, error);
-                    handlers.error.forEach(handler => {
+                    console.error(
+                        `WebSocket error for client ${clientId}:`,
+                        error,
+                    );
+                    handlers.error.forEach((handler) => {
                         try {
                             handler(clientInfo, error);
                         } catch (err) {
@@ -85,7 +95,7 @@ export function createWebSocketServer(port, options = {}) {
                 });
 
                 // Notify connection handlers
-                handlers.connection.forEach(handler => {
+                handlers.connection.forEach((handler) => {
                     try {
                         handler(clientInfo);
                     } catch (error) {
@@ -116,7 +126,9 @@ export function createWebSocketServer(port, options = {}) {
                 throw new Error(`Client ${clientId} not connected`);
             }
 
-            const message = typeof data === "string" ? data : JSON.stringify(data);
+            const message = typeof data === "string"
+                ? data
+                : JSON.stringify(data);
             client.ws.send(message);
         },
 
@@ -125,8 +137,10 @@ export function createWebSocketServer(port, options = {}) {
          * @param {any} data - Data to send
          */
         broadcast(data) {
-            const message = typeof data === "string" ? data : JSON.stringify(data);
-            clients.forEach(client => {
+            const message = typeof data === "string"
+                ? data
+                : JSON.stringify(data);
+            clients.forEach((client) => {
                 if (client.ws.readyState === 1) {
                     client.ws.send(message);
                 }
@@ -159,7 +173,7 @@ export function createWebSocketServer(port, options = {}) {
             return {
                 port,
                 clientCount: clients.size,
-                clients: Array.from(clients.values()).map(c => ({
+                clients: Array.from(clients.values()).map((c) => ({
                     id: c.id,
                     remoteAddress: c.remoteAddress,
                     connectedAt: c.connectedAt,
@@ -181,10 +195,10 @@ export function createWebSocketServer(port, options = {}) {
  */
 export function createRPCServer(port, methods = {}, options = {}) {
     const server = createWebSocketServer(port, options);
-
     server.on("message", async (client, data) => {
         try {
-            const message = JSON.parse(data);
+            console.log("message", data);
+            const message = parse(data);
 
             if (message.type === "request" && message.method) {
                 const handler = methods[message.method];

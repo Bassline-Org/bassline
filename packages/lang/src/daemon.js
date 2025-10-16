@@ -46,7 +46,7 @@ const server = createRPCServer(port, {
         // Serialize the result for transmission
         return {
             ok: result.ok,
-            value: result.ok ? serializeValue(result.value) : null,
+            value: result.ok ? (result.value?.mold?.() ?? result.value) : null,
             error: result.error || null,
         };
     },
@@ -61,7 +61,7 @@ const server = createRPCServer(port, {
         const result = await repl.eval(name);
         return {
             ok: result.ok,
-            value: result.ok ? serializeValue(result.value) : null,
+            value: result.ok ? (result.value?.mold?.() ?? result.value) : null,
             error: result.error || null,
         };
     },
@@ -74,7 +74,7 @@ const server = createRPCServer(port, {
         }
 
         // Create a set-word expression
-        const code = `${name}: ${JSON.stringify(value)}`;
+        const code = `${name}: ${value?.mold?.() ?? value}`;
         const result = await repl.eval(code);
 
         return {
@@ -100,11 +100,17 @@ const server = createRPCServer(port, {
 
 // Handle connections
 server.server.on("connection", (client) => {
-    console.log(`✓ Client connected: ${client.id} from ${client.remoteAddress}`);
+    console.log(
+        `✓ Client connected: ${client.id} from ${client.remoteAddress}`,
+    );
 });
 
 server.server.on("disconnect", (client) => {
     console.log(`✗ Client disconnected: ${client.id}`);
+});
+
+server.server.on("message", (client, data) => {
+    console.log(`✓ Message received: ${data}`);
 });
 
 // Start server
@@ -136,53 +142,3 @@ process.on("SIGTERM", () => {
     server.stop();
     process.exit(0);
 });
-
-/**
- * Serialize a Bassline value for transmission
- * @param {any} value - Value to serialize
- * @returns {any} Serialized value
- */
-function serializeValue(value) {
-    // Handle null/undefined
-    if (value === null || value === undefined) {
-        return null;
-    }
-
-    // Handle primitives
-    if (typeof value === "boolean" || typeof value === "number" || typeof value === "string") {
-        return value;
-    }
-
-    // Handle Bassline value types
-    const constructorName = value.constructor?.name;
-
-    if (constructorName === "Num" && "value" in value) {
-        return { type: "num", value: value.value };
-    }
-
-    if (constructorName === "Str" && "value" in value) {
-        return { type: "str", value: value.value };
-    }
-
-    if (constructorName === "Block" && "items" in value) {
-        return {
-            type: "block",
-            items: value.items.map(serializeValue),
-        };
-    }
-
-    if (constructorName === "Context" && "bindings" in value) {
-        const obj = {};
-        for (const [sym, val] of value.bindings) {
-            obj[sym.description] = serializeValue(val);
-        }
-        return { type: "context", bindings: obj };
-    }
-
-    // Fallback: try to JSON serialize
-    try {
-        return JSON.parse(JSON.stringify(value));
-    } catch {
-        return { type: "unknown", value: String(value) };
-    }
-}

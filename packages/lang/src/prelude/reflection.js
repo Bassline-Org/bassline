@@ -1,4 +1,4 @@
-import { native } from "../natives.js";
+import { native } from "../datatypes/functions.js";
 import { evalNext } from "../evaluator.js";
 
 export function installReflection(context) {

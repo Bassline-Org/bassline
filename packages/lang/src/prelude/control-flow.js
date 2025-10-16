@@ -1,6 +1,6 @@
-import { native } from "../natives.js";
+import { native } from "../datatypes/functions.js";
 import { isa } from "../utils.js";
-import { Block, Word } from "../values.js";
+import { Block, Word } from "../datatypes/core.js";
 import { evalNext, ex } from "../evaluator.js";
 
 export function installControlFlow(context) {

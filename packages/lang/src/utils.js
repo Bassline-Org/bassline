@@ -1,4 +1,4 @@
-import { Block } from "./values.js";
+import { Block } from "./datatypes/core.js";
 export function normalize(str) {
     if (typeof str === "symbol") {
         return Symbol.for(str.description.trim().toUpperCase());

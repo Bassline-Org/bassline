@@ -8,7 +8,7 @@
     ".": "./src/index.js",
     "./repl": "./src/repl.js",
     "./prelude/helpers": "./src/prelude/helpers.js",
-    "./values": "./src/values.js",
+    "./datatypes/core": "./src/datatypes/core.js",
     "./context": "./src/context.js",
     "./natives": "./src/natives.js"
   },

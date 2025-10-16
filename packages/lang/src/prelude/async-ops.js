@@ -1,7 +1,7 @@
-import { native } from "../natives.js";
-import { Context } from "../context.js";
+import { native } from "../datatypes/functions.js";
+import { Context } from "../datatypes/context.js";
 import { isa } from "../utils.js";
-import { Block } from "../values.js";
+import { Block } from "../datatypes/core.js";
 import { evalNext, ex } from "../evaluator.js";
 
 export function installAsyncOps(context) {

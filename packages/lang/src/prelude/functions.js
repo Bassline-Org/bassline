@@ -1,4 +1,4 @@
-import { Fn, native } from "../natives.js";
+import { Fn, native } from "../datatypes/functions.js";
 import { evalNext } from "../evaluator.js";
 
 export function installFunctions(context) {

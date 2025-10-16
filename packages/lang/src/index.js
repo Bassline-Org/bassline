@@ -6,6 +6,6 @@
 
 export { createRepl } from "./repl.js";
 export { parse } from "./parser.js";
-export { Context } from "./context.js";
+export { Context } from "./datatypes/context.js";
 export { createPreludeContext, ex } from "./prelude.js";
-export * from "./values.js";
+export * from "./datatypes/core.js";

@@ -1,7 +1,14 @@
-import { Context } from "./context.js";
-import { Fn, NativeFn } from "./natives.js";
+import { Context } from "./datatypes/context.js";
+import { Fn, NativeFn } from "./datatypes/functions.js";
 import { isa, isSelfEvaluating } from "./utils.js";
-import { Block, GetWord, LitWord, Paren, SetWord, Word } from "./values.js";
+import {
+    Block,
+    GetWord,
+    LitWord,
+    Paren,
+    SetWord,
+    Word,
+} from "./datatypes/core.js";
 
 // Main evaluator for prelude (top-level bassline code)
 export async function ex(context, code) {

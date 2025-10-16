@@ -1,5 +1,5 @@
-import { native } from "../natives.js";
-import { Block } from "../values.js";
+import { native } from "../datatypes/functions.js";
+import { Block } from "../datatypes/core.js";
 import { evalNext, ex } from "../evaluator.js";
 import { isa } from "../utils.js";
 

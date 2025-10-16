@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
 import { SyntaxHighlight } from "./SyntaxHighlight";
 import { useREPL } from "../../../lib/repl-context";
-import { Block, Word } from "@bassline/lang/values";
-import { Fn, NativeFn } from "@bassline/lang/natives";
-import { Context } from "@bassline/lang/context";
+import {
+    Block,
+    Word,
+} from "../../../../../../packages/lang/src/datatypes/core";
+import {
+    Fn,
+    NativeFn,
+} from "../../../../../../packages/lang/src/datatypes/functions";
+import { Context } from "../../../../../../packages/lang/src/datatypes/context";
 
 interface OutputEntry {
     code: string;

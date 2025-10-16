@@ -1,4 +1,4 @@
-import { normalize, Stream } from "./utils.js";
+import { normalize, Stream } from "../utils.js";
 
 export class Value {}
 

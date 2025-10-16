@@ -1,9 +1,9 @@
-import { native } from "../natives.js";
-import { Context } from "../context.js";
+import { native } from "../datatypes/functions.js";
+import { Context } from "../datatypes/context.js";
 import { isa } from "../utils.js";
-import { Block, Word } from "../values.js";
+import { Block, Word } from "../datatypes/core.js";
 import { evalNext } from "../evaluator.js";
-import { NativeFn } from "../natives.js";
+import { NativeFn } from "../datatypes/functions.js";
 
 export function installTypes(context) {
     context.set(

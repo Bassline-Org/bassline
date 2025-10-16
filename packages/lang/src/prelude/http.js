@@ -1,7 +1,7 @@
-import { evalValue, native } from "../natives.js";
-import { Context } from "../context.js";
+import { evalValue, native } from "../datatypes/functions.js";
+import { Context } from "../datatypes/context.js";
 import { isa } from "../utils.js";
-import { Num, Str } from "../values.js";
+import { Num, Str } from "../datatypes/core.js";
 import { evalNext } from "../evaluator.js";
 
 export function installHttp(context) {

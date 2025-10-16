@@ -1,4 +1,4 @@
-import { Context } from "./context.js";
+import { Context } from "./datatypes/context.js";
 
 // Import evaluator functions
 export { evalNext, ex } from "./evaluator.js";
@@ -18,11 +18,13 @@ import { installReflection } from "./prelude/reflection.js";
 //import { installGadgets } from "./prelude/gadgets.js";
 //import { installDialects } from "./prelude/dialects.js";
 import { installAsyncOps } from "./prelude/async-ops.js";
+import { installEvents } from "./datatypes/events.js";
 //import { installContactOps } from "./prelude/contact-ops.js";
 //import { installRemoteOps } from "./prelude/remote-ops.js";
 import { installArrayOps } from "./prelude/array-ops.js";
 import { evalNext, ex } from "./evaluator.js";
-import { native } from "./natives.js";
+import { native } from "./datatypes/functions.js";
+import { installWebsocket } from "./prelude/websocket.js";
 
 // Create a prelude context with built-in natives
 export function createPreludeContext() {
@@ -37,7 +39,8 @@ export function createPreludeContext() {
     installReflection(context);
     installStrings(context);
     installAsyncOps(context);
-
+    installEvents(context);
+    installWebsocket(context);
     // Special values
     context.set("true", true);
     context.set("false", false);
