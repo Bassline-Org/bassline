@@ -9,7 +9,7 @@ import {
     sequenceOf,
     whitespace,
 } from "arcsecond/index.js";
-import { Block, LitWord, Num, Paren, SetWord, Str, Word } from "./values.js";
+import { Block, GetWord, LitWord, Paren, SetWord, Word } from "./values.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([
@@ -23,7 +23,7 @@ const ws = many(
 
 // ===== Numbers =====
 const number = choice([
-    digits.map((int) => new Num(Number(int))),
+    digits.map((int) => Number(int)),
 ]).errorMap(() => "Expected number");
 
 // ===== Strings =====
@@ -47,12 +47,18 @@ const stringLiteral = sequenceOf([
     char('"'),
     many(stringChar),
     char('"'),
-]).map(([_, chars, __]) => new Str(String(chars.join(""))))
+]).map(([_, chars, __]) => String(chars.join("")))
     .errorMap(() => "Expected string");
 
 // ===== Words =====
 // Word characters (allow everything except whitespace and delimiters)
 const wordChars = regex(/^[^ \t\n\r\[\](){}";:']+/);
+
+const getWord = sequenceOf([
+    char(":"),
+    wordChars,
+]).map(([_, spelling]) => new GetWord(spelling))
+    .errorMap(() => "Expected get word");
 
 // 'word (literal word)
 const litWord = sequenceOf([
@@ -74,7 +80,7 @@ const normalWord = sequenceOf([
 ]).map(([spelling]) => new Word(spelling))
     .errorMap(() => "Expected normal word");
 
-const word = choice([setWord, litWord, normalWord]);
+const word = choice([litWord, getWord, setWord, normalWord]);
 
 // Forward declare for recursion
 const value = recursiveParser(() => valueParser);

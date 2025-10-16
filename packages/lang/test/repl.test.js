@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRepl } from "../src/repl.js";
+import { createRepl } from "../repl.js";
 
 describe("REPL - Safe Evaluation", () => {
     it("should handle successful evaluation", async () => {

@@ -1,7 +1,9 @@
 import { normalize } from "./utils.js";
+import { Value } from "./values.js";
 
-export class Context {
+export class Context extends Value {
     constructor(parent = null) {
+        super();
         this.bindings = new Map();
         this.parent = parent;
     }
@@ -45,5 +47,13 @@ export class Context {
         }
 
         return false;
+    }
+
+    mold() {
+        return `context [${
+            Array.from(this.bindings.entries()).map(([key, value]) =>
+                `${key.description}: ${value.mold ? value.mold() : value}`
+            ).join(" ")
+        }]`;
     }
 }

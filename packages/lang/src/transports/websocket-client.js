@@ -37,7 +37,11 @@ export function createWebSocketClient(url, options = {}) {
          * Connect to the WebSocket server
          */
         connect() {
-            if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+            if (
+                ws &&
+                (ws.readyState === WebSocket.CONNECTING ||
+                    ws.readyState === WebSocket.OPEN)
+            ) {
                 return; // Already connected or connecting
             }
 
@@ -51,7 +55,7 @@ export function createWebSocketClient(url, options = {}) {
                 ws.onopen = (event) => {
                     connection.status = "connected";
                     reconnectAttempts = 0;
-                    handlers.open.forEach(handler => {
+                    handlers.open.forEach((handler) => {
                         try {
                             handler(event);
                         } catch (error) {
@@ -61,7 +65,7 @@ export function createWebSocketClient(url, options = {}) {
                 };
 
                 ws.onmessage = (event) => {
-                    handlers.message.forEach(handler => {
+                    handlers.message.forEach((handler) => {
                         try {
                             handler(event.data);
                         } catch (error) {
@@ -72,7 +76,7 @@ export function createWebSocketClient(url, options = {}) {
 
                 ws.onerror = (event) => {
                     connection.status = "error";
-                    handlers.error.forEach(handler => {
+                    handlers.error.forEach((handler) => {
                         try {
                             handler(event);
                         } catch (error) {
@@ -85,7 +89,7 @@ export function createWebSocketClient(url, options = {}) {
                     connection.status = "disconnected";
                     connection.ws = null;
 
-                    handlers.close.forEach(handler => {
+                    handlers.close.forEach((handler) => {
                         try {
                             handler(event);
                         } catch (error) {
@@ -94,7 +98,10 @@ export function createWebSocketClient(url, options = {}) {
                     });
 
                     // Auto-reconnect if not intentionally closed
-                    if (!intentionallyClosed && reconnectAttempts < maxReconnectAttempts) {
+                    if (
+                        !intentionallyClosed &&
+                        reconnectAttempts < maxReconnectAttempts
+                    ) {
                         scheduleReconnect();
                     }
                 };
@@ -132,7 +139,9 @@ export function createWebSocketClient(url, options = {}) {
                 throw new Error("WebSocket is not connected");
             }
 
-            const message = typeof data === "string" ? data : JSON.stringify(data);
+            const message = typeof data === "string"
+                ? data
+                : JSON.stringify(data);
             ws.send(message);
         },
 
@@ -174,10 +183,11 @@ export function createWebSocketClient(url, options = {}) {
     function scheduleReconnect() {
         if (reconnectTimer) return;
 
-        const delay = reconnectDelay * Math.pow(reconnectBackoff, reconnectAttempts);
+        const delay = reconnectDelay *
+            Math.pow(reconnectBackoff, reconnectAttempts);
         reconnectAttempts++;
 
-        handlers.reconnect.forEach(handler => {
+        handlers.reconnect.forEach((handler) => {
             try {
                 handler({ attempt: reconnectAttempts, delay });
             } catch (error) {

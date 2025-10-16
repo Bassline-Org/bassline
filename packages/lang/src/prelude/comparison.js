@@ -1,21 +1,23 @@
-import { native, evalValue } from "../natives.js";
+import { native } from "../natives.js";
+import { evalNext } from "../evaluator.js";
+import { Block } from "../values.js";
 
 export function installComparison(context) {
     // = <a> <b>
     context.set(
         "=",
         native(async (stream, context) => {
-            const a = evalValue(stream.next(), context);
-            const b = evalValue(stream.next(), context);
+            const a = await evalNext(stream, context);
+            const b = await evalNext(stream, context);
             return a === b;
         }, {
             doc: "Returns true if both values are equal, false otherwise.",
-            args: ["a", "b"],
-            examples: [
+            args: new Block(["a", "b"]),
+            examples: new Block([
                 "= 5 5  ; => true",
                 "= 10 3  ; => false",
-                '= "hello" "hello"  ; => true'
-            ]
+                '= "hello" "hello"  ; => true',
+            ]),
         }),
     );
 
@@ -23,17 +25,17 @@ export function installComparison(context) {
     context.set(
         "<",
         native(async (stream, context) => {
-            const a = evalValue(stream.next(), context);
-            const b = evalValue(stream.next(), context);
+            const a = await evalNext(stream, context);
+            const b = await evalNext(stream, context);
             return a < b;
         }, {
             doc: "Returns true if the first value is less than the second.",
-            args: ["a", "b"],
-            examples: [
+            args: new Block(["a", "b"]),
+            examples: new Block([
                 "< 3 5  ; => true",
                 "< 10 5  ; => false",
-                "< 5 5  ; => false"
-            ]
+                "< 5 5  ; => false",
+            ]),
         }),
     );
 
@@ -41,17 +43,17 @@ export function installComparison(context) {
     context.set(
         ">",
         native(async (stream, context) => {
-            const a = evalValue(stream.next(), context);
-            const b = evalValue(stream.next(), context);
+            const a = await evalNext(stream, context);
+            const b = await evalNext(stream, context);
             return a > b;
         }, {
             doc: "Returns true if the first value is greater than the second.",
-            args: ["a", "b"],
-            examples: [
+            args: new Block(["a", "b"]),
+            examples: new Block([
                 "> 10 5  ; => true",
                 "> 3 5  ; => false",
-                "> 5 5  ; => false"
-            ]
+                "> 5 5  ; => false",
+            ]),
         }),
     );
 
@@ -59,17 +61,17 @@ export function installComparison(context) {
     context.set(
         "<=",
         native(async (stream, context) => {
-            const a = evalValue(stream.next(), context);
-            const b = evalValue(stream.next(), context);
+            const a = await evalNext(stream, context);
+            const b = await evalNext(stream, context);
             return a <= b;
         }, {
             doc: "Returns true if the first value is less than or equal to the second.",
-            args: ["a", "b"],
-            examples: [
+            args: new Block(["a", "b"]),
+            examples: new Block([
                 "<= 3 5  ; => true",
                 "<= 5 5  ; => true",
-                "<= 10 5  ; => false"
-            ]
+                "<= 10 5  ; => false",
+            ]),
         }),
     );
 
@@ -77,17 +79,17 @@ export function installComparison(context) {
     context.set(
         ">=",
         native(async (stream, context) => {
-            const a = evalValue(stream.next(), context);
-            const b = evalValue(stream.next(), context);
+            const a = await evalNext(stream, context);
+            const b = await evalNext(stream, context);
             return a >= b;
         }, {
             doc: "Returns true if the first value is greater than or equal to the second.",
-            args: ["a", "b"],
-            examples: [
+            args: new Block(["a", "b"]),
+            examples: new Block([
                 ">= 10 5  ; => true",
                 ">= 5 5  ; => true",
-                ">= 3 5  ; => false"
-            ]
+                ">= 3 5  ; => false",
+            ]),
         }),
     );
 
@@ -95,17 +97,17 @@ export function installComparison(context) {
     context.set(
         "not=",
         native(async (stream, context) => {
-            const a = evalValue(stream.next(), context);
-            const b = evalValue(stream.next(), context);
+            const a = await evalNext(stream, context);
+            const b = await evalNext(stream, context);
             return a !== b;
         }, {
             doc: "Returns true if the values are not equal, false otherwise.",
-            args: ["a", "b"],
-            examples: [
+            args: new Block(["a", "b"]),
+            examples: new Block([
                 "not= 5 3  ; => true",
                 "not= 5 5  ; => false",
-                'not= "hello" "world"  ; => true'
-            ]
+                'not= "hello" "world"  ; => true',
+            ]),
         }),
     );
 }

@@ -1,6 +1,6 @@
-import { evalValue, native } from "../natives.js";
+import { native } from "../natives.js";
 import { isa } from "../utils.js";
-import { Block, Num, Str } from "../values.js";
+import { Block } from "../values.js";
 import { evalNext, ex } from "../evaluator.js";
 
 export function installSeries(context) {
@@ -13,10 +13,7 @@ export function installSeries(context) {
             if (isa(series, Block)) {
                 return series.items[0];
             }
-            if (Array.isArray(series)) {
-                return series[0];
-            }
-            throw new Error("first expects a block or array");
+            throw new Error("first expects a block");
         }),
     );
 
@@ -29,10 +26,7 @@ export function installSeries(context) {
             if (isa(series, Block)) {
                 return series.items[series.items.length - 1];
             }
-            if (Array.isArray(series)) {
-                return series[series.length - 1];
-            }
-            throw new Error("last expects a block or array");
+            throw new Error("last expects a block");
         }),
     );
 
@@ -45,16 +39,10 @@ export function installSeries(context) {
             if (isa(series, Block)) {
                 return new Num(series.items.length);
             }
-            if (isa(series, Str)) {
-                return new Num(series.value.length);
-            }
-            if (Array.isArray(series)) {
-                return new Num(series.length);
-            }
             if (typeof series === "string") {
-                return new Num(series.length);
+                return series.length;
             }
-            throw new Error("length expects a block, string, or array");
+            throw new Error("length expects a block");
         }),
     );
 
@@ -69,10 +57,7 @@ export function installSeries(context) {
             if (isa(series, Block)) {
                 return new Block([...series.items, value]);
             }
-            if (Array.isArray(series)) {
-                return [...series, value];
-            }
-            throw new Error("append expects a block or array");
+            throw new Error("append expects a block");
         }),
     );
 
@@ -87,10 +72,7 @@ export function installSeries(context) {
             if (isa(series, Block)) {
                 return new Block([value, ...series.items]);
             }
-            if (Array.isArray(series)) {
-                return [value, ...series];
-            }
-            throw new Error("insert expects a block or array");
+            throw new Error("insert expects a block");
         }),
     );
 
@@ -100,15 +82,12 @@ export function installSeries(context) {
         "at",
         native(async (stream, context) => {
             const series = await evalNext(stream, context);
-            const index = evalValue(stream.next(), context);
+            const index = await evalNext(stream, context);
 
             if (isa(series, Block)) {
                 return new Block(series.items.slice(index - 1));
             }
-            if (Array.isArray(series)) {
-                return series.slice(index - 1);
-            }
-            throw new Error("at expects a block or array");
+            throw new Error("at expects a block");
         }),
     );
 
@@ -118,15 +97,12 @@ export function installSeries(context) {
         "pick",
         native(async (stream, context) => {
             const series = await evalNext(stream, context);
-            const index = evalValue(stream.next(), context);
+            const index = await evalNext(stream, context);
 
             if (isa(series, Block)) {
                 return series.items[index - 1];
             }
-            if (Array.isArray(series)) {
-                return series[index - 1];
-            }
-            throw new Error("pick expects a block or array");
+            throw new Error("pick expects a block");
         }),
     );
 
@@ -139,16 +115,10 @@ export function installSeries(context) {
             if (isa(series, Block)) {
                 return series.items.length === 0;
             }
-            if (isa(series, Str)) {
-                return series.value.length === 0;
-            }
-            if (Array.isArray(series)) {
-                return series.length === 0;
-            }
             if (typeof series === "string") {
                 return series.length === 0;
             }
-            return false;
+            throw new Error("empty? expects a block or string");
         }),
     );
 
@@ -157,15 +127,14 @@ export function installSeries(context) {
     context.set(
         "reduce",
         native(async (stream, context) => {
-            const blockValue = await evalNext(stream, context);
+            const series = await evalNext(stream, context);
 
-            if (!isa(blockValue, Block)) {
-                console.log(blockValue);
+            if (!isa(series, Block)) {
                 throw new Error("reduce expects a block");
             }
 
             const results = [];
-            for (const item of blockValue.items) {
+            for (const item of series.items) {
                 // Evaluate each item in the context
                 const result = await ex(context, item);
                 results.push(result);
@@ -174,15 +143,14 @@ export function installSeries(context) {
             return new Block(results);
         }, {
             doc: "Evaluates each element in a block and returns a new block containing the results.",
-            args: ["block"],
-            examples: [
-                "x: 5",
-                "y: 10",
-                "reduce [x y (+ x y)]  ; => [5 10 15]",
-                'name: "Alice"',
-                "age: 30",
-                'reduce [name age]  ; => ["Alice" 30]',
-            ],
+            args: new Block(["series"]),
+            examples: new Block([
+                "reduce [1 2 3]  ; => [1 2 3]",
+                "reduce [1 2 3] (+)  ; => 6",
+                "reduce [1 2 3] (*)  ; => 6",
+                "reduce [1 2 3] (/)  ; => 0.16666666666666666",
+                "reduce [1 2 3] (%)  ; => 0",
+            ]),
         }),
     );
 }

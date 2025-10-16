@@ -1,4 +1,4 @@
-import { Block, Scalar } from "./values.js";
+import { Block } from "./values.js";
 export function normalize(str) {
     if (typeof str === "symbol") {
         return Symbol.for(str.description.trim().toUpperCase());
@@ -11,7 +11,9 @@ export function isa(value, aClass) {
 }
 
 export function isSelfEvaluating(value) {
-    return isa(value, Scalar) || isa(value, Block);
+    return typeof value === "number" ||
+        typeof value === "string" ||
+        isa(value, Block);
 }
 
 export class Stream {

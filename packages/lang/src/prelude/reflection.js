@@ -1,7 +1,7 @@
 import { native } from "../natives.js";
 import { Context } from "../context.js";
 import { isa } from "../utils.js";
-import { Num, Str, Word } from "../values.js";
+import { Word } from "../values.js";
 import { evalNext } from "../evaluator.js";
 import { inspectValue, moldValue } from "./helpers.js";
 
@@ -12,12 +12,8 @@ export function installReflection(context) {
         "print",
         native(async (stream, context) => {
             const value = await evalNext(stream, context);
-            // Unwrap for display
-            if (isa(value, Num) || isa(value, Str)) {
-                console.log(value.value);
-            } else {
-                console.log(value);
-            }
+            console.log(value);
+            return value;
         }),
     );
 
@@ -28,7 +24,7 @@ export function installReflection(context) {
         native(async (stream, context) => {
             // Evaluate the argument to get the actual value
             const value = await evalNext(stream, context);
-            return new Str(moldValue(value));
+            return value.mold();
         }),
     );
 
@@ -41,102 +37,104 @@ export function installReflection(context) {
         }),
     );
 
-    // help - list available functions or get help for a specific function
-    context.set(
-        "help",
-        native(async (stream, context) => {
-            // Check if there's an argument (function name to get help for)
-            const next = stream.peek();
+    // // help - list available functions or get help for a specific function
+    // context.set(
+    //     "help",
+    //     native(async (stream, context) => {
+    //         // Check if there's an argument (function name to get help for)
+    //         const next = stream.peek();
 
-            if (next === undefined) {
-                // No argument - list all available functions
-                const functions = [];
-                for (const [sym] of context.bindings) {
-                    const spelling = sym.description;
-                    // Skip internal metadata
-                    if (spelling.startsWith("_")) continue;
-                    functions.push(spelling);
-                }
+    //         if (next === undefined) {
+    //             // No argument - list all available functions
+    //             const functions = [];
+    //             for (const [sym] of context.bindings) {
+    //                 const spelling = sym.description;
+    //                 // Skip internal metadata
+    //                 if (spelling.startsWith("_")) continue;
+    //                 functions.push(spelling);
+    //             }
 
-                // Sort alphabetically
-                functions.sort();
+    //             // Sort alphabetically
+    //             functions.sort();
 
-                return {
-                    type: "help",
-                    topic: "all",
-                    functions,
-                };
-            }
+    //             return {
+    //                 type: "help",
+    //                 topic: "all",
+    //                 functions,
+    //             };
+    //         }
 
-            // Get help for specific function
-            const nameValue = stream.next();
-            let name;
+    //         // Get help for specific function
+    //         const nameValue = stream.next();
+    //         let name;
 
-            if (isa(nameValue, Word)) {
-                name = nameValue.spelling.description;
-            } else {
-                return { type: "error", message: "help expects a word" };
-            }
+    //         if (isa(nameValue, Word)) {
+    //             name = nameValue.spelling.description;
+    //         } else {
+    //             return { type: "error", message: "help expects a word" };
+    //         }
 
-            const normalized = Symbol.for(name.toUpperCase());
-            if (!context.bindings.has(normalized)) {
-                return {
-                    type: "help",
-                    topic: name,
-                    found: false,
-                    message: `No function found: ${name}`,
-                };
-            }
+    //         const normalized = Symbol.for(name.toUpperCase());
+    //         if (!context.bindings.has(normalized)) {
+    //             return {
+    //                 type: "help",
+    //                 topic: name,
+    //                 found: false,
+    //                 message: `No function found: ${name}`,
+    //             };
+    //         }
 
-            const value = context.bindings.get(normalized);
+    //         const value = context.bindings.get(normalized);
 
-            // Return help info based on what it is
-            if (value?.call) {
-                const doc = value[Symbol.for("DOC")];
-                const args = value[Symbol.for("ARGS")];
-                const examples = value[Symbol.for("EXAMPLES")];
+    //         // Return help info based on what it is
+    //         if (value?.call) {
+    //             const doc = value[Symbol.for("DOC")];
+    //             const args = value[Symbol.for("ARGS")];
+    //             const examples = value[Symbol.for("EXAMPLES")];
 
-                return {
-                    type: "help",
-                    topic: name,
-                    found: true,
-                    kind: "native",
-                    args: args ? args.map(arg => ({ name: arg, literal: false })) : [],
-                    doc: doc || null,
-                    examples: examples || null,
-                    description: doc || "Built-in native function",
-                };
-            }
+    //             return {
+    //                 type: "help",
+    //                 topic: name,
+    //                 found: true,
+    //                 kind: "native",
+    //                 args: args
+    //                     ? args.map((arg) => ({ name: arg, literal: false }))
+    //                     : [],
+    //                 doc: doc || null,
+    //                 examples: examples || null,
+    //                 description: doc || "Built-in native function",
+    //             };
+    //         }
 
-            if (value instanceof Context && value._function) {
-                const argNames = value._argNames || [];
-                const argEval = value._argEval || [];
-                const doc = value.get(Symbol.for("DOC"));
-                const examples = value.get(Symbol.for("EXAMPLES"));
+    //         if (value instanceof Context && value._function) {
+    //             const argNames = value._argNames || [];
+    //             const argEval = value._argEval || [];
+    //             const doc = value.get(Symbol.for("DOC"));
+    //             const examples = value.get(Symbol.for("EXAMPLES"));
 
-                return {
-                    type: "help",
-                    topic: name,
-                    found: true,
-                    kind: "function",
-                    args: argNames.map((argName, i) => ({
-                        name: argName.description,
-                        literal: !argEval[i],
-                    })),
-                    doc: doc ? (isa(doc, Str) ? doc.value : String(doc)) : null,
-                    examples: examples,
-                };
-            }
+    //             return {
+    //                 type: "help",
+    //                 topic: name,
+    //                 found: true,
+    //                 kind: "function",
+    //                 args: argNames.map((argName, i) => ({
+    //                     name: argName.description,
+    //                     literal: !argEval[i],
+    //                 })),
+    //                 doc: doc ? (isa(doc, Str) ? doc.value : String(doc)) : null,
+    //                 examples: examples,
+    //             };
+    //         }
 
-            return {
-                type: "help",
-                topic: name,
-                found: true,
-                kind: "value",
-                valueType: typeof value,
-            };
-        }),
-    );
+    //         return {
+    //             type: "help",
+    //             topic: name,
+    //             found: true,
+    //             kind: "value",
+    //             valueType: typeof value,
+    //         };
+    //     }),
+    // );
 
     // doc <function> <doc-string>
     // Add documentation to a function
@@ -212,7 +210,8 @@ export function installReflection(context) {
                 if (doc || args) {
                     // Format native with documentation
                     const argList = args ? args.join(" ") : "";
-                    const signature = `${name.description}: native [${argList}]`;
+                    const signature =
+                        `${name.description}: native [${argList}]`;
                     const docText = doc || "No documentation available.";
 
                     let output = `${signature}\n\n${docText}`;
@@ -235,7 +234,9 @@ export function installReflection(context) {
             // For other values, show type and molded representation
             const molded = moldValue(value);
             const typeStr = value.constructor?.name || typeof value;
-            return new Str(`${name.description}: ${typeStr}\n\nValue: ${molded}`);
+            return new Str(
+                `${name.description}: ${typeStr}\n\nValue: ${molded}`,
+            );
         }),
     );
 }

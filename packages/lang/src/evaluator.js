@@ -1,6 +1,7 @@
 import { Context } from "./context.js";
+import { NativeFn } from "./natives.js";
 import { isa, isSelfEvaluating } from "./utils.js";
-import { Block, LitWord, Paren, SetWord, Word } from "./values.js";
+import { Block, GetWord, LitWord, Paren, SetWord, Word } from "./values.js";
 
 // Main evaluator for prelude (top-level bassline code)
 export async function ex(context, code) {
@@ -13,41 +14,7 @@ export async function ex(context, code) {
     const stream = code.stream();
 
     while (!stream.done()) {
-        const current = stream.next();
-
-        // Self-evaluating values (numbers, strings, blocks)
-        if (isSelfEvaluating(current)) {
-            result = current;
-            continue;
-        }
-
-        if (isa(current, LitWord)) {
-            result = new Word(current.spelling);
-            continue;
-        }
-
-        // Assignment: var: value
-        if (isa(current, SetWord)) {
-            result = await evalNext(stream, context);
-            context.set(current.spelling, result);
-            continue;
-        }
-
-        // Word lookup/call
-        if (isa(current, Word)) {
-            const value = context.get(current.spelling);
-
-            // If callable (native or dialect), invoke it
-            if (value?.call) {
-                result = await value.call(stream, context);
-            } // If it's a function, call it
-            else if (value?._function) {
-                result = await callFunction(value, stream, context);
-            } else {
-                result = value;
-            }
-            continue;
-        }
+        result = await evalNext(stream, context);
     }
 
     return result;
@@ -62,19 +29,29 @@ export async function evalNext(stream, context) {
         return await ex(context, val);
     }
 
+    if (isa(val, GetWord)) {
+        const resolved = context.get(val.spelling);
+        return resolved;
+    }
+    if (isa(val, LitWord)) {
+        return new Word(val.spelling);
+    }
+
+    if (isa(val, SetWord)) {
+        const value = await evalNext(stream, context);
+        context.set(val.spelling, value);
+        return value;
+    }
+
     if (isa(val, Word)) {
         const resolved = context.get(val.spelling);
-        // If it's callable, call it
-        if (resolved?.call) {
-            return await resolved.call(stream, context);
-        }
-        // If it's a function, call it
-        if (resolved?._function) {
-            return await callFunction(resolved, stream, context);
+        if (isa(resolved, NativeFn)) {
+            return await resolved.fn(stream, context);
         }
         return resolved;
     }
-    return val; // Self-evaluating
+
+    return val;
 }
 
 // Call a function (context) with arguments

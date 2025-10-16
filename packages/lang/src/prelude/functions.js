@@ -2,6 +2,7 @@ import { native } from "../natives.js";
 import { Context } from "../context.js";
 import { isa } from "../utils.js";
 import { Block, LitWord, Word } from "../values.js";
+import { evalNext } from "../evaluator.js";
 
 export function installFunctions(context) {
     // func <args-block> <body-block>
@@ -9,8 +10,8 @@ export function installFunctions(context) {
     context.set(
         "func",
         native(async (stream, context) => {
-            const argsBlock = stream.next();
-            const bodyBlock = stream.next();
+            const argsBlock = await evalNext(stream, context);
+            const bodyBlock = await evalNext(stream, context);
 
             if (!isa(argsBlock, Block)) {
                 throw new Error("func expects a block of arguments");

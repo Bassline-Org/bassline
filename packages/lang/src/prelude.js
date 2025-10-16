@@ -11,16 +11,16 @@ import { installSeries } from "./prelude/series.js";
 import { installContextOps } from "./prelude/context-ops.js";
 import { installFunctions } from "./prelude/functions.js";
 import { installTypes } from "./prelude/types.js";
-import { installStrings } from "./prelude/strings.js";
-import { installHttp } from "./prelude/http.js";
-import { installJson } from "./prelude/json.js";
+//import { installStrings } from "./prelude/strings.js";
+//import { installHttp } from "./prelude/http.js";
+//import { installJson } from "./prelude/json.js";
 import { installReflection } from "./prelude/reflection.js";
-import { installView } from "./prelude/view.js";
-import { installGadgets } from "./prelude/gadgets.js";
-import { installDialects } from "./prelude/dialects.js";
-import { installAsyncOps } from "./prelude/async-ops.js";
-import { installContactOps } from "./prelude/contact-ops.js";
-import { installRemoteOps } from "./prelude/remote-ops.js";
+//import { installView } from "./prelude/view.js";
+//import { installGadgets } from "./prelude/gadgets.js";
+//import { installDialects } from "./prelude/dialects.js";
+//import { installAsyncOps } from "./prelude/async-ops.js";
+//import { installContactOps } from "./prelude/contact-ops.js";
+//import { installRemoteOps } from "./prelude/remote-ops.js";
 import { installArrayOps } from "./prelude/array-ops.js";
 
 // Create a prelude context with built-in natives
@@ -28,9 +28,9 @@ export function createPreludeContext() {
     const context = new Context();
 
     // Install all standard library modules
-    installDialects(context);
+    //    installDialects(context);
     installArrayOps(context);
-    installGadgets(context);
+    //    installGadgets(context);
     installArithmetic(context);
     installComparison(context);
     installControlFlow(context);
@@ -39,16 +39,16 @@ export function createPreludeContext() {
     installFunctions(context);
     installTypes(context);
     installReflection(context);
-    installView(context);
-    installStrings(context);
-    installHttp(context);
-    installJson(context);
-    installAsyncOps(context);
-    installContactOps(context);
+    //    installView(context);
+    //    installStrings(context);
+    //    installHttp(context);
+    //    installJson(context);
+    //    installAsyncOps(context);
+    //    installContactOps(context);
 
     // Install remote ops (needs access to async update function)
     // Remote ops will create tasks but async context is managed internally
-    installRemoteOps(context, () => {}); // Async updater is internal to async-ops
+    //    installRemoteOps(context, () => {}); // Async updater is internal to async-ops
 
     // Special values
     context.set("true", true);

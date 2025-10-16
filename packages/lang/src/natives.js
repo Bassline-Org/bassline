@@ -1,47 +1,17 @@
-import { isa } from "./utils.js";
-import { Block, Num, Str, Word } from "./values.js";
+import { Context } from "./context";
 
-// Helper to create native callable functions
-// Optionally accepts metadata: { doc, args, examples }
-export function native(fn, metadata) {
-    const nativeObj = {
-        call(stream, context) {
-            return fn(stream, context);
-        },
-    };
-
-    // Attach metadata as Symbol properties if provided
-    if (metadata) {
-        if (metadata.doc) {
-            nativeObj[Symbol.for("DOC")] = metadata.doc;
-        }
-        if (metadata.args) {
-            nativeObj[Symbol.for("ARGS")] = metadata.args;
-        }
-        if (metadata.examples) {
-            nativeObj[Symbol.for("EXAMPLES")] = metadata.examples;
-        }
+export class NativeFn extends Context {
+    constructor(fn) {
+        super();
+        this.fn = fn;
     }
-
-    return nativeObj;
 }
 
-// Evaluate a value - resolve words, extract scalars
-export function evalValue(val, context) {
-    // Resolve words first
-    if (isa(val, Word)) {
-        val = context.get(val.spelling);
+// Helper to create native callable functions
+export function native(fn, metadata = {}) {
+    const native = new NativeFn(fn);
+    for (const [key, value] of Object.entries(metadata)) {
+        native.set(key, value);
     }
-
-    // Then unwrap scalars
-    if (isa(val, Num)) {
-        return val.value;
-    }
-    if (isa(val, Str)) {
-        return val.value;
-    }
-    if (isa(val, Block)) {
-        return val; // Blocks stay as blocks
-    }
-    return val;
+    return native;
 }

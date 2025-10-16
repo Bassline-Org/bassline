@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRepl } from "../src/repl.js";
+import { createRepl } from "../repl.js";
 
 describe("Iteration - foreach", () => {
     it("should iterate over block items", async () => {
@@ -152,7 +152,7 @@ describe("Control Flow - either", () => {
         const repl = createRepl();
 
         await repl.eval("x: 10");
-        const result = await repl.eval("either (> x 5) [\"big\"] [\"small\"]");
+        const result = await repl.eval('either (> x 5) ["big"] ["small"]');
 
         expect(result.value.value).toBe("big");
     });
@@ -161,7 +161,7 @@ describe("Control Flow - either", () => {
         const repl = createRepl();
 
         await repl.eval("age: 25");
-        await repl.eval("status: either (>= age 18) [\"adult\"] [\"minor\"]");
+        await repl.eval('status: either (>= age 18) ["adult"] ["minor"]');
 
         const result = await repl.eval("status");
         expect(result.value.value).toBe("adult");
@@ -173,7 +173,9 @@ describe("Integration - Complex Patterns", () => {
         const repl = createRepl();
 
         await repl.eval("evens: 0");
-        await repl.eval("foreach n [1 2 3 4 5] [if (= 0 (% n 2)) [evens: + evens 1]]");
+        await repl.eval(
+            "foreach n [1 2 3 4 5] [if (= 0 (% n 2)) [evens: + evens 1]]",
+        );
 
         // Need modulo operator first! Skip for now
         // const result = await repl.eval("evens");
