@@ -138,6 +138,15 @@ export class Series extends Value {
             `[ ${this.items.map((item) => item.form()).join(" ")} ]`,
         );
     }
+    fold(fn, initial, stream, context) {
+        return this.items.reduce(
+            (acc, curr) => {
+                const expr = new Block([fn, acc, curr]);
+                return evaluate(expr, context);
+            },
+            initial,
+        );
+    }
     slice(start, end) {
         const startValue = start.to("number!");
         const endValue = end.to("number!");

@@ -7,7 +7,7 @@ export class Context extends Value {
         super();
         this.bindings = new Map();
         this.set("self", this);
-        if (parent) {
+        if (parent !== null) {
             this.set("parent", parent);
         }
     }
@@ -65,6 +65,9 @@ export class Context extends Value {
 
     // Update existing binding (searches up parent chain)
     update(spelling, value) {
+        if (spelling instanceof Str) {
+            return this.update(new Word(spelling.value), value);
+        }
         const normalized = normalize(spelling);
 
         if (this.hasLocal(normalized)) {
@@ -74,6 +77,7 @@ export class Context extends Value {
 
         if (this.hasLocal("parent")) {
             const parent = this.get("parent");
+            console.log(parent);
             return parent.update(spelling, value);
         }
 

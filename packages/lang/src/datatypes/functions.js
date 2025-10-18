@@ -1,7 +1,7 @@
 import { Context } from "./context.js";
-import { Datatype, Str, Value } from "./core.js";
+import { Block, Datatype, Str, Value } from "./core.js";
 import { normalizeString } from "../utils.js";
-
+import { evaluate } from "../evaluator.js";
 /**
  * Native functions are functions implemented in the host language
  * Unlike user-defined functions, they don't have a context
@@ -17,10 +17,15 @@ export class NativeFn extends Value {
     getArgs(stream, context) {
         return this.spec.map((arg) => {
             const value = stream.next();
+            //console.log(value);
             if (arg.startsWith(":")) {
                 return value;
             } else {
-                return value.evaluate(stream, context);
+                console.log(arg);
+                console.log(context);
+                const result = value.evaluate(stream, context);
+                console.log(result);
+                return result;
             }
         });
     }
@@ -74,11 +79,12 @@ export class NativeMethod extends NativeFn {
 
 export class Fn extends Context {
     static type = normalizeString("fn!");
-    constructor(args, body) {
-        super(null);
+    constructor(parentContext, args, body) {
+        super(parentContext);
         this.set("args", args);
         this.set("body", body);
     }
+
     evaluate(stream, context) {
         for (const arg of this.get("args").items) {
             this.set(
@@ -86,13 +92,20 @@ export class Fn extends Context {
                 stream.next().evaluate(stream, context),
             );
         }
-        return this.get("body").evaluate(stream, this);
+        const body = this.get("body");
+        console.log(this);
+        return evaluate(body, this);
     }
     form() {
         return new Str(`fn! [
     args: [${this.get("args").form().value}]
     body: ${this.get("body").form().value}
 ]`);
+    }
+    static make(stream, context) {
+        const args = stream.next().to("block!");
+        const body = stream.next().to("block!");
+        return new Fn(context, args, body);
     }
 }
 

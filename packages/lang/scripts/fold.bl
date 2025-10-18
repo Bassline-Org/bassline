@@ -1,0 +1,17 @@
+map: make fn! [series cb] [
+    output: make block!
+    f: make fn! [acc curr] [
+    ]
+    fold series :f output
+    output
+]
+
+inc: make fn! [n] [ + n 1 ]
+
+someVar: 10
+
+foo: make fn! [n] [
+    in system [ someVar: n ]
+]
+
+foo 20

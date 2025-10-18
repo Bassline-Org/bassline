@@ -1,3 +1,4 @@
+import { Block, Num } from "../datatypes/core.js";
 import { NativeFn, NativeMethod } from "../datatypes/functions.js";
 
 export default {
@@ -9,16 +10,22 @@ export default {
     "eq?": NativeMethod.binary("equals"),
 
     // Series methods
+    "update": NativeMethod.ternary("update"),
     "append": NativeMethod.binary("append"),
     "insert": NativeMethod.ternary("insert"),
     "pick": NativeMethod.binary("pick"),
     "pluck": NativeMethod.ternary("pluck"),
     "slice": NativeMethod.ternary("slice"),
     "length": NativeMethod.unary("length"),
+    "iota": new NativeFn(["n"], ([n], stream, context) => {
+        const arr = Array.from({ length: n.value }, (_, i) => new Num(i));
+        return new Block(arr);
+    }),
 
     // Block methods
     "compose": NativeMethod.unary("compose"),
     "reduce": NativeMethod.unary("reduce"),
+    "fold": NativeMethod.ternary("fold"),
 
     // Control flow
     "if": new NativeFn(
