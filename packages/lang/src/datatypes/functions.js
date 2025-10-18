@@ -22,6 +22,14 @@ export class NativeFn extends Value {
         const result = this.fn(args, stream, context);
         return result;
     }
+    print() {
+        console.log(
+            `native-fn! [ \n    spec: [${
+                this.spec.join(", ")
+            }] \n    host-fn: ${this.fn.toString()} \n ]`,
+        );
+        return this;
+    }
     mold() {
         return "native";
     }
@@ -32,6 +40,7 @@ export class Action extends NativeFn {
         super(spec, ([target, ...args]) => {
             return (target[method])(...args);
         });
+        this.method = method;
         this.type = "action!";
     }
     static make(stream, context) {
@@ -47,6 +56,14 @@ export class Action extends NativeFn {
     }
     static ternary(method) {
         return new Action(["a", "b", "c"], method);
+    }
+    print() {
+        console.log(
+            `action! [ \n    spec: [${
+                this.spec.join(", ")
+            }] \n    method: ${this.method} \n ]`,
+        );
+        return this;
     }
 }
 

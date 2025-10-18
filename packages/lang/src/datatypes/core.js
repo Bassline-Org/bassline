@@ -19,6 +19,10 @@ export class Value {
         }
         return this;
     }
+    print() {
+        console.log(this);
+        return this;
+    }
 }
 
 export class Num extends Value {
@@ -55,6 +59,10 @@ export class Num extends Value {
     divide(other) {
         const otherValue = other.to("number!");
         return new Num(this.value / otherValue.value);
+    }
+    print() {
+        console.log(this.value);
+        return this;
     }
 }
 
@@ -144,6 +152,10 @@ export class Str extends Series {
 
     static make(stream, context) {
         return new Str("");
+    }
+    print() {
+        console.log(this.value);
+        return this;
     }
 }
 
@@ -256,21 +268,22 @@ export class Datatype extends Value {
     }
 }
 
-let nil;
+let _nil;
 export class Nil extends Value {
     constructor() {
         super("nil!");
-        if (!nil) {
-            nil = this;
+        if (!_nil) {
+            _nil = this;
         }
     }
     evaluate(stream, context) {
-        return nil;
+        return _nil;
     }
     static make(stream, context) {
-        return nil;
+        return _nil;
     }
 }
+export const nil = new Nil();
 
 export default {
     "number!": new Datatype(Num),
@@ -283,5 +296,5 @@ export default {
     "block!": new Datatype(Block),
     "paren!": new Datatype(Paren),
     "nil!": new Datatype(Nil),
-    "nil": new Nil(),
+    "nil": nil,
 };

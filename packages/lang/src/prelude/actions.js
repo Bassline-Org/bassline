@@ -10,6 +10,7 @@ export default {
     "append": Action.binary("append"),
     "insert": Action.ternary("insert"),
     "pick": Action.binary("pick"),
+    "pluck": Action.binary("pluck"),
     "slice": Action.binary("slice"),
     "length": Action.unary("length"),
 };

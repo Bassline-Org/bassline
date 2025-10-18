@@ -1,37 +1,42 @@
 import { normalize } from "../utils.js";
-import { Datatype, Value } from "./core.js";
+import { Datatype, nil, Value } from "./core.js";
 
 export class Context extends Value {
     constructor(parent = null) {
         super("context!");
         this.bindings = new Map();
-        this.parent = parent;
+        this.set("self", this);
+        if (parent) {
+            this.set("parent", parent);
+        }
     }
 
     get(spelling) {
         const normalized = normalize(spelling);
 
         // Try local bindings first
-        if (this.bindings.has(normalized)) {
+        if (this.hasLocal(normalized)) {
             return this.bindings.get(normalized);
         }
 
         // Then try parent chain
-        if (this.parent) {
-            return this.parent.get(spelling);
+        if (this.hasLocal("parent")) {
+            return this.get("parent").get(spelling);
         }
 
-        return undefined;
+        return nil;
     }
 
     set(spelling, value) {
         this.bindings.set(normalize(spelling), value);
+        return value;
     }
 
     setMany(bindingObj) {
         for (const [key, value] of Object.entries(bindingObj)) {
             this.set(key, value);
         }
+        return this;
     }
 
     // Check if a binding exists locally (not in parent)
@@ -43,13 +48,14 @@ export class Context extends Value {
     update(spelling, value) {
         const normalized = normalize(spelling);
 
-        if (this.bindings.has(normalized)) {
-            this.bindings.set(normalized, value);
+        if (this.hasLocal(normalized)) {
+            this.set(normalized, value);
             return true;
         }
 
-        if (this.parent) {
-            return this.parent.update(spelling, value);
+        if (this.hasLocal("parent")) {
+            const parent = this.get("parent");
+            return parent.update(spelling, value);
         }
 
         return false;
@@ -57,29 +63,22 @@ export class Context extends Value {
 
     pick(index) {
         const indexValue = index.to("word!");
-        return this.bindings.get(indexValue.spelling);
+        return this.get(indexValue.spelling);
+    }
+
+    pluck(index) {
+        const indexValue = index.to("word!");
+        const value = this.get(indexValue.spelling);
+        this.bindings.delete(indexValue.spelling);
+        return value;
     }
 
     insert(index, value) {
         const indexValue = index.to("word!");
-        this.bindings.set(indexValue.spelling, value);
+        this.set(indexValue.spelling, value);
         return value;
     }
 
-    mold() {
-        return `context [${
-            Array.from(this.bindings.entries())
-                .filter(([key, value]) =>
-                    (value !== this) &&
-                    !(value?.constructor?.name === "NativeFn")
-                )
-                .map(([key, value]) =>
-                    `${key.description}: ${
-                        value?.mold?.() ?? JSON.stringify(value)
-                    }`
-                ).join(" ")
-        }]`;
-    }
     static make(stream, context) {
         return new Context(null);
     }

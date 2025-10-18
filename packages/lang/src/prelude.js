@@ -1,6 +1,6 @@
 import types from "./prelude/types.js";
 import actions from "./prelude/actions.js";
-import { NativeFn } from "./datatypes/functions.js";
+import { Action, NativeFn } from "./datatypes/functions.js";
 import { evaluate } from "./eval.js";
 import { parse } from "./parser.js";
 import { Context } from "./datatypes/context.js";
@@ -10,10 +10,7 @@ const prelude = {
     "do": new NativeFn(["a"], ([a], stream, context) => {
         return evaluate(a.items, context);
     }),
-    "print": new NativeFn(["a"], ([a], stream, context) => {
-        console.log(a);
-        return a;
-    }),
+    "print": Action.unary("print"),
 };
 
 export function installPrelude(context) {
@@ -25,13 +22,9 @@ export function installPrelude(context) {
 
 const example = `
     a: make context!
-    insert a "foo" 10
-    pick a "foo"
 `;
 
 const parsed = parse(example);
 const context = new Context();
 installPrelude(context);
-console.log(context);
-const result = evaluate(parsed, context);
-console.log(result);
+evaluate(parsed, context);
