@@ -7,7 +7,7 @@ export default {
         ([type], stream, context) => {
             const spelling = type.spelling;
             const datatype = context.get(spelling);
-            return datatype.aClass.make(stream, context);
+            return datatype.value.make(stream, context);
         },
     ),
 };

@@ -17,17 +17,12 @@ export function installPrelude(context) {
 }
 
 const example = `
-    a: 10
-    b: 20
-    added: + a b
-    c: 30
-    print eq? added c
-
-    foo: [a b c]
-    bar: [a b c]
-    print eq? foo bar
-    baz: append foo 'd
-    print eq? baz bar
+    foo: make context!
+    in foo [ x: 1 y: 2 ]
+    print x
+    in foo [ print x print y ]
+    print foo
+    print self
 `;
 
 const parsed = parse(example);

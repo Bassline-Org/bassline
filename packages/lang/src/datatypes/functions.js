@@ -1,5 +1,6 @@
 import { Context } from "./context.js";
-import { Datatype, Value } from "./core.js";
+import { Datatype, Str, Value } from "./core.js";
+import { normalizeString } from "../utils.js";
 
 /**
  * Native functions are functions implemented in the host language
@@ -7,8 +8,9 @@ import { Datatype, Value } from "./core.js";
  * And unlike methods, they have a single implementation for all arguments
  */
 export class NativeFn extends Value {
-    constructor(spec, fn, type = "native-fn!") {
-        super(type);
+    static type = normalizeString("native-fn!");
+    constructor(spec, fn) {
+        super();
         this.fn = fn;
         this.spec = spec;
     }
@@ -27,13 +29,8 @@ export class NativeFn extends Value {
         const result = this.fn(args, stream, context);
         return result;
     }
-    print() {
-        console.log(
-            `native-fn! [ \n    spec: [${
-                this.spec.join(", ")
-            }] \n    host-fn: ${this.fn.toString()} \n ]`,
-        );
-        return this;
+    form() {
+        return new Str(`native-fn! spec: [ ${this.spec.join(", ")} ]`);
     }
     mold() {
         return "native";
@@ -41,16 +38,17 @@ export class NativeFn extends Value {
 }
 
 export class Method extends NativeFn {
-    constructor(spec, selector, type = "method!") {
-        super(spec, ([target, ...args]) => {
+    static type = normalizeString("method!");
+    constructor(spec, selector) {
+        super(spec, ([target, ...args], stream, context) => {
             const method = target[selector];
             if (!method) {
                 throw new Error(
                     `No method "${selector}" found on ${target.type}`,
                 );
             }
-            return (target[selector])(...args);
-        }, type);
+            return (target[selector])(...args, stream, context);
+        });
         this.selector = selector;
     }
     static unary(selector) {
@@ -67,19 +65,17 @@ export class Method extends NativeFn {
             "Cannot use make with method! It's a primitive data type!",
         );
     }
-    print() {
-        console.log(
-            `method! [ \n    spec: [${
-                this.spec.join(", ")
-            }] \n    selector: ${this.selector} \n ]`,
+    form() {
+        return new Str(
+            `method! spec: [ ${this.spec.join(", ")} ]`,
         );
-        return this;
     }
 }
 
 export class Fn extends Context {
-    constructor(args, body, type = "fn!") {
-        super(null, type);
+    static type = normalizeString("fn!");
+    constructor(args, body) {
+        super(null);
         this.set("args", args);
         this.set("body", body);
     }
@@ -92,13 +88,11 @@ export class Fn extends Context {
         }
         return this.get("body").evaluate(stream, this);
     }
-    print() {
-        console.log(
-            `fn! [ \n    args: [${this.get("args").mold()}] \n    body: [${
-                this.get("body").mold()
-            }] \n bindings: ${this.bindings} ]`,
-        );
-        return this;
+    form() {
+        return new Str(`fn! [
+    args: [${this.get("args").form().value}]
+    body: ${this.get("body").form().value}
+]`);
     }
 }
 

@@ -1,6 +1,6 @@
-import * as core from "./core.js";
-import * as functions from "./functions.js";
-import * as context from "./context.js";
+import core from "./core.js";
+import functions from "./functions.js";
+import context from "./context.js";
 
 export {
     Block,

@@ -1,14 +1,33 @@
-import { normalize } from "../utils.js";
-import { Datatype, nil, Value } from "./core.js";
+import { normalize, normalizeString } from "../utils.js";
+import { Datatype, nil, Str, Value } from "./core.js";
 
 export class Context extends Value {
-    constructor(parent = null, type = "context!") {
-        super(type);
+    static type = normalizeString("context!");
+    constructor(parent = null) {
+        super();
         this.bindings = new Map();
         this.set("self", this);
         if (parent) {
             this.set("parent", parent);
         }
+    }
+
+    form() {
+        const formed = [];
+        for (const [key, value] of this.bindings.entries()) {
+            if (value === this) {
+                formed.push([key.description, "<self>"]);
+                continue;
+            }
+            if (value instanceof Context) {
+                formed.push([key.description, "<parent>"]);
+                continue;
+            }
+            formed.push([key.description, value.form().value]);
+        }
+        return new Str(`context! [
+  ${formed.map(([key, value]) => `${key}: ${value}`).join("\n  ")}
+]`);
     }
 
     get(spelling) {
@@ -80,7 +99,7 @@ export class Context extends Value {
     }
 
     static make(stream, context) {
-        return new Context(null);
+        return new Context(context);
     }
 }
 

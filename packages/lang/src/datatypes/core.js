@@ -2,12 +2,14 @@ import { evaluate } from "../evaluator.js";
 import { normalize, normalizeString } from "../utils.js";
 
 export class Value {
-    constructor(type) {
-        this.type = normalizeString(type);
-    }
+    static type = normalizeString("value!");
 
     evaluate(stream, context) {
         return this;
+    }
+
+    get type() {
+        return this.constructor.type;
     }
 
     getType() {
@@ -22,20 +24,25 @@ export class Value {
         return this;
     }
 
+    form() {
+        return new Str(this.value);
+    }
+
     equals(other) {
         const otherValue = other.to(this.type);
         return new Bool(this.value === otherValue.value);
     }
 
     print() {
-        console.log(this);
+        console.log(this.form().value);
         return this;
     }
 }
 
 export class Bool extends Value {
-    constructor(value, type = "bool!") {
-        super(type);
+    static type = normalizeString("bool!");
+    constructor(value) {
+        super();
         this.value = value;
     }
 
@@ -46,18 +53,15 @@ export class Bool extends Value {
         }
         return super.to(normalizedType);
     }
-    print() {
-        console.log(this.value);
-        return this;
-    }
     static make(stream, context) {
         throw new Error("Cannot make new bool! values, these are singletons!");
     }
 }
 
 export class Num extends Value {
-    constructor(value, type = "number!") {
-        super(type);
+    static type = normalizeString("number!");
+    constructor(value) {
+        super();
         this.value = value;
     }
 
@@ -88,15 +92,12 @@ export class Num extends Value {
         const otherValue = other.to(this.type);
         return new Num(this.value / otherValue.value);
     }
-    print() {
-        console.log(this.value);
-        return this;
-    }
 }
 
 export class Series extends Value {
-    constructor(items = [], type = "series!") {
-        super(type);
+    static type = normalizeString("series!");
+    constructor(items = []) {
+        super();
         this.items = items;
     }
 
@@ -123,6 +124,11 @@ export class Series extends Value {
             ...this.items.slice(indexValue.value),
         ]);
     }
+    form() {
+        return new Str(
+            `[ ${this.items.map((item) => item.form()).join(" ")} ]`,
+        );
+    }
     slice(start, end) {
         const startValue = start.to("number!");
         const endValue = end.to("number!");
@@ -140,8 +146,9 @@ export class Series extends Value {
 }
 
 export class Str extends Series {
-    constructor(value, type = "string!") {
-        super(Array.from(value), type);
+    static type = normalizeString("string!");
+    constructor(value) {
+        super(Array.from(value));
         this.value = value;
     }
 
@@ -165,6 +172,10 @@ export class Str extends Series {
         if (normalizedType !== "STRING!") {
             throw new Error(`Cannot convert ${this.type} to ${normalizedType}`);
         }
+        return this;
+    }
+
+    form() {
         return this;
     }
 
@@ -193,20 +204,21 @@ export class Str extends Series {
     static make(stream, context) {
         return new Str("");
     }
-    print() {
-        console.log(this.value);
-        return this;
-    }
 }
 
 export class Block extends Series {
-    constructor(items = [], type = "block!") {
-        super(items, type);
+    static type = normalizeString("block!");
+    constructor(items = []) {
+        super(items);
     }
-    mold() {
-        return `[${this.items.map((e) => e.mold()).join(" ")}]`;
-    }
-    reduce() {
+    /**
+     * Reduce will evaluate each item in the block, and return a new block with the results
+     * It will not deeply evaluate
+     * @param {*} stream
+     * @param {*} context
+     * @returns
+     */
+    reduce(stream, context) {
         return new Block(this.items.map((item) => evaluate(item, context)));
     }
     /**
@@ -214,13 +226,13 @@ export class Block extends Series {
      * This is useful for dynamically generating code
      * @returns {Block} - A new block with the paren items evaluated, and blocks composed
      */
-    compose() {
+    compose(stream, context) {
         return new Block(this.items.map((item) => {
             if (item instanceof Paren) {
                 return item.evaluate(stream, context);
             }
             if (item instanceof Block) {
-                return item.compose();
+                return item.compose(stream, context);
             }
             return item;
         }));
@@ -231,13 +243,9 @@ export class Block extends Series {
 }
 
 export class Paren extends Series {
-    constructor(items = [], type = "paren!") {
-        super(items, type);
-    }
-    mold() {
-        return `(${
-            this.items.map((e) => e instanceof Value ? e.mold() : e).join(" ")
-        })`;
+    static type = normalizeString("paren!");
+    constructor(items = []) {
+        super(items);
     }
     evaluate(stream, context) {
         return evaluate(this, context);
@@ -261,8 +269,9 @@ export class Paren extends Series {
  * @returns {Word} - The word value
  */
 export class Word extends Value {
-    constructor(spelling, type = "word!") {
-        super(type);
+    static type = normalizeString("word!");
+    constructor(spelling) {
+        super();
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
@@ -275,6 +284,9 @@ export class Word extends Value {
     mold() {
         return this.spelling.description;
     }
+    form() {
+        return this.spelling.description;
+    }
 
     static make(stream, context) {
         const next = stream.next();
@@ -285,14 +297,18 @@ export class Word extends Value {
  * Get word is similar to {Word}, however if the value is a function, it will not execute it,
  */
 export class GetWord extends Value {
-    constructor(spelling, type = "get-word!") {
-        super(type);
+    static type = normalizeString("get-word!");
+    constructor(spelling) {
+        super();
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
         return context.get(this.spelling);
     }
     mold() {
+        return `:${this.spelling.description}`;
+    }
+    form() {
         return `:${this.spelling.description}`;
     }
     static make(stream, context) {
@@ -305,8 +321,9 @@ export class GetWord extends Value {
  * Set word will set the value for the spelling in the context
  */
 export class SetWord extends Value {
-    constructor(spelling, type = "set-word!") {
-        super(type);
+    static type = normalizeString("set-word!");
+    constructor(spelling) {
+        super();
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
@@ -318,6 +335,9 @@ export class SetWord extends Value {
     mold() {
         return `${this.spelling.description}:`;
     }
+    form() {
+        return `${this.spelling.description}:`;
+    }
     static make(stream, context) {
         const next = stream.next();
         return next.to("set-word!");
@@ -327,14 +347,18 @@ export class SetWord extends Value {
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
  */
 export class LitWord extends Value {
-    constructor(spelling, type = "lit-word!") {
-        super(type);
+    static type = normalizeString("lit-word!");
+    constructor(spelling) {
+        super();
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
         return new Word(this.spelling);
     }
     mold() {
+        return `'${this.spelling.description}`;
+    }
+    form() {
         return `'${this.spelling.description}`;
     }
     static make(stream, context) {
@@ -348,9 +372,14 @@ export class LitWord extends Value {
 // As well as for type checking, since type? returns a datatype! value
 // And we can compare them using eq?
 export class Datatype extends Value {
-    constructor(aClass, type = "datatype!") {
-        super(type);
+    static type = normalizeString("datatype!");
+    constructor(aClass) {
+        super();
         this.value = aClass;
+    }
+
+    form() {
+        return new Str(`datatype! [ ${this.value.type} ]`);
     }
 }
 
@@ -358,8 +387,9 @@ export class Datatype extends Value {
 // We don't export this, because it's a singleton, and should be used via `nil`
 // That's also why the make method throws an error
 class Nil extends Value {
-    constructor(type = "nil!") {
-        super(type);
+    static type = normalizeString("nil!");
+    constructor() {
+        super();
         if (!Nil.nil) {
             Nil.nil = this;
         }
@@ -369,6 +399,9 @@ class Nil extends Value {
     }
     equals(other) {
         return other === this ? Bool.t : Bool.f;
+    }
+    form() {
+        return new Str(this.type);
     }
     static nil;
     static make(stream, context) {
@@ -388,6 +421,7 @@ export default {
     "lit-word!": new Datatype(LitWord),
     "block!": new Datatype(Block),
     "paren!": new Datatype(Paren),
+    "datatype!": new Datatype(Datatype),
     "nil!": new Datatype(Nil),
     "nil": nil,
     "true": new Bool(true),
