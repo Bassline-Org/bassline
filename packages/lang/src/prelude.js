@@ -24,10 +24,9 @@ export function installPrelude(context) {
 }
 
 const example = `
-    a: make string!
-    print string!
-    print a
-    append a " world"
+    a: make context!
+    insert a "foo" 10
+    pick a "foo"
 `;
 
 const parsed = parse(example);
@@ -35,4 +34,4 @@ const context = new Context();
 installPrelude(context);
 console.log(context);
 const result = evaluate(parsed, context);
-//console.log(result);
+console.log(result);

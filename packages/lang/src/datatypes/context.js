@@ -55,6 +55,17 @@ export class Context extends Value {
         return false;
     }
 
+    pick(index) {
+        const indexValue = index.to("word!");
+        return this.bindings.get(indexValue.spelling);
+    }
+
+    insert(index, value) {
+        const indexValue = index.to("word!");
+        this.bindings.set(indexValue.spelling, value);
+        return value;
+    }
+
     mold() {
         return `context [${
             Array.from(this.bindings.entries())
@@ -68,6 +79,9 @@ export class Context extends Value {
                     }`
                 ).join(" ")
         }]`;
+    }
+    static make(stream, context) {
+        return new Context(null);
     }
 }
 

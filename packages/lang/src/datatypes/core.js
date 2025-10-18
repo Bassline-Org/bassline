@@ -68,17 +68,26 @@ export class Series extends Value {
         return new this.constructor([...this.items, item]);
     }
     insert(index, item) {
+        const indexValue = index.to("number!");
         return new this.constructor([
-            ...this.items.slice(0, index),
+            ...this.items.slice(0, indexValue.value),
             item,
-            ...this.items.slice(index),
+            ...this.items.slice(indexValue.value),
         ]);
     }
     slice(start, end) {
-        return new this.constructor(this.items.slice(start, end));
+        const startValue = start.to("number!");
+        const endValue = end.to("number!");
+        return new this.constructor(
+            this.items.slice(startValue.value, endValue.value),
+        );
     }
     length() {
         return new Num(this.items.length);
+    }
+    pick(index) {
+        const indexValue = index.to("number!");
+        return this.items[indexValue.value];
     }
 }
 
@@ -146,7 +155,7 @@ export class Word extends Value {
     evaluate(stream, context) {
         const value = context.get(this.spelling);
         if (!value) {
-            throw new Error(`Undefined word: ${this.spelling.description}`);
+            return nil;
         }
         return value.evaluate(stream, context);
     }
@@ -247,6 +256,22 @@ export class Datatype extends Value {
     }
 }
 
+let nil;
+export class Nil extends Value {
+    constructor() {
+        super("nil!");
+        if (!nil) {
+            nil = this;
+        }
+    }
+    evaluate(stream, context) {
+        return nil;
+    }
+    static make(stream, context) {
+        return nil;
+    }
+}
+
 export default {
     "number!": new Datatype(Num),
     "series!": new Datatype(Series),
@@ -257,4 +282,6 @@ export default {
     "lit-word!": new Datatype(LitWord),
     "block!": new Datatype(Block),
     "paren!": new Datatype(Paren),
+    "nil!": new Datatype(Nil),
+    "nil": new Nil(),
 };

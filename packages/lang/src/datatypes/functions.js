@@ -28,9 +28,25 @@ export class NativeFn extends Value {
 }
 
 export class Action extends NativeFn {
-    constructor(method) {
-        super(["a", "b"], ([a, b], _stream, _context) => a[method](b));
+    constructor(spec, method) {
+        super(spec, ([target, ...args]) => {
+            return (target[method])(...args);
+        });
         this.type = "action!";
+    }
+    static make(stream, context) {
+        throw new Error(
+            "Cannot make action! It's a primitive data type! Use fn! instead",
+        );
+    }
+    static binary(method) {
+        return new Action(["a", "b"], method);
+    }
+    static unary(method) {
+        return new Action(["a"], method);
+    }
+    static ternary(method) {
+        return new Action(["a", "b", "c"], method);
     }
 }
 

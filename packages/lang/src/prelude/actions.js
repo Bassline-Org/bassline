@@ -1,14 +1,15 @@
 import { Action } from "../datatypes/functions.js";
 
 export default {
-    "+": new Action("add"),
-    "-": new Action("subtract"),
-    "*": new Action("multiply"),
-    "/": new Action("divide"),
-    "=": new Action("equals"),
+    "+": Action.binary("add"),
+    "-": Action.binary("subtract"),
+    "*": Action.binary("multiply"),
+    "/": Action.binary("divide"),
+    "=": Action.binary("equals"),
 
-    "append": new Action("append"),
-    "insert": new Action("insert"),
-    "slice": new Action("slice"),
-    "length": new Action("length"),
+    "append": Action.binary("append"),
+    "insert": Action.ternary("insert"),
+    "pick": Action.binary("pick"),
+    "slice": Action.binary("slice"),
+    "length": Action.unary("length"),
 };
