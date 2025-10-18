@@ -15,4 +15,8 @@ export default {
     "pluck": Method.binary("pluck"),
     "slice": Method.binary("slice"),
     "length": Method.unary("length"),
+
+    // Block methods
+    "compose": Method.unary("compose"),
+    "reduce": Method.unary("reduce"),
 };

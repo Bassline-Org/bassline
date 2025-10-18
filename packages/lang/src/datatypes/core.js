@@ -199,87 +199,31 @@ export class Str extends Series {
     }
 }
 
-export class Word extends Value {
-    constructor(spelling, type = "word!") {
-        super(type);
-        this.spelling = normalize(spelling);
-    }
-    evaluate(stream, context) {
-        const value = context.get(this.spelling);
-        if (!value) {
-            return nil;
-        }
-        return value.evaluate(stream, context);
-    }
-    mold() {
-        return this.spelling.description;
-    }
-
-    static make(stream, context) {
-        const next = stream.next();
-        return new Word(next.to("word!").spelling);
-    }
-}
-
-export class GetWord extends Value {
-    constructor(spelling, type = "get-word!") {
-        super(type);
-        this.spelling = normalize(spelling);
-    }
-    evaluate(stream, context) {
-        return context.get(this.spelling);
-    }
-    mold() {
-        return `:${this.spelling.description}`;
-    }
-    static make(stream, context) {
-        const next = stream.next();
-        return next.to("get-word!");
-    }
-}
-
-export class SetWord extends Value {
-    constructor(spelling, type = "set-word!") {
-        super(type);
-        this.spelling = normalize(spelling);
-    }
-    evaluate(stream, context) {
-        let value = stream.next();
-        value = value.evaluate(stream, context);
-        context.set(this.spelling, value);
-        return value;
-    }
-    mold() {
-        return `${this.spelling.description}:`;
-    }
-    static make(stream, context) {
-        const next = stream.next();
-        return next.to("set-word!");
-    }
-}
-export class LitWord extends Value {
-    constructor(spelling, type = "lit-word!") {
-        super(type);
-        this.spelling = normalize(spelling);
-    }
-    evaluate(stream, context) {
-        return new Word(this.spelling);
-    }
-    mold() {
-        return `'${this.spelling.description}`;
-    }
-    static make(stream, context) {
-        const next = stream.next();
-        return next.to("lit-word!");
-    }
-}
-
 export class Block extends Series {
     constructor(items = [], type = "block!") {
         super(items, type);
     }
     mold() {
         return `[${this.items.map((e) => e.mold()).join(" ")}]`;
+    }
+    reduce() {
+        return new Block(this.items.map((item) => evaluate(item, context)));
+    }
+    /**
+     * Compose will evaluate paren items, and recursively compose blocks
+     * This is useful for dynamically generating code
+     * @returns {Block} - A new block with the paren items evaluated, and blocks composed
+     */
+    compose() {
+        return new Block(this.items.map((item) => {
+            if (item instanceof Paren) {
+                return item.evaluate(stream, context);
+            }
+            if (item instanceof Block) {
+                return item.compose();
+            }
+            return item;
+        }));
     }
     static make(stream, context) {
         return new Block([]);
@@ -303,6 +247,106 @@ export class Paren extends Series {
     }
 }
 
+// =================================
+// Word types
+// =================================
+// Words are similar to symbols in other languages
+// They can be used as variables
+/**
+ * Word is like a variable name.
+ *
+ * When it evaluates, it will look up the value for the spelling in the context
+ * And if it is a function, it will execute it
+ * @param {string} spelling - The spelling of the word
+ * @returns {Word} - The word value
+ */
+export class Word extends Value {
+    constructor(spelling, type = "word!") {
+        super(type);
+        this.spelling = normalize(spelling);
+    }
+    evaluate(stream, context) {
+        const value = context.get(this.spelling);
+        if (!value) {
+            return nil;
+        }
+        return value.evaluate(stream, context);
+    }
+    mold() {
+        return this.spelling.description;
+    }
+
+    static make(stream, context) {
+        const next = stream.next();
+        return new Word(next.to("word!").spelling);
+    }
+}
+/**
+ * Get word is similar to {Word}, however if the value is a function, it will not execute it,
+ */
+export class GetWord extends Value {
+    constructor(spelling, type = "get-word!") {
+        super(type);
+        this.spelling = normalize(spelling);
+    }
+    evaluate(stream, context) {
+        return context.get(this.spelling);
+    }
+    mold() {
+        return `:${this.spelling.description}`;
+    }
+    static make(stream, context) {
+        const next = stream.next();
+        return next.to("get-word!");
+    }
+}
+
+/**
+ * Set word will set the value for the spelling in the context
+ */
+export class SetWord extends Value {
+    constructor(spelling, type = "set-word!") {
+        super(type);
+        this.spelling = normalize(spelling);
+    }
+    evaluate(stream, context) {
+        let value = stream.next();
+        value = value.evaluate(stream, context);
+        context.set(this.spelling, value);
+        return value;
+    }
+    mold() {
+        return `${this.spelling.description}:`;
+    }
+    static make(stream, context) {
+        const next = stream.next();
+        return next.to("set-word!");
+    }
+}
+/**
+ * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
+ */
+export class LitWord extends Value {
+    constructor(spelling, type = "lit-word!") {
+        super(type);
+        this.spelling = normalize(spelling);
+    }
+    evaluate(stream, context) {
+        return new Word(this.spelling);
+    }
+    mold() {
+        return `'${this.spelling.description}`;
+    }
+    static make(stream, context) {
+        const next = stream.next();
+        return next.to("lit-word!");
+    }
+}
+
+// Datatype is a type that represents a class of values
+// It is only used via `make` to create a new basic instance of that type
+// As well as for type checking, since type? returns a datatype! value
+// And we can compare them using eq?
 export class Datatype extends Value {
     constructor(aClass, type = "datatype!") {
         super(type);
@@ -310,6 +354,9 @@ export class Datatype extends Value {
     }
 }
 
+// Nil value
+// We don't export this, because it's a singleton, and should be used via `nil`
+// That's also why the make method throws an error
 class Nil extends Value {
     constructor(type = "nil!") {
         super(type);
