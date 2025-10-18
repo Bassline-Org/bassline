@@ -13,8 +13,10 @@ import {
     Block,
     GetWord,
     LitWord,
+    Num,
     Paren,
     SetWord,
+    Str,
     Word,
 } from "./datatypes/core.js";
 
@@ -30,7 +32,7 @@ const ws = many(
 
 // ===== Numbers =====
 const number = choice([
-    digits.map((int) => Number(int)),
+    digits.map((int) => new Num(Number(int))),
 ]).errorMap(() => "Expected number");
 
 // ===== Strings =====
@@ -54,7 +56,7 @@ const stringLiteral = sequenceOf([
     char('"'),
     many(stringChar),
     char('"'),
-]).map(([_, chars, __]) => String(chars.join("")))
+]).map(([_, chars, __]) => new Str(String(chars.join(""))))
     .errorMap(() => "Expected string");
 
 // ===== Words =====

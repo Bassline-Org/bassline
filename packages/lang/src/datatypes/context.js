@@ -3,7 +3,7 @@ import { Value } from "./core.js";
 
 export class Context extends Value {
     constructor(parent = null) {
-        super();
+        super("context!");
         this.bindings = new Map();
         this.parent = parent;
     }

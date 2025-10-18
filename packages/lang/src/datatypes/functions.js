@@ -1,9 +1,26 @@
 import { Context } from "./context.js";
+import { Value } from "./core.js";
 
-export class NativeFn extends Context {
-    constructor(fn) {
-        super();
+export class NativeFn extends Value {
+    constructor(spec, fn) {
+        super("native-fn!");
         this.fn = fn;
+        this.spec = spec;
+    }
+    getArgs(stream, context) {
+        return this.spec.map((arg) => {
+            const value = stream.next();
+            if (arg.startsWith(":")) {
+                return value;
+            } else {
+                return value.evaluate(stream, context);
+            }
+        });
+    }
+    evaluate(stream, context) {
+        const args = this.getArgs(stream, context);
+        const result = this.fn(args, context);
+        return result;
     }
     mold() {
         return "native";
@@ -12,21 +29,22 @@ export class NativeFn extends Context {
 
 /// User defined function
 export class Fn extends Context {
-    constructor(context, args, body) {
-        super(context);
+    constructor(args, body) {
+        super();
+        this.type = "fn!";
         this.set("args", args);
         this.set("body", body);
     }
+    evaluate(stream, context) {
+        for (const arg of this.get("args").items) {
+            this.set(
+                arg.spelling,
+                stream.next().evaluate(stream, context),
+            );
+        }
+        return this.get("body").evaluate(stream, this);
+    }
     mold() {
-        return `fn [${this.args.mold()}] [${this.body.mold()}]`;
+        return `fn [${this.get("args").mold()}] [${this.get("body").mold()}]`;
     }
-}
-
-// Helper to create native callable functions
-export function native(fn, metadata = {}) {
-    const native = new NativeFn(fn);
-    for (const [key, value] of Object.entries(metadata)) {
-        native.set(key, value);
-    }
-    return native;
 }
