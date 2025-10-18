@@ -9,6 +9,10 @@ export class Value {
         return this;
     }
 
+    getType() {
+        return new Str(this.type);
+    }
+
     to(type) {
         if (this.type !== type) {
             throw new Error(`Cannot convert ${this.type} to ${type}`);
@@ -54,10 +58,35 @@ export class Num extends Value {
     }
 }
 
-export class Str extends Value {
+export class Series extends Value {
+    constructor(items = []) {
+        super("series!");
+        this.items = items;
+    }
+
+    append(item) {
+        return new this.constructor([...this.items, item]);
+    }
+    insert(index, item) {
+        return new this.constructor([
+            ...this.items.slice(0, index),
+            item,
+            ...this.items.slice(index),
+        ]);
+    }
+    slice(start, end) {
+        return new this.constructor(this.items.slice(start, end));
+    }
+    length() {
+        return new Num(this.items.length);
+    }
+}
+
+export class Str extends Series {
     constructor(value) {
-        super("string!");
+        super(Array.from(value));
         this.value = value;
+        this.type = "string!";
     }
 
     to(type) {
@@ -103,6 +132,10 @@ export class Str extends Value {
     length() {
         return new Num(this.value.length);
     }
+
+    static make(stream, context) {
+        return new Str("");
+    }
 }
 
 export class Word extends Value {
@@ -112,10 +145,18 @@ export class Word extends Value {
     }
     evaluate(stream, context) {
         const value = context.get(this.spelling);
+        if (!value) {
+            throw new Error(`Undefined word: ${this.spelling.description}`);
+        }
         return value.evaluate(stream, context);
     }
     mold() {
         return this.spelling.description;
+    }
+
+    static make(stream, context) {
+        const next = stream.next();
+        return new Word(next.to("word!").spelling);
     }
 }
 
@@ -129,6 +170,10 @@ export class GetWord extends Value {
     }
     mold() {
         return `:${this.spelling.description}`;
+    }
+    static make(stream, context) {
+        const next = stream.next();
+        return next.to("get-word!");
     }
 }
 export class SetWord extends Value {
@@ -145,6 +190,10 @@ export class SetWord extends Value {
     mold() {
         return `${this.spelling.description}:`;
     }
+    static make(stream, context) {
+        const next = stream.next();
+        return next.to("set-word!");
+    }
 }
 export class LitWord extends Value {
     constructor(spelling) {
@@ -157,46 +206,55 @@ export class LitWord extends Value {
     mold() {
         return `'${this.spelling.description}`;
     }
+    static make(stream, context) {
+        const next = stream.next();
+        return next.to("lit-word!");
+    }
 }
 
-export class Block extends Value {
-    constructor(items) {
-        super("block!");
-        this.items = items;
-    }
-    append(item) {
-        return new Block([...this.items, item]);
-    }
-    insert(index, item) {
-        const indexValue = index.to("number!");
-        const itemValue = item.to("block!");
-        return new Block([
-            ...this.items.slice(0, indexValue.value),
-            itemValue,
-            ...this.items.slice(indexValue.value),
-        ]);
-    }
-    slice(start, end) {
-        const startValue = start.to("number!");
-        const endValue = end.to("number!");
-        return new Block(this.items.slice(startValue.value, endValue.value));
-    }
-    length() {
-        return new Num(this.items.length);
+export class Block extends Series {
+    constructor(items = []) {
+        super(items);
+        this.type = "block!";
     }
     mold() {
         return `[${this.items.map((e) => e.mold()).join(" ")}]`;
     }
+    static make(stream, context) {
+        return new Block([]);
+    }
 }
 
-export class Paren extends Value {
-    constructor(items) {
-        super("paren!");
-        this.items = items;
+export class Paren extends Series {
+    constructor(items = []) {
+        super(items);
+        this.type = "paren!";
     }
     mold() {
         return `(${
             this.items.map((e) => e instanceof Value ? e.mold() : e).join(" ")
         })`;
     }
+    static make(stream, context) {
+        return new Paren([]);
+    }
 }
+
+export class Datatype extends Value {
+    constructor(aClass) {
+        super("datatype!");
+        this.aClass = aClass;
+    }
+}
+
+export default {
+    "number!": new Datatype(Num),
+    "series!": new Datatype(Series),
+    "string!": new Datatype(Str),
+    "word!": new Datatype(Word),
+    "get-word!": new Datatype(GetWord),
+    "set-word!": new Datatype(SetWord),
+    "lit-word!": new Datatype(LitWord),
+    "block!": new Datatype(Block),
+    "paren!": new Datatype(Paren),
+};

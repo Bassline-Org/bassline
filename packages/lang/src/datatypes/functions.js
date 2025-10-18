@@ -1,5 +1,5 @@
 import { Context } from "./context.js";
-import { Value } from "./core.js";
+import { Datatype, Value } from "./core.js";
 
 export class NativeFn extends Value {
     constructor(spec, fn) {
@@ -19,7 +19,7 @@ export class NativeFn extends Value {
     }
     evaluate(stream, context) {
         const args = this.getArgs(stream, context);
-        const result = this.fn(args, context);
+        const result = this.fn(args, stream, context);
         return result;
     }
     mold() {
@@ -27,7 +27,13 @@ export class NativeFn extends Value {
     }
 }
 
-/// User defined function
+export class Action extends NativeFn {
+    constructor(method) {
+        super(["a", "b"], ([a, b], _stream, _context) => a[method](b));
+        this.type = "action!";
+    }
+}
+
 export class Fn extends Context {
     constructor(args, body) {
         super();
@@ -48,3 +54,9 @@ export class Fn extends Context {
         return `fn [${this.get("args").mold()}] [${this.get("body").mold()}]`;
     }
 }
+
+export default {
+    "native-fn!": new Datatype(NativeFn),
+    "fn!": new Datatype(Fn),
+    "action!": new Datatype(Action),
+};

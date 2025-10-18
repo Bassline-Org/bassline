@@ -1,53 +1,16 @@
-import { native } from "../datatypes/functions.js";
-import { Context } from "../datatypes/context.js";
-import { isa } from "../utils.js";
-import { Block, Word } from "../datatypes/core.js";
-import { evalNext } from "../evaluator.js";
 import { NativeFn } from "../datatypes/functions.js";
 
-export function installTypes(context) {
-    context.set(
-        "block?",
-        native(async (stream, context) => {
-            const value = await evalNext(stream, context);
-            return isa(value, Block);
-        }),
-    );
-    context.set(
-        "word?",
-        native(async (stream, context) => {
-            const value = await evalNext(stream, context);
-            return isa(value, Word);
-        }),
-    );
-    context.set(
-        "num?",
-        native(async (stream, context) => {
-            const value = await evalNext(stream, context);
-            return typeof value === "number";
-        }),
-    );
-    context.set(
-        "str?",
-        native(async (stream, context) => {
-            const value = await evalNext(stream, context);
-            return typeof value === "string";
-        }),
-    );
-
-    context.set(
-        "context?",
-        native(async (stream, context) => {
-            const value = await evalNext(stream, context);
-            return value instanceof Context;
-        }),
-    );
-
-    context.set(
-        "native?",
-        native(async (stream, context) => {
-            const value = await evalNext(stream, context);
-            return isa(value, NativeFn);
-        }),
-    );
-}
+export default {
+    "type?": new NativeFn(
+        ["value"],
+        ([value], _context) => value.getType(),
+    ),
+    "make": new NativeFn(
+        [":type"],
+        ([type], stream, context) => {
+            const spelling = type.spelling;
+            const datatype = context.get(spelling);
+            return datatype.aClass.make(stream, context);
+        },
+    ),
+};

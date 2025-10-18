@@ -1,5 +1,5 @@
 import { normalize } from "../utils.js";
-import { Value } from "./core.js";
+import { Datatype, Value } from "./core.js";
 
 export class Context extends Value {
     constructor(parent = null) {
@@ -26,6 +26,12 @@ export class Context extends Value {
 
     set(spelling, value) {
         this.bindings.set(normalize(spelling), value);
+    }
+
+    setMany(bindingObj) {
+        for (const [key, value] of Object.entries(bindingObj)) {
+            this.set(key, value);
+        }
     }
 
     // Check if a binding exists locally (not in parent)
@@ -64,3 +70,7 @@ export class Context extends Value {
         }]`;
     }
 }
+
+export default {
+    "context!": new Datatype(Context),
+};
