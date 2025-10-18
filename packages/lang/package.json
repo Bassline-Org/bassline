@@ -1,7 +1,7 @@
 {
   "name": "@bassline/lang",
   "version": "1.0.0",
-  "description": "Language for Bassline",
+  "description": "The Bassline language",
   "type": "module",
   "module": "src/index.js",
   "exports": {
