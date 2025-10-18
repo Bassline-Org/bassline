@@ -1,7 +1,6 @@
 export class Stream {
-    constructor(items, context) {
+    constructor(items) {
         this.items = items;
-        this.context = context;
         this.pos = 0;
     }
 

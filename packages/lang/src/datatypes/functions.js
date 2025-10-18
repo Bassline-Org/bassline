@@ -1,6 +1,11 @@
 import { Context } from "./context.js";
 import { Datatype, Value } from "./core.js";
 
+/**
+ * Native functions are functions implemented in the host language
+ * Unlike user-defined functions, they don't have a context
+ * And unlike methods, they have a single implementation for all arguments
+ */
 export class NativeFn extends Value {
     constructor(spec, fn, type = "native-fn!") {
         super(type);
@@ -36,31 +41,37 @@ export class NativeFn extends Value {
 }
 
 export class Method extends NativeFn {
-    constructor(spec, method, type = "method!") {
+    constructor(spec, selector, type = "method!") {
         super(spec, ([target, ...args]) => {
-            return (target[method])(...args);
+            const method = target[selector];
+            if (!method) {
+                throw new Error(
+                    `No method "${selector}" found on ${target.type}`,
+                );
+            }
+            return (target[selector])(...args);
         }, type);
-        this.method = method;
+        this.selector = selector;
+    }
+    static unary(selector) {
+        return new Method(["a"], selector);
+    }
+    static binary(selector) {
+        return new Method(["a", "b"], selector);
+    }
+    static ternary(selector) {
+        return new Method(["a", "b", "c"], selector);
     }
     static make(stream, context) {
         throw new Error(
             "Cannot use make with method! It's a primitive data type!",
         );
     }
-    static binary(method) {
-        return new Method(["a", "b"], method);
-    }
-    static unary(method) {
-        return new Method(["a"], method);
-    }
-    static ternary(method) {
-        return new Method(["a", "b", "c"], method);
-    }
     print() {
         console.log(
             `method! [ \n    spec: [${
                 this.spec.join(", ")
-            }] \n    name: ${this.method} \n ]`,
+            }] \n    selector: ${this.selector} \n ]`,
         );
         return this;
     }

@@ -1,23 +1,19 @@
 import types from "./prelude/types.js";
 import methods from "./prelude/actions.js";
-import { Method, NativeFn } from "./datatypes/functions.js";
-import { evaluate } from "./eval.js";
+import datatypes, { Context } from "./datatypes/index.js";
+import { evaluate } from "./evaluator.js";
 import { parse } from "./parser.js";
-import { Context } from "./datatypes/context.js";
-import datatypes from "./datatypes/index.js";
-
-const prelude = {
-    "do": new NativeFn(["a"], ([a], stream, context) => {
-        return evaluate(a.items, context);
-    }),
-    "print": Method.unary("print"),
-};
+import doPrelude from "./prelude/do.js";
+import print from "./prelude/print.js";
 
 export function installPrelude(context) {
-    context.setMany(datatypes);
-    context.setMany(types);
-    context.setMany(methods);
-    context.setMany(prelude);
+    context.setMany({
+        ...datatypes,
+        ...types,
+        ...methods,
+        ...doPrelude,
+        ...print,
+    });
 }
 
 const example = `

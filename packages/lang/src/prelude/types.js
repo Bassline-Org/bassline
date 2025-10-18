@@ -1,10 +1,7 @@
-import { NativeFn } from "../datatypes/functions.js";
+import { Method, NativeFn } from "../datatypes/index.js";
 
 export default {
-    "type?": new NativeFn(
-        ["value"],
-        ([value], _context) => value.getType(),
-    ),
+    "type?": Method.unary("getType"),
     "make": new NativeFn(
         [":type"],
         ([type], stream, context) => {

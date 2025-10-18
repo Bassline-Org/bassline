@@ -1,4 +1,4 @@
-import { evaluate } from "../eval.js";
+import { evaluate } from "../evaluator.js";
 import { normalize, normalizeString } from "../utils.js";
 
 export class Value {
