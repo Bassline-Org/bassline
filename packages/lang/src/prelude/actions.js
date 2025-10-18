@@ -20,6 +20,7 @@ export default {
     "compose": NativeMethod.unary("compose"),
     "reduce": NativeMethod.unary("reduce"),
 
+    // Control flow
     "if": new NativeFn(
         ["condition", "true-body", "false-body"],
         ([condition, ifTrue, ifFalse], stream, context) => {
@@ -30,4 +31,8 @@ export default {
             }
         },
     ),
+
+    // Documentation
+    "doc": NativeMethod.binary("doc"),
+    "describe": NativeMethod.unary("describe"),
 };

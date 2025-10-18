@@ -28,6 +28,15 @@ export class Value {
         return new Str(this.value);
     }
 
+    doc(doc) {
+        const docString = doc.to("STRING!");
+        this.documentation = docString;
+    }
+
+    describe() {
+        return this.documentation ?? nil;
+    }
+
     equals(other) {
         const otherValue = other.to(this.type);
         return new Bool(this.value === otherValue.value);
