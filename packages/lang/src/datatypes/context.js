@@ -77,7 +77,6 @@ export class Context extends Value {
 
         if (this.hasLocal("parent")) {
             const parent = this.get("parent");
-            console.log(parent);
             return parent.update(spelling, value);
         }
 

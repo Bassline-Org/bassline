@@ -1,17 +1,20 @@
-map: make fn! [series cb] [
-    output: make block!
-    f: make fn! [acc curr] [
-    ]
-    fold series :f output
-    output
+iterations: 0
+
+foo: make fn! [a b] [
+    in system [ iterations: + iterations 1 ]
+    + a b
 ]
 
-inc: make fn! [n] [ + n 1 ]
-
-someVar: 10
-
-foo: make fn! [n] [
-    in system [ someVar: n ]
+folder: make fn! [n] [
+    fold (iota n) :foo 0
 ]
 
-foo 20
+print folder 5
+print folder 10
+print folder 50
+print folder 100
+print folder 1000
+print folder 10000
+print folder 100000
+print folder 1000000
+print iterations

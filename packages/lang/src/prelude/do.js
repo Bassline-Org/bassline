@@ -3,7 +3,7 @@ import { evaluate } from "../evaluator.js";
 
 export default {
     "do": new NativeFn(["a"], ([a], stream, context) => {
-        return evaluate(a.items, context);
+        return evaluate(a, context);
     }),
     "in": new NativeFn(["context", "block"], ([ctx, block]) => {
         return evaluate(block, ctx);

@@ -21,11 +21,7 @@ export class NativeFn extends Value {
             if (arg.startsWith(":")) {
                 return value;
             } else {
-                console.log(arg);
-                console.log(context);
-                const result = value.evaluate(stream, context);
-                console.log(result);
-                return result;
+                return value.evaluate(stream, context);
             }
         });
     }
@@ -93,7 +89,6 @@ export class Fn extends Context {
             );
         }
         const body = this.get("body");
-        console.log(this);
         return evaluate(body, this);
     }
     form() {

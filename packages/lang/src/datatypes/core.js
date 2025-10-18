@@ -159,7 +159,8 @@ export class Series extends Value {
     }
     pick(index) {
         const indexValue = index.to("number!");
-        return this.items[indexValue.value];
+        const value = this.items[indexValue.value];
+        return value;
     }
 }
 
