@@ -26,6 +26,7 @@ export default {
     "compose": NativeMethod.unary("compose"),
     "reduce": NativeMethod.unary("reduce"),
     "fold": NativeMethod.ternary("fold"),
+    "map": NativeMethod.binary("map"),
 
     // Control flow
     "if": new NativeFn(

@@ -80,7 +80,6 @@ export class Fn extends Context {
         this.set("args", args);
         this.set("body", body);
     }
-
     evaluate(stream, context) {
         for (const arg of this.get("args").items) {
             this.set(

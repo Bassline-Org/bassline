@@ -1,0 +1,23 @@
+iterations: 0
+
+count: [in system [ iterations: + iterations 1 ]]
+
+mapper: make fn! [n] [
+    map (iota n) :double
+]
+
+double: make fn! [item] [
+    do count
+    * item 2
+]
+
+mapper 5
+mapper 10
+mapper 50
+mapper 100
+mapper 1000
+mapper 10000
+mapper 100000
+mapper 1000000
+
+print iterations

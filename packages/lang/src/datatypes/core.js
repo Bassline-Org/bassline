@@ -135,7 +135,7 @@ export class Series extends Value {
     }
     form() {
         return new Str(
-            `[ ${this.items.map((item) => item.form()).join(" ")} ]`,
+            `[ ${this.items.map((item) => item.form().value).join(" ")} ]`,
         );
     }
     fold(fn, initial, stream, context) {
@@ -146,6 +146,13 @@ export class Series extends Value {
             },
             initial,
         );
+    }
+    map(fn, stream, context) {
+        const result = this.items.map((item) => {
+            const expr = new Block([fn, item]);
+            return evaluate(expr, context);
+        });
+        return new this.constructor(result);
     }
     slice(start, end) {
         const startValue = start.to("number!");

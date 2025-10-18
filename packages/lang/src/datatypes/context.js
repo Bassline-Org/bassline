@@ -1,5 +1,5 @@
 import { normalize, normalizeString } from "../utils.js";
-import { Datatype, nil, Str, Value } from "./core.js";
+import { Datatype, nil, Str, Value, Word } from "./core.js";
 
 export class Context extends Value {
     static type = normalizeString("context!");
@@ -65,10 +65,7 @@ export class Context extends Value {
 
     // Update existing binding (searches up parent chain)
     update(spelling, value) {
-        if (spelling instanceof Str) {
-            return this.update(new Word(spelling.value), value);
-        }
-        const normalized = normalize(spelling);
+        const normalized = spelling.to("word!").spelling;
 
         if (this.hasLocal(normalized)) {
             this.set(normalized, value);
