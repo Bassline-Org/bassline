@@ -1,55 +1,36 @@
 import { parse } from "./parser.js";
-import { ex, createPreludeContext } from "./prelude.js";
+import { createRuntime } from "./runtime.js";
+
+/**
+ * @typedef {Object} Runtime
+ * @property {Object} context - The runtime context
+ * @property {Function} evaluate - Safely evaluates Bassline code, catching parse and runtime errors
+ *
+ * @typedef {Object} Repl
+ * @property {Runtime} runtime - The runtime instance
+ * @property {Function} evaluate - Safely evaluates Bassline code, catching parse and runtime errors
+ */
 
 /**
  * Create a REPL instance with safe evaluation
  *
- * Returns an object with:
- * - eval(input): Safely evaluates Bassline code, catching parse and runtime errors
- * - context: The prelude context for direct manipulation
+ * @returns {Repl} A repl instance
  */
 export function createRepl() {
-    const context = createPreludeContext();
-
+    const runtime = createRuntime();
     return {
-        /**
-         * Safely evaluate Bassline code
-         * @param {string} input - Bassline code to evaluate
-         * @returns {Promise<{ ok: true, value: any } | { ok: false, error: string }>}
-         */
-        async eval(input) {
+        runtime,
+        evaluate(source) {
             try {
-                const ast = parse(input);
-                const result = await ex(context, ast);
+                const ast = parse(source);
+                const result = runtime.evaluate(ast);
                 return { ok: true, value: result };
             } catch (error) {
                 return {
                     ok: false,
                     error: error.message,
-                    stack: error.stack,
                 };
             }
         },
-
-        /**
-         * Execute a Block directly (for UI event handlers)
-         * @param {Block} block - Block object to execute
-         * @returns {Promise<{ ok: true, value: any } | { ok: false, error: string }>}
-         */
-        async execBlock(block) {
-            try {
-                const result = await ex(context, block);
-                return { ok: true, value: result };
-            } catch (error) {
-                return {
-                    ok: false,
-                    error: error.message,
-                    stack: error.stack,
-                };
-            }
-        },
-
-        // Expose context for direct access if needed
-        context,
     };
 }

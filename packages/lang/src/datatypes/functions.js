@@ -37,8 +37,8 @@ export class NativeFn extends Value {
     }
 }
 
-export class Method extends NativeFn {
-    static type = normalizeString("method!");
+export class NativeMethod extends NativeFn {
+    static type = normalizeString("native-method!");
     constructor(spec, selector) {
         super(spec, ([target, ...args], stream, context) => {
             const method = target[selector];
@@ -52,22 +52,22 @@ export class Method extends NativeFn {
         this.selector = selector;
     }
     static unary(selector) {
-        return new Method(["a"], selector);
+        return new NativeMethod(["a"], selector);
     }
     static binary(selector) {
-        return new Method(["a", "b"], selector);
+        return new NativeMethod(["a", "b"], selector);
     }
     static ternary(selector) {
-        return new Method(["a", "b", "c"], selector);
+        return new NativeMethod(["a", "b", "c"], selector);
     }
     static make(stream, context) {
         throw new Error(
-            "Cannot use make with method! It's a primitive data type!",
+            "Cannot use make with native-method! It's a primitive data type!",
         );
     }
     form() {
         return new Str(
-            `method! spec: [ ${this.spec.join(", ")} ]`,
+            `native-method! spec: [ ${this.spec.join(", ")} ]`,
         );
     }
 }
@@ -99,5 +99,5 @@ export class Fn extends Context {
 export default {
     "native-fn!": new Datatype(NativeFn),
     "fn!": new Datatype(Fn),
-    "method!": new Datatype(Method),
+    "native-method!": new Datatype(NativeMethod),
 };

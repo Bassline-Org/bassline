@@ -1,22 +1,33 @@
-import { Method } from "../datatypes/functions.js";
+import { NativeFn, NativeMethod } from "../datatypes/functions.js";
 
 export default {
     // Core arithmetic methods
-    "+": Method.binary("add"),
-    "-": Method.binary("subtract"),
-    "*": Method.binary("multiply"),
-    "/": Method.binary("divide"),
-    "eq?": Method.binary("equals"),
+    "+": NativeMethod.binary("add"),
+    "-": NativeMethod.binary("subtract"),
+    "*": NativeMethod.binary("multiply"),
+    "/": NativeMethod.binary("divide"),
+    "eq?": NativeMethod.binary("equals"),
 
     // Series methods
-    "append": Method.binary("append"),
-    "insert": Method.ternary("insert"),
-    "pick": Method.binary("pick"),
-    "pluck": Method.binary("pluck"),
-    "slice": Method.binary("slice"),
-    "length": Method.unary("length"),
+    "append": NativeMethod.binary("append"),
+    "insert": NativeMethod.ternary("insert"),
+    "pick": NativeMethod.binary("pick"),
+    "pluck": NativeMethod.ternary("pluck"),
+    "slice": NativeMethod.ternary("slice"),
+    "length": NativeMethod.unary("length"),
 
     // Block methods
-    "compose": Method.unary("compose"),
-    "reduce": Method.unary("reduce"),
+    "compose": NativeMethod.unary("compose"),
+    "reduce": NativeMethod.unary("reduce"),
+
+    "if": new NativeFn(
+        ["condition", "true-body", "false-body"],
+        ([condition, ifTrue, ifFalse], stream, context) => {
+            if (condition.evaluate(stream, context)) {
+                return ifTrue.evaluate(stream, context);
+            } else {
+                return ifFalse.evaluate(stream, context);
+            }
+        },
+    ),
 };

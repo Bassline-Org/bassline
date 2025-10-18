@@ -1,7 +1,0 @@
-foo: emitter
-
-exampleHandler: fn [e] [print e]
-
-fooListener: on foo "fug" :exampleHandler
-
-emit foo "fug" 123

@@ -1,7 +1,0 @@
-; Simple view test - don't assign, just create
-view [
-    panel "Test" [
-        text "Hello from view!"
-        button "Click me" on-click [print "Clicked!"]
-    ]
-]

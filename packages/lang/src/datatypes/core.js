@@ -145,10 +145,10 @@ export class Series extends Value {
     }
 }
 
-export class Str extends Series {
+export class Str extends Value {
     static type = normalizeString("string!");
     constructor(value) {
-        super(Array.from(value));
+        super();
         this.value = value;
     }
 
@@ -169,10 +169,7 @@ export class Str extends Series {
         if (normalizedType === "LIT-WORD!") {
             return new LitWord(this.value);
         }
-        if (normalizedType !== "STRING!") {
-            throw new Error(`Cannot convert ${this.type} to ${normalizedType}`);
-        }
-        return this;
+        return super.to(normalizedType);
     }
 
     form() {
@@ -199,6 +196,17 @@ export class Str extends Series {
     }
     length() {
         return new Num(this.value.length);
+    }
+    pick(index) {
+        const indexValue = index.to("number!");
+        return new Str(this.value[indexValue.value]);
+    }
+    pluck(index) {
+        const indexValue = index.to("number!");
+        return new Str(
+            this.value.slice(0, indexValue.value) +
+                this.value.slice(indexValue.value + 1),
+        );
     }
 
     static make(stream, context) {
