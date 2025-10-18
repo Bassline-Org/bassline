@@ -2,8 +2,8 @@ import { Context } from "./context.js";
 import { Datatype, Value } from "./core.js";
 
 export class NativeFn extends Value {
-    constructor(spec, fn) {
-        super("native-fn!");
+    constructor(spec, fn, type = "native-fn!") {
+        super(type);
         this.fn = fn;
         this.spec = spec;
     }
@@ -35,42 +35,40 @@ export class NativeFn extends Value {
     }
 }
 
-export class Action extends NativeFn {
-    constructor(spec, method) {
+export class Method extends NativeFn {
+    constructor(spec, method, type = "method!") {
         super(spec, ([target, ...args]) => {
             return (target[method])(...args);
-        });
+        }, type);
         this.method = method;
-        this.type = "action!";
     }
     static make(stream, context) {
         throw new Error(
-            "Cannot make action! It's a primitive data type! Use fn! instead",
+            "Cannot use make with method! It's a primitive data type!",
         );
     }
     static binary(method) {
-        return new Action(["a", "b"], method);
+        return new Method(["a", "b"], method);
     }
     static unary(method) {
-        return new Action(["a"], method);
+        return new Method(["a"], method);
     }
     static ternary(method) {
-        return new Action(["a", "b", "c"], method);
+        return new Method(["a", "b", "c"], method);
     }
     print() {
         console.log(
-            `action! [ \n    spec: [${
+            `method! [ \n    spec: [${
                 this.spec.join(", ")
-            }] \n    method: ${this.method} \n ]`,
+            }] \n    name: ${this.method} \n ]`,
         );
         return this;
     }
 }
 
 export class Fn extends Context {
-    constructor(args, body) {
-        super();
-        this.type = "fn!";
+    constructor(args, body, type = "fn!") {
+        super(null, type);
         this.set("args", args);
         this.set("body", body);
     }
@@ -83,13 +81,18 @@ export class Fn extends Context {
         }
         return this.get("body").evaluate(stream, this);
     }
-    mold() {
-        return `fn [${this.get("args").mold()}] [${this.get("body").mold()}]`;
+    print() {
+        console.log(
+            `fn! [ \n    args: [${this.get("args").mold()}] \n    body: [${
+                this.get("body").mold()
+            }] \n bindings: ${this.bindings} ]`,
+        );
+        return this;
     }
 }
 
 export default {
     "native-fn!": new Datatype(NativeFn),
     "fn!": new Datatype(Fn),
-    "action!": new Datatype(Action),
+    "method!": new Datatype(Method),
 };

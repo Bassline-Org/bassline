@@ -1,9 +1,12 @@
 import { Block } from "./datatypes/core.js";
 export function normalize(str) {
     if (typeof str === "symbol") {
-        return Symbol.for(str.description.trim().toUpperCase());
+        return Symbol.for(normalizeString(str.description));
     }
-    return Symbol.for(str.trim().toUpperCase());
+    return Symbol.for(normalizeString(str));
+}
+export function normalizeString(str) {
+    return str.trim().toUpperCase();
 }
 
 export function isa(value, aClass) {

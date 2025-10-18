@@ -1,8 +1,9 @@
-import { normalize } from "../utils.js";
+import { evaluate } from "../eval.js";
+import { normalize, normalizeString } from "../utils.js";
 
 export class Value {
     constructor(type) {
-        this.type = type;
+        this.type = normalizeString(type);
     }
 
     evaluate(stream, context) {
@@ -14,11 +15,13 @@ export class Value {
     }
 
     to(type) {
-        if (this.type !== type) {
-            throw new Error(`Cannot convert ${this.type} to ${type}`);
+        const normalizedType = normalizeString(type);
+        if (this.type !== normalizedType) {
+            throw new Error(`Cannot convert ${this.type} to ${normalizedType}`);
         }
         return this;
     }
+
     print() {
         console.log(this);
         return this;
@@ -26,38 +29,36 @@ export class Value {
 }
 
 export class Num extends Value {
-    constructor(value) {
-        super("number!");
+    constructor(value, type = "number!") {
+        super(type);
         this.value = value;
     }
 
     to(type) {
-        if (type === "number!") {
-            return this;
-        }
-        if (type === "string!") {
+        const normalizedType = normalizeString(type);
+        if (normalizedType === "STRING!") {
             return new Str(String(this.value));
         }
-        throw new Error(`Cannot convert ${this.type} to ${type}`);
+        return super.to(normalizedType);
     }
 
     add(other) {
-        const otherValue = other.to("number!");
+        const otherValue = other.to(this.type);
         return new Num(this.value + otherValue.value);
     }
 
     subtract(other) {
-        const otherValue = other.to("number!");
+        const otherValue = other.to(this.type);
         return new Num(this.value - otherValue.value);
     }
 
     multiply(other) {
-        const otherValue = other.to("number!");
+        const otherValue = other.to(this.type);
         return new Num(this.value * otherValue.value);
     }
 
     divide(other) {
-        const otherValue = other.to("number!");
+        const otherValue = other.to(this.type);
         return new Num(this.value / otherValue.value);
     }
     print() {
@@ -67,8 +68,8 @@ export class Num extends Value {
 }
 
 export class Series extends Value {
-    constructor(items = []) {
-        super("series!");
+    constructor(items = [], type = "series!") {
+        super(type);
         this.items = items;
     }
 
@@ -100,42 +101,42 @@ export class Series extends Value {
 }
 
 export class Str extends Series {
-    constructor(value) {
-        super(Array.from(value));
+    constructor(value, type = "string!") {
+        super(Array.from(value), type);
         this.value = value;
-        this.type = "string!";
     }
 
     to(type) {
-        if (type === "number!") {
+        const normalizedType = normalizeString(type);
+        if (normalizedType === "NUMBER!") {
             return new Num(Number(this.value));
         }
-        if (type === "word!") {
+        if (normalizedType === "WORD!") {
             return new Word(this.value);
         }
-        if (type === "set-word!") {
+        if (normalizedType === "SET-WORD!") {
             return new SetWord(this.value);
         }
-        if (type === "get-word!") {
+        if (normalizedType === "GET-WORD!") {
             return new GetWord(this.value);
         }
-        if (type === "lit-word!") {
+        if (normalizedType === "LIT-WORD!") {
             return new LitWord(this.value);
         }
-        if (type !== "string!") {
-            throw new Error(`Cannot convert ${this.type} to ${type}`);
+        if (normalizedType !== "STRING!") {
+            throw new Error(`Cannot convert ${this.type} to ${normalizedType}`);
         }
         return this;
     }
 
     append(other) {
-        const otherValue = other.to("string!");
+        const otherValue = other.to(this.type);
         return new Str(this.value + otherValue.value);
     }
 
     insert(index, other) {
         const indexValue = index.to("number!");
-        const otherValue = other.to("string!");
+        const otherValue = other.to(this.type);
         return new Str(
             this.value.slice(0, indexValue.value) + otherValue.value +
                 this.value.slice(indexValue.value),
@@ -160,8 +161,8 @@ export class Str extends Series {
 }
 
 export class Word extends Value {
-    constructor(spelling) {
-        super("word!");
+    constructor(spelling, type = "word!") {
+        super(type);
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
@@ -182,8 +183,8 @@ export class Word extends Value {
 }
 
 export class GetWord extends Value {
-    constructor(spelling) {
-        super("get-word!");
+    constructor(spelling, type = "get-word!") {
+        super(type);
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
@@ -197,9 +198,10 @@ export class GetWord extends Value {
         return next.to("get-word!");
     }
 }
+
 export class SetWord extends Value {
-    constructor(spelling) {
-        super("set-word!");
+    constructor(spelling, type = "set-word!") {
+        super(type);
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
@@ -217,8 +219,8 @@ export class SetWord extends Value {
     }
 }
 export class LitWord extends Value {
-    constructor(spelling) {
-        super("lit-word!");
+    constructor(spelling, type = "lit-word!") {
+        super(type);
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
@@ -234,9 +236,8 @@ export class LitWord extends Value {
 }
 
 export class Block extends Series {
-    constructor(items = []) {
-        super(items);
-        this.type = "block!";
+    constructor(items = [], type = "block!") {
+        super(items, type);
     }
     mold() {
         return `[${this.items.map((e) => e.mold()).join(" ")}]`;
@@ -247,14 +248,16 @@ export class Block extends Series {
 }
 
 export class Paren extends Series {
-    constructor(items = []) {
-        super(items);
-        this.type = "paren!";
+    constructor(items = [], type = "paren!") {
+        super(items, type);
     }
     mold() {
         return `(${
             this.items.map((e) => e instanceof Value ? e.mold() : e).join(" ")
         })`;
+    }
+    evaluate(stream, context) {
+        return evaluate(this, context);
     }
     static make(stream, context) {
         return new Paren([]);
@@ -262,27 +265,28 @@ export class Paren extends Series {
 }
 
 export class Datatype extends Value {
-    constructor(aClass) {
-        super("datatype!");
-        this.aClass = aClass;
+    constructor(aClass, type = "datatype!") {
+        super(type);
+        this.value = aClass;
     }
 }
 
-let _nil;
-export class Nil extends Value {
-    constructor() {
-        super("nil!");
-        if (!_nil) {
-            _nil = this;
+class Nil extends Value {
+    constructor(type = "nil!") {
+        super(type);
+        if (!Nil.nil) {
+            Nil.nil = this;
         }
     }
     evaluate(stream, context) {
-        return _nil;
+        return this;
     }
+    static nil;
     static make(stream, context) {
-        return _nil;
+        return Nil.nil;
     }
 }
+
 export const nil = new Nil();
 
 export default {

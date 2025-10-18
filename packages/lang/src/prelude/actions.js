@@ -1,16 +1,16 @@
-import { Action } from "../datatypes/functions.js";
+import { Method } from "../datatypes/functions.js";
 
 export default {
-    "+": Action.binary("add"),
-    "-": Action.binary("subtract"),
-    "*": Action.binary("multiply"),
-    "/": Action.binary("divide"),
-    "=": Action.binary("equals"),
+    "+": Method.binary("add"),
+    "-": Method.binary("subtract"),
+    "*": Method.binary("multiply"),
+    "/": Method.binary("divide"),
+    "=": Method.binary("equals"),
 
-    "append": Action.binary("append"),
-    "insert": Action.ternary("insert"),
-    "pick": Action.binary("pick"),
-    "pluck": Action.binary("pluck"),
-    "slice": Action.binary("slice"),
-    "length": Action.unary("length"),
+    "append": Method.binary("append"),
+    "insert": Method.ternary("insert"),
+    "pick": Method.binary("pick"),
+    "pluck": Method.binary("pluck"),
+    "slice": Method.binary("slice"),
+    "length": Method.unary("length"),
 };

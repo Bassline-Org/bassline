@@ -1,6 +1,3 @@
-import { Context } from "./datatypes/context.js";
-import { NativeFn } from "./datatypes/functions.js";
-import { parse } from "./parser.js";
 import { Stream } from "./stream.js";
 
 export function evaluate(code, context) {

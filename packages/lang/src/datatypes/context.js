@@ -2,8 +2,8 @@ import { normalize } from "../utils.js";
 import { Datatype, nil, Value } from "./core.js";
 
 export class Context extends Value {
-    constructor(parent = null) {
-        super("context!");
+    constructor(parent = null, type = "context!") {
+        super(type);
         this.bindings = new Map();
         this.set("self", this);
         if (parent) {
