@@ -17,14 +17,17 @@ export function installPrelude(context) {
 }
 
 const example = `
-    a: 456
-    b: "123"
-    c: append b a
-    print type? c
-    print c
-    result: + (+ 10 c) 15
-    print result
-    print type? result
+    a: 10
+    b: 20
+    added: + a b
+    c: 30
+    print eq? added c
+
+    foo: [a b c]
+    bar: [a b c]
+    print eq? foo bar
+    baz: append foo 'd
+    print eq? baz bar
 `;
 
 const parsed = parse(example);

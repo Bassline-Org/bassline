@@ -22,9 +22,36 @@ export class Value {
         return this;
     }
 
+    equals(other) {
+        const otherValue = other.to(this.type);
+        return new Bool(this.value === otherValue.value);
+    }
+
     print() {
         console.log(this);
         return this;
+    }
+}
+
+export class Bool extends Value {
+    constructor(value, type = "bool!") {
+        super(type);
+        this.value = value;
+    }
+
+    to(type) {
+        const normalizedType = normalizeString(type);
+        if (normalizedType === "NUMBER!") {
+            return new Num(this.value ? 1 : 0);
+        }
+        return super.to(normalizedType);
+    }
+    print() {
+        console.log(this.value);
+        return this;
+    }
+    static make(stream, context) {
+        throw new Error("Cannot make new bool! values, these are singletons!");
     }
 }
 
@@ -71,6 +98,18 @@ export class Series extends Value {
     constructor(items = [], type = "series!") {
         super(type);
         this.items = items;
+    }
+
+    equals(other) {
+        const otherValue = other.to(this.type);
+        if (this.items.length !== otherValue.items.length) {
+            return new Bool(false);
+        }
+        return new Bool(
+            this.items.every((item, index) =>
+                item.equals(otherValue.items[index])
+            ),
+        );
     }
 
     append(item) {
@@ -281,6 +320,9 @@ class Nil extends Value {
     evaluate(stream, context) {
         return this;
     }
+    equals(other) {
+        return other === this ? Bool.t : Bool.f;
+    }
     static nil;
     static make(stream, context) {
         return Nil.nil;
@@ -301,4 +343,6 @@ export default {
     "paren!": new Datatype(Paren),
     "nil!": new Datatype(Nil),
     "nil": nil,
+    "true": new Bool(true),
+    "false": new Bool(false),
 };
