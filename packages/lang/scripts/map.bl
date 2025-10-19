@@ -2,11 +2,11 @@ iterations: 0
 
 count: [in system [ iterations: + iterations 1 ]]
 
-mapper: make fn! [n] [
+mapper: make fn! self [n] [
     map (iota n) :double
 ]
 
-double: make fn! [item] [
+double: make fn! self [item] [
     do count
     * item 2
 ]

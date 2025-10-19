@@ -1,11 +1,11 @@
 iterations: 0
 
-foo: make fn! [a b] [
+foo: make fn! self [a b] [
     in system [ iterations: + iterations 1 ]
     + a b
 ]
 
-folder: make fn! [n] [
+folder: make fn! self [n] [
     fold (iota n) :foo 0
 ]
 

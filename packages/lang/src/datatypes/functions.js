@@ -86,7 +86,7 @@ export class Fn extends ContextChain {
 
         for (const arg of this.get("args").items) {
             if (arg instanceof LitWord) {
-                execCtx.set(arg, stream.next()); // Set on exec context
+                execCtx.set(arg, stream.next());
             } else {
                 execCtx.set(
                     arg,
@@ -95,7 +95,7 @@ export class Fn extends ContextChain {
             }
         }
         const body = this.get("body");
-        return evaluate(body, execCtx); // Eval in exec context
+        return evaluate(body, execCtx);
     }
     form() {
         return new Str(`fn! [

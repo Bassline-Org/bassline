@@ -15,6 +15,6 @@ export class Stream {
     }
 
     isAtEnd() {
-        return this.pos >= this.items.length - 1;
+        return this.pos >= this.items.length;
     }
 }

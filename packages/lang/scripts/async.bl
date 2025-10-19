@@ -1,5 +1,6 @@
 a: make task!
 foo: make context!
+
 in foo [
     something: 10
 ]
