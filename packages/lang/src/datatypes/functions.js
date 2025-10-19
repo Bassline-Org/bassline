@@ -1,4 +1,4 @@
-import { Context } from "./context.js";
+import { ContextBase } from "./context.js";
 import { Block, Datatype, Str, Value } from "./core.js";
 import { normalizeString } from "../utils.js";
 import { evaluate } from "../evaluator.js";
@@ -73,17 +73,18 @@ export class NativeMethod extends NativeFn {
     }
 }
 
-export class Fn extends Context {
+export class Fn extends ContextBase {
     static type = normalizeString("fn!");
-    constructor(parentContext, args, body) {
-        super(parentContext);
+    constructor(ctx, args, body) {
+        super();
+        ctx.copy(this);
         this.set("args", args);
         this.set("body", body);
     }
     evaluate(stream, context) {
         for (const arg of this.get("args").items) {
             this.set(
-                arg.spelling,
+                arg,
                 stream.next().evaluate(stream, context),
             );
         }
@@ -97,9 +98,10 @@ export class Fn extends Context {
 ]`);
     }
     static make(stream, context) {
+        const ctx = stream.next().evaluate(stream, context).to("context!");
         const args = stream.next().to("block!");
         const body = stream.next().to("block!");
-        return new Fn(context, args, body);
+        return new Fn(ctx, args, body);
     }
 }
 

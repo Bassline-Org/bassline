@@ -40,6 +40,18 @@ export default {
         },
     ),
 
+    // Context methods
+    "get": NativeMethod.binary("get"),
+    "set": NativeMethod.ternary("set"),
+    "delete": NativeMethod.binary("delete"),
+    "clone": NativeMethod.unary("clone"),
+    "copy": NativeMethod.binary("copy"),
+    "merge": NativeMethod.binary("merge"),
+    "project": NativeMethod.binary("project"),
+    "has": NativeMethod.binary("has"),
+    "words": NativeMethod.unary("words"),
+    "rename": NativeMethod.ternary("rename"),
+
     // Documentation
     "doc": NativeMethod.binary("doc"),
     "describe": NativeMethod.unary("describe"),

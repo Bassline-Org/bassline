@@ -5,6 +5,7 @@ import * as repl from "node:repl";
 import { parse } from "../parser.js";
 import { existsSync } from "fs";
 import { Block, Str, Value } from "../datatypes/core.js";
+import { setMany } from "../datatypes/context.js";
 import { NativeFn } from "../datatypes/functions.js";
 
 const args = process.argv.slice(2);
@@ -31,14 +32,14 @@ const replExtras = {
     }),
 };
 
-GLOBAL.context.setMany(replExtras);
+setMany(GLOBAL.context, replExtras);
 
 // No arguments - start REPL
 if (args.length === 0) {
     console.log("Bassline REPL - Type expressions to evaluate");
     console.log("Press Ctrl+D to exit\n");
 
-    GLOBAL.context.setMany(replExtras);
+    setMany(GLOBAL.context, replExtras);
     repl.start({
         prompt: ">> ",
         eval: (cmd, context, filename, callback) => {

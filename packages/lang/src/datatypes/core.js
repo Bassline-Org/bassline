@@ -309,7 +309,7 @@ export class Word extends Value {
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
-        const value = context.get(this.spelling);
+        const value = context.get(this);
         if (!value) {
             return nil;
         }
@@ -319,7 +319,7 @@ export class Word extends Value {
         return this.spelling.description;
     }
     form() {
-        return this.spelling.description;
+        return new Str(this.spelling.description);
     }
 
     static make(stream, context) {
@@ -337,13 +337,13 @@ export class GetWord extends Value {
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
-        return context.get(this.spelling);
+        return context.get(this);
     }
     mold() {
         return `:${this.spelling.description}`;
     }
     form() {
-        return `:${this.spelling.description}`;
+        return new Str(`:${this.spelling.description}`);
     }
     static make(stream, context) {
         const next = stream.next();
@@ -363,14 +363,14 @@ export class SetWord extends Value {
     evaluate(stream, context) {
         let value = stream.next();
         value = value.evaluate(stream, context);
-        context.set(this.spelling, value);
+        context.set(this, value);
         return value;
     }
     mold() {
         return `${this.spelling.description}:`;
     }
     form() {
-        return `${this.spelling.description}:`;
+        return new Str(`${this.spelling.description}:`);
     }
     static make(stream, context) {
         const next = stream.next();
@@ -393,7 +393,7 @@ export class LitWord extends Value {
         return `'${this.spelling.description}`;
     }
     form() {
-        return `'${this.spelling.description}`;
+        return new Str(`'${this.spelling.description}`);
     }
     static make(stream, context) {
         const next = stream.next();
