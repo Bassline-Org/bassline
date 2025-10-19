@@ -1,5 +1,12 @@
 reducedContext: project system [ + make fn! reduce ]
 
+fn: make fn! self [args body] [
+    compose [make fn! self (args) (body)]
+]
+
+double: fn [x] [ * x 2]
+print :double
+
 hof: make fn! reducedContext [a] [
     make fn! self [b] [
         + a b
@@ -8,7 +15,11 @@ hof: make fn! reducedContext [a] [
 
 foo: hof 10
 bar: hof 20
-print foo 30
-print bar 30
 
-print in :foo [ reduce [ args parent body ] ]
+print map (iota 10) :foo
+commands: map
+    (iota 10)
+    (make fn! self [x] [ compose [ print (x)] ])
+print commands
+
+reduce commands
