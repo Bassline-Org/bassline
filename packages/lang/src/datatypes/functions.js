@@ -1,5 +1,5 @@
-import { ContextBase } from "./context.js";
-import { Block, Datatype, Str, Value } from "./core.js";
+import { ContextChain } from "./context.js";
+import { Datatype, LitWord, Str, Value, Word } from "./core.js";
 import { normalizeString } from "../utils.js";
 import { evaluate } from "../evaluator.js";
 /**
@@ -73,23 +73,29 @@ export class NativeMethod extends NativeFn {
     }
 }
 
-export class Fn extends ContextBase {
+export class Fn extends ContextChain {
     static type = normalizeString("fn!");
-    constructor(ctx, args, body) {
-        super();
-        ctx.copy(this);
+    constructor(parent, args, body) {
+        super(parent);
         this.set("args", args);
         this.set("body", body);
     }
+
     evaluate(stream, context) {
+        const execCtx = new ContextChain(this);
+
         for (const arg of this.get("args").items) {
-            this.set(
-                arg,
-                stream.next().evaluate(stream, context),
-            );
+            if (arg instanceof LitWord) {
+                execCtx.set(arg, stream.next()); // Set on exec context
+            } else {
+                execCtx.set(
+                    arg,
+                    stream.next().evaluate(stream, context),
+                );
+            }
         }
         const body = this.get("body");
-        return evaluate(body, this);
+        return evaluate(body, execCtx); // Eval in exec context
     }
     form() {
         return new Str(`fn! [
@@ -98,10 +104,15 @@ export class Fn extends ContextBase {
 ]`);
     }
     static make(stream, context) {
-        const ctx = stream.next().evaluate(stream, context).to("context!");
-        const args = stream.next().to("block!");
-        const body = stream.next().to("block!");
-        return new Fn(ctx, args, body);
+        let parent = stream.next();
+        if (parent instanceof Word) {
+            parent = context.get(parent);
+        } else {
+            parent = parent.evaluate(stream, context);
+        }
+        const args = stream.next().evaluate(stream, context).to("block!");
+        const body = stream.next().evaluate(stream, context).to("block!");
+        return new Fn(parent, args, body);
     }
 }
 

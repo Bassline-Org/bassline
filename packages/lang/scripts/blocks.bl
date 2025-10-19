@@ -1,0 +1,11 @@
+
+foo: 123
+bar: 123
+
+aBlock: [ + x y ]
+
+result: in (rename self [ foo bar ] [ x y ]) aBlock
+
+users: [ alice bob charlie ]
+
+print concat users users

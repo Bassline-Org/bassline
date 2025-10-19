@@ -14,7 +14,6 @@ export class ContextBase extends Value {
         if (word?.spelling) return word.spelling;
         if (word instanceof Str) return normalize(word.value);
         if (typeof word === "string") return normalize(word);
-        console.log("type: ", typeof word);
         throw new Error(`Invalid string ${JSON.stringify(word)}`);
     }
 
@@ -53,16 +52,20 @@ export class ContextBase extends Value {
         return new Block(allWords);
     }
 
+    fresh() {
+        return new this.constructor();
+    }
+
+    clone() {
+        return this.copy(this.fresh());
+    }
+
     copy(targetContext = this.clone()) {
         for (const [word, value] of this.bindings.entries()) {
             if (word === this.keyFor("self")) continue;
             targetContext.set(word, value);
         }
         return targetContext;
-    }
-
-    clone() {
-        return new this.constructor();
     }
 
     project(words) {
@@ -121,26 +124,53 @@ export class ContextChain extends ContextBase {
         }
     }
 
-    clone() {
-        return new this.constructor(this.parent());
-    }
-
     hasParent() {
         return this.bindings.has(this.keyFor("parent"));
     }
 
     parent() {
-        if (this.has("parent")) {
-            return this.get("parent");
+        const p = this.bindings.get(this.keyFor("parent"));
+        if (p === undefined) {
+            return nil;
         }
-        return nil;
+        return p;
+    }
+
+    form() {
+        const formed = [];
+        for (const [key, value] of this.bindings.entries()) {
+            if (value === this) {
+                formed.push(`${key.description}: <self>`);
+                continue;
+            }
+            if (key === this.keyFor("parent")) {
+                formed.push(`${key.description}: <parent>`);
+                continue;
+            }
+            formed.push(`${key.description}: ${value.form().value}`);
+        }
+        return new Str(`context-chain! [${formed.join("\n  ")}]`);
+    }
+
+    copy(targetContext = this.clone()) {
+        for (const [key, value] of this.bindings.entries()) {
+            if (key === this.keyFor("self")) continue;
+            if (key === this.keyFor("parent")) continue;
+            targetContext.set(key, value);
+        }
+        return targetContext;
+    }
+
+    fresh() {
+        return new this.constructor(this);
     }
 
     get(word) {
         const key = this.keyFor(word);
         if (this.bindings.has(key)) return this.bindings.get(key);
         if (this.hasParent()) {
-            return this.parent().get(word);
+            const p = this.parent();
+            return p.get(word);
         }
         return nil;
     }

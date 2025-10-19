@@ -121,7 +121,10 @@ export class Series extends Value {
             ),
         );
     }
-
+    concat(other) {
+        const otherValue = other.to(this.type);
+        return new this.constructor([...this.items, ...otherValue.items]);
+    }
     append(item) {
         return new this.constructor([...this.items, item]);
     }

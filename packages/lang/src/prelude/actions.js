@@ -21,6 +21,7 @@ export default {
         const arr = Array.from({ length: n.value }, (_, i) => new Num(i));
         return new Block(arr);
     }),
+    "concat": NativeMethod.binary("concat"),
 
     // Block methods
     "compose": NativeMethod.unary("compose"),
@@ -51,6 +52,7 @@ export default {
     "has": NativeMethod.binary("has"),
     "words": NativeMethod.unary("words"),
     "rename": NativeMethod.ternary("rename"),
+    "fresh": NativeMethod.unary("fresh"),
 
     // Documentation
     "doc": NativeMethod.binary("doc"),
