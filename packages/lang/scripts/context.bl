@@ -7,3 +7,14 @@ bar: rename foo [ print ] [ say ]
 in bar [ say "hello" ]
 
 print words bar
+
+myCtx: project system [ + ]
+myBlock: [ print (+ 1 2) ]
+
+print "my block!"
+result: in myCtx myBlock
+print (type? result)
+
+print "my block in project context!"
+result: in (project system [ + print ]) myBlock
+print (type? result)
