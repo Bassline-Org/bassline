@@ -28,6 +28,10 @@ export class Value {
         return new Str(this.value);
     }
 
+    mold() {
+        return new Str(this.value);
+    }
+
     doc(doc) {
         const docString = doc.to("STRING!");
         this.documentation = docString;
@@ -243,6 +247,10 @@ export class Str extends Value {
         );
     }
 
+    mold() {
+        return new Str(`"${this.value}"`);
+    }
+
     static make(stream, context) {
         return new Str("");
     }
@@ -279,6 +287,10 @@ export class Block extends Series {
             return item;
         }));
     }
+    mold() {
+        const items = this.items.map((e) => `${e.mold().value}`);
+        return new Str(`[ ${items.join(" ")} ]`);
+    }
     static make(stream, context) {
         return new Block([]);
     }
@@ -291,6 +303,10 @@ export class Paren extends Series {
     }
     evaluate(stream, context) {
         return evaluate(this, context);
+    }
+    mold() {
+        const items = this.items.map((e) => `${e.mold().value}`);
+        return new Str(`(${items.join(" ")})`);
     }
     static make(stream, context) {
         return new Paren([]);
@@ -324,7 +340,7 @@ export class Word extends Value {
         return value.evaluate(stream, context);
     }
     mold() {
-        return this.spelling.description;
+        return new Str(this.spelling.description);
     }
     form() {
         return new Str(this.spelling.description);
@@ -356,7 +372,7 @@ export class GetWord extends Value {
         return context.get(this);
     }
     mold() {
-        return `:${this.spelling.description}`;
+        return new Str(`:${this.spelling.description}`);
     }
     form() {
         return new Str(`:${this.spelling.description}`);
@@ -391,7 +407,7 @@ export class SetWord extends Value {
         return value;
     }
     mold() {
-        return `${this.spelling.description}:`;
+        return new Str(`${this.spelling.description}:`);
     }
     form() {
         return new Str(`${this.spelling.description}:`);
@@ -422,7 +438,7 @@ export class LitWord extends Value {
         return new Word(this.spelling);
     }
     mold() {
-        return `'${this.spelling.description}`;
+        return new Str(`'${this.spelling.description}`);
     }
     form() {
         return new Str(`'${this.spelling.description}`);
@@ -450,6 +466,10 @@ export class Datatype extends Value {
     constructor(aClass) {
         super();
         this.value = aClass;
+    }
+
+    mold() {
+        return new Str(this.value.type);
     }
 
     form() {

@@ -33,9 +33,6 @@ export class NativeFn extends Value {
     form() {
         return new Str(`native-fn! spec: [ ${this.spec.join(", ")} ]`);
     }
-    mold() {
-        return "native";
-    }
 }
 
 export class NativeMethod extends NativeFn {
@@ -92,6 +89,13 @@ export class PureFn extends ContextBase {
             }
         }
         return evaluate(body, localCtx);
+    }
+    mold() {
+        const args = this.get("args");
+        const body = this.get("body");
+        return new Str(
+            `(make pure-fn! ${args.mold().value} ${body.mold().value})`,
+        );
     }
     static make(stream, context) {
         const args = stream.next().evaluate(stream, context).to("block!");

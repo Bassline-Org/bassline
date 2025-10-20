@@ -1,5 +1,6 @@
 import { normalize, normalizeString } from "../utils.js";
 import { Block, Bool, Datatype, nil, Str, Value, Word } from "./core.js";
+import { NativeFn, NativeMethod } from "./functions.js";
 
 export class ContextBase extends Value {
     static type = normalizeString("context!");
@@ -108,6 +109,25 @@ export class ContextBase extends Value {
 context! [
     ${entries.join("\n  ")}
 ]`);
+    }
+
+    mold() {
+        const parts = [];
+        const natives = [];
+        for (const [key, value] of this.bindings) {
+            if (
+                value instanceof NativeFn ||
+                value instanceof NativeMethod ||
+                value instanceof Datatype
+            ) continue; // TODO: Push the missing natives into a projection from system
+            // IE in (project system [<MISSING_NATIVES>] <Block>)
+            if (value === this) continue;
+            parts.push(`${key.description}: ${value.mold().value}`);
+        }
+        return new Str(`in (clone system) [
+        ${parts.join("  \n")}
+        self
+        ]`);
     }
 
     static make(stream, context) {
