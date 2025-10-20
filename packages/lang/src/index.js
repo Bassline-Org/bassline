@@ -6,6 +6,6 @@
 
 export { createRepl } from "./repl.js";
 export { parse } from "./parser.js";
-export { Context } from "./datatypes/index.js";
+export * from "./datatypes/index.js";
 export { GLOBAL } from "./runtime.js";
 export { evaluate } from "./evaluator.js";

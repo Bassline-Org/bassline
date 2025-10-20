@@ -1,4 +1,5 @@
 import { evaluate } from "../evaluator.js";
+import { Stream } from "../stream.js";
 import { normalize, normalizeString } from "../utils.js";
 
 export class Value {
@@ -151,20 +152,12 @@ export class Series extends Value {
         );
     }
     fold(fn, initial, stream, context) {
-        return this.items.reduce(
-            (acc, curr) => {
-                const expr = new Block([fn, acc, curr]);
-                return evaluate(expr, context);
-            },
-            initial,
-        );
-    }
-    map(fn, stream, context) {
-        const result = this.items.map((item) => {
-            const expr = new Block([fn, item]);
-            return evaluate(expr, context);
-        });
-        return new this.constructor(result);
+        let acc = initial;
+        for (const item of this.items) {
+            const s = new Stream([acc, item]);
+            acc = fn.evaluate(s, context);
+        }
+        return acc;
     }
     slice(start, end) {
         const startValue = start.to("number!");
