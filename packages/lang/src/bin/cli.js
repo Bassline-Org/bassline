@@ -15,16 +15,16 @@ const replExtras = {
     "home": new Str(process.env.HOME || ""),
     "~": new Str(process.env.HOME || ""),
     "cd": new NativeFn(["path"], ([path], stream, context) => {
-        process.chdir(path.value);
+        process.chdir(path.to("string!").value);
         context.set("pwd", new Str(process.cwd()));
         return new Str(process.cwd());
     }),
     "ls": new NativeFn([], ([], stream, context) => {
         const files = readdirSync(process.cwd());
-        return new Block(files.map((file) => new Str(file.name)));
+        return new Block(files.map((file) => new Str(file)));
     }),
     "cat": new NativeFn(["file"], ([file], stream, context) => {
-        const content = readFileSync(file.value, "utf8");
+        const content = readFileSync(file.to("string!").value, "utf8");
         return new Str(content);
     }),
     "exit": new NativeFn([], ([], stream, context) => {
@@ -62,13 +62,13 @@ if (args.length === 0) {
     // Run script file
     const filename = args[0];
 
-    //try {
-    const source = readFileSync(filename, "utf8");
-    const parsed = parse(source);
-    const result = GLOBAL.evaluate(parsed);
-    //} catch (e) {
-    //console.error(`Error running ${filename}:`);
-    //console.error(e.message);
-    //process.exit(1);
-    //}
+    try {
+        const source = readFileSync(filename, "utf8");
+        const parsed = parse(source);
+        const result = GLOBAL.evaluate(parsed);
+    } catch (e) {
+        console.error(`Error running ${filename}:`);
+        console.error(e.message);
+        process.exit(1);
+    }
 }

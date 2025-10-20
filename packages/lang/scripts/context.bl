@@ -1,14 +1,20 @@
-foo: project system [ print ]
+foo: project self [ print ]
+
+print words foo
+print type? foo
 
 in foo [ print "hello" ]
 
 bar: rename foo [ print ] [ say ]
+print words bar
 
 in bar [ say "hello" ]
 
 print words bar
 
-myCtx: project system [ + ]
+someSecret: "ooohhh"
+
+myCtx: project system [ + someSecret ]
 myBlock: [ print (+ 1 2) ]
 
 print "my block!"
@@ -18,3 +24,4 @@ print (type? result)
 print "my block in project context!"
 result: in (project system [ + print ]) myBlock
 print (type? result)
+print myCtx

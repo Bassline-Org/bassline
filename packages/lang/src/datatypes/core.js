@@ -325,6 +325,14 @@ export class Word extends Value {
         return new Str(this.spelling.description);
     }
 
+    to(type) {
+        const normalized = normalizeString(type);
+        if (normalized === normalizeString("string!")) {
+            return new Str(this.spelling.description);
+        }
+        return super.to(type);
+    }
+
     static make(stream, context) {
         const next = stream.next();
         return new Word(next.to("word!").spelling);
@@ -347,6 +355,14 @@ export class GetWord extends Value {
     }
     form() {
         return new Str(`:${this.spelling.description}`);
+    }
+
+    to(type) {
+        const normalized = normalizeString(type);
+        if (normalized === normalizeString("string!")) {
+            return new Str(this.spelling.description);
+        }
+        return super.to(type);
     }
     static make(stream, context) {
         const next = stream.next();
@@ -375,6 +391,14 @@ export class SetWord extends Value {
     form() {
         return new Str(`${this.spelling.description}:`);
     }
+
+    to(type) {
+        const normalized = normalizeString(type);
+        if (normalized === normalizeString("string!")) {
+            return new Str(this.spelling.description);
+        }
+        return super.to(type);
+    }
     static make(stream, context) {
         const next = stream.next();
         return next.to("set-word!");
@@ -397,6 +421,14 @@ export class LitWord extends Value {
     }
     form() {
         return new Str(`'${this.spelling.description}`);
+    }
+
+    to(type) {
+        const normalized = normalizeString(type);
+        if (normalized === normalizeString("string!")) {
+            return new Str(this.spelling.description);
+        }
+        return super.to(type);
     }
     static make(stream, context) {
         const next = stream.next();

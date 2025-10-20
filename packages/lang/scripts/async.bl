@@ -1,5 +1,6 @@
 a: make task!
 foo: make context!
+copy system foo
 
 in foo [
     something: 10
@@ -10,6 +11,7 @@ b: after a [ something: + something 20 ] foo
 after b [
     print append "from foo " form something
 ] foo
+
 after b [
     print append "from system " form something
 ] system
