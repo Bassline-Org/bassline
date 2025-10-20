@@ -10,6 +10,7 @@ export default {
     "/": NativeMethod.binary("divide"),
     "//": NativeMethod.binary("modulo"),
     "eq?": NativeMethod.binary("equals"),
+    "cast": NativeMethod.binary("cast"),
 
     // Series methods
     "update": NativeMethod.ternary("update"),

@@ -47,6 +47,11 @@ export class Value {
         return new Bool(this.value === otherValue.value);
     }
 
+    cast(datatype) {
+        const type = datatype.value.type;
+        return this.to(type);
+    }
+
     print() {
         console.log(this.form().value);
         return this;
@@ -344,6 +349,15 @@ export class Word extends Value {
         if (normalized === normalizeString("string!")) {
             return new Str(this.spelling.description);
         }
+        if (normalized === normalizeString("lit-word!")) {
+            return new LitWord(this.spelling);
+        }
+        if (normalized === normalizeString("get-word!")) {
+            return new GetWord(this.spelling);
+        }
+        if (normalized === normalizeString("set-word!")) {
+            return new SetWord(this.spelling);
+        }
         return super.to(type);
     }
 
@@ -376,6 +390,15 @@ export class GetWord extends Value {
         if (normalized === normalizeString("string!")) {
             return new Str(this.spelling.description);
         }
+        if (normalized === normalizeString("lit-word!")) {
+            return new LitWord(this.spelling);
+        }
+        if (normalized === normalizeString("word!")) {
+            return new Word(this.spelling);
+        }
+        if (normalized === normalizeString("set-word!")) {
+            return new SetWord(this.spelling);
+        }
         return super.to(type);
     }
     static make(stream, context) {
@@ -394,8 +417,8 @@ export class SetWord extends Value {
         this.spelling = normalize(spelling);
     }
     evaluate(stream, context) {
-        let value = stream.next();
-        value = value.evaluate(stream, context);
+        const next = stream.next();
+        const value = next.evaluate(stream, context);
         context.set(this, value);
         return value;
     }
@@ -410,6 +433,15 @@ export class SetWord extends Value {
         const normalized = normalizeString(type);
         if (normalized === normalizeString("string!")) {
             return new Str(this.spelling.description);
+        }
+        if (normalized === normalizeString("word!")) {
+            return new Word(this.spelling);
+        }
+        if (normalized === normalizeString("lit-word!")) {
+            return new LitWord(this.spelling);
+        }
+        if (normalized === normalizeString("get-word!")) {
+            return new GetWord(this.spelling);
         }
         return super.to(type);
     }
@@ -427,20 +459,28 @@ export class LitWord extends Value {
         super();
         this.spelling = normalize(spelling);
     }
-    evaluate(stream, context) {
-        return new Word(this.spelling);
-    }
+    // evaluate(stream, context) {
+    //     return new Word(this.spelling);
+    // }
     mold() {
         return new Str(`'${this.spelling.description}`);
     }
     form() {
         return new Str(`'${this.spelling.description}`);
     }
-
     to(type) {
         const normalized = normalizeString(type);
         if (normalized === normalizeString("string!")) {
             return new Str(this.spelling.description);
+        }
+        if (normalized === normalizeString("word!")) {
+            return new Word(this.spelling);
+        }
+        if (normalized === normalizeString("get-word!")) {
+            return new GetWord(this.spelling);
+        }
+        if (normalized === normalizeString("set-word!")) {
+            return new SetWord(this.spelling);
         }
         return super.to(type);
     }

@@ -4,6 +4,7 @@ export function normalize(str) {
     }
     return Symbol.for(normalizeString(str));
 }
+
 export function normalizeString(str) {
     return str.trim().toUpperCase();
 }

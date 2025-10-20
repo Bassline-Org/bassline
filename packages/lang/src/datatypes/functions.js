@@ -68,7 +68,13 @@ export class NativeMethod extends NativeFn {
                     `No method "${selector}" found on ${target.type}`,
                 );
             }
-            return target[selector].call(target, ...args, stream, context);
+            const result = method.call(
+                target,
+                ...args,
+                stream,
+                context,
+            );
+            return result;
         });
         this.selector = selector;
     }

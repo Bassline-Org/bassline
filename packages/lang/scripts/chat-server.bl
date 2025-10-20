@@ -1,0 +1,93 @@
+; WebSocket Echo Server Example
+; This shows how handles work with event handlers
+
+fn: make pure-fn! [args body] [
+    make pure-fn! args body
+]
+
+; Create a WebSocket server on port 8080
+server: open "ws-server://8080"
+copy system server
+
+in server [
+    handler: fn [event] [
+        print type? event
+        print event
+        type: cast (pick event 0) lit-word!
+        print append "picked " (form type)
+        if (eq? 'listening type) [
+            port: pick event 1
+            print (append "server listening on: " port)
+        ] [ ]
+    ]
+]
+
+; ; Set the handler - it receives events as parsed Bassline blocks
+; set server 'handler make pure-fn! [event] [
+;     ; Events are blocks, first element is the event type
+;     type: pick event 0
+    
+;     ; Pattern match on event types
+;     if (eq? type 'listening) [
+;         port: pick event 1
+;         print append "WebSocket server listening on port " (form port)
+;     ] [nil]
+    
+;     if (eq? type 'connection) [
+;         print "New client connected!"
+        
+;         ; The server context has 'client' set to the new connection
+;         ; Send a welcome message (as molded Bassline code!)
+;         write client (mold [ welcome "Connected to Bassline server!" ])
+        
+;         ; We could also set a handler on the specific client
+;         set client 'handler make pure-fn! [client-event] [
+;             print append "Client got: " (form client-event)
+;         ]
+;     ] [nil]
+    
+;     if (eq? type 'client-message) [
+;         ; A client sent a message
+;         msg: pick event 1
+;         print append "Received from client: " msg
+        
+;         ; Parse the message as Bassline code
+;         data: load msg
+;         print append "Parsed data: " (form data)
+        
+;         ; Echo it back with a timestamp
+;         response: compose [ 
+;             echo (form data) 
+;             time (form now)  ; assuming we add a 'now' function
+;         ]
+        
+;         ; Write back to the specific client
+;         write client (mold response)
+        
+;         ; Or broadcast to all clients
+;         broadcast server (mold [ broadcast-msg (form data) ])
+;     ] [nil]
+    
+;     if (eq? type 'client-close) [
+;         print "Client disconnected"
+;     ] [nil]
+    
+;     if (eq? type 'client-error) [
+;         error-msg: pick event 1
+;         print append "Client error: " error-msg
+;     ] [nil]
+; ]
+
+; The server is now running and handling events!
+
+; You could test this with a simple WebSocket client in JavaScript:
+; 
+; const ws = new WebSocket('ws://localhost:8080');
+; ws.onopen = () => {
+;     // Send Bassline code as a string
+;     ws.send('[ hello "from JavaScript" ]');
+; };
+; ws.onmessage = (event) => {
+;     console.log('Received:', event.data);
+;     // Parse and evaluate if you have a Bassline parser
+; };
