@@ -62,13 +62,13 @@ if (args.length === 0) {
     // Run script file
     const filename = args[0];
 
-    try {
-        const source = readFileSync(filename, "utf8");
-        const parsed = parse(source);
-        const result = GLOBAL.evaluate(parsed);
-    } catch (e) {
-        console.error(`Error running ${filename}:`);
-        console.error(e.message);
-        process.exit(1);
-    }
+    //try {
+    const source = readFileSync(filename, "utf8");
+    const parsed = parse(source);
+    const result = GLOBAL.evaluate(parsed);
+    //} catch (e) {
+    // console.error(`Error running ${filename}:`);
+    // console.error(e.message);
+    //    process.exit(1);
+    //}
 }

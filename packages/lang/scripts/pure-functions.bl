@@ -1,0 +1,19 @@
+fn: make pure-fn! [args body] [ make pure-fn! args body ]
+hof: fn [f x] [ f x ]
+
+head: fn [series] [pick series 0]
+tail: fn [series] [slice series 1 length series]
+
+does: fn [block] [ fn [] compose [do (block)] ]
+
+thread: fn [arg fns] [
+    f: fn [a func] [ func a ]
+    fold fns :f arg
+]
+
+add: fn [x] [+ x 10]
+res: thread 10 compose [
+    :add
+    :add
+]
+print res

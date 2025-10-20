@@ -1,5 +1,5 @@
-import { ContextChain } from "./context.js";
-import { Datatype, LitWord, Str, Value, Word } from "./core.js";
+import { ContextBase, ContextChain } from "./context.js";
+import { Datatype, GetWord, LitWord, Str, Value, Word } from "./core.js";
 import { normalizeString } from "../utils.js";
 import { evaluate } from "../evaluator.js";
 /**
@@ -73,6 +73,33 @@ export class NativeMethod extends NativeFn {
     }
 }
 
+export class PureFn extends ContextBase {
+    static type = normalizeString("pure-fn!");
+    constructor(args, body) {
+        super();
+        this.set("args", args);
+        this.set("body", body);
+    }
+    evaluate(stream, context) {
+        const localCtx = new ContextChain(context);
+        const args = this.get("args");
+        const body = this.get("body");
+        for (const arg of args.items) {
+            if (arg instanceof GetWord) {
+                localCtx.set(arg, stream.next());
+            } else {
+                localCtx.set(arg, stream.next().evaluate(stream, context));
+            }
+        }
+        return evaluate(body, localCtx);
+    }
+    static make(stream, context) {
+        const args = stream.next().evaluate(stream, context).to("block!");
+        const body = stream.next().evaluate(stream, context).to("block!");
+        return new PureFn(args, body);
+    }
+}
+
 export class Fn extends ContextChain {
     static type = normalizeString("fn!");
     constructor(parent, args, body) {
@@ -120,4 +147,5 @@ export default {
     "native-fn!": new Datatype(NativeFn),
     "fn!": new Datatype(Fn),
     "native-method!": new Datatype(NativeMethod),
+    "pure-fn!": new Datatype(PureFn),
 };
