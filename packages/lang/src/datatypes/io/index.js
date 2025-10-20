@@ -166,12 +166,12 @@ class WebSocketClientHandle extends Handle {
         // Setup event handlers for this client
         wsClient.on("message", (data) => {
             // First notify this client handle's handler
-            this.callHandler(`message "${data}"`);
+            this.callHandler(`${data}`);
 
             // Then notify the server with client context
             // This allows the server to handle messages from any client
             this.server.set("client", this);
-            this.server.callHandler(`client-message "${data}"`);
+            this.server.callHandler(`client-message ${data}`);
         });
 
         wsClient.on("close", () => {

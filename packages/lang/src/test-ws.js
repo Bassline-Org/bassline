@@ -5,7 +5,7 @@ ws.addEventListener("message", (event) => {
 });
 ws.addEventListener("open", () => {
     console.log("Open");
-    ws.send('hello "from JavaScript"');
+    ws.send("words system");
 });
 ws.addEventListener("error", (event) => {
     console.error("Error:", event);

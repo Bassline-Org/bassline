@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bassline WebSocket Test Client</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #0f0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .log {
+            background: #000;
+            border: 1px solid #0f0;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            font-family: monospace;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            cursor: pointer;
+            font-family: monospace;
+        }
+
+        button:hover {
+            background: #0f0;
+            color: #000;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 5px;
+            text-align: center;
+        }
+
+        .connected {
+            color: #0f0;
+        }
+
+        .disconnected {
+            color: #f00;
+        }
+
+        .examples {
+            border: 1px solid #0f0;
+            padding: 10px;
+            background: #000;
+        }
+
+        .example {
+            cursor: pointer;
+            padding: 5px;
+            margin: 5px 0;
+        }
+
+        .example:hover {
+            background: #0f0;
+            color: #000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Bassline WebSocket Test Client</h1>
+
+        <div class="status disconnected" id="status">Disconnected</div>
+
+        <div class="controls">
+            <input type="text" id="url" value="ws://localhost:8080" placeholder="ws://localhost:8080">
+            <button id="connect">Connect</button>
+            <button id="disconnect" disabled>Disconnect</button>
+        </div>
+
+        <div class="log" id="log">Ready to connect...</div>
+
+        <div class="controls">
+            <input type="text" id="message" placeholder="Enter Bassline code, e.g. [ hello &quot;world&quot; ]"
+                disabled>
+            <button id="send" disabled>Send</button>
+        </div>
+
+        <div class="examples">
+            <h3>Example Messages (click to use):</h3>
+            <div class="example" data-msg='[ hello "from browser" ]'>[ hello "from browser" ]</div>
+            <div class="example" data-msg='[ identify "user123" ]'>[ identify "user123" ]</div>
+            <div class="example" data-msg='[ chat "Hello everyone!" ]'>[ chat "Hello everyone!" ]</div>
+            <div class="example" data-msg='[ eval (+ 1 2) ]'>[ eval (+ 1 2) ]</div>
+            <div class="example" data-msg='[ request time ]'>[ request time ]</div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        const $ = id => document.getElementById(id);
+        const log = $('log');
+        const status = $('status');
+        const messageInput = $('message');
+        const connectBtn = $('connect');
+        const disconnectBtn = $('disconnect');
+        const sendBtn = $('send');
+        const urlInput = $('url');
+
+        function addLog(msg, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'send' ? '>> ' :
+                type === 'recv' ? '<< ' :
+                    type === 'error' ? '!! ' : '-- ';
+            log.textContent += `[${timestamp}] ${prefix}${msg}\n`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function setConnected(connected) {
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                sendBtn.disabled = false;
+                messageInput.disabled = false;
+                urlInput.disabled = true;
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+                messageInput.disabled = true;
+                urlInput.disabled = false;
+            }
+        }
+
+        connectBtn.addEventListener('click', () => {
+            const url = urlInput.value;
+            addLog(`Connecting to ${url}...`);
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    addLog('Connected successfully!');
+                    setConnected(true);
+                };
+
+                ws.onmessage = (event) => {
+                    addLog(event.data, 'recv');
+                };
+
+                ws.onerror = (error) => {
+                    addLog(`Error: ${error.message || 'Connection failed'}`, 'error');
+                };
+
+                ws.onclose = () => {
+                    addLog('Connection closed');
+                    setConnected(false);
+                    ws = null;
+                };
+            } catch (error) {
+                addLog(`Failed to connect: ${error.message}`, 'error');
+            }
+        });
+
+        disconnectBtn.addEventListener('click', () => {
+            if (ws) {
+                ws.close();
+            }
+        });
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message && ws && ws.readyState === WebSocket.OPEN) {
+                addLog(message, 'send');
+                ws.send(message);
+                messageInput.value = '';
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Example message handlers
+        document.querySelectorAll('.example').forEach(example => {
+            example.addEventListener('click', () => {
+                messageInput.value = example.dataset.msg;
+                messageInput.focus();
+            });
+        });
+
+        // Focus on URL input initially
+        urlInput.focus();
+    </script>
+</body>
+
+</html>

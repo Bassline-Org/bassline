@@ -1,9 +1,10 @@
 ; WebSocket Echo Server Example
 ; This shows how handles work with event handlers
 
-fn: make pure-fn! [args body] [
-    make pure-fn! args body
-]
+fn: make pure-fn! [args body] [ make pure-fn! args body ]
+
+head: fn [list] [pick list 0]
+tail: fn [list] [slice list 1 (length list)]
 
 ; Create a WebSocket server on port 8080
 server: open "ws-server://8080"
@@ -11,10 +12,7 @@ copy system server
 
 in server [
     handler: fn [event] [
-        print type? event
-        print event
-        type: cast (pick event 0) lit-word!
-        print append "picked " (form type)
+        type: cast (head event) lit-word!
         if (eq? 'listening type) [
             port: pick event 1
             print (append "server listening on: " port)
@@ -25,7 +23,8 @@ in server [
             print event
             write client (mold [ welcome "Connected to Bassline server!" ])
             set client 'handler fn [client-event] [
-                print append "Client got: " (form client-event)
+                result: do client-event
+                write parent (mold result)
             ]
         ] []
     ]
