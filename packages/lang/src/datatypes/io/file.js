@@ -50,7 +50,7 @@ class FileContext extends ContextChain {
 
     mold() {
         const path = this.path().mold();
-        return new Str(`make file-context! "${path.value}"`);
+        return new Str(`make file-context! ${path.value}`);
     }
 
     static make(stream, context) {
