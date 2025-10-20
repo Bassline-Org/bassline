@@ -14,7 +14,7 @@ export class Value {
     }
 
     getType() {
-        return new Str(this.type);
+        return new LitWord(this.type);
     }
 
     to(type) {

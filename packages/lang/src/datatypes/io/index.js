@@ -1,127 +1,61 @@
-import { ContextBase } from "../context.js";
+import { ContextChain } from "../context.js";
 import { Block, Datatype, nil, Str, Word } from "../core.js";
+import { NativeFn } from "../functions.js";
 import { normalizeString } from "../../utils.js";
 import { parse } from "../../parser.js";
 import { Stream } from "../../stream.js";
 import { WebSocketServer } from "ws";
 import { evaluate } from "../../evaluator.js";
-
 import file from "./file.js";
 import process from "./process.js";
-/**
- * Base Handle class - all IO resources are handles with event handlers
- *
- * Handles are contexts that:
- * - Have a 'handler' property that receives events as parsed Bassline code
- * - Can be read from and/or written to
- * - Can be closed to cleanup resources
- */
-export class Handle extends ContextBase {
-    static type = normalizeString("handle!");
-
-    constructor(resource = null) {
-        super();
-        this.resource = resource;
-        this.closed = false;
-    }
-
-    /**
-     * Call the handler with a string that will be parsed as Bassline code
-     * This is the core of the event system - all events are Bassline code
-     */
-    callHandler(eventStr) {
-        if (this.closed) return;
-
-        const parsed = parse(eventStr);
-        const block = new Block([new Word("handler"), parsed]);
-        try {
-            evaluate(block, this);
-        } catch (e) {
-            console.error("Handler error:", e);
-            this.callHandler(`error "${e.message}"`);
-        }
-    }
-
-    /**
-     * Write data to the handle (for writable handles)
-     * @param {Str} data - String to write
-     */
-    write(data) {
-        throw new Error(`${this.type} does not support writing`);
-    }
-
-    /**
-     * Read data from the handle (for readable handles)
-     * @returns {Str|nil} - String data or nil
-     */
-    read() {
-        throw new Error(`${this.type} does not support reading`);
-    }
-
-    /**
-     * Close the handle and cleanup resources
-     */
-    close() {
-        if (this.closed) return nil;
-        this.closed = true;
-        this.cleanup();
-        this.callHandler("closed");
-        return nil;
-    }
-
-    /**
-     * Cleanup resources - override in subclasses
-     */
-    cleanup() {
-        // Override in subclasses to cleanup OS resources
-    }
-
-    form() {
-        return new Str(
-            `handle! [${this.constructor.name} closed: ${this.closed}]`,
-        );
-    }
-}
 
 /**
  * WebSocket Server Handle
  * Creates a WebSocket server that listens for connections
  */
-export class WebSocketServerHandle extends Handle {
-    static type = normalizeString("websocket-server-handle!");
+export class WsServer extends ContextChain {
+    static type = normalizeString("ws-server!");
 
-    constructor(port) {
-        super();
-        this.clients = new Set();
+    constructor(host, port, context) {
+        super(context);
+        this.set("host", host);
+        this.set("port", port);
+        this.set("clients", new ContextChain(this));
+        this.set(
+            "listen",
+            new NativeFn([], ([], stream, context) => {
+                this.listen(this.get("port").value, this.get("host").value);
+                return nil;
+            }),
+        );
+        this.id = 0;
+    }
 
-        this.resource = new WebSocketServer({ port: port.value });
+    close() {
+        this.server.close();
+        return nil;
+    }
 
-        this.resource.on("connection", (client, request) => {
-            // Create a handle for this client connection
-            const clientHandle = new WebSocketClientHandle(client, this);
-            this.copy(clientHandle);
-            this.clients.add(clientHandle);
-
-            // Store latest client in the server context for easy access
-            this.set("client", clientHandle);
-
-            // Notify about new connection
-            this.callHandler("connection");
-
-            // Cleanup when client disconnects
-            client.on("close", () => {
-                this.clients.delete(clientHandle);
-                clientHandle.closed = true;
-            });
+    listen(port, host) {
+        if (this.server) return;
+        this.server = new WebSocketServer({ port, host });
+        this.server.on("connection", (client, request) => {
+            const clientHandle = new WsClient(this);
+            clientHandle.set("url", new Str(request.url));
+            const clients = this.get("clients");
+            clients.set(`client-${this.id++}`, clientHandle);
+            evaluate(parse(`connection ${this.id}`), clientHandle);
         });
-
-        this.resource.on("error", (error) => {
-            this.callHandler(`error "${error.message}"`);
+        this.server.on("error", (error) => {
+            evaluate(parse(`error "${error.message}"`), this);
         });
-
-        this.resource.on("listening", () => {
-            this.callHandler(`listening ${port.value}`);
+        this.server.on("listening", () => {
+            evaluate(parse(`listening ${port}`), this);
         });
+    }
+    error(message) {
+        console.error(message);
+        return nil;
     }
 
     /**
@@ -149,8 +83,16 @@ export class WebSocketServerHandle extends Handle {
 
     form() {
         return new Str(
-            `websocket-server-handle! [port: ${this.resource.options?.port} clients: ${this.clients.size}]`,
+            `ws-server! [host: ${this.get("host").value} port: ${
+                this.get("port").value
+            }]`,
         );
+    }
+
+    static make(stream, context) {
+        const host = stream.next().evaluate(stream, context).to("string!");
+        const port = stream.next().evaluate(stream, context).to("number!");
+        return new WsServer(host, port, context);
     }
 }
 
@@ -158,62 +100,91 @@ export class WebSocketServerHandle extends Handle {
  * WebSocket Client Connection Handle (server-side)
  * Represents a single client connection to the server
  */
-class WebSocketClientHandle extends Handle {
-    static type = normalizeString("websocket-client-handle!");
+export class WsClient extends ContextChain {
+    static type = normalizeString("ws-client!");
 
-    constructor(wsClient, server) {
-        super(wsClient);
-        this.server = server;
-
-        // Setup event handlers for this client
-        wsClient.on("message", (data) => {
-            // First notify this client handle's handler
-            this.callHandler(`${data}`);
-
-            // Then notify the server with client context
-            // This allows the server to handle messages from any client
-            this.server.set("client", this);
-            this.server.callHandler(`client-message ${data}`);
-        });
-
-        wsClient.on("close", () => {
-            this.closed = true;
-            this.callHandler("close");
-
-            // Notify server about client disconnect
-            this.server.set("client", this);
-            this.server.callHandler("client-close");
-        });
-
-        wsClient.on("error", (error) => {
-            this.callHandler(`error "${error.message}"`);
-
-            // Also notify server
-            this.server.set("client", this);
-            this.server.callHandler(`client-error "${error.message}"`);
-        });
+    constructor(context) {
+        super(context);
+        //this.client = client;
+        this.set(
+            "write",
+            new NativeFn(["data"], ([data], stream, context) => {
+                this.write(data);
+                return nil;
+            }),
+        );
+        this.set(
+            "close",
+            new NativeFn([], ([], stream, context) => {
+                this.close();
+                return nil;
+            }),
+        );
+        this.set(
+            "connect",
+            new NativeFn([], ([], stream, context) => {
+                this.connect();
+                return nil;
+            }),
+        );
     }
 
-    write(str) {
-        if (this.closed) throw new Error("Client connection is closed");
-        this.resource.send(str.value);
+    connect() {
+        if (this.client) return;
+        const url = this.get("url").value;
+        const client = new WebSocket(url);
+        client.addEventListener("open", (data) => {
+            console.log("message: ", data.toString());
+            const parsed = parse(`read ${data.toString()}`);
+            evaluate(parsed, this);
+            return nil;
+        });
+        client.addEventListener("close", () => {
+            console.log("close");
+            this.closed = true;
+            evaluate(parse("close"), this);
+            return nil;
+        });
+        client.addEventListener("error", (error) => {
+            console.log("error: ", error.message);
+            evaluate(parse(`error "${error.message}"`), this);
+            return nil;
+        });
+        client.addEventListener("message", (data) => {
+            console.log("message: ", data.toString());
+            const parsed = parse(`read ${data.toString()}`);
+            evaluate(parsed, this);
+            return nil;
+        });
+        this.client = client;
+    }
+
+    write(data) {
+        this.client.send(data.mold());
+        return nil;
+    }
+    close() {
+        this.closed = true;
+        return nil;
+    }
+    error(message) {
+        console.error(message);
         return nil;
     }
 
-    cleanup() {
-        this.resource.close();
+    form() {
+        return new Str(`ws-client! [closed: ${this.closed}]`);
     }
 
-    form() {
-        return new Str(`websocket-client-handle! [closed: ${this.closed}]`);
+    static make(stream, context) {
+        return new WsClient(context);
     }
 }
 
 // Export datatypes
 export default {
-    "handle!": new Datatype(Handle),
-    "websocket-server-handle!": new Datatype(WebSocketServerHandle),
-    //"websocket-client-handle!": new Datatype(WebSocketClientHandle),
+    "ws-server!": new Datatype(WsServer),
+    "ws-client!": new Datatype(WsClient),
     ...file,
     ...process,
 };

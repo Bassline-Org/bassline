@@ -1,0 +1,16 @@
+url: "ws://localhost:8080"
+
+server: make ws-server! "0.0.0.0" 8080
+
+in server [
+    print "server created"
+    listen
+]
+
+; client: make ws-client!
+; in client compose [
+;     url: (url)
+;     connect
+; ]
+
+; print client
