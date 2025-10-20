@@ -9,9 +9,6 @@ export function evaluate(code, context) {
         return nil;
     }
     const stream = new Stream(code.items);
-    //    if (code.items.length === 1) {
-    //        return code.items[0].evaluate(stream, context);
-    //    }
 
     let result = null;
     do {

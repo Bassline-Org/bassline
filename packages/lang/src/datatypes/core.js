@@ -349,7 +349,7 @@ export class Word extends Value {
 
     static make(stream, context) {
         const next = stream.next();
-        return new Word(next.to("word!").spelling);
+        return next.to("word!");
     }
 }
 /**

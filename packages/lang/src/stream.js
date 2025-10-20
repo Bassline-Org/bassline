@@ -4,17 +4,36 @@ export class Stream {
         this.pos = 0;
     }
 
-    peek() {
-        return this.items[this.pos];
+    peek(k = 0) {
+        return this.items[this.pos + k];
     }
-
     next() {
-        const value = this.items[this.pos];
-        this.pos = this.pos + 1;
-        return value;
+        if (this.pos >= this.items.length) throw new Error("eoi");
+        return this.items[this.pos++];
     }
-
     isAtEnd() {
         return this.pos >= this.items.length;
+    }
+
+    mark() {
+        return this.pos;
+    }
+    restore(m) {
+        this.pos = m;
+    }
+
+    take(n) {
+        if (this.pos + n > this.items.length) {
+            throw new Error("not enough tokens");
+        }
+        const slice = this.items.slice(this.pos, this.pos + n);
+        this.pos += n;
+        return slice;
+    }
+
+    consumeWhile(pred) {
+        const start = this.pos;
+        while (!this.isAtEnd() && pred(this.peek())) this.pos++;
+        return this.items.slice(start, this.pos);
     }
 }

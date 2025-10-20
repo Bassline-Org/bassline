@@ -2,6 +2,13 @@ import { ContextBase, ContextChain } from "./context.js";
 import { Datatype, GetWord, LitWord, Str, Value, Word } from "./core.js";
 import { normalizeString } from "../utils.js";
 import { evaluate } from "../evaluator.js";
+
+export function isCallable(value) {
+    return value instanceof NativeFn ||
+        value instanceof NativeMethod ||
+        value instanceof PureFn;
+}
+
 /**
  * Native functions are functions implemented in the host language
  * Unlike user-defined functions, they don't have a context
@@ -15,15 +22,31 @@ export class NativeFn extends Value {
         this.spec = spec;
     }
     getArgs(stream, context) {
-        return this.spec.map((arg) => {
-            const value = stream.next();
-            //console.log(value);
-            if (arg.startsWith(":")) {
-                return value;
-            } else {
-                return value.evaluate(stream, context);
+        const argValues = [];
+        for (let i = 0; i < this.spec.length; i++) {
+            const arg = stream.next();
+            const specArg = this.spec[i];
+            // Lit word semantics - Get the next token literally
+            if (specArg.startsWith("'")) {
+                argValues[i] = arg;
+                continue;
             }
-        });
+            // Get word semantics - Evaluate, but if it's a function don't invoke
+            if (specArg.startsWith(":")) {
+                if (isCallable(arg)) {
+                    argValues[i] = arg;
+                    continue;
+                }
+                if (arg instanceof Word) {
+                    const asGet = new GetWord(arg.spelling);
+                    argValues[i] = asGet.evaluate(stream, context);
+                    continue;
+                }
+            }
+            // Normal semantics, just evaluate the argument
+            argValues[i] = arg.evaluate(stream, context);
+        }
+        return argValues;
     }
     evaluate(stream, context) {
         const args = this.getArgs(stream, context);
@@ -45,18 +68,18 @@ export class NativeMethod extends NativeFn {
                     `No method "${selector}" found on ${target.type}`,
                 );
             }
-            return (target[selector])(...args, stream, context);
+            return target[selector].call(target, ...args, stream, context);
         });
         this.selector = selector;
     }
-    static unary(selector) {
-        return new NativeMethod(["a"], selector);
+    static unary(selector, names = ["a"]) {
+        return new NativeMethod(names, selector);
     }
-    static binary(selector) {
-        return new NativeMethod(["a", "b"], selector);
+    static binary(selector, names = ["a", "b"]) {
+        return new NativeMethod(names, selector);
     }
-    static ternary(selector) {
-        return new NativeMethod(["a", "b", "c"], selector);
+    static ternary(selector, names = ["a", "b", "c"]) {
+        return new NativeMethod(names, selector);
     }
     static make(stream, context) {
         throw new Error(
@@ -76,6 +99,34 @@ export class PureFn extends ContextBase {
         super();
         this.set("args", args);
         this.set("body", body);
+    }
+    getArgs(stream, context) {
+        const argValues = [];
+        const spec = this.get("args").items;
+        for (let i = 0; i < spec.length; i++) {
+            const arg = stream.next();
+            const specArg = spec[i];
+            // Lit word semantics
+            if (specArg instanceof LitWord) {
+                argValues[i] = arg;
+                continue;
+            }
+            // Get word semantics - Evaluate, but if it's a function don't invoke
+            if (specArg instanceof GetWord) {
+                if (isCallable(arg)) {
+                    argValues[i] = arg;
+                    continue;
+                }
+                if (arg instanceof Word) {
+                    const asGet = new GetWord(arg.spelling);
+                    argValues[i] = asGet.evaluate(stream, context);
+                    continue;
+                }
+            }
+            // Normal semantics, just evaluate the argument
+            argValues[i] = arg.evaluate(stream, context);
+        }
+        return argValues;
     }
     evaluate(stream, context) {
         const localCtx = new ContextChain(context);
@@ -104,52 +155,8 @@ export class PureFn extends ContextBase {
     }
 }
 
-export class Fn extends ContextChain {
-    static type = normalizeString("fn!");
-    constructor(parent, args, body) {
-        super(parent);
-        this.set("args", args);
-        this.set("body", body);
-    }
-
-    evaluate(stream, context) {
-        const execCtx = new ContextChain(this);
-
-        for (const arg of this.get("args").items) {
-            if (arg instanceof LitWord) {
-                execCtx.set(arg, stream.next());
-            } else {
-                execCtx.set(
-                    arg,
-                    stream.next().evaluate(stream, context),
-                );
-            }
-        }
-        const body = this.get("body");
-        return evaluate(body, execCtx);
-    }
-    form() {
-        return new Str(`fn! [
-    args: [${this.get("args").form().value}]
-    body: ${this.get("body").form().value}
-]`);
-    }
-    static make(stream, context) {
-        let parent = stream.next();
-        if (parent instanceof Word) {
-            parent = context.get(parent);
-        } else {
-            parent = parent.evaluate(stream, context);
-        }
-        const args = stream.next().evaluate(stream, context).to("block!");
-        const body = stream.next().evaluate(stream, context).to("block!");
-        return new Fn(parent, args, body);
-    }
-}
-
 export default {
     "native-fn!": new Datatype(NativeFn),
-    "fn!": new Datatype(Fn),
     "native-method!": new Datatype(NativeMethod),
     "pure-fn!": new Datatype(PureFn),
 };

@@ -15,7 +15,7 @@ export {
     Str,
     Word,
 } from "./core.js";
-export { Fn, NativeFn, NativeMethod } from "./functions.js";
+export { NativeFn, NativeMethod, PureFn } from "./functions.js";
 export { ContextBase, ContextChain } from "./context.js";
 export { Task } from "./async.js";
 
