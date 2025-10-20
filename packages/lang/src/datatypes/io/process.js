@@ -30,7 +30,7 @@ class ProcessContext extends ContextChain {
                 });
                 this.spawned.on("exit", (code) => {
                     const num = new Num(code ?? 0);
-                    this.set("exit-code", num);
+                    //this.set("exit-code", num);
                     const block = new Block([new Word("close"), num]);
                     //console.log("close block: ", block.form().value);
                     evaluate(block, this);
@@ -78,8 +78,12 @@ class ProcessContext extends ContextChain {
     mold() {
         const command = this.command().mold();
         const args = this.args().mold();
+        const entries = this.moldEntries();
         return new Str(
-            `make process-context! ${command.value} ${args.value}`,
+            `in (make process-context! ${command.value} ${args.value}) [
+            ${entries}
+            self
+            ]`,
         );
     }
 

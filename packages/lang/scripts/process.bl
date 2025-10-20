@@ -18,7 +18,7 @@ after (in curl [ :closeTask ]) [
     print "close task completed from curl"
 ] curl
 
-after (sleep 3000) [
+after (sleep 1000) [
     kill
     print output
 ] curl
@@ -33,7 +33,7 @@ in bl [
 
 after (in bl [ :closeTask ]) [
     print "close task completed from system"
-] bl
+] system
 
 after (sleep 1000) [
     send "print words system"
@@ -41,5 +41,5 @@ after (sleep 1000) [
 
 after (sleep 2000) [
     kill
-    print mold system
+    print mold bl
 ] bl

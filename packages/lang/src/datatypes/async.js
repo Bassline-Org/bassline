@@ -41,6 +41,10 @@ export class Task extends Value {
         return new Str(`task! status: ${this._status}`);
     }
 
+    mold() {
+        return new Str(`(make task!)`);
+    }
+
     static make(stream, context) {
         return new Task();
     }

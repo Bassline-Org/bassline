@@ -17,10 +17,10 @@ print "writing:"
 in f compose [ write (original) ]
 
 print "new: "
-print (in f [ read ])
+new: (in f [ read ])
 
 print "for readme:"
-in f compose [ path: (readmePath) ]
+readme: in f compose [ path: (readmePath) ]
 
-print "readme: "
-print (in f [ read ])
+;print mold f
+print mold system

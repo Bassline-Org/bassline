@@ -111,6 +111,25 @@ context! [
 ]`);
     }
 
+    moldEntries() {
+        const parts = [];
+        for (const [key, value] of this.bindings) {
+            if (
+                value instanceof NativeFn ||
+                value instanceof NativeMethod ||
+                value instanceof Datatype ||
+                value instanceof Bool ||
+                value instanceof Nil ||
+                key === this.keyFor("self") ||
+                key === this.keyFor("parent")
+            ) {
+                continue;
+            }
+            parts.push(`${key.description}: ${value.mold().value}`);
+        }
+        return parts.join("\n  ");
+    }
+
     mold() {
         const parts = [];
         const natives = [];
