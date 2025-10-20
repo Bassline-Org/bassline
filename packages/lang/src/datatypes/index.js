@@ -18,10 +18,12 @@ export {
 export { NativeFn, NativeMethod, PureFn } from "./functions.js";
 export { ContextBase, ContextChain } from "./context.js";
 export { Task } from "./async.js";
+import io from "./io/index.js";
 
 export default {
     ...core,
     ...functions,
     ...context,
     ...async,
+    ...io,
 };

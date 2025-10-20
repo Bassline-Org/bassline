@@ -6,6 +6,8 @@ import { Stream } from "../../stream.js";
 import { WebSocketServer } from "ws";
 import { evaluate } from "../../evaluator.js";
 
+import file from "./file.js";
+
 /**
  * Base Handle class - all IO resources are handles with event handlers
  *
@@ -212,4 +214,5 @@ export default {
     "handle!": new Datatype(Handle),
     "websocket-server-handle!": new Datatype(WebSocketServerHandle),
     //"websocket-client-handle!": new Datatype(WebSocketClientHandle),
+    ...file,
 };

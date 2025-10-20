@@ -1,0 +1,26 @@
+path: "/Users/goose/prg/bassline/packages/lang/foo.txt"
+readmePath: "/Users/goose/prg/bassline/packages/lang/README.md"
+
+f: make file-context! path
+
+original: in f [ read ]
+print (append "original: " original)
+
+
+print "writing:"
+in f [ write "hello!" ]
+
+print "new: "
+print (in f [ read ])
+
+print "writing:"
+in f compose [ write (original) ]
+
+print "new: "
+print (in f [ read ])
+
+print "for readme:"
+in f compose [ path: (readmePath) ]
+
+print "readme: "
+print (in f [ read ])
