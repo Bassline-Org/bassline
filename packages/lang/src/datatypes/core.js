@@ -311,6 +311,26 @@ export class Paren extends Series {
     }
 }
 
+export class WordLike extends Value {
+    static type = normalizeString("any-word!");
+    constructor(spelling) {
+        super();
+        this.spelling = normalize(spelling);
+    }
+    equals(other) {
+        const otherValue = other.to(this.type);
+        return new Bool(this.spelling === otherValue.spelling);
+    }
+
+    static isAnyWord(type) {
+        const normalized = normalizeString(type);
+        return normalized === normalizeString("word!") ||
+            normalized === normalizeString("get-word!") ||
+            normalized === normalizeString("set-word!") ||
+            normalized === normalizeString("lit-word!");
+    }
+}
+
 // =================================
 // Word types
 // =================================
@@ -324,12 +344,8 @@ export class Paren extends Series {
  * @param {string} spelling - The spelling of the word
  * @returns {Word} - The word value
  */
-export class Word extends Value {
+export class Word extends WordLike {
     static type = normalizeString("word!");
-    constructor(spelling) {
-        super();
-        this.spelling = normalize(spelling);
-    }
     evaluate(stream, context) {
         const value = context.get(this);
         if (!value) {
@@ -369,12 +385,8 @@ export class Word extends Value {
 /**
  * Get word is similar to {Word}, however if the value is a function, it will not execute it,
  */
-export class GetWord extends Value {
+export class GetWord extends WordLike {
     static type = normalizeString("get-word!");
-    constructor(spelling) {
-        super();
-        this.spelling = normalize(spelling);
-    }
     evaluate(stream, context) {
         return context.get(this);
     }
@@ -410,12 +422,8 @@ export class GetWord extends Value {
 /**
  * Set word will set the value for the spelling in the context
  */
-export class SetWord extends Value {
+export class SetWord extends WordLike {
     static type = normalizeString("set-word!");
-    constructor(spelling) {
-        super();
-        this.spelling = normalize(spelling);
-    }
     evaluate(stream, context) {
         const next = stream.next();
         const value = next.evaluate(stream, context);
@@ -428,7 +436,6 @@ export class SetWord extends Value {
     form() {
         return new Str(`${this.spelling.description}:`);
     }
-
     to(type) {
         const normalized = normalizeString(type);
         if (normalized === normalizeString("string!")) {
@@ -453,12 +460,8 @@ export class SetWord extends Value {
 /**
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
  */
-export class LitWord extends Value {
+export class LitWord extends WordLike {
     static type = normalizeString("lit-word!");
-    constructor(spelling) {
-        super();
-        this.spelling = normalize(spelling);
-    }
     // evaluate(stream, context) {
     //     return new Word(this.spelling);
     // }

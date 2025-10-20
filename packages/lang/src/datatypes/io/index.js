@@ -32,17 +32,12 @@ export class Handle extends ContextBase {
 
         const parsed = parse(eventStr);
         const block = new Block([new Word("handler"), parsed]);
-        evaluate(block, this);
-        //        console.log("stream", stream);
-        //        if (handler && handler !== nil) {
-        //try {
-        //            handler.evaluate(stream, this);
-        //} catch (e) {
-        //console.error("Handler error:", e);
-        // Errors also become events
-        //this.callHandler(`error "${e.message}"`);
-        //}
-        //}
+        try {
+            evaluate(block, this);
+        } catch (e) {
+            console.error("Handler error:", e);
+            this.callHandler(`error "${e.message}"`);
+        }
     }
 
     /**
