@@ -1,5 +1,5 @@
 import { normalize, normalizeString } from "../utils.js";
-import { Block, Bool, Datatype, nil, Str, Value, Word } from "./core.js";
+import { Block, Bool, Datatype, Nil, nil, Str, Value, Word } from "./core.js";
 import { NativeFn, NativeMethod } from "./functions.js";
 
 export class ContextBase extends Value {
@@ -118,7 +118,9 @@ context! [
             if (
                 value instanceof NativeFn ||
                 value instanceof NativeMethod ||
-                value instanceof Datatype
+                value instanceof Datatype ||
+                value instanceof Bool ||
+                value instanceof Nil
             ) continue; // TODO: Push the missing natives into a projection from system
             // IE in (project system [<MISSING_NATIVES>] <Block>)
             if (value === this) continue;

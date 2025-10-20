@@ -514,9 +514,9 @@ export class Datatype extends Value {
 }
 
 // Nil value
-// We don't export this, because it's a singleton, and should be used via `nil`
+// This is a singleton, and should be used via `nil`
 // That's also why the make method throws an error
-class Nil extends Value {
+export class Nil extends Value {
     static type = normalizeString("nil!");
     constructor() {
         super();

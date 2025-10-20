@@ -1,0 +1,45 @@
+fn: make pure-fn! [args body] [ make pure-fn! args body ]
+
+url: "https://www.google.com"
+
+bl: make process-context! "bassline" []
+
+curl: make process-context! "curl" reduce ["-L", "-s" url]
+
+in curl [
+    stdout: (fn [str] [ in curl compose [output: (str)] ])
+    ;;stderr: (fn [str] [ print append "\n\n" str ])
+    closeTask: (make task!)
+    close: (fn [code] [ (print append "\n\ncurl: close: " code) schedule closeTask ])
+    spawn
+]
+
+after (in curl [ :closeTask ]) [
+    print "close task completed from curl"
+] curl
+
+after (sleep 3000) [
+    kill
+    print output
+] curl
+
+in bl [
+    stdout: (fn [str] [ print append "stdout: " str ])
+    stderr: (fn [str] [ print append "stderr: " str ])
+    closeTask: (make task!)
+    close: (fn [code] [ (print append "close: " code) schedule closeTask ])
+    spawn
+]
+
+after (in bl [ :closeTask ]) [
+    print "close task completed from system"
+] bl
+
+after (sleep 1000) [
+    send "print words system"
+] bl
+
+after (sleep 2000) [
+    kill
+    print mold system
+] bl
