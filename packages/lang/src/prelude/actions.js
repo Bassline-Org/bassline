@@ -1,5 +1,6 @@
-import { Block, Num } from "../datatypes/core.js";
+import { Block, Bool, Num } from "../datatypes/core.js";
 import { NativeFn, NativeMethod } from "../datatypes/functions.js";
+import { evaluate } from "../evaluator.js";
 
 export default {
     // Core arithmetic methods
@@ -7,6 +8,7 @@ export default {
     "-": NativeMethod.binary("subtract"),
     "*": NativeMethod.binary("multiply"),
     "/": NativeMethod.binary("divide"),
+    "//": NativeMethod.binary("modulo"),
     "eq?": NativeMethod.binary("equals"),
 
     // Series methods
@@ -27,16 +29,15 @@ export default {
     "compose": NativeMethod.unary("compose"),
     "reduce": NativeMethod.unary("reduce"),
     "fold": NativeMethod.ternary("fold"),
-    "map": NativeMethod.binary("map"),
 
     // Control flow
     "if": new NativeFn(
         ["condition", "true-body", "false-body"],
         ([condition, ifTrue, ifFalse], stream, context) => {
-            if (condition.evaluate(stream, context)) {
-                return ifTrue.evaluate(stream, context);
+            if (condition.evaluate(stream, context).to("bool!")?.value) {
+                return evaluate(ifTrue, context);
             } else {
-                return ifFalse.evaluate(stream, context);
+                return evaluate(ifFalse, context);
             }
         },
     ),

@@ -1,19 +1,62 @@
 fn: make pure-fn! [args body] [ make pure-fn! args body ]
+|>: :fn
 hof: fn [f x] [ f x ]
 
 head: fn [series] [pick series 0]
 tail: fn [series] [slice series 1 length series]
 
-does: fn [block] [ fn [] compose [do (block)] ]
+does: fn [block] [ fn [] block ]
+times: fn [n f] [
+    map (iota n) :f
+]
 
 thread: fn [arg fns] [
-    f: fn [a func] [ func a ]
-    fold fns :f arg
+    f: fn [a :func] [ func a ]
+    fold reduce fns :f arg
 ]
 
 add: fn [x] [+ x 10]
-res: thread 10 compose [
+res: thread 10 [
     :add
     :add
+    (|> [x] [+ x 100])
+    (|> [x] [* x 10])
 ]
 print res
+
+greet: does [ print "hello" ]
+
+times 5 :greet
+
+map: fn [series f] [
+    fold
+        tail series
+        (fn [acc curr] [ append acc (f curr) ])
+        append [] head series
+]
+
+filter: fn [series f] [
+    fold
+        tail series
+        (fn [acc curr] [
+            if (f curr)
+                [ append acc curr ]
+                [ acc ]
+         ])
+         append [] head series
+]
+
+not: |> [x] [ eq? x false ]
+
+even?: fn [x] [
+    eq? (// x 2) 0
+]
+
+odd?: fn [x] [
+    eq? (even? x) false
+]
+
+print map (iota 100) (|> [x] [+ x 10])
+
+print filter (iota 100) :even?
+print filter (iota 100) :odd?

@@ -101,6 +101,11 @@ export class Num extends Value {
         const otherValue = other.to(this.type);
         return new Num(this.value / otherValue.value);
     }
+
+    modulo(other) {
+        const otherValue = other.to(this.type);
+        return new Num(this.value % otherValue.value);
+    }
 }
 
 export class Series extends Value {
