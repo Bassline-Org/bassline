@@ -6,26 +6,23 @@
   "module": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./repl": "./src/repl.js",
+    "./prelude": "./src/prelude/index.js",
     "./runtime": "./src/runtime.js",
-    "./datatypes": "./src/datatypes/index.js",
-    "./evaluator": "./src/evaluator.js",
-    "./parser": "./src/parser.js",
-    "./prelude": "./src/prelude/index.js"
+    "./io/file": "./src/io/file.js",
+    "./io/process": "./src/io/process.js",
+    "./io/ws-server": "./src/io/ws-server.js",
+    "./io/ws-client": "./src/io/ws-client.js"
   },
   "bin": {
     "bassline": "./src/bin/cli.js"
   },
   "dependencies": {
-    "@bassline/core": "workspace:*",
-    "@bassline/cells": "workspace:*",
-    "@bassline/taps": "workspace:*",
     "arcsecond": "^5.0.0",
     "ws": "^8.0.0"
   },
   "scripts": {
     "test": "vitest run",
-    "daemon": "node src/daemon.js"
-  },
+    "cli": "node src/bin/cli.js"
+   },
   "license": "MIT"
 }
