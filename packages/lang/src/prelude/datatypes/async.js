@@ -53,7 +53,6 @@ export class Task extends Value {
 
 export default {
     "task!": new Datatype(Task),
-
     "after": NativeMethod.ternary("after"),
     "schedule": NativeMethod.unary("schedule"),
     "status": NativeMethod.unary("status"),

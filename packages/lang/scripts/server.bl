@@ -6,7 +6,11 @@ fn: make pure-fn! [args body] [ make pure-fn! args body ]
 
 server: make ws-server! "0.0.0.0" 8080
 
+
 in server [
+    active-sessions: fn [] [
+        words sessions
+    ]
     connection: fn [key] [
         print append "new connection: " key
         c: get sessions key

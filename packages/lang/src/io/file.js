@@ -1,6 +1,10 @@
-import { NativeFn } from "../prelude/index.js";
-import { Datatype, nil, Str } from "../prelude/index.js";
-import { ContextChain } from "../prelude/index.js";
+import {
+    ContextChain,
+    Datatype,
+    NativeFn,
+    nil,
+    Str,
+} from "../prelude/index.js";
 import { appendFileSync, readFileSync, writeFileSync } from "fs";
 import { normalizeString } from "../utils.js";
 
