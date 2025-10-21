@@ -1,16 +1,44 @@
 url: "ws://localhost:8080"
 
+fn: make pure-fn! [args body] [ make pure-fn! args body ]
+
 server: make ws-server! "0.0.0.0" 8080
 
 in server [
+    connection: fn [id] [
+        print append "new connection: " id
+        print clients
+        c: get clients (append "client-" id)
+        print c
+        in c [
+            read: (fn [data] [
+                print (append "server-read: " data)
+            ])
+            write "hello from server"
+        ]
+    ]
+    error: fn [message] [
+        print append "error: " message
+    ]
     print "server created"
     listen
 ]
 
-; client: make ws-client!
-; in client compose [
-;     url: (url)
-;     connect
-; ]
+client: make ws-client!
 
-; print client
+in client [
+    open: (fn [] [
+        print "client opened"
+        write "hello from client"
+    ])
+    read: (fn [data] [
+        print (append "client-read: " data)
+    ])
+    error: (fn [message] [
+        print (append "client-error: " message)
+    ])
+]
+
+in client [
+    connect
+]

@@ -40,11 +40,11 @@ export class WsServer extends ContextChain {
         if (this.server) return;
         this.server = new WebSocketServer({ port, host });
         this.server.on("connection", (client, request) => {
-            const clientHandle = new WsClient(this);
-            clientHandle.set("url", new Str(request.url));
-            const clients = this.get("clients");
-            clients.set(`client-${this.id++}`, clientHandle);
-            evaluate(parse(`connection ${this.id}`), clientHandle);
+            const clientHandle = new WsClient(this, client);
+            clientHandle.connect();
+            this.id = this.id + 1;
+            this.get("clients").set(`client-${this.id}`, clientHandle);
+            evaluate(parse(`connection ${this.id}`), this);
         });
         this.server.on("error", (error) => {
             evaluate(parse(`error "${error.message}"`), this);
@@ -103,9 +103,10 @@ export class WsServer extends ContextChain {
 export class WsClient extends ContextChain {
     static type = normalizeString("ws-client!");
 
-    constructor(context) {
+    constructor(context, client) {
         super(context);
-        //this.client = client;
+        this.client = client;
+        this.connected = false;
         this.set(
             "write",
             new NativeFn(["data"], ([data], stream, context) => {
@@ -130,37 +131,39 @@ export class WsClient extends ContextChain {
     }
 
     connect() {
-        if (this.client) return;
-        const url = this.get("url").value;
-        const client = new WebSocket(url);
-        client.addEventListener("open", (data) => {
-            console.log("message: ", data.toString());
-            const parsed = parse(`read ${data.toString()}`);
-            evaluate(parsed, this);
-            return nil;
-        });
-        client.addEventListener("close", () => {
+        if (this.connected) return;
+        this.connected = true;
+        if (!this.client) {
+            const url = this.get("url").value;
+            const client = new WebSocket(url);
+            client.addEventListener("open", (data) => {
+                const parsed = parse(`open`);
+                evaluate(parsed, this);
+                return nil;
+            });
+            this.client = client;
+        }
+        this.client.addEventListener("close", () => {
             console.log("close");
             this.closed = true;
             evaluate(parse("close"), this);
             return nil;
         });
-        client.addEventListener("error", (error) => {
+        this.client.addEventListener("error", (error) => {
             console.log("error: ", error.message);
             evaluate(parse(`error "${error.message}"`), this);
             return nil;
         });
-        client.addEventListener("message", (data) => {
-            console.log("message: ", data.toString());
-            const parsed = parse(`read ${data.toString()}`);
+        this.client.addEventListener("message", (data) => {
+            const parsed = parse(`read ${data.data.toString()}`);
             evaluate(parsed, this);
             return nil;
         });
-        this.client = client;
     }
 
     write(data) {
-        this.client.send(data.mold());
+        console.log("writing: ", data.mold().value);
+        this.client.send(data.mold().value);
         return nil;
     }
     close() {
