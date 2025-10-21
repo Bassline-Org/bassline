@@ -14,6 +14,7 @@ export class WsClient extends ContextChain {
         this.set(
             "write",
             new NativeFn(["data"], ([data], stream, context) => {
+                console.log("write: ", data);
                 this.write(data);
                 return nil;
             }),
@@ -39,7 +40,12 @@ export class WsClient extends ContextChain {
         this.connected = true;
         if (!this.client) {
             const url = this.get("url").value;
-            const client = new WebSocket(url);
+            const key = this.get("key");
+            const client = new WebSocket(url, {
+                headers: {
+                    key: key.to("string!").value,
+                },
+            });
             client.addEventListener("open", (data) => {
                 const parsed = parse(`open`);
                 evaluate(parsed, this);
@@ -60,7 +66,7 @@ export class WsClient extends ContextChain {
         });
         this.client.addEventListener("message", (data) => {
             const parsed = parse(`read ${data.data}`);
-            console.log("read: ", parsed);
+            //console.log("read: ", parsed);
             evaluate(parsed, this);
             return nil;
         });

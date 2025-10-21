@@ -12,7 +12,7 @@ export class WsServer extends ContextChain {
         super(context);
         this.set("host", host);
         this.set("port", port);
-        this.set("clients", new ContextChain(this));
+        this.set("sessions", new ContextChain(this));
         this.set(
             "listen",
             new NativeFn([], ([], stream, context) => {
@@ -32,11 +32,17 @@ export class WsServer extends ContextChain {
         if (this.server) return;
         this.server = new WebSocketServer({ port, host });
         this.server.on("connection", (client, request) => {
+            const key = request.headers["key"];
+            if (!key) {
+                client.send('print "No key provided!"');
+                client.close();
+                return;
+            }
             const clientHandle = new WsClient(this, client);
             clientHandle.connect();
             this.id = this.id + 1;
-            this.get("clients").set(`client-${this.id}`, clientHandle);
-            evaluate(parse(`connection ${this.id}`), this);
+            this.get("sessions").set(new Str(key), clientHandle);
+            evaluate(parse(`connection "${key}"`), this);
         });
         this.server.on("error", (error) => {
             evaluate(parse(`error "${error.message}"`), this);

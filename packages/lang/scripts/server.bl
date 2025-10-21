@@ -1,3 +1,5 @@
+use functions
+
 url: "ws://localhost:8080"
 
 fn: make pure-fn! [args body] [ make pure-fn! args body ]
@@ -5,9 +7,9 @@ fn: make pure-fn! [args body] [ make pure-fn! args body ]
 server: make ws-server! "0.0.0.0" 8080
 
 in server [
-    connection: fn [id] [
-        print append "new connection: " id
-        c: get clients (append "client-" id)
+    connection: fn [key] [
+        print append "new connection: " key
+        c: get sessions key
         print c
         in c [
             read: (fn [data] [
@@ -15,7 +17,7 @@ in server [
                 print (append "server-read: " form data)
                 do data
             ])
-            write "hello from server"
+            write ["hello from server"]
         ]
     ]
     error: fn [message] [
@@ -24,21 +26,38 @@ in server [
     listen
 ]
 
-client: make ws-client!
+map (iota 10) fn [x] [
+    key: (append "hello-" x)
+    client: make ws-client! url: "ws://localhost:8080" key: key
+    in client [
+        url: "ws://localhost:8080"
+        key: key
+        open: (fn [] [
+        ;    print "client opened"
+            write [ write compose [(words system)] ]
+        ])
+        read: (fn [data] [
+            print type? data
+            print data
+            do data
+            ;print (append "client-read: " form data)
+        ])
+        error: (fn [message] [
+        ;    print (append "client-error: " message)
+        ])
+    ]
 
-in client [
-    open: (fn [] [
-        print "client opened"
-        write [ write words system ]
-    ])
-    read: (fn [data] [
-        print (append "client-read: " form data)
-    ])
-    error: (fn [message] [
-        print (append "client-error: " message)
-    ])
+    in client [
+        connect
+    ]
 ]
 
-in client [
-    connect
-]
+after (sleep 2000) [
+    map (iota 10) fn [x] [
+        key: (append "hello-" x)
+        client: get sessions key
+        in client [
+            write [print (+ 10 20)]
+        ]
+    ]
+] server
