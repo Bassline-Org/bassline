@@ -1,5 +1,5 @@
 import { Stream } from "./stream.js";
-import { Block, nil, Paren } from "./datatypes/core.js";
+import { Block, nil, Paren } from "./prelude/datatypes/core.js";
 
 export function evaluate(code, context) {
     if (!(code instanceof Block) && !(code instanceof Paren)) {

@@ -18,7 +18,7 @@ import {
     SetWord,
     Str,
     Word,
-} from "./datatypes/core.js";
+} from "./prelude/index.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([

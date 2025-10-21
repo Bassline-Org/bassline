@@ -1,4 +1,4 @@
-import { NativeFn } from "../datatypes/index.js";
+import { NativeFn } from "./datatypes/index.js";
 import { evaluate } from "../evaluator.js";
 import { parse } from "../parser.js";
 

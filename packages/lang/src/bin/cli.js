@@ -4,9 +4,9 @@ import { GLOBAL } from "../runtime.js";
 import * as repl from "node:repl";
 import { parse } from "../parser.js";
 import { existsSync } from "fs";
-import { Block, Str, Value } from "../datatypes/core.js";
-import { setMany } from "../datatypes/context.js";
-import { NativeFn } from "../datatypes/functions.js";
+import { Block, Str, Value } from "../prelude/datatypes/core.js";
+import { setMany } from "../prelude/datatypes/context.js";
+import { NativeFn } from "../prelude/datatypes/functions.js";
 
 const args = process.argv.slice(2);
 
@@ -48,6 +48,13 @@ const replExtras = {
 };
 
 setMany(GLOBAL.context, replExtras);
+
+const rcPath = process.env.HOME + "/.basslinerc";
+if (existsSync(rcPath)) {
+    console.log("Loading ~/.basslinerc");
+    const rcCode = readFileSync(rcPath, "utf8");
+    GLOBAL.evaluate(parse(rcCode));
+}
 
 // Load file if specified
 if (fileToLoad) {

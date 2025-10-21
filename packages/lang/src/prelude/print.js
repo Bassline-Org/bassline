@@ -1,4 +1,4 @@
-import { NativeFn, NativeMethod, Str } from "../datatypes/index.js";
+import { NativeFn, NativeMethod, Str } from "./datatypes/index.js";
 
 export default {
     "print": NativeMethod.unary("print"),

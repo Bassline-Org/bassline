@@ -1,4 +1,4 @@
-import { NativeFn, NativeMethod } from "../datatypes/index.js";
+import { NativeFn, NativeMethod } from "./datatypes/index.js";
 
 export default {
     "type?": NativeMethod.unary("getType"),

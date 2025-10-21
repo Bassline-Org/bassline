@@ -1,8 +1,8 @@
-import { NativeFn } from "../functions.js";
-import { Datatype, nil, Str } from "../core.js";
-import { ContextChain } from "../context.js";
+import { NativeFn } from "../prelude/index.js";
+import { Datatype, nil, Str } from "../prelude/index.js";
+import { ContextChain } from "../prelude/index.js";
 import { appendFileSync, readFileSync, writeFileSync } from "fs";
-import { normalizeString } from "../../utils.js";
+import { normalizeString } from "../utils.js";
 
 class FileContext extends ContextChain {
     static type = normalizeString("file-context!");
@@ -61,4 +61,17 @@ class FileContext extends ContextChain {
 
 export default {
     "file-context!": new Datatype(FileContext),
+    "read-file": new NativeFn(["path"], ([path], stream, context) => {
+        return new Str(readFileSync(path.to("string!").value, "utf8"));
+    }),
+    "write-file": new NativeFn(
+        ["path", "content"],
+        ([path, content], stream, context) => {
+            writeFileSync(
+                path.to("string!").value,
+                content.to("string!").value,
+            );
+            return nil;
+        },
+    ),
 };

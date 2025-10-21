@@ -1,11 +1,11 @@
-import { ContextChain } from "../context.js";
-import { Block, Datatype, nil, Str, Word } from "../core.js";
-import { NativeFn } from "../functions.js";
-import { normalizeString } from "../../utils.js";
-import { parse } from "../../parser.js";
-import { Stream } from "../../stream.js";
+import { ContextChain } from "../prelude/index.js";
+import { Block, Datatype, nil, Str, Word } from "../prelude/index.js";
+import { NativeFn } from "../prelude/index.js";
+import { normalizeString } from "../utils.js";
+import { parse } from "../parser.js";
+import { Stream } from "../stream.js";
 import { WebSocketServer } from "ws";
-import { evaluate } from "../../evaluator.js";
+import { evaluate } from "../evaluator.js";
 import file from "./file.js";
 import process from "./process.js";
 

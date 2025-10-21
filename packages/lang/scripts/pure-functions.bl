@@ -1,15 +1,12 @@
 fn: make pure-fn! [args body] [ make pure-fn! args body ]
 |>: :fn
 hof: fn [f x] [ f x ]
-
 head: fn [series] [pick series 0]
 tail: fn [series] [slice series 1 length series]
-
 does: fn [block] [ fn [] block ]
 times: fn [n f] [
     map (iota n) :f
 ]
-
 thread: fn [arg fns] [
     f: fn [a :func] [ func a ]
     fold reduce fns :f arg
@@ -57,6 +54,5 @@ odd?: fn [x] [
 ]
 
 print map (iota 100) (|> [x] [+ x 10])
-
 print filter (iota 100) :even?
 print filter (iota 100) :odd?

@@ -1,7 +1,8 @@
 import { Datatype, Value } from "./core.js";
-import { evaluate } from "../evaluator.js";
-import { normalizeString } from "../utils.js";
-import { Str } from "./core.js";
+import { evaluate } from "../../evaluator.js";
+import { normalizeString } from "../../utils.js";
+import { nil, Str } from "./core.js";
+import { NativeFn, NativeMethod } from "./functions.js";
 
 export class Task extends Value {
     static type = normalizeString("task!");
@@ -52,4 +53,17 @@ export class Task extends Value {
 
 export default {
     "task!": new Datatype(Task),
+
+    "after": NativeMethod.ternary("after"),
+    "schedule": NativeMethod.unary("schedule"),
+    "status": NativeMethod.unary("status"),
+    "sleep": new NativeFn(["ms"], ([ms], stream, context) => {
+        const task = new Task();
+
+        setTimeout(() => {
+            task.resolve(nil);
+        }, ms.value);
+
+        return task;
+    }),
 };

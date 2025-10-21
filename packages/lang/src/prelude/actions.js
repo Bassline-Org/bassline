@@ -1,5 +1,5 @@
-import { Block, Bool, Num } from "../datatypes/core.js";
-import { NativeFn, NativeMethod } from "../datatypes/functions.js";
+import { Block, Bool, Num } from "./datatypes/core.js";
+import { NativeFn, NativeMethod } from "./datatypes/functions.js";
 import { evaluate } from "../evaluator.js";
 
 export default {

@@ -5,6 +5,21 @@ A homoiconic language / data interchange format, inspired by rebol.
 The language was designed for easy serialization & transport of running systems,
 as well as being highly portable in the core implementation.
 
+# Repo organization
+
+-`src/prelude`
+
+Includes all the the core universal functions & definitions
+
+- `src/io`
+
+Contains specialized transports for connecting the runtime over the wire. These
+are to be installed in the runtime to upgrade it.
+
+- `src/bin`
+
+Contains the cli implementation of the language / entrypoint to the shell
+
 ## Syntax
 
 ```

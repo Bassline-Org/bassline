@@ -1,7 +1,7 @@
 import { ContextBase, ContextChain } from "./context.js";
 import { Datatype, GetWord, LitWord, Str, Value, Word } from "./core.js";
-import { normalizeString } from "../utils.js";
-import { evaluate } from "../evaluator.js";
+import { normalizeString } from "../../utils.js";
+import { evaluate } from "../../evaluator.js";
 
 export function isCallable(value) {
     return value instanceof NativeFn ||

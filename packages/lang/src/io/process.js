@@ -1,9 +1,9 @@
-import { NativeFn } from "../functions.js";
-import { Block, Datatype, nil, Num, Str, Word } from "../core.js";
-import { ContextChain } from "../context.js";
-import { normalizeString } from "../../utils.js";
+import { NativeFn } from "../prelude/index.js";
+import { Block, Datatype, nil, Num, Str, Word } from "../prelude/index.js";
+import { ContextChain } from "../prelude/index.js";
+import { normalizeString } from "../utils.js";
 import { spawn } from "child_process";
-import { evaluate } from "../../evaluator.js";
+import { evaluate } from "../evaluator.js";
 
 class ProcessContext extends ContextChain {
     static type = normalizeString("process-context!");

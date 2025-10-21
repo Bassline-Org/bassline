@@ -1,4 +1,4 @@
-import { normalize, normalizeString } from "../utils.js";
+import { normalize, normalizeString } from "../../utils.js";
 import { Block, Bool, Datatype, Nil, nil, Str, Value, Word } from "./core.js";
 import { NativeFn, NativeMethod } from "./functions.js";
 
@@ -139,7 +139,9 @@ context! [
                 value instanceof NativeMethod ||
                 value instanceof Datatype ||
                 value instanceof Bool ||
-                value instanceof Nil
+                value instanceof Nil ||
+                key === this.keyFor("self") ||
+                key === this.keyFor("parent")
             ) continue; // TODO: Push the missing natives into a projection from system
             // IE in (project system [<MISSING_NATIVES>] <Block>)
             if (value === this) continue;
@@ -214,6 +216,11 @@ export class ContextChain extends ContextBase {
             return p.get(word);
         }
         return nil;
+    }
+
+    static make(stream, context) {
+        const parent = stream.next().evaluate(stream, context);
+        return new ContextChain(parent);
     }
 }
 

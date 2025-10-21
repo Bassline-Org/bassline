@@ -1,6 +1,6 @@
-import { evaluate } from "../evaluator.js";
-import { Stream } from "../stream.js";
-import { normalize, normalizeString } from "../utils.js";
+import { evaluate } from "../../evaluator.js";
+import { Stream } from "../../stream.js";
+import { normalize, normalizeString } from "../../utils.js";
 
 export class Value {
     static type = normalizeString("value!");
