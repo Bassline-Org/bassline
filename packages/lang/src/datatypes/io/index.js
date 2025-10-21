@@ -155,14 +155,14 @@ export class WsClient extends ContextChain {
             return nil;
         });
         this.client.addEventListener("message", (data) => {
-            const parsed = parse(`read ${data.data.toString()}`);
+            const parsed = parse(`read ${data.data}`);
+            console.log("read: ", parsed);
             evaluate(parsed, this);
             return nil;
         });
     }
 
     write(data) {
-        console.log("writing: ", data.mold().value);
         this.client.send(data.mold().value);
         return nil;
     }

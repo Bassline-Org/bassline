@@ -7,12 +7,13 @@ server: make ws-server! "0.0.0.0" 8080
 in server [
     connection: fn [id] [
         print append "new connection: " id
-        print clients
         c: get clients (append "client-" id)
         print c
         in c [
             read: (fn [data] [
-                print (append "server-read: " data)
+                print type? data
+                print (append "server-read: " form data)
+                do data
             ])
             write "hello from server"
         ]
@@ -20,7 +21,6 @@ in server [
     error: fn [message] [
         print append "error: " message
     ]
-    print "server created"
     listen
 ]
 
@@ -29,10 +29,10 @@ client: make ws-client!
 in client [
     open: (fn [] [
         print "client opened"
-        write "hello from client"
+        write [ write words system ]
     ])
     read: (fn [data] [
-        print (append "client-read: " data)
+        print (append "client-read: " form data)
     ])
     error: (fn [message] [
         print (append "client-error: " message)
