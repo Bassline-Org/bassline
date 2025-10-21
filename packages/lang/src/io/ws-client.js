@@ -1,4 +1,10 @@
-import { ContextChain, NativeFn, nil, Str } from "../prelude/index.js";
+import {
+    ContextChain,
+    Datatype,
+    NativeFn,
+    nil,
+    Str,
+} from "../prelude/index.js";
 import { normalizeString } from "../utils.js";
 import { parse } from "../parser.js";
 import { evaluate } from "../evaluator.js";
@@ -93,3 +99,7 @@ export class WsClient extends ContextChain {
         return new WsClient(context);
     }
 }
+
+export default {
+    "ws-client!": new Datatype(WsClient),
+};

@@ -1,4 +1,10 @@
-import { ContextChain, NativeFn, nil, Str } from "../prelude/index.js";
+import {
+    ContextChain,
+    Datatype,
+    NativeFn,
+    nil,
+    Str,
+} from "../prelude/index.js";
 import { normalizeString } from "../utils.js";
 import { parse } from "../parser.js";
 import { WebSocketServer } from "ws";
@@ -93,3 +99,7 @@ export class WsServer extends ContextChain {
         return new WsServer(host, port, context);
     }
 }
+
+export default {
+    "ws-server!": new Datatype(WsServer),
+};

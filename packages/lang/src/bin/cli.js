@@ -4,9 +4,9 @@ import { GLOBAL } from "../runtime.js";
 import * as repl from "node:repl";
 import { parse } from "../parser.js";
 import { existsSync } from "fs";
-import { Block, Str, Value } from "../prelude/datatypes/core.js";
-import { setMany } from "../prelude/datatypes/context.js";
-import { NativeFn } from "../prelude/datatypes/functions.js";
+import { Block, NativeFn, setMany, Str, Value } from "../prelude/index.js";
+import wsServer from "../io/ws-server.js";
+import file from "../io/file.js";
 
 const args = process.argv.slice(2);
 
@@ -47,7 +47,11 @@ const replExtras = {
     }),
 };
 
-setMany(GLOBAL.context, replExtras);
+setMany(GLOBAL.context, {
+    ...replExtras,
+    ...wsServer,
+    ...file,
+});
 
 const rcPath = process.env.HOME + "/.basslinerc";
 if (existsSync(rcPath)) {
