@@ -1,21 +1,29 @@
-url: "ws://localhost:8080"
+use functions
 
-fn: make pure-fn! [args body] [ make pure-fn! args body ]
+clientcount: 1
 
-client: make ws-client!
+map (iota clientcount) (fn [x] [
+    key: (append "hello-" x)
+    client: make ws-client! url: "ws://localhost:8080" key: key
+    in client [
+        url: "ws://localhost:8080"
+        key: key
+        open: (fn [] [
+        ;    print "client opened"
+            write [ write compose [(words system)] ]
+        ])
+        read: (fn [data] [
+            print type? data
+            print data
+            do data
+            ;print (append "client-read: " form data)
+        ])
+        error: (fn [message] [
+        ;    print (append "client-error: " message)
+        ])
+    ]
 
-in client [
-    open: (fn [] [
-        write "hello from client"
-    ])
-    read: (fn [data] [
-        print (append "read: " data)
-    ])
-    error: (fn [message] [
-        print (append "error: " message)
-    ])
-]
-
-in client [
-    connect
-]
+    in client [
+        connect
+    ]
+])

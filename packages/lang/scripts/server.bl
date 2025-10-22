@@ -1,17 +1,12 @@
 use functions
 
 url: "ws://localhost:8080"
-
 server: make ws-server! "0.0.0.0" 8080
 
 in server [
-    active-sessions: fn [] [
-        words sessions
-    ]
-    connection: fn [key] [
+    connection: (fn [key] [
         print append "new connection: " key
-        c: get sessions key
-        print c
+        c: (get sessions key)
         in c [
             read: (fn [data] [
                 print type? data
@@ -20,26 +15,27 @@ in server [
             ])
             write ["hello from server"]
         ]
-    ]
-    error: fn [message] [
+    ])
+    (error: fn [message] [
         print append "error: " message
-    ]
+    ])
     listen
 ]
 
-map (iota 1) fn [x] [
+clientcount: 1
+
+map (iota clientcount) (fn [x] [
     key: (append "hello-" x)
     client: make ws-client! url: "ws://localhost:8080" key: key
     in client [
         url: "ws://localhost:8080"
         key: key
         open: (fn [] [
-        ;    print "client opened"
             write [ write compose [(words system)] ]
         ])
         read: (fn [data] [
             print type? data
-            print data
+            print (append "client-read: " form data)
             do data
             ;print (append "client-read: " form data)
         ])
@@ -51,14 +47,14 @@ map (iota 1) fn [x] [
     in client [
         connect
     ]
-]
+])
 
-; after (sleep 2000) [
-;     map (iota 10) fn [x] [
-;         key: (append "hello-" x)
-;         client: get sessions key
-;         in client [
-;             write [print (+ 10 20)]
-;         ]
-;     ]
-; ] server
+after (sleep 2000) [
+    map (iota clientcount) fn [x] [
+        key: (append "hello-" x)
+        client: get sessions key
+        in client [
+            write [print (+ 10 20)]
+        ]
+    ]
+] server

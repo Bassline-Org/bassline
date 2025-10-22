@@ -21,24 +21,24 @@ after (sleep 1000) [
     ;print output
 ] curl
 
-;bl: make process-context! "bassline" []
-; in bl [
-;     stdout: (fn [str] [ print append "stdout: " str ])
-;     stderr: (fn [str] [ print append "stderr: " str ])
-;     closeTask: (make task!)
-;     close: (fn [code] [ (print append "close: " code) schedule closeTask ])
-;     spawn
-; ]
+bl: make process-context! "bassline" []
+in bl [
+    stdout: (fn [str] [ print append "stdout: " str ])
+    stderr: (fn [str] [ print append "stderr: " str ])
+    closeTask: (make task!)
+    close: (fn [code] [ (print append "close: " code) schedule closeTask ])
+    spawn
+]
 
-; after (in bl [ :closeTask ]) [
-;     print "close task completed from system"
-; ] system
+after (in bl [ :closeTask ]) [
+    print "close task completed from system"
+] system
 
-; after (sleep 1000) [
-;     send "print words system"
-; ] bl
+after (sleep 1000) [
+    send "print words system"
+] bl
 
-; after (sleep 2000) [
-;     kill
-;     print mold bl
-; ] bl
+after (sleep 2000) [
+    kill
+    print mold bl
+] bl

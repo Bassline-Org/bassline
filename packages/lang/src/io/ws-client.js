@@ -20,7 +20,6 @@ export class WsClient extends ContextChain {
         this.set(
             "write",
             new NativeFn(["data"], ([data], stream, context) => {
-                console.log("write: ", data);
                 this.write(data);
                 return nil;
             }),
@@ -66,13 +65,11 @@ export class WsClient extends ContextChain {
             return nil;
         });
         this.client.addEventListener("error", (error) => {
-            console.log("error: ", error.message);
             evaluate(parse(`error "${error.message}"`), this);
             return nil;
         });
         this.client.addEventListener("message", (data) => {
             const parsed = parse(`read ${data.data}`);
-            //console.log("read: ", parsed);
             evaluate(parsed, this);
             return nil;
         });
