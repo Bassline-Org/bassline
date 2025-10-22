@@ -31,7 +31,7 @@ export class WsServer extends Sock {
                 client.close();
             }
             const clientHandle = new WsClient(this, client);
-            clientHandle.open();
+            clientHandle.openSocket();
             this.id = this.id + 1;
             const sessions = this.get("sessions");
             sessions.set(new Str(key), clientHandle);

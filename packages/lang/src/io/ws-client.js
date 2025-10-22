@@ -64,7 +64,9 @@ export class WsClient extends Sock {
         this.client.addEventListener("message", ({ data }) => {
             try {
                 const parsed = parse(data);
-                evaluate(parsed, this);
+                for (const item of parsed.items) {
+                    evaluate(item, this);
+                }
             } catch (error) {
                 this.error(error.message);
             }

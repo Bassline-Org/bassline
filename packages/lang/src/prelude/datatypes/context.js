@@ -10,6 +10,40 @@ export class ContextBase extends Value {
         this.set("self", this);
     }
 
+    values() {
+        const values = [];
+        for (const [key, value] of this.bindings.entries()) {
+            if (
+                value instanceof NativeFn ||
+                value instanceof NativeMethod ||
+                value instanceof Datatype ||
+                value instanceof Bool ||
+                value instanceof Nil ||
+                key === this.keyFor("self") ||
+                key === this.keyFor("parent")
+            ) continue;
+            values.push(value);
+        }
+        return new Block(values);
+    }
+
+    keys() {
+        const keys = [];
+        for (const [key, value] of this.bindings.entries()) {
+            if (
+                value instanceof NativeFn ||
+                value instanceof NativeMethod ||
+                value instanceof Datatype ||
+                value instanceof Bool ||
+                value instanceof Nil ||
+                key === this.keyFor("self") ||
+                key === this.keyFor("parent")
+            ) continue;
+            keys.push(new Word(key));
+        }
+        return new Block(keys);
+    }
+
     keyFor(word) {
         if (typeof word === "symbol") return word;
         if (word?.spelling) return word.spelling;

@@ -55,6 +55,8 @@ export default {
     "words": NativeMethod.unary("words"),
     "rename": NativeMethod.ternary("rename"),
     "fresh": NativeMethod.unary("fresh"),
+    "values": NativeMethod.unary("values"),
+    "keys": NativeMethod.unary("keys"),
 
     // Documentation
     "doc": NativeMethod.binary("doc"),
