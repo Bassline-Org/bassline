@@ -13,12 +13,6 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/bassline-repl": {
-    params: {};
-  };
-  "/sex-editor": {
-    params: {};
-  };
   "/home": {
     params: {};
   };
@@ -30,15 +24,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/bassline-repl" | "/sex-editor" | "/home" | "/repl";
-  };
-  "routes/bassline-repl/route.tsx": {
-    id: "routes/bassline-repl";
-    page: "/bassline-repl";
-  };
-  "routes/sex-editor/route.tsx": {
-    id: "routes/sex-editor";
-    page: "/sex-editor";
+    page: "/" | "/home" | "/repl";
   };
   "routes/home.tsx": {
     id: "routes/home";

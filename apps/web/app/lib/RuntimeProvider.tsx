@@ -1,7 +1,6 @@
 import { createRuntime } from "@bassline/lang/runtime";
 import * as prelude from "@bassline/lang/prelude";
-import { evaluate, parse } from "@bassline/lang";
-import { DisplayContext } from "./ValueDisplay";
+import { parse } from "@bassline/lang";
 import { createContext, useCallback, useContext, useRef } from "react";
 const { setMany, NativeMethod, NativeFn } = prelude;
 
@@ -146,21 +145,6 @@ export const RuntimeProvider = (
     const runtime = useRef(createRuntime());
     runtime.current.evaluate(parse(rc));
     runtime.current.evaluate(parse(views));
-    setMany(runtime.current.context, {
-        "display-context": new DisplayContext(runtime.current.context),
-        "display": new NativeFn(["value"], ([value], stream, context) => {
-            return (
-                <div>
-                    {value.items.map((item) =>
-                        evaluate(
-                            item,
-                            context.get("display-context"),
-                        )
-                    )}
-                </div>
-            );
-        }),
-    });
     return (
         <RuntimeContext.Provider value={runtime.current}>
             {children}

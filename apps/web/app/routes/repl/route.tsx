@@ -1,12 +1,5 @@
-import * as p from "@bassline/lang/prelude";
-import { normalize } from "@bassline/lang/utils";
-import { useEffect, useState } from "react";
-import { Outlet } from "react-router";
-import {
-    RuntimeProvider,
-    useEvaluate,
-    useRuntime,
-} from "~/lib/RuntimeProvider";
+import { useState } from "react";
+import { RuntimeProvider, useEvaluate } from "~/lib/RuntimeProvider";
 import { DisplayValue } from "~/lib/BasicView";
 
 function ReplInner() {

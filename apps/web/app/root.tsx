@@ -6,15 +6,10 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
-import { Toaster } from 'sonner';
+import { Toaster } from "sonner";
 import type { Route } from "./+types/root";
 import "./app.css";
 import "./styles/scrollbar.css";
-import { installReact } from "@bassline/react";
-
-installReact();
-
-// Preloading is now handled by the SoundSystemProvider
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -25,7 +20,8 @@ export const links: Route.LinksFunction = () => [
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap",
+    href:
+      "https://fonts.googleapis.com/css2?family=Oxanium:wght@200..800&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap",
   },
 ];
 
@@ -46,12 +42,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             duration: 3000,
             unstyled: true,
             classNames: {
-              toast: 'bg-white text-slate-900 rounded-lg shadow-lg border border-slate-200 p-4',
-              title: 'font-semibold',
-              description: 'text-sm text-slate-600',
-              success: 'bg-white text-slate-900 border-green-200',
-              error: 'bg-white text-slate-900 border-red-200',
-            }
+              toast:
+                "bg-white text-slate-900 rounded-lg shadow-lg border border-slate-200 p-4",
+              title: "font-semibold",
+              description: "text-sm text-slate-600",
+              success: "bg-white text-slate-900 border-green-200",
+              error: "bg-white text-slate-900 border-red-200",
+            },
           }}
         />
         <ScrollRestoration />
@@ -76,10 +73,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   if (isRouteErrorResponse(error)) {
     message = error.status === 404 ? "404" : "Error";
-    details =
-      error.status === 404
-        ? "The requested page could not be found."
-        : error.statusText || details;
+    details = error.status === 404
+      ? "The requested page could not be found."
+      : error.statusText || details;
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
     stack = error.stack;

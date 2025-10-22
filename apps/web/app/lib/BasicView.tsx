@@ -18,7 +18,7 @@ export function List({ rest }: { rest: p.Value[] }) {
         <div>
             <h1>List</h1>
             <ul>
-                {items.items.map((item, index) => (
+                {items.items.map((item: p.Value, index: number) => (
                     <li key={index}>
                         <DisplayValue value={item} />
                     </li>
@@ -62,8 +62,8 @@ export function DisplayValue({ value }: { value: p.Value }) {
                 return <div>{first.spelling}</div>;
             }
         } else {
-            return value.items.map((item) => (
-                <DisplayValue key={item.form().value} value={item} />
+            return value.items.map((item: p.Value, index: number) => (
+                <DisplayValue key={index} value={item} />
             ));
         }
     }
