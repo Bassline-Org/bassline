@@ -4,6 +4,7 @@ import { evaluate, parse } from "@bassline/lang";
 import { useRuntime } from "./RuntimeProvider";
 import { Button as ShadButton } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input as ShadInput } from "~/components/ui/input";
 import React from "react";
 
 export function Header({ context }: { context: p.ContextBase }) {
@@ -67,11 +68,105 @@ export function Button({ context }: { context: p.ContextBase }) {
     );
 }
 
+export function Input({ context }: { context: p.ContextBase }) {
+    const value = context.get("value");
+    const onChange = context.get("on-change");
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (onChange) {
+            // Create a Bassline string value
+            const newValue = new p.Str(e.target.value);
+            // Set it in the context and evaluate the on-change function
+            context.set("_new_value", newValue);
+            evaluate(parse("(on-change _new_value)"), context);
+        }
+    };
+
+    return (
+        <ShadInput
+            value={value?.value || value?.form?.().value || ""}
+            onChange={handleChange}
+            className="font-mono text-sm"
+        />
+    );
+}
+
 export function Item({ context }: { context: p.ContextBase }) {
     const content = context.get("content");
     return (
         <div className="px-2 py-1">
             <DisplayValue value={content} />
+        </div>
+    );
+}
+
+export function Inspector({ context }: { context: p.ContextBase }) {
+    const target = context.get("target");
+    const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+
+    const toggleExpanded = (key: string) => {
+        const newExpanded = new Set(expanded);
+        if (newExpanded.has(key)) {
+            newExpanded.delete(key);
+        } else {
+            newExpanded.add(key);
+        }
+        setExpanded(newExpanded);
+    };
+
+    if (!target || !target.is || !target.is(p.ContextBase)) {
+        return (
+            <div className="text-muted-foreground text-sm">
+                {target ? "Not a context" : "No target"}
+            </div>
+        );
+    }
+
+    const targetContext = target as p.ContextBase;
+    const keys = targetContext.keys();
+    const values = targetContext.values();
+
+    if (!keys || !keys.items || keys.items.length === 0) {
+        return <div className="text-muted-foreground text-sm">Empty context</div>;
+    }
+
+    return (
+        <div className="space-y-1 font-mono text-sm">
+            {keys.items.map((key: p.Value, i: number) => {
+                const keyStr = key.spelling || key.form?.().value || String(key);
+                const value = values.items[i];
+                const isContext = value?.is?.(p.ContextBase);
+                const isExpanded = expanded.has(keyStr);
+
+                return (
+                    <div key={i} className="border-l-2 border-muted pl-2">
+                        <div className="flex items-start gap-2">
+                            {isContext && (
+                                <button
+                                    onClick={() => toggleExpanded(keyStr)}
+                                    className="text-xs hover:bg-accent px-1 rounded"
+                                >
+                                    {isExpanded ? "▼" : "▶"}
+                                </button>
+                            )}
+                            <span className="text-muted-foreground">{keyStr}:</span>
+                            {!isContext && (
+                                <span className="text-foreground">
+                                    {value?.form?.().value || String(value)}
+                                </span>
+                            )}
+                            {isContext && !isExpanded && (
+                                <span className="text-accent">context {"{ ... }"}</span>
+                            )}
+                        </div>
+                        {isContext && isExpanded && (
+                            <div className="ml-4 mt-1">
+                                <Inspector context={{ get: () => value } as p.ContextBase} />
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
         </div>
     );
 }
@@ -180,7 +275,9 @@ export const displayComponents = {
     [normalize("list")]: List,
     [normalize("group")]: Group,
     [normalize("button")]: Button,
+    [normalize("input")]: Input,
     [normalize("item")]: Item,
+    [normalize("inspector")]: Inspector,
     [normalize("table")]: Table,
 };
 

@@ -120,6 +120,21 @@ view-context: context [
             action: does (action)
         ]
     ])
+
+    input: (fn [value :on-change] [
+        context compose [
+            type: 'input
+            value: (value)
+            on-change: (:on-change)
+        ]
+    ])
+
+    inspector: (fn [target] [
+        context compose [
+            type: 'inspector
+            target: (target)
+        ]
+    ])
 ]
 
 view: fn [block] [
@@ -168,6 +183,58 @@ export const RuntimeProvider = (
 ) => {
     const runtime = useRef(createRuntime());
     runtime.current.context.set("system", runtime.current.context);
+
+    // Add localStorage persistence functions
+    runtime.current.context.set(
+        "save-local",
+        new NativeFn(
+            ["key", "value"],
+            ([key, value], stream, context) => {
+                if (typeof window !== "undefined" && window.localStorage) {
+                    localStorage.setItem(key.value, value.mold().value);
+                    return value;
+                }
+                return prelude.unset;
+            },
+        ),
+    );
+
+    runtime.current.context.set(
+        "load-local",
+        new NativeFn(
+            ["key"],
+            ([key], stream, context) => {
+                if (typeof window !== "undefined" && window.localStorage) {
+                    const data = localStorage.getItem(key.value);
+                    if (data) {
+                        return runtime.current.evaluate(parse(data));
+                    }
+                }
+                return prelude.unset;
+            },
+        ),
+    );
+
+    runtime.current.context.set(
+        "list-local",
+        new NativeFn(
+            [],
+            () => {
+                if (typeof window !== "undefined" && window.localStorage) {
+                    const keys = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key) {
+                            keys.push(new prelude.Str(key));
+                        }
+                    }
+                    return new prelude.Block(keys);
+                }
+                return new prelude.Block([]);
+            },
+        ),
+    );
+
     runtime.current.evaluate(parse(rc));
     runtime.current.evaluate(parse(views));
     return (
