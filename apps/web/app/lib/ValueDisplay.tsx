@@ -1,53 +1,84 @@
 import * as p from "@bassline/lang/prelude";
+import { normalizeString } from "@bassline/lang/utils";
+import { evaluate } from "@bassline/lang";
 
-function StringDisplay({ value }: { value: p.Str }) {
-    return <span className="text-blue-500">{value.value}</span>;
-}
+export class DisplayContext extends p.ContextChain {
+    static type = normalizeString("display-context!");
+    constructor(parent: any) {
+        super(parent);
+        this.set(
+            "group",
+            new p.NativeFn(
+                ["title", "content"],
+                ([title, content], stream, context) => {
+                    console.log("group", title, content);
+                    return this.group(title, content);
+                },
+            ),
+        );
 
-function NumberDisplay({ value }: { value: p.Num }) {
-    return <span className="text-green-500">{value.value}</span>;
-}
+        this.set(
+            "list",
+            new p.NativeFn(
+                ["items"],
+                ([items], s, c) => {
+                    console.log("list", items);
+                    return this.list(items);
+                },
+            ),
+        );
 
-function BooleanDisplay({ value }: { value: p.Bool }) {
-    return (
-        <span className="text-purple-500">
-            {value.value}
-        </span>
-    );
-}
-
-function BlockDisplay({ value }: { value: p.Block }) {
-    return (
-        <ul>
-            {value.items.map((item) => (
-                <li key={item.value}>
-                    <ValueDisplay value={item} />
-                </li>
-            ))}
-        </ul>
-    );
-}
-
-function UnsetDisplay({ value }: { value: p.Unset }) {
-    return <span className="text-gray-500">unset</span>;
-}
-
-export function ValueDisplay({ value }: { value: any }) {
-    if (value.is(p.Str)) {
-        return <StringDisplay value={value} />;
+        this.set(
+            "header",
+            new p.NativeFn(
+                ["level", "content"],
+                ([level, content], s, c) => {
+                    console.log("header", level, content);
+                    return this.header(level, content);
+                },
+            ),
+        );
     }
-    if (value.is(p.Num)) {
-        return <NumberDisplay value={value} />;
+
+    list(block: p.Block) {
+        return (
+            <ul>
+                {block.items.map((item: any) => {
+                    if (item instanceof p.Block) {
+                        return <li>{evaluate(item, this)}</li>;
+                    } else {
+                        return <li>{item.form().value}</li>;
+                    }
+                })}
+            </ul>
+        );
     }
-    if (value.is(p.Bool)) {
-        return <BooleanDisplay value={value} />;
+
+    header(level: p.Num, content: p.Value) {
+        switch (level.value) {
+            case 1:
+                return <h1>{content.form().value}</h1>;
+            case 2:
+                return <h2>{content.form().value}</h2>;
+            case 3:
+                return <h3>{content.form().value}</h3>;
+            case 4:
+                return <h4>{content.form().value}</h4>;
+            case 5:
+                return <h5>{content.form().value}</h5>;
+            case 6:
+                return <h6>{content.form().value}</h6>;
+            default:
+                return <p>{content.form().value}</p>;
+        }
     }
-    if (value.is(p.Unset)) {
-        return <UnsetDisplay value={value} />;
+
+    group(title: p.Str, content: p.Block) {
+        return (
+            <div>
+                <h2>{title.value}</h2>
+                {evaluate(content, this)}
+            </div>
+        );
     }
-    if (value.is(p.Block)) {
-        return <BlockDisplay value={value} />;
-    }
-    console.log("Unknown value", value);
-    return <span className="text-red-500">Unknown value</span>;
 }

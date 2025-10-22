@@ -1,6 +1,11 @@
 use: make pure-fn! [module] [ copy module parent ]
 
 import: make pure-fn! [module words] [ copy (project module words) parent ]
+context: make pure-fn! [block] [
+    ctx: make context-chain! self
+    (in ctx block)
+    ctx
+]
 
 functions: make context-chain! system
 
@@ -47,7 +52,6 @@ sockets: make context-chain! system
 
 in sockets [
    use functions [ 'fn ]
-   doc self "A module that adds helper functions for interacting with socket-like contexts"
    send: (fn [context data] [
     in context (compose [ send (data) ])
    ])

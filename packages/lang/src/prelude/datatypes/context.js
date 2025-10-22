@@ -27,16 +27,18 @@ export class ContextBase extends Value {
     }
 
     relevantEntries() {
-        return this.bindings.entries().filter(([key, value]) => {
-            return !(
-                isCallable(value) ||
-                value.is(Datatype) ||
-                value.is(Bool) ||
-                value.is(Unset) ||
-                key === keys.self ||
-                key === keys.parent
-            );
-        });
+        return Array.from(
+            this.bindings.entries().filter(([key, value]) => {
+                return !(
+                    isCallable(value) ||
+                    value.is(Datatype) ||
+                    value.is(Bool) ||
+                    value.is(Unset) ||
+                    key === keys.self ||
+                    key === keys.parent
+                );
+            }),
+        );
     }
 
     values() {

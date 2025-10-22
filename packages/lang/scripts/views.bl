@@ -1,0 +1,65 @@
+use functions
+views: context [
+
+view-context: context [
+    header: (fn [level content] [
+        compose ['header (level) (content)]
+    ])
+
+    list: (fn [items] [
+        compose ['list (items)]
+    ])
+
+    item: (fn [content] [
+        compose ['item (content)]
+    ])
+
+    table: (fn [columns rows] [
+        compose ['table (columns) (rows)]
+    ])
+
+    group: (fn [title content] [
+        compose ['group (title) (content)]
+    ])
+
+    button: (fn [label action] [
+        compose ['button (label) (action)]
+    ])
+]
+
+view: fn [block] [
+    use view-context
+    compose block
+]
+]
+
+users: [
+    "John Doe"
+    "Jane Doe"
+    "John Smith"
+    "Jane Smith"
+]
+
+posts: [
+    "Post 1"
+    "Post 2"
+    "Post 3"
+]
+
+example-view: view [
+    (group "Users" [
+        list ( foreach users [ header 1 it ])
+    ])
+
+    (group "Posts" [
+        list ( foreach posts [ header 1 it ])
+    ])
+
+    (button "Click me" [
+        print "Button clicked!"
+    ])
+]
+
+[
+    in display example-view
+]
