@@ -12,10 +12,13 @@ import {
     WordLike,
 } from "./core.js";
 import { isCallable } from "./functions.js";
+import { evaluate } from "../../evaluator.js";
+import { parse } from "../../parser.js";
 
 export const keys = {
     self: normalize("self"),
     parent: normalize("parent"),
+    onSet: normalize("on-set"),
 };
 
 export class ContextBase extends Value {
@@ -82,7 +85,15 @@ export class ContextBase extends Value {
 
     set(word, value) {
         const spelling = this.keyFor(word);
-        this.bindings.set(spelling, value);
+        if (this.bindings.has(keys.onSet)) {
+            this.bindings.set(spelling, value);
+            evaluate(
+                new Block([new Word(keys.onSet), new LitWord(spelling), value]),
+                this,
+            );
+        } else {
+            this.bindings.set(spelling, value);
+        }
         return value;
     }
 

@@ -1,0 +1,15 @@
+use functions
+
+a: (fn [x] [ print (append "a: " form x) ])
+b: (fn [x] [ print (append "b: " form x) ])
+c: (fn [x] [ print (append "c: " form x) ])
+
+funcs: reduce [ :a :b :c ]
+
+;foreach funcs [ type? it ]
+
+;(pick funcs 0) 5
+
+;(map funcs (fn [x] [ type? :x ]))
+
+;(map fns (fn [it] [ it 5 ]))

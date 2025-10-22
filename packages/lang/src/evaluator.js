@@ -17,7 +17,9 @@ export function evaluate(code, context) {
             result = stream.next().evaluate(stream, context);
         } catch (error) {
             console.error("Error: ", error);
-            console.error(`Error near: ${stream.current().form().value}`);
+            console.error(
+                `Error near: ${stream?.current()?.form?.()?.value ?? stream}`,
+            );
             console.error(error);
             throw error;
         }
