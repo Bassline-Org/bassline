@@ -5,7 +5,7 @@ import { useRuntime } from "./RuntimeProvider";
 import { Button as ShadButton } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input as ShadInput } from "~/components/ui/input";
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 export function Header({ context }: { context: p.ContextBase }) {
     const level = context.get("level");
@@ -60,7 +60,6 @@ export function Group({ context }: { context: p.ContextBase }) {
 
 export function Button({ context }: { context: p.ContextBase }) {
     const label = context.get("label");
-    console.log("context", context);
     return (
         <ShadButton onClick={() => evaluate(parse("action"), context)}>
             <DisplayValue value={label} />
@@ -69,23 +68,23 @@ export function Button({ context }: { context: p.ContextBase }) {
 }
 
 export function Input({ context }: { context: p.ContextBase }) {
-    const value = context.get("value");
-    const onChange = context.get("on-change");
-
+    const [value, setValue] = useState(
+        context.get("value")?.form?.().value ?? "",
+    );
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (onChange) {
-            // Create a Bassline string value
-            const newValue = new p.Str(e.target.value);
-            // Set it in the context and evaluate the on-change function
-            context.set("_new_value", newValue);
-            evaluate(parse("(on-change _new_value)"), context);
-        }
+        context.set("value", new p.Str(e.target.value));
+        evaluate(parse(`on-change "${e.target.value}"`), context);
     };
 
     return (
         <ShadInput
-            value={value?.value || value?.form?.().value || ""}
-            onChange={handleChange}
+            value={value}
+            onChange={(e) => {
+                setValue(e.target.value);
+                if (e.target.value) {
+                    handleChange(e);
+                }
+            }}
             className="font-mono text-sm"
         />
     );
@@ -127,13 +126,16 @@ export function Inspector({ context }: { context: p.ContextBase }) {
     const values = targetContext.values();
 
     if (!keys || !keys.items || keys.items.length === 0) {
-        return <div className="text-muted-foreground text-sm">Empty context</div>;
+        return (
+            <div className="text-muted-foreground text-sm">Empty context</div>
+        );
     }
 
     return (
         <div className="space-y-1 font-mono text-sm">
             {keys.items.map((key: p.Value, i: number) => {
-                const keyStr = key.spelling || key.form?.().value || String(key);
+                const keyStr = key.spelling || key.form?.().value ||
+                    String(key);
                 const value = values.items[i];
                 const isContext = value?.is?.(p.ContextBase);
                 const isExpanded = expanded.has(keyStr);
@@ -149,19 +151,30 @@ export function Inspector({ context }: { context: p.ContextBase }) {
                                     {isExpanded ? "▼" : "▶"}
                                 </button>
                             )}
-                            <span className="text-muted-foreground">{keyStr}:</span>
+                            <span className="text-muted-foreground">
+                                {keyStr}:
+                            </span>
                             {!isContext && (
                                 <span className="text-foreground">
                                     {value?.form?.().value || String(value)}
                                 </span>
                             )}
                             {isContext && !isExpanded && (
-                                <span className="text-accent">context {"{ ... }"}</span>
+                                <span className="text-accent">
+                                    context {"{ ... }"}
+                                </span>
                             )}
                         </div>
                         {isContext && isExpanded && (
                             <div className="ml-4 mt-1">
-                                <Inspector context={{ get: () => value } as p.ContextBase} />
+                                <Inspector
+                                    context={(() => {
+                                        // Create a proper context wrapper for the nested inspector
+                                        const wrapper = new p.ContextBase();
+                                        wrapper.set("target", value);
+                                        return wrapper;
+                                    })()}
+                                />
                             </div>
                         )}
                     </div>

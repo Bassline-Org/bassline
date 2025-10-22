@@ -121,11 +121,11 @@ view-context: context [
         ]
     ])
 
-    input: (fn [value :on-change] [
+    input: (fn [value action] [
         context compose [
             type: 'input
             value: (value)
-            on-change: (:on-change)
+            on-change: does (action)
         ]
     ])
 
@@ -148,6 +148,7 @@ view: fn [block] [
 
 use views
 
+; Sample data
 users: [
     "John Doe"
     "Jane Doe"
@@ -161,17 +162,60 @@ posts: [
     "Post 3"
 ]
 
+; State for the input demo
+user-input: ""
+saved-items: load-local "demo-items"
+
+; Example view showcasing all features
 example-view: view [
-    (group "Users" [
-        (list foreach users [ header 1 it ])
+    (header 1 "Bassline View System Demo")
+
+    (group "Interactive Input" [
+        (header 3 "Type something and see it update:")
+        (input user-input [
+            in parent (compose [user-input: (value)])
+            print (append "value: " value)
+        ])
+        (header 4 append "You typed: " user-input)
     ])
 
-    (group "Posts" [
-        (list foreach posts [ header 1 it ])
+    ;(group "Local Storage Persistence" [
+    ;    (header 3 "Items saved across sessions:")
+    ;    (list foreach saved-items [ item it ])
+    ;    (button "Add Current Input" [
+    ;        if (gt? length user-input 0) [
+    ;            append saved-items user-input
+    ;            save-local "demo-items" saved-items
+    ;            set 'user-input ""
+    ;        ]
+    ;    ])
+    ;    (button "Clear All" [
+    ;        set 'saved-items []
+    ;        save-local "demo-items" []
+    ;    ])
+    ;])
+
+    ;(group "Context Inspector" [
+    ;    (header 3 "Explore the system context:")
+    ;    (inspector system)
+    ;])
+
+    (group "Users & Posts" [
+        (table ["Type" "Name"] [
+            ["User" "John Doe"]
+            ["User" "Jane Doe"]
+            ["Post" "Post 1"]
+            ["Post" "Post 2"]
+        ])
     ])
 
-    (button "Click me" [
-        print "Button clicked!"
+    (group "Actions" [
+        (button "Show Alert" [
+            print "Button clicked! Check the console."
+        ])
+        ;(button "Load Last Input" [
+        ;    set 'user-input (load-local "last-input" || "")
+        ;])
     ])
 ]
 `;
