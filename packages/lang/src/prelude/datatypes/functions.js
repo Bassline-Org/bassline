@@ -58,7 +58,7 @@ export class NativeFn extends Value {
     }
 }
 
-export class NativeMethod extends Value {
+export class NativeMethod extends NativeFn {
     static type = normalizeString("native-method!");
     constructor(spec, selector) {
         super(spec, ([target, ...args], stream, context) => {
@@ -93,6 +93,7 @@ export class NativeMethod extends Value {
         );
     }
     form() {
+        console.log("NativeMethod form", this.spec, this.selector);
         return new Str(
             `native-method! spec: [ ${this.spec.join(", ")} ]`,
         );

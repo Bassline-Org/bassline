@@ -1,6 +1,12 @@
-import { NativeFn } from "../prelude/index.js";
-import { Block, Datatype, Num, Str, Word } from "../prelude/index.js";
-import { ContextChain } from "../prelude/index.js";
+import {
+    Block,
+    ContextChain,
+    Datatype,
+    NativeFn,
+    Num,
+    Str,
+    Word,
+} from "../prelude/index.js";
 import { normalizeString } from "../utils.js";
 import { spawn } from "child_process";
 import { evaluate } from "../evaluator.js";

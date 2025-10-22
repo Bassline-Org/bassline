@@ -4,6 +4,7 @@
   "description": "The Bassline language",
   "type": "module",
   "module": "src/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./prelude": "./src/prelude/index.js",
@@ -20,9 +21,13 @@
     "arcsecond": "^5.0.0",
     "ws": "^8.0.0"
   },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
   "scripts": {
     "test": "vitest run",
-    "cli": "node src/bin/cli.js"
+    "cli": "node src/bin/cli.js",
+    "build": "tsc"
    },
   "license": "MIT"
 }

@@ -4,7 +4,6 @@
  * Exports the core Bassline language types and functions
  */
 
-export { createRepl } from "./repl.js";
 export { parse } from "./parser.js";
 export * from "./prelude/index.js";
 export * from "./runtime.js";

@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Route } from "./+types/route";
 import { ReplInput } from "./components/ReplInput";
 import { ReplOutput } from "./components/ReplOutput";
-import { AsyncTasksPanel, type AsyncTask } from "./components/AsyncTasksPanel";
-import { RemotePeersPanel, type RemotePeer } from "./components/RemotePeersPanel";
+import { type AsyncTask, AsyncTasksPanel } from "./components/AsyncTasksPanel";
+import {
+    type RemotePeer,
+    RemotePeersPanel,
+} from "./components/RemotePeersPanel";
 import { StatusBar } from "./components/StatusBar";
-import { createRepl } from "@bassline/lang/repl";
+import { createRuntime } from "@bassline/lang/runtime";
 import { REPLProvider } from "../../lib/repl-context";
 
 export function meta({}: Route.MetaArgs) {
@@ -67,7 +70,10 @@ export default function BasslineRepl() {
     // Save history to localStorage when it changes
     useEffect(() => {
         if (typeof window !== "undefined" && history.length > 0) {
-            localStorage.setItem("bassline-repl-history", JSON.stringify(history));
+            localStorage.setItem(
+                "bassline-repl-history",
+                JSON.stringify(history),
+            );
         }
     }, [history]);
 
@@ -85,20 +91,42 @@ export default function BasslineRepl() {
                 // Poll async tasks
                 const tasksResult = await repl.eval("keys ASYNC_TASKS");
                 if (tasksResult.ok && tasksResult.value?.items) {
-                    const taskIds = tasksResult.value.items.map((item: any) => item.value);
+                    const taskIds = tasksResult.value.items.map((item: any) =>
+                        item.value
+                    );
                     const tasks: AsyncTask[] = [];
 
                     for (const taskId of taskIds) {
-                        const taskResult = await repl.eval(`get ASYNC_TASKS "${taskId}"`);
+                        const taskResult = await repl.eval(
+                            `get ASYNC_TASKS "${taskId}"`,
+                        );
                         if (taskResult.ok && taskResult.value) {
-                            const id = taskResult.value.get?.(Symbol.for("ID"))?.value || taskId;
-                            const name = taskResult.value.get?.(Symbol.for("NAME"))?.value || "Unknown";
-                            const status = taskResult.value.get?.(Symbol.for("STATUS"))?.value || "pending";
-                            const startTime = taskResult.value.get?.(Symbol.for("STARTTIME"))?.value || Date.now();
-                            const endTime = taskResult.value.get?.(Symbol.for("ENDTIME"))?.value;
-                            const duration = taskResult.value.get?.(Symbol.for("DURATION"))?.value;
+                            const id = taskResult.value.get?.(Symbol.for("ID"))
+                                ?.value || taskId;
+                            const name =
+                                taskResult.value.get?.(Symbol.for("NAME"))
+                                    ?.value || "Unknown";
+                            const status =
+                                taskResult.value.get?.(Symbol.for("STATUS"))
+                                    ?.value || "pending";
+                            const startTime =
+                                taskResult.value.get?.(Symbol.for("STARTTIME"))
+                                    ?.value || Date.now();
+                            const endTime = taskResult.value.get?.(
+                                Symbol.for("ENDTIME"),
+                            )?.value;
+                            const duration = taskResult.value.get?.(
+                                Symbol.for("DURATION"),
+                            )?.value;
 
-                            tasks.push({ id, name, status, startTime, endTime, duration });
+                            tasks.push({
+                                id,
+                                name,
+                                status,
+                                startTime,
+                                endTime,
+                                duration,
+                            });
                         }
                     }
 
@@ -108,14 +136,20 @@ export default function BasslineRepl() {
                 // Poll remote peers
                 const peersResult = await repl.eval("keys REMOTE_PEERS");
                 if (peersResult.ok && peersResult.value?.items) {
-                    const peerUrls = peersResult.value.items.map((item: any) => item.value);
+                    const peerUrls = peersResult.value.items.map((item: any) =>
+                        item.value
+                    );
                     const peers: RemotePeer[] = [];
 
                     for (const url of peerUrls) {
-                        const peerResult = await repl.eval(`get REMOTE_PEERS "${url}"`);
+                        const peerResult = await repl.eval(
+                            `get REMOTE_PEERS "${url}"`,
+                        );
                         if (peerResult.ok && peerResult.value) {
                             const statusValue = peerResult.value.get("status");
-                            const connectedAtValue = peerResult.value.get("connected-at");
+                            const connectedAtValue = peerResult.value.get(
+                                "connected-at",
+                            );
 
                             const status = statusValue?.value || "unknown";
                             const connectedAt = connectedAtValue?.value;
@@ -168,8 +202,13 @@ export default function BasslineRepl() {
                 ? history.length - 1
                 : Math.max(0, historyIndex - 1);
         } else {
-            newIndex = historyIndex === -1 ? -1 : Math.min(history.length - 1, historyIndex + 1);
-            if (newIndex === history.length - 1 && historyIndex === history.length - 1) {
+            newIndex = historyIndex === -1
+                ? -1
+                : Math.min(history.length - 1, historyIndex + 1);
+            if (
+                newIndex === history.length - 1 &&
+                historyIndex === history.length - 1
+            ) {
                 newIndex = -1; // Wrap to empty
             }
         }
@@ -234,7 +273,7 @@ export default function BasslineRepl() {
                 throw new Error(result.error || "Connection failed");
             }
         },
-        [repl, history]
+        [repl, history],
     );
 
     const handleDisconnect = useCallback(
@@ -247,7 +286,7 @@ export default function BasslineRepl() {
                 setHistory([...history, { code, result: { ok: true } }]);
             }
         },
-        [repl, history]
+        [repl, history],
     );
 
     const handlePing = useCallback(
@@ -259,7 +298,7 @@ export default function BasslineRepl() {
                 setHistory([...history, { code, result }]);
             }
         },
-        [repl, history]
+        [repl, history],
     );
 
     return (
@@ -267,80 +306,85 @@ export default function BasslineRepl() {
             <div className="h-screen flex bg-slate-50">
                 {/* Main REPL area */}
                 <div className="flex-1 flex flex-col min-w-0">
-                {/* Header */}
-                <div className="border-b bg-white px-6 py-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold">Bassline REPL</h1>
-                            <p className="text-sm text-slate-600">
-                                Interactive distributed runtime
-                            </p>
+                    {/* Header */}
+                    <div className="border-b bg-white px-6 py-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-2xl font-bold">
+                                    Bassline REPL
+                                </h1>
+                                <p className="text-sm text-slate-600">
+                                    Interactive distributed runtime
+                                </p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleImport}
+                                    className="text-sm px-3 py-1 border rounded hover:bg-slate-50"
+                                    title="Import session from .bl file"
+                                >
+                                    Import
+                                </button>
+                                <button
+                                    onClick={handleExport}
+                                    className="text-sm px-3 py-1 border rounded hover:bg-slate-50"
+                                    disabled={history.length === 0}
+                                    title="Export session as .bl file"
+                                >
+                                    Export
+                                </button>
+                                <button
+                                    onClick={handleClear}
+                                    className="text-sm px-3 py-1 border rounded hover:bg-slate-50"
+                                    title="Clear history and reset session"
+                                >
+                                    Clear
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleImport}
-                                className="text-sm px-3 py-1 border rounded hover:bg-slate-50"
-                                title="Import session from .bl file"
-                            >
-                                Import
-                            </button>
-                            <button
-                                onClick={handleExport}
-                                className="text-sm px-3 py-1 border rounded hover:bg-slate-50"
-                                disabled={history.length === 0}
-                                title="Export session as .bl file"
-                            >
-                                Export
-                            </button>
-                            <button
-                                onClick={handleClear}
-                                className="text-sm px-3 py-1 border rounded hover:bg-slate-50"
-                                title="Clear history and reset session"
-                            >
-                                Clear
-                            </button>
+                    </div>
+
+                    {/* Status bar */}
+                    <StatusBar
+                        tasks={asyncTasks}
+                        peers={remotePeers}
+                        onToggleTasks={() => setShowSidebar((prev) => !prev)}
+                        onTogglePeers={() => setShowSidebar((prev) => !prev)}
+                    />
+
+                    {/* Main content */}
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        {/* Output area */}
+                        <div
+                            ref={outputRef}
+                            className="flex-1 overflow-auto px-6 py-4"
+                        >
+                            <ReplOutput history={history} />
+                        </div>
+
+                        {/* Input area */}
+                        <div className="border-t bg-white px-6 py-4">
+                            <ReplInput
+                                onExecute={handleExecute}
+                                onNavigateHistory={handleNavigateHistory}
+                            />
                         </div>
                     </div>
                 </div>
 
-                {/* Status bar */}
-                <StatusBar
-                    tasks={asyncTasks}
-                    peers={remotePeers}
-                    onToggleTasks={() => setShowSidebar((prev) => !prev)}
-                    onTogglePeers={() => setShowSidebar((prev) => !prev)}
-                />
-
-                {/* Main content */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Output area */}
-                    <div ref={outputRef} className="flex-1 overflow-auto px-6 py-4">
-                        <ReplOutput history={history} />
-                    </div>
-
-                    {/* Input area */}
-                    <div className="border-t bg-white px-6 py-4">
-                        <ReplInput
-                            onExecute={handleExecute}
-                            onNavigateHistory={handleNavigateHistory}
+                {/* Right sidebar */}
+                {showSidebar && (
+                    <div className="w-96 border-l bg-white overflow-auto flex-shrink-0">
+                        <AsyncTasksPanel tasks={asyncTasks} />
+                        <RemotePeersPanel
+                            peers={remotePeers}
+                            onConnect={handleConnect}
+                            onDisconnect={handleDisconnect}
+                            onPing={handlePing}
                         />
                     </div>
-                </div>
+                )}
             </div>
-
-            {/* Right sidebar */}
-            {showSidebar && (
-                <div className="w-96 border-l bg-white overflow-auto flex-shrink-0">
-                    <AsyncTasksPanel tasks={asyncTasks} />
-                    <RemotePeersPanel
-                        peers={remotePeers}
-                        onConnect={handleConnect}
-                        onDisconnect={handleDisconnect}
-                        onPing={handlePing}
-                    />
-                </div>
-            )}
-        </div>
         </REPLProvider>
     );
 }

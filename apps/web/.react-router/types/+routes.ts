@@ -22,12 +22,15 @@ type Pages = {
   "/home": {
     params: {};
   };
+  "/repl": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/bassline-repl" | "/sex-editor" | "/home";
+    page: "/" | "/bassline-repl" | "/sex-editor" | "/home" | "/repl";
   };
   "routes/bassline-repl/route.tsx": {
     id: "routes/bassline-repl";
@@ -40,5 +43,9 @@ type RouteFiles = {
   "routes/home.tsx": {
     id: "routes/home";
     page: "/home";
+  };
+  "routes/repl/route.tsx": {
+    id: "routes/repl";
+    page: "/repl";
   };
 };
