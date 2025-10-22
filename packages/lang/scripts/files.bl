@@ -23,4 +23,6 @@ print "for readme:"
 readme: in f compose [ path: (readmePath) ]
 
 ;print mold f
+functions: nil
 print mold system
+123

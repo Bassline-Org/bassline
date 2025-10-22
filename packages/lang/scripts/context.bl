@@ -1,14 +1,17 @@
-foo: project self [ print ]
+foo: project system [ print ]
 
+print words system
 print words foo
 print type? foo
 
 in foo [ print "hello" ]
 
+
 bar: rename foo [ print ] [ say ]
 print words bar
 
 in bar [ say "hello" ]
+
 
 print words bar
 

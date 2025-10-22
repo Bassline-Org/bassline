@@ -1,10 +1,7 @@
-fn: make pure-fn! [args body] [ make pure-fn! args body ]
+use functions
 
 url: "https://www.google.com"
-
-bl: make process-context! "bassline" []
-
-curl: make process-context! "curl" reduce ["-L", "-s" url]
+curl: make process-context! "curl" (reduce ["-L", "-s" url])
 
 in curl [
     stdout: (fn [str] [ in curl compose [output: (str)] ])
@@ -20,26 +17,28 @@ after (in curl [ :closeTask ]) [
 
 after (sleep 1000) [
     kill
-    print output
+    print mold curl
+    ;print output
 ] curl
 
-in bl [
-    stdout: (fn [str] [ print append "stdout: " str ])
-    stderr: (fn [str] [ print append "stderr: " str ])
-    closeTask: (make task!)
-    close: (fn [code] [ (print append "close: " code) schedule closeTask ])
-    spawn
-]
+;bl: make process-context! "bassline" []
+; in bl [
+;     stdout: (fn [str] [ print append "stdout: " str ])
+;     stderr: (fn [str] [ print append "stderr: " str ])
+;     closeTask: (make task!)
+;     close: (fn [code] [ (print append "close: " code) schedule closeTask ])
+;     spawn
+; ]
 
-after (in bl [ :closeTask ]) [
-    print "close task completed from system"
-] system
+; after (in bl [ :closeTask ]) [
+;     print "close task completed from system"
+; ] system
 
-after (sleep 1000) [
-    send "print words system"
-] bl
+; after (sleep 1000) [
+;     send "print words system"
+; ] bl
 
-after (sleep 2000) [
-    kill
-    print mold bl
-] bl
+; after (sleep 2000) [
+;     kill
+;     print mold bl
+; ] bl

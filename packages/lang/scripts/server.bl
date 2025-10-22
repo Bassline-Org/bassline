@@ -2,8 +2,6 @@ use functions
 
 url: "ws://localhost:8080"
 
-fn: make pure-fn! [args body] [ make pure-fn! args body ]
-
 server: make ws-server! "0.0.0.0" 8080
 
 in server [
@@ -29,7 +27,7 @@ in server [
     listen
 ]
 
-map (iota 10) fn [x] [
+map (iota 1) fn [x] [
     key: (append "hello-" x)
     client: make ws-client! url: "ws://localhost:8080" key: key
     in client [
@@ -55,12 +53,12 @@ map (iota 10) fn [x] [
     ]
 ]
 
-after (sleep 2000) [
-    map (iota 10) fn [x] [
-        key: (append "hello-" x)
-        client: get sessions key
-        in client [
-            write [print (+ 10 20)]
-        ]
-    ]
-] server
+; after (sleep 2000) [
+;     map (iota 10) fn [x] [
+;         key: (append "hello-" x)
+;         client: get sessions key
+;         in client [
+;             write [print (+ 10 20)]
+;         ]
+;     ]
+; ] server

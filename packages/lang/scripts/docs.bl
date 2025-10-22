@@ -4,11 +4,11 @@ print "======first print======="
 print (describe :print)
 print "=======================\n\n"
 
-doc :print 
-"# Print
+; doc :print 
+; "# Print
 
-## Multi Line Test
-"
+; ## Multi Line Test
+; "
 
 print "======second print======="
 print (describe :print)

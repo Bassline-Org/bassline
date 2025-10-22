@@ -7,6 +7,7 @@ import { existsSync } from "fs";
 import { Block, NativeFn, setMany, Str, Value } from "../prelude/index.js";
 import wsServer from "../io/ws-server.js";
 import file from "../io/file.js";
+import processContext from "../io/process.js";
 
 const args = process.argv.slice(2);
 
@@ -51,6 +52,7 @@ setMany(GLOBAL.context, {
     ...replExtras,
     ...wsServer,
     ...file,
+    ...processContext,
 });
 
 const rcPath = process.env.HOME + "/.basslinerc";
