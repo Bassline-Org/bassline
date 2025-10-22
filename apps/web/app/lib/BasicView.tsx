@@ -2,7 +2,7 @@ import { normalize } from "@bassline/lang/utils";
 import * as p from "@bassline/lang/prelude";
 import { useRuntime } from "./RuntimeProvider";
 
-export function Header({ rest }: { rest: p.Value[] }) {
+export function Header({ rest }: { rest: [p.Num, p.Value] }) {
     const [level, content] = rest;
     return (
         <div>
@@ -12,7 +12,7 @@ export function Header({ rest }: { rest: p.Value[] }) {
     );
 }
 
-export function List({ rest }: { rest: p.Value[] }) {
+export function List({ rest }: { rest: [p.Block] }) {
     const [items] = rest;
     return (
         <div>
@@ -28,7 +28,7 @@ export function List({ rest }: { rest: p.Value[] }) {
     );
 }
 
-export function Group({ rest }: { rest: p.Value[] }) {
+export function Group({ rest }: { rest: [p.Str, p.Block] }) {
     const [title, content] = rest;
     return (
         <div>
@@ -38,7 +38,7 @@ export function Group({ rest }: { rest: p.Value[] }) {
     );
 }
 
-export function Button({ rest }: { rest: p.Value[] }) {
+export function Button({ rest }: { rest: [p.Str, p.Block] }) {
     const [label, action] = rest;
     const runtime = useRuntime();
     return (
@@ -51,13 +51,13 @@ export function Button({ rest }: { rest: p.Value[] }) {
     );
 }
 
-export function DisplayValue({ value }: { value: p.Value }) {
+export function DisplayValue({ value }: { value: p.Block }) {
     if (value.is(p.Block)) {
         const [first, ...rest] = value.items;
         if (first.is(p.WordLike)) {
             const Component = displayComponents[first.spelling];
             if (Component) {
-                return <Component rest={rest} />;
+                return <Component rest={rest as any} />;
             } else {
                 return <div>{first.spelling}</div>;
             }

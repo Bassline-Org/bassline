@@ -6,14 +6,38 @@
   "module": "src/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./prelude": "./src/prelude/index.js",
-    "./utils": "./src/utils.js",
-    "./runtime": "./src/runtime.js",
-    "./io/file": "./src/io/file.js",
-    "./io/process": "./src/io/process.js",
-    "./io/ws-server": "./src/io/ws-server.js",
-    "./io/ws-client": "./src/io/ws-client.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./prelude": {
+      "types": "./dist/prelude/index.d.ts",
+      "default": "./src/prelude/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "default": "./src/utils.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./src/runtime.js"
+    },
+    "./io/file": {
+      "types": "./dist/io/file.d.ts",
+      "default": "./src/io/file.js"
+    },
+    "./io/process": {
+      "types": "./dist/io/process.d.ts",
+      "default": "./src/io/process.js"
+    },
+    "./io/ws-server": {
+      "types": "./dist/io/ws-server.d.ts",
+      "default": "./src/io/ws-server.js"
+    },
+    "./io/ws-client": {
+      "types": "./dist/io/ws-client.d.ts",
+      "default": "./src/io/ws-client.js"
+    }
   },
   "bin": {
     "bassline": "./src/bin/cli.js"

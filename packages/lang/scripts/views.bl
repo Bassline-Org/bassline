@@ -3,33 +3,55 @@ views: context [
 
 view-context: context [
     header: (fn [level content] [
-        compose ['header (level) (content)]
+        context (compose [
+            type: 'header
+            level: (level)
+            content: (content)
+        ])
     ])
 
     list: (fn [items] [
-        compose ['list (items)]
+        context (compose [
+            type: 'list
+            items: (items)
+        ])
     ])
 
     item: (fn [content] [
-        compose ['item (content)]
+        context (compose [
+            type: 'item
+            content: (content)
+        ])
     ])
 
     table: (fn [columns rows] [
-        compose ['table (columns) (rows)]
+        context (compose [
+            type: 'table
+            columns: (columns)
+            rows: (rows)
+        ])
     ])
 
     group: (fn [title content] [
-        compose ['group (title) (content)]
+        context (compose [
+            type: 'group
+            title: (title)
+            content: (content)
+        ])
     ])
 
     button: (fn [label action] [
-        compose ['button (label) (action)]
+        context (compose [
+            type: 'button
+            label: (label)
+            action: does (action)
+        ])
     ])
 ]
 
 view: fn [block] [
     use view-context
-    compose block
+    context compose block
 ]
 ]
 
@@ -47,19 +69,15 @@ posts: [
 ]
 
 example-view: view [
-    (group "Users" [
+    users: (group "Users" [
         list ( foreach users [ header 1 it ])
     ])
 
-    (group "Posts" [
+    posts: (group "Posts" [
         list ( foreach posts [ header 1 it ])
     ])
 
-    (button "Click me" [
+    click-me: (button "Click me" [
         print "Button clicked!"
     ])
-]
-
-[
-    in display example-view
 ]
