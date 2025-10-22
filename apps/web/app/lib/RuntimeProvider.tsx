@@ -130,6 +130,10 @@ example-view: view [
     (group "Posts" [
         list ( foreach posts [ header 1 it ])
     ])
+
+    (button "Click me" [
+        print "Button clicked!"
+    ])
 ]
 
 `;
