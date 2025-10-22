@@ -8,7 +8,12 @@ export class Stream {
         return this.items[this.pos + k];
     }
     next() {
-        if (this.pos >= this.items.length) throw new Error("eoi");
+        if (this.pos >= this.items.length) {
+            console.error(
+                `Unexpected end of input! ${this.items} ${this.pos}`,
+            );
+            throw new Error("eoi");
+        }
         return this.items[this.pos++];
     }
     isAtEnd() {

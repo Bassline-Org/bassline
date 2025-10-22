@@ -167,6 +167,7 @@ export const RuntimeProvider = (
     { children }: { children: React.ReactNode },
 ) => {
     const runtime = useRef(createRuntime());
+    runtime.current.context.set("system", runtime.current.context);
     runtime.current.evaluate(parse(rc));
     runtime.current.evaluate(parse(views));
     return (
