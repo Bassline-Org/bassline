@@ -1,0 +1,43 @@
+use functions
+use sockets
+
+client-1: make ws-client!
+
+url: "ws://localhost:8080"
+key: "test"
+
+in client-1 [
+    on-open: fn [] [
+        print "Client opened"
+    ]
+
+    on-error: fn [error] [
+        print (append "Client error: " error)
+    ]
+
+    on-close: fn [] [
+        print "Client closed"
+    ]
+]
+
+client-2: make ws-client!
+
+in client-2 [
+    value: 123
+]
+
+slumber: sleep 2000
+after slumber [
+    open client-1
+    open client-2
+] system
+
+after (sleep 4000) [
+    send client-1 "Hello from client-1"
+    send client-2 "Hello from client-2"
+] system
+
+after (sleep 8000) [
+    close client-1
+    close client-2
+] system

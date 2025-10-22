@@ -1,0 +1,21 @@
+use functions
+use sockets
+
+server: make ws-server! "0.0.0.0" 8080
+
+in server [
+    connection: fn [key] [
+        print (append "Connection established with key: " key)
+        after (sleep 1000) [
+            print "Sending welcome message to client"
+            send [print "Welcome to the server"]
+        ] (get sessions key)
+    ]
+]
+
+open server
+
+after (sleep 20000) [
+    close server
+    print "Server closed"
+] system

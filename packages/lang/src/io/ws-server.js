@@ -10,79 +10,51 @@ import { parse } from "../parser.js";
 import { WebSocketServer } from "ws";
 import { evaluate } from "../evaluator.js";
 import { WsClient } from "./ws-client.js";
+import { Sock } from "./socket.js";
 
-export class WsServer extends ContextChain {
+export class WsServer extends Sock {
     static type = normalizeString("ws-server!");
 
     constructor(host, port, context) {
         super(context);
         this.set("host", host);
         this.set("port", port);
-        this.set("sessions", new ContextChain(this));
-        this.set(
-            "listen",
-            new NativeFn([], ([], stream, context) => {
-                this.listen(this.get("port").value, this.get("host").value);
-                return nil;
-            }),
-        );
         this.id = 0;
+        this.set("sessions", new ContextChain(this));
+    }
+
+    addServerListeners() {
+        this.server.on("connection", (client, request) => {
+            const key = request.headers["key"];
+            if (!key) {
+                client.send('error "No key provided!"');
+                client.close();
+            }
+            const clientHandle = new WsClient(this, client);
+            clientHandle.open();
+            this.id = this.id + 1;
+            const sessions = this.get("sessions");
+            sessions.set(new Str(key), clientHandle);
+            evaluate(parse(`connection "${key}"`), this);
+        });
+        this.server.on("error", (error) => {
+            this.error(error.message);
+        });
+    }
+
+    open() {
+        const port = this.get("port").value;
+        const host = this.get("host").value;
+        this.server = new WebSocketServer({ port, host });
+        this.addServerListeners();
     }
 
     close() {
         this.server.close();
-        return nil;
     }
 
-    listen(port, host) {
-        if (this.server) return;
-        this.server = new WebSocketServer({ port, host });
-        this.server.on("connection", (client, request) => {
-            const key = request.headers["key"];
-            if (!key) {
-                client.send('print "No key provided!"');
-                client.close();
-                return;
-            }
-            const clientHandle = new WsClient(this, client);
-            clientHandle.connect();
-            this.id = this.id + 1;
-            this.get("sessions").set(new Str(key), clientHandle);
-            evaluate(parse(`connection "${key}"`), this);
-        });
-        this.server.on("error", (error) => {
-            evaluate(parse(`error "${error.message}"`), this);
-        });
-        this.server.on("listening", () => {
-            evaluate(parse(`listening ${port}`), this);
-        });
-    }
     error(message) {
         console.error(message);
-        return nil;
-    }
-
-    /**
-     * Broadcast a message to all connected clients
-     * @param {Str} str - Message to broadcast
-     */
-    broadcast(str) {
-        const message = str.value;
-        for (const client of this.clients) {
-            if (!client.closed) {
-                client.write(new Str(message));
-            }
-        }
-        return nil;
-    }
-
-    cleanup() {
-        // Close all client connections
-        for (const client of this.clients) {
-            client.close();
-        }
-        // Close the server
-        this.resource.close();
     }
 
     form() {
