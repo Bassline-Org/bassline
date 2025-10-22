@@ -1,4 +1,4 @@
-import { ContextBase, ContextChain } from "./context.js";
+import { ContextChain } from "./context.js";
 import { Datatype, GetWord, LitWord, Str, Value, Word } from "./core.js";
 import { normalizeString } from "../../utils.js";
 import { evaluate } from "../../evaluator.js";
@@ -58,7 +58,7 @@ export class NativeFn extends Value {
     }
 }
 
-export class NativeMethod extends NativeFn {
+export class NativeMethod extends Value {
     static type = normalizeString("native-method!");
     constructor(spec, selector) {
         super(spec, ([target, ...args], stream, context) => {
@@ -99,7 +99,7 @@ export class NativeMethod extends NativeFn {
     }
 }
 
-export class PureFn extends ContextBase {
+export class PureFn extends ContextChain {
     static type = normalizeString("pure-fn!");
     constructor(args, body) {
         super();

@@ -15,6 +15,15 @@ in server [
             in session (cmd)
         ])
     ]
+    task: make task!
+    on-close: fn [] [
+        print "Server closed"
+        schedule task
+    ]
 ]
 
 open server
+
+after (sleep 20000) [
+    close server
+]

@@ -1,10 +1,4 @@
-import {
-    ContextChain,
-    Datatype,
-    NativeFn,
-    nil,
-    Str,
-} from "../prelude/index.js";
+import { Datatype, Str } from "../prelude/index.js";
 import { normalizeString } from "../utils.js";
 import { parse } from "../parser.js";
 import { evaluate } from "../evaluator.js";
@@ -35,9 +29,9 @@ export class WsClient extends Sock {
     }
     send(data) {
         const molded = data?.mold?.();
-        if (!molded) return nil;
+        if (!molded) return this;
         this.client.send(molded.value);
-        return nil;
+        return this;
     }
     error(message) {
         console.error(message);

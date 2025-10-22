@@ -4,7 +4,14 @@ import { GLOBAL } from "../runtime.js";
 import * as repl from "node:repl";
 import { parse } from "../parser.js";
 import { existsSync } from "fs";
-import { Block, NativeFn, setMany, Str, Value } from "../prelude/index.js";
+import {
+    Block,
+    NativeFn,
+    setMany,
+    Str,
+    Unset,
+    Value,
+} from "../prelude/index.js";
 import wsServer from "../io/ws-server.js";
 import file from "../io/file.js";
 import processContext from "../io/process.js";
@@ -76,7 +83,7 @@ if (fileToLoad) {
 
         // Only print result if not entering interactive mode
         if (!interactiveMode) {
-            if (result instanceof Value) {
+            if (!result.is(Unset)) {
                 console.log(result.form().value);
             }
         } else {

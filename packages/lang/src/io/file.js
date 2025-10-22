@@ -1,10 +1,4 @@
-import {
-    ContextChain,
-    Datatype,
-    NativeFn,
-    nil,
-    Str,
-} from "../prelude/index.js";
+import { ContextChain, Datatype, NativeFn, Str } from "../prelude/index.js";
 import { appendFileSync, readFileSync, writeFileSync } from "fs";
 import { normalizeString } from "../utils.js";
 
@@ -22,13 +16,15 @@ class FileContext extends ContextChain {
         this.set(
             "write",
             new NativeFn(["content"], ([content], stream, context) => {
-                return this.write(content);
+                this.write(content);
+                return this;
             }),
         );
         this.set(
             "append",
             new NativeFn(["content"], ([content], stream, context) => {
-                return this.append(content);
+                this.append(content);
+                return this;
             }),
         );
     }
@@ -40,11 +36,9 @@ class FileContext extends ContextChain {
     }
     write(content) {
         writeFileSync(this.path().value, content.to("string!").value);
-        return nil;
     }
     append(content) {
         appendFileSync(this.path().value, content.to("string!").value);
-        return nil;
     }
 
     form() {
@@ -75,7 +69,7 @@ export default {
                 path.to("string!").value,
                 content.to("string!").value,
             );
-            return nil;
+            return content;
         },
     ),
 };

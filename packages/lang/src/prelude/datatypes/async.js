@@ -1,12 +1,11 @@
-import { Datatype, Value } from "./core.js";
 import { evaluate } from "../../evaluator.js";
 import { normalizeString } from "../../utils.js";
-import { nil, Str } from "./core.js";
+import { Datatype, Str, unset, Value } from "./core.js";
 import { NativeFn, NativeMethod } from "./functions.js";
 
 export class Task extends Value {
     static type = normalizeString("task!");
-    constructor(promise = null) {
+    constructor(promise) {
         super();
         if (promise) {
             this._status = "pending";
@@ -60,7 +59,7 @@ export default {
         const task = new Task();
 
         setTimeout(() => {
-            task.resolve(nil);
+            task.resolve(unset);
         }, ms.value);
 
         return task;

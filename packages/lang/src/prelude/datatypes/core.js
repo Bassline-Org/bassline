@@ -38,8 +38,12 @@ export class Value {
         this.documentation = docString;
     }
 
+    is(type) {
+        return this instanceof type;
+    }
+
     describe() {
-        return this.documentation ?? nil;
+        return this.documentation ?? unset;
     }
 
     equals(other) {
@@ -348,8 +352,8 @@ export class Word extends WordLike {
     static type = normalizeString("word!");
     evaluate(stream, context) {
         const value = context.get(this);
-        if (!value) {
-            return nil;
+        if (value.is(Unset)) {
+            return unset;
         }
         return value.evaluate(stream, context);
     }
@@ -513,33 +517,38 @@ export class Datatype extends Value {
     }
 }
 
-// Nil value
-// This is a singleton, and should be used via `nil`
-// That's also why the make method throws an error
-export class Nil extends Value {
-    static type = normalizeString("nil!");
-    constructor() {
-        super();
-        if (!Nil.nil) {
-            Nil.nil = this;
-        }
-    }
-    evaluate(stream, context) {
-        return this;
-    }
-    equals(other) {
-        return other === this ? Bool.t : Bool.f;
-    }
+export class Unset extends Value {
+    static type = normalizeString("unset!");
     form() {
         return new Str(this.type);
     }
-    static nil;
+    mold() {
+        return new Str("make unset!");
+    }
     static make(stream, context) {
-        return Nil.nil;
+        return new Unset();
     }
 }
 
-export const nil = new Nil();
+export const unset = new Unset();
+
+export class Err extends Value {
+    static type = normalizeString("err!");
+    constructor(message) {
+        super();
+        this.message = message;
+    }
+    form() {
+        return new Str(`err! [${this.message}]`);
+    }
+    mold() {
+        return new Str(`err! [${this.message}]`);
+    }
+    static make(stream, context) {
+        const message = stream.next().evaluate(stream, context).to("string!");
+        return new Err(message.value);
+    }
+}
 
 export default {
     "number!": new Datatype(Num),
@@ -552,8 +561,8 @@ export default {
     "block!": new Datatype(Block),
     "paren!": new Datatype(Paren),
     "datatype!": new Datatype(Datatype),
-    "nil!": new Datatype(Nil),
-    "nil": nil,
+    "unset!": new Datatype(Unset),
+    "err!": new Datatype(Err),
     "true": new Bool(true),
     "false": new Bool(false),
 };

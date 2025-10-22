@@ -1,54 +1,59 @@
 import { normalize, normalizeString } from "../../utils.js";
-import { Block, Bool, Datatype, Nil, nil, Str, Value, Word } from "./core.js";
-import { NativeFn, NativeMethod } from "./functions.js";
+import {
+    Block,
+    Bool,
+    Datatype,
+    LitWord,
+    Str,
+    Unset,
+    unset,
+    Value,
+    Word,
+    WordLike,
+} from "./core.js";
+import { isCallable } from "./functions.js";
+
+export const keys = {
+    self: normalize("self"),
+    parent: normalize("parent"),
+};
 
 export class ContextBase extends Value {
     static type = normalizeString("context!");
     constructor() {
         super();
         this.bindings = new Map();
-        this.set("self", this);
+        this.set(keys.self, this);
+    }
+
+    relevantEntries() {
+        return this.bindings.entries().filter(([key, value]) => {
+            return !(
+                isCallable(value) ||
+                value.is(Datatype) ||
+                value.is(Bool) ||
+                value.is(Unset) ||
+                key === keys.self ||
+                key === keys.parent
+            );
+        });
     }
 
     values() {
-        const values = [];
-        for (const [key, value] of this.bindings.entries()) {
-            if (
-                value instanceof NativeFn ||
-                value instanceof NativeMethod ||
-                value instanceof Datatype ||
-                value instanceof Bool ||
-                value instanceof Nil ||
-                key === this.keyFor("self") ||
-                key === this.keyFor("parent")
-            ) continue;
-            values.push(value);
-        }
-        return new Block(values);
+        return new Block(this.relevantEntries().map(([key, value]) => value));
     }
 
     keys() {
-        const keys = [];
-        for (const [key, value] of this.bindings.entries()) {
-            if (
-                value instanceof NativeFn ||
-                value instanceof NativeMethod ||
-                value instanceof Datatype ||
-                value instanceof Bool ||
-                value instanceof Nil ||
-                key === this.keyFor("self") ||
-                key === this.keyFor("parent")
-            ) continue;
-            keys.push(new Word(key));
-        }
-        return new Block(keys);
+        return new Block(
+            this.relevantEntries().map(([key, value]) => new LitWord(key)),
+        );
     }
 
     keyFor(word) {
         if (typeof word === "symbol") return word;
-        if (word?.spelling) return word.spelling;
-        if (word instanceof Str) return normalize(word.value);
         if (typeof word === "string") return normalize(word);
+        if (word.is(WordLike)) return word.spelling;
+        if (word.is(Str)) return normalize(word.value);
         throw new Error(`Invalid string ${JSON.stringify(word)}`);
     }
 
@@ -68,7 +73,7 @@ export class ContextBase extends Value {
         const spelling = this.keyFor(word);
         const value = this.bindings.get(spelling);
         if (value === undefined) {
-            return nil;
+            return unset;
         }
         return value;
     }
@@ -97,7 +102,7 @@ export class ContextBase extends Value {
 
     copy(targetContext = this.clone()) {
         for (const [word, value] of this.bindings.entries()) {
-            if (word === this.keyFor("self")) continue;
+            if (word === keys.self) continue;
             targetContext.set(word, value);
         }
         return targetContext;
@@ -106,7 +111,7 @@ export class ContextBase extends Value {
     project(words) {
         const newContext = this.fresh();
         for (const word of words.items) {
-            if (word === this.keyFor("self")) continue;
+            if (word === keys.self) continue;
             newContext.set(word, this.get(word));
         }
         return newContext;
@@ -146,22 +151,9 @@ context! [
     }
 
     moldEntries() {
-        const parts = [];
-        for (const [key, value] of this.bindings) {
-            if (
-                value instanceof NativeFn ||
-                value instanceof NativeMethod ||
-                value instanceof Datatype ||
-                value instanceof Bool ||
-                value instanceof Nil ||
-                key === this.keyFor("self") ||
-                key === this.keyFor("parent")
-            ) {
-                continue;
-            }
-            parts.push(`${key.description}: ${value.mold().value}`);
-        }
-        return parts.join("\n  ");
+        return this.relevantEntries().map(([key, value]) =>
+            `${key.description}: ${value.mold().value}`
+        ).join("\n  ");
     }
 
     mold() {
@@ -169,13 +161,12 @@ context! [
         const natives = [];
         for (const [key, value] of this.bindings) {
             if (
-                value instanceof NativeFn ||
-                value instanceof NativeMethod ||
+                isCallable(value) ||
                 value instanceof Datatype ||
                 value instanceof Bool ||
-                value instanceof Nil ||
-                key === this.keyFor("self") ||
-                key === this.keyFor("parent")
+                value instanceof Unset ||
+                key === keys.self ||
+                key === keys.parent
             ) continue; // TODO: Push the missing natives into a projection from system
             // IE in (project system [<MISSING_NATIVES>] <Block>)
             if (value === this) continue;
@@ -194,22 +185,20 @@ context! [
 
 export class ContextChain extends ContextBase {
     static type = normalizeString("context-chain!");
-    constructor(parent = nil) {
+    constructor(parent) {
         super();
-        if (parent !== nil) {
-            this.set("parent", parent);
+        if (parent) {
+            this.set(keys.parent, parent);
         }
     }
 
     hasParent() {
-        return this.bindings.has(this.keyFor("parent"));
+        return this.bindings.has(keys.parent);
     }
 
     parent() {
-        const p = this.bindings.get(this.keyFor("parent"));
-        if (p === undefined) {
-            return nil;
-        }
+        const p = this.bindings.get(keys.parent);
+        if (!p) return unset;
         return p;
     }
 
@@ -231,8 +220,8 @@ export class ContextChain extends ContextBase {
 
     copy(targetContext = this.clone()) {
         for (const [key, value] of this.bindings.entries()) {
-            if (key === this.keyFor("self")) continue;
-            if (key === this.keyFor("parent")) continue;
+            if (key === keys.self) continue;
+            if (key === keys.parent) continue;
             targetContext.set(key, value);
         }
         return targetContext;
@@ -249,7 +238,7 @@ export class ContextChain extends ContextBase {
             const p = this.parent();
             return p.get(word);
         }
-        return nil;
+        return unset;
     }
 
     static make(stream, context) {

@@ -1,10 +1,4 @@
-import {
-    ContextChain,
-    Datatype,
-    NativeFn,
-    nil,
-    Str,
-} from "../prelude/index.js";
+import { ContextChain, Datatype, Str } from "../prelude/index.js";
 import { normalizeString } from "../utils.js";
 import { parse } from "../parser.js";
 import { WebSocketServer } from "ws";
@@ -36,6 +30,10 @@ export class WsServer extends Sock {
             const sessions = this.get("sessions");
             sessions.set(new Str(key), clientHandle);
             evaluate(parse(`connection "${key}"`), this);
+        });
+        this.server.on("close", () => {
+            this.closeSocket();
+            evaluate(parse("on-close"), this);
         });
         this.server.on("error", (error) => {
             this.error(error.message);

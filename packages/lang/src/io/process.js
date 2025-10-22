@@ -1,5 +1,5 @@
 import { NativeFn } from "../prelude/index.js";
-import { Block, Datatype, nil, Num, Str, Word } from "../prelude/index.js";
+import { Block, Datatype, Num, Str, Word } from "../prelude/index.js";
 import { ContextChain } from "../prelude/index.js";
 import { normalizeString } from "../utils.js";
 import { spawn } from "child_process";
@@ -14,7 +14,7 @@ class ProcessContext extends ContextChain {
         this.set(
             "spawn",
             new NativeFn([], ([], stream, context) => {
-                if (this.spawned) return nil;
+                if (this.spawned) return this;
                 const command = this.command().value;
                 const args = this.args().items.map((arg) => arg.value);
                 this.spawned = spawn(command, args);
@@ -35,21 +35,21 @@ class ProcessContext extends ContextChain {
                     //console.log("close block: ", block.form().value);
                     evaluate(block, this);
                 });
-                return nil;
+                return this;
             }),
         );
         this.set(
             "send",
             new NativeFn(["data"], ([data], stream, context) => {
                 this.send(data);
-                return nil;
+                return this;
             }),
         );
         this.set(
             "kill",
             new NativeFn([], ([], stream, context) => {
                 this.kill();
-                return nil;
+                return this;
             }),
         );
     }

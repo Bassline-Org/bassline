@@ -5,18 +5,20 @@ import async from "./async.js";
 
 export {
     Block,
+    Bool,
     Datatype,
     GetWord,
     LitWord,
-    nil,
     Num,
     Paren,
     SetWord,
     Str,
+    Unset,
+    unset,
     Value,
     Word,
 } from "./core.js";
-export { NativeFn, NativeMethod, PureFn } from "./functions.js";
+export { isCallable, NativeFn, NativeMethod, PureFn } from "./functions.js";
 export { ContextBase, ContextChain, setMany } from "./context.js";
 export { Task } from "./async.js";
 
