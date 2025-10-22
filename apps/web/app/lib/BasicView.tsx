@@ -1,8 +1,9 @@
 import { normalize } from "@bassline/lang/utils";
 import * as p from "@bassline/lang/prelude";
+import { evaluate, parse } from "@bassline/lang";
 import { useRuntime } from "./RuntimeProvider";
 import { Button as ShadButton } from "~/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import React from "react";
 
 export function Header({ context }: { context: p.ContextBase }) {
@@ -16,13 +17,13 @@ export function Header({ context }: { context: p.ContextBase }) {
         3: "text-xl font-semibold mb-2",
         4: "text-lg font-medium mb-2",
         5: "text-base font-medium mb-1",
-        6: "text-sm font-medium mb-1"
+        6: "text-sm font-medium mb-1",
     }[headingLevel];
 
     return React.createElement(
         `h${headingLevel}`,
         { className: headingClasses },
-        React.createElement(DisplayValue, { value: content })
+        React.createElement(DisplayValue, { value: content }),
     );
 }
 
@@ -45,7 +46,9 @@ export function Group({ context }: { context: p.ContextBase }) {
     return (
         <Card className="mb-4">
             <CardHeader>
-                <CardTitle>{title?.value || title?.form?.().value || ""}</CardTitle>
+                <CardTitle>
+                    {title?.value || title?.form?.().value || ""}
+                </CardTitle>
             </CardHeader>
             <CardContent>
                 <DisplayValue value={content} />
@@ -56,11 +59,10 @@ export function Group({ context }: { context: p.ContextBase }) {
 
 export function Button({ context }: { context: p.ContextBase }) {
     const label = context.get("label");
-    const action = context.get("action"); // This is already a function
-    const runtime = useRuntime();
+    console.log("context", context);
     return (
-        <ShadButton onClick={() => runtime.evaluate(action)}>
-            {label?.value || label?.form?.().value || ""}
+        <ShadButton onClick={() => evaluate(parse("action"), context)}>
+            <DisplayValue value={label} />
         </ShadButton>
     );
 }
@@ -75,16 +77,20 @@ export function Item({ context }: { context: p.ContextBase }) {
 }
 
 export function View({ context }: { context: p.ContextBase }) {
-    // Get all values from the context (excluding functions, types, etc.)
-    const values = context.values();
-    if (values && values.items && values.items.length > 0) {
-        return (
-            <div className="space-y-4">
-                {values.items.map((item: p.Value, index: number) => (
-                    <DisplayValue key={index} value={item} />
-                ))}
-            </div>
-        );
+    // Get the children field which contains the composed block
+    const children = context.get("children");
+
+    if (children && children.is && children.is(p.Block)) {
+        const block = children as p.Block;
+        if (block.items && block.items.length > 0) {
+            return (
+                <div className="space-y-4">
+                    {block.items.map((item: p.Value, index: number) => (
+                        <DisplayValue key={index} value={item} />
+                    ))}
+                </div>
+            );
+        }
     }
     return <span className="text-muted-foreground">Empty view</span>;
 }
@@ -99,7 +105,10 @@ export function Table({ context }: { context: p.ContextBase }) {
                 <thead>
                     <tr className="border-b">
                         {columns?.items?.map((col: p.Value, i: number) => (
-                            <th key={i} className="px-4 py-2 text-left font-medium text-muted-foreground">
+                            <th
+                                key={i}
+                                className="px-4 py-2 text-left font-medium text-muted-foreground"
+                            >
                                 <DisplayValue value={col} />
                             </th>
                         ))}
@@ -107,7 +116,10 @@ export function Table({ context }: { context: p.ContextBase }) {
                 </thead>
                 <tbody className="divide-y divide-border">
                     {rows?.items?.map((row: p.Block, i: number) => (
-                        <tr key={i} className="border-b hover:bg-accent/50 transition-colors">
+                        <tr
+                            key={i}
+                            className="border-b hover:bg-accent/50 transition-colors"
+                        >
                             {row.items?.map((cell: p.Value, j: number) => (
                                 <td key={j} className="px-4 py-2">
                                     <DisplayValue value={cell} />
@@ -127,15 +139,23 @@ export function DisplayValue({ value }: { value: p.Value }) {
         const context = value as p.ContextBase;
         const type = context.get("type");
 
-        if (type && type.is && type.is(p.Word)) {
+        if (type && type.is && type.is(p.WordLike)) {
             const Component = displayComponents[type.spelling];
             if (Component) {
                 return <Component context={context} />;
             }
-            return <span className="text-muted-foreground">Unknown component: {type.spelling}</span>;
+            return (
+                <span className="text-muted-foreground">
+                    Unknown component: {type.spelling}
+                </span>
+            );
         }
         // Fallback for contexts without type
-        return <span className="text-muted-foreground">{context.form().value}</span>;
+        return (
+            <span className="text-muted-foreground">
+                {context.form().value}
+            </span>
+        );
     }
 
     // Handle blocks (for backward compatibility or lists of items)

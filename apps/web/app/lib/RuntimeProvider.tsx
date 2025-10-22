@@ -76,7 +76,7 @@ views: context [
 
 view-context: context [
     header: (fn [level content] [
-        context [
+        context compose [
             type: 'header
             level: (level)
             content: (content)
@@ -84,21 +84,21 @@ view-context: context [
     ])
 
     list: (fn [items] [
-        context [
+        context compose [
             type: 'list
             items: (items)
         ]
     ])
 
     item: (fn [content] [
-        context [
+        context compose [
             type: 'item
             content: (content)
         ]
     ])
 
     table: (fn [columns rows] [
-        context [
+        context compose [
             type: 'table
             columns: (columns)
             rows: (rows)
@@ -106,27 +106,27 @@ view-context: context [
     ])
 
     group: (fn [title content] [
-        context [
+        context compose [
             type: 'group
             title: (title)
-            content: (content)
+            content: (compose content)
         ]
     ])
 
     button: (fn [label action] [
-        context [
+        context compose [
             type: 'button
             label: (label)
-            action: (does (action))
+            action: does (action)
         ]
     ])
 ]
 
 view: fn [block] [
     use view-context
-    context [
+    context compose [
         type: 'view
-        children: (block)
+        children: (compose block)
     ]
 ]
 ]
@@ -148,11 +148,11 @@ posts: [
 
 example-view: view [
     (group "Users" [
-        list ( foreach users [ header 1 it ])
+        (list foreach users [ header 1 it ])
     ])
 
     (group "Posts" [
-        list ( foreach posts [ header 1 it ])
+        (list foreach posts [ header 1 it ])
     ])
 
     (button "Click me" [
