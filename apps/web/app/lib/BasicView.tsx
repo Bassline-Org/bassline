@@ -74,6 +74,21 @@ export function Item({ context }: { context: p.ContextBase }) {
     );
 }
 
+export function View({ context }: { context: p.ContextBase }) {
+    // Get all values from the context (excluding functions, types, etc.)
+    const values = context.values();
+    if (values && values.items && values.items.length > 0) {
+        return (
+            <div className="space-y-4">
+                {values.items.map((item: p.Value, index: number) => (
+                    <DisplayValue key={index} value={item} />
+                ))}
+            </div>
+        );
+    }
+    return <span className="text-muted-foreground">Empty view</span>;
+}
+
 export function Table({ context }: { context: p.ContextBase }) {
     const columns = context.get("columns");
     const rows = context.get("rows");
@@ -119,6 +134,8 @@ export function DisplayValue({ value }: { value: p.Value }) {
             }
             return <span className="text-muted-foreground">Unknown component: {type.spelling}</span>;
         }
+        // Fallback for contexts without type
+        return <span className="text-muted-foreground">{context.form().value}</span>;
     }
 
     // Handle blocks (for backward compatibility or lists of items)
@@ -138,6 +155,7 @@ export function DisplayValue({ value }: { value: p.Value }) {
 }
 
 export const displayComponents = {
+    [normalize("view")]: View,
     [normalize("header")]: Header,
     [normalize("list")]: List,
     [normalize("group")]: Group,

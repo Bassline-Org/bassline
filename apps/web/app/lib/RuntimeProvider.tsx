@@ -124,7 +124,10 @@ view-context: context [
 
 view: fn [block] [
     use view-context
-    context block
+    context [
+        type: 'view
+        children: (block)
+    ]
 ]
 ]
 
@@ -144,17 +147,17 @@ posts: [
 ]
 
 example-view: view [
-    users: group "Users" [
+    (group "Users" [
         list ( foreach users [ header 1 it ])
-    ]
+    ])
 
-    posts: group "Posts" [
+    (group "Posts" [
         list ( foreach posts [ header 1 it ])
-    ]
+    ])
 
-    click-me: button "Click me" [
+    (button "Click me" [
         print "Button clicked!"
-    ]
+    ])
 ]
 `;
 
