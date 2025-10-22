@@ -5,8 +5,9 @@ import { Button as ShadButton } from "~/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "~/components/ui/card";
 import React from "react";
 
-export function Header({ rest }: { rest: [p.Num, p.Value] }) {
-    const [level, content] = rest;
+export function Header({ context }: { context: p.ContextBase }) {
+    const level = context.get("level");
+    const content = context.get("content");
     const headingLevel = Math.min(6, Math.max(1, level?.value || 1));
 
     const headingClasses = {
@@ -25,11 +26,11 @@ export function Header({ rest }: { rest: [p.Num, p.Value] }) {
     );
 }
 
-export function List({ rest }: { rest: [p.Block] }) {
-    const [items] = rest;
+export function List({ context }: { context: p.ContextBase }) {
+    const items = context.get("items");
     return (
         <ul className="space-y-2 pl-4">
-            {items.items.map((item: p.Value, index: number) => (
+            {items?.items?.map((item: p.Value, index: number) => (
                 <li key={index} className="list-disc">
                     <DisplayValue value={item} />
                 </li>
@@ -38,12 +39,13 @@ export function List({ rest }: { rest: [p.Block] }) {
     );
 }
 
-export function Group({ rest }: { rest: [p.Str, p.Block] }) {
-    const [title, content] = rest;
+export function Group({ context }: { context: p.ContextBase }) {
+    const title = context.get("title");
+    const content = context.get("content");
     return (
         <Card className="mb-4">
             <CardHeader>
-                <CardTitle>{title.value}</CardTitle>
+                <CardTitle>{title?.value || title?.form?.().value || ""}</CardTitle>
             </CardHeader>
             <CardContent>
                 <DisplayValue value={content} />
@@ -52,27 +54,76 @@ export function Group({ rest }: { rest: [p.Str, p.Block] }) {
     );
 }
 
-export function Button({ rest }: { rest: [p.Str, p.Block] }) {
-    const [label, action] = rest;
+export function Button({ context }: { context: p.ContextBase }) {
+    const label = context.get("label");
+    const action = context.get("action"); // This is already a function
     const runtime = useRuntime();
     return (
         <ShadButton onClick={() => runtime.evaluate(action)}>
-            {label.value}
+            {label?.value || label?.form?.().value || ""}
         </ShadButton>
     );
 }
 
+export function Item({ context }: { context: p.ContextBase }) {
+    const content = context.get("content");
+    return (
+        <div className="px-2 py-1">
+            <DisplayValue value={content} />
+        </div>
+    );
+}
+
+export function Table({ context }: { context: p.ContextBase }) {
+    const columns = context.get("columns");
+    const rows = context.get("rows");
+
+    return (
+        <div className="overflow-auto">
+            <table className="min-w-full divide-y divide-border">
+                <thead>
+                    <tr className="border-b">
+                        {columns?.items?.map((col: p.Value, i: number) => (
+                            <th key={i} className="px-4 py-2 text-left font-medium text-muted-foreground">
+                                <DisplayValue value={col} />
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                    {rows?.items?.map((row: p.Block, i: number) => (
+                        <tr key={i} className="border-b hover:bg-accent/50 transition-colors">
+                            {row.items?.map((cell: p.Value, j: number) => (
+                                <td key={j} className="px-4 py-2">
+                                    <DisplayValue value={cell} />
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
 export function DisplayValue({ value }: { value: p.Value }) {
+    // Check if value is a context with a 'type' binding
+    if (value && value.is && value.is(p.ContextBase)) {
+        const context = value as p.ContextBase;
+        const type = context.get("type");
+
+        if (type && type.is && type.is(p.Word)) {
+            const Component = displayComponents[type.spelling];
+            if (Component) {
+                return <Component context={context} />;
+            }
+            return <span className="text-muted-foreground">Unknown component: {type.spelling}</span>;
+        }
+    }
+
+    // Handle blocks (for backward compatibility or lists of items)
     if (value && value.is && value.is(p.Block)) {
         const block = value as p.Block;
-        const [first, ...rest] = block.items;
-        if (first && first.is && first.is(p.WordLike)) {
-            const Component = displayComponents[first.spelling];
-            if (Component) {
-                return <Component rest={rest as any} />;
-            }
-            return <span className="text-muted-foreground">{first.spelling}</span>;
-        }
         return (
             <div className="space-y-2">
                 {block.items.map((item: p.Value, index: number) => (
@@ -81,6 +132,8 @@ export function DisplayValue({ value }: { value: p.Value }) {
             </div>
         );
     }
+
+    // Handle primitive values
     return <span>{value?.form ? value.form().value : String(value)}</span>;
 }
 
@@ -89,6 +142,8 @@ export const displayComponents = {
     [normalize("list")]: List,
     [normalize("group")]: Group,
     [normalize("button")]: Button,
+    [normalize("item")]: Item,
+    [normalize("table")]: Table,
 };
 
 export default displayComponents;

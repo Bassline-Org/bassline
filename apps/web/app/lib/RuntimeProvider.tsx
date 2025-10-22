@@ -73,40 +73,62 @@ sockets: context [
 export const views = `
 use functions
 views: context [
-    
+
 view-context: context [
     header: (fn [level content] [
-        compose ['header (level) (content)]
+        context [
+            type: 'header
+            level: (level)
+            content: (content)
+        ]
     ])
 
     list: (fn [items] [
-        compose ['list (items)]
+        context [
+            type: 'list
+            items: (items)
+        ]
     ])
 
     item: (fn [content] [
-        compose ['item (content)]
+        context [
+            type: 'item
+            content: (content)
+        ]
     ])
 
     table: (fn [columns rows] [
-        compose ['table (columns) (rows)]
+        context [
+            type: 'table
+            columns: (columns)
+            rows: (rows)
+        ]
     ])
 
     group: (fn [title content] [
-        compose ['group (title) (content)]
+        context [
+            type: 'group
+            title: (title)
+            content: (content)
+        ]
     ])
 
     button: (fn [label action] [
-        compose ['button (label) (action)]
+        context [
+            type: 'button
+            label: (label)
+            action: (does (action))
+        ]
     ])
 ]
 
 view: fn [block] [
     use view-context
-    compose block
+    context block
 ]
 ]
-use views
 
+use views
 
 users: [
     "John Doe"
@@ -122,19 +144,18 @@ posts: [
 ]
 
 example-view: view [
-    (group "Users" [
+    users: group "Users" [
         list ( foreach users [ header 1 it ])
-    ])
+    ]
 
-    (group "Posts" [
+    posts: group "Posts" [
         list ( foreach posts [ header 1 it ])
-    ])
+    ]
 
-    (button "Click me" [
+    click-me: button "Click me" [
         print "Button clicked!"
-    ])
+    ]
 ]
-
 `;
 
 export const RuntimeContext = createContext<any>(null);
