@@ -1,15 +1,15 @@
 import { method } from "../method.js";
 import * as t from "./datatypes/types.js";
-import { doBlock, evaluate } from "../evaluator.js";
+import { doBlock, evaluate, reduceBlock } from "../evaluator.js";
 import { fn, nativeMethod } from "./datatypes/methods.js";
 const { TYPES } = t;
 
 export { defMake, make };
-const [defMake, make] = method();
+const [defMake, make] = method((first) => first.value);
 
 const makeMethod = nativeMethod(["dataType", "'value"], make);
 
-defMake(t.contextChain, (_, block, context, iter) => {
+defMake(TYPES.contextChain, (_, block, context, iter) => {
     const ctx = t.contextChain(new Map());
     t.bind(ctx, t.word("self"), ctx);
     t.bind(ctx, t.word("parent"), context);
@@ -17,7 +17,7 @@ defMake(t.contextChain, (_, block, context, iter) => {
     return result;
 });
 
-defMake(t.fn, (_, block, context, iter) => {
+defMake(TYPES.fn, (_, block, context, iter) => {
     const reduced = reduceBlock(block, context);
     const args = reduced.value[0];
     const body = reduced.value[1];

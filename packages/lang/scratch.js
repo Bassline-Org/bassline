@@ -28,6 +28,7 @@ t.setMany(ctx, makeFns);
 //bind(ctx, t.word("foo"), exampleFn);
 //const binding = t.block([t.setWord("foo"), exampleFn]);
 
-const expr = parse("print :fn!");
+const expr = parse("foo: make fn! [[a b] [a b]]");
 doBlock(expr, ctx);
+doBlock(parse("foo :print 123"), ctx);
 //console.log(ctx);

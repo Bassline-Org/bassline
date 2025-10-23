@@ -1,3 +1,7 @@
+export const defaultDispatch = (first, ...rest) => {
+    return first.type;
+};
+
 /**
  * Creates a method object that can be used to define methods for a given type.
  * The first function is used to define the method for a given type.
@@ -10,20 +14,20 @@
  * });
  * callMethod(types.context, "foo");
  */
-export const method = () => {
+export const method = (dispatch = defaultDispatch) => {
     const cases = {};
     return [
         (type, impl) => {
             cases[type] = impl;
         },
         (first, ...rest) => {
-            const { type } = first;
-            const impl = cases[type];
+            const dispatchValue = dispatch(first, ...rest);
+            const impl = cases[dispatchValue];
             if (impl) {
                 return impl(first, ...rest);
             }
             throw new Error(
-                `No implementation found for type: ${JSON.stringify(first)}`,
+                `No implementation found for type: ${dispatchValue.toString()}`,
             );
         },
     ];
