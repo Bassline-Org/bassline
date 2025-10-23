@@ -1,6 +1,5 @@
-import { Stream } from "./stream.js";
-import { Block, Paren, unset } from "./prelude/index.js";
 import { method } from "./method.js";
+import { lookup } from "./prelude/datatypes/methods.js";
 import * as t from "./prelude/datatypes/types.js";
 const types = t.TYPES;
 
@@ -33,6 +32,20 @@ export const defEval = evaluator[0];
  * @returns {BasslineValue} The evaluated value.
  */
 export const evaluate = evaluator[1];
+
+export const collectArguments = (spec, context, iter) => {
+    return spec.map((arg) => {
+        const next = iter.next().value;
+        if (arg.type === types.litWord) return next;
+        if (arg.type === types.getWord) {
+            if (t.isFunction(next)) return next;
+            if (next.type === types.word) {
+                return evaluate(t.getWord(next.value), context, iter);
+            }
+        }
+        return evaluate(next, context, iter);
+    });
+};
 
 for (const type of t.DIRECT_TYPES.values()) {
     defEval(type, (value, _context, _iter) => value);
@@ -91,3 +104,40 @@ defEval(
         return body(...args, context, iter);
     },
 );
+defEval(
+    types.fn,
+    (fn, context, iter) => {
+        const argSpec = lookup(context, t.word("args"));
+        const body = lookup(context, t.word("body"));
+        const localContext = t.contextChain(fn);
+        const args = collectArguments(argSpec, localContext, iter);
+        for (let i = 0; i < args.length; i++) {
+            t.bind(localContext, argSpec[i], args[i]);
+        }
+        return doBlock(body, localContext);
+    },
+);
+
+export const doBlock = (block, context) => {
+    if (block.type === types.block || block.type === types.paren) {
+        const iter = t.iter(block);
+        let result = null;
+        for (const curr of iter) {
+            result = evaluate(curr, context, iter);
+        }
+        return result;
+    }
+    throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);
+};
+
+export const reduceBlock = (block, context) => {
+    if (block.type === types.block || block.type === types.paren) {
+        const iter = t.iter(block);
+        const result = iter.reduce(
+            (acc, curr) => [...acc, evaluate(curr, context, iter)],
+            [],
+        );
+        return t.block(result);
+    }
+    throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);
+};

@@ -34,50 +34,68 @@ export const TYPES = {
     condition: normalize("condition!"),
 };
 
+// Basic Cells
 export const number = cell(TYPES.number);
 export const string = cell(TYPES.string);
 export const block = cell(TYPES.block);
 export const paren = cell(TYPES.paren);
 
+// Word Cells
 export const word = (spelling) => cell(TYPES.word)(normalize(spelling));
 export const getWord = (spelling) => cell(TYPES.getWord)(normalize(spelling));
 export const setWord = (spelling) => cell(TYPES.setWord)(normalize(spelling));
 export const litWord = (spelling) => cell(TYPES.litWord)(normalize(spelling));
 
+// Function Cells
 export const nativeFn = cell(TYPES.nativeFn);
 export const nativeMethod = cell(TYPES.nativeMethod);
 export const fn = cell(TYPES.fn);
 
+// Context Cells
 export const context = cell(TYPES.context);
 export const contextChain = cell(TYPES.contextChain);
 
+// Datatype Cell
 export const datatype = cell(TYPES.datatype);
 export const condition = cell(TYPES.condition);
 
+// Type Sets
+// Direct Types are types that evaluate to themselves
 export const DIRECT_TYPES = new Set([
     TYPES.number,
     TYPES.string,
     TYPES.block,
 ]);
+
+// Series Types also evaluate to themselves, but are collections of other values
 export const SERIES_TYPES = new Set([
     TYPES.block,
     TYPES.paren,
     TYPES.string,
 ]);
+
+// Word Types are types that have a spelling, and require a context to be evaluated
 export const WORD_TYPES = new Set([
     TYPES.word,
     TYPES.getWord,
     TYPES.setWord,
     TYPES.litWord,
 ]);
+
+// Function types
 export const FUNCTION_TYPES = new Set([
     TYPES.nativeFn,
     TYPES.nativeMethod,
     TYPES.fn,
 ]);
+
+// Context types
+// Context types are types that can store and retrive values by a normalized spelling
 export const CONTEXT_TYPES = new Set([
     TYPES.context,
     TYPES.contextChain,
+    // Functions are also context types, since they hold their arguments and body internally
+    TYPES.fn,
 ]);
 
 // Type predicates
@@ -106,3 +124,10 @@ export const setMany = (context, obj) => {
     }
     return context;
 };
+
+// Datatype Map
+// This is a map of all the core datatypes, this is used to populate the runtime
+export const DATATYPES = new Map();
+for (const value of Object.values(TYPES)) {
+    DATATYPES.set(value, datatype(value));
+}

@@ -1,5 +1,4 @@
 import * as t from "./types.js";
-import { parse } from "../../parser.js";
 const types = t.TYPES;
 import { normalize } from "../../utils.js";
 import { method } from "../../method.js";
@@ -29,7 +28,20 @@ export const nativeMethod = (methodSpec, method) => {
     });
 };
 
-export const [defLookup, lookup] = method();
+export const fn = (args, body, parent) => {
+    const ctx = t.fn(new Map());
+    bind(ctx, t.word("self"), ctx);
+    if (parent) {
+        bind(ctx, t.word("parent"), parent);
+    }
+    bind(ctx, t.word("args"), args);
+    bind(ctx, t.word("body"), body);
+    return ctx;
+};
+
+export { defLookup, lookup };
+
+const [defLookup, lookup] = method();
 defLookup(types.context, (context, word) => {
     if (t.isAnyWord(word)) {
         const bound = context.value.get(word.value);
@@ -41,7 +53,7 @@ defLookup(types.context, (context, word) => {
         return bound;
     }
 });
-defLookup(types.contextChain, (context, word) => {
+const lookupWithParent = (context, word) => {
     if (t.isAnyWord(word)) {
         const bound = context.value.get(word.value);
         if (!bound) {
@@ -51,12 +63,14 @@ defLookup(types.contextChain, (context, word) => {
                     `Word ${word.value.toString()} not found in context, and no parent context found`,
                 );
             }
-            return lookup(parent, word);
+            return lookupWithParent(parent, word);
         }
         return bound;
     }
     throw new Error(`Invalid word: ${word} for context: ${context.type}`);
-});
+};
+defLookup(types.contextChain, lookupWithParent);
+defLookup(types.fn, lookupWithParent);
 
 export const bind = (context, key, value) => {
     if (t.isContext(context) && t.isAnyWord(key)) {
@@ -70,55 +84,6 @@ export const bind = (context, key, value) => {
 
 // All evaluators have the signature: (value, evaluationContext, tokenIterator) => value
 const [defEval, evaluate] = method();
-
-export const collectArguments = (spec, context, iter) => {
-    return spec.map((arg) => {
-        const next = iter.next().value;
-        if (arg.type === types.litWord) return next;
-        if (arg.type === types.getWord) {
-            if (t.isFunction(next)) return next;
-            if (next.type === types.word) {
-                return evaluate(t.getWord(next.value), context, iter);
-            }
-        }
-        return evaluate(next, context, iter);
-    });
-};
-
-const context = t.context(new Map());
-const aFunc = nativeFn(["a"], (a) => {
-    return t.number(a * 10);
-});
-const anotherFunc = nativeFn(["a"], (a) => {
-    return t.string(`${a.value.toString()} is a string`);
-});
-t.bind(context, t.word("a"), t.number(1));
-t.bind(context, t.word("anotherFunc"), anotherFunc);
-t.bind(context, t.word("aFunc"), aFunc);
-
-export const doBlock = (block, context) => {
-    if (block.type === types.block || block.type === types.paren) {
-        const iter = t.iter(block);
-        let result = null;
-        for (const curr of iter) {
-            result = evaluate(curr, context, iter);
-        }
-        return result;
-    }
-    throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);
-};
-
-export const reduceBlock = (block, context) => {
-    if (block.type === types.block || block.type === types.paren) {
-        const iter = t.iter(block);
-        const result = iter.reduce(
-            (acc, curr) => [...acc, evaluate(curr, context, iter)],
-            [],
-        );
-        return t.block(result);
-    }
-    throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);
-};
 
 const printMethod = nativeFn(["value"], (value, context, iter) => {
     console.log(value.value);
