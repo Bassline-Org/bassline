@@ -4,7 +4,9 @@ import { normalize, normalizeString } from "../../utils.js";
 
 export class Value {
     static type = normalizeString("value!");
-
+    constructor(value) {
+        this.value = value;
+    }
     evaluate(stream, context) {
         return this;
     }
@@ -64,11 +66,6 @@ export class Value {
 
 export class Bool extends Value {
     static type = normalizeString("bool!");
-    constructor(value) {
-        super();
-        this.value = value;
-    }
-
     to(type) {
         const normalizedType = normalizeString(type);
         if (normalizedType === "NUMBER!") {
@@ -83,11 +80,6 @@ export class Bool extends Value {
 
 export class Num extends Value {
     static type = normalizeString("number!");
-    constructor(value) {
-        super();
-        this.value = value;
-    }
-
     to(type) {
         const normalizedType = normalizeString(type);
         if (normalizedType === "STRING!") {
@@ -95,27 +87,22 @@ export class Num extends Value {
         }
         return super.to(normalizedType);
     }
-
     add(other) {
         const otherValue = other.to(this.type);
         return new Num(this.value + otherValue.value);
     }
-
     subtract(other) {
         const otherValue = other.to(this.type);
         return new Num(this.value - otherValue.value);
     }
-
     multiply(other) {
         const otherValue = other.to(this.type);
         return new Num(this.value * otherValue.value);
     }
-
     divide(other) {
         const otherValue = other.to(this.type);
         return new Num(this.value / otherValue.value);
     }
-
     modulo(other) {
         const otherValue = other.to(this.type);
         return new Num(this.value % otherValue.value);
@@ -125,10 +112,14 @@ export class Num extends Value {
 export class Series extends Value {
     static type = normalizeString("series!");
     constructor(items = []) {
-        super();
-        this.items = items;
+        super(items);
     }
-
+    get items() {
+        return this.value;
+    }
+    iter() {
+        return this.items.values();
+    }
     equals(other) {
         const otherValue = other.to(this.type);
         if (this.items.length !== otherValue.items.length) {
@@ -185,13 +176,14 @@ export class Series extends Value {
     }
 }
 
-export class Str extends Value {
+export class Str extends Series {
     static type = normalizeString("string!");
-    constructor(value) {
-        super();
-        this.value = value;
+    constructor(value = "") {
+        super(String(value));
     }
-
+    get items() {
+        return Array.from(this.value);
+    }
     to(type) {
         const normalizedType = normalizeString(type);
         if (normalizedType === "NUMBER!") {
@@ -211,16 +203,13 @@ export class Str extends Value {
         }
         return super.to(normalizedType);
     }
-
     form() {
         return this;
     }
-
     append(other) {
         const otherValue = other.to(this.type);
         return new Str(this.value + otherValue.value);
     }
-
     insert(index, other) {
         const indexValue = index.to("number!");
         const otherValue = other.to(this.type);
@@ -260,9 +249,6 @@ export class Str extends Value {
 
 export class Block extends Series {
     static type = normalizeString("block!");
-    constructor(items = []) {
-        super(items);
-    }
     /**
      * Reduce will evaluate each item in the block, and return a new block with the results
      * It will not deeply evaluate
