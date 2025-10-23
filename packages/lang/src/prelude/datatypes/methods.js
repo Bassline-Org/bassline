@@ -1,4 +1,5 @@
 import * as t from "./types.js";
+import { parse } from "../../parser.js";
 const types = t.TYPES;
 
 export const spec = (args) => {
@@ -19,6 +20,12 @@ export const nativeFn = (fnSpec, body) => {
         body,
     });
 };
+export const nativeMethod = (methodSpec, method) => {
+    return t.nativeMethod({
+        spec: spec(methodSpec),
+        body: method,
+    });
+};
 
 export const method = () => {
     const cases = {};
@@ -33,7 +40,7 @@ export const method = () => {
                 return impl(first, ...rest);
             }
             throw new Error(
-                `No implementation found for type: ${JSON.stringify(type)}`,
+                `No implementation found for type: ${JSON.stringify(first)}`,
             );
         },
     ];
@@ -56,15 +63,22 @@ export const collectArguments = (spec, context, iter) => {
     });
 };
 
-defEval(types.number, (value, context, iter) => value);
-defEval(types.string, (value, context, iter) => value);
-defEval(types.block, (value, context, iter) => value);
-defEval(types.datatype, (value, context, iter) => value);
-defEval(types.context, (value, context, iter) => value);
-defEval(types.contextChain, (value, context, iter) => value);
+const defEvalDirect = (...types) => {
+    return types.forEach((type) => {
+        defEval(type, (value, context, iter) => value);
+    });
+};
+
+for (const type of t.DIRECT_TYPES.values()) {
+    defEvalDirect(type, (value, _context, _iter) => value);
+}
 defEval(types.paren, (value, context, iter) => {
+    let result = null;
     const parenIter = t.iter(value);
-    return parenIter.reduce((acc, curr) => evaluate(curr, context, parenIter));
+    for (const curr of parenIter) {
+        result = evaluate(curr, context, parenIter);
+    }
+    return result;
 });
 defEval(
     types.word,
@@ -104,38 +118,34 @@ defEval(
         return body(...args, context, iter);
     },
 );
+defEval(
+    types.nativeMethod,
+    (method, context, iter) => {
+        const { spec, body } = method.value;
+        const args = collectArguments(spec, context, iter);
+        return body(...args, context, iter);
+    },
+);
 
 const context = t.context(new Map());
 const aFunc = nativeFn(["a"], (a) => {
     return t.number(a * 10);
 });
 const anotherFunc = nativeFn(["a"], (a) => {
-    console.log(a.value);
     return t.string(`${a.value.toString()} is a string`);
 });
 t.bind(context, t.word("a"), t.number(1));
 t.bind(context, t.word("anotherFunc"), anotherFunc);
 t.bind(context, t.word("aFunc"), aFunc);
 
-const samples = t.block([
-    t.word("a"),
-    t.getWord("a"),
-    t.setWord("a"),
-    t.number(123),
-    t.string("a"),
-    t.block([t.number(1), t.string("a")]),
-    t.paren([nativeFn(["a"], (a) => t.number(a * 10)), t.number(2)]),
-    t.setWord("foo"),
-    t.word("anotherFunc"),
-    t.word("anotherFunc"),
-    t.word("a"),
-    t.word("foo"),
-]);
-
 export const doBlock = (block, context) => {
     if (block.type === types.block || block.type === types.paren) {
         const iter = t.iter(block);
-        return iter.reduce((acc, curr) => evaluate(curr, context, iter));
+        let result = null;
+        for (const curr of iter) {
+            result = evaluate(curr, context, iter);
+        }
+        return result;
     }
     throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);
 };
@@ -152,7 +162,31 @@ export const reduceBlock = (block, context) => {
     throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);
 };
 
-//console.log(doBlock(samples, context));
-console.log(samples);
-console.log(reduceBlock(samples, context));
-console.log(context);
+const printMethod = nativeFn(["value"], (value, context, iter) => {
+    console.log(value.value);
+    return value;
+});
+
+const exampleSource = `
+foo: 123
+bar: "hello"
+baz: print print (print "hello")
+print do [foo bar]
+print reduce [foo bar baz]
+`;
+
+const exampleContext = t.context(new Map());
+
+const doFn = nativeFn(
+    ["block"],
+    (block, context, iter) => doBlock(block, context),
+);
+const reduceFn = nativeFn(
+    ["block"],
+    (block, context, iter) => reduceBlock(block, context),
+);
+t.bind(exampleContext, t.word("do"), doFn);
+t.bind(exampleContext, t.word("print"), printMethod);
+t.bind(exampleContext, t.word("reduce"), reduceFn);
+const example = parse(exampleSource);
+console.log(doBlock(example, exampleContext));

@@ -98,7 +98,12 @@ export const iter = (cell) => {
 export const lookup = (context, word) => {
     if (isContext(context) && isAnyWord(word)) {
         const bound = context.value.get(word.value);
-        if (!bound) throw new Error(`Word ${word.value} not found in context`);
+        if (!bound) {
+            throw new Error(
+                `Word ${word.value.toString()} not found in context`,
+            );
+        }
+        console.log("bound: ", bound);
         return bound;
     }
     throw new Error(`Cannot lookup word: ${word} in context: ${context.type}`);
