@@ -60,7 +60,7 @@ defEval(types.paren, (value, context, iter) => {
 });
 defEval(
     types.word,
-    (value, context, iter) => evaluate(t.lookup(context, value), context, iter),
+    (value, context, iter) => evaluate(lookup(context, value), context, iter),
 );
 defEval(
     types.setWord,
@@ -80,7 +80,7 @@ defEval(
 defEval(
     types.getWord,
     (value, context, iter) => {
-        const bound = t.lookup(context, value);
+        const bound = lookup(context, value);
         if (t.isFunction(bound)) {
             return bound;
         } else {
@@ -107,12 +107,13 @@ defEval(
 defEval(
     types.fn,
     (fn, context, iter) => {
-        const argSpec = lookup(context, t.word("args"));
-        const body = lookup(context, t.word("body"));
-        const localContext = t.contextChain(fn);
-        const args = collectArguments(argSpec, localContext, iter);
+        const argSpec = lookup(fn, t.word("args"));
+        const body = lookup(fn, t.word("body"));
+        const localContext = t.contextChain(new Map());
+        t.bind(localContext, t.word("parent"), context);
+        const args = collectArguments(argSpec.value, context, iter);
         for (let i = 0; i < args.length; i++) {
-            t.bind(localContext, argSpec[i], args[i]);
+            t.bind(localContext, argSpec.value[i], args[i]);
         }
         return doBlock(body, localContext);
     },

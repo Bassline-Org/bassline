@@ -131,3 +131,13 @@ export const DATATYPES = new Map();
 for (const value of Object.values(TYPES)) {
     DATATYPES.set(value, datatype(value));
 }
+
+export const bind = (context, key, value) => {
+    if (isContext(context) && isAnyWord(key)) {
+        context.value.set(key.value, value);
+        return value;
+    }
+    throw new Error(
+        `Cannot bind word: ${key} to value: ${value} in context: ${context.type}`,
+    );
+};

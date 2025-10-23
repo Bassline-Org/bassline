@@ -2,6 +2,9 @@ import * as t from "./types.js";
 const types = t.TYPES;
 import { normalize } from "../../utils.js";
 import { method } from "../../method.js";
+import { bind } from "./types.js";
+import { parse } from "../../parser.js";
+import { doBlock } from "../../evaluator.js";
 
 export const spec = (args) => {
     return args.map((arg) => {
@@ -46,6 +49,7 @@ defLookup(types.context, (context, word) => {
     if (t.isAnyWord(word)) {
         const bound = context.value.get(word.value);
         if (!bound) {
+            console.log(context.value);
             throw new Error(
                 `Word ${word.value.toString()} not found in context`,
             );
@@ -72,20 +76,21 @@ const lookupWithParent = (context, word) => {
 defLookup(types.contextChain, lookupWithParent);
 defLookup(types.fn, lookupWithParent);
 
-export const bind = (context, key, value) => {
-    if (t.isContext(context) && t.isAnyWord(key)) {
-        context.value.set(key.value, value);
+const ctx = t.context(new Map());
+bind(
+    ctx,
+    t.word("print"),
+    nativeFn(["value"], (value, context, iter) => {
+        console.log(value.value);
         return value;
-    }
-    throw new Error(
-        `Cannot bind word: ${key} to value: ${value} in context: ${context.type}`,
-    );
-};
+    }),
+);
+const exampleArgs = parse("a b c");
+const exampleBody = parse("print a print b print c");
+const exampleFn = fn(exampleArgs, exampleBody, ctx);
+bind(ctx, t.word("foo"), exampleFn);
+//const binding = t.block([t.setWord("foo"), exampleFn]);
+//console.log(doBlock(binding, ctx));
 
-// All evaluators have the signature: (value, evaluationContext, tokenIterator) => value
-const [defEval, evaluate] = method();
-
-const printMethod = nativeFn(["value"], (value, context, iter) => {
-    console.log(value.value);
-    return value;
-});
+const expr = parse("bar: :foo bar foo 1 2 3 foo 4 5 6 foo 7 8 9");
+console.log(doBlock(expr, ctx));
