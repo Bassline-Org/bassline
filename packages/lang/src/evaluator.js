@@ -110,7 +110,8 @@ defEval(
         const argSpec = lookup(fn, t.word("args"));
         const body = lookup(fn, t.word("body"));
         const localContext = t.contextChain(new Map());
-        t.bind(localContext, t.word("parent"), context);
+        t.bind(localContext, t.word("self"), localContext);
+        t.bind(localContext, t.word("parent"), fn);
         const args = collectArguments(argSpec.value, context, iter);
         for (let i = 0; i < args.length; i++) {
             t.bind(localContext, argSpec.value[i], args[i]);
@@ -134,10 +135,10 @@ export const doBlock = (block, context) => {
 export const reduceBlock = (block, context) => {
     if (block.type === types.block || block.type === types.paren) {
         const iter = t.iter(block);
-        const result = iter.reduce(
-            (acc, curr) => [...acc, evaluate(curr, context, iter)],
-            [],
-        );
+        const result = [];
+        for (const curr of iter) {
+            result.push(evaluate(curr, context, iter));
+        }
         return t.block(result);
     }
     throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);

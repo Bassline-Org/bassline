@@ -65,6 +65,7 @@ export const DIRECT_TYPES = new Set([
     TYPES.number,
     TYPES.string,
     TYPES.block,
+    TYPES.datatype,
 ]);
 
 // Series Types also evaluate to themselves, but are collections of other values
@@ -124,13 +125,6 @@ export const setMany = (context, obj) => {
     }
     return context;
 };
-
-// Datatype Map
-// This is a map of all the core datatypes, this is used to populate the runtime
-export const DATATYPES = new Map();
-for (const value of Object.values(TYPES)) {
-    DATATYPES.set(value, datatype(value));
-}
 
 export const bind = (context, key, value) => {
     if (isContext(context) && isAnyWord(key)) {
