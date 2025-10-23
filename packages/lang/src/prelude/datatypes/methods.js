@@ -1,6 +1,8 @@
 import * as t from "./types.js";
 import { parse } from "../../parser.js";
 const types = t.TYPES;
+import { normalize } from "../../utils.js";
+import { method } from "../../method.js";
 
 export const spec = (args) => {
     return args.map((arg) => {
@@ -27,23 +29,43 @@ export const nativeMethod = (methodSpec, method) => {
     });
 };
 
-export const method = () => {
-    const cases = {};
-    return [
-        (type, impl) => {
-            cases[type] = impl;
-        },
-        (first, ...rest) => {
-            const { type } = first;
-            const impl = cases[type];
-            if (impl) {
-                return impl(first, ...rest);
-            }
+export const [defLookup, lookup] = method();
+defLookup(types.context, (context, word) => {
+    if (t.isAnyWord(word)) {
+        const bound = context.value.get(word.value);
+        if (!bound) {
             throw new Error(
-                `No implementation found for type: ${JSON.stringify(first)}`,
+                `Word ${word.value.toString()} not found in context`,
             );
-        },
-    ];
+        }
+        return bound;
+    }
+});
+defLookup(types.contextChain, (context, word) => {
+    if (t.isAnyWord(word)) {
+        const bound = context.value.get(word.value);
+        if (!bound) {
+            const parent = context.value.get(normalize("parent"));
+            if (!parent) {
+                throw new Error(
+                    `Word ${word.value.toString()} not found in context, and no parent context found`,
+                );
+            }
+            return lookup(parent, word);
+        }
+        return bound;
+    }
+    throw new Error(`Invalid word: ${word} for context: ${context.type}`);
+});
+
+export const bind = (context, key, value) => {
+    if (t.isContext(context) && t.isAnyWord(key)) {
+        context.value.set(key.value, value);
+        return value;
+    }
+    throw new Error(
+        `Cannot bind word: ${key} to value: ${value} in context: ${context.type}`,
+    );
 };
 
 // All evaluators have the signature: (value, evaluationContext, tokenIterator) => value
@@ -62,70 +84,6 @@ export const collectArguments = (spec, context, iter) => {
         return evaluate(next, context, iter);
     });
 };
-
-const defEvalDirect = (...types) => {
-    return types.forEach((type) => {
-        defEval(type, (value, context, iter) => value);
-    });
-};
-
-for (const type of t.DIRECT_TYPES.values()) {
-    defEvalDirect(type, (value, _context, _iter) => value);
-}
-defEval(types.paren, (value, context, iter) => {
-    let result = null;
-    const parenIter = t.iter(value);
-    for (const curr of parenIter) {
-        result = evaluate(curr, context, parenIter);
-    }
-    return result;
-});
-defEval(
-    types.word,
-    (value, context, iter) => evaluate(t.lookup(context, value), context, iter),
-);
-defEval(
-    types.setWord,
-    (value, context, iter) => {
-        const next = iter.next().value;
-        const nextValue = evaluate(next, context, iter);
-        t.bind(context, value, nextValue);
-        return nextValue;
-    },
-);
-defEval(
-    types.litWord,
-    (value, context, iter) => {
-        return t.word(value.value);
-    },
-);
-defEval(
-    types.getWord,
-    (value, context, iter) => {
-        const bound = t.lookup(context, value);
-        if (t.isFunction(bound)) {
-            return bound;
-        } else {
-            return evaluate(bound, context, iter);
-        }
-    },
-);
-defEval(
-    types.nativeFn,
-    (fn, context, iter) => {
-        const { spec, body } = fn.value;
-        const args = collectArguments(spec, context, iter);
-        return body(...args, context, iter);
-    },
-);
-defEval(
-    types.nativeMethod,
-    (method, context, iter) => {
-        const { spec, body } = method.value;
-        const args = collectArguments(spec, context, iter);
-        return body(...args, context, iter);
-    },
-);
 
 const context = t.context(new Map());
 const aFunc = nativeFn(["a"], (a) => {
@@ -166,27 +124,3 @@ const printMethod = nativeFn(["value"], (value, context, iter) => {
     console.log(value.value);
     return value;
 });
-
-const exampleSource = `
-foo: 123
-bar: "hello"
-baz: print print (print "hello")
-print do [foo bar]
-print reduce [foo bar baz]
-`;
-
-const exampleContext = t.context(new Map());
-
-const doFn = nativeFn(
-    ["block"],
-    (block, context, iter) => doBlock(block, context),
-);
-const reduceFn = nativeFn(
-    ["block"],
-    (block, context, iter) => reduceBlock(block, context),
-);
-t.bind(exampleContext, t.word("do"), doFn);
-t.bind(exampleContext, t.word("print"), printMethod);
-t.bind(exampleContext, t.word("reduce"), reduceFn);
-const example = parse(exampleSource);
-console.log(doBlock(example, exampleContext));

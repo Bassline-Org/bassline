@@ -95,26 +95,14 @@ export const iter = (cell) => {
     throw new Error(`Cannot iterate over type: ${cell.type}`);
 };
 
-export const lookup = (context, word) => {
-    if (isContext(context) && isAnyWord(word)) {
-        const bound = context.value.get(word.value);
-        if (!bound) {
+export const setMany = (context, obj) => {
+    for (const [key, value] of Object.entries(obj)) {
+        if (!Object.values(TYPES).includes(value.type)) {
             throw new Error(
-                `Word ${word.value.toString()} not found in context`,
+                `Cannot set value: ${value} in context: ${context.type}`,
             );
         }
-        console.log("bound: ", bound);
-        return bound;
+        context.value.set(normalize(key), value);
     }
-    throw new Error(`Cannot lookup word: ${word} in context: ${context.type}`);
-};
-
-export const bind = (context, key, value) => {
-    if (isContext(context) && isAnyWord(key)) {
-        context.value.set(key.value, value);
-        return value;
-    }
-    throw new Error(
-        `Cannot bind word: ${key} to value: ${value} in context: ${context.type}`,
-    );
+    return context;
 };
