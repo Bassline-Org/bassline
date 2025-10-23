@@ -4,6 +4,7 @@ import { normalize } from "../../utils.js";
 import { method } from "../../method.js";
 import { bind } from "./types.js";
 
+//== Function Creators ==//
 export const spec = (args) => {
     return args.map((arg) => {
         if (arg.startsWith(":")) {
@@ -22,6 +23,7 @@ export const nativeFn = (fnSpec, body) => {
         body,
     });
 };
+
 export const nativeMethod = (methodSpec, method) => {
     return t.nativeMethod({
         spec: spec(methodSpec),
@@ -40,10 +42,10 @@ export const fn = (args, body, parent) => {
     return ctx;
 };
 
+// == Lookup Methods ==//
 export { defLookup, lookup };
 
 const [defLookup, lookup] = method();
-
 defLookup(types.context, (context, word) => {
     if (t.isAnyWord(word)) {
         const bound = context.value.get(word.value);
@@ -51,7 +53,9 @@ defLookup(types.context, (context, word) => {
         console.log(context.value);
         throw new Error(`Word ${word.value.toString()} not found in context`);
     }
-    throw new Error(`Invalid word: ${word} for context: ${context.type}`);
+    throw new Error(
+        `Invalid word: ${word} for context: ${JSON.stringify(context.type)}`,
+    );
 });
 const lookupWithParent = (context, word) => {
     if (t.isAnyWord(word)) {
@@ -71,3 +75,7 @@ const lookupWithParent = (context, word) => {
 };
 defLookup(types.contextChain, lookupWithParent);
 defLookup(types.fn, lookupWithParent);
+
+export default {
+    "get": nativeMethod(["word"], lookup),
+};

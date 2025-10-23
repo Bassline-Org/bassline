@@ -141,5 +141,5 @@ export const reduceBlock = (block, context) => {
         }
         return t.block(result);
     }
-    throw new Error(`Cannot evaluate block: ${JSON.stringify(block)}`);
+    throw new Error(`Cannot evaluate block: ${block.type.toString()}`);
 };

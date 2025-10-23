@@ -7,7 +7,7 @@ const { TYPES } = t;
 export { defMake, make };
 const [defMake, make] = method((first) => first.value);
 
-const makeMethod = nativeMethod(["dataType", "'value"], make);
+const makeMethod = nativeMethod(["dataType", "value"], make);
 
 defMake(TYPES.contextChain, (_, block, context, iter) => {
     const ctx = t.contextChain(new Map());
@@ -24,14 +24,26 @@ defMake(TYPES.fn, (_, block, context, iter) => {
     if (args.type !== TYPES.block || body.type !== TYPES.block) {
         throw new Error("Invalid fn block");
     }
-    const f = fn(args, body, context);
-    return f;
+    return fn(args, body, context);
+});
+
+defMake(TYPES.getWord, (_, word, context, iter) => {
+    const spelling = word.value;
+    return t.getWord(spelling);
+});
+defMake(TYPES.litWord, (_, word, context, iter) => {
+    const spelling = word.value;
+    return t.getWord(spelling);
+});
+defMake(TYPES.setWord, (_, word, context, iter) => {
+    const spelling = word.value;
+    return t.setWord(spelling);
+});
+defMake(TYPES.word, (_, word, context, iter) => {
+    const spelling = word.value;
+    return t.word(spelling);
 });
 
 export default {
     "make": makeMethod,
-    "datatype!": t.datatype(TYPES.datatype),
-    "fn!": t.datatype(TYPES.fn),
-    "context!": t.datatype(TYPES.context),
-    "context-chain!": t.datatype(TYPES.contextChain),
 };

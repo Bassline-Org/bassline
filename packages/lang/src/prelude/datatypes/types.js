@@ -1,6 +1,6 @@
 import { normalize } from "../../utils.js";
 
-const cell = (type) => (value) => ({
+export const cell = (type) => (value) => ({
     type,
     value,
 });
@@ -60,12 +60,15 @@ export const datatype = cell(TYPES.datatype);
 export const condition = cell(TYPES.condition);
 
 // Type Sets
+
 // Direct Types are types that evaluate to themselves
 export const DIRECT_TYPES = new Set([
     TYPES.number,
     TYPES.string,
     TYPES.block,
     TYPES.datatype,
+    TYPES.context,
+    TYPES.contextChain,
 ]);
 
 // Series Types also evaluate to themselves, but are collections of other values
@@ -118,7 +121,7 @@ export const setMany = (context, obj) => {
     for (const [key, value] of Object.entries(obj)) {
         if (!Object.values(TYPES).includes(value.type)) {
             throw new Error(
-                `Cannot set value: ${value} in context: ${context.type}`,
+                `Cannot set value: ${value.toString()} in context: ${context.type.toString()}`,
             );
         }
         context.value.set(normalize(key), value);
@@ -134,4 +137,22 @@ export const bind = (context, key, value) => {
     throw new Error(
         `Cannot bind word: ${key} to value: ${value} in context: ${context.type}`,
     );
+};
+
+export default {
+    "number!": datatype(TYPES.number),
+    "string!": datatype(TYPES.string),
+    "block!": datatype(TYPES.block),
+    "paren!": datatype(TYPES.paren),
+    "word!": datatype(TYPES.word),
+    "get-word!": datatype(TYPES.getWord),
+    "set-word!": datatype(TYPES.setWord),
+    "lit-word!": datatype(TYPES.litWord),
+    "native-fn!": datatype(TYPES.nativeFn),
+    "native-method!": datatype(TYPES.nativeMethod),
+    "fn!": datatype(TYPES.fn),
+    "context!": datatype(TYPES.context),
+    "context-chain!": datatype(TYPES.contextChain),
+    "datatype!": datatype(TYPES.datatype),
+    "condition!": datatype(TYPES.condition),
 };
