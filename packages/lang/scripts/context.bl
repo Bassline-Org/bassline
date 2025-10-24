@@ -6,7 +6,6 @@ print type? foo
 
 in foo [ print "hello" ]
 
-
 bar: rename foo [ print ] [ say ]
 print words bar
 

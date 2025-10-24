@@ -1,13 +1,15 @@
-use functions
+fn: make fn! [[args body] [ make fn! reduce [args body] ]]
 
 url: "https://www.google.com"
-curl: make process-context! "curl" (reduce ["-L", "-s" url])
+args: compose ["-L" "-s" (url)]
+print args
+curl: make process-context! reduce ["curl" args]
 
 in curl [
-    stdout: (fn [str] [ in curl compose [output: (str)] ])
-    ;;stderr: (fn [str] [ print append "\n\n" str ])
-    closeTask: (make task!)
-    close: (fn [code] [ (print append "\n\ncurl: close: " code) schedule closeTask ])
+    stdout: fn [str] [ in curl compose [output: (str)] ]
+    stderr: fn [str] [ print append "\n\n" str ]
+    closeTask: make task! []
+    close: fn [code] [ (print append "\n\ncurl: close: " code) schedule closeTask ]
     spawn
 ]
 
@@ -21,12 +23,12 @@ after (sleep 1000) [
     ;print output
 ] curl
 
-bl: make process-context! "bassline" []
+bl: make process-context! ["bassline" []]
 in bl [
-    stdout: (fn [str] [ print append "stdout: " str ])
-    stderr: (fn [str] [ print append "stderr: " str ])
-    closeTask: (make task!)
-    close: (fn [code] [ (print append "close: " code) schedule closeTask ])
+    stdout: fn [str] [ print append "stdout: " str ]
+    stderr: fn [str] [ print append "stderr: " str ]
+    closeTask: make task! []
+    close: fn [code] [ (print append "close: " code) schedule closeTask ]
     spawn
 ]
 

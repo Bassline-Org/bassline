@@ -6,7 +6,6 @@ f: make file-context! path
 original: in f [ read ]
 print (append "original: " original)
 
-
 print "writing:"
 in f [ write "hello!" ]
 
@@ -22,7 +21,4 @@ new: (in f [ read ])
 print "for readme:"
 readme: in f compose [ path: (readmePath) ]
 
-;print mold f
-functions: nil
-;print mold system
 123

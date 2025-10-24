@@ -1,46 +1,41 @@
-import { ContextChain, Datatype, NativeFn, Str } from "../prelude/index.js";
+import {
+    ContextChain,
+    datatype,
+    nativeFn,
+    Str,
+    TYPES,
+} from "../prelude/datatypes/index.js";
 import { appendFileSync, readFileSync, writeFileSync } from "fs";
-import { normalizeString } from "../utils.js";
+import { normalize } from "../utils.js";
 
-class FileContext extends ContextChain {
-    static type = normalizeString("file-context!");
-    constructor(path, context) {
-        super(context);
-        this.set("path", new Str(path));
+TYPES.fileContext = normalize("file-context!");
+
+class FileContext extends ContextChain.typed(TYPES.fileContext) {
+    constructor(path, parent) {
+        super(parent);
+        this.set("path", path);
         this.set(
             "read",
-            new NativeFn([], ([], stream, context) => {
-                return this.read();
+            nativeFn("", () => {
+                const path = this.path().to(TYPES.string).value;
+                console.log("path", path);
+                return new Str(readFileSync(path, "utf8"));
             }),
         );
         this.set(
             "write",
-            new NativeFn(["content"], ([content], stream, context) => {
-                this.write(content);
-                return this;
-            }),
-        );
-        this.set(
-            "append",
-            new NativeFn(["content"], ([content], stream, context) => {
-                this.append(content);
+            nativeFn("content", (content) => {
+                writeFileSync(
+                    this.path().value,
+                    content.to(TYPES.string).value,
+                );
                 return this;
             }),
         );
     }
     path() {
-        return this.get("path").to("string!");
+        return this.get("path");
     }
-    read() {
-        return new Str(readFileSync(this.path().value, "utf8"));
-    }
-    write(content) {
-        writeFileSync(this.path().value, content.to("string!").value);
-    }
-    append(content) {
-        appendFileSync(this.path().value, content.to("string!").value);
-    }
-
     form() {
         const path = this.path().form();
         return new Str(`file-context! "${path.value}"`);
@@ -51,25 +46,21 @@ class FileContext extends ContextChain {
         return new Str(`make file-context! ${path.value}`);
     }
 
-    static make(stream, context) {
-        const path = stream.next().evaluate(stream, context).to("string!");
-        return new FileContext(path.value, context);
+    static make(path, parent) {
+        return new FileContext(path.to(TYPES.string), parent);
     }
 }
 
 export default {
-    "file-context!": new Datatype(FileContext),
-    "read-file": new NativeFn(["path"], ([path], stream, context) => {
-        return new Str(readFileSync(path.to("string!").value, "utf8"));
+    "file-context!": datatype(FileContext),
+    "read-file": nativeFn("path", (path) => {
+        return new Str(readFileSync(path.to(TYPES.string).value, "utf8"));
     }),
-    "write-file": new NativeFn(
-        ["path", "content"],
-        ([path, content], stream, context) => {
-            writeFileSync(
-                path.to("string!").value,
-                content.to("string!").value,
-            );
-            return content;
-        },
-    ),
+    "write-file": nativeFn("path content", (path, content) => {
+        writeFileSync(
+            path.to(TYPES.string).value,
+            content.to(TYPES.string).value,
+        );
+        return this;
+    }),
 };

@@ -1,25 +1,25 @@
 import {
     Block,
     ContextChain,
-    Datatype,
-    NativeFn,
+    datatype,
     Num,
     Str,
+    TYPES,
     Word,
 } from "../prelude/index.js";
-import { normalizeString } from "../utils.js";
+import { nativeFn } from "../prelude/datatypes/functions.js";
 import { spawn } from "child_process";
-import { evaluate } from "../evaluator.js";
+import { normalize } from "../utils.js";
+TYPES.processContext = normalize("process-context!");
 
-class ProcessContext extends ContextChain {
-    static type = normalizeString("process-context!");
-    constructor(command, args, context) {
-        super(context);
+class ProcessContext extends ContextChain.typed(TYPES.processContext) {
+    constructor(command, args, parent) {
+        super(parent);
         this.set("command", command);
         this.set("args", args);
         this.set(
             "spawn",
-            new NativeFn([], ([], stream, context) => {
+            nativeFn("", () => {
                 if (this.spawned) return this;
                 const command = this.command().value;
                 const args = this.args().items.map((arg) => arg.value);
@@ -27,31 +27,31 @@ class ProcessContext extends ContextChain {
                 this.spawned.stdout.on("data", (data) => {
                     const str = new Str(data.toString());
                     const block = new Block([new Word("stdout"), str]);
-                    evaluate(block, this);
+                    block.doBlock(this);
                 });
                 this.spawned.stderr.on("data", (data) => {
                     const str = new Str(data.toString());
                     const block = new Block([new Word("stderr"), str]);
-                    evaluate(block, this);
+                    block.doBlock(this);
                 });
                 this.spawned.on("exit", (code) => {
                     const num = new Num(code ?? 0);
                     const block = new Block([new Word("close"), num]);
-                    evaluate(block, this);
+                    block.doBlock(this);
                 });
                 return this;
             }),
         );
         this.set(
             "send",
-            new NativeFn(["data"], ([data], stream, context) => {
+            nativeFn("data", (data) => {
                 this.send(data);
                 return this;
             }),
         );
         this.set(
             "kill",
-            new NativeFn([], ([], stream, context) => {
+            nativeFn("", () => {
                 this.kill();
                 return this;
             }),
@@ -59,24 +59,24 @@ class ProcessContext extends ContextChain {
     }
 
     command() {
-        return this.get("command").to("string!");
+        return this.get("command").to(TYPES.string);
     }
     args() {
-        return this.get("args").to("block!");
+        return this.get("args").to(TYPES.block);
     }
 
     send(data) {
-        this.spawned.stdin.write(data.to("string!").value);
+        this.spawned.stdin.write(data.to(TYPES.string).value);
     }
     kill() {
         this.spawned.kill();
-        //this.spawned = null;
     }
-
     form() {
         const command = this.command().form();
         const args = this.args().map((arg) => arg.form()).join(" ");
-        return new Str(`process-context! "${command.value}" [${args.value}]`);
+        return new Str(
+            `make process-context! ["${command.value}" ${args.value}]`,
+        );
     }
 
     mold() {
@@ -91,13 +91,16 @@ class ProcessContext extends ContextChain {
         );
     }
 
-    static make(stream, context) {
-        const command = stream.next().evaluate(stream, context).to("string!");
-        const args = stream.next().evaluate(stream, context).to("block!");
-        return new ProcessContext(command, args, context);
+    static make(values, parent) {
+        const [command, args] = values.items;
+        return new ProcessContext(
+            command.to(TYPES.string),
+            args.to(TYPES.block),
+            parent,
+        );
     }
 }
 
 export default {
-    "process-context!": new Datatype(ProcessContext),
+    "process-context!": datatype(ProcessContext),
 };

@@ -30,5 +30,5 @@ in loop [
     false: [ i: + i 1 do body ]
 ]
 
-in loop [ do body ]
+;in loop [ do body ]
 "done"

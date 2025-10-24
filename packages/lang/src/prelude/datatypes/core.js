@@ -186,6 +186,10 @@ export class Series extends Value.typed(TYPES.series) {
         const indexValue = index.to(this.keyType);
         return this.items[indexValue.value];
     }
+    unique() {
+        const uniqueItems = new Set();
+        return new this.constructor(Array.from(uniqueItems));
+    }
     pick(index) {
         const indexValue = index.to(this.keyType);
         const value = this.get(indexValue);

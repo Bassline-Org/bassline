@@ -1,15 +1,58 @@
-use functions
+fn: make fn! [[args body] [ make fn! reduce [args body]]]
 
-a: (fn [x] [ print (append "a: " form x) ])
-b: (fn [x] [ print (append "b: " form x) ])
-c: (fn [x] [ print (append "c: " form x) ])
+greet: fn [name] [ print name ]
 
-funcs: reduce [ :a :b :c ]
+does: fn [block] [
+    _block: block
+    fn [] _block ]
 
-;foreach funcs [ type? it ]
+foreach: fn [series f] [
+    _f: f
+    fold series fn [a curr] [ _f curr ] []
+]
 
-;(pick funcs 0) 5
+context: fn [block] [
+    ctx: make context-chain! parent
+    in ctx block
+    ctx
+]
 
-;(map funcs (fn [x] [ type? :x ]))
+change: fn [target newVal] [
+    in target compose [
+        value: (newVal)
+        foreach blocks :do
+    ]
+]
 
-;(map fns (fn [it] [ it 5 ]))
+observable: fn [aValue] [
+    context [
+        value: aValue
+        blocks: []
+    ]
+]
+
+watch: fn [observable block] [
+    in observable compose [
+        blocks: append blocks (block)
+    ]
+]
+
+a: observable 10
+b: observable 20
+changes: []
+
+addChange: fn [change] [
+    in system compose [ append changes (change) ]
+]
+
+watch a [ addChange reduce ['a value ] ]
+watch b [ print value ]
+
+foo: does [ print "hello" ]
+
+;change a 20
+;change a 30
+;print changes
+"done"
+
+;print a

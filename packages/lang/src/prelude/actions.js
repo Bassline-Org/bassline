@@ -1,12 +1,17 @@
 import { Block, nativeFn, Num, TYPES } from "./datatypes/index.js";
 import { parse } from "../parser.js";
+import { Value } from "./index.js";
 
 export default {
     // Basic introspection
     "print": nativeFn("value", (value) => {
         const formed = value?.form?.()?.value;
         if (Array.isArray(formed)) {
-            console.log(formed.map((each) => each).join(""));
+            console.log(
+                formed.map((each) =>
+                    each instanceof Value ? each.form().value : each
+                ).join(""),
+            );
         } else {
             console.log(formed);
         }
@@ -33,6 +38,7 @@ export default {
         "list index value",
         (list, index, value) => list.insert(index, value),
     ),
+    "unique": nativeFn("list", (list) => list.unique()),
     "pick": nativeFn("list index", (list, index) => list.pick(index)),
     "pluck": nativeFn("list index", (list, index) => list.pluck(index)),
     "slice": nativeFn(
