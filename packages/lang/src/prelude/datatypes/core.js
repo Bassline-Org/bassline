@@ -206,9 +206,9 @@ export class Str extends Series.typed(TYPES.string) {
         return Array.from(this.value).map((char) => new Char(char));
     }
     to(type) {
-        if (type === TYPES.number) {
-            return new Num(Number(this.value));
-        }
+        // if (type === TYPES.number) {
+        //     return new Num(Number(this.value));
+        // }
         if (type === TYPES.word) {
             return new Word(this.value);
         }
@@ -279,7 +279,7 @@ export class Block extends Series.typed(TYPES.block) {
             result = item.evaluate(context, iter);
         }
         if (!result) {
-            throw new Error("No result from doBlock");
+            return new Condition(normalize("no-result"));
         }
         return result;
     }
@@ -397,6 +397,9 @@ export class GetWord extends WordLike.typed(TYPES.getWord) {
 export class SetWord extends WordLike.typed(TYPES.setWord) {
     evaluate(context, iter) {
         const value = iter.next().value.evaluate(context, iter);
+        if (value.type === TYPES.condition) {
+            return value.evaluate(context, iter);
+        }
         context.set(this, value);
         return value;
     }
@@ -442,6 +445,9 @@ export class Condition extends Value.typed(TYPES.condition) {
     }
     evaluate(context, iter) {
         return new Restart(this, context, iter);
+    }
+    static badConversion() {
+        return new Condition(new LitWord("bad-conversion"));
     }
 }
 

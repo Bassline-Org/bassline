@@ -1,8 +1,17 @@
 import { ContextChain } from "./context.js";
-import { Datatype, GetWord, Str, Value } from "./core.js";
+import {
+    Condition,
+    Datatype,
+    GetWord,
+    LitWord,
+    Restart,
+    Str,
+    Value,
+} from "./core.js";
 import * as t from "./types.js";
 const { TYPES } = t;
 import { parse } from "../../parser.js";
+import { normalize } from "../../utils.js";
 
 /**
  * Native functions are functions implemented in the host language
@@ -23,8 +32,13 @@ export class NativeFn extends Value.typed(TYPES.nativeFn) {
         return this.value.fn;
     }
     evaluate(context, iter) {
-        const args = collectArguments(this.spec, context, iter);
-        return this.fn(...args, context, iter);
+        try {
+            const args = collectArguments(this.spec, context, iter);
+            return this.fn(...args, context, iter);
+        } catch (error) {
+            const condition = new Condition(normalize("error"));
+            return condition.evaluate(context, iter);
+        }
     }
     form() {
         return new Str(`native-fn! spec: [ ${this.spec.join(", ")} ]`);
@@ -42,14 +56,19 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
         this.set("body", body);
     }
     evaluate(context, iter) {
-        const localCtx = new ContextChain(context);
-        const spec = this.get("spec");
-        const body = this.get("body");
-        const args = collectArguments(spec.items, localCtx, iter);
-        args.forEach((arg, index) => {
-            localCtx.set(spec.items[index], arg);
-        });
-        return body.doBlock(localCtx);
+        try {
+            const localCtx = new ContextChain(context);
+            const spec = this.get("spec");
+            const body = this.get("body");
+            const args = collectArguments(spec.items, localCtx, iter);
+            args.forEach((arg, index) => {
+                localCtx.set(spec.items[index], arg);
+            });
+            return body.doBlock(localCtx);
+        } catch (error) {
+            const condition = new Condition(normalize("error"));
+            return condition.evaluate(context, iter);
+        }
     }
     mold() {
         const args = this.get("args");

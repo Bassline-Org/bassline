@@ -10,7 +10,7 @@ import {
 } from "./src/prelude/datatypes/context.js";
 import contextTypes from "./src/prelude/datatypes/context.js";
 import { nativeFn } from "./src/prelude/datatypes/functions.js";
-const { word, Restart } = core;
+const { word, Restart, Condition } = core;
 
 import readline from "node:readline";
 import { TYPES } from "./src/prelude/datatypes/types.js";
@@ -99,10 +99,11 @@ setMany(ctx, {
 
 const conditionTest = parse(`
     a: 123
-    b: 123
-
-    cond: make condition! "fuck"
+    b: "fuck"
     c: add a b
+    print c
+    print c
+    cond: make condition! "fuck"
     print c
 
     cond
@@ -110,15 +111,33 @@ const conditionTest = parse(`
     print c
 `);
 
-let running = true;
-let result = conditionTest.doBlock(ctx);
-if (result instanceof Restart) {
-    console.log(result.condition);
-    const cond = result.condition.value.description;
-    const msg = `CONDITION: ${cond}`;
-    rl.question(msg, (answer) => {
+async function handleRestarts(result) {
+    while (result instanceof Restart || result instanceof Condition) {
+        const cond = result.condition.value.description;
+        console.log(result.continuation.form().value);
+        const msg = `CONDITION: ${cond}\n\n>> `;
+
+        const answer = await new Promise((resolve) => {
+            rl.question(msg, resolve);
+        });
+
         const parsed = parse(answer);
-        parsed.doBlock(ctx);
-        result = result.resume();
-    });
+        if (result instanceof Restart) {
+            parsed.doBlock(ctx);
+            result = result.resume();
+        } else {
+            result = parsed.doBlock(ctx);
+        }
+    }
+    return result;
 }
+
+// Run the test with restart handling
+const initialResult = conditionTest.doBlock(ctx);
+handleRestarts(initialResult).then((finalResult) => {
+    console.log("\nFinal result:", finalResult);
+    rl.close();
+}).catch((err) => {
+    console.error("Error:", err);
+    rl.close();
+});

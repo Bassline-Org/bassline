@@ -1,5 +1,5 @@
 import { normalize } from "../../utils.js";
-import { Block, Bool, datatype, Str, Value, Word } from "./core.js";
+import { Block, Bool, Condition, datatype, Str, Value, Word } from "./core.js";
 import { TYPES, WORD_TYPES } from "./types.js";
 
 export const keys = {
@@ -65,8 +65,7 @@ export class ContextBase extends Value.typed(TYPES.context) {
         const spelling = this.keyFor(word);
         const value = this.bindings.get(spelling);
         if (!value) {
-            console.error("Key not found in context: ", spelling);
-            throw new Error(`Key ${spelling} not found in context`);
+            return new Condition(normalize(`key-not-found`));
         }
         return value;
     }
