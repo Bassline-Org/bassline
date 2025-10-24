@@ -43,7 +43,7 @@ class FileContext extends ContextChain.typed(TYPES.fileContext) {
 
     mold() {
         const path = this.path().mold();
-        return new Str(`make file-context! ${path.value}`);
+        return `make file-context! "${path}"`;
     }
 
     static make(path, parent) {

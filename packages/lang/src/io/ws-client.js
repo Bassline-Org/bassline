@@ -70,6 +70,14 @@ export class WsClient extends Sock.typed(TYPES.wsClient) {
     form() {
         return new Str(`ws-client! [closed: ${this.closed}]`);
     }
+    moldBody() {
+        return this.relevantEntries().map(([key, value]) => {
+            return `${key.description}: ${value.mold()}`;
+        }).join("\n  ");
+    }
+    mold() {
+        return `in (make ws-client! self) [ \n  ${this.moldBody()} \n  self ]`;
+    }
     static make(parent) {
         return new WsClient(parent);
     }

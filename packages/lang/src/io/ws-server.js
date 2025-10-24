@@ -62,6 +62,16 @@ export class WsServer extends Sock.typed(TYPES.wsServer) {
             }]`,
         );
     }
+    moldBody() {
+        return this.relevantEntries().map(([key, value]) => {
+            return `${key.description}: ${value.mold()}`;
+        }).join("\n  ");
+    }
+    mold() {
+        return `in (make ws-server! [${this.get("host").mold()} ${
+            this.get("port").mold()
+        }]) [ \n  ${this.moldBody()} \n  self ]`;
+    }
 
     static make(values, parent) {
         const [host, port] = values.items;

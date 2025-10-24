@@ -80,15 +80,7 @@ class ProcessContext extends ContextChain.typed(TYPES.processContext) {
     }
 
     mold() {
-        const command = this.command().mold();
-        const args = this.args().mold();
-        const entries = this.moldEntries();
-        return new Str(
-            `in (make process-context! ${command.value} ${args.value}) [
-            ${entries}
-            self
-            ]`,
-        );
+        return `make process-context! ["${this.command().mold()}" "${this.args().mold()}"]`;
     }
 
     static make(values, parent) {
