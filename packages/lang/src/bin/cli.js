@@ -62,13 +62,13 @@ setMany(GLOBAL.context, {
     //    ...processContext,
 });
 
-const rcPath = process.env.HOME + "/.basslinerc";
-if (existsSync(rcPath)) {
-    console.log("Loading ~/.basslinerc");
-    const rcCode = readFileSync(rcPath, "utf8");
-    GLOBAL.evaluate(parse(rcCode));
-    console.log("~/.basslinerc loaded");
-}
+// const rcPath = process.env.HOME + "/.basslinerc";
+// if (existsSync(rcPath)) {
+//     console.log("Loading ~/.basslinerc");
+//     const rcCode = readFileSync(rcPath, "utf8");
+//     GLOBAL.evaluate(parse(rcCode));
+//     console.log("~/.basslinerc loaded");
+// }
 
 // Load file if specified
 if (fileToLoad) {

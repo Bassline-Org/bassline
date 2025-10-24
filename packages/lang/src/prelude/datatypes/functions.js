@@ -1,17 +1,8 @@
 import { ContextChain } from "./context.js";
-import {
-    Condition,
-    Datatype,
-    GetWord,
-    LitWord,
-    Restart,
-    Str,
-    Value,
-} from "./core.js";
+import { Datatype, GetWord, Str, Value } from "./core.js";
 import * as t from "./types.js";
 const { TYPES } = t;
 import { parse } from "../../parser.js";
-import { normalize } from "../../utils.js";
 
 /**
  * Native functions are functions implemented in the host language

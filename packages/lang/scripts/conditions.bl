@@ -1,0 +1,37 @@
+fn: make fn! [[args body] [ make fn! reduce [args body] ]]
+
+does: fn [ block ] [ compose [fn [] (block)] ]
+
+context: fn [body] [
+    ctx: make context-chain! parent
+    in ctx body
+    ctx
+]
+
+restarts: fn [cond restartsBlock] [
+    make condition! reduce [cond restartsBlock]
+]
+
+;cond: make condition! ['no-result [
+;    use-value: fn [value] [value]
+;]]
+
+no-result: [ print "oops!" ]
+
+fail: restarts 'no-result [
+        use-value: fn [value] [ value ]
+        double-value: fn [value] [ * 2 value ]
+        scream: fn [] [ print "AGHHH" ]
+    ]
+
+foo: context [
+    no-result: [ use-value 10 ]
+]
+
+bar: context [
+    no-result: [ double-value 10 ]
+]
+
+print fail
+print (in foo [ fail ])
+print (in bar [ fail ])

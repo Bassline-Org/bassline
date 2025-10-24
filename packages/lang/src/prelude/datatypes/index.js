@@ -2,6 +2,7 @@ import core from "./core.js";
 import context from "./context.js";
 import functions from "./functions.js";
 import async from "./async.js";
+import conditions from "./conditions.js";
 
 export * from "./core.js";
 export * from "./context.js";
@@ -14,4 +15,5 @@ export default {
     ...context,
     ...functions,
     ...async,
+    ...conditions,
 };

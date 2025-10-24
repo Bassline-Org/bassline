@@ -1,5 +1,5 @@
 import { normalize } from "../../utils.js";
-import { Block, Bool, Condition, datatype, Str, Value, Word } from "./core.js";
+import { Block, Bool, datatype, Str, Value, Word } from "./core.js";
 import { TYPES, WORD_TYPES } from "./types.js";
 
 export const keys = {

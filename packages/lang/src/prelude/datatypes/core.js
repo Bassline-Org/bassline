@@ -271,7 +271,9 @@ export class Block extends Series.typed(TYPES.block) {
             result = item.evaluate(context, iter);
         }
         if (!result) {
-            return new Condition(normalize("no-result"));
+            console.error("No result from block: ", this);
+            throw new Error("No result from block");
+            //return new Condition(normalize("no-result"));
         }
         return result;
     }
@@ -391,9 +393,6 @@ export class GetWord extends WordLike.typed(TYPES.getWord) {
 export class SetWord extends WordLike.typed(TYPES.setWord) {
     evaluate(context, iter) {
         const value = iter.next().value.evaluate(context, iter);
-        //if (value.type === TYPES.condition) {
-        //return value.evaluate(context, iter);
-        //}
         context.set(this, value);
         return value;
     }
@@ -433,40 +432,6 @@ export class Datatype extends Value.typed(TYPES.datatype) {
     }
 }
 
-export class Condition extends Value.typed(TYPES.condition) {
-    static make(condition) {
-        return new Condition(condition.to(TYPES.litWord).spelling);
-    }
-    evaluate(context, iter) {
-        return new Restart(this, context, iter);
-    }
-    static badConversion() {
-        return new Condition(new LitWord("bad-conversion"));
-    }
-}
-
-export class Restart extends Value.typed(TYPES.restart) {
-    constructor(condition, context, iter) {
-        super({
-            condition,
-            context,
-            continuation: new Block(iter.toArray()),
-        });
-    }
-    get condition() {
-        return this.value.condition;
-    }
-    get context() {
-        return this.value.context;
-    }
-    get continuation() {
-        return this.value.continuation;
-    }
-    resume() {
-        return this.continuation.doBlock(this.context);
-    }
-}
-
 export const number = (value) => new Num(value);
 export const string = (value) => new Str(value);
 export const block = (value) => new Block(value);
@@ -492,6 +457,4 @@ export default {
     "char!": new Datatype(Char),
     "true": new Bool(true),
     "false": new Bool(false),
-    "condition!": new Datatype(Condition),
-    "restart!": new Datatype(Restart),
 };
