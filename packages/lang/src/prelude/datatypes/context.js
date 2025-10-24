@@ -20,7 +20,6 @@ export class ContextBase extends Value.typed(TYPES.context) {
         return Array.from(
             this.bindings.entries().filter(([key, value]) => {
                 return !(
-                    //isCallable(value) ||
                     value.type === TYPES.nativeFn ||
                     value.type === TYPES.datatype ||
                     value.type === TYPES.bool ||
@@ -66,6 +65,7 @@ export class ContextBase extends Value.typed(TYPES.context) {
         const spelling = this.keyFor(word);
         const value = this.bindings.get(spelling);
         if (!value) {
+            console.error("Key not found in context: ", spelling);
             throw new Error(`Key ${spelling} not found in context`);
         }
         return value;

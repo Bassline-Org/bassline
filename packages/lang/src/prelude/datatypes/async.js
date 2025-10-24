@@ -1,10 +1,10 @@
-import { evaluate } from "../../evaluator.js";
-import { normalizeString } from "../../utils.js";
-//import { Datatype, Str, unset, Value } from "./core.js";
-import { NativeFn, NativeMethod } from "./functions.js";
+import { normalize } from "../../utils.js";
+import { datatype, Str, Value } from "./core.js";
+import { nativeFn } from "./functions.js";
+import { TYPES } from "./types.js";
+TYPES.task = normalize("task!");
 
-export class Task extends Value {
-    static type = normalizeString("task!");
+export class Task extends Value.typed(TYPES.task) {
     constructor(promise) {
         super();
         if (promise) {
@@ -24,13 +24,14 @@ export class Task extends Value {
 
     after(block, context) {
         const task = new Task(this.value.then(async () => {
-            return await evaluate(block, context);
+            return await block.doBlock(context);
         }));
         return task;
     }
 
     schedule() {
         this?.resolve?.();
+        return this;
     }
 
     status() {
@@ -45,23 +46,24 @@ export class Task extends Value {
         return new Str(`(make task!)`);
     }
 
-    static make(stream, context) {
+    static make(arg) {
         return new Task();
     }
 }
 
 export default {
-    "task!": new Datatype(Task),
-    "after": NativeMethod.ternary("after"),
-    "schedule": NativeMethod.unary("schedule"),
-    "status": NativeMethod.unary("status"),
-    "sleep": new NativeFn(["ms"], ([ms], stream, context) => {
+    "task!": datatype(Task),
+    "after": nativeFn(
+        "task block context",
+        (task, block, context) => task.after(block, context),
+    ),
+    "schedule": nativeFn("task", (task) => task.schedule()),
+    "status": nativeFn("task", (task) => task.status()),
+    "sleep": nativeFn("ms", (ms) => {
         const task = new Task();
-
         setTimeout(() => {
-            task.resolve(unset);
+            task.resolve();
         }, ms.value);
-
         return task;
     }),
 };

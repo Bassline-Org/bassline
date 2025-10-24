@@ -1,13 +1,9 @@
 import functions from "./src/prelude/datatypes/functions.js";
 import { parse } from "./src/parser.js";
-//import { doBlock, reduceBlock } from "./src/evaluator.js";
 import * as core from "./src/prelude/datatypes/core.js";
+import async from "./src/prelude/datatypes/async.js";
 import coreTypes from "./src/prelude/datatypes/core.js";
-import {
-    context,
-    contextChain,
-    setMany,
-} from "./src/prelude/datatypes/context.js";
+import { context, setMany } from "./src/prelude/datatypes/context.js";
 import contextTypes from "./src/prelude/datatypes/context.js";
 import { nativeFn } from "./src/prelude/datatypes/functions.js";
 const { word } = core;
@@ -17,12 +13,14 @@ setMany(ctx, {
     ...coreTypes,
     ...functions,
     ...contextTypes,
+    ...async,
 });
 setMany(ctx, {
     "print": nativeFn("value", (value) => {
         console.log(value.form().value);
         return value;
     }),
+    "system": ctx,
     "project": nativeFn("context keys", (ctx, keys) => {
         return ctx.project(keys);
     }),
@@ -75,5 +73,8 @@ const expr = parse(`
     createAdder: fn [x] [ fn [y] compose [ add (x) y ] ]
     add10: createAdder 10
     print add10 5
+
+    task: sleep 1000
+    after after task [ print "done" ] self [print "again done" ] self
     `);
 expr.doBlock(ctx);
