@@ -2,7 +2,7 @@ import { createRuntime } from "@bassline/lang/runtime";
 import * as prelude from "@bassline/lang/prelude";
 import { parse } from "@bassline/lang";
 import { createContext, useCallback, useContext, useRef } from "react";
-const { setMany, NativeMethod, NativeFn } = prelude;
+const { nativeFn } = prelude;
 
 export const rc = `
 use: make pure-fn! [module] [ copy module parent ]

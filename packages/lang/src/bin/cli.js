@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { readdirSync, readFileSync } from "fs";
 import { GLOBAL } from "../runtime.js";
-import { createInterface } from "node:readline";
 import * as repl from "node:repl";
 import { parse } from "../parser.js";
 import { promisify } from "node:util";
@@ -68,13 +67,13 @@ setMany(GLOBAL.context, {
     ...wsClient,
 });
 
-// const rcPath = process.env.HOME + "/.basslinerc";
-// if (existsSync(rcPath)) {
-//     console.log("Loading ~/.basslinerc");
-//     const rcCode = readFileSync(rcPath, "utf8");
-//     GLOBAL.evaluate(parse(rcCode));
-//     console.log("~/.basslinerc loaded");
-// }
+const rcPath = process.env.HOME + "/.basslinerc";
+if (existsSync(rcPath)) {
+    console.log("Loading ~/.basslinerc");
+    const rcCode = readFileSync(rcPath, "utf8");
+    GLOBAL.evaluate(parse(rcCode));
+    console.log("~/.basslinerc loaded");
+}
 
 // Load file if specified
 if (fileToLoad) {
@@ -90,6 +89,7 @@ if (fileToLoad) {
 
     // Only print result if not entering interactive mode
     if (!interactiveMode) {
+        console.log("result", result);
         console.log(result?.form?.()?.value);
     } else {
         console.log(`Loaded ${fileToLoad}`);
@@ -118,11 +118,14 @@ if (args.length === 0 || interactiveMode) {
                     ast,
                     GLOBAL.context,
                 );
+                console.log("result", result);
                 if (result instanceof Task) {
                     result = await result.value;
                 }
+                console.log("result", result);
                 callback(null, result);
             } catch (e) {
+                console.error("error", e);
                 console.error(`Error: ${e.message}`);
                 callback(null, undefined);
             }

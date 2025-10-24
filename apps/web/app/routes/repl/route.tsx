@@ -1,5 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { RuntimeProvider, useEvaluate, useRuntime } from "~/lib/RuntimeProvider";
+import { useEffect, useRef, useState } from "react";
+import {
+    RuntimeProvider,
+    useEvaluate,
+    useRuntime,
+} from "~/lib/RuntimeProvider";
 import { DisplayValue } from "~/lib/BasicView";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Textarea } from "~/components/ui/textarea";
@@ -93,7 +97,11 @@ function ReplInner() {
         <div className="flex h-screen max-h-screen">
             {/* Left Panel - Output/View Tabs */}
             <div className="flex-1 border-r bg-background">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="h-full flex flex-col"
+                >
                     <div className="border-b px-4 pt-4">
                         <TabsList className="grid w-full max-w-md grid-cols-2">
                             <TabsTrigger value="repl">REPL Output</TabsTrigger>
@@ -108,7 +116,10 @@ function ReplInner() {
                                     <Card key={index}>
                                         <CardHeader className="pb-3">
                                             <div className="flex items-center justify-between">
-                                                <Badge variant="outline" className="font-mono text-xs">
+                                                <Badge
+                                                    variant="outline"
+                                                    className="font-mono text-xs"
+                                                >
                                                     {entry.code}
                                                 </Badge>
                                                 <span className="text-xs text-muted-foreground">
@@ -117,7 +128,9 @@ function ReplInner() {
                                             </div>
                                         </CardHeader>
                                         <CardContent>
-                                            <DisplayValue value={entry.result} />
+                                            <DisplayValue
+                                                value={entry.result}
+                                            />
                                         </CardContent>
                                     </Card>
                                 ))}
@@ -139,16 +152,20 @@ function ReplInner() {
                     <TabsContent value="view" className="flex-1 m-0">
                         <ScrollArea className="h-[calc(100vh-100px)]">
                             <div className="p-6">
-                                {liveView ? (
-                                    <DisplayValue value={liveView} />
-                                ) : (
-                                    <div className="text-center text-muted-foreground py-8">
-                                        <p>No view loaded</p>
-                                        <p className="text-sm mt-2">
-                                            Execute <code className="px-1 py-0.5 bg-muted rounded">example-view</code> to see the demo
-                                        </p>
-                                    </div>
-                                )}
+                                {liveView
+                                    ? <DisplayValue value={liveView} />
+                                    : (
+                                        <div className="text-center text-muted-foreground py-8">
+                                            <p>No view loaded</p>
+                                            <p className="text-sm mt-2">
+                                                Execute{" "}
+                                                <code className="px-1 py-0.5 bg-muted rounded">
+                                                    example-view
+                                                </code>{" "}
+                                                to see the demo
+                                            </p>
+                                        </div>
+                                    )}
                             </div>
                         </ScrollArea>
                     </TabsContent>
@@ -194,7 +211,8 @@ function ReplInner() {
                         <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => setCode('save-local "test" "Hello from REPL!"')}
+                            onClick={() =>
+                                setCode('save-local "test" "Hello from REPL!"')}
                             className="text-xs"
                         >
                             Test Save

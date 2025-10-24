@@ -1,6 +1,6 @@
 import { normalize } from "@bassline/lang/utils";
 import * as p from "@bassline/lang/prelude";
-import { evaluate, parse } from "@bassline/lang";
+import { parse } from "@bassline/lang";
 import { useRuntime } from "./RuntimeProvider";
 import { Button as ShadButton } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";

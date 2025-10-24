@@ -165,8 +165,8 @@ export class Series extends Value.typed(TYPES.series) {
         );
     }
     slice(start, end) {
-        const startValue = start.to("number!");
-        const endValue = end.to("number!");
+        const startValue = start.to(TYPES.number);
+        const endValue = end.to(TYPES.number);
         return new this.constructor(
             this.items.slice(startValue.value, endValue.value),
         );

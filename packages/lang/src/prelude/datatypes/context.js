@@ -129,7 +129,9 @@ export class ContextBase extends Value.typed(TYPES.context) {
                 entries.push(`${key.description}: <self>`);
                 continue;
             }
-            entries.push(`${key.description}: ${value.form().value}`);
+            entries.push(
+                `${key.description}: ${JSON.stringify(value)}`,
+            );
         }
         return new Str(`
 context! [
