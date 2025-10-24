@@ -1,7 +1,5 @@
 fn: make fn! [[args body] [ make fn! reduce [args body] ]]
 
-does: fn [ block ] [ compose [fn [] (block)] ]
-
 context: fn [body] [
     ctx: make context-chain! parent
     in ctx body
@@ -12,26 +10,41 @@ restarts: fn [cond restartsBlock] [
     make condition! reduce [cond restartsBlock]
 ]
 
-;cond: make condition! ['no-result [
-;    use-value: fn [value] [value]
-;]]
+#no-result: [ /scream ]
 
-no-result: [ print "oops!" ]
-
-fail: restarts 'no-result [
-        use-value: fn [value] [ value ]
-        double-value: fn [value] [ * 2 value ]
-        scream: fn [] [ print "AGHHH" ]
+fail: restarts '#no-result [
+        /use-value: fn [value] [ value ]
+        /double-value: fn [value] [ * 2 value ]
+        /scream: fn [] [ "AGHHH" ]
     ]
 
 foo: context [
-    no-result: [ use-value 10 ]
+    val: false
+    #no-result: [ /use-value 10 ]
 ]
 
 bar: context [
-    no-result: [ double-value 10 ]
+    val: true
+    #no-result: [ /double-value 10 ]
 ]
 
-print fail
-print (in foo [ fail ])
-print (in bar [ fail ])
+val: false
+
+aBlock: [
+    if val [
+        print "happy path"
+    ] [
+        print fail
+    ]
+]
+
+print "Top level"
+do aBlock
+
+print "In foo (val is false)"
+in foo aBlock
+
+print "In bar (val is true)"
+in bar aBlock
+
+"done"

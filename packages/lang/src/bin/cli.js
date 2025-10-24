@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { readdirSync, readFileSync } from "fs";
 import { GLOBAL } from "../runtime.js";
+import { createInterface } from "node:readline";
 import * as repl from "node:repl";
 import { parse } from "../parser.js";
+import { promisify } from "node:util";
 import { existsSync } from "fs";
+import { Condition } from "../prelude/datatypes/conditions.js";
 import {
     Block,
     nativeFn,
     setMany,
     Str,
+    Task,
     TYPES,
     Value,
 } from "../prelude/index.js";
@@ -57,9 +61,6 @@ const replExtras = {
 
 setMany(GLOBAL.context, {
     ...replExtras,
-    //    ...wsServer,
-    //    ...file,
-    //    ...processContext,
 });
 
 // const rcPath = process.env.HOME + "/.basslinerc";
@@ -103,13 +104,18 @@ if (fileToLoad) {
 if (args.length === 0 || interactiveMode) {
     console.log("Bassline REPL - Type expressions to evaluate");
     console.log("Press Ctrl+D to exit\n");
-
-    repl.start({
+    const replServer = repl.start({
         prompt: ">> ",
-        eval: (cmd, context, filename, callback) => {
+        eval: async (cmd, context, filename, callback) => {
             try {
                 const ast = parse(cmd.trim());
-                const result = GLOBAL.evaluate(ast);
+                let result = await evaluateWithConditions(
+                    ast,
+                    GLOBAL.context,
+                );
+                if (result instanceof Task) {
+                    result = await result.value;
+                }
                 callback(null, result);
             } catch (e) {
                 console.error(`Error: ${e.message}`);
@@ -122,4 +128,33 @@ if (args.length === 0 || interactiveMode) {
             }
         },
     });
+    const question = promisify(replServer.question).bind(replServer);
+    const formatMessage = (message) => {
+        return `Condition: ${message.value}\n    <~ `;
+    };
+    const prompt = async (message) => {
+        const answer = await question(message);
+        return new Str(answer);
+    };
+    GLOBAL.context.set(
+        "prompt",
+        nativeFn("message", (message) => {
+            return new Task(
+                prompt(formatMessage(message)),
+            );
+        }),
+    );
+
+    async function evaluateWithConditions(ast, ctx) {
+        let result = ast.doBlock(ctx);
+
+        while (result instanceof Condition) {
+            const handler = result.get("type");
+            const answer = await prompt(formatMessage(handler));
+            const parsed = parse(answer);
+            result = parsed.doBlock(result);
+        }
+
+        return result;
+    }
 }

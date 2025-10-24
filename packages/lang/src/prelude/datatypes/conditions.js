@@ -3,6 +3,14 @@ import { Block, Datatype, Value } from "./core.js";
 import * as t from "./types.js";
 const { TYPES } = t;
 
+export class MissingHandler extends Error {
+    constructor(condition, iter) {
+        super(`No handler found for condition: ${condition.type.description}`);
+        this.condition = condition;
+        this.iter = iter;
+    }
+}
+
 export class Condition extends ContextChain.typed(TYPES.condition) {
     constructor(type, context) {
         super(context);
@@ -20,9 +28,11 @@ export class Condition extends ContextChain.typed(TYPES.condition) {
             return handler.doBlock(this);
         }
         console.error(`No handler found for condition: `, this);
-        throw new Error(
-            `No handler found for condition: ${type.description}`,
-        );
+        const defaultHandler = context.get("#default-handler");
+        if (defaultHandler) {
+            return defaultHandler.doBlock(this);
+        }
+        throw new MissingHandler(this, iter);
     }
 
     static make(args, context, iter) {
