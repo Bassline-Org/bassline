@@ -285,9 +285,11 @@ export class Block extends Series.typed(TYPES.block) {
         for (const item of iter) {
             if (item instanceof Paren) {
                 result.push(item.doBlock(context));
+                continue;
             }
             if (item instanceof Block) {
                 result.push(item.compose(context));
+                continue;
             }
             result.push(item);
         }

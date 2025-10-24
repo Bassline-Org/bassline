@@ -12,7 +12,7 @@ import contextTypes from "./src/prelude/datatypes/context.js";
 import { nativeFn } from "./src/prelude/datatypes/functions.js";
 const { word } = core;
 
-const ctx = contextChain();
+const ctx = context();
 setMany(ctx, {
     ...coreTypes,
     ...functions,
@@ -20,8 +20,11 @@ setMany(ctx, {
 });
 setMany(ctx, {
     "print": nativeFn("value", (value) => {
-        console.log(value);
+        console.log(value.form().value);
         return value;
+    }),
+    "project": nativeFn("context keys", (ctx, keys) => {
+        return ctx.project(keys);
     }),
     "in": nativeFn("context block", (ctx, block) => {
         return block.doBlock(ctx);
@@ -53,7 +56,7 @@ const expr = parse(`
     fn: make fn! [[args body] [ make fn! reduce [args body] ]]
     does: fn [block] [ fn [ ] block ]
     constant: fn [x] [ fn [ ] reduce [x] ]
-    hof: fn [f] [ fn [x] [ f x ] ]
+    hof: fn [f] [ fn [x] compose [ (:f) x ] ]
     greeting: constant "Hello, world!"
     greet: does [ print greeting ]
     greet
@@ -67,14 +70,10 @@ const expr = parse(`
 
     ;fold [1 2 3 4 5] fn [acc x] [ print x ] 0
     mapped: map [1 2 3 4 5] fn [x] [ add x x ]
-    print form mapped
-    print mold mapped
-    print mold :map
-    print type? mapped
-    print type? :map
+    print mapped
     print eq? "Hello, world!" greeting
+    createAdder: fn [x] [ fn [y] compose [ add (x) y ] ]
+    add10: createAdder 10
+    print add10 5
     `);
 expr.doBlock(ctx);
-//console.log(result);
-//doBlock(parse(""), ctx);
-//console.log(ctx);
