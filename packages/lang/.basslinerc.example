@@ -1,23 +1,20 @@
-use: make pure-fn! [module] [ copy module parent ]
+fn: make fn! [[args body] [ make fn! reduce [args body] ]]
+use: fn [module] [ copy module parent ]
 
-import: make pure-fn! [module words] [ copy (project module words) parent ]
-context: make pure-fn! [block] [
-    ctx: make context-chain! self
-    (in ctx block)
+import: fn [module words] [ copy (project module words) parent ]
+context: fn [block] [
+    ctx: make context-chain! parent
+    in ctx block
     ctx
 ]
 
-functions: make context-chain! system
-
-in functions [
-   doc self "A module that adds some sugar over the creation of functions, and using functional patterns"
-    fn: make pure-fn! [args body] [ make pure-fn! args body ]
-    |>: :fn
+functions: context [
+    doc self "A module that adds some sugar over the creation of functions, and using functional patterns"
     head: fn [series] [pick series 0]
     tail: fn [series] [slice series 1 length series]
     does: fn [block] [ fn [] block ]
     times: fn [n f] [
-        map (iota n) :f
+        map iota n :f
     ]
     thread: fn [arg fns] [
         f: fn [a :func] [ func a ]
@@ -26,39 +23,41 @@ in functions [
     map: fn [series f] [
         fold
             tail series
-            (fn [acc curr] [ append acc (f curr) ])
-            append [] (f head series)
+            fn [acc curr] [ append acc f curr ]
+            append [] f head series
     ]
-    filter: fn [series f] [
-        fold
-            tail series
-            (fn [acc curr] [
-                if (f curr)
-                    [ append acc curr ]
-                    [ acc ]
-             ])
-             append [] head series
-    ]
-    not: |> [x] [ eq? x false ]
+    ;; filter: fn [series f] [
+    ;;     fold
+    ;;         tail series
+    ;;         (fn [acc curr] [
+    ;;             if (f curr)
+    ;;                 [ append acc curr ]
+    ;;                 [ acc ]
+    ;;          ])
+    ;;          append [] head series
+    ;;  ]
+    not: fn [x] [ eq? x false ]
     even?: fn [x] [
-        eq? (// x 2) 0
+        eq? // x 2 0
     ]
     odd?: fn [x] [
-        eq? (even? x) false
+        eq? even? x false
+    ]
+    foreach: fn [series block] [
+        map series fn [it] block
     ]
 ]
 
-sockets: make context-chain! system
-
-in sockets [
-   use functions [ 'fn ]
-   send: (fn [context data] [
-    in context (compose [ send (data) ])
-   ])
-   open: (fn [context] [
-    in context [ open ]
-   ])
-   close: (fn [context] [
-    in context [ close ]
-   ])
+ sockets: context [
+    use functions [ 'fn ]
+    doc self "A module that adds some sugar over the usage of sockets"
+    send: (fn [context data] [
+     in context (compose [ send (data) ])
+    ])
+    open: (fn [context] [
+     in context [ open ]
+    ])
+    close: (fn [context] [
+     in context [ close ]
+    ])
 ]
