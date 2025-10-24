@@ -1,10 +1,5 @@
 import { normalize } from "../../utils.js";
 
-export const cell = (type) => (value) => ({
-    type,
-    value,
-});
-
 export const TYPES = {
     // Literal data types
     number: normalize("number!"),
@@ -33,31 +28,6 @@ export const TYPES = {
     // Condition type
     condition: normalize("condition!"),
 };
-
-// Basic Cells
-export const number = cell(TYPES.number);
-export const string = cell(TYPES.string);
-export const block = cell(TYPES.block);
-export const paren = cell(TYPES.paren);
-
-// Word Cells
-export const word = (spelling) => cell(TYPES.word)(normalize(spelling));
-export const getWord = (spelling) => cell(TYPES.getWord)(normalize(spelling));
-export const setWord = (spelling) => cell(TYPES.setWord)(normalize(spelling));
-export const litWord = (spelling) => cell(TYPES.litWord)(normalize(spelling));
-
-// Function Cells
-export const nativeFn = cell(TYPES.nativeFn);
-export const nativeMethod = cell(TYPES.nativeMethod);
-export const fn = cell(TYPES.fn);
-
-// Context Cells
-export const context = cell(TYPES.context);
-export const contextChain = cell(TYPES.contextChain);
-
-// Datatype Cell
-export const datatype = cell(TYPES.datatype);
-export const condition = cell(TYPES.condition);
 
 // Type Sets
 
@@ -103,19 +73,11 @@ export const CONTEXT_TYPES = new Set([
 ]);
 
 // Type predicates
-export const isDirect = ({ type }) => DIRECT_TYPES.has(type);
-export const isSeries = ({ type }) => SERIES_TYPES.has(type);
-export const isAnyWord = ({ type }) => WORD_TYPES.has(type);
-export const isContext = ({ type }) => CONTEXT_TYPES.has(type);
-export const isFunction = ({ type }) => FUNCTION_TYPES.has(type);
-
-// Helpers
-export const iter = (cell) => {
-    if (isSeries(cell)) {
-        return cell.value.values();
-    }
-    throw new Error(`Cannot iterate over type: ${cell.type}`);
-};
+export const isDirect = (cell) => DIRECT_TYPES.has(cell.type);
+export const isSeries = (cell) => SERIES_TYPES.has(cell.type);
+export const isAnyWord = (cell) => WORD_TYPES.has(cell.type);
+export const isContext = (cell) => CONTEXT_TYPES.has(cell.type);
+export const isFunction = (cell) => FUNCTION_TYPES.has(cell.type);
 
 export const setMany = (context, obj) => {
     for (const [key, value] of Object.entries(obj)) {
@@ -137,22 +99,4 @@ export const bind = (context, key, value) => {
     throw new Error(
         `Cannot bind word: ${key} to value: ${value} in context: ${context.type}`,
     );
-};
-
-export default {
-    "number!": datatype(TYPES.number),
-    "string!": datatype(TYPES.string),
-    "block!": datatype(TYPES.block),
-    "paren!": datatype(TYPES.paren),
-    "word!": datatype(TYPES.word),
-    "get-word!": datatype(TYPES.getWord),
-    "set-word!": datatype(TYPES.setWord),
-    "lit-word!": datatype(TYPES.litWord),
-    "native-fn!": datatype(TYPES.nativeFn),
-    "native-method!": datatype(TYPES.nativeMethod),
-    "fn!": datatype(TYPES.fn),
-    "context!": datatype(TYPES.context),
-    "context-chain!": datatype(TYPES.contextChain),
-    "datatype!": datatype(TYPES.datatype),
-    "condition!": datatype(TYPES.condition),
 };

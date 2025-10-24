@@ -1,91 +1,81 @@
-import { evaluate } from "../../evaluator.js";
-import { Stream } from "../../stream.js";
 import { normalize, normalizeString } from "../../utils.js";
+import * as t from "./types.js";
+const { TYPES, FUNCTION_TYPES } = t;
 
 export class Value {
-    static type = normalizeString("value!");
     constructor(value) {
         this.value = value;
     }
-    evaluate(stream, context) {
+    evaluate(context, iter) {
         return this;
     }
-
-    get type() {
-        return this.constructor.type;
-    }
-
     getType() {
         return new LitWord(this.type);
     }
-
     to(type) {
-        const normalizedType = normalizeString(type);
-        if (this.type !== normalizedType) {
-            throw new Error(`Cannot convert ${this.type} to ${normalizedType}`);
+        if (this.type !== type) {
+            throw new Error(
+                `Cannot convert ${this.type.description} to ${type.description}`,
+            );
         }
         return this;
     }
-
     form() {
         return new Str(this.value);
     }
-
     mold() {
         return new Str(this.value);
     }
-
     doc(doc) {
         const docString = doc.to("STRING!");
         this.documentation = docString;
     }
-
     is(type) {
-        return this instanceof type;
+        if (type instanceof Value) {
+            return this.type === type.type;
+        }
+        return this.type === type;
     }
-
     describe() {
         return this.documentation ?? unset;
     }
-
     equals(other) {
         const otherValue = other.to(this.type);
         return new Bool(this.value === otherValue.value);
     }
-
     cast(datatype) {
         const type = datatype.value.type;
         return this.to(type);
     }
-
     print() {
         console.log(this.form().value);
         return this;
     }
-}
-
-export class Bool extends Value {
-    static type = normalizeString("bool!");
-    to(type) {
-        const normalizedType = normalizeString(type);
-        if (normalizedType === "NUMBER!") {
-            return new Num(this.value ? 1 : 0);
-        }
-        return super.to(normalizedType);
+    static make(context, iter) {
+        throw new Error(
+            "Unknown make! method for type: ${this.type.description}",
+        );
     }
-    static make(stream, context) {
-        throw new Error("Cannot make new bool! values, these are singletons!");
+
+    static typed(type) {
+        return class extends this {
+            constructor(value) {
+                super(value);
+                this.type = type;
+            }
+        };
     }
 }
-
-export class Num extends Value {
-    static type = normalizeString("number!");
+export class Bool extends Value.typed(TYPES.bool) {
     to(type) {
-        const normalizedType = normalizeString(type);
-        if (normalizedType === "STRING!") {
-            return new Str(String(this.value));
-        }
-        return super.to(normalizedType);
+        if (type === TYPES.bool) return new Num(this.value ? 1 : 0);
+        return super.to(type);
+    }
+}
+export class Num extends Value.typed(TYPES.number) {
+    to(type) {
+        if (type === TYPES.string) return new Str(String(this.value));
+        return super.to(type);
     }
     add(other) {
         const otherValue = other.to(this.type);
@@ -109,10 +99,12 @@ export class Num extends Value {
     }
 }
 
-export class Series extends Value {
-    static type = normalizeString("series!");
+export class Series extends Value.typed(TYPES.series) {
     constructor(items = []) {
         super(items);
+    }
+    get keyType() {
+        return TYPES.number;
     }
     get items() {
         return this.value;
@@ -139,7 +131,7 @@ export class Series extends Value {
         return new this.constructor([...this.items, item]);
     }
     insert(index, item) {
-        const indexValue = index.to("number!");
+        const indexValue = index.to(this.keyType);
         return new this.constructor([
             ...this.items.slice(0, indexValue.value),
             item,
@@ -151,11 +143,12 @@ export class Series extends Value {
             `[ ${this.items.map((item) => item.form().value).join(" ")} ]`,
         );
     }
-    fold(fn, initial, stream, context) {
+    fold(fn, initial, context, _iter) {
         let acc = initial;
-        for (const item of this.items) {
-            const s = new Stream([acc, item]);
-            acc = fn.evaluate(s, context);
+        const iter = this.iter();
+        for (const item of iter) {
+            const fIter = [acc, item].values();
+            acc = fn.evaluate(context, fIter);
         }
         return acc;
     }
@@ -169,86 +162,90 @@ export class Series extends Value {
     length() {
         return new Num(this.items.length);
     }
+    get(index) {
+        const indexValue = index.to(this.keyType);
+        return this.items[indexValue.value];
+    }
     pick(index) {
-        const indexValue = index.to("number!");
-        const value = this.items[indexValue.value];
+        const indexValue = index.to(this.keyType);
+        const value = this.get(indexValue);
+        if (!value) {
+            throw new Error(
+                `Index ${indexValue.value} out of bounds for series: ${this.type.description}`,
+            );
+        }
         return value;
     }
 }
 
-export class Str extends Series {
-    static type = normalizeString("string!");
-    constructor(value = "") {
-        super(String(value));
-    }
+export class Str extends Series.typed(TYPES.string) {
     get items() {
         return Array.from(this.value);
     }
     to(type) {
-        const normalizedType = normalizeString(type);
-        if (normalizedType === "NUMBER!") {
+        if (type === TYPES.number) {
             return new Num(Number(this.value));
         }
-        if (normalizedType === "WORD!") {
+        if (type === TYPES.word) {
             return new Word(this.value);
         }
-        if (normalizedType === "SET-WORD!") {
+        if (type === TYPES.setWord) {
             return new SetWord(this.value);
         }
-        if (normalizedType === "GET-WORD!") {
+        if (type === TYPES.getWord) {
             return new GetWord(this.value);
         }
-        if (normalizedType === "LIT-WORD!") {
+        if (type === TYPES.litWord) {
             return new LitWord(this.value);
         }
-        return super.to(normalizedType);
+        return super.to(type);
     }
     form() {
         return this;
     }
-    append(other) {
-        const otherValue = other.to(this.type);
-        return new Str(this.value + otherValue.value);
-    }
-    insert(index, other) {
-        const indexValue = index.to("number!");
-        const otherValue = other.to(this.type);
-        return new Str(
-            this.value.slice(0, indexValue.value) + otherValue.value +
-                this.value.slice(indexValue.value),
-        );
-    }
-    slice(start, end) {
-        const startValue = start.to("number!");
-        const endValue = end.to("number!");
-        return new Str(this.value.slice(startValue.value, endValue.value));
-    }
-    length() {
-        return new Num(this.value.length);
-    }
-    pick(index) {
-        const indexValue = index.to("number!");
-        return new Str(this.value[indexValue.value]);
-    }
-    pluck(index) {
-        const indexValue = index.to("number!");
-        return new Str(
-            this.value.slice(0, indexValue.value) +
-                this.value.slice(indexValue.value + 1),
-        );
-    }
+    //append(other) {
+    //    const otherValue = other.to(this.type);
+    //    return new Str(this.value + otherValue.value);
+    //}
+    // insert(index, other) {
+    //     const indexValue = index.to(TYPES.number);
+    //     const otherValue = other.to(this.type);
+    //     return new Str(
+    //         this.value.slice(0, indexValue.value) + otherValue.value +
+    //             this.value.slice(indexValue.value),
+    //     );
+    // }
+    // slice(start, end) {
+    //     const startValue = start.to(TYPES.number);
+    //     const endValue = end.to(TYPES.number);
+    //     return new Str(this.value.slice(startValue.value, endValue.value));
+    // }
+    // length() {
+    //     return new Num(this.value.length);
+    // }
+    // pick(index) {
+    //     const indexValue = index.to(TYPES.number);
+    //     return new Str(this.value[indexValue.value]);
+    // }
+    // pluck(index) {
+    //     const indexValue = index.to(TYPES.number);
+    //     return new Str(
+    //         this.value.slice(0, indexValue.value) +
+    //             this.value.slice(indexValue.value + 1),
+    //     );
+    // }
 
     mold() {
         return new Str(`"${this.value}"`);
     }
 
-    static make(stream, context) {
-        return new Str("");
+    static make(context, iter) {
+        const value = iter.next().value.evaluate(context, iter);
+        return new Str(value.form().value);
     }
 }
 
-export class Block extends Series {
-    static type = normalizeString("block!");
+export class Block extends Series.typed(TYPES.block) {
     /**
      * Reduce will evaluate each item in the block, and return a new block with the results
      * It will not deeply evaluate
@@ -256,68 +253,88 @@ export class Block extends Series {
      * @param {*} context
      * @returns
      */
-    reduce(stream, context) {
-        return new Block(this.items.map((item) => evaluate(item, context)));
+    reduce(context, _iter) {
+        const iter = this.iter();
+        const result = [];
+        for (const item of iter) {
+            result.push(item.evaluate(context, iter));
+        }
+        return new Block(result);
     }
     /**
      * Compose will evaluate paren items, and recursively compose blocks
      * This is useful for dynamically generating code
      * @returns {Block} - A new block with the paren items evaluated, and blocks composed
      */
-    compose(stream, context) {
-        return new Block(this.items.map((item) => {
+    compose(context, _iter) {
+        const iter = this.iter();
+        const result = [];
+        for (const item of iter) {
             if (item instanceof Paren) {
-                return item.evaluate(stream, context);
+                result.push(item.evaluate(context, iter));
             }
             if (item instanceof Block) {
-                return item.compose(stream, context);
+                result.push(item.compose(context, iter));
             }
-            return item;
-        }));
+            result.push(item);
+        }
+        return new Block(result);
+    }
+    doBlock(context, _iter) {
+        const iter = this.iter();
+        let result = null;
+        for (const item of iter) {
+            result = item.evaluate(context, iter);
+        }
+        return result;
     }
     mold() {
         const items = this.items.map((e) => `${e.mold().value}`);
         return new Str(`[ ${items.join(" ")} ]`);
     }
     static make(stream, context) {
-        return new Block([]);
+        const value = iter.next().value.evaluate(context, iter);
+        return new this.constructor([value]);
     }
 }
 
-export class Paren extends Series {
-    static type = normalizeString("paren!");
-    constructor(items = []) {
-        super(items);
-    }
-    evaluate(stream, context) {
-        return evaluate(this, context);
-    }
+export class Paren extends Block.typed(TYPES.paren) {
     mold() {
         const items = this.items.map((e) => `${e.mold().value}`);
         return new Str(`(${items.join(" ")})`);
     }
-    static make(stream, context) {
-        return new Paren([]);
-    }
 }
 
-export class WordLike extends Value {
-    static type = normalizeString("any-word!");
+export class WordLike extends Value.typed(normalize("any-word!")) {
     constructor(spelling) {
-        super();
-        this.spelling = normalize(spelling);
+        if (typeof spelling === "string") {
+            super(normalize(spelling));
+            return this;
+        }
+        if (typeof spelling === "symbol") {
+            super(spelling);
+            return this;
+        }
+        if (spelling instanceof WordLike) {
+            super(spelling.spelling);
+            return this;
+        }
+        console.error("Invalid spelling: ", spelling);
+        console.log("Type: ", typeof spelling);
+        throw new Error(`Invalid spelling!`);
+    }
+    get spelling() {
+        return this.value;
     }
     equals(other) {
         const otherValue = other.to(this.type);
-        return new Bool(this.spelling === otherValue.spelling);
+        return (this.spelling === otherValue.spelling)
+            ? new Word("true")
+            : new Word("false");
     }
-
-    static isAnyWord(type) {
-        const normalized = normalizeString(type);
-        return normalized === normalizeString("word!") ||
-            normalized === normalizeString("get-word!") ||
-            normalized === normalizeString("set-word!") ||
-            normalized === normalizeString("lit-word!");
+    static make(context, iter) {
+        const value = iter.next().value.evaluate(context, iter);
+        return new this.constructor(value.spelling);
     }
 }
 
@@ -334,14 +351,9 @@ export class WordLike extends Value {
  * @param {string} spelling - The spelling of the word
  * @returns {Word} - The word value
  */
-export class Word extends WordLike {
-    static type = normalizeString("word!");
-    evaluate(stream, context) {
-        const value = context.get(this);
-        if (value.is(Unset)) {
-            return unset;
-        }
-        return value.evaluate(stream, context);
+export class Word extends WordLike.typed(TYPES.word) {
+    evaluate(context, iter) {
+        return (context.get(this)).evaluate(context, iter);
     }
     mold() {
         return new Str(this.spelling.description);
@@ -349,36 +361,32 @@ export class Word extends WordLike {
     form() {
         return new Str(this.spelling.description);
     }
-
     to(type) {
-        const normalized = normalizeString(type);
-        if (normalized === normalizeString("string!")) {
+        if (type === TYPES.string) {
             return new Str(this.spelling.description);
         }
-        if (normalized === normalizeString("lit-word!")) {
+        if (type === TYPES.litWord) {
             return new LitWord(this.spelling);
         }
-        if (normalized === normalizeString("get-word!")) {
+        if (type === TYPES.getWord) {
             return new GetWord(this.spelling);
         }
-        if (normalized === normalizeString("set-word!")) {
+        if (type === TYPES.setWord) {
             return new SetWord(this.spelling);
         }
         return super.to(type);
-    }
-
-    static make(stream, context) {
-        const next = stream.next();
-        return next.to("word!");
     }
 }
 /**
  * Get word is similar to {Word}, however if the value is a function, it will not execute it,
  */
-export class GetWord extends WordLike {
-    static type = normalizeString("get-word!");
-    evaluate(stream, context) {
-        return context.get(this);
+export class GetWord extends WordLike.typed(TYPES.getWord) {
+    evaluate(context, _iter) {
+        const bound = context.get(this);
+        if (FUNCTION_TYPES.has(bound.type)) {
+            return bound;
+        }
+        return bound.evaluate(context, _iter);
     }
     mold() {
         return new Str(`:${this.spelling.description}`);
@@ -386,37 +394,29 @@ export class GetWord extends WordLike {
     form() {
         return new Str(`:${this.spelling.description}`);
     }
-
     to(type) {
-        const normalized = normalizeString(type);
-        if (normalized === normalizeString("string!")) {
+        if (type === TYPES.string) {
             return new Str(this.spelling.description);
         }
-        if (normalized === normalizeString("lit-word!")) {
+        if (type === TYPES.litWord) {
             return new LitWord(this.spelling);
         }
-        if (normalized === normalizeString("word!")) {
+        if (type === TYPES.word) {
             return new Word(this.spelling);
         }
-        if (normalized === normalizeString("set-word!")) {
+        if (type === TYPES.setWord) {
             return new SetWord(this.spelling);
         }
         return super.to(type);
-    }
-    static make(stream, context) {
-        const next = stream.next();
-        return next.to("get-word!");
     }
 }
 
 /**
  * Set word will set the value for the spelling in the context
  */
-export class SetWord extends WordLike {
-    static type = normalizeString("set-word!");
-    evaluate(stream, context) {
-        const next = stream.next();
-        const value = next.evaluate(stream, context);
+export class SetWord extends WordLike.typed(TYPES.setWord) {
+    evaluate(context, iter) {
+        const value = iter.next().value.evaluate(context, iter);
         context.set(this, value);
         return value;
     }
@@ -427,31 +427,26 @@ export class SetWord extends WordLike {
         return new Str(`${this.spelling.description}:`);
     }
     to(type) {
-        const normalized = normalizeString(type);
-        if (normalized === normalizeString("string!")) {
+        if (type === TYPES.string) {
             return new Str(this.spelling.description);
         }
-        if (normalized === normalizeString("word!")) {
+        if (type === TYPES.word) {
             return new Word(this.spelling);
         }
-        if (normalized === normalizeString("lit-word!")) {
+        if (type === TYPES.litWord) {
             return new LitWord(this.spelling);
         }
-        if (normalized === normalizeString("get-word!")) {
+        if (type === TYPES.getWord) {
             return new GetWord(this.spelling);
         }
         return super.to(type);
-    }
-    static make(stream, context) {
-        const next = stream.next();
-        return next.to("set-word!");
     }
 }
 /**
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
  */
 export class LitWord extends WordLike {
-    static type = normalizeString("lit-word!");
+    static type = TYPES.litWord;
     // evaluate(stream, context) {
     //     return new Word(this.spelling);
     // }
@@ -487,54 +482,24 @@ export class LitWord extends WordLike {
 // It is only used via `make` to create a new basic instance of that type
 // As well as for type checking, since type? returns a datatype! value
 // And we can compare them using eq?
-export class Datatype extends Value {
-    static type = normalizeString("datatype!");
-    constructor(aClass) {
-        super();
-        this.value = aClass;
-    }
-
+export class Datatype extends Value.typed(TYPES.datatype) {
     mold() {
-        return new Str(this.value.type);
+        return new Str(this.value.type.description);
     }
-
     form() {
-        return new Str(`datatype! [ ${this.value.type} ]`);
+        return new Str(`datatype! [ ${this.value.type.description} ]`);
     }
 }
 
-export class Unset extends Value {
-    static type = normalizeString("unset!");
-    form() {
-        return new Str(this.type);
-    }
-    mold() {
-        return new Str("make unset!");
-    }
-    static make(stream, context) {
-        return new Unset();
-    }
-}
-
-export const unset = new Unset();
-
-export class Err extends Value {
-    static type = normalizeString("err!");
-    constructor(message) {
-        super();
-        this.message = message;
-    }
-    form() {
-        return new Str(`err! [${this.message}]`);
-    }
-    mold() {
-        return new Str(`err! [${this.message}]`);
-    }
-    static make(stream, context) {
-        const message = stream.next().evaluate(stream, context).to("string!");
-        return new Err(message.value);
-    }
-}
+export const number = (value) => new Num(value);
+export const string = (value) => new Str(value);
+export const block = (value) => new Block(value);
+export const paren = (value) => new Paren(value);
+export const word = (value) => new Word(value);
+export const getWord = (value) => new GetWord(value);
+export const setWord = (value) => new SetWord(value);
+export const litWord = (value) => new LitWord(value);
+export const datatype = (value) => new Datatype(value);
 
 export default {
     "number!": new Datatype(Num),
@@ -547,8 +512,6 @@ export default {
     "block!": new Datatype(Block),
     "paren!": new Datatype(Paren),
     "datatype!": new Datatype(Datatype),
-    "unset!": new Datatype(Unset),
-    "err!": new Datatype(Err),
     "true": new Bool(true),
     "false": new Bool(false),
 };

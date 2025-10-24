@@ -1,6 +1,6 @@
 import { evaluate } from "../../evaluator.js";
 import { normalizeString } from "../../utils.js";
-import { Datatype, Str, unset, Value } from "./core.js";
+//import { Datatype, Str, unset, Value } from "./core.js";
 import { NativeFn, NativeMethod } from "./functions.js";
 
 export class Task extends Value {

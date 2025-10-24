@@ -1,12 +1,21 @@
 import { ContextChain } from "./context.js";
-import { Datatype, GetWord, LitWord, Str, Value, Word } from "./core.js";
-import { normalizeString } from "../../utils.js";
-import { evaluate } from "../../evaluator.js";
+import { Datatype, GetWord, Str, Value } from "./core.js";
+import * as t from "./types.js";
+const { TYPES } = t;
+import { parse } from "../../parser.js";
 
-export function isCallable(value) {
-    return value instanceof NativeFn ||
-        value instanceof NativeMethod ||
-        value instanceof PureFn;
+export function collectArguments(spec, context, iter) {
+    return spec.map((arg) => {
+        const next = iter.next().value;
+        if (arg.type === TYPES.litWord) return next;
+        if (arg.type === TYPES.getWord) {
+            if (t.isFunction(next)) return next;
+            if (next.type === TYPES.word) {
+                return new GetWord(next.spelling).evaluate(context, iter);
+            }
+        }
+        return next.evaluate(context, iter);
+    });
 }
 
 /**
@@ -14,83 +23,53 @@ export function isCallable(value) {
  * Unlike user-defined functions, they don't have a context
  * And unlike methods, they have a single implementation for all arguments
  */
-export class NativeFn extends Value {
-    static type = normalizeString("native-fn!");
+export class NativeFn extends Value.typed(TYPES.nativeFn) {
     constructor(spec, fn) {
-        super();
-        this.fn = fn;
-        this.spec = spec;
+        super({
+            spec: parse(spec),
+            fn: fn,
+        });
     }
-    getArgs(stream, context) {
-        const argValues = [];
-        for (let i = 0; i < this.spec.length; i++) {
-            const arg = stream.next();
-            const specArg = this.spec[i];
-            // Lit word semantics - Get the next token literally
-            if (specArg.startsWith("'")) {
-                argValues[i] = arg;
-                continue;
-            }
-            // Get word semantics - Evaluate, but if it's a function don't invoke
-            if (specArg.startsWith(":")) {
-                if (isCallable(arg)) {
-                    argValues[i] = arg;
-                    continue;
-                }
-                if (arg instanceof Word) {
-                    const asGet = new GetWord(arg.spelling);
-                    argValues[i] = asGet.evaluate(stream, context);
-                    continue;
-                }
-            }
-            // Normal semantics, just evaluate the argument
-            argValues[i] = arg.evaluate(stream, context);
-        }
-        return argValues;
+    get spec() {
+        return this.value.spec.items;
     }
-    evaluate(stream, context) {
-        const args = this.getArgs(stream, context);
-        const result = this.fn(args, stream, context);
-        return result;
+    get fn() {
+        return this.value.fn;
+    }
+    evaluate(context, iter) {
+        const args = collectArguments(this.spec, context, iter);
+        return this.fn(...args, context, iter);
     }
     form() {
         return new Str(`native-fn! spec: [ ${this.spec.join(", ")} ]`);
     }
 }
 
-export class NativeMethod extends NativeFn {
-    static type = normalizeString("native-method!");
+export const nativeFn = (spec, fn) => {
+    return new NativeFn(spec, fn);
+};
+export const unaryMethod = (selector, names = ["a"]) => {
+    return new NativeMethod(names, selector);
+};
+export const binaryMethod = (selector, names = ["a", "b"]) => {
+    return new NativeMethod(names, selector);
+};
+export const ternaryMethod = (selector, names = ["a", "b", "c"]) => {
+    return new NativeMethod(names, selector);
+};
+
+export class NativeMethod extends NativeFn.typed(TYPES.nativeMethod) {
     constructor(spec, selector) {
-        super(spec, ([target, ...args], stream, context) => {
+        super(spec, ([target, ...args], context, iter) => {
             const method = target[selector];
             if (!method) {
                 throw new Error(
                     `No method "${selector}" found on ${target.type}`,
                 );
             }
-            const result = method.call(
-                target,
-                ...args,
-                stream,
-                context,
-            );
-            return result;
+            return method.call(target, ...args, context, iter);
         });
         this.selector = selector;
-    }
-    static unary(selector, names = ["a"]) {
-        return new NativeMethod(names, selector);
-    }
-    static binary(selector, names = ["a", "b"]) {
-        return new NativeMethod(names, selector);
-    }
-    static ternary(selector, names = ["a", "b", "c"]) {
-        return new NativeMethod(names, selector);
-    }
-    static make(stream, context) {
-        throw new Error(
-            "Cannot use make with native-method! It's a primitive data type!",
-        );
     }
     form() {
         console.log("NativeMethod form", this.spec, this.selector);
@@ -100,53 +79,18 @@ export class NativeMethod extends NativeFn {
     }
 }
 
-export class PureFn extends ContextChain {
-    static type = normalizeString("pure-fn!");
-    constructor(args, body) {
-        super();
-        this.set("args", args);
+export class PureFn extends ContextChain.typed(TYPES.fn) {
+    constructor(spec, body, parent) {
+        super(parent);
+        this.set("spec", spec);
         this.set("body", body);
     }
-    getArgs(stream, context) {
-        const argValues = [];
-        const spec = this.get("args").items;
-        for (let i = 0; i < spec.length; i++) {
-            const arg = stream.next();
-            const specArg = spec[i];
-            // Lit word semantics
-            if (specArg instanceof LitWord) {
-                argValues[i] = arg;
-                continue;
-            }
-            // Get word semantics - Evaluate, but if it's a function don't invoke
-            if (specArg instanceof GetWord) {
-                if (isCallable(arg)) {
-                    argValues[i] = arg;
-                    continue;
-                }
-                if (arg instanceof Word) {
-                    const asGet = new GetWord(arg.spelling);
-                    argValues[i] = asGet.evaluate(stream, context);
-                    continue;
-                }
-            }
-            // Normal semantics, just evaluate the argument
-            argValues[i] = arg.evaluate(stream, context);
-        }
-        return argValues;
-    }
-    evaluate(stream, context) {
+    evaluate(context, iter) {
         const localCtx = new ContextChain(context);
-        const args = this.get("args");
+        const spec = this.get("spec");
         const body = this.get("body");
-        for (const arg of args.items) {
-            if (arg instanceof GetWord) {
-                localCtx.set(arg, stream.next());
-            } else {
-                localCtx.set(arg, stream.next().evaluate(stream, context));
-            }
-        }
-        return evaluate(body, localCtx);
+        const args = collectArguments(spec.items, localCtx, iter);
+        return body.doBlock(args, localCtx);
     }
     mold() {
         const args = this.get("args");
@@ -162,8 +106,13 @@ export class PureFn extends ContextChain {
     }
 }
 
+export const make = nativeFn("type value", (type, value, context, iter) => {
+    return type.make(value, context, iter);
+});
+
 export default {
     "native-fn!": new Datatype(NativeFn),
     "native-method!": new Datatype(NativeMethod),
-    "pure-fn!": new Datatype(PureFn),
+    "fn!": new Datatype(PureFn),
+    "make": make,
 };

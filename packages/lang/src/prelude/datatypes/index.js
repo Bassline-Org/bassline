@@ -13,13 +13,13 @@ export {
     Paren,
     SetWord,
     Str,
-    Unset,
-    unset,
+    //    Unset,
+    //    unset,
     Value,
     Word,
     WordLike,
 } from "./core.js";
-export { isCallable, NativeFn, NativeMethod, PureFn } from "./functions.js";
+export { NativeFn, NativeMethod, PureFn } from "./functions.js";
 export { ContextBase, ContextChain, setMany } from "./context.js";
 export { Task } from "./async.js";
 

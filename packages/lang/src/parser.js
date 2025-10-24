@@ -9,17 +9,7 @@ import {
     sequenceOf,
     whitespace,
 } from "arcsecond/index.js";
-import {
-    Block,
-    GetWord,
-    LitWord,
-    Num,
-    Paren,
-    SetWord,
-    Str,
-    Word,
-} from "./prelude/index.js";
-import * as t from "./prelude/datatypes/types.js";
+import * as t from "./prelude/datatypes/core.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([

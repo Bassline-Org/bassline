@@ -1,42 +1,29 @@
-import { normalize, normalizeString } from "../../utils.js";
-import {
-    Block,
-    Bool,
-    Datatype,
-    LitWord,
-    Str,
-    Unset,
-    unset,
-    Value,
-    Word,
-    WordLike,
-} from "./core.js";
-import { isCallable } from "./functions.js";
-import { evaluate } from "../../evaluator.js";
-import { parse } from "../../parser.js";
+import { normalize } from "../../utils.js";
+import { Block, Bool, Datatype, Str, Value, Word } from "./core.js";
+import { TYPES, WORD_TYPES } from "./types.js";
 
 export const keys = {
     self: normalize("self"),
     parent: normalize("parent"),
-    onSet: normalize("on-set"),
 };
 
-export class ContextBase extends Value {
-    static type = normalizeString("context!");
+export class ContextBase extends Value.typed(TYPES.context) {
     constructor() {
-        super();
-        this.bindings = new Map();
+        super(new Map());
         this.set(keys.self, this);
+    }
+    get bindings() {
+        return this.value;
     }
 
     relevantEntries() {
         return Array.from(
             this.bindings.entries().filter(([key, value]) => {
                 return !(
-                    isCallable(value) ||
-                    value.is(Datatype) ||
-                    value.is(Bool) ||
-                    value.is(Unset) ||
+                    //isCallable(value) ||
+                    value.type === TYPES.nativeFn ||
+                    value.type === TYPES.datatype ||
+                    value.type === TYPES.bool ||
                     key === keys.self ||
                     key === keys.parent
                 );
@@ -50,15 +37,16 @@ export class ContextBase extends Value {
 
     keys() {
         return new Block(
-            this.relevantEntries().map(([key, value]) => new LitWord(key)),
+            this.relevantEntries().map(([key, value]) => new Word(key)),
         );
     }
 
     keyFor(word) {
         if (typeof word === "symbol") return word;
         if (typeof word === "string") return normalize(word);
-        if (word.is(WordLike)) return word.spelling;
-        if (word.is(Str)) return normalize(word.value);
+        if (WORD_TYPES.has(word.type)) return word.spelling;
+        if (word.type === TYPES.string) return normalize(word.value);
+        console.error("Invalid word: ", word);
         throw new Error(`Invalid string ${JSON.stringify(word)}`);
     }
 
@@ -77,32 +65,16 @@ export class ContextBase extends Value {
     get(word) {
         const spelling = this.keyFor(word);
         const value = this.bindings.get(spelling);
-        if (value === undefined) {
-            return unset;
+        if (!value) {
+            throw new Error(`Key ${spelling} not found in context`);
         }
         return value;
     }
 
     set(word, value) {
         const spelling = this.keyFor(word);
-        if (this.bindings.has(keys.onSet)) {
-            this.bindings.set(spelling, value);
-            evaluate(
-                new Block([new Word(keys.onSet), new LitWord(spelling), value]),
-                this,
-            );
-        } else {
-            this.bindings.set(spelling, value);
-        }
+        this.bindings.set(spelling, value);
         return value;
-    }
-
-    words() {
-        const allWords = [];
-        for (const spelling of this.bindings.keys()) {
-            allWords.push(new Word(spelling));
-        }
-        return new Block(allWords);
     }
 
     fresh() {
@@ -123,7 +95,7 @@ export class ContextBase extends Value {
 
     project(words) {
         const newContext = this.fresh();
-        for (const word of words.items) {
+        for (const word of words.iter()) {
             if (word === keys.self) continue;
             newContext.set(word, this.get(word));
         }
@@ -142,7 +114,7 @@ export class ContextBase extends Value {
 
     merge(contexts) {
         const newContext = this.clone();
-        for (const ctx of contexts.items) {
+        for (const ctx of contexts.iter()) {
             ctx.copy(newContext);
         }
         return newContext;
@@ -174,10 +146,10 @@ context! [
         const natives = [];
         for (const [key, value] of this.bindings) {
             if (
-                isCallable(value) ||
-                value instanceof Datatype ||
-                value instanceof Bool ||
-                value instanceof Unset ||
+                value.type === TYPES.nativeFn ||
+                value.type === TYPES.nativeMethod ||
+                value.type === TYPES.datatype ||
+                value.type === TYPES.bool ||
                 key === keys.self ||
                 key === keys.parent
             ) continue; // TODO: Push the missing natives into a projection from system
@@ -196,8 +168,7 @@ context! [
     }
 }
 
-export class ContextChain extends ContextBase {
-    static type = normalizeString("context-chain!");
+export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
     constructor(parent) {
         super();
         if (parent) {
@@ -211,7 +182,9 @@ export class ContextChain extends ContextBase {
 
     parent() {
         const p = this.bindings.get(keys.parent);
-        if (!p) return unset;
+        if (!p) {
+            throw new Error(`Parent not found in context chain`);
+        }
         return p;
     }
 
@@ -251,7 +224,7 @@ export class ContextChain extends ContextBase {
             const p = this.parent();
             return p.get(word);
         }
-        return unset;
+        throw new Error(`Key ${key} not found in context chain`);
     }
 
     static make(stream, context) {
@@ -264,6 +237,9 @@ export default {
     "context!": new Datatype(ContextBase),
     "context-chain!": new Datatype(ContextChain),
 };
+
+export const context = () => new ContextBase();
+export const contextChain = (parent) => new ContextChain(parent);
 
 export function setMany(context, bindingObj) {
     for (const [key, value] of Object.entries(bindingObj)) {
