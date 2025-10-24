@@ -36,9 +36,7 @@ class ProcessContext extends ContextChain {
                 });
                 this.spawned.on("exit", (code) => {
                     const num = new Num(code ?? 0);
-                    //this.set("exit-code", num);
                     const block = new Block([new Word("close"), num]);
-                    //console.log("close block: ", block.form().value);
                     evaluate(block, this);
                 });
                 return this;

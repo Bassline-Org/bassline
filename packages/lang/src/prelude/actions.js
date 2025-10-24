@@ -1,12 +1,15 @@
-import { Block, Num } from "./datatypes/core.js";
-import { nativeFn } from "./datatypes/functions.js";
-import { TYPES } from "./datatypes/types.js";
+import { Block, nativeFn, Num, TYPES } from "./datatypes/index.js";
 import { parse } from "../parser.js";
 
 export default {
     // Basic introspection
     "print": nativeFn("value", (value) => {
-        console.log(value);
+        const formed = value?.form?.()?.value;
+        if (Array.isArray(formed)) {
+            console.log(formed.map((each) => each).join(""));
+        } else {
+            console.log(formed);
+        }
         return value;
     }),
     "form": nativeFn("value", (value) => value.form()),
@@ -46,7 +49,7 @@ export default {
     "length": nativeFn("list", (list) => list.length()),
     "iota": nativeFn(
         "n",
-        (n) => new Block(Array.from({ length: n }, (_, i) => new Num(i))),
+        (n) => new Block(Array.from({ length: n.value }, (_, i) => new Num(i))),
     ),
     "concat": nativeFn("list1 list2", (list1, list2) => list1.concat(list2)),
 
@@ -58,7 +61,7 @@ export default {
     ),
     "fold": nativeFn(
         "series fn inital",
-        (series, fn, initial) => series.fold(fn, initial),
+        (series, fn, initial, context) => series.fold(fn, initial, context),
     ),
 
     // Control flow

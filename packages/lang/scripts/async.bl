@@ -1,5 +1,5 @@
-a: make task!
-foo: make context!
+a: make task! []
+foo: make context! []
 copy system foo
 
 in foo [
@@ -9,17 +9,17 @@ in foo [
 b: after a [ something: + something 20 ] foo
 
 after b [
-    print append "from foo " form something
+    print concat "from foo " form something
 ] foo
 
 after b [
-    print append "from system " form something
+    print concat "from system " form something
 ] system
 
 print "sleeping..."
-after (sleep 1000) [
+after sleep 1000 [
     print "yawning"
     schedule a
 ] self
 
-after (sleep 1500) [ print "done" ] self
+after sleep 1500 [ print "done" ] self

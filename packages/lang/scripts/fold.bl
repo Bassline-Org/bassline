@@ -1,20 +1,22 @@
 iterations: 0
 
-foo: make pure-fn! [a b] [
-    in system [ iterations: + iterations 1 ]
-    + a b
+fn: make fn! [[args body] [ make fn! reduce [args body] ]]
+
+foo: fn [x] [
+    ;in system [ iterations: + iterations 1 ]
+    + x 1
 ]
 
-folder: make pure-fn! [n] [
+folder: fn [n] [
     fold (iota n) :foo 0
 ]
 
+
 print folder 5
-print folder 10
-print folder 50
-print folder 100
-print folder 1000
-print folder 10000
-print folder 100000
-print folder 1000000
-print iterations
+; print folder 10
+; print folder 50
+; print folder 100
+; print folder 1000
+; print folder 10000
+; print folder 100000
+; print folder 1000000

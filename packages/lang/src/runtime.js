@@ -6,11 +6,7 @@ import { parse } from "./parser.js";
 export function createRuntime() {
     const context = new ContextBase();
     context.set("system", context);
-    setMany(context, {
-        ...prelude,
-        //      ...wsClient,
-    });
-    console.log(context);
+    setMany(context, prelude);
     return {
         context,
         evaluate: (code) => {

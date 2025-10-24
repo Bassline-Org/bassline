@@ -199,6 +199,9 @@ export class Char extends Value.typed(TYPES.char) {
         if (type === TYPES.string) return new Str(this.value);
         return super.to(type);
     }
+    form() {
+        return new Str(this.value);
+    }
 }
 
 export class Str extends Series.typed(TYPES.string) {
@@ -376,12 +379,12 @@ export class Word extends WordLike.typed(TYPES.word) {
  * Get word is similar to {Word}, however if the value is a function, it will not execute it,
  */
 export class GetWord extends WordLike.typed(TYPES.getWord) {
-    evaluate(context, _iter) {
+    evaluate(context, iter) {
         const bound = context.get(this);
         if (FUNCTION_TYPES.has(bound.type)) {
             return bound;
         }
-        return bound.evaluate(context, _iter);
+        return bound.evaluate(context, iter);
     }
     mold() {
         return new Str(`:${this.spelling.description}`);

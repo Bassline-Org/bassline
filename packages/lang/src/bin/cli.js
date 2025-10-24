@@ -84,9 +84,7 @@ if (fileToLoad) {
 
         // Only print result if not entering interactive mode
         if (!interactiveMode) {
-            if (!result.is(Unset)) {
-                console.log(result.form().value);
-            }
+            console.log(result?.form?.()?.value);
         } else {
             console.log(`Loaded ${fileToLoad}`);
         }
