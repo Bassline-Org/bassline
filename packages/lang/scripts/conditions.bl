@@ -13,6 +13,7 @@ restarts: fn [cond restartsBlock] [
 #no-result: [ /scream ]
 
 fail: restarts '#no-result [
+        error-mode
         /use-value: fn [value] [ value ]
         /double-value: fn [value] [ * 2 value ]
         /scream: fn [] [ "AGHHH" ]

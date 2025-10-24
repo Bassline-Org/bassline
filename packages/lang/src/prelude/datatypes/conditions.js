@@ -1,5 +1,7 @@
+import { normalize } from "../../utils.js";
 import { ContextChain } from "./context.js";
-import { Block, Datatype, Value } from "./core.js";
+import { Block, Datatype, LitWord, Value } from "./core.js";
+import { nativeFn } from "./functions.js";
 import * as t from "./types.js";
 const { TYPES } = t;
 
@@ -11,10 +13,32 @@ export class MissingHandler extends Error {
     }
 }
 
+const modes = {
+    error: normalize("error"),
+    warning: normalize("warning"),
+    info: normalize("info"),
+    debug: normalize("debug"),
+    trace: normalize("trace"),
+};
+
+const error = nativeFn("", (context) => {
+    context.set("mode", new LitWord(modes.error));
+});
+const warning = nativeFn("", (context) => {
+    context.set("mode", new LitWord(modes.warning));
+});
+const info = nativeFn("", (context) => {
+    context.set("mode", new LitWord(modes.info));
+});
+
 export class Condition extends ContextChain.typed(TYPES.condition) {
     constructor(type, context) {
         super(context);
         this.set("type", type);
+        this.set("mode", new LitWord(modes.error));
+        this.set("error-mode", error);
+        this.set("warning-mode", warning);
+        this.set("info-mode", info);
     }
     static make(type, context) {
         return new Condition(type, context);
@@ -32,7 +56,18 @@ export class Condition extends ContextChain.typed(TYPES.condition) {
         if (defaultHandler) {
             return defaultHandler.doBlock(this);
         }
-        throw new MissingHandler(this, iter);
+        const mode = this.get("mode");
+        if (mode.spelling === modes.error) {
+            throw new MissingHandler(this, iter);
+        }
+        if (mode.spelling === modes.warning) {
+            console.warn(`Warning: ${this.get("type").value}`);
+            return this;
+        }
+        if (mode.spelling === modes.info) {
+            console.info(`Info: ${this.get("type").value}`);
+            return this;
+        }
     }
 
     static make(args, context, iter) {

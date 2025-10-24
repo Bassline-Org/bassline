@@ -14,8 +14,14 @@ export class Value {
     }
     to(type) {
         if (this.type !== type) {
+            console.error(
+                "Cannot convert ",
+                this.type,
+                " to ",
+                type,
+            );
             throw new Error(
-                `Cannot convert ${this.type.description} to ${type.description}`,
+                `Cannot convert ${this} to ${type}`,
             );
         }
         return this;
@@ -56,6 +62,7 @@ export class Value {
 
     static typed(type) {
         return class extends this {
+            static type = type;
             constructor(value) {
                 super(value);
                 this.type = type;
@@ -63,9 +70,20 @@ export class Value {
         };
     }
 }
+
 export class Bool extends Value.typed(TYPES.bool) {
     to(type) {
-        if (type === TYPES.bool) return new Num(this.value ? 1 : 0);
+        if (type === TYPES.number) return new Num(this.value ? 1 : 0);
+        if (type === TYPES.word) return new Word(this.value ? "true" : "false");
+        if (type === TYPES.litWord) {
+            return new LitWord(this.value ? "true" : "false");
+        }
+        if (type === TYPES.getWord) {
+            return new GetWord(this.value ? "true" : "false");
+        }
+        if (type === TYPES.setWord) {
+            return new SetWord(this.value ? "true" : "false");
+        }
         return super.to(type);
     }
 }
@@ -407,7 +425,6 @@ export class SetWord extends WordLike.typed(TYPES.setWord) {
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
  */
 export class LitWord extends WordLike.typed(TYPES.litWord) {
-    static type = TYPES.litWord;
     // evaluate(stream, context) {
     //     return new Word(this.spelling);
     // }

@@ -1,0 +1,22 @@
+conditional: make context-chain! self
+
+current-condition: false
+
+in conditional [
+    true: [ print "it's true" ]
+    false: [ print "it's false" ]
+]
+
+
+block: [
+    in conditional
+        compose [ do (cast current-condition word!) ]
+]
+
+do block
+
+current-condition: true
+
+do block
+
+"done"
