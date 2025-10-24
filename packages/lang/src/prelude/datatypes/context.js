@@ -1,5 +1,5 @@
 import { normalize } from "../../utils.js";
-import { Block, Bool, Datatype, Str, Value, Word } from "./core.js";
+import { Block, Bool, datatype, Str, Value, Word } from "./core.js";
 import { TYPES, WORD_TYPES } from "./types.js";
 
 export const keys = {
@@ -233,11 +233,6 @@ export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
     }
 }
 
-export default {
-    "context!": new Datatype(ContextBase),
-    "context-chain!": new Datatype(ContextChain),
-};
-
 export const context = () => new ContextBase();
 export const contextChain = (parent) => new ContextChain(parent);
 
@@ -247,3 +242,8 @@ export function setMany(context, bindingObj) {
     }
     return context;
 }
+
+export default {
+    "context!": datatype(ContextBase),
+    "context-chain!": datatype(ContextChain),
+};

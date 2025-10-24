@@ -4,20 +4,6 @@ import * as t from "./types.js";
 const { TYPES } = t;
 import { parse } from "../../parser.js";
 
-export function collectArguments(spec, context, iter) {
-    return spec.map((arg) => {
-        const next = iter.next().value;
-        if (arg.type === TYPES.litWord) return next;
-        if (arg.type === TYPES.getWord) {
-            if (t.isFunction(next)) return next;
-            if (next.type === TYPES.word) {
-                return new GetWord(next.spelling).evaluate(context, iter);
-            }
-        }
-        return next.evaluate(context, iter);
-    });
-}
-
 /**
  * Native functions are functions implemented in the host language
  * Unlike user-defined functions, they don't have a context
@@ -79,6 +65,20 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
         const [args, body] = value.items;
         return new PureFn(args, body, context);
     }
+}
+
+export function collectArguments(spec, context, iter) {
+    return spec.map((arg) => {
+        const next = iter.next().value;
+        if (arg.type === TYPES.litWord) return next;
+        if (arg.type === TYPES.getWord) {
+            if (t.isFunction(next)) return next;
+            if (next.type === TYPES.word) {
+                return new GetWord(next.spelling).evaluate(context, iter);
+            }
+        }
+        return next.evaluate(context, iter);
+    });
 }
 
 export const make = nativeFn("type value", (type, value, context, iter) => {

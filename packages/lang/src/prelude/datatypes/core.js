@@ -191,9 +191,19 @@ export class Series extends Value.typed(TYPES.series) {
     }
 }
 
+export class Char extends Value.typed(TYPES.char) {
+    constructor(value) {
+        super(value);
+    }
+    to(type) {
+        if (type === TYPES.string) return new Str(this.value);
+        return super.to(type);
+    }
+}
+
 export class Str extends Series.typed(TYPES.string) {
     get items() {
-        return Array.from(this.value);
+        return Array.from(this.value).map((char) => new Char(char));
     }
     to(type) {
         if (type === TYPES.number) {
@@ -216,42 +226,9 @@ export class Str extends Series.typed(TYPES.string) {
     form() {
         return this;
     }
-    //append(other) {
-    //    const otherValue = other.to(this.type);
-    //    return new Str(this.value + otherValue.value);
-    //}
-    // insert(index, other) {
-    //     const indexValue = index.to(TYPES.number);
-    //     const otherValue = other.to(this.type);
-    //     return new Str(
-    //         this.value.slice(0, indexValue.value) + otherValue.value +
-    //             this.value.slice(indexValue.value),
-    //     );
-    // }
-    // slice(start, end) {
-    //     const startValue = start.to(TYPES.number);
-    //     const endValue = end.to(TYPES.number);
-    //     return new Str(this.value.slice(startValue.value, endValue.value));
-    // }
-    // length() {
-    //     return new Num(this.value.length);
-    // }
-    // pick(index) {
-    //     const indexValue = index.to(TYPES.number);
-    //     return new Str(this.value[indexValue.value]);
-    // }
-    // pluck(index) {
-    //     const indexValue = index.to(TYPES.number);
-    //     return new Str(
-    //         this.value.slice(0, indexValue.value) +
-    //             this.value.slice(indexValue.value + 1),
-    //     );
-    // }
-
     mold() {
         return new Str(`"${this.value}"`);
     }
-
     static make(context, iter) {
         const value = iter.next().value.evaluate(context, iter);
         return new Str(value.form().value);
@@ -531,6 +508,7 @@ export default {
     "block!": new Datatype(Block),
     "paren!": new Datatype(Paren),
     "datatype!": new Datatype(Datatype),
+    "char!": new Datatype(Char),
     "true": new Bool(true),
     "false": new Bool(false),
 };

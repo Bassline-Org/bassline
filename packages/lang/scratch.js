@@ -74,7 +74,9 @@ const expr = parse(`
     add10: createAdder 10
     print add10 5
 
-    task: sleep 1000
+    task: make task! []
     after after task [ print "done" ] self [print "again done" ] self
+
+    map "Hello" fn [x] [ print x ]
     `);
 expr.doBlock(ctx);

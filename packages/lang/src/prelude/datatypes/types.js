@@ -7,6 +7,7 @@ export const TYPES = {
     block: normalize("block!"),
     paren: normalize("paren!"),
     bool: normalize("bool!"),
+    char: normalize("char!"),
 
     // Word Types
     word: normalize("word!"),
@@ -39,6 +40,7 @@ export const DIRECT_TYPES = new Set([
     TYPES.datatype,
     TYPES.context,
     TYPES.contextChain,
+    TYPES.char,
 ]);
 
 // Series Types also evaluate to themselves, but are collections of other values

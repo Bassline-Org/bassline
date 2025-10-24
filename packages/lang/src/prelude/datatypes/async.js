@@ -46,7 +46,7 @@ export class Task extends Value.typed(TYPES.task) {
         return new Str(`(make task!)`);
     }
 
-    static make(arg) {
+    static make() {
         return new Task();
     }
 }
