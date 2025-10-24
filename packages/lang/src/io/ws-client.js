@@ -1,22 +1,25 @@
-import { Datatype, Str } from "../prelude/index.js";
-import { normalizeString } from "../utils.js";
+import { datatype, Str } from "../prelude/index.js";
+import { normalize } from "../utils.js";
 import { parse } from "../parser.js";
-import { evaluate } from "../evaluator.js";
 import { WebSocket } from "ws";
 import { Sock } from "./socket.js";
+import { TYPES } from "../prelude/datatypes/types.js";
 
-export class WsClient extends Sock {
-    static type = normalizeString("ws-client!");
-    constructor(context, client) {
-        super(context);
-        this.client = client;
+TYPES.wsClient = normalize("ws-client!");
+
+export class WsClient extends Sock.typed(TYPES.wsClient) {
+    constructor(parent, client = null) {
+        super(parent);
+        if (client) {
+            this.client = client;
+        }
     }
     buildClient() {
         const url = this.get("url").value;
         const key = this.get("key");
         const client = new WebSocket(url, {
             headers: {
-                key: key.to("string!").value,
+                key: key.to(TYPES.string).value,
             },
         });
         return client;
@@ -41,14 +44,14 @@ export class WsClient extends Sock {
         this.closed = true;
     }
     addClientListeners() {
-        this.client.addEventListener("open", (data) => {
-            const parsed = parse(`on-open`);
-            evaluate(parsed, this);
+        this.client.addEventListener("open", ({ data }) => {
+            const parsed = parse(`on-open ${data}`);
+            parsed.doBlock(this);
         });
         this.client.addEventListener("close", () => {
             this.close();
             const parsed = parse(`on-close`);
-            evaluate(parsed, this);
+            parsed.doBlock(this);
         });
 
         this.client.addEventListener("error", (error) => {
@@ -58,9 +61,7 @@ export class WsClient extends Sock {
         this.client.addEventListener("message", ({ data }) => {
             try {
                 const parsed = parse(data);
-                for (const item of parsed.items) {
-                    evaluate(item, this);
-                }
+                parsed.doBlock(this);
             } catch (error) {
                 this.error(error.message);
             }
@@ -69,11 +70,11 @@ export class WsClient extends Sock {
     form() {
         return new Str(`ws-client! [closed: ${this.closed}]`);
     }
-    static make(stream, context) {
-        return new WsClient(context);
+    static make(parent) {
+        return new WsClient(parent);
     }
 }
 
 export default {
-    "ws-client!": new Datatype(WsClient),
+    "ws-client!": datatype(WsClient),
 };

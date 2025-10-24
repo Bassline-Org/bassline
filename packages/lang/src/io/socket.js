@@ -1,11 +1,14 @@
-import { context, functions } from "../prelude/index.js";
+import { ContextChain } from "../prelude/datatypes/context.js";
 import { parse } from "../parser.js";
+import { TYPES } from "../prelude/datatypes/types.js";
+import { nativeFn } from "../prelude/datatypes/functions.js";
+import { normalize } from "../utils.js";
 
-const { ContextChain } = context;
-const { nativeFn } = functions;
-export class Sock extends ContextChain {
-    constructor(context) {
-        super(context);
+TYPES.socket = normalize("socket!");
+
+export class Sock extends ContextChain.typed(TYPES.socket) {
+    constructor(parent) {
+        super(parent);
         this.opened = false;
         this.set(
             "send",

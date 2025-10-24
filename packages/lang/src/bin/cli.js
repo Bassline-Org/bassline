@@ -16,7 +16,8 @@ import {
     TYPES,
     Value,
 } from "../prelude/index.js";
-//import wsServer from "../io/ws-server.js";
+import wsServer from "../io/ws-server.js";
+import wsClient from "../io/ws-client.js";
 import file from "../io/file.js";
 import processContext from "../io/process.js";
 
@@ -63,6 +64,8 @@ setMany(GLOBAL.context, {
     ...replExtras,
     ...file,
     ...processContext,
+    ...wsServer,
+    ...wsClient,
 });
 
 // const rcPath = process.env.HOME + "/.basslinerc";

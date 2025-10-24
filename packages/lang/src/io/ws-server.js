@@ -1,15 +1,16 @@
-import { ContextChain, Datatype, Str } from "../prelude/index.js";
-import { normalizeString } from "../utils.js";
+import { ContextChain, datatype, Str } from "../prelude/index.js";
 import { parse } from "../parser.js";
 import { WebSocketServer } from "ws";
 import { WsClient } from "./ws-client.js";
 import { Sock } from "./socket.js";
+import { TYPES } from "../prelude/datatypes/types.js";
+import { normalize } from "../utils.js";
 
-export class WsServer extends Sock {
-    static type = normalizeString("ws-server!");
+TYPES.wsServer = normalize("ws-server!");
 
-    constructor(host, port, context) {
-        super(context);
+export class WsServer extends Sock.typed(TYPES.wsServer) {
+    constructor(parent, host, port) {
+        super(parent);
         this.set("host", host);
         this.set("port", port);
         this.id = 0;
@@ -28,11 +29,11 @@ export class WsServer extends Sock {
             this.id = this.id + 1;
             const sessions = this.get("sessions");
             sessions.set(new Str(key), clientHandle);
-            evaluate(parse(`connection "${key}"`), this);
+            parse(`connection "${key}"`).doBlock(this);
         });
         this.server.on("close", () => {
             this.closeSocket();
-            evaluate(parse("on-close"), this);
+            parse("on-close").doBlock(this);
         });
         this.server.on("error", (error) => {
             this.error(error.message);
@@ -62,13 +63,16 @@ export class WsServer extends Sock {
         );
     }
 
-    static make(stream, context) {
-        const host = stream.next().evaluate(stream, context).to("string!");
-        const port = stream.next().evaluate(stream, context).to("number!");
-        return new WsServer(host, port, context);
+    static make(values, parent) {
+        const [host, port] = values.items;
+        return new WsServer(
+            parent,
+            host.to(TYPES.string),
+            port.to(TYPES.number),
+        );
     }
 }
 
 export default {
-    "ws-server!": new Datatype(WsServer),
+    "ws-server!": datatype(WsServer),
 };
