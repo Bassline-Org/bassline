@@ -7,7 +7,6 @@ in conditional [
     false: [ print "it's false" ]
 ]
 
-
 block: [
     in conditional
         compose [ do (cast current-condition word!) ]
@@ -19,4 +18,17 @@ current-condition: true
 
 do block
 
+"done"
+
+loop: make context-chain! self
+
+in loop [
+    i: 0
+    condition: [ eq? i 100 ]
+    body: [ print i do compose [do (cast do condition word!)] ]
+    true: [ i ]
+    false: [ i: + i 1 do body ]
+]
+
+in loop [ do body ]
 "done"
