@@ -141,8 +141,8 @@ context! [
 
     moldEntries() {
         return this.relevantEntries().map(([key, value]) =>
-            `${key.description}: ${value.mold().value}`
-        ).join("\n  ");
+            `${key.description}: ${value.mold()}`
+        ).join("\n");
     }
 
     mold() {
@@ -159,12 +159,9 @@ context! [
             ) continue; // TODO: Push the missing natives into a projection from system
             // IE in (project system [<MISSING_NATIVES>] <Block>)
             if (value === this) continue;
-            parts.push(`${key.description}: ${value.mold().value}`);
+            parts.push(`    ${key.description}: ${value.mold()}`);
         }
-        return new Str(`in (clone system) [
-        ${parts.join("  \n")}
-        self
-        ]`);
+        return `in (clone system) [ \n  ${parts.join("\n  ")} \n  self ]`;
     }
 
     static make(stream, context) {
@@ -206,6 +203,18 @@ export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
             formed.push(`${key.description}: ${value.form().value}`);
         }
         return new Str(`context-chain! [${formed.join("\n  ")}]`);
+    }
+
+    mold() {
+        const formed = [];
+        for (const [key, value] of this.bindings.entries()) {
+            if (key === keys.self) continue;
+            if (key === keys.parent) continue;
+            formed.push(`    ${key.description}: ${value.mold()}`);
+        }
+        return `in (make context-chain! self) [ \n  ${
+            formed.join("\n  ")
+        } \n  self ]`;
     }
 
     copy(targetContext = this.clone()) {

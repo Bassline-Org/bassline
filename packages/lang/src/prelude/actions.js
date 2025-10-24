@@ -1,4 +1,4 @@
-import { Block, nativeFn, Num, TYPES } from "./datatypes/index.js";
+import { Block, nativeFn, Num, Str, TYPES } from "./datatypes/index.js";
 import { parse } from "../parser.js";
 import { Value } from "./index.js";
 
@@ -18,7 +18,7 @@ export default {
         return value;
     }),
     "form": nativeFn("value", (value) => value.form()),
-    "mold": nativeFn("value", (value) => value.mold()),
+    "mold": nativeFn("value", (value) => new Str(value.mold())),
     "type?": nativeFn("value", (value) => value.getType()),
 
     // Basic evaluation

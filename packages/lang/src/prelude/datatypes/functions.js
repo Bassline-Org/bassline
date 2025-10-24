@@ -34,6 +34,10 @@ export class NativeFn extends Value.typed(TYPES.nativeFn) {
     form() {
         return new Str(`native-fn! spec: [ ${this.spec.join(", ")} ]`);
     }
+    mold() {
+        // No mold for native functions
+        return "";
+    }
 }
 
 export const nativeFn = (spec, fn) => {
@@ -62,11 +66,9 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
         //}
     }
     mold() {
-        const args = this.get("args");
+        const args = this.get("spec");
         const body = this.get("body");
-        return new Str(
-            `(make pure-fn! ${args.mold().value} ${body.mold().value})`,
-        );
+        return `(make fn! [${args.mold()} ${body.mold()}])`;
     }
     static make(value, context) {
         if (value.type !== TYPES.block) {

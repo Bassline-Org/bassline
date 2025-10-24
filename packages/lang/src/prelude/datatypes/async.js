@@ -43,7 +43,7 @@ export class Task extends Value.typed(TYPES.task) {
     }
 
     mold() {
-        return new Str(`(make task!)`);
+        return `(make task! [])`;
     }
 
     static make() {

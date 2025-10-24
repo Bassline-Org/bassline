@@ -30,7 +30,8 @@ export class Value {
         return new Str(this.value);
     }
     mold() {
-        return new Str(this.value);
+        console.error("Cannot mold a this value!", this);
+        throw new Error("Cannot mold a this value!");
     }
     doc(doc) {
         const docString = doc.to(TYPES.string);
@@ -59,7 +60,6 @@ export class Value {
             "Unknown make! method for type: ${this.type.description}",
         );
     }
-
     static typed(type) {
         return class extends this {
             static type = type;
@@ -86,6 +86,9 @@ export class Bool extends Value.typed(TYPES.bool) {
         }
         return super.to(type);
     }
+    mold() {
+        return this.value.toString();
+    }
 }
 export class Num extends Value.typed(TYPES.number) {
     to(type) {
@@ -111,6 +114,9 @@ export class Num extends Value.typed(TYPES.number) {
     modulo(other) {
         const otherValue = other.to(this.type);
         return new Num(this.value % otherValue.value);
+    }
+    mold() {
+        return this.value.toString();
     }
 }
 
@@ -213,6 +219,12 @@ export class Char extends Value.typed(TYPES.char) {
     form() {
         return new Str(this.value);
     }
+    mold() {
+        return this.value;
+    }
+    toString() {
+        return this.value;
+    }
 }
 
 export class Str extends Series.typed(TYPES.string) {
@@ -220,9 +232,9 @@ export class Str extends Series.typed(TYPES.string) {
         return Array.from(this.value).map((char) => new Char(char));
     }
     to(type) {
-        // if (type === TYPES.number) {
-        //     return new Num(Number(this.value));
-        // }
+        if (type === TYPES.number) {
+            return new Num(Number(this.value));
+        }
         if (type === TYPES.word) {
             return new Word(this.value);
         }
@@ -241,7 +253,10 @@ export class Str extends Series.typed(TYPES.string) {
         return this;
     }
     mold() {
-        return new Str(`"${this.value}"`);
+        if (Array.isArray(this.value)) {
+            return this.value.map((e) => e.toString()).join("");
+        }
+        return this.value;
     }
     static make(context, iter) {
         const value = iter.next().value.evaluate(context, iter);
@@ -300,8 +315,8 @@ export class Block extends Series.typed(TYPES.block) {
         return result;
     }
     mold() {
-        const items = this.items.map((e) => `${e.mold().value}`);
-        return new Str(`[ ${items.join(" ")} ]`);
+        const items = this.items.map((e) => e.mold()).join(" ");
+        return `[ ${items} ]`;
     }
     static make(stream, context) {
         const value = iter.next().value.evaluate(context, iter);
@@ -314,8 +329,8 @@ export class Paren extends Block.typed(TYPES.paren) {
         return this.doBlock(context);
     }
     mold() {
-        const items = this.items.map((e) => `${e.mold().value}`);
-        return new Str(`(${items.join(" ")})`);
+        const items = this.items.map((e) => e.mold()).join(" ");
+        return `(${items})`;
     }
 }
 
@@ -389,6 +404,9 @@ export class Word extends WordLike.typed(TYPES.word) {
         }
         return super.to(type);
     }
+    mold() {
+        return this.spelling.description;
+    }
 }
 /**
  * Get word is similar to {Word}, however if the value is a function, it will not execute it,
@@ -401,11 +419,11 @@ export class GetWord extends WordLike.typed(TYPES.getWord) {
         }
         return bound.evaluate(context, iter);
     }
-    mold() {
-        return new Str(`:${this.spelling.description}`);
-    }
     form() {
         return new Str(`:${this.spelling.description}`);
+    }
+    mold() {
+        return `:${this.spelling.description}`;
     }
 }
 
@@ -418,11 +436,11 @@ export class SetWord extends WordLike.typed(TYPES.setWord) {
         context.set(this, value);
         return value;
     }
-    mold() {
-        return new Str(`${this.spelling.description}:`);
-    }
     form() {
         return new Str(`${this.spelling.description}:`);
+    }
+    mold() {
+        return `${this.spelling.description}:`;
     }
 }
 /**
@@ -432,11 +450,11 @@ export class LitWord extends WordLike.typed(TYPES.litWord) {
     // evaluate(stream, context) {
     //     return new Word(this.spelling);
     // }
-    mold() {
-        return new Str(`'${this.spelling.description}`);
-    }
     form() {
         return new Str(`'${this.spelling.description}`);
+    }
+    mold() {
+        return `'${this.spelling.description}`;
     }
 }
 
@@ -446,10 +464,13 @@ export class LitWord extends WordLike.typed(TYPES.litWord) {
 // And we can compare them using eq?
 export class Datatype extends Value.typed(TYPES.datatype) {
     mold() {
-        return new Str(this.value.type.description);
+        return this.value.type.description;
     }
     form() {
         return new Str(`datatype! [ ${this.value.type.description} ]`);
+    }
+    toString() {
+        return this.value.type.description;
     }
 }
 

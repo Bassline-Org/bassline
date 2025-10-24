@@ -70,6 +70,18 @@ export class Condition extends ContextChain.typed(TYPES.condition) {
         }
     }
 
+    moldBody() {
+        return this.relevantEntries().map(([key, value]) => {
+            return `${key.description}: ${value.mold()}`;
+        }).join("\n  ");
+    }
+
+    mold() {
+        return `(make condition! [${
+            this.get("type").mold()
+        } [${this.moldBody()}]])`;
+    }
+
     static make(args, context, iter) {
         const [type, restartsBlock] = args.items;
         const condition = new Condition(type, context);
