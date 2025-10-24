@@ -3,10 +3,22 @@ import { parse } from "./src/parser.js";
 import * as core from "./src/prelude/datatypes/core.js";
 import async from "./src/prelude/datatypes/async.js";
 import coreTypes from "./src/prelude/datatypes/core.js";
-import { context, setMany } from "./src/prelude/datatypes/context.js";
+import {
+    context,
+    contextChain,
+    setMany,
+} from "./src/prelude/datatypes/context.js";
 import contextTypes from "./src/prelude/datatypes/context.js";
 import { nativeFn } from "./src/prelude/datatypes/functions.js";
-const { word } = core;
+const { word, Restart } = core;
+
+import readline from "node:readline";
+import { TYPES } from "./src/prelude/datatypes/types.js";
+
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+});
 
 const ctx = context();
 setMany(ctx, {
@@ -48,35 +60,65 @@ setMany(ctx, {
     "eq?": nativeFn("a b", (a, b) => {
         return a.equals(b);
     }),
+    "resume": nativeFn("restart", (restart) => {
+        return restart.resume();
+    }),
+    "handlers": contextChain(ctx),
 });
 
-const expr = parse(`
-    fn: make fn! [[args body] [ make fn! reduce [args body] ]]
-    does: fn [block] [ fn [ ] block ]
-    constant: fn [x] [ fn [ ] reduce [x] ]
-    hof: fn [f] [ fn [x] compose [ (:f) x ] ]
-    greeting: constant "Hello, world!"
-    greet: does [ print greeting ]
-    greet
-    ;greeting: "Goodbye, world!"
-    ;greet
-    print :greeting
+// const expr = parse(`
+//     fn: make fn! [[args body] [ make fn! reduce [args body] ]]
+//     does: fn [block] [ fn [ ] block ]
+//     constant: fn [x] [ fn [ ] reduce [x] ]
+//     hof: fn [f] [ fn [x] compose [ (:f) x ] ]
+//     greeting: constant "Hello, world!"
+//     greet: does [ print greeting ]
+//     greet
+//     ;greeting: "Goodbye, world!"
+//     ;greet
+//     print :greeting
 
-    ctx: make context-chain! self
-    in ctx [ foo: 123 print foo ]
-    map: fn [series f] [ fold series fn [acc x] [ append acc f x ] [] ]
+//     ctx: make context-chain! self
+//     in ctx [ foo: 123 print foo ]
+//     map: fn [series f] [ fold series fn [acc x] [ append acc f x ] [] ]
 
-    ;fold [1 2 3 4 5] fn [acc x] [ print x ] 0
-    mapped: map [1 2 3 4 5] fn [x] [ add x x ]
-    print mapped
-    print eq? "Hello, world!" greeting
-    createAdder: fn [x] [ fn [y] compose [ add (x) y ] ]
-    add10: createAdder 10
-    print add10 5
+//     ;fold [1 2 3 4 5] fn [acc x] [ print x ] 0
+//     mapped: map [1 2 3 4 5] fn [x] [ add x x ]
+//     print mapped
+//     print eq? "Hello, world!" greeting
+//     createAdder: fn [x] [ fn [y] compose [ add (x) y ] ]
+//     add10: createAdder 10
+//     print add10 5
 
-    task: make task! []
-    after after task [ print "done" ] self [print "again done" ] self
+//     task: make task! []
+//     after after task [ print "done" ] self [print "again done" ] self
 
-    map "Hello" fn [x] [ print x ]
-    `);
-expr.doBlock(ctx);
+//     map "Hello" fn [x] [ print x ]
+//     `);
+// expr.doBlock(ctx);
+
+const conditionTest = parse(`
+    a: 123
+    b: 123
+
+    cond: make condition! "fuck"
+    c: add a b
+    print c
+
+    cond
+
+    print c
+`);
+
+let running = true;
+let result = conditionTest.doBlock(ctx);
+if (result instanceof Restart) {
+    console.log(result.condition);
+    const cond = result.condition.value.description;
+    const msg = `CONDITION: ${cond}`;
+    rl.question(msg, (answer) => {
+        const parsed = parse(answer);
+        parsed.doBlock(ctx);
+        result = result.resume();
+    });
+}

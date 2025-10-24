@@ -8,6 +8,7 @@ export const TYPES = {
     paren: normalize("paren!"),
     bool: normalize("bool!"),
     char: normalize("char!"),
+    restart: normalize("restart!"),
 
     // Word Types
     word: normalize("word!"),
@@ -28,6 +29,7 @@ export const TYPES = {
 
     // Condition type
     condition: normalize("condition!"),
+    restart: normalize("restart!"),
 };
 
 // Type Sets

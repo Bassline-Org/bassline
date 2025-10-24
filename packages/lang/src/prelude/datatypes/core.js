@@ -1,4 +1,4 @@
-import { normalize, normalizeString } from "../../utils.js";
+import { normalize } from "../../utils.js";
 import * as t from "./types.js";
 const { TYPES, FUNCTION_TYPES } = t;
 
@@ -328,9 +328,8 @@ export class WordLike extends Value.typed(normalize("any-word!")) {
             ? new Word("true")
             : new Word("false");
     }
-    static make(context, iter) {
-        const value = iter.next().value.evaluate(context, iter);
-        return new this.constructor(value.spelling);
+    static make(spelling, context, iter) {
+        return new this.constructor(spelling);
     }
 }
 
@@ -390,21 +389,6 @@ export class GetWord extends WordLike.typed(TYPES.getWord) {
     form() {
         return new Str(`:${this.spelling.description}`);
     }
-    to(type) {
-        if (type === TYPES.string) {
-            return new Str(this.spelling.description);
-        }
-        if (type === TYPES.litWord) {
-            return new LitWord(this.spelling);
-        }
-        if (type === TYPES.word) {
-            return new Word(this.spelling);
-        }
-        if (type === TYPES.setWord) {
-            return new SetWord(this.spelling);
-        }
-        return super.to(type);
-    }
 }
 
 /**
@@ -422,21 +406,6 @@ export class SetWord extends WordLike.typed(TYPES.setWord) {
     form() {
         return new Str(`${this.spelling.description}:`);
     }
-    to(type) {
-        if (type === TYPES.string) {
-            return new Str(this.spelling.description);
-        }
-        if (type === TYPES.word) {
-            return new Word(this.spelling);
-        }
-        if (type === TYPES.litWord) {
-            return new LitWord(this.spelling);
-        }
-        if (type === TYPES.getWord) {
-            return new GetWord(this.spelling);
-        }
-        return super.to(type);
-    }
 }
 /**
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
@@ -451,26 +420,6 @@ export class LitWord extends WordLike.typed(TYPES.litWord) {
     }
     form() {
         return new Str(`'${this.spelling.description}`);
-    }
-    to(type) {
-        const normalized = normalizeString(type);
-        if (normalized === normalizeString("string!")) {
-            return new Str(this.spelling.description);
-        }
-        if (normalized === normalizeString("word!")) {
-            return new Word(this.spelling);
-        }
-        if (normalized === normalizeString("get-word!")) {
-            return new GetWord(this.spelling);
-        }
-        if (normalized === normalizeString("set-word!")) {
-            return new SetWord(this.spelling);
-        }
-        return super.to(type);
-    }
-    static make(stream, context) {
-        const next = stream.next();
-        return next.to("lit-word!");
     }
 }
 
@@ -487,6 +436,37 @@ export class Datatype extends Value.typed(TYPES.datatype) {
     }
 }
 
+export class Condition extends Value.typed(TYPES.condition) {
+    static make(condition) {
+        return new Condition(condition.to(TYPES.litWord).spelling);
+    }
+    evaluate(context, iter) {
+        return new Restart(this, context, iter);
+    }
+}
+
+export class Restart extends Value.typed(TYPES.restart) {
+    constructor(condition, context, iter) {
+        super({
+            condition,
+            context,
+            continuation: new Block(iter.toArray()),
+        });
+    }
+    get condition() {
+        return this.value.condition;
+    }
+    get context() {
+        return this.value.context;
+    }
+    get continuation() {
+        return this.value.continuation;
+    }
+    resume() {
+        return this.continuation.doBlock(this.context);
+    }
+}
+
 export const number = (value) => new Num(value);
 export const string = (value) => new Str(value);
 export const block = (value) => new Block(value);
@@ -496,6 +476,7 @@ export const getWord = (value) => new GetWord(value);
 export const setWord = (value) => new SetWord(value);
 export const litWord = (value) => new LitWord(value);
 export const datatype = (value) => new Datatype(value);
+export const char = (value) => new Char(value);
 
 export default {
     "number!": new Datatype(Num),
@@ -511,4 +492,6 @@ export default {
     "char!": new Datatype(Char),
     "true": new Bool(true),
     "false": new Bool(false),
+    "condition!": new Datatype(Condition),
+    "restart!": new Datatype(Restart),
 };
