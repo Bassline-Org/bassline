@@ -33,7 +33,6 @@ export const TYPES = {
 };
 
 // Type Sets
-
 // Direct Types are types that evaluate to themselves
 export const DIRECT_TYPES = new Set([
     TYPES.number,
@@ -81,25 +80,3 @@ export const isSeries = (cell) => SERIES_TYPES.has(cell.type);
 export const isAnyWord = (cell) => WORD_TYPES.has(cell.type);
 export const isContext = (cell) => CONTEXT_TYPES.has(cell.type);
 export const isFunction = (cell) => FUNCTION_TYPES.has(cell.type);
-
-export const setMany = (context, obj) => {
-    for (const [key, value] of Object.entries(obj)) {
-        if (!Object.values(TYPES).includes(value.type)) {
-            throw new Error(
-                `Cannot set value: ${value.toString()} in context: ${context.type.toString()}`,
-            );
-        }
-        context.value.set(normalize(key), value);
-    }
-    return context;
-};
-
-export const bind = (context, key, value) => {
-    if (isContext(context) && isAnyWord(key)) {
-        context.value.set(key.value, value);
-        return value;
-    }
-    throw new Error(
-        `Cannot bind word: ${key} to value: ${value} in context: ${context.type}`,
-    );
-};

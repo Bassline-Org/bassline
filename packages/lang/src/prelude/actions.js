@@ -1,64 +1,108 @@
-import { Block, Bool, Num } from "./datatypes/core.js";
-import { NativeFn, NativeMethod } from "./datatypes/functions.js";
-import { evaluate } from "../evaluator.js";
+import { Block, Num } from "./datatypes/core.js";
+import { nativeFn } from "./datatypes/functions.js";
+import { TYPES } from "./datatypes/types.js";
+import { parse } from "../parser.js";
 
 export default {
+    // Basic introspection
+    "print": nativeFn("value", (value) => {
+        console.log(value);
+        return value;
+    }),
+    "form": nativeFn("value", (value) => value.form()),
+    "mold": nativeFn("value", (value) => value.mold()),
+    "type?": nativeFn("value", (value) => value.getType()),
+
+    // Basic evaluation
+    "do": nativeFn("block", (block, context) => block.doBlock(context)),
+    "in": nativeFn("context block", (context, block) => block.doBlock(context)),
+    "load": nativeFn("string", (string) => parse(string.value)),
+
     // Core arithmetic methods
-    "+": NativeMethod.binary("add"),
-    "-": NativeMethod.binary("subtract"),
-    "*": NativeMethod.binary("multiply"),
-    "/": NativeMethod.binary("divide"),
-    "//": NativeMethod.binary("modulo"),
-    "eq?": NativeMethod.binary("equals"),
-    "cast": NativeMethod.binary("cast"),
+    "+": nativeFn("a b", (a, b) => a.add(b)),
+    "-": nativeFn("a b", (a, b) => a.subtract(b)),
+    "*": nativeFn("a b", (a, b) => a.multiply(b)),
+    "/": nativeFn("a b", (a, b) => a.divide(b)),
+    "//": nativeFn("a b", (a, b) => a.modulo(b)),
+    "eq?": nativeFn("a b", (a, b) => a.equals(b)),
+    "cast": nativeFn("a b", (a, b) => a.cast(b)),
 
     // Series methods
-    "update": NativeMethod.ternary("update"),
-    "append": NativeMethod.binary("append"),
-    "insert": NativeMethod.ternary("insert"),
-    "pick": NativeMethod.binary("pick"),
-    "pluck": NativeMethod.ternary("pluck"),
-    "slice": NativeMethod.ternary("slice"),
-    "length": NativeMethod.unary("length"),
-    "iota": new NativeFn(["n"], ([n], stream, context) => {
-        const arr = Array.from({ length: n.value }, (_, i) => new Num(i));
-        return new Block(arr);
-    }),
-    "concat": NativeMethod.binary("concat"),
+    "update": nativeFn(
+        "list index value",
+        (list, index, value) => list.update(index, value),
+    ),
+    "append": nativeFn("list value", (list, value) => list.append(value)),
+    "insert": nativeFn(
+        "list index value",
+        (list, index, value) => list.insert(index, value),
+    ),
+    "pick": nativeFn("list index", (list, index) => list.pick(index)),
+    "pluck": nativeFn("list index", (list, index) => list.pluck(index)),
+    "slice": nativeFn(
+        "list start end",
+        (list, start, end) => list.slice(start, end),
+    ),
+    "length": nativeFn("list", (list) => list.length()),
+    "iota": nativeFn(
+        "n",
+        (n) => new Block(Array.from({ length: n }, (_, i) => new Num(i))),
+    ),
+    "concat": nativeFn("list1 list2", (list1, list2) => list1.concat(list2)),
 
     // Block methods
-    "compose": NativeMethod.unary("compose"),
-    "reduce": NativeMethod.unary("reduce"),
-    "fold": NativeMethod.ternary("fold"),
+    "compose": nativeFn("block", (block, context) => block.compose(context)),
+    "reduce": nativeFn(
+        "block",
+        (block, context) => block.reduce(context),
+    ),
+    "fold": nativeFn(
+        "series fn inital",
+        (series, fn, initial) => series.fold(fn, initial),
+    ),
 
     // Control flow
-    "if": new NativeFn(
-        ["condition", "true-body", "false-body"],
-        ([condition, ifTrue, ifFalse], stream, context) => {
-            if (condition.evaluate(stream, context).to("bool!")?.value) {
-                return evaluate(ifTrue, context);
+    "if": nativeFn(
+        "condition ifTrue ifFalse",
+        (condition, ifTrue, ifFalse, context, iter) => {
+            const result = condition.evaluate(context, iter);
+            if (result.to(TYPES.bool)?.value) {
+                return ifTrue.doBlock(context);
             } else {
-                return evaluate(ifFalse, context);
+                return ifFalse.doBlock(context);
             }
         },
     ),
 
     // Context methods
-    "get": NativeMethod.binary("get"),
-    "set": NativeMethod.ternary("set"),
-    "delete": NativeMethod.binary("delete"),
-    "clone": NativeMethod.unary("clone"),
-    "copy": NativeMethod.binary("copy"),
-    "merge": NativeMethod.binary("merge"),
-    "project": NativeMethod.binary("project"),
-    "has": NativeMethod.binary("has"),
-    "words": NativeMethod.unary("words"),
-    "rename": NativeMethod.ternary("rename"),
-    "fresh": NativeMethod.unary("fresh"),
-    "values": NativeMethod.unary("values"),
-    "keys": NativeMethod.unary("keys"),
-
-    // Documentation
-    "doc": NativeMethod.binary("doc"),
-    "describe": NativeMethod.unary("describe"),
+    "get": nativeFn("context word", (context, word) => context.get(word)),
+    "set": nativeFn(
+        "context word value",
+        (context, word, value) => context.set(word, value),
+    ),
+    "delete": nativeFn("context word", (context, word) => context.delete(word)),
+    "clone": nativeFn("context", (context) => context.clone()),
+    "copy": nativeFn(
+        "context targetContext",
+        (context, targetContext) => context.copy(targetContext),
+    ),
+    "merge": nativeFn(
+        "context contexts",
+        (context, contexts) => context.merge(contexts),
+    ),
+    "project": nativeFn(
+        "context words",
+        (context, words) => context.project(words),
+    ),
+    "has": nativeFn("context word", (context, word) => context.has(word)),
+    "delete": nativeFn("context word", (context, word) => context.delete(word)),
+    "rename": nativeFn(
+        "context oldWords newWords",
+        (context, oldWords, newWords) => context.rename(oldWords, newWords),
+    ),
+    "fresh": nativeFn("context", (context) => context.fresh()),
+    "values": nativeFn("context", (context) => context.values()),
+    "keys": nativeFn("context", (context) => context.keys()),
+    "doc": nativeFn("value doc", (value) => value.doc(doc)),
+    "describe": nativeFn("value", (value) => value.describe()),
 };

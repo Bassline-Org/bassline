@@ -6,15 +6,15 @@ import { parse } from "../parser.js";
 import { existsSync } from "fs";
 import {
     Block,
-    NativeFn,
+    nativeFn,
     setMany,
     Str,
-    Unset,
+    TYPES,
     Value,
 } from "../prelude/index.js";
-import wsServer from "../io/ws-server.js";
-import file from "../io/file.js";
-import processContext from "../io/process.js";
+//import wsServer from "../io/ws-server.js";
+//import file from "../io/file.js";
+//import processContext from "../io/process.js";
 
 const args = process.argv.slice(2);
 
@@ -37,29 +37,29 @@ const replExtras = {
     "pwd": new Str(process.cwd()),
     "home": new Str(process.env.HOME || ""),
     "~": new Str(process.env.HOME || ""),
-    "cd": new NativeFn(["path"], ([path], stream, context) => {
-        process.chdir(path.to("string!").value);
-        context.set("pwd", new Str(process.cwd()));
+    "cd": nativeFn("path", (path) => {
+        process.chdir(path.to(TYPES.string).value);
+        GLOBAL.context.set("pwd", new Str(process.cwd()));
         return new Str(process.cwd());
     }),
-    "ls": new NativeFn([], ([], stream, context) => {
+    "ls": nativeFn("", () => {
         const files = readdirSync(process.cwd());
         return new Block(files.map((file) => new Str(file)));
     }),
-    "cat": new NativeFn(["file"], ([file], stream, context) => {
-        const content = readFileSync(file.to("string!").value, "utf8");
+    "cat": nativeFn("file", (file) => {
+        const content = readFileSync(file.to(TYPES.string).value, "utf8");
         return new Str(content);
     }),
-    "exit": new NativeFn([], ([], stream, context) => {
+    "exit": nativeFn("", () => {
         process.exit(0);
     }),
 };
 
 setMany(GLOBAL.context, {
     ...replExtras,
-    ...wsServer,
-    ...file,
-    ...processContext,
+    //    ...wsServer,
+    //    ...file,
+    //    ...processContext,
 });
 
 const rcPath = process.env.HOME + "/.basslinerc";

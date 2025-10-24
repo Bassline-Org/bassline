@@ -2,7 +2,6 @@ import { ContextChain, Datatype, Str } from "../prelude/index.js";
 import { normalizeString } from "../utils.js";
 import { parse } from "../parser.js";
 import { WebSocketServer } from "ws";
-import { evaluate } from "../evaluator.js";
 import { WsClient } from "./ws-client.js";
 import { Sock } from "./socket.js";
 

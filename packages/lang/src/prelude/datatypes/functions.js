@@ -104,23 +104,8 @@ export const make = nativeFn("type value", (type, value, context, iter) => {
     return type.value.make(value, context, iter);
 });
 
-export const doBlock = nativeFn("block", (block, context, iter) => {
-    return block.doBlock(context);
-});
-
-export const reduce = nativeFn("block", (block, context, iter) => {
-    return block.reduce(context);
-});
-
-export const compose = nativeFn("block", (block, context, iter) => {
-    return block.compose(context);
-});
-
 export default {
     "native-fn!": new Datatype(NativeFn),
     "fn!": new Datatype(PureFn),
     "make": make,
-    "do": doBlock,
-    "reduce": reduce,
-    "compose": compose,
 };

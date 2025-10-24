@@ -1,38 +1,39 @@
-import { ContextChain, NativeFn, Unset } from "../prelude/index.js";
+import { context, functions } from "../prelude/index.js";
 import { parse } from "../parser.js";
-import { evaluate } from "../evaluator.js";
 
+const { ContextChain } = context;
+const { nativeFn } = functions;
 export class Sock extends ContextChain {
     constructor(context) {
         super(context);
         this.opened = false;
         this.set(
             "send",
-            new NativeFn(["data"], ([data], stream, context) => {
+            nativeFn("data", (data) => {
                 this.sendSocket(data);
                 return this;
             }),
         );
         this.set(
             "close",
-            new NativeFn([], ([], stream, context) => {
+            nativeFn("", () => {
                 this.closeSocket();
                 return this;
             }),
         );
         this.set(
             "open",
-            new NativeFn([], ([], stream, context) => {
+            nativeFn("", () => {
                 this.openSocket();
                 return this;
             }),
         );
     }
     error(message) {
-        const handler = this.get("error");
-        if (!handler.is(Unset)) {
+        // Maybe call the handler Handler
+        if (this.has("error")) {
             const parsed = parse(`error "${message}"`);
-            evaluate(parsed, this);
+            parsed.doBlock(this);
         } else {
             console.error(message);
         }

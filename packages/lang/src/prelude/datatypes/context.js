@@ -36,7 +36,7 @@ export class ContextBase extends Value.typed(TYPES.context) {
 
     keys() {
         return new Block(
-            this.relevantEntries().map(([key, value]) => new Word(key)),
+            Array.from(this.bindings.keys()).map((key) => new Word(key)),
         );
     }
 

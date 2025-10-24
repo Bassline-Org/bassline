@@ -1,15 +1,9 @@
-import types from "./types.js";
-import methods from "./actions.js";
+import actions from "./actions.js";
 import datatypes from "./datatypes/index.js";
-import doPrelude from "./do.js";
-import print from "./print.js";
 
 export * from "./datatypes/index.js";
 
 export default {
     ...datatypes,
-    ...types,
-    ...methods,
-    ...doPrelude,
-    ...print,
+    ...actions,
 };
