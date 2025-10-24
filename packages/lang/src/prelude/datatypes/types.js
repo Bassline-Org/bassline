@@ -6,6 +6,7 @@ export const TYPES = {
     string: normalize("string!"),
     block: normalize("block!"),
     paren: normalize("paren!"),
+    bool: normalize("bool!"),
 
     // Word Types
     word: normalize("word!"),
@@ -15,7 +16,6 @@ export const TYPES = {
 
     // Function Types
     nativeFn: normalize("native-fn!"),
-    nativeMethod: normalize("native-method!"),
     fn: normalize("fn!"),
 
     // Context Types
@@ -59,7 +59,6 @@ export const WORD_TYPES = new Set([
 // Function types
 export const FUNCTION_TYPES = new Set([
     TYPES.nativeFn,
-    TYPES.nativeMethod,
     TYPES.fn,
 ]);
 

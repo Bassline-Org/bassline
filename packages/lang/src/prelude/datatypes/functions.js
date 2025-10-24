@@ -48,36 +48,6 @@ export class NativeFn extends Value.typed(TYPES.nativeFn) {
 export const nativeFn = (spec, fn) => {
     return new NativeFn(spec, fn);
 };
-export const unaryMethod = (selector, names = ["a"]) => {
-    return new NativeMethod(names, selector);
-};
-export const binaryMethod = (selector, names = ["a", "b"]) => {
-    return new NativeMethod(names, selector);
-};
-export const ternaryMethod = (selector, names = ["a", "b", "c"]) => {
-    return new NativeMethod(names, selector);
-};
-
-export class NativeMethod extends NativeFn.typed(TYPES.nativeMethod) {
-    constructor(spec, selector) {
-        super(spec, ([target, ...args], context, iter) => {
-            const method = target[selector];
-            if (!method) {
-                throw new Error(
-                    `No method "${selector}" found on ${target.type}`,
-                );
-            }
-            return method.call(target, ...args, context, iter);
-        });
-        this.selector = selector;
-    }
-    form() {
-        console.log("NativeMethod form", this.spec, this.selector);
-        return new Str(
-            `native-method! spec: [ ${this.spec.join(", ")} ]`,
-        );
-    }
-}
 
 export class PureFn extends ContextChain.typed(TYPES.fn) {
     constructor(spec, body, parent) {
@@ -90,7 +60,10 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
         const spec = this.get("spec");
         const body = this.get("body");
         const args = collectArguments(spec.items, localCtx, iter);
-        return body.doBlock(args, localCtx);
+        args.forEach((arg, index) => {
+            localCtx.set(spec.items[index], arg);
+        });
+        return body.doBlock(localCtx);
     }
     mold() {
         const args = this.get("args");
@@ -99,20 +72,36 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
             `(make pure-fn! ${args.mold().value} ${body.mold().value})`,
         );
     }
-    static make(stream, context) {
-        const args = stream.next().evaluate(stream, context).to("block!");
-        const body = stream.next().evaluate(stream, context).to("block!");
-        return new PureFn(args, body);
+    static make(value, context) {
+        if (value.type !== TYPES.block) {
+            throw new Error("Invalid value for make");
+        }
+        const [args, body] = value.items;
+        return new PureFn(args, body, context);
     }
 }
 
 export const make = nativeFn("type value", (type, value, context, iter) => {
-    return type.make(value, context, iter);
+    return type.value.make(value, context, iter);
+});
+
+export const doBlock = nativeFn("block", (block, context, iter) => {
+    return block.doBlock(context);
+});
+
+export const reduce = nativeFn("block", (block, context, iter) => {
+    return block.reduce(context);
+});
+
+export const compose = nativeFn("block", (block, context, iter) => {
+    return block.compose(context);
 });
 
 export default {
     "native-fn!": new Datatype(NativeFn),
-    "native-method!": new Datatype(NativeMethod),
     "fn!": new Datatype(PureFn),
     "make": make,
+    "do": doBlock,
+    "reduce": reduce,
+    "compose": compose,
 };

@@ -224,11 +224,11 @@ export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
             const p = this.parent();
             return p.get(word);
         }
-        throw new Error(`Key ${key} not found in context chain`);
+        console.error("Key not found in context chain: ", key);
+        throw new Error(`Key not found in context chain`);
     }
 
-    static make(stream, context) {
-        const parent = stream.next().evaluate(stream, context);
+    static make(parent, context) {
         return new ContextChain(parent);
     }
 }

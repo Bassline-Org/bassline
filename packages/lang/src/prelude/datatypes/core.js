@@ -10,7 +10,7 @@ export class Value {
         return this;
     }
     getType() {
-        return new LitWord(this.type);
+        return new Word(this.type);
     }
     to(type) {
         if (this.type !== type) {
@@ -46,10 +46,6 @@ export class Value {
     cast(datatype) {
         const type = datatype.value.type;
         return this.to(type);
-    }
-    print() {
-        console.log(this.form().value);
-        return this;
     }
     static make(context, iter) {
         throw new Error(
@@ -109,6 +105,10 @@ export class Series extends Value.typed(TYPES.series) {
     get items() {
         return this.value;
     }
+    set items(items) {
+        this.value = items;
+        return this;
+    }
     iter() {
         return this.items.values();
     }
@@ -119,7 +119,9 @@ export class Series extends Value.typed(TYPES.series) {
         }
         return new Bool(
             this.items.every((item, index) =>
-                item.equals(otherValue.items[index])
+                (item instanceof Value)
+                    ? item.equals(otherValue.items[index])
+                    : item === otherValue.items[index]
             ),
         );
     }
@@ -143,7 +145,7 @@ export class Series extends Value.typed(TYPES.series) {
             `[ ${this.items.map((item) => item.form().value).join(" ")} ]`,
         );
     }
-    fold(fn, initial, context, _iter) {
+    fold(fn, initial, context) {
         let acc = initial;
         const iter = this.iter();
         for (const item of iter) {
@@ -158,6 +160,17 @@ export class Series extends Value.typed(TYPES.series) {
         return new this.constructor(
             this.items.slice(startValue.value, endValue.value),
         );
+    }
+    fold(fn, initial, context) {
+        let acc = initial;
+        const iter = this.iter();
+        const blockItems = [];
+        const block = new Block(blockItems);
+        for (const item of iter) {
+            block.items = [fn, acc, item];
+            acc = block.doBlock(context);
+        }
+        return acc;
     }
     length() {
         return new Num(this.items.length);
@@ -253,7 +266,7 @@ export class Block extends Series.typed(TYPES.block) {
      * @param {*} context
      * @returns
      */
-    reduce(context, _iter) {
+    reduce(context) {
         const iter = this.iter();
         const result = [];
         for (const item of iter) {
@@ -266,28 +279,32 @@ export class Block extends Series.typed(TYPES.block) {
      * This is useful for dynamically generating code
      * @returns {Block} - A new block with the paren items evaluated, and blocks composed
      */
-    compose(context, _iter) {
+    compose(context) {
         const iter = this.iter();
         const result = [];
         for (const item of iter) {
             if (item instanceof Paren) {
-                result.push(item.evaluate(context, iter));
+                result.push(item.doBlock(context));
             }
             if (item instanceof Block) {
-                result.push(item.compose(context, iter));
+                result.push(item.compose(context));
             }
             result.push(item);
         }
         return new Block(result);
     }
-    doBlock(context, _iter) {
+    doBlock(context) {
         const iter = this.iter();
         let result = null;
         for (const item of iter) {
             result = item.evaluate(context, iter);
         }
+        if (!result) {
+            throw new Error("No result from doBlock");
+        }
         return result;
     }
+
     mold() {
         const items = this.items.map((e) => `${e.mold().value}`);
         return new Str(`[ ${items.join(" ")} ]`);
@@ -445,7 +462,7 @@ export class SetWord extends WordLike.typed(TYPES.setWord) {
 /**
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
  */
-export class LitWord extends WordLike {
+export class LitWord extends WordLike.typed(TYPES.litWord) {
     static type = TYPES.litWord;
     // evaluate(stream, context) {
     //     return new Word(this.spelling);
