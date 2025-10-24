@@ -254,9 +254,9 @@ export class Str extends Series.typed(TYPES.string) {
     }
     mold() {
         if (Array.isArray(this.value)) {
-            return this.value.map((e) => e.toString()).join("");
+            return `"${this.value.map((e) => e.toString()).join("")}"`;
         }
-        return this.value;
+        return `"${this.value}"`;
     }
     static make(context, iter) {
         const value = iter.next().value.evaluate(context, iter);
