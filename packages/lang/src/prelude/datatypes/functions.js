@@ -32,13 +32,13 @@ export class NativeFn extends Value.typed(TYPES.nativeFn) {
         return this.value.fn;
     }
     evaluate(context, iter) {
-        try {
-            const args = collectArguments(this.spec, context, iter);
-            return this.fn(...args, context, iter);
-        } catch (error) {
-            const condition = new Condition(normalize("error"));
-            return condition.evaluate(context, iter);
-        }
+        //try {
+        const args = collectArguments(this.spec, context, iter);
+        return this.fn(...args, context, iter);
+        //} catch (error) {
+        //    const condition = new Condition(normalize("error"));
+        //    return condition.evaluate(context, iter);
+        //}
     }
     form() {
         return new Str(`native-fn! spec: [ ${this.spec.join(", ")} ]`);
@@ -56,19 +56,19 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
         this.set("body", body);
     }
     evaluate(context, iter) {
-        try {
-            const localCtx = new ContextChain(context);
-            const spec = this.get("spec");
-            const body = this.get("body");
-            const args = collectArguments(spec.items, localCtx, iter);
-            args.forEach((arg, index) => {
-                localCtx.set(spec.items[index], arg);
-            });
-            return body.doBlock(localCtx);
-        } catch (error) {
-            const condition = new Condition(normalize("error"));
-            return condition.evaluate(context, iter);
-        }
+        //try {
+        const localCtx = new ContextChain(context);
+        const spec = this.get("spec");
+        const body = this.get("body");
+        const args = collectArguments(spec.items, localCtx, iter);
+        args.forEach((arg, index) => {
+            localCtx.set(spec.items[index], arg);
+        });
+        return body.doBlock(localCtx);
+        //} catch (error) {
+        //    const condition = new Condition(normalize("error"));
+        //    return condition.evaluate(context, iter);
+        //}
     }
     mold() {
         const args = this.get("args");
@@ -87,8 +87,10 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
 }
 
 export function collectArguments(spec, context, iter) {
+    //console.log("collectArguments: ", spec);
     return spec.map((arg) => {
         const next = iter.next().value;
+        //console.log("next: ", next);
         if (arg.type === TYPES.litWord) return next;
         if (arg.type === TYPES.getWord) {
             if (t.isFunction(next)) return next;

@@ -2,21 +2,23 @@ iterations: 0
 
 fn: make fn! [[args body] [ make fn! reduce [args body] ]]
 
-foo: fn [x] [
-    ;in system [ iterations: + iterations 1 ]
-    + x 1
+foo: fn [acc curr] [
+    in system [ iterations: + iterations 1 ]
+    + acc curr
 ]
 
 folder: fn [n] [
     fold (iota n) :foo 0
 ]
 
+;print iterations
+print folder 10
+print folder 50
+print folder 100
+print folder 1000
+print folder 10000
+print folder 100000
+print folder 1000000
+print iterations
 
-print folder 5
-; print folder 10
-; print folder 50
-; print folder 100
-; print folder 1000
-; print folder 10000
-; print folder 100000
-; print folder 1000000
+"done"

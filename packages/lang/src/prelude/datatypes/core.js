@@ -27,8 +27,9 @@ export class Value {
         return new Str(this.value);
     }
     doc(doc) {
-        const docString = doc.to("STRING!");
+        const docString = doc.to(TYPES.string);
         this.documentation = docString;
+        return doc;
     }
     is(type) {
         if (type instanceof Value) {
@@ -37,7 +38,7 @@ export class Value {
         return this.type === type;
     }
     describe() {
-        return this.documentation ?? unset;
+        return this.documentation ?? new Str("No documentation available");
     }
     equals(other) {
         const otherValue = other.to(this.type);
@@ -145,15 +146,6 @@ export class Series extends Value.typed(TYPES.series) {
             `[ ${this.items.map((item) => item.form().value).join(" ")} ]`,
         );
     }
-    fold(fn, initial, context) {
-        let acc = initial;
-        const iter = this.iter();
-        for (const item of iter) {
-            const fIter = [acc, item].values();
-            acc = fn.evaluate(context, fIter);
-        }
-        return acc;
-    }
     slice(start, end) {
         const startValue = start.to("number!");
         const endValue = end.to("number!");
@@ -164,11 +156,8 @@ export class Series extends Value.typed(TYPES.series) {
     fold(fn, initial, context) {
         let acc = initial;
         const iter = this.iter();
-        const blockItems = [];
-        const block = new Block(blockItems);
         for (const item of iter) {
-            block.items = [fn, acc, item];
-            acc = block.doBlock(context);
+            acc = fn.evaluate(context, [acc, item].values());
         }
         return acc;
     }
@@ -286,7 +275,6 @@ export class Block extends Series.typed(TYPES.block) {
         }
         return result;
     }
-
     mold() {
         const items = this.items.map((e) => `${e.mold().value}`);
         return new Str(`[ ${items.join(" ")} ]`);
@@ -298,6 +286,9 @@ export class Block extends Series.typed(TYPES.block) {
 }
 
 export class Paren extends Block.typed(TYPES.paren) {
+    evaluate(context, iter) {
+        return this.doBlock(context);
+    }
     mold() {
         const items = this.items.map((e) => `${e.mold().value}`);
         return new Str(`(${items.join(" ")})`);
@@ -400,9 +391,9 @@ export class GetWord extends WordLike.typed(TYPES.getWord) {
 export class SetWord extends WordLike.typed(TYPES.setWord) {
     evaluate(context, iter) {
         const value = iter.next().value.evaluate(context, iter);
-        if (value.type === TYPES.condition) {
-            return value.evaluate(context, iter);
-        }
+        //if (value.type === TYPES.condition) {
+        //return value.evaluate(context, iter);
+        //}
         context.set(this, value);
         return value;
     }

@@ -72,29 +72,29 @@ if (existsSync(rcPath)) {
 
 // Load file if specified
 if (fileToLoad) {
-    try {
-        if (!existsSync(fileToLoad)) {
-            console.error(`Error: File '${fileToLoad}' not found`);
-            process.exit(1);
-        }
-
-        const source = readFileSync(fileToLoad, "utf8");
-        const parsed = parse(source);
-        const result = GLOBAL.evaluate(parsed);
-
-        // Only print result if not entering interactive mode
-        if (!interactiveMode) {
-            console.log(result?.form?.()?.value);
-        } else {
-            console.log(`Loaded ${fileToLoad}`);
-        }
-    } catch (e) {
-        console.error(`Error running ${fileToLoad}:`);
-        console.error(e.message);
-        if (!interactiveMode) {
-            process.exit(1);
-        }
+    //    try {
+    if (!existsSync(fileToLoad)) {
+        console.error(`Error: File '${fileToLoad}' not found`);
+        process.exit(1);
     }
+
+    const source = readFileSync(fileToLoad, "utf8");
+    const parsed = parse(source);
+    const result = GLOBAL.evaluate(parsed);
+
+    // Only print result if not entering interactive mode
+    if (!interactiveMode) {
+        console.log(result?.form?.()?.value);
+    } else {
+        console.log(`Loaded ${fileToLoad}`);
+    }
+    //    } catch (e) {
+    //console.error(`Error running ${fileToLoad}:`);
+    //console.error(e.message);
+    //if (!interactiveMode) {
+    //    process.exit(1);
+    //}
+    //    }
 }
 
 // Start REPL only if:

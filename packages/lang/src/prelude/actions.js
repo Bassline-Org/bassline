@@ -17,9 +17,6 @@ export default {
     "type?": nativeFn("value", (value) => value.getType()),
 
     // Basic evaluation
-    "do": nativeFn("block", (block, context) => block.doBlock(context)),
-    "in": nativeFn("context block", (context, block) => block.doBlock(context)),
-    "load": nativeFn("string", (string) => parse(string.value)),
 
     // Core arithmetic methods
     "+": nativeFn("a b", (a, b) => a.add(b)),
@@ -31,10 +28,6 @@ export default {
     "cast": nativeFn("a b", (a, b) => a.cast(b)),
 
     // Series methods
-    "update": nativeFn(
-        "list index value",
-        (list, index, value) => list.update(index, value),
-    ),
     "append": nativeFn("list value", (list, value) => list.append(value)),
     "insert": nativeFn(
         "list index value",
@@ -59,8 +52,11 @@ export default {
         "block",
         (block, context) => block.reduce(context),
     ),
+    "do": nativeFn("block", (block, context) => block.doBlock(context)),
+    "in": nativeFn("context block", (context, block) => block.doBlock(context)),
+    "load": nativeFn("string", (string) => parse(string.value)),
     "fold": nativeFn(
-        "series fn inital",
+        "series fn initial",
         (series, fn, initial, context) => series.fold(fn, initial, context),
     ),
 
@@ -106,6 +102,6 @@ export default {
     "fresh": nativeFn("context", (context) => context.fresh()),
     "values": nativeFn("context", (context) => context.values()),
     "keys": nativeFn("context", (context) => context.keys()),
-    "doc": nativeFn("value doc", (value) => value.doc(doc)),
+    "doc": nativeFn("value doc", (value, doc) => value.doc(doc)),
     "describe": nativeFn("value", (value) => value.describe()),
 };

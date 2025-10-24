@@ -65,7 +65,11 @@ export class ContextBase extends Value.typed(TYPES.context) {
         const spelling = this.keyFor(word);
         const value = this.bindings.get(spelling);
         if (!value) {
-            return new Condition(normalize(`key-not-found`));
+            console.error("Key not found in context: ", spelling.description);
+            throw new Error(
+                `Key not found in context: ${spelling.description}`,
+            );
+            //return new Condition(normalize(`key-not-found`));
         }
         return value;
     }
@@ -83,7 +87,6 @@ export class ContextBase extends Value.typed(TYPES.context) {
     clone() {
         return this.copy(this.fresh());
     }
-
     copy(targetContext = this.clone()) {
         for (const [word, value] of this.bindings.entries()) {
             if (word === keys.self) continue;
@@ -227,7 +230,7 @@ export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
         throw new Error(`Key not found in context chain`);
     }
 
-    static make(parent, context) {
+    static make(parent) {
         return new ContextChain(parent);
     }
 }
