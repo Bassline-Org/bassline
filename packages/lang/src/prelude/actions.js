@@ -30,7 +30,7 @@ export default {
     "/": nativeFn("a b", (a, b) => a.divide(b)),
     "//": nativeFn("a b", (a, b) => a.modulo(b)),
     "eq?": nativeFn("a b", (a, b) => a.equals(b)),
-    "cast": nativeFn("a b", (a, b) => a.cast(b)),
+    "cast": nativeFn("value type", (a, b) => a.cast(b)),
 
     // Series methods
     "append": nativeFn("list value", (list, value) => list.append(value)),
@@ -110,4 +110,8 @@ export default {
     "keys": nativeFn("context", (context) => context.keys()),
     "doc": nativeFn("value doc", (value, doc) => value.doc(doc)),
     "describe": nativeFn("value", (value) => value.describe()),
+
+    "pause": nativeFn("", (context, iter) => {
+        return new Block(iter.toArray());
+    }),
 };
