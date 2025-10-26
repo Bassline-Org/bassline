@@ -355,6 +355,24 @@ export class WordLike extends Value.typed(normalize("any-word!")) {
     get spelling() {
         return this.value;
     }
+    to(type) {
+        if (type === TYPES.string) {
+            return new Str(this.spelling.description);
+        }
+        if (type === TYPES.litWord) {
+            return new LitWord(this.spelling);
+        }
+        if (type === TYPES.getWord) {
+            return new GetWord(this.spelling);
+        }
+        if (type === TYPES.setWord) {
+            return new SetWord(this.spelling);
+        }
+        if (type === TYPES.word) {
+            return new Word(this.spelling);
+        }
+        return super.to(type);
+    }
     equals(other) {
         const otherValue = other.to(this.type);
         return (this.spelling === otherValue.spelling)
@@ -388,21 +406,6 @@ export class Word extends WordLike.typed(TYPES.word) {
     }
     form() {
         return new Str(this.spelling.description);
-    }
-    to(type) {
-        if (type === TYPES.string) {
-            return new Str(this.spelling.description);
-        }
-        if (type === TYPES.litWord) {
-            return new LitWord(this.spelling);
-        }
-        if (type === TYPES.getWord) {
-            return new GetWord(this.spelling);
-        }
-        if (type === TYPES.setWord) {
-            return new SetWord(this.spelling);
-        }
-        return super.to(type);
     }
     mold() {
         return this.spelling.description;
@@ -443,13 +446,14 @@ export class SetWord extends WordLike.typed(TYPES.setWord) {
         return `${this.spelling.description}:`;
     }
 }
+
 /**
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
  */
 export class LitWord extends WordLike.typed(TYPES.litWord) {
-    // evaluate(stream, context) {
-    //     return new Word(this.spelling);
-    // }
+    evaluate(stream, context) {
+        return this;
+    }
     form() {
         return new Str(`'${this.spelling.description}`);
     }
@@ -487,7 +491,6 @@ export const char = (value) => new Char(value);
 
 export default {
     "number!": new Datatype(Num),
-    "series!": new Datatype(Series),
     "string!": new Datatype(Str),
     "word!": new Datatype(Word),
     "get-word!": new Datatype(GetWord),
