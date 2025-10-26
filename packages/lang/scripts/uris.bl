@@ -1,0 +1,17 @@
+
+
+foo: https://google.com
+
+print type? foo
+
+mail: mailto:user@example.com
+
+print type? mail
+
+tel: tel:+1234567890
+
+print type? tel
+
+file: file:///path/to/file.txt
+
+print type? file

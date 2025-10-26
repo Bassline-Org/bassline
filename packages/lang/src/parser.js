@@ -10,7 +10,7 @@ import {
     whitespace,
 } from "arcsecond/index.js";
 import * as t from "./prelude/datatypes/core.js";
-import { Url } from "./prelude/datatypes/context.js";
+import { Uri } from "./prelude/datatypes/context.js";
 
 // ===== Comments and Whitespace =====
 const comment = sequenceOf([
@@ -83,20 +83,20 @@ const normalWord = sequenceOf([
 
 const word = choice([litWord, getWord, setWord, normalWord]);
 
-// ===== URL Parsing (RFC 3986 compliant) =====
-// URL structure: scheme://[userinfo@]host[:port][/path][?query][#fragment]
+// ===== URI Parsing (RFC 3986 compliant) =====
+// URI structure: scheme://[userinfo@]host[:port][/path][?query][#fragment]
 
 // Scheme: must start with letter, followed by letters, digits, +, -, or .
-const urlScheme = regex(/^[a-zA-Z][a-zA-Z0-9+.-]*/);
+const uriScheme = regex(/^[a-zA-Z][a-zA-Z0-9+.-]*/);
 
 // Userinfo: optional username[:password] before @ (we'll capture everything before @)
-const urlUserinfo = regex(/^[^@\/\s]+/);
+const uriUserinfo = regex(/^[^@\/\s]+/);
 
 // Host: domain name or IP address
 // Domain: alphanumeric and hyphens, dots for subdomains
 // IPv4: four groups of 1-3 digits
 // IPv6: enclosed in square brackets (simplified pattern)
-const urlHost = choice([
+const uriHost = choice([
     // IPv6 in brackets
     sequenceOf([
         char("["),
@@ -110,66 +110,66 @@ const urlHost = choice([
 ]);
 
 // Port: optional colon followed by digits
-const urlPort = sequenceOf([
+const uriPort = sequenceOf([
     char(":"),
     digits,
 ]).map(([_, port]) => port);
 
 // Path: everything until ? or # or end
 // Can be empty, or start with /
-const urlPath = regex(/^[^?#\s]*/);
+const uriPath = regex(/^[^?#\s]*/);
 
 // Query: everything after ? until # or end
-const urlQuery = sequenceOf([
+const uriQuery = sequenceOf([
     char("?"),
     regex(/^[^#\s]*/),
 ]).map(([_, query]) => query);
 
 // Fragment: everything after #
-const urlFragment = sequenceOf([
+const uriFragment = sequenceOf([
     char("#"),
     regex(/^[^\s]*/),
 ]).map(([_, fragment]) => fragment);
 
 // Authority: [userinfo@]host[:port]
-const urlAuthority = sequenceOf([
+const uriAuthority = sequenceOf([
     // Optional userinfo@
     choice([
         sequenceOf([
-            urlUserinfo,
+            uriUserinfo,
             char("@"),
         ]).map(([userinfo, _]) => userinfo),
         // No userinfo
         sequenceOf([]).map(() => null),
     ]),
     // Required host
-    urlHost,
+    uriHost,
     // Optional port
     choice([
-        urlPort,
+        uriPort,
         sequenceOf([]).map(() => null),
     ]),
 ]).map(([userinfo, host, port]) => ({ userinfo, host, port }));
 
 // Full URL parser
-const urlParser = sequenceOf([
+const uriParser = sequenceOf([
     // Scheme is required
-    sequenceOf([urlScheme, char(":")]).map(([scheme, _]) => scheme),
+    sequenceOf([uriScheme, char(":")]).map(([scheme, _]) => scheme),
     // Authority with // prefix (optional for some schemes like mailto:)
     choice([
         sequenceOf([
             char("/"),
             char("/"),
-            urlAuthority,
+            uriAuthority,
             // Path after authority (can be empty)
-            urlPath,
+            uriPath,
         ]).map(([_, __, auth, path]) => ({
             hasAuthority: true,
             ...auth,
             path: path || null,
         })),
         // No authority, just path (for schemes like mailto:, file:, etc.)
-        urlPath.map((path) => ({
+        uriPath.map((path) => ({
             hasAuthority: false,
             userinfo: null,
             host: null,
@@ -179,12 +179,12 @@ const urlParser = sequenceOf([
     ]),
     // Optional query
     choice([
-        urlQuery,
+        uriQuery,
         sequenceOf([]).map(() => null),
     ]),
     // Optional fragment
     choice([
-        urlFragment,
+        uriFragment,
         sequenceOf([]).map(() => null),
     ]),
 ]).map(([scheme, authorityAndPath, query, fragment]) => {
@@ -192,7 +192,7 @@ const urlParser = sequenceOf([
     // Scheme and host are case-insensitive (stored as words)
     // Path, query, fragment, userinfo are case-sensitive (stored as strings)
     // Port is stored as a number
-    const urlContext = new Url({
+    const uriContext = new Uri({
         scheme: t.word(scheme.toLowerCase()), // Normalize scheme to lowercase
         userinfo: authorityAndPath.userinfo
             ? t.string(authorityAndPath.userinfo)
@@ -208,9 +208,9 @@ const urlParser = sequenceOf([
         fragment: fragment ? t.string(fragment) : null,
     });
 
-    return urlContext;
+    return uriContext;
 })
-    .errorMap(() => "Expected URL");
+    .errorMap(() => "Expected URI");
 
 // Forward declare for recursion
 const value = recursiveParser(() => valueParser);
@@ -238,7 +238,7 @@ const valueParser = choice([
     stringLiteral,
     blockParser,
     parenParser,
-    urlParser,
+    uriParser,
     word,
 ]);
 
@@ -248,9 +248,6 @@ const program = sequenceOf([
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     endOfInput,
 ]).map(([_, values, __]) => t.block(values)); // Return as block!
-
-// Export URL parser for testing
-export { urlParser };
 
 export function parse(source) {
     const result = program.run(source);

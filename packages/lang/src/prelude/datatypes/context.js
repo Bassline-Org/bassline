@@ -246,7 +246,7 @@ export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
     }
 }
 
-export class Url extends ContextBase.typed(TYPES.url) {
+export class Uri extends ContextBase.typed(TYPES.uri) {
     constructor({ scheme, userinfo, host, port, path, query, fragment }) {
         super();
         if (scheme) this.set("scheme", scheme);
@@ -335,5 +335,5 @@ export function setMany(context, bindingObj) {
 export default {
     "context!": datatype(ContextBase),
     "context-chain!": datatype(ContextChain),
-    "url!": datatype(Url),
+    "uri!": datatype(Uri),
 };

@@ -71,6 +71,9 @@ const rcPath = process.env.HOME + "/.basslinerc";
 if (existsSync(rcPath)) {
     console.log("Loading ~/.basslinerc");
     const rcCode = readFileSync(rcPath, "utf8");
+    const parsed = parse(rcCode);
+    console.log("parsed", parsed);
+    throw new Error("test");
     GLOBAL.evaluate(parse(rcCode));
     console.log("~/.basslinerc loaded");
 }

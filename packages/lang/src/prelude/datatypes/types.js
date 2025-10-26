@@ -32,7 +32,7 @@ export const TYPES = {
     restart: normalize("restart!"),
 
     // URL type
-    url: normalize("url!"),
+    uri: normalize("uri!"),
 };
 
 // Type Sets
@@ -52,7 +52,7 @@ export const SERIES_TYPES = new Set([
     TYPES.block,
     TYPES.paren,
     TYPES.string,
-    TYPES.url,
+    TYPES.uri,
 ]);
 
 // Word Types are types that have a spelling, and require a context to be evaluated
