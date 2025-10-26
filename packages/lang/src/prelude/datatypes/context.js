@@ -246,6 +246,82 @@ export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
     }
 }
 
+export class Url extends ContextBase.typed(TYPES.url) {
+    constructor({ scheme, userinfo, host, port, path, query, fragment }) {
+        super();
+        if (scheme) this.set("scheme", scheme);
+        if (userinfo) this.set("userinfo", userinfo);
+        if (host) this.set("host", host);
+        if (port) this.set("port", port);
+        if (path) this.set("path", path);
+        if (query) this.set("query", query);
+        if (fragment) this.set("fragment", fragment);
+    }
+
+    mold() {
+        // Build the URL string from its components
+        let url = "";
+
+        // Scheme is required
+        const scheme = this.get("scheme");
+        url += scheme.mold().toLowerCase();
+        url += ":";
+
+        // Authority section (host is required if using //)
+        if (this.has("host").value) {
+            url += "//";
+
+            // Optional userinfo
+            if (this.has("userinfo").value) {
+                const userinfo = this.get("userinfo");
+                url += userinfo.value;
+                url += "@";
+            }
+
+            // Host
+            const host = this.get("host");
+            // Check if it's IPv6 (contains colons)
+            const hostStr = host.mold().toLowerCase();
+            if (hostStr.includes(":")) {
+                url += "[" + hostStr + "]";
+            } else {
+                url += hostStr;
+            }
+
+            // Optional port
+            if (this.has("port").value) {
+                const port = this.get("port");
+                url += ":" + port.value;
+            }
+        }
+
+        // Path (can exist with or without authority)
+        if (this.has("path").value) {
+            const path = this.get("path");
+            url += path.value;
+        }
+
+        // Optional query
+        if (this.has("query").value) {
+            const query = this.get("query");
+            url += "?" + query.value;
+        }
+
+        // Optional fragment
+        if (this.has("fragment").value) {
+            const fragment = this.get("fragment");
+            url += "#" + fragment.value;
+        }
+
+        return url;
+    }
+
+    form() {
+        // form() returns a Str object with the molded representation
+        return new Str(this.mold());
+    }
+}
+
 export const context = () => new ContextBase();
 export const contextChain = (parent) => new ContextChain(parent);
 
@@ -259,4 +335,5 @@ export function setMany(context, bindingObj) {
 export default {
     "context!": datatype(ContextBase),
     "context-chain!": datatype(ContextChain),
+    "url!": datatype(Url),
 };

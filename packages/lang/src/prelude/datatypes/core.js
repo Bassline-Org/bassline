@@ -497,6 +497,7 @@ export default {
     "paren!": new Datatype(Paren),
     "datatype!": new Datatype(Datatype),
     "char!": new Datatype(Char),
+    "bool!": new Datatype(Bool),
     "true": new Bool(true),
     "false": new Bool(false),
 };

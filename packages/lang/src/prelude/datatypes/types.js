@@ -30,6 +30,9 @@ export const TYPES = {
     // Condition type
     condition: normalize("condition!"),
     restart: normalize("restart!"),
+
+    // URL type
+    url: normalize("url!"),
 };
 
 // Type Sets
@@ -49,6 +52,7 @@ export const SERIES_TYPES = new Set([
     TYPES.block,
     TYPES.paren,
     TYPES.string,
+    TYPES.url,
 ]);
 
 // Word Types are types that have a spelling, and require a context to be evaluated
