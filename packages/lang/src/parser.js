@@ -115,20 +115,20 @@ const uriPort = sequenceOf([
     digits,
 ]).map(([_, port]) => port);
 
-// Path: everything until ? or # or end
-// Can be empty, or start with /
-const uriPath = regex(/^[^?#\s]*/);
+// Path: everything until ? or # or delimiter
+// Exclude whitespace and our language delimiters: [ ] ( ) { } " ;
+const uriPath = regex(/^[^?#\s\[\](){}";]*/);
 
-// Query: everything after ? until # or end
+// Query: everything after ? until # or delimiter
 const uriQuery = sequenceOf([
     char("?"),
-    regex(/^[^#\s]*/),
+    regex(/^[^#\s\[\](){}";]*/),
 ]).map(([_, query]) => query);
 
-// Fragment: everything after #
+// Fragment: everything after # until delimiter
 const uriFragment = sequenceOf([
     char("#"),
-    regex(/^[^\s]*/),
+    regex(/^[^\s\[\](){}";]*/),
 ]).map(([_, fragment]) => fragment);
 
 // Authority: [userinfo@]host[:port]
@@ -169,12 +169,14 @@ const uriParser = sequenceOf([
             path: path || null,
         })),
         // No authority, just path (for schemes like mailto:, file:, etc.)
-        uriPath.map((path) => ({
+        // But we need a non-empty path to distinguish from set-words
+        // Also exclude our language delimiters
+        regex(/^[^?#\s\[\](){}";]+/).map((path) => ({
             hasAuthority: false,
             userinfo: null,
             host: null,
             port: null,
-            path: path || null,
+            path: path,
         })),
     ]),
     // Optional query

@@ -1,17 +1,17 @@
 
 
-foo: https://google.com
+foo: [ foo: https://google.com ]
 
-print type? foo
+print foo
 
 mail: mailto:user@example.com
 
-print type? mail
+print mold mail
 
 tel: tel:+1234567890
 
-print type? tel
+print mold tel
 
 file: file:///path/to/file.txt
 
-print type? file
+print mold file
