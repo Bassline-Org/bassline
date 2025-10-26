@@ -332,6 +332,10 @@ export function setMany(context, bindingObj) {
     return context;
 }
 
+export function getMany(context, keys) {
+    return keys.map((key) => context.get(key));
+}
+
 export default {
     "context!": datatype(ContextBase),
     "context-chain!": datatype(ContextChain),

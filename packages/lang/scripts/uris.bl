@@ -1,17 +1,8 @@
-
-
-foo: [ foo: https://google.com ]
-
+foo: https://google.com
 print foo
-
 mail: mailto:user@example.com
-
-print mold mail
-
+print mail
 tel: tel:+1234567890
-
-print mold tel
-
+print tel
 file: file:///path/to/file.txt
-
-print mold file
+print file

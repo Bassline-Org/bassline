@@ -52,7 +52,6 @@ export const SERIES_TYPES = new Set([
     TYPES.block,
     TYPES.paren,
     TYPES.string,
-    TYPES.uri,
 ]);
 
 // Word Types are types that have a spelling, and require a context to be evaluated
@@ -76,6 +75,7 @@ export const CONTEXT_TYPES = new Set([
     TYPES.contextChain,
     // Functions are also context types, since they hold their arguments and body internally
     TYPES.fn,
+    TYPES.uri,
 ]);
 
 // Type predicates
