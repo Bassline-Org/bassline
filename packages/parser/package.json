@@ -1,0 +1,23 @@
+{
+    "name": "@bassline/parser",
+    "version": "1.0.0",
+    "description": "Parser for the Bassline language, and core data types",
+    "type": "module",
+    "module": "src/index.js",
+    "exports": {
+        ".": "./src/index.js",
+        "./data": "./src/data.js",
+        "./parser": "./src/parser.js"
+    },
+    "dependencies": {
+      "arcsecond": "^5.0.0"
+    },
+    "devDependencies": {
+      "typescript": "^5.0.0"
+    },
+    "scripts": {
+      "test": "vitest run",
+      "build": "tsc"
+     },
+    "license": "MIT"
+  }

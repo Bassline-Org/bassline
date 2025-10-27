@@ -12,6 +12,13 @@ cell: fn [aValue] [
     ]
 ]
 
+computed: fn [inputs body] [
+    map inputs fn [input] [
+        print input
+        ;print current get input
+    ]
+]
+
 current: fn [aCell] [
     get aCell 'value
 ]
@@ -29,6 +36,7 @@ handleChange: fn [e] [
         update c + current a current b
     ]
 ]
+
 once: fn [target kind f] [
     remove: on target kind fn [e] [
         f e
@@ -59,4 +67,12 @@ print concat "A: " current a
 print concat "B: " current b
 print concat "C: " current c
 
-"done"
+foo: fn [a] [
+    print map a fn ['a] [ print a ]
+]
+
+foo [a b c]
+
+;a 123
+
+;"done"

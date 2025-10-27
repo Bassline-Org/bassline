@@ -293,6 +293,16 @@ importers:
         specifier: ^1.0.0
         version: link:../core
 
+  packages/parser:
+    dependencies:
+      arcsecond:
+        specifier: ^5.0.0
+        version: 5.0.0
+    devDependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.2
+
   packages/react:
     dependencies:
       '@bassline/core':
