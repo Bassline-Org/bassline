@@ -43,11 +43,12 @@
     "bassline": "./src/bin/cli.js"
   },
   "dependencies": {
-    "arcsecond": "^5.0.0",
-    "ws": "^8.0.0"
+    "ws": "^8.0.0",
+    "@bassline/parser": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@types/ws": "^8.0.0"
   },
   "scripts": {
     "test": "vitest run",

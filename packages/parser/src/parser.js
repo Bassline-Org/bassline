@@ -263,16 +263,3 @@ export function parse(source) {
     }
     return result.result;
 }
-
-const example = `
-foo: https://google.com
-print foo
-mail: mailto:user@example.com
-print mail
-tel: tel:+1234567890
-print tel
-file: file:///path/to/file.txt
-print file
-`;
-
-console.log(JSON.stringify(parse(example), null, 2));
