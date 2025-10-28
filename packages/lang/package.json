@@ -37,6 +37,15 @@
     "./io/ws-client": {
       "types": "./dist/io/ws-client.d.ts",
       "default": "./src/io/ws-client.js"
+    },
+    "./connections": {
+      "default": "./src/connections.js"
+    },
+    "./server": {
+      "default": "./src/server.js"
+    },
+    "./client": {
+      "default": "./src/client.js"
     }
   },
   "bin": {
