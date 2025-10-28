@@ -37,15 +37,15 @@ const word = (value) => ({
 });
 const getWord = (value) => ({
     type: TYPES.getWord,
-    value: `:${normalize(value)}`,
+    value: normalize(value),
 });
 const setWord = (value) => ({
     type: TYPES.setWord,
-    value: `${normalize(value)}:`,
+    value: normalize(value),
 });
 const litWord = (value) => ({
     type: TYPES.litWord,
-    value: `'${normalize(value)}`,
+    value: normalize(value),
 });
 const block = (value) => ({
     type: TYPES.block,

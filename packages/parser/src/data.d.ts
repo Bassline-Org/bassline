@@ -27,17 +27,17 @@ export type Word = {
 
 export type GetWord = {
     type: TYPES['getWord'];
-    value: `:${string}`;
+    value: string;
 }
 
 export type SetWord = {
     type: TYPES['setWord'];
-    value: `${string}:`;
+    value: string;
 }
 
 export type LitWord = {
     type: TYPES['litWord'];
-    value: `'${string}`;
+    value: string;
 }
 
 export type Block = {
