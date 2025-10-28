@@ -59,7 +59,7 @@ export default {
         (block, context) => block.reduce(context),
     ),
     "do": nativeFn("block", (block, context) => block.doBlock(context)),
-    "in": nativeFn("context block", (context, block) => block.doBlock(context)),
+    "in": nativeFn("context block", (context, block) => context.doBlock(block)),
     "load": nativeFn("string", (string) => parse(string.value)),
     "fold": nativeFn(
         "series fn initial",

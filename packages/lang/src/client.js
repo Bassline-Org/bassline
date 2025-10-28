@@ -12,8 +12,9 @@ export async function initClientConnection(socket, id) {
         if (type === MESSAGES.connection.err) {
             return reject(data);
         }
+        return reject(new Error(`Unknown message type: ${type} data: ${data}`));
     });
-    socket.send(JSON.stringify(message.connect(id)));
+    send(socket, message.connect(id));
     return await promise;
 }
 
@@ -38,6 +39,8 @@ export async function wsClient(url, id = randomUUID()) {
             if (!nonce) return console.error("No nonce!");
             if (!data) return console.error("No data!");
             connection.didit(nonce, data, type === MESSAGES.didit.err);
+        } else {
+            return console.error("Unknown message type: ", type);
         }
     });
     socket.on("error", (error) => {

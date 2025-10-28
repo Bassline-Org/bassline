@@ -37,7 +37,9 @@ export class BasslineServer {
             }
         });
         connection.socket.on("error", (error) => {
-            connection.error(error.message);
+            console.error("Connection error: ", error.message);
+            this.connections.delete(id);
+            connection.socket.close();
         });
         connection.socket.on("close", () => {
             console.log("Connection closed");
@@ -74,11 +76,13 @@ export class BasslineWs extends BasslineServer {
             ws.once("message", (msg) => {
                 const { type, data } = JSON.parse(msg);
                 if (type !== MESSAGES.connect) {
+                    console.error("EXPECTED CONNECT MESSAGE! Got: ", type);
                     return send(
                         ws,
                         message.connection.err("EXPECTED CONNECT MESSAGE!"),
                     );
                 }
+                console.log("CONNECT: ", data);
                 this.onConnect(ws, { id: data });
             });
         });

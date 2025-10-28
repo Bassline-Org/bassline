@@ -51,6 +51,8 @@ export class Task extends Value.typed(TYPES.task) {
     }
 }
 
+export const task = (promise) => new Task(promise);
+
 export default {
     "task!": datatype(Task),
     "after": nativeFn(

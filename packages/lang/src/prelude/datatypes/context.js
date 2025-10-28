@@ -1,5 +1,5 @@
 import { normalize } from "../../utils.js";
-import { Block, Bool, datatype, LitWord, Str, Value, Word } from "./core.js";
+import { Block, datatype, LitWord, Str, Value, Word } from "./core.js";
 import { collectArguments, nativeFn } from "./functions.js";
 import { TYPES, WORD_TYPES } from "./types.js";
 
@@ -33,6 +33,10 @@ export class ContextBase extends Value.typed(TYPES.context) {
     }
     get bindings() {
         return this.value;
+    }
+
+    doBlock(block) {
+        return block.to(TYPES.block).doBlock(this);
     }
 
     relevantEntries() {
@@ -381,6 +385,8 @@ export class Uri extends ContextBase.typed(TYPES.uri) {
 
 export const context = () => new ContextBase();
 export const contextChain = (parent) => new ContextChain(parent);
+export const uri = (value) => new Uri(value);
+export const pureFn = (spec, body, parent) => new PureFn(spec, body, parent);
 
 export function setMany(context, bindingObj) {
     for (const [key, value] of Object.entries(bindingObj)) {

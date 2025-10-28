@@ -10,23 +10,23 @@ export function parse(source) {
 function toCell({ type, value }) {
     switch (type) {
         case TYPES.number:
-            return new core.Num(value);
+            return core.number(value);
         case TYPES.string:
-            return new core.Str(value);
+            return core.string(value);
         case TYPES.word:
-            return new core.Word(value);
+            return core.word(value);
         case TYPES.getWord:
-            return new core.GetWord(value);
+            return core.getWord(value);
         case TYPES.setWord:
-            return new core.SetWord(value);
+            return core.setWord(value);
         case TYPES.litWord:
-            return new core.LitWord(value);
+            return core.litWord(value);
         case TYPES.block:
-            return new core.Block(value.map(toCell));
+            return core.block(value.map(toCell));
         case TYPES.paren:
-            return new core.Paren(value.map(toCell));
+            return core.paren(value.map(toCell));
         case TYPES.uri:
-            return new core.Uri(value);
+            return core.uri(value);
         default:
             throw new Error(`Unknown type: ${type}`);
     }

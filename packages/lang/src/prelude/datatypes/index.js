@@ -5,8 +5,8 @@ import async from "./async.js";
 import conditions from "./conditions.js";
 
 export * from "./core.js";
-export * from "./context.js";
 export * from "./functions.js";
+export * from "./context.js";
 export * from "./async.js";
 export * from "./types.js";
 

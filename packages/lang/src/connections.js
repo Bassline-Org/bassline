@@ -23,7 +23,7 @@ export class ClientConnection {
         const nonce = this.nextNonce();
         const { promise, resolve, reject } = Promise.withResolvers();
         this.requests.set(nonce, { promise, resolve, reject });
-        this.socket.send(JSON.stringify(message.doit(nonce, data)));
+        send(this.socket, message.doit(nonce, data));
         return promise;
     }
     didit(nonce, data) {
@@ -57,24 +57,29 @@ export class ServerConnection {
         return false;
     }
     doit(nonce, data) {
-        if (!this.validNonce(nonce)) return;
+        if (!this.validNonce(nonce)) {
+            console.log("Invalid nonce: ", nonce);
+            return;
+        }
         try {
             const result = this.runtime.evaluate(data);
             if (result === null || result === undefined) {
-                this.didit(nonce, new Str("No result"), false);
+                this.didit(nonce, `"No result"`, false);
                 return;
             }
-            this.didit(nonce, result, false);
+            this.didit(nonce, result.mold(), false);
         } catch (e) {
-            this.didit(nonce, result, true);
+            console.error("Error evaluating: ", nonce, data, e);
+            this.didit(nonce, `"${e.message}"`, true);
         }
     }
     didit(nonce, data, isErr) {
-        this.socket.send(JSON.stringify(
+        send(
+            this.socket,
             isErr
                 ? message.didit.err(nonce, data)
                 : message.didit.ok(nonce, data),
-        ));
+        );
     }
 }
 
