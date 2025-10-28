@@ -3,22 +3,24 @@ import { parse } from "./parser.js";
 import { createRuntime } from "./runtime.js";
 import { nativeFn, word } from "./prelude/index.js";
 
-export const TYPES = {
-    // Client request to initialize a connection
-    init: "BL_INIT",
-    // Server response to BL_INIT
-    attached: "BL_ATTACHED",
-    // Client request to evaluate
-    req: "BL_REQ",
-    // Server response to BL_REQ
-    resp: "BL_RESP",
-    // Server error
-    error: "BL_ERROR",
-    // Server fatal error, closes the connection
-    fatal: "BL_FATAL",
-};
+export async function initServerConnection(socket) {
+    const { promise, resolve, reject } = Promise.withResolvers();
+    socket.once("message", (msg) => {
+        const { type, data } = JSON.parse(msg);
+        switch (type) {
+            case TYPES.init:
+                resolve(data);
+                break;
+            default:
+                console.error("UNKNOWN MESSAGE TYPE:", type);
+                reject(new Error("UNKNOWN MESSAGE TYPE: " + type));
+                break;
+        }
+    });
+    return await promise;
+}
 
-export class BasslineConnection {
+export class BasslineServerConnection {
     constructor(socket, runtime) {
         this.socket = socket;
         this.runtime = runtime;
@@ -95,7 +97,7 @@ export class BasslineServer {
         return runtime;
     }
     createConnection(socket) {
-        return new BasslineConnection(socket);
+        return new BasslineServerConnection(socket);
     }
     setupConnection(id, connection) {
         connection.socket.on("message", (msg) => {
