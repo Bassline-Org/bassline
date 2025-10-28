@@ -7,106 +7,218 @@
  * The server responds with RES_CONNECT_OK or RES_CONNECT_ERR.
  * If the server responds with OK, the connection is established,
  * and all further messages are sent using DO messages
+ *
+ * @typedef {"client-connecting" | "client-connected" | "client-connection-error" | "client-disconnected"} ClientConnectionEvent
+ * @typedef {"server-connecting" | "server-connected" | "server-connection-error" | "server-disconnected"} ServerConnectionEvent
+ * @typedef {"client-requested" | "client-evaluated-ok" | "client-evaluated-err"} ClientEvaluationEvent
+ * @typedef {"server-runtime-set" | "server-received-request" | "server-evaluated-ok" | "server-evaluated-err"} ServerEvaluationEvent
+ * @typedef {ClientConnectionEvent | ClientEvaluationEvent} ClientEvent
+ * @typedef {ServerConnectionEvent | ServerEvaluationEvent} ServerEvent
  */
 
-export class ClientConnection {
-    constructor(socket) {
+export class ClientConnection extends EventTarget {
+    constructor(socket, id) {
+        super();
         this.socket = socket;
+        this.id = id;
         this.requests = new Map();
         this.nonce = 0;
-    }
-    nextNonce() {
-        this.nonce = this.nonce + 1;
-        return this.nonce;
-    }
-    async doit(data) {
-        const nonce = this.nextNonce();
-        const { promise, resolve, reject } = Promise.withResolvers();
-        this.requests.set(nonce, { promise, resolve, reject });
-        send(this.socket, message.doit(nonce, data));
-        return promise;
-    }
-    didit(nonce, data) {
-        const request = this.requests.get(nonce);
-        if (!request) {
-            console.error("NO REQUEST FOUND FOR NONCE: ", nonce);
-            return;
-        }
-        request.resolve(data);
-        this.requests.delete(nonce);
-    }
-    close() {
-        console.log("Closing client connection");
-        this.socket.close();
-        this.requests.forEach((request) => request.reject("Connection closed"));
-        this.requests.clear();
-    }
-}
+        this.state = "connecting";
 
-export class ServerConnection {
-    constructor(socket, runtime) {
-        this.socket = socket;
-        this.runtime = runtime;
-        this.nonce = 0;
-    }
-    validNonce(nonce) {
-        if (nonce > this.nonce) {
-            this.nonce = nonce;
-            return true;
-        }
-        return false;
-    }
-    doit(nonce, data) {
-        if (!this.validNonce(nonce)) {
-            console.log("Invalid nonce: ", nonce);
-            return;
-        }
-        try {
-            const result = this.runtime.evaluate(data);
-            if (result === null || result === undefined) {
-                this.didit(nonce, `"No result"`, false);
+        socket.on("open", () => {
+            socket.send(JSON.stringify({ type: "CONNECT", data: id }));
+            this.emit("client-connecting");
+        });
+
+        socket.on("message", (msg) => {
+            const { type, nonce, data } = JSON.parse(msg);
+            if (this.state === "connecting") {
+                if (type === "CONNECTION_OK") {
+                    this.state = "connected";
+                    return this.emit("client-connected");
+                }
+                if (type === "CONNECTION_ERR") {
+                    this.socket.close();
+                    return this.emit(
+                        "client-connection-error",
+                        data,
+                    );
+                }
+                return console.error("UNKNOWN MESSAGE TYPE: ", type, data);
+            }
+
+            if (this.state === "connected") {
+                if (type === "DIDIT_OK") {
+                    const request = this.requests.get(nonce);
+                    if (request) {
+                        request.resolve(data);
+                        this.requests.delete(nonce);
+                        this.emit("client-evaluated-ok", nonce);
+                        return;
+                    }
+                    console.error("NO REQUEST FOUND FOR NONCE: ", nonce);
+                    return;
+                }
+
+                if (type === "DIDIT_ERR") {
+                    const request = this.requests.get(nonce);
+                    if (request) {
+                        request.reject(new Error(data));
+                        this.requests.delete(nonce);
+                        this.emit("client-evaluated-err", data);
+                        return;
+                    }
+                    console.error("NO REQUEST FOUND FOR NONCE: ", nonce);
+                    return;
+                }
+                console.error("UNKNOWN MESSAGE: ", type, data);
                 return;
             }
-            this.didit(nonce, result.mold(), false);
-        } catch (e) {
-            console.error("Error evaluating: ", nonce, data, e);
-            this.didit(nonce, `"${e.message}"`, true);
-        }
+
+            console.error("UNKNOWN STATE: ", this.state, type, data);
+            return;
+        });
+
+        socket.on("close", () => {
+            this.state = "disconnected";
+            this.emit("client-disconnected");
+        });
+
+        socket.on("error", (e) => {
+            this.state = "error";
+            this.emit("client-connection-error", e.message);
+        });
     }
-    didit(nonce, data, isErr) {
-        send(
-            this.socket,
-            isErr
-                ? message.didit.err(nonce, data)
-                : message.didit.ok(nonce, data),
-        );
+    /**
+     * @param {ClientEvent} event
+     * @param {any} data
+     */
+    emit(event, data) {
+        this.dispatchEvent(new CustomEvent(event, { detail: data }));
+    }
+
+    /**
+     * @param {ClientEvent} event
+     * @param {(event: ClientEvent) => void} callback
+     * @returns {() => void}
+     */
+    on(event, callback) {
+        this.addEventListener(event, (e) => callback(e.detail));
+        return () => this.removeEventListener(event, callback);
+    }
+
+    async doit(code) {
+        if (this.state !== "connected") {
+            return new Promise((resolve, reject) => {
+                this.on("client-connected", () => {
+                    resolve(this.doit(code));
+                });
+                this.on("client-connection-error", (error) => {
+                    reject(error);
+                });
+            });
+        }
+        const nonce = ++this.nonce;
+        const { promise, resolve, reject } = Promise.withResolvers();
+        this.requests.set(nonce, { resolve, reject });
+        this.socket.send(JSON.stringify({ type: "DOIT", nonce, data: code }));
+        return promise;
+    }
+    close() {
+        this.socket.close();
+        this.state = "disconnected";
+        this.emit("client-disconnected");
     }
 }
 
-export const MESSAGES = {
-    connect: "CONNECT",
-    connection: {
-        ok: "CONNECTION_OK",
-        err: "CONNECTION_ERR",
-    },
-    doit: "DOIT",
-    didit: {
-        ok: "DIDIT_OK",
-        err: "DIDIT_ERR",
-    },
-};
+export class ServerConnection extends EventTarget {
+    constructor(socket) {
+        super();
+        this.socket = socket;
+        this.state = "connecting";
 
-export const message = {
-    connect: (data) => ({ type: MESSAGES.connect, data }),
-    connection: {
-        ok: (data) => ({ type: MESSAGES.connection.ok, data }),
-        err: (data) => ({ type: MESSAGES.connection.err, data }),
-    },
-    doit: (nonce, data) => ({ type: MESSAGES.doit, nonce, data }),
-    didit: {
-        ok: (nonce, data) => ({ type: MESSAGES.didit.ok, nonce, data }),
-        err: (nonce, data) => ({ type: MESSAGES.didit.err, nonce, data }),
-    },
-};
+        socket.on("message", (msg) => {
+            const { type, nonce, data } = JSON.parse(msg);
+            console.log("SERVER MESSAGE: ", type, nonce, data);
+            if (this.state === "connecting") {
+                if (type === "CONNECT") {
+                    this.id = data;
+                    this.emit("server-connecting", { id: this.id });
+                    socket.send(
+                        JSON.stringify({
+                            type: "CONNECTION_OK",
+                            data: { id: this.id },
+                        }),
+                    );
+                    this.state = "connected";
+                    this.emit("server-connected", { id: this.id });
+                    return;
+                }
+                if (type === "CONNECTION_ERR") {
+                    this.socket.close();
+                    return this.emit("server-connection-error", data);
+                }
+                console.error("UNKNOWN MESSAGE TYPE: ", type, data);
+                return;
+            }
 
-export const send = (socket, msg) => socket.send(JSON.stringify(msg));
+            if (this.state === "connected") {
+                if (type === "DOIT") {
+                    try {
+                        const result = this.runtime.evaluate(data);
+                        this.socket.send(JSON.stringify({
+                            type: "DIDIT_OK",
+                            nonce: nonce,
+                            data: result?.mold() || '""',
+                        }));
+                        this.emit("server-evaluated-ok", nonce);
+                        return;
+                    } catch (e) {
+                        this.socket.send(JSON.stringify({
+                            type: "DIDIT_ERR",
+                            nonce: nonce,
+                            data: e.message,
+                        }));
+                        this.emit("server-evaluated-err", e.message);
+                        return;
+                    }
+                }
+                console.error("UNKNOWN MESSAGE TYPE: ", type, data);
+                return;
+            }
+
+            console.error("UNKNOWN STATE: ", this.state, type, data);
+            return;
+        });
+
+        socket.on("close", () => {
+            this.state = "disconnected";
+            this.emit("server-disconnected");
+        });
+
+        socket.on("error", (e) => {
+            this.state = "error";
+            this.emit("server-connection-error", e.message);
+        });
+    }
+    setRuntime(runtime) {
+        this.runtime = runtime;
+        this.emit("server-runtime-set", runtime);
+    }
+    /**
+     * @param {ServerEvent} event
+     * @param {any} data
+     */
+    emit(event, data) {
+        this.dispatchEvent(new CustomEvent(event, { detail: data }));
+    }
+    /**
+     * @param {ServerEvent} event
+     * @param {(event: ServerEvent) => void} callback
+     * @returns {() => void}
+     */
+    on(event, callback) {
+        this.addEventListener(event, (e) => callback(e.detail));
+        return () => this.removeEventListener(event, callback);
+    }
+}
