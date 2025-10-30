@@ -1,7 +1,14 @@
 import { normalize } from "../../utils.js";
-import { Block, datatype, LitWord, Str, Value, Word } from "./core.js";
-import { collectArguments, nativeFn } from "./functions.js";
-import { TYPES, WORD_TYPES } from "./types.js";
+import {
+    Block,
+    Datatype,
+    LitWord,
+    Str,
+    Value,
+    Word,
+} from "./datatypes/core.js";
+import { NativeFn } from "./datatypes/functions.js";
+import { TYPES, WORD_TYPES } from "./datatypes/types.js";
 
 export const keys = {
     self: normalize("self"),
@@ -10,13 +17,17 @@ export const keys = {
     on: normalize("on"),
 };
 
+/**
+ * Base context class - stores values in a Map keyed by normalized symbols.
+ * Removed evaluate() method - dialects handle evaluation.
+ */
 export class ContextBase extends Value.typed(TYPES.context) {
     constructor() {
         super(new Map());
         this.set(keys.self, this);
         this.set(
             keys.emit,
-            nativeFn("kind value", (kind, value) => {
+            new NativeFn("kind value", (kind, value) => {
                 this.emitter.dispatchEvent(
                     new CustomEvent(kind.to(TYPES.string).value, {
                         detail: value,
@@ -33,10 +44,6 @@ export class ContextBase extends Value.typed(TYPES.context) {
     }
     get bindings() {
         return this.value;
-    }
-
-    doBlock(block) {
-        return block.to(TYPES.block).doBlock(this);
     }
 
     relevantEntries() {
@@ -95,7 +102,6 @@ export class ContextBase extends Value.typed(TYPES.context) {
             throw new Error(
                 `Key not found in context: ${spelling.description}`,
             );
-            //return new Condition(normalize(`key-not-found`));
         }
         return value;
     }
@@ -173,7 +179,6 @@ context! [
 
     mold() {
         const parts = [];
-        const natives = [];
         for (const [key, value] of this.bindings) {
             if (
                 value.type === TYPES.nativeFn ||
@@ -182,8 +187,7 @@ context! [
                 value.type === TYPES.bool ||
                 key === keys.self ||
                 key === keys.parent
-            ) continue; // TODO: Push the missing natives into a projection from system
-            // IE in (project system [<MISSING_NATIVES>] <Block>)
+            ) continue;
             if (value === this) continue;
             parts.push(`    ${key.description}: ${value.mold()}`);
         }
@@ -195,6 +199,10 @@ context! [
     }
 }
 
+/**
+ * Context chain - extends ContextBase with parent chaining for lexical scoping.
+ * Removed evaluate() method - dialects handle evaluation.
+ */
 export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
     constructor(parent) {
         super();
@@ -272,41 +280,23 @@ export class ContextChain extends ContextBase.typed(TYPES.contextChain) {
     }
 }
 
-export class PureFn extends ContextChain.typed(TYPES.fn) {
-    constructor(spec, body, parent) {
-        super(parent);
-        this.set("spec", spec);
-        this.set("body", body);
+export const context = () => new ContextBase();
+export const contextChain = (parent) => new ContextChain(parent);
+
+export function setMany(context, bindingObj) {
+    for (const [key, value] of Object.entries(bindingObj)) {
+        context.set(key, value);
     }
-    evaluate(context, iter) {
-        //try {
-        const localCtx = new ContextChain(context);
-        const spec = this.get("spec");
-        const body = this.get("body");
-        const args = collectArguments(spec.items, localCtx, iter);
-        args.forEach((arg, index) => {
-            localCtx.set(spec.items[index], arg);
-        });
-        return body.doBlock(localCtx);
-        //} catch (error) {
-        //    const condition = new Condition(normalize("error"));
-        //    return condition.evaluate(context, iter);
-        //}
-    }
-    mold() {
-        const args = this.get("spec");
-        const body = this.get("body");
-        return `(make fn! [${args.mold()} ${body.mold()}])`;
-    }
-    static make(value, context) {
-        if (value.type !== TYPES.block) {
-            throw new Error("Invalid value for make");
-        }
-        const [args, body] = value.items;
-        return new PureFn(args, body, context);
-    }
+    return context;
 }
 
+export function getMany(context, keys) {
+    return keys.map((key) => context.get(key));
+}
+
+/**
+ * URI class - represents a URI/URL with components.
+ */
 export class Uri extends ContextBase.typed(TYPES.uri) {
     constructor({ scheme, userinfo, host, port, path, query, fragment }) {
         super();
@@ -383,42 +373,12 @@ export class Uri extends ContextBase.typed(TYPES.uri) {
     }
 }
 
-export const context = () => new ContextBase();
-export const contextChain = (parent) => new ContextChain(parent);
+// Uri factory
 export const uri = (value) => new Uri(value);
-export const pureFn = (spec, body, parent) => new PureFn(spec, body, parent);
 
-export function setMany(context, bindingObj) {
-    for (const [key, value] of Object.entries(bindingObj)) {
-        context.set(key, value);
-    }
-    return context;
-}
-
-export function getMany(context, keys) {
-    return keys.map((key) => context.get(key));
-}
-
+// Export datatypes for backward compatibility
 export default {
-    "context!": datatype(ContextBase),
-    "context-chain!": datatype(ContextChain),
-    "on": nativeFn("target kind fn", (target, kind, fn, context) => {
-        const kindStr = kind.to(TYPES.string).value;
-        const handler = (event) => {
-            new Block([fn, event.detail]).doBlock(context);
-        };
-        target.emitter.addEventListener(
-            kindStr,
-            handler,
-        );
-        return nativeFn("", () => {
-            target.emitter.removeEventListener(
-                kindStr,
-                handler,
-            );
-            return new Word("true");
-        });
-    }),
-    "fn!": datatype(PureFn),
-    "uri!": datatype(Uri),
+    "context!": new Datatype(ContextBase),
+    "context-chain!": new Datatype(ContextChain),
+    "uri!": new Datatype(Uri),
 };

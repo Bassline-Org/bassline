@@ -1,8 +1,9 @@
-import { ContextChain } from "../prelude/datatypes/context.js";
+import { ContextChain } from "../semantics/default/contexts.js";
 import { parse } from "../parser.js";
-import { TYPES } from "../prelude/datatypes/types.js";
-import { nativeFn } from "../prelude/datatypes/functions.js";
+import { TYPES } from "../semantics/default/datatypes/types.js";
+import { nativeFn } from "../semantics/default/datatypes/functions.js";
 import { normalize } from "../utils.js";
+import { evaluateBlock } from "../semantics/default/evaluate.js";
 
 TYPES.socket = normalize("socket!");
 
@@ -36,7 +37,7 @@ export class Sock extends ContextChain.typed(TYPES.socket) {
         // Maybe call the handler Handler
         if (this.has("error")) {
             const parsed = parse(`error "${message}"`);
-            parsed.doBlock(this);
+            evaluateBlock(parsed, this);
         } else {
             console.error(message);
         }

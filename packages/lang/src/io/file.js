@@ -1,10 +1,12 @@
 import {
     ContextChain,
+} from "../semantics/default/contexts.js";
+import {
     datatype,
     nativeFn,
     Str,
     TYPES,
-} from "../prelude/datatypes/index.js";
+} from "../semantics/default/datatypes/index.js";
 import { appendFileSync, readFileSync, writeFileSync } from "fs";
 import { normalize } from "../utils.js";
 

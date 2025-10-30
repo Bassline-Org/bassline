@@ -1,4 +1,4 @@
-import { normalize } from "../../utils.js";
+import { normalize } from "../../../utils.js";
 
 export const TYPES = {
     // Literal data types

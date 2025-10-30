@@ -70,6 +70,9 @@ importers:
       '@bassline/lang':
         specifier: workspace:*
         version: link:../../packages/lang
+      '@bassline/parser':
+        specifier: workspace:*
+        version: link:../../packages/parser
       '@bassline/react':
         specifier: workspace:*
         version: link:../../packages/react

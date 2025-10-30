@@ -1,6 +1,6 @@
 // Type definitions for @bassline/lang/runtime
 
-import type { Value, ContextChain } from "./prelude/index.js";
+import type { Value, ContextChain } from "./semantics/default/index.js";
 
 /**
  * Runtime interface for executing Bassline code
@@ -28,7 +28,7 @@ export interface Runtime {
 }
 
 /**
- * Create a new runtime instance with prelude loaded
+ * Create a new runtime instance with default semantics loaded
  * @returns A new runtime instance
  */
 export declare function createRuntime(): Runtime;

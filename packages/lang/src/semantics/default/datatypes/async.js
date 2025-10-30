@@ -1,7 +1,8 @@
-import { normalize } from "../../utils.js";
+import { normalize } from "../../../utils.js";
 import { datatype, Str, Value } from "./core.js";
 import { nativeFn } from "./functions.js";
 import { TYPES } from "./types.js";
+import { evaluateBlock } from "../evaluate.js";
 TYPES.task = normalize("task!");
 
 export class Task extends Value.typed(TYPES.task) {
@@ -24,7 +25,7 @@ export class Task extends Value.typed(TYPES.task) {
 
     after(block, context) {
         const task = new Task(this.value.then(async () => {
-            return await block.doBlock(context);
+            return await evaluateBlock(block, context);
         }));
         return task;
     }

@@ -5,6 +5,5 @@
  */
 
 export { parse } from "./parser.js";
-export * from "./prelude/index.js";
+export * from "./semantics/default/index.js";
 export * from "./runtime.js";
-export { evaluate } from "./evaluator.js";

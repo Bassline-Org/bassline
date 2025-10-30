@@ -1,9 +1,9 @@
-import { datatype, Str } from "../prelude/index.js";
+import { datatype, Str } from "../semantics/default/index.js";
 import { normalize } from "../utils.js";
 import { parse } from "../parser.js";
 import { WebSocket } from "ws";
 import { Sock } from "./socket.js";
-import { TYPES } from "../prelude/datatypes/types.js";
+import { TYPES } from "../semantics/default/datatypes/types.js";
 
 TYPES.wsClient = normalize("ws-client!");
 
@@ -46,12 +46,12 @@ export class WsClient extends Sock.typed(TYPES.wsClient) {
     addClientListeners() {
         this.client.addEventListener("open", ({ data }) => {
             const parsed = parse(`on-open ${data}`);
-            parsed.doBlock(this);
+            evaluateBlock(parsed, this);
         });
         this.client.addEventListener("close", () => {
             this.close();
             const parsed = parse(`on-close`);
-            parsed.doBlock(this);
+            evaluateBlock(parsed, this);
         });
 
         this.client.addEventListener("error", (error) => {
@@ -61,7 +61,7 @@ export class WsClient extends Sock.typed(TYPES.wsClient) {
         this.client.addEventListener("message", ({ data }) => {
             try {
                 const parsed = parse(data);
-                parsed.doBlock(this);
+                evaluateBlock(parsed, this);
             } catch (error) {
                 this.error(error.message);
             }

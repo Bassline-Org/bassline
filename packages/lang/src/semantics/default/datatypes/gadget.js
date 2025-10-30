@@ -1,5 +1,5 @@
-import { normalize } from "../../utils.js";
-import { ContextChain } from "./context.js";
+import { normalize } from "../../../utils.js";
+import { ContextChain } from "../contexts.js";
 import { datatype, Value, word } from "./core.js";
 import { nativeFn } from "./functions.js";
 import { TYPES } from "./types.js";

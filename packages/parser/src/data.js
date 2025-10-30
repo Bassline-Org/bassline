@@ -16,7 +16,7 @@ export const TYPES = {
     uri: "URI!",
 };
 
-const normalize = (name) => name.toUpperCase();
+export const normalize = (name) => name.toUpperCase();
 
 /**
  * Create a number cell

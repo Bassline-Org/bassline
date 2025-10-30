@@ -1,9 +1,10 @@
-import { normalize } from "../../utils.js";
-import { ContextChain } from "./context.js";
+import { normalize } from "../../../utils.js";
+import { ContextChain } from "../contexts.js";
 import { Block, Datatype, LitWord, Value } from "./core.js";
 import { nativeFn } from "./functions.js";
 import * as t from "./types.js";
 const { TYPES } = t;
+import { evaluateBlock } from "../evaluate.js";
 
 export class MissingHandler extends Error {
     constructor(condition, iter) {
@@ -49,12 +50,12 @@ export class Condition extends ContextChain.typed(TYPES.condition) {
         // They are expected to invoke restarts or somethin
         const handler = context.get(type);
         if (handler) {
-            return handler.doBlock(this);
+            return evaluateBlock(handler, this);
         }
         console.error(`No handler found for condition: `, this);
         const defaultHandler = context.get("#default-handler");
         if (defaultHandler) {
-            return defaultHandler.doBlock(this);
+            return evaluateBlock(defaultHandler, this);
         }
         const mode = this.get("mode");
         if (mode.spelling === modes.error) {
@@ -85,7 +86,7 @@ export class Condition extends ContextChain.typed(TYPES.condition) {
     static make(args, context, iter) {
         const [type, restartsBlock] = args.items;
         const condition = new Condition(type, context);
-        restartsBlock.doBlock(condition, iter);
+        evaluateBlock(restartsBlock, condition);
         return condition;
     }
 }

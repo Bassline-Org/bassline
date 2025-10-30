@@ -5,7 +5,7 @@ import * as repl from "node:repl";
 import { parse } from "../parser.js";
 import { promisify } from "node:util";
 import { existsSync } from "fs";
-import { Condition } from "../prelude/datatypes/conditions.js";
+import { Condition } from "../semantics/default/datatypes/conditions.js";
 import {
     Block,
     nativeFn,
@@ -14,7 +14,7 @@ import {
     Task,
     TYPES,
     Value,
-} from "../prelude/index.js";
+} from "../semantics/default/index.js";
 import wsServer from "../io/ws-server.js";
 import wsClient from "../io/ws-client.js";
 import file from "../io/file.js";
@@ -154,14 +154,16 @@ if (args.length === 0 || interactiveMode) {
         }),
     );
 
+    const { evaluateBlock } = await import("../semantics/default/evaluate.js");
+    
     async function evaluateWithConditions(ast, ctx) {
-        let result = ast.doBlock(ctx);
+        let result = evaluateBlock(ast, ctx);
 
         while (result instanceof Condition) {
             const handler = result.get("type");
             const answer = await prompt(formatMessage(handler));
             const parsed = parse(answer);
-            result = parsed.doBlock(result);
+            result = evaluateBlock(parsed, result);
         }
 
         return result;

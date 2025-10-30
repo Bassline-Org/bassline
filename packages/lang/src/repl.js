@@ -1,8 +1,8 @@
 import { parse } from "./parser.js";
 import { createRuntime } from "./runtime.js";
-import { NativeFn, setMany, Str } from "./prelude/index.js";
+import { NativeFn, setMany, Str } from "./semantics/default/index.js";
 import { readdirSync, readFileSync } from "fs";
-import { Block } from "./prelude/index.js";
+import { Block } from "./semantics/default/index.js";
 import wsServer from "./io/ws-server.js";
 import file from "./io/file.js";
 

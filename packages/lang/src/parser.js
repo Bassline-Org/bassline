@@ -1,6 +1,6 @@
 import { parse as parseData } from "@bassline/parser";
 import { TYPES } from "@bassline/parser/data";
-import * as core from "./prelude/index.js";
+import * as core from "./semantics/default/index.js";
 
 export function parse(source) {
     const data = parseData(source);

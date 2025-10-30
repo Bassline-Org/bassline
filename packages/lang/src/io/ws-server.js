@@ -1,10 +1,11 @@
-import { ContextChain, datatype, Str } from "../prelude/index.js";
+import { ContextChain, datatype, Str } from "../semantics/default/index.js";
 import { parse } from "../parser.js";
 import { WebSocketServer } from "ws";
 import { WsClient } from "./ws-client.js";
 import { Sock } from "./socket.js";
-import { TYPES } from "../prelude/datatypes/types.js";
+import { TYPES } from "../semantics/default/datatypes/types.js";
 import { normalize } from "../utils.js";
+import { evaluateBlock } from "../semantics/default/evaluate.js";
 
 TYPES.wsServer = normalize("ws-server!");
 
@@ -29,11 +30,11 @@ export class WsServer extends Sock.typed(TYPES.wsServer) {
             this.id = this.id + 1;
             const sessions = this.get("sessions");
             sessions.set(new Str(key), clientHandle);
-            parse(`connection "${key}"`).doBlock(this);
+            evaluateBlock(parse(`connection "${key}"`), this);
         });
-        this.server.on("close", () => {
+        this.server.on("close", async () => {
             this.closeSocket();
-            parse("on-close").doBlock(this);
+            evaluateBlock(parse("on-close"), this);
         });
         this.server.on("error", (error) => {
             this.error(error.message);

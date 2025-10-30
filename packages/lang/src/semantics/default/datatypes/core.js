@@ -1,4 +1,4 @@
-import { normalize } from "../../utils.js";
+import { normalize } from "../../../utils.js";
 import * as t from "./types.js";
 const { TYPES, FUNCTION_TYPES } = t;
 
@@ -6,12 +6,7 @@ export class Value {
     constructor(value) {
         this.value = value;
     }
-    evaluate(context, iter) {
-        return this;
-    }
-    getType() {
-        return new Word(this.type);
-    }
+    // Removed evaluate() and getType() - dialects handle evaluation
     to(type) {
         if (this.type !== type) {
             console.error(
@@ -55,7 +50,7 @@ export class Value {
         const type = datatype.value.type;
         return this.to(type);
     }
-    static make(context, iter) {
+    static make(ev) {
         throw new Error(
             "Unknown make! method for type: ${this.type.description}",
         );
@@ -150,8 +145,13 @@ export class Series extends Value.typed(TYPES.series) {
         this.value = items;
         return this;
     }
-    iter() {
-        return this.items.values();
+    chunk(chunkSize) {
+        const size = chunkSize.to(TYPES.number).value;
+        const chunks = [];
+        for (let i = 0; i < this.items.length; i += size) {
+            chunks.push(this.items.slice(i, i + size));
+        }
+        return new this.constructor(chunks);
     }
     equals(other) {
         const otherValue = other.to(this.type);
@@ -193,14 +193,7 @@ export class Series extends Value.typed(TYPES.series) {
             this.items.slice(startValue.value, endValue.value),
         );
     }
-    fold(fn, initial, context) {
-        let acc = initial;
-        const iter = this.iter();
-        for (const item of iter) {
-            acc = fn.evaluate(context, [acc, item].values());
-        }
-        return acc;
-    }
+    // Removed fold() - use fold action from semantics/default/actions.js instead
     length() {
         return new Num(this.items.length);
     }
@@ -274,76 +267,23 @@ export class Str extends Series.typed(TYPES.string) {
         }
         return `"${this.value}"`;
     }
-    static make(context, iter) {
-        const value = iter.next().value.evaluate(context, iter);
-        return new Str(value.form().value);
+    static make(val) {
+        return new Str(val.form().value);
     }
 }
 
 export class Block extends Series.typed(TYPES.block) {
-    /**
-     * Reduce will evaluate each item in the block, and return a new block with the results
-     * It will not deeply evaluate
-     * @param {*} stream
-     * @param {*} context
-     * @returns
-     */
-    reduce(context) {
-        const iter = this.iter();
-        const result = [];
-        for (const item of iter) {
-            result.push(item.evaluate(context, iter));
-        }
-        return new Block(result);
-    }
-    /**
-     * Compose will evaluate paren items, and recursively compose blocks
-     * This is useful for dynamically generating code
-     * @returns {Block} - A new block with the paren items evaluated, and blocks composed
-     */
-    compose(context) {
-        const iter = this.iter();
-        const result = [];
-        for (const item of iter) {
-            if (item instanceof Paren) {
-                result.push(item.doBlock(context));
-                continue;
-            }
-            if (item instanceof Block) {
-                result.push(item.compose(context));
-                continue;
-            }
-            result.push(item);
-        }
-        return new Block(result);
-    }
-    doBlock(context) {
-        const iter = this.iter();
-        let result = null;
-        for (const item of iter) {
-            result = item.evaluate(context, iter);
-        }
-        if (!result) {
-            console.error("No result from block: ", this);
-            throw new Error("No result from block");
-            //return new Condition(normalize("no-result"));
-        }
-        return result;
-    }
+    // Removed reduce() - use evaluateBlock() from semantics/default/evaluate.js instead
+    // Removed compose() - use composeBlock() from semantics/default/evaluate.js instead
+    // Removed doBlock() - use evaluateBlock() from semantics/default/evaluate.js instead
     mold() {
         const items = this.items.map((e) => e.mold()).join(" ");
         return `[ ${items} ]`;
     }
-    static make(stream, context) {
-        const value = iter.next().value.evaluate(context, iter);
-        return new this.constructor([value]);
-    }
 }
 
 export class Paren extends Block.typed(TYPES.paren) {
-    evaluate(context, iter) {
-        return this.doBlock(context);
-    }
+    // Removed evaluate() - dialects handle paren evaluation
     mold() {
         const items = this.items.map((e) => e.mold()).join(" ");
         return `(${items})`;
@@ -414,9 +354,7 @@ export class WordLike extends Value.typed(normalize("any-word!")) {
  * @returns {Word} - The word value
  */
 export class Word extends WordLike.typed(TYPES.word) {
-    evaluate(context, iter) {
-        return (context.get(this)).evaluate(context, iter);
-    }
+    // Removed evaluate() - dialects handle word evaluation
     mold() {
         return new Str(this.spelling.description);
     }
@@ -431,13 +369,7 @@ export class Word extends WordLike.typed(TYPES.word) {
  * Get word is similar to {Word}, however if the value is a function, it will not execute it,
  */
 export class GetWord extends WordLike.typed(TYPES.getWord) {
-    evaluate(context, iter) {
-        const bound = context.get(this);
-        if (FUNCTION_TYPES.has(bound.type)) {
-            return bound;
-        }
-        return bound.evaluate(context, iter);
-    }
+    // Removed evaluate() - dialects handle get-word evaluation
     form() {
         return new Str(`:${this.spelling.description}`);
     }
@@ -450,11 +382,7 @@ export class GetWord extends WordLike.typed(TYPES.getWord) {
  * Set word will set the value for the spelling in the context
  */
 export class SetWord extends WordLike.typed(TYPES.setWord) {
-    evaluate(context, iter) {
-        const value = iter.next().value.evaluate(context, iter);
-        context.set(this, value);
-        return value;
-    }
+    // Removed evaluate() - dialects handle set-word evaluation
     form() {
         return new Str(`${this.spelling.description}:`);
     }
@@ -467,9 +395,7 @@ export class SetWord extends WordLike.typed(TYPES.setWord) {
  * Lit word when evaluated, will return a {Word} value, with the spelling of the literal word
  */
 export class LitWord extends WordLike.typed(TYPES.litWord) {
-    evaluate(stream, context) {
-        return this;
-    }
+    // Removed evaluate() - dialects handle lit-word evaluation
     form() {
         return new Str(`'${this.spelling.description}`);
     }

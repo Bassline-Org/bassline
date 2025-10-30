@@ -6,10 +6,11 @@ import {
     Str,
     TYPES,
     Word,
-} from "../prelude/index.js";
-import { nativeFn } from "../prelude/datatypes/functions.js";
+} from "../semantics/default/index.js";
+import { nativeFn } from "../semantics/default/datatypes/functions.js";
 import { spawn } from "child_process";
 import { normalize } from "../utils.js";
+import { evaluateBlock } from "../semantics/default/evaluate.js";
 TYPES.processContext = normalize("process-context!");
 
 class ProcessContext extends ContextChain.typed(TYPES.processContext) {
@@ -27,17 +28,17 @@ class ProcessContext extends ContextChain.typed(TYPES.processContext) {
                 this.spawned.stdout.on("data", (data) => {
                     const str = new Str(data.toString());
                     const block = new Block([new Word("stdout"), str]);
-                    block.doBlock(this);
+                    evaluateBlock(block, this);
                 });
                 this.spawned.stderr.on("data", (data) => {
                     const str = new Str(data.toString());
                     const block = new Block([new Word("stderr"), str]);
-                    block.doBlock(this);
+                    evaluateBlock(block, this);
                 });
                 this.spawned.on("exit", (code) => {
                     const num = new Num(code ?? 0);
                     const block = new Block([new Word("close"), num]);
-                    block.doBlock(this);
+                    evaluateBlock(block, this);
                 });
                 return this;
             }),
