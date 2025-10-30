@@ -29,6 +29,10 @@ export default {
     "*": nativeFn("a b", (a, b) => a.multiply(b)),
     "/": nativeFn("a b", (a, b) => a.divide(b)),
     "//": nativeFn("a b", (a, b) => a.modulo(b)),
+    ">": nativeFn("a b", (a, b) => a.gt(b)),
+    "<": nativeFn("a b", (a, b) => a.lt(b)),
+    ">=": nativeFn("a b", (a, b) => a.gte(b)),
+    "<=": nativeFn("a b", (a, b) => a.lte(b)),
     "eq?": nativeFn("a b", (a, b) => a.equals(b)),
     "cast": nativeFn("value type", (a, b) => a.cast(b)),
 
@@ -49,6 +53,10 @@ export default {
     "iota": nativeFn(
         "n",
         (n) => new Block(Array.from({ length: n.value }, (_, i) => new Num(i))),
+    ),
+    "shape": nativeFn(
+        "fill dims",
+        (fill, dims) => makeShape(fill, dims.to(TYPES.block).items),
     ),
     "concat": nativeFn("list1 list2", (list1, list2) => list1.concat(list2)),
 
@@ -115,3 +123,15 @@ export default {
         return new Block(iter.toArray());
     }),
 };
+
+function makeShape(fill, dims) {
+    const [dim, ...rest] = dims;
+    if (rest.length === 0) {
+        return new Block(
+            Array.from({ length: dim.value }, (_, i) => fill),
+        );
+    }
+    return new Block(
+        Array.from({ length: dim.value }, (_, i) => makeShape(fill, rest)),
+    );
+}

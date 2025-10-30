@@ -3,12 +3,14 @@ import context from "./context.js";
 import functions from "./functions.js";
 import async from "./async.js";
 import conditions from "./conditions.js";
+import gadgets from "./gadget.js";
 
 export * from "./core.js";
 export * from "./functions.js";
 export * from "./context.js";
 export * from "./async.js";
 export * from "./types.js";
+export * from "./gadget.js";
 
 export default {
     ...core,
@@ -16,4 +18,5 @@ export default {
     ...functions,
     ...async,
     ...conditions,
+    ...gadgets,
 };

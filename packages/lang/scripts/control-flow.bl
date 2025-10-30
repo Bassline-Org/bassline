@@ -22,6 +22,8 @@ do block
 
 loop: make context-chain! self
 
+pause
+
 in loop [
     i: 0
     condition: [ eq? i 100 ]

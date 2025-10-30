@@ -115,6 +115,22 @@ export class Num extends Value.typed(TYPES.number) {
         const otherValue = other.to(this.type);
         return new Num(this.value % otherValue.value);
     }
+    gt(other) {
+        const otherValue = other.to(this.type);
+        return new Bool(this.value > otherValue.value);
+    }
+    lt(other) {
+        const otherValue = other.to(this.type);
+        return new Bool(this.value < otherValue.value);
+    }
+    gte(other) {
+        const otherValue = other.to(this.type);
+        return new Bool(this.value >= otherValue.value);
+    }
+    lte(other) {
+        const otherValue = other.to(this.type);
+        return new Bool(this.value <= otherValue.value);
+    }
     mold() {
         return this.value.toString();
     }

@@ -1,56 +1,23 @@
-import { GLOBAL } from "./src/runtime.js";
-import { parse } from "./src/parser.js";
-import { Condition, Restart } from "./src/prelude/index.js";
-import { createInterface } from "node:readline";
+function iota(n) {
+    if (typeof n === "number") {
+        return Array.from({ length: n }, (_, i) => i);
+    }
+    if (Array.isArray(n)) {
+        if (n.length === 1) {
+            return Array.from({ length: n[0] }, (_, i) => i);
+        }
+        const [dim, ...rest] = n;
+        return Array.from({ length: dim }, (_, i) => iota(rest));
+    }
+}
 
-// const rl = createInterface({
-//     input: process.stdin,
-//     output: process.stdout,
-// });
+function shape(fill, dims) {
+    if (dims.length === 1) {
+        return Array.from({ length: dims[0] }, (_, i) => fill);
+    }
+    const [dim, ...rest] = dims;
+    return Array.from({ length: dim }, (_, i) => shape(fill, rest));
+}
 
-// const ctx = GLOBAL.context;
-
-// const conditionTest = parse(`
-//     a: 123
-//     b: "fuck"
-//     c: add a b
-//     print c
-//     print c
-//     cond: make condition! "fuck"
-//     print c
-
-//     cond
-
-//     print c
-// `);
-
-// async function handleRestarts(result) {
-//     while (result instanceof Restart || result instanceof Condition) {
-//         const cond = result.condition.value.description;
-//         console.log(result.continuation.form().value);
-//         const msg = `CONDITION: ${cond}\n\n>> `;
-
-//         const answer = await new Promise((resolve) => {
-//             rl.question(msg, resolve);
-//         });
-
-//         const parsed = parse(answer);
-//         if (result instanceof Restart) {
-//             parsed.doBlock(ctx);
-//             result = result.resume();
-//         } else {
-//             result = parsed.doBlock(ctx);
-//         }
-//     }
-//     return result;
-// }
-
-// // Run the test with restart handling
-// const initialResult = conditionTest.doBlock(ctx);
-// handleRestarts(initialResult).then((finalResult) => {
-//     console.log("\nFinal result:", finalResult);
-//     rl.close();
-// }).catch((err) => {
-//     console.error("Error:", err);
-//     rl.close();
-// });
+//console.log(shape("hello", [3, 2]));
+//console.log(shape("foo", [3, 3, 3]));
