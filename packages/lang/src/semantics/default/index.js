@@ -32,6 +32,11 @@ export {
 
 // Export datatypes
 export * from "./datatypes/index.js";
+// Export signalCondition and registerDefaultRestarts from conditions
+export {
+    registerDefaultRestarts,
+    signalCondition,
+} from "./datatypes/conditions.js";
 
 // Re-export everything from datatypes and actions for convenience
 import datatypes from "./datatypes/index.js";

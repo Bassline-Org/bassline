@@ -1,10 +1,10 @@
 import { TYPES } from "./datatypes/types.js";
-import { Num, Str, Block, Bool } from "./datatypes/core.js";
+import { Block, Bool, Num, Str } from "./datatypes/core.js";
 
 /**
  * Polymorphic dispatch table for operations.
  * Similar to dialects, but dispatches based on operand types.
- * 
+ *
  * @typedef {Object<string, Object<string, Function>>} PolymorphicDispatch
  */
 
@@ -33,14 +33,14 @@ export function dispatchPolymorphic(operation, left, right) {
 
     // Try single-type handlers (monomorphic)
     const monoHandler = dispatchTable[leftType];
-    if (monoHandler && typeof monoHandler === 'function') {
+    if (monoHandler && typeof monoHandler === "function") {
         return monoHandler(left, right);
     }
 
     // Try with type conversion
     // For now, throw error - we can add conversion logic later
     throw new Error(
-        `No handler for ${operation} with types ${leftType} and ${rightType}`
+        `No handler for ${operation} with types ${leftType} and ${rightType}`,
     );
 }
 
@@ -49,7 +49,7 @@ export function dispatchPolymorphic(operation, left, right) {
  * Each operation maps to a table of type combinations.
  */
 export const polymorphicDispatch = {
-    '+': {
+    "+": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.add(b),
         },
@@ -61,57 +61,59 @@ export const polymorphicDispatch = {
         },
     },
 
-    '-': {
+    "-": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.subtract(b),
         },
     },
 
-    '*': {
+    "*": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.multiply(b),
         },
     },
 
-    '/': {
+    "/": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.divide(b),
         },
+        [TYPES.context]: {
+            [TYPES.litWord]: (a, b) => a.get(b),
+        },
     },
 
-    '//': {
+    "//": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.modulo(b),
         },
     },
 
-    '>': {
+    ">": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.gt(b),
         },
     },
 
-    '<': {
+    "<": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.lt(b),
         },
     },
 
-    '>=': {
+    ">=": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.gte(b),
         },
     },
 
-    '<=': {
+    "<=": {
         [TYPES.number]: {
             [TYPES.number]: (a, b) => a.lte(b),
         },
     },
 
-    'eq?': {
+    "eq?": {
         // eq? works on any type through Value.equals()
         default: (a, b) => a.equals(b),
     },
 };
-

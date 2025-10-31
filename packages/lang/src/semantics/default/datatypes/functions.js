@@ -11,9 +11,8 @@ const { TYPES } = t;
  */
 export class NativeFn extends Value.typed(TYPES.nativeFn) {
     constructor(spec, fn) {
-        // Store spec as string - parsing happens in dialect/semantics layer
         super({
-            spec: spec, // Store spec string, not parsed items
+            spec: spec,
             fn: fn,
         });
     }
@@ -24,13 +23,10 @@ export class NativeFn extends Value.typed(TYPES.nativeFn) {
     get fn() {
         return this.value.fn;
     }
-    // Removed evaluate() - dialects handle function invocation through fn handler
     form() {
-        // Spec is a string, so just display it
         return new Str(`native-fn! spec: ${this.spec}`);
     }
     mold() {
-        // No mold for native functions
         return "";
     }
 }
@@ -39,13 +35,7 @@ export const nativeFn = (spec, fn) => {
     return new NativeFn(spec, fn);
 };
 
-// Removed collectArguments - replaced by takeN in semantics/default/functions.js
-// This function used the old iterator-based evaluation which has been replaced
-// by the state machine evaluator
-
 const makeFn = nativeFn("type value", (type, value, context) => {
-    // Pass the raw value to the make method
-    // Individual make methods handle their own evaluation needs
     return type.value.make(value, context);
 });
 

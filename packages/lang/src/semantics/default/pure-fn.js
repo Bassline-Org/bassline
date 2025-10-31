@@ -88,15 +88,7 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
 
         // Use takeN to collect arguments according to spec
         // Convert spec block items to spec string
-        const specString = specItems.map((item) => {
-            if (item.type === TYPES.litWord) {
-                return `'${item.spelling.description}`;
-            }
-            if (item.type === TYPES.getWord) {
-                return `:${item.spelling.description}`;
-            }
-            return item.spelling.description;
-        }).join(" ");
+        const specString = specItems.map((e) => e.mold()).join(" ");
 
         const { values, state: nextState } = takeN(state, specString);
 
@@ -105,6 +97,11 @@ export class PureFn extends ContextChain.typed(TYPES.fn) {
             const argName = specItems[index];
             if (argName) {
                 localCtx.set(argName.spelling, arg);
+            } else {
+                throw new Error("PureFn: argument name is undefined", {
+                    cause: arg.mold(),
+                    spec: specString,
+                });
             }
         });
 

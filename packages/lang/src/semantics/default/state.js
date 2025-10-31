@@ -10,6 +10,10 @@
  * @typedef {Object} ContinuationFrame
  * @property {Function} k - Continuation function (value, rest, state) => State|Result
  * @property {EvaluationState} state - State associated with this continuation
+ * @property {string} [type] - Type of continuation (e.g., "assignment", "function-call", "block-eval")
+ * @property {string} [description] - Human-readable description of what this continuation does
+ * @property {Object} [source] - Source location info (if available) with line, column, filename
+ * @property {Object} [contextSnapshot] - Snapshot of relevant context variables at continuation creation
  */
 
 /**
@@ -66,21 +70,32 @@ export function makeState(stream, ctx, konts = [], dialect = null) {
  * Push a continuation frame onto the continuation stack.
  * @param {EvaluationState} state - Current evaluation state
  * @param {Function} k - Continuation function (value, rest, state) => nextState
+ * @param {Object} [metadata] - Optional metadata about the continuation
+ * @param {string} [metadata.type] - Type of continuation (e.g., "assignment", "function-call", "block-eval")
+ * @param {string} [metadata.description] - Human-readable description
+ * @param {Object} [metadata.source] - Source location {line, column, filename}
+ * @param {Object} [metadata.contextSnapshot] - Snapshot of relevant context variables
  * @returns {EvaluationState} New state with continuation pushed onto stack
  */
-export function pushKont(state, k) {
-    return { ...state, konts: [...state.konts, k] };
+export function pushKont(state, k, metadata = {}) {
+    const frame = { k, state: { ...state }, ...metadata };
+    return { ...state, konts: [...state.konts, frame] };
 }
 
 /**
  * Pop a continuation frame from the continuation stack.
  * @param {EvaluationState} state - Current evaluation state
- * @returns {ContinuationFrame|null} Continuation frame with k and state, or null if stack is empty
+ * @returns {ContinuationFrame|null} Continuation frame with k, state, and metadata, or null if stack is empty
  */
 export function popKont(state) {
     if (state.konts.length === 0) return null;
-    const [k, ...restKonts] = state.konts;
-    return { k, state: { ...state, konts: restKonts } };
+    const [frame, ...restKonts] = state.konts;
+    // Ensure frame has k and state properties
+    const result = {
+        ...frame,
+        state: { ...state, konts: restKonts },
+    };
+    return result;
 }
 
 /**
@@ -165,4 +180,3 @@ export function runUntilDone(state) {
         currentState = result;
     }
 }
-

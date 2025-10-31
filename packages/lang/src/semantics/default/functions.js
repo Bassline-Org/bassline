@@ -51,11 +51,13 @@ export function takeN(state, spec) {
                 currentState.konts,
                 currentState.dialect,
             );
-        } else if (argSpec.type === TYPES.getWord) {
+            continue;
+        }
+        if (argSpec.type === TYPES.getWord) {
             if (head.type === TYPES.word) {
-                const spelling = head.spelling || head.value;
-                const bound = currentState.ctx.get 
-                    ? currentState.ctx.get(spelling) 
+                const spelling = head.spelling;
+                const bound = currentState.ctx.get
+                    ? currentState.ctx.get(spelling)
                     : currentState.ctx[spelling];
                 if (!bound) {
                     throw new Error(`Undefined word: ${spelling}`);
@@ -140,4 +142,3 @@ export function buildCpsFunction(spec, compute) {
         return k(result, nextState);
     }, spec);
 }
-

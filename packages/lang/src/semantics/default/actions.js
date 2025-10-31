@@ -1,5 +1,5 @@
 // No parser imports - parsing happens in dialect/semantics layer
-import { composeBlock, evaluateBlock } from "./evaluate.js";
+import { composeBlock, evaluateBlock, reduceBlock } from "./evaluate.js";
 import { makeState, runUntilDone } from "./state.js";
 import { doSemantics } from "./dialect.js";
 // Import directly from individual files to avoid circular dependency
@@ -7,6 +7,7 @@ import { Block, Num, Str, Value, Word } from "./datatypes/core.js";
 import { Datatype } from "./datatypes/core.js";
 import { nativeFn } from "./datatypes/functions.js";
 import { TYPES } from "./datatypes/types.js";
+import { dispatchPolymorphic } from "./polymorphic.js";
 
 export default {
     // Basic introspection
@@ -29,17 +30,17 @@ export default {
 
     // Basic evaluation
 
-    // Core arithmetic methods
-    "+": nativeFn("a b", (a, b) => a.add(b)),
-    "-": nativeFn("a b", (a, b) => a.subtract(b)),
-    "*": nativeFn("a b", (a, b) => a.multiply(b)),
-    "/": nativeFn("a b", (a, b) => a.divide(b)),
-    "//": nativeFn("a b", (a, b) => a.modulo(b)),
-    ">": nativeFn("a b", (a, b) => a.gt(b)),
-    "<": nativeFn("a b", (a, b) => a.lt(b)),
-    ">=": nativeFn("a b", (a, b) => a.gte(b)),
-    "<=": nativeFn("a b", (a, b) => a.lte(b)),
-    "eq?": nativeFn("a b", (a, b) => a.equals(b)),
+    // Core arithmetic methods - use polymorphic dispatch
+    "+": nativeFn("a b", (a, b) => dispatchPolymorphic("+", a, b)),
+    "-": nativeFn("a b", (a, b) => dispatchPolymorphic("-", a, b)),
+    "*": nativeFn("a b", (a, b) => dispatchPolymorphic("*", a, b)),
+    "/": nativeFn("a b", (a, b) => dispatchPolymorphic("/", a, b)),
+    "//": nativeFn("a b", (a, b) => dispatchPolymorphic("//", a, b)),
+    ">": nativeFn("a b", (a, b) => dispatchPolymorphic(">", a, b)),
+    "<": nativeFn("a b", (a, b) => dispatchPolymorphic("<", a, b)),
+    ">=": nativeFn("a b", (a, b) => dispatchPolymorphic(">=", a, b)),
+    "<=": nativeFn("a b", (a, b) => dispatchPolymorphic("<=", a, b)),
+    "eq?": nativeFn("a b", (a, b) => dispatchPolymorphic("eq?", a, b)),
     "cast": nativeFn("value type", (a, b) => a.cast(b)),
 
     // Series methods
@@ -77,17 +78,7 @@ export default {
     ),
     "reduce": nativeFn(
         "block",
-        (block, context) => {
-            // Evaluate each item in the block and return a new block with results
-            const result = [];
-            for (const item of block.items) {
-                // Evaluate each item individually using the state machine
-                const state = makeState([item], context, [], doSemantics);
-                const evalResult = runUntilDone(state);
-                result.push(evalResult.value);
-            }
-            return new Block(result);
-        },
+        (block, context) => reduceBlock(block, context),
     ),
     "do": nativeFn("block", (block, context) => {
         return evaluateBlock(block, context);
@@ -115,7 +106,15 @@ export default {
     }),
     "fold": nativeFn(
         "series fn initial",
-        (series, fn, initial, context) => series.fold(fn, initial, context),
+        (series, fn, initial, context) => {
+            let acc = initial;
+            for (const item of series.items) {
+                evaluateBlock(new Block([fn, acc, item]), context, (result) => {
+                    acc = result;
+                });
+            }
+            return acc;
+        },
     ),
 
     // Control flow
