@@ -223,7 +223,13 @@ const queryBuilder = (g) => {
 
             return [results, shouldCache];
         },
-
+        reduce(fn, initial) {
+            builder.addQuery((items) => {
+                const result = items.reduce(fn, initial);
+                return [result];
+            });
+            return builder;
+        },
         enableReactivity: () => {
             if (builder.removeTrigger !== undefined) {
                 return builder;
@@ -452,37 +458,37 @@ const tx = g.tx();
 ast.insert(tx);
 tx.commit();
 
-//const fooValues = g.query()
-//    .match("?x", "SPELLING?", "FOO")
-//.match("?x", "VALUE?", "?value")
-//    .select("?x");
+const fooIds = g.query()
+    .match("?id", "SPELLING?", "FOO")
+    .select("?id");
 
-// console.log(fooValues.run());
+const fooValues = g.query()
+    .match("?id", "SPELLING?", "FOO")
+    .match("?id", "VALUE?", "?value")
+    .select("?id", "?value");
+
+const someFoo = fooIds.run()[0];
+g.tx().relate(someFoo.id, "SEMANTICS?", "NORMAL").commit();
 
 g.constraint((builder) => {
     return builder
-        .match("*", "SPELLING?", "FOO")
+        .match("?id", "SPELLING?", "FOO")
+        .match("?id", "SEMANTICS?", "NORMAL")
+        .select("?id")
         .addSideEffect((results) => {
             const tx = g.tx();
-            for (const { source, attr, target } of results) {
-                tx.relate(source, "VALUE?", 69);
+            console.log(results);
+            for (const { id } of results) {
+                tx.relate(id, "VALUE?", 69);
             }
             console.log("Committing foo values");
             tx.commit();
         });
 });
 
-const fooValues = g.query()
-    .match("?x", "SPELLING?", "FOO") // Finds all with SPELLING?=FOO, binds ?x
-    .match("?x", "VALUE?", "?value") // Searches ALL edges for ?x -> VALUE? -> ?value
-    .select("?value")
-    .run();
+console.log(fooValues.run());
 
-const blocksWithChildren = g.query()
-    .match("?b", "TYPE?", "BLOCK!")
-    .match("?child", "PARENT?", "?b")
-    .select("?b", "?child")
-    .run();
+const otherFoo = fooIds.run()[1];
+g.tx().relate(otherFoo.id, "SEMANTICS?", "NORMAL").commit();
 
-console.log(fooValues);
-console.log(blocksWithChildren);
+console.log(fooValues.run());
