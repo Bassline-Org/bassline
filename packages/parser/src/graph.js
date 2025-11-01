@@ -99,11 +99,9 @@ const queryBuilder = (g) => {
             builder.addQuery((edges) => edges.map(fn));
             return builder;
         },
-        build() {
-            return () => {
-                const [results] = builder.compute(g.edges);
-                return results;
-            };
+        run(edges = g.edges) {
+            const [results] = builder.compute(edges);
+            return results;
         },
         // Threads the edges through all of the queries and returns the results and a boolean indicating if any matches were found
         // We need to track this, because if no matches are found, we can discard the edges
@@ -325,41 +323,6 @@ const createGraph = (edges = []) => {
             };
             return txn;
         },
-        store(cell) {
-            if (
-                cell.type === TYPES.block ||
-                cell.type === TYPES.paren
-            ) {
-                cell.value.forEach((item, index) => {
-                    const id = g.store(item);
-                    g.relate(id, "PARENT?", cell.id);
-                    g.relate(cell.id, index.toString(), id);
-                    return id;
-                });
-                g.relate(cell.type, "TYPE?", "DATATYPE!");
-                g.relate(cell.id, "TYPE?", cell.type);
-                return cell.id;
-            }
-            if (
-                cell.type === TYPES.uri
-            ) {
-                Object.entries(cell.value)
-                    .filter(([k, v]) => v !== null)
-                    .map(([k, v]) => {
-                        const id = g.store(v);
-                        g.relate(cell.id, normalize(k), id);
-                        g.relate(id, "PARENT?", cell.id);
-                    });
-
-                g.relate(cell.type, "TYPE?", "DATATYPE!");
-                g.relate(cell.id, "TYPE?", cell.type);
-
-                return cell.id;
-            }
-            g.relate(cell.type, "TYPE?", "DATATYPE!");
-            g.relate(cell.id, "TYPE?", cell.type);
-            return cell.id;
-        },
     };
 
     g.relate("DATATYPE!", "TYPE?", "DATATYPE!");
@@ -370,84 +333,32 @@ const createGraph = (edges = []) => {
 
 const g = createGraph();
 
-g.store(ast);
-
-const blocks = g.query()
-    .matchTo(["BLOCK!", "PAREN!"])
-    .matchAttr("TYPE?")
-    .materialize();
-
-const uris = g.query()
-    .matchAttr("TYPE?")
-    .matchTo("URI!")
-    .build();
-
-const allNodes = new Set();
-const nodeQuery = g.query()
-    .match("*", "*", "*")
-    .addSideEffect((results) => {
-        for (const result of results) {
-            allNodes.add(result.source);
-            allNodes.add(result.attr);
-            allNodes.add(result.target);
-        }
-    })
-    .materialize();
-
-const hosts = g.query()
-    .matchAttr("HOST")
-    .build();
-
-//console.log(uris());
-const logBlocks = () => {
-    console.log(blocks().length);
-};
-
-logBlocks();
-logBlocks();
-logBlocks();
-
-g.relate("FOO", "PARENT?", "BLOCK!");
-
-logBlocks();
-
-g.relate("FOO", "TYPE?", "BLOCK!");
-g.relate("BAR", "TYPE?", "BLOCK!");
-
-logBlocks();
-
-nodeQuery();
-
-console.log(allNodes);
-const barQuery = g.query()
-    .enableReactivity()
-    .match("BAR", "PARENT?", null)
-    .addSideEffect((results) => {
-        console.log("new data: ", results);
-    })
-    .build();
-
-console.log("bar: ", barQuery(), "\n\n");
-
-const createConstraint = () =>
-    g.constraint((builder) => {
-        builder
-            .match("BAR", "PARENT?", "BLOCK!")
-            .addSideEffect(() => {
-                throw new Error("NO SETTING BAR PARENT TO BLOCK!");
-            });
-    });
-
-let removeConstraint = createConstraint();
-
-const tx = g.tx()
-    .relate("BAR", "PARENT?", "BLOCK!");
-
+const tx = g.tx();
+ast.insert(tx);
 tx.commit();
-g.tx().relate("FOO", "PARENT?", "BLOCK!").commit();
 
-removeConstraint();
-tx.commit();
-removeConstraint = createConstraint();
+const fooValues = g.query()
+    .match("*", "SPELLING?", "FOO")
+    .map(({ source }) =>
+        g.query()
+            .match(source, "VALUE?", "*")
+            .map(({ target }) => target)
+            .run()
+    );
 
-console.log("Nodes: ", g.nodes.size);
+console.log(fooValues.run());
+
+g.constraint((builder) => {
+    return builder
+        .match("*", "SPELLING?", "FOO")
+        .addSideEffect((results) => {
+            const tx = g.tx();
+            for (const { source, attr, target } of results) {
+                tx.relate(source, "VALUE?", 69);
+            }
+            console.log("Committing foo values");
+            tx.commit();
+        });
+});
+
+console.log(fooValues.run());
