@@ -72,12 +72,12 @@ const find = (sourceQuery, attrQuery, targetQuery) => {
         );
 };
 
-const queryBuilder = (edgeFn) => {
+const queryBuilder = (g) => {
     let builder = {
-        query: edgeFn,
-        updateQuery: (f) => {
-            const oldQuery = builder.query;
-            builder.query = () => f(oldQuery());
+        queries: [],
+        addQuery: (f) => {
+            builder.queries.push(f);
+            return builder;
         },
         from(source) {
             builder.where(source, null, null);
@@ -92,15 +92,71 @@ const queryBuilder = (edgeFn) => {
             return builder;
         },
         where(source, attr, target) {
-            builder.updateQuery(find(source, attr, target));
+            builder.addQuery(find(source, attr, target));
             return builder;
         },
         map(fn) {
-            builder.updateQuery((edges) => edges.map(fn));
+            builder.addQuery((edges) => edges.map(fn));
             return builder;
         },
         build() {
-            return builder.query;
+            return () => {
+                const [results] = builder.compute(g.edges);
+                return results;
+            };
+        },
+        // Threads the edges through all of the queries and returns the results and a boolean indicating if any matches were found
+        // We need to track this, because if no matches are found, we can discard the edges
+        compute: (edges) => {
+            let shouldCache = false;
+            let results = edges;
+            for (const query of builder.queries) {
+                results = query(results);
+                if (results.length > 0) {
+                    shouldCache = true;
+                }
+            }
+            return [results, shouldCache];
+        },
+        materialize: () => {
+            let partialResults = [];
+            let results = [];
+            let lastHeight = 0;
+            const newEdges = () => g.edges.slice(lastHeight, g.edges.length);
+
+            return () => {
+                const unseen = newEdges();
+                if (unseen.length > 0) {
+                    lastHeight = g.edges.length;
+                    // We need to process the unseen edges with the partial results
+                    const toProcess = partialResults.concat(unseen);
+
+                    const [newResults, shouldCache] = builder.compute(
+                        toProcess,
+                    );
+
+                    if (!shouldCache) {
+                        console.log(
+                            "No useful edges, returning cached and discarding unseen",
+                        );
+                        return results;
+                    }
+
+                    if (shouldCache && newResults.length === 0) {
+                        console.log("No results, caching unseen");
+                        partialResults = toProcess;
+                        return results;
+                    }
+
+                    console.log("New results, clearing cache");
+                    partialResults = [];
+                    results = results.concat(newResults);
+                    return results;
+                } else {
+                    console.log("No new edges, returning cached");
+                    return results;
+                }
+            };
         },
     };
     return builder;
@@ -110,9 +166,8 @@ const createGraph = (nodes = new Map(), edges = []) => {
     const g = {
         nodes,
         edges,
-        query() {
-            return queryBuilder(() => g.edges);
-        },
+        rules: [],
+        query: () => queryBuilder(g),
         relate(source, attr, target) {
             g.edges.push({
                 source,
@@ -121,25 +176,29 @@ const createGraph = (nodes = new Map(), edges = []) => {
             });
         },
         store(cell) {
-            g.nodes.set(cell.type, cell.type);
-            g.relate(cell.type, "TYPE?", "DATATYPE!");
-            g.relate(cell.id, "TYPE?", cell.type);
             if (
                 cell.type === TYPES.block ||
                 cell.type === TYPES.paren
             ) {
+                g.nodes.set(cell.id, cell.id);
+
                 cell.value.forEach((item, index) => {
                     const id = g.store(item);
                     g.relate(id, "PARENT?", cell.id);
                     g.relate(cell.id, index.toString(), id);
                     return id;
                 });
-                g.nodes.set(cell.id, cell.id);
+
+                g.relate(cell.type, "TYPE?", "DATATYPE!");
+                g.relate(cell.id, "TYPE?", cell.type);
+
                 return cell.id;
             }
             if (
                 cell.type === TYPES.uri
             ) {
+                g.nodes.set(cell.id, cell.id);
+
                 Object.entries(cell.value)
                     .filter(([k, v]) => v !== null)
                     .map(([k, v]) => {
@@ -147,14 +206,23 @@ const createGraph = (nodes = new Map(), edges = []) => {
                         g.relate(cell.id, normalize(k), id);
                         g.relate(id, "PARENT?", cell.id);
                     });
-                g.nodes.set(cell.id, cell.id);
+
+                g.relate(cell.type, "TYPE?", "DATATYPE!");
+                g.relate(cell.id, "TYPE?", cell.type);
+
                 return cell.id;
             }
+
             g.nodes.set(cell.id, cell.value);
+
+            g.relate(cell.type, "TYPE?", "DATATYPE!");
+            g.relate(cell.id, "TYPE?", cell.type);
             return cell.id;
         },
     };
+
     g.nodes.set("DATATYPE!", "DATATYPE!");
+
     return g;
 };
 
@@ -165,7 +233,7 @@ g.store(ast);
 const blocks = g.query()
     .to(["BLOCK!", "PAREN!"])
     .attr("TYPE?")
-    .build();
+    .materialize();
 
 const uris = g.query()
     .attr("TYPE?")
@@ -177,4 +245,18 @@ const hosts = g.query()
     .build();
 
 //console.log(uris());
-console.log(blocks());
+const logBlocks = () => {
+    console.log(blocks().length);
+};
+
+logBlocks();
+logBlocks();
+logBlocks();
+
+g.relate("FOO", "PARENT?", "BLOCK!");
+
+logBlocks();
+
+g.relate("FOO", "TYPE?", "BLOCK!");
+
+logBlocks();
