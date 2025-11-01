@@ -1,4 +1,4 @@
-export type TYPES = {
+export const TYPES = {
     number: "NUMBER!",
     string: "STRING!",
     word: "WORD!",
