@@ -35,42 +35,25 @@ after sleep 1500 [ print "done" ] self
 
 const ast = p.parse(example);
 
-const find = (sourceQuery, attrQuery, targetQuery) => {
-    const source = sourceQuery ?? "*";
-    const attr = attrQuery ?? "*";
-    const target = targetQuery ?? "*";
-    const sourceMatches = (e) => {
-        if (source === "*") {
-            return true;
+const matcher = (property) => (value) => {
+    const val = value ?? "*";
+    const match = (e) => val === "*" ? true : (val === e[property]);
+    return (e) => {
+        if (Array.isArray(val)) {
+            return val.some(match);
         }
-        if (Array.isArray(source)) {
-            return source.some((s) => s === e.source);
-        }
-        return e.source === source;
+        return match(e);
     };
-    const attrMatches = (e) => {
-        if (attr === "*") {
-            return true;
-        }
-        if (Array.isArray(attr)) {
-            return attr.some((a) => a === e.attr);
-        }
-        return e.attr === attr;
-    };
-    const targetMatches = (e) => {
-        if (target === "*") {
-            return true;
-        }
-        if (Array.isArray(target)) {
-            return target.some((t) => t === e.target);
-        }
-        return e.target === target;
-    };
-    return (edges) =>
-        edges.filter((e) =>
-            sourceMatches(e) && attrMatches(e) && targetMatches(e)
-        );
 };
+
+const matchSource = matcher("source");
+const matchAttr = matcher("attr");
+const matchTarget = matcher("target");
+
+const findExact = (...predicates) => (edges) =>
+    edges.filter((edge) => predicates.every((p) => p(edge)));
+const findAny = (...predicates) => (edges) =>
+    edges.filter((edge) => predicates.some((p) => p(edge)));
 
 const queryBuilder = (g) => {
     let builder = {
@@ -84,20 +67,32 @@ const queryBuilder = (g) => {
             builder.sideEffects.push(f);
             return builder;
         },
-        from(source) {
-            builder.where(source, null, null);
+        matchFrom(source) {
+            builder.match(source, null, null);
             return builder;
         },
-        to(target) {
-            builder.where(null, null, target);
+        matchTo(target) {
+            builder.match(null, null, target);
             return builder;
         },
-        attr(attr) {
-            builder.where(null, attr, null);
+        matchAttr(attr) {
+            builder.match(null, attr, null);
             return builder;
         },
-        where(source, attr, target) {
-            builder.addQuery(find(source, attr, target));
+        match(source, attr, target) {
+            builder.addQuery(findExact(
+                matchSource(source),
+                matchAttr(attr),
+                matchTarget(target),
+            ));
+            return builder;
+        },
+        matchAny(property) {
+            builder.addQuery(findAny(
+                matchSource(property),
+                matchAttr(property),
+                matchTarget(property),
+            ));
             return builder;
         },
         map(fn) {
@@ -115,18 +110,38 @@ const queryBuilder = (g) => {
         compute: (edges) => {
             let shouldCache = false;
             let results = edges;
-            for (const query of builder.queries) {
+            builder.queries.forEach((query, index) => {
                 results = query(results);
-                if (results.length > 0) {
-                    shouldCache = true;
+                // If the first query finds no matches, we can discard the edges
+                if (index === 0) {
+                    shouldCache = results.length > 0;
                 }
-            }
+            });
             if (results.length > 0) {
                 for (const sideEffect of builder.sideEffects) {
                     sideEffect(results);
                 }
             }
             return [results, shouldCache];
+        },
+        isReactive: false,
+        enableReactivity: () => {
+            if (builder.isReactive) {
+                return builder;
+            }
+            builder.isReactive = true;
+            builder.removeTrigger = g.addTrigger(() =>
+                builder.compute(g.edges)
+            );
+            return builder;
+        },
+        disableReactivity: () => {
+            if (!builder.isReactive) {
+                return builder;
+            }
+            builder.removeTrigger();
+            builder.isReactive = false;
+            return builder;
         },
         materialize: () => {
             let partialResults = [];
@@ -135,36 +150,55 @@ const queryBuilder = (g) => {
             const newEdges = () => g.edges.slice(lastHeight, g.edges.length);
 
             return () => {
-                const unseen = newEdges();
-                if (unseen.length > 0) {
-                    lastHeight = g.edges.length;
-                    // We need to process the unseen edges with the partial results
-                    const toProcess = partialResults.concat(unseen);
+                const prevHeight = lastHeight;
+                const prevPartialResults = [...partialResults];
+                try {
+                    console.log("lastHeight: ", lastHeight);
+                    console.log("g.edges.length: ", g.edges.length);
+                    if (lastHeight > g.edges.length) {
+                        console.log("Graph rollback, recomputing results");
+                        lastHeight = g.edges.length;
+                        const [newResults] = builder.compute(g.edges);
+                        partialResults = [];
+                        return newResults;
+                    }
 
-                    const [newResults, shouldCache] = builder.compute(
-                        toProcess,
-                    );
+                    const unseen = newEdges();
+                    if (unseen.length > 0) {
+                        lastHeight = g.edges.length;
+                        // We need to process the unseen edges with the partial results
+                        const toProcess = partialResults.concat(unseen);
 
-                    if (!shouldCache) {
-                        console.log(
-                            "No useful edges, returning cached and discarding unseen",
+                        const [newResults, shouldCache] = builder.compute(
+                            toProcess,
                         );
+
+                        if (!shouldCache) {
+                            console.log(
+                                "No useful edges, returning cached and discarding unseen",
+                            );
+                            return results;
+                        }
+
+                        if (shouldCache && newResults.length === 0) {
+                            console.log("No results, caching unseen");
+                            partialResults = toProcess;
+                            return results;
+                        }
+
+                        console.log("New results, clearing cache");
+                        partialResults = [];
+                        results = results.concat(newResults);
+                        return results;
+                    } else {
+                        console.log("No new edges, returning cached");
                         return results;
                     }
-
-                    if (shouldCache && newResults.length === 0) {
-                        console.log("No results, caching unseen");
-                        partialResults = toProcess;
-                        return results;
-                    }
-
-                    console.log("New results, clearing cache");
-                    partialResults = [];
-                    results = results.concat(newResults);
-                    return results;
-                } else {
-                    console.log("No new edges, returning cached");
-                    return results;
+                } catch (e) {
+                    console.error("Error materializing", e);
+                    lastHeight = prevHeight;
+                    partialResults = prevPartialResults;
+                    throw e;
                 }
             };
         },
@@ -172,14 +206,84 @@ const queryBuilder = (g) => {
     return builder;
 };
 
-const createGraph = (nodes = new Map(), edges = []) => {
+const createGraph = (edges = []) => {
     const g = {
-        nodes,
+        _nodes: new Set(),
+        get nodes() {
+            if (g._nodeQuery === undefined) {
+                g._nodeQuery = g.query()
+                    .match("*", "*", "*")
+                    .addSideEffect((results) => {
+                        for (const result of results) {
+                            g._nodes.add(result.source);
+                            g._nodes.add(result.attr);
+                            g._nodes.add(result.target);
+                        }
+                    })
+                    .enableReactivity()
+                    .materialize();
+            }
+            return g._nodeQuery();
+        },
         edges,
+        constraints: [],
+        triggers: [],
         query: () => queryBuilder(g),
-        addNode(id, node) {
-            g.nodes.set(id, node);
-            return g;
+        addConstraint: (f) => {
+            console.log("Adding constraint");
+            g.constraints.push(f);
+            return () => {
+                console.log("Removing constraint");
+                g.constraints = g.constraints.filter((c) => c !== f);
+            };
+        },
+        addTrigger: (f) => {
+            g.triggers.push(f);
+            return () => {
+                g.triggers = g.triggers.filter((t) => t !== f);
+            };
+        },
+        constraint: (f) => {
+            const builder = queryBuilder(g);
+            let constraintQuery = f(builder);
+            if (typeof constraintQuery !== "function") {
+                constraintQuery = builder.materialize();
+            }
+            try {
+                constraintQuery();
+            } catch (error) {
+                console.error("Constraint not valid on initial state", error);
+                return;
+            }
+            console.log("Constraint added");
+            return g.addConstraint(() => {
+                constraintQuery();
+            });
+        },
+        runConstraints: () => {
+            let valid = true;
+            for (const constraint of g.constraints) {
+                try {
+                    constraint();
+                } catch (error) {
+                    console.error("Error running constraint", error);
+                    valid = false;
+                    break;
+                }
+            }
+            return valid;
+        },
+        runTriggers: (catchErrors = false) => {
+            for (const trigger of g.triggers) {
+                try {
+                    trigger();
+                } catch (error) {
+                    console.error("Error running trigger", error);
+                    if (!catchErrors) {
+                        throw error;
+                    }
+                }
+            }
         },
         relate(source, attr, target) {
             g.edges.push({
@@ -187,31 +291,66 @@ const createGraph = (nodes = new Map(), edges = []) => {
                 attr,
                 target,
             });
+            return g;
+        },
+        tx() {
+            let commited = false;
+            const txn = {
+                changes: [],
+                relate: (source, attr, target) => {
+                    txn.changes.push({
+                        source,
+                        attr,
+                        target,
+                    });
+                    return txn;
+                },
+                commit: () => {
+                    if (!commited) {
+                        commited = true;
+                        const oldEdges = [...g.edges];
+                        for (const change of txn.changes) {
+                            g.relate(
+                                change.source,
+                                change.attr,
+                                change.target,
+                            );
+                        }
+                        console.log("Running constraints");
+                        const valid = g.runConstraints();
+                        if (!valid) {
+                            console.error(
+                                "Constraints failed, rolling back",
+                            );
+                            commited = false;
+                            g.edges = oldEdges;
+                            g.runConstraints();
+                        }
+                        console.log("Constraints passed, running triggers");
+                        g.runTriggers();
+                    }
+                },
+            };
+            return txn;
         },
         store(cell) {
             if (
                 cell.type === TYPES.block ||
                 cell.type === TYPES.paren
             ) {
-                g.addNode(cell.id, cell.id);
-
                 cell.value.forEach((item, index) => {
                     const id = g.store(item);
                     g.relate(id, "PARENT?", cell.id);
                     g.relate(cell.id, index.toString(), id);
                     return id;
                 });
-
                 g.relate(cell.type, "TYPE?", "DATATYPE!");
                 g.relate(cell.id, "TYPE?", cell.type);
-
                 return cell.id;
             }
             if (
                 cell.type === TYPES.uri
             ) {
-                g.addNode(cell.id, cell.id);
-
                 Object.entries(cell.value)
                     .filter(([k, v]) => v !== null)
                     .map(([k, v]) => {
@@ -225,16 +364,14 @@ const createGraph = (nodes = new Map(), edges = []) => {
 
                 return cell.id;
             }
-
-            g.addNode(cell.id, cell.value);
-
             g.relate(cell.type, "TYPE?", "DATATYPE!");
             g.relate(cell.id, "TYPE?", cell.type);
             return cell.id;
         },
     };
 
-    g.nodes.set("DATATYPE!", "DATATYPE!");
+    g.relate("DATATYPE!", "TYPE?", "DATATYPE!");
+    g.relate("TYPE?", "TYPE?", "WORD!");
 
     return g;
 };
@@ -244,18 +381,18 @@ const g = createGraph();
 g.store(ast);
 
 const blocks = g.query()
-    .to(["BLOCK!", "PAREN!"])
-    .attr("TYPE?")
+    .matchTo(["BLOCK!", "PAREN!"])
+    .matchAttr("TYPE?")
     .materialize();
 
 const uris = g.query()
-    .attr("TYPE?")
-    .to("URI!")
+    .matchAttr("TYPE?")
+    .matchTo("URI!")
     .build();
 
 const allNodes = new Set();
 const nodeQuery = g.query()
-    .where("*", "*", "*")
+    .match("*", "*", "*")
     .addSideEffect((results) => {
         for (const result of results) {
             allNodes.add(result.source);
@@ -266,7 +403,7 @@ const nodeQuery = g.query()
     .materialize();
 
 const hosts = g.query()
-    .attr("HOST")
+    .matchAttr("HOST")
     .build();
 
 //console.log(uris());
@@ -283,9 +420,55 @@ g.relate("FOO", "PARENT?", "BLOCK!");
 logBlocks();
 
 g.relate("FOO", "TYPE?", "BLOCK!");
+g.relate("BAR", "TYPE?", "BLOCK!");
 
 logBlocks();
 
 nodeQuery();
 
 console.log(allNodes);
+const barQuery = g.query()
+    .enableReactivity()
+    .match("BAR", "PARENT?", null)
+    .addSideEffect((results) => {
+        console.log("new data: ", results);
+    })
+    .build();
+
+console.log("bar: ", barQuery(), "\n\n");
+
+const createConstraint = () =>
+    g.constraint((builder) => {
+        builder
+            .match("BAR", "PARENT?", "BLOCK!")
+            .addSideEffect(() => {
+                throw new Error("NO SETTING BAR PARENT TO BLOCK!");
+            });
+    });
+
+let removeConstraint = createConstraint();
+
+const tx = g.tx()
+    .relate("BAR", "PARENT?", "BLOCK!");
+
+console.log("Attempting first commit");
+tx.commit();
+console.log("after first commit: ", barQuery(), "\n\n");
+
+console.log("Attempting second commit");
+g.tx().relate("FOO", "PARENT?", "BLOCK!").commit();
+console.log("after second commit: ", barQuery(), "\n\n");
+
+//console.log("bar: ", barQuery(), "\n\n");
+
+console.log("Removing constraint");
+removeConstraint();
+
+console.log("after removing constraint: ", barQuery(), "\n\n");
+
+console.log("Attempting third commit");
+tx.commit();
+console.log("after third commit: ", barQuery(), "\n\n");
+
+console.log("Creating new constraint");
+removeConstraint = createConstraint();
