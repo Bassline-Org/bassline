@@ -75,8 +75,13 @@ const find = (sourceQuery, attrQuery, targetQuery) => {
 const queryBuilder = (g) => {
     let builder = {
         queries: [],
+        sideEffects: [],
         addQuery: (f) => {
             builder.queries.push(f);
+            return builder;
+        },
+        addSideEffect: (f) => {
+            builder.sideEffects.push(f);
             return builder;
         },
         from(source) {
@@ -114,6 +119,11 @@ const queryBuilder = (g) => {
                 results = query(results);
                 if (results.length > 0) {
                     shouldCache = true;
+                }
+            }
+            if (results.length > 0) {
+                for (const sideEffect of builder.sideEffects) {
+                    sideEffect(results);
                 }
             }
             return [results, shouldCache];
@@ -166,8 +176,11 @@ const createGraph = (nodes = new Map(), edges = []) => {
     const g = {
         nodes,
         edges,
-        rules: [],
         query: () => queryBuilder(g),
+        addNode(id, node) {
+            g.nodes.set(id, node);
+            return g;
+        },
         relate(source, attr, target) {
             g.edges.push({
                 source,
@@ -180,7 +193,7 @@ const createGraph = (nodes = new Map(), edges = []) => {
                 cell.type === TYPES.block ||
                 cell.type === TYPES.paren
             ) {
-                g.nodes.set(cell.id, cell.id);
+                g.addNode(cell.id, cell.id);
 
                 cell.value.forEach((item, index) => {
                     const id = g.store(item);
@@ -197,7 +210,7 @@ const createGraph = (nodes = new Map(), edges = []) => {
             if (
                 cell.type === TYPES.uri
             ) {
-                g.nodes.set(cell.id, cell.id);
+                g.addNode(cell.id, cell.id);
 
                 Object.entries(cell.value)
                     .filter(([k, v]) => v !== null)
@@ -213,7 +226,7 @@ const createGraph = (nodes = new Map(), edges = []) => {
                 return cell.id;
             }
 
-            g.nodes.set(cell.id, cell.value);
+            g.addNode(cell.id, cell.value);
 
             g.relate(cell.type, "TYPE?", "DATATYPE!");
             g.relate(cell.id, "TYPE?", cell.type);
@@ -240,6 +253,18 @@ const uris = g.query()
     .to("URI!")
     .build();
 
+const allNodes = new Set();
+const nodeQuery = g.query()
+    .where("*", "*", "*")
+    .addSideEffect((results) => {
+        for (const result of results) {
+            allNodes.add(result.source);
+            allNodes.add(result.attr);
+            allNodes.add(result.target);
+        }
+    })
+    .materialize();
+
 const hosts = g.query()
     .attr("HOST")
     .build();
@@ -260,3 +285,7 @@ logBlocks();
 g.relate("FOO", "TYPE?", "BLOCK!");
 
 logBlocks();
+
+nodeQuery();
+
+console.log(allNodes);

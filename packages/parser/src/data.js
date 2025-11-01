@@ -29,13 +29,15 @@ export const hash = (value) =>
 const number = (value) => ({
     type: TYPES.number,
     value: Number(value),
-    id: value.toString(),
+    id: value,
 });
+
 const string = (value) => ({
     type: TYPES.string,
     value: String(value),
-    id: hash(value.toString()),
+    id: hash(value),
 });
+
 const word = (value) => ({
     type: TYPES.word,
     value: normalize(value),
