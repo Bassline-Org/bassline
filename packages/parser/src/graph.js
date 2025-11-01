@@ -465,7 +465,11 @@ const fooIds = g.query()
 const fooValues = g.query()
     .match("?id", "SPELLING?", "FOO")
     .match("?id", "VALUE?", "?value")
-    .select("?id", "?value");
+    .select("?id", "?value")
+    .addSideEffect((results) => {
+        console.log("New foo values", results);
+    })
+    .materialize();
 
 const someFoo = fooIds.run()[0];
 g.tx().relate(someFoo.id, "SEMANTICS?", "NORMAL").commit();
@@ -486,9 +490,7 @@ g.constraint((builder) => {
         });
 });
 
-console.log(fooValues.run());
-
-const otherFoo = fooIds.run()[1];
+const otherFoo = fooIds.run()[3];
 g.tx().relate(otherFoo.id, "SEMANTICS?", "NORMAL").commit();
 
-console.log(fooValues.run());
+console.log(fooValues());
