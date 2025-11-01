@@ -54,39 +54,37 @@ const findExact = (...predicates) => (edges) =>
     edges.filter((edge) => predicates.every((p) => p(edge)));
 const findAny = (...predicates) => (edges) =>
     edges.filter((edge) => predicates.some((p) => p(edge)));
-
 const queryBuilder = (g) => {
     let builder = {
         queries: [],
         sideEffects: [],
+        hasVariables: false, // Track if any patterns use variables
+
         addQuery: (f) => {
             builder.queries.push(f);
             return builder;
         },
+
         addSideEffect: (f) => {
             builder.sideEffects.push(f);
             return builder;
         },
+
+        // Check if value is a variable
+        isVar: (val) => typeof val === "string" && val.startsWith("?"),
+
         matchFrom(source) {
-            builder.match(source, null, null);
-            return builder;
+            return builder.match(source, null, null);
         },
+
         matchTo(target) {
-            builder.match(null, null, target);
-            return builder;
+            return builder.match(null, null, target);
         },
+
         matchAttr(attr) {
-            builder.match(null, attr, null);
-            return builder;
+            return builder.match(null, attr, null);
         },
-        match(source, attr, target) {
-            builder.addQuery(findExact(
-                matchSource(source),
-                matchAttr(attr),
-                matchTarget(target),
-            ));
-            return builder;
-        },
+
         matchAny(property) {
             builder.addQuery(findAny(
                 matchSource(property),
@@ -95,33 +93,137 @@ const queryBuilder = (g) => {
             ));
             return builder;
         },
+
         map(fn) {
-            builder.addQuery((edges) => edges.map(fn));
+            builder.addQuery((items) => {
+                // If items have bindings, extract edges for the map function
+                if (builder.hasVariables && items.length > 0 && items[0].edge) {
+                    return items.map((item) => {
+                        const result = fn(item.edge);
+                        // Preserve bindings through map
+                        return { edge: result, bindings: item.bindings };
+                    });
+                }
+                // Original behavior
+                return items.map(fn);
+            });
             return builder;
         },
+
+        select(...vars) {
+            builder.addQuery((items) => {
+                return items.map((item) => {
+                    const bindings = item.bindings || {};
+                    const selected = {};
+                    for (const v of vars) {
+                        const key = v.startsWith("?") ? v.slice(1) : v;
+                        selected[key] = bindings[v];
+                    }
+                    return selected;
+                });
+            });
+            return builder;
+        },
+
         run(edges = g.edges) {
             const [results] = builder.compute(edges);
             return results;
         },
-        // Threads the edges through all of the queries and returns the results and a boolean indicating if any matches were found
-        // We need to track this, because if no matches are found, we can discard the edges
+        match(source, attr, target) {
+            const usesVars = builder.isVar(source) || builder.isVar(attr) ||
+                builder.isVar(target);
+            if (usesVars) builder.hasVariables = true;
+
+            if (usesVars) {
+                builder.addQuery((items) => {
+                    // Check if items are plain edges (no bindings yet)
+                    const isFirstPattern = items.length === 0 ||
+                        !items[0].bindings ||
+                        Object.keys(items[0].bindings).length === 0;
+
+                    if (isFirstPattern) {
+                        // Initialize: filter current edges and create bindings
+                        const results = [];
+                        for (const edge of items) {
+                            const actualEdge = edge.edge || edge; // Handle wrapped or plain
+                            const bindings = {};
+                            if (
+                                matchField(
+                                    source,
+                                    actualEdge.source,
+                                    bindings,
+                                ) &&
+                                matchField(attr, actualEdge.attr, bindings) &&
+                                matchField(target, actualEdge.target, bindings)
+                            ) {
+                                results.push({ edge: actualEdge, bindings });
+                            }
+                        }
+                        return results;
+                    } else {
+                        // Extend: for each binding set, find compatible edges from ALL edges
+                        return items.flatMap((item) => {
+                            const matches = [];
+                            for (const edge of g.edges) {
+                                const newBindings = { ...item.bindings };
+                                if (
+                                    matchField(
+                                        source,
+                                        edge.source,
+                                        newBindings,
+                                    ) &&
+                                    matchField(attr, edge.attr, newBindings) &&
+                                    matchField(target, edge.target, newBindings)
+                                ) {
+                                    // Only add if bindings actually changed (new constraints satisfied)
+                                    matches.push({
+                                        edge,
+                                        bindings: newBindings,
+                                    });
+                                }
+                            }
+                            return matches;
+                        });
+                    }
+                });
+            } else {
+                builder.addQuery(findExact(
+                    matchSource(source),
+                    matchAttr(attr),
+                    matchTarget(target),
+                ));
+            }
+
+            return builder;
+        },
+
         compute: (edges) => {
             let shouldCache = false;
+
+            // DON'T wrap here - let first pattern do it
             let results = edges;
+
             builder.queries.forEach((query, index) => {
                 results = query(results);
-                // If the first query finds no matches, we can discard the edges
                 if (index === 0) {
                     shouldCache = results.length > 0;
                 }
             });
+
             if (results.length > 0) {
                 for (const sideEffect of builder.sideEffects) {
                     sideEffect(results);
                 }
             }
+
+            // Extract at the end for backwards compat
+            if (builder.hasVariables && results.length > 0 && results[0].edge) {
+                results = results.map((r) => r.edge);
+            }
+
             return [results, shouldCache];
         },
+
         enableReactivity: () => {
             if (builder.removeTrigger !== undefined) {
                 return builder;
@@ -131,6 +233,7 @@ const queryBuilder = (g) => {
             );
             return builder;
         },
+
         disableReactivity: () => {
             if (builder.removeTrigger === undefined) {
                 return builder;
@@ -139,6 +242,7 @@ const queryBuilder = (g) => {
             delete builder.removeTrigger;
             return builder;
         },
+
         materialize: () => {
             let partialResults = [];
             let results = [];
@@ -150,7 +254,6 @@ const queryBuilder = (g) => {
                 const prevPartialResults = [...partialResults];
                 try {
                     if (lastHeight > g.edges.length) {
-                        console.log("Graph rollback, recomputing results");
                         lastHeight = g.edges.length;
                         const [newResults] = builder.compute(g.edges);
                         partialResults = [];
@@ -160,32 +263,24 @@ const queryBuilder = (g) => {
                     const unseen = newEdges();
                     if (unseen.length > 0) {
                         lastHeight = g.edges.length;
-                        // We need to process the unseen edges with the partial results
                         const toProcess = partialResults.concat(unseen);
-
                         const [newResults, shouldCache] = builder.compute(
                             toProcess,
                         );
 
                         if (!shouldCache) {
-                            console.log(
-                                "No useful edges, returning cached and discarding unseen",
-                            );
                             return results;
                         }
 
                         if (shouldCache && newResults.length === 0) {
-                            console.log("No results, caching unseen");
                             partialResults = toProcess;
                             return results;
                         }
 
-                        console.log("New results, clearing cache");
                         partialResults = [];
                         results = results.concat(newResults);
                         return results;
                     } else {
-                        console.log("No new edges, returning cached");
                         return results;
                     }
                 } catch (e) {
@@ -196,6 +291,26 @@ const queryBuilder = (g) => {
             };
         },
     };
+
+    // Helper for variable matching
+    function matchField(patternField, edgeField, bindings) {
+        if (patternField === null || patternField === "*") return true;
+
+        if (typeof patternField === "string" && patternField.startsWith("?")) {
+            if (patternField in bindings) {
+                return bindings[patternField] === edgeField;
+            }
+            bindings[patternField] = edgeField;
+            return true;
+        }
+
+        if (Array.isArray(patternField)) {
+            return patternField.includes(edgeField);
+        }
+
+        return patternField === edgeField;
+    }
+
     return builder;
 };
 
@@ -337,16 +452,12 @@ const tx = g.tx();
 ast.insert(tx);
 tx.commit();
 
-const fooValues = g.query()
-    .match("*", "SPELLING?", "FOO")
-    .map(({ source }) =>
-        g.query()
-            .match(source, "VALUE?", "*")
-            .map(({ target }) => target)
-            .run()
-    );
+//const fooValues = g.query()
+//    .match("?x", "SPELLING?", "FOO")
+//.match("?x", "VALUE?", "?value")
+//    .select("?x");
 
-console.log(fooValues.run());
+// console.log(fooValues.run());
 
 g.constraint((builder) => {
     return builder
@@ -361,4 +472,17 @@ g.constraint((builder) => {
         });
 });
 
-console.log(fooValues.run());
+const fooValues = g.query()
+    .match("?x", "SPELLING?", "FOO") // Finds all with SPELLING?=FOO, binds ?x
+    .match("?x", "VALUE?", "?value") // Searches ALL edges for ?x -> VALUE? -> ?value
+    .select("?value")
+    .run();
+
+const blocksWithChildren = g.query()
+    .match("?b", "TYPE?", "BLOCK!")
+    .match("?child", "PARENT?", "?b")
+    .select("?b", "?child")
+    .run();
+
+console.log(fooValues);
+console.log(blocksWithChildren);
