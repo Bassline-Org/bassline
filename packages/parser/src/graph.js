@@ -124,23 +124,21 @@ const queryBuilder = (g) => {
             }
             return [results, shouldCache];
         },
-        isReactive: false,
         enableReactivity: () => {
-            if (builder.isReactive) {
+            if (builder.removeTrigger !== undefined) {
                 return builder;
             }
-            builder.isReactive = true;
             builder.removeTrigger = g.addTrigger(() =>
                 builder.compute(g.edges)
             );
             return builder;
         },
         disableReactivity: () => {
-            if (!builder.isReactive) {
+            if (builder.removeTrigger === undefined) {
                 return builder;
             }
             builder.removeTrigger();
-            builder.isReactive = false;
+            delete builder.removeTrigger;
             return builder;
         },
         materialize: () => {
@@ -153,8 +151,6 @@ const queryBuilder = (g) => {
                 const prevHeight = lastHeight;
                 const prevPartialResults = [...partialResults];
                 try {
-                    console.log("lastHeight: ", lastHeight);
-                    console.log("g.edges.length: ", g.edges.length);
                     if (lastHeight > g.edges.length) {
                         console.log("Graph rollback, recomputing results");
                         lastHeight = g.edges.length;
@@ -195,7 +191,6 @@ const queryBuilder = (g) => {
                         return results;
                     }
                 } catch (e) {
-                    console.error("Error materializing", e);
                     lastHeight = prevHeight;
                     partialResults = prevPartialResults;
                     throw e;
@@ -222,18 +217,17 @@ const createGraph = (edges = []) => {
                     })
                     .enableReactivity()
                     .materialize();
+                g._nodeQuery();
             }
-            return g._nodeQuery();
+            return g._nodes;
         },
         edges,
         constraints: [],
         triggers: [],
         query: () => queryBuilder(g),
         addConstraint: (f) => {
-            console.log("Adding constraint");
             g.constraints.push(f);
             return () => {
-                console.log("Removing constraint");
                 g.constraints = g.constraints.filter((c) => c !== f);
             };
         },
@@ -255,7 +249,6 @@ const createGraph = (edges = []) => {
                 console.error("Constraint not valid on initial state", error);
                 return;
             }
-            console.log("Constraint added");
             return g.addConstraint(() => {
                 constraintQuery();
             });
@@ -316,7 +309,6 @@ const createGraph = (edges = []) => {
                                 change.target,
                             );
                         }
-                        console.log("Running constraints");
                         const valid = g.runConstraints();
                         if (!valid) {
                             console.error(
@@ -324,10 +316,10 @@ const createGraph = (edges = []) => {
                             );
                             commited = false;
                             g.edges = oldEdges;
-                            g.runConstraints();
+                            return false;
                         }
-                        console.log("Constraints passed, running triggers");
                         g.runTriggers();
+                        return true;
                     }
                 },
             };
@@ -451,24 +443,11 @@ let removeConstraint = createConstraint();
 const tx = g.tx()
     .relate("BAR", "PARENT?", "BLOCK!");
 
-console.log("Attempting first commit");
 tx.commit();
-console.log("after first commit: ", barQuery(), "\n\n");
-
-console.log("Attempting second commit");
 g.tx().relate("FOO", "PARENT?", "BLOCK!").commit();
-console.log("after second commit: ", barQuery(), "\n\n");
 
-//console.log("bar: ", barQuery(), "\n\n");
-
-console.log("Removing constraint");
 removeConstraint();
-
-console.log("after removing constraint: ", barQuery(), "\n\n");
-
-console.log("Attempting third commit");
 tx.commit();
-console.log("after third commit: ", barQuery(), "\n\n");
-
-console.log("Creating new constraint");
 removeConstraint = createConstraint();
+
+console.log("Nodes: ", g.nodes.size);
