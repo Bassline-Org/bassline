@@ -435,10 +435,10 @@ const createGraph = (edges = []) => {
                             );
                             commited = false;
                             g.edges = oldEdges;
-                            return false;
+                            return valid;
                         }
                         g.runTriggers();
-                        return true;
+                        return valid;
                     }
                 },
             };
@@ -466,6 +466,7 @@ const fooValues = g.query()
     .match("?id", "SPELLING?", "FOO")
     .match("?id", "VALUE?", "?value")
     .select("?id", "?value")
+    .enableReactivity()
     .addSideEffect((results) => {
         console.log("New foo values", results);
     })
@@ -476,21 +477,25 @@ g.tx().relate(someFoo.id, "SEMANTICS?", "NORMAL").commit();
 
 g.constraint((builder) => {
     return builder
-        .match("?id", "SPELLING?", "FOO")
         .match("?id", "SEMANTICS?", "NORMAL")
+        .match("?id", "SPELLING?", "FOO")
         .select("?id")
         .addSideEffect((results) => {
             const tx = g.tx();
-            console.log(results);
-            for (const { id } of results) {
-                tx.relate(id, "VALUE?", 69);
+            for (const result of results) {
+                tx.relate(result.id, "VALUE?", 69);
             }
-            console.log("Committing foo values");
             tx.commit();
-        });
+        })
+        .materialize();
 });
 
-const otherFoo = fooIds.run()[3];
-g.tx().relate(otherFoo.id, "SEMANTICS?", "NORMAL").commit();
+await new Promise((resolve) => setTimeout(resolve, 1000));
 
-console.log(fooValues());
+{
+    const tx = g.tx();
+    for (const { id } of fooIds.run()) {
+        tx.relate(id, "SEMANTICS?", "NORMAL");
+    }
+    tx.commit();
+}
