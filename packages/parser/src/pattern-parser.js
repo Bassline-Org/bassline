@@ -125,15 +125,41 @@ const tripleBlock = choice([block, emptyBlock]);
 // Pattern separator: | for alternatives
 const patternSep = sequenceOf([ws, char("|"), ws]);
 
-// Pattern spec: triple patterns with | separator for alternatives
+// NAC (Negative Application Condition) pattern: not ?x deleted true
+const nacTriple = sequenceOf([
+  str("not"),
+  ws1,
+  element,
+  ws1,
+  element,
+  ws1,
+  element,
+]).map(([_, __, source, ___, attr, ____, target]) => ({
+  nac: true,
+  triple: [source, attr, target]
+}));
+
+// Either a regular triple or a NAC triple
+const tripleOrNac = choice([
+  nacTriple,
+  triple.map(t => ({ nac: false, triple: t }))
+]);
+
+// Pattern spec: triple patterns with | separator for alternatives, supporting NAC
 const patternSpec = sequenceOf([
   char("["),
   ws,
-  triple,
-  many(sequenceOf([patternSep, triple]).map(([_, t]) => t)),
+  tripleOrNac,
+  many(sequenceOf([patternSep, tripleOrNac]).map(([_, t]) => t)),
   ws,
   char("]"),
-]).map(([_, __, first, rest]) => [first, ...rest]);
+]).map(([_, __, first, rest]) => {
+  const all = [first, ...rest];
+  const patterns = all.filter(p => !p.nac).map(p => p.triple);
+  const nac = all.filter(p => p.nac).map(p => p.triple);
+
+  return { patterns, nac };
+});
 
 // ============================================================================
 // Commands (special word handling like parser.js)
@@ -154,9 +180,10 @@ const queryCommand = sequenceOf([
   str("query"),
   ws,
   patternSpec,
-]).map(([_, __, patterns]) => ({
+]).map(([_, __, spec]) => ({
   type: "query",
-  patterns,
+  patterns: spec.patterns,
+  nac: spec.nac,
 }));
 
 // rule name [match...] -> [produce...]
@@ -170,11 +197,13 @@ const ruleCommand = sequenceOf([
   str("->"),
   ws,
   patternSpec,
-]).map(([_, __, name, ___, match, ____, _____, ______, produce]) => ({
+]).map(([_, __, name, ___, matchSpec, ____, _____, ______, produceSpec]) => ({
   type: "rule",
   name,
-  match,
-  produce,
+  match: matchSpec.patterns,
+  matchNac: matchSpec.nac,
+  produce: produceSpec.patterns,
+  produceNac: produceSpec.nac,
 }));
 
 // pattern name [patterns...]
@@ -184,10 +213,11 @@ const patternCommand = sequenceOf([
   word,
   ws,
   patternSpec,
-]).map(([_, __, name, ___, patterns]) => ({
+]).map(([_, __, name, ___, spec]) => ({
   type: "pattern",
   name,
-  patterns,
+  patterns: spec.patterns,
+  nac: spec.nac,
 }));
 
 // watch [match...] [action...]
@@ -197,10 +227,12 @@ const watchCommand = sequenceOf([
   patternSpec,
   ws,
   patternSpec,
-]).map(([_, __, match, ___, action]) => ({
+]).map(([_, __, matchSpec, ___, actionSpec]) => ({
   type: "watch",
-  match,
-  action,
+  match: matchSpec.patterns,
+  matchNac: matchSpec.nac,
+  action: actionSpec.patterns,
+  actionNac: actionSpec.nac,
 }));
 
 // delete source attr target
@@ -279,6 +311,10 @@ export function parsePatternSpec(input) {
   const result = patternSpec.run(wrapped);
   if (result.isError) {
     throw new Error(`Parse error at position ${result.index}: ${result.error}`);
+  }
+  // For backward compatibility, if no NAC patterns, return just the patterns array
+  if (result.result.nac.length === 0) {
+    return result.result.patterns;
   }
   return result.result;
 }

@@ -99,8 +99,10 @@ export class Graph {
 // ============================================================================
 
 export class Pattern {
-  constructor(spec) {
+  constructor(spec, nacSpec = [], graph = null) {
     this.spec = spec; // [[s,a,t], ...] pattern specification
+    this.nacSpec = nacSpec; // [[s,a,t], ...] NAC patterns (must NOT match)
+    this.graph = graph; // Reference to the graph (for NAC checking)
     this.partial = new Map(); // Map<edgeId, PartialMatch>
     this.complete = []; // Array<CompleteMatch>
     this.onComplete = null; // Callback when pattern matches
@@ -126,11 +128,14 @@ export class Pattern {
       const extended = this.tryExtend(partial, edge);
       if (extended) {
         if (extended.isComplete) {
-          this.complete.push(extended);
-          toRemove.push(id);
-          // Fire callback if registered
-          if (this.onComplete) {
-            this.onComplete(extended.bindings);
+          // Check NAC conditions before accepting as complete
+          if (this.checkNAC(extended.bindings, extended.edges)) {
+            this.complete.push(extended);
+            toRemove.push(id);
+            // Fire callback if registered
+            if (this.onComplete) {
+              this.onComplete(extended.bindings);
+            }
           }
         } else {
           // Add extended partial as new entry
@@ -154,9 +159,12 @@ export class Pattern {
     const started = this.tryStart(edge);
     if (started) {
       if (started.isComplete) {
-        this.complete.push(started);
-        if (this.onComplete) {
-          this.onComplete(started.bindings);
+        // Check NAC conditions before accepting as complete
+        if (this.checkNAC(started.bindings, started.edges)) {
+          this.complete.push(started);
+          if (this.onComplete) {
+            this.onComplete(started.bindings);
+          }
         }
       } else {
         this.partial.set(`start-${edge.id}`, started);
@@ -241,6 +249,53 @@ export class Pattern {
     // Literal match
     return pattern === value;
   }
+
+  /**
+   * Check NAC conditions - returns true if NO nac patterns match
+   * @param {Map} bindings - Current variable bindings
+   * @param {Array} matchedEdges - Edges that were matched (not used anymore)
+   */
+  checkNAC(bindings, matchedEdges) {
+    // If no NAC patterns, always pass
+    if (!this.nacSpec || this.nacSpec.length === 0) {
+      return true;
+    }
+
+    // If no graph reference, can't check NAC (shouldn't happen)
+    if (!this.graph) {
+      return true;
+    }
+
+    // Check each NAC pattern - if ANY match, return false
+    for (const [s, a, t] of this.nacSpec) {
+      // Apply current bindings to the NAC pattern
+      const resolvedS = this.resolveValue(s, bindings);
+      const resolvedA = this.resolveValue(a, bindings);
+      const resolvedT = this.resolveValue(t, bindings);
+
+      // Check if this NAC pattern matches any edge in the graph
+      for (const edge of this.graph.edges) {
+        const nacBindings = new Map(bindings);
+        if (this.matches(edge, resolvedS, resolvedA, resolvedT, nacBindings)) {
+          // NAC pattern matched - this violates the condition
+          return false;
+        }
+      }
+    }
+
+    // No NAC patterns matched - the NAC conditions are satisfied
+    return true;
+  }
+
+  /**
+   * Resolve a value using current bindings
+   */
+  resolveValue(value, bindings) {
+    if (typeof value === "string" && value.startsWith("?") && bindings.has(value)) {
+      return bindings.get(value);
+    }
+    return value;
+  }
 }
 
 // ============================================================================
@@ -251,11 +306,23 @@ export class Pattern {
 Object.assign(Graph.prototype, {
   /**
    * One-shot query - find all current matches
-   * @param {...Array} spec - Pattern specification
+   * @param {...Array} spec - Pattern specification (can be arrays or object with patterns/nac)
    * @returns {Array<Map>} Array of variable bindings
    */
   query(...spec) {
-    const pattern = new Pattern(spec);
+    let patterns, nac;
+
+    // Check if first arg is an object with patterns/nac structure
+    if (spec.length === 1 && spec[0].patterns) {
+      patterns = spec[0].patterns;
+      nac = spec[0].nac || [];
+    } else {
+      // Traditional usage - just pattern arrays
+      patterns = spec;
+      nac = [];
+    }
+
+    const pattern = new Pattern(patterns, nac, this);
 
     // Process all existing edges
     for (const edge of this.edges) {
@@ -268,12 +335,24 @@ Object.assign(Graph.prototype, {
 
   /**
    * Watch for pattern matches (persistent)
-   * @param {Array} spec - Pattern specification
+   * @param {Array} spec - Pattern specification (can be arrays or object with patterns/nac)
    * @param {Function} onMatch - Callback for matches
    * @returns {Function} Unwatch function
    */
   watch(spec, onMatch) {
-    const pattern = new Pattern(spec);
+    let patterns, nac;
+
+    // Check if spec is an object with patterns/nac structure
+    if (spec.patterns) {
+      patterns = spec.patterns;
+      nac = spec.nac || [];
+    } else {
+      // Traditional usage - just pattern arrays
+      patterns = spec;
+      nac = [];
+    }
+
+    const pattern = new Pattern(patterns, nac, this);
     pattern.onComplete = onMatch;
 
     // Process existing edges

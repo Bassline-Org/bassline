@@ -43,13 +43,21 @@ export function executeCommand(graph, command, context = {}) {
     }
 
     case "query": {
-      // Query with triple patterns
-      return graph.query(...command.patterns);
+      // Query with triple patterns and optional NAC
+      if (command.nac && command.nac.length > 0) {
+        return graph.query({ patterns: command.patterns, nac: command.nac });
+      } else {
+        return graph.query(...command.patterns);
+      }
     }
 
     case "pattern": {
-      // Named pattern for watching
-      const unwatch = graph.watch(command.patterns, (bindings) => {
+      // Named pattern for watching with optional NAC
+      const spec = command.nac && command.nac.length > 0
+        ? { patterns: command.patterns, nac: command.nac }
+        : command.patterns;
+
+      const unwatch = graph.watch(spec, (bindings) => {
         // Record match in graph
         const matchId = `match:${Date.now()}:${Math.random()}`;
         graph.add(`pattern:${command.name}`, "MATCHED", matchId);
@@ -65,14 +73,22 @@ export function executeCommand(graph, command, context = {}) {
 
       // Store in context
       if (!context.patterns) context.patterns = new Map();
-      context.patterns.set(command.name, { patterns: command.patterns, unwatch });
+      context.patterns.set(command.name, {
+        patterns: command.patterns,
+        nac: command.nac || [],
+        unwatch
+      });
 
       return command.name;
     }
 
     case "rule": {
-      // Rule: match patterns trigger produce patterns
-      const unwatch = graph.watch(command.match, (bindings) => {
+      // Rule: match patterns trigger produce patterns with optional NAC
+      const matchSpec = command.matchNac && command.matchNac.length > 0
+        ? { patterns: command.match, nac: command.matchNac }
+        : command.match;
+
+      const unwatch = graph.watch(matchSpec, (bindings) => {
         // Apply the rewrite - resolve variables in produce patterns
         for (const [s, a, t] of command.produce) {
           const source = resolve(s, bindings);
@@ -92,7 +108,9 @@ export function executeCommand(graph, command, context = {}) {
       if (!context.rules) context.rules = new Map();
       context.rules.set(command.name, {
         match: command.match,
+        matchNac: command.matchNac || [],
         produce: command.produce,
+        produceNac: command.produceNac || [],
         unwatch
       });
 
@@ -100,8 +118,12 @@ export function executeCommand(graph, command, context = {}) {
     }
 
     case "watch": {
-      // Watch: match patterns trigger action patterns
-      const unwatch = graph.watch(command.match, (bindings) => {
+      // Watch: match patterns trigger action patterns with optional NAC
+      const matchSpec = command.matchNac && command.matchNac.length > 0
+        ? { patterns: command.match, nac: command.matchNac }
+        : command.match;
+
+      const unwatch = graph.watch(matchSpec, (bindings) => {
         // Execute action patterns with bindings
         for (const [s, a, t] of command.action) {
           const source = resolve(s, bindings);
