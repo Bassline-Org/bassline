@@ -16,6 +16,12 @@ export class Graph {
     this.nextId = 0; // Sequential edge IDs for rollback
     this.inBatch = false; // Are we in a batch transaction?
     this.batchEdges = []; // Edges accumulated during batch
+
+    // Selective activation indexes
+    this.sourceIndex = new Map(); // Map<value, Set<Pattern>>
+    this.attrIndex = new Map();   // Map<value, Set<Pattern>>
+    this.targetIndex = new Map(); // Map<value, Set<Pattern>>
+    this.wildcardPatterns = new Set(); // Patterns with ANY wildcard/variable
   }
 
   /**
@@ -45,7 +51,11 @@ export class Graph {
    * @private
    */
   updatePatterns(edge) {
-    for (const pattern of this.patterns) {
+    // Get only patterns that could match this edge
+    const candidates = this.getCandidatePatterns(edge);
+
+    // Update only candidate patterns
+    for (const pattern of candidates) {
       pattern.update(edge);
     }
   }
@@ -91,6 +101,134 @@ export class Graph {
 
       throw error;
     }
+  }
+
+  /**
+   * Register a pattern in the activation indexes
+   * @private
+   */
+  indexPattern(pattern) {
+    // If pattern has any wildcards/variables, add to wildcard set
+    if (pattern.hasWildcardsOrVariables()) {
+      this.wildcardPatterns.add(pattern);
+      return; // Don't index in literal indexes
+    }
+
+    // Pure literal pattern - create composite key for specificity
+    // Index by the COMBINATION of literals to avoid over-activation
+    const { sources, attrs, targets } = pattern.getLiteralValues();
+
+    // Index by most specific field (prefer source > attr > target)
+    // This prevents patterns from being activated by common attributes
+    if (sources.size > 0) {
+      // Index by source (most selective usually)
+      for (const source of sources) {
+        if (!this.sourceIndex.has(source)) {
+          this.sourceIndex.set(source, new Set());
+        }
+        this.sourceIndex.get(source).add(pattern);
+      }
+    } else if (attrs.size > 0) {
+      // No source literals, index by attr
+      for (const attr of attrs) {
+        if (!this.attrIndex.has(attr)) {
+          this.attrIndex.set(attr, new Set());
+        }
+        this.attrIndex.get(attr).add(pattern);
+      }
+    } else if (targets.size > 0) {
+      // Only target literals, index by target
+      for (const target of targets) {
+        if (!this.targetIndex.has(target)) {
+          this.targetIndex.set(target, new Set());
+        }
+        this.targetIndex.get(target).add(pattern);
+      }
+    } else {
+      // No literals at all? Shouldn't happen if hasWildcardsOrVariables() returned false
+      this.wildcardPatterns.add(pattern);
+    }
+  }
+
+  /**
+   * Remove a pattern from activation indexes
+   * @private
+   */
+  unindexPattern(pattern) {
+    // Remove from wildcard patterns
+    this.wildcardPatterns.delete(pattern);
+
+    // Remove from literal indexes
+    const { sources, attrs, targets } = pattern.getLiteralValues();
+
+    for (const source of sources) {
+      const set = this.sourceIndex.get(source);
+      if (set) {
+        set.delete(pattern);
+        if (set.size === 0) {
+          this.sourceIndex.delete(source);
+        }
+      }
+    }
+
+    for (const attr of attrs) {
+      const set = this.attrIndex.get(attr);
+      if (set) {
+        set.delete(pattern);
+        if (set.size === 0) {
+          this.attrIndex.delete(attr);
+        }
+      }
+    }
+
+    for (const target of targets) {
+      const set = this.targetIndex.get(target);
+      if (set) {
+        set.delete(pattern);
+        if (set.size === 0) {
+          this.targetIndex.delete(target);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get patterns that could potentially match this edge
+   * @private
+   */
+  getCandidatePatterns(edge) {
+    const candidates = new Set();
+
+    // Always include wildcard patterns
+    for (const p of this.wildcardPatterns) {
+      candidates.add(p);
+    }
+
+    // Include patterns watching for this specific source
+    const sourcePatterns = this.sourceIndex.get(edge.source);
+    if (sourcePatterns) {
+      for (const p of sourcePatterns) {
+        candidates.add(p);
+      }
+    }
+
+    // Include patterns watching for this specific attr
+    const attrPatterns = this.attrIndex.get(edge.attr);
+    if (attrPatterns) {
+      for (const p of attrPatterns) {
+        candidates.add(p);
+      }
+    }
+
+    // Include patterns watching for this specific target
+    const targetPatterns = this.targetIndex.get(edge.target);
+    if (targetPatterns) {
+      for (const p of targetPatterns) {
+        candidates.add(p);
+      }
+    }
+
+    return candidates;
   }
 }
 
@@ -296,6 +434,57 @@ export class Pattern {
     }
     return value;
   }
+
+  /**
+   * Check if a value is a wildcard or variable
+   * @private
+   */
+  isWildcardOrVariable(value) {
+    if (value === "*" || value === null || value === undefined) {
+      return true;
+    }
+    if (typeof value === "string" && value.startsWith("?")) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Determine if this pattern uses any wildcards or variables
+   * @returns {boolean}
+   */
+  hasWildcardsOrVariables() {
+    for (const [s, a, t] of this.spec) {
+      if (this.isWildcardOrVariable(s)) return true;
+      if (this.isWildcardOrVariable(a)) return true;
+      if (this.isWildcardOrVariable(t)) return true;
+    }
+    // Also check NAC spec
+    for (const [s, a, t] of this.nacSpec) {
+      if (this.isWildcardOrVariable(s)) return true;
+      if (this.isWildcardOrVariable(a)) return true;
+      if (this.isWildcardOrVariable(t)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get all literal values from this pattern's spec
+   * @returns {{ sources: Set, attrs: Set, targets: Set }}
+   */
+  getLiteralValues() {
+    const sources = new Set();
+    const attrs = new Set();
+    const targets = new Set();
+
+    for (const [s, a, t] of this.spec) {
+      if (!this.isWildcardOrVariable(s)) sources.add(s);
+      if (!this.isWildcardOrVariable(a)) attrs.add(a);
+      if (!this.isWildcardOrVariable(t)) targets.add(t);
+    }
+
+    return { sources, attrs, targets };
+  }
 }
 
 // ============================================================================
@@ -363,11 +552,15 @@ Object.assign(Graph.prototype, {
     // Register for future updates
     this.patterns.push(pattern);
 
+    // Register pattern in activation indexes
+    this.indexPattern(pattern);
+
     // Return unwatch function
     return () => {
       const idx = this.patterns.indexOf(pattern);
       if (idx >= 0) {
         this.patterns.splice(idx, 1);
+        this.unindexPattern(pattern); // Remove from indexes
       }
     };
   },
