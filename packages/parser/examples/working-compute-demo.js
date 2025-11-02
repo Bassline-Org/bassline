@@ -8,7 +8,7 @@
 import { Graph } from "../src/minimal-graph.js";
 import { parsePattern } from "../src/pattern-parser.js";
 import { createContext, executeProgram } from "../src/pattern-words.js";
-import { installCompute } from "../extensions/compute-v2.js";
+import { installCompute, getCurrentResultViaQuery } from "../extensions/compute-v2.js";
 
 const graph = new Graph();
 const context = createContext(graph);
@@ -232,20 +232,19 @@ executeProgram(graph, ast, context);
 await new Promise((resolve) => setTimeout(resolve, 10));
 
 console.log("Aggregation results:");
-const sumResult = graph.query(["AGG:SUM1", "RESULT", "?R"]);
-if (sumResult.length > 0) {
-  // Get the latest result (last one) for incremental aggregation
-  console.log(`  sum([10, 20, 30, 40]) = ${sumResult[sumResult.length - 1].get("?R")}`);
+const sumResult = getCurrentResultViaQuery(graph, "AGG:SUM1");
+if (sumResult !== null) {
+  console.log(`  sum([10, 20, 30, 40]) = ${sumResult}`);
 }
 
-const avgResult = graph.query(["AGG:AVG1", "RESULT", "?R"]);
-if (avgResult.length > 0) {
-  console.log(`  avg([5, 10, 15, 20]) = ${avgResult[avgResult.length - 1].get("?R")}`);
+const avgResult = getCurrentResultViaQuery(graph, "AGG:AVG1");
+if (avgResult !== null) {
+  console.log(`  avg([5, 10, 15, 20]) = ${avgResult}`);
 }
 
-const minResult = graph.query(["AGG:MINMAX", "RESULT", "?R"]);
-if (minResult.length > 0) {
-  console.log(`  min([42, 17, 99, 3]) = ${minResult[minResult.length - 1].get("?R")}`);
+const minResult = getCurrentResultViaQuery(graph, "AGG:MINMAX");
+if (minResult !== null) {
+  console.log(`  min([42, 17, 99, 3]) = ${minResult}`);
 }
 
 // ============================================================================
