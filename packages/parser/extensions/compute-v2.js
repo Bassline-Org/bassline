@@ -141,105 +141,97 @@ export function installCompute(graph) {
   // Aggregations - truly incremental with refinement pattern
   // All state stored in the graph itself via versioned edges
 
-  // Track version counters per aggregation to handle concurrent watchers
-  const versionCounters = new Map();
+  // Track aggregation state and watchers
+  const aggregationStates = new Map();
+  const aggregationWatchers = new Map();
 
-  // Watch for new items being added to aggregations
-  graph.watch([["?A", "ITEM", "?V"]], (bindings) => {
+  // When an AGGREGATE edge is added, set up a specific watcher for that aggregation's items
+  graph.watch([["?A", "AGGREGATE", "?OP"]], (bindings) => {
     const aggId = bindings.get("?A");
-    const value = bindings.get("?V");
+    const op = bindings.get("?OP").toString();
 
-    // Check if this entity has an AGGREGATE type
-    const aggTypeResults = graph.query([aggId, "AGGREGATE", "?OP"]);
-    if (aggTypeResults.length === 0) return;
-
-    const op = aggTypeResults[0].get("?OP").toString();
-    const num = typeof value === 'number' ? value : parseFloat(value);
-    if (isNaN(num)) return;
-
-    // Get and increment version counter atomically
-    const versionKey = `${aggId}:VERSION`;
-
-    if (!versionCounters.has(aggId)) {
-      // Initialize from graph if this is the first time
-      const versionResults = graph.query([versionKey, "CURRENT", "?V"]);
-      const currentVersion = versionResults.length > 0 ? parseInt(versionResults[0].get("?V")) : 0;
-      versionCounters.set(aggId, currentVersion);
+    // Skip if we already have a watcher for this aggregation
+    if (aggregationWatchers.has(aggId)) {
+      return;
     }
 
-    const currentVersion = versionCounters.get(aggId);
-    const newVersion = currentVersion + 1;
-    versionCounters.set(aggId, newVersion);
+    // Initialize state for this aggregation
+    aggregationStates.set(aggId, {
+      version: 0,
+      sum: 0,
+      count: 0,
+      min: Infinity,
+      max: -Infinity,
+      op: op
+    });
 
-    // Get previous state (if exists)
-    let prevSum = 0, prevCount = 0, prevMin = Infinity, prevMax = -Infinity;
+    // Set up a specific watcher for THIS aggregation's items
+    const unwatch = graph.watch([[aggId, "ITEM", "?V"]], (itemBindings) => {
+      const value = itemBindings.get("?V");
+      const num = typeof value === 'number' ? value : parseFloat(value);
+      if (isNaN(num)) return;
 
-    if (currentVersion > 0) {
-      const prevStateKey = `${aggId}:STATE:V${currentVersion}`;
+      // Get current state for this specific aggregation
+      const state = aggregationStates.get(aggId);
 
-      const sumResults = graph.query([prevStateKey, "SUM", "?S"]);
-      if (sumResults.length > 0) prevSum = parseFloat(sumResults[0].get("?S"));
+      // Update version
+      state.version++;
+      const newVersion = state.version;
 
-      const countResults = graph.query([prevStateKey, "COUNT", "?C"]);
-      if (countResults.length > 0) prevCount = parseInt(countResults[0].get("?C"));
+      // Update state
+      state.sum += num;
+      state.count++;
+      state.min = Math.min(state.min, num);
+      state.max = Math.max(state.max, num);
 
-      const minResults = graph.query([prevStateKey, "MIN", "?M"]);
-      if (minResults.length > 0) prevMin = parseFloat(minResults[0].get("?M"));
+      // Compute result based on operation
+      let result;
+      switch (op) {
+        case 'SUM':
+          result = state.sum;
+          break;
+        case 'AVG':
+          result = state.sum / state.count;
+          break;
+        case 'MIN':
+          result = state.min === Infinity ? num : state.min;
+          break;
+        case 'MAX':
+          result = state.max === -Infinity ? num : state.max;
+          break;
+        case 'COUNT':
+          result = state.count;
+          break;
+        default:
+          return;
+      }
 
-      const maxResults = graph.query([prevStateKey, "MAX", "?X"]);
-      if (maxResults.length > 0) prevMax = parseFloat(maxResults[0].get("?X"));
-    }
+      // Create versioned keys
+      const newResultKey = `${aggId}:RESULT:V${newVersion}`;
+      const newStateKey = `${aggId}:STATE:V${newVersion}`;
+      const prevResultKey = newVersion > 1 ? `${aggId}:RESULT:V${newVersion - 1}` : null;
 
-    // Calculate new state
-    const newSum = prevSum + num;
-    const newCount = prevCount + 1;
-    const newMin = Math.min(prevMin, num);
-    const newMax = Math.max(prevMax, num);
+      // Add new result
+      graph.add(aggId, newResultKey, result);
 
-    // Compute result based on operation
-    let result;
-    switch (op) {
-      case 'SUM':
-        result = newSum;
-        break;
-      case 'AVG':
-        result = newSum / newCount;
-        break;
-      case 'MIN':
-        result = newMin === Infinity ? num : newMin;
-        break;
-      case 'MAX':
-        result = newMax === -Infinity ? num : newMax;
-        break;
-      case 'COUNT':
-        result = newCount;
-        break;
-      default:
-        return;
-    }
+      // Add new state to graph (for persistence/debugging)
+      graph.add(newStateKey, "SUM", state.sum);
+      graph.add(newStateKey, "COUNT", state.count);
+      graph.add(newStateKey, "MIN", state.min === Infinity ? num : state.min);
+      graph.add(newStateKey, "MAX", state.max === -Infinity ? num : state.max);
 
-    // Create versioned keys
-    const newResultKey = `${aggId}:RESULT:V${newVersion}`;
-    const newStateKey = `${aggId}:STATE:V${newVersion}`;
-    const prevResultKey = currentVersion > 0 ? `${aggId}:RESULT:V${currentVersion}` : null;
+      // Mark as refining previous result (if exists)
+      if (prevResultKey) {
+        graph.add(newResultKey, "REFINES", prevResultKey);
+      }
 
-    // Add edges directly (watchers already run in transaction context)
-    // Add new result
-    graph.add(aggId, newResultKey, result);
+      // Update version marker
+      const versionKey = `${aggId}:VERSION`;
+      graph.add(versionKey, "CURRENT", newVersion);
+    });
 
-    // Add new state
-    graph.add(newStateKey, "SUM", newSum);
-    graph.add(newStateKey, "COUNT", newCount);
-    graph.add(newStateKey, "MIN", newMin === Infinity ? num : newMin);
-    graph.add(newStateKey, "MAX", newMax === -Infinity ? num : newMax);
-
-    // Mark as refining previous result (if exists)
-    if (prevResultKey) {
-      graph.add(newResultKey, "REFINES", prevResultKey);
-    }
-
-    // Update version marker
-    graph.add(versionKey, "CURRENT", newVersion);
+    // Store the unwatch function so we can clean up if needed
+    aggregationWatchers.set(aggId, unwatch);
   });
 }
 
