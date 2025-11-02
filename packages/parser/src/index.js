@@ -1,2 +1,2 @@
-export { parse } from "./parser.js";
-export { CELLS, TYPES } from "./data.js";
+export { parse } from "./ogBassline/parser.js";
+export { CELLS, TYPES } from "./ogBassline/data.js";

@@ -68,8 +68,14 @@ export function executeCommand(graph, command, context = {}) {
         });
       });
 
-      // Store pattern metadata
-      graph.add(`pattern:${command.name}`, "ACTIVE", true);
+      // Register pattern as triples for self-description
+      const patternId = `pattern:${command.name}`;
+      graph.add(patternId, "type", "pattern");
+      graph.add(patternId, "match", JSON.stringify(command.patterns));
+      if (command.nac && command.nac.length > 0) {
+        graph.add(patternId, "nac", JSON.stringify(command.nac));
+      }
+      graph.add(patternId, "status", "active");
 
       // Store in context
       if (!context.patterns) context.patterns = new Map();
@@ -101,8 +107,18 @@ export function executeCommand(graph, command, context = {}) {
         graph.add(`rule:${command.name}`, "FIRED", Date.now());
       });
 
-      // Store rule metadata
-      graph.add(`rule:${command.name}`, "ACTIVE", true);
+      // Register rule as triples for self-description
+      const ruleId = `rule:${command.name}`;
+      graph.add(ruleId, "type", "rule");
+      graph.add(ruleId, "match", JSON.stringify(command.match));
+      if (command.matchNac && command.matchNac.length > 0) {
+        graph.add(ruleId, "match-nac", JSON.stringify(command.matchNac));
+      }
+      graph.add(ruleId, "produce", JSON.stringify(command.produce));
+      if (command.produceNac && command.produceNac.length > 0) {
+        graph.add(ruleId, "produce-nac", JSON.stringify(command.produceNac));
+      }
+      graph.add(ruleId, "status", "active");
 
       // Store in context
       if (!context.rules) context.rules = new Map();

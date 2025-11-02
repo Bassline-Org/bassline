@@ -74,8 +74,8 @@ const litWord = sequenceOf([
 // Wildcard: * (direct, not as lit-word)
 const wildcard = char("*").map(() => "*");
 
-// Word: alice, type, person
-const word = regex(/^[a-zA-Z][a-zA-Z0-9_\-?!]*/).map(w => w.toUpperCase());
+// Word: alice, type, person, compute:1, rule:name
+const word = regex(/^[a-zA-Z][a-zA-Z0-9_\-?!:]*/).map(w => w.toUpperCase());
 
 // Any value element
 const element = choice([number, string, patternVar, wildcard, litWord, word]);
