@@ -93,11 +93,30 @@ const triple = sequenceOf([
   element,
 ]).map(([source, _, attr, __, target]) => [source, attr, target]);
 
-// Multiple triples (for blocks)
+// Object syntax: source { attr1 target1 attr2 target2 ... }
+// Expands to multiple triples with same source
+const objectTriples = sequenceOf([
+  element,
+  ws,
+  char("{"),
+  ws,
+  many(sequenceOf([element, ws1, element, ws]).map(([a, _, t]) => [a, t])),
+  char("}"),
+]).map(([source, _, __, ___, pairs]) =>
+  pairs.map(([attr, target]) => [source, attr, target])
+);
+
+// Either a single triple or object syntax
+const tripleOrObject = choice([
+  objectTriples,  // Returns array of triples
+  triple.map(t => [t])  // Wrap single triple in array for consistency
+]);
+
+// Multiple triples or objects
 const triples = sequenceOf([
-  triple,
-  many(sequenceOf([ws, triple]).map(([_, t]) => t)),
-]).map(([first, rest]) => [first, ...rest]);
+  tripleOrObject,
+  many(sequenceOf([ws, tripleOrObject]).map(([_, t]) => t)),
+]).map(([first, rest]) => first.concat(...rest));  // Flatten arrays
 
 // Block of triples: [alice type person ...]
 const block = sequenceOf([
@@ -122,9 +141,6 @@ const tripleBlock = choice([block, emptyBlock]);
 // Pattern Specifications (for queries and rules)
 // ============================================================================
 
-// Pattern separator: | for alternatives
-const patternSep = sequenceOf([ws, char("|"), ws]);
-
 // NAC (Negative Application Condition) pattern: not ?x deleted true
 const nacTriple = sequenceOf([
   str("not"),
@@ -136,27 +152,52 @@ const nacTriple = sequenceOf([
   element,
 ]).map(([_, __, source, ___, attr, ____, target]) => ({
   nac: true,
-  triple: [source, attr, target]
+  triples: [[source, attr, target]]
 }));
 
-// Either a regular triple or a NAC triple
-const tripleOrNac = choice([
+// NAC with object syntax: not source { attr target ... }
+const nacObject = sequenceOf([
+  str("not"),
+  ws1,
+  element,
+  ws,
+  char("{"),
+  ws,
+  many(sequenceOf([element, ws1, element, ws]).map(([a, _, t]) => [a, t])),
+  char("}"),
+]).map(([_, __, source, ___, ____, _____, pairs]) => ({
+  nac: true,
+  triples: pairs.map(([attr, target]) => [source, attr, target])
+}));
+
+// Pattern element: regular triple/object or NAC
+const patternElement = choice([
+  nacObject,
   nacTriple,
-  triple.map(t => ({ nac: false, triple: t }))
+  objectTriples.map(ts => ({ nac: false, triples: ts })),
+  triple.map(t => ({ nac: false, triples: [t] }))
 ]);
 
-// Pattern spec: triple patterns with | separator for alternatives, supporting NAC
+// Pattern spec: sequence of pattern elements
 const patternSpec = sequenceOf([
   char("["),
   ws,
-  tripleOrNac,
-  many(sequenceOf([patternSep, tripleOrNac]).map(([_, t]) => t)),
+  patternElement,
+  many(sequenceOf([ws, patternElement]).map(([_, p]) => p)),
   ws,
   char("]"),
 ]).map(([_, __, first, rest]) => {
   const all = [first, ...rest];
-  const patterns = all.filter(p => !p.nac).map(p => p.triple);
-  const nac = all.filter(p => p.nac).map(p => p.triple);
+  const patterns = [];
+  const nac = [];
+
+  for (const elem of all) {
+    if (elem.nac) {
+      nac.push(...elem.triples);
+    } else {
+      patterns.push(...elem.triples);
+    }
+  }
 
   return { patterns, nac };
 });

@@ -277,54 +277,59 @@ We've successfully built the minimal core that proves **everything is incrementa
 
 ## Session 3: Pattern DSL Integration
 
-### What We Built
-We successfully integrated the minimal graph runtime with the Bassline parser:
+### Complete Rewrite as Tokenizer
+Following feedback that the parser was "poorly implemented using ad hoc regex," we completely redesigned it as a tokenizer that outputs simple triple arrays with semantics in the runtime.
 
-1. **pattern-words.js** (~290 lines)
-   - Integrated directly with existing parser infrastructure
-   - Uses Rebol-like syntax (`:word` for variables, `'*` for wildcards)
-   - Provides pattern, rule, fact, query, watch, delete words
-   - Maintains compatibility with existing Bassline data types
+1. **pattern-parser.js** (~335 lines)
+   - Pure tokenizer approach - identifies structures
+   - Everything compiles to [source, attr, target] triples
+   - Native `?variable` syntax for pattern matching
+   - Semicolon comments: `; this is a comment`
+   - Block facts: `fact [alice type person | bob age 30]`
+   - NAC support: `not ?x deleted true`
 
-2. **pattern-cookbook.js** (~400 lines)
-   - Library of semantic patterns (deletion, counting, indexing, etc.)
-   - Shows how "missing" features emerge from patterns
-   - Demonstrates meta-patterns and constraints
-   - Provides reusable pattern templates
+2. **pattern-words.js** (~200 lines)
+   - Runtime bridge to minimal-graph.js
+   - Executes commands from parser
+   - Handles facts, queries, rules, patterns
+   - NAC integration for deletion patterns
+   - Context management for active patterns/rules
 
-3. **pattern-words.test.js** (11 passing tests)
-   - Tests pattern definition and matching
-   - Tests rule creation and firing
-   - Tests integration with parser data types
-   - Validates variable binding and wildcards
+3. **NAC_IMPLEMENTATION.md**
+   - Documents Negative Application Conditions
+   - Shows deletion via tombstones + NAC
+   - Maintains monotonicity in append-only system
+   - Examples for orphan detection, uniqueness
 
-4. **semantic-evaluation.js** (Example)
-   - Demonstrates language evaluation using patterns
-   - Shows cascading rules for semantic analysis
-   - Implements meta-circular patterns
-   - Real-world usage example
+4. **compute-demo.js** (NEW)
+   - Demonstrates computation emerging from patterns
+   - No expression syntax needed!
+   - Shows arithmetic, aggregation, comparison via patterns
+   - Compute gadgets watch patterns and emit results
+   - Everything stays as triples
 
 ### Key Design Decisions
 
-1. **Parser Integration Over New DSL**
-   - Reused existing parser infrastructure
-   - Leveraged Rebol-like word types for pattern syntax
-   - `:word` becomes `?variable` in patterns
-   - `'word` can be wildcards or literals
-   - Maintains language consistency
+1. **Tokenizer Philosophy**
+   - Parser is "little more than a tokenizer"
+   - Identifies structures, runtime provides semantics
+   - Direct output of triple arrays
+   - No complex AST, no ad hoc data structures
+   - Clean separation of syntax and execution
 
 2. **Everything as Patterns**
-   - Deletion: Tombstone patterns
-   - Negation: Absence checking patterns
-   - Aggregation: Incremental counting patterns
-   - Indexes: Grouped result patterns
-   - Constraints: Patterns that throw
+   - Deletion: Tombstone + NAC patterns
+   - Computation: Pattern requests + compute gadgets
+   - Aggregation: Patterns identify items to aggregate
+   - Indexes: Incremental queries over the graph
+   - All operations are graph rewriting
 
-3. **Meta-Circular Capabilities**
-   - Patterns stored in the graph
-   - Patterns that create patterns
-   - Self-describing rule system
-   - Complete homoiconicity achieved
+3. **No Expression Syntax**
+   - Computation emerges from patterns
+   - Compute requests are triples
+   - Results are edges in the graph
+   - External compute gadgets watch and respond
+   - Maintains purity of triple model
 
 ### Performance & Architecture
 
