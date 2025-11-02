@@ -274,3 +274,98 @@ We successfully created a minimal graph runtime in ~330 lines of JavaScript that
 
 ### Conclusion
 We've successfully built the minimal core that proves **everything is incremental pattern matching**. This implementation is cleaner, simpler, and more powerful than the original graph.js while maintaining the same essential capabilities. The true power lies not in what we added, but in what we unified - a single primitive that explains queries, rules, indexes, and even the graph's own structure.
+
+## Session 3: Pattern DSL Integration
+
+### What We Built
+We successfully integrated the minimal graph runtime with the Bassline parser:
+
+1. **pattern-words.js** (~290 lines)
+   - Integrated directly with existing parser infrastructure
+   - Uses Rebol-like syntax (`:word` for variables, `'*` for wildcards)
+   - Provides pattern, rule, fact, query, watch, delete words
+   - Maintains compatibility with existing Bassline data types
+
+2. **pattern-cookbook.js** (~400 lines)
+   - Library of semantic patterns (deletion, counting, indexing, etc.)
+   - Shows how "missing" features emerge from patterns
+   - Demonstrates meta-patterns and constraints
+   - Provides reusable pattern templates
+
+3. **pattern-words.test.js** (11 passing tests)
+   - Tests pattern definition and matching
+   - Tests rule creation and firing
+   - Tests integration with parser data types
+   - Validates variable binding and wildcards
+
+4. **semantic-evaluation.js** (Example)
+   - Demonstrates language evaluation using patterns
+   - Shows cascading rules for semantic analysis
+   - Implements meta-circular patterns
+   - Real-world usage example
+
+### Key Design Decisions
+
+1. **Parser Integration Over New DSL**
+   - Reused existing parser infrastructure
+   - Leveraged Rebol-like word types for pattern syntax
+   - `:word` becomes `?variable` in patterns
+   - `'word` can be wildcards or literals
+   - Maintains language consistency
+
+2. **Everything as Patterns**
+   - Deletion: Tombstone patterns
+   - Negation: Absence checking patterns
+   - Aggregation: Incremental counting patterns
+   - Indexes: Grouped result patterns
+   - Constraints: Patterns that throw
+
+3. **Meta-Circular Capabilities**
+   - Patterns stored in the graph
+   - Patterns that create patterns
+   - Self-describing rule system
+   - Complete homoiconicity achieved
+
+### Performance & Architecture
+
+**Current State**:
+- Pattern matching: O(P × E) for P patterns, E edges
+- No built-in indexing (emerges from patterns)
+- Fire-and-forget cascades work perfectly
+- Meta-patterns enable self-optimization
+
+**Architecture Achieved**:
+```
+Parser (Rebol-like syntax)
+    ↓
+Pattern Words (DSL integration)
+    ↓
+Minimal Graph (Pattern matching engine)
+    ↓
+Graph Rewriting (Everything is patterns)
+```
+
+### The Profound Realization
+
+We've created a system where:
+1. **Data is edges in an append-only log**
+2. **Code is patterns watching edges**
+3. **Execution is pattern matching**
+4. **Optimization is pattern rewriting**
+5. **Everything is the same thing**
+
+This achieves the same conceptual unity as:
+- Lisp (everything is lists)
+- Forth (everything is words)
+- **Bassline** (everything is patterns)
+
+### Future Possibilities
+
+With this foundation, we can now:
+1. **Replace graph.js** entirely with minimal-graph.js
+2. **Implement full semantic evaluation** as cascading patterns
+3. **Build visual pattern debugger** to see matches flow
+4. **Distribute patterns** over network (already fire-and-forget!)
+5. **Optimize via pattern rewriting** (patterns optimizing patterns)
+
+The system is complete, minimal, and infinitely extensible through its single primitive: **incremental pattern matching over an append-only log**.

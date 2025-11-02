@@ -12,22 +12,22 @@ import {
 import { CELLS as c } from "./data.js";
 
 // ===== Comments and Whitespace =====
-const comment = sequenceOf([
+export const comment = sequenceOf([
     char(";"),
     regex(/^[^\n]*/),
 ]).map(() => null);
 
-const ws = many(
+export const ws = many(
     choice([whitespace.map(() => null), comment]),
 ).map(() => null);
 
 // ===== Numbers =====
-const number = choice([
+export const number = choice([
     digits.map((int) => c.number(Number(int))),
 ]).errorMap(() => "Expected number");
 
 // ===== Strings =====
-const escapeSequence = sequenceOf([char("\\"), regex(/^./)]).map(
+export const escapeSequence = sequenceOf([char("\\"), regex(/^./)]).map(
     ([_, escaped]) => {
         if (escaped === "n") return "\n";
         if (escaped === "t") return "\t";
@@ -38,12 +38,12 @@ const escapeSequence = sequenceOf([char("\\"), regex(/^./)]).map(
     },
 );
 
-const stringChar = choice([
+export const stringChar = choice([
     escapeSequence,
     regex(/^[^"\\]/),
 ]);
 
-const stringLiteral = sequenceOf([
+export const stringLiteral = sequenceOf([
     char('"'),
     many(stringChar),
     char('"'),
@@ -52,50 +52,50 @@ const stringLiteral = sequenceOf([
 
 // ===== Words =====
 // Word characters (allow everything except whitespace and delimiters)
-const wordChars = regex(/^[^ \t\n\r\[\](){}";:']+/);
+export const wordChars = regex(/^[^ \t\n\r\[\](){}";:']+/);
 
-const getWord = sequenceOf([
+export const getWord = sequenceOf([
     char(":"),
     wordChars,
 ]).map(([_, spelling]) => c.getWord(spelling))
     .errorMap(() => "Expected get word");
 
 // 'word (literal word)
-const litWord = sequenceOf([
+export const litWord = sequenceOf([
     char("'"),
     wordChars,
 ]).map(([_, spelling]) => c.litWord(spelling))
     .errorMap(() => "Expected literal word");
 
 // word:
-const setWord = sequenceOf([
+export const setWord = sequenceOf([
     wordChars,
     char(":"),
 ]).map(([spelling, _]) => c.setWord(spelling))
     .errorMap(() => "Expected set word");
 
 // word
-const normalWord = sequenceOf([
+export const normalWord = sequenceOf([
     wordChars,
 ]).map(([spelling]) => c.word(spelling))
     .errorMap(() => "Expected normal word");
 
-const word = choice([litWord, getWord, setWord, normalWord]);
+export const word = choice([litWord, getWord, setWord, normalWord]);
 
 // ===== URI Parsing (RFC 3986 compliant) =====
 // URI structure: scheme://[userinfo@]host[:port][/path][?query][#fragment]
 
 // Scheme: must start with letter, followed by letters, digits, +, -, or .
-const uriScheme = regex(/^[a-zA-Z][a-zA-Z0-9+.-]*/);
+export const uriScheme = regex(/^[a-zA-Z][a-zA-Z0-9+.-]*/);
 
 // Userinfo: optional username[:password] before @ (we'll capture everything before @)
-const uriUserinfo = regex(/^[^@\/\s]+/);
+export const uriUserinfo = regex(/^[^@\/\s]+/);
 
 // Host: domain name or IP address
 // Domain: alphanumeric and hyphens, dots for subdomains
 // IPv4: four groups of 1-3 digits
 // IPv6: enclosed in square brackets (simplified pattern)
-const uriHost = choice([
+export const uriHost = choice([
     // IPv6 in brackets
     sequenceOf([
         char("["),
@@ -109,29 +109,29 @@ const uriHost = choice([
 ]);
 
 // Port: optional colon followed by digits
-const uriPort = sequenceOf([
+export const uriPort = sequenceOf([
     char(":"),
     digits,
 ]).map(([_, port]) => port);
 
 // Path: everything until ? or # or delimiter
 // Exclude whitespace and our language delimiters: [ ] ( ) { } " ;
-const uriPath = regex(/^[^?#\s\[\](){}";]*/);
+export const uriPath = regex(/^[^?#\s\[\](){}";]*/);
 
 // Query: everything after ? until # or delimiter
-const uriQuery = sequenceOf([
+export const uriQuery = sequenceOf([
     char("?"),
     regex(/^[^#\s\[\](){}";]*/),
 ]).map(([_, query]) => query);
 
 // Fragment: everything after # until delimiter
-const uriFragment = sequenceOf([
+export const uriFragment = sequenceOf([
     char("#"),
     regex(/^[^\s\[\](){}";]*/),
 ]).map(([_, fragment]) => fragment);
 
 // Authority: [userinfo@]host[:port]
-const uriAuthority = sequenceOf([
+export const uriAuthority = sequenceOf([
     // Optional userinfo@
     choice([
         sequenceOf([
@@ -151,7 +151,7 @@ const uriAuthority = sequenceOf([
 ]).map(([userinfo, host, port]) => ({ userinfo, host, port }));
 
 // Full URL parser
-const uriParser = sequenceOf([
+export const uriParser = sequenceOf([
     // Scheme is required
     sequenceOf([uriScheme, char(":")]).map(([scheme, _]) => scheme),
     // Authority with // prefix (optional for some schemes like mailto:)
@@ -214,10 +214,10 @@ const uriParser = sequenceOf([
     .errorMap(() => "Expected URI");
 
 // Forward declare for recursion
-const value = recursiveParser(() => valueParser);
+export const value = recursiveParser(() => valueParser);
 
 // ===== Blocks =====
-const blockParser = sequenceOf([
+export const blockParser = sequenceOf([
     char("["),
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
@@ -226,7 +226,7 @@ const blockParser = sequenceOf([
     .errorMap(() => "Expected block");
 
 // ===== Parens =====
-const parenParser = sequenceOf([
+export const parenParser = sequenceOf([
     char("("),
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
@@ -234,7 +234,7 @@ const parenParser = sequenceOf([
 ]).map(([_, __, items, ___]) => c.paren(items))
     .errorMap(() => "Expected paren");
 
-const valueParser = choice([
+export const valueParser = choice([
     number,
     stringLiteral,
     blockParser,
@@ -244,7 +244,7 @@ const valueParser = choice([
 ]);
 
 // ===== Program =====
-const program = sequenceOf([
+export const program = sequenceOf([
     ws,
     many(sequenceOf([value, ws]).map(([v, _]) => v)),
     endOfInput,

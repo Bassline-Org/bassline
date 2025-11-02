@@ -11,9 +11,9 @@
 
 export class Graph {
   constructor() {
-    this.edges = [];      // Append-only log of edges
-    this.patterns = [];   // Active patterns watching for matches
-    this.nextId = 0;      // Sequential edge IDs for rollback
+    this.edges = []; // Append-only log of edges
+    this.patterns = []; // Active patterns watching for matches
+    this.nextId = 0; // Sequential edge IDs for rollback
     this.inBatch = false; // Are we in a batch transaction?
     this.batchEdges = []; // Edges accumulated during batch
   }
@@ -100,10 +100,10 @@ export class Graph {
 
 export class Pattern {
   constructor(spec) {
-    this.spec = spec;           // [[s,a,t], ...] pattern specification
-    this.partial = new Map();   // Map<edgeId, PartialMatch>
-    this.complete = [];         // Array<CompleteMatch>
-    this.onComplete = null;     // Callback when pattern matches
+    this.spec = spec; // [[s,a,t], ...] pattern specification
+    this.partial = new Map(); // Map<edgeId, PartialMatch>
+    this.complete = []; // Array<CompleteMatch>
+    this.onComplete = null; // Callback when pattern matches
   }
 
   /**
@@ -177,7 +177,7 @@ export class Pattern {
           matched: [i],
           bindings,
           edges: [edge],
-          isComplete: this.spec.length === 1
+          isComplete: this.spec.length === 1,
         };
       }
     }
@@ -201,7 +201,7 @@ export class Pattern {
           matched,
           bindings,
           edges: [...partial.edges, edge],
-          isComplete: matched.length === this.spec.length
+          isComplete: matched.length === this.spec.length,
         };
       }
     }
@@ -213,8 +213,8 @@ export class Pattern {
    */
   matches(edge, s, a, t, bindings) {
     return this.matchField(edge.source, s, bindings) &&
-           this.matchField(edge.attr, a, bindings) &&
-           this.matchField(edge.target, t, bindings);
+      this.matchField(edge.attr, a, bindings) &&
+      this.matchField(edge.target, t, bindings);
   }
 
   /**
@@ -263,7 +263,7 @@ Object.assign(Graph.prototype, {
     }
 
     // Return bindings from complete matches
-    return pattern.complete.map(match => match.bindings);
+    return pattern.complete.map((match) => match.bindings);
   },
 
   /**
@@ -291,7 +291,7 @@ Object.assign(Graph.prototype, {
         this.patterns.splice(idx, 1);
       }
     };
-  }
+  },
 });
 
 // ============================================================================
