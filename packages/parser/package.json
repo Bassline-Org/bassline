@@ -9,7 +9,10 @@
         "./graph": "./src/minimal-graph.js",
         "./parser": "./src/pattern-parser.js",
         "./runtime": "./src/pattern-words.js",
+        "./interactive": "./src/interactive-runtime.js",
+        "./format": "./src/format-results.js",
         "./compute": "./extensions/compute.js",
+        "./aggregation": "./extensions/aggregation/index.js",
         "./legacy": "./src/index.js"
     },
     "dependencies": {
