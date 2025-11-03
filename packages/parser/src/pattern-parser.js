@@ -8,6 +8,7 @@
  */
 
 import {
+  anyChar,
   char,
   choice,
   digits,
@@ -48,12 +49,27 @@ const number = sequenceOf([
   possibly(regex(/^\.\d+/)),
 ]).map(([sign, whole, decimal]) => Number(sign + whole + (decimal || "")));
 
-// String: "hello world"
+// String: "hello world" with escape sequences
+// Character inside string: either non-special char OR backslash + any char
+const stringChar = choice([
+  regex(/^[^"\\]/u),  // Any char except quote and backslash (Unicode-aware for emojis)
+  sequenceOf([char('\\'), anyChar]).map(([slash, c]) => slash + c)  // Escape sequence
+]);
+
 const string = sequenceOf([
   char('"'),
-  regex(/^[^"]*/),
+  many(stringChar),
   char('"'),
-]).map(([_, content]) => content);
+]).map(([_, chars, __]) => {
+  const content = chars.join('');
+  // Unescape standard escape sequences
+  return content
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\r/g, '\r');
+});
 
 // Pattern variable: ?x, ?who, ?thing-lovers
 const patternVar = sequenceOf([

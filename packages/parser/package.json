@@ -18,7 +18,8 @@
       "arcsecond": "^5.0.0"
     },
     "scripts": {
-      "test": "vitest run"
+      "test": "vitest run",
+      "web-example": "node examples/web/server.js"
      },
     "license": "MIT"
   }
