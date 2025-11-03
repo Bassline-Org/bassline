@@ -564,6 +564,50 @@ Object.assign(Graph.prototype, {
       }
     };
   },
+
+  /**
+   * Query and return results as a new Graph
+   * This enables query composition - the result is itself queryable
+   * @param {...Array} spec - Pattern specification
+   * @returns {Graph} New graph containing edges that matched the pattern
+   */
+  queryAsGraph(...spec) {
+    let patterns, nac;
+
+    // Check if first arg is an object with patterns/nac structure
+    if (spec.length === 1 && spec[0].patterns) {
+      patterns = spec[0].patterns;
+      nac = spec[0].nac || [];
+    } else {
+      // Traditional usage - just pattern arrays
+      patterns = spec;
+      nac = [];
+    }
+
+    const pattern = new Pattern(patterns, nac, this);
+
+    // Process all existing edges
+    for (const edge of this.edges) {
+      pattern.update(edge);
+    }
+
+    // Create new graph with matching edges
+    const resultGraph = new Graph();
+
+    // Add all edges that were part of complete matches
+    const addedEdges = new Set();
+    for (const match of pattern.complete) {
+      for (const edge of match.edges) {
+        // Avoid duplicates if edge appears in multiple matches
+        if (!addedEdges.has(edge.id)) {
+          resultGraph.add(edge.source, edge.attr, edge.target);
+          addedEdges.add(edge.id);
+        }
+      }
+    }
+
+    return resultGraph;
+  },
 });
 
 // ============================================================================

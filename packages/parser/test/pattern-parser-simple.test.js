@@ -101,8 +101,8 @@ describe("Simple Pattern Parser", () => {
       });
     });
 
-    it("should parse queries with alternatives", () => {
-      const result = parsePattern("query [?x type person | ?x age ?a]");
+    it("should parse queries with multiple patterns", () => {
+      const result = parsePattern("query [?x type person ?x age ?a]");
       expect(result.commands[0]).toEqual({
         type: "query",
         patterns: [
@@ -200,7 +200,7 @@ describe("Simple Pattern Parser", () => {
 
   describe("Pattern Specifications", () => {
     it("should parse pattern specs", () => {
-      const result = parsePatternSpec("?x type person | ?x age ?a");
+      const result = parsePatternSpec("?x type person ?x age ?a");
       expect(result).toEqual([
         ["?X", "TYPE", "PERSON"],
         ["?X", "AGE", "?A"],

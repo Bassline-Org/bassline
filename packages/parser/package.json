@@ -5,9 +5,12 @@
     "type": "module",
     "module": "src/index.js",
     "exports": {
-        ".": "./src/index.js",
-        "./data": "./src/data.js",
-        "./parser": "./src/parser.js"
+        ".": "./src/minimal-graph.js",
+        "./graph": "./src/minimal-graph.js",
+        "./parser": "./src/pattern-parser.js",
+        "./runtime": "./src/pattern-words.js",
+        "./compute": "./extensions/compute.js",
+        "./legacy": "./src/index.js"
     },
     "dependencies": {
       "arcsecond": "^5.0.0"

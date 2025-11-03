@@ -1,3 +1,11 @@
+/**
+ * LEGACY PARSER - Replaced by pattern-parser.js
+ *
+ * This file contains the original parser implementation.
+ * Kept for backward compatibility but should not be used for new code.
+ * Use pattern-parser.js instead.
+ */
+
 import {
     char,
     choice,

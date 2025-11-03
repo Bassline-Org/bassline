@@ -178,20 +178,21 @@ const patternElement = choice([
   triple.map(t => ({ nac: false, triples: [t] }))
 ]);
 
-// Pattern spec: sequence of pattern elements
+// Pattern spec with inline NAC syntax (no pipes needed - just "not" prefix)
 const patternSpec = sequenceOf([
   char("["),
   ws,
-  patternElement,
-  many(sequenceOf([ws, patternElement]).map(([_, p]) => p)),
-  ws,
+  // Parse mixed patterns and NAC inline
+  many(sequenceOf([
+    patternElement,
+    ws
+  ]).map(([elem]) => elem)),
   char("]"),
-]).map(([_, __, first, rest]) => {
-  const all = [first, ...rest];
+]).map(([_, __, elements, ___]) => {
   const patterns = [];
   const nac = [];
 
-  for (const elem of all) {
+  for (const elem of elements) {
     if (elem.nac) {
       nac.push(...elem.triples);
     } else {
@@ -221,11 +222,17 @@ const queryCommand = sequenceOf([
   str("query"),
   ws,
   patternSpec,
-]).map(([_, __, spec]) => ({
-  type: "query",
-  patterns: spec.patterns,
-  nac: spec.nac,
-}));
+]).map(([_, __, spec]) => {
+  const result = {
+    type: "query",
+    patterns: spec.patterns,
+  };
+  // Only add nac field if there are NAC patterns
+  if (spec.nac && spec.nac.length > 0) {
+    result.nac = spec.nac;
+  }
+  return result;
+});
 
 // rule name [match...] -> [produce...]
 const ruleCommand = sequenceOf([
@@ -238,14 +245,21 @@ const ruleCommand = sequenceOf([
   str("->"),
   ws,
   patternSpec,
-]).map(([_, __, name, ___, matchSpec, ____, _____, ______, produceSpec]) => ({
-  type: "rule",
-  name,
-  match: matchSpec.patterns,
-  matchNac: matchSpec.nac,
-  produce: produceSpec.patterns,
-  produceNac: produceSpec.nac,
-}));
+]).map(([_, __, name, ___, matchSpec, ____, _____, ______, produceSpec]) => {
+  const result = {
+    type: "rule",
+    name,
+    match: matchSpec.patterns,
+    produce: produceSpec.patterns,
+  };
+  // Always add NAC fields for consistency with NAC tests
+  // But only if either has NAC patterns
+  if ((matchSpec.nac && matchSpec.nac.length > 0) || (produceSpec.nac && produceSpec.nac.length > 0)) {
+    result.matchNac = matchSpec.nac || [];
+    result.produceNac = produceSpec.nac || [];
+  }
+  return result;
+});
 
 // pattern name [patterns...]
 const patternCommand = sequenceOf([
@@ -254,12 +268,18 @@ const patternCommand = sequenceOf([
   word,
   ws,
   patternSpec,
-]).map(([_, __, name, ___, spec]) => ({
-  type: "pattern",
-  name,
-  patterns: spec.patterns,
-  nac: spec.nac,
-}));
+]).map(([_, __, name, ___, spec]) => {
+  const result = {
+    type: "pattern",
+    name,
+    patterns: spec.patterns,
+  };
+  // Only add nac field if there are NAC patterns
+  if (spec.nac && spec.nac.length > 0) {
+    result.nac = spec.nac;
+  }
+  return result;
+});
 
 // watch [match...] [action...]
 const watchCommand = sequenceOf([
@@ -268,13 +288,20 @@ const watchCommand = sequenceOf([
   patternSpec,
   ws,
   patternSpec,
-]).map(([_, __, matchSpec, ___, actionSpec]) => ({
-  type: "watch",
-  match: matchSpec.patterns,
-  matchNac: matchSpec.nac,
-  action: actionSpec.patterns,
-  actionNac: actionSpec.nac,
-}));
+]).map(([_, __, matchSpec, ___, actionSpec]) => {
+  const result = {
+    type: "watch",
+    match: matchSpec.patterns,
+    action: actionSpec.patterns,
+  };
+  // Always add NAC fields for consistency with NAC tests
+  // But only if either has NAC patterns
+  if ((matchSpec.nac && matchSpec.nac.length > 0) || (actionSpec.nac && actionSpec.nac.length > 0)) {
+    result.matchNac = matchSpec.nac || [];
+    result.actionNac = actionSpec.nac || [];
+  }
+  return result;
+});
 
 // delete source attr target
 const deleteCommand = sequenceOf([
