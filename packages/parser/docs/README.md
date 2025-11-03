@@ -47,6 +47,33 @@ graph.watch([["?x", "temperature", "?t"]], (bindings) => {
 });
 ```
 
+### Everything is Self-Describing
+
+The system describes itself through edges - no separate reflection API needed:
+
+```javascript
+// Operations describe themselves when installed
+query [?o TYPE OPERATION!]
+// → [ADD, MULTIPLY, SQRT, GT, ...]
+
+// Get operation documentation
+query [ADD DOCS ?d]
+// → ["Binary addition"]
+
+// Rules describe themselves when created
+rule ADULT [?p AGE ?a] -> [?p ADULT TRUE]
+query [?r TYPE RULE!]
+// → [ADULT]
+
+// Even types describe themselves
+query [?t TYPE TYPE!]
+// → [OPERATION!, AGGREGATION!, RULE!, PATTERN!, TYPE!]
+```
+
+The type system closes the loop: `TYPE! TYPE TYPE!` 🔁
+
+See [SELF-DESCRIPTION.md](SELF-DESCRIPTION.md) for details.
+
 ## Why This is Better
 
 Traditional gadget model:
@@ -179,6 +206,7 @@ self-description.js - Meta-patterns (patterns that create patterns)
 ## Learn More
 
 - [CORE.md](CORE.md) - Deep dive into the computation model
+- [SELF-DESCRIPTION.md](SELF-DESCRIPTION.md) - How the system describes itself
 - [PERFORMANCE.md](PERFORMANCE.md) - Optimization strategies and benchmarks
 - [COOKBOOK.md](COOKBOOK.md) - Common patterns and recipes
 
