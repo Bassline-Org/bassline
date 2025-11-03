@@ -7,6 +7,7 @@ The Bassline pattern system is **self-describing**: all components describe them
 All types use uppercase with a `!` suffix:
 - `OPERATION!` - Computational operations (ADD, MULTIPLY, etc.)
 - `AGGREGATION!` - Aggregation operations (SUM, COUNT, etc.)
+- `EFFECT!` - Side-effecting operations (LOG, HTTP_GET, WRITE_FILE, etc.)
 - `RULE!` - User-defined rewrite rules
 - `PATTERN!` - User-defined patterns
 - `TOMBSTONE!` - Deleted triples
@@ -24,7 +25,7 @@ This means you can query for all types in the system:
 
 ```javascript
 query [?t TYPE TYPE!]
-// → [OPERATION!, AGGREGATION!, RULE!, PATTERN!, TOMBSTONE!, TYPE!]
+// → [OPERATION!, AGGREGATION!, EFFECT!, RULE!, PATTERN!, TOMBSTONE!, TYPE!]
 ```
 
 ## How Components Self-Describe
@@ -73,7 +74,58 @@ query [?a TYPE AGGREGATION!]
 // → [SUM, COUNT, AVG, MIN, MAX]
 ```
 
-### 3. Rules
+### 3. Effects (Effects Extension)
+
+When `installEffects(graph)` is called, each effect adds edges describing itself:
+
+```javascript
+// Core effects (browser-compatible)
+graph.add("LOG", "TYPE", "EFFECT!");
+graph.add("LOG", "CATEGORY", "io");
+graph.add("LOG", "DOCS", "Log message to console");
+
+graph.add("HTTP_GET", "TYPE", "EFFECT!");
+graph.add("HTTP_GET", "CATEGORY", "http");
+graph.add("HTTP_GET", "DOCS", "HTTP GET request returning JSON");
+// ... etc for all core effects
+```
+
+When `installNodeEffects(graph)` is called (opt-in for Node.js), filesystem effects are added:
+
+```javascript
+graph.add("WRITE_FILE", "TYPE", "EFFECT!");
+graph.add("WRITE_FILE", "CATEGORY", "filesystem");
+graph.add("WRITE_FILE", "DOCS", "Write string content to file");
+// ... etc
+```
+
+**Query all effects:**
+```javascript
+query [?e TYPE EFFECT!]
+// → [LOG, ERROR, WARN, HTTP_GET, HTTP_POST, READ_FILE, WRITE_FILE, ...]
+```
+
+**Query effects by category:**
+```javascript
+query [?e CATEGORY "io"]
+// → [LOG, ERROR, WARN]
+
+query [?e CATEGORY "http"]
+// → [HTTP_GET, HTTP_POST]
+
+query [?e CATEGORY "filesystem"]
+// → [READ_FILE, WRITE_FILE, APPEND_FILE]  (only if installNodeEffects was called)
+```
+
+**Get effect documentation:**
+```javascript
+query [LOG DOCS ?d]
+// → ["Log message to console"]
+```
+
+**Browser Compatibility:** Core effects are automatically installed and work in both Node.js and browsers. Filesystem effects require explicit installation via `installNodeEffects(graph)` and only work in Node.js.
+
+### 4. Rules
 
 When a user creates a rule, it adds edges describing itself:
 
@@ -100,7 +152,7 @@ query [ADULT MATCH ?m]
 // → ["[[\"?p\",\"AGE\",\"?a\"]]"]
 ```
 
-### 4. Patterns
+### 5. Patterns
 
 When a user creates a pattern, it adds edges describing itself:
 

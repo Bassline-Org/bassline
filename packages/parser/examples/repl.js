@@ -359,8 +359,14 @@ function showHelp() {
   console.log("  query [?p TYPE PATTERN!]       List all patterns");
   console.log("  query [?o TYPE OPERATION!]     List all operations");
   console.log("  query [?a TYPE AGGREGATION!]   List all aggregations");
+  console.log("  query [?e TYPE EFFECT!]        List all effects");
   console.log("  query [?t TYPE TYPE!]          List all types");
   console.log("  query [ADD DOCS ?d]            Get operation documentation");
+  console.log("");
+  console.log("Effects (Side-Effects):");
+  console.log("  fact [log1 { EFFECT LOG INPUT \"msg\" }]   Execute LOG effect");
+  console.log("  query [log1 RESULT ?r]                     Query effect result");
+  console.log("  (Note: Filesystem effects require Node.js and opt-in installation)");
   console.log("");
   console.log("Examples:");
   console.log("  fact [alice age 30 bob age 25]");

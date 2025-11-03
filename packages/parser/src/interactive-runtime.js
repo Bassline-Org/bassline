@@ -6,7 +6,7 @@
  * - Single-word shorthand expansion (alice → query [alice * *])
  * - Convenient eval() interface
  * - Persistence and serialization
- * - Built-in extensions (compute, aggregation)
+ * - Built-in extensions (compute, aggregation, effects)
  */
 
 import { Graph } from './minimal-graph.js';
@@ -14,6 +14,7 @@ import { parsePattern } from './pattern-parser.js';
 import { createContext, executeProgram } from './pattern-words.js';
 import { installCompute } from '../extensions/compute.js';
 import { installAggregation, builtinAggregations } from '../extensions/aggregation/index.js';
+import { installEffects } from '../extensions/effects/index.js';
 
 export class Runtime {
   constructor() {
@@ -23,6 +24,7 @@ export class Runtime {
     // Install extensions
     installCompute(this.graph);
     installAggregation(this.graph, builtinAggregations);
+    installEffects(this.graph);
 
     // Time-travel: eval history is the source of truth
     // Replaying history recreates all state (edges, patterns, rules, aggregations)
@@ -114,6 +116,7 @@ export class Runtime {
     // Reinstall extensions to restore self-describing metadata
     installCompute(this.graph);
     installAggregation(this.graph, builtinAggregations);
+    installEffects(this.graph);
   }
 
   /**

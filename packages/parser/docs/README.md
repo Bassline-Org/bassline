@@ -67,7 +67,11 @@ query [?r TYPE RULE!]
 
 // Even types describe themselves
 query [?t TYPE TYPE!]
-// → [OPERATION!, AGGREGATION!, RULE!, PATTERN!, TYPE!]
+// → [OPERATION!, AGGREGATION!, RULE!, PATTERN!, EFFECT!, TYPE!]
+
+// Effects describe themselves too
+query [?e TYPE EFFECT!]
+// → [LOG, ERROR, WARN, HTTP_GET, HTTP_POST, ...]
 ```
 
 The type system closes the loop: `TYPE! TYPE TYPE!` 🔁
@@ -193,14 +197,50 @@ graph.watch([["?x", "validating", true]], (b) => {
 });
 ```
 
+### Effects (Side-Effects)
+
+Effects enable real-world I/O while maintaining the pattern-matching model:
+
+```javascript
+import { Runtime } from "@bassline/parser";
+import { installNodeEffects } from "@bassline/parser/extensions/effects-node";
+
+const rt = new Runtime();
+// Core effects (LOG, HTTP_GET, HTTP_POST) are installed by default
+
+// Opt-in for Node.js-specific effects (filesystem)
+installNodeEffects(rt.graph);
+
+// Execute effects via patterns
+rt.eval('fact [log1 { EFFECT LOG INPUT "Hello!" }]');
+
+// Query results when ready
+rt.eval('query [log1 RESULT ?r]');
+// → { logged: true, message: "Hello!" }
+
+// HTTP requests (async)
+rt.eval('fact [req1 { EFFECT HTTP_GET INPUT "https://api.example.com" }]');
+
+// Filesystem (Node.js only)
+rt.eval('fact [file1 { EFFECT WRITE_FILE INPUT { path "/tmp/test.txt" content "data" } }]');
+```
+
+**Browser Compatibility**: Core effects (`LOG`, `ERROR`, `WARN`, `HTTP_GET`, `HTTP_POST`) work in both browsers and Node.js. Filesystem effects (`READ_FILE`, `WRITE_FILE`, `APPEND_FILE`) are opt-in and require Node.js.
+
 ## Architecture
 
 ```
-minimal-graph.js   - Core pattern matching engine (607 lines)
-pattern-parser.js  - DSL parser for pattern syntax
-pattern-words.js   - Runtime for executing DSL commands
-compute.js        - Pattern-based computation examples
-self-description.js - Meta-patterns (patterns that create patterns)
+src/
+  minimal-graph.js       - Core pattern matching engine
+  pattern-parser.js      - DSL parser for pattern syntax
+  pattern-words.js       - Runtime for executing DSL commands
+  interactive-runtime.js - High-level runtime with time-travel
+
+extensions/
+  compute/               - Arithmetic & comparison operations
+  aggregation/           - Aggregation strategies (SUM, COUNT, etc)
+  effects/               - Browser-compatible effects (LOG, HTTP)
+  effects-node/          - Node.js effects (filesystem operations)
 ```
 
 ## Learn More
