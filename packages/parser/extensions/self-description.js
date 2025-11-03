@@ -16,7 +16,7 @@ export function installSelfDescription(graph, context) {
   graph.watch([
     ["?P", "type", "pattern"],
     ["?P", "match", "?M"],
-    ["?P", "status", "active"]
+    ["?P", "status", "active"],
   ], (bindings) => {
     const patternId = bindings.get("?P");
     const matchSpec = bindings.get("?M");
@@ -39,7 +39,7 @@ export function installSelfDescription(graph, context) {
       type: "pattern",
       name: name.toUpperCase(),
       patterns: match,
-      nac: []  // NAC will be filled by NAC watcher
+      nac: [], // NAC will be filled by NAC watcher
     };
 
     executeCommand(graph, command, context);
@@ -50,7 +50,7 @@ export function installSelfDescription(graph, context) {
     ["?P", "type", "pattern"],
     ["?P", "match", "?M"],
     ["?P", "nac", "?N"],
-    ["?P", "status", "active"]
+    ["?P", "status", "active"],
   ], (bindings) => {
     const patternId = bindings.get("?P");
     const matchSpec = bindings.get("?M");
@@ -67,7 +67,7 @@ export function installSelfDescription(graph, context) {
       type: "pattern",
       name: name.toUpperCase(),
       patterns: JSON.parse(matchSpec),
-      nac: JSON.parse(nacSpec)
+      nac: JSON.parse(nacSpec),
     };
 
     executeCommand(graph, command, context);
@@ -78,7 +78,7 @@ export function installSelfDescription(graph, context) {
     ["?R", "type", "rule"],
     ["?R", "match", "?M"],
     ["?R", "produce", "?P"],
-    ["?R", "status", "active"]
+    ["?R", "status", "active"],
   ], (bindings) => {
     const ruleId = bindings.get("?R");
     const matchSpec = bindings.get("?M");
@@ -97,7 +97,7 @@ export function installSelfDescription(graph, context) {
       match: JSON.parse(matchSpec),
       matchNac: [],
       produce: JSON.parse(produceSpec),
-      produceNac: []
+      produceNac: [],
     };
 
     executeCommand(graph, command, context);
@@ -109,7 +109,7 @@ export function installSelfDescription(graph, context) {
     ["?R", "match", "?M"],
     ["?R", "match-nac", "?MN"],
     ["?R", "produce", "?P"],
-    ["?R", "status", "active"]
+    ["?R", "status", "active"],
   ], (bindings) => {
     const ruleId = bindings.get("?R");
     const name = ruleId.replace("rule:", "");
@@ -124,7 +124,7 @@ export function installSelfDescription(graph, context) {
       match: JSON.parse(bindings.get("?M")),
       matchNac: JSON.parse(bindings.get("?MN")),
       produce: JSON.parse(bindings.get("?P")),
-      produceNac: []
+      produceNac: [],
     };
 
     executeCommand(graph, command, context);
@@ -132,7 +132,7 @@ export function installSelfDescription(graph, context) {
 
   // Watch for deactivation
   graph.watch([
-    ["?P", "status", "inactive"]
+    ["?P", "status", "inactive"],
   ], (bindings) => {
     const id = bindings.get("?P");
 
@@ -158,21 +158,25 @@ export function installSelfDescription(graph, context) {
  * Serialize - just dump edges, no queries needed
  */
 export function serialize(graph) {
-  return JSON.stringify({
-    edges: graph.edges.map(e => ({
-      source: e.source,
-      attr: e.attr,
-      target: e.target
-    })),
-    timestamp: Date.now()
-  }, null, 2);
+  return JSON.stringify(
+    {
+      edges: graph.edges.map((e) => ({
+        source: e.source,
+        attr: e.attr,
+        target: e.target,
+      })),
+      timestamp: Date.now(),
+    },
+    null,
+    2,
+  );
 }
 
 /**
  * Deserialize - just restore edges, watchers auto-activate everything
  */
 export function deserialize(json, graph, context) {
-  const data = typeof json === 'string' ? JSON.parse(json) : json;
+  const data = typeof json === "string" ? JSON.parse(json) : json;
 
   // Clear and restore
   graph.edges = [];
@@ -197,7 +201,7 @@ export function installBootstrap(graph) {
   graph.watch([
     ["?EXT", "type", "extension"],
     ["?EXT", "name", "?NAME"],
-    ["?EXT", "status", "active"]
+    ["?EXT", "status", "active"],
   ], (bindings) => {
     const name = bindings.get("?NAME");
 
@@ -209,7 +213,7 @@ export function installBootstrap(graph) {
 
   // Watch for aspect dependencies
   graph.watch([
-    ["?A", "requires", "?B"]
+    ["?A", "requires", "?B"],
   ], (bindings) => {
     const aspectA = bindings.get("?A");
     const aspectB = bindings.get("?B");
