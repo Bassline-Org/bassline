@@ -19,7 +19,7 @@ export class Graph {
 
     // Selective activation indexes
     this.sourceIndex = new Map(); // Map<value, Set<Pattern>>
-    this.attrIndex = new Map();   // Map<value, Set<Pattern>>
+    this.attrIndex = new Map(); // Map<value, Set<Pattern>>
     this.targetIndex = new Map(); // Map<value, Set<Pattern>>
     this.wildcardPatterns = new Set(); // Patterns with ANY wildcard/variable
   }
@@ -429,7 +429,9 @@ export class Pattern {
    * Resolve a value using current bindings
    */
   resolveValue(value, bindings) {
-    if (typeof value === "string" && value.startsWith("?") && bindings.has(value)) {
+    if (
+      typeof value === "string" && value.startsWith("?") && bindings.has(value)
+    ) {
       return bindings.get(value);
     }
     return value;

@@ -1,11 +1,20 @@
 /**
- * Compute Extension V2 - Pure Watcher-Based
+ * Compute Operations (Modular)
  *
- * Compute operations (arithmetic, comparisons) use incremental watchers.
- * Aggregations are handled by the modular aggregation system.
+ * Arithmetic, unary, and comparison operations for pattern-based computation.
+ *
+ * This module re-exports from the modular structure:
+ * - compute/definitions.js: Operation specifications
+ * - compute/installer.js: Graph installation logic
+ *
+ * Maintains backward compatibility with existing code.
  */
 
-// Re-export aggregation functionality from modular system
+// Re-export compute functionality
+export { installCompute } from './compute/installer.js';
+export { builtinOperations } from './compute/definitions.js';
+
+// Re-export aggregation functionality for backward compatibility
 export {
   addVersionedResult,
   getCurrentValue,
@@ -13,207 +22,3 @@ export {
   builtinAggregations,
   installAggregation
 } from './aggregation/index.js';
-
-/**
- * Install compute watchers on a graph (arithmetic and comparison operations)
- * For aggregations, use installAggregation() from './aggregation/index.js'
- */
-export function installCompute(graph) {
-  // Self-describe all operations
-  // Binary arithmetic operations
-  graph.add("ADD", "TYPE", "OPERATION!");
-  graph.add("ADD", "DOCS", "Binary addition");
-  graph.add("SUBTRACT", "TYPE", "OPERATION!");
-  graph.add("SUBTRACT", "DOCS", "Binary subtraction");
-  graph.add("MULTIPLY", "TYPE", "OPERATION!");
-  graph.add("MULTIPLY", "DOCS", "Binary multiplication");
-  graph.add("DIVIDE", "TYPE", "OPERATION!");
-  graph.add("DIVIDE", "DOCS", "Binary division");
-  graph.add("MOD", "TYPE", "OPERATION!");
-  graph.add("MOD", "DOCS", "Modulo operation");
-  graph.add("POW", "TYPE", "OPERATION!");
-  graph.add("POW", "DOCS", "Power operation");
-
-  // Unary operations
-  graph.add("SQRT", "TYPE", "OPERATION!");
-  graph.add("SQRT", "DOCS", "Square root");
-  graph.add("ABS", "TYPE", "OPERATION!");
-  graph.add("ABS", "DOCS", "Absolute value");
-  graph.add("FLOOR", "TYPE", "OPERATION!");
-  graph.add("FLOOR", "DOCS", "Floor function");
-  graph.add("CEIL", "TYPE", "OPERATION!");
-  graph.add("CEIL", "DOCS", "Ceiling function");
-  graph.add("ROUND", "TYPE", "OPERATION!");
-  graph.add("ROUND", "DOCS", "Round to nearest integer");
-  graph.add("NEGATE", "TYPE", "OPERATION!");
-  graph.add("NEGATE", "DOCS", "Negate a number");
-
-  // Comparison operations
-  graph.add("GT", "TYPE", "OPERATION!");
-  graph.add("GT", "DOCS", "Greater than");
-  graph.add("LT", "TYPE", "OPERATION!");
-  graph.add("LT", "DOCS", "Less than");
-  graph.add("GTE", "TYPE", "OPERATION!");
-  graph.add("GTE", "DOCS", "Greater than or equal");
-  graph.add("LTE", "TYPE", "OPERATION!");
-  graph.add("LTE", "DOCS", "Less than or equal");
-  graph.add("EQ", "TYPE", "OPERATION!");
-  graph.add("EQ", "DOCS", "Equal");
-  graph.add("NEQ", "TYPE", "OPERATION!");
-  graph.add("NEQ", "DOCS", "Not equal");
-
-  // Mark OPERATION! as a type
-  graph.add("OPERATION!", "TYPE", "TYPE!");
-
-  // Mark TYPE! as a type (meta-type, closes the loop)
-  graph.add("TYPE!", "TYPE", "TYPE!");
-
-  // Binary arithmetic: fires when we have op, x, and y
-  graph.watch([
-    ["?C", "OP", "?OP"],
-    ["?C", "X", "?X"],
-    ["?C", "Y", "?Y"]
-  ], (bindings) => {
-    const computeId = bindings.get("?C");
-    const op = bindings.get("?OP");
-    const x = bindings.get("?X");
-    const y = bindings.get("?Y");
-
-    // Convert to numbers
-    const xNum = typeof x === 'number' ? x : parseFloat(x);
-    const yNum = typeof y === 'number' ? y : parseFloat(y);
-
-    if (isNaN(xNum) || isNaN(yNum)) return;
-
-    let result;
-    switch (op.toString()) {
-      case 'ADD':
-        result = xNum + yNum;
-        break;
-      case 'SUBTRACT':
-        result = xNum - yNum;
-        break;
-      case 'MULTIPLY':
-        result = xNum * yNum;
-        break;
-      case 'DIVIDE':
-        result = yNum !== 0 ? xNum / yNum : NaN;
-        break;
-      case 'MOD':
-        result = xNum % yNum;
-        break;
-      case 'POW':
-        result = Math.pow(xNum, yNum);
-        break;
-      default:
-        return;
-    }
-
-    if (!isNaN(result)) {
-      graph.add(computeId, "RESULT", result);
-    }
-  });
-
-  // Unary operations: fires when we have op and value
-  graph.watch([
-    ["?C", "OP", "?OP"],
-    ["?C", "VALUE", "?V"]
-  ], (bindings) => {
-    const computeId = bindings.get("?C");
-    const op = bindings.get("?OP");
-    const value = bindings.get("?V");
-
-    const num = typeof value === 'number' ? value : parseFloat(value);
-    if (isNaN(num)) return;
-
-    let result;
-    switch (op.toString()) {
-      case 'SQRT':
-        result = Math.sqrt(num);
-        break;
-      case 'ABS':
-        result = Math.abs(num);
-        break;
-      case 'FLOOR':
-        result = Math.floor(num);
-        break;
-      case 'CEIL':
-        result = Math.ceil(num);
-        break;
-      case 'ROUND':
-        result = Math.round(num);
-        break;
-      case 'NEGATE':
-        result = -num;
-        break;
-      default:
-        return;
-    }
-
-    if (!isNaN(result)) {
-      graph.add(computeId, "RESULT", result);
-    }
-  });
-
-  // Comparisons: fires when we have compare, left, and right
-  graph.watch([
-    ["?C", "COMPARE", "?OP"],
-    ["?C", "LEFT", "?L"],
-    ["?C", "RIGHT", "?R"]
-  ], (bindings) => {
-    const computeId = bindings.get("?C");
-    const op = bindings.get("?OP");
-    const left = bindings.get("?L");
-    const right = bindings.get("?R");
-
-    const leftNum = typeof left === 'number' ? left : parseFloat(left);
-    const rightNum = typeof right === 'number' ? right : parseFloat(right);
-
-    let result;
-    switch (op.toString()) {
-      case 'GT':
-        result = leftNum > rightNum;
-        break;
-      case 'LT':
-        result = leftNum < rightNum;
-        break;
-      case 'GTE':
-        result = leftNum >= rightNum;
-        break;
-      case 'LTE':
-        result = leftNum <= rightNum;
-        break;
-      case 'EQ':
-        result = leftNum === rightNum;
-        break;
-      case 'NEQ':
-        result = leftNum !== rightNum;
-        break;
-      default:
-        return;
-    }
-
-    graph.add(computeId, "RESULT", result);
-  });
-}
-
-/**
- * Install meta-watcher that prevents duplicate results
- * This ensures compute operations are idempotent
- */
-export function installIdempotency(graph) {
-  // Prevent duplicate results by using NAC
-  graph.watch({
-    patterns: [
-      ["?C", "OP", "?OP"],
-      ["?C", "X", "?X"],
-      ["?C", "Y", "?Y"]
-    ],
-    nac: [
-      ["?C", "RESULT", "?R"]
-    ]
-  }, (bindings) => {
-    // This watcher only fires if there's NO existing result
-    // The actual computation is handled by the compute watchers
-  });
-}

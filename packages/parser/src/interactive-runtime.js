@@ -23,6 +23,11 @@ export class Runtime {
     // Install extensions
     installCompute(this.graph);
     installAggregation(this.graph, builtinAggregations);
+
+    // Time-travel: eval history is the source of truth
+    // Replaying history recreates all state (edges, patterns, rules, aggregations)
+    this.evalHistory = [];
+    this.checkpoints = new Map();
   }
 
   /**
@@ -42,6 +47,17 @@ export class Runtime {
    * - clear-graph: string
    */
   eval(source) {
+    // Execute and track in history
+    const result = this._executeEval(source);
+    this.evalHistory.push(source);
+    return result;
+  }
+
+  /**
+   * Internal eval for replay (doesn't add to history)
+   * @private
+   */
+  _executeEval(source) {
     // Handle single-word shorthand: alice → query [alice ?attr ?target]
     const trimmed = source.trim();
     if (this.isSingleWord(trimmed)) {
@@ -153,5 +169,90 @@ export class Runtime {
       patterns: this.context.patterns.size,
       rules: this.context.rules.size
     };
+  }
+
+  /**
+   * Create a checkpoint of current state
+   * @param {string} name - Checkpoint name (defaults to timestamp)
+   * @returns {Object} Checkpoint metadata
+   */
+  checkpoint(name = `auto-${Date.now()}`) {
+    const cp = {
+      name,
+      historyIndex: this.evalHistory.length,
+      timestamp: Date.now()
+    };
+    this.checkpoints.set(name, cp);
+    return cp;
+  }
+
+  /**
+   * Restore to a named checkpoint
+   * @param {string} name - Checkpoint name
+   */
+  restore(name) {
+    const cp = this.checkpoints.get(name);
+    if (!cp) {
+      throw new Error(`Checkpoint not found: ${name}`);
+    }
+
+    // Reset to fresh state
+    this.reset();
+
+    // Truncate history to checkpoint
+    const historyToReplay = this.evalHistory.slice(0, cp.historyIndex);
+    this.evalHistory = [];
+
+    // Replay commands up to checkpoint
+    historyToReplay.forEach(cmd => {
+      this._executeEval(cmd);
+      this.evalHistory.push(cmd);
+    });
+
+    // Restore checkpoint metadata
+    this.checkpoints = new Map();
+    this.checkpoints.set(name, cp);
+  }
+
+  /**
+   * Undo last N commands
+   * @param {number} count - Number of commands to undo (default 1)
+   */
+  undo(count = 1) {
+    if (count > this.evalHistory.length) {
+      throw new Error(`Can only undo ${this.evalHistory.length} command(s)`);
+    }
+
+    // Truncate history
+    const historyToReplay = this.evalHistory.slice(0, -count);
+    this.evalHistory = [];
+
+    // Reset and replay
+    this.reset();
+    historyToReplay.forEach(cmd => {
+      this._executeEval(cmd);
+      this.evalHistory.push(cmd);
+    });
+
+    // Clear checkpoints (they're now invalid)
+    this.checkpoints.clear();
+  }
+
+  /**
+   * List all checkpoints
+   * @returns {Array<Object>} Checkpoint metadata sorted by timestamp
+   */
+  listCheckpoints() {
+    return Array.from(this.checkpoints.values())
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }
+
+  /**
+   * Get recent command history
+   * @param {number} count - Number of commands to return (default 10)
+   * @returns {Array<string>} Recent commands
+   */
+  getHistory(count = 10) {
+    return this.evalHistory.slice(-count);
   }
 }
