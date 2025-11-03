@@ -518,8 +518,12 @@ Object.assign(Graph.prototype, {
       pattern.update(edge);
     }
 
-    // Return bindings from complete matches
-    return pattern.complete.map((match) => match.bindings);
+    // Return bindings from complete matches, with edges attached
+    return pattern.complete.map((match) => {
+      // Attach matched edges to bindings Map for formatter access
+      match.bindings.__edges__ = match.edges;
+      return match.bindings;
+    });
   },
 
   /**

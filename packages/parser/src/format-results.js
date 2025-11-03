@@ -90,6 +90,22 @@ function formatBindings(bindings) {
 
   const vars = Array.from(variables).sort();
 
+  // If there are no variables, show the matched edges as a table
+  // (This happens with queries like: query [alice age 30] or [* * *])
+  if (vars.length === 0) {
+    // Collect all edges from all bindings
+    const allEdges = [];
+    bindings.forEach(b => {
+      if (b.__edges__) {
+        allEdges.push(...b.__edges__);
+      }
+    });
+    if (allEdges.length > 0) {
+      return formatEdges(allEdges);
+    }
+    return `${bindings.length} match${bindings.length !== 1 ? 'es' : ''}`;
+  }
+
   // Convert to rows
   const rows = bindings.map(b => {
     const row = {};
@@ -168,7 +184,12 @@ export function formatEdges(edges) {
     return "(no edges)";
   }
 
-  return edges.map(e =>
-    `${formatValue(e.source)} ${formatValue(e.attr)} ${formatValue(e.target)}`
-  ).join('\n');
+  const headers = ['source', 'attribute', 'target'];
+  const rows = edges.map(e => ({
+    source: formatValue(e.source),
+    attribute: formatValue(e.attr),
+    target: formatValue(e.target)
+  }));
+
+  return formatTable(headers, rows);
 }

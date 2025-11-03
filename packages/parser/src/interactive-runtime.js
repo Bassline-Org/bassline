@@ -64,9 +64,9 @@ export class Runtime {
    * @private
    */
   isSingleWord(source) {
-    // Match: word, word-with-dashes, word:with:colons
+    // Match: word, word-with-dashes, word:with:colons, word!
     // But not: patterns with spaces, brackets, or other syntax
-    return /^[a-zA-Z_][a-zA-Z0-9_:-]*$/.test(source);
+    return /^[a-zA-Z_][a-zA-Z0-9_:!-]*$/.test(source);
   }
 
   /**
