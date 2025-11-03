@@ -6,16 +6,23 @@
  * - Single-word shorthand expansion (alice → query [alice * *])
  * - Convenient eval() interface
  * - Persistence and serialization
+ * - Built-in extensions (compute, aggregation)
  */
 
 import { Graph } from './minimal-graph.js';
 import { parsePattern } from './pattern-parser.js';
 import { createContext, executeProgram } from './pattern-words.js';
+import { installCompute } from '../extensions/compute.js';
+import { installAggregation, builtinAggregations } from '../extensions/aggregation/index.js';
 
 export class Runtime {
   constructor() {
     this.graph = new Graph();
     this.context = createContext(this.graph);
+
+    // Install extensions
+    installCompute(this.graph);
+    installAggregation(this.graph, builtinAggregations);
   }
 
   /**
@@ -87,6 +94,10 @@ export class Runtime {
     this.context.cleanup();
     this.graph = new Graph();
     this.context = createContext(this.graph);
+
+    // Reinstall extensions to restore self-describing metadata
+    installCompute(this.graph);
+    installAggregation(this.graph, builtinAggregations);
   }
 
   /**

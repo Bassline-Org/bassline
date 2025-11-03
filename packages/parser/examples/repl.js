@@ -30,6 +30,10 @@ const rl = readline.createInterface({
   prompt: "> ",
 });
 
+// Multi-line input state
+let inputBuffer = "";
+let bracketDepth = 0;
+
 console.log("╔═══════════════════════════════════════════════════════╗");
 console.log("║   Bassline Interactive Runtime                        ║");
 console.log("║   Pattern-based graph computation                     ║");
@@ -41,34 +45,100 @@ console.log("");
 rl.prompt();
 
 rl.on("line", (line) => {
-  const input = line.trim();
+  const trimmed = line.trim();
 
   // Handle empty input
-  if (!input) {
+  if (!trimmed && inputBuffer === "") {
     rl.prompt();
     return;
   }
 
-  // Handle REPL commands
-  if (input.startsWith(".")) {
-    handleReplCommand(input);
-    rl.prompt();
-    return;
+  // Add to buffer
+  if (inputBuffer) {
+    inputBuffer += "\n" + line;
+  } else {
+    inputBuffer = line;
   }
 
-  // Execute pattern language expression
-  try {
-    const results = rt.eval(input);
-    console.log(formatResults(results));
-  } catch (err) {
-    console.error("Error:", err.message);
-    if (process.env.DEBUG) {
-      console.error(err.stack);
+  // Update bracket depth
+  bracketDepth += countBrackets(line);
+
+  // Check if we have complete input
+  if (bracketDepth === 0 && inputBuffer.trim() !== "") {
+    const input = inputBuffer.trim();
+    inputBuffer = "";
+
+    // Handle REPL commands
+    if (input.startsWith(".")) {
+      handleReplCommand(input);
+      rl.setPrompt("> ");
+      rl.prompt();
+      return;
+    }
+
+    // Execute pattern language expression
+    try {
+      const results = rt.eval(input);
+      console.log(formatResults(results));
+    } catch (err) {
+      console.error("Error:", err.message);
+      if (process.env.DEBUG) {
+        console.error(err.stack);
+      }
+    }
+
+    rl.setPrompt("> ");
+    rl.prompt();
+  } else if (bracketDepth > 0) {
+    // Continuation needed
+    rl.setPrompt("... ");
+    rl.prompt();
+  } else if (bracketDepth < 0) {
+    // Unbalanced brackets (more closing than opening)
+    console.error("Error: Unbalanced brackets (too many closing brackets)");
+    inputBuffer = "";
+    bracketDepth = 0;
+    rl.setPrompt("> ");
+    rl.prompt();
+  }
+});
+
+/**
+ * Count net bracket depth change in a line
+ * Handles strings to avoid counting brackets inside them
+ */
+function countBrackets(line) {
+  let depth = 0;
+  let inString = false;
+  let stringChar = null;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const prevChar = i > 0 ? line[i - 1] : null;
+
+    // Handle string boundaries (skip escaped quotes)
+    if ((char === '"' || char === "'") && prevChar !== "\\") {
+      if (!inString) {
+        inString = true;
+        stringChar = char;
+      } else if (char === stringChar) {
+        inString = false;
+        stringChar = null;
+      }
+    }
+
+    // Count brackets only outside strings
+    if (!inString) {
+      if (char === "[") {
+        depth++;
+      } else if (char === "]") {
+        depth--;
+      }
     }
   }
 
-  rl.prompt();
-});
+  return depth;
+}
 
 rl.on("close", () => {
   console.log("\nBye!");
@@ -86,18 +156,6 @@ function handleReplCommand(cmd) {
     case "help":
     case "h":
       showHelp();
-      break;
-
-    case "stats":
-      showStats();
-      break;
-
-    case "patterns":
-      showPatterns();
-      break;
-
-    case "rules":
-      showRules();
       break;
 
     case "reset":
@@ -120,9 +178,6 @@ function handleReplCommand(cmd) {
 function showHelp() {
   console.log("REPL Commands:");
   console.log("  .help          Show this help");
-  console.log("  .stats         Show graph statistics");
-  console.log("  .patterns      List active patterns");
-  console.log("  .rules         List active rules");
   console.log("  .reset         Clear graph and remove all watchers");
   console.log("  .exit          Exit REPL");
   console.log("");
@@ -137,39 +192,20 @@ function showHelp() {
   console.log("  graph-info     Show graph statistics");
   console.log("");
   console.log("Single-word Shorthand:");
-  console.log("  alice          Expands to: query [alice * *]");
+  console.log("  alice          Expands to: query [alice ?attr ?target]");
+  console.log("");
+  console.log("System Reflection (via queries):");
+  console.log("  query [?r TYPE RULE!]        List all rules");
+  console.log("  query [?p TYPE PATTERN!]     List all patterns");
+  console.log("  query [?o TYPE OPERATION!]   List all operations");
+  console.log("  query [?a TYPE AGGREGATION!] List all aggregations");
+  console.log("  query [?t TYPE TYPE!]        List all types");
+  console.log("  query [ADD DOCS ?d]          Get operation documentation");
   console.log("");
   console.log("Examples:");
   console.log("  fact [alice age 30 bob age 25]");
   console.log("  query [?x age ?a]");
   console.log("  rule adult [?p age ?a] -> [?p adult true]");
   console.log("  alice");
-}
-
-function showStats() {
-  const stats = rt.getStats();
-  console.log("Graph Statistics:");
-  console.log(`  Edges:    ${stats.edges}`);
-  console.log(`  Patterns: ${stats.patterns}`);
-  console.log(`  Rules:    ${stats.rules}`);
-}
-
-function showPatterns() {
-  const patterns = rt.getActivePatterns();
-  if (patterns.length === 0) {
-    console.log("No active patterns");
-  } else {
-    console.log(`Active Patterns (${patterns.length}):`);
-    patterns.forEach((p) => console.log(`  - ${p}`));
-  }
-}
-
-function showRules() {
-  const rules = rt.getActiveRules();
-  if (rules.length === 0) {
-    console.log("No active rules");
-  } else {
-    console.log(`Active Rules (${rules.length}):`);
-    rules.forEach((r) => console.log(`  - ${r}`));
-  }
+  console.log("  query [?t TYPE TYPE!]");
 }

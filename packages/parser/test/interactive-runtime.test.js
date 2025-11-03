@@ -11,6 +11,7 @@ describe("Interactive Runtime", () => {
 
   describe("Basic Functionality", () => {
     it("should execute fact commands", () => {
+      const beforeCount = rt.graph.edges.length;
       const result = rt.eval("fact [alice age 30]");
 
       // Returns array of edge IDs
@@ -19,10 +20,11 @@ describe("Interactive Runtime", () => {
       expect(typeof result[0]).toBe("number");
 
       // Verify edge was added to graph
-      expect(rt.graph.edges.length).toBe(1);
-      expect(rt.graph.edges[0].source).toBe("ALICE");
-      expect(rt.graph.edges[0].attr).toBe("AGE");
-      expect(rt.graph.edges[0].target).toBe(30);
+      expect(rt.graph.edges.length).toBe(beforeCount + 1);
+      const addedEdge = rt.graph.edges[rt.graph.edges.length - 1];
+      expect(addedEdge.source).toBe("ALICE");
+      expect(addedEdge.attr).toBe("AGE");
+      expect(addedEdge.target).toBe(30);
     });
 
     it("should execute query commands", () => {
@@ -114,25 +116,28 @@ describe("Interactive Runtime", () => {
     });
 
     it("should provide fact() helper", () => {
+      const beforeCount = rt.graph.edges.length;
       const result = rt.fact("bob city Boston");
 
       expect(result.length).toBe(1);
-      expect(rt.graph.edges.length).toBe(1);
+      expect(rt.graph.edges.length).toBe(beforeCount + 1);
     });
   });
 
   describe("Reset Functionality", () => {
     it("should clear graph and context", () => {
+      const initialEdgeCount = rt.graph.edges.length;  // Self-description edges
       rt.eval("fact [alice age 30]");
       rt.eval("rule test [?x age ?a] -> [?x adult true]");
 
-      // Rules add self-description metadata, so more than 1 edge
-      expect(rt.graph.edges.length).toBeGreaterThan(1);
+      // Rules add self-description metadata, so more than initial
+      expect(rt.graph.edges.length).toBeGreaterThan(initialEdgeCount);
       expect(rt.getActiveRules().length).toBe(1);
 
       rt.reset();
 
-      expect(rt.graph.edges.length).toBe(0);
+      // After reset, should have same initial self-description edges
+      expect(rt.graph.edges.length).toBe(initialEdgeCount);
       expect(rt.getActiveRules().length).toBe(0);
       expect(rt.getActivePatterns().length).toBe(0);
     });
@@ -140,16 +145,25 @@ describe("Interactive Runtime", () => {
 
   describe("Serialization", () => {
     it("should serialize to JSON", () => {
+      const beforeCount = rt.graph.edges.length;
       rt.eval("fact [alice age 30 bob age 25]");
 
       const json = rt.toJSON();
 
       expect(json.edges).toBeDefined();
-      expect(json.edges.length).toBe(2);
-      expect(json.edges[0]).toEqual({
+      expect(json.edges.length).toBe(beforeCount + 2);
+
+      // Check that the user-added edges are present
+      const userEdges = json.edges.slice(-2);  // Last 2 edges
+      expect(userEdges).toContainEqual({
         source: "ALICE",
         attr: "AGE",
         target: 30,
+      });
+      expect(userEdges).toContainEqual({
+        source: "BOB",
+        attr: "AGE",
+        target: 25,
       });
     });
 
@@ -161,9 +175,11 @@ describe("Interactive Runtime", () => {
         ],
       };
 
+      const baselineCount = rt.graph.edges.length;
       rt.fromJSON(data);
 
-      expect(rt.graph.edges.length).toBe(2);
+      // fromJSON calls reset() which reinstalls extensions, so we have baseline + user edges
+      expect(rt.graph.edges.length).toBe(baselineCount + 2);
 
       const result = rt.query("?x age ?a");
       expect(result.length).toBe(2);

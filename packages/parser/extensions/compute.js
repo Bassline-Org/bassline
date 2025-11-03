@@ -19,6 +19,55 @@ export {
  * For aggregations, use installAggregation() from './aggregation/index.js'
  */
 export function installCompute(graph) {
+  // Self-describe all operations
+  // Binary arithmetic operations
+  graph.add("ADD", "TYPE", "OPERATION!");
+  graph.add("ADD", "DOCS", "Binary addition");
+  graph.add("SUBTRACT", "TYPE", "OPERATION!");
+  graph.add("SUBTRACT", "DOCS", "Binary subtraction");
+  graph.add("MULTIPLY", "TYPE", "OPERATION!");
+  graph.add("MULTIPLY", "DOCS", "Binary multiplication");
+  graph.add("DIVIDE", "TYPE", "OPERATION!");
+  graph.add("DIVIDE", "DOCS", "Binary division");
+  graph.add("MOD", "TYPE", "OPERATION!");
+  graph.add("MOD", "DOCS", "Modulo operation");
+  graph.add("POW", "TYPE", "OPERATION!");
+  graph.add("POW", "DOCS", "Power operation");
+
+  // Unary operations
+  graph.add("SQRT", "TYPE", "OPERATION!");
+  graph.add("SQRT", "DOCS", "Square root");
+  graph.add("ABS", "TYPE", "OPERATION!");
+  graph.add("ABS", "DOCS", "Absolute value");
+  graph.add("FLOOR", "TYPE", "OPERATION!");
+  graph.add("FLOOR", "DOCS", "Floor function");
+  graph.add("CEIL", "TYPE", "OPERATION!");
+  graph.add("CEIL", "DOCS", "Ceiling function");
+  graph.add("ROUND", "TYPE", "OPERATION!");
+  graph.add("ROUND", "DOCS", "Round to nearest integer");
+  graph.add("NEGATE", "TYPE", "OPERATION!");
+  graph.add("NEGATE", "DOCS", "Negate a number");
+
+  // Comparison operations
+  graph.add("GT", "TYPE", "OPERATION!");
+  graph.add("GT", "DOCS", "Greater than");
+  graph.add("LT", "TYPE", "OPERATION!");
+  graph.add("LT", "DOCS", "Less than");
+  graph.add("GTE", "TYPE", "OPERATION!");
+  graph.add("GTE", "DOCS", "Greater than or equal");
+  graph.add("LTE", "TYPE", "OPERATION!");
+  graph.add("LTE", "DOCS", "Less than or equal");
+  graph.add("EQ", "TYPE", "OPERATION!");
+  graph.add("EQ", "DOCS", "Equal");
+  graph.add("NEQ", "TYPE", "OPERATION!");
+  graph.add("NEQ", "DOCS", "Not equal");
+
+  // Mark OPERATION! as a type
+  graph.add("OPERATION!", "TYPE", "TYPE!");
+
+  // Mark TYPE! as a type (meta-type, closes the loop)
+  graph.add("TYPE!", "TYPE", "TYPE!");
+
   // Binary arithmetic: fires when we have op, x, and y
   graph.watch([
     ["?C", "OP", "?OP"],

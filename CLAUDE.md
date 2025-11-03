@@ -1,592 +1,420 @@
-# CLAUDE.md - Bassline System Guide
+# CLAUDE.md - Bassline Pattern-Matching Graph System
 
 **📝 Note**: Check `.claude/context.md` for recent work context and architectural decisions from previous sessions.
 
 ## Project Overview
 
-This is **Bassline** - a hyper-minimal propagation network model built around **gadgets**. Despite the repo name "port-graphs", this is actually an implementation of a more general and powerful model inspired by propagation networks (Sussman/Radul) but evolved into something more fundamental.
+**Bassline** is a **pattern-matching graph computation system** - think Datalog meets reactive programming, with incremental pattern matching over an append-only triple store.
 
-**Core Philosophy**: We don't define how gadgets communicate - we provide a minimal protocol for doing useful work and leave communication semantically open. This is intentional and critical to the design.
+**Core Philosophy**: Everything is edges in a graph. Patterns watch for matches. Computation is incremental and reactive. All state is queryable.
 
 ## Why JavaScript (Not TypeScript)
 
-**The system is written in vanilla JavaScript, not TypeScript.** This is a deliberate choice:
-
-- Our behaviors are highly dynamic (prototype manipulation, runtime composition, meta-programming)
-- Static typing fought against the dynamic nature of the gadget model
-- TypeScript ceremony added complexity without proportional value for this use case
-- JavaScript lets us focus on the primitive without type gymnastics
-
-**Future**: We may add type definitions later for library consumers, but the core implementation will remain JavaScript. The system's power comes from its runtime flexibility, not compile-time guarantees.
-
-## Critical Design Principles
-
-1. **Semantic Openness**: `emit()` goes nowhere by default. Communication is NOT baked into the model.
-2. **Partial Information**: Everything is partial information moving up a lattice via ACI (Associative, Commutative, Idempotent) operations.
-3. **Mechanical Simplicity**: Core is ~28 lines (gadget.js). Taps are an extension (~27 lines). Complexity emerges from composition, not the primitive.
-4. **Fire-and-Forget Everything**: Both effects AND taps are fire-and-forget - no delivery or timing guarantees.
-5. **Effects as Data**: Effects are just data about what happened internally - no prescribed handlers.
-6. **Meta-Gadgets**: Routing/communication patterns are themselves gadgets operating on effects.
-7. **Runtime Flexibility**: Prototype-based composition enables emergent behaviors impossible with static types.
+- Highly dynamic runtime (pattern compilation, incremental matching, meta-programming)
+- Static types don't add value for this use case
+- Vanilla JS lets us ship source directly (no build step)
+- Power comes from runtime flexibility, not compile-time guarantees
 
 ## Architecture
 
 ```
-packages/
-├── core/                    # Core primitives (gadget protocol, package system)
-│   └── src/
-│       ├── gadget.js        # THE CORE - ~60 lines of gadget protocol
-│       ├── index.js         # Package installation, fromSpec, bl()
-│       ├── packageLoader.js # Load packages from JSON definitions
-│       ├── packageExporter.js # Export gadgets as packages
-│       └── packageResolver.js # Type resolution system
+packages/parser/
+├── src/
+│   ├── minimal-graph.js         # Core: Graph + Pattern matching (~400 lines)
+│   ├── pattern-parser.js        # Parser: Pattern language -> AST
+│   ├── pattern-words.js         # Runtime: Execute AST on graph
+│   ├── interactive-runtime.js   # Interactive wrapper + REPL
+│   └── format-results.js        # Result formatting for display
 │
-├── cells/                   # ACI merge strategies (lattice operations)
-│   └── src/
-│       ├── numeric.js       # Max, Min (monotonic numbers)
-│       ├── set.js           # Union, Intersection (set operations)
-│       ├── tables.js        # First, Last (table merge strategies)
-│       ├── versioned.js     # Version-tracked values
-│       └── unsafe.js        # Last (no merge, always replace)
+├── extensions/
+│   ├── compute.js               # Arithmetic & comparison operations
+│   ├── aggregation/
+│   │   ├── core.js              # Refinement & versioning helpers
+│   │   ├── definitions.js       # SUM, COUNT, AVG, MIN, MAX
+│   │   ├── installer.js         # Generic aggregation installer
+│   │   └── index.js             # Public API
+│   └── self-description.js      # Meta-circular capabilities
 │
-├── taps/                    # Observation extension (~40 lines)
-│   └── src/
-│       └── index.js         # tap(), tapOn(), emit() with Set-based distribution
+├── examples/
+│   ├── repl.js                  # Interactive CLI
+│   ├── demo.js                  # Basic usage examples
+│   └── *.js                     # More examples
 │
-├── functions/               # Function composition patterns
-│   └── src/
-│       ├── core.js          # Map, partial application
-│       ├── math.js          # Mathematical operations
-│       ├── logic.js         # Logical operations
-│       ├── array.js         # Array operations
-│       └── http.js          # HTTP request handling
-│
-├── relations/               # Gadget wiring utilities
-│   └── src/
-│       ├── index.js         # Wire, connect helpers
-│       └── relationGadgets.js # Wire gadget implementation
-│
-├── systems/                 # Compound gadgets (meta-circularity)
-│   └── src/
-│       ├── compound.js      # Compound gadget proto
-│       ├── compoundProto.js # Factory for creating compound protos
-│       ├── scope.js         # Scoped gadget resolution
-│       └── versionControl.js # Version tracking
-│
-├── refs/                    # Reference types (local, file, web, gadget)
-│   └── src/
-│       ├── localRef.js      # Local scope references
-│       ├── gadgetRef.js     # References to other gadgets
-│       ├── fileRef.js       # File system references
-│       └── webRef.js        # HTTP/URL references
-│
-├── metadata/                # Metadata extension
-├── devtools/                # Developer utilities
-├── registry/                # Global gadget registry
-└── react/                   # React integration
-    └── src/
-        └── index.js         # useGadget, useTap hooks
-```
+└── test/
+    ├── minimal-graph.test.js    # Core graph tests
+    ├── aggregation.test.js      # Aggregation tests (35 tests)
+    ├── interactive-runtime.test.js  # Runtime tests (20 tests)
+    └── *.test.js                # Parser tests
 
-**Key Features**:
-- Vanilla JavaScript (no build step)
-- Auto-install on import (each package calls `installPackage()`)
-- Meta-circular (gadgets describe gadgets via package system)
-- Prototype-based extensions (one install, universal behavior)
+docs/
+├── CORE.md                      # Core model philosophy
+└── PERFORMANCE.md               # O(1) pattern matching via selective activation
+```
 
 ## Core Concepts
 
-### 1. Gadget Anatomy
+### 1. The Graph
+
+An **append-only triple store** with incremental pattern matching:
 
 ```javascript
-// The gadget protocol (from gadgetProto)
-{
-  receive(input)      // Accept input, validate, step, handle
-  validate(input)     // Validate input (default: pass-through)
-  current()           // Get current state (from Symbol-protected storage)
-  update(newState)    // Update state (internal use only!)
-  step(state, input)  // User-defined: state + input -> action
-  handle(action)      // User-defined: execute action
-  emit(data)          // Emit effects (no-op by default!)
-}
-```
+import { Graph } from '@bassline/parser/graph';
 
-**Critical**: `emit()` goes nowhere by default. Communication is semantic, not baked in.
+const graph = new Graph();
 
-### 2. Creating Gadgets
+// Add edges (triples)
+graph.add("alice", "age", 30);
+graph.add("alice", "city", "NYC");
+graph.add("bob", "age", 25);
 
-Gadgets are created via the prototype pattern using `spawn()`:
+// Query with variables
+const results = graph.query(["?person", "age", "?age"]);
+// Returns: [Map{"?person" => "alice", "?age" => 30}, Map{"?person" => "bob", "?age" => 25}]
 
-```javascript
-import { bl } from "@bassline/core";
-import "@bassline/cells";  // Auto-installs max gadget
-
-// Using installed gadgets
-const { packages } = bl();
-const maxProto = packages["@bassline/cells/numeric"].max;
-const gadget = maxProto.spawn(0);
-
-// Or use fromSpec (recommended)
-const gadget2 = bl().fromSpec({
-  pkg: "@bassline/cells/numeric",
-  name: "max",
-  state: 0
+// Watch for patterns (reactive)
+graph.watch([["?person", "age", "?age"]], (bindings) => {
+  console.log(`${bindings.get("?person")} is ${bindings.get("?age")} years old`);
 });
-
-// Use it
-gadget.receive(5);   // Accepted
-gadget.current();    // 5
-gadget.receive(3);   // Rejected (max only accepts increases)
 ```
 
-**Custom Gadgets**:
+**Key properties**:
+- Append-only (edges never removed, only marked deleted via tombstones)
+- Incremental pattern matching (patterns fire as edges accumulate)
+- O(1) lookup via selective activation indexes (see PERFORMANCE.md)
+- Variables (`?x`), wildcards (`*`), and NAC (Negative Application Conditions)
+
+### 2. Pattern Language
+
+A **declarative language** for graph manipulation:
 
 ```javascript
-import { bl } from "@bassline/core";
+import { Runtime } from '@bassline/parser/interactive';
 
-const counterProto = Object.create(bl().gadgetProto);
-Object.assign(counterProto, {
-  pkg: "@myapp/gadgets",
-  name: "counter",
-  step(state, input) {
-    if (input.increment) {
-      this.update(state + 1);
-    } else if (input.decrement) {
-      this.update(state - 1);
+const rt = new Runtime();
+
+// Add facts
+rt.eval('fact [alice age 30 bob age 25]');
+
+// Query
+rt.eval('query [?x age ?a]');
+
+// Create reactive rule
+rt.eval('rule adult-check [?p age ?a] -> [?p adult true]');
+
+// Single-word shorthand (explore an entity)
+rt.eval('alice');  // Expands to: query [alice ?attr ?target]
+```
+
+**Command types**:
+- `fact [...]` - Add triples
+- `query [...]` - Find matches (with optional NAC)
+- `rule name [...] -> [...]` - Reactive rewrite rules
+- `pattern name [...]` - Named observable patterns
+- `watch [...] [...]` - Watch and react
+- `delete s a t` - Mark triple as deleted (tombstone)
+- `clear-graph` - Reset everything
+- `graph-info` - Statistics
+
+### 3. Incremental Aggregations
+
+**Modular, versioned aggregations** with refinement chains:
+
+```javascript
+import { installAggregation, builtinAggregations, getCurrentValue } from '@bassline/parser/aggregation';
+
+// Install aggregation system
+installAggregation(graph, builtinAggregations);
+
+// Define aggregation
+graph.add("AGG1", "AGGREGATE", "SUM");
+
+// Add items (aggregation updates incrementally)
+graph.add("AGG1", "ITEM", 10);
+graph.add("AGG1", "ITEM", 20);
+graph.add("AGG1", "ITEM", 15);
+
+// Get current result (uses NAC to find non-refined version)
+getCurrentValue(graph, "AGG1");  // 45
+```
+
+**Built-in operations**: SUM, COUNT, AVG, MIN, MAX
+
+**Custom aggregations**:
+```javascript
+const customAggs = {
+  PRODUCT: {
+    initialState: { product: 1 },
+    accumulate(state, rawValue) {
+      const num = parseFloat(rawValue);
+      return isNaN(num) ? state : { product: state.product * num };
+    },
+    reduce(state) {
+      return state.product;
     }
   }
-});
+};
 
-const counter = counterProto.spawn(0);
-counter.receive({ increment: true });  // 1
-counter.receive({ increment: true });  // 2
-counter.receive({ decrement: true });  // 1
+installAggregation(graph, customAggs);
 ```
 
-### 3. Taps Extension (Mechanical Wiring)
+### 4. Refinement Pattern (Append-Only Updates)
+
+**How to "update" in an append-only system**:
 
 ```javascript
-import "@bassline/taps";  // Auto-installs on import!
+// Version 1
+graph.add("AGG1", "AGG1:RESULT:V1", 10);
 
-// Now all gadgets can be tapped
-const cleanup = gadget.tap(effects => {
-  console.log("Effects:", effects);
+// Version 2 (refines V1)
+graph.add("AGG1", "AGG1:RESULT:V2", 30);
+graph.add("AGG1:RESULT:V2", "REFINES", "AGG1:RESULT:V1");
+
+// Query for current (non-refined) value using NAC
+const current = graph.query({
+  patterns: [["AGG1", "?key", "?value"]],
+  nac: [["?newer", "REFINES", "?key"]]  // No newer version refines this
 });
-
-// Specific effect tapping
-gadget.tapOn("changed", newValue => {
-  console.log(`Changed to ${newValue}`);
-});
-
-// Cleanup when done
-cleanup();
 ```
 
-Taps are **fire-and-forget** - they can be sync or async, and the emitting gadget doesn't care about timing or delivery guarantees. This uniformity means the same gadget works in-memory, over network, or across processes without modification.
+This pattern enables:
+- Time-travel queries (inspect any version)
+- Incremental computation (only recompute what changed)
+- Distributed convergence (versions merge naturally)
 
-### 4. Lattice Operations (Cells)
+## Interactive Runtime (NEW!)
 
-Cells implement different merge strategies for moving up a lattice:
+**Minimal wrapper** for interactive use:
 
 ```javascript
-import { bl } from "@bassline/core";
-import "@bassline/cells";
+import { Runtime } from '@bassline/parser/interactive';
+import { formatResults } from '@bassline/parser/format';
 
-const { fromSpec } = bl();
+const rt = new Runtime();
 
-// Numeric cells (monotonic)
-const max = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-const min = fromSpec({ pkg: "@bassline/cells/numeric", name: "min", state: 100 });
+// Evaluate expressions
+const results = rt.eval('fact [alice age 30]');
+console.log(formatResults(results));
 
-// Set cells
-const union = fromSpec({ pkg: "@bassline/cells/set", name: "union", state: new Set() });
-const intersection = fromSpec({ pkg: "@bassline/cells/set", name: "intersection", state: new Set() });
+// Single-word exploration
+rt.eval('alice');  // Shows all edges about alice
 
-// Table cells
-const last = fromSpec({ pkg: "@bassline/cells/tables", name: "last", state: {} });
-const first = fromSpec({ pkg: "@bassline/cells/tables", name: "first", state: {} });
+// Convenience methods
+rt.query('?x age ?a');
+rt.fact('bob age 25');
 
-// Unsafe (no merge, always replace)
-const unsafe = fromSpec({ pkg: "@bassline/cells/unsafe", name: "last", state: 0 });
+// Introspection
+rt.getStats();         // {edges: 10, patterns: 2, rules: 3}
+rt.getActiveRules();   // ["ADULT-CHECK", "FRIEND-DETECTOR"]
+rt.getActivePatterns(); // ["PEOPLE-TRACKER"]
+
+// Serialization
+const json = rt.toJSON();
+rt.fromJSON(json);
+
+// Reset
+rt.reset();
 ```
 
-### 5. React Integration
+**REPL** (Command-line interface):
+```bash
+node packages/parser/examples/repl.js
+```
+
+Commands: `.help`, `.stats`, `.patterns`, `.rules`, `.reset`, `.exit`
+
+## Pattern Matching Performance
+
+**O(1) pattern matching** via selective activation indexes.
+
+Key insight: Don't check every pattern against every edge - **index patterns by their literals**:
 
 ```javascript
-import { useMemo } from "react";
-import { bl } from "@bassline/core";
-import { useGadget } from "@bassline/react";
-import "@bassline/cells";
+// When pattern is registered:
+graph.watch([["alice", "likes", "?x"]], callback);
+// Indexed: sourceIndex.get("alice").add(pattern)
 
-function Component() {
-  const gadget = useMemo(() =>
-    bl().fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 }),
-    []
-  );
-
-  // Subscribe to changed effect
-  const [count] = useGadget(gadget, ["changed"]);
-
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => gadget.receive(count + 1)}>Increment</button>
-    </div>
-  );
-}
+// When edge is added:
+graph.add("alice", "likes", "bob");
+// Only activates patterns indexed under "alice" (not all patterns!)
 ```
 
-**Key Innovation**: Simple hook-based integration. `useGadget(gadget, effects)` subscribes to specific effects and re-renders when they occur.
+**Performance**:
+- 20,000 patterns + 100,000 edges: **4.4M edges/sec**
+- Throughput stays constant regardless of pattern count
+- 67-235x faster than naive O(P × E) approach
 
-## Working with the Codebase
+See [PERFORMANCE.md](packages/parser/docs/PERFORMANCE.md) for details.
 
-### Creating Custom Gadgets
+## Self-Description
 
-All gadgets follow the prototype pattern:
+**Rules and patterns describe themselves as edges**:
 
 ```javascript
-import { bl, installPackage } from "@bassline/core";
+// When you create a rule:
+rt.eval('rule my-rule [?x age ?a] -> [?x adult true]');
 
-// 1. Create proto extending gadgetProto
-const counterProto = Object.create(bl().gadgetProto);
+// The graph automatically contains:
+// rule:MY-RULE type "rule"
+// rule:MY-RULE match "[["?X","AGE","?A"]]"
+// rule:MY-RULE produce "[["?X","ADULT","TRUE"]]"
+// rule:MY-RULE status "active"
 
-// 2. Define package/name and step function
-Object.assign(counterProto, {
-  pkg: "@myapp/gadgets",
-  name: "counter",
-
-  step(state, input) {
-    // Decide what to do based on input
-    if (input.increment) {
-      this.update(state + 1);
-    } else if (input.decrement) {
-      this.update(state - 1);
-    } else if (input.set !== undefined) {
-      this.update(input.set);
-    }
-    // If no match, do nothing (reject input)
-  }
-});
-
-// 3. Install the gadget
-installPackage({
-  gadgets: { counter: counterProto }
-});
-
-// 4. Use it
-const counter = bl().fromSpec({
-  pkg: "@myapp/gadgets",
-  name: "counter",
-  state: 0
-});
-
-counter.receive({ increment: true });  // 1
-counter.receive({ increment: true });  // 2
-counter.receive({ set: 10 });          // 10
-counter.receive({ decrement: true });  // 9
+// You can query this metadata:
+rt.eval('rule:MY-RULE');  // Shows all rule metadata
 ```
 
-### Extension Pattern (Install Functions)
-
-Extensions modify `gadgetProto` to add methods to all gadgets:
-
-```javascript
-import { bl } from "@bassline/core";
-
-export function installMyExtension() {
-  const { gadgetProto } = bl();
-
-  // Check if already installed
-  if (gadgetProto.myMethod !== undefined) {
-    return;
-  }
-
-  // Add methods to prototype
-  Object.assign(gadgetProto, {
-    myMethod() {
-      // Now all gadgets have this method
-      console.log("Extended!", this.current());
-    }
-  });
-}
-
-// Auto-install on import (common pattern)
-installMyExtension();
-```
-
-### Available Packages
-
-**@bassline/core** - Core protocol and package system
-- `bl()` - Access global bassline runtime
-- `installPackage(pkg)` - Install gadget packages
-- `fromSpec(spec)` - Create gadgets from specifications
-- Package loading/exporting for meta-circularity
-
-**@bassline/cells** - ACI merge strategies
-- `numeric` - Max, Min (monotonic numbers)
-- `set` - Union, Intersection (set operations)
-- `tables` - First, Last (table merge strategies)
-- `versioned` - Version-tracked values
-- `unsafe` - Last-write-wins (no merge)
-
-**@bassline/taps** - Observation extension
-- `tap(fn)` - Subscribe to all effects
-- `tapOn(key, fn)` - Subscribe to specific effect
-- Auto-installs on import
-
-**@bassline/functions** - Function composition
-- Map, partial application
-- Math, logic, array operations
-- HTTP request handling
-
-**@bassline/relations** - Gadget wiring
-- `wire` - Connect gadgets together
-- Connection management
-
-**@bassline/systems** - Compound gadgets
-- `compound` - Compose gadgets into systems
-- Meta-circular package description
-
-**@bassline/refs** - Reference types
-- `localRef` - Local scope references
-- `gadgetRef` - References to other gadgets
-- `fileRef`, `webRef` - External references
-
-**@bassline/react** - React hooks
-- `useGadget(gadget, effects)` - Subscribe and re-render
-- Works with any gadget
-
-**@bassline/metadata** - Metadata extension
-**@bassline/devtools** - Developer utilities
-**@bassline/registry** - Global gadget registry
+This enables:
+- Introspection (query what rules/patterns are active)
+- Meta-programming (patterns that watch for pattern definitions)
+- Serialization (save/load entire runtime state)
 
 ## Common Patterns
 
-### Bidirectional Sync
+### Cascading Rules
 
 ```javascript
-import { bl } from "@bassline/core";
-import "@bassline/cells";
-import "@bassline/taps";
+rt.eval('rule step1 [?x type person] -> [?x verified true]');
+rt.eval('rule step2 [?x verified true] -> [?x processed true]');
+rt.eval('rule step3 [?x processed true] -> [?x complete true]');
 
-const { fromSpec } = bl();
-
-const a = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-const b = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-
-a.tapOn("changed", (newValue) => b.receive(newValue));
-b.tapOn("changed", (newValue) => a.receive(newValue));
-
-a.receive(5);  // Both a and b become 5
+rt.eval('fact [alice type person]');
+// All three rules fire in sequence!
 ```
 
-### Async Propagation
+### NAC (Negative Application Conditions)
 
 ```javascript
-import { bl } from "@bassline/core";
-import "@bassline/cells";
-import "@bassline/taps";
+// Find people who are NOT deleted
+rt.eval('query [?x type person not ?x deleted true]');
 
-const { fromSpec } = bl();
-
-const source = fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: 0 });
-const delayed = fromSpec({ pkg: "@bassline/cells/unsafe", name: "last", state: 0 });
-
-source.tap(async ({ changed }) => {
-  if (changed !== undefined) {
-    await new Promise(r => setTimeout(r, 100));
-    delayed.receive(changed);
-  }
-});
+// Rule that only fires if person doesn't have status
+rt.eval('rule set-default [?p age ?a not ?p status *] -> [?p status active]');
 ```
 
-### Aggregation
+### Aggregation with Rules
 
 ```javascript
-import { bl } from "@bassline/core";
-import "@bassline/cells";
-import "@bassline/taps";
+// Set up aggregation
+rt.eval('fact [sales:2024 AGGREGATE SUM]');
 
-const { fromSpec } = bl();
+// Rule that feeds aggregation
+rt.eval('rule track-sales [?order total ?amount] -> [sales:2024 ITEM ?amount]');
 
-const nums = [1, 2, 3].map(n =>
-  fromSpec({ pkg: "@bassline/cells/numeric", name: "max", state: n })
-);
-const sum = fromSpec({ pkg: "@bassline/cells/unsafe", name: "last", state: 0 });
+// Add orders (aggregation updates automatically)
+rt.eval('fact [order:1 total 100 order:2 total 250]');
 
-nums.forEach(n => {
-  n.tap(() => {
-    const total = nums.reduce((acc, g) => acc + g.current(), 0);
-    sum.receive(total);
-  });
-});
+// Get result
+getCurrentValue(graph, "sales:2024");  // 350
 ```
 
-## Philosophy Reminders
+### Computed Values
 
-- **Don't fight the model** - if something feels hard, you're probably trying to bake in too much
-- **Everything is fire-and-forget** - effects AND taps don't guarantee delivery or timing
-- **Keep gadgets focused** - combine simple gadgets rather than making complex ones
-- **Embrace partial information** - not knowing everything is a feature
-- **Communication is just another gadget** - routers, channels, spaces are all gadgets
-- **Prototype extensions over wrappers** - modify gadgetProto, don't wrap gadgets
+```javascript
+import { installCompute } from '@bassline/parser/compute';
+
+installCompute(graph);
+
+// Set up computation
+graph.add("CALC1", "OP", "ADD");
+graph.add("CALC1", "X", 10);
+graph.add("CALC1", "Y", 20);
+
+// Result is automatically computed
+graph.query(["CALC1", "RESULT", "?r"]);  // 30
+```
+
+## Package Exports
+
+```json
+{
+  ".": "./src/minimal-graph.js",           // Graph class
+  "./graph": "./src/minimal-graph.js",     // Graph class
+  "./parser": "./src/pattern-parser.js",   // Pattern parser
+  "./runtime": "./src/pattern-words.js",   // Runtime executor
+  "./interactive": "./src/interactive-runtime.js",  // Interactive wrapper
+  "./format": "./src/format-results.js",   // Result formatter
+  "./compute": "./extensions/compute.js",  // Compute operations
+  "./aggregation": "./extensions/aggregation/index.js"  // Aggregations
+}
+```
+
+## Test Coverage
+
+**All tests passing**:
+- `minimal-graph.test.js` - Core graph & pattern matching
+- `aggregation.test.js` - 35 tests for modular aggregations
+- `interactive-runtime.test.js` - 20 tests for runtime & REPL
+- `pattern-parser.test.js` - Parser tests
+- `nac-parser.test.js` - NAC syntax tests
+
+## Design Principles
+
+1. **Append-only** - Never delete, only add (tombstones for deletion)
+2. **Incremental** - Patterns fire as edges accumulate (no batch queries needed)
+3. **Reactive** - Rules automatically maintain invariants
+4. **Queryable** - All state is edges, all edges are queryable
+5. **Modular** - Extensions add capabilities without core changes
+6. **Self-describing** - Rules/patterns store themselves as edges
+7. **O(1) matching** - Selective activation via indexing (not naive O(P × E))
 
 ## Debugging Tips
 
-1. **Tap everything during development**:
 ```javascript
-gadget.tap(e => console.log('Effect:', e));
+// 1. Inspect graph state
+rt.eval('graph-info');  // Statistics
+rt.getStats();          // {edges, patterns, rules}
+
+// 2. Explore entities
+rt.eval('alice');       // All edges about alice
+rt.eval('rule:MY-RULE'); // All metadata about rule
+
+// 3. Query patterns
+rt.eval('query [?s ?a ?t]');  // All edges
+
+// 4. Check active patterns/rules
+rt.getActivePatterns();  // List all patterns
+rt.getActiveRules();     // List all rules
+
+// 5. Reset if confused
+rt.reset();  // Clear everything
 ```
 
-2. **Check step logic first** - most bugs are in deciding what action to take
+## Anti-Patterns
 
-3. **Use devtools** (if available):
-```javascript
-import { installBassline } from "@bassline/core/devtools";
-installBassline(); // Adds window.bassline
-```
+❌ **Don't** mutate graph state outside of `graph.add()`
+❌ **Don't** assume pattern firing order (incremental = order depends on edge arrival)
+❌ **Don't** create infinite rule cascades (rule A → B → A → ...)
+❌ **Don't** use external state in watchers (keeps state in graph)
+❌ **Don't** forget NAC can be expensive (check what it filters)
 
-4. **Build trace gadgets for time-travel debugging**:
-```javascript
-const tracer = new tables.Last({});
-gadget.tap(effect => {
-  const timestamp = Date.now();
-  tracer.receive({ [timestamp]: { state: gadget.current(), effect } });
-});
-// Now tracer.current() has full history for replay
-```
+## Philosophy
 
-## Anti-Patterns to Avoid
+This system unifies:
+- **Datalog** - Logic programming over facts
+- **Reactive programming** - Automatic propagation via watchers
+- **CQRS/Event Sourcing** - Append-only log with projections
+- **Incremental view maintenance** - Update derived state as base data changes
 
-❌ **Don't** put communication logic in gadget step/handle methods
-❌ **Don't** make effects dependent on external state
-❌ **Don't** use async operations inside step/handle (async taps are fine!)
-❌ **Don't** mutate state directly - always use gadget.update()
-❌ **Don't** forget to install extensions before using them
-❌ **Don't** create circular dependencies without careful thought about termination
-❌ **Don't** assume taps execute synchronously or in order
+Everything is **edges** (triples). Patterns are **queries** that react. Computation is **incremental** and **observable**.
 
-## Advanced Patterns
+The goal: **Maximal expressiveness from minimal primitives**.
 
-### Async Taps
-```javascript
-// Taps can be async - fire-and-forget works across async boundaries
-gadget.tap(async (effect) => {
-  if ('changed' in effect) {
-    await fetch('/api/log', {
-      method: 'POST',
-      body: JSON.stringify(effect)
-    });
-  }
-});
+## What's Next
 
-// Or spawn background processing
-gadget.tap(effect => {
-  setTimeout(() => otherGadget.receive(effect.changed?.newState), 1000);
-});
-```
+Current capabilities:
+- ✅ Pattern matching with O(1) selective activation
+- ✅ Reactive rules and watchers
+- ✅ Modular aggregations with refinement
+- ✅ Interactive runtime + REPL
+- ✅ Self-description and introspection
 
-### Distributed Gadgets
-```javascript
-// Fire-and-forget taps naturally support distributed systems
-const local = new numeric.Max(0);
+Future directions:
+- Distributed graph (sync across nodes)
+- Persistence layer (durability)
+- Advanced aggregations (windowing, joins)
+- Query optimization (plan generation)
+- Visual graph explorer
 
-// Could be across network, IPC, WebSocket, etc.
-local.tap(({ changed }) => {
-  if (changed !== undefined) {
-    websocket.send(JSON.stringify({ type: 'sync', value: changed.newState }));
-  }
-});
+---
 
-// No changes needed to the gadget model - distribution is just async taps
-```
-
-### Custom Extensions
-
-```javascript
-// Example: Add logging to all gadgets
-export function installLogging() {
-  const originalReceive = gadgetProto.receive;
-
-  Object.assign(gadgetProto, {
-    receive(input) {
-      console.log(`[${this.constructor.name}] receive:`, input);
-      return originalReceive.call(this, input);
-    }
-  });
-}
-```
-
-## No Bundler Needed
-
-All packages are vanilla ES modules with no build step:
-
-**Package structure:**
-```json
-{
-  "name": "@bassline/[package]",
-  "type": "module",
-  "main": "./src/index.js",
-  "exports": {
-    ".": "./src/index.js"
-  }
-}
-```
-
-Each package auto-installs on import. Consuming apps (like Vite) handle bundling. We ship source directly.
-
-## Meta-Circularity: Package Description Language
-
-The system can describe and extend itself using its own primitives:
-
-```javascript
-import { bl } from "@bassline/core";
-import "@bassline/systems";
-
-// Create a compound gadget (gadgets composed of other gadgets)
-const myCompound = bl().fromSpec({
-  pkg: "@bassline/systems",
-  name: "compound",
-  state: {
-    imports: { cells: "@bassline/cells/numeric" },
-    gadgets: {
-      threshold: { type: "cells.max", state: 50 },
-      input: { type: "cells.max", state: 0 }
-    }
-  }
-});
-
-// Export it as a reusable package definition
-import { exportAsPackage, savePackage } from "@bassline/core";
-
-const packageDef = exportAsPackage(myCompound.toSpec(), {
-  name: "@myapp/filters",
-  gadgetName: "valueFilter"
-});
-
-await savePackage(packageDef, "./my-filter.json");
-
-// Load it back and use it
-import { loadPackageFromFile } from "@bassline/core";
-
-await loadPackageFromFile("./my-filter.json");
-
-// Now it's available like any built-in gadget
-const filter = bl().fromSpec({
-  pkg: "@myapp/filters",
-  name: "valueFilter",
-  state: { threshold: 100 }
-});
-```
-
-**This closes the loop**: The system can now describe itself as data, load new capabilities from data, and export runtime structures as reusable types.
-
-## Remember
-
-This system's power comes from its **minimalism** and **semantic openness**. The core is intentionally simple - complexity emerges from composition. When in doubt, make another gadget rather than making existing gadgets more complex.
-
-Both effects and taps are **fire-and-forget** - this isn't a limitation, it's what enables the model to work across any transport (memory, network, IPC) without changes. Timing and delivery are concerns for meta-gadgets if needed, not the core model.
-
-The prototype-based extension system means **one install, universal behavior**. No wrappers, no providers, no ceremony.
-
-The goal is to do more than anyone else in the world not by having more features, but by having the right primitive that composes infinitely.
+**Remember**: The power is in the **pattern**. Keep the core simple. Build everything as patterns watching edges.

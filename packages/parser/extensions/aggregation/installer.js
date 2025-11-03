@@ -22,8 +22,18 @@ export function installAggregation(graph, definitions) {
   // Build a map of normalized operation names to definitions
   const normalizedDefs = new Map();
   for (const [opName, def] of Object.entries(definitions)) {
-    normalizedDefs.set(opName.toUpperCase(), def);
+    const normalized = opName.toUpperCase();
+    normalizedDefs.set(normalized, def);
+
+    // Self-describe each aggregation type
+    graph.add(normalized, "TYPE", "AGGREGATION!");
+    if (def.docs) {
+      graph.add(normalized, "DOCS", def.docs);
+    }
   }
+
+  // Mark AGGREGATION! as a type
+  graph.add("AGGREGATION!", "TYPE", "TYPE!");
 
   // Watch for any AGGREGATE edge and check if it matches a definition (case-insensitive)
   graph.watch([["?A", "AGGREGATE", "?OP"]], (bindings) => {

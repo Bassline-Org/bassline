@@ -10,11 +10,35 @@
  * @returns {string} Formatted string for display
  */
 export function formatResults(results) {
-  if (!results || results.length === 0) {
+  // Handle null/undefined
+  if (results === null || results === undefined) {
     return "(no results)";
   }
 
-  // Get first result to determine type
+  // Handle single string result (e.g., from delete command)
+  if (typeof results === 'string') {
+    return results;
+  }
+
+  // Handle empty array
+  if (Array.isArray(results) && results.length === 0) {
+    return "(no results)";
+  }
+
+  // Handle non-array results
+  if (!Array.isArray(results)) {
+    // Single object result (e.g., graph-info, watch)
+    if (typeof results === 'object' && results !== null) {
+      if (results.unwatch && typeof results.unwatch === 'function') {
+        return `Watch registered`;
+      }
+      return JSON.stringify(results, null, 2);
+    }
+    // Fallback for other single values
+    return String(results);
+  }
+
+  // At this point, results is a non-empty array
   const first = results[0];
 
   // Array of Maps (query results - variable bindings)
@@ -27,12 +51,12 @@ export function formatResults(results) {
     return `Added ${results.length} edge(s): ${results.join(', ')}`;
   }
 
-  // String (rule/pattern names, or status messages)
+  // Array of strings (rule/pattern names, or status messages)
   if (typeof first === 'string') {
     return results.join(', ');
   }
 
-  // Object (graph-info results, or watch objects)
+  // Array of objects (graph-info results, or watch objects)
   if (typeof first === 'object' && first !== null) {
     // Handle watch objects specially
     if (first.unwatch && typeof first.unwatch === 'function') {

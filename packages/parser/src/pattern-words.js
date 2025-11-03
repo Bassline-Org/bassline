@@ -59,8 +59,8 @@ export function executeCommand(graph, command, context = {}) {
 
       const unwatch = graph.watch(spec, (bindings) => {
         // Record match in graph
-        const matchId = `match:${Date.now()}:${Math.random()}`;
-        graph.add(`pattern:${command.name}`, "MATCHED", matchId);
+        const matchId = `MATCH:${Date.now()}:${Math.random()}`;
+        graph.add(command.name, "MATCHED", matchId);
 
         // Store bindings
         bindings.forEach((value, varName) => {
@@ -69,13 +69,15 @@ export function executeCommand(graph, command, context = {}) {
       });
 
       // Register pattern as triples for self-description
-      const patternId = `pattern:${command.name}`;
-      graph.add(patternId, "type", "pattern");
-      graph.add(patternId, "match", JSON.stringify(command.patterns));
+      graph.add(command.name, "TYPE", "PATTERN!");
+      graph.add(command.name, "MATCH", JSON.stringify(command.patterns));
       if (command.nac && command.nac.length > 0) {
-        graph.add(patternId, "nac", JSON.stringify(command.nac));
+        graph.add(command.name, "NAC", JSON.stringify(command.nac));
       }
-      graph.add(patternId, "status", "active");
+      graph.add(command.name, "STATUS", "ACTIVE");
+
+      // Mark PATTERN! as a type (idempotent)
+      graph.add("PATTERN!", "TYPE", "TYPE!");
 
       // Store in context
       if (!context.patterns) context.patterns = new Map();
@@ -104,21 +106,23 @@ export function executeCommand(graph, command, context = {}) {
         }
 
         // Record rule firing
-        graph.add(`rule:${command.name}`, "FIRED", Date.now());
+        graph.add(command.name, "FIRED", Date.now());
       });
 
       // Register rule as triples for self-description
-      const ruleId = `rule:${command.name}`;
-      graph.add(ruleId, "type", "rule");
-      graph.add(ruleId, "match", JSON.stringify(command.match));
+      graph.add(command.name, "TYPE", "RULE!");
+      graph.add(command.name, "MATCH", JSON.stringify(command.match));
       if (command.matchNac && command.matchNac.length > 0) {
-        graph.add(ruleId, "match-nac", JSON.stringify(command.matchNac));
+        graph.add(command.name, "MATCH-NAC", JSON.stringify(command.matchNac));
       }
-      graph.add(ruleId, "produce", JSON.stringify(command.produce));
+      graph.add(command.name, "PRODUCE", JSON.stringify(command.produce));
       if (command.produceNac && command.produceNac.length > 0) {
-        graph.add(ruleId, "produce-nac", JSON.stringify(command.produceNac));
+        graph.add(command.name, "PRODUCE-NAC", JSON.stringify(command.produceNac));
       }
-      graph.add(ruleId, "status", "active");
+      graph.add(command.name, "STATUS", "ACTIVE");
+
+      // Mark RULE! as a type (idempotent)
+      graph.add("RULE!", "TYPE", "TYPE!");
 
       // Store in context
       if (!context.rules) context.rules = new Map();
@@ -158,11 +162,15 @@ export function executeCommand(graph, command, context = {}) {
     case "delete": {
       // Delete: create tombstone for triple
       const [source, attr, target] = command.triple;
-      const tombstoneId = `tombstone:${source}:${attr}:${target}`;
-      graph.add(tombstoneId, "DELETED", true);
+      const tombstoneId = `TOMBSTONE-${Date.now()}-${Math.random()}`;
+      graph.add(tombstoneId, "TYPE", "TOMBSTONE!");
       graph.add(tombstoneId, "SOURCE", source);
       graph.add(tombstoneId, "ATTR", attr);
       graph.add(tombstoneId, "TARGET", target);
+
+      // Mark TOMBSTONE! as a type (idempotent)
+      graph.add("TOMBSTONE!", "TYPE", "TYPE!");
+
       return tombstoneId;
     }
 
