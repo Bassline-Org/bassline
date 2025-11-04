@@ -1,0 +1,18 @@
+fact [
+    inspector-view {
+        type view!
+        docs "A view that displays the edges of a node in the graph"
+    }
+
+    table-view {
+        type view!
+        docs "A view that displays the contents of a node in a table according to the columns specified"
+    }
+
+    example-foo {
+        view table-view
+        column {
+            name "Name"
+        }
+    }
+]

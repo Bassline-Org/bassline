@@ -13,6 +13,7 @@ const runtime = new Runtime();
 // DOM elements
 const queryInput = document.getElementById("query-input");
 const executeBtn = document.getElementById("execute-btn");
+const undoBtn = document.getElementById("undo-btn");
 const clearBtn = document.getElementById("clear-btn");
 const resultsContainer = document.getElementById("results-container");
 const contextMenu = document.getElementById("context-menu");
@@ -30,9 +31,21 @@ function executeQuery() {
   try {
     const result = runtime.eval(input);
     displayResults(input, result);
+    updateHistoryControls();
+    populateHistorySection();
   } catch (error) {
     displayError(error.message);
   }
+}
+
+/**
+ * Update history controls (undo button state, etc.)
+ */
+function updateHistoryControls() {
+  undoBtn.disabled = runtime.evalHistory.length === 0;
+  undoBtn.textContent = runtime.evalHistory.length > 0
+    ? `↶ Undo (${runtime.evalHistory.length})`
+    : '↶ Undo';
 }
 
 /**
@@ -236,6 +249,17 @@ function clearResults() {
 
 // Event listeners
 executeBtn.addEventListener("click", executeQuery);
+undoBtn.addEventListener("click", () => {
+  if (runtime.evalHistory.length > 0) {
+    runtime.undo();
+    updateHistoryControls();
+    populateHistorySection();
+    populateDiscoverySection();
+    populateExamplesSection();
+    populateSystemSection();
+    clearResults();
+  }
+});
 clearBtn.addEventListener("click", clearResults);
 
 // Execute on Enter (with Shift+Enter for newline)
@@ -450,6 +474,44 @@ function populateExamplesSection() {
 }
 
 /**
+ * Populate History Section
+ */
+function populateHistorySection() {
+  const history = runtime.evalHistory || [];
+  const historyContainer = document.getElementById("history-section");
+  historyContainer.innerHTML = "";
+
+  if (history.length === 0) {
+    historyContainer.innerHTML = '<p class="sidebar-empty">No history yet</p>';
+    return;
+  }
+
+  // Show most recent commands first (reverse order)
+  const recentHistory = history.slice().reverse().slice(0, 10);
+
+  recentHistory.forEach((command, reverseIndex) => {
+    const actualIndex = history.length - 1 - reverseIndex;
+    const historyItem = document.createElement("div");
+    historyItem.className = "sidebar-item history-item";
+
+    // Truncate long commands
+    const displayCommand = command.length > 40
+      ? command.substring(0, 37) + "..."
+      : command;
+
+    historyItem.textContent = `${actualIndex + 1}. ${displayCommand}`;
+    historyItem.title = command; // Show full command on hover
+
+    historyItem.addEventListener("click", () => {
+      queryInput.value = command;
+      queryInput.focus();
+    });
+
+    historyContainer.appendChild(historyItem);
+  });
+}
+
+/**
  * Populate System Section
  */
 function populateSystemSection() {
@@ -509,8 +571,10 @@ function initializeSidebar() {
   bootstrapExamples();
   populateDiscoverySection();
   populateExamplesSection();
+  populateHistorySection();
   populateSystemSection();
   setupWatchers();
+  updateHistoryControls();
 }
 
 // Load some example data on startup

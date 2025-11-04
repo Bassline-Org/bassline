@@ -5,7 +5,7 @@
  * Uses data-driven definitions and pattern-triggered execution.
  */
 
-import { builtinEffects } from './definitions.js';
+import { builtinEffects } from "./definitions.js";
 
 /**
  * Install effect watchers on a graph
@@ -35,7 +35,7 @@ export function installEffects(graph, effects = builtinEffects) {
   // Effect execution watcher: [?E EFFECT ?NAME] [?E INPUT ?data]
   graph.watch([
     ["?E", "EFFECT", "?NAME"],
-    ["?E", "INPUT", "?DATA"]
+    ["?E", "INPUT", "?DATA"],
   ], async (bindings) => {
     const effectId = bindings.get("?E");
     const effectName = bindings.get("?NAME").toString().toUpperCase();

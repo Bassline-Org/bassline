@@ -120,6 +120,16 @@ header p {
   transform: translateX(3px);
 }
 
+.history-item {
+  font-size: 0.85em;
+  background: #fff5e6;
+}
+
+.history-item:hover {
+  background: #e67e22;
+  color: white;
+}
+
 .example-card {
   padding: 10px 12px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -233,6 +243,21 @@ button {
 
 #execute-btn:hover {
   background: #2980b9;
+}
+
+#undo-btn {
+  background: #e67e22;
+  color: white;
+}
+
+#undo-btn:hover:not(:disabled) {
+  background: #d35400;
+}
+
+#undo-btn:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 #clear-btn {

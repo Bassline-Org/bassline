@@ -28,6 +28,15 @@ import { formatResults } from "../src/format-results.js";
 
 const rt = new Runtime();
 
+const args = process.argv.slice(2);
+if (args.length > 0) {
+  const file = args[0];
+  console.log(`Loading file: ${file}`);
+  const code = fs.readFileSync(file, "utf8");
+  rt.eval(code);
+  console.log(`Loaded ${file}`);
+}
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -176,7 +185,11 @@ function handleReplCommand(cmd) {
           console.log("No checkpoints available");
         } else {
           console.log("Available checkpoints:");
-          cps.forEach(cp => console.log(`  ${cp.name} (${new Date(cp.timestamp).toLocaleTimeString()})`));
+          cps.forEach((cp) =>
+            console.log(
+              `  ${cp.name} (${new Date(cp.timestamp).toLocaleTimeString()})`,
+            )
+          );
         }
       } else {
         try {
@@ -232,7 +245,7 @@ function handleReplCommand(cmd) {
         break;
       }
       try {
-        const data = JSON.parse(fs.readFileSync(parts[1], 'utf8'));
+        const data = JSON.parse(fs.readFileSync(parts[1], "utf8"));
         rt.fromJSON(data);
 
         // Restore history and checkpoints if present
@@ -240,12 +253,14 @@ function handleReplCommand(cmd) {
           rt.evalHistory = data.evalHistory;
         }
         if (data.checkpoints) {
-          rt.checkpoints = new Map(data.checkpoints.map(cp => [cp.name, cp]));
+          rt.checkpoints = new Map(data.checkpoints.map((cp) => [cp.name, cp]));
         }
 
         console.log(`Loaded ${data.edges?.length || 0} edges from ${parts[1]}`);
         if (data.evalHistory) {
-          console.log(`Restored ${data.evalHistory.length} commands in history`);
+          console.log(
+            `Restored ${data.evalHistory.length} commands in history`,
+          );
         }
         if (data.checkpoints) {
           console.log(`Restored ${data.checkpoints.length} checkpoint(s)`);
@@ -270,7 +285,7 @@ function handleReplCommand(cmd) {
         const historyToSave = rt.evalHistory.slice(0, cp.historyIndex);
         const data = {
           checkpoint: cp,
-          evalHistory: historyToSave
+          evalHistory: historyToSave,
         };
         fs.writeFileSync(parts[2], JSON.stringify(data, null, 2));
         console.log(`Saved checkpoint '${parts[1]}' to ${parts[2]}`);
@@ -286,13 +301,13 @@ function handleReplCommand(cmd) {
         break;
       }
       try {
-        const data = JSON.parse(fs.readFileSync(parts[1], 'utf8'));
+        const data = JSON.parse(fs.readFileSync(parts[1], "utf8"));
         rt.reset();
         rt.evalHistory = [];
 
         // Replay history
         if (data.evalHistory) {
-          data.evalHistory.forEach(cmd => {
+          data.evalHistory.forEach((cmd) => {
             rt._executeEval(cmd);
             rt.evalHistory.push(cmd);
           });
@@ -331,14 +346,22 @@ function showHelp() {
   console.log("REPL Commands:");
   console.log("  .help                          Show this help");
   console.log("  .checkpoint [name] / .cp       Create checkpoint");
-  console.log("  .restore [name]                Restore checkpoint (or list all)");
-  console.log("  .undo [N]                      Undo last N commands (default: 1)");
-  console.log("  .history [N]                   Show last N commands (default: 10)");
+  console.log(
+    "  .restore [name]                Restore checkpoint (or list all)",
+  );
+  console.log(
+    "  .undo [N]                      Undo last N commands (default: 1)",
+  );
+  console.log(
+    "  .history [N]                   Show last N commands (default: 10)",
+  );
   console.log("  .save <file>                   Save session with history");
   console.log("  .load <file>                   Load session from file");
   console.log("  .save-checkpoint <cp> <file>   Save specific checkpoint");
   console.log("  .load-checkpoint <file>        Load checkpoint from file");
-  console.log("  .reset                         Clear graph and remove all watchers");
+  console.log(
+    "  .reset                         Clear graph and remove all watchers",
+  );
   console.log("  .exit / .quit                  Exit REPL");
   console.log("");
   console.log("Pattern Language:");
@@ -352,7 +375,9 @@ function showHelp() {
   console.log("  graph-info                     Show graph statistics");
   console.log("");
   console.log("Single-word Shorthand:");
-  console.log("  alice                          Expands to: query [alice ?attr ?target]");
+  console.log(
+    "  alice                          Expands to: query [alice ?attr ?target]",
+  );
   console.log("");
   console.log("System Reflection (via queries):");
   console.log("  query [?r TYPE RULE!]          List all rules");
@@ -364,9 +389,13 @@ function showHelp() {
   console.log("  query [ADD DOCS ?d]            Get operation documentation");
   console.log("");
   console.log("Effects (Side-Effects):");
-  console.log("  fact [log1 { EFFECT LOG INPUT \"msg\" }]   Execute LOG effect");
-  console.log("  query [log1 RESULT ?r]                     Query effect result");
-  console.log("  (Note: Filesystem effects require Node.js and opt-in installation)");
+  console.log('  fact [log1 { EFFECT LOG INPUT "msg" }]   Execute LOG effect');
+  console.log(
+    "  query [log1 RESULT ?r]                     Query effect result",
+  );
+  console.log(
+    "  (Note: Filesystem effects require Node.js and opt-in installation)",
+  );
   console.log("");
   console.log("Examples:");
   console.log("  fact [alice age 30 bob age 25]");
