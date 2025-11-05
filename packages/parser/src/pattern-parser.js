@@ -9,6 +9,7 @@
 
 import {
   anyChar,
+  between,
   char,
   choice,
   digits,
@@ -50,10 +51,11 @@ const ws1 = many1(whitespace);
 
 // Number: 42, -3.14
 const number = sequenceOf([
+  ws,
   possibly(char("-")),
   digits,
   possibly(sequenceOf([char("."), digits]).map(([, decimal]) => decimal)),
-]).map(([sign, whole, decimal]) =>
+]).map(([_, sign, whole, decimal]) =>
   Number((sign ?? "") + whole + (decimal ?? ""))
 );
 
@@ -65,10 +67,11 @@ const stringChar = choice([
 ]);
 
 const string = sequenceOf([
+  ws,
   char('"'),
   many(stringChar),
   char('"'),
-]).map(([_, chars, __]) => {
+]).map(([_, __, chars, ___]) => {
   return chars.join("");
 });
 
@@ -88,41 +91,41 @@ const wordChars = sequenceOf([
 ]).map(([chars]) => chars.toUpperCase());
 
 const patternVar = sequenceOf([
+  ws,
   char("?"),
   wordChars,
-]).map(([_, chars]) => {
+]).map(([_, __, chars]) => {
   return {
     pattern: chars,
   };
 });
 
-const wild = char("_").map(() => {
+const wild = sequenceOf([ws, char("_")]).map(([_, __]) => {
   return {
     wild: true,
   };
 });
 
 const word = sequenceOf([
+  ws,
   letter.map((c) => c.toUpperCase()),
   wordChars,
-]).map(([start, chars]) => {
+]).map(([_, start, chars]) => {
   return {
     word: start + chars,
   };
 });
 
 const litWord = sequenceOf([
+  ws,
   char("'"),
   choice([patternVar, wild, word]),
-]).map(([_, word]) => ({
+]).map(([_, __, word]) => ({
   literal: true,
   ...word,
 }));
 
-const scalar = sequenceOf([
-  ws,
-  choice([number, string, wild, litWord, patternVar, word]),
-]).map(([_, value]) => value);
+const scalar = choice([number, string, wild, litWord, patternVar, word]);
 
 // ============================================================================
 // Compound values
@@ -145,31 +148,33 @@ const value = recursiveParser(() => {
   ]);
 });
 
-const objEntry = sequenceOf([
-  ws,
-  scalar,
-  ws,
-  value,
-  ws,
-]).map(([_, key, __, value]) => [key, value]);
-
 /**
- * A triple is [entity, attribute, val]
- * Entity, attribute, and val are all of type scalar
+ * A triple is entity, attribute, val
+ * Entity, attribute, are scalar
+ * val can be a compound
  */
 const triple = sequenceOf([
-  ws,
   scalar,
-  ws,
   scalar,
-  ws,
+  value,
+]).map((
+  [entity, attribute, value],
+) => {
+  if (value.triples) {
+    return [...value.triples, [entity, attribute, value.id]];
+  } else {
+    return [[entity, attribute, value]];
+  }
+});
+
+const objEntry = sequenceOf([
   scalar,
-  ws,
-]).map(([_, entity, __, attribute, ___, value]) => [entity, attribute, value]);
+  value,
+]);
 
 const obj = sequenceOf([
-  char("{"),
   ws,
+  char("{"),
   many(
     objEntry,
   ),
@@ -177,16 +182,17 @@ const obj = sequenceOf([
   char("}"),
 ]).map(([_, __, entries]) => {
   const id = { word: `obj-${crypto.randomUUID()}` };
-  let triples = [];
-  triples.push([id, { word: "TYPE?" }, { word: "OBJECT!" }]);
-  entries.forEach(([attr, val]) => {
-    if (val.type === "object" || val.type === "list") {
-      triples = triples.concat(val.triples);
-      triples.push([id, attr, val.id]);
-    } else {
-      triples.push([id, attr, val]);
+  const triples = entries.reduce((acc, [attr, val]) => {
+    if (val.triples) {
+      return [
+        ...acc,
+        ...val.triples,
+        [id, attr, val.id],
+      ];
     }
-  });
+    return [...acc, [id, attr, val]];
+  }, [[id, { word: "TYPE?" }, { word: "OBJECT!" }]]);
+
   return {
     type: "object",
     id,
@@ -195,26 +201,19 @@ const obj = sequenceOf([
 });
 
 const list = sequenceOf([
-  char("["),
   ws,
-  many(
-    sequenceOf([
-      value,
-      ws,
-    ]).map(([val, _]) => val),
-  ),
+  char("["),
+  many(value),
+  ws,
   char("]"),
 ]).map(([_, __, values]) => {
   const id = { word: `list-${crypto.randomUUID()}` };
-  let triples = [];
-  triples.push([id, { word: "TYPE?" }, { word: "LIST!" }]);
-  values.forEach((val, index) => {
-    if (val.type === "object" || val.type === "list") {
-      triples = triples.concat(val.triples);
-    } else {
-      triples.push([id, index, val]);
+  const triples = values.reduce((acc, val, index) => {
+    if (val.triples) {
+      return [...acc, ...val.triples, [id, index, val.id]];
     }
-  });
+    return [...acc, [id, index, val]];
+  }, [[id, { word: "TYPE?" }, { word: "LIST!" }]]);
   return {
     type: "list",
     id,
@@ -222,417 +221,95 @@ const list = sequenceOf([
   };
 });
 
-const commandParser = (commandName, bodyParser) => {
-  const head = sequenceOf([
-    ws,
-    str(commandName),
-    ws,
-    char("{"),
-  ]);
-  const tail = sequenceOf([
-    ws,
-    char("}"),
-  ]);
-  return sequenceOf([
-    head,
-    bodyParser,
-    tail,
-  ]).map(([_, body]) => body);
-};
+const triples = many(
+  choice([
+    obj.map((obj) => obj.triples),
+    list.map((list) => list.triples),
+    triple,
+  ]),
+).map((triples) => triples.reduce((acc, triple) => [...acc, ...triple], []));
 
-const insert = commandParser(
-  "insert",
-  many(objEntry)
-    .map((entries) => {
-      let triples = [];
-      const root = { word: "root" };
-      entries.forEach(([attr, val]) => {
-        if (val.type === "object" || val.type === "list") {
-          triples = triples.concat(val.triples);
-          triples.push([root, attr, val.id]);
-        } else {
-          triples.push([root, attr, val]);
-        }
-      });
-      return { insert: triples };
-    }),
-);
-
-const where = commandParser(
-  "where",
-  many(triple).map((triples) => ({ where: triples })),
-);
-const not = commandParser(
-  "not",
-  many(triple).map((triples) => ({ not: triples })),
-);
-
-const query = commandParser(
-  "query",
+const cmd = (name) => sequenceOf([ws, str(name)]).map(([_, name]) => name);
+const body = (parser) =>
   sequenceOf([
-    where,
-    not,
-  ]).map(([where, not]) => {
-    return {
-      where: where.where,
-      not: not?.not ?? [],
-    };
-  }),
-);
+    sequenceOf([ws, char("{")]),
+    parser,
+    sequenceOf([ws, char("}")]),
+  ]).map(([_, body]) => body);
+
+const insert = sequenceOf([
+  cmd("insert"),
+  body(triples),
+]).map(([_, trips]) => {
+  return { insert: trips };
+});
+
+const where = sequenceOf([
+  cmd("where"),
+  body(triples),
+]).map(([_, trips]) => {
+  return { where: trips };
+});
+
+const not = sequenceOf([
+  cmd("not"),
+  body(triples),
+]).map(([_, trips]) => {
+  return { not: trips };
+});
+
+const select = sequenceOf([
+  cmd("select"),
+  where,
+  possibly(not),
+]).map(([_, { where }, { not }]) => {
+  return {
+    select: {
+      where,
+      not: not ?? [],
+    },
+  };
+});
 
 const ruleHead = sequenceOf([
+  cmd("rule"),
   ws,
-  str("rule"),
-  ws,
-  wordChars,
-  ws,
-  char("{"),
-]).map((results) => results[3]);
+  word,
+]).map(([_, __, { word }]) => ({ name: word }));
 
 const rule = sequenceOf([
   ruleHead,
   where,
   possibly(not),
   insert,
-  ws,
-  char("}"),
-]).map(([name, where, not, insert]) => ({
-  rule: {
-    name,
-    ...where,
-    ...(not ?? {}),
-    ...insert,
-  },
-}));
+]).map(([{ name }, { where }, not, { insert }]) => {
+  return {
+    rule: {
+      name,
+      where,
+      not: not?.not ?? [],
+      insert,
+    },
+  };
+});
 
-const command = choice([
-  insert,
-  query,
-  rule,
-]);
-
-const program = many(command);
-
-// // Either a single triple or object syntax
-// const tripleOrObject = choice([
-//   objectTriples, // Returns array of triples
-//   triple.map((t) => [t]), // Wrap single triple in array for consistency
-// ]);
-
-// // Multiple triples or objects
-// const triples = sequenceOf([
-//   tripleOrObject,
-//   many(sequenceOf([ws, tripleOrObject]).map(([_, t]) => t)),
-// ]).map(([first, rest]) => first.concat(...rest)); // Flatten arrays
-
-// // Block of triples: [alice type person ...]
-// const block = sequenceOf([
-//   char("["),
-//   ws,
-//   triples,
-//   ws,
-//   char("]"),
-// ]).map(([_, __, ts]) => ts);
-
-// // Empty block: []
-// const emptyBlock = sequenceOf([
-//   char("["),
-//   ws,
-//   char("]"),
-// ]).map(() => []);
-
-// // Block or empty
-// const tripleBlock = choice([block, emptyBlock]);
-
-// // ============================================================================
-// // Pattern Specifications (for queries and rules)
-// // ============================================================================
-
-// // NAC (Negative Application Condition) pattern: not ?x deleted true
-// const nacTriple = sequenceOf([
-//   str("not"),
-//   ws1,
-//   element,
-//   ws1,
-//   element,
-//   ws1,
-//   element,
-// ]).map(([_, __, source, ___, attr, ____, target]) => ({
-//   nac: true,
-//   triples: [[source, attr, target]],
-// }));
-
-// // NAC with object syntax: not source { attr target ... }
-// const nacObject = sequenceOf([
-//   str("not"),
-//   ws1,
-//   element,
-//   ws,
-//   char("{"),
-//   ws,
-//   many(sequenceOf([element, ws1, element, ws]).map(([a, _, t]) => [a, t])),
-//   char("}"),
-// ]).map(([_, __, source, ___, ____, _____, pairs]) => ({
-//   nac: true,
-//   triples: pairs.map(([attr, target]) => [source, attr, target]),
-// }));
-
-// // Pattern element: regular triple/object or NAC
-// const patternElement = choice([
-//   nacObject,
-//   nacTriple,
-//   objectTriples.map((ts) => ({ nac: false, triples: ts })),
-//   triple.map((t) => ({ nac: false, triples: [t] })),
-// ]);
-
-// // Pattern spec with inline NAC syntax (no pipes needed - just "not" prefix)
-// const patternSpec = sequenceOf([
-//   char("["),
-//   ws,
-//   // Parse mixed patterns and NAC inline
-//   many(
-//     sequenceOf([
-//       patternElement,
-//       ws,
-//     ]).map(([elem]) => elem),
-//   ),
-//   char("]"),
-// ]).map(([_, __, elements, ___]) => {
-//   const patterns = [];
-//   const nac = [];
-
-//   for (const elem of elements) {
-//     if (elem.nac) {
-//       nac.push(...elem.triples);
-//     } else {
-//       patterns.push(...elem.triples);
-//     }
-//   }
-
-//   return { patterns, nac };
-// });
-
-// // ============================================================================
-// // Commands (special word handling like parser.js)
-// // ============================================================================
-
-// // fact [triples...]
-// const factCommand = sequenceOf([
-//   str("fact"),
-//   ws,
-//   tripleBlock,
-// ]).map(([_, __, triples]) => ({
-//   type: "fact",
-//   triples,
-// }));
-
-// // query [patterns...]
-// const queryCommand = sequenceOf([
-//   str("query"),
-//   ws,
-//   patternSpec,
-// ]).map(([_, __, spec]) => {
-//   const result = {
-//     type: "query",
-//     patterns: spec.patterns,
-//   };
-//   // Only add nac field if there are NAC patterns
-//   if (spec.nac && spec.nac.length > 0) {
-//     result.nac = spec.nac;
-//   }
-//   return result;
-// });
-
-// // rule name [match...] -> [produce...]
-// const ruleCommand = sequenceOf([
-//   str("rule"),
-//   ws1,
-//   word,
-//   ws,
-//   patternSpec,
-//   ws,
-//   str("->"),
-//   ws,
-//   patternSpec,
-// ]).map(([_, __, name, ___, matchSpec, ____, _____, ______, produceSpec]) => {
-//   const result = {
-//     type: "rule",
-//     name,
-//     match: matchSpec.patterns,
-//     produce: produceSpec.patterns,
-//   };
-//   // Always add NAC fields for consistency with NAC tests
-//   // But only if either has NAC patterns
-//   if (
-//     (matchSpec.nac && matchSpec.nac.length > 0) ||
-//     (produceSpec.nac && produceSpec.nac.length > 0)
-//   ) {
-//     result.matchNac = matchSpec.nac || [];
-//     result.produceNac = produceSpec.nac || [];
-//   }
-//   return result;
-// });
-
-// // pattern name [patterns...]
-// const patternCommand = sequenceOf([
-//   str("pattern"),
-//   ws1,
-//   word,
-//   ws,
-//   patternSpec,
-// ]).map(([_, __, name, ___, spec]) => {
-//   const result = {
-//     type: "pattern",
-//     name,
-//     patterns: spec.patterns,
-//   };
-//   // Only add nac field if there are NAC patterns
-//   if (spec.nac && spec.nac.length > 0) {
-//     result.nac = spec.nac;
-//   }
-//   return result;
-// });
-
-// // watch [match...] [action...]
-// const watchCommand = sequenceOf([
-//   str("watch"),
-//   ws,
-//   patternSpec,
-//   ws,
-//   patternSpec,
-// ]).map(([_, __, matchSpec, ___, actionSpec]) => {
-//   const result = {
-//     type: "watch",
-//     match: matchSpec.patterns,
-//     action: actionSpec.patterns,
-//   };
-//   // Always add NAC fields for consistency with NAC tests
-//   // But only if either has NAC patterns
-//   if (
-//     (matchSpec.nac && matchSpec.nac.length > 0) ||
-//     (actionSpec.nac && actionSpec.nac.length > 0)
-//   ) {
-//     result.matchNac = matchSpec.nac || [];
-//     result.actionNac = actionSpec.nac || [];
-//   }
-//   return result;
-// });
-
-// // delete source attr target
-// const deleteCommand = sequenceOf([
-//   str("delete"),
-//   ws1,
-//   element,
-//   ws1,
-//   element,
-//   ws1,
-//   element,
-// ]).map(([_, __, source, ___, attr, ____, target]) => ({
-//   type: "delete",
-//   triple: [source, attr, target],
-// }));
-
-// // clear-graph
-// const clearCommand = sequenceOf([
-//   str("clear-graph"),
-// ]).map(() => ({
-//   type: "clear",
-// }));
-
-// // graph-info
-// const infoCommand = sequenceOf([
-//   str("graph-info"),
-// ]).map(() => ({
-//   type: "info",
-// }));
-
-// // Any command
-// const command = choice([
-//   factCommand,
-//   queryCommand,
-//   ruleCommand,
-//   patternCommand,
-//   watchCommand,
-//   deleteCommand,
-//   clearCommand,
-//   infoCommand,
-// ]);
-
-// // ============================================================================
-// // Program Structure
-// // ============================================================================
-
-// // A program is a sequence of commands
-// const program = sequenceOf([
-//   ws,
-//   many(sequenceOf([command, ws]).map(([cmd]) => cmd)),
-// ]).map(([_, commands]) => ({
-//   type: "program",
-//   commands,
-// }));
-
-// // ============================================================================
-// // Exports
-// // ============================================================================
-
-// /**
-//  * Parse a pattern DSL program
-//  */
-// export function parsePattern(input) {
-//   const result = program.run(input);
-//   if (result.isError) {
-//     throw new Error(`Parse error at position ${result.index}: ${result.error}`);
-//   }
-//   return result.result;
-// }
-
-// /**
-//  * Parse a single pattern specification (for testing)
-//  */
-// export function parsePatternSpec(input) {
-//   const wrapped = `[${input}]`;
-//   const result = patternSpec.run(wrapped);
-//   if (result.isError) {
-//     throw new Error(`Parse error at position ${result.index}: ${result.error}`);
-//   }
-//   // For backward compatibility, if no NAC patterns, return just the patterns array
-//   if (result.result.nac.length === 0) {
-//     return result.result.patterns;
-//   }
-//   return result.result;
-// }
-
-// // Export parsers for testing
-// export {
-//   command,
-//   element,
-//   litWord,
-//   number,
-//   patternSpec,
-//   patternVar,
-//   program,
-//   string,
-//   triple,
-//   tripleBlock,
-//   word,
-// };
+const program = many(choice([rule, select, insert]));
 
 const input = `
   insert {
-    foo 123
-    bar [1 2 3]
+    root foo 123
+    root bar [1 2 3]
   }
 
-  query {
+  select
     where {
       ?x type type!
     }
     not {
       ?x name foo
     }
-  }
 
-  rule foo {
+  rule foo
     where {
       ?x type type!
     }
@@ -640,32 +317,37 @@ const input = `
       ?x name foo
     }
     insert {
-      ?x {
-      name foo
-}
+      ?x name foo
     }
-  }
 `;
 
-const result = program.run(input);
+{
+  const result = program.run(input);
 
-for (const { insert, query, rule } of result.result) {
-  if (insert) {
-    console.log("insert: ", insert);
-  }
-  if (query) {
-    console.log("query: ", query);
-  }
-  if (rule) {
-    const { name, where, not, insert } = rule;
-    console.log("rule: ", name);
-    console.log("where: ", where);
-    console.log("not: ", not);
-    console.log("insert: ", insert);
+  console.log("Remaining input: ", input.substring(result.index, input.length));
+  if (result.isError) {
+    console.error(`Parse error at position ${result.index}: ${result.error}`);
+    console.log("error: ", result.error);
+    console.log("remaining: ", input.substring(result.index, input.length));
+    console.log("remaining length: ", input.length - result.index);
+  } else {
+    for (const { insert, select, rule } of result.result) {
+      if (insert) {
+        console.log("insert: ", insert);
+      }
+      if (select) {
+        const { where, not } = select;
+        console.log("Select:");
+        console.log(" where: ", where);
+        console.log(" not: ", not);
+      }
+      if (rule) {
+        const { name, where, not, insert } = rule;
+        console.log("Rule: ", name);
+        console.log(" Where: ", where);
+        console.log(" Not: ", not);
+        console.log(" Insert: ", insert);
+      }
+    }
   }
 }
-
-console.log("isError: ", result.isError);
-console.log("error: ", result.error);
-console.log("remaining: ", input.substring(result.index, input.length));
-console.log("remaining length: ", input.length - result.index);
