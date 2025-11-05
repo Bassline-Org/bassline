@@ -11,8 +11,5 @@ fact [
 
     example-foo {
         view table-view
-        column {
-            name "Name"
-        }
     }
 ]
