@@ -17,6 +17,7 @@ import {
   everyCharUntil,
   everythingUntil,
   letter,
+  letters,
   lookAhead,
   many,
   many1,
@@ -28,6 +29,32 @@ import {
   str,
   whitespace,
 } from "arcsecond/index.js";
+
+const store = new Map();
+
+// ============================================================================
+// Simple portable hash function for strings (FNV-1a)
+// ============================================================================
+function hashString(value) {
+  const str = String(value);
+  let hash = 2166136261; // FNV offset basis
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash *= 16777619; // FNV prime
+    hash = hash >>> 0;
+  }
+  return String(hash);
+}
+
+const wordId = (word) => `w:${word.toUpperCase()}`;
+const numberId = (num) => `n:${num}`;
+
+const idParser = sequenceOf([
+  letters,
+  char(":"),
+  letters,
+]).map(([prefix, _, suffix]) => [prefix, suffix]);
+export const parseId = (id) => idParser.run(id).result;
 
 // ============================================================================
 // Basic Tokens
@@ -55,9 +82,12 @@ const number = sequenceOf([
   possibly(char("-")),
   digits,
   possibly(sequenceOf([char("."), digits]).map(([, decimal]) => decimal)),
-]).map(([_, sign, whole, decimal]) =>
-  Number((sign ?? "") + whole + (decimal ?? ""))
-);
+]).map(([_, sign, whole, decimal]) => {
+  const number = Number((sign ?? "") + whole + (decimal ?? ""));
+  const id = `n:${number.toString()}`;
+  store.set(id, number);
+  return { id };
+});
 
 // String: "hello world" with escape sequences
 // Character inside string: either non-special char OR backslash + any char
@@ -72,7 +102,10 @@ const string = sequenceOf([
   many(stringChar),
   char('"'),
 ]).map(([_, __, chars, ___]) => {
-  return chars.join("");
+  const str = chars.join("");
+  const hash = `s:${hashString(str)}`;
+  store.set(hash, str);
+  return { id: hash };
 });
 
 const delimiter = choice([
@@ -95,15 +128,15 @@ const patternVar = sequenceOf([
   char("?"),
   wordChars,
 ]).map(([_, __, chars]) => {
-  return {
-    pattern: chars,
-  };
+  const id = `v:${chars}`;
+  store.set(id, chars);
+  return { id };
 });
 
 const wild = sequenceOf([ws, char("_")]).map(([_, __]) => {
-  return {
-    wild: true,
-  };
+  const id = "w:_";
+  store.set(id, true);
+  return { id };
 });
 
 const word = sequenceOf([
@@ -111,19 +144,22 @@ const word = sequenceOf([
   letter.map((c) => c.toUpperCase()),
   wordChars,
 ]).map(([_, start, chars]) => {
-  return {
-    word: start + chars,
-  };
+  const word = start + chars;
+  const id = wordId(word);
+  store.set(id, word);
+  return { id };
 });
 
 const litWord = sequenceOf([
   ws,
   char("'"),
   choice([patternVar, wild, word]),
-]).map(([_, __, word]) => ({
-  literal: true,
-  ...word,
-}));
+]).map(([_, __, word]) => {
+  const [type, wordId] = parseId(word);
+  const id = `lw:${wordId}`;
+  store.set(id, word);
+  return { id };
+});
 
 const scalar = choice([number, string, wild, litWord, patternVar, word]);
 
@@ -161,9 +197,9 @@ const triple = sequenceOf([
   [entity, attribute, value],
 ) => {
   if (value.triples) {
-    return [...value.triples, [entity, attribute, value.id]];
+    return [...value.triples, [entity.id, attribute.id, value.id]];
   } else {
-    return [[entity, attribute, value]];
+    return [[entity.id, attribute.id, value.id]];
   }
 });
 
@@ -181,20 +217,26 @@ const obj = sequenceOf([
   ws,
   char("}"),
 ]).map(([_, __, entries]) => {
-  const id = { word: `obj-${crypto.randomUUID()}` };
-  const triples = entries.reduce((acc, [attr, val]) => {
+  const sortedEntries = entries.slice().sort((a, b) => a[0].id - b[0].id);
+  const id = `o:${
+    hashString(
+      sortedEntries.map(([attr, val]) => attr.id + val.id).join(""),
+    )
+  }`;
+  let triples = [];
+  const values = new Map();
+  for (const [attr, val] of sortedEntries) {
     if (val.triples) {
-      return [
-        ...acc,
-        ...val.triples,
-        [id, attr, val.id],
-      ];
+      triples = [...triples, ...val.triples];
     }
-    return [...acc, [id, attr, val]];
-  }, [[id, { word: "TYPE?" }, { word: "OBJECT!" }]]);
+    values.set(attr, val.id);
 
+    triples.push([id, attr.id, val.id]);
+    triples.push([val.id, wordId("MEMBER"), id]);
+  }
+  triples.push([id, wordId("TYPE"), wordId("OBJECT!")]);
+  store.set(id, values);
   return {
-    type: "object",
     id,
     triples,
   };
@@ -207,15 +249,22 @@ const list = sequenceOf([
   ws,
   char("]"),
 ]).map(([_, __, values]) => {
-  const id = { word: `list-${crypto.randomUUID()}` };
-  const triples = values.reduce((acc, val, index) => {
+  const id = `l:${hashString(values.map((val) => val.id).join(""))}`;
+  let triples = [];
+  const valueMap = new Map();
+  for (let index = 0; index < values.length; index++) {
+    const val = values[index];
+    const indexId = numberId(index);
     if (val.triples) {
-      return [...acc, ...val.triples, [id, index, val.id]];
+      triples = [...triples, ...val.triples];
     }
-    return [...acc, [id, index, val]];
-  }, [[id, { word: "TYPE?" }, { word: "LIST!" }]]);
+    valueMap.set(indexId, val.id);
+    triples.push([id, indexId, val.id]);
+    triples.push([val.id, wordId("MEMBER"), id]);
+  }
+  triples.push([id, wordId("TYPE"), wordId("LIST!")]);
+  store.set(id, valueMap);
   return {
-    type: "list",
     id,
     triples,
   };
@@ -275,7 +324,7 @@ const ruleHead = sequenceOf([
   cmd("rule"),
   ws,
   word,
-]).map(([_, __, { word }]) => ({ name: word }));
+]).map(([_, __, name]) => ({ name: name.id }));
 
 const rule = sequenceOf([
   ruleHead,
@@ -351,3 +400,5 @@ const input = `
     }
   }
 }
+
+console.log(store);
