@@ -29,37 +29,37 @@ export function installCompute(graph, operations = builtinOperations) {
   for (const [name, def] of Object.entries(operations.binary)) {
     const opName = name.toUpperCase();
     binaryOps.set(opName, def);
-    graph.add(opName, "TYPE", "OPERATION!");
-    graph.add(opName, "DOCS", def.doc);
+    graph.add(opName, "TYPE", "OPERATION!", "system");
+    graph.add(opName, "DOCS", def.doc, "system");
   }
 
   // Register unary operations
   for (const [name, def] of Object.entries(operations.unary)) {
     const opName = name.toUpperCase();
     unaryOps.set(opName, def);
-    graph.add(opName, "TYPE", "OPERATION!");
-    graph.add(opName, "DOCS", def.doc);
+    graph.add(opName, "TYPE", "OPERATION!", "system");
+    graph.add(opName, "DOCS", def.doc, "system");
   }
 
   // Register comparison operations
   for (const [name, def] of Object.entries(operations.comparison)) {
     const opName = name.toUpperCase();
     comparisonOps.set(opName, def);
-    graph.add(opName, "TYPE", "OPERATION!");
-    graph.add(opName, "DOCS", def.doc);
+    graph.add(opName, "TYPE", "OPERATION!", "system");
+    graph.add(opName, "DOCS", def.doc, "system");
   }
 
   // Mark OPERATION! as a type
-  graph.add("OPERATION!", "TYPE", "TYPE!");
+  graph.add("OPERATION!", "TYPE", "TYPE!", "system");
 
   // Mark TYPE! as a type (meta-type, closes the loop)
-  graph.add("TYPE!", "TYPE", "TYPE!");
+  graph.add("TYPE!", "TYPE", "TYPE!", "system");
 
   // Binary arithmetic watcher: [?C OP ?OP] [?C X ?X] [?C Y ?Y]
   graph.watch([
-    ["?C", "OP", "?OP"],
-    ["?C", "X", "?X"],
-    ["?C", "Y", "?Y"]
+    ["?C", "OP", "?OP", "*"],
+    ["?C", "X", "?X", "*"],
+    ["?C", "Y", "?Y", "*"]
   ], (bindings) => {
     const computeId = bindings.get("?C");
     const opName = bindings.get("?OP").toString().toUpperCase();
@@ -78,14 +78,14 @@ export function installCompute(graph, operations = builtinOperations) {
     // Compute result
     const result = op.compute(xNum, yNum);
     if (!isNaN(result)) {
-      graph.add(computeId, "RESULT", result);
+      graph.add(computeId, "RESULT", result, null);
     }
   });
 
   // Unary operations watcher: [?C OP ?OP] [?C VALUE ?V]
   graph.watch([
-    ["?C", "OP", "?OP"],
-    ["?C", "VALUE", "?V"]
+    ["?C", "OP", "?OP", "*"],
+    ["?C", "VALUE", "?V", "*"]
   ], (bindings) => {
     const computeId = bindings.get("?C");
     const opName = bindings.get("?OP").toString().toUpperCase();
@@ -102,15 +102,15 @@ export function installCompute(graph, operations = builtinOperations) {
     // Compute result
     const result = op.compute(num);
     if (!isNaN(result)) {
-      graph.add(computeId, "RESULT", result);
+      graph.add(computeId, "RESULT", result, null);
     }
   });
 
   // Comparison watcher: [?C COMPARE ?OP] [?C LEFT ?L] [?C RIGHT ?R]
   graph.watch([
-    ["?C", "COMPARE", "?OP"],
-    ["?C", "LEFT", "?L"],
-    ["?C", "RIGHT", "?R"]
+    ["?C", "COMPARE", "?OP", "*"],
+    ["?C", "LEFT", "?L", "*"],
+    ["?C", "RIGHT", "?R", "*"]
   ], (bindings) => {
     const computeId = bindings.get("?C");
     const opName = bindings.get("?OP").toString().toUpperCase();
@@ -128,6 +128,6 @@ export function installCompute(graph, operations = builtinOperations) {
 
     // Compute result
     const result = op.compute(leftNum, rightNum);
-    graph.add(computeId, "RESULT", result);
+    graph.add(computeId, "RESULT", result, null);
   });
 }

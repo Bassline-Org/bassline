@@ -18,21 +18,21 @@ export function addVersionedResult(graph, entityId, version, result, debugState 
   const prevKey = version > 1 ? `${entityId}:RESULT:V${version - 1}` : null;
 
   // Add new result
-  graph.add(entityId, resultKey, result);
+  graph.add(entityId, resultKey, result, null);
 
   // Add refinement edge (marks previous version as superseded)
   if (prevKey) {
-    graph.add(resultKey, "REFINES", prevKey);
+    graph.add(resultKey, "REFINES", prevKey, "system");
   }
 
   // Update version marker (for convenience)
-  graph.add(`${entityId}:VERSION`, "CURRENT", version);
+  graph.add(`${entityId}:VERSION`, "CURRENT", version, "system");
 
   // Optional: persist internal state for debugging/inspection
   if (debugState) {
     const stateKey = `${entityId}:STATE:V${version}`;
     Object.entries(debugState).forEach(([key, val]) => {
-      graph.add(stateKey, key, val);
+      graph.add(stateKey, key, val, "system");
     });
   }
 }
@@ -48,8 +48,8 @@ export function addVersionedResult(graph, entityId, version, result, debugState 
 export function getCurrentValue(graph, entityId) {
   // Query with NAC: find RESULT keys that aren't refined
   const results = graph.query({
-    patterns: [[entityId, "?key", "?value"]],
-    nac: [["?newer", "REFINES", "?key"]]  // NAC: no newer version refines this
+    patterns: [[entityId, "?key", "?value", "*"]],
+    nac: [["?newer", "REFINES", "?key", "system"]]  // NAC: no newer version refines this (in system context)
   });
 
   // Filter to only RESULT keys
@@ -71,7 +71,7 @@ export function getCurrentValue(graph, entityId) {
  */
 export function getAllVersions(graph, entityId) {
   // Get all RESULT edges
-  const allResults = graph.query([entityId, "?key", "?value"]);
+  const allResults = graph.query([entityId, "?key", "?value", "*"]);
 
   const versions = allResults
     .filter(b => b.get("?key").toString().startsWith(`${entityId}:RESULT:V`))
@@ -80,8 +80,8 @@ export function getAllVersions(graph, entityId) {
       const versionMatch = key.match(/V(\d+)$/);
       const version = versionMatch ? parseInt(versionMatch[1]) : 0;
 
-      // Check if this version is refined
-      const refined = graph.query(["?newer", "REFINES", key]);
+      // Check if this version is refined (REFINES edges are in "system" context)
+      const refined = graph.query(["?newer", "REFINES", key, "system"]);
       const isCurrent = refined.length === 0;
 
       return {

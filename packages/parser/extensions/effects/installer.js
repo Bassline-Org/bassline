@@ -23,19 +23,19 @@ export function installEffects(graph, effects = builtinEffects) {
       effectMap.set(effectName, def);
 
       // Self-describe in graph
-      graph.add(effectName, "TYPE", "EFFECT!");
-      graph.add(effectName, "CATEGORY", category);
-      graph.add(effectName, "DOCS", def.doc);
+      graph.add(effectName, "TYPE", "EFFECT!", "system");
+      graph.add(effectName, "CATEGORY", category, "system");
+      graph.add(effectName, "DOCS", def.doc, "system");
     }
   }
 
   // Mark EFFECT! as a type
-  graph.add("EFFECT!", "TYPE", "TYPE!");
+  graph.add("EFFECT!", "TYPE", "TYPE!", "system");
 
   // Effect execution watcher: [?E EFFECT ?NAME] [?E INPUT ?data]
   graph.watch([
-    ["?E", "EFFECT", "?NAME"],
-    ["?E", "INPUT", "?DATA"],
+    ["?E", "EFFECT", "?NAME", "*"],
+    ["?E", "INPUT", "?DATA", "*"],
   ], async (bindings) => {
     const effectId = bindings.get("?E");
     const effectName = bindings.get("?NAME").toString().toUpperCase();
@@ -50,12 +50,12 @@ export function installEffects(graph, effects = builtinEffects) {
       const result = await effectDef.execute(inputData);
 
       // Write result to graph when done
-      graph.add(effectId, "RESULT", result);
-      graph.add(effectId, "STATUS", "SUCCESS");
+      graph.add(effectId, "RESULT", result, null);
+      graph.add(effectId, "STATUS", "SUCCESS", null);
     } catch (error) {
       // Write error to graph
-      graph.add(effectId, "ERROR", error.message);
-      graph.add(effectId, "STATUS", "ERROR");
+      graph.add(effectId, "ERROR", error.message, null);
+      graph.add(effectId, "STATUS", "ERROR", null);
     }
   });
 }

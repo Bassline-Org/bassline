@@ -26,17 +26,17 @@ export function installAggregation(graph, definitions) {
     normalizedDefs.set(normalized, def);
 
     // Self-describe each aggregation type
-    graph.add(normalized, "TYPE", "AGGREGATION!");
+    graph.add(normalized, "TYPE", "AGGREGATION!", "system");
     if (def.docs) {
-      graph.add(normalized, "DOCS", def.docs);
+      graph.add(normalized, "DOCS", def.docs, "system");
     }
   }
 
   // Mark AGGREGATION! as a type
-  graph.add("AGGREGATION!", "TYPE", "TYPE!");
+  graph.add("AGGREGATION!", "TYPE", "TYPE!", "system");
 
   // Watch for any AGGREGATE edge and check if it matches a definition (case-insensitive)
-  graph.watch([["?A", "AGGREGATE", "?OP"]], (bindings) => {
+  graph.watch([["?A", "AGGREGATE", "?OP", "*"]], (bindings) => {
     const aggId = bindings.get("?A");
     const opRaw = bindings.get("?OP");
     const opNormalized = opRaw.toString().toUpperCase();
@@ -56,7 +56,7 @@ export function installAggregation(graph, definitions) {
     let version = 0;
 
     // Watch for items for THIS specific aggregation
-    const unwatch = graph.watch([[aggId, "ITEM", "?V"]], (itemBindings) => {
+    const unwatch = graph.watch([[aggId, "ITEM", "?V", "*"]], (itemBindings) => {
       const rawValue = itemBindings.get("?V");
 
       // Let the definition handle the value (parsing, validation, etc.)

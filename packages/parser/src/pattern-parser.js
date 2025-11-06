@@ -18,7 +18,6 @@ import {
   everythingUntil,
   letter,
   letters,
-  lookAhead,
   many,
   many1,
   possibly,
@@ -97,8 +96,8 @@ const patternVar = sequenceOf([
   return { patternVar: chars };
 });
 
-const wild = sequenceOf([ws, char("_")]).map(([_, __]) => {
-  return { wildcard: "_" };
+const wild = sequenceOf([ws, char("*")]).map(([_, __]) => {
+  return { wildcard: "*" };
 });
 
 const word = sequenceOf([
@@ -112,254 +111,180 @@ const word = sequenceOf([
 
 const scalar = choice([number, string, wild, patternVar, word]);
 
+const entityId = choice([number, word]);
+const attribute = word;
+const value = choice([number, word, string]);
+const context = choice([wild, word]);
+
 // ============================================================================
 // Compound values
 // ============================================================================
 
-const compound = recursiveParser(() =>
-  sequenceOf([
-    ws,
-    choice([
-      obj,
-      list,
-    ]),
-  ]).map(([_, value]) => value)
-);
-
-const value = recursiveParser(() => {
-  return choice([
-    compound,
-    scalar,
-  ]);
-});
-
 /**
- * A triple is entity, attribute, val
- * Entity, attribute, are scalar
+ * A quad is entity, attribute, val, context
+ * Entity
  * val can be a compound
  */
-const triple = sequenceOf([
-  scalar,
-  scalar,
+const quad = sequenceOf([
+  entityId,
+  attribute,
   value,
-]).map((
-  [entity, attribute, value],
-) => {
-  if (value.triples) {
-    return [...value.triples, [entity.id, attribute.id, value.id]];
-  } else {
-    return [[entity.id, attribute.id, value.id]];
-  }
-});
+  context,
+]).map(([e, a, v, c]) => [e, a, v, c.wildcard ? null : c.word]);
+
+// Insertions
 
 const objEntry = sequenceOf([
-  scalar,
+  attribute,
   value,
 ]);
 
+const openBracket = sequenceOf([ws, char("{")]);
+const closeBracket = sequenceOf([ws, char("}")]);
+const cmd = (name) => sequenceOf([ws, str(name)]);
+
 const obj = sequenceOf([
-  ws,
-  char("{"),
-  many(
-    objEntry,
-  ),
-  ws,
-  char("}"),
-]).map(([_, __, entries]) => {
-  const sortedEntries = entries.slice().sort((a, b) => a[0].id - b[0].id);
-  const id = `o:${
-    hashString(
-      sortedEntries.map(([attr, val]) => attr.id + val.id).join(""),
-    )
-  }`;
-  let triples = [];
-  const values = new Map();
-  for (const [attr, val] of sortedEntries) {
-    if (val.triples) {
-      triples = [...triples, ...val.triples];
-    }
-    values.set(attr, val.id);
-
-    triples.push([id, attr.id, val.id]);
-    triples.push([val.id, wordId("MEMBER"), id]);
-  }
-  triples.push([id, wordId("TYPE"), wordId("OBJECT!")]);
-  store.set(id, values);
-  return {
-    id,
-    triples,
-  };
+  entityId,
+  openBracket,
+  many(objEntry),
+  closeBracket,
+]).map(([entity, _, entries, __]) => {
+  return entries.map(([attr, value]) => [entity, attr, value, null]);
 });
 
-const list = sequenceOf([
-  ws,
-  char("["),
-  many(value),
-  ws,
-  char("]"),
-]).map(([_, __, values]) => {
-  const id = `l:${hashString(values.map((val) => val.id).join(""))}`;
-  let triples = [];
-  const valueMap = new Map();
-  for (let index = 0; index < values.length; index++) {
-    const val = values[index];
-    const indexId = numberId(index);
-    if (val.triples) {
-      triples = [...triples, ...val.triples];
-    }
-    valueMap.set(indexId, val.id);
-    triples.push([id, indexId, val.id]);
-    triples.push([val.id, wordId("MEMBER"), id]);
-  }
-  triples.push([id, wordId("TYPE"), wordId("LIST!")]);
-  store.set(id, valueMap);
-  return {
-    id,
-    triples,
-  };
+const group = sequenceOf([
+  cmd("group"),
+  context,
+  openBracket,
+  many(obj),
+  closeBracket,
+]).map(([_, context, __, objs]) => {
+  const quads = objs.flat();
+  return quads.map((
+    [entity, attribute, value],
+  ) => [entity, attribute, value, context]);
 });
-
-const triples = many(
-  choice([
-    obj.map((obj) => obj.triples),
-    list.map((list) => list.triples),
-    triple,
-  ]),
-).map((triples) => triples.reduce((acc, triple) => [...acc, ...triple], []));
-
-const cmd = (name) => sequenceOf([ws, str(name)]).map(([_, name]) => name);
-const body = (parser) =>
-  sequenceOf([
-    sequenceOf([ws, char("{")]),
-    parser,
-    sequenceOf([ws, char("}")]),
-  ]).map(([_, body]) => body);
 
 const insert = sequenceOf([
   cmd("insert"),
-  body(triples),
-]).map(([_, trips]) => {
-  return { insert: trips };
+  openBracket,
+  many(choice([
+    group,
+    obj,
+    quad.map((q) => [q]),
+  ])),
+  closeBracket,
+]).map(([_, __, entries]) => ({
+  insert: entries.flat(),
+}));
+
+// Patterns
+const patternChoice = (parser) => choice([wild, patternVar, parser]);
+const patternQuad = sequenceOf([
+  patternChoice(entityId),
+  patternChoice(attribute),
+  patternChoice(value),
+  patternChoice(context),
+]);
+const patternObjEntry = sequenceOf([
+  patternChoice(attribute),
+  patternChoice(value),
+]);
+const patternObj = sequenceOf([
+  patternChoice(entityId),
+  openBracket,
+  many(patternObjEntry),
+  closeBracket,
+]).map(([entity, _, entries, __]) => entries.map(([a, v]) => [entity, a, v, null]));
+
+const patternGroup = sequenceOf([
+  cmd("group"),
+  patternChoice(context),
+  openBracket,
+  many(patternObj),
+  closeBracket,
+]).map(([_, context, __, objs]) => {
+  const quads = objs.flat();
+  return quads.map((
+    [entity, attribute, value],
+  ) => [entity, attribute, value, context]);
 });
 
 const where = sequenceOf([
   cmd("where"),
-  body(triples),
-]).map(([_, trips]) => {
-  return { where: trips };
-});
+  openBracket,
+  many(choice([
+    patternGroup,
+    patternObj,
+    patternQuad.map((q) => [q]),
+  ])),
+  closeBracket,
+]).map(([_, __, patterns]) => ({ where: patterns.flat() }));
 
 const not = sequenceOf([
   cmd("not"),
-  body(triples),
-]).map(([_, trips]) => {
-  return { not: trips };
-});
+  openBracket,
+  many(choice([
+    patternGroup,
+    patternObj,
+    patternQuad.map((q) => [q]),
+  ])),
+  closeBracket,
+]).map(([_, __, patterns]) => ({ not: patterns.flat() }));
 
-const select = sequenceOf([
-  cmd("select"),
+const query = sequenceOf([
+  cmd("query"),
   where,
   possibly(not),
-]).map(([_, { where }, { not }]) => {
-  return {
-    select: {
-      where,
-      not: not ?? [],
-    },
-  };
-});
+]).map(([_, { where }, not]) => ({
+  query: {
+    where,
+    not: not?.not ?? [],
+  },
+}));
 
-const ruleHead = sequenceOf([
-  cmd("rule"),
-  ws,
-  word,
-]).map(([_, __, name]) => ({ name: name.id }));
+const produce = sequenceOf([
+  cmd("produce"),
+  openBracket,
+  many(choice([
+    patternGroup,
+    patternObj,
+    patternQuad.map((q) => [q]),
+  ])),
+  closeBracket,
+]).map(([_, __, entries]) => ({
+  produce: entries.flat(),
+}));
 
+// Rules
 const rule = sequenceOf([
-  ruleHead,
+  cmd("rule"),
+  word,
   where,
   possibly(not),
-  insert,
-]).map(([{ name }, { where }, not, { insert }]) => {
-  return {
-    rule: {
-      name,
-      where,
-      not: not?.not ?? [],
-      insert,
-    },
-  };
-});
+  produce,
+]).map(([_, name, { where }, not, { produce }]) => ({
+  rule: {
+    name,
+    where,
+    not: not?.not ?? [],
+    produce,
+  },
+}));
 
-const program = many(choice([rule, select, insert]));
-
-function parseProgram(input) {
-  store = new Map();
-  const result = program.run(input);
-  if (result.isError) {
-    throw new Error(`Parse error at position ${result.index}: ${result.error}`);
+const test = `
+  produce {
+    foo loves bar system
+    group some-context {
+      alice {
+        likes bob
+      }
+    }
+    some-context {
+      source goose
+    }
   }
-  return {
-    result,
-    store,
-  };
-}
-
-const input = `
-  insert {
-    root foo 123
-    root bar [1 2 3]
-  }
-
-  select
-    where {
-      ?x type type!
-    }
-    not {
-      ?x name foo
-    }
-
-  rule foo
-    where {
-      ?x type type!
-    }
-    not {
-      ?x name foo
-    }
-    insert {
-      ?x name foo
-    }
 `;
 
-{
-  const { result, store } = parseProgram(input);
-
-  console.log("Remaining input: ", input.substring(result.index, input.length));
-  if (result.isError) {
-    console.error(`Parse error at position ${result.index}: ${result.error}`);
-    console.log("error: ", result.error);
-    console.log("remaining: ", input.substring(result.index, input.length));
-    console.log("remaining length: ", input.length - result.index);
-  } else {
-    for (const { insert, select, rule } of result.result) {
-      if (insert) {
-        console.log("insert: ", insert);
-      }
-      if (select) {
-        const { where, not } = select;
-        console.log("Select:");
-        console.log(" where: ", where);
-        console.log(" not: ", not);
-      }
-      if (rule) {
-        const { name, where, not, insert } = rule;
-        console.log("Rule: ", name);
-        console.log(" Where: ", where);
-        console.log(" Not: ", not);
-        console.log(" Insert: ", insert);
-      }
-    }
-  }
-
-  console.log(store);
-}
+const res = produce.run(test);
+console.log("Parse result:", JSON.stringify(res, null, 2));

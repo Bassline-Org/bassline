@@ -14,9 +14,9 @@ import { executeCommand } from "../src/pattern-words.js";
 export function installSelfDescription(graph, context) {
   // Watch for pattern definitions and auto-activate them
   graph.watch([
-    ["?P", "type", "pattern"],
-    ["?P", "match", "?M"],
-    ["?P", "status", "active"],
+    ["?P", "type", "pattern", "*"],
+    ["?P", "match", "?M", "*"],
+    ["?P", "status", "active", "*"],
   ], (bindings) => {
     const patternId = bindings.get("?P");
     const matchSpec = bindings.get("?M");
@@ -47,10 +47,10 @@ export function installSelfDescription(graph, context) {
 
   // Separate watcher for patterns with NAC
   graph.watch([
-    ["?P", "type", "pattern"],
-    ["?P", "match", "?M"],
-    ["?P", "nac", "?N"],
-    ["?P", "status", "active"],
+    ["?P", "type", "pattern", "*"],
+    ["?P", "match", "?M", "*"],
+    ["?P", "nac", "?N", "*"],
+    ["?P", "status", "active", "*"],
   ], (bindings) => {
     const patternId = bindings.get("?P");
     const matchSpec = bindings.get("?M");
@@ -75,10 +75,10 @@ export function installSelfDescription(graph, context) {
 
   // Watch for rule definitions (without NAC)
   graph.watch([
-    ["?R", "type", "rule"],
-    ["?R", "match", "?M"],
-    ["?R", "produce", "?P"],
-    ["?R", "status", "active"],
+    ["?R", "type", "rule", "*"],
+    ["?R", "match", "?M", "*"],
+    ["?R", "produce", "?P", "*"],
+    ["?R", "status", "active", "*"],
   ], (bindings) => {
     const ruleId = bindings.get("?R");
     const matchSpec = bindings.get("?M");
@@ -105,11 +105,11 @@ export function installSelfDescription(graph, context) {
 
   // Watch for rules with match NAC
   graph.watch([
-    ["?R", "type", "rule"],
-    ["?R", "match", "?M"],
-    ["?R", "match-nac", "?MN"],
-    ["?R", "produce", "?P"],
-    ["?R", "status", "active"],
+    ["?R", "type", "rule", "*"],
+    ["?R", "match", "?M", "*"],
+    ["?R", "match-nac", "?MN", "*"],
+    ["?R", "produce", "?P", "*"],
+    ["?R", "status", "active", "*"],
   ], (bindings) => {
     const ruleId = bindings.get("?R");
     const name = ruleId.replace("rule:", "");
@@ -132,7 +132,7 @@ export function installSelfDescription(graph, context) {
 
   // Watch for deactivation
   graph.watch([
-    ["?P", "status", "inactive"],
+    ["?P", "status", "inactive", "*"],
   ], (bindings) => {
     const id = bindings.get("?P");
 
@@ -164,6 +164,7 @@ export function serialize(graph) {
         source: e.source,
         attr: e.attr,
         target: e.target,
+        context: e.context,
       })),
       timestamp: Date.now(),
     },
@@ -186,7 +187,7 @@ export function deserialize(json, graph, context) {
 
   // Restore edges - watchers will handle the rest
   for (const edge of data.edges) {
-    graph.add(edge.source, edge.attr, edge.target);
+    graph.add(edge.source, edge.attr, edge.target, edge.context);
   }
 
   return graph;
@@ -199,28 +200,28 @@ export function deserialize(json, graph, context) {
 export function installBootstrap(graph) {
   // Watch for extension requests
   graph.watch([
-    ["?EXT", "type", "extension"],
-    ["?EXT", "name", "?NAME"],
-    ["?EXT", "status", "active"],
+    ["?EXT", "type", "extension", "*"],
+    ["?EXT", "name", "?NAME", "*"],
+    ["?EXT", "status", "active", "*"],
   ], (bindings) => {
     const name = bindings.get("?NAME");
 
     // This is where we'd dynamically load and install extensions
     // For now, just mark it as loaded
-    graph.add(bindings.get("?EXT"), "loaded", true);
-    graph.add(bindings.get("?EXT"), "loaded-at", Date.now());
+    graph.add(bindings.get("?EXT"), "loaded", true, "system");
+    graph.add(bindings.get("?EXT"), "loaded-at", Date.now(), "system");
   });
 
   // Watch for aspect dependencies
   graph.watch([
-    ["?A", "requires", "?B"],
+    ["?A", "requires", "?B", "*"],
   ], (bindings) => {
     const aspectA = bindings.get("?A");
     const aspectB = bindings.get("?B");
 
     // Ensure B is loaded before A
-    graph.add(`dependency:${aspectA}:${aspectB}`, "type", "dependency");
-    graph.add(`dependency:${aspectA}:${aspectB}`, "from", aspectA);
-    graph.add(`dependency:${aspectA}:${aspectB}`, "to", aspectB);
+    graph.add(`dependency:${aspectA}:${aspectB}`, "type", "dependency", "system");
+    graph.add(`dependency:${aspectA}:${aspectB}`, "from", aspectA, "system");
+    graph.add(`dependency:${aspectA}:${aspectB}`, "to", aspectB, "system");
   });
 }

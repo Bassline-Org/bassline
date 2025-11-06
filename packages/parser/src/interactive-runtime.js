@@ -141,7 +141,7 @@ export class Runtime {
     this.reset();
     if (data.edges) {
       data.edges.forEach(e => {
-        this.graph.add(e.source, e.attr, e.target);
+        this.graph.add(e.source, e.attr, e.target, e.context);
       });
     }
   }

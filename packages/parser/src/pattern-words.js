@@ -1,7 +1,7 @@
 /**
  * Pattern Words - Runtime for pattern DSL
  *
- * Takes the simple triple arrays from pattern-parser.js
+ * Takes the simple quad arrays from pattern-parser.js
  * and executes them using the minimal-graph.js engine.
  *
  * Like parser.js words, this provides the semantics for our parsed structures.
@@ -29,15 +29,15 @@ export function createContext(graph) {
 
 /**
  * Execute a command from the parser
- * Commands work directly with triple arrays: [source, attr, target]
+ * Commands work directly with quad arrays: [source, attr, target, context]
  */
 export function executeCommand(graph, command, context = {}) {
   switch (command.type) {
     case "fact": {
-      // Insert triples into the graph
+      // Insert quads into the graph
       const results = [];
-      for (const [source, attr, target] of command.triples) {
-        results.push(graph.add(source, attr, target));
+      for (const [source, attr, target, ctx] of command.triples) {
+        results.push(graph.add(source, attr, target, ctx));
       }
       return results;
     }
@@ -60,24 +60,24 @@ export function executeCommand(graph, command, context = {}) {
       const unwatch = graph.watch(spec, (bindings) => {
         // Record match in graph
         const matchId = `MATCH:${Date.now()}:${Math.random()}`;
-        graph.add(command.name, "MATCHED", matchId);
+        graph.add(command.name, "MATCHED", matchId, "system");
 
         // Store bindings
         bindings.forEach((value, varName) => {
-          graph.add(matchId, varName, value);
+          graph.add(matchId, varName, value, "system");
         });
       });
 
-      // Register pattern as triples for self-description
-      graph.add(command.name, "TYPE", "PATTERN!");
-      graph.add(command.name, "MATCH", JSON.stringify(command.patterns));
+      // Register pattern as quads for self-description
+      graph.add(command.name, "TYPE", "PATTERN!", "system");
+      graph.add(command.name, "MATCH", JSON.stringify(command.patterns), "system");
       if (command.nac && command.nac.length > 0) {
-        graph.add(command.name, "NAC", JSON.stringify(command.nac));
+        graph.add(command.name, "NAC", JSON.stringify(command.nac), "system");
       }
-      graph.add(command.name, "STATUS", "ACTIVE");
+      graph.add(command.name, "STATUS", "ACTIVE", "system");
 
       // Mark PATTERN! as a type (idempotent)
-      graph.add("PATTERN!", "TYPE", "TYPE!");
+      graph.add("PATTERN!", "TYPE", "TYPE!", "system");
 
       // Store in context
       if (!context.patterns) context.patterns = new Map();
@@ -98,31 +98,32 @@ export function executeCommand(graph, command, context = {}) {
 
       const unwatch = graph.watch(matchSpec, (bindings) => {
         // Apply the rewrite - resolve variables in produce patterns
-        for (const [s, a, t] of command.produce) {
+        for (const [s, a, t, c] of command.produce) {
           const source = resolve(s, bindings);
           const attr = resolve(a, bindings);
           const target = resolve(t, bindings);
-          graph.add(source, attr, target);
+          const ctx = c ? resolve(c, bindings) : null;
+          graph.add(source, attr, target, ctx);
         }
 
         // Record rule firing
-        graph.add(command.name, "FIRED", Date.now());
+        graph.add(command.name, "FIRED", Date.now(), "system");
       });
 
-      // Register rule as triples for self-description
-      graph.add(command.name, "TYPE", "RULE!");
-      graph.add(command.name, "MATCH", JSON.stringify(command.match));
+      // Register rule as quads for self-description
+      graph.add(command.name, "TYPE", "RULE!", "system");
+      graph.add(command.name, "MATCH", JSON.stringify(command.match), "system");
       if (command.matchNac && command.matchNac.length > 0) {
-        graph.add(command.name, "MATCH-NAC", JSON.stringify(command.matchNac));
+        graph.add(command.name, "MATCH-NAC", JSON.stringify(command.matchNac), "system");
       }
-      graph.add(command.name, "PRODUCE", JSON.stringify(command.produce));
+      graph.add(command.name, "PRODUCE", JSON.stringify(command.produce), "system");
       if (command.produceNac && command.produceNac.length > 0) {
-        graph.add(command.name, "PRODUCE-NAC", JSON.stringify(command.produceNac));
+        graph.add(command.name, "PRODUCE-NAC", JSON.stringify(command.produceNac), "system");
       }
-      graph.add(command.name, "STATUS", "ACTIVE");
+      graph.add(command.name, "STATUS", "ACTIVE", "system");
 
       // Mark RULE! as a type (idempotent)
-      graph.add("RULE!", "TYPE", "TYPE!");
+      graph.add("RULE!", "TYPE", "TYPE!", "system");
 
       // Store in context
       if (!context.rules) context.rules = new Map();
@@ -145,31 +146,35 @@ export function executeCommand(graph, command, context = {}) {
 
       const unwatch = graph.watch(matchSpec, (bindings) => {
         // Execute action patterns with bindings
-        for (const [s, a, t] of command.action) {
+        for (const [s, a, t, c] of command.action) {
           const source = resolve(s, bindings);
           const attr = resolve(a, bindings);
           const target = resolve(t, bindings);
-          graph.add(source, attr, target);
+          const ctx = c ? resolve(c, bindings) : null;
+          graph.add(source, attr, target, ctx);
         }
 
         // Record watch firing
-        graph.add("watch", "MATCHED", true);
+        graph.add("watch", "MATCHED", true, "system");
       });
 
       return { unwatch };
     }
 
     case "delete": {
-      // Delete: create tombstone for triple
-      const [source, attr, target] = command.triple;
+      // Delete: create tombstone for quad
+      const [source, attr, target, ctx] = command.triple;
       const tombstoneId = `TOMBSTONE-${Date.now()}-${Math.random()}`;
-      graph.add(tombstoneId, "TYPE", "TOMBSTONE!");
-      graph.add(tombstoneId, "SOURCE", source);
-      graph.add(tombstoneId, "ATTR", attr);
-      graph.add(tombstoneId, "TARGET", target);
+      graph.add(tombstoneId, "TYPE", "TOMBSTONE!", "system");
+      graph.add(tombstoneId, "SOURCE", source, "system");
+      graph.add(tombstoneId, "ATTR", attr, "system");
+      graph.add(tombstoneId, "TARGET", target, "system");
+      if (ctx) {
+        graph.add(tombstoneId, "CONTEXT", ctx, "system");
+      }
 
       // Mark TOMBSTONE! as a type (idempotent)
-      graph.add("TOMBSTONE!", "TYPE", "TYPE!");
+      graph.add("TOMBSTONE!", "TYPE", "TYPE!", "system");
 
       return tombstoneId;
     }
