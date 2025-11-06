@@ -26,12 +26,12 @@ console.log("Edge 0:", graph.edges[0]);
 console.log("\n=== Test 2: Rule with Variables ===");
 const program2 = parseProgram(`
   rule adult-check
-    where { ?p age ?a }
-    produce { ?p adult true }
+    where { ?p age ?a * }
+    produce { ?p adult true * }
 `);
 console.log("Commands:", program2.length);
 if (program2[0] && program2[0].rule) {
-  console.log("Parsed rule name:", program2[0].rule.name);
+  console.log("Parsed rule name:", program2[0].rule.name.word || program2[0].rule.name);
 }
 executeProgram(graph, program2, context);
 console.log("Rules registered:", context.rules.size);
@@ -40,7 +40,7 @@ console.log("Rules registered:", context.rules.size);
 console.log("\n=== Test 3: Named Pattern + Ref ===");
 const program3 = parseProgram(`
   pattern person-filter {
-    ?x type person
+    ?x type person *
   }
 
   insert {
@@ -48,14 +48,25 @@ const program3 = parseProgram(`
   }
 
   rule test-ref
-    where { <person-filter> ?x age ?a }
-    produce { ?x verified true }
+    where { <person-filter> ?x age ?a * }
+    produce { ?x verified true * }
 `);
 console.log("Program commands:", program3.length);
-console.log("First command type:", program3[0].pattern ? "pattern" : "other");
+if (program3.length > 0) {
+  console.log("First command type:", program3[0].pattern ? "pattern" : "other");
+}
 executeProgram(graph, program3, context);
 console.log("Named patterns stored:", context.namedPatterns?.size);
 
 console.log("\n=== All Tests Complete ===");
 console.log("Total edges:", graph.edges.length);
 console.log("Total rules:", context.rules.size);
+
+// Verify Test 2 rule fired
+console.log("\n=== Verification ===");
+const adultQuery = graph.query(["?p", "ADULT", "?v", "*"]);
+console.log("Adults found:", adultQuery.length, adultQuery.map(b => `${b.get("?p")} -> ${b.get("?v")}`));
+
+// Verify Test 3 rule fired
+const verifiedQuery = graph.query(["?p", "VERIFIED", "?v", "*"]);
+console.log("Verified found:", verifiedQuery.length, verifiedQuery.map(b => `${b.get("?p")} -> ${b.get("?v")}`));

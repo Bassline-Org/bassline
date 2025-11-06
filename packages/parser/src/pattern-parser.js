@@ -75,6 +75,8 @@ const delimiter = choice([
   char("]"),
   char('"'),
   char("'"),
+  char("<"),
+  char(">"),
   endOfInput,
 ]);
 
@@ -223,7 +225,8 @@ const namedPattern = sequenceOf([
 const patternRef = sequenceOf([
   cmd("<"),
   word,
-]).map(([_, name]) => ({
+  char(">"),
+]).map(([_, name, __]) => ({
   patternRef: name,
 }));
 
