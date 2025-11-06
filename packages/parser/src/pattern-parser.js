@@ -4,7 +4,7 @@
  * Like parser.js, this is primarily a tokenizer that identifies structures.
  * Semantics are handled by the runtime (pattern-words.js).
  *
- * Everything is fundamentally triples: [source, attr, target]
+ * Everything is fundamentally quads: [entity, attribute, value, context]
  */
 
 import {
@@ -30,47 +30,17 @@ import {
   whitespace,
 } from "arcsecond/index.js";
 
-let store = null;
-
-// ============================================================================
-// Simple portable hash function for strings (FNV-1a)
-// ============================================================================
-function hashString(value) {
-  const str = String(value);
-  let hash = 2166136261; // FNV offset basis
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash *= 16777619; // FNV prime
-    hash = hash >>> 0;
-  }
-  return String(hash);
-}
-
-const wordId = (word) => `w:${word.toUpperCase()}`;
-const numberId = (num) => `n:${num}`;
-
-const idParser = sequenceOf([
-  letters,
-  char(":"),
-  letters,
-]).map(([prefix, _, suffix]) => [prefix, suffix]);
-export const parseId = (id) => idParser.run(id).result;
-
 // ============================================================================
 // Basic Tokens
 // ============================================================================
 
-// Comments: ; to end of line
 const comment = sequenceOf([
   char(";"),
   everyCharUntil(choice([char("\n"), endOfInput])),
   choice([char("\n"), endOfInput]),
 ]);
-
-// Whitespace and comments
 const wsOrComment = choice([whitespace, comment]);
 const ws = many(wsOrComment);
-const ws1 = many1(whitespace);
 
 // ============================================================================
 // Value Types (like parser.js)
@@ -84,9 +54,7 @@ const number = sequenceOf([
   possibly(sequenceOf([char("."), digits]).map(([, decimal]) => decimal)),
 ]).map(([_, sign, whole, decimal]) => {
   const number = Number((sign ?? "") + whole + (decimal ?? ""));
-  const id = `n:${number.toString()}`;
-  store.set(id, number);
-  return { id };
+  return { number };
 });
 
 // String: "hello world" with escape sequences
@@ -103,9 +71,7 @@ const string = sequenceOf([
   char('"'),
 ]).map(([_, __, chars, ___]) => {
   const str = chars.join("");
-  const hash = `s:${hashString(str)}`;
-  store.set(hash, str);
-  return { id: hash };
+  return { string: str };
 });
 
 const delimiter = choice([
@@ -128,15 +94,11 @@ const patternVar = sequenceOf([
   char("?"),
   wordChars,
 ]).map(([_, __, chars]) => {
-  const id = `v:${chars}`;
-  store.set(id, chars);
-  return { id };
+  return { patternVar: chars };
 });
 
 const wild = sequenceOf([ws, char("_")]).map(([_, __]) => {
-  const id = "w:_";
-  store.set(id, true);
-  return { id };
+  return { wildcard: "_" };
 });
 
 const word = sequenceOf([
@@ -145,23 +107,10 @@ const word = sequenceOf([
   wordChars,
 ]).map(([_, start, chars]) => {
   const word = start + chars;
-  const id = wordId(word);
-  store.set(id, word);
-  return { id };
+  return { word };
 });
 
-const litWord = sequenceOf([
-  ws,
-  char("'"),
-  choice([patternVar, wild, word]),
-]).map(([_, __, word]) => {
-  const [type, wordId] = parseId(word);
-  const id = `lw:${wordId}`;
-  store.set(id, word);
-  return { id };
-});
-
-const scalar = choice([number, string, wild, litWord, patternVar, word]);
+const scalar = choice([number, string, wild, patternVar, word]);
 
 // ============================================================================
 // Compound values

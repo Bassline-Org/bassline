@@ -10,32 +10,40 @@ describe("Minimal Graph Runtime", () => {
 
   describe("Core Operations", () => {
     it("should add edges to the graph", () => {
-      const id1 = g.add("alice", "likes", "bob");
-      const id2 = g.add("bob", "likes", "carol");
+      const ctx1 = g.add("alice", "likes", "bob");
+      const ctx2 = g.add("bob", "likes", "carol");
 
       expect(g.edges.length).toBe(2);
-      expect(g.edges[0]).toEqual({
+      expect(g.edges[0]).toMatchObject({
         source: "alice",
         attr: "likes",
         target: "bob",
-        id: id1
+        context: ctx1,
+        id: 0
       });
-      expect(g.edges[1]).toEqual({
+      expect(g.edges[1]).toMatchObject({
         source: "bob",
         attr: "likes",
         target: "carol",
-        id: id2
+        context: ctx2,
+        id: 1
       });
     });
 
-    it("should assign sequential IDs to edges", () => {
-      const id1 = g.add("a", "b", "c");
-      const id2 = g.add("d", "e", "f");
-      const id3 = g.add("g", "h", "i");
+    it("should auto-generate contexts and assign sequential IDs", () => {
+      const ctx1 = g.add("a", "b", "c");
+      const ctx2 = g.add("d", "e", "f");
+      const ctx3 = g.add("g", "h", "i");
 
-      expect(id1).toBe(0);
-      expect(id2).toBe(1);
-      expect(id3).toBe(2);
+      // Returns auto-generated contexts
+      expect(ctx1).toBe("edge:0");
+      expect(ctx2).toBe("edge:1");
+      expect(ctx3).toBe("edge:2");
+
+      // Internal IDs are still sequential
+      expect(g.edges[0].id).toBe(0);
+      expect(g.edges[1].id).toBe(1);
+      expect(g.edges[2].id).toBe(2);
     });
   });
 
@@ -45,7 +53,7 @@ describe("Minimal Graph Runtime", () => {
       g.add("bob", "likes", "carol");
       g.add("alice", "age", 25);
 
-      const results = g.query(["alice", "likes", "bob"]);
+      const results = g.query(["alice", "likes", "bob", "*"]);
       expect(results.length).toBe(1);
       expect(results[0].size).toBe(0); // No variables, so no bindings
     });
@@ -55,7 +63,7 @@ describe("Minimal Graph Runtime", () => {
       g.add("bob", "likes", "carol");
       g.add("carol", "likes", "alice");
 
-      const results = g.query(["?x", "likes", "?y"]);
+      const results = g.query(["?x", "likes", "?y", "*"]);
       expect(results.length).toBe(3);
 
       const bindings = results.map(b => ({
@@ -73,7 +81,7 @@ describe("Minimal Graph Runtime", () => {
       g.add("alice", "hates", "carol");
       g.add("bob", "likes", "alice");
 
-      const results = g.query(["alice", "*", "?target"]);
+      const results = g.query(["alice", "*", "?target", "*"]);
       expect(results.length).toBe(2);
 
       const targets = results.map(b => b.get("?target"));
@@ -90,8 +98,8 @@ describe("Minimal Graph Runtime", () => {
       g.add("carol", "age", 5);
 
       const results = g.query(
-        ["?x", "type", "person"],
-        ["?x", "age", "?age"]
+        ["?x", "type", "person", "*"],
+        ["?x", "age", "?age", "*"]
       );
 
       expect(results.length).toBe(2);
@@ -113,8 +121,8 @@ describe("Minimal Graph Runtime", () => {
 
       // ?x must be the same in both patterns
       const results = g.query(
-        ["?x", "likes", "bob"],
-        ["?x", "age", "?age"]
+        ["?x", "likes", "bob", "*"],
+        ["?x", "age", "?age", "*"]
       );
 
       expect(results.length).toBe(1);
@@ -323,7 +331,7 @@ describe("Minimal Graph Runtime", () => {
       });
 
       // Check that responses were added
-      const responses = g.query(["?x", "response", "fired"]);
+      const responses = g.query(["?x", "response", "fired", "*"]);
       expect(responses.length).toBe(2);
     });
   });
@@ -344,7 +352,7 @@ describe("Minimal Graph Runtime", () => {
       g.add("item1", "needs_eval", true);
       g.add("item2", "needs_eval", true);
 
-      const evaluated = g.query(["?x", "evaluated", true]);
+      const evaluated = g.query(["?x", "evaluated", true, "*"]);
       expect(evaluated.length).toBe(2);
     });
 
@@ -385,9 +393,9 @@ describe("Minimal Graph Runtime", () => {
       g.add("cascade", "a", true);
 
       // Check all steps executed
-      expect(g.query(["cascade", "b", true]).length).toBe(1);
-      expect(g.query(["cascade", "c", true]).length).toBe(1);
-      expect(g.query(["cascade", "d", true]).length).toBe(1);
+      expect(g.query(["cascade", "b", true, "*"]).length).toBe(1);
+      expect(g.query(["cascade", "c", true, "*"]).length).toBe(1);
+      expect(g.query(["cascade", "d", true, "*"]).length).toBe(1);
     });
   });
 
@@ -447,7 +455,7 @@ describe("Minimal Graph Runtime", () => {
       );
 
       // Check that index creation was triggered
-      const created = g.query(["index-created", "for", "?rule"]);
+      const created = g.query(["index-created", "for", "?rule", "*"]);
       expect(created.length).toBe(1);
     });
   });
@@ -491,7 +499,7 @@ describe("Minimal Graph Runtime", () => {
       }
 
       // Query them
-      const results = g.query(["?x", "index", "?i"]);
+      const results = g.query(["?x", "index", "?i", "*"]);
 
       const elapsed = Date.now() - start;
 
@@ -535,8 +543,8 @@ describe("Edge Cases", () => {
   it("should handle undefined wildcards", () => {
     g.add("a", "b", "c");
 
-    const results1 = g.query([undefined, "b", "c"]);
-    const results2 = g.query([null, "b", "c"]);
+    const results1 = g.query([undefined, "b", "c", "*"]);
+    const results2 = g.query([null, "b", "c", "*"]);
 
     expect(results1.length).toBe(1);
     expect(results2.length).toBe(1);
@@ -549,10 +557,10 @@ describe("Edge Cases", () => {
     g.add("node", "data", obj);
     g.add("node", "array", arr);
 
-    const results = g.query(["node", "data", "?val"]);
+    const results = g.query(["node", "data", "?val", "*"]);
     expect(results[0].get("?val")).toBe(obj);
 
-    const arrResults = g.query(["node", "array", "?val"]);
+    const arrResults = g.query(["node", "array", "?val", "*"]);
     expect(arrResults[0].get("?val")).toBe(arr);
   });
 });

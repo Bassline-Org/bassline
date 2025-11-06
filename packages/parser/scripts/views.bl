@@ -1,15 +1,26 @@
-fact [
-    inspector-view {
-        type view!
-        docs "A view that displays the edges of a node in the graph"
-    }
+insert [
+    ;; this becomes [some-context trustworthy maybe some-context author goose]
+    some-context [
+        ;; No context specified, so it's auto-generated
+        trustworthy "maybe"
+        author goose
+    ]
 
-    table-view {
-        type view!
-        docs "A view that displays the contents of a node in a table according to the columns specified"
-    }
+    ;; Explicit grouping
+    group some-context [
+        alice [
+            name "alice"
+            knows bob
+        ]
+        bob hates alice
+    ]
 
-    example-foo {
-        view table-view
-    }
+    ;; Or maybe we just use a smalltalk pragma style syntax?
+    <some-context> [
+        alice [
+            name "alice"
+            knows bob
+        ]
+        bob hates alice
+    ]
 ]

@@ -21,6 +21,7 @@ export class Graph {
     this.sourceIndex = new Map(); // Map<value, Set<Pattern>>
     this.attrIndex = new Map(); // Map<value, Set<Pattern>>
     this.targetIndex = new Map(); // Map<value, Set<Pattern>>
+    this.contextIndex = new Map(); // Map<context, Set<Pattern>>
     this.wildcardPatterns = new Set(); // Patterns with ANY wildcard/variable
   }
 
@@ -29,10 +30,33 @@ export class Graph {
    * @param {*} source - Source node
    * @param {*} attr - Attribute/relation
    * @param {*} target - Target node/value
-   * @returns {number} Edge ID
+   * @param {*} context - Context (null = auto-generate)
+   * @returns {*} Context (handle/identity)
    */
-  add(source, attr, target) {
-    const edge = { source, attr, target, id: this.nextId++ };
+  add(source, attr, target, context = null) {
+    // Auto-generate context if null
+    const edgeContext = context ?? `edge:${this.nextId}`;
+
+    // Check for existing edge (dedupe by 4-tuple)
+    const existing = this.edges.find(
+      (e) =>
+        e.source === source &&
+        e.attr === attr &&
+        e.target === target &&
+        e.context === edgeContext,
+    );
+
+    if (existing) {
+      return existing.context;
+    }
+
+    const edge = {
+      source,
+      attr,
+      target,
+      context: edgeContext,
+      id: this.nextId++,
+    };
 
     if (this.inBatch) {
       // Accumulate in batch, don't update patterns yet
@@ -43,7 +67,7 @@ export class Graph {
       this.updatePatterns(edge);
     }
 
-    return edge.id;
+    return edge.context;
   }
 
   /**
@@ -116,9 +140,9 @@ export class Graph {
 
     // Pure literal pattern - create composite key for specificity
     // Index by the COMBINATION of literals to avoid over-activation
-    const { sources, attrs, targets } = pattern.getLiteralValues();
+    const { sources, attrs, targets, contexts } = pattern.getLiteralValues();
 
-    // Index by most specific field (prefer source > attr > target)
+    // Index by most specific field (prefer source > attr > target > context)
     // This prevents patterns from being activated by common attributes
     if (sources.size > 0) {
       // Index by source (most selective usually)
@@ -144,6 +168,14 @@ export class Graph {
         }
         this.targetIndex.get(target).add(pattern);
       }
+    } else if (contexts.size > 0) {
+      // Only context literals, index by context
+      for (const context of contexts) {
+        if (!this.contextIndex.has(context)) {
+          this.contextIndex.set(context, new Set());
+        }
+        this.contextIndex.get(context).add(pattern);
+      }
     } else {
       // No literals at all? Shouldn't happen if hasWildcardsOrVariables() returned false
       this.wildcardPatterns.add(pattern);
@@ -159,7 +191,7 @@ export class Graph {
     this.wildcardPatterns.delete(pattern);
 
     // Remove from literal indexes
-    const { sources, attrs, targets } = pattern.getLiteralValues();
+    const { sources, attrs, targets, contexts } = pattern.getLiteralValues();
 
     for (const source of sources) {
       const set = this.sourceIndex.get(source);
@@ -187,6 +219,16 @@ export class Graph {
         set.delete(pattern);
         if (set.size === 0) {
           this.targetIndex.delete(target);
+        }
+      }
+    }
+
+    for (const context of contexts) {
+      const set = this.contextIndex.get(context);
+      if (set) {
+        set.delete(pattern);
+        if (set.size === 0) {
+          this.contextIndex.delete(context);
         }
       }
     }
@@ -228,7 +270,32 @@ export class Graph {
       }
     }
 
+    // Include patterns watching for this specific context
+    const contextPatterns = this.contextIndex.get(edge.context);
+    if (contextPatterns) {
+      for (const p of contextPatterns) {
+        candidates.add(p);
+      }
+    }
+
     return candidates;
+  }
+
+  /**
+   * Get all edges with a specific context
+   * @param {*} contextName - Context to filter by
+   * @returns {Array} Edges with the given context
+   */
+  getEdgesInContext(contextName) {
+    return this.edges.filter((e) => e.context === contextName);
+  }
+
+  /**
+   * List all unique contexts in the graph
+   * @returns {Array} Unique context values
+   */
+  listContexts() {
+    return [...new Set(this.edges.map((e) => e.context))];
   }
 }
 
@@ -315,10 +382,10 @@ export class Pattern {
    */
   tryStart(edge) {
     for (let i = 0; i < this.spec.length; i++) {
-      const [s, a, t] = this.spec[i];
+      const [s, a, t, c] = this.spec[i];
       const bindings = new Map();
 
-      if (this.matches(edge, s, a, t, bindings)) {
+      if (this.matches(edge, s, a, t, c, bindings)) {
         return {
           matched: [i],
           bindings,
@@ -338,10 +405,10 @@ export class Pattern {
       // Skip already matched positions
       if (partial.matched.includes(i)) continue;
 
-      const [s, a, t] = this.spec[i];
+      const [s, a, t, c] = this.spec[i];
       const bindings = new Map(partial.bindings);
 
-      if (this.matches(edge, s, a, t, bindings)) {
+      if (this.matches(edge, s, a, t, c, bindings)) {
         const matched = [...partial.matched, i];
         return {
           matched,
@@ -355,12 +422,15 @@ export class Pattern {
   }
 
   /**
-   * Check if an edge matches a pattern triple with variable binding
+   * Check if an edge matches a pattern quad with variable binding
    */
-  matches(edge, s, a, t, bindings) {
-    return this.matchField(edge.source, s, bindings) &&
+  matches(edge, s, a, t, c, bindings) {
+    return (
+      this.matchField(edge.source, s, bindings) &&
       this.matchField(edge.attr, a, bindings) &&
-      this.matchField(edge.target, t, bindings);
+      this.matchField(edge.target, t, bindings) &&
+      this.matchField(edge.context, c, bindings)
+    );
   }
 
   /**
@@ -405,16 +475,26 @@ export class Pattern {
     }
 
     // Check each NAC pattern - if ANY match, return false
-    for (const [s, a, t] of this.nacSpec) {
+    for (const [s, a, t, c] of this.nacSpec) {
       // Apply current bindings to the NAC pattern
       const resolvedS = this.resolveValue(s, bindings);
       const resolvedA = this.resolveValue(a, bindings);
       const resolvedT = this.resolveValue(t, bindings);
+      const resolvedC = this.resolveValue(c, bindings);
 
       // Check if this NAC pattern matches any edge in the graph
       for (const edge of this.graph.edges) {
         const nacBindings = new Map(bindings);
-        if (this.matches(edge, resolvedS, resolvedA, resolvedT, nacBindings)) {
+        if (
+          this.matches(
+            edge,
+            resolvedS,
+            resolvedA,
+            resolvedT,
+            resolvedC,
+            nacBindings,
+          )
+        ) {
           // NAC pattern matched - this violates the condition
           return false;
         }
@@ -456,36 +536,40 @@ export class Pattern {
    * @returns {boolean}
    */
   hasWildcardsOrVariables() {
-    for (const [s, a, t] of this.spec) {
+    for (const [s, a, t, c] of this.spec) {
       if (this.isWildcardOrVariable(s)) return true;
       if (this.isWildcardOrVariable(a)) return true;
       if (this.isWildcardOrVariable(t)) return true;
+      if (this.isWildcardOrVariable(c)) return true;
     }
     // Also check NAC spec
-    for (const [s, a, t] of this.nacSpec) {
+    for (const [s, a, t, c] of this.nacSpec) {
       if (this.isWildcardOrVariable(s)) return true;
       if (this.isWildcardOrVariable(a)) return true;
       if (this.isWildcardOrVariable(t)) return true;
+      if (this.isWildcardOrVariable(c)) return true;
     }
     return false;
   }
 
   /**
    * Get all literal values from this pattern's spec
-   * @returns {{ sources: Set, attrs: Set, targets: Set }}
+   * @returns {{ sources: Set, attrs: Set, targets: Set, contexts: Set }}
    */
   getLiteralValues() {
     const sources = new Set();
     const attrs = new Set();
     const targets = new Set();
+    const contexts = new Set();
 
-    for (const [s, a, t] of this.spec) {
+    for (const [s, a, t, c] of this.spec) {
       if (!this.isWildcardOrVariable(s)) sources.add(s);
       if (!this.isWildcardOrVariable(a)) attrs.add(a);
       if (!this.isWildcardOrVariable(t)) targets.add(t);
+      if (!this.isWildcardOrVariable(c)) contexts.add(c);
     }
 
-    return { sources, attrs, targets };
+    return { sources, attrs, targets, contexts };
   }
 }
 
