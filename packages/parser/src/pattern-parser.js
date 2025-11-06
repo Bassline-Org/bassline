@@ -9,22 +9,16 @@
 
 import {
   anyChar,
-  between,
   char,
   choice,
   digits,
   endOfInput,
   everyCharUntil,
-  everythingUntil,
   letter,
-  letters,
   many,
-  many1,
   possibly,
-  recursiveParser,
   regex,
   sequenceOf,
-  startOfInput,
   str,
   whitespace,
 } from "arcsecond/index.js";
@@ -108,8 +102,6 @@ const word = sequenceOf([
   const word = start + chars;
   return { word };
 });
-
-const scalar = choice([number, string, wild, patternVar, word]);
 
 const entityId = choice([number, word]);
 const attribute = word;
@@ -198,7 +190,6 @@ const patternObj = sequenceOf([
 ]).map(([entity, _, entries, __]) =>
   entries.map(([a, v]) => [entity, a, v, null])
 );
-
 const patternGroup = sequenceOf([
   cmd("group"),
   patternChoice(context),
@@ -212,10 +203,35 @@ const patternGroup = sequenceOf([
   ) => [entity, attribute, value, context]);
 });
 
+const namedPattern = sequenceOf([
+  cmd("pattern"),
+  word,
+  openBracket,
+  many(choice(
+    patternGroup,
+    patternObj,
+    patternQuad.map((q) => [q]),
+  )),
+  closeBracket,
+]).map(([_, name, _, patterns]) => ({
+  pattern: {
+    name,
+    patterns: patterns.flat(),
+  },
+}));
+
+const patternRef = sequenceOf([
+  cmd("<"),
+  word,
+]).map(([_, name, __]) => ({
+  patternRef: name,
+}));
+
 const where = sequenceOf([
   cmd("where"),
   openBracket,
   many(choice([
+    patternRef,
     patternGroup,
     patternObj,
     patternQuad.map((q) => [q]),
@@ -227,6 +243,7 @@ const not = sequenceOf([
   cmd("not"),
   openBracket,
   many(choice([
+    patternRef,
     patternGroup,
     patternObj,
     patternQuad.map((q) => [q]),
@@ -249,6 +266,7 @@ const produce = sequenceOf([
   cmd("produce"),
   openBracket,
   many(choice([
+    patternRef,
     patternGroup,
     patternObj,
     patternQuad.map((q) => [q]),
@@ -274,7 +292,7 @@ const rule = sequenceOf([
   },
 }));
 
-const program = many(choice([insert, rule, query]));
+const program = many(choice([insert, rule, query, namedPattern]));
 export function parseProgram(input) {
   const result = program.run(input);
   if (result.isError) {
