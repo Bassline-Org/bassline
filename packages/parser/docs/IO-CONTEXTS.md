@@ -363,14 +363,64 @@ Benefits:
 - ✅ Documentation updated
 - ✅ OLD code deleted
 
+## Important: Not All Operations Use IO Contexts
+
+The IO contexts pattern is designed for **one-shot request/response operations**. However, some graph operations require **continuous reactivity** and use a different pattern:
+
+### One-Shot Pattern: IO Contexts (handle/handled)
+
+**Use for**: Effects and Compute operations that execute once per request
+
+```javascript
+// Setup → Trigger → Execute once → Complete
+graph.add("calc1", "X", 10, null);
+graph.add("calc1", "Y", 20, null);
+graph.add("calc1", "handle", "ADD", "input");  // Executes once
+// Result: calc1 RESULT 30 output
+```
+
+**Operations using this pattern**:
+- Effects: LOG, HTTP_GET, WRITE_FILE, etc. (8 effects)
+- Compute: ADD, SQRT, GT, etc. (18 operations)
+
+### Continuous Reactive Pattern: Reified Activation (memberOf)
+
+**Use for**: Operations that need to continuously react to new data
+
+```javascript
+// Define → Activate → Continuously react to new items
+graph.add("AGG1", "AGGREGATE", "SUM", null);
+graph.add("AGG1", "ITEM", 10, null);
+graph.add("AGG1", "memberOf", "aggregation", "system");  // Activates continuous watcher
+
+// After activation, automatically reacts to new items:
+graph.add("AGG1", "ITEM", 20, null);  // Triggers recomputation!
+// Result continuously updates via refinement
+```
+
+**Operations using this pattern**:
+- **Rules**: Continuously watch for pattern matches, fire on new data
+- **Aggregations**: Continuously accumulate values, update results incrementally
+
+**Key differences**:
+
+| Aspect | IO Contexts | Reified Activation |
+|--------|-------------|-------------------|
+| Execution | One-shot | Continuous |
+| Trigger | `handle` edge | `memberOf` edge |
+| Context | `input`/`output` | `system` |
+| Re-execution | New handle request | Automatically on new data |
+| Use case | Effects, compute | Rules, aggregations |
+
 ## Future Extensions
 
-The IO contexts pattern generalizes to:
-- **Rules**: Define rule structure, activate via `memberOf rule system`
-- **Patterns**: Named pattern definitions with activation control
+The IO contexts pattern may generalize to:
+- **Patterns**: Named pattern definitions with explicit activation
 - **Streaming**: Multi-step operations with progress tracking
 - **Workflows**: Complex orchestration via watchers
 - **Distributed**: Contexts can flow across nodes
+
+Note: Rules and aggregations already use the reified activation pattern, not IO contexts.
 
 ## References
 

@@ -1,19 +1,32 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Graph } from "../src/minimal-graph.js";
+import { createContext } from "../src/pattern-words.js";
 import {
   addVersionedResult,
   builtinAggregations,
   getAllVersions,
   getCurrentValue,
-  installAggregation,
+  installReifiedAggregations,
 } from "../extensions/aggregation/index.js";
 
 describe("Modular Aggregation System", () => {
   let graph;
+  let context;
 
   beforeEach(() => {
     graph = new Graph();
+    context = createContext(graph);
   });
+
+  // Helpers to setup and activate aggregations (closures over graph variable)
+  function setupAgg(aggType) {
+    graph.add("AGG1", "AGGREGATE", aggType, null);
+    graph.add("AGG1", "memberOf", "aggregation", "system");
+  }
+
+  function addItem(value) {
+    graph.add("AGG1", "ITEM", value, null);
+  }
 
   describe("Core Helpers", () => {
     describe("addVersionedResult", () => {
@@ -121,44 +134,44 @@ describe("Modular Aggregation System", () => {
 
   describe("Built-in Aggregations", () => {
     beforeEach(() => {
-      installAggregation(graph, builtinAggregations);
+      installReifiedAggregations(graph, builtinAggregations, context);
     });
 
     describe("SUM", () => {
       it("should sum numeric values", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
-        graph.add("AGG1", "ITEM", 30);
+        setupAgg("SUM");
+        addItem(10);
+        addItem(20);
+        addItem(30);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(60);
       });
 
       it("should parse string numbers", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
-        graph.add("AGG1", "ITEM", "10");
-        graph.add("AGG1", "ITEM", "20");
+        setupAgg("SUM");
+        addItem("10");
+        addItem("20");
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(30);
       });
 
       it("should skip invalid values", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", "invalid");
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("SUM");
+        addItem(10);
+        addItem("invalid");
+        addItem(20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(30);
       });
 
       it("should handle negative numbers", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", -5);
-        graph.add("AGG1", "ITEM", 15);
+        setupAgg("SUM");
+        addItem(10);
+        addItem(-5);
+        addItem(15);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(20);
@@ -167,20 +180,20 @@ describe("Modular Aggregation System", () => {
 
     describe("COUNT", () => {
       it("should count all items", () => {
-        graph.add("AGG1", "AGGREGATE", "COUNT");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
-        graph.add("AGG1", "ITEM", 30);
+        setupAgg("COUNT");
+        addItem(10);
+        addItem(20);
+        addItem(30);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(3);
       });
 
       it("should count regardless of value", () => {
-        graph.add("AGG1", "AGGREGATE", "COUNT");
-        graph.add("AGG1", "ITEM", "hello");
-        graph.add("AGG1", "ITEM", 42);
-        graph.add("AGG1", "ITEM", null);
+        setupAgg("COUNT");
+        addItem("hello");
+        addItem(42);
+        addItem(null);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(3);
@@ -189,27 +202,27 @@ describe("Modular Aggregation System", () => {
 
     describe("AVG", () => {
       it("should compute average of numeric values", () => {
-        graph.add("AGG1", "AGGREGATE", "AVG");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
-        graph.add("AGG1", "ITEM", 30);
+        setupAgg("AVG");
+        addItem(10);
+        addItem(20);
+        addItem(30);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(20);
       });
 
       it("should skip invalid values", () => {
-        graph.add("AGG1", "AGGREGATE", "AVG");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", "invalid");
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("AVG");
+        addItem(10);
+        addItem("invalid");
+        addItem(20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(15);
       });
 
       it("should return 0 for no valid values", () => {
-        graph.add("AGG1", "AGGREGATE", "AVG");
+        setupAgg("AVG");
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBeNull(); // No items yet
@@ -218,37 +231,37 @@ describe("Modular Aggregation System", () => {
 
     describe("MIN", () => {
       it("should find minimum value", () => {
-        graph.add("AGG1", "AGGREGATE", "MIN");
-        graph.add("AGG1", "ITEM", 30);
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("MIN");
+        addItem(30);
+        addItem(10);
+        addItem(20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(10);
       });
 
       it("should handle negative numbers", () => {
-        graph.add("AGG1", "AGGREGATE", "MIN");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", -5);
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("MIN");
+        addItem(10);
+        addItem(-5);
+        addItem(20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(-5);
       });
 
       it("should skip invalid values", () => {
-        graph.add("AGG1", "AGGREGATE", "MIN");
-        graph.add("AGG1", "ITEM", 30);
-        graph.add("AGG1", "ITEM", "invalid");
-        graph.add("AGG1", "ITEM", 10);
+        setupAgg("MIN");
+        addItem(30);
+        addItem("invalid");
+        addItem(10);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(10);
       });
 
       it("should return null when no valid values", () => {
-        graph.add("AGG1", "AGGREGATE", "MIN");
+        setupAgg("MIN");
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBeNull();
@@ -257,37 +270,37 @@ describe("Modular Aggregation System", () => {
 
     describe("MAX", () => {
       it("should find maximum value", () => {
-        graph.add("AGG1", "AGGREGATE", "MAX");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 30);
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("MAX");
+        addItem(10);
+        addItem(30);
+        addItem(20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(30);
       });
 
       it("should handle negative numbers", () => {
-        graph.add("AGG1", "AGGREGATE", "MAX");
-        graph.add("AGG1", "ITEM", -10);
-        graph.add("AGG1", "ITEM", -5);
-        graph.add("AGG1", "ITEM", -20);
+        setupAgg("MAX");
+        addItem(-10);
+        addItem(-5);
+        addItem(-20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(-5);
       });
 
       it("should skip invalid values", () => {
-        graph.add("AGG1", "AGGREGATE", "MAX");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", "invalid");
-        graph.add("AGG1", "ITEM", 30);
+        setupAgg("MAX");
+        addItem(10);
+        addItem("invalid");
+        addItem(30);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(30);
       });
 
       it("should return null when no valid values", () => {
-        graph.add("AGG1", "AGGREGATE", "MAX");
+        setupAgg("MAX");
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBeNull();
@@ -296,18 +309,18 @@ describe("Modular Aggregation System", () => {
 
     describe("Operation Name Normalization", () => {
       it("should handle lowercase operation names", () => {
-        graph.add("AGG1", "AGGREGATE", "sum");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("sum");
+        addItem(10);
+        addItem(20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(30);
       });
 
       it("should handle mixed case operation names", () => {
-        graph.add("AGG1", "AGGREGATE", "Sum");
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("Sum");
+        addItem(10);
+        addItem(20);
 
         const result = getCurrentValue(graph, "AGG1");
         expect(result).toBe(30);
@@ -316,20 +329,22 @@ describe("Modular Aggregation System", () => {
 
     describe("Multiple Independent Aggregations", () => {
       it("should handle multiple aggregations simultaneously", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
-        graph.add("AGG2", "AGGREGATE", "COUNT");
-        graph.add("AGG3", "AGGREGATE", "MAX");
+        setupAgg("SUM");
+        graph.add("AGG2", "AGGREGATE", "COUNT", null);
+        graph.add("AGG2", "memberOf", "aggregation", "system");
+        graph.add("AGG3", "AGGREGATE", "MAX", null);
+        graph.add("AGG3", "memberOf", "aggregation", "system");
 
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
+        addItem(10);
+        addItem(20);
 
-        graph.add("AGG2", "ITEM", "a");
-        graph.add("AGG2", "ITEM", "b");
-        graph.add("AGG2", "ITEM", "c");
+        graph.add("AGG2", "ITEM", "a", null);
+        graph.add("AGG2", "ITEM", "b", null);
+        graph.add("AGG2", "ITEM", "c", null);
 
-        graph.add("AGG3", "ITEM", 5);
-        graph.add("AGG3", "ITEM", 15);
-        graph.add("AGG3", "ITEM", 10);
+        graph.add("AGG3", "ITEM", 5, null);
+        graph.add("AGG3", "ITEM", 15, null);
+        graph.add("AGG3", "ITEM", 10, null);
 
         expect(getCurrentValue(graph, "AGG1")).toBe(30);
         expect(getCurrentValue(graph, "AGG2")).toBe(3);
@@ -339,24 +354,24 @@ describe("Modular Aggregation System", () => {
 
     describe("Incremental Updates", () => {
       it("should incrementally update results as items are added", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
+        setupAgg("SUM");
 
-        graph.add("AGG1", "ITEM", 10);
+        addItem(10);
         expect(getCurrentValue(graph, "AGG1")).toBe(10);
 
-        graph.add("AGG1", "ITEM", 20);
+        addItem(20);
         expect(getCurrentValue(graph, "AGG1")).toBe(30);
 
-        graph.add("AGG1", "ITEM", 15);
+        addItem(15);
         expect(getCurrentValue(graph, "AGG1")).toBe(45);
       });
 
       it("should maintain version history", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
+        setupAgg("SUM");
 
-        graph.add("AGG1", "ITEM", 10);
-        graph.add("AGG1", "ITEM", 20);
-        graph.add("AGG1", "ITEM", 15);
+        addItem(10);
+        addItem(20);
+        addItem(15);
 
         const versions = getAllVersions(graph, "AGG1");
         expect(versions.length).toBe(3);
@@ -368,17 +383,17 @@ describe("Modular Aggregation System", () => {
 
     describe("Cleanup", () => {
       it("should return cleanup function", () => {
-        const cleanup = installAggregation(graph, builtinAggregations);
+        const cleanup = installReifiedAggregations(graph, builtinAggregations, context);
         expect(typeof cleanup).toBe("function");
       });
 
       it("should prevent duplicate watcher setup for same aggregation", () => {
-        graph.add("AGG1", "AGGREGATE", "SUM");
-        graph.add("AGG1", "ITEM", 10);
+        setupAgg("SUM");
+        addItem(10);
 
         // Try to set up again (should be ignored)
-        graph.add("AGG1", "AGGREGATE", "SUM");
-        graph.add("AGG1", "ITEM", 20);
+        setupAgg("SUM");
+        addItem(20);
 
         // Should have correct result (not doubled)
         const result = getCurrentValue(graph, "AGG1");
@@ -405,12 +420,12 @@ describe("Modular Aggregation System", () => {
         },
       };
 
-      installAggregation(graph, customAggregations);
+      installReifiedAggregations(graph, customAggregations, context);
 
-      graph.add("AGG1", "AGGREGATE", "PRODUCT");
-      graph.add("AGG1", "ITEM", 2);
-      graph.add("AGG1", "ITEM", 3);
-      graph.add("AGG1", "ITEM", 4);
+      setupAgg("PRODUCT");
+      addItem(2);
+      addItem(3);
+      addItem(4);
 
       const result = getCurrentValue(graph, "AGG1");
       expect(result).toBe(24);
@@ -430,13 +445,13 @@ describe("Modular Aggregation System", () => {
         },
       };
 
-      installAggregation(graph, customAggregations);
+      installReifiedAggregations(graph, customAggregations, context);
 
-      graph.add("AGG1", "AGGREGATE", "UNIQUE");
-      graph.add("AGG1", "ITEM", "a");
-      graph.add("AGG1", "ITEM", "b");
-      graph.add("AGG1", "ITEM", "a"); // Duplicate
-      graph.add("AGG1", "ITEM", "c");
+      setupAgg("UNIQUE");
+      addItem("a");
+      addItem("b");
+      addItem("a"); // Duplicate
+      addItem("c");
 
       const result = getCurrentValue(graph, "AGG1");
       expect(result).toBe(3); // Only counts unique values

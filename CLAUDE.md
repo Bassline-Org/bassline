@@ -99,49 +99,57 @@ import { Runtime } from '@bassline/parser/interactive';
 const rt = new Runtime();
 
 // Add facts
-rt.eval('fact [alice age 30 bob age 25]');
+rt.eval('insert { alice age 30 * bob age 25 * }');
 
 // Query
-rt.eval('query [?x age ?a]');
+rt.eval('query where { ?x age ?a * }');
 
 // Create reactive rule
-rt.eval('rule adult-check [?p age ?a] -> [?p adult true]');
+rt.eval('rule adult-check where { ?p age ?a * } produce { ?p adult true * }');
 
 // Single-word shorthand (explore an entity)
-rt.eval('alice');  // Expands to: query [alice ?attr ?target]
+rt.eval('alice');  // Expands to: query where { alice ?attr ?target * }
 ```
 
 **Command types**:
-- `fact [...]` - Add triples
-- `query [...]` - Find matches (with optional NAC)
-- `rule name [...] -> [...]` - Reactive rewrite rules
-- `pattern name [...]` - Named observable patterns
-- `watch [...] [...]` - Watch and react
+- `insert { ... }` - Add triples
+- `query where { ... }` - Find matches (with optional NAC)
+- `rule name where { ... } produce { ... }` - Reactive rewrite rules
+- `pattern name { ... }` - Named observable patterns
+- `watch where { ... } do { ... }` - Watch and react
 - `delete s a t` - Mark triple as deleted (tombstone)
 - `clear-graph` - Reset everything
 - `graph-info` - Statistics
 
 ### 3. Incremental Aggregations
 
-**Modular, versioned aggregations** with refinement chains:
+**Reified aggregations** with explicit activation and continuous reactivity:
 
 ```javascript
-import { installAggregation, builtinAggregations, getCurrentValue } from '@bassline/parser/aggregation';
+import { installReifiedAggregations, builtinAggregations, getCurrentValue } from '@bassline/parser/aggregation';
+import { createContext } from '@bassline/parser/runtime';
 
-// Install aggregation system
-installAggregation(graph, builtinAggregations);
+const context = createContext(graph);
 
-// Define aggregation
-graph.add("AGG1", "AGGREGATE", "SUM");
+// Install reified aggregations system
+installReifiedAggregations(graph, builtinAggregations, context);
 
-// Add items (aggregation updates incrementally)
-graph.add("AGG1", "ITEM", 10);
-graph.add("AGG1", "ITEM", 20);
-graph.add("AGG1", "ITEM", 15);
+// Define aggregation structure
+graph.add("AGG1", "AGGREGATE", "SUM", null);
+graph.add("AGG1", "ITEM", 10, null);
+graph.add("AGG1", "ITEM", 20, null);
 
-// Get current result (uses NAC to find non-refined version)
+// Activate - makes it REACTIVE
+graph.add("AGG1", "memberOf", "aggregation", "system");
+
+// Continuously reactive - new items auto-update
+graph.add("AGG1", "ITEM", 15, null);  // Triggers recomputation!
+
+// Get current result (uses refinement with NAC)
 getCurrentValue(graph, "AGG1");  // 45
 ```
+
+**Pattern**: Like reified rules - define structure, then activate via `memberOf`. After activation, aggregation is **continuously reactive** to new items.
 
 **Built-in operations**: SUM, COUNT, AVG, MIN, MAX
 
@@ -160,7 +168,14 @@ const customAggs = {
   }
 };
 
-installAggregation(graph, customAggs);
+installReifiedAggregations(graph, customAggs, context);
+
+// Use like built-ins
+graph.add("AGG2", "AGGREGATE", "PRODUCT", null);
+graph.add("AGG2", "memberOf", "aggregation", "system");
+graph.add("AGG2", "ITEM", 2, null);
+graph.add("AGG2", "ITEM", 3, null);
+getCurrentValue(graph, "AGG2");  // 6
 ```
 
 ### 4. Refinement Pattern (Append-Only Updates)
@@ -249,7 +264,7 @@ import { formatResults } from '@bassline/parser/format';
 const rt = new Runtime();
 
 // Evaluate expressions
-const results = rt.eval('fact [alice age 30]');
+const results = rt.eval('insert { alice age 30 * }');
 console.log(formatResults(results));
 
 // Single-word exploration
@@ -308,16 +323,16 @@ See [PERFORMANCE.md](packages/parser/docs/PERFORMANCE.md) for details.
 
 ```javascript
 // When you create a rule:
-rt.eval('rule my-rule [?x age ?a] -> [?x adult true]');
+rt.eval('rule my-rule where { ?x age ?a * } produce { ?x adult true * }');
 
 // The graph automatically contains:
-// rule:MY-RULE type "rule"
-// rule:MY-RULE match "[["?X","AGE","?A"]]"
-// rule:MY-RULE produce "[["?X","ADULT","TRUE"]]"
-// rule:MY-RULE status "active"
+// MY-RULE TYPE RULE! system
+// MY-RULE matches "?X AGE ?A *" MY-RULE
+// MY-RULE produces "?X ADULT TRUE *" MY-RULE
+// MY-RULE memberOf rule system
 
 // You can query this metadata:
-rt.eval('rule:MY-RULE');  // Shows all rule metadata
+rt.eval('my-rule');  // Shows all rule metadata
 ```
 
 This enables:
@@ -330,11 +345,11 @@ This enables:
 ### Cascading Rules
 
 ```javascript
-rt.eval('rule step1 [?x type person] -> [?x verified true]');
-rt.eval('rule step2 [?x verified true] -> [?x processed true]');
-rt.eval('rule step3 [?x processed true] -> [?x complete true]');
+rt.eval('rule step1 where { ?x type person * } produce { ?x verified true * }');
+rt.eval('rule step2 where { ?x verified true * } produce { ?x processed true * }');
+rt.eval('rule step3 where { ?x processed true * } produce { ?x complete true * }');
 
-rt.eval('fact [alice type person]');
+rt.eval('insert { alice type person * }');
 // All three rules fire in sequence!
 ```
 
@@ -342,26 +357,26 @@ rt.eval('fact [alice type person]');
 
 ```javascript
 // Find people who are NOT deleted
-rt.eval('query [?x type person not ?x deleted true]');
+rt.eval('query where { ?x type person * | not ?x deleted true * }');
 
 // Rule that only fires if person doesn't have status
-rt.eval('rule set-default [?p age ?a not ?p status *] -> [?p status active]');
+rt.eval('rule set-default where { ?p age ?a * | not ?p status ?v * } produce { ?p status active * }');
 ```
 
 ### Aggregation with Rules
 
 ```javascript
-// Set up aggregation
-rt.eval('fact [sales:2024 AGGREGATE SUM]');
+// Set up and activate aggregation
+rt.eval('insert { sales:2024 AGGREGATE SUM * sales:2024 memberOf aggregation system }');
 
 // Rule that feeds aggregation
-rt.eval('rule track-sales [?order total ?amount] -> [sales:2024 ITEM ?amount]');
+rt.eval('rule track-sales where { ?order total ?amount * } produce { sales:2024 ITEM ?amount * }');
 
 // Add orders (aggregation updates automatically)
-rt.eval('fact [order:1 total 100 order:2 total 250]');
+rt.eval('insert { order:1 total 100 * order:2 total 250 * }');
 
 // Get result
-getCurrentValue(graph, "sales:2024");  // 350
+getCurrentValue(rt.graph, "sales:2024");  // 350
 ```
 
 ### Computed Values (IO-Based)
@@ -571,10 +586,10 @@ rt.getStats();          // {edges, patterns, rules}
 
 // 2. Explore entities
 rt.eval('alice');       // All edges about alice
-rt.eval('rule:MY-RULE'); // All metadata about rule
+rt.eval('ADULT-CHECK'); // All metadata about rule
 
 // 3. Query patterns
-rt.eval('query [?s ?a ?t]');  // All edges
+rt.eval('query where { ?s ?a ?t * }');  // All edges
 
 // 4. Check active patterns/rules
 rt.getActivePatterns();  // List all patterns
