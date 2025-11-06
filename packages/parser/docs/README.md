@@ -199,33 +199,49 @@ graph.watch([["?x", "validating", true]], (b) => {
 
 ### Effects (Side-Effects)
 
-Effects enable real-world I/O while maintaining the pattern-matching model:
+Effects enable real-world I/O using the **IO contexts pattern** - explicit coordination via `input`/`output` contexts:
 
 ```javascript
-import { Runtime } from "@bassline/parser";
-import { installNodeEffects } from "@bassline/parser/extensions/effects-node";
+import { Graph } from "@bassline/parser";
+import { installBuiltinEffects, installNodeEffects, isHandled, getOutput } from "@bassline/parser/io-effects";
 
-const rt = new Runtime();
-// Core effects (LOG, HTTP_GET, HTTP_POST) are installed by default
+const graph = new Graph();
+
+// Install browser effects (LOG, ERROR, WARN, HTTP_GET, HTTP_POST)
+installBuiltinEffects(graph);
 
 // Opt-in for Node.js-specific effects (filesystem)
-installNodeEffects(rt.graph);
+installNodeEffects(graph);
 
-// Execute effects via patterns
-rt.eval('fact [log1 { EFFECT LOG INPUT "Hello!" }]');
+// Console logging (IO pattern: setup → trigger → check)
+graph.add("req1", "MESSAGE", "Hello World", null);     // 1. Setup data
+graph.add("req1", "handle", "LOG", "input");           // 2. Trigger execution
 
-// Query results when ready
-rt.eval('query [log1 RESULT ?r]');
-// → { logged: true, message: "Hello!" }
+// Wait for completion and get results
+isHandled(graph, "LOG", "req1");                       // true
+getOutput(graph, "req1", "LOGGED");                    // "TRUE"
 
 // HTTP requests (async)
-rt.eval('fact [req1 { EFFECT HTTP_GET INPUT "https://api.example.com" }]');
+graph.add("req2", "URL", "https://api.example.com", null);
+graph.add("req2", "handle", "HTTP_GET", "input");
+// Results: graph.query(["req2", "DATA", "?d", "output"])
 
 // Filesystem (Node.js only)
-rt.eval('fact [file1 { EFFECT WRITE_FILE INPUT { path "/tmp/test.txt" content "data" } }]');
+graph.add("req3", "PATH", "/tmp/test.txt", null);
+graph.add("req3", "CONTENT", "Hello", null);
+graph.add("req3", "handle", "WRITE_FILE", "input");
+// Results: graph.query(["req3", "SUCCESS", "?s", "output"])
 ```
 
-**Browser Compatibility**: Core effects (`LOG`, `ERROR`, `WARN`, `HTTP_GET`, `HTTP_POST`) work in both browsers and Node.js. Filesystem effects (`READ_FILE`, `WRITE_FILE`, `APPEND_FILE`) are opt-in and require Node.js.
+**IO Contexts Benefits**:
+- **Explicit activation**: Setup data separately from execution
+- **Introspectable**: Query pending/completed work via graph queries
+- **Composable**: Chain effects by watching `output` context
+- **Testable**: Prepare contexts, trigger execution, assert outputs
+
+**Browser Compatibility**: Core effects (`LOG`, `ERROR`, `WARN`, `HTTP_GET`, `HTTP_POST`) work in both browsers and Node.js. Filesystem effects (`READ_FILE`, `WRITE_FILE`, `APPEND_FILE`) are Node.js-only.
+
+See [IO-CONTEXTS.md](IO-CONTEXTS.md) for detailed documentation.
 
 ## Architecture
 
@@ -237,15 +253,19 @@ src/
   interactive-runtime.js - High-level runtime with time-travel
 
 extensions/
-  compute/               - Arithmetic & comparison operations
+  io-compute.js          - IO-based compute framework
+  io-compute-builtin.js  - Built-in compute operations (18 ops)
+  io-effects.js          - IO-based effects framework
+  io-effects-builtin.js  - Browser effects (LOG, HTTP, etc)
+  io-effects-node.js     - Node.js effects (filesystem)
   aggregation/           - Aggregation strategies (SUM, COUNT, etc)
-  effects/               - Browser-compatible effects (LOG, HTTP)
-  effects-node/          - Node.js effects (filesystem operations)
+  reified-rules.js       - Graph-native rule storage & activation
 ```
 
 ## Learn More
 
 - [CORE.md](CORE.md) - Deep dive into the computation model
+- [IO-CONTEXTS.md](IO-CONTEXTS.md) - Graph-native IO pattern for effects & compute
 - [SELF-DESCRIPTION.md](SELF-DESCRIPTION.md) - How the system describes itself
 - [PERFORMANCE.md](PERFORMANCE.md) - Optimization strategies and benchmarks
 - [COOKBOOK.md](COOKBOOK.md) - Common patterns and recipes
