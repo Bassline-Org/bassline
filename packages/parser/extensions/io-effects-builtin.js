@@ -16,13 +16,13 @@
  *   graph.query(["req1", "?attr", "?val", "output"]);
  */
 
+import { getInput } from './io-effects.js';
+
 export const builtinIOEffects = {
   io: {
     LOG: {
       execute: async (graph, ctx) => {
-        // Query for MESSAGE input
-        const messageQ = graph.query([ctx, "MESSAGE", "?m", "*"]);
-        const message = messageQ[0]?.get("?m");
+        const message = getInput(graph, ctx, "MESSAGE");
 
         console.log(message);
 
@@ -37,8 +37,7 @@ export const builtinIOEffects = {
 
     ERROR: {
       execute: async (graph, ctx) => {
-        const messageQ = graph.query([ctx, "MESSAGE", "?m", "*"]);
-        const message = messageQ[0]?.get("?m");
+        const message = getInput(graph, ctx, "MESSAGE");
 
         console.error(message);
 
@@ -53,8 +52,7 @@ export const builtinIOEffects = {
 
     WARN: {
       execute: async (graph, ctx) => {
-        const messageQ = graph.query([ctx, "MESSAGE", "?m", "*"]);
-        const message = messageQ[0]?.get("?m");
+        const message = getInput(graph, ctx, "MESSAGE");
 
         console.warn(message);
 
@@ -71,8 +69,7 @@ export const builtinIOEffects = {
   http: {
     HTTP_GET: {
       execute: async (graph, ctx) => {
-        const urlQ = graph.query([ctx, "URL", "?u", "*"]);
-        const url = urlQ[0]?.get("?u");
+        const url = getInput(graph, ctx, "URL");
 
         if (!url) {
           throw new Error("HTTP_GET requires URL input");
@@ -93,14 +90,9 @@ export const builtinIOEffects = {
 
     HTTP_POST: {
       execute: async (graph, ctx) => {
-        const urlQ = graph.query([ctx, "URL", "?u", "*"]);
-        const url = urlQ[0]?.get("?u");
-
-        const bodyQ = graph.query([ctx, "BODY", "?b", "*"]);
-        const body = bodyQ[0]?.get("?b");
-
-        const headersQ = graph.query([ctx, "HEADERS", "?h", "*"]);
-        const headersStr = headersQ[0]?.get("?h");
+        const url = getInput(graph, ctx, "URL");
+        const body = getInput(graph, ctx, "BODY");
+        const headersStr = getInput(graph, ctx, "HEADERS");
         const headers = headersStr ? JSON.parse(headersStr) : {};
 
         if (!url) {

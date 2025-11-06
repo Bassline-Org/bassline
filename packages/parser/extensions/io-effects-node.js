@@ -26,13 +26,13 @@
  */
 
 import { promises as fs } from 'fs';
+import { getInput } from './io-effects.js';
 
 export const builtinNodeEffects = {
   filesystem: {
     READ_FILE: {
       execute: async (graph, ctx) => {
-        const pathQ = graph.query([ctx, "PATH", "?p", "*"]);
-        const path = pathQ[0]?.get("?p");
+        const path = getInput(graph, ctx, "PATH");
 
         if (!path) {
           throw new Error("READ_FILE requires PATH input");
@@ -59,11 +59,8 @@ export const builtinNodeEffects = {
 
     WRITE_FILE: {
       execute: async (graph, ctx) => {
-        const pathQ = graph.query([ctx, "PATH", "?p", "*"]);
-        const path = pathQ[0]?.get("?p");
-
-        const contentQ = graph.query([ctx, "CONTENT", "?c", "*"]);
-        const content = contentQ[0]?.get("?c");
+        const path = getInput(graph, ctx, "PATH");
+        const content = getInput(graph, ctx, "CONTENT");
 
         if (!path) {
           throw new Error("WRITE_FILE requires PATH input");
@@ -93,11 +90,8 @@ export const builtinNodeEffects = {
 
     APPEND_FILE: {
       execute: async (graph, ctx) => {
-        const pathQ = graph.query([ctx, "PATH", "?p", "*"]);
-        const path = pathQ[0]?.get("?p");
-
-        const contentQ = graph.query([ctx, "CONTENT", "?c", "*"]);
-        const content = contentQ[0]?.get("?c");
+        const path = getInput(graph, ctx, "PATH");
+        const content = getInput(graph, ctx, "CONTENT");
 
         if (!path) {
           throw new Error("APPEND_FILE requires PATH input");

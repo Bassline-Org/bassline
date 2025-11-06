@@ -10,44 +10,45 @@ describe("Minimal Graph Runtime", () => {
 
   describe("Core Operations", () => {
     it("should add edges to the graph", () => {
-      const id1 = g.add("alice", "likes", "bob");
-      const id2 = g.add("bob", "likes", "carol");
+      const ctx1 = g.add("alice", "likes", "bob");
+      const ctx2 = g.add("bob", "likes", "carol");
 
       expect(g.edges.length).toBe(2);
       expect(g.edges[0]).toMatchObject({
         source: "alice",
         attr: "likes",
-        target: "bob",
-        context: "edge:0",
-        id: 0
+        target: "bob"
       });
+      expect(g.edges[0].context).toMatch(/^edge:/);
       expect(g.edges[1]).toMatchObject({
         source: "bob",
         attr: "likes",
-        target: "carol",
-        context: "edge:1",
-        id: 1
+        target: "carol"
       });
+      expect(g.edges[1].context).toMatch(/^edge:/);
 
-      // Returns edge IDs
-      expect(id1).toBe(0);
-      expect(id2).toBe(1);
+      // Returns contexts (UUID-based)
+      expect(typeof ctx1).toBe("string");
+      expect(typeof ctx2).toBe("string");
+      expect(ctx1).not.toBe(ctx2);
     });
 
-    it("should auto-generate contexts and assign sequential IDs", () => {
-      const id1 = g.add("a", "b", "c");
-      const id2 = g.add("d", "e", "f");
-      const id3 = g.add("g", "h", "i");
+    it("should auto-generate contexts with UUIDs", () => {
+      const ctx1 = g.add("a", "b", "c");
+      const ctx2 = g.add("d", "e", "f");
+      const ctx3 = g.add("g", "h", "i");
 
-      // Returns edge IDs
-      expect(id1).toBe(0);
-      expect(id2).toBe(1);
-      expect(id3).toBe(2);
+      // Returns contexts (UUID-based)
+      expect(typeof ctx1).toBe("string");
+      expect(typeof ctx2).toBe("string");
+      expect(typeof ctx3).toBe("string");
 
-      // Internal IDs are still sequential
-      expect(g.edges[0].id).toBe(0);
-      expect(g.edges[1].id).toBe(1);
-      expect(g.edges[2].id).toBe(2);
+      // Contexts are unique
+      expect(ctx1).not.toBe(ctx2);
+      expect(ctx2).not.toBe(ctx3);
+      expect(ctx1).toMatch(/^edge:/);
+      expect(ctx2).toMatch(/^edge:/);
+      expect(ctx3).toMatch(/^edge:/);
     });
   });
 

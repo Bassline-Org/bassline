@@ -253,6 +253,93 @@ graph.add("ADULT-CHECK", "memberOf", "rule", "tombstone");
 
 See [REIFIED-RULES-IMPLEMENTATION.md](packages/parser/docs/REIFIED-RULES-IMPLEMENTATION.md) for details.
 
+### 6. Persistence (IO-Based)
+
+**Graph persistence using IO effects** - backup, restore, and incremental sync:
+
+```javascript
+import { installAllPersistence, isHandled, getOutput } from '@bassline/parser/io-effects-persistence';
+
+// Install persistence effects
+installAllPersistence(graph);
+
+// Snapshot backup - save entire graph
+graph.add("backup1", "TARGET", "file:///path/to/backup.json", null);
+graph.add("backup1", "handle", "BACKUP", "input");
+
+// Wait for completion
+await waitUntil(() => isHandled(graph, "BACKUP", "backup1"));
+
+// Check results
+const success = getOutput(graph, "backup1", "SUCCESS");  // "TRUE"
+const edgeCount = getOutput(graph, "backup1", "EDGE_COUNT");  // Total edges
+
+// Restore from snapshot
+graph.add("load1", "SOURCE", "file:///path/to/backup.json", null);
+graph.add("load1", "handle", "LOAD", "input");
+
+await waitUntil(() => isHandled(graph, "LOAD", "load1"));
+const loadedCount = getOutput(graph, "load1", "LOADED_COUNT");
+```
+
+**Incremental sync with timestamps**:
+
+```javascript
+// Add edges with timestamps
+const ctx1 = "batch-1";
+graph.add("alice", "AGE", 30, ctx1);
+graph.add("bob", "AGE", 25, ctx1);
+
+// Record timestamp for this context
+graph.add(ctx1, "timestamp", Date.now(), "timestamps");
+
+// Incremental sync - only edges since watermark
+graph.add("sync1", "TARGET", "file:///path/to/log.jsonl", null);
+graph.add("sync1", "SINCE_TIME", lastSyncTime, null);
+graph.add("sync1", "handle", "SYNC", "input");
+
+await waitUntil(() => isHandled(graph, "SYNC", "sync1"));
+const syncedCount = getOutput(graph, "sync1", "SYNCED_COUNT");
+const newWatermark = getOutput(graph, "sync1", "LAST_TIME");  // Update for next sync
+```
+
+**Replay from JSONL log**:
+
+```javascript
+// Replay edges from incremental log
+graph.add("replay1", "SOURCE", "file:///path/to/log.jsonl", null);
+graph.add("replay1", "handle", "REPLAY", "input");
+
+await waitUntil(() => isHandled(graph, "REPLAY", "replay1"));
+const replayedCount = getOutput(graph, "replay1", "REPLAYED_COUNT");
+```
+
+**Built-in effects** (4 total):
+- **BACKUP**: Full graph snapshot to JSON file
+- **LOAD**: Restore graph from JSON snapshot
+- **SYNC**: Incremental backup using timestamp watermark
+- **REPLAY**: Apply edges from JSONL log
+
+**Key features**:
+- **Append-only safe**: Preserves all edges including tombstones
+- **Context-aware**: All contexts preserved on restore
+- **Rule reactivation**: Rules automatically reactivate when loaded
+- **Incremental sync**: Only backup edges with timestamps since last sync
+- **JSONL format**: JSON Lines for efficient streaming
+
+**Helper: Wait for effect**:
+```javascript
+async function waitUntil(condition, timeout = 5000) {
+  const start = Date.now();
+  while (!condition()) {
+    if (Date.now() - start > timeout) {
+      throw new Error("Timeout waiting for condition");
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+}
+```
+
 ## Interactive Runtime (NEW!)
 
 **Minimal wrapper** for interactive use:
@@ -551,6 +638,7 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
   "./format": "./src/format-results.js",   // Result formatter
   "./io-compute": "./extensions/io-compute.js",  // IO-based compute operations
   "./io-effects": "./extensions/io-effects.js",  // IO-based effects
+  "./io-effects-persistence": "./extensions/io-effects-persistence.js",  // Persistence
   "./aggregation": "./extensions/aggregation/index.js",  // Aggregations
   "./reified-rules": "./extensions/reified-rules.js"  // Graph-native rule storage
 }
@@ -558,7 +646,7 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
 
 ## Test Coverage
 
-**All 160 tests passing**:
+**All 169 tests passing**:
 - `minimal-graph.test.js` - Core graph & pattern matching (28 tests)
 - `contexts.test.js` - Context-based selective activation (40 tests)
 - `aggregation.test.js` - Modular aggregations (35 tests)
@@ -566,6 +654,7 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
 - `reified-rules.test.js` - Graph-native rules (13 tests)
 - `io-contexts.test.js` - IO-based effects and compute (18 tests)
 - `context-performance.test.js` - Performance benchmarks (6 tests)
+- `persistence.test.js` - Persistence (snapshot, sync, replay) (9 tests)
 
 ## Design Principles
 
@@ -628,14 +717,17 @@ Current capabilities:
 - ✅ Interactive runtime + REPL
 - ✅ Self-description and introspection
 - ✅ Reified rules (graph-native rule storage & activation)
+- ✅ IO-based compute operations (18 operations)
+- ✅ IO-based effects (browser + Node.js)
+- ✅ Persistence layer (snapshot, incremental sync, replay)
 
 Future directions:
 - Parser integration for reified rules (emit edges from `rule` command)
-- Distributed graph (sync across nodes)
-- Persistence layer (durability)
+- Distributed graph (sync across nodes with CRDT semantics)
 - Advanced aggregations (windowing, joins)
 - Query optimization (plan generation)
 - Visual graph explorer
+- Remote persistence backends (databases, object storage)
 
 ---
 

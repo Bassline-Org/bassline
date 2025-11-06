@@ -5,6 +5,8 @@
  * No indexes, no query builders - just patterns watching edges.
  */
 
+import { v4 as uuid } from 'uuid';
+
 // ============================================================================
 // Phase 1: Core Data Structure (The Log)
 // ============================================================================
@@ -13,7 +15,6 @@ export class Graph {
   constructor() {
     this.edges = []; // Append-only log of edges
     this.patterns = []; // Active patterns watching for matches
-    this.nextId = 0; // Sequential edge IDs for rollback
     this.inBatch = false; // Are we in a batch transaction?
     this.batchEdges = []; // Edges accumulated during batch
 
@@ -34,8 +35,8 @@ export class Graph {
    * @returns {*} Context (handle/identity)
    */
   add(source, attr, target, context = null) {
-    // Auto-generate context if null
-    const edgeContext = context ?? `edge:${this.nextId}`;
+    // Auto-generate context if null (use UUID for global uniqueness)
+    const edgeContext = context ?? `edge:${uuid()}`;
 
     // Check for existing edge (dedupe by 4-tuple)
     const existing = this.edges.find(
@@ -47,7 +48,7 @@ export class Graph {
     );
 
     if (existing) {
-      return existing.id;
+      return existing.context;
     }
 
     const edge = {
@@ -55,7 +56,6 @@ export class Graph {
       attr,
       target,
       context: edgeContext,
-      id: this.nextId++,
     };
 
     if (this.inBatch) {
@@ -67,7 +67,7 @@ export class Graph {
       this.updatePatterns(edge);
     }
 
-    return edge.id;
+    return edge.context;
   }
 
   /**
@@ -89,7 +89,6 @@ export class Graph {
    * All edges commit together or rollback on error
    */
   batch(fn) {
-    const checkpoint = this.nextId;
     const edgeCountBefore = this.edges.length;
     this.inBatch = true;
     this.batchEdges = [];
@@ -110,7 +109,6 @@ export class Graph {
     } catch (error) {
       // Rollback: remove any edges added after checkpoint
       this.edges = this.edges.slice(0, edgeCountBefore);
-      this.nextId = checkpoint;
       this.batchEdges = [];
       this.inBatch = false;
 
@@ -344,7 +342,7 @@ export class Pattern {
           }
         } else {
           // Add extended partial as new entry
-          toAdd.push([`${id}-${edge.id}`, extended]);
+          toAdd.push([`${id}-${edge.context}`, extended]);
         }
       }
       // Keep original partial too (it might match with different future edges)
@@ -372,7 +370,7 @@ export class Pattern {
           }
         }
       } else {
-        this.partial.set(`start-${edge.id}`, started);
+        this.partial.set(`start-${edge.context}`, started);
       }
     }
   }
@@ -689,9 +687,9 @@ Object.assign(Graph.prototype, {
     for (const match of pattern.complete) {
       for (const edge of match.edges) {
         // Avoid duplicates if edge appears in multiple matches
-        if (!addedEdges.has(edge.id)) {
+        if (!addedEdges.has(edge.context)) {
           resultGraph.add(edge.source, edge.attr, edge.target);
-          addedEdges.add(edge.id);
+          addedEdges.add(edge.context);
         }
       }
     }

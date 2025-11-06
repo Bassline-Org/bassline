@@ -22,6 +22,7 @@
 
 // Import built-in operations
 import { builtinIOOperations } from './io-compute-builtin.js';
+import { getInput } from './io-effects.js';
 
 /**
  * Parse number from value (handles strings and numbers)
@@ -77,11 +78,11 @@ export function installIOCompute(graph, name, compute, metadata = {}) {
       // Query context for operands
       const operands = {};
       for (const attr of attrs) {
-        const results = graph.query([ctx, attr.toUpperCase(), "?val", "*"]);
-        if (results.length === 0) {
+        const value = getInput(graph, ctx, attr.toUpperCase());
+        if (value === undefined) {
           throw new Error(`Missing operand: ${attr}`);
         }
-        operands[attr] = parseNum(results[0].get("?val"));
+        operands[attr] = parseNum(value);
         if (isNaN(operands[attr])) {
           throw new Error(`Invalid number for ${attr}`);
         }
@@ -141,8 +142,7 @@ export function installIOComputeOps(graph, operations) {
  * Query helper: Get result from output context
  */
 export function getComputeResult(graph, ctx) {
-  const results = graph.query([ctx, "RESULT", "?value", "output"]);
-  return results.length > 0 ? results[0].get("?value") : null;
+  return getInput(graph, ctx, "RESULT", "output");
 }
 
 /**

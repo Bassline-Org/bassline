@@ -46,13 +46,25 @@ export function formatResults(results) {
     return formatBindings(results);
   }
 
-  // Array of numbers (fact command - edge IDs)
+  // Array of numbers (fact command - edge IDs - legacy)
   if (typeof first === 'number') {
     return `Added ${results.length} edge(s): ${results.join(', ')}`;
   }
 
-  // Array of strings (rule/pattern names, or status messages)
+  // Array of strings (could be contexts from fact command, rule/pattern names, or status messages)
   if (typeof first === 'string') {
+    // Check if this looks like an array of contexts (fact command results)
+    // Contexts can be explicit (user-provided) or auto-generated (edge:uuid)
+    const looksLikeContexts = results.every(r =>
+      typeof r === 'string' && (r.startsWith('edge:') || r.length > 0)
+    );
+
+    // If all elements look like contexts and there are multiple, format as edge results
+    if (looksLikeContexts && results.length > 0) {
+      return `Added ${results.length} edge(s): ${results.join(', ')}`;
+    }
+
+    // Otherwise just join as strings (rule names, etc.)
     return results.join(', ');
   }
 

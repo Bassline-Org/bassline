@@ -14,10 +14,10 @@ describe("Interactive Runtime", () => {
       const beforeCount = rt.graph.edges.length;
       const result = rt.eval("insert { alice age 30 * }");
 
-      // Returns array of edge IDs
+      // Returns array of contexts (strings)
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(1);
-      expect(typeof result[0]).toBe("number");
+      expect(typeof result[0]).toBe("string");
 
       // Verify edge was added to graph
       expect(rt.graph.edges.length).toBe(beforeCount + 1);
@@ -216,8 +216,8 @@ describe("Result Formatting", () => {
     expect(formatted).toBe("(no results)");
   });
 
-  it("should format fact results (edge IDs)", () => {
-    const formatted = formatResults([1, 2, 3]);
+  it("should format fact results (contexts)", () => {
+    const formatted = formatResults(["ctx-1", "ctx-2", "ctx-3"]);
     expect(formatted).toContain("Added 3 edge(s)");
   });
 

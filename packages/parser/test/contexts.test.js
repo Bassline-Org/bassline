@@ -10,23 +10,24 @@ describe("Context Functionality", () => {
 
   describe("Edge Creation with Contexts", () => {
     it("should auto-generate context when null", () => {
-      const id1 = g.add("Alice", "age", 30, null);
-      const id2 = g.add("Bob", "age", 25, null);
+      const ctx1 = g.add("Alice", "age", 30, null);
+      const ctx2 = g.add("Bob", "age", 25, null);
 
-      // Returns edge IDs
-      expect(id1).toBe(0);
-      expect(id2).toBe(1);
-      expect(id1).not.toBe(id2);
+      // Returns contexts (UUIDs)
+      expect(typeof ctx1).toBe("string");
+      expect(typeof ctx2).toBe("string");
+      expect(ctx1).not.toBe(ctx2);
 
-      // Contexts are auto-generated
-      expect(g.edges[0].context).toBe("edge:0");
-      expect(g.edges[1].context).toBe("edge:1");
+      // Contexts are auto-generated with edge: prefix
+      expect(g.edges[0].context).toMatch(/^edge:/);
+      expect(g.edges[1].context).toMatch(/^edge:/);
+      expect(g.edges[0].context).not.toBe(g.edges[1].context);
     });
 
     it("should return explicit context", () => {
-      const id = g.add("Alice", "city", "NYC", "census-2024");
-      // Returns edge ID
-      expect(id).toBe(0);
+      const ctx = g.add("Alice", "city", "NYC", "census-2024");
+      // Returns context
+      expect(ctx).toBe("census-2024");
       // Context is stored correctly
       expect(g.edges[0].context).toBe("census-2024");
     });
@@ -44,22 +45,22 @@ describe("Context Functionality", () => {
     });
 
     it("should handle default parameter (null)", () => {
-      const id = g.add("Alice", "age", 30);
-      // Returns edge ID
-      expect(id).toBe(0);
+      const ctx = g.add("Alice", "age", 30);
+      // Returns context
+      expect(typeof ctx).toBe("string");
       // Context is auto-generated
-      expect(g.edges[0].context).toBe("edge:0");
+      expect(g.edges[0].context).toMatch(/^edge:/);
     });
   });
 
   describe("Deduplication by 4-Tuple", () => {
     it("should deduplicate same 4-tuple", () => {
-      const id1 = g.add("Alice", "age", 30, "ctx-1");
-      const id2 = g.add("Alice", "age", 30, "ctx-1");
+      const ctx1 = g.add("Alice", "age", 30, "ctx-1");
+      const ctx2 = g.add("Alice", "age", 30, "ctx-1");
 
-      // Returns same edge ID for duplicate
-      expect(id1).toBe(id2);
-      expect(id1).toBe(0);
+      // Returns same context for duplicate
+      expect(ctx1).toBe(ctx2);
+      expect(ctx1).toBe("ctx-1");
       expect(g.edges.length).toBe(1);
       // Context is correct
       expect(g.edges[0].context).toBe("ctx-1");
@@ -79,8 +80,8 @@ describe("Context Functionality", () => {
       g.add("Alice", "age", 30, null);
 
       expect(g.edges.length).toBe(2);
-      expect(g.edges[0].context).toBe("edge:0");
-      expect(g.edges[1].context).toBe("edge:1");
+      expect(g.edges[0].context).toMatch(/^edge:/);
+      expect(g.edges[1].context).toMatch(/^edge:/);
     });
 
     it("should allow same s/a/t with different contexts", () => {
@@ -122,9 +123,9 @@ describe("Context Functionality", () => {
     });
 
     it("should match auto-generated context", () => {
-      g.add("Dave", "age", 40, null); // auto-gen: "edge:3"
+      const ctx = g.add("Dave", "age", 40, null); // auto-gen UUID
 
-      const results = g.query(["Dave", "age", "?a", "edge:3"]);
+      const results = g.query(["Dave", "age", "?a", ctx]);
 
       expect(results.length).toBe(1);
       expect(results[0].get("?a")).toBe(40);
@@ -285,7 +286,8 @@ describe("Context Functionality", () => {
       expect(contexts.length).toBe(3);
       expect(contexts).toContain("census-2024");
       expect(contexts).toContain("survey-2024");
-      expect(contexts).toContain("edge:3");
+      // Dave's edge has auto-generated context starting with "edge:"
+      expect(contexts.some(c => c.startsWith("edge:"))).toBe(true);
     });
 
     it("should return empty array for non-existent context", () => {
@@ -402,26 +404,26 @@ describe("Context Functionality", () => {
     });
 
     it("should handle empty string context", () => {
-      const id = g.add("Alice", "age", 30, "");
-      // Returns edge ID
-      expect(id).toBe(0);
+      const ctx = g.add("Alice", "age", 30, "");
+      // Returns context (empty string)
+      expect(ctx).toBe("");
       // Context is empty string
       expect(g.edges[0].context).toBe("");
     });
 
     it("should handle numeric context", () => {
-      const id = g.add("Alice", "age", 30, 123);
-      // Returns edge ID
-      expect(id).toBe(0);
+      const ctx = g.add("Alice", "age", 30, 123);
+      // Returns context (numeric)
+      expect(ctx).toBe(123);
       // Context is numeric
       expect(g.edges[0].context).toBe(123);
     });
 
     it("should handle object as context", () => {
       const ctxObj = { batch: 1 };
-      const id = g.add("Alice", "age", 30, ctxObj);
-      // Returns edge ID
-      expect(id).toBe(0);
+      const ctx = g.add("Alice", "age", 30, ctxObj);
+      // Returns context (object reference)
+      expect(ctx).toBe(ctxObj);
       // Context is object reference
       expect(g.edges[0].context).toBe(ctxObj);
     });

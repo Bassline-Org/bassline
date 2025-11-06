@@ -23,6 +23,20 @@ import { builtinIOEffects } from './io-effects-builtin.js';
 import { builtinNodeEffects } from './io-effects-node.js';
 
 /**
+ * Helper: Get input value from context
+ *
+ * @param {Graph} graph - The graph instance
+ * @param {string} ctx - Context to query
+ * @param {string} attr - Attribute to get
+ * @param {string} context - Context filter (default: "*")
+ * @returns {*} Value or undefined
+ */
+export function getInput(graph, ctx, attr, context = "*") {
+  const results = graph.query([ctx, attr, "?val", context]);
+  return results[0]?.get("?val");
+}
+
+/**
  * Install an effect using IO context pattern
  *
  * @param {Graph} graph - The graph instance
