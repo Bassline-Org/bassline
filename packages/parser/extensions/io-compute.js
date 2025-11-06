@@ -1,19 +1,27 @@
 /**
- * IO-Based Compute - Prototype
+ * IO-Based Compute
  *
  * Compute operations implemented using input/output system contexts.
- * This is a proof-of-concept for the graph-native IO pattern.
+ * Uses graph-native IO pattern with handle/handled coordination.
  *
  * Pattern:
  * 1. Create context with operands:
- *    graph.add("calc1", "x", 10, null);
- *    graph.add("calc1", "y", 20, null);
+ *    graph.add("calc1", "X", 10, null);
+ *    graph.add("calc1", "Y", 20, null);
  * 2. Request computation:
  *    graph.add("calc1", "handle", "ADD", "input");
  * 3. Operation executes and writes to output:
  *    graph.add("ADD", "handled", "calc1", "output");
- *    graph.add("calc1", "result", 30, "output");
+ *    graph.add("calc1", "RESULT", 30, "output");
+ *
+ * Built-in operations:
+ * - Binary: ADD, SUBTRACT, MULTIPLY, DIVIDE, MOD, POW
+ * - Unary: SQRT, ABS, FLOOR, CEIL, ROUND, NEGATE
+ * - Comparison: GT, LT, GTE, LTE, EQ, NEQ
  */
+
+// Import built-in operations
+import { builtinIOOperations } from './io-compute-builtin.js';
 
 /**
  * Parse number from value (handles strings and numbers)
@@ -160,3 +168,16 @@ export function getActiveOperations(graph) {
   const results = graph.query(["?op", "TYPE", "OPERATION", "system"]);
   return results.map((b) => b.get("?op"));
 }
+
+/**
+ * Install all built-in compute operations
+ *
+ * @param {Graph} graph - The graph instance
+ * @returns {Map} Map of operation names to unwatch functions
+ */
+export function installBuiltinCompute(graph) {
+  return installIOComputeOps(graph, builtinIOOperations);
+}
+
+// Re-export built-in definitions
+export { builtinIOOperations };

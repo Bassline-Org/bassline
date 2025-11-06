@@ -12,9 +12,9 @@
 import { Graph } from './minimal-graph.js';
 import { parseProgram } from './pattern-parser.js';
 import { createContext, executeProgram } from './pattern-words.js';
-import { installCompute } from '../extensions/compute.js';
+import { installBuiltinCompute } from '../extensions/io-compute.js';
 import { installAggregation, builtinAggregations } from '../extensions/aggregation/index.js';
-import { installEffects } from '../extensions/effects/index.js';
+import { installAllEffects } from '../extensions/io-effects.js';
 import { installReifiedRules, getActiveRules as getReifiedActiveRules } from '../extensions/reified-rules.js';
 
 export class Runtime {
@@ -24,9 +24,9 @@ export class Runtime {
 
     // Install extensions
     installReifiedRules(this.graph, this.context);
-    installCompute(this.graph);
+    installBuiltinCompute(this.graph);
     installAggregation(this.graph, builtinAggregations);
-    installEffects(this.graph);
+    installAllEffects(this.graph);
 
     // Time-travel: eval history is the source of truth
     // Replaying history recreates all state (edges, patterns, rules, aggregations)
@@ -117,9 +117,9 @@ export class Runtime {
 
     // Reinstall extensions to restore self-describing metadata
     installReifiedRules(this.graph, this.context);
-    installCompute(this.graph);
+    installBuiltinCompute(this.graph);
     installAggregation(this.graph, builtinAggregations);
-    installEffects(this.graph);
+    installAllEffects(this.graph);
   }
 
   /**

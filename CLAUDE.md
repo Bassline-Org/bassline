@@ -27,7 +27,11 @@ packages/parser/
 │   └── format-results.js        # Result formatting for display
 │
 ├── extensions/
-│   ├── compute.js               # Arithmetic & comparison operations
+│   ├── io-compute.js            # IO-based compute framework
+│   ├── io-compute-builtin.js    # Built-in compute operations (18 ops)
+│   ├── io-effects.js            # IO-based effects framework
+│   ├── io-effects-builtin.js    # Built-in browser effects (5 effects)
+│   ├── io-effects-node.js       # Built-in Node.js effects (3 filesystem)
 │   ├── aggregation/
 │   │   ├── core.js              # Refinement & versioning helpers
 │   │   ├── definitions.js       # SUM, COUNT, AVG, MIN, MAX
@@ -360,20 +364,129 @@ rt.eval('fact [order:1 total 100 order:2 total 250]');
 getCurrentValue(graph, "sales:2024");  // 350
 ```
 
-### Computed Values
+### Computed Values (IO-Based)
+
+**IO-based compute operations** using handle/handled coordination:
 
 ```javascript
-import { installCompute } from '@bassline/parser/compute';
+import { installBuiltinCompute, getComputeResult, isComputed } from '@bassline/parser/io-compute';
 
-installCompute(graph);
+installBuiltinCompute(graph);
 
-// Set up computation
-graph.add("CALC1", "OP", "ADD");
-graph.add("CALC1", "X", 10);
-graph.add("CALC1", "Y", 20);
+// Set up operands
+graph.add("calc1", "X", 10, null);
+graph.add("calc1", "Y", 20, null);
 
-// Result is automatically computed
-graph.query(["CALC1", "RESULT", "?r"]);  // 30
+// Request computation (handle triggers execution)
+graph.add("calc1", "handle", "ADD", "input");
+
+// Wait for completion (check handled marker)
+const computed = isComputed(graph, "ADD", "calc1");  // true
+
+// Get result from output context
+const result = getComputeResult(graph, "calc1");  // 30
+
+// Or query directly
+graph.query(["calc1", "RESULT", "?r", "output"]);  // [{?r => 30}]
+```
+
+**Built-in operations** (18 total):
+- **Binary**: ADD, SUBTRACT, MULTIPLY, DIVIDE, MOD, POW
+- **Unary**: SQRT, ABS, FLOOR, CEIL, ROUND, NEGATE
+- **Comparison**: GT, LT, GTE, LTE, EQ, NEQ
+
+**Custom operations**:
+```javascript
+import { installIOCompute } from '@bassline/parser/io-compute';
+
+// Install custom operation
+installIOCompute(graph, "DOUBLE", (x) => x * 2, {
+  arity: "unary",
+  operationType: "arithmetic",
+  doc: "Double a number"
+});
+
+// Use it
+graph.add("calc2", "VALUE", 5, null);
+graph.add("calc2", "handle", "DOUBLE", "input");
+// Result: graph.query(["calc2", "RESULT", "?r", "output"]) => 10
+```
+
+### Effects (IO-Based)
+
+**IO-based effects** for side-effecting operations:
+
+```javascript
+import {
+  installBuiltinEffects,  // Browser effects
+  installNodeEffects,     // Node.js effects
+  installAllEffects,      // All effects
+  isHandled,
+  getOutput
+} from '@bassline/parser/io-effects';
+
+// Install browser effects (LOG, ERROR, WARN, HTTP_GET, HTTP_POST)
+installBuiltinEffects(graph);
+
+// Or install all (browser + Node.js filesystem)
+installAllEffects(graph);
+
+// Console logging
+graph.add("req1", "MESSAGE", "Hello World", null);
+graph.add("req1", "handle", "LOG", "input");
+
+// Wait for completion
+const done = isHandled(graph, "LOG", "req1");  // true
+
+// Get output
+const logged = getOutput(graph, "req1", "LOGGED");  // "TRUE"
+
+// HTTP request
+graph.add("req2", "URL", "https://api.example.com/data", null);
+graph.add("req2", "handle", "HTTP_GET", "input");
+// Result: graph.query(["req2", "DATA", "?data", "output"])
+
+// File operations (Node.js only)
+graph.add("req3", "PATH", "/tmp/test.txt", null);
+graph.add("req3", "CONTENT", "Hello", null);
+graph.add("req3", "handle", "WRITE_FILE", "input");
+// Result: graph.query(["req3", "SUCCESS", "?s", "output"]) => "TRUE"
+```
+
+**Built-in browser effects** (5 total):
+- **io**: LOG, ERROR, WARN (console operations)
+- **http**: HTTP_GET, HTTP_POST (fetch-based)
+
+**Built-in Node.js effects** (3 total):
+- **filesystem**: READ_FILE, WRITE_FILE, APPEND_FILE
+
+**Custom effects**:
+```javascript
+import { installIOEffect } from '@bassline/parser/io-effects';
+
+// Install custom effect
+installIOEffect(graph, "NOTIFY", async (graph, ctx) => {
+  // Query inputs from context
+  const messageQ = graph.query([ctx, "MESSAGE", "?m", "*"]);
+  const message = messageQ[0]?.get("?m");
+
+  // Perform side effect
+  await sendNotification(message);
+
+  // Return outputs (written to output context)
+  return {
+    SENT: "TRUE",
+    TIMESTAMP: Date.now()
+  };
+}, {
+  category: "notification",
+  doc: "Send notification. Input: MESSAGE"
+});
+
+// Use it
+graph.add("notify1", "MESSAGE", "Task complete", null);
+graph.add("notify1", "handle", "NOTIFY", "input");
+// Result: graph.query(["notify1", "SENT", "?s", "output"]) => "TRUE"
 ```
 
 ### Reified Rules (Meta-Programming)
@@ -421,7 +534,8 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
   "./runtime": "./src/pattern-words.js",   // Runtime executor
   "./interactive": "./src/interactive-runtime.js",  // Interactive wrapper
   "./format": "./src/format-results.js",   // Result formatter
-  "./compute": "./extensions/compute.js",  // Compute operations
+  "./io-compute": "./extensions/io-compute.js",  // IO-based compute operations
+  "./io-effects": "./extensions/io-effects.js",  // IO-based effects
   "./aggregation": "./extensions/aggregation/index.js",  // Aggregations
   "./reified-rules": "./extensions/reified-rules.js"  // Graph-native rule storage
 }
@@ -429,13 +543,14 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
 
 ## Test Coverage
 
-**All tests passing**:
-- `minimal-graph.test.js` - Core graph & pattern matching
-- `aggregation.test.js` - 35 tests for modular aggregations
-- `interactive-runtime.test.js` - 20 tests for runtime & REPL
-- `reified-rules.test.js` - 13 tests for graph-native rules (basic, complex, introspection)
-- `pattern-parser.test.js` - Parser tests
-- `nac-parser.test.js` - NAC syntax tests
+**All 160 tests passing**:
+- `minimal-graph.test.js` - Core graph & pattern matching (28 tests)
+- `contexts.test.js` - Context-based selective activation (40 tests)
+- `aggregation.test.js` - Modular aggregations (35 tests)
+- `interactive-runtime.test.js` - Runtime & REPL (20 tests)
+- `reified-rules.test.js` - Graph-native rules (13 tests)
+- `io-contexts.test.js` - IO-based effects and compute (18 tests)
+- `context-performance.test.js` - Performance benchmarks (6 tests)
 
 ## Design Principles
 
