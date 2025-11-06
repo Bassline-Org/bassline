@@ -207,13 +207,13 @@ const namedPattern = sequenceOf([
   cmd("pattern"),
   word,
   openBracket,
-  many(choice(
+  many(choice([
     patternGroup,
     patternObj,
     patternQuad.map((q) => [q]),
-  )),
+  ])),
   closeBracket,
-]).map(([_, name, _, patterns]) => ({
+]).map(([_, name, __, patterns, ___]) => ({
   pattern: {
     name,
     patterns: patterns.flat(),
@@ -223,7 +223,7 @@ const namedPattern = sequenceOf([
 const patternRef = sequenceOf([
   cmd("<"),
   word,
-]).map(([_, name, __]) => ({
+]).map(([_, name]) => ({
   patternRef: name,
 }));
 

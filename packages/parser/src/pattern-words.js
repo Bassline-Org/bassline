@@ -27,6 +27,103 @@ export function createContext(graph) {
   };
 }
 
+// ============================================================================
+// Compatibility Shim: Parser AST → Runtime Format
+// ============================================================================
+
+/**
+ * Unwrap parser value objects to raw values
+ * Temporary compatibility layer - proper type handling TBD
+ */
+function unwrap(val) {
+  if (val === null) return null;
+  if (typeof val === 'object') {
+    if (val.word) return val.word;
+    if (val.number !== undefined) return val.number;
+    if (val.string !== undefined) return val.string;
+    if (val.patternVar) return `?${val.patternVar}`;
+    if (val.wildcard) return "*";
+  }
+  return val;
+}
+
+/**
+ * Unwrap a quad (4-tuple with wrapped values)
+ */
+function unwrapQuad([e, a, v, c]) {
+  return [unwrap(e), unwrap(a), unwrap(v), unwrap(c)];
+}
+
+/**
+ * Expand pattern references (<name>) inline to stored quads
+ * Pattern references are like macros - they inject the stored quad list
+ */
+function expandPatternRefs(quads, context) {
+  const expanded = [];
+  for (const quad of quads) {
+    if (quad.patternRef) {
+      // Inline expansion: <name> → stored quads
+      const patternName = unwrap(quad.patternRef);
+      const stored = context.namedPatterns?.get(patternName);
+      if (stored) {
+        expanded.push(...stored);
+      } else {
+        throw new Error(`Pattern not found: ${patternName}`);
+      }
+    } else {
+      expanded.push(unwrapQuad(quad));
+    }
+  }
+  return expanded;
+}
+
+/**
+ * Normalize parser AST to runtime command format
+ * Handles: insert→fact, unwrapping values, expanding pattern refs, storing named patterns
+ */
+function normalizeCommand(cmd, context = {}) {
+  if (cmd.insert) {
+    return {
+      type: "fact",
+      triples: expandPatternRefs(cmd.insert, context)
+    };
+  }
+
+  if (cmd.query) {
+    return {
+      type: "query",
+      patterns: expandPatternRefs(cmd.query.where, context),
+      nac: expandPatternRefs(cmd.query.not, context)
+    };
+  }
+
+  if (cmd.rule) {
+    return {
+      type: "rule",
+      name: unwrap(cmd.rule.name),
+      match: expandPatternRefs(cmd.rule.where, context),
+      matchNac: expandPatternRefs(cmd.rule.not, context),
+      produce: expandPatternRefs(cmd.rule.produce, context),
+      produceNac: []
+    };
+  }
+
+  if (cmd.pattern) {
+    // Store pattern for later reference (not executed, just stored)
+    const name = unwrap(cmd.pattern.name);
+    const quads = cmd.pattern.patterns.map(unwrapQuad);
+    if (!context.namedPatterns) context.namedPatterns = new Map();
+    context.namedPatterns.set(name, quads);
+    return null; // Don't execute, just store
+  }
+
+  return cmd; // Already normalized
+}
+
+// ============================================================================
+// Command Execution
+// ============================================================================
+
 /**
  * Execute a command from the parser
  * Commands work directly with quad arrays: [source, attr, target, context]
@@ -49,45 +146,6 @@ export function executeCommand(graph, command, context = {}) {
       } else {
         return graph.query(...command.patterns);
       }
-    }
-
-    case "pattern": {
-      // Named pattern for watching with optional NAC
-      const spec = command.nac && command.nac.length > 0
-        ? { patterns: command.patterns, nac: command.nac }
-        : command.patterns;
-
-      const unwatch = graph.watch(spec, (bindings) => {
-        // Record match in graph
-        const matchId = `MATCH:${Date.now()}:${Math.random()}`;
-        graph.add(command.name, "MATCHED", matchId, "system");
-
-        // Store bindings
-        bindings.forEach((value, varName) => {
-          graph.add(matchId, varName, value, "system");
-        });
-      });
-
-      // Register pattern as quads for self-description
-      graph.add(command.name, "TYPE", "PATTERN!", "system");
-      graph.add(command.name, "MATCH", JSON.stringify(command.patterns), "system");
-      if (command.nac && command.nac.length > 0) {
-        graph.add(command.name, "NAC", JSON.stringify(command.nac), "system");
-      }
-      graph.add(command.name, "STATUS", "ACTIVE", "system");
-
-      // Mark PATTERN! as a type (idempotent)
-      graph.add("PATTERN!", "TYPE", "TYPE!", "system");
-
-      // Store in context
-      if (!context.patterns) context.patterns = new Map();
-      context.patterns.set(command.name, {
-        patterns: command.patterns,
-        nac: command.nac || [],
-        unwatch
-      });
-
-      return command.name;
     }
 
     case "rule": {
@@ -138,47 +196,6 @@ export function executeCommand(graph, command, context = {}) {
       return command.name;
     }
 
-    case "watch": {
-      // Watch: match patterns trigger action patterns with optional NAC
-      const matchSpec = command.matchNac && command.matchNac.length > 0
-        ? { patterns: command.match, nac: command.matchNac }
-        : command.match;
-
-      const unwatch = graph.watch(matchSpec, (bindings) => {
-        // Execute action patterns with bindings
-        for (const [s, a, t, c] of command.action) {
-          const source = resolve(s, bindings);
-          const attr = resolve(a, bindings);
-          const target = resolve(t, bindings);
-          const ctx = c ? resolve(c, bindings) : null;
-          graph.add(source, attr, target, ctx);
-        }
-
-        // Record watch firing
-        graph.add("watch", "MATCHED", true, "system");
-      });
-
-      return { unwatch };
-    }
-
-    case "delete": {
-      // Delete: create tombstone for quad
-      const [source, attr, target, ctx] = command.triple;
-      const tombstoneId = `TOMBSTONE-${Date.now()}-${Math.random()}`;
-      graph.add(tombstoneId, "TYPE", "TOMBSTONE!", "system");
-      graph.add(tombstoneId, "SOURCE", source, "system");
-      graph.add(tombstoneId, "ATTR", attr, "system");
-      graph.add(tombstoneId, "TARGET", target, "system");
-      if (ctx) {
-        graph.add(tombstoneId, "CONTEXT", ctx, "system");
-      }
-
-      // Mark TOMBSTONE! as a type (idempotent)
-      graph.add("TOMBSTONE!", "TYPE", "TYPE!", "system");
-
-      return tombstoneId;
-    }
-
     case "clear": {
       // Clear graph
       graph.edges = [];
@@ -193,23 +210,6 @@ export function executeCommand(graph, command, context = {}) {
       return "CLEARED";
     }
 
-    case "info": {
-      // Graph info
-      const activePatterns = Array.from(context.patterns || []).filter(
-        ([_, p]) => p.unwatch
-      ).length;
-      const activeRules = Array.from(context.rules || []).filter(
-        ([_, r]) => r.unwatch
-      ).length;
-
-      return {
-        edges: graph.edges.length,
-        patterns: context.patterns ? context.patterns.size : 0,
-        activePatterns,
-        activeRules,
-      };
-    }
-
     default:
       throw new Error(`Unknown command type: ${command.type}`);
   }
@@ -217,15 +217,21 @@ export function executeCommand(graph, command, context = {}) {
 
 /**
  * Execute a program (list of commands)
+ * Normalizes parser AST and executes commands
  */
 export function executeProgram(graph, program, context = {}) {
-  if (program.type !== "program") {
-    throw new Error(`Expected program, got ${program.type}`);
-  }
+  // Handle both array format (from parser) and wrapped format
+  const commands = Array.isArray(program) ? program : program.commands;
 
   const results = [];
-  for (const command of program.commands) {
-    results.push(executeCommand(graph, command, context));
+  for (const command of commands) {
+    // Normalize parser AST to runtime format
+    const normalized = normalizeCommand(command, context);
+
+    // Skip null (stored patterns don't execute, just store)
+    if (normalized) {
+      results.push(executeCommand(graph, normalized, context));
+    }
   }
   return results;
 }
