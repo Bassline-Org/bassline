@@ -30,7 +30,7 @@ import {
   whitespace,
 } from "arcsecond/index.js";
 
-const store = new Map();
+let store = null;
 
 // ============================================================================
 // Simple portable hash function for strings (FNV-1a)
@@ -344,6 +344,18 @@ const rule = sequenceOf([
 
 const program = many(choice([rule, select, insert]));
 
+function parseProgram(input) {
+  store = new Map();
+  const result = program.run(input);
+  if (result.isError) {
+    throw new Error(`Parse error at position ${result.index}: ${result.error}`);
+  }
+  return {
+    result,
+    store,
+  };
+}
+
 const input = `
   insert {
     root foo 123
@@ -371,7 +383,7 @@ const input = `
 `;
 
 {
-  const result = program.run(input);
+  const { result, store } = parseProgram(input);
 
   console.log("Remaining input: ", input.substring(result.index, input.length));
   if (result.isError) {
@@ -399,6 +411,6 @@ const input = `
       }
     }
   }
-}
 
-console.log(store);
+  console.log(store);
+}
