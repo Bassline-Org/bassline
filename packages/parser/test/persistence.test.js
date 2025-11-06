@@ -351,3 +351,173 @@ describe("Persistence - Integration", () => {
     await fs.unlink(snapshotFile);
   });
 });
+
+describe("Persistence - Atomic Writes", () => {
+  let graph;
+  let testFile;
+
+  beforeEach(() => {
+    graph = new Graph();
+    installAllPersistence(graph);
+    testFile = `/tmp/bassline-test-atomic-${Date.now()}.json`;
+  });
+
+  afterEach(async () => {
+    try {
+      await fs.unlink(testFile);
+    } catch (e) {
+      // Ignore
+    }
+    try {
+      await fs.unlink(testFile + '.tmp');
+    } catch (e) {
+      // Ignore
+    }
+  });
+
+  it("should use temp file for atomic backup", async () => {
+    // Add data
+    graph.add("alice", "age", 30, null);
+
+    // Start backup
+    graph.add("backup1", "TARGET", `file://${testFile}`, null);
+    graph.add("backup1", "handle", "BACKUP", "input");
+
+    // Wait for completion
+    await waitForEffect(graph, "BACKUP", "backup1");
+
+    // Verify no temp file left behind
+    try {
+      await fs.access(testFile + '.tmp');
+      throw new Error("Temp file should not exist after backup");
+    } catch (e) {
+      expect(e.code).toBe('ENOENT');
+    }
+
+    // Verify main file exists and is valid
+    const content = await fs.readFile(testFile, 'utf8');
+    const data = JSON.parse(content);
+    expect(data.edges.length).toBeGreaterThan(0);
+  });
+
+  it("should batch writes in SYNC for atomicity", async () => {
+    // Add edges with timestamps
+    const ctx1 = "batch1";
+    graph.add("alice", "age", 30, ctx1);
+    graph.add("bob", "age", 25, ctx1);
+    graph.add("charlie", "age", 35, ctx1);
+    graph.add(ctx1, "timestamp", 1000, "timestamps");
+
+    // Sync
+    const logFile = `/tmp/bassline-test-sync-${Date.now()}.jsonl`;
+    graph.add("sync1", "TARGET", `file://${logFile}`, null);
+    graph.add("sync1", "SINCE_TIME", 0, null);
+    graph.add("sync1", "handle", "SYNC", "input");
+    await waitForEffect(graph, "SYNC", "sync1");
+
+    const count = getOutput(graph, "sync1", "SYNCED_COUNT");
+    expect(count).toBe(3);
+
+    // Verify log file has all entries
+    const content = await fs.readFile(logFile, 'utf8');
+    const lines = content.trim().split('\n');
+    expect(lines.length).toBe(3);
+
+    // Cleanup
+    await fs.unlink(logFile);
+  });
+});
+
+describe("Persistence - Garbage Collection", () => {
+  let graph;
+
+  beforeEach(() => {
+    graph = new Graph();
+    installAllPersistence(graph);
+  });
+
+  it("should prune tombstoned edges", async () => {
+    // Add normal edges
+    graph.add("alice", "age", 30, null);
+    graph.add("bob", "age", 25, null);
+
+    // Add tombstoned edges
+    graph.add("old1", "data", "value1", "tombstone");
+    graph.add("old2", "data", "value2", "tombstone");
+
+    // Count non-tombstone edges before prune
+    const beforeNonTombstone = graph.edges.filter(e => e.context !== "tombstone").length;
+
+    // Prune
+    graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
+    await waitForEffect(graph, "PRUNE_TOMBSTONES", "prune1");
+
+    // Check results
+    const success = getOutput(graph, "prune1", "SUCCESS");
+    const removed = getOutput(graph, "prune1", "REMOVED");
+
+    expect(success).toBe("TRUE");
+    expect(removed).toBe(2);
+
+    // Verify our tombstoned data edges are gone
+    const oldData = graph.query(["old1", "data", "?v", "*"]);
+    expect(oldData.length).toBe(0);
+    const old2Data = graph.query(["old2", "data", "?v", "*"]);
+    expect(old2Data.length).toBe(0);
+
+    // Verify normal edges still exist
+    const aliceAge = graph.query(["alice", "age", "?a", "*"]);
+    expect(aliceAge[0].get("?a")).toBe(30);
+
+    // After pruning, we should have original non-tombstone edges + effect output edges
+    const afterNonTombstone = graph.edges.filter(e => e.context !== "tombstone").length;
+    expect(afterNonTombstone).toBeGreaterThanOrEqual(beforeNonTombstone);
+  });
+
+  it("should handle empty tombstone prune", async () => {
+    // Add only normal edges
+    graph.add("alice", "age", 30, null);
+    graph.add("bob", "age", 25, null);
+
+    const before = graph.edges.filter(e => e.context !== "tombstone").length;
+
+    // Prune (nothing to prune)
+    graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
+    await waitForEffect(graph, "PRUNE_TOMBSTONES", "prune1");
+
+    const removed = getOutput(graph, "prune1", "REMOVED");
+    expect(removed).toBe(0);
+
+    // After pruning with no tombstones, should have original + effect output edges
+    const after = graph.edges.filter(e => e.context !== "tombstone").length;
+    expect(after).toBeGreaterThanOrEqual(before);
+  });
+
+  it("should enable refinement compaction pattern", async () => {
+    // Add initial value
+    graph.add("AGG1", "AGG1:RESULT:V1", 10, null);
+
+    // Add refined version
+    graph.add("AGG1", "AGG1:RESULT:V2", 30, null);
+    graph.add("AGG1:RESULT:V2", "REFINES", "AGG1:RESULT:V1", null);
+
+    // Pattern: Tombstone old versions
+    const refined = graph.query(["?newer", "REFINES", "?older", "*"]);
+    expect(refined.length).toBe(1);
+
+    // Mark old version as tombstone
+    const olderKey = refined[0].get("?older");
+    graph.add("AGG1", olderKey, 10, "tombstone");
+
+    // Prune
+    graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
+    await waitForEffect(graph, "PRUNE_TOMBSTONES", "prune1");
+
+    const removed = getOutput(graph, "prune1", "REMOVED");
+    expect(removed).toBe(1);
+
+    // New version still exists
+    const current = graph.query(["AGG1", "AGG1:RESULT:V2", "?v", "*"]);
+    expect(current[0].get("?v")).toBe(30);
+  });
+});

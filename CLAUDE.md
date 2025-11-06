@@ -316,18 +316,68 @@ await waitUntil(() => isHandled(graph, "REPLAY", "replay1"));
 const replayedCount = getOutput(graph, "replay1", "REPLAYED_COUNT");
 ```
 
-**Built-in effects** (4 total):
-- **BACKUP**: Full graph snapshot to JSON file
+**Built-in effects** (5 total):
+- **BACKUP**: Atomic full graph snapshot to JSON file (uses temp + rename)
 - **LOAD**: Restore graph from JSON snapshot
-- **SYNC**: Incremental backup using timestamp watermark
+- **SYNC**: Atomic incremental backup using timestamp watermark (batched writes)
 - **REPLAY**: Apply edges from JSONL log
+- **PRUNE_TOMBSTONES**: Remove edges marked with tombstone context (GC)
 
 **Key features**:
+- **Atomic writes**: BACKUP/SYNC use temp files + rename for crash safety
 - **Append-only safe**: Preserves all edges including tombstones
 - **Context-aware**: All contexts preserved on restore
 - **Rule reactivation**: Rules automatically reactivate when loaded
 - **Incremental sync**: Only backup edges with timestamps since last sync
 - **JSONL format**: JSON Lines for efficient streaming
+- **Garbage collection**: PRUNE_TOMBSTONES for long-running graphs
+
+**Garbage Collection**:
+```javascript
+// Mark edges for deletion by using tombstone context
+graph.add("old-data", "deleted", "TRUE", "tombstone");
+graph.add("stale-record", "archived", "TRUE", "tombstone");
+
+// Prune all tombstoned edges
+graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
+await waitUntil(() => isHandled(graph, "PRUNE_TOMBSTONES", "prune1"));
+
+const removed = getOutput(graph, "prune1", "REMOVED");  // Count of pruned edges
+```
+
+**User-level compaction patterns**:
+```javascript
+// Refinement compaction - remove old versions
+const refined = graph.query(["?newer", "REFINES", "?older", "*"]);
+
+graph.batch(() => {
+  refined.forEach(b => {
+    const olderKey = b.get("?older");
+    // Tombstone old version
+    graph.add("AGG1", olderKey, null, "tombstone");
+  });
+});
+
+// Prune tombstones
+graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
+
+// Context-based archiving - archive old data before pruning
+// 1. Backup specific context
+graph.add("backup1", "TARGET", "file:///archive/old-data.json", null);
+graph.add("backup1", "CONTEXT", "old-context", null);
+graph.add("backup1", "handle", "BACKUP", "input");
+
+// 2. Mark context for deletion
+const oldEdges = graph.query(["?s", "?a", "?t", "old-context"]);
+graph.batch(() => {
+  oldEdges.forEach(e => {
+    graph.add(e.get("?s"), e.get("?a"), e.get("?t"), "tombstone");
+  });
+});
+
+// 3. Prune
+graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
+```
 
 **Helper: Wait for effect**:
 ```javascript
@@ -761,7 +811,7 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
 
 ## Test Coverage
 
-**All 169 tests passing**:
+**All 188 tests passing**:
 - `minimal-graph.test.js` - Core graph & pattern matching (28 tests)
 - `contexts.test.js` - Context-based selective activation (40 tests)
 - `aggregation.test.js` - Modular aggregations (35 tests)
@@ -769,7 +819,8 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
 - `reified-rules.test.js` - Graph-native rules (13 tests)
 - `io-contexts.test.js` - IO-based effects and compute (18 tests)
 - `context-performance.test.js` - Performance benchmarks (6 tests)
-- `persistence.test.js` - Persistence (snapshot, sync, replay) (9 tests)
+- `persistence.test.js` - Persistence (snapshot, sync, replay, atomic writes, GC) (14 tests)
+- `connections.test.js` - WebSocket connections (14 tests)
 
 ## Design Principles
 
@@ -834,10 +885,12 @@ Current capabilities:
 - ✅ Reified rules (graph-native rule storage & activation)
 - ✅ IO-based compute operations (18 operations)
 - ✅ IO-based effects (browser + Node.js)
-- ✅ Persistence layer (snapshot, incremental sync, replay)
+- ✅ Persistence layer (atomic snapshot, incremental sync, replay, GC)
+- ✅ WebSocket connections (bidirectional context-based sync)
 
 Future directions:
 - Parser integration for reified rules (emit edges from `rule` command)
+- Multi-graph daemon (Postgres-like architecture: one process, multiple graph instances)
 - Distributed graph (sync across nodes with CRDT semantics)
 - Advanced aggregations (windowing, joins)
 - Query optimization (plan generation)

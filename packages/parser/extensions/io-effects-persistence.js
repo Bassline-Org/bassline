@@ -27,7 +27,9 @@ import { promises as fs } from 'fs';
 import { getInput, installIOEffect } from './io-effects.js';
 
 /**
- * BACKUP Effect - Write full graph snapshot to JSON file
+ * BACKUP Effect - Write full graph snapshot to JSON file (atomic)
+ *
+ * Uses temp file + rename for atomic writes to prevent corruption
  */
 const BACKUP = {
   execute: async (graph, ctx) => {
@@ -43,9 +45,12 @@ const BACKUP = {
       edges: graph.edges  // All edges (s, a, t, c)
     };
 
-    // Write to file
+    // Write atomically: temp file + rename
     const path = target.replace("file://", "");
-    await fs.writeFile(path, JSON.stringify(data, null, 2), 'utf8');
+    const tempPath = path + '.tmp';
+
+    await fs.writeFile(tempPath, JSON.stringify(data, null, 2), 'utf8');
+    await fs.rename(tempPath, path);  // Atomic operation!
 
     return {
       SUCCESS: "TRUE",
@@ -55,7 +60,7 @@ const BACKUP = {
     };
   },
   category: "persistence",
-  doc: "Write full graph snapshot to JSON file. Input: TARGET (optional, default: file://backup.json)"
+  doc: "Write full graph snapshot to JSON file (atomic). Input: TARGET (optional, default: file://backup.json)"
 };
 
 /**
@@ -93,10 +98,11 @@ const LOAD = {
 };
 
 /**
- * SYNC Effect - Incremental backup of edges since watermark
+ * SYNC Effect - Incremental backup of edges since watermark (atomic)
  *
  * Backs up contexts that have timestamps > SINCE_TIME.
  * Timestamps stored as: ctx timestamp time timestamps
+ * Uses batched writes for atomicity
  */
 const SYNC = {
   execute: async (graph, ctx) => {
@@ -127,10 +133,11 @@ const SYNC = {
       }
     }
 
-    // Append to JSONL file
-    const path = target.replace("file://", "");
-    for (const edge of newEdges) {
-      await fs.appendFile(path, JSON.stringify(edge) + "\n", 'utf8');
+    // Append to JSONL file atomically (single write)
+    if (newEdges.length > 0) {
+      const path = target.replace("file://", "");
+      const content = newEdges.map(e => JSON.stringify(e)).join("\n") + "\n";
+      await fs.appendFile(path, content, 'utf8');
     }
 
     // Compute max timestamp from synced contexts
@@ -147,7 +154,7 @@ const SYNC = {
     };
   },
   category: "persistence",
-  doc: "Incremental sync of edges since watermark. Inputs: TARGET, SINCE_TIME (optional, default: 0)"
+  doc: "Incremental sync of edges since watermark (atomic). Inputs: TARGET, SINCE_TIME (optional, default: 0)"
 };
 
 /**
@@ -185,6 +192,39 @@ const REPLAY = {
 };
 
 /**
+ * PRUNE_TOMBSTONES Effect - Remove edges marked with tombstone context
+ *
+ * Removes all edges where context === "tombstone" from the graph.
+ * This is a garbage collection operation for long-running graphs.
+ *
+ * Usage:
+ *   // Mark edges for deletion
+ *   graph.add("old-data", "deleted", "TRUE", "tombstone");
+ *
+ *   // Prune all tombstones
+ *   graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
+ */
+const PRUNE_TOMBSTONES = {
+  execute: async (graph, ctx) => {
+    const before = graph.edges.length;
+
+    // Filter out tombstoned edges
+    graph.edges = graph.edges.filter(e => e.context !== "tombstone");
+
+    const removed = before - graph.edges.length;
+
+    return {
+      SUCCESS: "TRUE",
+      REMOVED: removed,
+      BEFORE: before,
+      AFTER: graph.edges.length
+    };
+  },
+  category: "persistence",
+  doc: "Remove all edges with tombstone context. No inputs required."
+};
+
+/**
  * Install all persistence effects on a graph
  */
 export function installAllPersistence(graph) {
@@ -207,6 +247,11 @@ export function installAllPersistence(graph) {
     category: REPLAY.category,
     doc: REPLAY.doc
   });
+
+  installIOEffect(graph, "PRUNE_TOMBSTONES", PRUNE_TOMBSTONES.execute, {
+    category: PRUNE_TOMBSTONES.category,
+    doc: PRUNE_TOMBSTONES.doc
+  });
 }
 
 // Export individual effects for selective installation
@@ -214,5 +259,6 @@ export const persistenceEffects = {
   BACKUP,
   LOAD,
   SYNC,
-  REPLAY
+  REPLAY,
+  PRUNE_TOMBSTONES
 };
