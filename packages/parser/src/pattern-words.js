@@ -55,6 +55,19 @@ function unwrapQuad([e, a, v, c]) {
 }
 
 /**
+ * Convert quad to pattern string for reified rules
+ * Example: ["?X", "TYPE", "PERSON", "*"] → "?X TYPE PERSON *"
+ */
+function quadToString([s, a, t, c]) {
+  const parts = [s, a, t, c === null ? "*" : c];
+  return parts.map(p => {
+    if (typeof p === "string") return p;
+    if (typeof p === "number") return String(p);
+    return String(p);
+  }).join(" ");
+}
+
+/**
  * Expand pattern references (<name>) inline to stored quads
  * Pattern references are like macros - they inject the stored quad list
  */
@@ -149,7 +162,36 @@ export function executeCommand(graph, command, context = {}) {
     }
 
     case "rule": {
-      // Rule: match patterns trigger produce patterns with optional NAC
+      // Option: emit reified rules (graph-native storage & activation)
+      if (context.emitReifiedRules) {
+        // Emit rule structure as edges
+        graph.add(command.name, "TYPE", "RULE!", "system");
+
+        // Emit match patterns as strings
+        for (const matchQuad of command.match) {
+          graph.add(command.name, "matches", quadToString(matchQuad), command.name);
+        }
+
+        // Emit NAC patterns if present
+        if (command.matchNac && command.matchNac.length > 0) {
+          for (const nacQuad of command.matchNac) {
+            graph.add(command.name, "nac", quadToString(nacQuad), command.name);
+          }
+        }
+
+        // Emit produce patterns
+        for (const produceQuad of command.produce) {
+          graph.add(command.name, "produces", quadToString(produceQuad), command.name);
+        }
+
+        // Activate rule via system context
+        // (requires installReifiedRules to be called first)
+        graph.add(command.name, "memberOf", "rule", "system");
+
+        return command.name;
+      }
+
+      // Default behavior: immediate activation with watcher
       const matchSpec = command.matchNac && command.matchNac.length > 0
         ? { patterns: command.match, nac: command.matchNac }
         : command.match;

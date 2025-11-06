@@ -33,6 +33,7 @@ packages/parser/
 │   │   ├── definitions.js       # SUM, COUNT, AVG, MIN, MAX
 │   │   ├── installer.js         # Generic aggregation installer
 │   │   └── index.js             # Public API
+│   ├── reified-rules.js         # Graph-native rule storage & activation
 │   └── self-description.js      # Meta-circular capabilities
 │
 ├── examples/
@@ -44,6 +45,7 @@ packages/parser/
     ├── minimal-graph.test.js    # Core graph tests
     ├── aggregation.test.js      # Aggregation tests (35 tests)
     ├── interactive-runtime.test.js  # Runtime tests (20 tests)
+    ├── reified-rules.test.js    # Reified rules tests (13 tests)
     └── *.test.js                # Parser tests
 
 docs/
@@ -180,6 +182,57 @@ This pattern enables:
 - Time-travel queries (inspect any version)
 - Incremental computation (only recompute what changed)
 - Distributed convergence (versions merge naturally)
+
+### 5. Reified Rules (Graph-Native Rule Storage)
+
+**Rules as first-class graph entities** - stored as edges, activated via system contexts:
+
+```javascript
+import { installReifiedRules, getActiveRules, getRuleFirings } from '@bassline/parser/extensions/reified-rules';
+
+// Install reified rules system
+installReifiedRules(graph, context);
+
+// Define rule structure as edges
+graph.add("ADULT-CHECK", "TYPE", "RULE!", "system");
+graph.add("ADULT-CHECK", "matches", "?p AGE ?a *", "ADULT-CHECK");
+graph.add("ADULT-CHECK", "produces", "?p ADULT TRUE *", "ADULT-CHECK");
+
+// Activate rule via system context
+graph.add("ADULT-CHECK", "memberOf", "rule", "system");
+
+// Rule automatically:
+// 1. Scans existing edges and fires for matches
+// 2. Watches for new edges reactively
+
+// Add data (rule fires automatically)
+graph.add("ALICE", "AGE", 30, null);
+
+// Check if rule fired
+graph.query(["ALICE", "ADULT", "?v", "*"]);  // TRUE
+
+// Introspection (everything is queryable)
+getActiveRules(graph);           // ["ADULT-CHECK"]
+getRuleFirings(graph, "ADULT-CHECK");  // 1
+```
+
+**Key features**:
+- **Graph-native storage**: Rules stored as edges, not runtime state
+- **System context activation**: `memberOf rule system` triggers installation
+- **Initial scan + reactive**: Processes existing data on activation, then watches for new data
+- **Full introspection**: Query rule structure, active status, firing history
+- **Dynamic control**: Activate/deactivate at runtime
+- **NAC support**: Negative application conditions work on both existing and new data
+
+**Deactivation**:
+```javascript
+// Deactivate via tombstone (append-only)
+graph.add("ADULT-CHECK", "memberOf", "rule", "tombstone");
+```
+
+**Pattern strings**: Stored as parseable strings like `"?X TYPE PERSON *"` for simplicity.
+
+See [REIFIED-RULES-IMPLEMENTATION.md](packages/parser/docs/REIFIED-RULES-IMPLEMENTATION.md) for details.
 
 ## Interactive Runtime (NEW!)
 
@@ -323,6 +376,41 @@ graph.add("CALC1", "Y", 20);
 graph.query(["CALC1", "RESULT", "?r"]);  // 30
 ```
 
+### Reified Rules (Meta-Programming)
+
+```javascript
+import { installReifiedRules, getActiveRules } from '@bassline/parser/extensions/reified-rules';
+
+installReifiedRules(graph, context);
+
+// Define multiple rules as edges
+graph.add("VERIFY", "TYPE", "RULE!", "system");
+graph.add("VERIFY", "matches", "?p TYPE PERSON *", "VERIFY");
+graph.add("VERIFY", "produces", "?p VERIFIED TRUE *", "VERIFY");
+
+graph.add("PROCESS", "TYPE", "RULE!", "system");
+graph.add("PROCESS", "matches", "?p VERIFIED TRUE *", "PROCESS");
+graph.add("PROCESS", "produces", "?p PROCESSED TRUE *", "PROCESS");
+
+// Activate both (order doesn't matter for data defined before activation)
+graph.add("VERIFY", "memberOf", "rule", "system");
+graph.add("PROCESS", "memberOf", "rule", "system");
+
+// Add data - rules cascade automatically
+graph.add("ALICE", "TYPE", "PERSON", null);
+// Result: ALICE gets VERIFIED and PROCESSED markers
+
+// Introspection via queries (no special API)
+graph.query(["?rule", "TYPE", "RULE!", "system"]);  // List all rules
+graph.query(["?rule", "memberOf", "rule", "system"]);  // Active rules
+graph.query(["VERIFY", "matches", "?pattern", "*"]);  // Rule structure
+
+// Conditional activation
+graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
+  graph.add("VALIDATION-RULE", "memberOf", "rule", "system");
+});
+```
+
 ## Package Exports
 
 ```json
@@ -334,7 +422,8 @@ graph.query(["CALC1", "RESULT", "?r"]);  // 30
   "./interactive": "./src/interactive-runtime.js",  // Interactive wrapper
   "./format": "./src/format-results.js",   // Result formatter
   "./compute": "./extensions/compute.js",  // Compute operations
-  "./aggregation": "./extensions/aggregation/index.js"  // Aggregations
+  "./aggregation": "./extensions/aggregation/index.js",  // Aggregations
+  "./reified-rules": "./extensions/reified-rules.js"  // Graph-native rule storage
 }
 ```
 
@@ -344,6 +433,7 @@ graph.query(["CALC1", "RESULT", "?r"]);  // 30
 - `minimal-graph.test.js` - Core graph & pattern matching
 - `aggregation.test.js` - 35 tests for modular aggregations
 - `interactive-runtime.test.js` - 20 tests for runtime & REPL
+- `reified-rules.test.js` - 13 tests for graph-native rules (basic, complex, introspection)
 - `pattern-parser.test.js` - Parser tests
 - `nac-parser.test.js` - NAC syntax tests
 
@@ -407,8 +497,10 @@ Current capabilities:
 - ✅ Modular aggregations with refinement
 - ✅ Interactive runtime + REPL
 - ✅ Self-description and introspection
+- ✅ Reified rules (graph-native rule storage & activation)
 
 Future directions:
+- Parser integration for reified rules (emit edges from `rule` command)
 - Distributed graph (sync across nodes)
 - Persistence layer (durability)
 - Advanced aggregations (windowing, joins)
