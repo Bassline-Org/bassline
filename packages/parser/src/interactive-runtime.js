@@ -17,6 +17,7 @@ import { installReifiedAggregations, builtinAggregations } from '../extensions/a
 import { installAllEffects } from '../extensions/io-effects.js';
 import { installReifiedRules, getActiveRules as getReifiedActiveRules } from '../extensions/reified-rules.js';
 import { installAllPersistence } from '../extensions/io-effects-persistence.js';
+import { installConnectionEffects } from '../extensions/io-effects-connections.js';
 
 export class Runtime {
   constructor() {
@@ -29,6 +30,7 @@ export class Runtime {
     installReifiedAggregations(this.graph, builtinAggregations, this.context);
     installAllEffects(this.graph);
     installAllPersistence(this.graph);
+    installConnectionEffects(this.graph);
 
     // Time-travel: eval history is the source of truth
     // Replaying history recreates all state (edges, patterns, rules, aggregations)
@@ -122,6 +124,8 @@ export class Runtime {
     installBuiltinCompute(this.graph);
     installReifiedAggregations(this.graph, builtinAggregations, this.context);
     installAllEffects(this.graph);
+    installAllPersistence(this.graph);
+    installConnectionEffects(this.graph);
   }
 
   /**

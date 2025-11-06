@@ -12,11 +12,13 @@
         "./interactive": "./src/interactive-runtime.js",
         "./format": "./src/format-results.js",
         "./compute": "./extensions/compute.js",
-        "./aggregation": "./extensions/aggregation/index.js"
+        "./aggregation": "./extensions/aggregation/index.js",
+        "./connections": "./extensions/io-effects-connections.js"
     },
     "dependencies": {
       "arcsecond": "^5.0.0",
-      "uuid": "^10.0.0"
+      "uuid": "^10.0.0",
+      "ws": "^8.18.0"
     },
     "scripts": {
       "test": "vitest run",

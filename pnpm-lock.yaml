@@ -70,9 +70,6 @@ importers:
       '@bassline/lang':
         specifier: workspace:*
         version: link:../../packages/lang
-      '@bassline/parser':
-        specifier: workspace:*
-        version: link:../../packages/parser
       '@bassline/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -304,10 +301,12 @@ importers:
       arcsecond:
         specifier: ^5.0.0
         version: 5.0.0
-    devDependencies:
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.2
+      uuid:
+        specifier: ^10.0.0
+        version: 10.0.0
+      ws:
+        specifier: ^8.18.0
+        version: 8.18.3
 
   packages/react:
     dependencies:
@@ -5748,6 +5747,11 @@ packages:
   /utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
+
+  /uuid@10.0.0:
+    resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
+    hasBin: true
+    dev: false
 
   /valibot@0.41.0(typescript@5.9.2):
     resolution: {integrity: sha512-igDBb8CTYr8YTQlOKgaN9nSS0Be7z+WRuaeYqGf3Cjz3aKmSnqEmYnkfVjzIuumGqfHpa3fLIvMEAfhrpqN8ng==}

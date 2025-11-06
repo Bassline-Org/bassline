@@ -32,6 +32,8 @@ packages/parser/
 │   ├── io-effects.js            # IO-based effects framework
 │   ├── io-effects-builtin.js    # Built-in browser effects (5 effects)
 │   ├── io-effects-node.js       # Built-in Node.js effects (3 filesystem)
+│   ├── io-effects-persistence.js # Persistence effects (BACKUP/LOAD/SYNC/REPLAY)
+│   ├── io-effects-connections.js # WebSocket connections (4 network effects)
 │   ├── aggregation/
 │   │   ├── core.js              # Refinement & versioning helpers
 │   │   ├── definitions.js       # SUM, COUNT, AVG, MIN, MAX
@@ -591,6 +593,118 @@ graph.add("notify1", "handle", "NOTIFY", "input");
 // Result: graph.query(["notify1", "SENT", "?s", "output"]) => "TRUE"
 ```
 
+### Graph Connections (WebSocket Sync)
+
+**WebSocket-based connections** between graphs with **automatic context-based sync**:
+
+```javascript
+import {
+  installConnectionEffects,
+  getActiveConnections,
+  getActiveServers,
+  getConnectionInfo
+} from '@bassline/parser/connections';
+
+installConnectionEffects(graph);
+
+// Server: Start WebSocket server and bind context
+graph.add("server1", "PORT", 8080, null);
+graph.add("server1", "BIND_CONTEXT", "shared-data", null);
+graph.add("server1", "handle", "LISTEN", "input");
+
+// Client: Connect to server and bind context
+graph.add("conn1", "URL", "ws://localhost:8080", null);
+graph.add("conn1", "BIND_CONTEXT", "shared-data", null);
+graph.add("conn1", "handle", "CONNECT", "input");
+
+// Any quad added to bound context → automatically sent!
+graph.add("alice", "age", 30, "shared-data");  // Syncs over WebSocket
+
+// Received quads → automatically added to bound context
+// Both graphs now have: alice age 30 shared-data
+```
+
+**Key features**:
+- **Context-based auto-sync**: Bind a context to connection → quads auto-sync
+- **Bidirectional**: Both client and server can send/receive
+- **Effect filtering**: input/output/system/tombstone contexts NOT sent
+- **Multiple clients**: Server can handle multiple simultaneous connections
+- **Protocol**: Simple JSON arrays of quads `[source, attr, target, context]`
+
+**Built-in connection effects** (4 total):
+- **network**: CONNECT, LISTEN, DISCONNECT, CLOSE_SERVER
+
+**Connection lifecycle**:
+```javascript
+// CONNECT - Connect to remote graph
+graph.add("conn1", "URL", "ws://remote:8080", null);
+graph.add("conn1", "BIND_CONTEXT", "sync", null);  // Optional
+graph.add("conn1", "handle", "CONNECT", "input");
+
+// Get connection ID
+const connId = getOutput(graph, "conn1", "CONNECTION_ID");
+
+// DISCONNECT - Close connection
+graph.add("disc1", "CONNECTION_ID", connId, null);
+graph.add("disc1", "handle", "DISCONNECT", "input");
+```
+
+**Server lifecycle**:
+```javascript
+// LISTEN - Start WebSocket server
+graph.add("server1", "PORT", 8080, null);
+graph.add("server1", "BIND_CONTEXT", "lobby", null);  // Optional
+graph.add("server1", "handle", "LISTEN", "input");
+
+// Server notifies when clients connect
+graph.query(["server-8080", "CLIENT", "?clientId", "output"]);
+
+// CLOSE_SERVER - Stop server and disconnect all clients
+graph.add("close1", "SERVER_ID", "server-8080", null);
+graph.add("close1", "handle", "CLOSE_SERVER", "input");
+```
+
+**Sandboxing and security**:
+- Quads are inert data without watchers/rules installed
+- Remote cannot execute code unless reified rules are installed
+- Use NAC patterns to block unwanted quads:
+```javascript
+// Rule that only accepts quads from verified sources
+graph.watch([
+  ["?s", "?a", "?t", "shared-data"],
+  ["NOT", "?s", "blacklisted", "TRUE", "*"]
+], (bindings) => {
+  // Process verified quad
+});
+```
+
+**Multiple connections**:
+```javascript
+// Different contexts for different connections
+graph.add("conn1", "URL", "ws://server1:8080", null);
+graph.add("conn1", "BIND_CONTEXT", "server1-data", null);
+graph.add("conn1", "handle", "CONNECT", "input");
+
+graph.add("conn2", "URL", "ws://server2:9000", null);
+graph.add("conn2", "BIND_CONTEXT", "server2-data", null);
+graph.add("conn2", "handle", "CONNECT", "input");
+
+// Each connection syncs its own context independently
+```
+
+**Introspection**:
+```javascript
+// List active connections
+const connections = getActiveConnections();  // ["conn-123", "conn-456"]
+
+// List active servers
+const servers = getActiveServers();  // ["server-8080"]
+
+// Get connection details
+const info = getConnectionInfo("conn-123");
+// { id: "conn-123", context: "shared-data", readyState: 1 }
+```
+
 ### Reified Rules (Meta-Programming)
 
 ```javascript
@@ -639,6 +753,7 @@ graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
   "./io-compute": "./extensions/io-compute.js",  // IO-based compute operations
   "./io-effects": "./extensions/io-effects.js",  // IO-based effects
   "./io-effects-persistence": "./extensions/io-effects-persistence.js",  // Persistence
+  "./connections": "./extensions/io-effects-connections.js",  // WebSocket connections
   "./aggregation": "./extensions/aggregation/index.js",  // Aggregations
   "./reified-rules": "./extensions/reified-rules.js"  // Graph-native rule storage
 }
