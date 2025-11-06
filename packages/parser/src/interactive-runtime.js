@@ -10,11 +10,12 @@
  */
 
 import { Graph } from './minimal-graph.js';
-import { parsePattern } from './pattern-parser.js';
+import { parseProgram } from './pattern-parser.js';
 import { createContext, executeProgram } from './pattern-words.js';
 import { installCompute } from '../extensions/compute.js';
 import { installAggregation, builtinAggregations } from '../extensions/aggregation/index.js';
 import { installEffects } from '../extensions/effects/index.js';
+import { installReifiedRules, getActiveRules as getReifiedActiveRules } from '../extensions/reified-rules.js';
 
 export class Runtime {
   constructor() {
@@ -22,6 +23,7 @@ export class Runtime {
     this.context = createContext(this.graph);
 
     // Install extensions
+    installReifiedRules(this.graph, this.context);
     installCompute(this.graph);
     installAggregation(this.graph, builtinAggregations);
     installEffects(this.graph);
@@ -60,14 +62,14 @@ export class Runtime {
    * @private
    */
   _executeEval(source) {
-    // Handle single-word shorthand: alice → query [alice ?attr ?target]
+    // Handle single-word shorthand: alice → query where { alice ?attr ?target * }
     const trimmed = source.trim();
     if (this.isSingleWord(trimmed)) {
-      source = `query [${trimmed} ?attr ?target]`;
+      source = `query where { ${trimmed} ?attr ?target * }`;
     }
 
     // Parse and execute using existing infrastructure
-    const ast = parsePattern(source);
+    const ast = parseProgram(source);
     const commandResults = executeProgram(this.graph, ast, this.context);
 
     // executeProgram returns array of results (one per command)
@@ -89,20 +91,20 @@ export class Runtime {
 
   /**
    * Convenience: Execute a query
-   * @param {string} patterns - Query patterns (without "query [...]" wrapper)
+   * @param {string} patterns - Query patterns (without "query where {...}" wrapper)
    * @returns {Array<Map>} Variable bindings
    */
   query(patterns) {
-    return this.eval(`query [${patterns}]`);
+    return this.eval(`query where { ${patterns} }`);
   }
 
   /**
    * Convenience: Add facts
-   * @param {string} triples - Fact triples (without "fact [...]" wrapper)
+   * @param {string} triples - Fact triples (without "insert {...}" wrapper)
    * @returns {Array<number>} Edge IDs
    */
   fact(triples) {
-    return this.eval(`fact [${triples}]`);
+    return this.eval(`insert { ${triples} }`);
   }
 
   /**
@@ -114,6 +116,7 @@ export class Runtime {
     this.context = createContext(this.graph);
 
     // Reinstall extensions to restore self-describing metadata
+    installReifiedRules(this.graph, this.context);
     installCompute(this.graph);
     installAggregation(this.graph, builtinAggregations);
     installEffects(this.graph);
@@ -151,7 +154,11 @@ export class Runtime {
    * @returns {Array<string>} Pattern names
    */
   getActivePatterns() {
-    return Array.from(this.context.patterns.keys());
+    // Named patterns are stored in context.namedPatterns
+    if (!this.context.namedPatterns) {
+      return [];
+    }
+    return Array.from(this.context.namedPatterns.keys());
   }
 
   /**
@@ -159,7 +166,7 @@ export class Runtime {
    * @returns {Array<string>} Rule names
    */
   getActiveRules() {
-    return Array.from(this.context.rules.keys());
+    return getReifiedActiveRules(this.graph);
   }
 
   /**

@@ -127,7 +127,8 @@ function normalizeCommand(cmd, context = {}) {
     const quads = cmd.pattern.patterns.map(unwrapQuad);
     if (!context.namedPatterns) context.namedPatterns = new Map();
     context.namedPatterns.set(name, quads);
-    return null; // Don't execute, just store
+    // Return a command that will return the pattern name
+    return { type: "pattern-name", name };
   }
 
   return cmd; // Already normalized
@@ -162,78 +163,30 @@ export function executeCommand(graph, command, context = {}) {
     }
 
     case "rule": {
-      // Option: emit reified rules (graph-native storage & activation)
-      if (context.emitReifiedRules) {
-        // Emit rule structure as edges
-        graph.add(command.name, "TYPE", "RULE!", "system");
-
-        // Emit match patterns as strings
-        for (const matchQuad of command.match) {
-          graph.add(command.name, "matches", quadToString(matchQuad), command.name);
-        }
-
-        // Emit NAC patterns if present
-        if (command.matchNac && command.matchNac.length > 0) {
-          for (const nacQuad of command.matchNac) {
-            graph.add(command.name, "nac", quadToString(nacQuad), command.name);
-          }
-        }
-
-        // Emit produce patterns
-        for (const produceQuad of command.produce) {
-          graph.add(command.name, "produces", quadToString(produceQuad), command.name);
-        }
-
-        // Activate rule via system context
-        // (requires installReifiedRules to be called first)
-        graph.add(command.name, "memberOf", "rule", "system");
-
-        return command.name;
-      }
-
-      // Default behavior: immediate activation with watcher
-      const matchSpec = command.matchNac && command.matchNac.length > 0
-        ? { patterns: command.match, nac: command.matchNac }
-        : command.match;
-
-      const unwatch = graph.watch(matchSpec, (bindings) => {
-        // Apply the rewrite - resolve variables in produce patterns
-        for (const [s, a, t, c] of command.produce) {
-          const source = resolve(s, bindings);
-          const attr = resolve(a, bindings);
-          const target = resolve(t, bindings);
-          const ctx = c ? resolve(c, bindings) : null;
-          graph.add(source, attr, target, ctx);
-        }
-
-        // Record rule firing
-        graph.add(command.name, "FIRED", Date.now(), "system");
-      });
-
-      // Register rule as quads for self-description
+      // Reified rules: graph-native storage & activation
+      // Emit rule structure as edges
       graph.add(command.name, "TYPE", "RULE!", "system");
-      graph.add(command.name, "MATCH", JSON.stringify(command.match), "system");
+
+      // Emit match patterns as strings
+      for (const matchQuad of command.match) {
+        graph.add(command.name, "matches", quadToString(matchQuad), command.name);
+      }
+
+      // Emit NAC patterns if present
       if (command.matchNac && command.matchNac.length > 0) {
-        graph.add(command.name, "MATCH-NAC", JSON.stringify(command.matchNac), "system");
+        for (const nacQuad of command.matchNac) {
+          graph.add(command.name, "nac", quadToString(nacQuad), command.name);
+        }
       }
-      graph.add(command.name, "PRODUCE", JSON.stringify(command.produce), "system");
-      if (command.produceNac && command.produceNac.length > 0) {
-        graph.add(command.name, "PRODUCE-NAC", JSON.stringify(command.produceNac), "system");
+
+      // Emit produce patterns
+      for (const produceQuad of command.produce) {
+        graph.add(command.name, "produces", quadToString(produceQuad), command.name);
       }
-      graph.add(command.name, "STATUS", "ACTIVE", "system");
 
-      // Mark RULE! as a type (idempotent)
-      graph.add("RULE!", "TYPE", "TYPE!", "system");
-
-      // Store in context
-      if (!context.rules) context.rules = new Map();
-      context.rules.set(command.name, {
-        match: command.match,
-        matchNac: command.matchNac || [],
-        produce: command.produce,
-        produceNac: command.produceNac || [],
-        unwatch
-      });
+      // Activate rule via system context
+      // (requires installReifiedRules to be called first)
+      graph.add(command.name, "memberOf", "rule", "system");
 
       return command.name;
     }
@@ -250,6 +203,11 @@ export function executeCommand(graph, command, context = {}) {
         context.rules.clear();
       }
       return "CLEARED";
+    }
+
+    case "pattern-name": {
+      // Pattern was stored during normalization, just return the name
+      return command.name;
     }
 
     default:

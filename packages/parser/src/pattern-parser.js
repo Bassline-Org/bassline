@@ -318,23 +318,3 @@ export function parsePatternQuad(quadStr) {
   }
   return result.result;
 }
-
-const test = `
-insert {
-    some-context {
-        foo bar
-    }
-    group some-context {
-        alice {
-            likes bob
-        }
-    }
-}
-
-rule foo
-  where { ?e foo ?v ?c }
-  produce { ?e bar ?v ?c }
-`;
-
-const res = parseProgram(test);
-console.log("Parse result:", JSON.stringify(res, null, 2));

@@ -47,7 +47,7 @@ export class Graph {
     );
 
     if (existing) {
-      return existing.context;
+      return existing.id;
     }
 
     const edge = {
@@ -67,7 +67,7 @@ export class Graph {
       this.updatePatterns(edge);
     }
 
-    return edge.context;
+    return edge.id;
   }
 
   /**

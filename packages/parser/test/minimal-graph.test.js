@@ -10,35 +10,39 @@ describe("Minimal Graph Runtime", () => {
 
   describe("Core Operations", () => {
     it("should add edges to the graph", () => {
-      const ctx1 = g.add("alice", "likes", "bob");
-      const ctx2 = g.add("bob", "likes", "carol");
+      const id1 = g.add("alice", "likes", "bob");
+      const id2 = g.add("bob", "likes", "carol");
 
       expect(g.edges.length).toBe(2);
       expect(g.edges[0]).toMatchObject({
         source: "alice",
         attr: "likes",
         target: "bob",
-        context: ctx1,
+        context: "edge:0",
         id: 0
       });
       expect(g.edges[1]).toMatchObject({
         source: "bob",
         attr: "likes",
         target: "carol",
-        context: ctx2,
+        context: "edge:1",
         id: 1
       });
+
+      // Returns edge IDs
+      expect(id1).toBe(0);
+      expect(id2).toBe(1);
     });
 
     it("should auto-generate contexts and assign sequential IDs", () => {
-      const ctx1 = g.add("a", "b", "c");
-      const ctx2 = g.add("d", "e", "f");
-      const ctx3 = g.add("g", "h", "i");
+      const id1 = g.add("a", "b", "c");
+      const id2 = g.add("d", "e", "f");
+      const id3 = g.add("g", "h", "i");
 
-      // Returns auto-generated contexts
-      expect(ctx1).toBe("edge:0");
-      expect(ctx2).toBe("edge:1");
-      expect(ctx3).toBe("edge:2");
+      // Returns edge IDs
+      expect(id1).toBe(0);
+      expect(id2).toBe(1);
+      expect(id3).toBe(2);
 
       // Internal IDs are still sequential
       expect(g.edges[0].id).toBe(0);
