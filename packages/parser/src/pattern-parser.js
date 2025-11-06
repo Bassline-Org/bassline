@@ -304,6 +304,21 @@ export function parseProgram(input) {
   return result.result;
 }
 
+/**
+ * Parse a single pattern quad string
+ * Exported for use in reified rules
+ *
+ * @param {string} quadStr - Quad string like "?x TYPE PERSON *"
+ * @returns {Array} Parsed quad [e, a, v, c]
+ */
+export function parsePatternQuad(quadStr) {
+  const result = patternQuad.run(quadStr);
+  if (result.isError) {
+    throw new Error(`Failed to parse quad: ${quadStr}\n${result.error}`);
+  }
+  return result.result;
+}
+
 const test = `
 insert {
     some-context {
