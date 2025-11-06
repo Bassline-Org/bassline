@@ -195,7 +195,9 @@ const patternObj = sequenceOf([
   openBracket,
   many(patternObjEntry),
   closeBracket,
-]).map(([entity, _, entries, __]) => entries.map(([a, v]) => [entity, a, v, null]));
+]).map(([entity, _, entries, __]) =>
+  entries.map(([a, v]) => [entity, a, v, null])
+);
 
 const patternGroup = sequenceOf([
   cmd("group"),
@@ -272,19 +274,31 @@ const rule = sequenceOf([
   },
 }));
 
-const test = `
-  produce {
-    foo loves bar system
-    group some-context {
-      alice {
-        likes bob
-      }
-    }
-    some-context {
-      source goose
-    }
+const program = many(choice([insert, rule, query]));
+export function parseProgram(input) {
+  const result = program.run(input);
+  if (result.isError) {
+    throw new Error(result.message);
   }
+  return result.result;
+}
+
+const test = `
+insert {
+    some-context {
+        foo bar
+    }
+    group some-context {
+        alice {
+            likes bob
+        }
+    }
+}
+
+rule foo
+  where { ?e foo ?v ?c }
+  produce { ?e bar ?v ?c }
 `;
 
-const res = produce.run(test);
+const res = parseProgram(test);
 console.log("Parse result:", JSON.stringify(res, null, 2));
