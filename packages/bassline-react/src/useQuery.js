@@ -18,45 +18,46 @@
  */
 import { useEffect, useState } from "react";
 import { useRuntime } from "./useRuntime.js";
-import { parseQueryBody } from "@bassline/parser/parser";
+import { parsePatterns } from "@bassline/parser/parser";
 import { resolve } from "@bassline/parser/graph";
 import { unwrapQuad } from "@bassline/parser/runtime";
 import { Binding } from "@bassline/parser/helpers";
 
-export function useQuery(patternSource) {
+export function useQuery({ where, not, onMatch } = {}) {
   const runtime = useRuntime();
-  const [results, setResults] = useState([]);
-
   useEffect(() => {
-    const { where, not, produce } = parseQueryBody(patternSource);
+    const wherePatterns = where ? parsePatterns(where).map(unwrapQuad) : [];
+    const notPatterns = not ? parsePatterns(not).map(unwrapQuad) : [];
 
-    const unwrappedWhere = where.map(unwrapQuad);
-    const unwrappedNot = not.map(unwrapQuad);
-    const unwrappedProduce = produce.map(unwrapQuad);
-
-    const querySpec = unwrappedNot.length > 0
-      ? { patterns: unwrappedWhere, nac: unwrappedNot }
-      : unwrappedWhere;
+    const querySpec = notPatterns.length > 0
+      ? { patterns: wherePatterns, nac: notPatterns }
+      : wherePatterns;
 
     const callback = (bindings) => {
-      // If there's a produce clause, insert quads with substituted variables
-      if (unwrappedProduce.length > 0) {
-        unwrappedProduce.forEach(([s, a, t, c]) => {
-          const source = resolve(s, bindings);
-          const attr = resolve(a, bindings);
-          const target = resolve(t, bindings);
-          const context = resolve(c, bindings);
-          runtime.graph.add(source, attr, target, context);
-        });
-      }
-      setResults((prev) => [...prev, new Binding(bindings)]);
+      console.log("[useQuery] callback", bindings);
+      onMatch?.(new Binding(bindings));
     };
     const unwatch = runtime.graph.watch(querySpec, callback);
-    return () => {
-      console.log("unwatching");
-      unwatch();
-    };
-  }, [runtime.graph, patternSource]);
+    return unwatch;
+  }, [runtime.graph, where, not]);
+}
 
-  return results;
+export function useComputedQuery(initialValue, { where, not, onMatch } = {}) {
+  const runtime = useRuntime();
+  const [result, setResult] = useState(initialValue);
+  useEffect(() => {
+    const wherePatterns = where ? parsePatterns(where).map(unwrapQuad) : [];
+    const notPatterns = not ? parsePatterns(not).map(unwrapQuad) : [];
+
+    const querySpec = notPatterns.length > 0
+      ? { patterns: wherePatterns, nac: notPatterns }
+      : wherePatterns;
+
+    const callback = (bindings) => {
+      onMatch?.(new Binding(bindings), setResult);
+    };
+    const unwatch = runtime.graph.watch(querySpec, callback);
+    return unwatch;
+  }, [runtime.graph, where, not]);
+  return result;
 }

@@ -230,42 +230,34 @@ const patternRef = sequenceOf([
   patternRef: name,
 }));
 
+const patterns = many(choice([
+  patternRef,
+  patternGroup,
+  patternObj,
+  patternQuad.map((q) => [q]),
+])).map((patterns) => patterns.flat());
+
 const where = sequenceOf([
   cmd("where"),
   openBracket,
-  many(choice([
-    patternRef,
-    patternGroup,
-    patternObj,
-    patternQuad.map((q) => [q]),
-  ])),
+  patterns,
   closeBracket,
-]).map(([_, __, patterns]) => ({ where: patterns.flat() }));
+]).map(([_, __, patterns]) => ({ where: patterns }));
 
 const not = sequenceOf([
   cmd("not"),
   openBracket,
-  many(choice([
-    patternRef,
-    patternGroup,
-    patternObj,
-    patternQuad.map((q) => [q]),
-  ])),
+  patterns,
   closeBracket,
-]).map(([_, __, patterns]) => ({ not: patterns.flat() }));
+]).map(([_, __, patterns]) => ({ not: patterns }));
 
 const produce = sequenceOf([
   cmd("produce"),
   openBracket,
-  many(choice([
-    patternRef,
-    patternGroup,
-    patternObj,
-    patternQuad.map((q) => [q]),
-  ])),
+  patterns,
   closeBracket,
 ]).map(([_, __, entries]) => ({
-  produce: entries.flat(),
+  produce: entries,
 }));
 
 const query = sequenceOf([
@@ -321,27 +313,18 @@ export function parsePatternQuad(quadStr) {
   return result.result;
 }
 
-// Query body without "query" keyword (for useQuery hook)
-const queryBody = sequenceOf([
-  where,
-  possibly(not),
-  possibly(produce),
-]).map(([{ where }, not, produce]) => ({
-  where,
-  not: not?.not ?? [],
-  produce: produce?.produce ?? [],
-}));
 /**
- * Parse query body (where/not/produce without "query" keyword)
+ * Parse patterns
  * Exported for use in React useQuery hook
  *
- * @param {string} input - Query body like "where { ?x type person } not { ?x deleted true }"
- * @returns {Object} Parsed query { where, not, produce }
+ * @param {string} input - Patterns like "?x type person" or "group ?x { ?x type person }"
+ * @returns {Object} Parsed Patterns
  */
-export function parseQueryBody(input) {
-  const result = queryBody.run(input);
+export function parsePatterns(input) {
+  const result = patterns.run(input);
   if (result.isError) {
-    throw new Error(`Failed to parse query body: ${result.error}`);
+    throw new Error(`Failed to parse patterns: ${result.error}`);
   }
-  return result.result;
+  const parsed = result.result;
+  return parsed;
 }
