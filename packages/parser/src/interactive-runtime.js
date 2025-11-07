@@ -9,15 +9,21 @@
  * - Built-in extensions (compute, aggregation, effects)
  */
 
-import { Graph } from './minimal-graph.js';
-import { parseProgram } from './pattern-parser.js';
-import { createContext, executeProgram } from './pattern-words.js';
-import { installBuiltinCompute } from '../extensions/io-compute.js';
-import { installReifiedAggregations, builtinAggregations } from '../extensions/aggregation/index.js';
-import { installAllEffects } from '../extensions/io-effects.js';
-import { installReifiedRules, getActiveRules as getReifiedActiveRules } from '../extensions/reified-rules.js';
-import { installAllPersistence } from '../extensions/io-effects-persistence.js';
-import { installConnectionEffects } from '../extensions/io-effects-connections.js';
+import { Graph } from "./minimal-graph.js";
+import { parseProgram } from "./pattern-parser.js";
+import { createContext, executeProgram } from "./pattern-words.js";
+import { installBuiltinCompute } from "../extensions/io-compute.js";
+import {
+  builtinAggregations,
+  installReifiedAggregations,
+} from "../extensions/aggregation/index.js";
+import { installAllEffects } from "../extensions/io-effects.js";
+import {
+  getActiveRules as getReifiedActiveRules,
+  installReifiedRules,
+} from "../extensions/reified-rules.js";
+import { installAllPersistence } from "../extensions/io-effects-persistence.js";
+import { installConnectionEffects } from "../extensions/io-effects-connections.js";
 
 export class Runtime {
   constructor() {
@@ -134,11 +140,11 @@ export class Runtime {
    */
   toJSON() {
     return {
-      edges: this.graph.edges.map(e => ({
+      edges: this.graph.edges.map((e) => ({
         source: e.source,
         attr: e.attr,
-        target: e.target
-      }))
+        target: e.target,
+      })),
     };
   }
 
@@ -149,7 +155,7 @@ export class Runtime {
   fromJSON(data) {
     this.reset();
     if (data.edges) {
-      data.edges.forEach(e => {
+      data.edges.forEach((e) => {
         this.graph.add(e.source, e.attr, e.target, e.context);
       });
     }
@@ -183,7 +189,7 @@ export class Runtime {
     return {
       edges: this.graph.edges.length,
       patterns: this.context.patterns.size,
-      rules: this.context.rules.size
+      rules: this.context.rules.size,
     };
   }
 
@@ -196,7 +202,7 @@ export class Runtime {
     const cp = {
       name,
       historyIndex: this.evalHistory.length,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     this.checkpoints.set(name, cp);
     return cp;
@@ -220,7 +226,7 @@ export class Runtime {
     this.evalHistory = [];
 
     // Replay commands up to checkpoint
-    historyToReplay.forEach(cmd => {
+    historyToReplay.forEach((cmd) => {
       this._executeEval(cmd);
       this.evalHistory.push(cmd);
     });
@@ -245,7 +251,7 @@ export class Runtime {
 
     // Reset and replay
     this.reset();
-    historyToReplay.forEach(cmd => {
+    historyToReplay.forEach((cmd) => {
       this._executeEval(cmd);
       this.evalHistory.push(cmd);
     });

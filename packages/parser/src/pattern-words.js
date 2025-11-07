@@ -106,7 +106,8 @@ function normalizeCommand(cmd, context = {}) {
     return {
       type: "query",
       patterns: expandPatternRefs(cmd.query.where, context),
-      nac: expandPatternRefs(cmd.query.not, context)
+      nac: expandPatternRefs(cmd.query.not, context),
+      produce: expandPatternRefs(cmd.query.produce, context)
     };
   }
 
@@ -155,11 +156,26 @@ export function executeCommand(graph, command, context = {}) {
 
     case "query": {
       // Query with triple patterns and optional NAC
-      if (command.nac && command.nac.length > 0) {
-        return graph.query({ patterns: command.patterns, nac: command.nac });
-      } else {
-        return graph.query(...command.patterns);
+      const results = command.nac && command.nac.length > 0
+        ? graph.query({ patterns: command.patterns, nac: command.nac })
+        : graph.query(...command.patterns);
+
+      // If produce clause exists, insert quads for each match
+      if (command.produce && command.produce.length > 0) {
+        results.forEach(bindings => {
+          command.produce.forEach(([s, a, t, c]) => {
+            const resolvedQuad = [
+              resolve(s, bindings),
+              resolve(a, bindings),
+              resolve(t, bindings),
+              resolve(c, bindings)
+            ];
+            graph.add(...resolvedQuad);
+          });
+        });
       }
+
+      return results;
     }
 
     case "rule": {

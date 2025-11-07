@@ -254,17 +254,6 @@ const not = sequenceOf([
   closeBracket,
 ]).map(([_, __, patterns]) => ({ not: patterns.flat() }));
 
-const query = sequenceOf([
-  cmd("query"),
-  where,
-  possibly(not),
-]).map(([_, { where }, not]) => ({
-  query: {
-    where,
-    not: not?.not ?? [],
-  },
-}));
-
 const produce = sequenceOf([
   cmd("produce"),
   openBracket,
@@ -277,6 +266,19 @@ const produce = sequenceOf([
   closeBracket,
 ]).map(([_, __, entries]) => ({
   produce: entries.flat(),
+}));
+
+const query = sequenceOf([
+  cmd("query"),
+  where,
+  possibly(not),
+  possibly(produce),
+]).map(([_, { where }, not, produce]) => ({
+  query: {
+    where,
+    not: not?.not ?? [],
+    produce: produce?.produce ?? [],
+  },
 }));
 
 // Rules

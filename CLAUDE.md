@@ -116,12 +116,22 @@ rt.eval('alice');  // Expands to: query where { alice ?attr ?target * }
 **Command types**:
 - `insert { ... }` - Add triples
 - `query where { ... }` - Find matches (with optional NAC)
+- `query where { ... } produce { ... }` - Query and insert (non-reactive, SQL-style)
 - `rule name where { ... } produce { ... }` - Reactive rewrite rules
 - `pattern name { ... }` - Named observable patterns
 - `watch where { ... } do { ... }` - Watch and react
 - `delete s a t` - Mark triple as deleted (tombstone)
 - `clear-graph` - Reset everything
 - `graph-info` - Statistics
+
+**Query with Produce** - Non-reactive query with inserts:
+```javascript
+// Find all people and mark them as processed (one-time operation)
+rt.eval('query where { ?person age ?a * } produce { ?person processed true * }');
+
+// Returns query results + inserts produce quads for each match
+// Unlike rules, this is non-reactive (doesn't watch for future matches)
+```
 
 ### 3. Incremental Aggregations
 
