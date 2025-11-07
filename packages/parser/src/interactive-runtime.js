@@ -17,13 +17,15 @@ import {
   builtinAggregations,
   installReifiedAggregations,
 } from "../extensions/aggregation/index.js";
-import { installAllEffects } from "../extensions/io-effects.js";
+import { installBuiltinEffects } from "../extensions/io-effects.js";
 import {
   getActiveRules as getReifiedActiveRules,
   installReifiedRules,
 } from "../extensions/reified-rules.js";
-import { installAllPersistence } from "../extensions/io-effects-persistence.js";
-import { installConnectionEffects } from "../extensions/io-effects-connections.js";
+// Note: Persistence and connections require Node.js modules (fs, ws)
+// For Node environments, use io-effects-all.js instead
+// import { installAllPersistence } from "../extensions/io-effects-persistence.js";
+// import { installConnectionEffects } from "../extensions/io-effects-connections.js";
 
 export class Runtime {
   constructor() {
@@ -34,9 +36,7 @@ export class Runtime {
     installReifiedRules(this.graph, this.context);
     installBuiltinCompute(this.graph);
     installReifiedAggregations(this.graph, builtinAggregations, this.context);
-    installAllEffects(this.graph);
-    installAllPersistence(this.graph);
-    installConnectionEffects(this.graph);
+    installBuiltinEffects(this.graph); // Browser-compatible effects only
 
     // Time-travel: eval history is the source of truth
     // Replaying history recreates all state (edges, patterns, rules, aggregations)
@@ -129,9 +129,7 @@ export class Runtime {
     installReifiedRules(this.graph, this.context);
     installBuiltinCompute(this.graph);
     installReifiedAggregations(this.graph, builtinAggregations, this.context);
-    installAllEffects(this.graph);
-    installAllPersistence(this.graph);
-    installConnectionEffects(this.graph);
+    installBuiltinEffects(this.graph); // Browser-compatible effects only
   }
 
   /**

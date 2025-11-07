@@ -26,7 +26,7 @@
  */
 
 import { promises as fs } from 'fs';
-import { getInput } from './io-effects.js';
+import { getInput, installIOEffects } from './io-effects.js';
 
 export const builtinNodeEffects = {
   filesystem: {
@@ -120,3 +120,13 @@ export const builtinNodeEffects = {
     }
   }
 };
+
+/**
+ * Install all built-in Node.js effects (filesystem)
+ *
+ * @param {Graph} graph - The graph instance
+ * @returns {Map} Map of effect names to unwatch functions
+ */
+export function installNodeEffects(graph) {
+  return installIOEffects(graph, builtinNodeEffects);
+}

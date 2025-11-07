@@ -19,8 +19,8 @@ export function createContext(graph) {
     rules: new Map(),
     cleanup() {
       // Unwatch all patterns and rules
-      this.patterns.forEach(p => p.unwatch && p.unwatch());
-      this.rules.forEach(r => r.unwatch && r.unwatch());
+      this.patterns.forEach((p) => p.unwatch && p.unwatch());
+      this.rules.forEach((r) => r.unwatch && r.unwatch());
       this.patterns.clear();
       this.rules.clear();
     },
@@ -37,7 +37,7 @@ export function createContext(graph) {
  */
 function unwrap(val) {
   if (val === null) return null;
-  if (typeof val === 'object') {
+  if (typeof val === "object") {
     if (val.word) return val.word;
     if (val.number !== undefined) return val.number;
     if (val.string !== undefined) return val.string;
@@ -60,7 +60,7 @@ function unwrapQuad([e, a, v, c]) {
  */
 function quadToString([s, a, t, c]) {
   const parts = [s, a, t, c === null ? "*" : c];
-  return parts.map(p => {
+  return parts.map((p) => {
     if (typeof p === "string") return p;
     if (typeof p === "number") return String(p);
     return String(p);
@@ -98,7 +98,7 @@ function normalizeCommand(cmd, context = {}) {
   if (cmd.insert) {
     return {
       type: "fact",
-      triples: expandPatternRefs(cmd.insert, context)
+      triples: expandPatternRefs(cmd.insert, context),
     };
   }
 
@@ -107,7 +107,7 @@ function normalizeCommand(cmd, context = {}) {
       type: "query",
       patterns: expandPatternRefs(cmd.query.where, context),
       nac: expandPatternRefs(cmd.query.not, context),
-      produce: expandPatternRefs(cmd.query.produce, context)
+      produce: expandPatternRefs(cmd.query.produce, context),
     };
   }
 
@@ -118,7 +118,7 @@ function normalizeCommand(cmd, context = {}) {
       match: expandPatternRefs(cmd.rule.where, context),
       matchNac: expandPatternRefs(cmd.rule.not, context),
       produce: expandPatternRefs(cmd.rule.produce, context),
-      produceNac: []
+      produceNac: [],
     };
   }
 
@@ -162,13 +162,13 @@ export function executeCommand(graph, command, context = {}) {
 
       // If produce clause exists, insert quads for each match
       if (command.produce && command.produce.length > 0) {
-        results.forEach(bindings => {
+        results.forEach((bindings) => {
           command.produce.forEach(([s, a, t, c]) => {
             const resolvedQuad = [
               resolve(s, bindings),
               resolve(a, bindings),
               resolve(t, bindings),
-              resolve(c, bindings)
+              resolve(c, bindings),
             ];
             graph.add(...resolvedQuad);
           });
@@ -185,7 +185,12 @@ export function executeCommand(graph, command, context = {}) {
 
       // Emit match patterns as strings
       for (const matchQuad of command.match) {
-        graph.add(command.name, "matches", quadToString(matchQuad), command.name);
+        graph.add(
+          command.name,
+          "matches",
+          quadToString(matchQuad),
+          command.name,
+        );
       }
 
       // Emit NAC patterns if present
@@ -197,7 +202,12 @@ export function executeCommand(graph, command, context = {}) {
 
       // Emit produce patterns
       for (const produceQuad of command.produce) {
-        graph.add(command.name, "produces", quadToString(produceQuad), command.name);
+        graph.add(
+          command.name,
+          "produces",
+          quadToString(produceQuad),
+          command.name,
+        );
       }
 
       // Activate rule via system context
@@ -211,11 +221,11 @@ export function executeCommand(graph, command, context = {}) {
       // Clear graph
       graph.edges = [];
       if (context.patterns) {
-        context.patterns.forEach(p => p.unwatch && p.unwatch());
+        context.patterns.forEach((p) => p.unwatch && p.unwatch());
         context.patterns.clear();
       }
       if (context.rules) {
-        context.rules.forEach(r => r.unwatch && r.unwatch());
+        context.rules.forEach((r) => r.unwatch && r.unwatch());
         context.rules.clear();
       }
       return "CLEARED";

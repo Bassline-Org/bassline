@@ -18,9 +18,8 @@
  * - Node.js: READ_FILE, WRITE_FILE, APPEND_FILE
  */
 
-// Import built-in effects
+// Import built-in effects (browser-safe only)
 import { builtinIOEffects } from './io-effects-builtin.js';
-import { builtinNodeEffects } from './io-effects-node.js';
 
 /**
  * Helper: Get input value from context
@@ -169,29 +168,5 @@ export function installBuiltinEffects(graph) {
   return installIOEffects(graph, builtinIOEffects);
 }
 
-/**
- * Install all built-in Node.js effects (filesystem)
- *
- * @param {Graph} graph - The graph instance
- * @returns {Map} Map of effect names to unwatch functions
- */
-export function installNodeEffects(graph) {
-  return installIOEffects(graph, builtinNodeEffects);
-}
-
-/**
- * Install ALL built-in effects (browser + Node.js)
- *
- * @param {Graph} graph - The graph instance
- * @returns {Map} Map of effect names to unwatch functions
- */
-export function installAllEffects(graph) {
-  const browserUnwatchMap = installBuiltinEffects(graph);
-  const nodeUnwatchMap = installNodeEffects(graph);
-
-  // Merge maps
-  return new Map([...browserUnwatchMap, ...nodeUnwatchMap]);
-}
-
 // Re-export built-in definitions
-export { builtinIOEffects, builtinNodeEffects };
+export { builtinIOEffects };

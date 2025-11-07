@@ -13,7 +13,11 @@
         "./format": "./src/format-results.js",
         "./compute": "./extensions/compute.js",
         "./aggregation": "./extensions/aggregation/index.js",
-        "./connections": "./extensions/io-effects-connections.js"
+        "./reified-rules": "./extensions/reified-rules.js",
+        "./io-effects": "./extensions/io-effects.js",
+        "./io-effects-builtin": "./extensions/io-effects-builtin.js",
+        "./io-effects-node": "./extensions/io-effects-node.js",
+        "./io-effects-all": "./extensions/io-effects-all.js"
     },
     "dependencies": {
       "arcsecond": "^5.0.0",

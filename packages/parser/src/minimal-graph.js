@@ -5,7 +5,7 @@
  * No indexes, no query builders - just patterns watching edges.
  */
 
-import { v4 as uuid } from 'uuid';
+import { v4 as uuid } from "uuid";
 
 // ============================================================================
 // Phase 1: Core Data Structure (The Log)
