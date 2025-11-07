@@ -2,11 +2,10 @@
  * Minimal Todo App - Demonstrates Bassline React Integration
  *
  * Shows:
- * - GraphProvider setup
- * - useQuery for reactive lists
- * - Direct graph mutations
- * - Pattern matching with variables
- * - Reified rules integration
+ * - RuntimeProvider setup
+ * - useQuery with pattern language
+ * - Pattern language for mutations (runtime.eval)
+ * - Object syntax for clean queries
  */
 import { useState } from 'react';
 import { RuntimeProvider, useRuntime, useQuery } from '../src/index.js';
@@ -14,14 +13,6 @@ import { Runtime } from '@bassline/parser/interactive';
 
 // Initialize runtime (browser-compatible)
 const runtime = new Runtime();
-const graph = runtime.graph;
-runtime.eval(`
-  rule mark-done
-    where {
-      ?todo completed true ?ctx
-    }
-    produce { ?todo status done ?ctx }
-  `)
 
 export default function App() {
   return (
@@ -44,13 +35,13 @@ function AddTodo() {
     if (!text.trim()) return;
     const id = `todo:${Date.now()}`;
     rt.eval(`
-        insert {
-          ${id} {
-            type todo
-            text ${text}
-          }
+      insert {
+        ${id} {
+          type todo
+          text "${text}"
         }
-      `)
+      }
+    `);
     setText('');
   };
 
@@ -72,18 +63,16 @@ function AddTodo() {
 }
 
 function TodoList() {
-  // Query for active todos (not tombstoned)
-  const rt = useRuntime();
-
-  const todos = useQuery({
-    patterns: [
-      ["?id", "type", "todo", "*"],
-      ["?id", "text", "?text", "*"]
-    ],
-    nac: [
-      ["?id", "type", "todo", "tombstone"]
-    ]
-  });
+  const todos = useQuery(`
+    where {
+      ?id {
+        type todo 
+        text ?text 
+      }
+    }
+    not {
+      ?id type todo tombstone
+    }`);
 
   if (todos.length === 0) {
     return <p style={{ color: '#999' }}>No todos yet. Add one above!</p>;
@@ -91,36 +80,36 @@ function TodoList() {
 
   return (
     <ul style={{ listStyle: 'none', padding: 0 }}>
-      {todos.map((binding) => (
-        <TodoItem key={binding.get('?id')} id={binding.get('?id')} />
-      ))}
+      {todos.map((binding, index) => {
+        const id = binding.get('?id');
+        const text = binding.get('?text');
+        return (
+          <TodoItem
+            key={`${id}-${index}`}
+            id={id}
+            text={text}
+          />
+        );
+      })}
     </ul>
   );
 }
 
-function TodoItem({ id }) {
+function TodoItem({ id, text }) {
   const rt = useRuntime();
-  const graph = rt.graph;
-  const attrs = useQuery([[id, "?attr", "?value", "*"]]);
 
-  // Build attribute map
-  const attrMap = new Map();
-  attrs.forEach(binding => {
-    attrMap.set(binding.get("?attr"), binding.get("?value"));
-  });
-
-  const text = attrMap.get("text") ?? "";
-  const completed = attrMap.get("completed") ?? false;
-  const status = attrMap.get("status"); // Set by rule!
+  const [completedBindings] = useQuery(`where { ${id} completed ?value * }`);
+  const completed = completedBindings?.get('?value') ?? false;
 
   const handleToggle = () => {
     if (!completed) {
-      graph.add(id, 'completed', !completed, null);
+      const query = `insert { ${id} { completed true } }`;
+      rt.eval(query);
     }
   };
 
   const handleDelete = () => {
-    graph.add(id, 'type', 'todo', 'tombstone');
+    rt.eval(`insert { ${id} type todo tombstone }`);
   };
 
   return (
@@ -131,7 +120,7 @@ function TodoItem({ id }) {
       borderRadius: '4px',
       display: 'flex',
       alignItems: 'center',
-      backgroundColor: status === 'done' ? '#e8f5e9' : 'white'
+      backgroundColor: completed ? '#e8f5e9' : 'white'
     }}>
       <input
         type="checkbox"
@@ -146,7 +135,7 @@ function TodoItem({ id }) {
       }}>
         {text}
       </span>
-      {status === 'done' && (
+      {completed && (
         <span style={{ marginRight: '12px', color: '#4caf50', fontSize: '12px' }}>
           ✓ DONE
         </span>
@@ -159,19 +148,10 @@ function TodoItem({ id }) {
 }
 
 function Stats() {
-  // Multiple queries - all reactive!
-  const allTodos = useQuery([["?id", "type", "todo", "*"]]);
-
-  const completedTodos = useQuery([
-    ["?id", "type", "todo", "*"],
-    ["?id", "completed", true, "*"]
-  ]);
-
-  // Query with NAC - todos NOT deleted
-  const activeTodos = useQuery({
-    patterns: [["?id", "type", "todo", "*"]],
-    nac: [["?id", "type", "todo", "tombstone"]]
-  });
+  // Multiple reactive queries - all using pattern language!
+  const allTodos = useQuery('where { ?id type todo * }');
+  const completedTodos = useQuery('where { ?id { type todo completed true } }');
+  const activeTodos = useQuery('where { ?id type todo * } not { ?id type todo tombstone }');
 
   return (
     <div style={{

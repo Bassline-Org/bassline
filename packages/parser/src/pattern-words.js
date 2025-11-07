@@ -35,7 +35,7 @@ export function createContext(graph) {
  * Unwrap parser value objects to raw values
  * Temporary compatibility layer - proper type handling TBD
  */
-function unwrap(val) {
+export function unwrap(val) {
   if (val === null) return null;
   if (typeof val === "object") {
     if (val.word) return val.word;
@@ -50,7 +50,7 @@ function unwrap(val) {
 /**
  * Unwrap a quad (4-tuple with wrapped values)
  */
-function unwrapQuad([e, a, v, c]) {
+export function unwrapQuad([e, a, v, c]) {
   return [unwrap(e), unwrap(a), unwrap(v), unwrap(c)];
 }
 
@@ -146,11 +146,13 @@ function normalizeCommand(cmd, context = {}) {
 export function executeCommand(graph, command, context = {}) {
   switch (command.type) {
     case "fact": {
-      // Insert quads into the graph
+      // Insert quads into the graph using batch for atomicity
       const results = [];
-      for (const [source, attr, target, ctx] of command.triples) {
-        results.push(graph.add(source, attr, target, ctx));
-      }
+      graph.batch(() => {
+        for (const [source, attr, target, ctx] of command.triples) {
+          results.push(graph.add(source, attr, target, ctx));
+        }
+      });
       return results;
     }
 

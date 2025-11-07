@@ -320,3 +320,28 @@ export function parsePatternQuad(quadStr) {
   }
   return result.result;
 }
+
+// Query body without "query" keyword (for useQuery hook)
+const queryBody = sequenceOf([
+  where,
+  possibly(not),
+  possibly(produce),
+]).map(([{ where }, not, produce]) => ({
+  where,
+  not: not?.not ?? [],
+  produce: produce?.produce ?? [],
+}));
+/**
+ * Parse query body (where/not/produce without "query" keyword)
+ * Exported for use in React useQuery hook
+ *
+ * @param {string} input - Query body like "where { ?x type person } not { ?x deleted true }"
+ * @returns {Object} Parsed query { where, not, produce }
+ */
+export function parseQueryBody(input) {
+  const result = queryBody.run(input);
+  if (result.isError) {
+    throw new Error(`Failed to parse query body: ${result.error}`);
+  }
+  return result.result;
+}
