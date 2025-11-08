@@ -1,14 +1,5 @@
-import {
-    hash,
-    isWildcard,
-    PatternVar,
-    validateType,
-    WC,
-    Word,
-    word as w,
-} from "../types.js";
+import { hash, Word, word as w } from "../types.js";
 import { v4 } from "uuid";
-import { valuesEqual } from "../minimal-graph.js";
 
 export class Quad {
     constructor(entity, attribute, value, group = autoGroup()) {
