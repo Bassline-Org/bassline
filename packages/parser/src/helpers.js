@@ -1,40 +1,31 @@
-/**
- * Binding wrapper that normalizes variable name casing
- * Since parser uppercases all variables, this allows case-insensitive access
- */
-export class Binding {
-  constructor(map) {
-    this._map = map;
+export function normalize(key) {
+  if (typeof key === "symbol") {
+    return key.description.toUpperCase();
   }
+  return key.toUpperCase();
+}
 
-  get(key) {
-    const normalized = typeof key === 'string' ? key.toUpperCase() : key;
-    return this._map.get(normalized);
-  }
-
-  set(key, value) {
-    const normalized = typeof key === 'string' ? key.toUpperCase() : key;
-    return this._map.set(normalized, value);
-  }
-
-  has(key) {
-    const normalized = typeof key === 'string' ? key.toUpperCase() : key;
-    return this._map.has(normalized);
-  }
-
-  entries() {
-    return this._map.entries();
-  }
-
-  keys() {
-    return this._map.keys();
-  }
-
-  values() {
-    return this._map.values();
-  }
-
-  get size() {
-    return this._map.size;
-  }
+export function binding(map) {
+  return {
+    map,
+    getKey(key) {
+      const k = normalize(key);
+      if (map.has(`?${k}`)) {
+        return map.get(`?${k}`);
+      }
+      if (map.has(k)) {
+        return map.get(k);
+      }
+      return undefined;
+    },
+    get(key) {
+      if (Array.isArray(key)) {
+        return key.map((k) => this.getKey(k));
+      }
+      if (typeof key === "string") {
+        return this.getKey(key);
+      }
+      throw new Error(`Invalid key: ${key}`);
+    },
+  };
 }

@@ -21,7 +21,7 @@ import { useRuntime } from "./useRuntime.js";
 import { parsePatterns } from "@bassline/parser/parser";
 import { resolve } from "@bassline/parser/graph";
 import { unwrapQuad } from "@bassline/parser/runtime";
-import { Binding } from "@bassline/parser/helpers";
+import { binding, normalize } from "@bassline/parser/helpers";
 
 export function useQuery({ where, not, onMatch } = {}) {
   const runtime = useRuntime();
@@ -34,8 +34,7 @@ export function useQuery({ where, not, onMatch } = {}) {
       : wherePatterns;
 
     const callback = (bindings) => {
-      console.log("[useQuery] callback", bindings);
-      onMatch?.(new Binding(bindings));
+      onMatch?.(binding(bindings), setResult);
     };
     const unwatch = runtime.graph.watch(querySpec, callback);
     return unwatch;
@@ -54,10 +53,34 @@ export function useComputedQuery(initialValue, { where, not, onMatch } = {}) {
       : wherePatterns;
 
     const callback = (bindings) => {
-      onMatch?.(new Binding(bindings), setResult);
+      onMatch?.(binding(bindings), setResult);
     };
     const unwatch = runtime.graph.watch(querySpec, callback);
     return unwatch;
   }, [runtime.graph, where, not]);
   return result;
+}
+
+export function useEntity(id, ctx = null) {
+  const runtime = useRuntime();
+  const [entity, setEntity] = useState(new Map());
+  useEffect(() => {
+    const callback = (bindings) => {
+      const [attr, value] = binding(bindings).get(["attr", "value"]);
+      setEntity((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(attr, value);
+        console.log(newMap);
+        return newMap;
+      });
+    };
+    const querySpec = {
+      patterns: [[id, "?ATTR", "?VALUE", ctx ? normalize(ctx) : null]],
+    };
+    const unwatch = runtime.graph.watch(querySpec, callback);
+    return () => {
+      unwatch();
+    };
+  }, [runtime.graph, id, ctx]);
+  return binding(entity);
 }

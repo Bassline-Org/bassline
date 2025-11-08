@@ -11,6 +11,7 @@ import { useState } from "react";
 import {
   RuntimeProvider,
   useComputedQuery,
+  useEntity,
   useQuery,
   useRuntime,
 } from "../src/index.js";
@@ -82,53 +83,36 @@ function TodoList() {
   const todos = useComputedQuery([], {
     where: "?id type todo todos",
     onMatch: (binding, setTodos) => {
-      const id = binding.get("?id");
-      setTodos((prev) => [...prev, id]);
+      setTodos((prev) => [...prev, binding.get("id")]);
     },
   });
-
-  const deletedTodos = useComputedQuery({}, {
-    where: "?id deleted true todos",
-    onMatch: (binding, setDeletedTodos) => {
-      const id = binding.get("?id");
-      setDeletedTodos((prev) => ({ ...prev, [id]: true }));
-    },
-  });
-
   if (todos.length === 0) {
     return <p style={{ color: "#999" }}>No todos yet. Add one above!</p>;
   }
-
   return (
     <ul style={{ listStyle: "none", padding: 0 }}>
       {todos
-        .filter((id) => !deletedTodos[id])
-        .map((id, index) => {
+        .map((id) => {
           return (
             <TodoItem
               key={id}
               id={id}
             />
           );
-        })}
+        })
+        .filter((todo) => todo !== null)}
     </ul>
   );
 }
 
 function TodoItem({ id }) {
   const rt = useRuntime();
-  const completed = useComputedQuery(false, {
-    where: `${id} completed true todos`,
-    onMatch: (binding, setCompleted) => {
-      setCompleted(true);
-    },
-  });
-  const text = useComputedQuery("", {
-    where: `${id} text ?text todos`,
-    onMatch: (binding, setText) => {
-      setText(binding.get("?text"));
-    },
-  });
+  const todo = useEntity(id, "todos");
+  const [completed, text, deleted] = todo.get(["completed", "text", "deleted"]);
+
+  if (deleted) {
+    return null;
+  }
 
   const handleToggle = () => {
     if (!completed) {
@@ -188,8 +172,9 @@ function TodoItem({ id }) {
 function Stats() {
   // Multiple reactive queries - all using pattern language!
   const allTodos = useComputedQuery(0, {
-    where: "?id type todo todos",
-    onMatch: (_, setResult) => setResult((prev) => prev + 1),
+    where: `
+      ?id type todo todos`,
+    onMatch: (bindings, setResult) => setResult((prev) => prev + 1),
   });
 
   const completedTodos = useComputedQuery(0, {
@@ -197,11 +182,7 @@ function Stats() {
     onMatch: (_, setResult) => setResult((prev) => prev + 1),
   });
 
-  const deletedTodos = useComputedQuery(0, {
-    where: `?id deleted true todos`,
-    onMatch: (_, setResult) => setResult((prev) => prev + 1),
-  });
-  const activeTodos = allTodos - completedTodos - deletedTodos;
+  const activeTodos = allTodos - completedTodos;
 
   return (
     <div

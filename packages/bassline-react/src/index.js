@@ -35,4 +35,4 @@
 
 export { RuntimeProvider } from "./RuntimeContext.jsx";
 export { useRuntime } from "./useRuntime.js";
-export { useComputedQuery, useQuery } from "./useQuery.js";
+export { useComputedQuery, useEntity, useQuery } from "./useQuery.js";
