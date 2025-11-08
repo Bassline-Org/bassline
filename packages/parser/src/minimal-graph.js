@@ -32,7 +32,7 @@ import {
  * Check if two typed values are equal
  * Handles Words, PatternVars, Wildcards, strings, numbers
  */
-function valuesEqual(a, b) {
+export function valuesEqual(a, b) {
   validateType(a, "a in valuesEqual");
   validateType(b, "b in valuesEqual");
 

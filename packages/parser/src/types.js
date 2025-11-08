@@ -139,6 +139,7 @@ export function validateType(value, usage = "Value") {
       `${usage} must be Word, PatternVar, Wildcard, string, or number. Got: ${typeof value} ${value}`,
     );
   }
+  return value;
 }
 
 // ============================================================================
@@ -249,4 +250,25 @@ export function deserialize(str) {
   }
 
   throw new Error(`Invalid serialized value: ${str}`);
+}
+
+/**
+ * Compute the 32-bit FNV-1a hash of a string
+ * @param {string} str
+ * @returns {number} 32-bit unsigned hash
+ */
+export function fnv1aHash(str) {
+  if (typeof str !== "string") {
+    throw new Error(`Cannot hash non-string: ${typeof str}`);
+  }
+  let hash = 0x811c9dc5; // FNV offset basis
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0; // FNV prime
+  }
+  return hash;
+}
+
+export function hash(value) {
+  return fnv1aHash(serialize(value));
 }
