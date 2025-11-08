@@ -32,26 +32,31 @@ export function createContext(graph) {
 // ============================================================================
 
 /**
- * Unwrap parser value objects to raw values
- * Temporary compatibility layer - proper type handling TBD
+ * DEPRECATED: Parser now returns typed values directly
+ *
+ * This function is kept for backward compatibility but is now a no-op.
+ * Parser returns typed values (Word, PatternVar, WC, strings, numbers)
+ * instead of AST objects.
+ *
+ * @deprecated Use typed values directly
  */
 export function unwrap(val) {
-  if (val === null) return null;
-  if (typeof val === "object") {
-    if (val.word) return val.word;
-    if (val.number !== undefined) return val.number;
-    if (val.string !== undefined) return val.string;
-    if (val.patternVar) return `?${val.patternVar}`;
-    if (val.wildcard) return "*";
-  }
+  // Parser now returns typed values, not AST objects
+  // Just return the value as-is
   return val;
 }
 
 /**
- * Unwrap a quad (4-tuple with wrapped values)
+ * DEPRECATED: Parser now returns typed quads directly
+ *
+ * This function is kept for backward compatibility but is now a passthrough.
+ * Parser returns arrays of typed values, not AST objects.
+ *
+ * @deprecated Use parser output directly
  */
 export function unwrapQuad([e, a, v, c]) {
-  return [unwrap(e), unwrap(a), unwrap(v), unwrap(c)];
+  // Parser now returns typed quads, just return as-is
+  return [e, a, v, c];
 }
 
 /**

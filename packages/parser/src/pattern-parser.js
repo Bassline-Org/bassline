@@ -5,6 +5,13 @@
  * Semantics are handled by the runtime (pattern-words.js).
  *
  * Everything is fundamentally quads: [entity, attribute, value, context]
+ *
+ * Parser now creates typed values:
+ * - Words: new Word("alice")
+ * - Strings: "hello" (primitive)
+ * - Numbers: 42 (primitive)
+ * - Pattern variables: new PatternVar("x")
+ * - Wildcards: WC (singleton)
  */
 
 import {
@@ -23,6 +30,8 @@ import {
   whitespace,
 } from "arcsecond/index.js";
 
+import { PatternVar, WC, Word } from "./types.js";
+
 // ============================================================================
 // Basic Tokens
 // ============================================================================
@@ -40,14 +49,14 @@ const ws = many(wsOrComment);
 // ============================================================================
 
 // Number: 42, -3.14
+// Returns primitive number
 const number = sequenceOf([
   ws,
   possibly(char("-")),
   digits,
   possibly(sequenceOf([char("."), digits]).map(([, decimal]) => decimal)),
 ]).map(([_, sign, whole, decimal]) => {
-  const number = Number((sign ?? "") + whole + (decimal ?? ""));
-  return { number };
+  return Number((sign ?? "") + whole + (decimal ?? ""));
 });
 
 // String: "hello world" with escape sequences
@@ -57,14 +66,15 @@ const stringChar = choice([
   sequenceOf([char("\\"), anyChar]).map(([slash, c]) => slash + c), // Escape sequence
 ]);
 
+// String: "hello world" with escape sequences
+// Returns primitive string
 const string = sequenceOf([
   ws,
   char('"'),
   many(stringChar),
   char('"'),
 ]).map(([_, __, chars, ___]) => {
-  const str = chars.join("");
-  return { string: str };
+  return chars.join("");
 });
 
 const delimiter = choice([
@@ -84,25 +94,31 @@ const wordChars = sequenceOf([
   everyCharUntil(delimiter),
 ]).map(([chars]) => chars.toUpperCase());
 
+// Pattern variable: ?x
+// Returns new PatternVar("x")
 const patternVar = sequenceOf([
   ws,
   char("?"),
   wordChars,
 ]).map(([_, __, chars]) => {
-  return { patternVar: chars };
+  return new PatternVar(chars);
 });
 
+// Wildcard: *
+// Returns WC singleton
 const wild = sequenceOf([ws, char("*")]).map(([_, __]) => {
-  return { wildcard: "*" };
+  return WC;
 });
 
+// Word: alice
+// Returns new Word("alice")
 const word = sequenceOf([
   ws,
   letter.map((c) => c.toUpperCase()),
   wordChars,
 ]).map(([_, start, chars]) => {
-  const word = start + chars;
-  return { word };
+  const wordStr = start + chars;
+  return new Word(wordStr);
 });
 
 const entityId = choice([number, word]);
@@ -118,13 +134,16 @@ const context = choice([wild, word]);
  * A quad is entity, attribute, val, context
  * Entity
  * val can be a compound
+ *
+ * Context is either WC (wildcard) or a Word
+ * We convert WC to null for backward compatibility
  */
 const quad = sequenceOf([
   entityId,
   attribute,
   value,
   context,
-]).map(([e, a, v, c]) => [e, a, v, c.wildcard ? null : c.word]);
+]).map(([e, a, v, c]) => [e, a, v, c instanceof Word ? c : null]);
 
 // Insertions
 

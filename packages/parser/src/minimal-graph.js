@@ -3,9 +3,76 @@
  *
  * Everything is incremental pattern matching over an append-only log.
  * No indexes, no query builders - just patterns watching edges.
+ *
+ * Now supports typed values:
+ * - Words: Normalized identifiers (case-insensitive)
+ * - Strings: Case-sensitive literals
+ * - Numbers: Numeric values
+ * - PatternVars: Variables that match and bind any value
+ * - Wildcards: Match any value without binding
  */
 
 import { v4 as uuid } from "uuid";
+import {
+  isPatternVar,
+  isValidType,
+  isWildcard,
+  isWord,
+  PatternVar,
+  validateType,
+  Wildcard,
+  Word,
+} from "./types.js";
+
+// ============================================================================
+// Typed Value Utilities
+// ============================================================================
+
+/**
+ * Check if two typed values are equal
+ * Handles Words, PatternVars, Wildcards, strings, numbers
+ */
+function valuesEqual(a, b) {
+  validateType(a, "a in valuesEqual");
+  validateType(b, "b in valuesEqual");
+
+  // Words compare by spelling symbol
+  if (isWord(a) && isWord(b)) {
+    return a.spelling === b.spelling;
+  }
+
+  // PatternVars compare by name symbol
+  if (isPatternVar(a) && isPatternVar(b)) {
+    return a.name === b.name;
+  }
+
+  // Wildcards are singletons
+  if (isWildcard(a) && isWildcard(b)) {
+    return true;
+  }
+
+  // Primitives use === (strings, numbers)
+  return a === b;
+}
+
+/**
+ * Normalize a value for use as an index key
+ * Words are indexed by their spelling symbol for efficient lookup
+ */
+function normalizeIndexKey(value) {
+  // Words: use spelling symbol as key
+  if (isWord(value)) {
+    return value.spelling;
+  }
+
+  // PatternVars: use name symbol as key
+  if (isPatternVar(value)) {
+    return value.name;
+  }
+
+  // Wildcard, strings, numbers: use as-is
+  return value;
+}
 
 // ============================================================================
 // Phase 1: Core Data Structure (The Log)
@@ -28,23 +95,39 @@ export class Graph {
 
   /**
    * Add an edge to the graph
-   * @param {*} source - Source node
-   * @param {*} attr - Attribute/relation
-   * @param {*} target - Target node/value
-   * @param {*} context - Context (null = auto-generate)
+   * @param {*} source - Source node (Word, PatternVar, string, number)
+   * @param {*} attr - Attribute/relation (Word, PatternVar, string, number)
+   * @param {*} target - Target node/value (Word, PatternVar, string, number)
+   * @param {*} context - Context (Word, null = auto-generate)
    * @returns {*} Context (handle/identity)
    */
   add(source, attr, target, context = null) {
+    // Validate all values are valid types
+    validateType(source, "Source");
+    validateType(attr, "Attribute");
+    validateType(target, "Target");
+
+    // Context can be null (auto-generate), a Word, or a string for generated IDs
+    if (
+      !(context === null ||
+        context instanceof Word ||
+        typeof context === "string")
+    ) {
+      throw new Error(
+        `Context must be Word, string, or null. Got: ${typeof context}`,
+      );
+    }
+
     // Auto-generate context if null (use UUID for global uniqueness)
     const edgeContext = context ?? `edge:${uuid()}`;
 
-    // Check for existing edge (dedupe by 4-tuple)
+    // Check for existing edge (dedupe by 4-tuple using value equality)
     const existing = this.edges.find(
       (e) =>
-        e.source === source &&
-        e.attr === attr &&
-        e.target === target &&
-        e.context === edgeContext,
+        valuesEqual(e.source, source) &&
+        valuesEqual(e.attr, attr) &&
+        valuesEqual(e.target, target) &&
+        valuesEqual(e.context, edgeContext),
     );
 
     if (existing) {
@@ -142,37 +225,42 @@ export class Graph {
 
     // Index by most specific field (prefer source > attr > target > context)
     // This prevents patterns from being activated by common attributes
+    // Use normalizeIndexKey to handle typed values (Words -> symbols)
     if (sources.size > 0) {
       // Index by source (most selective usually)
       for (const source of sources) {
-        if (!this.sourceIndex.has(source)) {
-          this.sourceIndex.set(source, new Set());
+        const key = normalizeIndexKey(source);
+        if (!this.sourceIndex.has(key)) {
+          this.sourceIndex.set(key, new Set());
         }
-        this.sourceIndex.get(source).add(pattern);
+        this.sourceIndex.get(key).add(pattern);
       }
     } else if (attrs.size > 0) {
       // No source literals, index by attr
       for (const attr of attrs) {
-        if (!this.attrIndex.has(attr)) {
-          this.attrIndex.set(attr, new Set());
+        const key = normalizeIndexKey(attr);
+        if (!this.attrIndex.has(key)) {
+          this.attrIndex.set(key, new Set());
         }
-        this.attrIndex.get(attr).add(pattern);
+        this.attrIndex.get(key).add(pattern);
       }
     } else if (targets.size > 0) {
       // Only target literals, index by target
       for (const target of targets) {
-        if (!this.targetIndex.has(target)) {
-          this.targetIndex.set(target, new Set());
+        const key = normalizeIndexKey(target);
+        if (!this.targetIndex.has(key)) {
+          this.targetIndex.set(key, new Set());
         }
-        this.targetIndex.get(target).add(pattern);
+        this.targetIndex.get(key).add(pattern);
       }
     } else if (contexts.size > 0) {
       // Only context literals, index by context
       for (const context of contexts) {
-        if (!this.contextIndex.has(context)) {
-          this.contextIndex.set(context, new Set());
+        const key = normalizeIndexKey(context);
+        if (!this.contextIndex.has(key)) {
+          this.contextIndex.set(key, new Set());
         }
-        this.contextIndex.get(context).add(pattern);
+        this.contextIndex.get(key).add(pattern);
       }
     } else {
       // No literals at all? Shouldn't happen if hasWildcardsOrVariables() returned false
@@ -188,45 +276,49 @@ export class Graph {
     // Remove from wildcard patterns
     this.wildcardPatterns.delete(pattern);
 
-    // Remove from literal indexes
+    // Remove from literal indexes (use normalized keys)
     const { sources, attrs, targets, contexts } = pattern.getLiteralValues();
 
     for (const source of sources) {
-      const set = this.sourceIndex.get(source);
+      const key = normalizeIndexKey(source);
+      const set = this.sourceIndex.get(key);
       if (set) {
         set.delete(pattern);
         if (set.size === 0) {
-          this.sourceIndex.delete(source);
+          this.sourceIndex.delete(key);
         }
       }
     }
 
     for (const attr of attrs) {
-      const set = this.attrIndex.get(attr);
+      const key = normalizeIndexKey(attr);
+      const set = this.attrIndex.get(key);
       if (set) {
         set.delete(pattern);
         if (set.size === 0) {
-          this.attrIndex.delete(attr);
+          this.attrIndex.delete(key);
         }
       }
     }
 
     for (const target of targets) {
-      const set = this.targetIndex.get(target);
+      const key = normalizeIndexKey(target);
+      const set = this.targetIndex.get(key);
       if (set) {
         set.delete(pattern);
         if (set.size === 0) {
-          this.targetIndex.delete(target);
+          this.targetIndex.delete(key);
         }
       }
     }
 
     for (const context of contexts) {
-      const set = this.contextIndex.get(context);
+      const key = normalizeIndexKey(context);
+      const set = this.contextIndex.get(key);
       if (set) {
         set.delete(pattern);
         if (set.size === 0) {
-          this.contextIndex.delete(context);
+          this.contextIndex.delete(key);
         }
       }
     }
@@ -234,6 +326,7 @@ export class Graph {
 
   /**
    * Get patterns that could potentially match this edge
+   * Uses normalized keys for typed values (Words -> symbols)
    * @private
    */
   getCandidatePatterns(edge) {
@@ -244,32 +337,36 @@ export class Graph {
       candidates.add(p);
     }
 
-    // Include patterns watching for this specific source
-    const sourcePatterns = this.sourceIndex.get(edge.source);
+    // Include patterns watching for this specific source (use normalized key)
+    const sourceKey = normalizeIndexKey(edge.source);
+    const sourcePatterns = this.sourceIndex.get(sourceKey);
     if (sourcePatterns) {
       for (const p of sourcePatterns) {
         candidates.add(p);
       }
     }
 
-    // Include patterns watching for this specific attr
-    const attrPatterns = this.attrIndex.get(edge.attr);
+    // Include patterns watching for this specific attr (use normalized key)
+    const attrKey = normalizeIndexKey(edge.attr);
+    const attrPatterns = this.attrIndex.get(attrKey);
     if (attrPatterns) {
       for (const p of attrPatterns) {
         candidates.add(p);
       }
     }
 
-    // Include patterns watching for this specific target
-    const targetPatterns = this.targetIndex.get(edge.target);
+    // Include patterns watching for this specific target (use normalized key)
+    const targetKey = normalizeIndexKey(edge.target);
+    const targetPatterns = this.targetIndex.get(targetKey);
     if (targetPatterns) {
       for (const p of targetPatterns) {
         candidates.add(p);
       }
     }
 
-    // Include patterns watching for this specific context
-    const contextPatterns = this.contextIndex.get(edge.context);
+    // Include patterns watching for this specific context (use normalized key)
+    const contextKey = normalizeIndexKey(edge.context);
+    const contextPatterns = this.contextIndex.get(contextKey);
     if (contextPatterns) {
       for (const p of contextPatterns) {
         candidates.add(p);
@@ -432,28 +529,28 @@ export class Pattern {
   }
 
   /**
-   * Match a single field with variable binding support
+   * Match a single field with variable binding support (typed values)
    */
   matchField(value, pattern, bindings) {
-    // Wildcard matches anything
-    if (pattern === "*" || pattern === null || pattern === undefined) {
+    if (isWildcard(pattern)) {
       return true;
     }
 
-    // Variable binding
-    if (typeof pattern === "string" && pattern.startsWith("?")) {
-      if (bindings.has(pattern)) {
-        // Variable already bound - check consistency
-        return bindings.get(pattern) === value;
+    // PatternVar - matches anything and binds the value
+    if (isPatternVar(pattern)) {
+      const varKey = `?${pattern.name.description}`;
+      if (bindings.has(varKey)) {
+        // Variable already bound - check consistency using typed equality
+        return valuesEqual(bindings.get(varKey), value);
       } else {
         // New variable - create binding
-        bindings.set(pattern, value);
+        bindings.set(varKey, value);
         return true;
       }
     }
 
-    // Literal match
-    return pattern === value;
+    // Literal match - use typed equality
+    return valuesEqual(value, pattern);
   }
 
   /**

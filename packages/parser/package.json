@@ -12,6 +12,7 @@
         "./interactive": "./src/interactive-runtime.js",
         "./format": "./src/format-results.js",
         "./helpers": "./src/helpers.js",
+        "./types": "./src/types.js",
         "./compute": "./extensions/compute.js",
         "./aggregation": "./extensions/aggregation/index.js",
         "./reified-rules": "./extensions/reified-rules.js",
