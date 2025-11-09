@@ -5,10 +5,10 @@
     "type": "module",
     "module": "src/index.js",
     "exports": {
-        ".": "./src/minimal-graph.js",
-        "./graph": "./src/minimal-graph.js",
+        ".": "./src/algebra/watch.js",
+        "./graph": "./src/algebra/graph.js",
+        "./watch": "./src/algebra/watch.js",
         "./parser": "./src/pattern-parser.js",
-        "./helpers": "./src/helpers.js",
         "./types": "./src/types.js",
         "./compute": "./extensions/compute.js",
         "./aggregation": "./extensions/aggregation/index.js",

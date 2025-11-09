@@ -9,8 +9,41 @@
  * - Wildcards: Universal matchers that don't bind
  */
 
-import { normalize } from "./helpers.js";
+/**
+ * Check if two typed values are equal
+ * Handles Words, PatternVars, Wildcards, strings, numbers
+ */
+export function valuesEqual(a, b) {
+  validateType(a, "a in valuesEqual");
+  validateType(b, "b in valuesEqual");
 
+  // Words compare by spelling symbol
+  if (isWord(a) && isWord(b)) {
+    return a.spelling === b.spelling;
+  }
+
+  // PatternVars compare by name symbol
+  if (isPatternVar(a) && isPatternVar(b)) {
+    return a.name === b.name;
+  }
+
+  // Wildcards are singletons
+  if (isWildcard(a) && isWildcard(b)) {
+    return true;
+  }
+
+  // Primitives use === (strings, numbers)
+  return a === b;
+}
+/**
+ * Normalize a key to uppercase for case-insensitive lookups
+ */
+export function normalize(key) {
+  if (typeof key === "symbol") {
+    return key.description.toUpperCase();
+  }
+  return key.toUpperCase();
+}
 /**
  * Word - Normalized identifier/symbol
  *

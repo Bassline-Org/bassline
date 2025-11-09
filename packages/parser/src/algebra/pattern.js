@@ -3,10 +3,10 @@ import {
     isWildcard,
     PatternVar,
     validateType,
+    valuesEqual,
     variable as v,
     WC,
 } from "../types.js";
-import { valuesEqual } from "../minimal-graph.js";
 
 export class PatternQuad {
     constructor(entity, attribute, value, group = WC) {
