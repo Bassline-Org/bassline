@@ -1,15 +1,12 @@
-import { Quad, quad as q } from "./quad.js";
+import { Quad } from "./quad.js";
 import {
     isWildcard,
     PatternVar,
-    serialize,
     validateType,
     variable as v,
     WC,
-    word as w,
 } from "../types.js";
 import { valuesEqual } from "../minimal-graph.js";
-import { Graph, union } from "./graph.js";
 
 export class PatternQuad {
     constructor(entity, attribute, value, group = WC) {
