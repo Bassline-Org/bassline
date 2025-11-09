@@ -1,14 +1,6 @@
 import { Graph } from "./graph.js";
-import { pattern, patternQuad, rewrite } from "./pattern.js";
-import {
-    hash,
-    isWildcard,
-    PatternVar,
-    serialize,
-    variable as v,
-    word as w,
-} from "../types.js";
-import { quad as q } from "./quad.js";
+import { rewrite } from "./pattern.js";
+import { hash, isWildcard, PatternVar } from "../types.js";
 
 export class WatchedGraph extends Graph {
     constructor(...quads) {
@@ -252,43 +244,4 @@ export class WatchedGraph extends Graph {
             this.unindexRule(rule); // Remove from activation indexes
         };
     }
-}
-
-const graph = new WatchedGraph();
-const mutualLike = pattern(
-    patternQuad(v("X"), w("likes"), v("Y")),
-    patternQuad(v("Y"), w("likes"), v("X")),
-);
-// Rule 1: Detect reciprocal likes → mutual-like
-graph.watch({
-    pattern: mutualLike,
-    production: (
-        match,
-    ) => [q(match.get("X"), w("mutual-like"), match.get("Y"))],
-});
-
-// Rule 2: mutual-like → friend (cascades!)
-graph.watch({
-    pattern: pattern(patternQuad(v("X"), w("mutual-like"), v("Y"))),
-    production: (match) => [q(match.get("X"), w("friend"), match.get("Y"))],
-});
-
-console.log(`\nIndexing status after adding rules:`);
-console.log(`Total rules: ${graph.rules.size}`);
-console.log(`Wildcard rules: ${graph.wildcardRules.size}`);
-console.log(`Entity index entries: ${graph.entityIndex.size}`);
-console.log(`Attribute index entries: ${graph.attributeIndex.size}`);
-console.log(`Value index entries: ${graph.valueIndex.size}`);
-console.log(`Group index entries: ${graph.groupIndex.size}\n`);
-
-// Add data - should cascade through both rules
-graph.add(q(w("alice"), w("likes"), w("bob")));
-graph.add(q(w("bob"), w("likes"), w("alice")));
-
-console.log(`\nFinal graph:`);
-for (const quad of graph.quads) {
-    const [entity, attribute, value] = quad.values.slice(0, 3);
-    console.log(
-        `${serialize(entity)} ${serialize(attribute)} ${serialize(value)}`,
-    );
 }

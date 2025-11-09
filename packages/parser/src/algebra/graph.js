@@ -30,17 +30,19 @@ export class Graph {
         return this._quads.has(quad.hash());
     }
     add(quad) {
-        if (this.has(quad)) {
+        const h = quad.hash();  // Compute hash once
+        if (this._quads.has(h)) {
             return this;
         }
-        this._quads.set(quad.hash(), quad);
+        this._quads.set(h, quad);
         return this;
     }
     remove(quad) {
-        if (!this.has(quad)) {
+        const h = quad.hash();  // Compute hash once
+        if (!this._quads.has(h)) {
             return this;
         }
-        this._quads.delete(quad.hash());
+        this._quads.delete(h);
         return this;
     }
     static fromArray(quads) {

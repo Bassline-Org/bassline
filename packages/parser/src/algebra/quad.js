@@ -1,5 +1,7 @@
 import { hash, Word, word as w } from "../types.js";
-import { v4 } from "uuid";
+
+// Fast auto-group using incrementing counter instead of UUID
+let groupCounter = 0;
 
 export class Quad {
     constructor(entity, attribute, value, group = autoGroup()) {
@@ -9,9 +11,11 @@ export class Quad {
             quadValue(value, "Value"),
             quadValue(group, "Group"),
         ];
+        // Cache hash on creation for O(1) lookup
+        this._hash = toKey(this.values);
     }
     hash() {
-        return toKey(this.values);
+        return this._hash;
     }
 }
 
@@ -26,7 +30,7 @@ const quadValue = (value, usage = "Value") => {
     throw new Error(`Invalid ${usage}: ${value}`);
 };
 
-export const autoGroup = () => w(`e:${v4()}`);
+export const autoGroup = () => w(`g:${groupCounter++}`);
 
 export const quad = (entity, attribute, value, group) =>
     new Quad(entity, attribute, value, group);
