@@ -16,6 +16,8 @@
     "@bassline/core": "workspace:*",
     "@bassline/devtools": "workspace:*",
     "@bassline/functions": "workspace:*",
+    "@bassline/parser": "workspace:*",
+    "@bassline/parser-react": "workspace:*",
     "@bassline/react": "workspace:*",
     "@bassline/refs": "workspace:*",
     "@bassline/registry": "workspace:*",

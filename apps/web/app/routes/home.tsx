@@ -46,6 +46,20 @@ export default function Home() {
                             <Button variant="default">Open REPL</Button>
                         </div>
                     </Link>
+
+                    {/* Graph Visualization */}
+                    <Link to="/graph-viz" className="block">
+                        <div className="border border-green-200 rounded-lg p-6 hover:border-green-300 hover:shadow-lg transition-all bg-green-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                🕸️ Graph Visualization
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Real-time graph visualization with React Flow -
+                                watch quads update live
+                            </p>
+                            <Button variant="default">Open Graph</Button>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>

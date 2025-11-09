@@ -16,6 +16,9 @@ type Pages = {
   "/spreadsheet": {
     params: {};
   };
+  "/graph-viz": {
+    params: {};
+  };
   "/home": {
     params: {};
   };
@@ -27,11 +30,15 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/spreadsheet" | "/home" | "/repl";
+    page: "/" | "/spreadsheet" | "/graph-viz" | "/home" | "/repl";
   };
   "routes/spreadsheet.tsx": {
     id: "routes/spreadsheet";
     page: "/spreadsheet";
+  };
+  "routes/graph-viz.tsx": {
+    id: "routes/graph-viz";
+    page: "/graph-viz";
   };
   "routes/home.tsx": {
     id: "routes/home";

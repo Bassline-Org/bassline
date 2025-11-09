@@ -20,7 +20,8 @@
         "./algebra/watch": "./src/algebra/watch.js",
         "./algebra/pattern": "./src/algebra/pattern.js",
         "./algebra/quad": "./src/algebra/quad.js",
-        "./algebra/reified-rules": "./src/algebra/reified-rules.js"
+        "./algebra/reified-rules": "./src/algebra/reified-rules.js",
+        "./algebra/instrument": "./src/algebra/instrument.js"
     },
     "dependencies": {
       "arcsecond": "^5.0.0",
