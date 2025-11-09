@@ -207,7 +207,7 @@ export class WatchedGraph extends Graph {
             for (const entry of this.matches) {
                 const { match, production } = entry;
                 match.tryComplete(currentQuad);
-                if (match.isComplete()) {
+                if (match.isComplete() && match.checkNAC()) {
                     const productions = production(match);
                     this.matches.delete(entry);
                     queue.push(...productions);
@@ -220,7 +220,8 @@ export class WatchedGraph extends Graph {
                 const { pattern, production } = rule;
                 const match = pattern.match(currentQuad);
                 if (match) {
-                    if (match.isComplete()) {
+                    match.graph = this;
+                    if (match.isComplete() && match.checkNAC()) {
                         const productions = production(match);
                         queue.push(...productions);
                     } else {

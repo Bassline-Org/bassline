@@ -58,6 +58,20 @@ export class Pattern {
             }
             throw new Error(`Invalid quad: ${quad}`);
         });
+        this.nacQuads = [];
+    }
+
+    setNAC(...nacQuads) {
+        this.nacQuads = nacQuads.map((quad) => {
+            if (quad instanceof PatternQuad) {
+                return quad;
+            }
+            if (quad instanceof Quad) {
+                return new PatternQuad(...quad.values);
+            }
+            throw new Error(`Invalid NAC quad: ${quad}`);
+        });
+        return this;
     }
 
     /**
@@ -92,6 +106,7 @@ export class Match {
         this.pattern = pattern;
         this.quads = [];
         this.matchedPatternQuads = new Set();
+        this.graph = null;
     }
     get(key) {
         let normalKey = key;
@@ -105,6 +120,30 @@ export class Match {
     }
     isComplete() {
         return this.matchedPatternQuads.size === this.pattern.quads.length;
+    }
+    checkNAC() {
+        if (!this.pattern.nacQuads?.length || !this.graph) {
+            return true;
+        }
+
+        // For each NAC pattern quad
+        for (const nacQuad of this.pattern.nacQuads) {
+            // Scan all quads in graph (quads getter returns array)
+            for (const quad of this.graph.quads) {
+                // Use existing callback pattern from PatternQuad.match()
+                // PatternQuad already handles binding copy/undo internally
+                let matched = false;
+                nacQuad.match(quad, this.bindings, () => {
+                    matched = true;
+                });
+
+                if (matched) {
+                    return false; // NAC violated - this quad exists
+                }
+            }
+        }
+
+        return true; // No NAC patterns matched
     }
     tryComplete(sourceQuad) {
         for (let i = 0; i < this.pattern.quads.length; i++) {
@@ -134,8 +173,9 @@ export const matchGraph = (sourceGraph, pattern) => {
     for (const quad of sourceGraph.quads) {
         const match = pattern.match(quad);
         if (match) {
+            match.graph = sourceGraph;
             match.extendGraph(sourceGraph);
-            if (match.isComplete()) {
+            if (match.isComplete() && match.checkNAC()) {
                 matches.push(match);
             }
         }
