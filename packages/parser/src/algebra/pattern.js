@@ -106,7 +106,6 @@ export class Match {
         this.pattern = pattern;
         this.quads = [];
         this.matchedPatternQuads = new Set();
-        this.graph = null;
     }
     get(key) {
         let normalKey = key;
@@ -121,15 +120,21 @@ export class Match {
     isComplete() {
         return this.matchedPatternQuads.size === this.pattern.quads.length;
     }
-    checkNAC() {
-        if (!this.pattern.nacQuads?.length || !this.graph) {
+    checkNAC(quadIndex) {
+        if (!this.pattern.nacQuads?.length || !quadIndex) {
             return true;
         }
 
         // For each NAC pattern quad
         for (const nacQuad of this.pattern.nacQuads) {
-            // Scan all quads in graph (quads getter returns array)
-            for (const quad of this.graph.quads) {
+            // Get candidate quads from index (O(1) lookup)
+            const candidates = quadIndex.getCandidateQuads(
+                nacQuad,
+                this.bindings,
+            );
+
+            // Check only candidates instead of all quads
+            for (const quad of candidates) {
                 // Use existing callback pattern from PatternQuad.match()
                 // PatternQuad already handles binding copy/undo internally
                 let matched = false;
@@ -162,6 +167,12 @@ export class Match {
         if (this.isComplete()) return this;
         for (const quad of sourceGraph.quads) {
             this.tryComplete(quad);
+
+            // Early exit if NAC violated during extension
+            if (!this.checkNAC(sourceGraph)) {
+                return this;
+            }
+
             if (this.isComplete()) return this;
         }
         return this;
@@ -173,9 +184,15 @@ export const matchGraph = (sourceGraph, pattern) => {
     for (const quad of sourceGraph.quads) {
         const match = pattern.match(quad);
         if (match) {
-            match.graph = sourceGraph;
+            // Check NAC immediately (don't waste time extending doomed matches)
+            if (!match.checkNAC(sourceGraph)) {
+                continue;
+            }
+
             match.extendGraph(sourceGraph);
-            if (match.isComplete() && match.checkNAC()) {
+
+            // Check NAC again after extension (may have become violated during extension)
+            if (match.isComplete() && match.checkNAC(sourceGraph)) {
                 matches.push(match);
             }
         }

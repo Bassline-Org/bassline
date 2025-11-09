@@ -14,6 +14,12 @@ export class WatchedGraph extends Graph {
         this.valueIndex = new Map();
         this.groupIndex = new Map();
         this.wildcardRules = new Set(); // Rules with no literals
+
+        // Quad indexes for NAC checking (hash → Set<Quad>)
+        this.entityQuadIndex = new Map();
+        this.attributeQuadIndex = new Map();
+        this.valueQuadIndex = new Map();
+        this.groupQuadIndex = new Map();
     }
 
     // Extract all literal values from all pattern quads
@@ -150,6 +156,72 @@ export class WatchedGraph extends Graph {
         }
     }
 
+    // Add quad to all position indexes for NAC candidate lookup
+    indexQuad(quad) {
+        const [entity, attribute, value, group] = quad.values;
+
+        // Helper to add to index
+        const addToIndex = (index, key, quad) => {
+            if (!index.has(key)) {
+                index.set(key, new Set());
+            }
+            index.get(key).add(quad);
+        };
+
+        addToIndex(this.entityQuadIndex, hash(entity), quad);
+        addToIndex(this.attributeQuadIndex, hash(attribute), quad);
+        addToIndex(this.valueQuadIndex, hash(value), quad);
+        addToIndex(this.groupQuadIndex, hash(group), quad);
+    }
+
+    // Get quads that could match a NAC pattern (O(1) lookup via indexes)
+    getCandidateQuads(patternQuad, bindings = {}) {
+        const [entity, attribute, value, group] = patternQuad.values;
+
+        // Resolve pattern values (variables → bound values, wildcards → null)
+        const resolve = (val) => {
+            if (isWildcard(val)) return null;
+            if (val instanceof PatternVar) {
+                return bindings[val.name] ?? null;
+            }
+            return val;
+        };
+
+        const e = resolve(entity);
+        const a = resolve(attribute);
+        const v = resolve(value);
+        const g = resolve(group);
+
+        // Collect candidate sets from indexes
+        const candidateSets = [];
+        if (e) candidateSets.push(this.entityQuadIndex.get(hash(e)));
+        if (a) candidateSets.push(this.attributeQuadIndex.get(hash(a)));
+        if (v) candidateSets.push(this.valueQuadIndex.get(hash(v)));
+        if (g) candidateSets.push(this.groupQuadIndex.get(hash(g)));
+
+        // Filter out undefined sets
+        const validSets = candidateSets.filter((s) => s !== undefined);
+
+        // No literals → must check all quads
+        if (validSets.length === 0) {
+            return new Set(this.quads);
+        }
+
+        // Intersect sets for maximum selectivity
+        // Start with smallest set for efficiency
+        validSets.sort((a, b) => a.size - b.size);
+        const smallest = validSets[0];
+
+        const candidates = new Set();
+        for (const quad of smallest) {
+            if (validSets.every((set) => set.has(quad))) {
+                candidates.add(quad);
+            }
+        }
+
+        return candidates;
+    }
+
     // Get rules that could potentially match this quad (O(1) lookup)
     getCandidateRules(quad) {
         const candidates = new Set();
@@ -202,12 +274,22 @@ export class WatchedGraph extends Graph {
             const currentQuad = queue.shift();
 
             super.add(currentQuad);
+            this.indexQuad(currentQuad);
 
             // Process existing partial matches
             for (const entry of this.matches) {
                 const { match, production } = entry;
+                const wasComplete = match.isComplete();
                 match.tryComplete(currentQuad);
-                if (match.isComplete() && match.checkNAC()) {
+
+                // Check NAC after ANY state change (reject doomed matches immediately)
+                if (!match.checkNAC(this)) {
+                    this.matches.delete(entry);
+                    continue;
+                }
+
+                // Only fire production if newly complete
+                if (match.isComplete() && !wasComplete) {
                     const productions = production(match);
                     this.matches.delete(entry);
                     queue.push(...productions);
@@ -220,8 +302,12 @@ export class WatchedGraph extends Graph {
                 const { pattern, production } = rule;
                 const match = pattern.match(currentQuad);
                 if (match) {
-                    match.graph = this;
-                    if (match.isComplete() && match.checkNAC()) {
+                    // Check NAC immediately (even for partial matches!)
+                    if (!match.checkNAC(this)) {
+                        continue; // Reject doomed match, don't add to this.matches
+                    }
+
+                    if (match.isComplete()) {
                         const productions = production(match);
                         queue.push(...productions);
                     } else {
