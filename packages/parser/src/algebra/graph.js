@@ -48,69 +48,6 @@ export class Graph {
     }
 }
 
-export class DiffGraph extends Graph {
-    constructor(baseGraph) {
-        super();
-        this.baseGraph = baseGraph;
-        this.additions = new Graph();
-        this.removals = new Graph();
-    }
-    add(quad) {
-        if (this.removals.has(quad)) {
-            this.removals.remove(quad);
-            return this;
-        }
-        this.additions.add(quad);
-        return this;
-    }
-    remove(quad) {
-        if (this.additions.has(quad)) {
-            this.additions.remove(quad);
-            return this;
-        }
-        this.removals.add(quad);
-        return this;
-    }
-    get(key) {
-        return this.additions.get(key) ?? this.baseGraph.get(key);
-    }
-    has(quad) {
-        return this.additions.has(quad) || this.baseGraph.has(quad);
-    }
-    keys() {
-        return [...this.additions.keys(), ...this.baseGraph.keys()];
-    }
-    get size() {
-        return this.baseGraph.size + this.additions.size - this.removals.size;
-    }
-    get quads() {
-        return [...this.additions.quads, ...this.baseGraph.quads];
-    }
-    apply() {
-        for (const quad of this.additions.quads) {
-            this.baseGraph.add(quad);
-        }
-        for (const quad of this.removals.quads) {
-            this.baseGraph.remove(quad);
-        }
-        delete this.additions;
-        delete this.removals;
-        return this.baseGraph;
-    }
-}
-
-export class MutableGraph extends Graph {
-    constructor(...quads) {
-        super(...quads);
-    }
-    tx() {
-        return new DiffGraph(this);
-    }
-}
-
-export const mutableGraph = (...quads) => new MutableGraph(...quads);
-export const diffGraph = (baseGraph) => new DiffGraph(baseGraph);
-
 export const union = (...graphs) => {
     const quads = graphs.flatMap((graph) => graph.quads);
     return Graph.fromArray(quads);

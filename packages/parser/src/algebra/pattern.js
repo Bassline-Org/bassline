@@ -9,13 +9,7 @@ import {
     word as w,
 } from "../types.js";
 import { valuesEqual } from "../minimal-graph.js";
-import {
-    difference,
-    Graph,
-    intersection,
-    mutableGraph,
-    union,
-} from "./graph.js";
+import { Graph, union } from "./graph.js";
 
 export class PatternQuad {
     constructor(entity, attribute, value, group = WC) {
@@ -99,19 +93,9 @@ export class Match {
     constructor(pattern, bindings) {
         this.bindings = bindings;
         this.pattern = pattern;
-        this.completed = false;
         this.quads = [];
-        this.variables = new Set();
         this.matchedPatternQuads = new Set();
-        for (const quad of pattern.quads) {
-            for (const value of quad.values) {
-                if (value instanceof PatternVar) {
-                    this.variables.add(value.name);
-                }
-            }
-        }
     }
-
     get(key) {
         let normalKey = key;
         if (typeof key === "string") {
@@ -122,58 +106,39 @@ export class Match {
         }
         return this.bindings[normalKey];
     }
-
-    complete() {
-        if (this.completed) {
-            return true;
-        }
-        if (this.matchedPatternQuads.size !== this.pattern.quads.length) {
-            return false;
-        }
-        for (const variable of this.variables) {
-            if (!this.bindings[variable]) {
-                return false;
-            }
-        }
-        this.completed = true;
-        return true;
+    isComplete() {
+        return this.matchedPatternQuads.size === this.pattern.quads.length;
     }
-
     tryComplete(sourceQuad) {
         for (let i = 0; i < this.pattern.quads.length; i++) {
             if (this.matchedPatternQuads.has(i)) continue;
-
             const quad = this.pattern.quads[i];
             quad.match(sourceQuad, this.bindings, (matchedQuad, bindings) => {
                 this.quads.push(matchedQuad);
                 this.bindings = { ...this.bindings, ...bindings };
                 this.matchedPatternQuads.add(i);
             });
-
-            if (this.complete()) return true;
+            if (this.isComplete()) return true;
         }
         return false;
     }
-
     extendGraph(sourceGraph) {
-        if (this.completed) return this;
-
+        if (this.isComplete()) return this;
         for (const quad of sourceGraph.quads) {
             this.tryComplete(quad);
-            if (this.completed) return this;
+            if (this.isComplete()) return this;
         }
-
         return this;
     }
 }
 
-const matchGraph = (sourceGraph, pattern) => {
+export const matchGraph = (sourceGraph, pattern) => {
     const matches = [];
     for (const quad of sourceGraph.quads) {
         const match = pattern.match(quad);
         if (match) {
             match.extendGraph(sourceGraph);
-            if (match.completed) {
+            if (match.isComplete()) {
                 matches.push(match);
             }
         }
@@ -181,78 +146,78 @@ const matchGraph = (sourceGraph, pattern) => {
     return matches;
 };
 
-const rewrite = (sourceGraph, rules) => {
+export const rewrite = (sourceGraph, rules) => {
     return rules.flatMap(({ pattern, production }) => {
         return matchGraph(sourceGraph, pattern)
-            .map((match) => production(match));
+            .flatMap((match) => {
+                const result = production(match);
+                return Array.isArray(result) ? result : [result];
+            });
     });
 };
 
 export const patternQuad = (entity, attribute, value, group) =>
     new PatternQuad(entity, attribute, value, group);
-
 export const pattern = (...quads) => new Pattern(...quads);
 
 const pq = patternQuad;
-function test() {
-    const a = new Graph(
-        q(
-            w("alice"),
-            w("likes"),
-            w("bob"),
-        ),
-        q(
-            w("bob"),
-            w("likes"),
-            w("alice"),
-        ),
-    );
-    const b = new Graph(
-        q(
-            w("carol"),
-            w("likes"),
-            w("dave"),
-        ),
-    );
+// function test() {
+//     const a = new Graph(
+//         q(
+//             w("alice"),
+//             w("likes"),
+//             w("bob"),
+//         ),
+//         q(
+//             w("bob"),
+//             w("likes"),
+//             w("alice"),
+//         ),
+//     );
+//     const b = new Graph(
+//         q(
+//             w("carol"),
+//             w("likes"),
+//             w("dave"),
+//         ),
+//     );
 
-    const mutualLike = new Pattern(
-        pq(
-            v("X"),
-            w("likes"),
-            v("Y"),
-        ),
-        pq(
-            v("Y"),
-            w("likes"),
-            v("X"),
-        ),
-    );
-    const merge = union(a, b);
+//     const mutualLike = new Pattern(
+//         pq(
+//             v("X"),
+//             w("likes"),
+//             v("Y"),
+//         ),
+//         pq(
+//             v("Y"),
+//             w("likes"),
+//             v("X"),
+//         ),
+//     );
+//     const merge = union(a, b);
 
-    const mutable = mutableGraph(...merge.quads);
-    const tx = mutable.tx();
-    const productions = rewrite(tx, [
-        {
-            pattern: mutualLike,
-            production: (match) => {
-                return q(
-                    match.get("X"),
-                    w("mutual-like"),
-                    match.get("Y"),
-                );
-            },
-        },
-    ]);
-    for (const production of productions) {
-        tx.add(production);
-    }
-    tx.apply();
-    for (const quad of mutable.quads) {
-        const [entity, attribute, value] = quad.values.slice(0, 3);
-        console.log(
-            `${serialize(entity)} ${serialize(attribute)} ${serialize(value)}`,
-        );
-    }
-}
+//     const mutable = new Graph(...merge.quads);
+//     const productions = rewrite(mutable, [
+//         {
+//             pattern: mutualLike,
+//             production: (match) => {
+//                 return q(
+//                     match.get("X"),
+//                     w("mutual-like"),
+//                     match.get("Y"),
+//                 );
+//             },
+//         },
+//     ]);
+//     for (const production of productions) {
+//         mutable.add(production);
+//     }
+//     for (const quad of mutable.quads) {
+//         const [entity, attribute, value] = quad.values.slice(0, 3);
+//         console.log(
+//             `${serialize(entity)} ${serialize(attribute)} ${serialize(value)}`,
+//         );
+//     }
+// }
 
-test();
+// test();
