@@ -1,12 +1,12 @@
 /**
- * Pattern Parser - Simple tokenizer for pattern matching DSL
+ * Pattern Parser - Function-Emitting DSL Parser
  *
- * Like parser.js, this is primarily a tokenizer that identifies structures.
- * Semantics are handled by the runtime (pattern-words.js).
+ * Parses pattern matching DSL and emits executable functions.
+ * Each command returns (graph) => { ... } for direct execution.
  *
  * Everything is fundamentally quads: [entity, attribute, value, context]
  *
- * Parser now creates typed values:
+ * Parser creates typed values:
  * - Words: new Word("alice")
  * - Strings: "hello" (primitive)
  * - Numbers: 42 (primitive)
@@ -29,8 +29,60 @@ import {
   str,
   whitespace,
 } from "arcsecond/index.js";
+import { PatternVar, WC, Word, word as w, isWildcard } from "./types.js";
+import { pattern, patternQuad as pq, matchGraph } from "./algebra/pattern.js";
+import { quad as q } from "./algebra/quad.js";
 
-import { PatternVar, WC, Word } from "./types.js";
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Convert array to PatternQuad
+ */
+function toPatternQuad([e, a, v, c]) {
+  return pq(e, a, v, c ?? WC);
+}
+
+/**
+ * Build pattern from array of quads
+ */
+function buildPattern(quads, nacQuads = []) {
+  const p = pattern(...quads.map(toPatternQuad));
+  if (nacQuads.length > 0) {
+    p.setNAC(...nacQuads.map(toPatternQuad));
+  }
+  return p;
+}
+
+/**
+ * Serialize pattern quad array to string for reified rules
+ */
+function serializePattern(quads) {
+  return quads.map(([e, a, v, c]) => {
+    const parts = [e, a, v, c ?? WC].map(val => {
+      if (val instanceof PatternVar) return `?${val.name.description}`;
+      if (val instanceof Word) return val.spelling.description;
+      if (isWildcard(val)) return "*";
+      if (typeof val === "string") return `"${val}"`;
+      return String(val);
+    });
+    return parts.join(" ");
+  }).join(" ");
+}
+
+/**
+ * Substitute variables in production template
+ */
+function substitute(val, match) {
+  if (val?.constructor?.name === "PatternVar") {
+    return match.get(val.name) ?? val;
+  }
+  if (isWildcard(val)) {
+    return undefined;
+  }
+  return val;
+}
 
 // ============================================================================
 // Basic Tokens
@@ -187,9 +239,12 @@ const insert = sequenceOf([
     quad.map((q) => [q]),
   ])),
   closeBracket,
-]).map(([_, __, entries]) => ({
-  insert: entries.flat(),
-}));
+]).map(([_, __, entries]) => {
+  const quads = entries.flat();
+  return (graph) => {
+    quads.forEach(([e, a, v, c]) => graph.add(q(e, a, v, c)));
+  };
+});
 
 // Patterns
 const patternChoice = (parser) => choice([wild, patternVar, parser]);
@@ -234,12 +289,15 @@ const namedPattern = sequenceOf([
     patternQuad.map((q) => [q]),
   ])),
   closeBracket,
-]).map(([_, name, __, patterns, ___]) => ({
-  pattern: {
-    name,
-    patterns: patterns.flat(),
-  },
-}));
+]).map(([_, name, __, patterns, ___]) => {
+  const quads = patterns.flat();
+
+  return (graph) => {
+    // Store named pattern as reified pattern
+    graph.add(q(name, w("TYPE"), w("PATTERN!"), w("system")));
+    graph.add(q(name, w("pattern"), w(serializePattern(quads)), name));
+  };
+});
 
 const patternRef = sequenceOf([
   cmd("<"),
@@ -284,13 +342,32 @@ const query = sequenceOf([
   where,
   possibly(not),
   possibly(produce),
-]).map(([_, { where }, not, produce]) => ({
-  query: {
-    where,
-    not: not?.not ?? [],
-    produce: produce?.produce ?? [],
-  },
-}));
+]).map(([_, { where }, not, produce]) => {
+  const whereQuads = where;
+  const notQuads = not?.not ?? [];
+  const produceQuads = produce?.produce ?? [];
+
+  return (graph) => {
+    const p = buildPattern(whereQuads, notQuads);
+    const results = matchGraph(graph, p);
+
+    // If there's a produce clause, insert quads for each match
+    if (produceQuads.length > 0) {
+      results.forEach(match => {
+        produceQuads.forEach(([e, a, v, c]) => {
+          graph.add(q(
+            substitute(e, match),
+            substitute(a, match),
+            substitute(v, match),
+            substitute(c, match)
+          ));
+        });
+      });
+    }
+
+    return results;
+  };
+});
 
 // Rules
 const rule = sequenceOf([
@@ -299,14 +376,26 @@ const rule = sequenceOf([
   where,
   possibly(not),
   produce,
-]).map(([_, name, { where }, not, { produce }]) => ({
-  rule: {
-    name,
-    where,
-    not: not?.not ?? [],
-    produce,
-  },
-}));
+]).map(([_, name, { where }, not, { produce }]) => {
+  const whereQuads = where;
+  const notQuads = not?.not ?? [];
+  const produceQuads = produce;
+
+  return (graph) => {
+    // Insert reified rule definition as edges
+    graph.add(q(name, w("TYPE"), w("RULE!"), w("system")));
+    graph.add(q(name, w("matches"), w(serializePattern(whereQuads)), name));
+
+    if (notQuads.length > 0) {
+      graph.add(q(name, w("nac"), w(serializePattern(notQuads)), name));
+    }
+
+    graph.add(q(name, w("produces"), w(serializePattern(produceQuads)), name));
+
+    // Activate rule
+    graph.add(q(name, w("memberOf"), w("rule"), w("system")));
+  };
+});
 
 const program = many(choice([insert, rule, query, namedPattern]));
 export function parseProgram(input) {

@@ -2,6 +2,43 @@
 
 This directory contains performance benchmarks for the algebra-based pattern matching system.
 
+## Quick Start
+
+```javascript
+import { WatchedGraph } from '@bassline/parser/algebra/watch';
+import { pattern, patternQuad, matchGraph } from '@bassline/parser/algebra/pattern';
+import { quad as q } from '@bassline/parser/algebra/quad';
+import { word as w, variable as v, WC } from '@bassline/parser/types';
+import { installReifiedRules, getActiveRules } from '@bassline/parser/algebra/reified-rules';
+
+// Create graph
+const g = new WatchedGraph();
+
+// Add data
+g.add(q(w("alice"), w("age"), 30));
+g.add(q(w("bob"), w("age"), 25));
+
+// Pattern matching
+const results = matchGraph(g, pattern(
+  patternQuad(v("person"), w("age"), v("age"), WC)
+));
+console.log(`Found ${results.length} people`);
+
+// Reactive rules
+installReifiedRules(g);
+
+// Define rule as edges
+g.add(q(w("ADULT-CHECK"), w("TYPE"), w("RULE!"), w("system")));
+g.add(q(w("ADULT-CHECK"), w("matches"), w("?p age ?a *"), w("ADULT-CHECK")));
+g.add(q(w("ADULT-CHECK"), w("produces"), w("?p adult true *"), w("ADULT-CHECK")));
+
+// Activate rule
+g.add(q(w("ADULT-CHECK"), w("memberOf"), w("rule"), w("system")));
+
+// Check results
+console.log("Active rules:", getActiveRules(g));
+```
+
 ## Available Benchmarks
 
 ### Core Performance

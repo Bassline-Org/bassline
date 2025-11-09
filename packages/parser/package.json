@@ -8,9 +8,6 @@
         ".": "./src/minimal-graph.js",
         "./graph": "./src/minimal-graph.js",
         "./parser": "./src/pattern-parser.js",
-        "./runtime": "./src/pattern-words.js",
-        "./interactive": "./src/interactive-runtime.js",
-        "./format": "./src/format-results.js",
         "./helpers": "./src/helpers.js",
         "./types": "./src/types.js",
         "./compute": "./extensions/compute.js",
@@ -19,7 +16,11 @@
         "./io-effects": "./extensions/io-effects.js",
         "./io-effects-builtin": "./extensions/io-effects-builtin.js",
         "./io-effects-node": "./extensions/io-effects-node.js",
-        "./io-effects-all": "./extensions/io-effects-all.js"
+        "./io-effects-all": "./extensions/io-effects-all.js",
+        "./algebra/watch": "./src/algebra/watch.js",
+        "./algebra/pattern": "./src/algebra/pattern.js",
+        "./algebra/quad": "./src/algebra/quad.js",
+        "./algebra/reified-rules": "./src/algebra/reified-rules.js"
     },
     "dependencies": {
       "arcsecond": "^5.0.0",
