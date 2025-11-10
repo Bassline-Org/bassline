@@ -26,119 +26,80 @@
 
 export const builtinIOOperations = {
   binary: {
-    ADD: {
+    add: {
       compute: (x, y) => x + y,
       arity: "binary",
       operationType: "arithmetic",
-      doc: "Binary addition (x + y). Inputs: X, Y"
+      doc: "Binary addition (x + y). Inputs: X, Y",
     },
-    SUBTRACT: {
+    subtract: {
       compute: (x, y) => x - y,
       arity: "binary",
       operationType: "arithmetic",
-      doc: "Binary subtraction (x - y). Inputs: X, Y"
+      doc: "Binary subtraction (x - y). Inputs: X, Y",
     },
-    MULTIPLY: {
+    multiply: {
       compute: (x, y) => x * y,
       arity: "binary",
       operationType: "arithmetic",
-      doc: "Binary multiplication (x * y). Inputs: X, Y"
+      doc: "Binary multiplication (x * y). Inputs: X, Y",
     },
-    DIVIDE: {
+    divide: {
       compute: (x, y) => x / y,
       arity: "binary",
       operationType: "arithmetic",
-      doc: "Binary division (x / y). Inputs: X, Y"
+      doc: "Binary division (x / y). Inputs: X, Y",
     },
-    MOD: {
+    modulo: {
       compute: (x, y) => x % y,
       arity: "binary",
       operationType: "arithmetic",
-      doc: "Modulo operation (x % y). Inputs: X, Y"
+      doc: "Modulo operation (x % y). Inputs: X, Y",
     },
-    POW: {
+    pow: {
       compute: (x, y) => Math.pow(x, y),
       arity: "binary",
       operationType: "arithmetic",
-      doc: "Power operation (x ** y). Inputs: X, Y"
-    }
+      doc: "Power operation (x ** y). Inputs: X, Y",
+    },
   },
 
   unary: {
-    SQRT: {
+    sqrt: {
       compute: (x) => Math.sqrt(x),
       arity: "unary",
       operationType: "arithmetic",
-      doc: "Square root. Input: VALUE"
+      doc: "Square root. Input: VALUE",
     },
-    ABS: {
+    abs: {
       compute: (x) => Math.abs(x),
       arity: "unary",
       operationType: "arithmetic",
-      doc: "Absolute value. Input: VALUE"
+      doc: "Absolute value. Input: VALUE",
     },
-    FLOOR: {
+    floor: {
       compute: (x) => Math.floor(x),
       arity: "unary",
       operationType: "arithmetic",
-      doc: "Floor function (round down). Input: VALUE"
+      doc: "Floor function (round down). Input: VALUE",
     },
-    CEIL: {
+    ceil: {
       compute: (x) => Math.ceil(x),
       arity: "unary",
       operationType: "arithmetic",
-      doc: "Ceiling function (round up). Input: VALUE"
+      doc: "Ceiling function (round up). Input: VALUE",
     },
-    ROUND: {
+    round: {
       compute: (x) => Math.round(x),
       arity: "unary",
       operationType: "arithmetic",
-      doc: "Round to nearest integer. Input: VALUE"
+      doc: "Round to nearest integer. Input: VALUE",
     },
-    NEGATE: {
+    negate: {
       compute: (x) => -x,
       arity: "unary",
       operationType: "arithmetic",
-      doc: "Negate a number (-x). Input: VALUE"
-    }
+      doc: "Negate a number (-x). Input: VALUE",
+    },
   },
-
-  comparison: {
-    GT: {
-      compute: (l, r) => l > r,
-      arity: "comparison",
-      operationType: "comparison",
-      doc: "Greater than (left > right). Inputs: LEFT, RIGHT"
-    },
-    LT: {
-      compute: (l, r) => l < r,
-      arity: "comparison",
-      operationType: "comparison",
-      doc: "Less than (left < right). Inputs: LEFT, RIGHT"
-    },
-    GTE: {
-      compute: (l, r) => l >= r,
-      arity: "comparison",
-      operationType: "comparison",
-      doc: "Greater than or equal (left >= right). Inputs: LEFT, RIGHT"
-    },
-    LTE: {
-      compute: (l, r) => l <= r,
-      arity: "comparison",
-      operationType: "comparison",
-      doc: "Less than or equal (left <= right). Inputs: LEFT, RIGHT"
-    },
-    EQ: {
-      compute: (l, r) => l === r,
-      arity: "comparison",
-      operationType: "comparison",
-      doc: "Equal (left === right). Inputs: LEFT, RIGHT"
-    },
-    NEQ: {
-      compute: (l, r) => l !== r,
-      arity: "comparison",
-      operationType: "comparison",
-      doc: "Not equal (left !== right). Inputs: LEFT, RIGHT"
-    }
-  }
 };
