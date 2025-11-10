@@ -35,12 +35,10 @@ export function QuadTable({ pattern, events, onInspect }) {
         if (matches.length === 0) return [];
 
         const firstMatch = matches[0];
-        const vars = [];
 
-        // Get all keys from bindings
-        for (const key in firstMatch.bindings) {
-            vars.push(key);
-        }
+        // Bindings use Symbol keys, so we need getOwnPropertySymbols
+        const symbolKeys = Object.getOwnPropertySymbols(firstMatch.bindings);
+        const vars = symbolKeys.map(sym => sym.description);
 
         return vars.sort();
     }, [matches]);
@@ -112,13 +110,12 @@ export function QuadTable({ pattern, events, onInspect }) {
                                 }}
                             >
                                 {variables.map((varName) => {
-                                    const value = match.bindings[varName];
-                                    const valueStr = serialize(value);
+                                    const value = match.get(varName);
 
                                     return (
                                         <td
                                             key={varName}
-                                            onClick={() => onInspect && onInspect(valueStr)}
+                                            onClick={() => onInspect && onInspect(value)}
                                             style={{
                                                 padding: '12px 16px',
                                                 color: '#1e293b',
@@ -129,7 +126,7 @@ export function QuadTable({ pattern, events, onInspect }) {
                                             }}
                                             title={onInspect ? 'Click to inspect' : ''}
                                         >
-                                            {valueStr}
+                                            {serialize(value)}
                                         </td>
                                     );
                                 })}

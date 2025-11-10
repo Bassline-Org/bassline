@@ -25,15 +25,6 @@ import { serialize } from '@bassline/parser/types';
 export function EntityCard({ entityId, events, onInspect, editable = false }) {
     const matches = useEntity(entityId, events);
 
-    console.log(`EntityCard(${entityId}):`, matches.length, 'matches', matches);
-    if (matches.length > 0) {
-        const firstMatch = matches[0];
-        console.log('First match:', firstMatch);
-        console.log('First match.get("attr"):', firstMatch.get('attr'));
-        console.log('First match.get("value"):', firstMatch.get('value'));
-        console.log('First match.bindings:', firstMatch.bindings);
-    }
-
     return (
         <div style={{
             background: 'white',

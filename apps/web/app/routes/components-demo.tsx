@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/components-demo";
 import { createBrowserGraph } from "@bassline/parser/browser";
 import { GraphProvider } from "@bassline/parser-react/hooks";
-import { EntityCard, QuadTable, PatternEditor, Inspector } from "@bassline/parser-react/components";
+import { EntityCard, QuadTable, PatternEditor, Inspector, EntityList, QuadForm, GraphStats } from "@bassline/parser-react/components";
 import { pattern, patternQuad as pq, v, w, q } from "@bassline/parser/algebra";
 
 export function meta({}: Route.MetaArgs) {
@@ -21,7 +21,7 @@ const { graph, events } = createBrowserGraph();
 export default function ComponentsDemo() {
     const [selectedEntity, setSelectedEntity] = useState<any>(w("alice"));
     const [patternMatches, setPatternMatches] = useState<any[]>([]);
-    const [activeTab, setActiveTab] = useState<"entity" | "table" | "editor" | "inspector">("entity");
+    const [activeTab, setActiveTab] = useState<"entity" | "table" | "editor" | "inspector" | "list" | "form" | "stats">("entity");
 
     // Add initial demo data
     useEffect(() => {
@@ -74,7 +74,7 @@ export default function ComponentsDemo() {
                             Graph-Native Components Demo
                         </h1>
                         <p className="text-sm text-slate-600">
-                            Testing Phase 2: EntityCard, QuadTable, PatternEditor, Inspector
+                            Phase 2: View & Navigate | Phase 3: Forms, Lists & Stats
                         </p>
                     </div>
                 </div>
@@ -122,6 +122,36 @@ export default function ComponentsDemo() {
                                 }`}
                             >
                                 Inspector
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("list")}
+                                className={`px-6 py-3 font-medium transition-all ${
+                                    activeTab === "list"
+                                        ? "border-b-2 border-green-500 text-green-600"
+                                        : "text-slate-600 hover:text-slate-900"
+                                }`}
+                            >
+                                EntityList
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("form")}
+                                className={`px-6 py-3 font-medium transition-all ${
+                                    activeTab === "form"
+                                        ? "border-b-2 border-green-500 text-green-600"
+                                        : "text-slate-600 hover:text-slate-900"
+                                }`}
+                            >
+                                QuadForm
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("stats")}
+                                className={`px-6 py-3 font-medium transition-all ${
+                                    activeTab === "stats"
+                                        ? "border-b-2 border-green-500 text-green-600"
+                                        : "text-slate-600 hover:text-slate-900"
+                                }`}
+                            >
+                                GraphStats
                             </button>
                         </div>
                     </div>
@@ -289,6 +319,76 @@ export default function ComponentsDemo() {
                                         console.log("Navigated to:", entity);
                                     }}
                                 />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* EntityList Tab */}
+                    {activeTab === "list" && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-xl font-semibold mb-2">EntityList Component</h2>
+                                <p className="text-sm text-slate-600 mb-6">
+                                    Browse and filter all entities in the graph
+                                </p>
+                            </div>
+
+                            <div className="max-w-2xl">
+                                <EntityList
+                                    events={events}
+                                    onSelect={(entity) => {
+                                        console.log("Selected entity:", entity);
+                                        setSelectedEntity(entity);
+                                        setActiveTab("inspector");
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* QuadForm Tab */}
+                    {activeTab === "form" && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-xl font-semibold mb-2">QuadForm Component</h2>
+                                <p className="text-sm text-slate-600 mb-6">
+                                    Create new quads and add data to the graph
+                                </p>
+                            </div>
+
+                            <div className="max-w-2xl">
+                                <QuadForm
+                                    onSubmit={(quad) => {
+                                        console.log("Quad added:", quad);
+                                    }}
+                                />
+                            </div>
+
+                            <div className="max-w-2xl mt-8 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <h3 className="text-sm font-medium text-green-900 mb-2">
+                                    Try Adding:
+                                </h3>
+                                <ul className="text-sm text-green-800 space-y-1">
+                                    <li>• source: <span className="font-mono">dave</span>, attr: <span className="font-mono">age</span>, target: <span className="font-mono">40</span></li>
+                                    <li>• source: <span className="font-mono">dave</span>, attr: <span className="font-mono">city</span>, target: <span className="font-mono">la</span></li>
+                                    <li>• source: <span className="font-mono">acme</span>, attr: <span className="font-mono">employees</span>, target: <span className="font-mono">150</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* GraphStats Tab */}
+                    {activeTab === "stats" && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-xl font-semibold mb-2">GraphStats Component</h2>
+                                <p className="text-sm text-slate-600 mb-6">
+                                    View graph statistics and metrics
+                                </p>
+                            </div>
+
+                            <div className="max-w-2xl">
+                                <GraphStats events={events} />
                             </div>
                         </div>
                     )}
