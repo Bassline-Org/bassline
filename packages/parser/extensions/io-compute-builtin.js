@@ -7,21 +7,15 @@
  *
  * Usage:
  *   // Binary operation
- *   graph.add("calc1", "X", 10, null);
- *   graph.add("calc1", "Y", 20, null);
- *   graph.add("calc1", "handle", "ADD", "input");
- *   // Result: graph.query(["calc1", "RESULT", "?r", "output"]) => 30
+ *   graph.add(q(w("calc1"), w("x"), 10, w("calc1")));
+ *   graph.add(q(w("calc1"), w("y"), 20, w("calc1")));
+ *   graph.add(q(w("calc1"), w("handle"), w("add"), w("input")));
+ *   // Result: getComputeResult(graph, w("calc1")) => 30
  *
  *   // Unary operation
- *   graph.add("calc2", "VALUE", 16, null);
- *   graph.add("calc2", "handle", "SQRT", "input");
- *   // Result: graph.query(["calc2", "RESULT", "?r", "output"]) => 4
- *
- *   // Comparison operation
- *   graph.add("comp1", "LEFT", 5, null);
- *   graph.add("comp1", "RIGHT", 3, null);
- *   graph.add("comp1", "handle", "GT", "input");
- *   // Result: graph.query(["comp1", "RESULT", "?r", "output"]) => true
+ *   graph.add(q(w("calc2"), w("x"), 16, w("calc2")));
+ *   graph.add(q(w("calc2"), w("handle"), w("sqrt"), w("input")));
+ *   // Result: getComputeResult(graph, w("calc2")) => 4
  */
 
 export const builtinIOOperations = {

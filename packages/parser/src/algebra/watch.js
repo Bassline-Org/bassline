@@ -1,5 +1,5 @@
 import { Graph } from "./graph.js";
-import { rewrite } from "./pattern.js";
+import { matchGraph, rewrite } from "./pattern.js";
 import { hash, isWildcard, PatternVar } from "../types.js";
 
 export class WatchedGraph extends Graph {
@@ -330,5 +330,9 @@ export class WatchedGraph extends Graph {
             this.rules.delete(rule);
             this.unindexRule(rule); // Remove from activation indexes
         };
+    }
+
+    query(pattern) {
+        return matchGraph(this, pattern);
     }
 }

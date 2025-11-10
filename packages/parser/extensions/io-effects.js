@@ -19,20 +19,26 @@
  */
 
 // Import built-in effects (browser-safe only)
-import { builtinIOEffects } from './io-effects-builtin.js';
+import { builtinIOEffects } from "./io-effects-builtin.js";
+import {
+  matchGraph,
+  pattern as pat,
+  patternQuad as pq,
+} from "../src/algebra/pattern.js";
+import { variable as v, WC, word as w } from "../src/types.js";
 
 /**
  * Helper: Get input value from context
  *
  * @param {Graph} graph - The graph instance
- * @param {string} ctx - Context to query
- * @param {string} attr - Attribute to get
- * @param {string} context - Context filter (default: "*")
+ * @param {Word} ctx - Context to query
+ * @param {Word} attr - Attribute to get
+ * @param {Word} context - Context filter (default: WC)
  * @returns {*} Value or undefined
  */
-export function getInput(graph, ctx, attr, context = "*") {
-  const results = graph.query([ctx, attr, "?val", context]);
-  return results[0]?.get("?val");
+export function getInput(graph, ctx, attr, context = WC) {
+  const results = matchGraph(graph, pat(pq(ctx, attr, v("val"), context)));
+  return results[0]?.get("val");
 }
 
 /**
@@ -44,54 +50,49 @@ export function getInput(graph, ctx, attr, context = "*") {
  * @param {object} metadata - Optional metadata (category, docs, etc)
  */
 export function installIOEffect(graph, name, executor, metadata = {}) {
-  const effectName = name.toUpperCase();
+  const effectName = w(name);
 
   // Self-describe in graph
-  graph.add(effectName, "TYPE", "EFFECT", "system");
+  graph.add(q(effectName, w("type"), w("effect!"), w("system")));
   if (metadata.category) {
-    graph.add(effectName, "CATEGORY", metadata.category, "system");
+    graph.add(q(effectName, w("category"), metadata.category, w("system")));
   }
   if (metadata.doc) {
-    graph.add(effectName, "DOCS", metadata.doc, "system");
+    graph.add(q(effectName, w("docs"), metadata.doc, w("system")));
   }
 
   // Mark EFFECT as a type (idempotent)
-  graph.add("EFFECT", "TYPE", "TYPE!", "system");
+  graph.add(q(w("effect!"), w("type"), w("type!"), w("system")));
 
   // Watch for requests in input context
-  const unwatch = graph.watch([
-    ["?ctx", "handle", effectName, "input"],
-  ], async (bindings) => {
-    const ctx = bindings.get("?ctx");
+  const unwatch = graph.watch(
+    {
+      pattern: pat(pq(
+        v("ctx"),
+        w("handle"),
+        effectName,
+        w("input"),
+      )),
+      production: (bindings) => {
+        const ctx = bindings.get("ctx");
 
-    try {
-      // Mark as in-progress (optional)
-      graph.add(effectName, "processing", ctx, "system");
-
-      // Execute - lets executor query graph for inputs
-      const outputs = await executor(graph, ctx);
-
-      // Clear in-progress marker
-      graph.add(effectName, "processing", ctx, "tombstone");
-
-      // Write completion marker to output context
-      graph.add(effectName, "handled", ctx, "output");
-
-      // Write outputs to output context
-      for (const [attr, value] of Object.entries(outputs)) {
-        graph.add(ctx, attr, value, "output");
-      }
-    } catch (error) {
-      // Clear in-progress marker
-      graph.add(effectName, "processing", ctx, "tombstone");
-
-      // Write error to output context
-      graph.add(effectName, "handled", ctx, "output");
-      graph.add(ctx, "ERROR", error.message, "output");
-      graph.add(ctx, "STATUS", "ERROR", "output");
-    }
-  });
-
+        Promise.resolve(executor(graph, ctx)).then((outputs) => {
+          graph.add(q(ctx, w("status"), w("SUCCESS"), w("output")));
+          Object.entries(outputs).forEach(([attr, value]) => {
+            graph.add(q(ctx, attr, value, w("output")));
+          });
+          graph.add(q(effectName, w("handled"), ctx, w("output")));
+        }).catch((error) => {
+          graph.add(q(ctx, w("error"), error.message, w("output")));
+          graph.add(q(ctx, w("status"), w("error"), w("output")));
+          graph.add(q(effectName, w("handled"), ctx, w("output")));
+        });
+        return [
+          q(effectName, w("processing"), ctx, w("system")),
+        ];
+      },
+    },
+  );
   return unwatch;
 }
 
@@ -122,7 +123,10 @@ export function installIOEffects(graph, effects) {
  * Query helper: Check if effect is processing a context
  */
 export function isProcessing(graph, effectName, ctx) {
-  const results = graph.query([effectName, "processing", ctx, "system"]);
+  const results = matchGraph(
+    graph,
+    pat(pq(effectName, w("processing"), ctx, w("system"))),
+  );
   return results.length > 0;
 }
 
@@ -130,15 +134,21 @@ export function isProcessing(graph, effectName, ctx) {
  * Query helper: Get result from output context
  */
 export function getOutput(graph, ctx, attr) {
-  const results = graph.query([ctx, attr, "?value", "output"]);
-  return results.length > 0 ? results[0].get("?value") : null;
+  const results = matchGraph(
+    graph,
+    pat(pq(ctx, attr, v("value"), w("output"))),
+  );
+  return results[0]?.get("value");
 }
 
 /**
  * Query helper: Check if effect has handled a context
  */
 export function isHandled(graph, effectName, ctx) {
-  const results = graph.query([effectName, "handled", ctx, "output"]);
+  const results = matchGraph(
+    graph,
+    pat(pq(effectName, w("handled"), ctx, w("output"))),
+  );
   return results.length > 0;
 }
 
@@ -146,16 +156,21 @@ export function isHandled(graph, effectName, ctx) {
  * Query helper: Find all contexts handled by an effect
  */
 export function getHandledContexts(graph, effectName) {
-  const results = graph.query([effectName, "handled", "?ctx", "output"]);
-  return results.map((b) => b.get("?ctx"));
+  return matchGraph(
+    graph,
+    pat(pq(effectName, w("handled"), v("ctx"), w("output"))),
+  ).map((b) => b.get("ctx"));
 }
 
 /**
  * Query helper: Find all active effects
  */
 export function getActiveEffects(graph) {
-  const results = graph.query(["?effect", "TYPE", "EFFECT", "system"]);
-  return results.map((b) => b.get("?effect"));
+  const results = matchGraph(
+    graph,
+    pat(pq(v("effect"), w("type"), w("effect!"), w("system"))),
+  );
+  return results.map((b) => b.get("effect"));
 }
 
 /**

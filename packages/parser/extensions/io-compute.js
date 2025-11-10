@@ -5,32 +5,29 @@
  * Uses graph-native IO pattern with handle/handled coordination.
  *
  * Pattern:
- * 1. Create context with operands:
- *    graph.add("calc1", "X", 10, null);
- *    graph.add("calc1", "Y", 20, null);
+ * 1. Create context with operands (quads in calc context):
+ *    graph.add(q(w("calc1"), w("x"), 10, w("calc1")));
+ *    graph.add(q(w("calc1"), w("y"), 20, w("calc1")));
  * 2. Request computation:
- *    graph.add("calc1", "handle", "ADD", "input");
+ *    graph.add(q(w("calc1"), w("handle"), w("add"), w("input")));
  * 3. Operation executes and writes to output:
- *    graph.add("ADD", "handled", "calc1", "output");
- *    graph.add("calc1", "RESULT", 30, "output");
+ *    graph.add(q(w("add"), w("handled"), w("calc1"), w("output")));
+ *    graph.add(q(w("calc1"), w("result"), 30, w("output")));
  *
  * Built-in operations:
- * - Binary: ADD, SUBTRACT, MULTIPLY, DIVIDE, MOD, POW
- * - Unary: SQRT, ABS, FLOOR, CEIL, ROUND, NEGATE
- * - Comparison: GT, LT, GTE, LTE, EQ, NEQ
+ * - Binary: add, subtract, multiply, divide, modulo, pow
+ * - Unary: sqrt, abs, floor, ceil, round, negate
  */
 
 // Import built-in operations
 import { builtinIOOperations } from "./io-compute-builtin.js";
-import { quad as q } from "../algebra/quad.js";
-import { variable as v, word as w } from "../types.js";
+import { quad as q } from "../src/algebra/quad.js";
+import { variable as v, WC, word as w } from "../src/types.js";
 import {
   matchGraph,
   pattern as pat,
   patternQuad as pq,
 } from "../src/algebra/pattern.js";
-import { getInput } from "./io-effects.js";
-import { WC } from "../src/types.js";
 
 /**
  * Install a compute operation using IO context pattern
@@ -48,15 +45,15 @@ export function installIOCompute(graph, name, compute, metadata = {}) {
   ];
 
   if (metadata.arity) {
-    toAdd.push(q(opName, w("arity"), w(metadata.arity), w("system")));
+    toAdd.push(q(opName, w("arity"), metadata.arity, w("system")));
   }
   if (metadata.operationType) {
     toAdd.push(
-      q(opName, w("operation-type"), w(metadata.operationType), w("system")),
+      q(opName, w("operation-type"), metadata.operationType, w("system")),
     );
   }
   if (metadata.doc) {
-    toAdd.push(q(opName, w("docs"), w(metadata.doc), w("system")));
+    toAdd.push(q(opName, w("docs"), metadata.doc, w("system")));
   }
 
   toAdd.push(q(w("operation!"), w("type"), w("type!"), w("system")));
@@ -84,8 +81,8 @@ export function installIOCompute(graph, name, compute, metadata = {}) {
       )),
       production: (bindings) => {
         const ctx = bindings.get("ctx");
-        const args = getArgs(graph, ctx);
         try {
+          const args = getArgs(graph, ctx);
           const result = compute(...args);
           return [
             q(ctx, w("result"), result, w("output")),
@@ -133,7 +130,11 @@ export function installIOComputeOps(graph, operations) {
  * Query helper: Get result from output context
  */
 export function getComputeResult(graph, ctx) {
-  return getInput(graph, ctx, w("result"), w("output"));
+  const results = matchGraph(
+    graph,
+    pat(pq(ctx, w("result"), v("val"), w("output"))),
+  );
+  return results[0]?.get("val");
 }
 
 /**
@@ -165,7 +166,7 @@ export function getComputedContexts(graph, opName) {
       w("output"),
     )),
   );
-  return results.map((b) => b.get("?ctx"));
+  return results.map((b) => b.get("ctx"));
 }
 
 /**
@@ -177,11 +178,11 @@ export function getActiveOperations(graph) {
     pat(pq(
       v("op"),
       w("type"),
-      w("operation"),
+      w("operation!"),
       w("system"),
     )),
   );
-  return results.map((b) => b.get("?op"));
+  return results.map((b) => b.get("op"));
 }
 
 /**
