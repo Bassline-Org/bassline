@@ -25,6 +25,12 @@
 
 import { promises as fs } from 'fs';
 import { getInput, installIOEffect } from './io-effects.js';
+import {
+  matchGraph,
+  pattern as pat,
+  patternQuad as pq,
+} from "../src/algebra/pattern.js";
+import { variable as v, word as w } from "../src/types.js";
 
 /**
  * BACKUP Effect - Write full graph snapshot to JSON file (atomic)
@@ -114,20 +120,20 @@ const SYNC = {
     }
 
     // Query contexts with timestamp > sinceTime
-    const allTimestamps = graph.query(["?ctx", "timestamp", "?time", "timestamps"]);
+    const allTimestamps = matchGraph(graph, pat(pq(v("ctx"), w("timestamp"), v("time"), w("timestamps"))));
     const recentCtxs = allTimestamps
-      .filter(r => r.get("?time") > sinceTime)
-      .map(r => r.get("?ctx"));
+      .filter(r => r.get("time") > sinceTime)
+      .map(r => r.get("ctx"));
 
     // Get all edges for those contexts
     const newEdges = [];
     for (const ctxVal of recentCtxs) {
-      const edges = graph.query(["?s", "?a", "?t", ctxVal]);
+      const edges = matchGraph(graph, pat(pq(v("s"), v("a"), v("t"), ctxVal)));
       for (const edge of edges) {
         newEdges.push({
-          source: edge.get("?s"),
-          attr: edge.get("?a"),
-          target: edge.get("?t"),
+          source: edge.get("s"),
+          attr: edge.get("a"),
+          target: edge.get("t"),
           context: ctxVal
         });
       }

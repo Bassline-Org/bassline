@@ -21,6 +21,12 @@
 
 import { WebSocket, WebSocketServer } from 'ws';
 import { installIOEffect, getInput } from './io-effects.js';
+import {
+  matchGraph,
+  pattern as pat,
+  patternQuad as pq,
+} from "../src/algebra/pattern.js";
+import { variable as v, word as w } from "../src/types.js";
 
 // Connection registry: connectionId → { ws, unwatch, context }
 const connections = new Map();
@@ -50,17 +56,22 @@ function isEffectContext(context) {
  * @returns {Function} Unwatch function
  */
 function watchContext(graph, contextName, sendFn) {
-  return graph.watch([["?s", "?a", "?t", contextName]], (bindings) => {
-    const quad = [
-      bindings.get("?s"),
-      bindings.get("?a"),
-      bindings.get("?t"),
-      null  // Send without context - receiver will use bind context
-    ];
+  return graph.watch({
+    pattern: pat(pq(v("s"), v("a"), v("t"), w(contextName))),
+    production: (bindings) => {
+      const quad = [
+        bindings.get("s"),
+        bindings.get("a"),
+        bindings.get("t"),
+        null  // Send without context - receiver will use bind context
+      ];
 
-    // Don't send effect contexts
-    if (!isEffectContext(contextName)) {
-      sendFn(quad);
+      // Don't send effect contexts
+      if (!isEffectContext(contextName)) {
+        sendFn(quad);
+      }
+
+      return [];  // No quads to add to graph
     }
   });
 }

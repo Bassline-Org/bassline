@@ -20,6 +20,7 @@
 
 // Import built-in effects (browser-safe only)
 import { builtinIOEffects } from "./io-effects-builtin.js";
+import { quad as q } from "../src/algebra/quad.js";
 import {
   matchGraph,
   pattern as pat,
@@ -32,12 +33,12 @@ import { variable as v, WC, word as w } from "../src/types.js";
  *
  * @param {Graph} graph - The graph instance
  * @param {Word} ctx - Context to query
- * @param {Word} attr - Attribute to get
+ * @param {string} attr - Attribute to get
  * @param {Word} context - Context filter (default: WC)
  * @returns {*} Value or undefined
  */
 export function getInput(graph, ctx, attr, context = WC) {
-  const results = matchGraph(graph, pat(pq(ctx, attr, v("val"), context)));
+  const results = matchGraph(graph, pat(pq(ctx, w(attr), v("val"), context)));
   return results[0]?.get("val");
 }
 
@@ -79,7 +80,7 @@ export function installIOEffect(graph, name, executor, metadata = {}) {
         Promise.resolve(executor(graph, ctx)).then((outputs) => {
           graph.add(q(ctx, w("status"), w("SUCCESS"), w("output")));
           Object.entries(outputs).forEach(([attr, value]) => {
-            graph.add(q(ctx, attr, value, w("output")));
+            graph.add(q(ctx, w(attr), value, w("output")));
           });
           graph.add(q(effectName, w("handled"), ctx, w("output")));
         }).catch((error) => {
