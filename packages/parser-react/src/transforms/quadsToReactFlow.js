@@ -24,6 +24,7 @@ export function quadsToReactFlow(quads) {
     // Track unique words/values by their hash
     const wordMap = new Map(); // hash -> {id, label}
     const edges = [];
+    const entityIds = new Set(); // Track which nodes are entities (appear as source)
 
     for (const quad of quads) {
         const [entity, attr, value, group] = quad.values;
@@ -34,13 +35,19 @@ export function quadsToReactFlow(quads) {
         registerWord(wordMap, value);
         registerWord(wordMap, group);
 
+        // Mark entity as an entity (it's the source of the relationship)
+        const entityId = hash(entity).toString();
+        entityIds.add(entityId);
+
         // Create edge: entity --[attr]--> value
         edges.push({
             id: quad.hash().toString(),
-            source: hash(entity).toString(),
+            source: entityId,
             target: hash(value).toString(),
+            type: 'attribute',  // Use custom edge type
             label: serialize(attr),
             data: {
+                label: serialize(attr),  // For AttributeEdge component
                 attribute: serialize(attr),
                 context: serialize(group),
                 quadHash: quad.hash()
@@ -48,12 +55,18 @@ export function quadsToReactFlow(quads) {
         });
     }
 
-    // Convert word map to React Flow nodes
-    const nodes = Array.from(wordMap.values()).map(({ id, label }) => ({
-        id,
-        data: { label },
-        position: { x: 0, y: 0 } // Will be set by layout
-    }));
+    // Convert word map to React Flow nodes with types
+    const nodes = Array.from(wordMap.values()).map(({ id, label }) => {
+        // Determine node type: entity if it appears as source, otherwise literal
+        const type = entityIds.has(id) ? 'entity' : 'literal';
+
+        return {
+            id,
+            type,  // 'entity' or 'literal'
+            data: { label },
+            position: { x: 0, y: 0 } // Will be set by layout
+        };
+    });
 
     // Apply dagre layout
     return applyLayout(nodes, edges);

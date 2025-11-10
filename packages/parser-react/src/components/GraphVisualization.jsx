@@ -3,7 +3,20 @@ import { ReactFlow, useNodesState, useEdgesState, Controls, Background } from '@
 import { useGraphQuads } from '../hooks/useGraphQuads.js';
 import { quadsToReactFlow } from '../transforms/quadsToReactFlow.js';
 import { serialize } from '@bassline/parser/types';
+import { EntityNode } from '../nodes/EntityNode.jsx';
+import { LiteralNode } from '../nodes/LiteralNode.jsx';
+import { AttributeEdge } from '../edges/AttributeEdge.jsx';
 import '@xyflow/react/dist/style.css';
+
+// Register custom node and edge types
+const nodeTypes = {
+    entity: EntityNode,
+    literal: LiteralNode,
+};
+
+const edgeTypes = {
+    attribute: AttributeEdge,
+};
 
 /**
  * Visualize the entire graph as a React Flow diagram
@@ -14,6 +27,7 @@ import '@xyflow/react/dist/style.css';
  * @param {Graph} graph - The graph to visualize
  * @param {EventTarget} events - EventTarget from instrument(graph)
  * @param {string} [filterContext] - Optional: only show quads from this context
+ * @param {Array} [filteredQuads] - Optional: pre-filtered quads to display (overrides graph quads)
  *
  * @example
  * const graph = new WatchedGraph();
@@ -24,19 +38,22 @@ import '@xyflow/react/dist/style.css';
  *
  * <GraphVisualization graph={graph} events={events} />
  */
-export function GraphVisualization({ graph, events, filterContext = null }) {
+export function GraphVisualization({ graph, events, filterContext = null, filteredQuads: propFilteredQuads = null }) {
     // Subscribe to graph changes via useSyncExternalStore
     const quads = useGraphQuads(graph, events);
 
+    // Use provided filtered quads if available, otherwise use all quads
+    const sourceQuads = propFilteredQuads || quads;
+
     // Filter by context if specified
     const filteredQuads = useMemo(() => {
-        if (!filterContext) return quads;
+        if (!filterContext) return sourceQuads;
 
-        return quads.filter(quad => {
+        return sourceQuads.filter(quad => {
             const [_, __, ___, group] = quad.values;
             return serialize(group) === filterContext;
         });
-    }, [quads, filterContext]);
+    }, [sourceQuads, filterContext]);
 
     // Transform quads to React Flow format
     const { nodes, edges } = useMemo(() =>
@@ -59,6 +76,8 @@ export function GraphVisualization({ graph, events, filterContext = null }) {
             <ReactFlow
                 nodes={rfNodes}
                 edges={rfEdges}
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 fitView

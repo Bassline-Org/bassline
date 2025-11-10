@@ -9,6 +9,9 @@ import { QueryResultsTable } from "~/components/QueryResultsTable";
 import { GraphStatsPanel } from "~/components/GraphStatsPanel";
 import { ContextSelector } from "~/components/ContextSelector";
 import { ErrorDisplay } from "~/components/ErrorDisplay";
+import { VisualizationModeSwitcher, type ViewMode } from "~/components/VisualizationModeSwitcher";
+import { QuadsTableView } from "~/components/QuadsTableView";
+import { ViewQueryPanel } from "~/components/ViewQueryPanel";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -31,6 +34,11 @@ export default function GraphViz() {
     const [queryResults, setQueryResults] = useState<any[]>([]);
     const [filterContext, setFilterContext] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<ViewMode>("graph");
+    const [filteredQuads, setFilteredQuads] = useState<any[] | null>(null);
+
+    // Use filtered quads if available, otherwise use all quads from graph
+    const displayQuads = filteredQuads || graph.quads;
 
     // Add initial demo data
     useEffect(() => {
@@ -95,28 +103,74 @@ export default function GraphViz() {
                     <QueryResultsTable results={queryResults} />
                 )}
 
-                {/* Stats & Context Filter */}
-                <div className="flex gap-4 items-center">
-                    <GraphStatsPanel graph={graph} events={events} />
-                    <ContextSelector
-                        graph={graph}
-                        events={events}
-                        value={filterContext}
-                        onChange={setFilterContext}
+                {/* View Query Filter */}
+                <ViewQueryPanel
+                    graph={graph}
+                    onFilterChange={setFilteredQuads}
+                />
+
+                {/* Stats, Context Filter & View Mode */}
+                <div className="flex gap-4 items-center justify-between">
+                    <div className="flex gap-4 items-center">
+                        <GraphStatsPanel graph={graph} events={events} />
+                        <ContextSelector
+                            graph={graph}
+                            events={events}
+                            value={filterContext}
+                            onChange={setFilterContext}
+                        />
+                    </div>
+                    <VisualizationModeSwitcher
+                        value={viewMode}
+                        onChange={setViewMode}
                     />
                 </div>
 
-                {/* Graph Visualization */}
-                <div
-                    className="border rounded-lg bg-white"
-                    style={{ height: "500px" }}
-                >
-                    <GraphVisualization
-                        graph={graph}
-                        events={events}
-                        filterContext={filterContext}
-                    />
-                </div>
+                {/* Visualization Area */}
+                {viewMode === "table" && (
+                    <QuadsTableView quads={displayQuads} />
+                )}
+
+                {viewMode === "graph" && (
+                    <div
+                        className="border rounded-lg bg-white"
+                        style={{ height: "500px" }}
+                    >
+                        <GraphVisualization
+                            graph={graph}
+                            events={events}
+                            filterContext={filterContext}
+                            filteredQuads={filteredQuads}
+                        />
+                    </div>
+                )}
+
+                {viewMode === "both" && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <h3 className="text-sm font-medium text-slate-700">
+                                Table View
+                            </h3>
+                            <QuadsTableView quads={displayQuads} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-sm font-medium text-slate-700">
+                                Graph View
+                            </h3>
+                            <div
+                                className="border rounded-lg bg-white"
+                                style={{ height: "500px" }}
+                            >
+                                <GraphVisualization
+                                    graph={graph}
+                                    events={events}
+                                    filterContext={filterContext}
+                                    filteredQuads={filteredQuads}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
