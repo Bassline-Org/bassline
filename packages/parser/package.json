@@ -6,6 +6,7 @@
     "module": "src/index.js",
     "exports": {
         ".": "./src/algebra/watch.js",
+        "./browser": "./src/browser-graph.js",
         "./graph": "./src/algebra/graph.js",
         "./watch": "./src/algebra/watch.js",
         "./parser": "./src/pattern-parser.js",
@@ -17,6 +18,7 @@
         "./io-effects-builtin": "./extensions/io-effects-builtin.js",
         "./io-effects-node": "./extensions/io-effects-node.js",
         "./io-effects-all": "./extensions/io-effects-all.js",
+        "./algebra": "./src/algebra/index.js",
         "./algebra/watch": "./src/algebra/watch.js",
         "./algebra/pattern": "./src/algebra/pattern.js",
         "./algebra/quad": "./src/algebra/quad.js",

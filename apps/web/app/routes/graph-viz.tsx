@@ -1,12 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/graph-viz";
-import { WatchedGraph } from "@bassline/parser/algebra/watch";
-import { instrument } from "@bassline/parser/algebra/instrument";
-import { installReifiedRules } from "@bassline/parser/algebra/reified-rules";
+import { createBrowserGraph } from "@bassline/parser/browser";
 import { GraphVisualization } from "@bassline/parser-react";
 import { parseProgram } from "@bassline/parser/parser";
-import { quad as q } from "@bassline/parser/algebra/quad";
-import { word as w } from "@bassline/parser/types";
+import { pat, pq, q, v, w } from "@bassline/parser/algebra";
 import { ReplInput } from "~/components/ReplInput";
 import { QueryResultsTable } from "~/components/QueryResultsTable";
 import { GraphStatsPanel } from "~/components/GraphStatsPanel";
@@ -24,11 +21,11 @@ export function meta({}: Route.MetaArgs) {
 }
 
 // Module-level singleton (persists across navigation)
-const graph = new WatchedGraph();
-const events = instrument(graph);
-
-// Install reified rules system
-installReifiedRules(graph);
+// Creates graph with all browser-compatible extensions:
+// - Reified rules (graph-native rule storage)
+// - IO Compute (18 math operations: add, subtract, multiply, etc.)
+// - IO Effects (console: LOG, ERROR, WARN + HTTP: HTTP_GET, HTTP_POST)
+const { graph, events } = createBrowserGraph();
 
 export default function GraphViz() {
     const [queryResults, setQueryResults] = useState<any[]>([]);
