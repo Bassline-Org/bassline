@@ -1,62 +1,50 @@
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
+import { BaseEdge, getBezierPath, useStore } from '@xyflow/react';
+import { getEdgeParams } from './floatingEdgeHelpers.js';
 
 /**
- * Custom edge component for attribute edges
+ * Custom edge component for attribute edges with floating connection points
  *
- * Displays edges with attribute names as labels and improved styling
+ * Uses dynamic edge positions that attach to node borders based on relative positioning
  */
 export function AttributeEdge({
     id,
-    sourceX,
-    sourceY,
-    targetX,
-    targetY,
-    sourcePosition,
-    targetPosition,
-    data,
+    source,
+    target,
     markerEnd,
 }) {
-    const [edgePath, labelX, labelY] = getBezierPath({
-        sourceX,
-        sourceY,
-        sourcePosition,
-        targetX,
-        targetY,
-        targetPosition,
+    // Get source and target nodes from the store using the nodes array
+    const sourceNode = useStore((state) => state.nodes.find((n) => n.id === source));
+    const targetNode = useStore((state) => state.nodes.find((n) => n.id === target));
+
+    // If nodes aren't ready, don't render
+    if (!sourceNode || !targetNode) {
+        return null;
+    }
+
+    // Calculate dynamic edge positions based on node geometry
+    const { sx, sy, tx, ty, sourcePos, targetPos } = getEdgeParams(
+        sourceNode,
+        targetNode
+    );
+
+    const [edgePath] = getBezierPath({
+        sourceX: sx,
+        sourceY: sy,
+        sourcePosition: sourcePos,
+        targetX: tx,
+        targetY: ty,
+        targetPosition: targetPos,
     });
 
     return (
-        <>
-            <BaseEdge
-                id={id}
-                path={edgePath}
-                markerEnd={markerEnd}
-                style={{
-                    stroke: '#94a3b8',
-                    strokeWidth: 2,
-                }}
-            />
-            <EdgeLabelRenderer>
-                <div
-                    style={{
-                        position: 'absolute',
-                        transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-                        fontSize: '11px',
-                        fontWeight: '600',
-                        background: '#f8fafc',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #e2e8f0',
-                        color: '#475569',
-                        fontFamily: 'ui-monospace, monospace',
-                        pointerEvents: 'all',
-                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-                    }}
-                    className="nodrag nopan"
-                >
-                    {data?.label || ''}
-                </div>
-            </EdgeLabelRenderer>
-        </>
+        <BaseEdge
+            id={id}
+            path={edgePath}
+            markerEnd={markerEnd}
+            style={{
+                stroke: '#94a3b8',
+                strokeWidth: 2,
+            }}
+        />
     );
 }

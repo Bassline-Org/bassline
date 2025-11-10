@@ -1,13 +1,14 @@
-import dagre from '@dagrejs/dagre';
-import { serialize, hash } from '@bassline/parser/types';
+import { hash, serialize } from "@bassline/parser/types";
+import { applyForceLayout } from "../layouts/force.js";
 
 /**
  * Transform quads to React Flow node/edge format
  *
- * Nodes: One node per unique word/value in the quads
- * Edges: One edge per quad, representing the relationship
+ * Nodes: Three nodes per quad - entity, attribute, and value
+ * Edges: Two unlabeled edges per quad - entity -> attribute -> value
  *
  * @param {Quad[]} quads - Array of quads from graph
+ * @param {Object} [options] - Layout options (passed to force layout)
  * @returns {{nodes: Object[], edges: Object[]}} React Flow format
  *
  * @example
@@ -18,9 +19,9 @@ import { serialize, hash } from '@bassline/parser/types';
  *
  * const { nodes, edges } = quadsToReactFlow(quads);
  * // nodes: [alice, age, 30, friend, bob, ctx1]
- * // edges: [alice--(age)-->30, alice--(friend)-->bob]
+ * // edges: [alice-->age, age-->30, alice-->friend, friend-->bob]
  */
-export function quadsToReactFlow(quads) {
+export function quadsToReactFlow(quads, options = {}) {
     // Track unique words/values by their hash
     const wordMap = new Map(); // hash -> {id, label}
     const edges = [];
@@ -39,37 +40,49 @@ export function quadsToReactFlow(quads) {
         const entityId = hash(entity).toString();
         entityIds.add(entityId);
 
-        // Create edge: entity --[attr]--> value
+        const attrId = hash(attr).toString();
+        const valueId = hash(value).toString();
+        const quadHashStr = quad.hash().toString();
+
+        // Create two unlabeled edges: entity -> attribute -> value
         edges.push({
-            id: quad.hash().toString(),
+            id: `${quadHashStr}-1`,
             source: entityId,
-            target: hash(value).toString(),
-            type: 'attribute',  // Use custom edge type
-            label: serialize(attr),
+            target: attrId,
+            type: "attribute",
             data: {
-                label: serialize(attr),  // For AttributeEdge component
-                attribute: serialize(attr),
                 context: serialize(group),
-                quadHash: quad.hash()
-            }
+                quadHash: quad.hash(),
+            },
+        });
+
+        edges.push({
+            id: `${quadHashStr}-2`,
+            source: attrId,
+            target: valueId,
+            type: "attribute",
+            data: {
+                context: serialize(group),
+                quadHash: quad.hash(),
+            },
         });
     }
 
     // Convert word map to React Flow nodes with types
     const nodes = Array.from(wordMap.values()).map(({ id, label }) => {
         // Determine node type: entity if it appears as source, otherwise literal
-        const type = entityIds.has(id) ? 'entity' : 'literal';
+        const type = entityIds.has(id) ? "entity" : "literal";
 
         return {
             id,
-            type,  // 'entity' or 'literal'
+            type, // 'entity' or 'literal'
             data: { label },
-            position: { x: 0, y: 0 } // Will be set by layout
+            position: { x: 0, y: 0 }, // Will be set by layout
         };
     });
 
-    // Apply dagre layout
-    return applyLayout(nodes, edges);
+    // Apply force layout
+    return applyForceLayout(nodes, edges, options);
 }
 
 /**
@@ -81,53 +94,7 @@ function registerWord(wordMap, value) {
     if (!wordMap.has(id)) {
         wordMap.set(id, {
             id,
-            label: serialize(value)
+            label: serialize(value),
         });
     }
-}
-
-/**
- * Apply dagre layout algorithm to position nodes
- */
-function applyLayout(nodes, edges) {
-    const g = new dagre.graphlib.Graph();
-    g.setDefaultEdgeLabel(() => ({}));
-    g.setGraph({
-        rankdir: 'LR',      // Left to right
-        nodesep: 100,        // Horizontal spacing
-        ranksep: 150         // Vertical spacing
-    });
-
-    // Add nodes to graph
-    nodes.forEach(node => {
-        g.setNode(node.id, {
-            width: 150,
-            height: 50
-        });
-    });
-
-    // Add edges to graph
-    edges.forEach(edge => {
-        g.setEdge(edge.source, edge.target);
-    });
-
-    // Run layout algorithm
-    dagre.layout(g);
-
-    // Apply computed positions to nodes
-    const layoutedNodes = nodes.map(node => {
-        const nodeWithPosition = g.node(node.id);
-        return {
-            ...node,
-            position: {
-                x: nodeWithPosition.x - 75,  // Center (width/2)
-                y: nodeWithPosition.y - 25   // Center (height/2)
-            }
-        };
-    });
-
-    return {
-        nodes: layoutedNodes,
-        edges
-    };
 }

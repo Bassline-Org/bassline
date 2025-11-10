@@ -28,6 +28,7 @@ const edgeTypes = {
  * @param {EventTarget} events - EventTarget from instrument(graph)
  * @param {string} [filterContext] - Optional: only show quads from this context
  * @param {Array} [filteredQuads] - Optional: pre-filtered quads to display (overrides graph quads)
+ * @param {Object} [layoutOptions] - Optional: force layout configuration
  *
  * @example
  * const graph = new WatchedGraph();
@@ -38,7 +39,7 @@ const edgeTypes = {
  *
  * <GraphVisualization graph={graph} events={events} />
  */
-export function GraphVisualization({ graph, events, filterContext = null, filteredQuads: propFilteredQuads = null }) {
+export function GraphVisualization({ graph, events, filterContext = null, filteredQuads: propFilteredQuads = null, layoutOptions = {} }) {
     // Subscribe to graph changes via useSyncExternalStore
     const quads = useGraphQuads(graph, events);
 
@@ -57,8 +58,8 @@ export function GraphVisualization({ graph, events, filterContext = null, filter
 
     // Transform quads to React Flow format
     const { nodes, edges } = useMemo(() =>
-        quadsToReactFlow(filteredQuads),
-        [filteredQuads]
+        quadsToReactFlow(filteredQuads, layoutOptions),
+        [filteredQuads, layoutOptions]
     );
 
     // React Flow state management

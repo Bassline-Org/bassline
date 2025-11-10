@@ -11,11 +11,12 @@ interface ViewQueryPanelProps {
     onFilterChange: (quads: any[] | null) => void;
 }
 
-export function ViewQueryPanel({ graph, onFilterChange }: ViewQueryPanelProps) {
+export function ViewQueryPanel({ graph, events, onFilterChange }: ViewQueryPanelProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [matchCount, setMatchCount] = useState<number | null>(null);
     const [isActive, setIsActive] = useState(false);
+    const [queryPattern, setQueryPattern] = useState<string | null>(null);
 
     const handleExecute = (input: string) => {
         try {
@@ -26,8 +27,12 @@ export function ViewQueryPanel({ graph, onFilterChange }: ViewQueryPanelProps) {
                 onFilterChange(null);
                 setMatchCount(null);
                 setIsActive(false);
+                setQueryPattern(null);
                 return;
             }
+
+            // Store the query pattern for reactive re-execution
+            setQueryPattern(input);
 
             // Parse and execute the query directly (no wrapping)
             const commands = parseProgram(input);
@@ -62,8 +67,43 @@ export function ViewQueryPanel({ graph, onFilterChange }: ViewQueryPanelProps) {
         setError(null);
         setMatchCount(null);
         setIsActive(false);
+        setQueryPattern(null);
         onFilterChange(null);
     };
+
+    // Subscribe to graph events and re-execute query when quads are added
+    useEffect(() => {
+        if (!queryPattern) return;
+
+        const reExecuteQuery = () => {
+            try {
+                // Parse and execute the stored query
+                const commands = parseProgram(queryPattern);
+                const results = commands.map((fn: any) => fn(graph));
+
+                // Extract matched quads from results
+                if (results[0] && Array.isArray(results[0])) {
+                    const allQuads = results[0].flatMap((match: any) =>
+                        match.quads || []
+                    );
+                    const viewGraph = new Graph(...allQuads);
+
+                    onFilterChange(viewGraph.quads);
+                    setMatchCount(viewGraph.quads.length);
+                } else {
+                    onFilterChange([]);
+                    setMatchCount(0);
+                }
+            } catch (err: any) {
+                // Silent failure - don't show errors on auto-refresh
+                console.error("View query re-execution error:", err);
+            }
+        };
+
+        // Subscribe to quad-added events
+        events.addEventListener("quad-added", reExecuteQuery);
+        return () => events.removeEventListener("quad-added", reExecuteQuery);
+    }, [queryPattern, graph, events, onFilterChange]);
 
     return (
         <div className="border rounded-lg bg-white shadow-sm">

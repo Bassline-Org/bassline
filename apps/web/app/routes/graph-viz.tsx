@@ -12,6 +12,7 @@ import { ErrorDisplay } from "~/components/ErrorDisplay";
 import { VisualizationModeSwitcher, type ViewMode } from "~/components/VisualizationModeSwitcher";
 import { QuadsTableView } from "~/components/QuadsTableView";
 import { ViewQueryPanel } from "~/components/ViewQueryPanel";
+import { ForceControlsPanel, type ForceLayoutOptions } from "~/components/ForceControlsPanel";
 import { FileText } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
@@ -37,6 +38,13 @@ export default function GraphViz() {
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>("graph");
     const [filteredQuads, setFilteredQuads] = useState<any[] | null>(null);
+    const [layoutOptions, setLayoutOptions] = useState<ForceLayoutOptions>({
+        charge: -300,
+        linkDistance: 100,
+        linkStrength: 0.5,
+        collisionRadius: 50,
+        iterations: 300,
+    });
 
     // Use filtered quads if available, otherwise use all quads from graph
     const displayQuads = filteredQuads || graph.quads;
@@ -140,7 +148,14 @@ export default function GraphViz() {
                         {/* View Query Filter */}
                         <ViewQueryPanel
                             graph={graph}
+                            events={events}
                             onFilterChange={setFilteredQuads}
+                        />
+
+                        {/* Force Layout Controls */}
+                        <ForceControlsPanel
+                            options={layoutOptions}
+                            onChange={setLayoutOptions}
                         />
                     </div>
                 </div>
@@ -173,6 +188,7 @@ export default function GraphViz() {
                                     events={events}
                                     filterContext={filterContext}
                                     filteredQuads={filteredQuads}
+                                    layoutOptions={layoutOptions}
                                 />
                             </div>
                         )}
@@ -225,6 +241,7 @@ export default function GraphViz() {
                                             events={events}
                                             filterContext={filterContext}
                                             filteredQuads={filteredQuads}
+                                            layoutOptions={layoutOptions}
                                         />
                                     </div>
                                 </div>
