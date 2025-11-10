@@ -60,6 +60,20 @@ export default function Home() {
                             <Button variant="default">Open Graph</Button>
                         </div>
                     </Link>
+
+                    {/* Components Demo */}
+                    <Link to="/components-demo" className="block">
+                        <div className="border border-purple-200 rounded-lg p-6 hover:border-purple-300 hover:shadow-lg transition-all bg-purple-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                🧩 Components Demo
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Graph-native React components -
+                                EntityCard, QuadTable, PatternEditor, Inspector
+                            </p>
+                            <Button variant="default">Open Demo</Button>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>

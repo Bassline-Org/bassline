@@ -13,6 +13,9 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/components-demo": {
+    params: {};
+  };
   "/graph-viz": {
     params: {};
   };
@@ -27,7 +30,11 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/graph-viz" | "/home" | "/repl";
+    page: "/" | "/components-demo" | "/graph-viz" | "/home" | "/repl";
+  };
+  "routes/components-demo.tsx": {
+    id: "routes/components-demo";
+    page: "/components-demo";
   };
   "routes/graph-viz.tsx": {
     id: "routes/graph-viz";

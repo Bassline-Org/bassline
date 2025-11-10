@@ -4,7 +4,9 @@
   "description": "React integration for Bassline graph visualization with React Flow",
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./hooks": "./src/hooks/index.js",
+    "./components": "./src/components/index.js"
   },
   "dependencies": {
     "@xyflow/react": "^12.0.0",
