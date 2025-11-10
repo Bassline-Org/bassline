@@ -1,4 +1,5 @@
 import * as d3 from 'd3-force';
+import { applyIncrementalForceLayout } from './force-incremental.js';
 
 /**
  * Apply d3-force layout to nodes and edges
@@ -6,27 +7,66 @@ import * as d3 from 'd3-force';
  * Uses physics-based force simulation to position nodes organically.
  * Better for general graph structures than hierarchical dagre layout.
  *
+ * Supports two modes:
+ * - Synchronous: Computes final positions immediately (default)
+ * - Animated: Incrementally updates positions with smooth transitions
+ *
  * @param {Array} nodes - React Flow nodes
  * @param {Array} edges - React Flow edges
  * @param {Object} options - Layout configuration
- * @param {number} [options.charge=-300] - Node repulsion force (-1000 to 0)
- * @param {number} [options.linkDistance=100] - Target distance between connected nodes (20 to 500)
- * @param {number} [options.linkStrength=0.5] - How strongly links pull nodes together (0 to 1)
- * @param {number} [options.collisionRadius=50] - Prevent node overlap radius (10 to 200)
+ * @param {number} [options.charge=-500] - Node repulsion force (-1000 to 0) - stronger for labeled graphs
+ * @param {number} [options.linkDistance=150] - Target distance between connected nodes (20 to 500) - more space for labels
+ * @param {number} [options.linkStrength=0.3] - How strongly links pull nodes together (0 to 1) - weaker allows spreading
+ * @param {number} [options.collisionRadius=60] - Prevent node overlap radius (10 to 200) - accounts for label space
  * @param {number} [options.iterations=300] - Number of simulation steps (100 to 1000)
- * @returns {{nodes: Array, edges: Array}} Layouted nodes and edges
+ * @param {Array} [options.previousNodes] - Previous node positions for incremental layout
+ * @param {boolean} [options.animated=false] - Use animated incremental layout
+ * @param {Function} [options.onTick] - Callback for animation frames (animated mode only)
+ * @param {Function} [options.onEnd] - Callback when simulation completes (animated mode only)
+ * @returns {{nodes: Array, edges: Array}} Layouted nodes and edges (or simulation controller in animated mode)
  */
 export function applyForceLayout(nodes, edges, options = {}) {
+    const {
+        animated = false,
+        previousNodes = [],
+        onTick,
+        onEnd,
+        ...forceOptions
+    } = options;
+
+    // Use animated incremental layout if requested
+    if (animated && previousNodes.length > 0) {
+        return applyIncrementalForceLayout(nodes, edges, {
+            ...forceOptions,
+            previousNodes,
+            onTick,
+            onEnd,
+        });
+    }
+
+    // Otherwise use synchronous layout (original behavior)
+    return applySynchronousForceLayout(nodes, edges, forceOptions);
+}
+
+/**
+ * Apply synchronous force layout (runs all iterations at once)
+ *
+ * @param {Array} nodes - React Flow nodes
+ * @param {Array} edges - React Flow edges
+ * @param {Object} options - Layout configuration
+ * @returns {{nodes: Array, edges: Array}} Layouted nodes and edges
+ */
+function applySynchronousForceLayout(nodes, edges, options = {}) {
     // Handle empty graph
     if (nodes.length === 0) {
         return { nodes: [], edges: [] };
     }
 
     const {
-        charge = -300,
-        linkDistance = 100,
-        linkStrength = 0.5,
-        collisionRadius = 50,
+        charge = -500,          // Stronger repulsion for labeled graphs
+        linkDistance = 150,     // More space for edge labels
+        linkStrength = 0.3,     // Weaker links allow better spreading
+        collisionRadius = 60,   // Account for label space around nodes
         iterations = 300,
     } = options;
 
