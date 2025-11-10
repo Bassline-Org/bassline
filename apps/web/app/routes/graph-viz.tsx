@@ -12,6 +12,7 @@ import { ErrorDisplay } from "~/components/ErrorDisplay";
 import { VisualizationModeSwitcher, type ViewMode } from "~/components/VisualizationModeSwitcher";
 import { QuadsTableView } from "~/components/QuadsTableView";
 import { ViewQueryPanel } from "~/components/ViewQueryPanel";
+import { FileText } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -63,6 +64,8 @@ export default function GraphViz() {
                 results[0][0]?.bindings
             ) {
                 setQueryResults(results[0]);
+                // Auto-switch to results view when query returns results
+                setViewMode("results");
             } else {
                 // Clear results for non-query commands
                 setQueryResults([]);
@@ -74,93 +77,97 @@ export default function GraphViz() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50">
-            <div className="container mx-auto p-6 space-y-4">
-                {/* Header */}
-                <div>
-                    <h1 className="text-3xl font-bold mb-2">
-                        Bassline Interactive REPL
-                    </h1>
-                    <p className="text-sm text-slate-600">
-                        Execute pattern commands and explore the graph in
-                        real-time
-                    </p>
-                </div>
-
-                {/* REPL Input */}
-                <ReplInput onExecute={handleExecute} />
-
-                {/* Error Display */}
-                {error && (
-                    <ErrorDisplay
-                        error={error}
-                        onDismiss={() => setError(null)}
-                    />
-                )}
-
-                {/* Query Results */}
-                {queryResults.length > 0 && (
-                    <QueryResultsTable results={queryResults} />
-                )}
-
-                {/* View Query Filter */}
-                <ViewQueryPanel
-                    graph={graph}
-                    onFilterChange={setFilteredQuads}
-                />
-
-                {/* Stats, Context Filter & View Mode */}
-                <div className="flex gap-4 items-center justify-between">
-                    <div className="flex gap-4 items-center">
-                        <GraphStatsPanel graph={graph} events={events} />
-                        <ContextSelector
-                            graph={graph}
-                            events={events}
-                            value={filterContext}
-                            onChange={setFilterContext}
-                        />
-                    </div>
-                    <VisualizationModeSwitcher
-                        value={viewMode}
-                        onChange={setViewMode}
-                    />
-                </div>
-
-                {/* Visualization Area */}
-                {viewMode === "table" && (
-                    <QuadsTableView quads={displayQuads} />
-                )}
-
-                {viewMode === "graph" && (
-                    <div
-                        className="border rounded-lg bg-white"
-                        style={{ height: "500px" }}
-                    >
-                        <GraphVisualization
-                            graph={graph}
-                            events={events}
-                            filterContext={filterContext}
-                            filteredQuads={filteredQuads}
-                        />
-                    </div>
-                )}
-
-                {viewMode === "both" && (
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <h3 className="text-sm font-medium text-slate-700">
-                                Table View
-                            </h3>
-                            <QuadsTableView quads={displayQuads} />
+        <div className="flex flex-col min-h-screen bg-slate-50">
+            {/* Compact Header */}
+            <div className="border-b bg-white">
+                <div className="container mx-auto px-6 py-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold">
+                                Bassline Interactive REPL
+                            </h1>
+                            <p className="text-xs text-slate-600">
+                                Execute pattern commands and explore the graph in real-time
+                            </p>
                         </div>
-                        <div className="space-y-2">
-                            <h3 className="text-sm font-medium text-slate-700">
-                                Graph View
-                            </h3>
-                            <div
-                                className="border rounded-lg bg-white"
-                                style={{ height: "500px" }}
-                            >
+                        <div className="flex gap-4 items-center">
+                            <GraphStatsPanel graph={graph} events={events} />
+                            <ContextSelector
+                                graph={graph}
+                                events={events}
+                                value={filterContext}
+                                onChange={setFilterContext}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Content: Horizontal Split */}
+            <div className="flex flex-1 overflow-hidden">
+                {/* Left Panel: REPL + Results + Filters */}
+                <div className="w-[30%] flex flex-col border-r bg-white overflow-y-auto">
+                    <div className="p-4 space-y-4">
+                        {/* REPL Input */}
+                        <div>
+                            <h2 className="text-sm font-semibold text-slate-700 mb-2">
+                                Command Input
+                            </h2>
+                            <ReplInput onExecute={handleExecute} />
+                        </div>
+
+                        {/* Error Display */}
+                        {error && (
+                            <ErrorDisplay
+                                error={error}
+                                onDismiss={() => setError(null)}
+                            />
+                        )}
+
+                        {/* Query Results - Only show inline if not in results view mode */}
+                        {queryResults.length > 0 && viewMode !== "results" && (
+                            <div>
+                                <h2 className="text-sm font-semibold text-slate-700 mb-2">
+                                    Query Results
+                                    <span className="text-xs text-slate-500 ml-2">
+                                        (Switch to Results view for better display)
+                                    </span>
+                                </h2>
+                                <QueryResultsTable results={queryResults} />
+                            </div>
+                        )}
+
+                        {/* View Query Filter */}
+                        <ViewQueryPanel
+                            graph={graph}
+                            onFilterChange={setFilteredQuads}
+                        />
+                    </div>
+                </div>
+
+                {/* Right Panel: Visualization */}
+                <div className="flex-1 flex flex-col bg-slate-50">
+                    {/* Visualization Controls */}
+                    <div className="border-b bg-white px-4 py-3 flex items-center justify-between">
+                        <h2 className="text-sm font-semibold text-slate-700">
+                            Visualization
+                        </h2>
+                        <VisualizationModeSwitcher
+                            value={viewMode}
+                            onChange={setViewMode}
+                        />
+                    </div>
+
+                    {/* Visualization Area - Fills Remaining Space */}
+                    <div className="flex-1 p-4 overflow-hidden min-w-0">
+                        {viewMode === "table" && (
+                            <div className="h-full w-full overflow-auto">
+                                <QuadsTableView quads={displayQuads} />
+                            </div>
+                        )}
+
+                        {viewMode === "graph" && (
+                            <div className="h-full border rounded-lg bg-white overflow-hidden">
                                 <GraphVisualization
                                     graph={graph}
                                     events={events}
@@ -168,9 +175,63 @@ export default function GraphViz() {
                                     filteredQuads={filteredQuads}
                                 />
                             </div>
-                        </div>
+                        )}
+
+                        {viewMode === "results" && (
+                            <div className="h-full w-full overflow-auto">
+                                {queryResults.length > 0 ? (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="text-sm font-medium text-slate-700">
+                                                Query Results
+                                            </h3>
+                                            <div className="text-sm text-slate-600">
+                                                {queryResults.length} result{queryResults.length !== 1 ? "s" : ""}
+                                            </div>
+                                        </div>
+                                        <QueryResultsTable results={queryResults} />
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex items-center justify-center">
+                                        <div className="text-center text-slate-500">
+                                            <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                            <p className="text-sm font-medium">No query results</p>
+                                            <p className="text-xs mt-1">
+                                                Execute a query to see results here
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {viewMode === "both" && (
+                            <div className="h-full grid grid-cols-2 gap-4">
+                                <div className="flex flex-col space-y-2 overflow-hidden">
+                                    <h3 className="text-sm font-medium text-slate-700">
+                                        Table View
+                                    </h3>
+                                    <div className="flex-1 overflow-auto">
+                                        <QuadsTableView quads={displayQuads} />
+                                    </div>
+                                </div>
+                                <div className="flex flex-col space-y-2 overflow-hidden">
+                                    <h3 className="text-sm font-medium text-slate-700">
+                                        Graph View
+                                    </h3>
+                                    <div className="flex-1 border rounded-lg bg-white overflow-hidden">
+                                        <GraphVisualization
+                                            graph={graph}
+                                            events={events}
+                                            filterContext={filterContext}
+                                            filteredQuads={filteredQuads}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
         </div>
     );

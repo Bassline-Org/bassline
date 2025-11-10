@@ -145,7 +145,7 @@ export function QuadsTableView({ quads }: QuadsTableViewProps) {
     };
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-2 w-full min-w-0">
             <div className="flex items-center justify-between">
                 <Input
                     placeholder="Search quads..."
@@ -158,8 +158,8 @@ export function QuadsTableView({ quads }: QuadsTableViewProps) {
                 </div>
             </div>
 
-            <div className="border rounded-lg bg-white overflow-auto max-h-[600px]">
-                <Table>
+            <div className="border rounded-lg bg-white overflow-auto w-full">
+                <Table className="w-full">
                     <TableHeader>
                         <TableRow>
                             {/* Entity column */}

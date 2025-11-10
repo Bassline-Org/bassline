@@ -68,8 +68,6 @@ export function installIOCompute(graph, name, compute, metadata = {}) {
     graph.add(quad);
   }
 
-  const getArgs = metadata.arity === "unary" ? getUnaryArgs : getBinaryArgs;
-
   // Watch for requests in input context
   const unwatch = graph.watch(
     {
@@ -81,21 +79,11 @@ export function installIOCompute(graph, name, compute, metadata = {}) {
       )),
       production: (bindings) => {
         const ctx = bindings.get("ctx");
-        try {
-          const args = getArgs(graph, ctx);
-          const result = compute(...args);
-          return [
-            q(ctx, w("result"), result, w("output")),
-            q(ctx, w("status"), w("SUCCESS"), w("output")),
-            q(opName, w("handled"), ctx, w("output")),
-          ];
-        } catch (error) {
-          return [
-            q(ctx, w("error"), error.message, w("output")),
-            q(ctx, w("status"), w("error"), w("output")),
-            q(opName, w("handled"), ctx, w("output")),
-          ];
-        }
+        const watcher = metadata.arity === "unary"
+          ? unaryWatcher
+          : binaryWatcher;
+        watcher({ graph, ctx, opName, compute });
+        return [];
       },
     },
   );
@@ -195,41 +183,61 @@ export function installBuiltinCompute(graph) {
   return installIOComputeOps(graph, builtinIOOperations);
 }
 
-function getUnaryArgs(graph, ctx) {
-  let result;
-  matchGraph(
-    graph,
-    pat(pq(
-      ctx,
-      w("x"),
-      v("x"),
-      WC,
-    )),
-  ).forEach((m) => {
-    result = [m.get("x")];
-  });
-  if (result === undefined || result.length === 0) {
-    throw new Error(`Missing operand: x`);
-  }
-  return result;
-}
+const unaryArgs = (ctx) => pat(pq(ctx, w("x"), v("x"), ctx));
+const binaryArgs = (ctx) =>
+  pat(
+    pq(ctx, w("x"), v("x"), ctx),
+    pq(ctx, w("y"), v("y"), ctx),
+  );
 
-function getBinaryArgs(graph, ctx) {
-  let result;
-  matchGraph(
-    graph,
-    pat(
-      pq(ctx, w("x"), v("x"), WC),
-      pq(ctx, w("y"), v("y"), WC),
-    ),
-  ).forEach((m) => {
-    result = [m.get("x"), m.get("y")];
+const unaryWatcher = ({ graph, ctx, opName, compute }) =>
+  graph.watch({
+    pattern: unaryArgs(ctx),
+    production: (bindings) => {
+      const x = bindings.get("x");
+      try {
+        const result = compute(x);
+        return [
+          q(ctx, w("result"), result, w("output")),
+          q(ctx, w("result"), result, ctx),
+          q(ctx, w("status"), w("SUCCESS"), w("output")),
+          q(opName, w("handled"), ctx, w("output")),
+        ];
+      } catch (error) {
+        return [
+          q(ctx, w("error"), error.message, w("output")),
+          q(ctx, w("error"), error.message, ctx),
+          q(ctx, w("status"), w("error"), w("output")),
+          q(opName, w("handled"), ctx, w("output")),
+        ];
+      }
+    },
   });
-  if (result === undefined || result.length !== 2) {
-    throw new Error(`Missing or invalid operands: x and y`);
-  }
-  return result;
-}
+
+const binaryWatcher = ({ graph, ctx, opName, compute }) =>
+  graph.watch({
+    pattern: binaryArgs(ctx),
+    production: (bindings) => {
+      const x = bindings.get("x");
+      const y = bindings.get("y");
+      try {
+        const result = compute(x, y);
+        return [
+          q(ctx, w("result"), result, w("output")),
+          q(ctx, w("result"), result, ctx),
+          q(ctx, w("status"), w("SUCCESS"), w("output")),
+          q(opName, w("handled"), ctx, w("output")),
+        ];
+      } catch (error) {
+        return [
+          q(ctx, w("error"), error.message, w("output")),
+          q(ctx, w("error"), error.message, ctx),
+          q(ctx, w("status"), w("error"), w("output")),
+          q(opName, w("handled"), ctx, w("output")),
+        ];
+      }
+    },
+  });
 
 // Re-export built-in definitions
 export { builtinIOOperations };

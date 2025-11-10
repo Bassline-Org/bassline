@@ -1,37 +1,36 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Graph } from "@bassline/parser/algebra";
 import { Button } from "~/components/ui/button";
-import { Textarea } from "~/components/ui/textarea";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
 import { parseProgram } from "@bassline/parser/parser";
+import { ReplInput } from "~/components/ReplInput";
 
 interface ViewQueryPanelProps {
     graph: any;
+    events: EventTarget;
     onFilterChange: (quads: any[] | null) => void;
 }
 
 export function ViewQueryPanel({ graph, onFilterChange }: ViewQueryPanelProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [queryInput, setQueryInput] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [matchCount, setMatchCount] = useState<number | null>(null);
+    const [isActive, setIsActive] = useState(false);
 
-    const handleApplyFilter = () => {
+    const handleExecute = (input: string) => {
         try {
             setError(null);
 
-            if (!queryInput.trim()) {
+            if (!input.trim()) {
                 // Empty query = show all
                 onFilterChange(null);
                 setMatchCount(null);
+                setIsActive(false);
                 return;
             }
 
-            // Parse the pattern by wrapping it in a query command
-            const wrappedQuery = `query ${queryInput} `;
-            const commands = parseProgram(wrappedQuery);
-
-            // Execute the query on the graph
+            // Parse and execute the query directly (no wrapping)
+            const commands = parseProgram(input);
             const results = commands.map((fn) => fn(graph));
             console.log("view query results:", results);
 
@@ -45,39 +44,35 @@ export function ViewQueryPanel({ graph, onFilterChange }: ViewQueryPanelProps) {
 
                 onFilterChange(viewGraph.quads);
                 setMatchCount(viewGraph.quads.length);
+                setIsActive(true);
             } else {
                 onFilterChange([]);
                 setMatchCount(0);
+                setIsActive(false);
             }
         } catch (err: any) {
             setError(err.message || "Failed to parse query");
             onFilterChange(null);
             setMatchCount(null);
+            setIsActive(false);
         }
     };
 
     const handleClear = () => {
-        setQueryInput("");
         setError(null);
         setMatchCount(null);
+        setIsActive(false);
         onFilterChange(null);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            handleApplyFilter();
-        }
     };
 
     return (
         <div className="border rounded-lg bg-white shadow-sm">
             {/* Header */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors"
-            >
-                <div className="flex items-center gap-2">
+            <div className="w-full flex items-center justify-between p-3 hover:bg-slate-50 transition-colors">
+                <button
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="flex items-center gap-2 flex-1"
+                >
                     {isOpen
                         ? <ChevronDown className="w-4 h-4" />
                         : <ChevronRight className="w-4 h-4" />}
@@ -90,69 +85,38 @@ export function ViewQueryPanel({ graph, onFilterChange }: ViewQueryPanelProps) {
                             matched)
                         </span>
                     )}
-                </div>
-                {queryInput && (
+                </button>
+                {isActive && (
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleClear();
-                        }}
+                        onClick={handleClear}
                         className="h-6 px-2"
                     >
                         <X className="w-3 h-3" />
                     </Button>
                 )}
-            </button>
+            </div>
 
             {/* Panel Content */}
             {isOpen && (
                 <div className="p-3 pt-0 space-y-2 border-t">
                     <div className="text-xs text-slate-600 mb-2">
-                        Enter a pattern to filter the visualization. Examples:
+                        Enter a query to filter the visualization. Examples:
                         <ul className="mt-1 ml-4 list-disc space-y-0.5 font-mono">
-                            <li>?x age ?a *</li>
-                            <li>alice ?attr ?value *</li>
-                            <li>?person city nyc *</li>
+                            <li>query where &#123; ?person age ?a * &#125;</li>
+                            <li>query where &#123; alice ?attr ?value * &#125;</li>
+                            <li>query where &#123; ?x city nyc * &#125;</li>
                         </ul>
                     </div>
 
-                    <Textarea
-                        value={queryInput}
-                        onChange={(e) => setQueryInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="?entity ?attribute ?value *"
-                        className="font-mono text-sm min-h-[60px]"
-                        rows={2}
-                    />
+                    <ReplInput onExecute={handleExecute} />
 
                     {error && (
                         <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
                             {error}
                         </div>
                     )}
-
-                    <div className="flex gap-2">
-                        <Button
-                            onClick={handleApplyFilter}
-                            size="sm"
-                            className="flex-1"
-                        >
-                            Apply Filter
-                        </Button>
-                        <Button
-                            onClick={handleClear}
-                            variant="outline"
-                            size="sm"
-                        >
-                            Clear
-                        </Button>
-                    </div>
-
-                    <div className="text-xs text-slate-500 italic">
-                        Press Cmd+Enter (or Ctrl+Enter) to apply
-                    </div>
                 </div>
             )}
         </div>

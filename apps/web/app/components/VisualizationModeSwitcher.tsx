@@ -1,6 +1,6 @@
-import { Table2, Network, Columns2 } from "lucide-react";
+import { Table2, Network, Columns2, FileText } from "lucide-react";
 
-export type ViewMode = "table" | "graph" | "both";
+export type ViewMode = "table" | "graph" | "both" | "results";
 
 interface VisualizationModeSwitcherProps {
     value: ViewMode;
@@ -12,6 +12,7 @@ export function VisualizationModeSwitcher({ value, onChange }: VisualizationMode
         { value: "table", label: "Table", icon: Table2 },
         { value: "graph", label: "Graph", icon: Network },
         { value: "both", label: "Both", icon: Columns2 },
+        { value: "results", label: "Results", icon: FileText },
     ];
 
     return (
