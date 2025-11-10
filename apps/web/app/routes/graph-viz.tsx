@@ -2,67 +2,124 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/graph-viz";
 import { WatchedGraph } from "@bassline/parser/algebra/watch";
 import { instrument } from "@bassline/parser/algebra/instrument";
+import { installReifiedRules } from "@bassline/parser/algebra/reified-rules";
 import { GraphVisualization } from "@bassline/parser-react";
+import { parseProgram } from "@bassline/parser/parser";
 import { quad as q } from "@bassline/parser/algebra/quad";
 import { word as w } from "@bassline/parser/types";
+import { ReplInput } from "~/components/ReplInput";
+import { QueryResultsTable } from "~/components/QueryResultsTable";
+import { GraphStatsPanel } from "~/components/GraphStatsPanel";
+import { ContextSelector } from "~/components/ContextSelector";
+import { ErrorDisplay } from "~/components/ErrorDisplay";
 
 export function meta({}: Route.MetaArgs) {
     return [
-        { title: "Graph Visualization Test" },
+        { title: "Bassline Interactive REPL" },
         {
             name: "description",
-            content: "Test the parser-react graph visualization",
+            content: "Interactive graph REPL with real-time visualization",
         },
     ];
 }
 
+// Module-level singleton (persists across navigation)
 const graph = new WatchedGraph();
 const events = instrument(graph);
+
+// Install reified rules system
+installReifiedRules(graph);
+
 export default function GraphViz() {
-    // Add initial data
+    const [queryResults, setQueryResults] = useState<any[]>([]);
+    const [filterContext, setFilterContext] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    // Add initial demo data
     useEffect(() => {
-        // Add some entities and relationships
-        graph.add(q(w("alice"), w("age"), 30, w("demo")));
-        graph.add(q(w("alice"), w("city"), w("nyc"), w("demo")));
-        graph.add(q(w("alice"), w("friend"), w("bob"), w("demo")));
+        // Only add if graph is empty
+        if (graph.quads.length === 0) {
+            graph.add(q(w("alice"), w("age"), 30, w("demo")));
+            graph.add(q(w("alice"), w("city"), w("nyc"), w("demo")));
+            graph.add(q(w("bob"), w("age"), 25, w("demo")));
+            graph.add(q(w("bob"), w("city"), w("sf"), w("demo")));
+        }
+    }, []);
 
-        graph.add(q(w("bob"), w("age"), 25, w("demo")));
-        graph.add(q(w("bob"), w("city"), w("sf"), w("demo")));
-        graph.add(q(w("bob"), w("friend"), w("carol"), w("demo")));
+    const handleExecute = (input: string) => {
+        try {
+            setError(null);
+            const commands = parseProgram(input);
+            const results = commands.map((fn) => fn(graph));
 
-        graph.add(q(w("carol"), w("age"), 35, w("demo")));
-        graph.add(q(w("carol"), w("city"), w("la"), w("demo")));
-
-        // Add more data over time to demonstrate real-time updates
-        const timer1 = setTimeout(() => {
-            console.log("Adding status quad...");
-            graph.add(q(w("alice"), w("status"), w("admin"), w("demo")));
-        }, 2000);
-
-        const timer2 = setTimeout(() => {
-            console.log("Adding friendship quad...");
-            graph.add(q(w("carol"), w("friend"), w("alice"), w("demo")));
-        }, 4000);
-
-        return () => {
-            clearTimeout(timer1);
-            clearTimeout(timer2);
-        };
-    }, [graph]);
+            // Check if this was a query that returned results
+            if (
+                results[0] && Array.isArray(results[0]) &&
+                results[0][0]?.bindings
+            ) {
+                setQueryResults(results[0]);
+            } else {
+                // Clear results for non-query commands
+                setQueryResults([]);
+            }
+        } catch (err: any) {
+            setError(err.message || "Unknown error");
+            setQueryResults([]);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="p-4">
-                <h1 className="text-2xl font-bold mb-4">
-                    Graph Visualization Test
-                </h1>
-                <p className="text-sm text-slate-600 mb-4">
-                    Watch the graph update in real-time as new quads are added
-                    (at 2s and 4s).
-                </p>
-            </div>
-            <div style={{ width: "100%", height: "calc(100vh - 120px)" }}>
-                <GraphVisualization graph={graph} events={events} />
+            <div className="container mx-auto p-6 space-y-4">
+                {/* Header */}
+                <div>
+                    <h1 className="text-3xl font-bold mb-2">
+                        Bassline Interactive REPL
+                    </h1>
+                    <p className="text-sm text-slate-600">
+                        Execute pattern commands and explore the graph in
+                        real-time
+                    </p>
+                </div>
+
+                {/* REPL Input */}
+                <ReplInput onExecute={handleExecute} />
+
+                {/* Error Display */}
+                {error && (
+                    <ErrorDisplay
+                        error={error}
+                        onDismiss={() => setError(null)}
+                    />
+                )}
+
+                {/* Query Results */}
+                {queryResults.length > 0 && (
+                    <QueryResultsTable results={queryResults} />
+                )}
+
+                {/* Stats & Context Filter */}
+                <div className="flex gap-4 items-center">
+                    <GraphStatsPanel graph={graph} events={events} />
+                    <ContextSelector
+                        graph={graph}
+                        events={events}
+                        value={filterContext}
+                        onChange={setFilterContext}
+                    />
+                </div>
+
+                {/* Graph Visualization */}
+                <div
+                    className="border rounded-lg bg-white"
+                    style={{ height: "500px" }}
+                >
+                    <GraphVisualization
+                        graph={graph}
+                        events={events}
+                        filterContext={filterContext}
+                    />
+                </div>
             </div>
         </div>
     );
