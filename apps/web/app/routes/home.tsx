@@ -18,6 +18,34 @@ export default function Home() {
                     A hyper-minimal propagation network model
                 </p>
 
+                {/* Featured: Full Workspace */}
+                <Link to="/workspace-full" className="block mb-8">
+                    <div className="border-2 border-amber-300 rounded-xl p-8 hover:border-amber-400 hover:shadow-2xl transition-all bg-gradient-to-br from-amber-50 to-orange-50">
+                        <div className="flex items-center gap-3 mb-3">
+                            <span className="text-4xl">✨</span>
+                            <h2 className="text-3xl font-bold text-amber-900">
+                                Full Workspace
+                            </h2>
+                            <span className="px-3 py-1 bg-amber-200 text-amber-900 text-xs font-bold rounded-full">
+                                NEW
+                            </span>
+                        </div>
+                        <p className="text-lg text-slate-700 mb-4">
+                            Complete workspace with all panels in a dynamic,
+                            customizable layout - drag, resize, and arrange panels
+                            to create your perfect development environment
+                        </p>
+                        <div className="flex gap-4 items-center">
+                            <Button size="lg" variant="default">
+                                Open Full Workspace
+                            </Button>
+                            <span className="text-sm text-slate-600">
+                                Includes: Layer List • REPL • Plugboard • Version Control
+                            </span>
+                        </div>
+                    </div>
+                </Link>
+
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {/* Sex Editor */}
                     <Link to="/sex-editor" className="block">

@@ -28,6 +28,9 @@ type Pages = {
   "/components-demo": {
     params: {};
   };
+  "/workspace-full": {
+    params: {};
+  };
   "/project-demo": {
     params: {};
   };
@@ -45,7 +48,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/layered-control-demo" | "/workspace-plugboard" | "/workspace-staging" | "/workspace-layers" | "/components-demo" | "/project-demo" | "/graph-viz" | "/home" | "/repl";
+    page: "/" | "/layered-control-demo" | "/workspace-plugboard" | "/workspace-staging" | "/workspace-layers" | "/components-demo" | "/workspace-full" | "/project-demo" | "/graph-viz" | "/home" | "/repl";
   };
   "routes/layered-control-demo.tsx": {
     id: "routes/layered-control-demo";
@@ -66,6 +69,10 @@ type RouteFiles = {
   "routes/components-demo.tsx": {
     id: "routes/components-demo";
     page: "/components-demo";
+  };
+  "routes/workspace-full.tsx": {
+    id: "routes/workspace-full";
+    page: "/workspace-full";
   };
   "routes/project-demo.tsx": {
     id: "routes/project-demo";

@@ -1,7 +1,6 @@
-import { useMemo } from "react";
 import type { Route } from "./+types/workspace-staging";
-import { LayeredControl } from "@bassline/parser/control";
-import { WorkspaceProvider, Workspace } from "@bassline/parser-react";
+import { useProject } from "@bassline/parser-react/state";
+import { WorkspaceProvider, Workspace, ProjectHeader } from "@bassline/parser-react";
 import {
     LayerListPanel,
     StagingCommitPanel,
@@ -20,19 +19,38 @@ export function meta({}: Route.MetaArgs) {
 /**
  * Staging Workspace - Version control operations
  *
- * Demonstrates workspace with 2 panels:
+ * Features:
+ * - Project management (save/load/export/import)
  * - Left (30%): LayerListPanel
  * - Right (70%): StagingCommitPanel (staging, commits, branches)
  *
  * This workspace focuses on Git-style version control operations.
  */
 export default function WorkspaceStaging() {
-    // Create LayeredControl instance (could be from useProject in future)
-    const lc = useMemo(() => new LayeredControl(), []);
+    const {
+        lc,
+        projectName,
+        isDirty,
+        exportProject,
+        importProject,
+        newProject,
+        listProjects,
+        loadProject,
+    } = useProject("staging-workspace");
 
     return (
         <WorkspaceProvider lc={lc}>
-            <Workspace>
+            <div className="h-screen flex flex-col">
+                <ProjectHeader
+                    projectName={projectName}
+                    isDirty={isDirty}
+                    onExport={exportProject}
+                    onImport={importProject}
+                    onNewProject={newProject}
+                    projects={listProjects()}
+                    onLoadProject={loadProject}
+                />
+                <Workspace>
                 <div className="container mx-auto p-6">
                     {/* Header */}
                     <div className="mb-6">
@@ -99,6 +117,7 @@ export default function WorkspaceStaging() {
                     </div>
                 </div>
             </Workspace>
+            </div>
         </WorkspaceProvider>
     );
 }

@@ -1,7 +1,6 @@
-import { useMemo } from "react";
 import type { Route } from "./+types/workspace-plugboard";
-import { LayeredControl } from "@bassline/parser/control";
-import { WorkspaceProvider, Workspace } from "@bassline/parser-react";
+import { useProject } from "@bassline/parser-react/state";
+import { WorkspaceProvider, Workspace, ProjectHeader } from "@bassline/parser-react";
 import {
     LayerListPanel,
     ReplPanel,
@@ -21,7 +20,8 @@ export function meta({}: Route.MetaArgs) {
 /**
  * Plugboard Workspace - Visual routing diagram workspace
  *
- * Demonstrates workspace with 3 panels:
+ * Features:
+ * - Project management (save/load/export/import)
  * - Top Left (25%): LayerListPanel
  * - Top Right (75%): PlugboardPanel (visual routing diagram)
  * - Bottom (100%): ReplPanel
@@ -29,12 +29,30 @@ export function meta({}: Route.MetaArgs) {
  * This workspace focuses on visual routing and connection management.
  */
 export default function WorkspacePlugboard() {
-    // Create LayeredControl instance (could be from useProject in future)
-    const lc = useMemo(() => new LayeredControl(), []);
+    const {
+        lc,
+        projectName,
+        isDirty,
+        exportProject,
+        importProject,
+        newProject,
+        listProjects,
+        loadProject,
+    } = useProject("plugboard-workspace");
 
     return (
         <WorkspaceProvider lc={lc}>
-            <Workspace>
+            <div className="h-screen flex flex-col">
+                <ProjectHeader
+                    projectName={projectName}
+                    isDirty={isDirty}
+                    onExport={exportProject}
+                    onImport={importProject}
+                    onNewProject={newProject}
+                    projects={listProjects()}
+                    onLoadProject={loadProject}
+                />
+                <Workspace>
                 <div className="container mx-auto p-6">
                     {/* Header */}
                     <div className="mb-6">
@@ -111,6 +129,7 @@ export default function WorkspacePlugboard() {
                     </div>
                 </div>
             </Workspace>
+            </div>
         </WorkspaceProvider>
     );
 }

@@ -1,7 +1,6 @@
-import { useMemo } from "react";
 import type { Route } from "./+types/workspace-layers";
-import { LayeredControl } from "@bassline/parser/control";
-import { WorkspaceProvider, Workspace } from "@bassline/parser-react";
+import { useProject } from "@bassline/parser-react/state";
+import { WorkspaceProvider, Workspace, ProjectHeader } from "@bassline/parser-react";
 import { LayerListPanel, ReplPanel } from "@bassline/parser-react/components";
 
 export function meta({}: Route.MetaArgs) {
@@ -17,19 +16,38 @@ export function meta({}: Route.MetaArgs) {
 /**
  * Layers Workspace - Interactive layer management workspace
  *
- * Demonstrates workspace shell with hardcoded 2-column layout:
+ * Features:
+ * - Project management (save/load/export/import)
  * - Left (30%): LayerListPanel
  * - Right (70%): ReplPanel for interactive command execution
  *
  * This workspace focuses on layer management and command execution.
  */
 export default function WorkspaceLayers() {
-    // Create LayeredControl instance (could be from useProject in future)
-    const lc = useMemo(() => new LayeredControl(), []);
+    const {
+        lc,
+        projectName,
+        isDirty,
+        exportProject,
+        importProject,
+        newProject,
+        listProjects,
+        loadProject,
+    } = useProject("layers-workspace");
 
     return (
         <WorkspaceProvider lc={lc}>
-            <Workspace>
+            <div className="h-screen flex flex-col">
+                <ProjectHeader
+                    projectName={projectName}
+                    isDirty={isDirty}
+                    onExport={exportProject}
+                    onImport={importProject}
+                    onNewProject={newProject}
+                    projects={listProjects()}
+                    onLoadProject={loadProject}
+                />
+                <Workspace>
                 <div className="container mx-auto p-6">
                     {/* Header */}
                     <div className="mb-6">
@@ -86,6 +104,7 @@ export default function WorkspaceLayers() {
                     </div>
                 </div>
             </Workspace>
+            </div>
         </WorkspaceProvider>
     );
 }

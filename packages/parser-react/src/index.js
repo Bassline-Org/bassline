@@ -6,4 +6,5 @@ export {
     useWorkspace,
     Workspace,
     WorkspaceProvider,
+    ProjectHeader,
 } from "./workspace/index.js";
