@@ -1,5 +1,27 @@
 # Bassline Session Context - 2025-01-15
 
+## Current Work: LayeredControl UI Architecture
+
+**See [LAYERED-CONTROL-UI-PLAN.md](/Users/goose/prg/bassline/LAYERED-CONTROL-UI-PLAN.md) for complete UI architecture plan.**
+
+We're implementing a composable, interactive panel-based UI for the LayeredControl system (Git-style version control for graph layers). The plan follows an incremental, testable approach with 9 stages:
+
+1. **Stage 1 (IN PROGRESS)**: Make LayeredControl reactive (extend EventTarget, emit events)
+2. **Stage 2**: Build 8 core React hooks with useSyncExternalStore
+3. **Stage 3**: LayerListPanel (simple interactive panel)
+4. **Stage 4**: ReplPanel (text-based layer interaction)
+5. **Stage 5**: PlugboardPanel (React Flow visual routing - fully interactive)
+6. **Stage 6**: StagingPanel (commit UI)
+7. **Stage 7**: HistoryPanel (interactive Git graph)
+8. **Stage 8**: Panel layout system (react-grid-layout)
+9. **Stage 9**: Polish & integration
+
+**Key principles:**
+- Interactive, not just visual (plugboard lets you rewire, history lets you branch)
+- Composable panels
+- Minimal hooks (8 total)
+- Testable at each stage
+
 ## Major Accomplishments This Session
 
 ### 1. Documentation System (COMPLETED ✅)

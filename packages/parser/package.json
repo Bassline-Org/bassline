@@ -7,6 +7,7 @@
     "exports": {
         ".": "./src/algebra/watch.js",
         "./browser": "./src/browser-graph.js",
+        "./control": "./src/control.js",
         "./graph": "./src/algebra/graph.js",
         "./watch": "./src/algebra/watch.js",
         "./parser": "./src/pattern-parser.js",

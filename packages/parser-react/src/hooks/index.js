@@ -15,5 +15,18 @@ export { useEntity, useEntityFull } from "./useEntity.js";
 // Specialized hooks
 export { useActiveRules, useRuleDetails } from "./useActiveRules.js";
 
+// LayeredControl hooks
+export {
+    LayeredControlProvider,
+    useLayeredControl,
+    useLayer,
+    useLayers,
+    useRouting,
+    useLayerQuads,
+    useStaging,
+    useCommits,
+    useBranches,
+} from "./useLayeredControl.jsx";
+
 // Legacy hook (kept for backwards compatibility with existing code)
 export { useGraphQuads } from "./useGraphQuads.js";

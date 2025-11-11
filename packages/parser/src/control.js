@@ -49,7 +49,7 @@ export class Bus extends EventTarget {
     }
 }
 
-export class LayeredControl {
+export class LayeredControl extends EventTarget {
     // =============================================================================
     // CONSTRUCTOR & CORE STATE
     // =============================================================================
@@ -59,6 +59,7 @@ export class LayeredControl {
     // - refs: Branch references (layerName/branchName -> commitHash)
 
     constructor() {
+        super();
         this.layers = {};
         this.quadStore = new Graph();
         this.refs = {};
@@ -76,6 +77,10 @@ export class LayeredControl {
         this.layers[name] = {
             bus: new Bus(),
         };
+
+        this.dispatchEvent(new CustomEvent("bus-added", {
+            detail: { name }
+        }));
     }
     addLayer(name) {
         if (this.layers[name]) {
@@ -94,6 +99,11 @@ export class LayeredControl {
             layer.staging.add(quad.hash());
             this.quadStore.add(quad);
         });
+
+        this.dispatchEvent(new CustomEvent("layer-added", {
+            detail: { name }
+        }));
+
         return control;
     }
 
@@ -101,6 +111,10 @@ export class LayeredControl {
         const { cleanup } = this.getLayer(name) ?? {};
         cleanup?.();
         delete this.layers[name];
+
+        this.dispatchEvent(new CustomEvent("layer-removed", {
+            detail: { name }
+        }));
     }
 
     // =============================================================================
@@ -120,6 +134,10 @@ export class LayeredControl {
         const target = to.control ?? to.bus;
         const cleanup = source.listen((quad) => target.add(quad));
         from.cleanup = cleanup;
+
+        this.dispatchEvent(new CustomEvent("routing-changed", {
+            detail: { from: fromName, to: toName }
+        }));
     }
 
     // =============================================================================
@@ -160,6 +178,10 @@ export class LayeredControl {
             const refKey = `${name}/${layer.currentBranch}`;
             this.refs[refKey] = commitHash;
         }
+
+        this.dispatchEvent(new CustomEvent("committed", {
+            detail: { name, commitHash, message }
+        }));
 
         return commitHash;
     }
@@ -260,6 +282,10 @@ export class LayeredControl {
             this.route(sourceName, name);
         }
 
+        this.dispatchEvent(new CustomEvent("restored", {
+            detail: { name, commitHash }
+        }));
+
         return control;
     }
 
@@ -311,6 +337,11 @@ export class LayeredControl {
         }
 
         this.refs[refKey] = commit;
+
+        this.dispatchEvent(new CustomEvent("branch-created", {
+            detail: { layerName, branchName, commitHash: commit }
+        }));
+
         return refKey;
     }
 
@@ -334,6 +365,10 @@ export class LayeredControl {
         // Update HEAD to point to branch
         layer.currentBranch = branchName;
 
+        this.dispatchEvent(new CustomEvent("branch-switched", {
+            detail: { layerName, branchName, commitHash }
+        }));
+
         return commitHash;
     }
 
@@ -352,6 +387,10 @@ export class LayeredControl {
         }
 
         delete this.refs[refKey];
+
+        this.dispatchEvent(new CustomEvent("branch-deleted", {
+            detail: { layerName, branchName }
+        }));
     }
 
     listBranches(layerName) {
@@ -378,6 +417,10 @@ export class LayeredControl {
 
         // Detach from branch
         layer.currentBranch = null;
+
+        this.dispatchEvent(new CustomEvent("head-detached", {
+            detail: { layerName, commitHash }
+        }));
 
         return commitHash;
     }
@@ -510,64 +553,65 @@ export class LayeredControl {
 }
 
 // =============================================================================
-// TEST / DEMO CODE
+// TEST / DEMO CODE (commented out to avoid running during imports)
 // =============================================================================
-
-const layered = new LayeredControl();
-
-const foo = layered.addLayer("foo");
-
-// Add initial data and commit
-foo.run(`insert { alice age 30 system }`);
-const commit1 = layered.commit("foo", "Initial commit");
-console.log("Commit 1:", commit1);
-
-// Create main branch at commit1
-layered.createBranch("foo", "main", commit1);
-console.log("Created branch: main");
-
-// Switch to main (makes commits update branch ref)
-layered.switchBranch("foo", "main");
-console.log("Current branch:", layered.getCurrentBranch("foo"));
-
-// Add more data on main
-foo.run(`insert { alice city NYC system }`);
-layered.commit("foo", "Add city");
-console.log("Committed on main");
-
-// Create feature branch from current commit
-layered.createBranch("foo", "feature-x");
-layered.switchBranch("foo", "feature-x");
-console.log("Switched to branch: feature-x");
-
-// Add feature data
-foo.run(`insert { alice hobby coding system }`);
-layered.commit("foo", "Add hobby");
-console.log("Committed on feature-x");
-
-// Check branch status
-console.log("\nBranches:", layered.listBranches("foo"));
-console.log("Current branch:", layered.getCurrentBranch("foo"));
-console.log("Refs:", layered.refs);
-
-// Switch back to main
-layered.switchBranch("foo", "main");
-console.log("\nSwitched back to main");
-const mainData = foo.run(`query where { alice ?a ?v system }`);
-console.log("Alice data on main:", mainData.length); // Should be 2: age and city (not hobby)
-
-// Switch to feature-x
-layered.switchBranch("foo", "feature-x");
-console.log("\nSwitched to feature-x");
-const featureData = foo.run(`query where { alice ?a ?v system }`);
-console.log("Alice data on feature-x:", featureData.length); // Should be 3: age, city, and hobby
-
-// Commit history from feature-x
-console.log("\nHistory on feature-x:", layered.getCommitHistory("foo"));
-
-// Detached HEAD
-console.log("\nDetaching HEAD to commit1...");
-layered.detachHead("foo", commit1);
-console.log("Current branch (detached):", layered.getCurrentBranch("foo"));
-const detachedData = foo.run(`query where { alice ?a ?v system }`);
-console.log("Alice data at commit1:", detachedData.length); // Should be 1: just age
+// To run demo: node packages/parser/src/control.js
+//
+// const layered = new LayeredControl();
+//
+// const foo = layered.addLayer("foo");
+//
+// // Add initial data and commit
+// foo.run(`insert { alice age 30 system }`);
+// const commit1 = layered.commit("foo", "Initial commit");
+// console.log("Commit 1:", commit1);
+//
+// // Create main branch at commit1
+// layered.createBranch("foo", "main", commit1);
+// console.log("Created branch: main");
+//
+// // Switch to main (makes commits update branch ref)
+// layered.switchBranch("foo", "main");
+// console.log("Current branch:", layered.getCurrentBranch("foo"));
+//
+// // Add more data on main
+// foo.run(`insert { alice city NYC system }`);
+// layered.commit("foo", "Add city");
+// console.log("Committed on main");
+//
+// // Create feature branch from current commit
+// layered.createBranch("foo", "feature-x");
+// layered.switchBranch("foo", "feature-x");
+// console.log("Switched to branch: feature-x");
+//
+// // Add feature data
+// foo.run(`insert { alice hobby coding system }`);
+// layered.commit("foo", "Add hobby");
+// console.log("Committed on feature-x");
+//
+// // Check branch status
+// console.log("\nBranches:", layered.listBranches("foo"));
+// console.log("Current branch:", layered.getCurrentBranch("foo"));
+// console.log("Refs:", layered.refs);
+//
+// // Switch back to main
+// layered.switchBranch("foo", "main");
+// console.log("\nSwitched back to main");
+// const mainData = foo.run(`query where { alice ?a ?v system }`);
+// console.log("Alice data on main:", mainData.length); // Should be 2: age and city (not hobby)
+//
+// // Switch to feature-x
+// layered.switchBranch("foo", "feature-x");
+// console.log("\nSwitched to feature-x");
+// const featureData = foo.run(`query where { alice ?a ?v system }`);
+// console.log("Alice data on feature-x:", featureData.length); // Should be 3: age, city, and hobby
+//
+// // Commit history from feature-x
+// console.log("\nHistory on feature-x:", layered.getCommitHistory("foo"));
+//
+// // Detached HEAD
+// console.log("\nDetaching HEAD to commit1...");
+// layered.detachHead("foo", commit1);
+// console.log("Current branch (detached):", layered.getCurrentBranch("foo"));
+// const detachedData = foo.run(`query where { alice ?a ?v system }`);
+// console.log("Alice data at commit1:", detachedData.length); // Should be 1: just age

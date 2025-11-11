@@ -74,6 +74,20 @@ export default function Home() {
                             <Button variant="default">Open Demo</Button>
                         </div>
                     </Link>
+
+                    {/* LayeredControl Hooks Demo */}
+                    <Link to="/layered-control-demo" className="block">
+                        <div className="border border-orange-200 rounded-lg p-6 hover:border-orange-300 hover:shadow-lg transition-all bg-orange-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                🎛️ LayeredControl Hooks
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Reactive LayeredControl with Git-style version control -
+                                layers, commits, branches, staging
+                            </p>
+                            <Button variant="default">Open Demo</Button>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>
