@@ -1,5 +1,8 @@
-import { useSyncExternalStore, useMemo } from 'react';
-import { useGraph } from './useGraph.jsx';
+import { useMemo, useSyncExternalStore } from "react";
+import { useGraph } from "./useGraph.jsx";
+import { useState } from "react";
+import { useCallback } from "react";
+import { useEffect } from "react";
 
 /**
  * Reactive query hook - automatically re-queries when graph changes
@@ -52,27 +55,17 @@ import { useGraph } from './useGraph.jsx';
  * const active = useQuery(activePattern, events);
  * ```
  */
-export function useQuery(pattern, events) {
+export function useQuery(pattern, onMatch = () => {}) {
     const graph = useGraph();
-
-    // Create stable store for this pattern/graph/events combination
-    const store = useMemo(() => {
-        // Execute query and cache result
-        let cachedSnapshot = graph.query(pattern);
-
-        return {
-            subscribe: (callback) => {
-                const handler = () => {
-                    // Re-execute query when graph changes
-                    cachedSnapshot = graph.query(pattern);
-                    callback();
-                };
-                events.addEventListener('quad-added', handler);
-                return () => events.removeEventListener('quad-added', handler);
+    useEffect(() => {
+        const unwatch = graph.watch({
+            pattern,
+            production: (match) => {
+                onMatch(match);
+                return [];
             },
-            getSnapshot: () => cachedSnapshot,
-        };
-    }, [graph, events, pattern]);
-
-    return useSyncExternalStore(store.subscribe, store.getSnapshot);
+        });
+        return () => unwatch();
+    }, [pattern, graph]);
+    return null;
 }

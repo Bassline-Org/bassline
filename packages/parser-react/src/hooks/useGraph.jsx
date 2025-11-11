@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext } from "react";
 
 /**
  * Context for providing the graph instance to all components
@@ -30,7 +30,7 @@ export const GraphContext = createContext(null);
  */
 export function GraphProvider({ graph, children }) {
     if (!graph) {
-        throw new Error('GraphProvider requires a graph instance');
+        throw new Error("GraphProvider requires a graph instance");
     }
 
     return (
@@ -65,8 +65,8 @@ export function useGraph() {
 
     if (!graph) {
         throw new Error(
-            'useGraph must be used within a GraphProvider. ' +
-            'Wrap your component tree with <GraphProvider graph={graph}>.'
+            "useGraph must be used within a GraphProvider. " +
+                "Wrap your component tree with <GraphProvider graph={graph}>.",
         );
     }
 

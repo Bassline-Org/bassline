@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
-import { useQuery } from './useQuery.js';
-import { pattern, patternQuad as pq } from '@bassline/parser/algebra';
-import { variable as v, word as w, isWord } from '@bassline/parser/types';
+import { useMemo, useState } from "react";
+import { useQuery } from "./useQuery.js";
+import { pattern, patternQuad as pq } from "@bassline/parser/algebra";
+import { isWord, variable as v, word as w } from "@bassline/parser/types";
 
 /**
  * Hook for exploring a single entity
@@ -35,19 +35,20 @@ import { variable as v, word as w, isWord } from '@bassline/parser/types';
  * }
  * ```
  */
-export function useEntity(entityId, events) {
-    // Build pattern: entity ?attr ?value *
-    // Use symbol description as stable key for memoization
-    const entityKey = isWord(entityId) ? entityId.spelling.description : entityId;
-
+export function useEntity(entityId) {
+    const entity = isWord(entityId) ? entityId : w(entityId);
+    const [matches, setMatches] = useState([]);
     const entityPattern = useMemo(() => {
-        const entity = isWord(entityId) ? entityId : w(entityId);
         return pattern(
-            pq(entity, v('attr'), v('value'))
+            pq(entity, v("attr"), v("value")),
         );
-    }, [entityKey]);
+    }, [entity]);
 
-    return useQuery(entityPattern, events);
+    useQuery(entityPattern, (match) => {
+        setMatches([...matches, match]);
+    });
+
+    return matches;
 }
 
 /**
@@ -82,28 +83,26 @@ export function useEntity(entityId, events) {
  * }
  * ```
  */
-export function useEntityFull(entityId, events) {
-    // Use symbol description as stable key for memoization
-    const entityKey = isWord(entityId) ? entityId.spelling.description : entityId;
-
-    // Outgoing: entity ?attr ?value *
-    const outgoingPattern = useMemo(() => {
-        const entity = isWord(entityId) ? entityId : w(entityId);
-        return pattern(
-            pq(entity, v('attr'), v('value'))
-        );
-    }, [entityKey]);
-
-    // Incoming: ?source ?attr entity *
-    const incomingPattern = useMemo(() => {
-        const entity = isWord(entityId) ? entityId : w(entityId);
-        return pattern(
-            pq(v('source'), v('attr'), entity)
-        );
-    }, [entityKey]);
-
-    const outgoing = useQuery(outgoingPattern, events);
-    const incoming = useQuery(incomingPattern, events);
+export function useEntityFull(entityId) {
+    const entity = isWord(entityId) ? entityId : w(entityId);
+    const incomingPattern = useMemo(() =>
+        pattern(
+            pq(v("source"), v("attr"), entity),
+        ), [entity]);
+    const outgoingPattern = useMemo(() =>
+        pattern(
+            pq(entity, v("attr"), v("value")),
+        ), [entity]);
+    const [outgoing, setOutgoing] = useState([]);
+    const [incoming, setIncoming] = useState([]);
+    useQuery(
+        outgoingPattern,
+        (match) => setOutgoing((prev) => [...prev, match]),
+    );
+    useQuery(
+        incomingPattern,
+        (match) => setIncoming((prev) => [...prev, match]),
+    );
 
     return { outgoing, incoming };
 }

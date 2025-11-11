@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from "react";
 
 /**
  * Subscribe to graph changes via EventTarget and get current quads.
@@ -34,10 +34,10 @@ export function useGraphQuads(graph, events) {
                     cachedSnapshot = graph.quads;
                     callback();
                 };
-                events.addEventListener('quad-added', handler);
-                return () => events.removeEventListener('quad-added', handler);
+                events.addEventListener("quad-added", handler);
+                return () => events.removeEventListener("quad-added", handler);
             },
-            getSnapshot: () => cachedSnapshot
+            getSnapshot: () => cachedSnapshot,
         };
     }, [graph, events]);
 

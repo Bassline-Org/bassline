@@ -10,3 +10,8 @@ export { Inspector } from './Inspector.jsx';
 export { EntityList } from './EntityList.jsx';
 export { QuadForm } from './QuadForm.jsx';
 export { GraphStats } from './GraphStats.jsx';
+
+// Phase 4: Rules and automation
+export { RuleList } from './RuleList.jsx';
+export { RuleEditor } from './RuleEditor.jsx';
+export { RuleDebugger } from './RuleDebugger.jsx';

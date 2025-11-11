@@ -8,10 +8,12 @@
  */
 
 // Core hooks
-export { GraphProvider, useGraph, GraphContext } from './useGraph.jsx';
-export { useQuery } from './useQuery.js';
-export { useEntity, useEntityFull } from './useEntity.js';
-export { useGraphMutation } from './useGraphMutation.js';
+export { GraphContext, GraphProvider, useGraph } from "./useGraph.jsx";
+export { useQuery } from "./useQuery.js";
+export { useEntity, useEntityFull } from "./useEntity.js";
+
+// Specialized hooks
+export { useActiveRules, useRuleDetails } from "./useActiveRules.js";
 
 // Legacy hook (kept for backwards compatibility with existing code)
-export { useGraphQuads } from './useGraphQuads.js';
+export { useGraphQuads } from "./useGraphQuads.js";

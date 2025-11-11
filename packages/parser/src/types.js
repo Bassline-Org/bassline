@@ -64,7 +64,7 @@ export class Word {
   }
 
   toString() {
-    return `Word(${this.spelling.description})`;
+    return `${this.spelling.description}`;
   }
 }
 
@@ -246,43 +246,12 @@ export function match(value, handlers) {
  */
 export function serialize(value) {
   return match(value, {
-    word: (spelling) => `w:${spelling}`,
-    string: (str) => `s:${str}`,
-    number: (num) => `n:${num}`,
-    variable: (name) => `v:${name}`,
+    word: (spelling) => spelling.toString(),
+    string: (str) => `"${str}"`,
+    number: (num) => num.toString(),
+    variable: (name) => name.toString(),
     wildcard: () => "_",
   });
-}
-
-/**
- * Deserialize string to typed value
- */
-export function deserialize(str) {
-  if (typeof str !== "string") {
-    throw new Error(`Cannot deserialize non-string: ${typeof str}`);
-  }
-
-  if (str.startsWith("w:")) {
-    return new Word(str.slice(2));
-  }
-
-  if (str.startsWith("s:")) {
-    return str.slice(2);
-  }
-
-  if (str.startsWith("n:")) {
-    return Number(str.slice(2));
-  }
-
-  if (str.startsWith("v:")) {
-    return new PatternVar(str.slice(2));
-  }
-
-  if (str === "_") {
-    return WC;
-  }
-
-  throw new Error(`Invalid serialized value: ${str}`);
 }
 
 /**
