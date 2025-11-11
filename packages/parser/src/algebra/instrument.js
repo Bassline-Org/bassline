@@ -28,8 +28,8 @@ export function instrument(graph) {
     const emitter = new EventTarget();
 
     const originalAdd = graph.add.bind(graph);
-    graph.add = function(quad) {
-        emitter.dispatchEvent(new CustomEvent('quad-added', { detail: quad }));
+    graph.add = function (quad) {
+        emitter.dispatchEvent(new CustomEvent("quad-added", { detail: quad }));
         return originalAdd(quad);
     };
 

@@ -30,7 +30,7 @@ export class Graph {
         return this._quads.has(quad.hash());
     }
     add(quad) {
-        const h = quad.hash();  // Compute hash once
+        const h = quad.hash(); // Compute hash once
         if (this._quads.has(h)) {
             return this;
         }
@@ -38,7 +38,7 @@ export class Graph {
         return this;
     }
     remove(quad) {
-        const h = quad.hash();  // Compute hash once
+        const h = quad.hash(); // Compute hash once
         if (!this._quads.has(h)) {
             return this;
         }
