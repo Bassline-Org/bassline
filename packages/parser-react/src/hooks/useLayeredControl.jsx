@@ -198,6 +198,11 @@ export function useStaging(layerName) {
 
     return useSyncExternalStore(
         (callback) => {
+            // Handle null layerName
+            if (layerName === null || layerName === undefined) {
+                return () => {};
+            }
+
             // Staging changes when quads are added
             const layer = lc.getLayer(layerName);
             if (!layer?.control) return () => {};
@@ -216,6 +221,11 @@ export function useStaging(layerName) {
             };
         },
         () => {
+            // Handle null layerName
+            if (layerName === null || layerName === undefined) {
+                return cacheRef.current.value;
+            }
+
             const layer = lc.getLayer(layerName);
             const count = layer?.staging?.size ?? 0;
 
@@ -244,6 +254,11 @@ export function useCommits(layerName, maxCount = 20) {
 
     return useSyncExternalStore(
         (callback) => {
+            // Handle null layerName
+            if (layerName === null || layerName === undefined) {
+                return () => {};
+            }
+
             const handler = (e) => {
                 if (
                     e.detail.name === layerName ||
@@ -264,6 +279,11 @@ export function useCommits(layerName, maxCount = 20) {
             };
         },
         () => {
+            // Handle null layerName
+            if (layerName === null || layerName === undefined) {
+                return EMPTY_ARRAY;
+            }
+
             const commits = lc.getCommitHistory(layerName, maxCount);
             const cacheKey = `${commits.length}:${commits[0]?.hash ?? "empty"}`;
 
@@ -288,6 +308,11 @@ export function useBranches(layerName) {
 
     return useSyncExternalStore(
         (callback) => {
+            // Handle null layerName
+            if (layerName === null || layerName === undefined) {
+                return () => {};
+            }
+
             const handler = (e) => {
                 if (e.detail.layerName === layerName) callback();
             };
@@ -305,6 +330,11 @@ export function useBranches(layerName) {
             };
         },
         () => {
+            // Handle null layerName
+            if (layerName === null || layerName === undefined) {
+                return EMPTY_OBJECT;
+            }
+
             const branches = lc.listBranches(layerName);
             const current = lc.getCurrentBranch(layerName);
             const cacheKey = `${branches.join(",")}:${current ?? "null"}`;

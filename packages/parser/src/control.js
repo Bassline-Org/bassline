@@ -196,6 +196,54 @@ export class LayeredControl extends EventTarget {
         return layer ? layer.staging.size : 0;
     }
 
+    unstage(name, quadHash) {
+        const layer = this.layers[name];
+        if (!layer) throw new Error(`Layer not found: ${name}`);
+
+        const removed = layer.staging.delete(quadHash);
+
+        if (removed) {
+            this.dispatchEvent(new CustomEvent("staging-changed", {
+                detail: { layerName: name, action: "unstage", quadHash }
+            }));
+        }
+
+        return removed;
+    }
+
+    clearStaging(name) {
+        const layer = this.layers[name];
+        if (!layer) throw new Error(`Layer not found: ${name}`);
+
+        const count = layer.staging.size;
+        layer.staging.clear();
+
+        if (count > 0) {
+            this.dispatchEvent(new CustomEvent("staging-changed", {
+                detail: { layerName: name, action: "clear", count }
+            }));
+        }
+
+        return count;
+    }
+
+    getStagedQuads(name) {
+        const layer = this.layers[name];
+        if (!layer) throw new Error(`Layer not found: ${name}`);
+
+        const quads = [];
+        for (const quadHash of layer.staging) {
+            for (const quad of this.quadStore.quads) {
+                if (quad.hash() === quadHash) {
+                    quads.push(quad);
+                    break;
+                }
+            }
+        }
+
+        return quads;
+    }
+
     // =============================================================================
     // VERSION CONTROL: HISTORY & RESTORE
     // =============================================================================

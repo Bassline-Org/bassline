@@ -19,6 +19,9 @@ type Pages = {
   "/workspace-plugboard": {
     params: {};
   };
+  "/workspace-staging": {
+    params: {};
+  };
   "/workspace-layers": {
     params: {};
   };
@@ -42,7 +45,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/layered-control-demo" | "/workspace-plugboard" | "/workspace-layers" | "/components-demo" | "/project-demo" | "/graph-viz" | "/home" | "/repl";
+    page: "/" | "/layered-control-demo" | "/workspace-plugboard" | "/workspace-staging" | "/workspace-layers" | "/components-demo" | "/project-demo" | "/graph-viz" | "/home" | "/repl";
   };
   "routes/layered-control-demo.tsx": {
     id: "routes/layered-control-demo";
@@ -51,6 +54,10 @@ type RouteFiles = {
   "routes/workspace-plugboard.tsx": {
     id: "routes/workspace-plugboard";
     page: "/workspace-plugboard";
+  };
+  "routes/workspace-staging.tsx": {
+    id: "routes/workspace-staging";
+    page: "/workspace-staging";
   };
   "routes/workspace-layers.tsx": {
     id: "routes/workspace-layers";

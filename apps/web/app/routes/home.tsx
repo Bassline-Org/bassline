@@ -116,6 +116,34 @@ export default function Home() {
                             <Button variant="default">Open Workspace</Button>
                         </div>
                     </Link>
+
+                    {/* Plugboard Workspace */}
+                    <Link to="/workspace-plugboard" className="block">
+                        <div className="border border-pink-200 rounded-lg p-6 hover:border-pink-300 hover:shadow-lg transition-all bg-pink-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                🔌 Plugboard Workspace
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Visual routing diagram with React Flow -
+                                drag-and-drop connections between layers
+                            </p>
+                            <Button variant="default">Open Plugboard</Button>
+                        </div>
+                    </Link>
+
+                    {/* Staging & Commits Workspace */}
+                    <Link to="/workspace-staging" className="block">
+                        <div className="border border-emerald-200 rounded-lg p-6 hover:border-emerald-300 hover:shadow-lg transition-all bg-emerald-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                📦 Staging & Commits
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Git-style version control workspace -
+                                staging, commits, history, and branch management
+                            </p>
+                            <Button variant="default">Open Staging</Button>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>
