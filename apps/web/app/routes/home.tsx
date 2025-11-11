@@ -102,6 +102,20 @@ export default function Home() {
                             <Button variant="default">Open Demo</Button>
                         </div>
                     </Link>
+
+                    {/* Layers Workspace */}
+                    <Link to="/workspace-layers" className="block">
+                        <div className="border border-indigo-200 rounded-lg p-6 hover:border-indigo-300 hover:shadow-lg transition-all bg-indigo-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                🎛️ Layers Workspace
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Interactive workspace for managing layers -
+                                unified view with shared context and multiple panels
+                            </p>
+                            <Button variant="default">Open Workspace</Button>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>
