@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { Route } from "./+types/workspace-layers";
 import { LayeredControl } from "@bassline/parser/control";
 import { WorkspaceProvider, Workspace } from "@bassline/parser-react";
-import { LayerListPanel } from "@bassline/parser-react/components";
+import { LayerListPanel, ReplPanel } from "@bassline/parser-react/components";
 
 export function meta({}: Route.MetaArgs) {
     return [
@@ -15,14 +15,13 @@ export function meta({}: Route.MetaArgs) {
 }
 
 /**
- * Layers Workspace - First workspace view
+ * Layers Workspace - Interactive layer management workspace
  *
  * Demonstrates workspace shell with hardcoded 2-column layout:
  * - Left (30%): LayerListPanel
- * - Right (70%): Placeholder for future panels
+ * - Right (70%): ReplPanel for interactive command execution
  *
- * This workspace focuses on layer management and will be extended
- * with REPL panel in Stage 5.
+ * This workspace focuses on layer management and command execution.
  */
 export default function WorkspaceLayers() {
     // Create LayeredControl instance (could be from useProject in future)
@@ -51,19 +50,10 @@ export default function WorkspaceLayers() {
                             </div>
                         </div>
 
-                        {/* Right column: Placeholder */}
+                        {/* Right column: ReplPanel */}
                         <div className="w-[70%] flex flex-col">
-                            <div className="flex-1 border border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-white">
-                                <div className="text-center p-8">
-                                    <div className="text-6xl mb-4">📝</div>
-                                    <h3 className="text-xl font-semibold mb-2 text-slate-700">
-                                        REPL Panel Coming Soon
-                                    </h3>
-                                    <p className="text-slate-500 max-w-md">
-                                        Stage 5 will add an interactive REPL panel here
-                                        for executing commands on the selected layer.
-                                    </p>
-                                </div>
+                            <div className="flex-1 overflow-hidden">
+                                <ReplPanel />
                             </div>
                         </div>
                     </div>
@@ -75,20 +65,22 @@ export default function WorkspaceLayers() {
                         </h3>
                         <ul className="text-sm text-blue-800 space-y-1">
                             <li>
-                                • <strong>WorkspaceProvider</strong> shares LayeredControl instance
-                                and "active layer" state across panels
+                                • <strong>Create a layer</strong> using the LayerListPanel on the left
                             </li>
                             <li>
-                                • <strong>LayerListPanel</strong> shows all layers and lets you
-                                select the active one
+                                • <strong>Click a layer</strong> to set it as the active layer
                             </li>
                             <li>
-                                • <strong>Hardcoded layout</strong> (30% / 70% split) -
-                                Stage 9 will add dynamic resizing
+                                • <strong>Execute commands</strong> in the REPL panel on the right
                             </li>
                             <li>
-                                • <strong>Stage 5</strong> will add REPL panel that executes
-                                commands on the active layer
+                                • Try commands: <code className="bg-blue-100 px-1 rounded">help</code>,{" "}
+                                <code className="bg-blue-100 px-1 rounded">info</code>,{" "}
+                                <code className="bg-blue-100 px-1 rounded">quads</code>,{" "}
+                                <code className="bg-blue-100 px-1 rounded">staging</code>
+                            </li>
+                            <li>
+                                • <strong>Use ↑↓ arrows</strong> to navigate command history
                             </li>
                         </ul>
                     </div>

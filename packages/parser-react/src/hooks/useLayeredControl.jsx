@@ -53,12 +53,18 @@ export function useLayeredControl() {
 
 /**
  * Get a specific layer's Control instance
- * @param {string} name - The layer name
- * @returns {Control} The Control instance for this layer
- * @throws {Error} If layer not found
+ * @param {string | null} name - The layer name (null returns null)
+ * @returns {Control | null} The Control instance for this layer, or null if name is null
+ * @throws {Error} If layer not found (when name is not null)
  */
 export function useLayer(name) {
     const lc = useLayeredControl();
+
+    // Handle null case (no active layer)
+    if (name === null || name === undefined) {
+        return null;
+    }
+
     const layer = lc.getLayer(name);
     if (!layer) {
         throw new Error(`Layer not found: ${name}`);

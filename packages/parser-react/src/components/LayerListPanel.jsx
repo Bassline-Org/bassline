@@ -17,10 +17,12 @@ import {
     useCommits,
     useBranches
 } from "../hooks/useLayeredControl.jsx";
+import { useWorkspace } from "@bassline/parser-react";
 
 export function LayerListPanel() {
     const lc = useLayeredControl();
     const layers = useLayers();
+    const { activeLayer, setActiveLayer } = useWorkspace();
     const [newLayerName, setNewLayerName] = useState("");
 
     const handleAddLayer = () => {
@@ -68,6 +70,8 @@ export function LayerListPanel() {
                             <LayerItem
                                 key={name}
                                 name={name}
+                                isActive={name === activeLayer}
+                                onClick={() => setActiveLayer(name)}
                                 onRemove={() => handleRemoveLayer(name)}
                             />
                         ))}
@@ -103,13 +107,18 @@ export function LayerListPanel() {
     );
 }
 
-function LayerItem({ name, onRemove }) {
+function LayerItem({ name, isActive, onClick, onRemove }) {
     const staging = useStaging(name);
     const commits = useCommits(name);
     const branches = useBranches(name);
 
     return (
-        <div className="flex items-center justify-between p-3 border rounded-md hover:bg-accent/50 transition-colors">
+        <div
+            className={`flex items-center justify-between p-3 border rounded-md hover:bg-accent/50 transition-colors cursor-pointer ${
+                isActive ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""
+            }`}
+            onClick={onClick}
+        >
             <div className="flex-1 min-w-0">
                 {/* Layer Name */}
                 <div className="font-medium text-sm truncate mb-1">{name}</div>
@@ -145,7 +154,10 @@ function LayerItem({ name, onRemove }) {
 
             {/* Remove Button */}
             <button
-                onClick={onRemove}
+                onClick={(e) => {
+                    e.stopPropagation(); // Prevent triggering onClick
+                    onRemove();
+                }}
                 className="ml-3 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                 title={`Remove ${name}`}
             >

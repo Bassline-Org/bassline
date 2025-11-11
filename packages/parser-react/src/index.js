@@ -2,4 +2,8 @@
 export { ProjectFile, useProject } from "./state/index.js";
 
 // Workspace components and context
-export { WorkspaceProvider, useWorkspace, Workspace } from "./workspace/index.js";
+export {
+    useWorkspace,
+    Workspace,
+    WorkspaceProvider,
+} from "./workspace/index.js";
