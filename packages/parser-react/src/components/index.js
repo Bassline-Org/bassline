@@ -15,3 +15,6 @@ export { GraphStats } from './GraphStats.jsx';
 export { RuleList } from './RuleList.jsx';
 export { RuleEditor } from './RuleEditor.jsx';
 export { RuleDebugger } from './RuleDebugger.jsx';
+
+// Phase 5: LayeredControl panels
+export { LayerListPanel } from './LayerListPanel.jsx';

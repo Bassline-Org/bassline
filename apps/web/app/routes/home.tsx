@@ -88,6 +88,20 @@ export default function Home() {
                             <Button variant="default">Open Demo</Button>
                         </div>
                     </Link>
+
+                    {/* Project Management Demo */}
+                    <Link to="/project-demo" className="block">
+                        <div className="border border-teal-200 rounded-lg p-6 hover:border-teal-300 hover:shadow-lg transition-all bg-teal-50">
+                            <h2 className="text-xl font-semibold mb-2">
+                                💾 Project Management
+                            </h2>
+                            <p className="text-slate-600 mb-4">
+                                Unified project files with LayeredControl + UI state -
+                                save, load, export, import complete projects
+                            </p>
+                            <Button variant="default">Open Demo</Button>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>

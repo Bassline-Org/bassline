@@ -23,3 +23,6 @@ export { useGraphQuads } from './hooks/useGraphQuads.js';
 export { quadsToReactFlow } from './transforms/quadsToReactFlow.js';
 export { GraphVisualization } from './components/GraphVisualization.jsx';
 export { QueryVisualization } from './components/QueryVisualization.jsx';
+
+// Project state management
+export { ProjectFile, useProject } from './state/index.js';

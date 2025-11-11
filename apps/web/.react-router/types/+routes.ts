@@ -19,6 +19,9 @@ type Pages = {
   "/components-demo": {
     params: {};
   };
+  "/project-demo": {
+    params: {};
+  };
   "/graph-viz": {
     params: {};
   };
@@ -33,7 +36,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/layered-control-demo" | "/components-demo" | "/graph-viz" | "/home" | "/repl";
+    page: "/" | "/layered-control-demo" | "/components-demo" | "/project-demo" | "/graph-viz" | "/home" | "/repl";
   };
   "routes/layered-control-demo.tsx": {
     id: "routes/layered-control-demo";
@@ -42,6 +45,10 @@ type RouteFiles = {
   "routes/components-demo.tsx": {
     id: "routes/components-demo";
     page: "/components-demo";
+  };
+  "routes/project-demo.tsx": {
+    id: "routes/project-demo";
+    page: "/project-demo";
   };
   "routes/graph-viz.tsx": {
     id: "routes/graph-viz";
