@@ -1,0 +1,30 @@
+/**
+ * Parser React Styles
+ *
+ * This file ensures Tailwind generates classes used in parser-react components
+ * even when those components aren't directly imported in the app yet.
+ */
+
+/* Force Tailwind to generate color classes used in rule builder */
+.force-tailwind-classes {
+    /* GroupNode background colors */
+    @apply bg-blue-200 bg-green-200 bg-red-200;
+    @apply border-blue-500 border-green-500 border-red-500;
+
+    /* Node gradient colors */
+    @apply from-purple-400 to-purple-600;
+    @apply from-blue-400 to-blue-500;
+    @apply from-green-400 to-green-500;
+    @apply from-amber-400 to-amber-500;
+    @apply from-orange-400 to-orange-600;
+
+    /* Text colors */
+    @apply text-blue-900 text-green-900 text-red-900;
+
+    /* Hover states */
+    @apply hover:from-purple-500 hover:to-purple-700;
+    @apply hover:from-blue-500 hover:to-blue-600;
+    @apply hover:from-green-500 hover:to-green-600;
+    @apply hover:from-amber-500 hover:to-amber-600;
+    @apply hover:from-orange-500 hover:to-orange-700;
+}

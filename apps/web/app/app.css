@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@bassline/parser-react/panel-layout.css";
+@import "@bassline/parser-react/styles.css";
 
 @custom-variant dark (&:is(.dark *));
 

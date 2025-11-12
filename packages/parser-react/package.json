@@ -8,7 +8,9 @@
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
     "./panels": "./src/panels/index.js",
-    "./state": "./src/state/index.js"
+    "./state": "./src/state/index.js",
+    "./styles.css": "./src/styles.css",
+    "./panel-layout.css": "./src/panels/panel-layout.css"
   },
   "scripts": {
     "test": "vitest run",

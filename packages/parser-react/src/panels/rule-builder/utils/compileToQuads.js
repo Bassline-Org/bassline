@@ -72,7 +72,7 @@ function formatNode(node) {
  */
 function compileGroup(nodes, edges, groupId) {
     // Get all nodes that belong to this group
-    const groupNodes = nodes.filter(node => node.parentNode === groupId);
+    const groupNodes = nodes.filter(node => node.parentId === groupId);
 
     // Find all starting nodes (no incoming edges within this group)
     const groupNodeIds = new Set(groupNodes.map(n => n.id));
@@ -150,9 +150,9 @@ export function validateRule(patternQuads, productionQuads, nodes = []) {
         });
     });
 
-    // Also add palette variables (variables with no parentNode)
+    // Also add palette variables (variables with no parentId)
     const paletteVars = nodes
-        .filter(n => !n.parentNode && n.type === 'variable')
+        .filter(n => !n.parentId && n.type === 'variable')
         .map(n => n.data?.label);
     paletteVars.forEach(v => patternVars.add(v));
 
