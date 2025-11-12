@@ -23,8 +23,9 @@ export function useProject(initialProjectName = "default") {
 
     const [uiConfig, setUIConfig] = useState(project.uiConfig || getDefaultUIConfig());
 
-    // Create/restore LayeredControl instance from project
-    const lc = useMemo(() => {
+    // Create/restore LayeredControl instance - stable across autosaves
+    // Only recreated on mount or explicit load operations
+    const [lc, setLc] = useState(() => {
         const instance = new LayeredControl();
 
         // Restore state if we have it
@@ -40,13 +41,14 @@ export function useProject(initialProjectName = "default") {
         }
 
         return instance;
-    }, [project]);
+    });
 
     // Track if project has been modified since last save
     const [isDirty, setIsDirty] = useState(false);
     const saveTimeoutRef = useRef(null);
 
     // Auto-save to localStorage with debouncing
+    // NOTE: This does NOT update the project state to avoid recreating LC
     useEffect(() => {
         // Clear previous timeout
         if (saveTimeoutRef.current) {
@@ -60,7 +62,8 @@ export function useProject(initialProjectName = "default") {
                     name: projectName
                 });
 
-                setProject(updatedProject);
+                // Save to localStorage only - don't update state
+                // This prevents LC from being recreated every second
                 ProjectFile.saveToLocalStorage(projectName, updatedProject);
                 setIsDirty(false);
             } catch (err) {
@@ -109,6 +112,20 @@ export function useProject(initialProjectName = "default") {
                 throw new Error(`Invalid project file: ${validation.errors.join(", ")}`);
             }
 
+            // Restore LC instance from imported data
+            if (imported.layeredControl) {
+                try {
+                    const json = JSON.stringify(imported.layeredControl);
+                    const restored = LayeredControl.fromJSON(json);
+                    setLc(restored);
+                } catch (err) {
+                    console.error("Failed to restore LC from import:", err);
+                    setLc(new LayeredControl());
+                }
+            } else {
+                setLc(new LayeredControl());
+            }
+
             setProject(imported);
             setProjectName(imported.name);
             setUIConfig(imported.uiConfig || getDefaultUIConfig());
@@ -131,6 +148,9 @@ export function useProject(initialProjectName = "default") {
             return;
         }
 
+        // Create fresh LC instance
+        setLc(new LayeredControl());
+
         const newProj = ProjectFile.createEmpty(name);
         setProject(newProj);
         setProjectName(name);
@@ -149,6 +169,20 @@ export function useProject(initialProjectName = "default") {
             const loaded = ProjectFile.loadFromLocalStorage(name);
             if (!loaded) {
                 throw new Error(`Project "${name}" not found`);
+            }
+
+            // Restore LC instance from loaded data
+            if (loaded.layeredControl) {
+                try {
+                    const json = JSON.stringify(loaded.layeredControl);
+                    const restored = LayeredControl.fromJSON(json);
+                    setLc(restored);
+                } catch (err) {
+                    console.error("Failed to restore LC from load:", err);
+                    setLc(new LayeredControl());
+                }
+            } else {
+                setLc(new LayeredControl());
             }
 
             setProject(loaded);
