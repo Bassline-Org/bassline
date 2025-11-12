@@ -1,8 +1,10 @@
 # Layered Control UI Architecture Plan
 
-**Goal**: Build a composable, interactive panel-based UI for LayeredControl with minimal, well-composing primitives.
+**Goal**: Build a composable, interactive panel-based UI for LayeredControl with
+minimal, well-composing primitives.
 
-**Philosophy**: Panels are **interactive affordances**, not just visualizations. You manipulate the system visually and directly.
+**Philosophy**: Panels are **interactive affordances**, not just visualizations.
+You manipulate the system visually and directly.
 
 ---
 
@@ -17,7 +19,8 @@
 
 ### Key Principles
 
-- **Interactive, not just visual** - Plugboard lets you rewire, history lets you branch, REPL lets you execute
+- **Interactive, not just visual** - Plugboard lets you rewire, history lets you
+  branch, REPL lets you execute
 - **Composable** - Panels work independently, compose into layouts
 - **Minimal** - Fewer hooks, better composition
 - **Testable** - Each stage can be verified in the UI before moving forward
@@ -27,9 +30,11 @@
 ## Stage 1: Make LayeredControl Reactive
 
 ### Goal
+
 Add EventTarget to LayeredControl so React can subscribe to all mutations.
 
 ### Files Modified
+
 - `packages/parser/src/control.js`
 
 ### Changes
@@ -49,18 +54,18 @@ export class LayeredControl extends EventTarget {
 
 **Emit events for all mutations:**
 
-| Method | Event | Detail |
-|--------|-------|--------|
-| `addLayer(name)` | `layer-added` | `{ name }` |
-| `removeLayer(name)` | `layer-removed` | `{ name }` |
-| `addBus(name)` | `bus-added` | `{ name }` |
-| `route(from, to)` | `routing-changed` | `{ from, to }` |
-| `commit(name, msg)` | `committed` | `{ name, commitHash, message }` |
-| `restore(name, hash)` | `restored` | `{ name, commitHash }` |
-| `createBranch(layer, branch)` | `branch-created` | `{ layerName, branchName, commitHash }` |
+| Method                        | Event             | Detail                                  |
+| ----------------------------- | ----------------- | --------------------------------------- |
+| `addLayer(name)`              | `layer-added`     | `{ name }`                              |
+| `removeLayer(name)`           | `layer-removed`   | `{ name }`                              |
+| `addBus(name)`                | `bus-added`       | `{ name }`                              |
+| `route(from, to)`             | `routing-changed` | `{ from, to }`                          |
+| `commit(name, msg)`           | `committed`       | `{ name, commitHash, message }`         |
+| `restore(name, hash)`         | `restored`        | `{ name, commitHash }`                  |
+| `createBranch(layer, branch)` | `branch-created`  | `{ layerName, branchName, commitHash }` |
 | `switchBranch(layer, branch)` | `branch-switched` | `{ layerName, branchName, commitHash }` |
-| `deleteBranch(layer, branch)` | `branch-deleted` | `{ layerName, branchName }` |
-| `detachHead(layer, hash)` | `head-detached` | `{ layerName, commitHash }` |
+| `deleteBranch(layer, branch)` | `branch-deleted`  | `{ layerName, branchName }`             |
+| `detachHead(layer, hash)`     | `head-detached`   | `{ layerName, commitHash }`             |
 
 **Example implementation:**
 
@@ -116,7 +121,7 @@ commit(name, message = "") {
 **Test file: `packages/parser/test/reactive-layered-control.test.js`**
 
 ```javascript
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { LayeredControl } from "../src/control.js";
 
 describe("Reactive LayeredControl", () => {
@@ -172,6 +177,7 @@ describe("Reactive LayeredControl", () => {
 ```
 
 **Manual UI test:**
+
 ```javascript
 // In browser console or demo component
 const lc = new LayeredControl();
@@ -186,19 +192,21 @@ lc.addLayer("test");
 
 ### Success Criteria
 
-✅ All LayeredControl mutations emit events
-✅ Tests pass for all event types
-✅ Events contain correct detail payloads
-✅ No breaking changes to existing LayeredControl API
+✅ All LayeredControl mutations emit events ✅ Tests pass for all event types ✅
+Events contain correct detail payloads ✅ No breaking changes to existing
+LayeredControl API
 
 ---
 
 ## Stage 2: Core React Hooks
 
 ### Goal
-Build minimal reactive hooks using `useSyncExternalStore` to subscribe to LayeredControl events.
+
+Build minimal reactive hooks using `useSyncExternalStore` to subscribe to
+LayeredControl events.
 
 ### Files Created
+
 - `packages/parser-react/src/hooks/useLayeredControl.js`
 - `packages/parser-react/src/hooks/index.js`
 
@@ -223,7 +231,9 @@ export function LayeredControlProvider({ value, children }) {
 export function useLayeredControl() {
   const lc = useContext(LayeredControlContext);
   if (!lc) {
-    throw new Error("useLayeredControl must be used within LayeredControlProvider");
+    throw new Error(
+      "useLayeredControl must be used within LayeredControlProvider",
+    );
   }
   return lc;
 }
@@ -256,7 +266,7 @@ export function useLayers() {
         lc.removeEventListener("bus-added", callback);
       };
     },
-    () => Object.keys(lc.layers)
+    () => Object.keys(lc.layers),
   );
 }
 
@@ -276,7 +286,7 @@ export function useRouting() {
         }
       }
       return routes;
-    }
+    },
   );
 }
 ```
@@ -297,7 +307,7 @@ export function useLayerQuads(layerName) {
       const cleanup = layer.control.listen(callback);
       return cleanup;
     },
-    () => layer.control.graph.quads
+    () => layer.control.graph.quads,
   );
 }
 
@@ -317,9 +327,9 @@ export function useStaging(layerName) {
       const layer = lc.getLayer(layerName);
       return {
         count: layer?.staging?.size ?? 0,
-        hasChanges: (layer?.staging?.size ?? 0) > 0
+        hasChanges: (layer?.staging?.size ?? 0) > 0,
       };
-    }
+    },
   );
 }
 
@@ -344,7 +354,7 @@ export function useCommits(layerName) {
         lc.removeEventListener("branch-switched", handler);
       };
     },
-    () => lc.getCommitHistory(layerName, 20)
+    () => lc.getCommitHistory(layerName, 20),
   );
 }
 
@@ -369,8 +379,8 @@ export function useBranches(layerName) {
     },
     () => ({
       branches: lc.listBranches(layerName),
-      current: lc.getCurrentBranch(layerName)
-    })
+      current: lc.getCurrentBranch(layerName),
+    }),
   );
 }
 ```
@@ -379,31 +389,31 @@ export function useBranches(layerName) {
 
 **8 hooks total:**
 
-| Hook | Returns | Reactive To |
-|------|---------|-------------|
-| `useLayeredControl()` | LayeredControl instance | N/A (context) |
-| `useLayer(name)` | Control instance | N/A (direct access) |
-| `useLayers()` | `string[]` | layer-added, layer-removed, bus-added |
-| `useRouting()` | `{from, to}[]` | routing-changed |
-| `useLayerQuads(name)` | `Quad[]` | quad-added (via control.listen) |
-| `useStaging(name)` | `{count, hasChanges}` | quad-added (staging updates) |
-| `useCommits(name)` | `Commit[]` | committed, restored, branch-switched |
-| `useBranches(name)` | `{branches, current}` | branch-created, branch-deleted, branch-switched |
+| Hook                  | Returns                 | Reactive To                                     |
+| --------------------- | ----------------------- | ----------------------------------------------- |
+| `useLayeredControl()` | LayeredControl instance | N/A (context)                                   |
+| `useLayer(name)`      | Control instance        | N/A (direct access)                             |
+| `useLayers()`         | `string[]`              | layer-added, layer-removed, bus-added           |
+| `useRouting()`        | `{from, to}[]`          | routing-changed                                 |
+| `useLayerQuads(name)` | `Quad[]`                | quad-added (via control.listen)                 |
+| `useStaging(name)`    | `{count, hasChanges}`   | quad-added (staging updates)                    |
+| `useCommits(name)`    | `Commit[]`              | committed, restored, branch-switched            |
+| `useBranches(name)`   | `{branches, current}`   | branch-created, branch-deleted, branch-switched |
 
 ### Testing
 
 **Test file: `packages/parser-react/test/hooks.test.jsx`**
 
 ```javascript
-import { describe, it, expect } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import { LayeredControl } from "@bassline/parser/control";
 import {
   LayeredControlProvider,
   useLayeredControl,
   useLayers,
   useRouting,
-  useStaging
+  useStaging,
 } from "../src/hooks";
 
 describe("Hooks", () => {
@@ -471,7 +481,7 @@ import {
   LayeredControlProvider,
   useLayers,
   useRouting,
-  useStaging
+  useStaging,
 } from "../src/hooks";
 
 const lc = new LayeredControl();
@@ -488,10 +498,14 @@ function Demo() {
       <h2>Staging: {staging.count} changes</h2>
 
       <button onClick={() => lc.addLayer("test")}>Add Layer</button>
-      <button onClick={() => {
-        const layer = lc.getLayer("test")?.control;
-        layer?.run("insert { alice age 30 * }");
-      }}>Add Quad</button>
+      <button
+        onClick={() => {
+          const layer = lc.getLayer("test")?.control;
+          layer?.run("insert { alice age 30 * }");
+        }}
+      >
+        Add Quad
+      </button>
     </div>
   );
 }
@@ -507,19 +521,20 @@ export default function HookDemo() {
 
 ### Success Criteria
 
-✅ All 8 hooks implemented with useSyncExternalStore
-✅ Unit tests pass for all hooks
-✅ Manual UI demo shows reactive updates
-✅ No unnecessary re-renders (verified with React DevTools)
+✅ All 8 hooks implemented with useSyncExternalStore ✅ Unit tests pass for all
+hooks ✅ Manual UI demo shows reactive updates ✅ No unnecessary re-renders
+(verified with React DevTools)
 
 ---
 
 ## Stage 3: Layer List Panel (Simple Interactive)
 
 ### Goal
+
 Build the simplest interactive panel - a list of layers with add/remove actions.
 
 ### Files Created
+
 - `packages/parser-react/src/panels/LayerListPanel.jsx`
 - `packages/parser-react/src/panels/index.js`
 
@@ -528,7 +543,12 @@ Build the simplest interactive panel - a list of layers with add/remove actions.
 ```jsx
 // LayerListPanel.jsx
 import { useState } from "react";
-import { useLayeredControl, useLayers, useBranches, useStaging } from "../hooks";
+import {
+  useBranches,
+  useLayeredControl,
+  useLayers,
+  useStaging,
+} from "../hooks";
 
 export function LayerListPanel({ groups = {} }) {
   const lc = useLayeredControl();
@@ -553,7 +573,7 @@ export function LayerListPanel({ groups = {} }) {
       <h3>Layers</h3>
 
       <div className="layer-list">
-        {layers.map(name => (
+        {layers.map((name) => (
           <LayerItem
             key={name}
             name={name}
@@ -616,6 +636,7 @@ function App() {
 ```
 
 **Test cases:**
+
 1. Add layer via input → layer appears in list
 2. Add quads to layer → staging badge updates
 3. Commit layer → staging badge disappears
@@ -624,26 +645,26 @@ function App() {
 
 ### Success Criteria
 
-✅ Can add/remove layers interactively
-✅ Staging count updates reactively
-✅ Branch name displays when on branch
-✅ UI updates without manual refresh
+✅ Can add/remove layers interactively ✅ Staging count updates reactively ✅
+Branch name displays when on branch ✅ UI updates without manual refresh
 
 ---
 
 ## Stage 4: REPL Panel (Layer Interaction)
 
 ### Goal
+
 Build interactive text-based panel for running commands on a layer.
 
 ### Files Created
+
 - `packages/parser-react/src/panels/ReplPanel.jsx`
 
 ### Implementation
 
 ```jsx
 // ReplPanel.jsx
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLayer, useLayerQuads } from "../hooks";
 
 export function ReplPanel({ layerName }) {
@@ -668,13 +689,13 @@ export function ReplPanel({ layerName }) {
       setHistory([
         ...history,
         { type: "input", content: input },
-        { type: "output", content: formatResult(result) }
+        { type: "output", content: formatResult(result) },
       ]);
     } catch (err) {
       setHistory([
         ...history,
         { type: "input", content: input },
-        { type: "error", content: err.message }
+        { type: "error", content: err.message },
       ]);
     }
 
@@ -691,7 +712,7 @@ export function ReplPanel({ layerName }) {
       <div className="repl-output" ref={outputRef}>
         {history.map((entry, i) => (
           <div key={i} className={`repl-entry ${entry.type}`}>
-            {entry.type === "input" && <span className="prompt">&gt; </span>}
+            {entry.type === "input" && <span className="prompt">&gt;</span>}
             <span>{entry.content}</span>
           </div>
         ))}
@@ -716,7 +737,7 @@ function formatResult(result) {
     if (result.length === 0) return "No results";
     if (result[0] instanceof Map) {
       // Query results
-      return result.map(m => {
+      return result.map((m) => {
         const entries = Array.from(m.entries());
         return entries.map(([k, v]) => `${k}=${v}`).join(" ");
       }).join("\n");
@@ -729,6 +750,7 @@ function formatResult(result) {
 ### Testing
 
 **Test cases:**
+
 1. Run `insert { alice age 30 * }` → quad count increases
 2. Run `query where { ?s ?a ?t * }` → shows query results
 3. Run invalid command → shows error message
@@ -737,20 +759,20 @@ function formatResult(result) {
 
 ### Success Criteria
 
-✅ Can execute commands on layer
-✅ Results display correctly
-✅ Errors are handled gracefully
-✅ History persists during session
-✅ Quad count updates reactively
+✅ Can execute commands on layer ✅ Results display correctly ✅ Errors are
+handled gracefully ✅ History persists during session ✅ Quad count updates
+reactively
 
 ---
 
 ## Stage 5: Plugboard Panel (Interactive Routing)
 
 ### Goal
+
 Build visual routing diagram with React Flow that allows interactive rewiring.
 
 ### Files Created
+
 - `packages/parser-react/src/panels/PlugboardPanel.jsx`
 - `packages/parser-react/src/utils/layoutLayers.js`
 
@@ -760,11 +782,11 @@ Build visual routing diagram with React Flow that allows interactive rewiring.
 // PlugboardPanel.jsx
 import { useCallback } from "react";
 import ReactFlow, {
+  addEdge,
   Background,
   Controls,
-  useNodesState,
   useEdgesState,
-  addEdge
+  useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useLayeredControl, useLayers, useRouting } from "../hooks";
@@ -779,7 +801,7 @@ export function PlugboardPanel() {
   const { nodes: initialNodes, edges: initialEdges } = layersToFlow(
     layers,
     routing,
-    lc
+    lc,
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -787,7 +809,11 @@ export function PlugboardPanel() {
 
   // Update when layers/routing change
   useEffect(() => {
-    const { nodes: newNodes, edges: newEdges } = layersToFlow(layers, routing, lc);
+    const { nodes: newNodes, edges: newEdges } = layersToFlow(
+      layers,
+      routing,
+      lc,
+    );
     setNodes(newNodes);
     setEdges(newEdges);
   }, [layers, routing]);
@@ -805,7 +831,7 @@ export function PlugboardPanel() {
 
   // INTERACTIVE: Remove routing by deleting edges
   const onEdgesDelete = useCallback((edgesToDelete) => {
-    edgesToDelete.forEach(edge => {
+    edgesToDelete.forEach((edge) => {
       const sourceLayer = edge.source;
       const layer = lc.getLayer(sourceLayer);
 
@@ -813,9 +839,11 @@ export function PlugboardPanel() {
       if (layer?.output) {
         layer.output = null;
         layer.cleanup?.();
-        lc.dispatchEvent(new CustomEvent("routing-changed", {
-          detail: { from: sourceLayer, to: null }
-        }));
+        lc.dispatchEvent(
+          new CustomEvent("routing-changed", {
+            detail: { from: sourceLayer, to: null },
+          }),
+        );
       }
     });
   }, [lc]);
@@ -853,8 +881,8 @@ function layersToFlow(layers, routing, lc) {
         isBus,
         quadCount,
         hasStaging: (layer?.staging?.size ?? 0) > 0,
-        branch: layer?.currentBranch ?? null
-      }
+        branch: layer?.currentBranch ?? null,
+      },
     };
   });
 
@@ -863,7 +891,7 @@ function layersToFlow(layers, routing, lc) {
     source: from,
     target: to,
     animated: true,
-    style: { stroke: "#555", strokeWidth: 2 }
+    style: { stroke: "#555", strokeWidth: 2 },
   }));
 
   return { nodes, edges };
@@ -926,6 +954,7 @@ export function layoutLayers(layers, routing) {
 ### Testing
 
 **Test cases:**
+
 1. Drag from layer output → layer input → creates route
 2. Routing updates in LayeredControl
 3. Delete edge → removes route
@@ -935,20 +964,21 @@ export function layoutLayers(layers, routing) {
 
 ### Success Criteria
 
-✅ Visual routing diagram with nodes for layers/buses
-✅ Can connect layers by drawing edges
-✅ Can disconnect by deleting edges
-✅ Node data updates reactively (quad count, staging, branch)
-✅ Layout updates when layers added/removed
+✅ Visual routing diagram with nodes for layers/buses ✅ Can connect layers by
+drawing edges ✅ Can disconnect by deleting edges ✅ Node data updates
+reactively (quad count, staging, branch) ✅ Layout updates when layers
+added/removed
 
 ---
 
 ## Stage 6: Staging & Commit Panel
 
 ### Goal
+
 Interactive panel for viewing staged changes and committing with messages.
 
 ### Files Created
+
 - `packages/parser-react/src/panels/StagingPanel.jsx`
 
 ### Implementation
@@ -956,7 +986,7 @@ Interactive panel for viewing staged changes and committing with messages.
 ```jsx
 // StagingPanel.jsx
 import { useState } from "react";
-import { useLayeredControl, useStaging, useLayerQuads } from "../hooks";
+import { useLayeredControl, useLayerQuads, useStaging } from "../hooks";
 
 export function StagingPanel({ layerName }) {
   const lc = useLayeredControl();
@@ -982,11 +1012,9 @@ export function StagingPanel({ layerName }) {
       <h3>Staging: {layerName}</h3>
 
       <div className="staging-status">
-        {staging.hasChanges ? (
-          <span className="changes">{staging.count} changes staged</span>
-        ) : (
-          <span className="no-changes">No changes</span>
-        )}
+        {staging.hasChanges
+          ? <span className="changes">{staging.count} changes staged</span>
+          : <span className="no-changes">No changes</span>}
       </div>
 
       {staging.hasChanges && (
@@ -1016,13 +1044,16 @@ export function StagingPanel({ layerName }) {
 }
 
 function formatQuad(quad) {
-  return `${quad.values[0]} ${quad.values[1]} ${quad.values[2]} ${quad.values[3]}`;
+  return `${quad.values[0]} ${quad.values[1]} ${quad.values[2]} ${
+    quad.values[3]
+  }`;
 }
 ```
 
 ### Testing
 
 **Test cases:**
+
 1. Add quads → staged changes appear
 2. Write commit message → enable commit button
 3. Click commit → changes committed, staging clears
@@ -1030,20 +1061,19 @@ function formatQuad(quad) {
 
 ### Success Criteria
 
-✅ Shows staged quad count
-✅ Displays staged quads
-✅ Can write commit message
-✅ Commit button triggers commit
-✅ Staging clears after commit
+✅ Shows staged quad count ✅ Displays staged quads ✅ Can write commit message
+✅ Commit button triggers commit ✅ Staging clears after commit
 
 ---
 
 ## Stage 7: History Panel (Interactive Git Graph)
 
 ### Goal
+
 Visual commit history with interactive checkout, branching, and merging.
 
 ### Files Created
+
 - `packages/parser-react/src/panels/HistoryPanel.jsx`
 
 ### Implementation
@@ -1054,10 +1084,10 @@ import { useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
+  useEdgesState,
   useNodesState,
-  useEdgesState
 } from "@xyflow/react";
-import { useLayeredControl, useCommits, useBranches } from "../hooks";
+import { useBranches, useCommits, useLayeredControl } from "../hooks";
 
 export function HistoryPanel({ layerName }) {
   const lc = useLayeredControl();
@@ -1099,15 +1129,13 @@ export function HistoryPanel({ layerName }) {
     <div className="history-panel">
       <div className="history-header">
         <h3>History: {layerName}</h3>
-        {current ? (
-          <span className="current-branch">On {current}</span>
-        ) : (
-          <span className="detached">Detached HEAD</span>
-        )}
+        {current
+          ? <span className="current-branch">On {current}</span>
+          : <span className="detached">Detached HEAD</span>}
       </div>
 
       <div className="branch-list">
-        {branches.map(branch => (
+        {branches.map((branch) => (
           <button
             key={branch}
             className={branch === current ? "active" : ""}
@@ -1149,7 +1177,7 @@ export function HistoryPanel({ layerName }) {
 function commitsToGraph(commits, branches, currentBranch) {
   const nodes = commits.map((commit, i) => {
     // Find branches pointing to this commit
-    const branchLabels = branches.filter(b => {
+    const branchLabels = branches.filter((b) => {
       // Check if branch ref points to this commit
       // (Would need to add getBranchCommit method to LC)
       return false; // TODO
@@ -1164,18 +1192,18 @@ function commitsToGraph(commits, branches, currentBranch) {
         timestamp: commit.timestamp,
         quadCount: commit.quadCount,
         branches: branchLabels,
-        isCurrent: false // TODO: check if HEAD points here
-      }
+        isCurrent: false, // TODO: check if HEAD points here
+      },
     };
   });
 
   const edges = commits
-    .filter(c => c.parent !== null)
-    .map(c => ({
+    .filter((c) => c.parent !== null)
+    .map((c) => ({
       id: `${c.hash}-${c.parent}`,
       source: c.hash.toString(),
       target: c.parent.toString(),
-      type: "smoothstep"
+      type: "smoothstep",
     }));
 
   return { nodes, edges };
@@ -1185,6 +1213,7 @@ function commitsToGraph(commits, branches, currentBranch) {
 ### Testing
 
 **Test cases:**
+
 1. Make commits → appear in graph
 2. Click commit → show action menu
 3. Checkout commit → detached HEAD state
@@ -1193,20 +1222,20 @@ function commitsToGraph(commits, branches, currentBranch) {
 
 ### Success Criteria
 
-✅ Commit graph visualizes history
-✅ Can checkout any commit interactively
-✅ Can create branch from any commit
-✅ Can switch between branches
-✅ Current HEAD/branch highlighted
+✅ Commit graph visualizes history ✅ Can checkout any commit interactively ✅
+Can create branch from any commit ✅ Can switch between branches ✅ Current
+HEAD/branch highlighted
 
 ---
 
 ## Stage 8: Panel Layout System
 
 ### Goal
+
 Composable panel system with save/load layouts.
 
 ### Files Created
+
 - `packages/parser-react/src/layout/PanelLayout.jsx`
 - `packages/parser-react/src/layout/PanelRegistry.js`
 - `packages/parser-react/src/layout/useLayoutState.js`
@@ -1226,7 +1255,7 @@ export const PANEL_REGISTRY = {
   "PlugboardPanel": PlugboardPanel,
   "ReplPanel": ReplPanel,
   "StagingPanel": StagingPanel,
-  "HistoryPanel": HistoryPanel
+  "HistoryPanel": HistoryPanel,
 };
 ```
 
@@ -1253,7 +1282,7 @@ export function PanelLayout({ layout, onLayoutChange, groups = {} }) {
       rowHeight={60}
       draggableHandle=".panel-header"
     >
-      {panels.map(panel => {
+      {panels.map((panel) => {
         const PanelComponent = PANEL_REGISTRY[panel.type];
 
         return (
@@ -1277,7 +1306,7 @@ export function PanelLayout({ layout, onLayoutChange, groups = {} }) {
 
 ```javascript
 // useLayoutState.js
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export function useLayoutState(storageKey = "layeredControlLayout") {
   const [layout, setLayout] = useState(() => {
@@ -1294,19 +1323,19 @@ export function useLayoutState(storageKey = "layeredControlLayout") {
       id: `${panelType}-${Date.now()}`,
       type: panelType,
       props,
-      grid: { x: 0, y: Infinity, w: 6, h: 4 } // Auto-place at bottom
+      grid: { x: 0, y: Infinity, w: 6, h: 4 }, // Auto-place at bottom
     };
 
     setLayout({
       ...layout,
-      panels: [...layout.panels, newPanel]
+      panels: [...layout.panels, newPanel],
     });
   };
 
   const removePanel = (panelId) => {
     setLayout({
       ...layout,
-      panels: layout.panels.filter(p => p.id !== panelId)
+      panels: layout.panels.filter((p) => p.id !== panelId),
     });
   };
 
@@ -1320,16 +1349,16 @@ function getDefaultLayout() {
         id: "plugboard-main",
         type: "PlugboardPanel",
         props: {},
-        grid: { x: 0, y: 0, w: 12, h: 6 }
+        grid: { x: 0, y: 0, w: 12, h: 6 },
       },
       {
         id: "layers-list",
         type: "LayerListPanel",
         props: {},
-        grid: { x: 0, y: 6, w: 4, h: 4 }
-      }
+        grid: { x: 0, y: 6, w: 4, h: 4 },
+      },
     ],
-    groups: {}
+    groups: {},
   };
 }
 ```
@@ -1337,6 +1366,7 @@ function getDefaultLayout() {
 ### Testing
 
 **Test cases:**
+
 1. Load default layout → plugboard + layer list
 2. Drag panel → position persists
 3. Add new REPL panel → appears at bottom
@@ -1345,36 +1375,35 @@ function getDefaultLayout() {
 
 ### Success Criteria
 
-✅ Panels can be dragged and resized
-✅ Layout persists to localStorage
-✅ Can add panels dynamically
-✅ Can remove panels
-✅ Multiple instances of same panel type (e.g., 3 REPLs for different layers)
+✅ Panels can be dragged and resized ✅ Layout persists to localStorage ✅ Can
+add panels dynamically ✅ Can remove panels ✅ Multiple instances of same panel
+type (e.g., 3 REPLs for different layers)
 
 ---
 
 ## Stage 9: Integration & Polish
 
 ### Goal
+
 Integrate everything into main app with polished UX.
 
 ### Tasks
 
 1. **Add panel menu** - Dropdown to add any panel type with config
-2. **Layer selector** - When adding layer-specific panel (REPL, History), choose layer
+2. **Layer selector** - When adding layer-specific panel (REPL, History), choose
+   layer
 3. **Groups UI** - Add group management (create group, add layers to group)
 4. **Keyboard shortcuts** - Common actions (add layer, commit, switch branch)
 5. **Themes** - Dark/light mode for panels
 6. **Panel icons** - Visual indicators for panel types
-7. **Status bar** - Global status (total layers, total quads, current active layer)
+7. **Status bar** - Global status (total layers, total quads, current active
+   layer)
 
 ### Success Criteria
 
-✅ Fully functional multi-panel UI
-✅ All interactions work smoothly
-✅ Layout persists and restores correctly
-✅ Performance is acceptable with multiple panels
-✅ User can build custom workflows by composing panels
+✅ Fully functional multi-panel UI ✅ All interactions work smoothly ✅ Layout
+persists and restores correctly ✅ Performance is acceptable with multiple
+panels ✅ User can build custom workflows by composing panels
 
 ---
 
@@ -1423,27 +1452,30 @@ LayeredControl mutations
 
 ### Key Principles Maintained
 
-✅ **Interactive, not just visual** - All panels allow direct manipulation
-✅ **Composable** - Panels work independently, compose via layout system
-✅ **Minimal** - 8 hooks, 7 panels, 1 layout system
-✅ **Testable** - Each stage can be verified before moving to next
-✅ **Reactive** - All updates flow through events + useSyncExternalStore
+✅ **Interactive, not just visual** - All panels allow direct manipulation ✅
+**Composable** - Panels work independently, compose via layout system ✅
+**Minimal** - 8 hooks, 7 panels, 1 layout system ✅ **Testable** - Each stage
+can be verified before moving to next ✅ **Reactive** - All updates flow through
+events + useSyncExternalStore
 
 ---
 
 ## Testing Strategy
 
 ### Unit Tests
+
 - LayeredControl event emission
 - All 8 hooks with React Testing Library
 - Panel component logic
 
 ### Integration Tests
+
 - Multi-panel interactions (e.g., add layer in list → appears in plugboard)
 - Cross-panel updates (e.g., commit in staging → history updates)
 - Layout persistence
 
 ### Manual Tests
+
 - Build a project with 5+ layers
 - Route layers in plugboard
 - Make commits and create branches
@@ -1474,4 +1506,5 @@ LayeredControl mutations
 
 ---
 
-**This plan provides incremental, testable stages while building toward a fully interactive, composable panel system for LayeredControl.**
+**This plan provides incremental, testable stages while building toward a fully
+interactive, composable panel system for LayeredControl.**

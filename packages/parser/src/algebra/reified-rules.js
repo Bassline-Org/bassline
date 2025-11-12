@@ -90,6 +90,8 @@ function toPatternQuad([e, a, v, c]) {
  * Activate a rule by querying its structure and installing watchers
  */
 function activateRule(graph, ruleId, activeRules) {
+    console.log("[ReifiedRules] Activating rule:", getString(ruleId));
+
     // Query rule definition edges
     const matches = matchGraph(graph, pattern(patternQuad(ruleId, w("matches"), v("p"), WC)));
     const nacs = matchGraph(graph, pattern(patternQuad(ruleId, w("nac"), v("n"), WC)));
@@ -98,6 +100,9 @@ function activateRule(graph, ruleId, activeRules) {
     // Extract pattern strings
     const matchStr = matches.map(m => getString(m.get("p"))).join(" ");
     const produceStr = getString(produces[0]?.get("p"));
+
+    console.log("[ReifiedRules] Match pattern:", matchStr);
+    console.log("[ReifiedRules] Production template:", produceStr);
 
     // Validate
     if (!matchStr) {
@@ -119,22 +124,34 @@ function activateRule(graph, ruleId, activeRules) {
             return;
         }
 
+        console.log("[ReifiedRules] Parsed match quads:", matchQuads);
+        console.log("[ReifiedRules] Parsed production quads:", produceQuads);
+
         // Build pattern with NAC
         const rulePattern = pattern(...matchQuads.map(toPatternQuad));
         if (nacs.length > 0) {
             const nacStr = nacs.map(n => getString(n.get("n"))).join(" ");
             const nacQuads = parsePatterns(nacStr);
             rulePattern.setNAC(...nacQuads.map(toPatternQuad));
+            console.log("[ReifiedRules] NAC patterns:", nacQuads);
         }
 
         // Build production function
-        const production = (match) => produceQuads.map(([e, a, v, c]) =>
-            q(substitute(e, match), substitute(a, match), substitute(v, match), substitute(c, match))
-        );
+        const production = (match) => {
+            console.log("[ReifiedRules] 🔥 Rule FIRED:", getString(ruleId));
+            console.log("[ReifiedRules] Match bindings:", match);
+            const produced = produceQuads.map(([e, a, v, c]) =>
+                q(substitute(e, match), substitute(a, match), substitute(v, match), substitute(c, match))
+            );
+            console.log("[ReifiedRules] Produced quads:", produced);
+            return produced;
+        };
 
         // Install watcher
+        console.log("[ReifiedRules] Installing watcher for rule:", getString(ruleId));
         const unwatch = graph.watch({ pattern: rulePattern, production });
         activeRules.set(getString(ruleId), unwatch);
+        console.log("[ReifiedRules] Rule activated successfully:", getString(ruleId));
     } catch (error) {
         console.error(`Failed to parse rule ${getString(ruleId)}:`, error);
     }

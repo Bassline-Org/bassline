@@ -490,8 +490,16 @@ export function RuleBuilderPanel() {
                 ruleCommand = `rule ${ruleName} where { ${patternQuads.join(" ")} } produce { ${productionQuads.join(" ")} }`;
             }
 
+            console.log("[RuleBuilder] Installing rule:", ruleName);
+            console.log("[RuleBuilder] Target layer:", targetLayer);
+            console.log("[RuleBuilder] Rule command:", ruleCommand);
+            console.log("[RuleBuilder] Layer graph quads before install:", layer.graph.quads?.length);
+
             // Install rule into layer
-            layer.run(ruleCommand);
+            const result = layer.run(ruleCommand);
+
+            console.log("[RuleBuilder] Rule installation result:", result);
+            console.log("[RuleBuilder] Layer graph quads after install:", layer.graph.quads?.length);
 
             alert(
                 `Rule "${ruleName}" installed successfully into "${targetLayer}"!\n\nPattern:\n${
@@ -501,6 +509,7 @@ export function RuleBuilderPanel() {
                 }`,
             );
         } catch (err) {
+            console.error("[RuleBuilder] Rule installation failed:", err);
             alert(`Failed to install rule: ${err.message}`);
         }
     }, [ruleName, targetLayer, nodes, edges, lc]);
