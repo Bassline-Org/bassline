@@ -9,6 +9,7 @@ import { LayerListPanel } from "../components/LayerListPanel.jsx";
 import { ReplPanel } from "../components/ReplPanel.jsx";
 import { PlugboardPanel } from "../components/PlugboardPanel.jsx";
 import { StagingCommitPanel } from "../components/StagingCommitPanel.jsx";
+import { HistoryPanel } from "../components/HistoryPanel.jsx";
 import { RuleBuilderPanel } from "./RuleBuilderPanel.jsx";
 
 /**
@@ -98,6 +99,20 @@ export const PANEL_REGISTRY = {
             minH: 15,
         },
         tags: ["rewrite", "rules", "visualization"],
+    },
+    history: {
+        id: "history",
+        name: "History",
+        component: HistoryPanel,
+        icon: "🕐",
+        description: "Git-style commit history with branch navigation and time-travel",
+        defaultSize: {
+            w: 6, // 50% width (6/12)
+            h: 8, // Taller than default
+            minW: 4,
+            minH: 6,
+        },
+        tags: ["version-control", "visualization", "core"],
     },
 };
 
