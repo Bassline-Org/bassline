@@ -20,6 +20,7 @@
 .react-grid-layout {
     position: relative;
     z-index: 1;
+    min-height: 500px;
 }
 
 .react-grid-item {

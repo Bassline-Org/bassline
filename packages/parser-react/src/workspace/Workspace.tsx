@@ -57,6 +57,8 @@ export function Workspace({
             addPanel,
             resetLayout,
             layout,
+            updateLayout,
+            removePanel,
             currentViewName,
             saveView,
             loadView,
@@ -109,8 +111,9 @@ export function Workspace({
                 {/* Dynamic Panel Layout */}
                 <div className="h-[calc(100vh-5rem)]">
                     <PanelLayout
-                        layoutName={layoutName}
-                        options={layoutOptions}
+                        layout={layout}
+                        updateLayout={updateLayout}
+                        removePanel={removePanel}
                     />
                 </div>
             </div>

@@ -8,7 +8,6 @@
 import { useCallback } from "react";
 import { Responsive, WidthProvider } from "react-grid-layout";
 import { getPanelById } from "./PanelRegistry.js";
-import { useLayoutState } from "./useLayoutState.js";
 import "react-grid-layout/css/styles.css";
 import "./panel-layout.css";
 
@@ -47,14 +46,14 @@ function PanelWrapper({ panelId, panelType, onRemove, children }) {
  * PanelLayout component
  *
  * @param {Object} props
- * @param {string} props.layoutName - Unique name for this layout
- * @param {Object} [props.options] - Options passed to useLayoutState
+ * @param {Array} props.layout - Current layout configuration from useLayoutState
+ * @param {Function} props.updateLayout - Function to update layout
+ * @param {Function} props.removePanel - Function to remove a panel
  * @param {Function} [props.onLayoutChange] - Callback when layout changes
  * @param {React.ReactNode} [props.header] - Optional header content (AddPanelMenu, etc.)
  * @returns {JSX.Element}
  */
-export function PanelLayout({ layoutName, options, onLayoutChange, header }) {
-    const { layout, updateLayout, removePanel } = useLayoutState(layoutName, options);
+export function PanelLayout({ layout, updateLayout, removePanel, onLayoutChange, header }) {
 
     const handleLayoutChange = useCallback(
         (newLayout) => {
@@ -81,7 +80,14 @@ export function PanelLayout({ layoutName, options, onLayoutChange, header }) {
             {header && <div className="flex-none">{header}</div>}
 
             {/* Grid layout */}
-            <div className="flex-1 overflow-auto">
+            <div
+                className="flex-1"
+                style={{
+                    minHeight: '500px',
+                    position: 'relative',
+                    height: '100%'
+                }}
+            >
                 <ResponsiveGridLayout
                     className="layout"
                     layouts={{ lg: gridLayout }}
@@ -95,6 +101,8 @@ export function PanelLayout({ layoutName, options, onLayoutChange, header }) {
                     preventCollision={false}
                     draggableHandle=".panel-drag-handle"
                     draggableCancel=".no-drag"
+                    autoSize={true}
+                    containerPadding={[10, 10]}
                 >
                     {layout.map((item) => {
                         const panelDef = getPanelById(item.type);
