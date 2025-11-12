@@ -9,6 +9,7 @@ import { LayerListPanel } from "../components/LayerListPanel.jsx";
 import { ReplPanel } from "../components/ReplPanel.jsx";
 import { PlugboardPanel } from "../components/PlugboardPanel.jsx";
 import { StagingCommitPanel } from "../components/StagingCommitPanel.jsx";
+import { RuleBuilderPanel } from "./RuleBuilderPanel.jsx";
 
 /**
  * Panel registry mapping panel IDs to components and metadata
@@ -83,6 +84,20 @@ export const PANEL_REGISTRY = {
             minH: 8,
         },
         tags: ["core", "version-control"],
+    },
+    "rule-builder": {
+        id: "rule-builder",
+        name: "Rule Builder",
+        component: RuleBuilderPanel,
+        icon: "🔄",
+        description: "Visual graph rewrite rule builder using pattern/production morphisms",
+        defaultSize: {
+            w: 12, // Full width (12/12)
+            h: 20, // Tall height
+            minW: 8,
+            minH: 15,
+        },
+        tags: ["rewrite", "rules", "visualization"],
     },
 };
 

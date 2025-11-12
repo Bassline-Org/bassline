@@ -1,13 +1,18 @@
 import type { Route } from "./+types/workspace-full";
 import { useProject } from "@bassline/parser-react/state";
-import { WorkspaceProvider, Workspace, ProjectHeader } from "@bassline/parser-react";
+import {
+    ProjectHeader,
+    Workspace,
+    WorkspaceProvider,
+} from "@bassline/parser-react";
 
 export function meta({}: Route.MetaArgs) {
     return [
         { title: "Full Workspace - Bassline" },
         {
             name: "description",
-            content: "Complete workspace with all panels - dynamic layout system",
+            content:
+                "Complete workspace with all panels - dynamic layout system",
         },
     ];
 }
