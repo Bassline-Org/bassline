@@ -7,7 +7,7 @@
  * - NAC groups (blocking patterns)
  */
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     addEdge,
     Background,
@@ -18,7 +18,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { useLayeredControl } from "../hooks/useLayeredControl.jsx";
+import { useLayeredControl, useLayers } from "../hooks/useLayeredControl.jsx";
 import { GroupNode } from "./rule-builder/nodes/GroupNode.jsx";
 import { VariableNode } from "./rule-builder/nodes/VariableNode.jsx";
 import { LiteralNode } from "./rule-builder/nodes/LiteralNode.jsx";
@@ -42,7 +42,7 @@ const edgeTypes = {
     chain: ChainEdge,
 };
 
-// Initial nodes: pattern, production, and NAC groups
+// Initial nodes: pattern, production, and NAC groups + sample rule
 const initialNodes = [
     {
         id: "pattern-group",
@@ -74,19 +74,120 @@ const initialNodes = [
         selectable: false,
         zIndex: 0,
     },
+    // Sample rule: ?person age ?a * => ?person adult true *
+    // Pattern nodes
+    {
+        id: "sample-p-0",
+        type: "variable",
+        position: { x: 40, y: 150 },
+        data: { label: "?person" },
+        parentId: "pattern-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+    },
+    {
+        id: "sample-p-1",
+        type: "literal",
+        position: { x: 160, y: 150 },
+        data: { label: "age", literalType: "word" },
+        parentId: "pattern-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 100, height: 70, padding: 0, border: "none", background: "transparent" },
+    },
+    {
+        id: "sample-p-2",
+        type: "variable",
+        position: { x: 300, y: 150 },
+        data: { label: "?a" },
+        parentId: "pattern-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+    },
+    {
+        id: "sample-p-3",
+        type: "wildcard",
+        position: { x: 420, y: 150 },
+        data: { label: "*" },
+        parentId: "pattern-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+    },
+    // Production nodes
+    {
+        id: "sample-prod-0",
+        type: "variable",
+        position: { x: 40, y: 150 },
+        data: { label: "?person" },
+        parentId: "production-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+    },
+    {
+        id: "sample-prod-1",
+        type: "literal",
+        position: { x: 160, y: 150 },
+        data: { label: "adult", literalType: "word" },
+        parentId: "production-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 100, height: 70, padding: 0, border: "none", background: "transparent" },
+    },
+    {
+        id: "sample-prod-2",
+        type: "literal",
+        position: { x: 300, y: 150 },
+        data: { label: "true", literalType: "word" },
+        parentId: "production-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 100, height: 70, padding: 0, border: "none", background: "transparent" },
+    },
+    {
+        id: "sample-prod-3",
+        type: "wildcard",
+        position: { x: 440, y: 150 },
+        data: { label: "*" },
+        parentId: "production-group",
+        draggable: true,
+        zIndex: 100,
+        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+    },
 ];
 
-const initialEdges = [];
+const initialEdges = [
+    // Pattern edges
+    { id: "sample-p-edge-0", source: "sample-p-0", target: "sample-p-1", type: "chain", zIndex: 50 },
+    { id: "sample-p-edge-1", source: "sample-p-1", target: "sample-p-2", type: "chain", zIndex: 50 },
+    { id: "sample-p-edge-2", source: "sample-p-2", target: "sample-p-3", type: "chain", zIndex: 50 },
+    // Production edges
+    { id: "sample-prod-edge-0", source: "sample-prod-0", target: "sample-prod-1", type: "chain", zIndex: 50 },
+    { id: "sample-prod-edge-1", source: "sample-prod-1", target: "sample-prod-2", type: "chain", zIndex: 50 },
+    { id: "sample-prod-edge-2", source: "sample-prod-2", target: "sample-prod-3", type: "chain", zIndex: 50 },
+];
 
 export function RuleBuilderPanel() {
-    const { lc } = useLayeredControl();
+    const lc = useLayeredControl();
+    const layers = useLayers();
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
     const [contextMenu, setContextMenu] = useState(null);
     const [ruleName, setRuleName] = useState("");
+    const [targetLayer, setTargetLayer] = useState("");
     const [nodeCounter, setNodeCounter] = useState(0);
     const panelRef = useRef(null);
+
+    // Auto-select first layer when layers change
+    useEffect(() => {
+        if (!targetLayer && layers.length > 0) {
+            setTargetLayer(layers[0]);
+        }
+    }, [layers, targetLayer]);
 
     // Handle edge connection
     // Edges now connect nodes in 4-node chains (S→A→T→C)
@@ -344,6 +445,11 @@ export function RuleBuilderPanel() {
             return;
         }
 
+        if (!targetLayer) {
+            alert("Please select a target layer");
+            return;
+        }
+
         const { patternQuads, productionQuads, nacQuads } = compileToQuads(
             nodes,
             edges,
@@ -366,25 +472,38 @@ export function RuleBuilderPanel() {
             return;
         }
 
+        // Get layer's control
+        const layer = lc.getLayer(targetLayer)?.control;
+        if (!layer) {
+            alert(`Layer "${targetLayer}" not found`);
+            return;
+        }
+
         try {
-            // TODO: Use the actual LC API for adding rules
-            // For now, just log
-            console.log("Installing rule:", {
-                name: ruleName,
-                pattern: patternQuads,
-                production: productionQuads,
-                nac: nacQuads,
-            });
+            // Format rule command
+            let ruleCommand;
+            if (nacQuads.length > 0) {
+                // With NAC
+                ruleCommand = `rule ${ruleName} where { ${patternQuads.join(" ")} | not ${nacQuads.join(" ")} } produce { ${productionQuads.join(" ")} }`;
+            } else {
+                // Without NAC
+                ruleCommand = `rule ${ruleName} where { ${patternQuads.join(" ")} } produce { ${productionQuads.join(" ")} }`;
+            }
+
+            // Install rule into layer
+            layer.run(ruleCommand);
 
             alert(
-                `Rule "${ruleName}" compiled successfully!\n\nPattern:\n${
+                `Rule "${ruleName}" installed successfully into "${targetLayer}"!\n\nPattern:\n${
                     patternQuads.join("\n")
-                }\n\nProduction:\n${productionQuads.join("\n")}`,
+                }\n\nProduction:\n${productionQuads.join("\n")}${
+                    nacQuads.length > 0 ? `\n\nNAC:\n${nacQuads.join("\n")}` : ""
+                }`,
             );
         } catch (err) {
             alert(`Failed to install rule: ${err.message}`);
         }
-    }, [ruleName, nodes, edges, lc]);
+    }, [ruleName, targetLayer, nodes, edges, lc]);
 
     // Compute validation for each group
     const patternNodes = nodes.filter((n) => n.parentId === "pattern-group");
@@ -458,6 +577,21 @@ export function RuleBuilderPanel() {
 
                 <div className="w-px h-6 bg-gray-300" />
 
+                {/* Layer Selection */}
+                <select
+                    value={targetLayer}
+                    onChange={(e) => setTargetLayer(e.target.value)}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded bg-white"
+                    title="Target layer for rule installation"
+                >
+                    <option value="">-- Select Layer --</option>
+                    {layers.map((name) => (
+                        <option key={name} value={name}>
+                            {name}
+                        </option>
+                    ))}
+                </select>
+
                 {/* Rule Name and Install */}
                 <input
                     type="text"
@@ -469,6 +603,7 @@ export function RuleBuilderPanel() {
                 <button
                     onClick={installRule}
                     className="px-4 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-medium"
+                    disabled={!targetLayer || !ruleName.trim()}
                 >
                     Install Rule
                 </button>
