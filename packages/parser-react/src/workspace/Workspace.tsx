@@ -1,6 +1,7 @@
 import type { ReactNode, CSSProperties } from 'react';
 import { PanelLayout } from '../panels/PanelLayout.jsx';
 import { AddPanelMenu } from '../panels/AddPanelMenu.jsx';
+import { ViewSwitcher } from '../panels/ViewSwitcher.jsx';
 import { useLayoutState } from '../panels/useLayoutState.js';
 
 /**
@@ -52,7 +53,16 @@ export function Workspace({
 }: WorkspaceProps) {
     // If layoutName is provided, use dynamic PanelLayout
     if (layoutName) {
-        const { addPanel, resetLayout, layout } = useLayoutState(layoutName, layoutOptions);
+        const {
+            addPanel,
+            resetLayout,
+            layout,
+            currentViewName,
+            saveView,
+            loadView,
+            deleteView,
+            getViewNames,
+        } = useLayoutState(layoutName, layoutOptions);
 
         const currentPanelTypes = layout.map((item) => item.type);
 
@@ -74,6 +84,13 @@ export function Workspace({
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">
+                                <ViewSwitcher
+                                    currentViewName={currentViewName}
+                                    viewNames={getViewNames()}
+                                    onLoadView={loadView}
+                                    onSaveView={saveView}
+                                    onDeleteView={deleteView}
+                                />
                                 <button
                                     onClick={resetLayout}
                                     className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"

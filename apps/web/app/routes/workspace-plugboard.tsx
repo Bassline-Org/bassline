@@ -43,15 +43,17 @@ export default function WorkspacePlugboard() {
     return (
         <WorkspaceProvider lc={lc}>
             <div className="h-screen flex flex-col">
-                <ProjectHeader
-                    projectName={projectName}
-                    isDirty={isDirty}
-                    onExport={exportProject}
-                    onImport={importProject}
-                    onNewProject={newProject}
-                    projects={listProjects()}
-                    onLoadProject={loadProject}
-                />
+                <div className="relative z-[100] project-header">
+                    <ProjectHeader
+                        projectName={projectName}
+                        isDirty={isDirty}
+                        onExport={exportProject}
+                        onImport={importProject}
+                        onNewProject={newProject}
+                        projects={listProjects()}
+                        onLoadProject={loadProject}
+                    />
+                </div>
                 <Workspace>
                 <div className="container mx-auto p-6">
                     {/* Header */}

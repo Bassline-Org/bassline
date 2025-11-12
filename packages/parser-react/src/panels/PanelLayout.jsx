@@ -10,6 +10,7 @@ import { Responsive, WidthProvider } from "react-grid-layout";
 import { getPanelById } from "./PanelRegistry.js";
 import { useLayoutState } from "./useLayoutState.js";
 import "react-grid-layout/css/styles.css";
+import "./panel-layout.css";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -21,7 +22,7 @@ function PanelWrapper({ panelId, panelType, onRemove, children }) {
         <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
             {/* Panel header with close button */}
             <div className="flex-none flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 panel-drag-handle cursor-move">
                     <span className="text-lg">{getPanelById(panelType)?.icon}</span>
                     <span className="text-sm font-medium text-slate-700">
                         {getPanelById(panelType)?.name}
@@ -29,7 +30,7 @@ function PanelWrapper({ panelId, panelType, onRemove, children }) {
                 </div>
                 <button
                     onClick={() => onRemove(panelId)}
-                    className="text-slate-400 hover:text-slate-600 transition-colors"
+                    className="text-slate-400 hover:text-slate-600 transition-colors no-drag"
                     title="Remove panel"
                 >
                     ✕
@@ -37,7 +38,7 @@ function PanelWrapper({ panelId, panelType, onRemove, children }) {
             </div>
 
             {/* Panel content */}
-            <div className="flex-1 overflow-hidden">{children}</div>
+            <div className="flex-1 overflow-hidden no-drag">{children}</div>
         </div>
     );
 }
@@ -92,6 +93,8 @@ export function PanelLayout({ layoutName, options, onLayoutChange, header }) {
                     isResizable={true}
                     compactType="vertical"
                     preventCollision={false}
+                    draggableHandle=".panel-drag-handle"
+                    draggableCancel=".no-drag"
                 >
                     {layout.map((item) => {
                         const panelDef = getPanelById(item.type);

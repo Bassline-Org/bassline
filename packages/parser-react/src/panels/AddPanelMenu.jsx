@@ -54,7 +54,7 @@ export function AddPanelMenu({ onAddPanel, currentPanels = [] }) {
 
             {/* Dropdown Menu */}
             {isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-slate-200 z-50 overflow-hidden">
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-slate-200 z-[200] dropdown-menu overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
                         <h3 className="font-semibold text-slate-900">Add Panel</h3>
                         <p className="text-xs text-slate-600 mt-1">
