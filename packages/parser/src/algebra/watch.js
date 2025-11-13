@@ -298,7 +298,7 @@ export class WatchedGraph extends Graph {
 
                 // Only fire production if newly complete
                 if (match.isComplete() && !wasComplete) {
-                    const productions = production(match);
+                    const productions = production(match) ?? [];
                     this.matches.delete(entry);
                     queue.push(...productions);
                 }
@@ -328,7 +328,7 @@ export class WatchedGraph extends Graph {
     }
 
     watch(rule) {
-        const productions = rewrite(this, [rule]);
+        const productions = rewrite(this, [rule]) ?? [];
         productions.forEach((p) => this.add(p));
 
         this.rules.add(rule);

@@ -15,10 +15,39 @@ export class Control {
         this.graph.add(quad);
     }
     serialize() {
-        const quads = this.graph.quads.map(serializeQuad).join("\n  ");
+        const inserts = {};
+        const addInsert = (quad) => {
+            const [e, a, v, c] = quad.values.map(serialize);
+            if (!inserts[c]) {
+                inserts[c] = {};
+            }
+            if (!inserts[c][e]) {
+                inserts[c][e] = [];
+            }
+            inserts[c][e].push(`${a} ${v}`);
+        };
+        for (const quad of this.graph.quads) {
+            addInsert(quad);
+        }
+        let insertString = "";
+        for (const [ctx, entities] of Object.entries(inserts)) {
+            insertString += `in ${ctx} {\n`;
+            for (const [entity, attributes] of Object.entries(entities)) {
+                if (attributes.length === 1) {
+                    insertString += `  ${entity} ${attributes[0]}\n`;
+                    continue;
+                }
+                insertString += `  ${entity} {\n`;
+                for (const attribute of attributes) {
+                    insertString += `    ${attribute}\n`;
+                }
+                insertString += `  }\n`;
+            }
+            insertString += `}\n`;
+        }
         return `
 insert {
-  ${quads}
+${insertString}
 }`;
     }
 
@@ -78,9 +107,11 @@ export class LayeredControl extends EventTarget {
             bus: new Bus(),
         };
 
-        this.dispatchEvent(new CustomEvent("bus-added", {
-            detail: { name }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("bus-added", {
+                detail: { name },
+            }),
+        );
     }
     addLayer(name) {
         if (this.layers[name]) {
@@ -100,9 +131,11 @@ export class LayeredControl extends EventTarget {
             this.quadStore.add(quad);
         });
 
-        this.dispatchEvent(new CustomEvent("layer-added", {
-            detail: { name }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("layer-added", {
+                detail: { name },
+            }),
+        );
 
         return control;
     }
@@ -112,9 +145,11 @@ export class LayeredControl extends EventTarget {
         cleanup?.();
         delete this.layers[name];
 
-        this.dispatchEvent(new CustomEvent("layer-removed", {
-            detail: { name }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("layer-removed", {
+                detail: { name },
+            }),
+        );
     }
 
     // =============================================================================
@@ -135,9 +170,11 @@ export class LayeredControl extends EventTarget {
         const cleanup = source.listen((quad) => target.add(quad));
         from.cleanup = cleanup;
 
-        this.dispatchEvent(new CustomEvent("routing-changed", {
-            detail: { from: fromName, to: toName }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("routing-changed", {
+                detail: { from: fromName, to: toName },
+            }),
+        );
     }
 
     // =============================================================================
@@ -179,9 +216,11 @@ export class LayeredControl extends EventTarget {
             this.refs[refKey] = commitHash;
         }
 
-        this.dispatchEvent(new CustomEvent("committed", {
-            detail: { name, commitHash, message }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("committed", {
+                detail: { name, commitHash, message },
+            }),
+        );
 
         return commitHash;
     }
@@ -203,9 +242,11 @@ export class LayeredControl extends EventTarget {
         const removed = layer.staging.delete(quadHash);
 
         if (removed) {
-            this.dispatchEvent(new CustomEvent("staging-changed", {
-                detail: { layerName: name, action: "unstage", quadHash }
-            }));
+            this.dispatchEvent(
+                new CustomEvent("staging-changed", {
+                    detail: { layerName: name, action: "unstage", quadHash },
+                }),
+            );
         }
 
         return removed;
@@ -219,9 +260,11 @@ export class LayeredControl extends EventTarget {
         layer.staging.clear();
 
         if (count > 0) {
-            this.dispatchEvent(new CustomEvent("staging-changed", {
-                detail: { layerName: name, action: "clear", count }
-            }));
+            this.dispatchEvent(
+                new CustomEvent("staging-changed", {
+                    detail: { layerName: name, action: "clear", count },
+                }),
+            );
         }
 
         return count;
@@ -330,9 +373,11 @@ export class LayeredControl extends EventTarget {
             this.route(sourceName, name);
         }
 
-        this.dispatchEvent(new CustomEvent("restored", {
-            detail: { name, commitHash }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("restored", {
+                detail: { name, commitHash },
+            }),
+        );
 
         return control;
     }
@@ -386,9 +431,11 @@ export class LayeredControl extends EventTarget {
 
         this.refs[refKey] = commit;
 
-        this.dispatchEvent(new CustomEvent("branch-created", {
-            detail: { layerName, branchName, commitHash: commit }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("branch-created", {
+                detail: { layerName, branchName, commitHash: commit },
+            }),
+        );
 
         return refKey;
     }
@@ -413,9 +460,11 @@ export class LayeredControl extends EventTarget {
         // Update HEAD to point to branch
         layer.currentBranch = branchName;
 
-        this.dispatchEvent(new CustomEvent("branch-switched", {
-            detail: { layerName, branchName, commitHash }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("branch-switched", {
+                detail: { layerName, branchName, commitHash },
+            }),
+        );
 
         return commitHash;
     }
@@ -436,9 +485,11 @@ export class LayeredControl extends EventTarget {
 
         delete this.refs[refKey];
 
-        this.dispatchEvent(new CustomEvent("branch-deleted", {
-            detail: { layerName, branchName }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("branch-deleted", {
+                detail: { layerName, branchName },
+            }),
+        );
     }
 
     listBranches(layerName) {
@@ -466,9 +517,11 @@ export class LayeredControl extends EventTarget {
         // Detach from branch
         layer.currentBranch = null;
 
-        this.dispatchEvent(new CustomEvent("head-detached", {
-            detail: { layerName, commitHash }
-        }));
+        this.dispatchEvent(
+            new CustomEvent("head-detached", {
+                detail: { layerName, commitHash },
+            }),
+        );
 
         return commitHash;
     }

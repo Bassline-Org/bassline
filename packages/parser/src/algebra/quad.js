@@ -4,12 +4,12 @@ import { hash, Word, word as w } from "../types.js";
 let groupCounter = 0;
 
 export class Quad {
-    constructor(entity, attribute, value, group = autoGroup()) {
+    constructor(entity, attribute, value, group) {
         this.values = [
             quadValue(entity, "Entity"),
             quadValue(attribute, "Attribute"),
             quadValue(value, "Value"),
-            quadValue(group, "Group"),
+            quadValue(group ?? autoGroup(), "Group"),
         ];
         // Cache hash on creation for O(1) lookup
         this._hash = toKey(this.values);

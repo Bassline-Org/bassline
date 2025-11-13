@@ -1,8 +1,10 @@
 {
     "name": "bassline",
     "displayName": "Bassline",
-    "description": "Syntax highlighting for Bassline language",
-    "version": "0.1.0",
+    "description": "Syntax highlighting for Bassline pattern-matching graph DSL",
+    "repository": "https://github.com/MercuricChloride/bassline",
+    "license": "MIT",
+    "version": "0.2.0",
     "engines": {
         "vscode": "^1.60.0"
     },

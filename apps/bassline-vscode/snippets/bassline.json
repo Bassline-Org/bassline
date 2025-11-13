@@ -1,50 +1,61 @@
 {
-    "Function Definition": {
-      "prefix": "func",
-      "body": [
-        "func [${1:args}] [",
-        "\t$0",
-        "]"
-      ],
-      "description": "Define a function"
-    },
-    "Gadget Definition": {
-      "prefix": "gadget",
-      "body": [
-        "defgadget [",
-        "\tstate: [${1:initial-state}]",
-        "\treceive: func [${2:value}] [",
-        "\t\t$0",
-        "\t]",
-        "]"
-      ],
-      "description": "Define a gadget"
-    },
-    "Object": {
-      "prefix": "obj",
-      "body": [
-        "make object! [",
-        "\t$0",
-        "]"
-      ],
-      "description": "Create an object"
-    },
-    "Foreach Loop": {
-      "prefix": "foreach",
-      "body": [
-        "foreach ${1:item} ${2:series} [",
-        "\t$0",
-        "]"
-      ],
-      "description": "Foreach loop"
-    },
-    "Event Handler": {
-      "prefix": "on",
-      "body": [
-        "on ${1:emitter} '${2:event} [",
-        "\t$0",
-        "]"
-      ],
-      "description": "Event handler"
-    }
+  "Insert Block": {
+    "prefix": "insert",
+    "body": [
+      "insert {",
+      "\t${1}",
+      "}"
+    ],
+    "description": "Insert quads into the graph"
+  },
+  "Grouped": {
+    "prefix": "in",
+    "body": [
+      "in ${1:context} {",
+      "\t${2}",
+      "}"
+    ],
+    "description": "Insert quads grouped by context"
+  },
+  "Object": {
+    "prefix": "obj",
+    "body": [
+      "${1:entity} {",
+      "\t${2:attribute} ${3:value}",
+      "\t$0",
+      "}"
+    ],
+    "description": "Object notation for multiple attributes"
+  },
+  "Query": {
+    "prefix": "query",
+    "body": [
+      "query",
+      "where { ${1} }"
+    ],
+    "description": "Query pattern matches"
+  },
+  "Not": {
+    "prefix": "not",
+    "body": [
+      "not { ${1} }"
+    ],
+    "description": "Negative pattern matches"
+  },
+  "Produce": {
+    "prefix": "produce",
+    "body": [
+      "produce { ${1} }"
+    ],
+    "description": "Produce pattern matches"
+  },
+  "Rule Definition": {
+    "prefix": "rule",
+    "body": [
+      "rule ${1:name}",
+      "\twhere { ${2} }",
+      "\tproduce { ${3} }"
+    ],
+    "description": "Define a reactive rewrite rule"
   }
+}

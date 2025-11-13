@@ -23,9 +23,9 @@
  * g.add(q(w("VERIFY"), w("memberOf"), w("rule"), w("system")));
  */
 
-import { pattern, patternQuad, matchGraph } from "./pattern.js";
+import { matchGraph, pattern, patternQuad } from "./pattern.js";
 import { quad as q } from "./quad.js";
-import { word as w, variable as v, WC, isWildcard } from "../types.js";
+import { isWildcard, variable as v, WC, word as w } from "../types.js";
 import { parsePatterns } from "../pattern-parser.js";
 
 /**
@@ -41,31 +41,19 @@ import { parsePatterns } from "../pattern-parser.js";
 export function installReifiedRules(graph) {
     const activeRules = new Map(); // ruleId spelling → unwatch function
 
-    // Watch for rule activation: [?rule, "memberOf", "rule", "system"]
     const activationPattern = pattern(
-        patternQuad(v("rule"), w("memberOf"), w("rule"), w("system")),
+        patternQuad(w("meta"), w("type"), w("rule!"), v("ctx")),
+        patternQuad(w("meta"), w("nac"), v("nac"), v("ctx")),
     );
 
     graph.watch({
         pattern: activationPattern,
         production: (match) => {
-            const ruleId = match.get("rule");
-            activateRule(graph, ruleId, activeRules);
-            return [];
-        },
-    });
-
-    // Watch for rule deactivation: [?rule, "memberOf", "rule", "tombstone"]
-    const deactivationPattern = pattern(
-        patternQuad(v("rule"), w("memberOf"), w("rule"), w("tombstone")),
-    );
-
-    graph.watch({
-        pattern: deactivationPattern,
-        production: (match) => {
-            const ruleId = match.get("rule");
-            deactivateRule(ruleId, activeRules);
-            return [];
+            const ctx = match.get("ctx");
+            const hasNac = match.get("nac").toString() === "TRUE"
+                ? true
+                : false;
+            activateRule(graph, ctx, activeRules, hasNac);
         },
     });
 
@@ -88,70 +76,109 @@ function toPatternQuad([e, a, v, c]) {
 
 /**
  * Activate a rule by querying its structure and installing watchers
+ * @example
+ * ;; TO ENABLE
+ * in some-rule {
+ *   rule {
+ *     where "?p age ?a *"
+ *     produce "?p has-age true *"
+ *   }
+ *   meta {
+ *     type rule!
+ *     nac false
+ *   }
+ * }
+ *
+ * ;; TO DISABLE
+ * in some-rule {
+ *   meta disable rule
+ * }
  */
-function activateRule(graph, ruleId, activeRules) {
-    // Query rule definition edges
-    const matches = matchGraph(graph, pattern(patternQuad(ruleId, w("matches"), v("p"), WC)));
-    const nacs = matchGraph(graph, pattern(patternQuad(ruleId, w("nac"), v("n"), WC)));
-    const produces = matchGraph(graph, pattern(patternQuad(ruleId, w("produces"), v("p"), WC)));
-
-    // Extract pattern strings
-    const matchStr = matches.map(m => getString(m.get("p"))).join(" ");
-    const produceStr = getString(produces[0]?.get("p"));
-
-    // Validate
-    if (!matchStr) {
-        console.warn(`Rule ${getString(ruleId)} has no match patterns`);
-        return;
+function activateRule(graph, ruleId, activeRules, hasNac) {
+    const rulePatterns = [
+        patternQuad(w("rule"), w("where"), v("where"), ruleId),
+        patternQuad(w("rule"), w("produce"), v("produce"), ruleId),
+    ];
+    if (hasNac) {
+        rulePatterns.push(patternQuad(w("rule"), w("not"), v("not"), ruleId));
     }
-    if (!produceStr || produceStr === "undefined") {
-        console.warn(`Rule ${getString(ruleId)} has no production template`);
-        return;
-    }
-
-    try {
-        // Parse patterns
-        const matchQuads = parsePatterns(matchStr);
-        const produceQuads = parsePatterns(produceStr);
-
-        if (matchQuads.length === 0) {
-            console.warn(`Rule ${getString(ruleId)} has invalid match pattern: ${matchStr}`);
-            return;
-        }
-
-        // Build pattern with NAC
-        const rulePattern = pattern(...matchQuads.map(toPatternQuad));
-        if (nacs.length > 0) {
-            const nacStr = nacs.map(n => getString(n.get("n"))).join(" ");
-            const nacQuads = parsePatterns(nacStr);
-            rulePattern.setNAC(...nacQuads.map(toPatternQuad));
-        }
-
-        // Build production function
-        const production = (match) => {
-            const produced = produceQuads.map(([e, a, v, c]) =>
-                q(substitute(e, match), substitute(a, match), substitute(v, match), substitute(c, match))
+    let unwatchDefinition;
+    unwatchDefinition = graph.watch({
+        pattern: pattern(
+            ...rulePatterns,
+        ),
+        production: (match) => {
+            const rule = buildRule(
+                match.get("where"),
+                match.get("produce"),
+                match.get("not"),
             );
-            return produced;
-        };
-
-        // Install watcher
-        const unwatch = graph.watch({ pattern: rulePattern, production });
-        activeRules.set(getString(ruleId), unwatch);
-    } catch (error) {
-        console.error(`Failed to parse rule ${getString(ruleId)}:`, error);
-    }
+            if (!rule) {
+                console.warn(`Missing rule: ${ruleId}`);
+                return [];
+            }
+            // The unwatch function for the defined rule
+            const unwatchRule = graph.watch(rule);
+            // The unwatch function to deactive the newly defined rule
+            const unwatchDisableRule = graph.watch({
+                pattern: pattern(
+                    patternQuad(w("meta"), w("disable"), w("rule"), ruleId),
+                ),
+                production: (_match) => {
+                    console.log("Deactivating rule", ruleId);
+                    unwatchRule();
+                    unwatchDisableRule();
+                    return [];
+                },
+            });
+            // When we match and define the rule, we uninstall the definition watcher
+            unwatchDefinition?.();
+            activeRules.set(getString(ruleId), unwatchRule);
+            return [];
+        },
+    });
+    return [];
 }
 
-/**
- * Deactivate a rule by calling its unwatch function
- */
-function deactivateRule(ruleId, activeRules) {
-    const unwatch = activeRules.get(getString(ruleId));
-    if (unwatch) {
-        unwatch();
-        activeRules.delete(getString(ruleId));
+function buildRule(whereStr, produceStr, notStr) {
+    const where = parsePatterns(whereStr).map(toPatternQuad);
+    // NOTE: We don't need to convert to PatternQuads here, because we will use substitute to
+    // convert the variables to their actual values
+    const produce = parsePatterns(produceStr);
+
+    if (where.length === 0) {
+        console.warn(`Missing WHERE pattern: ${whereStr}`);
+        return null;
     }
+    if (produce.length === 0) {
+        console.warn(`Missing PRODUCE pattern: ${produceStr}`);
+        return null;
+    }
+
+    const rulePattern = pattern(...where);
+    if (notStr) {
+        const not = parsePatterns(notStr).map(toPatternQuad);
+        if (not.length === 0) {
+            console.warn(`Missing NOT pattern: ${notStr}`);
+            return null;
+        }
+        rulePattern.setNAC(...not);
+    }
+
+    return {
+        pattern: rulePattern,
+        production: (match) => {
+            const produced = produce.map(([e, a, v, c]) =>
+                q(
+                    substitute(e, match),
+                    substitute(a, match),
+                    substitute(v, match),
+                    substitute(c, match),
+                )
+            );
+            return produced;
+        },
+    };
 }
 
 /**
@@ -171,16 +198,23 @@ function substitute(val, match) {
  * Get list of active rule IDs
  */
 export function getActiveRules(graph) {
-    const pat = pattern(patternQuad(v("rule"), w("memberOf"), w("rule"), w("system")));
-    pat.setNAC(patternQuad(v("rule"), w("memberOf"), w("rule"), w("tombstone")));
-    return matchGraph(graph, pat).map(m => getString(m.get("rule")));
+    const pat = pattern(
+        patternQuad(w("meta"), w("type"), w("rule!"), v("ctx")),
+    );
+    pat.setNAC(
+        patternQuad(w("meta"), w("disable"), w("rule"), v("ctx")),
+    );
+    return matchGraph(graph, pat).map((m) => getString(m.get("ctx")));
 }
 
 /**
  * Get full definition of a rule
  */
 export function getRuleDefinition(graph, ruleId) {
-    const results = matchGraph(graph, pattern(patternQuad(w(ruleId), v("prop"), v("val"), WC)));
+    const results = matchGraph(
+        graph,
+        pattern(patternQuad(w("rule"), v("prop"), v("val"), ruleId)),
+    );
     return results.reduce((def, m) => {
         const propKey = getString(m.get("prop"));
         const valStr = getString(m.get("val"));
@@ -189,4 +223,3 @@ export function getRuleDefinition(graph, ruleId) {
         return def;
     }, {});
 }
-

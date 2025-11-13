@@ -1,0 +1,22 @@
+insert {
+    in adult-check {
+        rule {
+            where "?p age ?a ?c"
+            produce "?p adult true ?c"
+        }
+        meta {
+            type rule!
+            nac false
+        }
+    }
+}
+
+insert {
+    in people {
+        alice age 30
+        bob age 35
+    }
+    in * {
+        david age 25
+    }
+}

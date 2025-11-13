@@ -209,14 +209,20 @@ const obj = sequenceOf([
 ]).map(([entity, _, entries, __]) => {
   return entries.map(([attr, value]) => [entity, attr, value, null]);
 });
+const triple = sequenceOf([
+  entityId,
+  attribute,
+  value,
+]).map(([entity, attribute, value]) => [entity, attribute, value, null]);
 
 const group = sequenceOf([
-  cmd("group"),
+  cmd("in"),
   context,
   openBracket,
-  many(obj),
+  many(choice([triple.map((q) => [q]), obj])),
   closeBracket,
-]).map(([_, context, __, objs]) => {
+]).map(([_, ctx, __, objs]) => {
+  const context = ctx instanceof Word ? ctx : null;
   const quads = objs.flat();
   return quads.map((
     [entity, attribute, value],
@@ -247,6 +253,11 @@ const patternQuad = sequenceOf([
   patternChoice(value),
   patternChoice(context),
 ]);
+const patternTriple = sequenceOf([
+  patternChoice(entityId),
+  patternChoice(attribute),
+  patternChoice(value),
+]).map(([entity, attribute, value]) => [entity, attribute, value, null]);
 const patternObjEntry = sequenceOf([
   patternChoice(attribute),
   patternChoice(value),
@@ -260,10 +271,10 @@ const patternObj = sequenceOf([
   entries.map(([a, v]) => [entity, a, v, null])
 );
 const patternGroup = sequenceOf([
-  cmd("group"),
+  cmd("in"),
   patternChoice(context),
   openBracket,
-  many(patternObj),
+  many(choice([patternTriple.map((q) => [q]), patternObj])),
   closeBracket,
 ]).map(([_, context, __, objs]) => {
   const quads = objs.flat();
@@ -272,31 +283,7 @@ const patternGroup = sequenceOf([
   ) => [entity, attribute, value, context]);
 });
 
-const namedPattern = sequenceOf([
-  cmd("pattern"),
-  word,
-  openBracket,
-  many(choice([
-    patternGroup,
-    patternObj,
-    patternQuad.map((q) => [q]),
-  ])),
-  closeBracket,
-]).map(([_, name, __, patterns, ___]) => {
-  const quads = patterns.flat();
-  return (control) => {
-    control.setPattern(name, quads);
-  };
-});
-
-const patternRef = sequenceOf([
-  cmd("<"),
-  word,
-  char(">"),
-]).map(([_, name, __]) => (control) => control.getPattern(name));
-
 const patterns = many(choice([
-  patternRef,
   patternGroup,
   patternObj,
   patternQuad.map((q) => [q]),
@@ -372,20 +359,19 @@ const rule = sequenceOf([
   const whereQuads = where;
   const notQuads = not?.not ?? [];
   const produceQuads = produce;
-
   return ({ graph }) => {
-    // Insert reified rule definition as edges
-    graph.add(q(name, w("TYPE"), w("RULE!"), w("system")));
-    graph.add(q(name, w("matches"), serializePattern(whereQuads), name));
-
+    const toAdd = [
+      q(w("meta"), w("type"), w("rule!"), name),
+      q(w("rule"), w("where"), serializePattern(whereQuads), name),
+      q(w("rule"), w("produce"), serializePattern(produceQuads), name),
+    ];
     if (notQuads.length > 0) {
-      graph.add(q(name, w("nac"), serializePattern(notQuads), name));
+      toAdd.push(q(w("rule"), w("nac"), serializePattern(notQuads), name));
+      toAdd.push(q(w("meta"), w("nac"), w("true"), name));
+    } else {
+      toAdd.push(q(w("meta"), w("nac"), w("false"), name));
     }
-
-    graph.add(q(name, w("produces"), serializePattern(produceQuads), name));
-
-    // Activate rule
-    graph.add(q(name, w("memberOf"), w("rule"), w("system")));
+    toAdd.forEach((quad) => graph.add(quad));
   };
 });
 
