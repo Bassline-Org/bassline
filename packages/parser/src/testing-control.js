@@ -15,7 +15,7 @@ for (const result of results) {
         for (const res of result) {
             if (res instanceof Match) {
                 console.log(res.prettyBindings());
-                console.log(res.prettyQuads());
+                //                console.log(res.prettyQuads());
             }
         }
     }

@@ -10,6 +10,7 @@
     "./panels": "./src/panels/index.js",
     "./state": "./src/state/index.js",
     "./styles.css": "./src/styles.css",
+    "./alt/useGraph": "./src/alt/useGraph.jsx",
     "./panel-layout.css": "./src/panels/panel-layout.css"
   },
   "scripts": {

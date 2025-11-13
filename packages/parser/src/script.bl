@@ -93,28 +93,61 @@ insert {
     }
 }
 
-query
-    where {
-        ?e ?a ?v some-result
+query where { ?e ?a ?v some-result }
+
+insert {
+    in some-view {
+        meta type view!
+        view {
+            kind table
+            where "?e ?a ?v ?c"
+            context foo
+        }
     }
 
+    in another-view {
+        meta type view!
+        view {
+            kind table
+            where "meta ?a ?v ?c"
+            context foo
+        }
+    }
+}
+
+;; Get views on foo
 query
     where {
         in ?ctx {
             meta {
-                type operation!
-                operation-type binary
+                type view!
+            }
+            view {
+                context foo
+                kind ?kind
+                where ?where
             }
         }
     }
-    produce {
-        in system.binary-ops {
-            ?ctx binary-op true
-        }
-    }
 
-query
-    where {
-        ?ctx binary-op true system.binary-ops
-        meta docs ?docs ?ctx
-    }
+
+; query
+;     where {
+;         in ?ctx {
+;             meta {
+;                 type operation!
+;                 operation-type binary
+;             }
+;         }
+;     }
+;     produce {
+;         in system.binary-ops {
+;             ?ctx binary-op true
+;         }
+;     }
+
+; query
+;     where {
+;         ?ctx binary-op true system.binary-ops
+;         meta docs ?docs ?ctx
+;     }

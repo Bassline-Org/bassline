@@ -40,7 +40,7 @@ import { quad as q } from "./algebra/quad.js";
 /**
  * Convert array to PatternQuad
  */
-function toPatternQuad([e, a, v, c]) {
+export function toPatternQuad([e, a, v, c]) {
   return pq(e, a, v, c ?? WC);
 }
 

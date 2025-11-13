@@ -63,7 +63,7 @@ export function installReifiedRules(graph) {
 /**
  * Extract string value from Word or other value
  */
-function getString(val) {
+export function getString(val) {
     return val?.spelling?.description || String(val);
 }
 

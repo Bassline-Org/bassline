@@ -7,12 +7,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-    ReactFlow,
     Background,
     Controls,
     Panel,
-    useNodesState,
+    ReactFlow,
     useEdgesState,
+    useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -52,7 +52,7 @@ export function PlugboardPanel() {
             layers,
             routing,
             lc,
-            activeLayer
+            activeLayer,
         );
         setNodes(newNodes);
         setEdges(newEdges);
@@ -67,7 +67,7 @@ export function PlugboardPanel() {
                 console.error("Failed to create route:", err);
             }
         },
-        [lc]
+        [lc],
     );
 
     // Handle edge deletion
@@ -87,7 +87,7 @@ export function PlugboardPanel() {
                         lc.dispatchEvent(
                             new CustomEvent("routing-changed", {
                                 detail: { from: edge.source, to: null },
-                            })
+                            }),
                         );
                     }
                 } catch (err) {
@@ -95,7 +95,7 @@ export function PlugboardPanel() {
                 }
             });
         },
-        [lc]
+        [lc],
     );
 
     // Handle node click (set as active layer)
@@ -106,7 +106,7 @@ export function PlugboardPanel() {
                 setActiveLayer(node.id);
             }
         },
-        [setActiveLayer]
+        [setActiveLayer],
     );
 
     return (
@@ -137,9 +137,11 @@ export function PlugboardPanel() {
                     className="bg-white px-3 py-2 rounded-lg shadow-md border border-slate-200"
                 >
                     <div className="text-sm text-slate-700">
-                        <span className="font-semibold">{layers.length}</span>{" "}
+                        <span className="font-semibold">{layers.length}</span>
+                        {" "}
                         layer{layers.length !== 1 ? "s" : ""} •{" "}
-                        <span className="font-semibold">{routing.length}</span>{" "}
+                        <span className="font-semibold">{routing.length}</span>
+                        {" "}
                         connection{routing.length !== 1 ? "s" : ""}
                     </div>
                 </Panel>

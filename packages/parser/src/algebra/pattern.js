@@ -152,6 +152,13 @@ export class Match {
 
         return true; // No NAC patterns matched
     }
+    bindingObject() {
+        return Object.fromEntries(
+            Object.getOwnPropertySymbols(this.bindings).map(
+                (key) => [key.description, this.bindings[key]],
+            ),
+        );
+    }
     tryComplete(sourceQuad) {
         for (let i = 0; i < this.pattern.quads.length; i++) {
             if (this.matchedPatternQuads.has(i)) continue;

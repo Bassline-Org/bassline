@@ -37,6 +37,9 @@ type Pages = {
   "/graph-viz": {
     params: {};
   };
+  "/alt-flow": {
+    params: {};
+  };
   "/home": {
     params: {};
   };
@@ -48,7 +51,7 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/layered-control-demo" | "/workspace-plugboard" | "/workspace-staging" | "/workspace-layers" | "/components-demo" | "/workspace-full" | "/project-demo" | "/graph-viz" | "/home" | "/repl";
+    page: "/" | "/layered-control-demo" | "/workspace-plugboard" | "/workspace-staging" | "/workspace-layers" | "/components-demo" | "/workspace-full" | "/project-demo" | "/graph-viz" | "/alt-flow" | "/home" | "/repl";
   };
   "routes/layered-control-demo.tsx": {
     id: "routes/layered-control-demo";
@@ -81,6 +84,10 @@ type RouteFiles = {
   "routes/graph-viz.tsx": {
     id: "routes/graph-viz";
     page: "/graph-viz";
+  };
+  "routes/alt-flow.tsx": {
+    id: "routes/alt-flow";
+    page: "/alt-flow";
   };
   "routes/home.tsx": {
     id: "routes/home";
