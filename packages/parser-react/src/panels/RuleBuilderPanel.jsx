@@ -84,7 +84,13 @@ const initialNodes = [
         parentId: "pattern-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
     {
         id: "sample-p-1",
@@ -94,7 +100,13 @@ const initialNodes = [
         parentId: "pattern-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 100, height: 70, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
     {
         id: "sample-p-2",
@@ -104,7 +116,13 @@ const initialNodes = [
         parentId: "pattern-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
     {
         id: "sample-p-3",
@@ -114,7 +132,13 @@ const initialNodes = [
         parentId: "pattern-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
     // Production nodes
     {
@@ -125,7 +149,13 @@ const initialNodes = [
         parentId: "production-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
     {
         id: "sample-prod-1",
@@ -135,7 +165,13 @@ const initialNodes = [
         parentId: "production-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 100, height: 70, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
     {
         id: "sample-prod-2",
@@ -145,7 +181,13 @@ const initialNodes = [
         parentId: "production-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 100, height: 70, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
     {
         id: "sample-prod-3",
@@ -155,19 +197,61 @@ const initialNodes = [
         parentId: "production-group",
         draggable: true,
         zIndex: 100,
-        style: { width: 80, height: 80, padding: 0, border: "none", background: "transparent" },
+        style: {
+            width: 80,
+            height: 80,
+            padding: 0,
+            border: "none",
+            background: "transparent",
+        },
     },
 ];
 
 const initialEdges = [
     // Pattern edges
-    { id: "sample-p-edge-0", source: "sample-p-0", target: "sample-p-1", type: "chain", zIndex: 50 },
-    { id: "sample-p-edge-1", source: "sample-p-1", target: "sample-p-2", type: "chain", zIndex: 50 },
-    { id: "sample-p-edge-2", source: "sample-p-2", target: "sample-p-3", type: "chain", zIndex: 50 },
+    {
+        id: "sample-p-edge-0",
+        source: "sample-p-0",
+        target: "sample-p-1",
+        type: "chain",
+        zIndex: 50,
+    },
+    {
+        id: "sample-p-edge-1",
+        source: "sample-p-1",
+        target: "sample-p-2",
+        type: "chain",
+        zIndex: 50,
+    },
+    {
+        id: "sample-p-edge-2",
+        source: "sample-p-2",
+        target: "sample-p-3",
+        type: "chain",
+        zIndex: 50,
+    },
     // Production edges
-    { id: "sample-prod-edge-0", source: "sample-prod-0", target: "sample-prod-1", type: "chain", zIndex: 50 },
-    { id: "sample-prod-edge-1", source: "sample-prod-1", target: "sample-prod-2", type: "chain", zIndex: 50 },
-    { id: "sample-prod-edge-2", source: "sample-prod-2", target: "sample-prod-3", type: "chain", zIndex: 50 },
+    {
+        id: "sample-prod-edge-0",
+        source: "sample-prod-0",
+        target: "sample-prod-1",
+        type: "chain",
+        zIndex: 50,
+    },
+    {
+        id: "sample-prod-edge-1",
+        source: "sample-prod-1",
+        target: "sample-prod-2",
+        type: "chain",
+        zIndex: 50,
+    },
+    {
+        id: "sample-prod-edge-2",
+        source: "sample-prod-2",
+        target: "sample-prod-3",
+        type: "chain",
+        zIndex: 50,
+    },
 ];
 
 export function RuleBuilderPanel() {
@@ -301,21 +385,13 @@ export function RuleBuilderPanel() {
                     : type;
 
             // Determine node dimensions based on type
-            const nodeStyle = nodeType === "literal"
-                ? {
-                    width: 100,
-                    height: 70,
-                    padding: 0,
-                    border: "none",
-                    background: "transparent",
-                } // Literals are wider/shorter
-                : {
-                    width: 80,
-                    height: 80,
-                    padding: 0,
-                    border: "none",
-                    background: "transparent",
-                }; // Variables and wildcards are square
+            const nodeStyle = {
+                width: 80,
+                height: 80,
+                padding: 0,
+                border: "none",
+                background: "transparent",
+            }; // All nodes are now the same size
 
             const newNode = {
                 id,
@@ -484,28 +560,28 @@ export function RuleBuilderPanel() {
             let ruleCommand;
             if (nacQuads.length > 0) {
                 // With NAC
-                ruleCommand = `rule ${ruleName} where { ${patternQuads.join(" ")} | not ${nacQuads.join(" ")} } produce { ${productionQuads.join(" ")} }`;
+                ruleCommand = `rule ${ruleName} where { ${
+                    patternQuads.join(" ")
+                } | not ${nacQuads.join(" ")} } produce { ${
+                    productionQuads.join(" ")
+                } }`;
             } else {
                 // Without NAC
-                ruleCommand = `rule ${ruleName} where { ${patternQuads.join(" ")} } produce { ${productionQuads.join(" ")} }`;
+                ruleCommand = `rule ${ruleName} where { ${
+                    patternQuads.join(" ")
+                } } produce { ${productionQuads.join(" ")} }`;
             }
 
-            console.log("[RuleBuilder] Installing rule:", ruleName);
-            console.log("[RuleBuilder] Target layer:", targetLayer);
-            console.log("[RuleBuilder] Rule command:", ruleCommand);
-            console.log("[RuleBuilder] Layer graph quads before install:", layer.graph.quads?.length);
-
             // Install rule into layer
-            const result = layer.run(ruleCommand);
-
-            console.log("[RuleBuilder] Rule installation result:", result);
-            console.log("[RuleBuilder] Layer graph quads after install:", layer.graph.quads?.length);
+            layer.run(ruleCommand);
 
             alert(
                 `Rule "${ruleName}" installed successfully into "${targetLayer}"!\n\nPattern:\n${
                     patternQuads.join("\n")
                 }\n\nProduction:\n${productionQuads.join("\n")}${
-                    nacQuads.length > 0 ? `\n\nNAC:\n${nacQuads.join("\n")}` : ""
+                    nacQuads.length > 0
+                        ? `\n\nNAC:\n${nacQuads.join("\n")}`
+                        : ""
                 }`,
             );
         } catch (err) {

@@ -32,63 +32,35 @@ export const LiteralNode = memo(({ id, data }) => {
         }
     };
 
-    // Styling based on literal type
-    const typeStyles = {
-        word: {
-            bg: "bg-gradient-to-br from-blue-400 to-blue-500",
-            border: "border-blue-600",
-            hover: "hover:from-blue-500 hover:to-blue-600",
-            text: "text-white",
-            badge: "bg-blue-700 text-white",
-            badgeText: "word",
-        },
-        number: {
-            bg: "bg-gradient-to-br from-green-400 to-green-500",
-            border: "border-green-600",
-            hover: "hover:from-green-500 hover:to-green-600",
-            text: "text-white",
-            badge: "bg-green-700 text-white",
-            badgeText: "num",
-        },
-        string: {
-            bg: "bg-gradient-to-br from-amber-400 to-amber-500",
-            border: "border-amber-600",
-            hover: "hover:from-amber-500 hover:to-amber-600",
-            text: "text-white",
-            badge: "bg-amber-700 text-white",
-            badgeText: "str",
-        },
+    // Background gradient based on literal type
+    const getBackground = () => {
+        switch (literalType) {
+            case 'number':
+                return 'linear-gradient(to bottom right, rgb(74, 222, 128), rgb(34, 197, 94))';
+            case 'string':
+                return 'linear-gradient(to bottom right, rgb(251, 191, 36), rgb(245, 158, 11))';
+            default:
+                return 'linear-gradient(to bottom right, rgb(96, 165, 250), rgb(59, 130, 246))';
+        }
     };
 
-    const styles = typeStyles[literalType] || typeStyles.word;
-
     return (
-        <div className="relative flex flex-col items-center justify-center" style={{ width: '100%', height: '100%' }}>
+        <div
+            className="relative bg-gradient-to-br from-blue-400 to-blue-500 text-white rounded-full flex items-center justify-center font-mono text-xs font-semibold cursor-pointer hover:from-blue-500 hover:to-blue-600 shadow-lg transition-all px-3"
+            style={{
+                width: '100%',
+                height: '100%',
+                background: getBackground(),
+            }}
+            onDoubleClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+            }}
+            title="Double-click to edit"
+        >
             <Handle type="target" position={Position.Left} style={{ left: -4, width: 8, height: 8 }} />
 
-            {/* Type badge */}
-            <div
-                className={`${styles.badge} px-3 py-1 rounded-t text-xs font-semibold`}
-            >
-                {styles.badgeText}
-            </div>
-
-            {/* Main node */}
-            <div
-                className={`${styles.bg} ${styles.hover} ${styles.text} rounded-b-lg px-6 py-3 font-mono text-lg font-semibold min-w-[120px] text-center cursor-pointer transition-all shadow-md`}
-                style={{
-                    background: literalType === 'number'
-                        ? 'linear-gradient(to bottom right, rgb(74, 222, 128), rgb(34, 197, 94))'
-                        : literalType === 'string'
-                        ? 'linear-gradient(to bottom right, rgb(251, 191, 36), rgb(245, 158, 11))'
-                        : 'linear-gradient(to bottom right, rgb(96, 165, 250), rgb(59, 130, 246))',
-                }}
-                onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    setIsEditing(true);
-                }}
-                title="Double-click to edit"
-            >
+            <div className="overflow-hidden text-ellipsis whitespace-nowrap text-center w-full">
                 {isEditing
                     ? (
                         <input
@@ -105,7 +77,7 @@ export const LiteralNode = memo(({ id, data }) => {
                                     setIsEditing(false);
                                 }
                             }}
-                            className="bg-white text-gray-900 border border-blue-400 rounded px-2 py-1 text-sm font-mono text-center min-w-[80px]"
+                            className="bg-white text-gray-900 border border-blue-400 rounded px-2 py-1 text-xs font-mono text-center w-full"
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
                         />

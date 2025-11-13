@@ -1,4 +1,8 @@
 @import "tailwindcss";
+
+/* Tell Tailwind v4 to scan workspace packages for class usage */
+@source "../../../packages/parser-react/src";
+
 @import "tw-animate-css";
 @import "@bassline/parser-react/panel-layout.css";
 @import "@bassline/parser-react/styles.css";

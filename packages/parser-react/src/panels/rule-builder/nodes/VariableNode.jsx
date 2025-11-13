@@ -39,7 +39,7 @@ export const VariableNode = memo(({ id, data }) => {
 
     return (
         <div
-            className="relative bg-gradient-to-br from-purple-400 to-purple-600 text-white rounded-full flex items-center justify-center font-mono text-xl font-semibold cursor-pointer hover:from-purple-500 hover:to-purple-700 shadow-lg transition-all"
+            className="relative bg-gradient-to-br from-purple-400 to-purple-600 text-white rounded-full flex items-center justify-center font-mono text-xs font-semibold cursor-pointer hover:from-purple-500 hover:to-purple-700 shadow-lg transition-all px-3"
             style={{
                 width: "100%",
                 height: "100%",
@@ -58,28 +58,30 @@ export const VariableNode = memo(({ id, data }) => {
                 style={{ left: -4, width: 8, height: 8 }}
             />
 
-            {isEditing
-                ? (
-                    <input
-                        type="text"
-                        value={labelValue}
-                        onChange={(e) => setLabelValue(e.target.value)}
-                        onBlur={handleBlur}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                                handleLabelChange(labelValue);
-                                setIsEditing(false);
-                            } else if (e.key === "Escape") {
-                                setLabelValue(label);
-                                setIsEditing(false);
-                            }
-                        }}
-                        className="text-gray-900 border border-blue-400 rounded px-2 py-1 text-sm font-mono w-20 text-center"
-                        autoFocus
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                )
-                : label}
+            <div className="overflow-hidden text-ellipsis whitespace-nowrap text-center w-full">
+                {isEditing
+                    ? (
+                        <input
+                            type="text"
+                            value={labelValue}
+                            onChange={(e) => setLabelValue(e.target.value)}
+                            onBlur={handleBlur}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    handleLabelChange(labelValue);
+                                    setIsEditing(false);
+                                } else if (e.key === "Escape") {
+                                    setLabelValue(label);
+                                    setIsEditing(false);
+                                }
+                            }}
+                            className="bg-white text-gray-900 border border-blue-400 rounded px-2 py-1 text-xs font-mono text-center w-full"
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    )
+                    : label}
+            </div>
 
             <Handle
                 type="source"

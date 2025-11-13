@@ -25,12 +25,6 @@ export const GroupNode = memo(({ id, data }) => {
         red: "bg-red-200",
     };
 
-    const inlineBgColors = {
-        blue: "rgb(191, 219, 254)",  // blue-200
-        green: "rgb(187, 247, 208)", // green-200
-        red: "rgb(254, 202, 202)",   // red-200
-    };
-
     const headerColors = {
         blue: "text-blue-900 bg-gradient-to-r from-blue-200 to-blue-300",
         green: "text-green-900 bg-gradient-to-r from-green-200 to-green-300",
@@ -63,7 +57,6 @@ export const GroupNode = memo(({ id, data }) => {
             } w-full h-full shadow-md rounded-lg`}
             style={{
                 pointerEvents: "auto",
-                backgroundColor: inlineBgColors[color],
             }}
         >
             <div

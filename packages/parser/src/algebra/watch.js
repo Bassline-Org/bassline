@@ -271,7 +271,6 @@ export class WatchedGraph extends Graph {
         if (this._quads.has(quad.hash())) {
             return this;
         }
-        console.log("[Watch] Adding quad:", quad.values);
         const queue = [quad];
 
         while (queue.length > 0) {
@@ -299,9 +298,6 @@ export class WatchedGraph extends Graph {
 
                 // Only fire production if newly complete
                 if (match.isComplete() && !wasComplete) {
-                    console.log(
-                        "[Watch] Partial match completed, firing production",
-                    );
                     const productions = production(match);
                     this.matches.delete(entry);
                     queue.push(...productions);
@@ -310,30 +306,19 @@ export class WatchedGraph extends Graph {
 
             // Try to match new rules (O(1) selective activation)
             const candidates = this.getCandidateRules(currentQuad);
-            console.log("[Watch] Candidate rules:", candidates.size, "rules");
             for (const rule of candidates) {
                 const { pattern, production } = rule;
                 const match = pattern.match(currentQuad);
                 if (match) {
-                    console.log("[Watch] Pattern matched!");
                     // Check NAC immediately (even for partial matches!)
                     if (!match.checkNAC(this)) {
-                        console.log(
-                            "[Watch] NAC check failed, rejecting match",
-                        );
                         continue; // Reject doomed match, don't add to this.matches
                     }
 
                     if (match.isComplete()) {
-                        console.log(
-                            "[Watch] Complete match, firing production",
-                        );
                         const productions = production(match);
                         queue.push(...productions);
                     } else {
-                        console.log(
-                            "[Watch] Partial match, adding to match set",
-                        );
                         this.matches.add({ match, production });
                     }
                 }

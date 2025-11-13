@@ -12,8 +12,7 @@ import { useWorkspace } from "@bassline/parser-react";
 export function ReplPanel() {
     const lc = useLayeredControl();
     const { activeLayer } = useWorkspace();
-    const layer = useLayer(activeLayer);  // Now handles null gracefully
-    console.log("layer: ", activeLayer, layer);
+    const layer = useLayer(activeLayer);
 
     const [input, setInput] = useState("");
     const [output, setOutput] = useState([]);
