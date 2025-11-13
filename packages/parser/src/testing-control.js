@@ -1,29 +1,24 @@
+import { Match, pattern, patternQuad } from "./algebra/pattern.js";
 import { Control } from "./control.js";
 import { readFileSync } from "fs";
+import { variable as v, word as w } from "./types.js";
+import { quad } from "./algebra/quad.js";
 
 const control = new Control();
 
 const script = readFileSync("./script.bl", "utf8");
 
-control.run(script);
+const results = control.run(script);
 
-const disable = `
-insert {
-  in adult-check {
-    meta disable rule
-  }
-
-  in people {
-    charlie age 20
-  }
+for (const result of results) {
+    if (Array.isArray(result)) {
+        for (const res of result) {
+            if (res instanceof Match) {
+                console.log(res.prettyBindings());
+                console.log(res.prettyQuads());
+            }
+        }
+    }
 }
-`;
-control.run(disable);
 
-const queryResult2 = control.run(`
-query
-    where { ?p adult true ?c }`)[0];
-
-for (const result of queryResult2) {
-    console.log(result.get("p"));
-}
+console.log(control.serialize());

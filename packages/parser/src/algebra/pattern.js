@@ -2,11 +2,13 @@ import { Quad } from "./quad.js";
 import {
     isWildcard,
     PatternVar,
+    serialize,
     validateType,
     valuesEqual,
     variable as v,
     WC,
 } from "../types.js";
+import { serializeQuad } from "../control.js";
 
 export class PatternQuad {
     constructor(entity, attribute, value, group = WC) {
@@ -176,6 +178,19 @@ export class Match {
             if (this.isComplete()) return this;
         }
         return this;
+    }
+    prettyBindings() {
+        let str = `Match {\n`;
+        for (const entry of Object.getOwnPropertySymbols(this.bindings)) {
+            str += `  ${entry.description}: ${
+                serialize(this.bindings[entry])
+            }\n`;
+        }
+        str += `}`;
+        return str;
+    }
+    prettyQuads() {
+        return `${this.quads.map(serializeQuad).join("\n")}`;
     }
 }
 

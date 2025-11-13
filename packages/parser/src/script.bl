@@ -1,22 +1,79 @@
 insert {
-    in adult-check {
+    in foo { meta uses bar }
+    in other-foo { meta sync foo }
+
+    in bar {
+        meta slurp baz
+        alice age 30
+    }
+    in baz {
+        bob age 45
+    }
+
+    in system.alias {
+        slurp as uses
+    }
+}
+
+;; Manually writing a rule for example
+insert {
+    in core.alias {
         rule {
-            where "?p age ?a ?c"
-            produce "?p adult true ?c"
+            where "
+                ?e ?alias ?v ?c
+                in system.alias {
+                    ?alias as ?original
+                }
+            "
+            produce "?e ?original ?v ?c"
         }
         meta {
             type rule!
             nac false
+            docs "Renames a relationship"
         }
     }
 }
 
-insert {
-    in people {
-        alice age 30
-        bob age 35
+rule core.meta.uses
+    where {
+        meta uses ?source ?target
     }
-    in * {
-        david age 25
+    produce {
+        ?source forward ?target system.routing
     }
-}
+
+rule core.meta.sync
+    where { meta sync ?source ?target }
+    produce {
+        in system.routing {
+            ?source forward ?target
+            ?target forward ?source
+        }
+    }
+
+rule core.routing.forward
+    where {
+        ?e ?a ?v ?source
+        in system.routing {
+            ?source forward ?target
+        }
+    }
+    not {
+        meta ?a ?v ?source
+    }
+    produce {
+        ?e ?a ?v ?target
+    }
+
+rule core.contexts
+    where { ?e ?a ?v ?c }
+    not { in system.contexts { ?c tracked true } }
+    produce {
+        in system.contexts {
+            ?c tracked true
+        }
+    }
+
+query
+    where { in system.contexts { ?ctx * * } }

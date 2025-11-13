@@ -343,7 +343,6 @@ const query = sequenceOf([
         });
       });
     }
-
     return results;
   };
 });
@@ -366,7 +365,7 @@ const rule = sequenceOf([
       q(w("rule"), w("produce"), serializePattern(produceQuads), name),
     ];
     if (notQuads.length > 0) {
-      toAdd.push(q(w("rule"), w("nac"), serializePattern(notQuads), name));
+      toAdd.push(q(w("rule"), w("not"), serializePattern(notQuads), name));
       toAdd.push(q(w("meta"), w("nac"), w("true"), name));
     } else {
       toAdd.push(q(w("meta"), w("nac"), w("false"), name));

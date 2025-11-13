@@ -31,19 +31,19 @@ export class Control {
         }
         let insertString = "";
         for (const [ctx, entities] of Object.entries(inserts)) {
-            insertString += `in ${ctx} {\n`;
+            insertString += `  in ${ctx} {\n`;
             for (const [entity, attributes] of Object.entries(entities)) {
                 if (attributes.length === 1) {
-                    insertString += `  ${entity} ${attributes[0]}\n`;
+                    insertString += `    ${entity} ${attributes[0]}\n`;
                     continue;
                 }
-                insertString += `  ${entity} {\n`;
+                insertString += `    ${entity} {\n`;
                 for (const attribute of attributes) {
-                    insertString += `    ${attribute}\n`;
+                    insertString += `      ${attribute}\n`;
                 }
-                insertString += `  }\n`;
+                insertString += `    }\n`;
             }
-            insertString += `}\n`;
+            insertString += `  }\n`;
         }
         return `
 insert {
