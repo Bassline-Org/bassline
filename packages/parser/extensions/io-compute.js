@@ -41,53 +41,87 @@ export function installIOCompute(graph, name, compute, metadata = {}) {
   const opName = w(name);
 
   const toAdd = [
-    q(opName, w("type"), w("operation!"), w("system")),
+    q(w("meta"), w("type"), w("operation!"), opName),
   ];
 
   if (metadata.arity) {
-    toAdd.push(q(opName, w("arity"), metadata.arity, w("system")));
+    toAdd.push(q(w("meta"), w("arity"), metadata.arity, opName));
   }
   if (metadata.operationType) {
     toAdd.push(
-      q(opName, w("operation-type"), metadata.operationType, w("system")),
+      q(w("meta"), w("operation-type"), w(metadata.operationType), opName),
     );
   }
   if (metadata.doc) {
-    toAdd.push(q(opName, w("docs"), metadata.doc, w("system")));
+    toAdd.push(q(w("meta"), w("docs"), metadata.doc, opName));
   }
 
   toAdd.push(q(w("operation!"), w("type"), w("type!"), w("system")));
 
   if (metadata.arity === "unary") {
-    toAdd.push(q(opName, w("args"), "x", w("input")));
+    toAdd.push(q(w("args"), w("x"), w("required"), opName));
   } else {
-    toAdd.push(q(opName, w("args"), "x y", w("input")));
+    toAdd.push(q(w("args"), w("x"), w("required"), opName));
+    toAdd.push(q(w("args"), w("y"), w("required"), opName));
   }
 
   for (const quad of toAdd) {
     graph.add(quad);
   }
 
-  // Watch for requests in input context
-  const unwatch = graph.watch(
-    {
-      pattern: pat(pq(
-        v("ctx"),
-        w("handle"),
-        opName,
-        w("input"),
-      )),
-      production: (bindings) => {
-        const ctx = bindings.get("ctx");
-        const watcher = metadata.arity === "unary"
-          ? unaryWatcher
-          : binaryWatcher;
-        watcher({ graph, ctx, opName, compute });
-        return [];
+  if (metadata.arity === "unary") {
+    const callPattern = pat(
+      pq(w("meta"), w("type"), w("call!"), v("ctx")),
+      pq(opName, w("x"), v("x"), v("ctx")),
+      pq(w("output"), w("context"), v("target"), v("ctx")),
+      pq(w("output"), w("entity"), v("entity"), v("ctx")),
+      pq(w("output"), w("attribute"), v("attribute"), v("ctx")),
+    );
+    callPattern.setNAC(
+      pq(w("meta"), w("handled"), WC, v("ctx")),
+    );
+    graph.watch({
+      pattern: callPattern,
+      production: (match) => {
+        const x = match.get("x");
+        const source = match.get("ctx");
+        const targetContext = match.get("target");
+        const entity = match.get("entity");
+        const attribute = match.get("attribute");
+        return [
+          q(w("meta"), w("handled"), w("true"), source),
+          q(entity, attribute, compute(x), targetContext),
+        ];
       },
-    },
-  );
-  return unwatch;
+    });
+  } else {
+    const callPattern = pat(
+      pq(w("meta"), w("type"), w("call!"), v("ctx")),
+      pq(opName, w("x"), v("x"), v("ctx")),
+      pq(opName, w("y"), v("y"), v("ctx")),
+      pq(w("output"), w("context"), v("target"), v("ctx")),
+      pq(w("output"), w("entity"), v("entity"), v("ctx")),
+      pq(w("output"), w("attribute"), v("attribute"), v("ctx")),
+    );
+    callPattern.setNAC(
+      pq(w("meta"), w("handled"), WC, v("ctx")),
+    );
+    graph.watch({
+      pattern: callPattern,
+      production: (match) => {
+        const x = match.get("x");
+        const y = match.get("y");
+        const source = match.get("ctx");
+        const targetContext = match.get("target");
+        const entity = match.get("entity");
+        const attribute = match.get("attribute");
+        return [
+          q(w("meta"), w("handled"), w("true"), source),
+          q(entity, attribute, compute(x, y), targetContext),
+        ];
+      },
+    });
+  }
 }
 
 /**

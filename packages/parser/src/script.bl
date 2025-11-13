@@ -77,3 +77,44 @@ rule core.contexts
 
 query
     where { in system.contexts { ?ctx * * } }
+
+insert {
+    in some-call {
+        meta type call!
+        add {
+            x 123
+            y 100
+        }
+        output {
+            context some-result
+            entity some-entity
+            attribute some-label
+        }
+    }
+}
+
+query
+    where {
+        ?e ?a ?v some-result
+    }
+
+query
+    where {
+        in ?ctx {
+            meta {
+                type operation!
+                operation-type binary
+            }
+        }
+    }
+    produce {
+        in system.binary-ops {
+            ?ctx binary-op true
+        }
+    }
+
+query
+    where {
+        ?ctx binary-op true system.binary-ops
+        meta docs ?docs ?ctx
+    }
