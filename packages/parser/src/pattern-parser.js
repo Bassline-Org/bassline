@@ -16,31 +16,22 @@
 
 import {
   anyChar,
-  anyCharExcept,
   char,
   choice,
-  coroutine,
   digits,
   endOfInput,
   everyCharUntil,
   letter,
-  letters,
-  lookAhead,
   many,
-  many1,
   possibly,
-  recursiveParser,
   regex,
   sequenceOf,
   str,
-  tapParser,
   whitespace,
 } from "arcsecond/index.js";
 import { isWildcard, PatternVar, WC, Word, word as w } from "./types.js";
 import { matchGraph, pattern, patternQuad as pq } from "./algebra/pattern.js";
-import { autoGroup, quad as q } from "./algebra/quad.js";
-import * as n from "./nodes.js";
-import { Printer, ReplacementVisitor } from "./visitors.js";
+import { quad as q } from "./algebra/quad.js";
 
 // ============================================================================
 // Helper Functions
@@ -110,9 +101,7 @@ const number = sequenceOf([
   digits,
   possibly(sequenceOf([char("."), digits]).map(([, decimal]) => decimal)),
 ]).map(([_, sign, whole, decimal]) => {
-  const num = Number((sign ?? "") + whole + (decimal ?? ""));
-  return num;
-  //return new n.NumberNode(num);
+  return Number((sign ?? "") + whole + (decimal ?? ""));
 });
 
 // String: "hello world" with escape sequences
@@ -129,7 +118,9 @@ const string = sequenceOf([
   char('"'),
   many(stringChar),
   char('"'),
-]).map(([_, __, chars, ___]) => new n.StringNode(chars.join("")));
+]).map(([_, __, chars, ___]) => {
+  return chars.join("");
+});
 
 const delimiter = choice([
   whitespace,
@@ -141,7 +132,6 @@ const delimiter = choice([
   char("'"),
   char("<"),
   char(">"),
-  char(","),
   endOfInput,
 ]);
 
@@ -156,14 +146,13 @@ const patternVar = sequenceOf([
   char("?"),
   wordChars,
 ]).map(([_, __, chars]) => {
-  const p = new PatternVar(chars);
-  return new n.VarNode(p);
+  return new PatternVar(chars);
 });
 
 // Wildcard: *
 // Returns WC singleton
 const wild = sequenceOf([ws, char("*")]).map(([_, __]) => {
-  return new n.WildNode();
+  return WC;
 });
 
 // Word: alice
@@ -174,16 +163,13 @@ const word = sequenceOf([
   wordChars,
 ]).map(([_, start, chars]) => {
   const wordStr = start + chars;
-  const word = new Word(wordStr);
-  return new n.WordNode(word);
+  return new Word(wordStr);
 });
 
-const entityId = choice([wild, patternVar, word]);
-const attribute = choice([wild, patternVar, word]);
-const value = choice([wild, patternVar, word, number, string]);
-const context = choice([wild, patternVar, word]);
-
-const comma = sequenceOf([ws, char(",")]);
+const entityId = choice([number, word]);
+const attribute = word;
+const value = choice([number, word, string]);
+const context = choice([wild, word]);
 
 // ============================================================================
 // Compound values
@@ -191,73 +177,56 @@ const comma = sequenceOf([ws, char(",")]);
 
 /**
  * A quad is entity, attribute, val, context
+ * Entity
+ * val can be a compound
  *
  * Context is either WC (wildcard) or a Word
  * We convert WC to null for backward compatibility
  */
-const pair = sequenceOf([
-  attribute,
-  value,
-  comma,
-]).map(([a, v]) =>
-  new n.QuadNode(
-    new n.VarNode(new PatternVar("entity")),
-    a,
-    v,
-    new n.VarNode(new PatternVar("context")),
-  )
-);
-
-const triple = sequenceOf([
-  entityId,
-  attribute,
-  value,
-  comma,
-]).map(([e, a, v]) =>
-  new n.QuadNode(e, a, v, new n.VarNode(new PatternVar("context")))
-);
-
 const quad = sequenceOf([
   entityId,
   attribute,
   value,
   context,
-  possibly(comma),
-]).map(([e, a, v, c]) => new n.QuadNode(e, a, v, c));
+]).map(([e, a, v, c]) => [e, a, v, c instanceof Word ? c : null]);
+
+// Insertions
+
+const objEntry = sequenceOf([
+  attribute,
+  value,
+]);
 
 const openBracket = sequenceOf([ws, char("{")]);
 const closeBracket = sequenceOf([ws, char("}")]);
-const openBrace = sequenceOf([ws, char("[")]);
-const closeBrace = sequenceOf([ws, char("]")]);
-const openParen = sequenceOf([ws, char("(")]);
-const closeParen = sequenceOf([ws, char(")")]);
 const cmd = (name) => sequenceOf([ws, str(name)]);
 
-// const obj = sequenceOf([
-//   entityId,
-//   openBracket,
-//   many(pair),
-//   closeBracket,
-// ]).map(([entity, _, entries, __]) => {
-//   return entries.map(([attr, value]) => [entity, attr, value, null]);
-// });
-
-const quadLike = choice([pair, triple, quad]);
-const graph = sequenceOf([
+const obj = sequenceOf([
+  entityId,
   openBracket,
-  many(quadLike),
+  many(objEntry),
   closeBracket,
-]).map(([_, quads]) => new n.GraphNode(quads));
-const obj = graph;
+]).map(([entity, _, entries, __]) => {
+  return entries.map(([attr, value]) => [entity, attr, value, null]);
+});
+const triple = sequenceOf([
+  entityId,
+  attribute,
+  value,
+]).map(([entity, attribute, value]) => [entity, attribute, value, null]);
 
 const group = sequenceOf([
   cmd("in"),
   context,
-  graph,
-]).map(([_, replacement, graph]) => {
-  const variable = new PatternVar("context");
-  const visitor = new ReplacementVisitor(variable, replacement);
-  return visitor.visit(graph);
+  openBracket,
+  many(choice([triple.map((q) => [q]), obj])),
+  closeBracket,
+]).map(([_, ctx, __, objs]) => {
+  const context = ctx instanceof Word ? ctx : null;
+  const quads = objs.flat();
+  return quads.map((
+    [entity, attribute, value],
+  ) => [entity, attribute, value, context]);
 });
 
 const insert = sequenceOf([
@@ -444,101 +413,3 @@ export function parsePatterns(input) {
   const parsed = result.result;
   return parsed;
 }
-
-const operator = (p) => sequenceOf([ws, p]).map(([_, v]) => v);
-const numbers = many1(number);
-const strings = many1(string);
-const listLiteral = recursiveParser(() =>
-  sequenceOf([
-    ws,
-    char("["),
-    choice([numbers, strings]),
-    ws,
-    char("]"),
-  ])
-).map(([_, __, items]) => items);
-
-const list = choice([listLiteral, numbers, strings]);
-// ATOMS: Lists and parenthesized expressions
-const atom = recursiveParser(() =>
-  choice([
-    paren,
-    list,
-  ])
-);
-
-// PREFIX/MONADIC: Applies to atoms
-const prefix = recursiveParser(() =>
-  choice([
-    contextualize, // monadic application
-    atom, // or just an atom
-  ])
-);
-
-const contextualize = sequenceOf([
-  letters,
-  prefix,
-]).map(([word, items]) => {
-  return items.map((e) => Array.isArray(e) ? [word, ...e] : [word, e]);
-});
-
-const infix = recursiveParser(() =>
-  choice([
-    union,
-    remove,
-    prefix,
-  ])
-);
-
-const binaryExpression = (op) => {
-  const opParser = operator(str(op));
-
-  const primaryParser = sequenceOf([
-    prefix,
-    opParser,
-    infix,
-  ]).map(([l, _, r]) => [l, r]);
-
-  const lookaheadParser = lookAhead(
-    sequenceOf([
-      prefix,
-      opParser,
-    ]),
-  );
-
-  return sequenceOf([lookaheadParser, primaryParser]).map(([_, r]) => r);
-};
-
-const union = binaryExpression("++").map((
-  [left, right],
-) => [...left, ...right]);
-const remove = binaryExpression("--").map((
-  [left, right],
-) => {
-  return right.filter((e) => !(left.includes(e)));
-});
-
-const paren = sequenceOf([
-  ws,
-  char("("),
-  infix, // Parens contain full expressions
-  ws,
-  char(")"),
-]).map(([_, __, val]) => val);
-
-const example = `
-  :a :b 4 5 6
-  ++
-  1 2 3
-`;
-
-const parsed = infix.run(example);
-console.log(parsed.error);
-console.log(parsed.result);
-// for (const res of parsed.result[0] ?? []) {
-//   res.forEach((v) => {
-//     console.log(v);
-//     console.log("\n");
-//   });
-//   console.log("-----\n");
-// }

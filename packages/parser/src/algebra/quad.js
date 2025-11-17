@@ -14,6 +14,18 @@ export class Quad {
         // Cache hash on creation for O(1) lookup
         this._hash = toKey(this.values);
     }
+    get entity() {
+        return this.values[0];
+    }
+    get attribute() {
+        return this.values[1];
+    }
+    get value() {
+        return this.values[2];
+    }
+    get context() {
+        return this.values[3];
+    }
     hash() {
         return this._hash;
     }

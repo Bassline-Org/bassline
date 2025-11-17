@@ -35,14 +35,6 @@ insert {
     }
 }
 
-rule core.meta.uses
-    where {
-        meta uses ?source ?target
-    }
-    produce {
-        ?source forward ?target system.routing
-    }
-
 rule core.meta.sync
     where { meta sync ?source ?target }
     produce {
@@ -50,6 +42,14 @@ rule core.meta.sync
             ?source forward ?target
             ?target forward ?source
         }
+    }
+
+rule core.meta.uses
+    where {
+        meta uses ?source ?target
+    }
+    produce {
+        ?source forward ?target system.routing
     }
 
 rule core.routing.forward
@@ -151,3 +151,14 @@ query
 ;         ?ctx binary-op true system.binary-ops
 ;         meta docs ?docs ?ctx
 ;     }
+
+query
+where { 
+    in ?c {
+        rule ?a ?v
+        meta {
+            type rule!
+            ?meta-attr ?meta-value
+        }
+    }
+ }
