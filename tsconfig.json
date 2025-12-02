@@ -23,11 +23,6 @@
     },
     "baseUrl": "."
   },
-  "include": [
-    "stories/**/*.ts",
-    "stories/**/*.tsx",
-    ".storybook/*.ts"
-  ],
   "exclude": [
     "node_modules",
     "dist",
