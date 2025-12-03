@@ -1,74 +1,95 @@
 # Bassline
 
-A reflective toolkit for self-ordering distributed applications.
+A specification for reflective distributed programming.
 
-## The Problem
+## What Is This?
 
-Distributed systems are hard because of complexity at boundaries. Every integration point requires custom code for routing, transformation, caching, and error handling. There's no uniform way to compose these concerns.
+Bassline is rooted in **partial information**. In distributed systems, no node has the complete picture—you work with what you know, and merge what others know.
 
-## The Solution
+**Mirrors** are the API for partial information:
 
-Bassline provides a **uniform resource interface** built on two concepts:
+| Operation | Meaning |
+|-----------|---------|
+| `read()` | What do I know now? |
+| `write(value)` | Here's what I know |
+| `subscribe(cb)` | Tell me when you learn more |
 
-**URIs** address everything:
-```javascript
-bl:///cell/counter      // Local mutable state
-bl:///fold/sum          // Computed value
-ws://peer:8080          // Remote peer
+This simple interface enables powerful composition:
+
+- **Mirrors compose** - Folds over cells over remotes. Layers stack cleanly.
+- **Partial implementation** - Implement what you need, delegate what you don't.
+- **Semi-lattice semantics** - Concurrent updates merge without coordination.
+- **Layered properties** - Constraints enforced locally, shared as data, negotiated with peers.
+
+## The Core Insight
+
+**Refs are just URIs.** They're not tied to any scheme or implementation—they're the universal way to name things.
+
+```
+bl:///cell/counter?initial=0     # A mutable value
+https://api.example.com/user/42  # A REST resource
+ws://node2:8080/events           # A WebSocket stream
+custom://my/protocol             # Whatever you define
 ```
 
-**Mirrors** mediate access:
-```javascript
-bl.read('bl:///counter')     // Mirror decides what to return
-bl.write('bl:///counter', 1) // Mirror decides how to handle
-bl.watch('bl:///counter', f) // Mirror decides what to emit
-```
+A ref is just "something to address"—data, action, connection, computation. The scheme tells you what kind. Middleware resolves it.
 
-This is reflective programming - mirrors reify system internals as first-class resources and intercede on all access, enabling middleware patterns like caching, batching, and transformation.
+## What This Enables
+
+**Sandboxing** - Middleware controls what's resolvable. Create isolated environments with restricted capabilities.
+
+**Distributed** - Refs are location-transparent. Same interface whether local, remote, or replicated.
+
+**Protocol-extensible** - Define new resource types by creating mirrors and registering middleware.
+
+**Heterogeneous** - Any language can implement the spec. JavaScript, Rust, Python, Erlang—they all speak refs.
 
 ## Quick Start
 
 ```javascript
-import { createBassline, Cell, ref } from '@bassline/core';
+import { createBassline } from '@bassline/core';
 
 const bl = createBassline();
 
-// Mount mirrors at paths
-bl.mount('/counter', new Cell(0));
+// Cells - mutable values
+bl.write('bl:///cell/counter', 42);
+bl.read('bl:///cell/counter'); // 42
 
-// Uniform interface
-bl.write('bl:///counter', 42);
-bl.read('bl:///counter'); // 42
+// Folds - computed values
+bl.write('bl:///cell/a', 10);
+bl.write('bl:///cell/b', 20);
+bl.read('bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b'); // 30
 
 // Watch for changes
-bl.watch('bl:///counter', value => console.log('Changed:', value));
+bl.watch('bl:///cell/counter', value => console.log(value));
+
+// Custom middleware
+bl.use('/price', (ref, bl) => new PriceFeed(ref, bl));
+bl.read('bl:///price/btc?symbol=BTCUSD');
 ```
 
-## Project Structure
+## Reference Implementation
+
+This repo contains a JavaScript implementation in ~720 lines:
 
 ```
-packages/
-├── core/            # URI router + mirrors
-│   ├── src/
-│   │   ├── setup.js      # createBassline()
-│   │   ├── bassline.js   # URI router
-│   │   ├── types.js      # Word, Ref
-│   │   ├── graph/        # Quad, Graph
-│   │   └── mirror/       # Cell, Fold, Remote
-│   └── test/
-└── parser-react/    # React integration
+packages/core/src/
+├── bassline.js      # Middleware router + ref→mirror cache
+├── setup.js         # createBassline() with standard middleware
+├── types.js         # Word, Ref value types
+└── mirror/          # Cell, Fold, Remote, Registry mirrors
 ```
 
-## Getting Started
+## Running
 
 ```bash
 pnpm install
-pnpm test
+pnpm test  # 99 tests
 ```
 
 ## Documentation
 
-See [CLAUDE.md](./CLAUDE.md) for comprehensive technical documentation.
+See [CLAUDE.md](./CLAUDE.md) for the full specification and implementation details.
 
 ## License
 
