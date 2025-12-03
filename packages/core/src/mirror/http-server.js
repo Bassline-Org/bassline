@@ -96,6 +96,14 @@ export class HTTPServerMirror extends BaseMirror {
       return;
     }
 
+    // Check for INFO request: /bl/info/cell/counter -> capabilities of bl:///cell/counter
+    if (path.startsWith('/bl/info/')) {
+      const infoPath = path.slice(8); // Remove '/bl/info'
+      const refStr = `bl://${infoPath}${url.search}`;
+      this._handleInfo(refStr, res);
+      return;
+    }
+
     // Convert HTTP path to Bassline ref
     const blPath = path.slice(3); // Remove '/bl'
     const refStr = `bl://${blPath}${url.search}`;
@@ -115,6 +123,22 @@ export class HTTPServerMirror extends BaseMirror {
     } else {
       res.writeHead(405, { 'Content-Type': 'text/plain' });
       res.end('Method not allowed');
+    }
+  }
+
+  _handleInfo(refStr, res) {
+    try {
+      const mirror = this._bassline.resolve(refStr);
+      const info = {
+        readable: mirror.readable,
+        writable: mirror.writable,
+        ordering: mirror.ordering
+      };
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(info));
+    } catch (e) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
     }
   }
 

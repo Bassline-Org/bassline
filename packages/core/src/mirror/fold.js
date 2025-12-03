@@ -40,6 +40,11 @@ class BaseFold extends BaseMirror {
     return false;
   }
 
+  /** Folds are order-independent (semi-lattice semantics) */
+  get ordering() {
+    return 'none';
+  }
+
   read() {
     return this._cachedValue;
   }

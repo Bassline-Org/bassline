@@ -27,6 +27,7 @@ import {
 import { RemoteMirror } from './mirror/remote.js';
 import { HTTPServerMirror } from './mirror/http-server.js';
 import { HTTPClientMirror } from './mirror/http-client.js';
+import { TCPServerMirror } from './mirror/tcp-server.js';
 import { RegistryMirror } from './mirror/registry-mirror.js';
 
 // Re-export core types
@@ -49,6 +50,7 @@ export {
 export { RemoteMirror } from './mirror/remote.js';
 export { HTTPServerMirror } from './mirror/http-server.js';
 export { HTTPClientMirror } from './mirror/http-client.js';
+export { TCPServerMirror } from './mirror/tcp-server.js';
 export { RegistryMirror } from './mirror/registry-mirror.js';
 export { BaseMirror, isMirror } from './mirror/interface.js';
 
@@ -98,6 +100,9 @@ export function createBassline() {
   // HTTP middleware
   bl.use('/server/http', (ref, bl) => new HTTPServerMirror(ref, bl));
   bl.use('/http', (ref, bl) => new HTTPClientMirror(ref, bl));
+
+  // TCP middleware (BL/T protocol)
+  bl.use('/server/tcp', (ref, bl) => new TCPServerMirror(ref, bl));
 
   // Registry middleware - introspection
   bl.use('/registry', (ref, bl) => new RegistryMirror(ref, bl));

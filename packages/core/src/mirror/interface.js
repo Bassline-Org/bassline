@@ -55,6 +55,17 @@ export class BaseMirror {
     return true;
   }
 
+  /**
+   * Ordering requirements for this mirror
+   *
+   * - 'none': Order-independent (folds, CRDTs)
+   * - 'causal': Cause before effect (cells)
+   * - 'total': Strict sequential (transactions)
+   */
+  get ordering() {
+    return 'causal';
+  }
+
   /** Read current value */
   read() {
     throw new Error(`${this.constructor.name} does not implement read()`);
