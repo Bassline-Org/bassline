@@ -6,10 +6,10 @@ let groupCounter = 0;
 export class Quad {
     constructor(entity, attribute, value, group) {
         this.values = [
-            quadValue(entity, "Entity"),
-            quadValue(attribute, "Attribute"),
-            quadValue(value, "Value"),
-            quadValue(group ?? autoGroup(), "Group"),
+            identifierValue(entity, "Entity"),
+            identifierValue(attribute, "Attribute"),
+            dataValue(value, "Value"),
+            dataValue(group ?? autoGroup(), "Context"),
         ];
         // Cache hash on creation for O(1) lookup
         this._hash = toKey(this.values);
@@ -31,7 +31,23 @@ export class Quad {
     }
 }
 
-const quadValue = (value, usage = "Value") => {
+// Entity and Attribute: identifiers only (Word, string, number)
+const identifierValue = (value, usage) => {
+    if (
+        value instanceof Word ||
+        typeof value === "number" ||
+        typeof value === "string"
+    ) {
+        return value;
+    }
+    if (value instanceof Ref) {
+        throw new Error(`${usage} cannot be a Ref. Refs are only allowed in Value and Context slots.`);
+    }
+    throw new Error(`Invalid ${usage}: ${value}`);
+};
+
+// Value and Context: can include Refs
+const dataValue = (value, usage) => {
     if (
         value instanceof Word ||
         value instanceof Ref ||

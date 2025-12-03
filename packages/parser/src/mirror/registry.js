@@ -12,10 +12,13 @@ export class RefRegistry {
     /** Map<scheme, (ref, registry) => Mirror> */
     this._schemeHandlers = new Map();
 
+    /** Map<type, (subpath, ref, registry) => Mirror> - type handlers for bl:// */
+    this._typeHandlers = new Map();
+
     /** Map<href, Mirror> - memoized lookups */
     this._cache = new Map();
 
-    /** Map<scheme, Map<path, value>> - per-scheme stores (for local://) */
+    /** Map<name, Map<key, value>> - named stores for various purposes */
     this._stores = new Map();
   }
 
@@ -29,16 +32,55 @@ export class RefRegistry {
   }
 
   /**
-   * Get or create the store for a scheme
-   * Used by scheme handlers that need persistent storage (e.g., local://)
-   * @param {string} scheme
+   * Get or create a named store
+   * Used by handlers that need persistent storage
+   * @param {string} name - Store name (e.g., "cells", "peers", "actions")
    * @returns {Map}
    */
-  getStore(scheme) {
-    if (!this._stores.has(scheme)) {
-      this._stores.set(scheme, new Map());
+  getStore(name) {
+    if (!this._stores.has(name)) {
+      this._stores.set(name, new Map());
     }
-    return this._stores.get(scheme);
+    return this._stores.get(name);
+  }
+
+  // ============================================================================
+  // Type Registry (for bl:// path-based routing)
+  // ============================================================================
+
+  /**
+   * Register a type handler for bl:// URIs
+   * @param {string} type - The type (first path segment, e.g., "cell", "fold", "action")
+   * @param {function} handler - (subpath: string, ref: Ref, registry: RefRegistry) => Mirror
+   */
+  registerType(type, handler) {
+    this._typeHandlers.set(type, handler);
+  }
+
+  /**
+   * Get a type handler
+   * @param {string} type
+   * @returns {function|undefined}
+   */
+  getTypeHandler(type) {
+    return this._typeHandlers.get(type);
+  }
+
+  /**
+   * Check if a type is registered
+   * @param {string} type
+   * @returns {boolean}
+   */
+  hasType(type) {
+    return this._typeHandlers.has(type);
+  }
+
+  /**
+   * List all registered types
+   * @returns {string[]}
+   */
+  listTypes() {
+    return Array.from(this._typeHandlers.keys());
   }
 
   /**

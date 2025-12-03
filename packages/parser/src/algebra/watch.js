@@ -1,6 +1,6 @@
 import { Graph } from "./graph.js";
 import { matchGraph, rewrite } from "./pattern.js";
-import { hash, isWildcard, PatternVar } from "../types.js";
+import { hash, isWildcard, PatternVar, isRef } from "../types.js";
 
 export class WatchedGraph extends Graph {
     constructor(...quads) {
@@ -20,6 +20,25 @@ export class WatchedGraph extends Graph {
         this.attributeQuadIndex = new Map();
         this.valueQuadIndex = new Map();
         this.groupQuadIndex = new Map();
+
+        // Registry for middleware interception (optional)
+        this._registry = null;
+    }
+
+    /**
+     * Set the registry for ref resolution and middleware
+     * @param {RefRegistry} registry
+     */
+    setRegistry(registry) {
+        this._registry = registry;
+    }
+
+    /**
+     * Get the registry
+     * @returns {RefRegistry|null}
+     */
+    getRegistry() {
+        return this._registry;
     }
 
     // Extract all literal values from all pattern quads
@@ -267,14 +286,52 @@ export class WatchedGraph extends Graph {
 
         return candidates;
     }
-    add(quad) {
+    /**
+     * Add input to the graph
+     *
+     * Accepts two types of input:
+     * - Quad: Adds fact to graph (may trigger middleware)
+     * - Ref: Triggers action (fire-and-forget, not stored)
+     *
+     * Middleware pipeline:
+     * - For quads containing refs in value/context slots, calls onInsert()
+     *   on each mirror. Any handler can return false to block the insert.
+     * - For standalone refs, calls onTrigger() on the mirror.
+     *
+     * @param {Quad|Ref} input
+     */
+    add(input) {
+        // Handle standalone ref (action trigger)
+        if (isRef(input)) {
+            this._triggerRef(input);
+            return this;
+        }
+
+        // Normal quad handling
+        const quad = input;
         if (this._quads.has(quad.hash())) {
             return this;
         }
+
+        // Run middleware pipeline for refs in the quad
+        if (!this._runMiddleware(quad)) {
+            return this; // Insert blocked by middleware
+        }
+
         const queue = [quad];
 
         while (queue.length > 0) {
             const currentQuad = queue.shift();
+
+            // Check deduplication for produced quads too
+            if (currentQuad !== quad && this._quads.has(currentQuad.hash())) {
+                continue;
+            }
+
+            // Run middleware for produced quads too
+            if (currentQuad !== quad && !this._runMiddleware(currentQuad)) {
+                continue; // Insert blocked by middleware
+            }
 
             super.add(currentQuad);
             this.indexQuad(currentQuad);
@@ -325,6 +382,61 @@ export class WatchedGraph extends Graph {
             }
         }
         return this;
+    }
+
+    /**
+     * Trigger a standalone ref (action invocation)
+     * @private
+     */
+    _triggerRef(ref) {
+        if (!this._registry) {
+            return; // No registry, can't resolve refs
+        }
+
+        const mirror = this._registry.lookup(ref);
+        if (mirror?.onTrigger) {
+            mirror.onTrigger(this, ref);
+        }
+    }
+
+    /**
+     * Run middleware pipeline for refs in a quad
+     * @private
+     * @param {Quad} quad
+     * @returns {boolean} - true to allow insert, false to block
+     */
+    _runMiddleware(quad) {
+        if (!this._registry) {
+            return true; // No registry, allow all inserts
+        }
+
+        // Collect refs from value and context slots
+        const refs = [];
+        if (isRef(quad.value)) {
+            refs.push(quad.value);
+        }
+        if (isRef(quad.context)) {
+            refs.push(quad.context);
+        }
+
+        if (refs.length === 0) {
+            return true; // No refs, allow insert
+        }
+
+        // Run middleware pipeline (all handlers run, any can block)
+        let shouldInsert = true;
+        for (const ref of refs) {
+            const mirror = this._registry.lookup(ref);
+            if (mirror?.onInsert) {
+                const result = mirror.onInsert(quad, this);
+                if (result === false) {
+                    shouldInsert = false;
+                }
+                // Note: other handlers still run (middleware pattern)
+            }
+        }
+
+        return shouldInsert;
     }
 
     watch(rule) {

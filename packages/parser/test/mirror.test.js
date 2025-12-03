@@ -9,7 +9,6 @@ import {
   getRegistry,
   resetRegistry,
   createRegistry,
-  installBuiltinSchemes,
   isMirror,
   BaseMirror,
   ref
@@ -63,8 +62,7 @@ describe('Fold', () => {
   let registry;
 
   beforeEach(() => {
-    registry = new RefRegistry();
-    installBuiltinSchemes(registry);
+    registry = createRegistry();
   });
 
   afterEach(() => {
@@ -82,15 +80,14 @@ describe('Fold', () => {
     expect(f.read()).toBe(0);
   });
 
-  it('should fold multiple local sources', () => {
-    // Create cells in the local store (path = hostname + pathname)
-    const store = registry.getStore('local');
-    store.set('a', new Cell(10));
-    store.set('b', new Cell(20));
-    store.set('c', new Cell(30));
+  it('should fold multiple cell sources', () => {
+    // Create cells via bl:///cell/ scheme
+    const a = registry.lookup(ref('bl:///cell/a?initial=10'));
+    const b = registry.lookup(ref('bl:///cell/b?initial=20'));
+    const c = registry.lookup(ref('bl:///cell/c?initial=30'));
 
     const f = new Fold(
-      [ref('local://a'), ref('local://b'), ref('local://c')],
+      [ref('bl:///cell/a'), ref('bl:///cell/b'), ref('bl:///cell/c')],
       reducers.sum,
       registry
     );
@@ -99,14 +96,11 @@ describe('Fold', () => {
   });
 
   it('should recompute when sources change', () => {
-    const store = registry.getStore('local');
-    const a = new Cell(10);
-    const b = new Cell(20);
-    store.set('a', a);
-    store.set('b', b);
+    const a = registry.lookup(ref('bl:///cell/a?initial=10'));
+    const b = registry.lookup(ref('bl:///cell/b?initial=20'));
 
     const f = new Fold(
-      [ref('local://a'), ref('local://b')],
+      [ref('bl:///cell/a'), ref('bl:///cell/b')],
       reducers.sum,
       registry
     );
@@ -121,11 +115,9 @@ describe('Fold', () => {
   });
 
   it('should notify subscribers on recompute', () => {
-    const store = registry.getStore('local');
-    const a = new Cell(10);
-    store.set('a', a);
+    const a = registry.lookup(ref('bl:///cell/a?initial=10'));
 
-    const f = new Fold([ref('local://a')], reducers.sum, registry);
+    const f = new Fold([ref('bl:///cell/a')], reducers.sum, registry);
     const values = [];
     f.subscribe(v => values.push(v));
 
@@ -256,72 +248,6 @@ describe('RefRegistry', () => {
   });
 });
 
-describe('Built-in scheme handlers', () => {
-  let registry;
-
-  beforeEach(() => {
-    registry = createRegistry();
-  });
-
-  afterEach(() => {
-    registry.dispose();
-  });
-
-  describe('local://', () => {
-    it('should create cells by path', () => {
-      const m1 = registry.lookup(ref('local://counter'));
-      const m2 = registry.lookup(ref('local://counter'));
-      expect(m1).toBe(m2);
-      expect(m1).toBeInstanceOf(Cell);
-    });
-
-    it('should support initial values', () => {
-      const m = registry.lookup(ref('local://counter?initial=42'));
-      expect(m.read()).toBe(42);
-    });
-
-    it('should parse numeric initial values', () => {
-      const m = registry.lookup(ref('local://x?initial=3.14'));
-      expect(m.read()).toBe(3.14);
-    });
-
-    it('should parse boolean initial values', () => {
-      expect(registry.lookup(ref('local://bool-true?initial=true')).read()).toBe(true);
-      expect(registry.lookup(ref('local://bool-false?initial=false')).read()).toBe(false);
-    });
-  });
-
-  describe('fold://', () => {
-    it('should create folds from sources', () => {
-      // Set up source cells (path = hostname)
-      const store = registry.getStore('local');
-      store.set('a', new Cell(10));
-      store.set('b', new Cell(20));
-
-      const m = registry.lookup(ref('fold://sum?sources=local://a,local://b'));
-      expect(m.read()).toBe(30);
-    });
-
-    it('should support different reducers', () => {
-      const store = registry.getStore('local');
-      store.set('x', new Cell(5));
-      store.set('y', new Cell(10));
-      store.set('z', new Cell(3));
-
-      expect(registry.resolve(ref('fold://max?sources=local://x,local://y,local://z'))).toBe(10);
-      expect(registry.resolve(ref('fold://min?sources=local://x,local://y,local://z'))).toBe(3);
-      expect(registry.resolve(ref('fold://avg?sources=local://x,local://y,local://z'))).toBe(6);
-    });
-
-    it('should throw on unknown reducer', () => {
-      expect(() => registry.lookup(ref('fold://unknown?sources=local://a'))).toThrow(/Unknown fold reducer/);
-    });
-
-    it('should throw on missing sources', () => {
-      expect(() => registry.lookup(ref('fold://sum'))).toThrow(/requires sources/);
-    });
-  });
-});
 
 describe('isMirror', () => {
   it('should identify mirrors', () => {

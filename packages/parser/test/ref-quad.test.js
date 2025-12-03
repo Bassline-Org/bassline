@@ -3,37 +3,45 @@ import { quad, Quad } from '../src/algebra/quad.js';
 import { ref, word } from '../src/types.js';
 
 describe('Refs in Quads', () => {
-  it('should accept ref as entity', () => {
-    const q = quad(ref('local://alice'), word('age'), 30);
-    expect(q.entity.href).toBe('local://alice');
+  describe('allowed positions', () => {
+    it('should accept ref as value', () => {
+      const q = quad(word('alice'), word('source'), ref('bl:///cell/data'));
+      expect(q.value.href).toBe('bl:///cell/data');
+    });
+
+    it('should accept ref as context', () => {
+      const q = quad(word('alice'), word('age'), 30, ref('bl:///remote/peer1'));
+      expect(q.context.href).toBe('bl:///remote/peer1');
+    });
   });
 
-  it('should accept ref as attribute', () => {
-    const q = quad(word('alice'), ref('schema://age'), 30);
-    expect(q.attribute.href).toBe('schema://age');
+  describe('disallowed positions', () => {
+    it('should reject ref as entity', () => {
+      expect(() => {
+        quad(ref('bl:///cell/alice'), word('age'), 30);
+      }).toThrow(/Entity cannot be a Ref/);
+    });
+
+    it('should reject ref as attribute', () => {
+      expect(() => {
+        quad(word('alice'), ref('bl:///schema/age'), 30);
+      }).toThrow(/Attribute cannot be a Ref/);
+    });
   });
 
-  it('should accept ref as value', () => {
-    const q = quad(word('alice'), word('source'), ref('ws://remote:8080/data'));
-    expect(q.value.href).toBe('ws://remote:8080/data');
-  });
+  describe('hashing', () => {
+    it('should hash quads with refs consistently', () => {
+      const group = word('test-group');
+      const q1 = quad(word('a'), word('x'), ref('bl:///cell/data'), group);
+      const q2 = quad(word('a'), word('x'), ref('bl:///cell/data'), group);
+      expect(q1.hash()).toBe(q2.hash());
+    });
 
-  it('should accept ref as context', () => {
-    const q = quad(word('alice'), word('age'), 30, ref('local://context'));
-    expect(q.context.href).toBe('local://context');
-  });
-
-  it('should hash quads with refs consistently', () => {
-    // Use same explicit group so hashes match
-    const group = word('test-group');
-    const q1 = quad(ref('local://a'), word('x'), 1, group);
-    const q2 = quad(ref('local://a'), word('x'), 1, group);
-    expect(q1.hash()).toBe(q2.hash());
-  });
-
-  it('should produce different hashes for different refs', () => {
-    const q1 = quad(ref('local://a'), word('x'), 1);
-    const q2 = quad(ref('local://b'), word('x'), 1);
-    expect(q1.hash()).not.toBe(q2.hash());
+    it('should produce different hashes for different refs', () => {
+      const group = word('test-group');
+      const q1 = quad(word('a'), word('x'), ref('bl:///cell/a'), group);
+      const q2 = quad(word('a'), word('x'), ref('bl:///cell/b'), group);
+      expect(q1.hash()).not.toBe(q2.hash());
+    });
   });
 });

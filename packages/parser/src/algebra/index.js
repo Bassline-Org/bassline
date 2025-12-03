@@ -1,8 +1,6 @@
 export * from "./quad.js";
 export * from "./pattern.js";
 export * from "./watch.js";
-export * from "./reified-rules.js";
-export * from "./instrument.js";
 export * from "./graph.js";
 
 export { quad as q } from "./quad.js";

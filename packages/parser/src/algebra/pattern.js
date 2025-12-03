@@ -8,7 +8,8 @@ import {
     variable as v,
     WC,
 } from "../types.js";
-import { serializeQuad } from "../control.js";
+
+const serializeQuad = (q) => q.values.map(serialize).join(" ");
 
 export class PatternQuad {
     constructor(entity, attribute, value, group = WC) {

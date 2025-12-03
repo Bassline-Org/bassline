@@ -2,7 +2,8 @@
  * Mirror Interface
  *
  * Mirrors provide access to resources identified by Refs.
- * They have a simple interface: readable, writable, read(), write(), subscribe().
+ * Core interface: readable, writable, read(), write(), subscribe().
+ * Middleware hooks: onInsert(), onTrigger().
  */
 
 /**
@@ -64,6 +65,41 @@ export class BaseMirror {
     for (const cb of this._subscribers) {
       cb(value);
     }
+  }
+
+  // ============================================================================
+  // Middleware Hooks
+  // ============================================================================
+
+  /**
+   * Called when this ref appears in a quad being inserted (middleware hook)
+   *
+   * The mirror receives the full quad and can:
+   * - Perform side effects (fire-and-forget)
+   * - Return false to block the insert
+   * - Return true to allow the insert
+   *
+   * Multiple handlers can process the same quad (middleware pattern).
+   *
+   * @param {Quad} quad - The quad being inserted
+   * @param {Graph} graph - The graph receiving the insert
+   * @returns {boolean} - Return false to block insert
+   */
+  onInsert(quad, graph) {
+    return true; // Default: allow insert
+  }
+
+  /**
+   * Called when this ref is inserted standalone (not as part of a quad)
+   *
+   * Used for action triggers - the ref itself is the invocation.
+   * Parameters come from the URI query string.
+   *
+   * @param {Graph} graph - The graph
+   * @param {Ref} ref - The ref being triggered (contains params in searchParams)
+   */
+  onTrigger(graph, ref) {
+    // Default: do nothing
   }
 
   /** Clean up resources */
