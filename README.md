@@ -84,8 +84,37 @@ packages/core/src/
 
 ```bash
 pnpm install
-pnpm test  # 99 tests
+pnpm test  # 182 tests
 ```
+
+## BL/T Protocol
+
+Bassline includes a text-based wire protocol for shell-friendly interactions:
+
+```bash
+# Start a BL/T server
+node packages/core/bin/blt-server.js -p 9000 -c counter=0
+
+# Connect with netcat
+nc localhost 9000
+VERSION BL/1.0
+VERSION BL/1.0
+WRITE bl:///cell/counter 42
+OK
+READ bl:///cell/counter
+OK 42
+INFO bl:///cell/counter
+OK {"readable":true,"writable":true,"ordering":"causal"}
+```
+
+**Features:**
+- Human-readable, line-based format
+- Works with grep, awk, pipes
+- Tag correlation for request pipelining
+- Subscription support with EVENTs
+- Mirror introspection via INFO
+
+See [packages/core/docs/protocol.md](./packages/core/docs/protocol.md) for the full specification.
 
 ## Documentation
 
