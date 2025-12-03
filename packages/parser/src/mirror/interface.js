@@ -106,4 +106,52 @@ export class BaseMirror {
   dispose() {
     this._subscribers.clear();
   }
+
+  // ============================================================================
+  // Serialization
+  // ============================================================================
+
+  /**
+   * Serialize this mirror to a JSON-compatible object
+   *
+   * Must return an object with { $mirror: type, ...config }
+   * Subclasses must override this method.
+   */
+  toJSON() {
+    throw new Error(`${this.constructor.name} does not implement toJSON()`);
+  }
+
+  /**
+   * Merge serialized data into this mirror
+   *
+   * Used for sync scenarios where a mirror already exists.
+   * Default implementation does nothing - subclasses override as needed.
+   *
+   * @param {object} data - Serialized data (without $mirror marker)
+   */
+  merge(data) {
+    // Default: no-op
+  }
+
+  /**
+   * Static method to deserialize and reconstruct a mirror
+   *
+   * Subclasses must implement this to support deserialization.
+   *
+   * @param {object} data - Serialized data with $mirror field
+   * @param {object} registry - Registry for resolving refs
+   * @returns {BaseMirror} Reconstructed mirror instance
+   */
+  static fromJSON(data, registry) {
+    throw new Error(`${this.name} does not implement static fromJSON()`);
+  }
+
+  /**
+   * Mirror type identifier for serialization
+   *
+   * Default: lowercase class name without "Mirror" suffix
+   */
+  static get mirrorType() {
+    return this.name.toLowerCase().replace('mirror', '');
+  }
 }

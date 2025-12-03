@@ -36,6 +36,18 @@ export {
   basslineReviver
 } from './serialize-json.js';
 
+// Mirror serialization
+export {
+  serializeValue,
+  reviveValue,
+  serializeMirror,
+  deserializeMirror,
+  registerMirrorType,
+  getMirrorDeserializer,
+  toJSON,
+  fromJSON
+} from './serialize.js';
+
 // Re-export Ref from types
 export { Ref, ref, isRef } from '../types.js';
 

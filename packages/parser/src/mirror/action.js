@@ -12,6 +12,7 @@
  */
 
 import { BaseMirror } from './interface.js';
+import { registerMirrorType } from './serialize.js';
 
 /**
  * ActionMirror - executes a handler when triggered
@@ -74,6 +75,45 @@ export class ActionMirror extends BaseMirror {
     // Execute the action with quad context
     this._handler({ quad }, graph, null);
     return false; // Don't store the action quad by default
+  }
+
+  // ============================================================================
+  // Serialization
+  // ============================================================================
+
+  static get mirrorType() {
+    return 'action';
+  }
+
+  /**
+   * Serialize action config (handler function cannot be serialized)
+   */
+  toJSON() {
+    return {
+      $mirror: 'action',
+      name: this._name,
+      doc: this._doc
+    };
+  }
+
+  /**
+   * Deserialize action - looks up registered action by name
+   *
+   * If no action is registered, creates a placeholder that throws on trigger.
+   */
+  static fromJSON(data, registry = null) {
+    if (registry) {
+      const actionStore = registry.getStore('actions');
+      if (actionStore.has(data.name)) {
+        return actionStore.get(data.name);
+      }
+    }
+
+    // No registered action - return placeholder
+    return new ActionMirror(
+      () => { throw new Error(`Action '${data.name}' not registered`); },
+      { name: data.name, doc: data.doc }
+    );
   }
 }
 
@@ -172,3 +212,6 @@ export function installBuiltinActions(registry) {
   registerAction(registry, 'log', logAction, { doc: 'Log message to console' });
   registerAction(registry, 'noop', noopAction, { doc: 'Do nothing (for testing)' });
 }
+
+// Register with serialization system
+registerMirrorType('action', ActionMirror.fromJSON);

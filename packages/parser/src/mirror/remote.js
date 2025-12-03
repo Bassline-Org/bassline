@@ -6,16 +6,19 @@
  */
 
 import { BaseMirror } from './interface.js';
+import { registerMirrorType } from './serialize.js';
 
 export class RemoteMirror extends BaseMirror {
   /**
    * @param {string} url - WebSocket URL (ws:// or wss://)
    * @param {object} options - Connection options
+   * @param {string} [uri] - Optional URI for this remote (for serialization)
    */
-  constructor(url, options = {}) {
+  constructor(url, options = {}, uri = null) {
     super();
     this._url = url;
     this._options = options;
+    this._uri = uri;
     this._ws = null;
     this._value = undefined;
     this._connected = false;
@@ -105,11 +108,44 @@ export class RemoteMirror extends BaseMirror {
     this._connected = false;
     super.dispose();
   }
+
+  // ============================================================================
+  // Serialization
+  // ============================================================================
+
+  static get mirrorType() {
+    return 'remote';
+  }
+
+  /**
+   * Serialize remote config (connection state is transient)
+   */
+  toJSON() {
+    return {
+      $mirror: 'remote',
+      uri: this._uri,
+      url: this._url,
+      options: {
+        maxReconnectAttempts: this._maxReconnectAttempts,
+        reconnectDelay: this._reconnectDelay
+      }
+    };
+  }
+
+  /**
+   * Deserialize remote - creates new connection
+   */
+  static fromJSON(data, registry = null) {
+    return new RemoteMirror(data.url, data.options || {}, data.uri);
+  }
 }
 
 /**
  * Create a remote mirror
  */
-export function remote(url, options) {
-  return new RemoteMirror(url, options);
+export function remote(url, options, uri = null) {
+  return new RemoteMirror(url, options, uri);
 }
+
+// Register with serialization system
+registerMirrorType('remote', RemoteMirror.fromJSON);

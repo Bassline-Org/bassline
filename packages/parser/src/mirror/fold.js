@@ -8,19 +8,24 @@
  */
 
 import { BaseMirror } from './interface.js';
-import { Ref, isRef } from '../types.js';
+import { Ref, ref, isRef } from '../types.js';
+import { registerMirrorType } from './serialize.js';
 
 export class Fold extends BaseMirror {
   /**
    * @param {Ref[]} sources - Source refs to fold
    * @param {function} reducer - (values: any[]) => any
    * @param {RefRegistry} registry - Registry to resolve source refs
+   * @param {string} [uri] - Optional URI for this fold (for serialization)
+   * @param {string} [reducerName] - Name of the reducer (for serialization)
    */
-  constructor(sources, reducer, registry) {
+  constructor(sources, reducer, registry, uri = null, reducerName = null) {
     super();
     this._sources = sources;
     this._reducer = reducer;
     this._registry = registry;
+    this._uri = uri;
+    this._reducerName = reducerName || findReducerName(reducer);
     this._unsubscribes = [];
     this._cachedValue = undefined;
 
@@ -69,6 +74,32 @@ export class Fold extends BaseMirror {
     this._unsubscribes = [];
     super.dispose();
   }
+
+  // ============================================================================
+  // Serialization
+  // ============================================================================
+
+  static get mirrorType() {
+    return 'fold';
+  }
+
+  toJSON() {
+    return {
+      $mirror: 'fold',
+      uri: this._uri,
+      sources: this._sources.map(s => s.href),
+      reducer: this._reducerName
+    };
+  }
+
+  static fromJSON(data, registry = null) {
+    const sources = data.sources.map(uri => ref(uri));
+    const reducer = reducers[data.reducer];
+    if (!reducer) {
+      throw new Error(`Unknown reducer: ${data.reducer}`);
+    }
+    return new Fold(sources, reducer, registry, data.uri, data.reducer);
+  }
 }
 
 // ============================================================================
@@ -90,6 +121,19 @@ export const reducers = {
 /**
  * Create a fold from source refs
  */
-export function fold(sources, reducer, registry) {
-  return new Fold(sources, reducer, registry);
+export function fold(sources, reducer, registry, uri = null) {
+  return new Fold(sources, reducer, registry, uri);
 }
+
+/**
+ * Find the name of a reducer function
+ */
+function findReducerName(fn) {
+  for (const [name, reducer] of Object.entries(reducers)) {
+    if (reducer === fn) return name;
+  }
+  return null;
+}
+
+// Register with serialization system
+registerMirrorType('fold', Fold.fromJSON);

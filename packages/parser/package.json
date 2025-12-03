@@ -17,13 +17,12 @@
         "./mirror": "./src/mirror/index.js"
     },
     "dependencies": {
-      "arcsecond": "^5.0.0",
-      "uuid": "^10.0.0",
-      "ws": "^8.18.0"
+        "uuid": "^10.0.0",
+        "ws": "^8.18.0"
     },
     "scripts": {
-      "test": "vitest run",
-      "web-example": "node examples/web/server.js"
-     },
+        "test": "vitest run",
+        "web-example": "node examples/web/server.js"
+    },
     "license": "AGPL-3.0"
-  }
+}

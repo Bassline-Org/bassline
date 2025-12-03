@@ -8,11 +8,17 @@
  */
 
 import { BaseMirror } from './interface.js';
+import { serializeValue, reviveValue, registerMirrorType } from './serialize.js';
 
 export class Cell extends BaseMirror {
-  constructor(initialValue = undefined) {
+  /**
+   * @param {*} initialValue - Initial value for the cell
+   * @param {string} [uri] - Optional URI for this cell (for serialization)
+   */
+  constructor(initialValue = undefined, uri = null) {
     super();
     this._value = initialValue;
+    this._uri = uri;
   }
 
   get readable() {
@@ -31,11 +37,41 @@ export class Cell extends BaseMirror {
     this._value = value;
     this._notify(value);
   }
+
+  // ============================================================================
+  // Serialization
+  // ============================================================================
+
+  static get mirrorType() {
+    return 'cell';
+  }
+
+  toJSON() {
+    return {
+      $mirror: 'cell',
+      uri: this._uri,
+      value: serializeValue(this._value)
+    };
+  }
+
+  merge(data) {
+    if (data.value !== undefined) {
+      this.write(reviveValue(data.value));
+    }
+  }
+
+  static fromJSON(data, registry = null) {
+    const value = reviveValue(data.value, registry);
+    return new Cell(value, data.uri);
+  }
 }
 
 /**
  * Create a Cell mirror
  */
-export function cell(initialValue) {
-  return new Cell(initialValue);
+export function cell(initialValue, uri = null) {
+  return new Cell(initialValue, uri);
 }
+
+// Register with serialization system
+registerMirrorType('cell', Cell.fromJSON);
