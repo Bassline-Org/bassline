@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   Cell,
   Fold,
-  ActionMirror,
   RemoteMirror,
   reducers,
   serializeValue,
@@ -10,11 +9,10 @@ import {
   serializeMirror,
   deserializeMirror,
   toJSON,
-  fromJSON,
-  createRegistry,
-  registerAction
+  fromJSON
 } from '../src/mirror/index.js';
 import { word, ref, isWord, isRef } from '../src/types.js';
+import { createBassline } from '../src/setup.js';
 
 describe('Mirror Serialization', () => {
   describe('serializeValue', () => {
@@ -163,15 +161,19 @@ describe('Mirror Serialization', () => {
   });
 
   describe('Fold serialization', () => {
-    let registry;
+    let bl;
 
     beforeEach(() => {
-      registry = createRegistry();
+      bl = createBassline();
+    });
+
+    afterEach(() => {
+      bl.dispose();
     });
 
     it('should serialize fold with sources and reducer', () => {
       const sources = [ref('bl:///cell/a'), ref('bl:///cell/b')];
-      const fold = new Fold(sources, reducers.sum, registry, 'bl:///fold/sum', 'sum');
+      const fold = new Fold(sources, reducers.sum, { uri: 'bl:///fold/sum', reducerName: 'sum' });
       const json = fold.toJSON();
 
       expect(json).toEqual({
@@ -184,9 +186,9 @@ describe('Mirror Serialization', () => {
 
     it('should round-trip fold', () => {
       const sources = [ref('bl:///cell/a'), ref('bl:///cell/b')];
-      const original = new Fold(sources, reducers.max, registry, 'bl:///fold/max', 'max');
+      const original = new Fold(sources, reducers.max, { uri: 'bl:///fold/max', reducerName: 'max' });
       const json = original.toJSON();
-      const restored = Fold.fromJSON(json, registry);
+      const restored = Fold.fromJSON(json, bl);
 
       expect(restored._uri).toBe('bl:///fold/max');
       expect(restored._reducerName).toBe('max');
@@ -201,40 +203,7 @@ describe('Mirror Serialization', () => {
         reducer: 'nonexistent'
       };
 
-      expect(() => Fold.fromJSON(json, registry)).toThrow('Unknown reducer: nonexistent');
-    });
-  });
-
-  describe('ActionMirror serialization', () => {
-    it('should serialize action metadata', () => {
-      const action = new ActionMirror(() => {}, { name: 'myaction', doc: 'Test action' });
-      const json = action.toJSON();
-
-      expect(json).toEqual({
-        $mirror: 'action',
-        name: 'myaction',
-        doc: 'Test action'
-      });
-    });
-
-    it('should deserialize to registered action', () => {
-      const registry = createRegistry();
-      let called = false;
-      registerAction(registry, 'testaction', () => { called = true; });
-
-      const json = { $mirror: 'action', name: 'testaction' };
-      const restored = ActionMirror.fromJSON(json, registry);
-
-      restored.write({});
-      expect(called).toBe(true);
-    });
-
-    it('should create placeholder for unregistered action', () => {
-      const json = { $mirror: 'action', name: 'unknown', doc: 'Some doc' };
-      const restored = ActionMirror.fromJSON(json, null);
-
-      expect(restored._name).toBe('unknown');
-      expect(() => restored.write({})).toThrow("Action 'unknown' not registered");
+      expect(() => Fold.fromJSON(json, bl)).toThrow('Unknown reducer: nonexistent');
     });
   });
 

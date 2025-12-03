@@ -1,16 +1,16 @@
 {
-    "name": "@bassline/parser",
+    "name": "@bassline/core",
     "version": "1.0.0",
-    "description": "Parser for the Bassline language, and core data types",
+    "description": "Bassline core: types, algebra, mirrors, and URI routing",
     "type": "module",
-    "module": "src/index.js",
+    "module": "src/setup.js",
     "exports": {
-        ".": "./src/bassline.js",
+        ".": "./src/setup.js",
         "./bassline": "./src/bassline.js",
-        "./graph": "./src/algebra/graph.js",
         "./types": "./src/types.js",
         "./algebra": "./src/algebra/index.js",
         "./algebra/quad": "./src/algebra/quad.js",
+        "./algebra/graph": "./src/algebra/graph.js",
         "./mirror": "./src/mirror/index.js"
     },
     "dependencies": {
@@ -18,8 +18,7 @@
         "ws": "^8.18.0"
     },
     "scripts": {
-        "test": "vitest run",
-        "web-example": "node examples/web/server.js"
+        "test": "vitest run"
     },
     "license": "AGPL-3.0"
 }

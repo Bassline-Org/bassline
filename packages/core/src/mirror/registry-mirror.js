@@ -25,11 +25,13 @@ import { BaseMirror } from './interface.js';
 
 export class RegistryMirror extends BaseMirror {
   /**
-   * @param {import('../bassline.js').Bassline} bassline - The Bassline instance
+   * @param {import('../bassline.js').Bassline} [bassline] - The Bassline instance (optional, can be set via setBassline)
    */
-  constructor(bassline) {
+  constructor(bassline = null) {
     super();
-    this._bassline = bassline;
+    if (bassline) {
+      this.setBassline(bassline);
+    }
   }
 
   get readable() {

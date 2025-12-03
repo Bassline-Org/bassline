@@ -19,6 +19,7 @@
  */
 
 import { Ref, ref, isRef } from './types.js';
+import { isMirror } from './mirror/interface.js';
 
 /**
  * Bassline - The namespace router
@@ -55,6 +56,12 @@ export class Bassline {
   mount(path, handler) {
     // Normalize path
     const normalPath = this._normalizePath(path);
+
+    // Associate mirror with this Bassline instance
+    if (isMirror(handler) && typeof handler.setBassline === 'function') {
+      handler.setBassline(this);
+    }
+
     this._mounts.set(normalPath, handler);
 
     // Notify listeners

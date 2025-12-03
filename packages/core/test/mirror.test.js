@@ -5,14 +5,11 @@ import {
   Fold,
   fold,
   reducers,
-  RefRegistry,
-  getRegistry,
-  resetRegistry,
-  createRegistry,
   isMirror,
   BaseMirror,
   ref
 } from '../src/mirror/index.js';
+import { createBassline } from '../src/setup.js';
 
 describe('Cell', () => {
   it('should be readable and writable', () => {
@@ -59,70 +56,71 @@ describe('Cell', () => {
 });
 
 describe('Fold', () => {
-  let registry;
+  let bl;
 
   beforeEach(() => {
-    registry = createRegistry();
+    bl = createBassline();
   });
 
   afterEach(() => {
-    registry.dispose();
+    bl.dispose();
   });
 
   it('should be readable but not writable', () => {
-    const f = new Fold([], reducers.sum, registry);
+    const f = new Fold([], reducers.sum);
     expect(f.readable).toBe(true);
     expect(f.writable).toBe(false);
   });
 
   it('should fold empty sources', () => {
-    const f = new Fold([], reducers.sum, registry);
+    const f = new Fold([], reducers.sum);
+    f.setBassline(bl);
     expect(f.read()).toBe(0);
   });
 
   it('should fold multiple cell sources', () => {
     // Create cells via bl:///cell/ scheme
-    const a = registry.lookup(ref('bl:///cell/a?initial=10'));
-    const b = registry.lookup(ref('bl:///cell/b?initial=20'));
-    const c = registry.lookup(ref('bl:///cell/c?initial=30'));
+    bl.write(ref('bl:///cell/a'), 10);
+    bl.write(ref('bl:///cell/b'), 20);
+    bl.write(ref('bl:///cell/c'), 30);
 
     const f = new Fold(
       [ref('bl:///cell/a'), ref('bl:///cell/b'), ref('bl:///cell/c')],
       reducers.sum,
-      registry
+      { bassline: bl }
     );
 
     expect(f.read()).toBe(60);
   });
 
   it('should recompute when sources change', () => {
-    const a = registry.lookup(ref('bl:///cell/a?initial=10'));
-    const b = registry.lookup(ref('bl:///cell/b?initial=20'));
+    bl.write(ref('bl:///cell/a'), 10);
+    bl.write(ref('bl:///cell/b'), 20);
 
     const f = new Fold(
       [ref('bl:///cell/a'), ref('bl:///cell/b')],
       reducers.sum,
-      registry
+      { bassline: bl }
     );
 
     expect(f.read()).toBe(30);
 
-    a.write(100);
+    bl.write(ref('bl:///cell/a'), 100);
     expect(f.read()).toBe(120);
 
-    b.write(200);
+    bl.write(ref('bl:///cell/b'), 200);
     expect(f.read()).toBe(300);
   });
 
   it('should notify subscribers on recompute', () => {
-    const a = registry.lookup(ref('bl:///cell/a?initial=10'));
+    bl.write(ref('bl:///cell/a'), 10);
 
-    const f = new Fold([ref('bl:///cell/a')], reducers.sum, registry);
+    const f = new Fold([ref('bl:///cell/a')], reducers.sum, { bassline: bl });
     const values = [];
     f.subscribe(v => values.push(v));
 
-    a.write(20);
-    a.write(30);
+    bl.write(ref('bl:///cell/a'), 20);
+    bl.write(ref('bl:///cell/a'), 30);
 
     expect(values).toContain(20);
     expect(values).toContain(30);
@@ -178,77 +176,6 @@ describe('reducers', () => {
   });
 });
 
-describe('RefRegistry', () => {
-  let registry;
-
-  beforeEach(() => {
-    registry = new RefRegistry();
-  });
-
-  afterEach(() => {
-    registry.dispose();
-  });
-
-  it('should register scheme handlers', () => {
-    registry.registerScheme('test', () => new Cell(42));
-    expect(registry.hasScheme('test')).toBe(true);
-    expect(registry.hasScheme('unknown')).toBe(false);
-  });
-
-  it('should lookup refs via scheme handlers', () => {
-    registry.registerScheme('test', () => new Cell(42));
-    const mirror = registry.lookup(ref('test://something'));
-    expect(mirror.read()).toBe(42);
-  });
-
-  it('should memoize lookups', () => {
-    let callCount = 0;
-    registry.registerScheme('test', () => {
-      callCount++;
-      return new Cell(callCount);
-    });
-
-    const r = ref('test://something');
-    const m1 = registry.lookup(r);
-    const m2 = registry.lookup(r);
-
-    expect(m1).toBe(m2);
-    expect(callCount).toBe(1);
-  });
-
-  it('should resolve refs to values', () => {
-    registry.registerScheme('test', () => new Cell(42));
-    expect(registry.resolve(ref('test://something'))).toBe(42);
-  });
-
-  it('should return undefined for unknown schemes', () => {
-    expect(registry.lookup(ref('unknown://x'))).toBe(undefined);
-    expect(registry.resolve(ref('unknown://x'))).toBe(undefined);
-  });
-
-  it('should provide stores for scheme handlers', () => {
-    const store1 = registry.getStore('test');
-    const store2 = registry.getStore('test');
-    expect(store1).toBe(store2);
-    expect(store1).toBeInstanceOf(Map);
-  });
-
-  it('should clear cache', () => {
-    let callCount = 0;
-    registry.registerScheme('test', () => {
-      callCount++;
-      return new Cell(callCount);
-    });
-
-    registry.lookup(ref('test://x'));
-    registry.clearCache();
-    registry.lookup(ref('test://x'));
-
-    expect(callCount).toBe(2);
-  });
-});
-
-
 describe('isMirror', () => {
   it('should identify mirrors', () => {
     expect(isMirror(new Cell())).toBe(true);
@@ -262,21 +189,21 @@ describe('isMirror', () => {
   });
 });
 
-describe('Global registry', () => {
+describe('Bassline stores', () => {
+  let bl;
+
+  beforeEach(() => {
+    bl = createBassline();
+  });
+
   afterEach(() => {
-    resetRegistry();
+    bl.dispose();
   });
 
-  it('should provide a global registry', () => {
-    const r1 = getRegistry();
-    const r2 = getRegistry();
-    expect(r1).toBe(r2);
-  });
-
-  it('should reset global registry', () => {
-    const r1 = getRegistry();
-    resetRegistry();
-    const r2 = getRegistry();
-    expect(r1).not.toBe(r2);
+  it('should provide named stores', () => {
+    const store1 = bl.getStore('test');
+    const store2 = bl.getStore('test');
+    expect(store1).toBe(store2);
+    expect(store1).toBeInstanceOf(Map);
   });
 });

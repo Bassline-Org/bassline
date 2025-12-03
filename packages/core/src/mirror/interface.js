@@ -28,6 +28,35 @@ export function isMirror(obj) {
 export class BaseMirror {
   constructor() {
     this._subscribers = new Set();
+    this._bassline = null;
+  }
+
+  // ============================================================================
+  // Bassline Association
+  // ============================================================================
+
+  /**
+   * Set the Bassline instance this mirror is mounted on.
+   * Called automatically by Bassline.mount().
+   *
+   * @param {Bassline} bassline - The Bassline instance
+   */
+  setBassline(bassline) {
+    this._bassline = bassline;
+  }
+
+  /**
+   * Get the Bassline instance, throwing if not mounted.
+   * Helper for subclasses that need to resolve refs.
+   *
+   * @param {string} operation - Description of what operation needs bassline
+   * @returns {Bassline}
+   */
+  _requireBassline(operation = 'this operation') {
+    if (!this._bassline) {
+      throw new Error(`Mirror must be mounted to perform ${operation}`);
+    }
+    return this._bassline;
   }
 
   /** Whether this mirror can be read from */
