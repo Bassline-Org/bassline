@@ -3,8 +3,6 @@
  *
  * Folds subscribe to their source mirrors and recompute
  * whenever any source changes.
- *
- * Used by the fold:// scheme handler.
  */
 
 import { BaseMirror } from './interface.js';
@@ -15,22 +13,37 @@ export class Fold extends BaseMirror {
   /**
    * @param {Ref[]} sources - Source refs to fold
    * @param {function} reducer - (values: any[]) => any
-   * @param {RefRegistry} registry - Registry to resolve source refs
-   * @param {string} [uri] - Optional URI for this fold (for serialization)
-   * @param {string} [reducerName] - Name of the reducer (for serialization)
+   * @param {object} [options] - Configuration
+   * @param {string} [options.reducerName] - Name of the reducer (for serialization)
+   * @param {string} [options.uri] - Optional URI for this fold
+   * @param {Bassline} [options.bassline] - Bassline instance (optional, can be set later via setBassline)
    */
-  constructor(sources, reducer, registry, uri = null, reducerName = null) {
+  constructor(sources, reducer, options = {}) {
     super();
     this._sources = sources;
     this._reducer = reducer;
-    this._registry = registry;
-    this._uri = uri;
-    this._reducerName = reducerName || findReducerName(reducer);
+    this._reducerName = options.reducerName || findReducerName(reducer);
+    this._uri = options.uri || null;
     this._unsubscribes = [];
     this._cachedValue = undefined;
+    this._initialized = false;
 
-    this._subscribeToSources();
-    this._recompute();
+    // If bassline provided, set it now (triggers initialization)
+    if (options.bassline) {
+      this.setBassline(options.bassline);
+    }
+  }
+
+  /**
+   * Override setBassline to initialize subscriptions when mounted
+   */
+  setBassline(bassline) {
+    super.setBassline(bassline);
+    if (!this._initialized) {
+      this._subscribeToSources();
+      this._recompute();
+      this._initialized = true;
+    }
   }
 
   get readable() {
@@ -46,9 +59,11 @@ export class Fold extends BaseMirror {
   }
 
   _subscribeToSources() {
+    const bl = this._requireBassline('subscribe to sources');
+
     for (const sourceRef of this._sources) {
-      const mirror = this._registry.lookup(sourceRef);
-      if (mirror) {
+      const mirror = bl.getMirror(sourceRef);
+      if (mirror && mirror.subscribe) {
         const unsub = mirror.subscribe(() => this._recompute());
         this._unsubscribes.push(unsub);
       }
@@ -56,8 +71,10 @@ export class Fold extends BaseMirror {
   }
 
   _recompute() {
-    const values = this._sources.map(ref => {
-      const mirror = this._registry.lookup(ref);
+    if (!this._bassline) return; // Not mounted yet
+
+    const values = this._sources.map(sourceRef => {
+      const mirror = this._bassline.getMirror(sourceRef);
       return mirror?.readable ? mirror.read() : undefined;
     });
 
@@ -92,13 +109,17 @@ export class Fold extends BaseMirror {
     };
   }
 
-  static fromJSON(data, registry = null) {
+  static fromJSON(data, bassline = null) {
     const sources = data.sources.map(uri => ref(uri));
     const reducer = reducers[data.reducer];
     if (!reducer) {
       throw new Error(`Unknown reducer: ${data.reducer}`);
     }
-    return new Fold(sources, reducer, registry, data.uri, data.reducer);
+    return new Fold(sources, reducer, {
+      reducerName: data.reducer,
+      uri: data.uri,
+      bassline
+    });
   }
 }
 
@@ -121,8 +142,8 @@ export const reducers = {
 /**
  * Create a fold from source refs
  */
-export function fold(sources, reducer, registry, uri = null) {
-  return new Fold(sources, reducer, registry, uri);
+export function fold(sources, reducer, options = {}) {
+  return new Fold(sources, reducer, options);
 }
 
 /**

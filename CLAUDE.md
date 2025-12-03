@@ -39,8 +39,9 @@ A Mirror wrapping an Ethereum node can reify blocks, transactions, and state as 
 ## Architecture
 
 ```
-packages/parser/
+packages/core/
 ├── src/
+│   ├── setup.js          # createBassline() with standard handlers
 │   ├── bassline.js       # URI router (mounts Mirrors at paths)
 │   ├── types.js          # Value types: Word, Ref
 │   ├── algebra/
@@ -48,11 +49,10 @@ packages/parser/
 │   │   └── graph.js      # Graph: container for quads
 │   └── mirror/
 │       ├── interface.js  # BaseMirror class
-│       ├── registry.js   # RefRegistry: resolves URIs to mirrors
+│       ├── handlers.js   # Factory functions for standard handlers
 │       ├── cell.js       # Cell: mutable value
 │       ├── fold.js       # Fold: computed from sources
 │       ├── remote.js     # RemoteMirror: WebSocket connection
-│       ├── action.js     # ActionMirror: fire-and-forget
 │       ├── serialize.js  # Mirror serialization
 │       └── index.js      # Public API
 └── test/
@@ -64,7 +64,7 @@ packages/parser/
 A Mirror is a reflective object that reifies some part of the system and intercedes on access to it:
 
 ```javascript
-import { createBassline, Cell } from '@bassline/parser';
+import { createBassline, Cell, ref } from '@bassline/core';
 
 const bl = createBassline();
 
@@ -84,14 +84,13 @@ bl.watch('bl:///counter', v => {}); // Mirror decides what changes to emit
 | Cell | Mutable value | Direct read/write |
 | Fold | Computed value | Recomputes from sources on read |
 | RemoteMirror | WebSocket peer | Proxies to remote system |
-| ActionMirror | Side effect | Fires without storing |
 
 ### Custom Mirrors
 
 Mirrors define their own vocabulary and access patterns:
 
 ```javascript
-import { BaseMirror } from '@bassline/parser/mirror';
+import { BaseMirror } from '@bassline/core/mirror';
 
 class EthBlockMirror extends BaseMirror {
   // Reify Ethereum blocks as readable resources
@@ -116,7 +115,7 @@ bl.watch('bl:///eth/blocks', block => console.log('New block:', block.number));
 Resources are identified by URIs. The scheme determines how to resolve:
 
 ```javascript
-import { ref } from '@bassline/parser';
+import { ref } from '@bassline/core';
 
 // bl:// - your local mirror namespace
 ref('bl:///counter')              // Local cell
@@ -138,13 +137,13 @@ Two primary types with semantic meaning:
 
 **Word** - Case-insensitive identifier (interned symbol):
 ```javascript
-import { word } from '@bassline/parser/types';
+import { word } from '@bassline/core/types';
 word('alice') === word('ALICE')  // true (same symbol)
 ```
 
 **Ref** - URI reference to any resource:
 ```javascript
-import { ref } from '@bassline/parser/types';
+import { ref } from '@bassline/core/types';
 ref('bl:///counter').scheme      // 'bl' (local)
 ref('ws://peer:8080').scheme     // 'ws' (external)
 ref('ipfs://Qm.../x').scheme     // 'ipfs' (external)
