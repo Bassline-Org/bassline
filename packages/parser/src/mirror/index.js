@@ -27,14 +27,6 @@ export { ActionMirror, action, registerAction } from './action.js';
 
 // New Bassline mirrors
 export { RegistryMirror, mountRegistryMirror } from './registry-mirror.js';
-export {
-  JsonSerializerMirror,
-  mountJsonSerializer,
-  serialize,
-  deserialize,
-  basslineReplacer,
-  basslineReviver
-} from './serialize-json.js';
 
 // Mirror serialization
 export {

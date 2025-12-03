@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Bassline, createBassline, ref } from '../src/bassline.js';
 import { RegistryMirror, mountRegistryMirror } from '../src/mirror/registry-mirror.js';
-import { JsonSerializerMirror, mountJsonSerializer, serialize, deserialize, basslineReplacer, basslineReviver } from '../src/mirror/serialize-json.js';
 import { Cell } from '../src/mirror/cell.js';
 import { BaseMirror } from '../src/mirror/interface.js';
-import { word, variable, WC, Word, Ref, PatternVar } from '../src/types.js';
+import { word, Word, Ref } from '../src/types.js';
 
 describe('Bassline', () => {
   let bl;
@@ -301,150 +300,6 @@ describe('RegistryMirror', () => {
       expect(changes).toHaveLength(1);
       expect(changes[0].type).toBe('mount');
       expect(changes[0].path).toBe('/new');
-    });
-  });
-});
-
-describe('JSON Serialization', () => {
-  describe('serialize/deserialize functions', () => {
-    it('should serialize Words', () => {
-      const w = word('alice');
-      const json = serialize(w);
-      expect(json).toBe('{"$word":"ALICE"}');  // Words are normalized to uppercase
-    });
-
-    it('should deserialize Words', () => {
-      const json = '{"$word":"ALICE"}';
-      const w = deserialize(json);
-      expect(w).toBeInstanceOf(Word);
-      expect(w.spelling.description).toBe('ALICE');
-    });
-
-    it('should serialize Refs', () => {
-      const r = ref('bl:///cell/counter');
-      const json = serialize(r);
-      expect(json).toBe('{"$ref":"bl:///cell/counter"}');
-    });
-
-    it('should deserialize Refs', () => {
-      const json = '{"$ref":"bl:///cell/counter"}';
-      const r = deserialize(json);
-      expect(r).toBeInstanceOf(Ref);
-      expect(r.href).toBe('bl:///cell/counter');
-    });
-
-    it('should serialize Variables', () => {
-      const v = variable('x');
-      const json = serialize(v);
-      expect(json).toContain('"$var"');
-    });
-
-    it('should deserialize Variables', () => {
-      const json = '{"$var":"x"}';
-      const v = deserialize(json);
-      expect(v).toBeInstanceOf(PatternVar);
-    });
-
-    it('should serialize Wildcards', () => {
-      const json = serialize(WC);
-      expect(json).toBe('{"$wc":true}');
-    });
-
-    it('should deserialize Wildcards', () => {
-      const json = '{"$wc":true}';
-      const v = deserialize(json);
-      expect(v).toBe(WC);
-    });
-
-    it('should handle primitives', () => {
-      expect(serialize(42)).toBe('42');
-      expect(serialize('hello')).toBe('"hello"');
-      expect(serialize(true)).toBe('true');
-      expect(serialize(null)).toBe('null');
-
-      expect(deserialize('42')).toBe(42);
-      expect(deserialize('"hello"')).toBe('hello');
-      expect(deserialize('true')).toBe(true);
-      expect(deserialize('null')).toBe(null);
-    });
-
-    it('should handle nested objects', () => {
-      const obj = {
-        name: word('alice'),
-        ref: ref('bl:///cell/counter'),
-        value: 42
-      };
-
-      const json = serialize(obj);
-      const restored = deserialize(json);
-
-      expect(restored.name).toBeInstanceOf(Word);
-      expect(restored.name.spelling.description).toBe('ALICE');
-      expect(restored.ref).toBeInstanceOf(Ref);
-      expect(restored.ref.href).toBe('bl:///cell/counter');
-      expect(restored.value).toBe(42);
-    });
-
-    it('should handle arrays', () => {
-      const arr = [word('a'), word('b'), 42];
-      const json = serialize(arr);
-      const restored = deserialize(json);
-
-      expect(restored[0]).toBeInstanceOf(Word);
-      expect(restored[1]).toBeInstanceOf(Word);
-      expect(restored[2]).toBe(42);
-    });
-
-    it('should pretty print when requested', () => {
-      const obj = { name: word('alice') };
-      const json = serialize(obj, true);
-      expect(json).toContain('\n');
-    });
-  });
-
-  describe('JsonSerializerMirror', () => {
-    let bl;
-
-    beforeEach(() => {
-      bl = createBassline();
-      mountRegistryMirror(bl);
-      mountJsonSerializer(bl);
-      bl.mount('/cell/counter', new Cell(42));
-    });
-
-    it('should serialize a resource', () => {
-      const json = bl.read(ref('bl:///serialize/json?resource=bl:///cell/counter'));
-      expect(json).toBe('42');
-    });
-
-    it('should serialize registry mounts', () => {
-      const json = bl.read(ref('bl:///serialize/json?resource=bl:///registry/mounts'));
-      expect(json).toContain('/registry');
-      expect(json).toContain('/serialize/json');
-      expect(json).toContain('/cell/counter');
-    });
-
-    it('should pretty print with param', () => {
-      const json = bl.read(ref('bl:///serialize/json?resource=bl:///registry/mounts&pretty'));
-      expect(json).toContain('\n');
-    });
-
-    it('should deserialize and return', () => {
-      const result = bl.write(ref('bl:///serialize/json'), {
-        data: '{"$word":"TEST"}'
-      });
-
-      expect(result).toBeInstanceOf(Word);
-      expect(result.spelling.description).toBe('TEST');
-    });
-
-    it('should deserialize into a target', () => {
-      bl.write(ref('bl:///serialize/json'), {
-        data: '99',
-        target: 'bl:///cell/counter'
-      });
-
-      expect(bl.read(ref('bl:///cell/counter'))).toBe(99);
     });
   });
 });

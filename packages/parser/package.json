@@ -8,11 +8,8 @@
         ".": "./src/bassline.js",
         "./bassline": "./src/bassline.js",
         "./graph": "./src/algebra/graph.js",
-        "./watch": "./src/algebra/watch.js",
         "./types": "./src/types.js",
         "./algebra": "./src/algebra/index.js",
-        "./algebra/watch": "./src/algebra/watch.js",
-        "./algebra/pattern": "./src/algebra/pattern.js",
         "./algebra/quad": "./src/algebra/quad.js",
         "./mirror": "./src/mirror/index.js"
     },

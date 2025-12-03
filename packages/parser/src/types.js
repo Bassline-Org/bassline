@@ -3,43 +3,11 @@
  *
  * Distinguishes between:
  * - Words: Normalized identifiers (case-insensitive symbols)
+ * - Refs: URI references to resources
  * - Strings: Case-sensitive literals
  * - Numbers: Numeric values
- * - Pattern variables: Universal matchers that bind values
- * - Wildcards: Universal matchers that don't bind
  */
 
-/**
- * Check if two typed values are equal
- * Handles Words, PatternVars, Wildcards, strings, numbers
- */
-export function valuesEqual(a, b) {
-  validateType(a, "a in valuesEqual");
-  validateType(b, "b in valuesEqual");
-
-  // Words compare by spelling symbol
-  if (isWord(a) && isWord(b)) {
-    return a.spelling === b.spelling;
-  }
-
-  // PatternVars compare by name symbol
-  if (isPatternVar(a) && isPatternVar(b)) {
-    return a.name === b.name;
-  }
-
-  // Wildcards are singletons
-  if (isWildcard(a) && isWildcard(b)) {
-    return true;
-  }
-
-  // Refs compare by canonical href
-  if (isRef(a) && isRef(b)) {
-    return a.href === b.href;
-  }
-
-  // Primitives use === (strings, numbers)
-  return a === b;
-}
 /**
  * Normalize a key to uppercase for case-insensitive lookups
  */
@@ -49,6 +17,7 @@ export function normalize(key) {
   }
   return key.toUpperCase();
 }
+
 /**
  * Word - Normalized identifier/symbol
  *
@@ -74,59 +43,15 @@ export class Word {
 }
 
 /**
- * PatternVar - Pattern variable that matches and binds any value
- *
- * Pattern variables are case-insensitive like words.
- * They match any value type and bind the matched value.
- *
- * Examples:
- *   new PatternVar("x") matches new Word("alice") → binds {?X => new Word("alice")}
- *   new PatternVar("x") matches "hello"           → binds {?X => "hello"}
- *   new PatternVar("x") matches 42                → binds {?X => 42}
- */
-export class PatternVar {
-  constructor(name) {
-    if (typeof name !== "string") {
-      throw new Error(`PatternVar requires string, got: ${typeof name}`);
-    }
-    // Normalize variable name
-    this.name = Symbol.for(normalize(name));
-  }
-
-  toString() {
-    return `?${this.name.description}`;
-  }
-}
-
-/**
- * Wildcard - Universal matcher that doesn't bind
- *
- * Wildcards match any value but don't create bindings.
- * Singleton instance exported as WC constant.
- */
-export class Wildcard {
-  toString() {
-    return "*";
-  }
-}
-
-/**
- * Wildcard singleton
- */
-export const WC = new Wildcard();
-
-/**
  * Ref - URI reference to an external resource
  *
  * Refs are URIs that identify resources managed by Mirrors.
- * They can appear in any position in a quad (entity, attribute, value, context).
  * The URI is self-describing - the scheme determines how to resolve it.
  *
  * Examples:
- *   new Ref("local://counter")           // Local cell
- *   new Ref("fold://max?sources=a,b")    // Computed fold
- *   new Ref("ws://localhost:8080/sync")  // Remote graph
- *   new Ref("file:///data/backup.json")  // File resource
+ *   new Ref("bl:///cell/counter")        // Local cell
+ *   new Ref("bl:///fold/sum?sources=...") // Computed fold
+ *   new Ref("ws://localhost:8080")        // WebSocket connection
  */
 export class Ref {
   constructor(uriString) {
@@ -145,7 +70,7 @@ export class Ref {
     this._href = this._url.href;
   }
 
-  /** URI scheme (e.g., "local", "fold", "ws", "file") */
+  /** URI scheme (e.g., "bl", "ws", "wss") */
   get scheme() {
     return this._url.protocol.slice(0, -1); // Remove trailing ':'
   }
@@ -165,7 +90,7 @@ export class Ref {
     return this._url.port;
   }
 
-  /** Path portion (e.g., "/counters/alice") */
+  /** Path portion (e.g., "/cell/counter") */
   get pathname() {
     return this._url.pathname;
   }
@@ -207,13 +132,6 @@ export function word(str) {
 }
 
 /**
- * Create a pattern variable from a name
- */
-export function variable(name) {
-  return new PatternVar(name);
-}
-
-/**
  * Create a ref from a URI string
  */
 export function ref(uri) {
@@ -226,14 +144,6 @@ export function ref(uri) {
 
 export function isWord(value) {
   return value instanceof Word;
-}
-
-export function isPatternVar(value) {
-  return value instanceof PatternVar;
-}
-
-export function isWildcard(value) {
-  return value instanceof Wildcard;
 }
 
 export function isString(value) {
@@ -249,12 +159,10 @@ export function isRef(value) {
 }
 
 /**
- * Check if value is a valid graph value type
+ * Check if value is a valid type
  */
 export function isValidType(value) {
   return isWord(value) ||
-    isPatternVar(value) ||
-    isWildcard(value) ||
     isRef(value) ||
     isString(value) ||
     isNumber(value);
@@ -266,10 +174,31 @@ export function isValidType(value) {
 export function validateType(value, usage = "Value") {
   if (!isValidType(value)) {
     throw new Error(
-      `${usage} must be Word, PatternVar, Wildcard, string, or number. Got: ${typeof value} ${value}`,
+      `${usage} must be Word, Ref, string, or number. Got: ${typeof value} ${value}`,
     );
   }
   return value;
+}
+
+/**
+ * Check if two typed values are equal
+ */
+export function valuesEqual(a, b) {
+  validateType(a, "a in valuesEqual");
+  validateType(b, "b in valuesEqual");
+
+  // Words compare by spelling symbol
+  if (isWord(a) && isWord(b)) {
+    return a.spelling === b.spelling;
+  }
+
+  // Refs compare by canonical href
+  if (isRef(a) && isRef(b)) {
+    return a.href === b.href;
+  }
+
+  // Primitives use === (strings, numbers)
+  return a === b;
 }
 
 // ============================================================================
@@ -284,8 +213,7 @@ export function validateType(value, usage = "Value") {
  *     word: (spelling) => `Word: ${spelling}`,
  *     string: (str) => `String: ${str}`,
  *     number: (num) => `Number: ${num}`,
- *     variable: (name) => `Var: ${name}`,
- *     wildcard: () => 'Wildcard'
+ *     ref: (href) => `Ref: ${href}`
  *   })
  */
 export function match(value, handlers) {
@@ -294,20 +222,6 @@ export function match(value, handlers) {
       throw new Error("No handler for Word type");
     }
     return handlers.word(value.spelling.description);
-  }
-
-  if (value instanceof PatternVar) {
-    if (!handlers.variable) {
-      throw new Error("No handler for PatternVar type");
-    }
-    return handlers.variable(value.name.description);
-  }
-
-  if (value instanceof Wildcard) {
-    if (!handlers.wildcard) {
-      throw new Error("No handler for Wildcard type");
-    }
-    return handlers.wildcard();
   }
 
   if (typeof value === "string") {
@@ -342,19 +256,16 @@ export function match(value, handlers) {
  * Serialize typed value to string format
  *
  * Format:
- *   Word("ALICE")     → "w:ALICE"
- *   "hello"           → "s:hello"
- *   42                → "n:42"
- *   PatternVar("X")   → "v:X"
- *   Wildcard          → "_"
+ *   Word("ALICE")     → "ALICE"
+ *   "hello"           → "\"hello\""
+ *   42                → "42"
+ *   Ref(...)          → "<uri>"
  */
 export function serialize(value) {
   return match(value, {
     word: (spelling) => spelling.toString(),
     string: (str) => `"${str}"`,
     number: (num) => num.toString(),
-    variable: (name) => name.toString(),
-    wildcard: () => "_",
     ref: (href) => `<${href}>`,
   });
 }
