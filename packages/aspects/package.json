@@ -1,7 +1,0 @@
-{
-    "name": "@bassline/aspects",
-    "version": "1.0.0",
-    "description": "Implementation of the bassline Aspect system",
-    "type": "module",
-    "module": "src/index.js"
-}

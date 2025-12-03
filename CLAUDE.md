@@ -1,912 +1,243 @@
-# CLAUDE.md - Bassline Pattern-Matching Graph System
+# CLAUDE.md - Bassline
 
-**📝 Note**: Check `.claude/context.md` for recent work context and architectural decisions from previous sessions.
+## Overview
 
-## Project Overview
+Bassline is a pattern-matching graph system for distributed applications. The core idea: all data is quads, patterns watch for matches, computation is incremental and reactive.
 
-**Bassline** is a **pattern-matching graph computation system** - think Datalog meets reactive programming, with incremental pattern matching over an append-only triple store.
+## Why JavaScript
 
-**Core Philosophy**: Everything is edges in a graph. Patterns watch for matches. Computation is incremental and reactive. All state is queryable.
-
-## Why JavaScript (Not TypeScript)
-
-- Highly dynamic runtime (pattern compilation, incremental matching, meta-programming)
+- Highly dynamic runtime (pattern compilation, incremental matching)
 - Static types don't add value for this use case
-- Vanilla JS lets us ship source directly (no build step)
-- Power comes from runtime flexibility, not compile-time guarantees
+- Ship source directly, no build step
+- Power comes from runtime flexibility
 
 ## Architecture
 
 ```
 packages/parser/
 ├── src/
-│   ├── minimal-graph.js         # Core: Graph + Pattern matching (~400 lines)
-│   ├── pattern-parser.js        # Parser: Pattern language -> AST
-│   ├── pattern-words.js         # Runtime: Execute AST on graph
-│   ├── interactive-runtime.js   # Interactive wrapper + REPL
-│   └── format-results.js        # Result formatting for display
+│   ├── algebra/
+│   │   ├── graph.js      # Graph: set of quads with add/remove
+│   │   ├── quad.js       # Quad: (entity, attribute, value, context)
+│   │   ├── pattern.js    # Pattern matching and rewriting
+│   │   ├── watch.js      # WatchedGraph: reactive pattern matching
+│   │   └── instrument.js # Instrumentation hooks
+│   ├── types.js          # Value types: Word, PatternVar, Wildcard
+│   ├── control.js        # High-level control interface
+│   └── pattern-parser.js # Pattern language parser
 │
 ├── extensions/
-│   ├── io-compute.js            # IO-based compute framework
-│   ├── io-compute-builtin.js    # Built-in compute operations (18 ops)
-│   ├── io-effects.js            # IO-based effects framework
-│   ├── io-effects-builtin.js    # Built-in browser effects (5 effects)
-│   ├── io-effects-node.js       # Built-in Node.js effects (3 filesystem)
-│   ├── io-effects-persistence.js # Persistence effects (BACKUP/LOAD/SYNC/REPLAY)
-│   ├── io-effects-connections.js # WebSocket connections (4 network effects)
-│   ├── aggregation/
-│   │   ├── core.js              # Refinement & versioning helpers
-│   │   ├── definitions.js       # SUM, COUNT, AVG, MIN, MAX
-│   │   ├── installer.js         # Generic aggregation installer
-│   │   └── index.js             # Public API
-│   ├── reified-rules.js         # Graph-native rule storage & activation
-│   └── self-description.js      # Meta-circular capabilities
-│
-├── examples/
-│   ├── repl.js                  # Interactive CLI
-│   ├── demo.js                  # Basic usage examples
-│   └── *.js                     # More examples
+│   ├── io-compute.js            # Compute operations framework
+│   ├── io-compute-builtin.js    # Built-in operations (ADD, MULTIPLY, etc.)
+│   ├── io-effects.js            # Effects framework
+│   ├── io-effects-builtin.js    # Browser effects (LOG, HTTP_GET, etc.)
+│   ├── io-effects-node.js       # Node.js effects (filesystem)
+│   ├── io-effects-persistence.js # Persistence (BACKUP, LOAD, SYNC)
+│   ├── io-effects-connections.js # WebSocket connections
+│   └── aggregation/             # Aggregation operations
 │
 └── test/
-    ├── minimal-graph.test.js    # Core graph tests
-    ├── aggregation.test.js      # Aggregation tests (35 tests)
-    ├── interactive-runtime.test.js  # Runtime tests (20 tests)
-    ├── reified-rules.test.js    # Reified rules tests (13 tests)
-    └── *.test.js                # Parser tests
-
-docs/
-├── CORE.md                      # Core model philosophy
-└── PERFORMANCE.md               # O(1) pattern matching via selective activation
+    └── *.test.js
 ```
 
 ## Core Concepts
 
-### 1. The Graph
+### Value Types
 
-An **append-only triple store** with incremental pattern matching:
+All values in the graph are typed:
+
+- **Word** - Case-insensitive identifier (interned as symbol)
+- **PatternVar** - Variable that matches and binds any value
+- **Wildcard** - Matches any value without binding
+- **string** - Case-sensitive literal
+- **number** - Numeric value
+
+```javascript
+import { word, variable, WC } from '@bassline/parser/types';
+
+const w = word("alice");     // Word: ALICE
+const v = variable("x");     // PatternVar: ?X
+const wc = WC;               // Wildcard: *
+```
+
+### Quads
+
+A quad is `(entity, attribute, value, context)`. The context groups related facts.
+
+```javascript
+import { quad } from '@bassline/parser/algebra/quad';
+import { word as w } from '@bassline/parser/types';
+
+quad(w("alice"), w("age"), 30, w("facts"));
+```
+
+### Graph
+
+A graph is a set of quads with add/remove/query operations.
 
 ```javascript
 import { Graph } from '@bassline/parser/graph';
 
-const graph = new Graph();
-
-// Add edges (triples)
-graph.add("alice", "age", 30);
-graph.add("alice", "city", "NYC");
-graph.add("bob", "age", 25);
-
-// Query with variables
-const results = graph.query(["?person", "age", "?age"]);
-// Returns: [Map{"?person" => "alice", "?age" => 30}, Map{"?person" => "bob", "?age" => 25}]
-
-// Watch for patterns (reactive)
-graph.watch([["?person", "age", "?age"]], (bindings) => {
-  console.log(`${bindings.get("?person")} is ${bindings.get("?age")} years old`);
-});
+const g = new Graph();
+g.add(quad(w("alice"), w("age"), 30, w("facts")));
 ```
 
-**Key properties**:
-- Append-only (edges never removed, only marked deleted via tombstones)
-- Incremental pattern matching (patterns fire as edges accumulate)
-- O(1) lookup via selective activation indexes (see PERFORMANCE.md)
-- Variables (`?x`), wildcards (`*`), and NAC (Negative Application Conditions)
+### Patterns
 
-### 2. Pattern Language
-
-A **declarative language** for graph manipulation:
+Patterns match against quads using variables and wildcards.
 
 ```javascript
-import { Runtime } from '@bassline/parser/interactive';
+import { pattern, patternQuad } from '@bassline/parser/algebra/pattern';
+import { variable as v, WC } from '@bassline/parser/types';
 
-const rt = new Runtime();
+const p = pattern(
+  patternQuad(v("person"), w("age"), v("age"), WC)
+);
 
-// Add facts
-rt.eval('insert { alice age 30 * bob age 25 * }');
-
-// Query
-rt.eval('query where { ?x age ?a * }');
-
-// Create reactive rule
-rt.eval('rule adult-check where { ?p age ?a * } produce { ?p adult true * }');
-
-// Single-word shorthand (explore an entity)
-rt.eval('alice');  // Expands to: query where { alice ?attr ?target * }
+const matches = matchGraph(graph, p);
+// Returns Match objects with bindings
 ```
 
-**Command types**:
-- `insert { ... }` - Add triples
-- `query where { ... }` - Find matches (with optional NAC)
-- `query where { ... } produce { ... }` - Query and insert (non-reactive, SQL-style)
-- `rule name where { ... } produce { ... }` - Reactive rewrite rules
-- `pattern name { ... }` - Named observable patterns
-- `watch where { ... } do { ... }` - Watch and react
-- `delete s a t` - Mark triple as deleted (tombstone)
-- `clear-graph` - Reset everything
-- `graph-info` - Statistics
+### WatchedGraph
 
-**Query with Produce** - Non-reactive query with inserts:
-```javascript
-// Find all people and mark them as processed (one-time operation)
-rt.eval('query where { ?person age ?a * } produce { ?person processed true * }');
-
-// Returns query results + inserts produce quads for each match
-// Unlike rules, this is non-reactive (doesn't watch for future matches)
-```
-
-### 3. Incremental Aggregations
-
-**Reified aggregations** with explicit activation and continuous reactivity:
+Extends Graph with reactive pattern matching. When quads are added, matching patterns fire automatically.
 
 ```javascript
-import { installReifiedAggregations, builtinAggregations, getCurrentValue } from '@bassline/parser/aggregation';
-import { createContext } from '@bassline/parser/runtime';
+import { WatchedGraph } from '@bassline/parser/watch';
 
-const context = createContext(graph);
+const g = new WatchedGraph();
 
-// Install reified aggregations system
-installReifiedAggregations(graph, builtinAggregations, context);
-
-// Define aggregation structure
-graph.add("AGG1", "AGGREGATE", "SUM", null);
-graph.add("AGG1", "ITEM", 10, null);
-graph.add("AGG1", "ITEM", 20, null);
-
-// Activate - makes it REACTIVE
-graph.add("AGG1", "memberOf", "aggregation", "system");
-
-// Continuously reactive - new items auto-update
-graph.add("AGG1", "ITEM", 15, null);  // Triggers recomputation!
-
-// Get current result (uses refinement with NAC)
-getCurrentValue(graph, "AGG1");  // 45
-```
-
-**Pattern**: Like reified rules - define structure, then activate via `memberOf`. After activation, aggregation is **continuously reactive** to new items.
-
-**Built-in operations**: SUM, COUNT, AVG, MIN, MAX
-
-**Custom aggregations**:
-```javascript
-const customAggs = {
-  PRODUCT: {
-    initialState: { product: 1 },
-    accumulate(state, rawValue) {
-      const num = parseFloat(rawValue);
-      return isNaN(num) ? state : { product: state.product * num };
-    },
-    reduce(state) {
-      return state.product;
-    }
+// Register a rule: pattern + production function
+g.watch({
+  pattern: pattern(patternQuad(v("p"), w("age"), v("a"), WC)),
+  production: (match) => {
+    // Return new quads to add
+    return [quad(match.get("p"), w("adult"), w("true"), w("derived"))];
   }
-};
-
-installReifiedAggregations(graph, customAggs, context);
-
-// Use like built-ins
-graph.add("AGG2", "AGGREGATE", "PRODUCT", null);
-graph.add("AGG2", "memberOf", "aggregation", "system");
-graph.add("AGG2", "ITEM", 2, null);
-graph.add("AGG2", "ITEM", 3, null);
-getCurrentValue(graph, "AGG2");  // 6
-```
-
-### 4. Refinement Pattern (Append-Only Updates)
-
-**How to "update" in an append-only system**:
-
-```javascript
-// Version 1
-graph.add("AGG1", "AGG1:RESULT:V1", 10);
-
-// Version 2 (refines V1)
-graph.add("AGG1", "AGG1:RESULT:V2", 30);
-graph.add("AGG1:RESULT:V2", "REFINES", "AGG1:RESULT:V1");
-
-// Query for current (non-refined) value using NAC
-const current = graph.query({
-  patterns: [["AGG1", "?key", "?value"]],
-  nac: [["?newer", "REFINES", "?key"]]  // No newer version refines this
-});
-```
-
-This pattern enables:
-- Time-travel queries (inspect any version)
-- Incremental computation (only recompute what changed)
-- Distributed convergence (versions merge naturally)
-
-### 5. Reified Rules (Graph-Native Rule Storage)
-
-**Rules as first-class graph entities** - stored as edges, activated via system contexts:
-
-```javascript
-import { installReifiedRules, getActiveRules, getRuleFirings } from '@bassline/parser/extensions/reified-rules';
-
-// Install reified rules system
-installReifiedRules(graph, context);
-
-// Define rule structure as edges
-graph.add("ADULT-CHECK", "TYPE", "RULE!", "system");
-graph.add("ADULT-CHECK", "matches", "?p AGE ?a *", "ADULT-CHECK");
-graph.add("ADULT-CHECK", "produces", "?p ADULT TRUE *", "ADULT-CHECK");
-
-// Activate rule via system context
-graph.add("ADULT-CHECK", "memberOf", "rule", "system");
-
-// Rule automatically:
-// 1. Scans existing edges and fires for matches
-// 2. Watches for new edges reactively
-
-// Add data (rule fires automatically)
-graph.add("ALICE", "AGE", 30, null);
-
-// Check if rule fired
-graph.query(["ALICE", "ADULT", "?v", "*"]);  // TRUE
-
-// Introspection (everything is queryable)
-getActiveRules(graph);           // ["ADULT-CHECK"]
-getRuleFirings(graph, "ADULT-CHECK");  // 1
-```
-
-**Key features**:
-- **Graph-native storage**: Rules stored as edges, not runtime state
-- **System context activation**: `memberOf rule system` triggers installation
-- **Initial scan + reactive**: Processes existing data on activation, then watches for new data
-- **Full introspection**: Query rule structure, active status, firing history
-- **Dynamic control**: Activate/deactivate at runtime
-- **NAC support**: Negative application conditions work on both existing and new data
-
-**Deactivation**:
-```javascript
-// Deactivate via tombstone (append-only)
-graph.add("ADULT-CHECK", "memberOf", "rule", "tombstone");
-```
-
-**Pattern strings**: Stored as parseable strings like `"?X TYPE PERSON *"` for simplicity.
-
-See [REIFIED-RULES-IMPLEMENTATION.md](packages/parser/docs/REIFIED-RULES-IMPLEMENTATION.md) for details.
-
-### 6. Persistence (IO-Based)
-
-**Graph persistence using IO effects** - backup, restore, and incremental sync:
-
-```javascript
-import { installAllPersistence, isHandled, getOutput } from '@bassline/parser/io-effects-persistence';
-
-// Install persistence effects
-installAllPersistence(graph);
-
-// Snapshot backup - save entire graph
-graph.add("backup1", "TARGET", "file:///path/to/backup.json", null);
-graph.add("backup1", "handle", "BACKUP", "input");
-
-// Wait for completion
-await waitUntil(() => isHandled(graph, "BACKUP", "backup1"));
-
-// Check results
-const success = getOutput(graph, "backup1", "SUCCESS");  // "TRUE"
-const edgeCount = getOutput(graph, "backup1", "EDGE_COUNT");  // Total edges
-
-// Restore from snapshot
-graph.add("load1", "SOURCE", "file:///path/to/backup.json", null);
-graph.add("load1", "handle", "LOAD", "input");
-
-await waitUntil(() => isHandled(graph, "LOAD", "load1"));
-const loadedCount = getOutput(graph, "load1", "LOADED_COUNT");
-```
-
-**Incremental sync with timestamps**:
-
-```javascript
-// Add edges with timestamps
-const ctx1 = "batch-1";
-graph.add("alice", "AGE", 30, ctx1);
-graph.add("bob", "AGE", 25, ctx1);
-
-// Record timestamp for this context
-graph.add(ctx1, "timestamp", Date.now(), "timestamps");
-
-// Incremental sync - only edges since watermark
-graph.add("sync1", "TARGET", "file:///path/to/log.jsonl", null);
-graph.add("sync1", "SINCE_TIME", lastSyncTime, null);
-graph.add("sync1", "handle", "SYNC", "input");
-
-await waitUntil(() => isHandled(graph, "SYNC", "sync1"));
-const syncedCount = getOutput(graph, "sync1", "SYNCED_COUNT");
-const newWatermark = getOutput(graph, "sync1", "LAST_TIME");  // Update for next sync
-```
-
-**Replay from JSONL log**:
-
-```javascript
-// Replay edges from incremental log
-graph.add("replay1", "SOURCE", "file:///path/to/log.jsonl", null);
-graph.add("replay1", "handle", "REPLAY", "input");
-
-await waitUntil(() => isHandled(graph, "REPLAY", "replay1"));
-const replayedCount = getOutput(graph, "replay1", "REPLAYED_COUNT");
-```
-
-**Built-in effects** (5 total):
-- **BACKUP**: Atomic full graph snapshot to JSON file (uses temp + rename)
-- **LOAD**: Restore graph from JSON snapshot
-- **SYNC**: Atomic incremental backup using timestamp watermark (batched writes)
-- **REPLAY**: Apply edges from JSONL log
-- **PRUNE_TOMBSTONES**: Remove edges marked with tombstone context (GC)
-
-**Key features**:
-- **Atomic writes**: BACKUP/SYNC use temp files + rename for crash safety
-- **Append-only safe**: Preserves all edges including tombstones
-- **Context-aware**: All contexts preserved on restore
-- **Rule reactivation**: Rules automatically reactivate when loaded
-- **Incremental sync**: Only backup edges with timestamps since last sync
-- **JSONL format**: JSON Lines for efficient streaming
-- **Garbage collection**: PRUNE_TOMBSTONES for long-running graphs
-
-**Garbage Collection**:
-```javascript
-// Mark edges for deletion by using tombstone context
-graph.add("old-data", "deleted", "TRUE", "tombstone");
-graph.add("stale-record", "archived", "TRUE", "tombstone");
-
-// Prune all tombstoned edges
-graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
-await waitUntil(() => isHandled(graph, "PRUNE_TOMBSTONES", "prune1"));
-
-const removed = getOutput(graph, "prune1", "REMOVED");  // Count of pruned edges
-```
-
-**User-level compaction patterns**:
-```javascript
-// Refinement compaction - remove old versions
-const refined = graph.query(["?newer", "REFINES", "?older", "*"]);
-
-graph.batch(() => {
-  refined.forEach(b => {
-    const olderKey = b.get("?older");
-    // Tombstone old version
-    graph.add("AGG1", olderKey, null, "tombstone");
-  });
 });
 
-// Prune tombstones
-graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
-
-// Context-based archiving - archive old data before pruning
-// 1. Backup specific context
-graph.add("backup1", "TARGET", "file:///archive/old-data.json", null);
-graph.add("backup1", "CONTEXT", "old-context", null);
-graph.add("backup1", "handle", "BACKUP", "input");
-
-// 2. Mark context for deletion
-const oldEdges = graph.query(["?s", "?a", "?t", "old-context"]);
-graph.batch(() => {
-  oldEdges.forEach(e => {
-    graph.add(e.get("?s"), e.get("?a"), e.get("?t"), "tombstone");
-  });
-});
-
-// 3. Prune
-graph.add("prune1", "handle", "PRUNE_TOMBSTONES", "input");
-```
-
-**Helper: Wait for effect**:
-```javascript
-async function waitUntil(condition, timeout = 5000) {
-  const start = Date.now();
-  while (!condition()) {
-    if (Date.now() - start > timeout) {
-      throw new Error("Timeout waiting for condition");
-    }
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-}
-```
-
-## Interactive Runtime (NEW!)
-
-**Minimal wrapper** for interactive use:
-
-```javascript
-import { Runtime } from '@bassline/parser/interactive';
-import { formatResults } from '@bassline/parser/format';
-
-const rt = new Runtime();
-
-// Evaluate expressions
-const results = rt.eval('insert { alice age 30 * }');
-console.log(formatResults(results));
-
-// Single-word exploration
-rt.eval('alice');  // Shows all edges about alice
-
-// Convenience methods
-rt.query('?x age ?a');
-rt.fact('bob age 25');
-
-// Introspection
-rt.getStats();         // {edges: 10, patterns: 2, rules: 3}
-rt.getActiveRules();   // ["ADULT-CHECK", "FRIEND-DETECTOR"]
-rt.getActivePatterns(); // ["PEOPLE-TRACKER"]
-
-// Serialization
-const json = rt.toJSON();
-rt.fromJSON(json);
-
-// Reset
-rt.reset();
-```
-
-**REPL** (Command-line interface):
-```bash
-node packages/parser/examples/repl.js
-```
-
-Commands: `.help`, `.stats`, `.patterns`, `.rules`, `.reset`, `.exit`
-
-## Pattern Matching Performance
-
-**O(1) pattern matching** via selective activation indexes.
-
-Key insight: Don't check every pattern against every edge - **index patterns by their literals**:
-
-```javascript
-// When pattern is registered:
-graph.watch([["alice", "likes", "?x"]], callback);
-// Indexed: sourceIndex.get("alice").add(pattern)
-
-// When edge is added:
-graph.add("alice", "likes", "bob");
-// Only activates patterns indexed under "alice" (not all patterns!)
-```
-
-**Performance**:
-- 20,000 patterns + 100,000 edges: **4.4M edges/sec**
-- Throughput stays constant regardless of pattern count
-- 67-235x faster than naive O(P × E) approach
-
-See [PERFORMANCE.md](packages/parser/docs/PERFORMANCE.md) for details.
-
-## Self-Description
-
-**Rules and patterns describe themselves as edges**:
-
-```javascript
-// When you create a rule:
-rt.eval('rule my-rule where { ?x age ?a * } produce { ?x adult true * }');
-
-// The graph automatically contains:
-// MY-RULE TYPE RULE! system
-// MY-RULE matches "?X AGE ?A *" MY-RULE
-// MY-RULE produces "?X ADULT TRUE *" MY-RULE
-// MY-RULE memberOf rule system
-
-// You can query this metadata:
-rt.eval('my-rule');  // Shows all rule metadata
-```
-
-This enables:
-- Introspection (query what rules/patterns are active)
-- Meta-programming (patterns that watch for pattern definitions)
-- Serialization (save/load entire runtime state)
-
-## Common Patterns
-
-### Cascading Rules
-
-```javascript
-rt.eval('rule step1 where { ?x type person * } produce { ?x verified true * }');
-rt.eval('rule step2 where { ?x verified true * } produce { ?x processed true * }');
-rt.eval('rule step3 where { ?x processed true * } produce { ?x complete true * }');
-
-rt.eval('insert { alice type person * }');
-// All three rules fire in sequence!
+// Adding quads triggers matching rules
+g.add(quad(w("alice"), w("age"), 30, w("facts")));
+// → Automatically adds: alice adult true derived
 ```
 
 ### NAC (Negative Application Conditions)
 
-```javascript
-// Find people who are NOT deleted
-rt.eval('query where { ?x type person * | not ?x deleted true * }');
+Patterns can specify conditions that must NOT match:
 
-// Rule that only fires if person doesn't have status
-rt.eval('rule set-default where { ?p age ?a * | not ?p status ?v * } produce { ?p status active * }');
+```javascript
+const p = pattern(
+  patternQuad(v("p"), w("age"), v("a"), WC)
+).setNAC(
+  patternQuad(v("p"), w("deleted"), w("true"), WC)
+);
+// Only matches people who are NOT deleted
 ```
 
-### Aggregation with Rules
+## Performance
+
+WatchedGraph uses **selective activation indexes** for O(1) pattern matching:
+
+- Patterns are indexed by their literal values (entity, attribute, value, context)
+- When a quad is added, only patterns that could possibly match are checked
+- This avoids the naive O(patterns × quads) approach
+
+## Extensions
+
+### IO Compute
+
+Request-response style computation via quads:
 
 ```javascript
-// Set up and activate aggregation
-rt.eval('insert { sales:2024 AGGREGATE SUM * sales:2024 memberOf aggregation system }');
-
-// Rule that feeds aggregation
-rt.eval('rule track-sales where { ?order total ?amount * } produce { sales:2024 ITEM ?amount * }');
-
-// Add orders (aggregation updates automatically)
-rt.eval('insert { order:1 total 100 * order:2 total 250 * }');
-
-// Get result
-getCurrentValue(rt.graph, "sales:2024");  // 350
-```
-
-### Computed Values (IO-Based)
-
-**IO-based compute operations** using handle/handled coordination:
-
-```javascript
-import { installBuiltinCompute, getComputeResult, isComputed } from '@bassline/parser/io-compute';
+import { installBuiltinCompute } from '@bassline/parser/io-compute';
 
 installBuiltinCompute(graph);
 
 // Set up operands
-graph.add("calc1", "X", 10, null);
-graph.add("calc1", "Y", 20, null);
+graph.add(quad(w("calc1"), w("X"), 10, w("input")));
+graph.add(quad(w("calc1"), w("Y"), 20, w("input")));
 
-// Request computation (handle triggers execution)
-graph.add("calc1", "handle", "ADD", "input");
+// Request computation
+graph.add(quad(w("calc1"), w("handle"), w("ADD"), w("input")));
 
-// Wait for completion (check handled marker)
-const computed = isComputed(graph, "ADD", "calc1");  // true
-
-// Get result from output context
-const result = getComputeResult(graph, "calc1");  // 30
-
-// Or query directly
-graph.query(["calc1", "RESULT", "?r", "output"]);  // [{?r => 30}]
+// Result appears in output context
+// calc1 RESULT 30 output
 ```
 
-**Built-in operations** (18 total):
-- **Binary**: ADD, SUBTRACT, MULTIPLY, DIVIDE, MOD, POW
-- **Unary**: SQRT, ABS, FLOOR, CEIL, ROUND, NEGATE
-- **Comparison**: GT, LT, GTE, LTE, EQ, NEQ
+### IO Effects
 
-**Custom operations**:
-```javascript
-import { installIOCompute } from '@bassline/parser/io-compute';
-
-// Install custom operation
-installIOCompute(graph, "DOUBLE", (x) => x * 2, {
-  arity: "unary",
-  operationType: "arithmetic",
-  doc: "Double a number"
-});
-
-// Use it
-graph.add("calc2", "VALUE", 5, null);
-graph.add("calc2", "handle", "DOUBLE", "input");
-// Result: graph.query(["calc2", "RESULT", "?r", "output"]) => 10
-```
-
-### Effects (IO-Based)
-
-**IO-based effects** for side-effecting operations:
+Side effects (logging, HTTP, filesystem):
 
 ```javascript
-import {
-  installBuiltinEffects,  // Browser effects
-  installNodeEffects,     // Node.js effects
-  installAllEffects,      // All effects
-  isHandled,
-  getOutput
-} from '@bassline/parser/io-effects';
+import { installBuiltinEffects } from '@bassline/parser/io-effects';
 
-// Install browser effects (LOG, ERROR, WARN, HTTP_GET, HTTP_POST)
 installBuiltinEffects(graph);
 
-// Or install all (browser + Node.js filesystem)
-installAllEffects(graph);
-
-// Console logging
-graph.add("req1", "MESSAGE", "Hello World", null);
-graph.add("req1", "handle", "LOG", "input");
-
-// Wait for completion
-const done = isHandled(graph, "LOG", "req1");  // true
-
-// Get output
-const logged = getOutput(graph, "req1", "LOGGED");  // "TRUE"
-
-// HTTP request
-graph.add("req2", "URL", "https://api.example.com/data", null);
-graph.add("req2", "handle", "HTTP_GET", "input");
-// Result: graph.query(["req2", "DATA", "?data", "output"])
-
-// File operations (Node.js only)
-graph.add("req3", "PATH", "/tmp/test.txt", null);
-graph.add("req3", "CONTENT", "Hello", null);
-graph.add("req3", "handle", "WRITE_FILE", "input");
-// Result: graph.query(["req3", "SUCCESS", "?s", "output"]) => "TRUE"
+graph.add(quad(w("log1"), w("MESSAGE"), "Hello", w("input")));
+graph.add(quad(w("log1"), w("handle"), w("LOG"), w("input")));
 ```
 
-**Built-in browser effects** (5 total):
-- **io**: LOG, ERROR, WARN (console operations)
-- **http**: HTTP_GET, HTTP_POST (fetch-based)
+### Persistence
 
-**Built-in Node.js effects** (3 total):
-- **filesystem**: READ_FILE, WRITE_FILE, APPEND_FILE
+Snapshot and incremental sync:
 
-**Custom effects**:
 ```javascript
-import { installIOEffect } from '@bassline/parser/io-effects';
+import { installAllPersistence } from '@bassline/parser/io-effects-persistence';
 
-// Install custom effect
-installIOEffect(graph, "NOTIFY", async (graph, ctx) => {
-  // Query inputs from context
-  const messageQ = graph.query([ctx, "MESSAGE", "?m", "*"]);
-  const message = messageQ[0]?.get("?m");
+installAllPersistence(graph);
 
-  // Perform side effect
-  await sendNotification(message);
-
-  // Return outputs (written to output context)
-  return {
-    SENT: "TRUE",
-    TIMESTAMP: Date.now()
-  };
-}, {
-  category: "notification",
-  doc: "Send notification. Input: MESSAGE"
-});
-
-// Use it
-graph.add("notify1", "MESSAGE", "Task complete", null);
-graph.add("notify1", "handle", "NOTIFY", "input");
-// Result: graph.query(["notify1", "SENT", "?s", "output"]) => "TRUE"
+// Backup
+graph.add(quad(w("backup1"), w("TARGET"), "file:///path/to/backup.json", w("input")));
+graph.add(quad(w("backup1"), w("handle"), w("BACKUP"), w("input")));
 ```
 
-### Graph Connections (WebSocket Sync)
+### WebSocket Connections
 
-**WebSocket-based connections** between graphs with **automatic context-based sync**:
+Sync quads between graphs over WebSocket:
 
 ```javascript
-import {
-  installConnectionEffects,
-  getActiveConnections,
-  getActiveServers,
-  getConnectionInfo
-} from '@bassline/parser/connections';
+import { installConnectionEffects } from '@bassline/parser/connections';
 
 installConnectionEffects(graph);
 
-// Server: Start WebSocket server and bind context
-graph.add("server1", "PORT", 8080, null);
-graph.add("server1", "BIND_CONTEXT", "shared-data", null);
-graph.add("server1", "handle", "LISTEN", "input");
+// Server
+graph.add(quad(w("server1"), w("PORT"), 8080, w("input")));
+graph.add(quad(w("server1"), w("BIND_CONTEXT"), w("shared"), w("input")));
+graph.add(quad(w("server1"), w("handle"), w("LISTEN"), w("input")));
 
-// Client: Connect to server and bind context
-graph.add("conn1", "URL", "ws://localhost:8080", null);
-graph.add("conn1", "BIND_CONTEXT", "shared-data", null);
-graph.add("conn1", "handle", "CONNECT", "input");
+// Client
+graph.add(quad(w("conn1"), w("URL"), "ws://localhost:8080", w("input")));
+graph.add(quad(w("conn1"), w("BIND_CONTEXT"), w("shared"), w("input")));
+graph.add(quad(w("conn1"), w("handle"), w("CONNECT"), w("input")));
 
-// Any quad added to bound context → automatically sent!
-graph.add("alice", "age", 30, "shared-data");  // Syncs over WebSocket
-
-// Received quads → automatically added to bound context
-// Both graphs now have: alice age 30 shared-data
-```
-
-**Key features**:
-- **Context-based auto-sync**: Bind a context to connection → quads auto-sync
-- **Bidirectional**: Both client and server can send/receive
-- **Effect filtering**: input/output/system/tombstone contexts NOT sent
-- **Multiple clients**: Server can handle multiple simultaneous connections
-- **Protocol**: Simple JSON arrays of quads `[source, attr, target, context]`
-
-**Built-in connection effects** (4 total):
-- **network**: CONNECT, LISTEN, DISCONNECT, CLOSE_SERVER
-
-**Connection lifecycle**:
-```javascript
-// CONNECT - Connect to remote graph
-graph.add("conn1", "URL", "ws://remote:8080", null);
-graph.add("conn1", "BIND_CONTEXT", "sync", null);  // Optional
-graph.add("conn1", "handle", "CONNECT", "input");
-
-// Get connection ID
-const connId = getOutput(graph, "conn1", "CONNECTION_ID");
-
-// DISCONNECT - Close connection
-graph.add("disc1", "CONNECTION_ID", connId, null);
-graph.add("disc1", "handle", "DISCONNECT", "input");
-```
-
-**Server lifecycle**:
-```javascript
-// LISTEN - Start WebSocket server
-graph.add("server1", "PORT", 8080, null);
-graph.add("server1", "BIND_CONTEXT", "lobby", null);  // Optional
-graph.add("server1", "handle", "LISTEN", "input");
-
-// Server notifies when clients connect
-graph.query(["server-8080", "CLIENT", "?clientId", "output"]);
-
-// CLOSE_SERVER - Stop server and disconnect all clients
-graph.add("close1", "SERVER_ID", "server-8080", null);
-graph.add("close1", "handle", "CLOSE_SERVER", "input");
-```
-
-**Sandboxing and security**:
-- Quads are inert data without watchers/rules installed
-- Remote cannot execute code unless reified rules are installed
-- Use NAC patterns to block unwanted quads:
-```javascript
-// Rule that only accepts quads from verified sources
-graph.watch([
-  ["?s", "?a", "?t", "shared-data"],
-  ["NOT", "?s", "blacklisted", "TRUE", "*"]
-], (bindings) => {
-  // Process verified quad
-});
-```
-
-**Multiple connections**:
-```javascript
-// Different contexts for different connections
-graph.add("conn1", "URL", "ws://server1:8080", null);
-graph.add("conn1", "BIND_CONTEXT", "server1-data", null);
-graph.add("conn1", "handle", "CONNECT", "input");
-
-graph.add("conn2", "URL", "ws://server2:9000", null);
-graph.add("conn2", "BIND_CONTEXT", "server2-data", null);
-graph.add("conn2", "handle", "CONNECT", "input");
-
-// Each connection syncs its own context independently
-```
-
-**Introspection**:
-```javascript
-// List active connections
-const connections = getActiveConnections();  // ["conn-123", "conn-456"]
-
-// List active servers
-const servers = getActiveServers();  // ["server-8080"]
-
-// Get connection details
-const info = getConnectionInfo("conn-123");
-// { id: "conn-123", context: "shared-data", readyState: 1 }
-```
-
-### Reified Rules (Meta-Programming)
-
-```javascript
-import { installReifiedRules, getActiveRules } from '@bassline/parser/extensions/reified-rules';
-
-installReifiedRules(graph, context);
-
-// Define multiple rules as edges
-graph.add("VERIFY", "TYPE", "RULE!", "system");
-graph.add("VERIFY", "matches", "?p TYPE PERSON *", "VERIFY");
-graph.add("VERIFY", "produces", "?p VERIFIED TRUE *", "VERIFY");
-
-graph.add("PROCESS", "TYPE", "RULE!", "system");
-graph.add("PROCESS", "matches", "?p VERIFIED TRUE *", "PROCESS");
-graph.add("PROCESS", "produces", "?p PROCESSED TRUE *", "PROCESS");
-
-// Activate both (order doesn't matter for data defined before activation)
-graph.add("VERIFY", "memberOf", "rule", "system");
-graph.add("PROCESS", "memberOf", "rule", "system");
-
-// Add data - rules cascade automatically
-graph.add("ALICE", "TYPE", "PERSON", null);
-// Result: ALICE gets VERIFIED and PROCESSED markers
-
-// Introspection via queries (no special API)
-graph.query(["?rule", "TYPE", "RULE!", "system"]);  // List all rules
-graph.query(["?rule", "memberOf", "rule", "system"]);  // Active rules
-graph.query(["VERIFY", "matches", "?pattern", "*"]);  // Rule structure
-
-// Conditional activation
-graph.watch([["CONFIG", "ENABLE-VALIDATION", "TRUE", "*"]], () => {
-  graph.add("VALIDATION-RULE", "memberOf", "rule", "system");
-});
+// Quads added to "shared" context auto-sync
 ```
 
 ## Package Exports
 
-```json
-{
-  ".": "./src/minimal-graph.js",           // Graph class
-  "./graph": "./src/minimal-graph.js",     // Graph class
-  "./parser": "./src/pattern-parser.js",   // Pattern parser
-  "./runtime": "./src/pattern-words.js",   // Runtime executor
-  "./interactive": "./src/interactive-runtime.js",  // Interactive wrapper
-  "./format": "./src/format-results.js",   // Result formatter
-  "./io-compute": "./extensions/io-compute.js",  // IO-based compute operations
-  "./io-effects": "./extensions/io-effects.js",  // IO-based effects
-  "./io-effects-persistence": "./extensions/io-effects-persistence.js",  // Persistence
-  "./connections": "./extensions/io-effects-connections.js",  // WebSocket connections
-  "./aggregation": "./extensions/aggregation/index.js",  // Aggregations
-  "./reified-rules": "./extensions/reified-rules.js"  // Graph-native rule storage
-}
+```javascript
+import { Graph } from '@bassline/parser/graph';
+import { WatchedGraph } from '@bassline/parser/watch';
+import { quad } from '@bassline/parser/algebra/quad';
+import { pattern, patternQuad, matchGraph, rewrite } from '@bassline/parser/algebra/pattern';
+import { word, variable, WC } from '@bassline/parser/types';
 ```
-
-## Test Coverage
-
-**All 188 tests passing**:
-- `minimal-graph.test.js` - Core graph & pattern matching (28 tests)
-- `contexts.test.js` - Context-based selective activation (40 tests)
-- `aggregation.test.js` - Modular aggregations (35 tests)
-- `interactive-runtime.test.js` - Runtime & REPL (20 tests)
-- `reified-rules.test.js` - Graph-native rules (13 tests)
-- `io-contexts.test.js` - IO-based effects and compute (18 tests)
-- `context-performance.test.js` - Performance benchmarks (6 tests)
-- `persistence.test.js` - Persistence (snapshot, sync, replay, atomic writes, GC) (14 tests)
-- `connections.test.js` - WebSocket connections (14 tests)
 
 ## Design Principles
 
-1. **Append-only** - Never delete, only add (tombstones for deletion)
-2. **Incremental** - Patterns fire as edges accumulate (no batch queries needed)
-3. **Reactive** - Rules automatically maintain invariants
-4. **Queryable** - All state is edges, all edges are queryable
-5. **Modular** - Extensions add capabilities without core changes
-6. **Self-describing** - Rules/patterns store themselves as edges
-7. **O(1) matching** - Selective activation via indexing (not naive O(P × E))
+1. **Append-only** - Quads accumulate, deletions are tombstones
+2. **Incremental** - Patterns fire as quads arrive
+3. **Reactive** - Rules maintain invariants automatically
+4. **Queryable** - All state is quads, all quads are queryable
+5. **O(1) matching** - Selective activation via indexing
 
-## Debugging Tips
+## Running Tests
 
-```javascript
-// 1. Inspect graph state
-rt.eval('graph-info');  // Statistics
-rt.getStats();          // {edges, patterns, rules}
-
-// 2. Explore entities
-rt.eval('alice');       // All edges about alice
-rt.eval('ADULT-CHECK'); // All metadata about rule
-
-// 3. Query patterns
-rt.eval('query where { ?s ?a ?t * }');  // All edges
-
-// 4. Check active patterns/rules
-rt.getActivePatterns();  // List all patterns
-rt.getActiveRules();     // List all rules
-
-// 5. Reset if confused
-rt.reset();  // Clear everything
+```bash
+pnpm install
+pnpm test
 ```
 
-## Anti-Patterns
+## License
 
-❌ **Don't** mutate graph state outside of `graph.add()`
-❌ **Don't** assume pattern firing order (incremental = order depends on edge arrival)
-❌ **Don't** create infinite rule cascades (rule A → B → A → ...)
-❌ **Don't** use external state in watchers (keeps state in graph)
-❌ **Don't** forget NAC can be expensive (check what it filters)
-
-## Philosophy
-
-This system unifies:
-- **Datalog** - Logic programming over facts
-- **Reactive programming** - Automatic propagation via watchers
-- **CQRS/Event Sourcing** - Append-only log with projections
-- **Incremental view maintenance** - Update derived state as base data changes
-
-Everything is **edges** (triples). Patterns are **queries** that react. Computation is **incremental** and **observable**.
-
-The goal: **Maximal expressiveness from minimal primitives**.
-
-## What's Next
-
-Current capabilities:
-- ✅ Pattern matching with O(1) selective activation
-- ✅ Reactive rules and watchers
-- ✅ Modular aggregations with refinement
-- ✅ Interactive runtime + REPL
-- ✅ Self-description and introspection
-- ✅ Reified rules (graph-native rule storage & activation)
-- ✅ IO-based compute operations (18 operations)
-- ✅ IO-based effects (browser + Node.js)
-- ✅ Persistence layer (atomic snapshot, incremental sync, replay, GC)
-- ✅ WebSocket connections (bidirectional context-based sync)
-
-Future directions:
-- Parser integration for reified rules (emit edges from `rule` command)
-- Multi-graph daemon (Postgres-like architecture: one process, multiple graph instances)
-- Distributed graph (sync across nodes with CRDT semantics)
-- Advanced aggregations (windowing, joins)
-- Query optimization (plan generation)
-- Visual graph explorer
-- Remote persistence backends (databases, object storage)
-
----
-
-**Remember**: The power is in the **pattern**. Keep the core simple. Build everything as patterns watching edges.
+AGPLv3
