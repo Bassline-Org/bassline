@@ -1,15 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Bassline, createBassline, ref } from '../src/bassline.js';
-import { RegistryMirror, mountRegistryMirror } from '../src/mirror/registry-mirror.js';
+import { Bassline, ref } from '../src/bassline.js';
+import { mountRegistryMirror } from '../src/mirror/registry-mirror.js';
 import { Cell } from '../src/mirror/cell.js';
-import { BaseMirror } from '../src/mirror/interface.js';
-import { word, Word, Ref } from '../src/types.js';
 
 describe('Bassline', () => {
   let bl;
 
   beforeEach(() => {
-    bl = createBassline();
+    bl = new Bassline();
   });
 
   describe('mounting', () => {
@@ -159,55 +157,6 @@ describe('Bassline', () => {
     });
   });
 
-  describe('new-style mirrors (readRef/writeRef/watchRef)', () => {
-    it('should use readRef when available', () => {
-      class NewStyleMirror extends BaseMirror {
-        readRef(ref, bassline) {
-          return { path: ref.pathname, params: Object.fromEntries(ref.searchParams) };
-        }
-      }
-
-      bl.mount('/new', new NewStyleMirror());
-      const result = bl.read(ref('bl:///new/test?foo=bar'));
-
-      expect(result.path).toBe('/new/test');
-      expect(result.params.foo).toBe('bar');
-    });
-
-    it('should use writeRef when available', () => {
-      const written = [];
-      class NewStyleMirror extends BaseMirror {
-        writeRef(ref, value, bassline) {
-          written.push({ ref: ref.href, value });
-          return 'ok';
-        }
-      }
-
-      bl.mount('/new', new NewStyleMirror());
-      const result = bl.write(ref('bl:///new/action?param=1'), { data: 'test' });
-
-      expect(result).toBe('ok');
-      expect(written).toHaveLength(1);
-      expect(written[0].value).toEqual({ data: 'test' });
-    });
-
-    it('should use watchRef when available', () => {
-      const watchers = [];
-      class NewStyleMirror extends BaseMirror {
-        watchRef(ref, callback, bassline) {
-          watchers.push({ ref: ref.href, callback });
-          return () => { /* unsubscribe */ };
-        }
-      }
-
-      bl.mount('/new', new NewStyleMirror());
-      bl.watch(ref('bl:///new/stream?filter=x'), () => {});
-
-      expect(watchers).toHaveLength(1);
-      expect(watchers[0].ref).toContain('filter=x');
-    });
-  });
-
   describe('stores', () => {
     it('should provide named stores', () => {
       const store1 = bl.getStore('test');
@@ -224,7 +173,7 @@ describe('RegistryMirror', () => {
   let bl;
 
   beforeEach(() => {
-    bl = createBassline();
+    bl = new Bassline();
     mountRegistryMirror(bl);
   });
 

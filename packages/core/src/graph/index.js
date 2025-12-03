@@ -1,5 +1,5 @@
 /**
- * Algebra - Core data structures
+ * Graph - Core data structures
  *
  * Quads: (entity, attribute, value, context) tuples
  * Graph: Container for quads

@@ -192,8 +192,6 @@ export class Bassline {
   /**
    * Read from a resource
    *
-   * Parameters come from the URI query string.
-   *
    * @param {Ref|string} refOrHref - Resource to read
    * @returns {*} The value
    */
@@ -205,12 +203,12 @@ export class Bassline {
       throw new Error(`No handler for: ${r.href}`);
     }
 
-    // If mirror has read method that takes ref, use it (new style)
+    // Path-aware mirrors use readRef
     if (mirror.readRef) {
       return mirror.readRef(r, this);
     }
 
-    // Otherwise use classic read() (backward compat)
+    // Simple mirrors use read()
     if (mirror.readable === false) {
       throw new Error(`Resource is not readable: ${r.href}`);
     }
@@ -221,11 +219,8 @@ export class Bassline {
   /**
    * Write to a resource
    *
-   * For actions, the URI query string carries parameters.
-   * The value argument is optional additional data.
-   *
    * @param {Ref|string} refOrHref - Resource to write
-   * @param {*} [value] - Value to write (optional for actions)
+   * @param {*} [value] - Value to write
    * @returns {*} Result of the write
    */
   write(refOrHref, value) {
@@ -236,12 +231,12 @@ export class Bassline {
       throw new Error(`No handler for: ${r.href}`);
     }
 
-    // If mirror has write method that takes ref, use it (new style)
+    // Path-aware mirrors use writeRef
     if (mirror.writeRef) {
       return mirror.writeRef(r, value, this);
     }
 
-    // Otherwise use classic write(value) (backward compat)
+    // Simple mirrors use write()
     if (mirror.writable === false) {
       throw new Error(`Resource is not writable: ${r.href}`);
     }
@@ -264,12 +259,12 @@ export class Bassline {
       throw new Error(`No handler for: ${r.href}`);
     }
 
-    // If mirror has watch method that takes ref, use it (new style)
+    // Path-aware mirrors use watchRef
     if (mirror.watchRef) {
       return mirror.watchRef(r, callback, this);
     }
 
-    // Otherwise use classic subscribe(callback) (backward compat)
+    // Simple mirrors use subscribe()
     if (!mirror.subscribe) {
       throw new Error(`Resource does not support watching: ${r.href}`);
     }
@@ -326,18 +321,6 @@ export class Bassline {
     if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
     return p;
   }
-}
-
-// ============================================================================
-// Factory
-// ============================================================================
-
-/**
- * Create a Bassline instance
- * @returns {Bassline}
- */
-export function createBassline() {
-  return new Bassline();
 }
 
 export { ref, Ref, isRef };

@@ -1,39 +1,61 @@
 # Bassline
 
-A pattern-matching graph system for building distributed applications where **time doesn't matter**.
+A reflective toolkit for self-ordering distributed applications.
 
 ## The Problem
 
-Distributed systems are hard because of ordering and synchronization. Most protocols require global consensus on operation order, making them complex, fragile, and difficult to extend.
+Distributed systems are hard because of complexity at boundaries. Every integration point requires custom code for routing, transformation, caching, and error handling. There's no uniform way to compose these concerns.
 
 ## The Solution
 
-Bassline eliminates temporal concerns by making all computation:
+Bassline provides a **uniform resource interface** built on two concepts:
 
-- **Monotonic** — Information only accumulates, never retracts
-- **Incremental** — We care about convergence, not operation order
-- **Reactive** — Patterns fire automatically as data arrives
+**URIs** address everything:
+```javascript
+bl:///cell/counter      // Local mutable state
+bl:///fold/sum          // Computed value
+ws://peer:8080          // Remote peer
+```
 
-This means nodes can process information in any order and still converge to the same result.
+**Mirrors** mediate access:
+```javascript
+bl.read('bl:///counter')     // Mirror decides what to return
+bl.write('bl:///counter', 1) // Mirror decides how to handle
+bl.watch('bl:///counter', f) // Mirror decides what to emit
+```
 
-## Core Concepts
+This is reflective programming - mirrors reify system internals as first-class resources and intercede on all access, enabling middleware patterns like caching, batching, and transformation.
 
-**Quads** are the current standard data format: `(entity, attribute, value, context)`. We are using this for now because it's a nice representation of a piece of "partial information". Each quad represents one fact, and facts accumulate over time, filling in the graph as we process it. It also means all of our data is naturally relational and queryable.
+## Quick Start
 
-**Patterns** watch for matches. As quads accumulate, patterns fire reactively, enabling derived computations without polling or explicit subscriptions.
+```javascript
+import { createBassline, Cell, ref } from '@bassline/core';
 
-**Contexts** isolate concerns. The same entity-attribute-value triple can exist in different contexts (pending vs confirmed, local vs remote, etc.), enabling natural modeling of distributed state.
+const bl = createBassline();
+
+// Mount mirrors at paths
+bl.mount('/counter', new Cell(0));
+
+// Uniform interface
+bl.write('bl:///counter', 42);
+bl.read('bl:///counter'); // 42
+
+// Watch for changes
+bl.watch('bl:///counter', value => console.log('Changed:', value));
+```
 
 ## Project Structure
 
 ```
 packages/
-├── parser/          # Core graph + pattern matching system
+├── core/            # URI router + mirrors
 │   ├── src/
-│   │   ├── algebra/     # Graph, Quad, Pattern, Watch primitives
-│   │   ├── control.js   # High-level control interface
-│   │   └── types.js     # Value types and serialization
-│   └── extensions/      # IO effects, persistence, connections
+│   │   ├── setup.js      # createBassline()
+│   │   ├── bassline.js   # URI router
+│   │   ├── types.js      # Word, Ref
+│   │   ├── graph/        # Quad, Graph
+│   │   └── mirror/       # Cell, Fold, Remote
+│   └── test/
 └── parser-react/    # React integration
 ```
 
@@ -47,10 +69,6 @@ pnpm test
 ## Documentation
 
 See [CLAUDE.md](./CLAUDE.md) for comprehensive technical documentation.
-
-## Status
-
-Active development. Core primitives are stable.
 
 ## License
 

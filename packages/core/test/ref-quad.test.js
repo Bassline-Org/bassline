@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { quad, Quad } from '../src/algebra/quad.js';
+import { quad, Quad } from '../src/graph/quad.js';
 import { ref, word } from '../src/types.js';
 
 describe('Refs in Quads', () => {

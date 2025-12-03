@@ -1,16 +1,16 @@
 {
     "name": "@bassline/core",
     "version": "1.0.0",
-    "description": "Bassline core: types, algebra, mirrors, and URI routing",
+    "description": "Bassline core: types, graph, mirrors, and URI routing",
     "type": "module",
     "module": "src/setup.js",
     "exports": {
         ".": "./src/setup.js",
         "./bassline": "./src/bassline.js",
         "./types": "./src/types.js",
-        "./algebra": "./src/algebra/index.js",
-        "./algebra/quad": "./src/algebra/quad.js",
-        "./algebra/graph": "./src/algebra/graph.js",
+        "./graph": "./src/graph/index.js",
+        "./graph/quad": "./src/graph/quad.js",
+        "./graph/graph": "./src/graph/graph.js",
         "./mirror": "./src/mirror/index.js"
     },
     "dependencies": {

@@ -24,18 +24,6 @@ All of these are valid Refs. The `bl://` scheme is specifically for your local m
 
 Together, this creates an **open-world model**: systems emerge from local, bottom-up interactions rather than global coordination.
 
-## Why This Matters for Decentralized RPC
-
-Ethereum's RPC layer is a collection of rigid, provider-specific interfaces. Each client, indexer, or service defines its own API surface. There's no uniform way to compose, intercept, or transform these interfaces.
-
-Bassline provides a programmable access layer:
-- URIs address any resource uniformly (local or remote)
-- Mirrors intercept and transform access patterns (intercession)
-- Local state and remote peers share the same abstraction (reification)
-- Systems can self-organize without central coordination
-
-A Mirror wrapping an Ethereum node can reify blocks, transactions, and state as addressable resources. Another Mirror can intercede to cache, batch, or route requests across multiple providers.
-
 ## Architecture
 
 ```
@@ -44,7 +32,7 @@ packages/core/
 │   ├── setup.js          # createBassline() with standard handlers
 │   ├── bassline.js       # URI router (mounts Mirrors at paths)
 │   ├── types.js          # Value types: Word, Ref
-│   ├── algebra/
+│   ├── graph/
 │   │   ├── quad.js       # Quad: (entity, attribute, value, context)
 │   │   └── graph.js      # Graph: container for quads
 │   └── mirror/
@@ -59,9 +47,7 @@ packages/core/
     └── *.test.js
 ```
 
-## Mirrors
-
-A Mirror is a reflective object that reifies some part of the system and intercedes on access to it:
+## Quick Start
 
 ```javascript
 import { createBassline, Cell, ref } from '@bassline/core';
@@ -72,68 +58,70 @@ const bl = createBassline();
 bl.mount('/counter', new Cell(0));
 
 // All access goes through the Mirror (intercession)
-bl.read('bl:///counter');           // Mirror decides what to return
-bl.write('bl:///counter', 42);      // Mirror decides how to handle writes
+bl.read('bl:///counter');           // 0
+bl.write('bl:///counter', 42);      // Mirror handles the write
 bl.watch('bl:///counter', v => {}); // Mirror decides what changes to emit
 ```
+
+## Mirrors
+
+A Mirror is a reflective object that reifies some part of the system and intercedes on access to it.
 
 ### Built-in Mirrors
 
 | Mirror | Reifies | Intercession |
 |--------|---------|--------------|
 | Cell | Mutable value | Direct read/write |
-| Fold | Computed value | Recomputes from sources on read |
+| Fold | Computed value | Recomputes from sources |
 | RemoteMirror | WebSocket peer | Proxies to remote system |
 
-### Custom Mirrors
+### Standard Handlers
 
-Mirrors define their own vocabulary and access patterns:
+Handlers are factory functions that create mirrors on demand:
+
+```javascript
+// createBassline() mounts these by default:
+bl.mount('/cell', createCellHandler());    // bl:///cell/name → Cell
+bl.mount('/fold', createFoldHandler());    // bl:///fold/name?sources=... → Fold
+bl.mount('/remote', createRemoteHandler()); // bl:///remote/name?address=... → Remote
+bl.mount('/action', createActionHandler()); // bl:///action/name → Write-only trigger
+```
+
+### Custom Mirrors
 
 ```javascript
 import { BaseMirror } from '@bassline/core/mirror';
 
 class EthBlockMirror extends BaseMirror {
-  // Reify Ethereum blocks as readable resources
-  readRef(ref, bassline) {
-    const blockNum = ref.searchParams.get('block') || 'latest';
-    return this.provider.getBlock(blockNum);
-  }
+  get readable() { return true; }
+  get writable() { return false; }
 
-  // Intercede on watch to set up block subscriptions
-  watchRef(ref, callback, bassline) {
-    return this.provider.on('block', callback);
+  read() {
+    return this.provider.getBlock('latest');
   }
 }
 
 bl.mount('/eth/blocks', new EthBlockMirror(provider));
-bl.read('bl:///eth/blocks?block=latest');
-bl.watch('bl:///eth/blocks', block => console.log('New block:', block.number));
+bl.read('bl:///eth/blocks'); // Returns latest block
 ```
 
-## URI-Based Addressing
+### Path-Aware Mirrors
 
-Resources are identified by URIs. The scheme determines how to resolve:
+Mirrors that need to inspect the URI use `readRef`/`writeRef`/`watchRef`:
 
 ```javascript
-import { ref } from '@bassline/core';
-
-// bl:// - your local mirror namespace
-ref('bl:///counter')              // Local cell
-ref('bl:///eth/blocks?block=12345') // Local mirror wrapping Ethereum
-
-// ws:// - WebSocket connections (external)
-ref('ws://peer.example.com:8080')
-
-// Other schemes - references to external resources
-ref('http://api.example.com/data')
-ref('ipfs://QmYwAPJzv5CZsnA.../file')
+class RegistryMirror extends BaseMirror {
+  readRef(ref, bassline) {
+    const path = ref.pathname;
+    if (path === '/registry/mounts') {
+      return bassline.listMounts();
+    }
+    // ... handle other paths
+  }
+}
 ```
 
-The `bl://` scheme is for your local view - mirrors you've mounted. Other schemes are references to external resources. A Ref is just a URI - it's self-describing and requires no global schema.
-
 ## Value Types
-
-Two primary types with semantic meaning:
 
 **Word** - Case-insensitive identifier (interned symbol):
 ```javascript
@@ -146,37 +134,35 @@ word('alice') === word('ALICE')  // true (same symbol)
 import { ref } from '@bassline/core/types';
 ref('bl:///counter').scheme      // 'bl' (local)
 ref('ws://peer:8080').scheme     // 'ws' (external)
-ref('ipfs://Qm.../x').scheme     // 'ipfs' (external)
 ```
 
-Primitives (strings, numbers) pass through unchanged.
+## Graph (Optional)
 
-## The Open-World Model
+For applications that need structured data:
 
-Traditional systems define schemas upfront. Bassline inverts this:
+**Quad** - `(entity, attribute, value, context)`:
+```javascript
+import { quad, Graph } from '@bassline/core/graph';
+import { word } from '@bassline/core/types';
 
-1. **Mount mirrors locally** - Each node decides what to reify and how to intercede
-2. **Compose via URIs** - References are just strings until resolved
-3. **Transform at boundaries** - Mirrors intercept and transform at their discretion
-4. **Emerge structure** - Patterns arise from local interactions, not global coordination
-
-This is bottom-up, not top-down. No global consensus on schema. No central authority.
+const q = quad(word('alice'), word('age'), 30, word('facts'));
+const g = new Graph();
+g.add(q);
+```
 
 ## Serialization
 
 Mirrors define their own serialization:
 
 ```javascript
-// Serialize a mirror (reification of the mirror itself)
 const json = mirror.toJSON();  // { $mirror: 'cell', value: 42 }
-
-// Deserialize
 const restored = deserializeMirror(json);
 ```
 
-Special values use tagged encoding:
+Tagged encoding:
 - Words: `{ $word: "NAME" }`
-- Refs: just URI strings (already self-describing)
+- Refs: URI strings (already self-describing)
+- Mirrors: `{ $mirror: "type", ...config }`
 
 ## Running
 
