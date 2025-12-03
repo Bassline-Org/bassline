@@ -32,6 +32,11 @@ export function valuesEqual(a, b) {
     return true;
   }
 
+  // Refs compare by canonical href
+  if (isRef(a) && isRef(b)) {
+    return a.href === b.href;
+  }
+
   // Primitives use === (strings, numbers)
   return a === b;
 }
@@ -110,6 +115,86 @@ export class Wildcard {
  */
 export const WC = new Wildcard();
 
+/**
+ * Ref - URI reference to an external resource
+ *
+ * Refs are URIs that identify resources managed by Mirrors.
+ * They can appear in any position in a quad (entity, attribute, value, context).
+ * The URI is self-describing - the scheme determines how to resolve it.
+ *
+ * Examples:
+ *   new Ref("local://counter")           // Local cell
+ *   new Ref("fold://max?sources=a,b")    // Computed fold
+ *   new Ref("ws://localhost:8080/sync")  // Remote graph
+ *   new Ref("file:///data/backup.json")  // File resource
+ */
+export class Ref {
+  constructor(uriString) {
+    if (typeof uriString !== "string") {
+      throw new Error(`Ref requires string URI, got: ${typeof uriString}`);
+    }
+
+    // Use Node's built-in URL for parsing and validation
+    try {
+      this._url = new URL(uriString);
+    } catch (e) {
+      throw new Error(`Invalid URI: ${uriString} - ${e.message}`);
+    }
+
+    // Cache canonical href for O(1) comparison
+    this._href = this._url.href;
+  }
+
+  /** URI scheme (e.g., "local", "fold", "ws", "file") */
+  get scheme() {
+    return this._url.protocol.slice(0, -1); // Remove trailing ':'
+  }
+
+  /** Host portion (e.g., "localhost:8080") */
+  get host() {
+    return this._url.host;
+  }
+
+  /** Hostname without port */
+  get hostname() {
+    return this._url.hostname;
+  }
+
+  /** Port number as string */
+  get port() {
+    return this._url.port;
+  }
+
+  /** Path portion (e.g., "/counters/alice") */
+  get pathname() {
+    return this._url.pathname;
+  }
+
+  /** Query string including ? (e.g., "?sources=a,b") */
+  get search() {
+    return this._url.search;
+  }
+
+  /** URLSearchParams for query string access */
+  get searchParams() {
+    return this._url.searchParams;
+  }
+
+  /** Canonical URI string */
+  get href() {
+    return this._href;
+  }
+
+  /** The underlying URL object */
+  get url() {
+    return this._url;
+  }
+
+  toString() {
+    return this._href;
+  }
+}
+
 // ============================================================================
 // Type Constructors (User-facing API)
 // ============================================================================
@@ -126,6 +211,13 @@ export function word(str) {
  */
 export function variable(name) {
   return new PatternVar(name);
+}
+
+/**
+ * Create a ref from a URI string
+ */
+export function ref(uri) {
+  return new Ref(uri);
 }
 
 // ============================================================================
@@ -152,6 +244,10 @@ export function isNumber(value) {
   return typeof value === "number";
 }
 
+export function isRef(value) {
+  return value instanceof Ref;
+}
+
 /**
  * Check if value is a valid graph value type
  */
@@ -159,6 +255,7 @@ export function isValidType(value) {
   return isWord(value) ||
     isPatternVar(value) ||
     isWildcard(value) ||
+    isRef(value) ||
     isString(value) ||
     isNumber(value);
 }
@@ -227,6 +324,13 @@ export function match(value, handlers) {
     return handlers.number(value);
   }
 
+  if (value instanceof Ref) {
+    if (!handlers.ref) {
+      throw new Error("No handler for Ref type");
+    }
+    return handlers.ref(value.href);
+  }
+
   throw new Error(`Invalid value type: ${value}`);
 }
 
@@ -251,6 +355,7 @@ export function serialize(value) {
     number: (num) => num.toString(),
     variable: (name) => name.toString(),
     wildcard: () => "_",
+    ref: (href) => `<${href}>`,
   });
 }
 

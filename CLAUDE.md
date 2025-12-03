@@ -22,7 +22,14 @@ packages/parser/
 │   │   ├── pattern.js    # Pattern matching and rewriting
 │   │   ├── watch.js      # WatchedGraph: reactive pattern matching
 │   │   └── instrument.js # Instrumentation hooks
-│   ├── types.js          # Value types: Word, PatternVar, Wildcard
+│   ├── mirror/
+│   │   ├── interface.js  # Mirror interface + BaseMirror class
+│   │   ├── registry.js   # RefRegistry: resolves URIs to mirrors
+│   │   ├── cell.js       # Cell: mutable value mirror
+│   │   ├── fold.js       # Fold: computed mirror from sources
+│   │   ├── remote.js     # RemoteMirror: WebSocket connection
+│   │   └── index.js      # Public API + scheme handlers
+│   ├── types.js          # Value types: Word, PatternVar, Wildcard, Ref
 │   ├── control.js        # High-level control interface
 │   └── pattern-parser.js # Pattern language parser
 │
@@ -49,15 +56,83 @@ All values in the graph are typed:
 - **Word** - Case-insensitive identifier (interned as symbol)
 - **PatternVar** - Variable that matches and binds any value
 - **Wildcard** - Matches any value without binding
+- **Ref** - URI reference to an external resource
 - **string** - Case-sensitive literal
 - **number** - Numeric value
 
 ```javascript
-import { word, variable, WC } from '@bassline/parser/types';
+import { word, variable, WC, ref } from '@bassline/parser/types';
 
 const w = word("alice");     // Word: ALICE
 const v = variable("x");     // PatternVar: ?X
 const wc = WC;               // Wildcard: *
+const r = ref("local://counter"); // Ref: local://counter
+```
+
+### Refs and Mirrors
+
+Refs are URI-based resource identifiers. Mirrors provide access to those resources.
+
+```javascript
+import {
+  ref,
+  createRegistry,
+  Cell,
+  reducers
+} from '@bassline/parser/mirror';
+
+// Create a registry with built-in scheme handlers
+const registry = createRegistry();
+
+// local:// - mutable cells
+registry.lookup(ref('local://counter'));          // Creates/retrieves a Cell
+registry.lookup(ref('local://x?initial=42'));     // Cell with initial value
+
+// Read and write
+const cell = registry.lookup(ref('local://counter'));
+cell.write(10);
+cell.read();  // 10
+
+// fold:// - computed from sources
+registry.getStore('local').set('a', new Cell(10));
+registry.getStore('local').set('b', new Cell(20));
+registry.resolve(ref('fold://sum?sources=local://a,local://b'));  // 30
+registry.resolve(ref('fold://max?sources=local://a,local://b'));  // 20
+
+// Folds recompute when sources change
+const a = registry.lookup(ref('local://a'));
+a.write(100);
+registry.resolve(ref('fold://sum?sources=local://a,local://b'));  // 120
+
+// Subscribe to changes
+cell.subscribe(value => console.log('New value:', value));
+```
+
+**URI Schemes:**
+
+| Scheme | Description | Example |
+|--------|-------------|---------|
+| `local://` | Mutable cells stored by path | `local://counter` |
+| `fold://` | Computed from sources | `fold://sum?sources=local://a,local://b` |
+| `ws://` | WebSocket connection | `ws://localhost:8080/sync` |
+| `wss://` | Secure WebSocket | `wss://server.example.com/sync` |
+
+**Built-in Reducers** (for fold://):
+`sum`, `max`, `min`, `avg`, `count`, `first`, `last`, `concat`, `list`
+
+**Refs in Quads:**
+
+Refs can be used in any position in a quad:
+
+```javascript
+import { quad } from '@bassline/parser/algebra/quad';
+import { word, ref } from '@bassline/parser/types';
+
+// Ref as value (common case)
+quad(word('config'), word('source'), ref('ws://remote:8080/data'));
+
+// Ref as entity
+quad(ref('local://alice'), word('age'), 30);
 ```
 
 ### Quads
@@ -220,7 +295,17 @@ import { Graph } from '@bassline/parser/graph';
 import { WatchedGraph } from '@bassline/parser/watch';
 import { quad } from '@bassline/parser/algebra/quad';
 import { pattern, patternQuad, matchGraph, rewrite } from '@bassline/parser/algebra/pattern';
-import { word, variable, WC } from '@bassline/parser/types';
+import { word, variable, WC, ref, isRef } from '@bassline/parser/types';
+
+// Mirror system
+import {
+  Cell, cell,
+  Fold, fold, reducers,
+  RemoteMirror, remote,
+  RefRegistry, getRegistry, createRegistry,
+  installBuiltinSchemes,
+  isMirror
+} from '@bassline/parser/mirror';
 ```
 
 ## Design Principles

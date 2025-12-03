@@ -24,7 +24,8 @@
         "./algebra/pattern": "./src/algebra/pattern.js",
         "./algebra/quad": "./src/algebra/quad.js",
         "./algebra/reified-rules": "./src/algebra/reified-rules.js",
-        "./algebra/instrument": "./src/algebra/instrument.js"
+        "./algebra/instrument": "./src/algebra/instrument.js",
+        "./mirror": "./src/mirror/index.js"
     },
     "dependencies": {
       "arcsecond": "^5.0.0",
@@ -35,5 +36,5 @@
       "test": "vitest run",
       "web-example": "node examples/web/server.js"
      },
-    "license": "MIT"
+    "license": "AGPL-3.0"
   }

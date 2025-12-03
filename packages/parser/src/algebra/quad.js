@@ -1,4 +1,4 @@
-import { hash, Word, word as w } from "../types.js";
+import { hash, Word, Ref, word as w } from "../types.js";
 
 // Fast auto-group using incrementing counter instead of UUID
 let groupCounter = 0;
@@ -34,6 +34,7 @@ export class Quad {
 const quadValue = (value, usage = "Value") => {
     if (
         value instanceof Word ||
+        value instanceof Ref ||
         typeof value === "number" ||
         typeof value === "string"
     ) {
