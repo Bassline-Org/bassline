@@ -25,6 +25,8 @@ import {
   ListFold
 } from './mirror/fold.js';
 import { RemoteMirror } from './mirror/remote.js';
+import { HTTPServerMirror } from './mirror/http-server.js';
+import { HTTPClientMirror } from './mirror/http-client.js';
 import { RegistryMirror } from './mirror/registry-mirror.js';
 
 // Re-export core types
@@ -45,6 +47,8 @@ export {
   ListFold
 } from './mirror/fold.js';
 export { RemoteMirror } from './mirror/remote.js';
+export { HTTPServerMirror } from './mirror/http-server.js';
+export { HTTPClientMirror } from './mirror/http-client.js';
 export { RegistryMirror } from './mirror/registry-mirror.js';
 export { BaseMirror, isMirror } from './mirror/interface.js';
 
@@ -90,6 +94,10 @@ export function createBassline() {
 
   // Remote middleware
   bl.use('/remote', (ref, bl) => new RemoteMirror(ref, bl));
+
+  // HTTP middleware
+  bl.use('/server/http', (ref, bl) => new HTTPServerMirror(ref, bl));
+  bl.use('/http', (ref, bl) => new HTTPClientMirror(ref, bl));
 
   // Registry middleware - introspection
   bl.use('/registry', (ref, bl) => new RegistryMirror(ref, bl));

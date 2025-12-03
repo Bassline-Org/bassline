@@ -4,6 +4,9 @@
     "description": "Bassline core: types, graph, mirrors, and URI routing",
     "type": "module",
     "module": "src/setup.js",
+    "bin": {
+        "bassline-server": "./bin/server.js"
+    },
     "exports": {
         ".": "./src/setup.js",
         "./bassline": "./src/bassline.js",
@@ -18,7 +21,8 @@
         "ws": "^8.18.0"
     },
     "scripts": {
-        "test": "vitest run"
+        "test": "vitest run",
+        "serve": "node bin/server.js"
     },
     "license": "AGPL-3.0"
 }

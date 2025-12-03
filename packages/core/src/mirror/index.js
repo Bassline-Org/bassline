@@ -22,6 +22,8 @@ export {
   ListFold
 } from './fold.js';
 export { RemoteMirror } from './remote.js';
+export { HTTPServerMirror } from './http-server.js';
+export { HTTPClientMirror } from './http-client.js';
 
 // Serialization
 export { serializeValue, reviveValue } from './serialize.js';
