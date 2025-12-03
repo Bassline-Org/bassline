@@ -25,6 +25,17 @@ export { Fold, fold, reducers } from './fold.js';
 export { RemoteMirror, remote } from './remote.js';
 export { ActionMirror, action, registerAction } from './action.js';
 
+// New Bassline mirrors
+export { RegistryMirror, mountRegistryMirror } from './registry-mirror.js';
+export {
+  JsonSerializerMirror,
+  mountJsonSerializer,
+  serialize,
+  deserialize,
+  basslineReplacer,
+  basslineReviver
+} from './serialize-json.js';
+
 // Re-export Ref from types
 export { Ref, ref, isRef } from '../types.js';
 

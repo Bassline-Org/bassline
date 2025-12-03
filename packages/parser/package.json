@@ -5,10 +5,10 @@
     "type": "module",
     "module": "src/index.js",
     "exports": {
-        ".": "./src/algebra/watch.js",
+        ".": "./src/bassline.js",
+        "./bassline": "./src/bassline.js",
         "./graph": "./src/algebra/graph.js",
         "./watch": "./src/algebra/watch.js",
-        "./parser": "./src/pattern-parser.js",
         "./types": "./src/types.js",
         "./algebra": "./src/algebra/index.js",
         "./algebra/watch": "./src/algebra/watch.js",
