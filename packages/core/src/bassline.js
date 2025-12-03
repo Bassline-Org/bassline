@@ -1,115 +1,81 @@
 /**
- * Bassline - Uniform Resource Router
+ * Bassline - The System
  *
- * The primary entry point for the Bassline system.
- * Routes URIs to resources (mirrors) via path-based mounting.
- *
- * Inspired by Plan 9's 9P: the namespace is separate from storage.
- * Everything is a resource with a uniform interface: read/write/watch.
+ * Bassline is the ultimate mirror that resolves refs and manages all mirrors.
+ * Refs are self-describing - they carry their own resolution information.
  *
  * @example
  * const bl = new Bassline();
- * bl.mount('/cell', cellHandler);
- * bl.mount('/graph/main', new GraphMirror());
  *
- * // All operations go through uniform interface
- * bl.read(ref('bl:///cell/counter'));
- * bl.write(ref('bl:///cell/counter'), 42);
- * bl.watch(ref('bl:///cell/counter'), (value) => console.log(value));
+ * // Register middleware to handle ref patterns
+ * bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+ * bl.use('/action/log', (ref, bl) => new LogAction(ref, bl));
+ *
+ * // All operations resolve refs to mirrors
+ * bl.read('bl:///cell/counter');
+ * bl.write('bl:///cell/counter', 42);
+ * bl.watch('bl:///cell/counter', (value) => console.log(value));
  */
 
 import { Ref, ref, isRef } from './types.js';
-import { isMirror } from './mirror/interface.js';
 
 /**
- * Bassline - The namespace router
+ * Bassline - Resolves refs to mirrors
  *
- * Maps URI paths to resources (mirrors). Uses longest-prefix-match
- * to resolve paths to their handlers.
+ * Refs are unique values that carry their own resolution information.
+ * Middleware registers to handle patterns and create mirrors on demand.
  */
 export class Bassline {
   constructor() {
-    /** @type {Map<string, Object>} path → handler */
-    this._mounts = new Map();
+    /** @type {Map<string, Object>} ref.href → Mirror instance */
+    this._mirrors = new Map();
 
-    /** @type {Set<function>} mount change listeners */
-    this._mountListeners = new Set();
+    /** @type {Array<{pattern: string, resolve: function, onWrite?: function, onRead?: function}>} */
+    this._resolvers = [];
 
-    /** @type {Map<string, Object>} stores for handlers */
-    this._stores = new Map();
+    /** @type {Set<function>} Write listeners */
+    this._writeListeners = new Set();
+
+    /** @type {Set<function>} Read listeners */
+    this._readListeners = new Set();
   }
 
   // ============================================================================
-  // Mounting
+  // Middleware Registration
   // ============================================================================
 
   /**
-   * Mount a handler at a path
+   * Register middleware for a pattern
    *
-   * Handlers can be:
-   * - A Mirror instance (has read/write/subscribe)
-   * - A function (subpath, ref, bassline) => Mirror
+   * @param {string} pattern - Path pattern to match (e.g., '/cell', '/action/log')
+   * @param {function|Object} middleware - Resolver function or { resolve, onWrite?, onRead? }
    *
-   * @param {string} path - Mount path (e.g., '/cell', '/graph/main')
-   * @param {Object|function} handler - Mirror or handler function
+   * @example
+   * // Simple resolver
+   * bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+   *
+   * // With event listeners
+   * bl.use('/audit', {
+   *   resolve: (ref, bl) => new AuditMirror(ref, bl),
+   *   onWrite: (ref, value, result, bl) => console.log('Write:', ref.href)
+   * });
    */
-  mount(path, handler) {
-    // Normalize path
-    const normalPath = this._normalizePath(path);
+  use(pattern, middleware) {
+    const normalPattern = this._normalizePath(pattern);
 
-    // Associate mirror with this Bassline instance
-    if (isMirror(handler) && typeof handler.setBassline === 'function') {
-      handler.setBassline(this);
+    if (typeof middleware === 'function') {
+      middleware = { resolve: middleware };
     }
 
-    this._mounts.set(normalPath, handler);
+    this._resolvers.push({ pattern: normalPattern, ...middleware });
 
-    // Notify listeners
-    for (const listener of this._mountListeners) {
-      listener({ type: 'mount', path: normalPath, handler });
+    // Wire up event listeners if provided
+    if (middleware.onWrite) {
+      this._writeListeners.add(middleware.onWrite);
     }
-  }
-
-  /**
-   * Unmount a path
-   * @param {string} path
-   */
-  unmount(path) {
-    const normalPath = this._normalizePath(path);
-    const handler = this._mounts.get(normalPath);
-    this._mounts.delete(normalPath);
-
-    // Notify listeners
-    for (const listener of this._mountListeners) {
-      listener({ type: 'unmount', path: normalPath, handler });
+    if (middleware.onRead) {
+      this._readListeners.add(middleware.onRead);
     }
-  }
-
-  /**
-   * List all mounted paths
-   * @returns {string[]}
-   */
-  listMounts() {
-    return Array.from(this._mounts.keys());
-  }
-
-  /**
-   * Get handler at exact path
-   * @param {string} path
-   * @returns {Object|undefined}
-   */
-  getMount(path) {
-    return this._mounts.get(this._normalizePath(path));
-  }
-
-  /**
-   * Subscribe to mount changes
-   * @param {function} callback - Called with { type, path, handler }
-   * @returns {function} Unsubscribe function
-   */
-  onMountChange(callback) {
-    this._mountListeners.add(callback);
-    return () => this._mountListeners.delete(callback);
   }
 
   // ============================================================================
@@ -117,13 +83,13 @@ export class Bassline {
   // ============================================================================
 
   /**
-   * Resolve a ref to its handler and subpath
+   * Resolve a ref to its mirror
    *
-   * Uses longest-prefix-match: given mounts at /a and /a/b,
-   * /a/b/c resolves to /a/b with subpath c.
+   * If the mirror exists in cache, returns it.
+   * Otherwise finds matching middleware, creates mirror, caches and returns it.
    *
    * @param {Ref|string} refOrHref
-   * @returns {{ handler: Object, subpath: string, ref: Ref }|undefined}
+   * @returns {Object} The mirror
    */
   resolve(refOrHref) {
     const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
@@ -134,55 +100,48 @@ export class Bassline {
 
     // Only handle bl:// scheme
     if (r.scheme !== 'bl') {
-      return undefined;
+      throw new Error(`Unsupported scheme: ${r.scheme}`);
     }
 
-    const path = r.pathname;
+    // Already exists in cache?
+    if (this._mirrors.has(r.href)) {
+      return this._mirrors.get(r.href);
+    }
 
-    // Find longest matching mount
-    let bestMatch = null;
-    let bestLength = -1;
+    // Find matching resolver
+    const resolver = this._findResolver(r.pathname);
+    if (!resolver) {
+      throw new Error(`No resolver for: ${r.href}`);
+    }
 
-    for (const [mountPath] of this._mounts) {
-      if (path === mountPath || path.startsWith(mountPath + '/') || mountPath === '/') {
-        const length = mountPath === '/' ? 0 : mountPath.length;
-        if (length > bestLength) {
-          bestLength = length;
-          bestMatch = mountPath;
+    // Create mirror and cache it
+    const mirror = resolver.resolve(r, this);
+    this._mirrors.set(r.href, mirror);
+    return mirror;
+  }
+
+  /**
+   * Find the best matching resolver for a pathname
+   * Uses longest-prefix-match
+   *
+   * @param {string} pathname
+   * @returns {Object|null}
+   */
+  _findResolver(pathname) {
+    let best = null;
+    let bestLen = -1;
+
+    for (const resolver of this._resolvers) {
+      const { pattern } = resolver;
+      if (pathname === pattern || pathname.startsWith(pattern + '/')) {
+        if (pattern.length > bestLen) {
+          best = resolver;
+          bestLen = pattern.length;
         }
       }
     }
 
-    if (bestMatch === null) {
-      return undefined;
-    }
-
-    const handler = this._mounts.get(bestMatch);
-    const subpath = bestMatch === '/'
-      ? path.slice(1)
-      : path.slice(bestMatch.length + 1);
-
-    return { handler, subpath, ref: r };
-  }
-
-  /**
-   * Get the mirror for a ref (resolving handler functions)
-   * @param {Ref|string} refOrHref
-   * @returns {Object|undefined} The mirror
-   */
-  getMirror(refOrHref) {
-    const resolved = this.resolve(refOrHref);
-    if (!resolved) return undefined;
-
-    const { handler, subpath, ref: r } = resolved;
-
-    // If handler is a function, call it to get mirror
-    if (typeof handler === 'function') {
-      return handler(subpath, r, this);
-    }
-
-    // Otherwise handler is the mirror itself
-    return handler;
+    return best;
   }
 
   // ============================================================================
@@ -197,23 +156,20 @@ export class Bassline {
    */
   read(refOrHref) {
     const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-    const mirror = this.getMirror(r);
+    const mirror = this.resolve(r);
 
-    if (!mirror) {
-      throw new Error(`No handler for: ${r.href}`);
-    }
-
-    // Path-aware mirrors use readRef
-    if (mirror.readRef) {
-      return mirror.readRef(r, this);
-    }
-
-    // Simple mirrors use read()
     if (mirror.readable === false) {
       throw new Error(`Resource is not readable: ${r.href}`);
     }
 
-    return mirror.read();
+    const result = mirror.read();
+
+    // Notify listeners
+    for (const listener of this._readListeners) {
+      listener(r, result, this);
+    }
+
+    return result;
   }
 
   /**
@@ -225,23 +181,20 @@ export class Bassline {
    */
   write(refOrHref, value) {
     const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-    const mirror = this.getMirror(r);
+    const mirror = this.resolve(r);
 
-    if (!mirror) {
-      throw new Error(`No handler for: ${r.href}`);
-    }
-
-    // Path-aware mirrors use writeRef
-    if (mirror.writeRef) {
-      return mirror.writeRef(r, value, this);
-    }
-
-    // Simple mirrors use write()
     if (mirror.writable === false) {
       throw new Error(`Resource is not writable: ${r.href}`);
     }
 
-    return mirror.write(value);
+    const result = mirror.write(value);
+
+    // Notify listeners
+    for (const listener of this._writeListeners) {
+      listener(r, value, result, this);
+    }
+
+    return result;
   }
 
   /**
@@ -253,18 +206,8 @@ export class Bassline {
    */
   watch(refOrHref, callback) {
     const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-    const mirror = this.getMirror(r);
+    const mirror = this.resolve(r);
 
-    if (!mirror) {
-      throw new Error(`No handler for: ${r.href}`);
-    }
-
-    // Path-aware mirrors use watchRef
-    if (mirror.watchRef) {
-      return mirror.watchRef(r, callback, this);
-    }
-
-    // Simple mirrors use subscribe()
     if (!mirror.subscribe) {
       throw new Error(`Resource does not support watching: ${r.href}`);
     }
@@ -273,19 +216,59 @@ export class Bassline {
   }
 
   // ============================================================================
-  // Stores (for handler persistence)
+  // Event Subscription
   // ============================================================================
 
   /**
-   * Get or create a named store
-   * @param {string} name
-   * @returns {Map}
+   * Subscribe to all writes in the system
+   *
+   * @param {function} callback - Called with (ref, value, result, bassline)
+   * @returns {function} Unsubscribe function
    */
-  getStore(name) {
-    if (!this._stores.has(name)) {
-      this._stores.set(name, new Map());
-    }
-    return this._stores.get(name);
+  onWrite(callback) {
+    this._writeListeners.add(callback);
+    return () => this._writeListeners.delete(callback);
+  }
+
+  /**
+   * Subscribe to all reads in the system
+   *
+   * @param {function} callback - Called with (ref, result, bassline)
+   * @returns {function} Unsubscribe function
+   */
+  onRead(callback) {
+    this._readListeners.add(callback);
+    return () => this._readListeners.delete(callback);
+  }
+
+  // ============================================================================
+  // Introspection
+  // ============================================================================
+
+  /**
+   * List all resolved mirror refs
+   * @returns {string[]}
+   */
+  listMirrors() {
+    return Array.from(this._mirrors.keys());
+  }
+
+  /**
+   * List all registered resolver patterns
+   * @returns {string[]}
+   */
+  listResolvers() {
+    return this._resolvers.map(r => r.pattern);
+  }
+
+  /**
+   * Check if a ref has been resolved (is in cache)
+   * @param {Ref|string} refOrHref
+   * @returns {boolean}
+   */
+  hasResolved(refOrHref) {
+    const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
+    return this._mirrors.has(r.href);
   }
 
   // ============================================================================
@@ -293,17 +276,18 @@ export class Bassline {
   // ============================================================================
 
   /**
-   * Dispose all resources
+   * Dispose all mirrors and clear state
    */
   dispose() {
-    for (const handler of this._mounts.values()) {
-      if (typeof handler.dispose === 'function') {
-        handler.dispose();
+    for (const mirror of this._mirrors.values()) {
+      if (typeof mirror.dispose === 'function') {
+        mirror.dispose();
       }
     }
-    this._mounts.clear();
-    this._mountListeners.clear();
-    this._stores.clear();
+    this._mirrors.clear();
+    this._resolvers = [];
+    this._writeListeners.clear();
+    this._readListeners.clear();
   }
 
   // ============================================================================

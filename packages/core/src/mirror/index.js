@@ -10,32 +10,21 @@ export { isMirror, BaseMirror } from './interface.js';
 
 // Mirror types
 export { Cell, cell } from './cell.js';
-export { Fold, fold, reducers } from './fold.js';
-export { RemoteMirror, remote } from './remote.js';
-
-// Registry mirror (self-describing namespace)
-export { RegistryMirror, mountRegistryMirror } from './registry-mirror.js';
-
-// Handler factories
 export {
-  createCellHandler,
-  createFoldHandler,
-  createRemoteHandler,
-  createActionHandler,
-  builtinActions
-} from './handlers.js';
+  SumFold,
+  MaxFold,
+  MinFold,
+  AvgFold,
+  CountFold,
+  FirstFold,
+  LastFold,
+  ConcatFold,
+  ListFold
+} from './fold.js';
+export { RemoteMirror } from './remote.js';
 
 // Serialization
-export {
-  serializeValue,
-  reviveValue,
-  serializeMirror,
-  deserializeMirror,
-  registerMirrorType,
-  getMirrorDeserializer,
-  toJSON,
-  fromJSON
-} from './serialize.js';
+export { serializeValue, reviveValue } from './serialize.js';
 
 // Re-export Ref from types
 export { Ref, ref, isRef } from '../types.js';

@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Bassline, ref } from '../src/bassline.js';
-import { mountRegistryMirror } from '../src/mirror/registry-mirror.js';
 import { Cell } from '../src/mirror/cell.js';
+import { createBassline } from '../src/setup.js';
 
 describe('Bassline', () => {
   let bl;
@@ -10,245 +10,222 @@ describe('Bassline', () => {
     bl = new Bassline();
   });
 
-  describe('mounting', () => {
-    it('should mount a handler at a path', () => {
-      const cell = new Cell(42);
-      bl.mount('/test', cell);
-      expect(bl.listMounts()).toContain('/test');
+  afterEach(() => {
+    bl.dispose();
+  });
+
+  describe('middleware registration', () => {
+    it('should register middleware with use()', () => {
+      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+      expect(bl.listResolvers()).toContain('/cell');
     });
 
     it('should normalize paths', () => {
-      bl.mount('foo', new Cell());
-      bl.mount('/bar/', new Cell());
-      expect(bl.listMounts()).toContain('/foo');
-      expect(bl.listMounts()).toContain('/bar');
-    });
-
-    it('should unmount a path', () => {
-      bl.mount('/test', new Cell());
-      bl.unmount('/test');
-      expect(bl.listMounts()).not.toContain('/test');
-    });
-
-    it('should notify on mount changes', () => {
-      const changes = [];
-      bl.onMountChange((change) => changes.push(change));
-
-      bl.mount('/test', new Cell());
-      bl.unmount('/test');
-
-      expect(changes).toHaveLength(2);
-      expect(changes[0].type).toBe('mount');
-      expect(changes[1].type).toBe('unmount');
+      bl.use('foo', (ref, bl) => new Cell(ref, bl));
+      bl.use('/bar/', (ref, bl) => new Cell(ref, bl));
+      expect(bl.listResolvers()).toContain('/foo');
+      expect(bl.listResolvers()).toContain('/bar');
     });
   });
 
   describe('resolution', () => {
-    it('should resolve exact path matches', () => {
-      const cell = new Cell(42);
-      bl.mount('/cell/counter', cell);
+    beforeEach(() => {
+      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+    });
 
-      const resolved = bl.resolve(ref('bl:///cell/counter'));
-      expect(resolved.handler).toBe(cell);
-      expect(resolved.subpath).toBe('');
+    it('should resolve refs to mirrors', () => {
+      const mirror = bl.resolve('bl:///cell/counter');
+      expect(mirror).toBeDefined();
+      expect(mirror.readable).toBe(true);
+    });
+
+    it('should cache resolved mirrors', () => {
+      const mirror1 = bl.resolve('bl:///cell/counter');
+      const mirror2 = bl.resolve('bl:///cell/counter');
+      expect(mirror1).toBe(mirror2);
     });
 
     it('should use longest prefix match', () => {
-      const parentCell = new Cell('parent');
-      const childCell = new Cell('child');
-      bl.mount('/a', parentCell);
-      bl.mount('/a/b', childCell);
+      bl.use('/cell/special', (ref, bl) => {
+        const c = new Cell(ref, bl);
+        c._special = true;
+        return c;
+      });
 
-      const resolved1 = bl.resolve(ref('bl:///a/b/c'));
-      expect(resolved1.handler).toBe(childCell);
-      expect(resolved1.subpath).toBe('c');
+      const regular = bl.resolve('bl:///cell/counter');
+      const special = bl.resolve('bl:///cell/special/foo');
 
-      const resolved2 = bl.resolve(ref('bl:///a/x'));
-      expect(resolved2.handler).toBe(parentCell);
-      expect(resolved2.subpath).toBe('x');
+      expect(regular._special).toBeUndefined();
+      expect(special._special).toBe(true);
     });
 
-    it('should handle root mount', () => {
-      const rootHandler = new Cell('root');
-      bl.mount('/', rootHandler);
-
-      const resolved = bl.resolve(ref('bl:///anything/here'));
-      expect(resolved.handler).toBe(rootHandler);
-      expect(resolved.subpath).toBe('anything/here');
+    it('should throw for unsupported schemes', () => {
+      expect(() => bl.resolve('ws://localhost/test')).toThrow('Unsupported scheme');
     });
 
-    it('should return undefined for non-bl schemes', () => {
-      bl.mount('/test', new Cell());
-      const resolved = bl.resolve(ref('ws://localhost/test'));
-      expect(resolved).toBeUndefined();
+    it('should throw for unknown paths', () => {
+      expect(() => bl.resolve('bl:///unknown')).toThrow('No resolver');
     });
   });
 
   describe('read/write/watch', () => {
+    beforeEach(() => {
+      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+    });
+
     it('should read from a mirror', () => {
-      bl.mount('/cell/counter', new Cell(42));
-      const value = bl.read(ref('bl:///cell/counter'));
-      expect(value).toBe(42);
+      bl.write('bl:///cell/counter', 42);
+      expect(bl.read('bl:///cell/counter')).toBe(42);
     });
 
     it('should write to a mirror', () => {
-      bl.mount('/cell/counter', new Cell(0));
-      bl.write(ref('bl:///cell/counter'), 100);
-      expect(bl.read(ref('bl:///cell/counter'))).toBe(100);
+      bl.write('bl:///cell/counter', 100);
+      expect(bl.read('bl:///cell/counter')).toBe(100);
     });
 
     it('should watch a mirror', () => {
-      bl.mount('/cell/counter', new Cell(0));
       const values = [];
-      bl.watch(ref('bl:///cell/counter'), (v) => values.push(v));
+      bl.watch('bl:///cell/counter', (v) => values.push(v));
 
-      bl.write(ref('bl:///cell/counter'), 1);
-      bl.write(ref('bl:///cell/counter'), 2);
+      bl.write('bl:///cell/counter', 1);
+      bl.write('bl:///cell/counter', 2);
 
       expect(values).toEqual([1, 2]);
     });
 
-    it('should work with string refs', () => {
-      bl.mount('/cell/counter', new Cell(42));
-      expect(bl.read('bl:///cell/counter')).toBe(42);
-    });
-
-    it('should throw for unknown paths', () => {
-      expect(() => bl.read(ref('bl:///unknown'))).toThrow('No handler');
-    });
-  });
-
-  describe('handler functions', () => {
-    it('should call handler function with subpath', () => {
-      const store = new Map();
-
-      // Handler function that creates cells on demand
-      const cellHandler = (subpath, ref, bassline) => {
-        if (!store.has(subpath)) {
-          const initial = ref.searchParams.get('initial');
-          store.set(subpath, new Cell(initial ? Number(initial) : 0));
-        }
-        return store.get(subpath);
-      };
-
-      bl.mount('/cell', cellHandler);
-
-      // Should create and access cells by subpath
+    it('should work with Ref objects', () => {
       bl.write(ref('bl:///cell/counter'), 42);
       expect(bl.read(ref('bl:///cell/counter'))).toBe(42);
-
-      // Different subpath = different cell
-      bl.write(ref('bl:///cell/other'), 100);
-      expect(bl.read(ref('bl:///cell/other'))).toBe(100);
-      expect(bl.read(ref('bl:///cell/counter'))).toBe(42);
     });
 
-    it('should pass query params to handler', () => {
-      let receivedRef;
-      const handler = (subpath, ref) => {
-        receivedRef = ref;
-        return new Cell(ref.searchParams.get('value'));
-      };
+    it('should throw for non-readable mirrors', () => {
+      bl.use('/writeonly', (r, bl) => ({
+        readable: false,
+        writable: true,
+        read() { throw new Error('not readable'); },
+        write() {},
+        subscribe() { return () => {}; }
+      }));
+      expect(() => bl.read('bl:///writeonly/test')).toThrow('not readable');
+    });
 
-      bl.mount('/test', handler);
-      bl.read(ref('bl:///test/foo?value=hello'));
-
-      expect(receivedRef.searchParams.get('value')).toBe('hello');
+    it('should throw for non-writable mirrors', () => {
+      bl.use('/readonly', (r, bl) => ({
+        readable: true,
+        writable: false,
+        read() { return 42; },
+        write() { throw new Error('not writable'); },
+        subscribe() { return () => {}; }
+      }));
+      expect(() => bl.write('bl:///readonly/test', 1)).toThrow('not writable');
     });
   });
 
-  describe('stores', () => {
-    it('should provide named stores', () => {
-      const store1 = bl.getStore('test');
-      const store2 = bl.getStore('test');
-      expect(store1).toBe(store2);
+  describe('event listeners', () => {
+    beforeEach(() => {
+      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+    });
 
-      store1.set('key', 'value');
-      expect(store2.get('key')).toBe('value');
+    it('should notify write listeners', () => {
+      const writes = [];
+      bl.onWrite((ref, value, result, bassline) => {
+        writes.push({ href: ref.href, value });
+      });
+
+      bl.write('bl:///cell/a', 10);
+      bl.write('bl:///cell/b', 20);
+
+      expect(writes).toHaveLength(2);
+      expect(writes[0].value).toBe(10);
+      expect(writes[1].value).toBe(20);
+    });
+
+    it('should notify read listeners', () => {
+      const reads = [];
+      bl.onRead((ref, result, bassline) => {
+        reads.push({ href: ref.href, result });
+      });
+
+      bl.write('bl:///cell/counter', 42);
+      bl.read('bl:///cell/counter');
+
+      expect(reads).toHaveLength(1);
+      expect(reads[0].result).toBe(42);
+    });
+
+    it('should allow unsubscribe from listeners', () => {
+      const writes = [];
+      const unsub = bl.onWrite((ref, value) => writes.push(value));
+
+      bl.write('bl:///cell/a', 1);
+      unsub();
+      bl.write('bl:///cell/b', 2);
+
+      expect(writes).toEqual([1]);
+    });
+
+    it('should support middleware with event listeners', () => {
+      const logs = [];
+      bl.use('/logged', {
+        resolve: (ref, bl) => new Cell(ref, bl),
+        onWrite: (ref, value) => logs.push(`write: ${value}`),
+        onRead: (ref, result) => logs.push(`read: ${result}`)
+      });
+
+      bl.write('bl:///logged/test', 42);
+      bl.read('bl:///logged/test');
+
+      expect(logs).toContain('write: 42');
+      expect(logs).toContain('read: 42');
+    });
+  });
+
+  describe('introspection', () => {
+    it('should list resolved mirrors', () => {
+      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+
+      bl.resolve('bl:///cell/a');
+      bl.resolve('bl:///cell/b');
+
+      const mirrors = bl.listMirrors();
+      expect(mirrors).toContain('bl:///cell/a');
+      expect(mirrors).toContain('bl:///cell/b');
+    });
+
+    it('should check if ref is resolved', () => {
+      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+
+      expect(bl.hasResolved('bl:///cell/test')).toBe(false);
+      bl.resolve('bl:///cell/test');
+      expect(bl.hasResolved('bl:///cell/test')).toBe(true);
     });
   });
 });
 
-describe('RegistryMirror', () => {
+describe('Registry introspection', () => {
   let bl;
 
   beforeEach(() => {
-    bl = new Bassline();
-    mountRegistryMirror(bl);
+    bl = createBassline();
   });
 
-  describe('reading', () => {
-    it('should list mounts', () => {
-      bl.mount('/test', new Cell());
-      const mounts = bl.read(ref('bl:///registry/mounts'));
-
-      expect(mounts['/registry']).toBeDefined();
-      expect(mounts['/test']).toBeDefined();
-    });
-
-    it('should describe mount at specific path', () => {
-      bl.mount('/cell/counter', new Cell(42));
-      const info = bl.read(ref('bl:///registry/mount/cell/counter'));
-
-      expect(info.type).toBe('Cell');
-      expect(info.readable).toBe(true);
-      expect(info.writable).toBe(true);
-    });
-
-    it('should describe function handlers', () => {
-      bl.mount('/test', function testHandler() {});
-      const info = bl.read(ref('bl:///registry/mount/test'));
-
-      expect(info.type).toBe('function');
-      expect(info.name).toBe('testHandler');
-    });
-
-    it('should list stores', () => {
-      bl.getStore('cells').set('counter', new Cell());
-      bl.getStore('other').set('x', 1);
-
-      const stores = bl.read(ref('bl:///registry/stores'));
-
-      expect(stores.cells.size).toBe(1);
-      expect(stores.cells.keys).toContain('counter');
-      expect(stores.other.size).toBe(1);
-    });
+  afterEach(() => {
+    bl.dispose();
   });
 
-  describe('writing', () => {
-    it('should mount via registry', () => {
-      const cell = new Cell(99);
-      bl.write(ref('bl:///registry/mount'), { path: '/new', handler: cell });
-
-      expect(bl.listMounts()).toContain('/new');
-      expect(bl.read(ref('bl:///new'))).toBe(99);
-    });
-
-    it('should unmount via registry', () => {
-      bl.mount('/temp', new Cell());
-      bl.write(ref('bl:///registry/unmount'), '/temp');
-
-      expect(bl.listMounts()).not.toContain('/temp');
-    });
-
-    it('should unmount via registry with object', () => {
-      bl.mount('/temp', new Cell());
-      bl.write(ref('bl:///registry/unmount'), { path: '/temp' });
-
-      expect(bl.listMounts()).not.toContain('/temp');
-    });
+  it('should list resolvers via registry', () => {
+    const resolvers = bl.read('bl:///registry');
+    expect(resolvers).toContain('/cell');
+    expect(resolvers).toContain('/fold/sum');
+    expect(resolvers).toContain('/registry');
   });
 
-  describe('watching', () => {
-    it('should watch mount changes', () => {
-      const changes = [];
-      bl.watch(ref('bl:///registry/mounts'), (change) => changes.push(change));
+  it('should list mirrors via registry', () => {
+    bl.write('bl:///cell/a', 1);
+    bl.write('bl:///cell/b', 2);
 
-      bl.mount('/new', new Cell());
-
-      expect(changes).toHaveLength(1);
-      expect(changes[0].type).toBe('mount');
-      expect(changes[0].path).toBe('/new');
-    });
+    const mirrors = bl.read('bl:///registry/mirrors');
+    expect(mirrors).toContain('bl:///cell/a');
+    expect(mirrors).toContain('bl:///cell/b');
   });
 });

@@ -65,8 +65,7 @@ export class Ref {
     } catch (e) {
       throw new Error(`Invalid URI: ${uriString} - ${e.message}`);
     }
-
-    // Cache canonical href for O(1) comparison
+    
     this._href = this._url.href;
   }
 

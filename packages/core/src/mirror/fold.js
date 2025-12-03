@@ -1,49 +1,35 @@
 /**
- * Fold - A computed mirror that combines multiple source values
+ * Fold Mirrors - Computed values from sources
  *
- * Folds subscribe to their source mirrors and recompute
- * whenever any source changes.
+ * Each fold is an explicit class. Sources come from ref query params:
+ *   bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b
+ *
+ * Folds subscribe to their sources and recompute when any changes.
  */
 
 import { BaseMirror } from './interface.js';
-import { Ref, ref, isRef } from '../types.js';
-import { registerMirrorType } from './serialize.js';
+import { ref } from '../types.js';
 
-export class Fold extends BaseMirror {
-  /**
-   * @param {Ref[]} sources - Source refs to fold
-   * @param {function} reducer - (values: any[]) => any
-   * @param {object} [options] - Configuration
-   * @param {string} [options.reducerName] - Name of the reducer (for serialization)
-   * @param {string} [options.uri] - Optional URI for this fold
-   * @param {Bassline} [options.bassline] - Bassline instance (optional, can be set later via setBassline)
-   */
-  constructor(sources, reducer, options = {}) {
-    super();
-    this._sources = sources;
-    this._reducer = reducer;
-    this._reducerName = options.reducerName || findReducerName(reducer);
-    this._uri = options.uri || null;
+// ============================================================================
+// Base Fold Class
+// ============================================================================
+
+/**
+ * Base class for all fold mirrors
+ */
+class BaseFold extends BaseMirror {
+  constructor(r, bassline) {
+    super(r, bassline);
+    const sourcesParam = r.searchParams.get('sources');
+    this._sourceRefs = sourcesParam
+      ? sourcesParam.split(',').map(s => ref(s.trim()))
+      : [];
     this._unsubscribes = [];
     this._cachedValue = undefined;
-    this._initialized = false;
 
-    // If bassline provided, set it now (triggers initialization)
-    if (options.bassline) {
-      this.setBassline(options.bassline);
-    }
-  }
-
-  /**
-   * Override setBassline to initialize subscriptions when mounted
-   */
-  setBassline(bassline) {
-    super.setBassline(bassline);
-    if (!this._initialized) {
-      this._subscribeToSources();
-      this._recompute();
-      this._initialized = true;
-    }
+    // Subscribe to sources and compute initial value
+    this._subscribeToSources();
+    this._recompute();
   }
 
   get readable() {
@@ -58,30 +44,44 @@ export class Fold extends BaseMirror {
     return this._cachedValue;
   }
 
-  _subscribeToSources() {
-    const bl = this._requireBassline('subscribe to sources');
+  write() {
+    throw new Error('Folds are not writable');
+  }
 
-    for (const sourceRef of this._sources) {
-      const mirror = bl.getMirror(sourceRef);
-      if (mirror && mirror.subscribe) {
-        const unsub = mirror.subscribe(() => this._recompute());
+  /**
+   * Override in subclass: compute value from source values
+   */
+  _reduce(values) {
+    throw new Error(`${this.constructor.name} must implement _reduce()`);
+  }
+
+  _subscribeToSources() {
+    for (const sourceRef of this._sourceRefs) {
+      try {
+        const unsub = this._bassline.watch(sourceRef, () => this._recompute());
         this._unsubscribes.push(unsub);
+      } catch (e) {
+        // Source might not exist yet - that's ok
       }
     }
   }
 
   _recompute() {
-    if (!this._bassline) return; // Not mounted yet
-
-    const values = this._sources.map(sourceRef => {
-      const mirror = this._bassline.getMirror(sourceRef);
-      return mirror?.readable ? mirror.read() : undefined;
+    const values = this._sourceRefs.map(sourceRef => {
+      try {
+        return this._bassline.read(sourceRef);
+      } catch (e) {
+        return undefined;
+      }
     });
 
-    // Filter out undefined values for fold computation
     const definedValues = values.filter(v => v !== undefined);
-    this._cachedValue = this._reducer(definedValues);
-    this._notify(this._cachedValue);
+    const newValue = this._reduce(definedValues);
+
+    if (newValue !== this._cachedValue) {
+      this._cachedValue = newValue;
+      this._notify(this._cachedValue);
+    }
   }
 
   dispose() {
@@ -92,69 +92,63 @@ export class Fold extends BaseMirror {
     super.dispose();
   }
 
-  // ============================================================================
-  // Serialization
-  // ============================================================================
-
-  static get mirrorType() {
-    return 'fold';
-  }
-
   toJSON() {
     return {
-      $mirror: 'fold',
-      uri: this._uri,
-      sources: this._sources.map(s => s.href),
-      reducer: this._reducerName
+      $mirror: this.constructor.mirrorType,
+      uri: this._ref?.href
     };
   }
-
-  static fromJSON(data, bassline = null) {
-    const sources = data.sources.map(uri => ref(uri));
-    const reducer = reducers[data.reducer];
-    if (!reducer) {
-      throw new Error(`Unknown reducer: ${data.reducer}`);
-    }
-    return new Fold(sources, reducer, {
-      reducerName: data.reducer,
-      uri: data.uri,
-      bassline
-    });
-  }
 }
 
 // ============================================================================
-// Built-in Reducers
+// Explicit Fold Classes
 // ============================================================================
 
-export const reducers = {
-  sum: (values) => values.reduce((a, b) => a + b, 0),
-  max: (values) => values.length > 0 ? Math.max(...values) : undefined,
-  min: (values) => values.length > 0 ? Math.min(...values) : undefined,
-  avg: (values) => values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : undefined,
-  count: (values) => values.length,
-  first: (values) => values[0],
-  last: (values) => values[values.length - 1],
-  concat: (values) => values.join(''),
-  list: (values) => [...values],
-};
-
-/**
- * Create a fold from source refs
- */
-export function fold(sources, reducer, options = {}) {
-  return new Fold(sources, reducer, options);
+export class SumFold extends BaseFold {
+  static get mirrorType() { return 'sum'; }
+  _reduce(values) { return values.reduce((a, b) => a + b, 0); }
 }
 
-/**
- * Find the name of a reducer function
- */
-function findReducerName(fn) {
-  for (const [name, reducer] of Object.entries(reducers)) {
-    if (reducer === fn) return name;
+export class MaxFold extends BaseFold {
+  static get mirrorType() { return 'max'; }
+  _reduce(values) { return values.length > 0 ? Math.max(...values) : undefined; }
+}
+
+export class MinFold extends BaseFold {
+  static get mirrorType() { return 'min'; }
+  _reduce(values) { return values.length > 0 ? Math.min(...values) : undefined; }
+}
+
+export class AvgFold extends BaseFold {
+  static get mirrorType() { return 'avg'; }
+  _reduce(values) {
+    return values.length > 0
+      ? values.reduce((a, b) => a + b, 0) / values.length
+      : undefined;
   }
-  return null;
 }
 
-// Register with serialization system
-registerMirrorType('fold', Fold.fromJSON);
+export class CountFold extends BaseFold {
+  static get mirrorType() { return 'count'; }
+  _reduce(values) { return values.length; }
+}
+
+export class FirstFold extends BaseFold {
+  static get mirrorType() { return 'first'; }
+  _reduce(values) { return values[0]; }
+}
+
+export class LastFold extends BaseFold {
+  static get mirrorType() { return 'last'; }
+  _reduce(values) { return values[values.length - 1]; }
+}
+
+export class ConcatFold extends BaseFold {
+  static get mirrorType() { return 'concat'; }
+  _reduce(values) { return values.join(''); }
+}
+
+export class ListFold extends BaseFold {
+  static get mirrorType() { return 'list'; }
+  _reduce(values) { return [...values]; }
+}

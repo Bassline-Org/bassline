@@ -1,32 +1,25 @@
 /**
  * RemoteMirror - A mirror connected via WebSocket
  *
- * Provides bidirectional sync with a remote resource.
- * Used by the ws:// and wss:// scheme handlers.
+ * Address comes from ref query param: bl:///remote/peer1?address=ws://localhost:8080
  */
 
 import { BaseMirror } from './interface.js';
-import { registerMirrorType } from './serialize.js';
 
 export class RemoteMirror extends BaseMirror {
-  /**
-   * @param {string} url - WebSocket URL (ws:// or wss://)
-   * @param {object} options - Connection options
-   * @param {string} [uri] - Optional URI for this remote (for serialization)
-   */
-  constructor(url, options = {}, uri = null) {
-    super();
-    this._url = url;
-    this._options = options;
-    this._uri = uri;
+  constructor(r, bassline) {
+    super(r, bassline);
+    this._url = r.searchParams.get('address');
     this._ws = null;
     this._value = undefined;
     this._connected = false;
     this._reconnectAttempts = 0;
-    this._maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
-    this._reconnectDelay = options.reconnectDelay ?? 1000;
+    this._maxReconnectAttempts = parseInt(r.searchParams.get('maxReconnect') || '5', 10);
+    this._reconnectDelay = parseInt(r.searchParams.get('reconnectDelay') || '1000', 10);
 
-    this._connect();
+    if (this._url) {
+      this._connect();
+    }
   }
 
   get readable() {
@@ -53,7 +46,6 @@ export class RemoteMirror extends BaseMirror {
   }
 
   _connect() {
-    // Only attempt connection in environments with WebSocket
     if (typeof WebSocket === 'undefined') {
       console.warn('WebSocket not available in this environment');
       return;
@@ -109,43 +101,14 @@ export class RemoteMirror extends BaseMirror {
     super.dispose();
   }
 
-  // ============================================================================
-  // Serialization
-  // ============================================================================
-
   static get mirrorType() {
     return 'remote';
   }
 
-  /**
-   * Serialize remote config (connection state is transient)
-   */
   toJSON() {
     return {
       $mirror: 'remote',
-      uri: this._uri,
-      url: this._url,
-      options: {
-        maxReconnectAttempts: this._maxReconnectAttempts,
-        reconnectDelay: this._reconnectDelay
-      }
+      uri: this._ref?.href
     };
   }
-
-  /**
-   * Deserialize remote - creates new connection
-   */
-  static fromJSON(data, registry = null) {
-    return new RemoteMirror(data.url, data.options || {}, data.uri);
-  }
 }
-
-/**
- * Create a remote mirror
- */
-export function remote(url, options, uri = null) {
-  return new RemoteMirror(url, options, uri);
-}
-
-// Register with serialization system
-registerMirrorType('remote', RemoteMirror.fromJSON);

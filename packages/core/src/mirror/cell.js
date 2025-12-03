@@ -4,21 +4,33 @@
  * Cells are the simplest mirror type: a mutable container
  * that notifies subscribers when its value changes.
  *
- * Used by the local:// scheme handler.
+ * Initial value can be passed via ref query param: ?initial=42
  */
 
 import { BaseMirror } from './interface.js';
-import { serializeValue, reviveValue, registerMirrorType } from './serialize.js';
+import { serializeValue } from './serialize.js';
+
+/**
+ * Parse a value from string (for query params)
+ */
+function parseValue(str) {
+  if (str === null || str === undefined) return undefined;
+  const num = Number(str);
+  if (!isNaN(num)) return num;
+  if (str === 'true') return true;
+  if (str === 'false') return false;
+  return str;
+}
 
 export class Cell extends BaseMirror {
   /**
-   * @param {*} initialValue - Initial value for the cell
-   * @param {string} [uri] - Optional URI for this cell (for serialization)
+   * @param {Ref} ref - The ref this cell is bound to
+   * @param {Bassline} bassline - The bassline system
    */
-  constructor(initialValue = undefined, uri = null) {
-    super();
-    this._value = initialValue;
-    this._uri = uri;
+  constructor(ref, bassline) {
+    super(ref, bassline);
+    const initial = ref.searchParams.get('initial');
+    this._value = parseValue(initial);
   }
 
   get readable() {
@@ -49,29 +61,16 @@ export class Cell extends BaseMirror {
   toJSON() {
     return {
       $mirror: 'cell',
-      uri: this._uri,
+      uri: this._ref?.href,
       value: serializeValue(this._value)
     };
-  }
-
-  merge(data) {
-    if (data.value !== undefined) {
-      this.write(reviveValue(data.value));
-    }
-  }
-
-  static fromJSON(data, registry = null) {
-    const value = reviveValue(data.value, registry);
-    return new Cell(value, data.uri);
   }
 }
 
 /**
- * Create a Cell mirror
+ * Create a Cell mirror (convenience function for tests)
+ * Note: In normal usage, cells are created via middleware resolution
  */
-export function cell(initialValue, uri = null) {
-  return new Cell(initialValue, uri);
+export function cell(ref, bassline) {
+  return new Cell(ref, bassline);
 }
-
-// Register with serialization system
-registerMirrorType('cell', Cell.fromJSON);

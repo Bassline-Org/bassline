@@ -1,9 +1,10 @@
 /**
  * Mirror Interface
  *
- * Mirrors provide access to resources identified by Refs.
+ * Mirrors are reflective objects that provide controlled access to resources.
+ * Each mirror knows its ref and has access to the bassline system.
+ *
  * Core interface: readable, writable, read(), write(), subscribe().
- * Middleware hooks: onInsert(), onTrigger().
  */
 
 /**
@@ -12,8 +13,6 @@
 export function isMirror(obj) {
   return obj !== null &&
     typeof obj === 'object' &&
-    typeof obj.readable === 'boolean' &&
-    typeof obj.writable === 'boolean' &&
     typeof obj.read === 'function' &&
     typeof obj.write === 'function' &&
     typeof obj.subscribe === 'function';
@@ -22,61 +21,48 @@ export function isMirror(obj) {
 /**
  * Base class for Mirror implementations
  *
- * Provides subscriber management and notification.
+ * Mirrors receive their ref and bassline in the constructor.
  * Subclasses override readable, writable, read(), write().
  */
 export class BaseMirror {
-  constructor() {
-    this._subscribers = new Set();
-    this._bassline = null;
-  }
-
-  // ============================================================================
-  // Bassline Association
-  // ============================================================================
-
   /**
-   * Set the Bassline instance this mirror is mounted on.
-   * Called automatically by Bassline.mount().
-   *
-   * @param {Bassline} bassline - The Bassline instance
+   * @param {Ref} ref - The ref this mirror is bound to
+   * @param {Bassline} bassline - The bassline system
    */
-  setBassline(bassline) {
+  constructor(ref, bassline) {
+    this._ref = ref;
     this._bassline = bassline;
+    this._subscribers = new Set();
   }
 
-  /**
-   * Get the Bassline instance, throwing if not mounted.
-   * Helper for subclasses that need to resolve refs.
-   *
-   * @param {string} operation - Description of what operation needs bassline
-   * @returns {Bassline}
-   */
-  _requireBassline(operation = 'this operation') {
-    if (!this._bassline) {
-      throw new Error(`Mirror must be mounted to perform ${operation}`);
-    }
+  /** The ref this mirror is bound to */
+  get ref() {
+    return this._ref;
+  }
+
+  /** The bassline system */
+  get bassline() {
     return this._bassline;
   }
 
   /** Whether this mirror can be read from */
   get readable() {
-    return false;
+    return true;
   }
 
   /** Whether this mirror can be written to */
   get writable() {
-    return false;
+    return true;
   }
 
-  /** Read current value (throws if not readable) */
+  /** Read current value */
   read() {
-    throw new Error("Mirror is not readable");
+    throw new Error(`${this.constructor.name} does not implement read()`);
   }
 
-  /** Write a new value (throws if not writable) */
+  /** Write a new value */
   write(value) {
-    throw new Error("Mirror is not writable");
+    throw new Error(`${this.constructor.name} does not implement write()`);
   }
 
   /**
@@ -94,41 +80,6 @@ export class BaseMirror {
     for (const cb of this._subscribers) {
       cb(value);
     }
-  }
-
-  // ============================================================================
-  // Middleware Hooks
-  // ============================================================================
-
-  /**
-   * Called when this ref appears in a quad being inserted (middleware hook)
-   *
-   * The mirror receives the full quad and can:
-   * - Perform side effects (fire-and-forget)
-   * - Return false to block the insert
-   * - Return true to allow the insert
-   *
-   * Multiple handlers can process the same quad (middleware pattern).
-   *
-   * @param {Quad} quad - The quad being inserted
-   * @param {Graph} graph - The graph receiving the insert
-   * @returns {boolean} - Return false to block insert
-   */
-  onInsert(quad, graph) {
-    return true; // Default: allow insert
-  }
-
-  /**
-   * Called when this ref is inserted standalone (not as part of a quad)
-   *
-   * Used for action triggers - the ref itself is the invocation.
-   * Parameters come from the URI query string.
-   *
-   * @param {Graph} graph - The graph
-   * @param {Ref} ref - The ref being triggered (contains params in searchParams)
-   */
-  onTrigger(graph, ref) {
-    // Default: do nothing
   }
 
   /** Clean up resources */
@@ -151,27 +102,14 @@ export class BaseMirror {
   }
 
   /**
-   * Merge serialized data into this mirror
-   *
-   * Used for sync scenarios where a mirror already exists.
-   * Default implementation does nothing - subclasses override as needed.
-   *
-   * @param {object} data - Serialized data (without $mirror marker)
-   */
-  merge(data) {
-    // Default: no-op
-  }
-
-  /**
    * Static method to deserialize and reconstruct a mirror
    *
-   * Subclasses must implement this to support deserialization.
-   *
    * @param {object} data - Serialized data with $mirror field
-   * @param {object} registry - Registry for resolving refs
+   * @param {Ref} ref - The ref for this mirror
+   * @param {Bassline} bassline - The bassline system
    * @returns {BaseMirror} Reconstructed mirror instance
    */
-  static fromJSON(data, registry) {
+  static fromJSON(data, ref, bassline) {
     throw new Error(`${this.name} does not implement static fromJSON()`);
   }
 
