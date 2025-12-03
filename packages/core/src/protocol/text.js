@@ -3,15 +3,29 @@
  *
  * A simple line-based text format for Bassline interactions.
  *
- * Request format:  OPERATION ref [value] [@tag]
+ * Request format:  OPERATION <ref> [value] [@tag]
  * Response format: OK [value] [@tag] | ERROR code message | EVENT stream value
  *
+ * Type encoding:
+ *   <uri>        → Ref (angle brackets)
+ *   "string"     → String (quoted)
+ *   word         → Word (unquoted identifier)
+ *   42           → Number
+ *   true/false   → Boolean
+ *   null         → Null
+ *   {...}        → Object (JSON)
+ *   [...]        → Array (JSON)
+ *
  * Examples:
- *   READ bl:///cell/counter
- *   WRITE bl:///cell/counter 42
+ *   READ <bl:///cell/counter>
+ *   WRITE <bl:///cell/counter> 42
+ *   WRITE <bl:///cell/status> active
+ *   WRITE <bl:///cell/name> "Alice Smith"
  *   OK 42
  *   ERROR 404 not found
  */
+
+import { Word, Ref, isWord, isRef } from '../types.js';
 
 // Request operations
 export const Op = {
@@ -61,11 +75,11 @@ export function parse(line) {
     case Op.READ:
     case Op.SUBSCRIBE:
     case Op.INFO:
-      msg.ref = parts[1] || null;
+      msg.ref = parseRef(parts[1]);
       break;
 
     case Op.WRITE:
-      msg.ref = parts[1] || null;
+      msg.ref = parseRef(parts[1]);
       msg.value = parts.length > 2 ? parseValue(parts.slice(2).join(' ')) : null;
       break;
 
@@ -116,11 +130,11 @@ export function serialize(msg) {
     case Op.READ:
     case Op.SUBSCRIBE:
     case Op.INFO:
-      if (msg.ref) parts.push(msg.ref);
+      if (msg.ref) parts.push(serializeRef(msg.ref));
       break;
 
     case Op.WRITE:
-      if (msg.ref) parts.push(msg.ref);
+      if (msg.ref) parts.push(serializeRef(msg.ref));
       if (msg.value !== undefined && msg.value !== null) {
         parts.push(serializeValue(msg.value));
       }
@@ -164,13 +178,36 @@ export function serialize(msg) {
 }
 
 /**
- * Split a line into parts, respecting JSON objects/arrays
+ * Parse a ref from angle brackets or bare URI
+ * Returns the URI string (not a Ref object) for use in messages
+ */
+function parseRef(str) {
+  if (!str) return null;
+  str = str.trim();
+  // Remove angle brackets if present
+  if (str.startsWith('<') && str.endsWith('>')) {
+    return str.slice(1, -1);
+  }
+  return str;
+}
+
+/**
+ * Serialize a ref for command position (wrap in angle brackets)
+ */
+function serializeRef(ref) {
+  if (!ref) return '';
+  return `<${ref}>`;
+}
+
+/**
+ * Split a line into parts, respecting JSON objects/arrays and angle brackets
  */
 function splitParts(line) {
   const parts = [];
   let current = '';
   let depth = 0;
   let inString = false;
+  let inAngleBracket = false;
   let escape = false;
 
   for (let i = 0; i < line.length; i++) {
@@ -188,17 +225,29 @@ function splitParts(line) {
       continue;
     }
 
-    if (char === '"') {
+    if (char === '"' && !inAngleBracket) {
       inString = !inString;
       current += char;
       continue;
     }
 
     if (!inString) {
+      // Handle angle brackets for refs
+      if (char === '<' && depth === 0) {
+        inAngleBracket = true;
+        current += char;
+        continue;
+      }
+      if (char === '>' && inAngleBracket) {
+        inAngleBracket = false;
+        current += char;
+        continue;
+      }
+
       if (char === '{' || char === '[') depth++;
       if (char === '}' || char === ']') depth--;
 
-      if (char === ' ' && depth === 0) {
+      if (char === ' ' && depth === 0 && !inAngleBracket) {
         if (current) {
           parts.push(current);
           current = '';
@@ -216,52 +265,125 @@ function splitParts(line) {
 
 /**
  * Parse a value string into JS value
+ *
+ * Type rules:
+ *   <uri>     → Ref
+ *   "string"  → String
+ *   {...}     → Object (with ref/word revival)
+ *   [...]     → Array (with ref/word revival)
+ *   42        → Number
+ *   true      → Boolean
+ *   false     → Boolean
+ *   null      → Null
+ *   word      → Word (unquoted identifier)
  */
 function parseValue(str) {
   if (!str) return null;
   str = str.trim();
 
-  // Try JSON first
-  if (str.startsWith('{') || str.startsWith('[') || str.startsWith('"')) {
+  // Ref in angle brackets
+  if (str.startsWith('<') && str.endsWith('>')) {
+    const uri = str.slice(1, -1);
+    return new Ref(uri);
+  }
+
+  // Quoted string
+  if (str.startsWith('"')) {
     try {
       return JSON.parse(str);
     } catch {
-      // Fall through
+      // Fall through to word
     }
   }
 
-  // Primitives
+  // JSON object/array - parse with custom reviver for refs/words
+  if (str.startsWith('{') || str.startsWith('[')) {
+    try {
+      return JSON.parse(str, jsonReviver);
+    } catch {
+      // Fall through to word
+    }
+  }
+
+  // Boolean primitives
   if (str === 'true') return true;
   if (str === 'false') return false;
   if (str === 'null') return null;
-  if (str === 'undefined') return undefined;
 
   // Numbers
   if (/^-?\d+(\.\d+)?$/.test(str)) {
     return parseFloat(str);
   }
 
-  // Plain string
-  return str;
+  // Everything else is a Word (unquoted identifier)
+  return new Word(str);
+}
+
+/**
+ * JSON reviver for refs and words in objects/arrays
+ */
+function jsonReviver(key, value) {
+  if (value && typeof value === 'object') {
+    if (value.$ref) {
+      return new Ref(value.$ref);
+    }
+    if (value.$word) {
+      return new Word(value.$word);
+    }
+  }
+  return value;
 }
 
 /**
  * Serialize a JS value to string
+ *
+ * Type rules:
+ *   Ref    → <uri>
+ *   Word   → unquoted
+ *   String → "quoted"
+ *   Number → literal
+ *   Boolean → true/false
+ *   Null   → null
+ *   Object → JSON (with $ref/$word markers)
+ *   Array  → JSON (with $ref/$word markers)
  */
 function serializeValue(value) {
   if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
+  if (value === undefined) return 'null';
+
+  // Ref → <uri>
+  if (isRef(value)) {
+    return `<${value.href}>`;
+  }
+
+  // Word → unquoted
+  if (isWord(value)) {
+    return value.toString();
+  }
+
   if (typeof value === 'boolean') return String(value);
   if (typeof value === 'number') return String(value);
+
+  // String → quoted
   if (typeof value === 'string') {
-    // Quote if contains spaces or special chars
-    if (/[\s{}\[\]"]/.test(value)) {
-      return JSON.stringify(value);
-    }
-    return value;
+    return JSON.stringify(value);
   }
-  // Objects and arrays as JSON
-  return JSON.stringify(value);
+
+  // Objects and arrays → JSON with replacer for Word/Ref
+  return JSON.stringify(value, jsonReplacer);
+}
+
+/**
+ * JSON replacer for refs and words in objects/arrays
+ */
+function jsonReplacer(key, value) {
+  if (isRef(value)) {
+    return { $ref: value.href };
+  }
+  if (isWord(value)) {
+    return { $word: value.toString() };
+  }
+  return value;
 }
 
 /**

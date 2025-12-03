@@ -49,9 +49,9 @@ READ <ref> [@tag]
 
 **Examples:**
 ```
-READ bl:///cell/counter
-READ bl:///cell/counter @req1
-READ bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b
+READ <bl:///cell/counter>
+READ <bl:///cell/counter> @req1
+READ <bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b>
 ```
 
 **Response:** `OK <value> [@tag]` or `ERROR <code> <message>`
@@ -66,9 +66,12 @@ WRITE <ref> <value> [@tag]
 
 **Examples:**
 ```
-WRITE bl:///cell/counter 42
-WRITE bl:///cell/user {"name":"alice","age":30}
-WRITE bl:///cell/flag true @req1
+WRITE <bl:///cell/counter> 42
+WRITE <bl:///cell/user> {"name":"alice","age":30}
+WRITE <bl:///cell/flag> true @req1
+WRITE <bl:///cell/status> active
+WRITE <bl:///cell/name> "Alice Smith"
+WRITE <bl:///cell/target> <bl:///cell/counter>
 ```
 
 **Response:** `OK [@tag]` or `ERROR <code> <message>`
@@ -83,8 +86,8 @@ SUBSCRIBE <ref> [@tag]
 
 **Examples:**
 ```
-SUBSCRIBE bl:///cell/counter
-SUBSCRIBE bl:///cell/counter @sub1
+SUBSCRIBE <bl:///cell/counter>
+SUBSCRIBE <bl:///cell/counter> @sub1
 ```
 
 **Response:**
@@ -118,8 +121,8 @@ INFO <ref> [@tag]
 
 **Examples:**
 ```
-INFO bl:///cell/counter
-INFO bl:///fold/sum
+INFO <bl:///cell/counter>
+INFO <bl:///fold/sum>
 ```
 
 **Response:** `OK <capabilities-json> [@tag]`
@@ -199,32 +202,53 @@ EVENT s1 {"name":"alice"}
 
 ## Value Encoding
 
-Values are encoded inline, without surrounding quotes unless necessary:
+Values have distinct syntax for each type:
 
 | Type | Encoding | Examples |
 |------|----------|----------|
+| Ref | Angle brackets | `<bl:///cell/counter>`, `<https://example.com>` |
+| Word | Unquoted | `active`, `PENDING`, `my-status` |
+| String | Quoted | `"hello"`, `"Alice Smith"` |
 | Number | Literal | `42`, `-3.14`, `0` |
 | Boolean | Literal | `true`, `false` |
 | Null | Literal | `null` |
-| String (simple) | Literal | `hello`, `world` |
-| String (spaces) | JSON string | `"hello world"` |
 | Object | JSON | `{"name":"alice"}` |
 | Array | JSON | `[1,2,3]` |
 
-**Rules:**
-- Strings without spaces, quotes, or special characters are unquoted
-- Strings with spaces or special characters use JSON encoding
-- Objects and arrays always use JSON encoding
-- Numbers must match `-?\d+(\.\d+)?`
+**Type Rules:**
+- **Refs** are always wrapped in angle brackets `<uri>`
+- **Words** are unquoted identifiers (case-insensitive, interned symbols)
+- **Strings** are always quoted with double quotes
+- **Numbers** match `-?\d+(\.\d+)?`
+- **Objects/arrays** use JSON encoding
+
+**Words vs Strings:**
+```
+active          → Word (interned, case-insensitive)
+"active"        → String (literal text)
+ACTIVE          → Word (same as 'active')
+```
+
+**Refs in JSON:**
+
+When refs appear inside JSON objects or arrays, use the `$ref` marker:
+```json
+{"target": {"$ref": "bl:///cell/counter"}}
+```
+
+When words appear inside JSON, use the `$word` marker:
+```json
+{"status": {"$word": "ACTIVE"}}
+```
 
 ## Tags
 
 Tags enable request/response correlation for pipelining.
 
 ```
-READ bl:///cell/a @req1
-READ bl:///cell/b @req2
-WRITE bl:///cell/c 100 @req3
+READ <bl:///cell/a> @req1
+READ <bl:///cell/b> @req2
+WRITE <bl:///cell/c> 100 @req3
 ```
 
 Responses echo the tag:
@@ -263,22 +287,40 @@ This enables clients to parallelize requests to `ordering: none` mirrors.
 > VERSION BL/1.0
 < VERSION BL/1.0
 
-> WRITE bl:///cell/counter 0
+> WRITE <bl:///cell/counter> 0
 < OK
 
-> READ bl:///cell/counter
+> READ <bl:///cell/counter>
 < OK 0
 
-> WRITE bl:///cell/counter 42
+> WRITE <bl:///cell/counter> 42
 < OK
 
-> READ bl:///cell/counter
+> READ <bl:///cell/counter>
 < OK 42
 
-> INFO bl:///cell/counter
+> WRITE <bl:///cell/status> active
+< OK
+
+> READ <bl:///cell/status>
+< OK ACTIVE
+
+> WRITE <bl:///cell/name> "Alice"
+< OK
+
+> READ <bl:///cell/name>
+< OK "Alice"
+
+> WRITE <bl:///cell/target> <bl:///cell/counter>
+< OK
+
+> READ <bl:///cell/target>
+< OK <bl:///cell/counter>
+
+> INFO <bl:///cell/counter>
 < OK {"readable":true,"writable":true,"ordering":"causal"}
 
-> SUBSCRIBE bl:///cell/counter @sub1
+> SUBSCRIBE <bl:///cell/counter> @sub1
 < EVENT s1 42
 < STREAM s1 @sub1
 
@@ -303,21 +345,32 @@ response    = version-resp / ok-resp / error-resp /
 version-req = "VERSION" SP version [SP formats] [tag]
 version-resp = "VERSION" SP version
 
-read-req    = "READ" SP ref [tag]
-write-req   = "WRITE" SP ref SP value [tag]
-subscribe-req = "SUBSCRIBE" SP ref [tag]
+read-req    = "READ" SP bracketed-ref [tag]
+write-req   = "WRITE" SP bracketed-ref SP value [tag]
+subscribe-req = "SUBSCRIBE" SP bracketed-ref [tag]
 unsubscribe-req = "UNSUBSCRIBE" SP stream-id [tag]
-info-req    = "INFO" SP ref [tag]
+info-req    = "INFO" SP bracketed-ref [tag]
 
 ok-resp     = "OK" [SP value] [tag]
 error-resp  = "ERROR" SP code SP message
 stream-resp = "STREAM" SP stream-id [tag]
 event-resp  = "EVENT" SP stream-id SP value
 
-ref         = 1*VCHAR
-value       = json-value / primitive
-primitive   = number / boolean / null / string
-json-value  = object / array / quoted-string
+; Refs are wrapped in angle brackets
+bracketed-ref = "<" uri ">"
+uri         = 1*VCHAR
+
+; Values: ref, word, string, number, boolean, null, object, array
+value       = ref-value / word / quoted-string / number / boolean / null / json-object / json-array
+ref-value   = "<" uri ">"
+word        = 1*(ALPHA / DIGIT / "-" / "_")
+quoted-string = DQUOTE *char DQUOTE
+number      = ["-"] 1*DIGIT ["." 1*DIGIT]
+boolean     = "true" / "false"
+null        = "null"
+json-object = "{" *VCHAR "}"
+json-array  = "[" *VCHAR "]"
+
 stream-id   = "s" 1*DIGIT
 tag         = SP "@" 1*VCHAR
 version     = "BL/" 1*DIGIT "." 1*DIGIT
@@ -329,6 +382,8 @@ message     = *VCHAR
 SP          = %x20
 VCHAR       = %x21-7E
 DIGIT       = %x30-39
+ALPHA       = %x41-5A / %x61-7A
+DQUOTE      = %x22
 ```
 
 ## Transport Binding: TCP

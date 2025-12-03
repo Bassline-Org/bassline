@@ -95,7 +95,7 @@ class BLTClient:
         """Read a value from a ref."""
         if not ref.startswith("bl://"):
             ref = f"bl:///cell/{ref}"
-        resp = self._request(f"READ {ref}")
+        resp = self._request(f"READ <{ref}>")
         ok, value = self._parse_response(resp)
         if ok:
             return self._parse_value(value) if value else None
@@ -106,7 +106,7 @@ class BLTClient:
         if not ref.startswith("bl://"):
             ref = f"bl:///cell/{ref}"
         encoded = self._encode_value(value)
-        resp = self._request(f"WRITE {ref} {encoded}")
+        resp = self._request(f"WRITE <{ref}> {encoded}")
         ok, _ = self._parse_response(resp)
         return ok
 
@@ -114,7 +114,7 @@ class BLTClient:
         """Get mirror capabilities."""
         if not ref.startswith("bl://"):
             ref = f"bl:///cell/{ref}"
-        resp = self._request(f"INFO {ref}")
+        resp = self._request(f"INFO <{ref}>")
         ok, value = self._parse_response(resp)
         if ok:
             return json.loads(value)
@@ -139,7 +139,7 @@ class BLTClient:
             ref = f"bl:///cell/{ref}"
 
         self.connect()
-        self._send(f"SUBSCRIBE {ref}")
+        self._send(f"SUBSCRIBE <{ref}>")
 
         while True:
             line = self._recv_line()
@@ -164,13 +164,27 @@ class BLTClient:
         if isinstance(value, (int, float)):
             return str(value)
         if isinstance(value, str):
+            # Strings with spaces or special chars need quoting
             if " " in value or '"' in value or "{" in value or "[" in value:
                 return json.dumps(value)
+            # Simple strings become words (unquoted)
             return value
         return json.dumps(value)
 
     def _parse_value(self, value: str):
-        """Parse a BL/T value to Python."""
+        """Parse a BL/T value to Python.
+
+        Types:
+          <uri>     → Ref (dict with $ref)
+          "string"  → String
+          {...}     → Object
+          [...]     → Array
+          42        → Number
+          true      → Boolean
+          false     → Boolean
+          null      → Null
+          word      → Word (dict with $word)
+        """
         if value is None:
             return None
         value = value.strip()
@@ -180,14 +194,21 @@ class BLTClient:
             return True
         if value == "false":
             return False
+        # Ref in angle brackets
+        if value.startswith("<") and value.endswith(">"):
+            return {"$ref": value[1:-1]}
+        # JSON string, object, or array
         if value.startswith("{") or value.startswith("[") or value.startswith('"'):
             return json.loads(value)
+        # Number
         try:
             if "." in value:
                 return float(value)
             return int(value)
         except ValueError:
-            return value
+            pass
+        # Everything else is a word
+        return {"$word": value.upper()}
 
 
 def interactive(client: BLTClient):

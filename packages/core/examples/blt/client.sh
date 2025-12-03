@@ -26,7 +26,7 @@ blt_read() {
         ref="bl:///cell/$ref"
     fi
     local resp
-    resp=$(blt_cmd "READ $ref")
+    resp=$(blt_cmd "READ <$ref>")
     if [[ "$resp" == OK* ]]; then
         echo "${resp#OK }"
     else
@@ -43,7 +43,7 @@ blt_write() {
         ref="bl:///cell/$ref"
     fi
     local resp
-    resp=$(blt_cmd "WRITE $ref $value")
+    resp=$(blt_cmd "WRITE <$ref> $value")
     if [[ "$resp" == OK* ]]; then
         echo "ok"
     else
@@ -79,7 +79,7 @@ blt_info() {
         ref="bl:///cell/$ref"
     fi
     local resp
-    resp=$(blt_cmd "INFO $ref")
+    resp=$(blt_cmd "INFO <$ref>")
     if [[ "$resp" == OK* ]]; then
         echo "${resp#OK }"
     else

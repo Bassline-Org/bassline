@@ -1,43 +1,50 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { parse, serialize, Op, read, write, subscribe, info, ok, error, event } from '../src/protocol/text.js';
 import { createBassline } from '../src/setup.js';
+import { Word, Ref, isWord, isRef } from '../src/types.js';
 
 describe('BL/T Protocol Parser', () => {
   describe('parse', () => {
-    it('should parse READ', () => {
+    it('should parse READ with angle brackets', () => {
+      const msg = parse('READ <bl:///cell/counter>');
+      expect(msg.op).toBe('READ');
+      expect(msg.ref).toBe('bl:///cell/counter');
+    });
+
+    it('should parse READ without angle brackets (backward compat)', () => {
       const msg = parse('READ bl:///cell/counter');
       expect(msg.op).toBe('READ');
       expect(msg.ref).toBe('bl:///cell/counter');
     });
 
     it('should parse WRITE with primitive value', () => {
-      const msg = parse('WRITE bl:///cell/counter 42');
+      const msg = parse('WRITE <bl:///cell/counter> 42');
       expect(msg.op).toBe('WRITE');
       expect(msg.ref).toBe('bl:///cell/counter');
       expect(msg.value).toBe(42);
     });
 
     it('should parse WRITE with boolean', () => {
-      expect(parse('WRITE bl:///cell/flag true').value).toBe(true);
-      expect(parse('WRITE bl:///cell/flag false').value).toBe(false);
+      expect(parse('WRITE <bl:///cell/flag> true').value).toBe(true);
+      expect(parse('WRITE <bl:///cell/flag> false').value).toBe(false);
     });
 
     it('should parse WRITE with null', () => {
-      expect(parse('WRITE bl:///cell/x null').value).toBe(null);
+      expect(parse('WRITE <bl:///cell/x> null').value).toBe(null);
     });
 
     it('should parse WRITE with JSON object', () => {
-      const msg = parse('WRITE bl:///cell/user {"name":"alice","age":30}');
+      const msg = parse('WRITE <bl:///cell/user> {"name":"alice","age":30}');
       expect(msg.value).toEqual({ name: 'alice', age: 30 });
     });
 
     it('should parse WRITE with JSON array', () => {
-      const msg = parse('WRITE bl:///cell/list [1,2,3]');
+      const msg = parse('WRITE <bl:///cell/list> [1,2,3]');
       expect(msg.value).toEqual([1, 2, 3]);
     });
 
     it('should parse SUBSCRIBE', () => {
-      const msg = parse('SUBSCRIBE bl:///cell/counter');
+      const msg = parse('SUBSCRIBE <bl:///cell/counter>');
       expect(msg.op).toBe('SUBSCRIBE');
       expect(msg.ref).toBe('bl:///cell/counter');
     });
@@ -49,7 +56,7 @@ describe('BL/T Protocol Parser', () => {
     });
 
     it('should parse INFO', () => {
-      const msg = parse('INFO bl:///fold/sum');
+      const msg = parse('INFO <bl:///fold/sum>');
       expect(msg.op).toBe('INFO');
       expect(msg.ref).toBe('bl:///fold/sum');
     });
@@ -99,7 +106,7 @@ describe('BL/T Protocol Parser', () => {
     });
 
     it('should parse optional tag', () => {
-      const msg = parse('READ bl:///cell/counter @req1');
+      const msg = parse('READ <bl:///cell/counter> @req1');
       expect(msg.op).toBe('READ');
       expect(msg.ref).toBe('bl:///cell/counter');
       expect(msg.tag).toBe('req1');
@@ -119,22 +126,53 @@ describe('BL/T Protocol Parser', () => {
     it('should return null for comments', () => {
       expect(parse('# this is a comment')).toBe(null);
     });
+
+    // New type parsing tests
+    it('should parse word value (unquoted)', () => {
+      const msg = parse('WRITE <bl:///cell/status> active');
+      expect(isWord(msg.value)).toBe(true);
+      expect(msg.value.toString()).toBe('ACTIVE');
+    });
+
+    it('should parse string value (quoted)', () => {
+      const msg = parse('WRITE <bl:///cell/name> "Alice Smith"');
+      expect(typeof msg.value).toBe('string');
+      expect(msg.value).toBe('Alice Smith');
+    });
+
+    it('should parse ref value in angle brackets', () => {
+      const msg = parse('WRITE <bl:///cell/target> <bl:///cell/counter>');
+      expect(isRef(msg.value)).toBe(true);
+      expect(msg.value.href).toBe('bl:///cell/counter');
+    });
+
+    it('should parse OK with word value', () => {
+      const msg = parse('OK active');
+      expect(isWord(msg.value)).toBe(true);
+      expect(msg.value.toString()).toBe('ACTIVE');
+    });
+
+    it('should parse OK with ref value', () => {
+      const msg = parse('OK <bl:///cell/counter>');
+      expect(isRef(msg.value)).toBe(true);
+      expect(msg.value.href).toBe('bl:///cell/counter');
+    });
   });
 
   describe('serialize', () => {
-    it('should serialize READ', () => {
+    it('should serialize READ with angle brackets', () => {
       expect(serialize({ op: 'READ', ref: 'bl:///cell/counter' }))
-        .toBe('READ bl:///cell/counter');
+        .toBe('READ <bl:///cell/counter>');
     });
 
     it('should serialize WRITE with primitive', () => {
       expect(serialize({ op: 'WRITE', ref: 'bl:///cell/counter', value: 42 }))
-        .toBe('WRITE bl:///cell/counter 42');
+        .toBe('WRITE <bl:///cell/counter> 42');
     });
 
     it('should serialize WRITE with object', () => {
       expect(serialize({ op: 'WRITE', ref: 'bl:///cell/x', value: { a: 1 } }))
-        .toBe('WRITE bl:///cell/x {"a":1}');
+        .toBe('WRITE <bl:///cell/x> {"a":1}');
     });
 
     it('should serialize OK', () => {
@@ -154,29 +192,44 @@ describe('BL/T Protocol Parser', () => {
 
     it('should serialize with tag', () => {
       expect(serialize({ op: 'READ', ref: 'bl:///cell/x', tag: 'req1' }))
-        .toBe('READ bl:///cell/x @req1');
+        .toBe('READ <bl:///cell/x> @req1');
     });
 
-    it('should quote strings with spaces', () => {
+    it('should quote strings', () => {
       expect(serialize({ op: 'OK', value: 'hello world' }))
         .toBe('OK "hello world"');
+    });
+
+    it('should serialize Word unquoted', () => {
+      expect(serialize({ op: 'OK', value: new Word('active') }))
+        .toBe('OK ACTIVE');
+    });
+
+    it('should serialize Ref in angle brackets', () => {
+      expect(serialize({ op: 'OK', value: new Ref('bl:///cell/counter') }))
+        .toBe('OK <bl:///cell/counter>');
+    });
+
+    it('should serialize simple strings quoted', () => {
+      expect(serialize({ op: 'OK', value: 'hello' }))
+        .toBe('OK "hello"');
     });
   });
 
   describe('round-trip', () => {
     const messages = [
-      'READ bl:///cell/counter',
-      'WRITE bl:///cell/counter 42',
-      'WRITE bl:///cell/data {"name":"alice"}',
-      'SUBSCRIBE bl:///cell/counter',
+      'READ <bl:///cell/counter>',
+      'WRITE <bl:///cell/counter> 42',
+      'WRITE <bl:///cell/data> {"name":"alice"}',
+      'SUBSCRIBE <bl:///cell/counter>',
       'UNSUBSCRIBE s1',
-      'INFO bl:///fold/sum',
+      'INFO <bl:///fold/sum>',
       'OK 42',
       'OK {"status":"success"}',
       'ERROR 404 not found',
       'EVENT s1 100',
       'STREAM s1',
-      'READ bl:///cell/x @req1',
+      'READ <bl:///cell/x> @req1',
       'OK 42 @req1'
     ];
 
