@@ -228,4 +228,41 @@ describe('Registry introspection', () => {
     expect(mirrors).toContain('bl:///cell/a');
     expect(mirrors).toContain('bl:///cell/b');
   });
+
+  it('should get info about a specific mirror', () => {
+    bl.write('bl:///cell/counter', 42);
+
+    const info = bl.read('bl:///registry/info?ref=bl:///cell/counter');
+    expect(info).toEqual({
+      uri: 'bl:///cell/counter',
+      type: 'cell',
+      readable: true,
+      writable: true,
+      ordering: 'causal'
+    });
+  });
+
+  it('should get info about a fold mirror', () => {
+    bl.write('bl:///cell/a', 10);
+    bl.write('bl:///cell/b', 20);
+    bl.read('bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b');
+
+    const info = bl.read('bl:///registry/info?ref=bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b');
+    expect(info).toEqual({
+      uri: 'bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b',
+      type: 'sum',
+      readable: true,
+      writable: false,
+      ordering: 'none'
+    });
+  });
+
+  it('should return null for unresolved mirror', () => {
+    const info = bl.read('bl:///registry/info?ref=bl:///cell/nonexistent');
+    expect(info).toBeNull();
+  });
+
+  it('should throw error when ref parameter is missing', () => {
+    expect(() => bl.read('bl:///registry/info')).toThrow('Missing ref parameter');
+  });
 });

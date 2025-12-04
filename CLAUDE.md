@@ -219,15 +219,17 @@ The JavaScript implementation is ~720 lines:
 ```
 packages/core/src/
 ├── bassline.js         # 123 LOC - Middleware router + ref→mirror cache
-├── setup.js            #  49 LOC - createBassline() with standard middleware
+├── setup.js            #  65 LOC - createBassline() with standard middleware
 ├── types.js            # 152 LOC - Word, Ref value types
+├── compound.js         # 130 LOC - Compound structure utilities
 └── mirror/
     ├── interface.js    #  53 LOC - BaseMirror class
     ├── cell.js         #  43 LOC - Mutable value
     ├── fold.js         # 107 LOC - Computed values (sum, max, min, etc.)
+    ├── compound.js     #  70 LOC - Structures with refs
     ├── remote.js       #  91 LOC - WebSocket connection
     ├── serialize.js    #  46 LOC - Value serialization
-    ├── registry-mirror.js # 42 LOC - Introspection
+    ├── registry-mirror.js # 70 LOC - Introspection
     └── index.js        #  16 LOC - Exports
 ```
 
@@ -246,6 +248,7 @@ packages/core/src/
 | `/fold/concat` | ConcatFold | Concatenate string values |
 | `/fold/list` | ListFold | Collect values into array |
 | `/remote` | Remote | WebSocket connection |
+| `/compound` | Compound | Structures containing refs |
 | `/registry` | Registry | Introspection |
 
 ### Usage
@@ -299,7 +302,59 @@ bl.hasResolved('bl:///cell/counter'); // true/false
 // Or via the registry mirror
 bl.read('bl:///registry');         // List all resolvers
 bl.read('bl:///registry/mirrors'); // List all resolved mirrors
+bl.read('bl:///registry/info?ref=bl:///cell/counter'); // Get mirror info
 ```
+
+### Compounds
+
+Compounds are structures that contain refs to other resources. The `/compound` middleware provides an explicit capability for building these structures:
+
+```javascript
+// Store a compound definition (refs as $ref markers)
+bl.write('bl:///compound/user-bundle', {
+  name: { $ref: 'bl:///cell/alice-name' },
+  email: { $ref: 'bl:///cell/alice-email' },
+  role: 'admin'
+});
+
+// Read returns definition with refs intact
+const bundle = bl.read('bl:///compound/user-bundle');
+// { name: { $ref: 'bl:///cell/alice-name' }, ... }
+
+// Explicitly follow refs when you want
+const name = bl.read(bundle.name.$ref);
+```
+
+Helper utilities for working with compounds:
+
+```javascript
+import { isRefMarker, getPath, getRefAt, collectRefs } from '@bassline/core';
+
+isRefMarker({ $ref: 'bl:///cell/x' }); // true
+getPath(bundle, 'name.$ref');          // 'bl:///cell/alice-name'
+getRefAt(bundle, 'name');              // Ref object
+collectRefs(bundle);                   // All refs in structure
+```
+
+**Capability model**: Without `/compound` middleware registered, writes to `bl:///compound/...` fail. This matches the sandboxing model—middleware controls what's resolvable.
+
+### System Explorer
+
+A Smalltalk-style system browser for Bassline (`examples/explorer/index.html`). Demonstrates the reflective nature of the system:
+
+```bash
+# Start server
+node bin/server.js -p 8080 -c counter=0 -c name=alice
+
+# Open examples/explorer/index.html in browser
+```
+
+Features:
+- **Resolver Browser** - Lists all registered middleware patterns
+- **Mirror Browser** - Live-updating list of all resolved mirrors
+- **Inspector** - View capabilities and current value of any mirror
+- **Live Updates** - Values update in real-time via SSE
+- **Clickable Refs** - Navigate into `$ref` markers in compound structures
 
 ## Why This Matters
 
@@ -363,7 +418,7 @@ The URI carries everything needed. No type registry required.
 
 ```bash
 pnpm install
-pnpm test  # 99 tests
+pnpm test  # 220 tests
 ```
 
 ## License

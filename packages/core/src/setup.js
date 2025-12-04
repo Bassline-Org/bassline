@@ -29,6 +29,7 @@ import { HTTPServerMirror } from './mirror/http-server.js';
 import { HTTPClientMirror } from './mirror/http-client.js';
 import { TCPServerMirror } from './mirror/tcp-server.js';
 import { RegistryMirror } from './mirror/registry-mirror.js';
+import { CompoundMirror } from './mirror/compound.js';
 
 // Re-export core types
 export { Bassline } from './bassline.js';
@@ -52,7 +53,18 @@ export { HTTPServerMirror } from './mirror/http-server.js';
 export { HTTPClientMirror } from './mirror/http-client.js';
 export { TCPServerMirror } from './mirror/tcp-server.js';
 export { RegistryMirror } from './mirror/registry-mirror.js';
+export { CompoundMirror, compound } from './mirror/compound.js';
 export { BaseMirror, isMirror } from './mirror/interface.js';
+
+// Re-export compound utilities
+export {
+  isRefMarker,
+  getPath,
+  getRefAt,
+  collectRefs,
+  reviveRefs,
+  setPath
+} from './compound.js';
 
 // Re-export serialization
 export { serializeValue, reviveValue } from './mirror/serialize.js';
@@ -103,6 +115,9 @@ export function createBassline() {
 
   // TCP middleware (BL/T protocol)
   bl.use('/server/tcp', (ref, bl) => new TCPServerMirror(ref, bl));
+
+  // Compound middleware - structures with refs
+  bl.use('/compound', (ref, bl) => new CompoundMirror(ref, bl));
 
   // Registry middleware - introspection
   bl.use('/registry', (ref, bl) => new RegistryMirror(ref, bl));
