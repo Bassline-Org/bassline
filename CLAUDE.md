@@ -1,76 +1,426 @@
-# CLAUDE.md
+# Bassline
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+A specification for reflective distributed programming. Reference implementation: ~700 lines.
 
-## Project Overview
+## What Is Bassline?
 
-Bassline is a web frontend implementation for a visual programming environment based on propagation networks. This follows an existing Pharo Smalltalk implementation and represents the first dedicated web-based interface for the system.
+Bassline is a **specification** for distributed programming built around one key idea: **mirrors**.
 
-## Technology Stack
+A mirror is a uniform interface to a resource—any resource. It has three operations:
+- `read()` - get the current value
+- `write(value)` - update the value
+- `subscribe(callback)` - watch for changes
 
-- **Backend/Framework**: React Router v7 (full-stack framework)
-- **Graph Visualization**: React Flow for visual node/edge editing
-- **UI Components**: shadcn/ui for consistent component library
-- **Language**: TypeScript (assumed with React Router v7)
+That's it. But this simple interface enables powerful composition:
 
-## Core Concepts
+- **Mirrors compose** - A fold mirrors over cell mirrors. A remote mirrors a local. Layers stack cleanly.
+- **Implementation-agnostic** - Any language can implement the interface. You don't need a complete client—implement what you need, delegate what you don't.
+- **Folds are semi-lattices** - Operations are associative, commutative, idempotent. Concurrent updates merge without coordination. CRDT semantics baked in.
+- **Layered properties** - Each layer can add constraints enforced locally, shared as data, negotiated with peers. Protocol evolution without breaking changes.
 
-The system is built around:
-- **Contacts**: Information-carrying cells with content and blend modes
-- **ContactGroups**: Collections of contacts forming computational boundaries  
-- **ContactGroupWires**: Connections propagating information between contacts
-- **Boundary Contacts**: Interface contacts that create abstraction boundaries
+## The Foundation: Partial Information
 
-Key differentiator: This is NOT a traditional dataflow system - it supports bidirectional constraint propagation with natural cycles.
+Bassline is rooted in one idea: **partial information**.
 
-## React Flow Integration
+In any distributed system, no node has the complete picture:
+- You never have complete knowledge
+- You work with what you know
+- New information refines what you have
+- Different nodes have different partial views
+- Merging partial views must be well-defined
 
-When implementing with React Flow:
-- Map Contacts to React Flow nodes
-- Map ContactGroupWires to React Flow edges
-- Use custom node types for different Contact types (regular vs boundary)
-- Implement hierarchical navigation through nested React Flow instances
-- Consider using React Flow's subflows for ContactGroups
+Mirrors are a natural API for partial information:
 
-## Development Commands
+| Operation | Meaning |
+|-----------|---------|
+| `read()` | "What do I know now?" |
+| `write(value)` | "Here's what I know" |
+| `subscribe(cb)` | "Tell me when you learn more" |
 
-```bash
-# Start development server
-npm run dev
+Everything else follows from this:
+- **Semi-lattices** for merging partial views without conflicts
+- **Partial implementation** because you only implement what you know
+- **Layered properties** because each layer has partial constraints
+- **Eventual consistency** because partial views converge over time
 
-# Build for production
-npm run build
+This is why mirrors compose so cleanly—they're not "reactive state containers," they're interfaces to partial knowledge. A fold doesn't "compute a value," it merges partial information from its sources. A remote doesn't "sync state," it exchanges partial views with a peer.
 
-# Run tests
-npm test
+## Refs: Universal Naming
 
-# Type checking
-npm run typecheck
+**Refs are just URIs.** They're not tied to any particular scheme or implementation—they're the universal way to name things.
 
-# Linting
-npm run lint
+```
+bl:///cell/counter?initial=0     # A mutable value
+https://api.example.com/user/42  # A REST resource
+ws://node2:8080/events           # A WebSocket stream
+ipfs://Qm.../document            # Content-addressed data
+custom://my/protocol             # Whatever you define
 ```
 
-## Architecture Guidelines
+A ref is just "something to address"—could be data, an action, a connection, a computation, a remote service. The scheme tells you what kind of thing. Middleware teaches the system how to resolve it.
 
-1. **Routing Structure** (React Router v7):
-   - Use nested routes for the pager navigation model
-   - Each ContactGroup level gets its own route
-   - Implement breadcrumb navigation for hierarchy
+This is what makes refs universal:
+- Not tied to Bassline
+- Not tied to any language
+- Already the standard way to name things on the internet
+- Self-describing: the URI carries its own resolution information
 
-2. **Component Structure**:
-   - Use shadcn components for UI consistency
-   - Create custom React Flow node components for Contacts
-   - Implement edge components for ContactGroupWires
-   - Build boundary contact interfaces as special node types
+## What This Enables
 
-3. **State Management**:
-   - Leverage React Router v7's data loading patterns
-   - Consider using React Flow's internal state for graph data
-   - Implement propagation logic separate from visualization
+### 1. Sandboxing
 
-## Key Documentation
+Middleware controls what's resolvable. You can create isolated environments with restricted capabilities:
 
-- `README.org`: Comprehensive technical specification and propagation network theory
-- `ClaudeSummary.md`: Implementation strategy and UI/UX plans
-- Existing Pharo implementation serves as reference for behavior and semantics
+```javascript
+// Restricted environment - only cells, no remote access
+const sandbox = new Bassline();
+sandbox.use('/cell', (ref, bl) => new Cell(ref, bl));
+// That's it. No /remote, no /fold, nothing else.
+```
+
+Everything goes through resolution. You have complete control over what resources exist.
+
+### 2. Distributed Programming
+
+Refs are location-transparent. The same ref can resolve to:
+- A local cell
+- A remote proxy over WebSocket
+- A replicated value across nodes
+
+```javascript
+// Local
+bl.write('bl:///cell/counter', 42);
+
+// Remote - same interface
+bl.write('bl:///remote/peer1?address=ws://node2:8080', {
+  ref: 'bl:///cell/counter',
+  value: 42
+});
+```
+
+The code using refs doesn't know or care where the data lives.
+
+### 3. Protocol Definition
+
+Define new protocols by creating mirrors and registering middleware:
+
+```javascript
+class PriceFeed extends BaseMirror {
+  constructor(ref, bassline) {
+    super(ref, bassline);
+    this._symbol = ref.searchParams.get('symbol');
+    this._connect();
+  }
+
+  get readable() { return true; }
+  get writable() { return false; }
+
+  read() { return this._latestPrice; }
+}
+
+bl.use('/price', (ref, bl) => new PriceFeed(ref, bl));
+bl.read('bl:///price/btc?symbol=BTCUSD');
+```
+
+The system is self-extensible. Want a new kind of resource? Write a mirror, register it.
+
+### 4. Heterogeneity
+
+Because the spec is minimal, implementations can exist everywhere:
+
+| Environment | Implementation |
+|-------------|---------------|
+| Browser | JavaScript |
+| Server | Node, Deno, Bun |
+| Systems | Rust, Go, C |
+| Enterprise | Java, C# |
+| Distributed | Erlang, Elixir |
+| Embedded | C, Rust |
+
+They all speak the same language: refs.
+
+### 5. Partial Implementation
+
+You don't need to implement the entire spec. Implement what you need:
+
+- A browser client might only need cells and folds
+- An IoT device might only need cells and remote
+- A server might implement custom mirrors for your domain
+
+No monolithic client required. Delegate what you don't implement to peers who do.
+
+## Semi-Lattice Semantics
+
+Folds implement semi-lattice operations—associative, commutative, idempotent:
+
+```
+sum(a, b) = sum(b, a)           # commutative
+sum(a, sum(b, c)) = sum(sum(a, b), c)  # associative
+max(a, a) = a                   # idempotent
+```
+
+This means:
+- **Order-independent** - Operations can happen in any order and still converge
+- **Coordination-free** - No consensus needed for concurrent updates
+- **Eventually consistent** - Replicas converge automatically
+
+This is the CRDT insight built into the fold design. When you use folds, you get distributed-friendly semantics by default.
+
+## Layered Properties
+
+Each layer in the system can add properties that:
+- Are **enforced locally** - Your node validates its own constraints
+- Are **shared as data** - Properties travel with values
+- Are **negotiated with peers** - Connect to others, agree on what properties matter
+
+This enables protocol evolution:
+- Add new constraints without breaking existing clients
+- Clients that don't understand a property can ignore it or delegate
+- Properties compose: layer A's constraints + layer B's constraints
+
+## The Specification
+
+### Ref
+
+A URI with:
+- `scheme` - Protocol identifier (e.g., `bl`)
+- `pathname` - Resource path (e.g., `/cell/counter`)
+- `searchParams` - Configuration (e.g., `initial=0`)
+- `href` - Canonical string form
+
+### Mirror
+
+An object bound to a ref with:
+- `readable` - Boolean, can this be read?
+- `writable` - Boolean, can this be written?
+- `read()` - Return current value
+- `write(value)` - Update value
+- `subscribe(callback)` - Watch for changes, return unsubscribe function
+
+### Bassline (Router)
+
+- `use(pattern, middleware)` - Register resolver for pattern
+- `resolve(ref)` - Get or create mirror for ref
+- `read(ref)` - Resolve and read
+- `write(ref, value)` - Resolve and write
+- `watch(ref, callback)` - Resolve and subscribe
+
+### Resolution Algorithm
+
+1. Parse ref string → Ref object
+2. Find middleware with longest matching pattern prefix
+3. If mirror cached, return it
+4. Otherwise: create mirror via middleware, cache it, return it
+
+## Reference Implementation
+
+The JavaScript implementation is ~720 lines:
+
+```
+packages/core/src/
+├── bassline.js         # 123 LOC - Middleware router + ref→mirror cache
+├── setup.js            #  65 LOC - createBassline() with standard middleware
+├── types.js            # 152 LOC - Word, Ref value types
+├── compound.js         # 130 LOC - Compound structure utilities
+└── mirror/
+    ├── interface.js    #  53 LOC - BaseMirror class
+    ├── cell.js         #  43 LOC - Mutable value
+    ├── fold.js         # 107 LOC - Computed values (sum, max, min, etc.)
+    ├── compound.js     #  70 LOC - Structures with refs
+    ├── remote.js       #  91 LOC - WebSocket connection
+    ├── serialize.js    #  46 LOC - Value serialization
+    ├── registry-mirror.js # 70 LOC - Introspection
+    └── index.js        #  16 LOC - Exports
+```
+
+### Built-in Mirrors
+
+| Pattern | Mirror | Description |
+|---------|--------|-------------|
+| `/cell` | Cell | Mutable value with subscriptions |
+| `/fold/sum` | SumFold | Sum of source values |
+| `/fold/max` | MaxFold | Maximum of source values |
+| `/fold/min` | MinFold | Minimum of source values |
+| `/fold/avg` | AvgFold | Average of source values |
+| `/fold/count` | CountFold | Count of sources |
+| `/fold/first` | FirstFold | First source value |
+| `/fold/last` | LastFold | Last source value |
+| `/fold/concat` | ConcatFold | Concatenate string values |
+| `/fold/list` | ListFold | Collect values into array |
+| `/remote` | Remote | WebSocket connection |
+| `/compound` | Compound | Structures containing refs |
+| `/registry` | Registry | Introspection |
+
+### Usage
+
+```javascript
+import { createBassline } from '@bassline/core';
+
+const bl = createBassline();
+
+// Cells
+bl.write('bl:///cell/counter', 42);
+bl.read('bl:///cell/counter'); // 42
+
+// Folds
+bl.write('bl:///cell/a', 10);
+bl.write('bl:///cell/b', 20);
+bl.read('bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b'); // 30
+
+// Subscriptions
+bl.watch('bl:///cell/counter', value => console.log(value));
+
+// Custom middleware
+bl.use('/custom', (ref, bl) => new MyMirror(ref, bl));
+```
+
+### Event Observation
+
+Middleware can observe all reads/writes:
+
+```javascript
+bl.use('/audit', {
+  resolve: (ref, bl) => new AuditMirror(ref, bl),
+  onWrite: (ref, value, result, bl) => {
+    console.log(`Write to ${ref.href}:`, value);
+  }
+});
+
+// Or globally
+bl.onWrite((ref, value, result, bl) => {
+  // Called for every write in the system
+});
+```
+
+### Introspection
+
+```javascript
+bl.listResolvers();  // ['/cell', '/fold/sum', ...]
+bl.listMirrors();    // ['bl:///cell/counter', ...]
+bl.hasResolved('bl:///cell/counter'); // true/false
+
+// Or via the registry mirror
+bl.read('bl:///registry');         // List all resolvers
+bl.read('bl:///registry/mirrors'); // List all resolved mirrors
+bl.read('bl:///registry/info?ref=bl:///cell/counter'); // Get mirror info
+```
+
+### Compounds
+
+Compounds are structures that contain refs to other resources. The `/compound` middleware provides an explicit capability for building these structures:
+
+```javascript
+// Store a compound definition (refs as $ref markers)
+bl.write('bl:///compound/user-bundle', {
+  name: { $ref: 'bl:///cell/alice-name' },
+  email: { $ref: 'bl:///cell/alice-email' },
+  role: 'admin'
+});
+
+// Read returns definition with refs intact
+const bundle = bl.read('bl:///compound/user-bundle');
+// { name: { $ref: 'bl:///cell/alice-name' }, ... }
+
+// Explicitly follow refs when you want
+const name = bl.read(bundle.name.$ref);
+```
+
+Helper utilities for working with compounds:
+
+```javascript
+import { isRefMarker, getPath, getRefAt, collectRefs } from '@bassline/core';
+
+isRefMarker({ $ref: 'bl:///cell/x' }); // true
+getPath(bundle, 'name.$ref');          // 'bl:///cell/alice-name'
+getRefAt(bundle, 'name');              // Ref object
+collectRefs(bundle);                   // All refs in structure
+```
+
+**Capability model**: Without `/compound` middleware registered, writes to `bl:///compound/...` fail. This matches the sandboxing model—middleware controls what's resolvable.
+
+### System Explorer
+
+A Smalltalk-style system browser for Bassline (`examples/explorer/index.html`). Demonstrates the reflective nature of the system:
+
+```bash
+# Start server
+node bin/server.js -p 8080 -c counter=0 -c name=alice
+
+# Open examples/explorer/index.html in browser
+```
+
+Features:
+- **Resolver Browser** - Lists all registered middleware patterns
+- **Mirror Browser** - Live-updating list of all resolved mirrors
+- **Inspector** - View capabilities and current value of any mirror
+- **Live Updates** - Values update in real-time via SSE
+- **Clickable Refs** - Navigate into `$ref` markers in compound structures
+
+## Why This Matters
+
+Traditional approaches assume complete information:
+
+| Approach | Assumption |
+|----------|------------|
+| RPC | Caller knows the complete interface |
+| Databases | Schema defines the complete structure |
+| State libraries | One process has the complete state |
+| Message queues | Messages have complete, self-contained payloads |
+
+Real distributed systems don't work this way. Nodes have partial views. Information arrives incrementally. Schemas evolve. Peers come and go.
+
+Bassline embraces partial information:
+- **Mirrors** - uniform interface to partial knowledge
+- **Semi-lattices** - merge partial views without coordination
+- **Partial implementation** - implement what you need, delegate the rest
+- **Layered properties** - constraints compose across partial views
+- **Refs** - name things you don't fully know yet
+
+All in ~700 lines per implementation.
+
+## Value Types
+
+**Word** - Case-insensitive interned identifier:
+```javascript
+import { word } from '@bassline/core';
+word('alice') === word('ALICE')  // true (same symbol)
+```
+
+**Ref** - URI reference:
+```javascript
+import { ref } from '@bassline/core';
+const r = ref('bl:///cell/counter?initial=0');
+r.scheme       // 'bl'
+r.pathname     // '/cell/counter'
+r.searchParams // URLSearchParams { initial: '0' }
+```
+
+## Serialization
+
+Mirrors serialize to JSON with their URI:
+
+```javascript
+const cell = bl.resolve('bl:///cell/counter');
+cell.toJSON();
+// { $mirror: 'cell', uri: 'bl:///cell/counter', value: 42 }
+```
+
+To restore: just resolve the URI again.
+
+```javascript
+const data = JSON.parse(stored);
+const mirror = bl.resolve(data.uri);
+```
+
+The URI carries everything needed. No type registry required.
+
+## Running
+
+```bash
+pnpm install
+pnpm test  # 220 tests
+```
+
+## License
+
+AGPLv3

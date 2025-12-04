@@ -1,0 +1,142 @@
+# BL/T Protocol Example Session
+#
+# This file shows an annotated BL/T session over TCP.
+# Lines starting with '>' are client requests.
+# Lines starting with '<' are server responses.
+# Lines starting with '#' are comments.
+#
+# To try this yourself:
+#   1. Start the server: node bin/blt-server.js -p 9000
+#   2. Connect: nc localhost 9000
+#   3. Type the commands below (without the '>' prefix)
+
+# =============================================================================
+# Version Negotiation
+# =============================================================================
+
+# Client announces protocol version
+> VERSION BL/1.0
+< VERSION BL/1.0
+
+# =============================================================================
+# Basic Read/Write
+# =============================================================================
+
+# Write a value to a cell
+> WRITE bl:///cell/counter 0
+< OK
+
+# Read the value back
+> READ bl:///cell/counter
+< OK 0
+
+# Update the value
+> WRITE bl:///cell/counter 42
+< OK
+
+# Read the updated value
+> READ bl:///cell/counter
+< OK 42
+
+# =============================================================================
+# JSON Values
+# =============================================================================
+
+# Write a JSON object
+> WRITE bl:///cell/user {"name":"alice","age":30}
+< OK
+
+# Read it back
+> READ bl:///cell/user
+< OK {"name":"alice","age":30}
+
+# Write an array
+> WRITE bl:///cell/tags ["red","green","blue"]
+< OK
+
+# Read it back
+> READ bl:///cell/tags
+< OK ["red","green","blue"]
+
+# =============================================================================
+# Folds (Computed Values)
+# =============================================================================
+
+# Set up source cells
+> WRITE bl:///cell/a 10
+< OK
+> WRITE bl:///cell/b 20
+< OK
+> WRITE bl:///cell/c 30
+< OK
+
+# Read a sum fold
+> READ bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b,bl:///cell/c
+< OK 60
+
+# Read a max fold
+> READ bl:///fold/max?sources=bl:///cell/a,bl:///cell/b,bl:///cell/c
+< OK 30
+
+# Read an avg fold
+> READ bl:///fold/avg?sources=bl:///cell/a,bl:///cell/b,bl:///cell/c
+< OK 20
+
+# =============================================================================
+# Mirror Introspection (INFO)
+# =============================================================================
+
+# Query cell capabilities
+> INFO bl:///cell/counter
+< OK {"readable":true,"writable":true,"ordering":"causal"}
+
+# Query fold capabilities (note: not writable, ordering: none)
+> INFO bl:///fold/sum
+< OK {"readable":true,"writable":false,"ordering":"none"}
+
+# =============================================================================
+# Tags for Request Correlation
+# =============================================================================
+
+# Multiple requests with tags (enables pipelining)
+> READ bl:///cell/a @req1
+> READ bl:///cell/b @req2
+> READ bl:///cell/c @req3
+
+# Responses include the tag
+< OK 10 @req1
+< OK 20 @req2
+< OK 30 @req3
+
+# Write with tag
+> WRITE bl:///cell/x 100 @write1
+< OK @write1
+
+# =============================================================================
+# Subscriptions
+# =============================================================================
+
+# Subscribe to a cell
+> SUBSCRIBE bl:///cell/counter @sub1
+< EVENT s1 42
+< STREAM s1 @sub1
+
+# Server sends EVENT when value changes
+# (In another terminal: nc localhost 9000, then WRITE bl:///cell/counter 100)
+< EVENT s1 100
+
+# Unsubscribe
+> UNSUBSCRIBE s1
+< OK
+
+# =============================================================================
+# Error Handling
+# =============================================================================
+
+# Unknown operation
+> INVALID bl:///cell/x
+< ERROR 400 unknown operation
+
+# Unknown stream
+> UNSUBSCRIBE s999
+< ERROR 404 stream not found

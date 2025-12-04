@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "declaration": false,
+    "noEmit": true,
+    "paths": {
+      "port-graphs": ["./port-graphs/src"],
+      "port-graphs/*": ["./port-graphs/src/*"],
+      "port-graphs-react": ["./port-graphs-react/src"],
+      "port-graphs-react/*": ["./port-graphs-react/src/*"],
+      "@/components/*": ["./apps/web/app/components/*"],
+      "@/lib/*": ["./apps/web/app/lib/*"]
+    },
+    "baseUrl": "."
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build"
+  ]
+}

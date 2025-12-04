@@ -1,0 +1,32 @@
+{
+  "name": "bassline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Getchyo groove on",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MercuricChloride/bassline.git"
+  },
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "scripts": {
+    "start": "pnpm --filter @bassline/web start",
+    "dev": "pnpm --parallel --stream dev",
+    "dev:web": "pnpm --filter @bassline/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.9",
+    "@types/react": "^19.1.13",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.4"
+  }
+}
