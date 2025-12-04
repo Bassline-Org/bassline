@@ -278,6 +278,162 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.3; }
     }
+
+    /* Form Styles */
+    .ui-form {
+      padding: 8px;
+    }
+
+    .ui-form-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: #4cc9f0;
+    }
+
+    .ui-field {
+      margin-bottom: 16px;
+    }
+
+    .ui-field label {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .ui-field input[type="text"],
+    .ui-field input[type="number"],
+    .ui-field input[type="email"],
+    .ui-field textarea,
+    .ui-field select {
+      width: 100%;
+      background: #0f0f1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+
+    .ui-field input:focus,
+    .ui-field textarea:focus,
+    .ui-field select:focus {
+      outline: none;
+      border-color: #4cc9f0;
+    }
+
+    .ui-field input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+    }
+
+    .ui-field .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+    }
+
+    .ui-field .checkbox-label {
+      text-transform: none;
+      letter-spacing: normal;
+      color: #eee;
+      font-size: 14px;
+    }
+
+    .ui-field textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .ui-field select {
+      cursor: pointer;
+    }
+
+    .ui-field .readonly-value {
+      background: #0f0f1a;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #888;
+    }
+
+    .ui-field .ref-display {
+      background: #0f0f1a;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #4cc9f0;
+      cursor: pointer;
+    }
+
+    .ui-field .ref-display:hover {
+      color: #7dd8f4;
+      text-decoration: underline;
+    }
+
+    .ui-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #333;
+    }
+
+    .ui-actions button {
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .ui-actions button.primary {
+      background: #4cc9f0;
+      border: none;
+      color: #1a1a2e;
+    }
+
+    .ui-actions button.primary:hover {
+      background: #7dd8f4;
+    }
+
+    .ui-actions button.secondary {
+      background: transparent;
+      border: 1px solid #444;
+      color: #eee;
+    }
+
+    .ui-actions button.secondary:hover {
+      background: #2a2a4a;
+    }
+
+    /* List type UI */
+    .ui-list {
+      padding: 8px;
+    }
+
+    .ui-list-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: #4cc9f0;
+    }
+
+    .ui-list-item {
+      padding: 12px;
+      background: #0f0f1a;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .ui-list-item:hover {
+      background: #1a1a3e;
+    }
   </style>
 </head>
 <body>
@@ -349,10 +505,82 @@
         // Start watching mirrors
         watchMirrors();
 
+        // Bootstrap default UI definitions
+        await bootstrapUI();
+
       } catch (e) {
         setConnected(false);
         console.error('Connection failed:', e);
       }
+    }
+
+    /**
+     * Bootstrap default UI definitions if not present
+     */
+    async function bootstrapUI() {
+      try {
+        // Check if bootstrap UI exists
+        const bootstrap = await fetchJson('/bl/ui/_bootstrap');
+        if (bootstrap) {
+          // Bootstrap exists, select it
+          setTimeout(() => selectMirror('bl:///ui/_bootstrap'), 100);
+          return;
+        }
+      } catch (e) {
+        // Bootstrap doesn't exist, create it
+      }
+
+      // Create default UI definitions
+      const defaultUIs = {
+        // Counter demo UI
+        '_counter': {
+          type: 'form',
+          title: 'Counter',
+          data: { $ref: 'bl:///cell/counter' },
+          fields: [
+            { path: '', label: 'Value', widget: 'number' }
+          ],
+          actions: [
+            { label: 'Save', action: 'write' }
+          ]
+        },
+
+        // Name demo UI
+        '_name': {
+          type: 'form',
+          title: 'Name',
+          data: { $ref: 'bl:///cell/name' },
+          fields: [
+            { path: '', label: 'Name', widget: 'text' }
+          ],
+          actions: [
+            { label: 'Save', action: 'write' }
+          ]
+        },
+
+        // Bootstrap panel
+        '_bootstrap': {
+          type: 'panel',
+          title: 'Bassline Explorer',
+          sections: [
+            { id: 'welcome', label: 'Welcome', content: 'Click on a mirror in the list to inspect it, or select a UI definition to render a form.' },
+            { id: 'counter', label: 'Counter Demo', ui: { $ref: 'bl:///ui/_counter' } },
+            { id: 'name', label: 'Name Demo', ui: { $ref: 'bl:///ui/_name' } }
+          ]
+        }
+      };
+
+      // Write each UI definition
+      for (const [name, def] of Object.entries(defaultUIs)) {
+        try {
+          await putValue(`/bl/ui/${name}`, def);
+        } catch (e) {
+          console.warn(`Could not create UI ${name}:`, e);
+        }
+      }
+
+      // Select bootstrap
+      setTimeout(() => selectMirror('bl:///ui/_bootstrap'), 500);
     }
 
     function setConnected(state) {
@@ -450,6 +678,12 @@
       if (inspectorSSE) {
         inspectorSSE.close();
         inspectorSSE = null;
+      }
+
+      // Check if this is a UI mirror - render as form
+      if (uri.startsWith('bl:///ui/')) {
+        await renderUIInInspector(uri);
+        return;
       }
 
       // Get info
@@ -608,6 +842,383 @@
 
     function escapeAttr(str) {
       return String(str).replace(/'/g, "\\'");
+    }
+
+    // ============================================================================
+    // UI Rendering Engine
+    // ============================================================================
+
+    /**
+     * Render a UI definition
+     * @param {Object} uiDef - UI definition from bl:///ui/...
+     * @param {Object} schema - Optional schema from bl:///schema/...
+     * @param {Object} data - Current data value
+     * @returns {string} HTML
+     */
+    function renderUI(uiDef, schema, data) {
+      if (!uiDef || !uiDef.type) {
+        return '<div class="empty-state">No UI definition</div>';
+      }
+
+      switch (uiDef.type) {
+        case 'form':
+          return renderFormUI(uiDef, schema, data);
+        case 'list':
+          return renderListUI(uiDef, schema, data);
+        case 'panel':
+          return renderPanelUI(uiDef, schema, data);
+        default:
+          return `<div class="empty-state">Unknown UI type: ${escapeHtml(uiDef.type)}</div>`;
+      }
+    }
+
+    /**
+     * Render a form UI
+     */
+    function renderFormUI(uiDef, schema, data) {
+      const fields = (uiDef.fields || []).map(field => {
+        const schemaField = schema?.properties?.[field.path];
+        const value = data ? getNestedValue(data, field.path) : undefined;
+        return renderField(field, schemaField, value);
+      }).join('');
+
+      const actions = (uiDef.actions || [{ label: 'Save', action: 'write' }]).map(action => {
+        const isPrimary = action.action === 'write' || action.primary;
+        return `<button class="${isPrimary ? 'primary' : 'secondary'}"
+                        data-action="${escapeAttr(action.action)}">${escapeHtml(action.label)}</button>`;
+      }).join('');
+
+      return `
+        <div class="ui-form" data-ui-type="form" data-data-ref="${escapeAttr(uiDef.data?.$ref || '')}">
+          ${uiDef.title ? `<div class="ui-form-title">${escapeHtml(uiDef.title)}</div>` : ''}
+          ${fields}
+          <div class="ui-actions">${actions}</div>
+        </div>
+      `;
+    }
+
+    /**
+     * Render a single form field
+     */
+    function renderField(field, schemaField, value) {
+      const widget = field.widget || inferWidget(schemaField, value);
+      const label = field.label || field.path;
+      const required = schemaField?.required || field.required;
+
+      let input;
+      switch (widget) {
+        case 'text':
+          input = `<input type="text" data-path="${escapeAttr(field.path)}"
+                          value="${escapeAttr(value ?? '')}"
+                          ${required ? 'required' : ''}>`;
+          break;
+
+        case 'number':
+          input = `<input type="number" data-path="${escapeAttr(field.path)}"
+                          value="${escapeAttr(value ?? '')}"
+                          ${schemaField?.minimum !== undefined ? `min="${schemaField.minimum}"` : ''}
+                          ${schemaField?.maximum !== undefined ? `max="${schemaField.maximum}"` : ''}
+                          ${required ? 'required' : ''}>`;
+          break;
+
+        case 'checkbox':
+          input = `<div class="checkbox-wrapper">
+                     <input type="checkbox" data-path="${escapeAttr(field.path)}"
+                            ${value ? 'checked' : ''}>
+                     <span class="checkbox-label">${escapeHtml(label)}</span>
+                   </div>`;
+          // For checkbox, don't show label twice
+          return `<div class="ui-field">${input}</div>`;
+
+        case 'select':
+          const options = (field.options || schemaField?.enum || []).map(opt => {
+            const optValue = typeof opt === 'object' ? opt.value : opt;
+            const optLabel = typeof opt === 'object' ? opt.label : opt;
+            return `<option value="${escapeAttr(optValue)}" ${optValue === value ? 'selected' : ''}>${escapeHtml(optLabel)}</option>`;
+          }).join('');
+          input = `<select data-path="${escapeAttr(field.path)}" ${required ? 'required' : ''}>
+                     <option value="">Select...</option>
+                     ${options}
+                   </select>`;
+          break;
+
+        case 'textarea':
+          input = `<textarea data-path="${escapeAttr(field.path)}"
+                             ${required ? 'required' : ''}>${escapeHtml(value ?? '')}</textarea>`;
+          break;
+
+        case 'json':
+          input = `<textarea data-path="${escapeAttr(field.path)}" data-type="json"
+                             ${required ? 'required' : ''}>${escapeHtml(JSON.stringify(value, null, 2) ?? '')}</textarea>`;
+          break;
+
+        case 'ref':
+          const refValue = value?.$ref || value;
+          input = `<div class="ref-display" data-path="${escapeAttr(field.path)}"
+                       onclick="selectMirror('${escapeAttr(refValue)}')">${escapeHtml(refValue || '(none)')}</div>`;
+          break;
+
+        case 'display':
+          input = `<div class="readonly-value">${escapeHtml(formatDisplayValue(value))}</div>`;
+          break;
+
+        default:
+          input = `<input type="text" data-path="${escapeAttr(field.path)}"
+                          value="${escapeAttr(value ?? '')}">`;
+      }
+
+      return `
+        <div class="ui-field">
+          <label>${escapeHtml(label)}${required ? ' *' : ''}</label>
+          ${input}
+        </div>
+      `;
+    }
+
+    /**
+     * Infer widget type from schema or value
+     */
+    function inferWidget(schemaField, value) {
+      if (schemaField?.enum) return 'select';
+      if (schemaField?.type === 'boolean' || typeof value === 'boolean') return 'checkbox';
+      if (schemaField?.type === 'number' || schemaField?.type === 'integer' || typeof value === 'number') return 'number';
+      if (schemaField?.type === 'object' || schemaField?.type === 'array') return 'json';
+      if (typeof value === 'object' && value !== null) return 'json';
+      return 'text';
+    }
+
+    /**
+     * Format a value for display widget
+     */
+    function formatDisplayValue(value) {
+      if (value === null || value === undefined) return '(empty)';
+      if (typeof value === 'object') return JSON.stringify(value, null, 2);
+      return String(value);
+    }
+
+    /**
+     * Get nested value from object by path (e.g., "user.name")
+     * Empty path returns the value itself (for simple values like numbers)
+     */
+    function getNestedValue(obj, path) {
+      if (obj === null || obj === undefined) return undefined;
+      if (!path || path === '') return obj; // Empty path = return value itself
+      const parts = path.split('.');
+      let current = obj;
+      for (const part of parts) {
+        if (current === null || current === undefined) return undefined;
+        current = current[part];
+      }
+      return current;
+    }
+
+    /**
+     * Set nested value in object by path
+     */
+    function setNestedValue(obj, path, value) {
+      const parts = path.split('.');
+      let current = obj;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!(parts[i] in current)) {
+          current[parts[i]] = {};
+        }
+        current = current[parts[i]];
+      }
+      current[parts[parts.length - 1]] = value;
+    }
+
+    /**
+     * Render a list UI
+     */
+    function renderListUI(uiDef, schema, data) {
+      if (!Array.isArray(data)) {
+        return '<div class="empty-state">List data must be an array</div>';
+      }
+
+      const items = data.map((item, index) => {
+        const display = uiDef.itemDisplay ? getNestedValue(item, uiDef.itemDisplay) : JSON.stringify(item);
+        return `<div class="ui-list-item" data-index="${index}">${escapeHtml(display)}</div>`;
+      }).join('');
+
+      return `
+        <div class="ui-list" data-ui-type="list">
+          ${uiDef.title ? `<div class="ui-list-title">${escapeHtml(uiDef.title)}</div>` : ''}
+          ${items || '<div class="empty-state">No items</div>'}
+        </div>
+      `;
+    }
+
+    /**
+     * Render a panel UI (sections)
+     */
+    function renderPanelUI(uiDef, schema, data) {
+      // Panel contains sections - each may have a ui ref or content
+      const sections = (uiDef.sections || []).map(section => {
+        let content;
+        if (section.ui?.$ref) {
+          // Section has a nested UI - show link to it
+          content = `<div class="ref-display" onclick="selectMirror('${escapeAttr(section.ui.$ref)}')">${escapeHtml(section.ui.$ref)}</div>`;
+        } else if (section.content) {
+          content = `<div class="readonly-value">${escapeHtml(section.content)}</div>`;
+        } else {
+          content = `<div class="empty-state">No content</div>`;
+        }
+
+        return `
+          <div class="inspector-section">
+            <h3>${escapeHtml(section.label || section.id)}</h3>
+            <div class="panel-section-content" data-section="${escapeAttr(section.id)}">
+              ${content}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="ui-panel" data-ui-type="panel">
+          ${uiDef.title ? `<div class="ui-form-title">${escapeHtml(uiDef.title)}</div>` : ''}
+          ${sections}
+        </div>
+      `;
+    }
+
+    /**
+     * Collect form values from rendered UI
+     * Returns the value directly if there's a single empty-path field (for simple values like numbers)
+     */
+    function collectFormValues(formEl) {
+      const inputs = Array.from(formEl.querySelectorAll('[data-path]'));
+      let values = {};
+      let emptyPathCount = 0;
+      let emptyPathValue = null;
+
+      for (const input of inputs) {
+        const path = input.dataset.path;
+        let value;
+
+        if (input.type === 'checkbox') {
+          value = input.checked;
+        } else if (input.type === 'number') {
+          value = input.value !== '' ? Number(input.value) : null;
+        } else if (input.dataset.type === 'json') {
+          try {
+            value = JSON.parse(input.value);
+          } catch {
+            value = input.value;
+          }
+        } else {
+          value = input.value;
+        }
+
+        // Empty path means the value IS the data (not nested)
+        if (path === '' || path === undefined) {
+          emptyPathCount++;
+          emptyPathValue = value;
+        } else {
+          setNestedValue(values, path, value);
+        }
+      }
+
+      // If the only field has empty path, return the value directly
+      // This handles simple values like numbers, strings, etc.
+      if (emptyPathCount > 0 && Object.keys(values).length === 0) {
+        return emptyPathValue;
+      }
+      return values;
+    }
+
+    /**
+     * Setup event handlers for UI forms
+     */
+    function setupUIHandlers(container) {
+      container.querySelectorAll('.ui-actions button').forEach(btn => {
+        btn.onclick = async () => {
+          const action = btn.dataset.action;
+          const form = btn.closest('.ui-form');
+          const dataRef = form?.dataset.dataRef;
+
+          if (action === 'write' && dataRef) {
+            const values = collectFormValues(form);
+            try {
+              await putValue('/bl' + dataRef.replace('bl://', ''), values);
+              // Visual feedback
+              btn.textContent = 'Saved!';
+              setTimeout(() => btn.textContent = 'Save', 1000);
+            } catch (e) {
+              alert('Error saving: ' + e.message);
+            }
+          } else if (action === 'reload' && dataRef) {
+            // Reload data from server
+            selectMirror(dataRef);
+          }
+        };
+      });
+    }
+
+    /**
+     * Render a UI mirror in the inspector
+     */
+    async function renderUIInInspector(uiUri) {
+      const inspector = document.getElementById('inspector');
+
+      // Fetch UI definition
+      const uiPath = '/bl' + uiUri.replace('bl://', '');
+      let uiDef;
+      try {
+        uiDef = await fetchJson(uiPath);
+      } catch (e) {
+        inspector.innerHTML = `<div class="empty-state">Error loading UI: ${escapeHtml(e.message)}</div>`;
+        return;
+      }
+
+      if (!uiDef) {
+        inspector.innerHTML = '<div class="empty-state">UI definition is empty</div>';
+        return;
+      }
+
+      // Fetch data if referenced
+      let data = null;
+      if (uiDef.data?.$ref) {
+        try {
+          const dataPath = '/bl' + uiDef.data.$ref.replace('bl://', '');
+          data = await fetchJson(dataPath);
+        } catch (e) {
+          console.warn('Could not load data:', e);
+        }
+      }
+
+      // Fetch schema if referenced
+      let schema = null;
+      if (uiDef.schema?.$ref) {
+        try {
+          const schemaPath = '/bl' + uiDef.schema.$ref.replace('bl://', '');
+          schema = await fetchJson(schemaPath);
+        } catch (e) {
+          console.warn('Could not load schema:', e);
+        }
+      }
+
+      // Render
+      inspector.innerHTML = renderUI(uiDef, schema, data);
+      setupUIHandlers(inspector);
+
+      // Subscribe for live updates if data ref exists
+      if (uiDef.data?.$ref) {
+        if (inspectorSSE) inspectorSSE.close();
+        const dataPath = '/bl' + uiDef.data.$ref.replace('bl://', '');
+        inspectorSSE = subscribe(dataPath, (newData) => {
+          // Re-render form with new data but preserve focus
+          const activeEl = document.activeElement;
+          const activePath = activeEl?.dataset?.path;
+          inspector.innerHTML = renderUI(uiDef, schema, newData);
+          setupUIHandlers(inspector);
+          // Restore focus
+          if (activePath) {
+            const el = inspector.querySelector(`[data-path="${activePath}"]`);
+            if (el) el.focus();
+          }
+        });
+      }
     }
 
     // Auto-connect on load
