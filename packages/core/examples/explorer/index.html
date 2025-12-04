@@ -434,6 +434,27 @@
     .ui-list-item:hover {
       background: #1a1a3e;
     }
+
+    /* Filter dropdown */
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-header select {
+      background: #0f0f1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .panel-header select:hover {
+      border-color: #4cc9f0;
+    }
   </style>
 </head>
 <body>
@@ -456,7 +477,17 @@
     </div>
 
     <div class="panel">
-      <div class="panel-header">Mirrors <span id="watchingMirrors"></span></div>
+      <div class="panel-header">
+        <span>Mirrors</span>
+        <select id="mirrorFilter" onchange="updateMirrorFilter()">
+          <option value="">All</option>
+          <option value="type=cell">Cells</option>
+          <option value="type=ui">UI</option>
+          <option value="type=schema">Schema</option>
+          <option value="type=compound">Compound</option>
+        </select>
+        <span id="watchingMirrors"></span>
+      </div>
       <div class="panel-content" id="mirrorsList"></div>
     </div>
 
@@ -486,6 +517,7 @@
     let mirrorsSSE = null;
     let inspectorSSE = null;
     let knownMirrors = new Set();
+    let currentFilter = '';
 
     // ============================================================================
     // Connection
@@ -642,9 +674,16 @@
 
       document.getElementById('watchingMirrors').innerHTML = '<span class="watching-indicator"></span>';
 
-      mirrorsSSE = subscribe('/bl/registry/mirrors', (mirrors) => {
+      const filterParam = currentFilter ? `?${currentFilter}` : '';
+      mirrorsSSE = subscribe(`/bl/registry/mirrors${filterParam}`, (mirrors) => {
         renderMirrors(mirrors);
       });
+    }
+
+    function updateMirrorFilter() {
+      currentFilter = document.getElementById('mirrorFilter').value;
+      knownMirrors.clear(); // Reset known mirrors when filter changes
+      watchMirrors();
     }
 
     function renderMirrors(mirrors) {

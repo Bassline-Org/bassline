@@ -6,9 +6,65 @@
  * - bl:///registry/resolvers - List all resolvers (same as above)
  * - bl:///registry/mirrors - List all resolved mirrors
  * - bl:///registry/info?ref=<uri> - Info about specific mirror
+ *
+ * Query selectors for /mirrors:
+ * - ?type=cell - Filter by mirror type
+ * - ?pattern=ui/* - Filter by URI pattern (glob-like)
+ * - ?has=data - Filter by property existence in value
+ * - ?where=type:form - Filter by value content
  */
 
 import { BaseMirror } from './interface.js';
+
+/**
+ * Convert glob pattern to regex
+ * Supports * (any chars) and ? (single char)
+ */
+function patternToRegex(pattern) {
+  const escaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  return new RegExp(`^bl:///${escaped}$`);
+}
+
+/**
+ * Check if value has property at path
+ * Path uses dot notation: "data.$ref" checks value.data.$ref
+ */
+function hasProperty(value, path) {
+  if (value === null || value === undefined) return false;
+  if (path === '') return true;
+
+  const parts = path.split('.');
+  let current = value;
+  for (const part of parts) {
+    if (current === null || current === undefined) return false;
+    if (typeof current !== 'object') return false;
+    if (!(part in current)) return false;
+    current = current[part];
+  }
+  return true;
+}
+
+/**
+ * Get value at path
+ * Returns undefined if path doesn't exist
+ */
+function getPath(value, path) {
+  if (value === null || value === undefined) return undefined;
+  if (path === '') return value;
+
+  const parts = path.split('.');
+  let current = value;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    if (typeof current !== 'object') return undefined;
+    if (!(part in current)) return undefined;
+    current = current[part];
+  }
+  return current;
+}
 
 export class RegistryMirror extends BaseMirror {
   constructor(r, bassline) {
@@ -32,8 +88,7 @@ export class RegistryMirror extends BaseMirror {
         return this._bassline.listResolvers();
 
       case 'mirrors':
-        // Filter out registry mirrors to avoid recursive loops in explorers
-        return this._bassline.listMirrors().filter(uri => !uri.startsWith('bl:///registry'));
+        return this._getFilteredMirrors();
 
       case 'info':
         return this._getMirrorInfo();
@@ -67,6 +122,65 @@ export class RegistryMirror extends BaseMirror {
       writable: mirror.writable,
       ordering: mirror.ordering || null
     };
+  }
+
+  /**
+   * Get mirrors with optional filtering via query params
+   * - ?type=cell - Filter by mirror type
+   * - ?pattern=ui/* - Filter by URI pattern (glob-like)
+   * - ?has=data - Filter by property existence in value
+   * - ?where=type:form - Filter by value content
+   */
+  _getFilteredMirrors() {
+    // Start with all mirrors, excluding registry to avoid recursion
+    let mirrors = this._bassline.listMirrors()
+      .filter(uri => !uri.startsWith('bl:///registry'));
+
+    // Filter by mirror type
+    const type = this._ref.searchParams.get('type');
+    if (type) {
+      mirrors = mirrors.filter(uri => {
+        const mirror = this._bassline.resolve(uri);
+        return mirror.constructor.mirrorType === type;
+      });
+    }
+
+    // Filter by URI pattern (glob-like)
+    const pattern = this._ref.searchParams.get('pattern');
+    if (pattern) {
+      const regex = patternToRegex(pattern);
+      mirrors = mirrors.filter(uri => regex.test(uri));
+    }
+
+    // Filter by property existence in value
+    const has = this._ref.searchParams.get('has');
+    if (has) {
+      mirrors = mirrors.filter(uri => {
+        const mirror = this._bassline.resolve(uri);
+        if (!mirror.readable) return false;
+        const value = mirror.read();
+        return hasProperty(value, has);
+      });
+    }
+
+    // Filter by value content (where=path:expected)
+    const where = this._ref.searchParams.get('where');
+    if (where) {
+      const colonIdx = where.indexOf(':');
+      if (colonIdx > 0) {
+        const path = where.slice(0, colonIdx);
+        const expected = where.slice(colonIdx + 1);
+        mirrors = mirrors.filter(uri => {
+          const mirror = this._bassline.resolve(uri);
+          if (!mirror.readable) return false;
+          const value = mirror.read();
+          const actual = getPath(value, path);
+          return String(actual) === expected;
+        });
+      }
+    }
+
+    return mirrors;
   }
 
   write() {
