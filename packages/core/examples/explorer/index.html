@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bassline System Explorer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+      background: #1a1a2e;
+      color: #eee;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #16213e;
+      padding: 12px 20px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: #4cc9f0;
+    }
+
+    header .server-url {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    header input {
+      background: #0f0f1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      width: 200px;
+    }
+
+    header button {
+      background: #4cc9f0;
+      border: none;
+      color: #1a1a2e;
+      padding: 6px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    header button:hover { background: #7dd8f4; }
+
+    .status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #888;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #e63946;
+    }
+
+    .status-dot.connected { background: #2ecc71; }
+
+    main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #333;
+      min-width: 0;
+    }
+
+    .panel:last-child { border-right: none; }
+
+    .panel-header {
+      background: #16213e;
+      padding: 10px 16px;
+      border-bottom: 1px solid #333;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .list-item {
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-item:hover { background: #2a2a4a; }
+    .list-item.selected { background: #4cc9f0; color: #1a1a2e; }
+
+    .list-item.new {
+      animation: flash 0.5s ease-out;
+    }
+
+    @keyframes flash {
+      0% { background: #4cc9f0; }
+      100% { background: transparent; }
+    }
+
+    /* Inspector panel is wider */
+    .panel.inspector { flex: 1.5; }
+
+    .inspector-section {
+      margin-bottom: 20px;
+    }
+
+    .inspector-section h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      margin-bottom: 8px;
+      padding: 0 8px;
+    }
+
+    .inspector-field {
+      display: flex;
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    .inspector-field .label {
+      color: #888;
+      width: 80px;
+      flex-shrink: 0;
+    }
+
+    .inspector-field .value {
+      font-family: monospace;
+      word-break: break-all;
+    }
+
+    .inspector-field .value.true { color: #2ecc71; }
+    .inspector-field .value.false { color: #e63946; }
+
+    .value-display {
+      background: #0f0f1a;
+      border-radius: 4px;
+      padding: 12px;
+      margin: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .value-display .ref-link {
+      color: #4cc9f0;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .value-display .ref-link:hover { color: #7dd8f4; }
+
+    .actions {
+      padding: 8px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .actions button {
+      background: #2a2a4a;
+      border: 1px solid #444;
+      color: #eee;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .actions button:hover { background: #3a3a5a; }
+    .actions button.primary { background: #4cc9f0; color: #1a1a2e; border-color: #4cc9f0; }
+    .actions button.primary:hover { background: #7dd8f4; }
+
+    .edit-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .edit-modal.open { display: flex; }
+
+    .edit-modal-content {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 20px;
+      width: 500px;
+      max-width: 90%;
+    }
+
+    .edit-modal h3 {
+      margin-bottom: 16px;
+      font-size: 16px;
+    }
+
+    .edit-modal textarea {
+      width: 100%;
+      height: 200px;
+      background: #0f0f1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 13px;
+      resize: vertical;
+    }
+
+    .edit-modal .buttons {
+      margin-top: 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .empty-state {
+      color: #666;
+      font-style: italic;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .watching-indicator {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #2ecc71;
+      margin-left: 8px;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Form Styles */
+    .ui-form {
+      padding: 8px;
+    }
+
+    .ui-form-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: #4cc9f0;
+    }
+
+    .ui-field {
+      margin-bottom: 16px;
+    }
+
+    .ui-field label {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+
+    .ui-field input[type="text"],
+    .ui-field input[type="number"],
+    .ui-field input[type="email"],
+    .ui-field textarea,
+    .ui-field select {
+      width: 100%;
+      background: #0f0f1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+    }
+
+    .ui-field input:focus,
+    .ui-field textarea:focus,
+    .ui-field select:focus {
+      outline: none;
+      border-color: #4cc9f0;
+    }
+
+    .ui-field input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-right: 8px;
+    }
+
+    .ui-field .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+    }
+
+    .ui-field .checkbox-label {
+      text-transform: none;
+      letter-spacing: normal;
+      color: #eee;
+      font-size: 14px;
+    }
+
+    .ui-field textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .ui-field select {
+      cursor: pointer;
+    }
+
+    .ui-field .readonly-value {
+      background: #0f0f1a;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #888;
+    }
+
+    .ui-field .ref-display {
+      background: #0f0f1a;
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #4cc9f0;
+      cursor: pointer;
+    }
+
+    .ui-field .ref-display:hover {
+      color: #7dd8f4;
+      text-decoration: underline;
+    }
+
+    .ui-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #333;
+    }
+
+    .ui-actions button {
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .ui-actions button.primary {
+      background: #4cc9f0;
+      border: none;
+      color: #1a1a2e;
+    }
+
+    .ui-actions button.primary:hover {
+      background: #7dd8f4;
+    }
+
+    .ui-actions button.secondary {
+      background: transparent;
+      border: 1px solid #444;
+      color: #eee;
+    }
+
+    .ui-actions button.secondary:hover {
+      background: #2a2a4a;
+    }
+
+    /* List type UI */
+    .ui-list {
+      padding: 8px;
+    }
+
+    .ui-list-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: #4cc9f0;
+    }
+
+    .ui-list-item {
+      padding: 12px;
+      background: #0f0f1a;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    .ui-list-item:hover {
+      background: #1a1a3e;
+    }
+
+    /* Filter dropdown */
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-header select {
+      background: #0f0f1a;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .panel-header select:hover {
+      border-color: #4cc9f0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bassline System Explorer</h1>
+    <div class="server-url">
+      <input type="text" id="serverUrl" value="http://localhost:8080" placeholder="Server URL">
+      <button onclick="connect()">Connect</button>
+    </div>
+    <div class="status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Disconnected</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="panel">
+      <div class="panel-header">Resolvers</div>
+      <div class="panel-content" id="resolversList"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span>Mirrors</span>
+        <select id="mirrorFilter" onchange="updateMirrorFilter()">
+          <option value="">All</option>
+          <option value="type=cell">Cells</option>
+          <option value="type=ui">UI</option>
+          <option value="type=schema">Schema</option>
+          <option value="type=compound">Compound</option>
+        </select>
+        <span id="watchingMirrors"></span>
+      </div>
+      <div class="panel-content" id="mirrorsList"></div>
+    </div>
+
+    <div class="panel inspector">
+      <div class="panel-header">Inspector</div>
+      <div class="panel-content" id="inspector">
+        <div class="empty-state">Select a mirror to inspect</div>
+      </div>
+    </div>
+  </main>
+
+  <div class="edit-modal" id="editModal">
+    <div class="edit-modal-content">
+      <h3>Edit Value</h3>
+      <textarea id="editValue"></textarea>
+      <div class="buttons">
+        <button onclick="closeEditModal()">Cancel</button>
+        <button class="primary" onclick="saveValue()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let baseUrl = 'http://localhost:8080';
+    let connected = false;
+    let selectedMirror = null;
+    let mirrorsSSE = null;
+    let inspectorSSE = null;
+    let knownMirrors = new Set();
+    let currentFilter = '';
+
+    // ============================================================================
+    // Connection
+    // ============================================================================
+
+    async function connect() {
+      baseUrl = document.getElementById('serverUrl').value.replace(/\/$/, '');
+
+      try {
+        // Test connection by fetching resolvers
+        const resolvers = await fetchJson('/bl/registry');
+        setConnected(true);
+
+        // Populate resolvers
+        renderResolvers(resolvers);
+
+        // Start watching mirrors
+        watchMirrors();
+
+        // Bootstrap default UI definitions
+        await bootstrapUI();
+
+      } catch (e) {
+        setConnected(false);
+        console.error('Connection failed:', e);
+      }
+    }
+
+    /**
+     * Bootstrap default UI definitions if not present
+     */
+    async function bootstrapUI() {
+      try {
+        // Check if bootstrap UI exists
+        const bootstrap = await fetchJson('/bl/ui/_bootstrap');
+        if (bootstrap) {
+          // Bootstrap exists, select it
+          setTimeout(() => selectMirror('bl:///ui/_bootstrap'), 100);
+          return;
+        }
+      } catch (e) {
+        // Bootstrap doesn't exist, create it
+      }
+
+      // Create default UI definitions
+      const defaultUIs = {
+        // Counter demo UI
+        '_counter': {
+          type: 'form',
+          title: 'Counter',
+          data: { $ref: 'bl:///cell/counter' },
+          fields: [
+            { path: '', label: 'Value', widget: 'number' }
+          ],
+          actions: [
+            { label: 'Save', action: 'write' }
+          ]
+        },
+
+        // Name demo UI
+        '_name': {
+          type: 'form',
+          title: 'Name',
+          data: { $ref: 'bl:///cell/name' },
+          fields: [
+            { path: '', label: 'Name', widget: 'text' }
+          ],
+          actions: [
+            { label: 'Save', action: 'write' }
+          ]
+        },
+
+        // Bootstrap panel
+        '_bootstrap': {
+          type: 'panel',
+          title: 'Bassline Explorer',
+          sections: [
+            { id: 'welcome', label: 'Welcome', content: 'Click on a mirror in the list to inspect it, or select a UI definition to render a form.' },
+            { id: 'counter', label: 'Counter Demo', ui: { $ref: 'bl:///ui/_counter' } },
+            { id: 'name', label: 'Name Demo', ui: { $ref: 'bl:///ui/_name' } }
+          ]
+        }
+      };
+
+      // Write each UI definition
+      for (const [name, def] of Object.entries(defaultUIs)) {
+        try {
+          await putValue(`/bl/ui/${name}`, def);
+        } catch (e) {
+          console.warn(`Could not create UI ${name}:`, e);
+        }
+      }
+
+      // Select bootstrap
+      setTimeout(() => selectMirror('bl:///ui/_bootstrap'), 500);
+    }
+
+    function setConnected(state) {
+      connected = state;
+      document.getElementById('statusDot').className = 'status-dot' + (state ? ' connected' : '');
+      document.getElementById('statusText').textContent = state ? 'Connected' : 'Disconnected';
+    }
+
+    // ============================================================================
+    // API
+    // ============================================================================
+
+    async function fetchJson(path) {
+      const res = await fetch(baseUrl + path, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data.value !== undefined ? data.value : data;
+    }
+
+    async function putValue(path, value) {
+      const res = await fetch(baseUrl + path, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(value)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    }
+
+    function subscribe(path, onMessage) {
+      const url = baseUrl + path + (path.includes('?') ? '&' : '?') + 'sse=1';
+      const es = new EventSource(url);
+
+      es.addEventListener('value', (e) => onMessage(JSON.parse(e.data)));
+      es.addEventListener('update', (e) => onMessage(JSON.parse(e.data)));
+      es.onerror = () => console.error('SSE error for', path);
+
+      return es;
+    }
+
+    // ============================================================================
+    // Resolvers
+    // ============================================================================
+
+    function renderResolvers(resolvers) {
+      const list = document.getElementById('resolversList');
+      list.innerHTML = resolvers.map(r =>
+        `<div class="list-item">${escapeHtml(r)}</div>`
+      ).join('');
+    }
+
+    // ============================================================================
+    // Mirrors
+    // ============================================================================
+
+    function watchMirrors() {
+      if (mirrorsSSE) mirrorsSSE.close();
+
+      document.getElementById('watchingMirrors').innerHTML = '<span class="watching-indicator"></span>';
+
+      const filterParam = currentFilter ? `?${currentFilter}` : '';
+      mirrorsSSE = subscribe(`/bl/registry/mirrors${filterParam}`, (mirrors) => {
+        renderMirrors(mirrors);
+      });
+    }
+
+    function updateMirrorFilter() {
+      currentFilter = document.getElementById('mirrorFilter').value;
+      knownMirrors.clear(); // Reset known mirrors when filter changes
+      watchMirrors();
+    }
+
+    function renderMirrors(mirrors) {
+      const list = document.getElementById('mirrorsList');
+      const newMirrors = mirrors.filter(m => !knownMirrors.has(m));
+
+      list.innerHTML = mirrors.map(m => {
+        const isNew = newMirrors.includes(m);
+        const isSelected = m === selectedMirror;
+        return `<div class="list-item${isNew ? ' new' : ''}${isSelected ? ' selected' : ''}"
+                     onclick="selectMirror('${escapeAttr(m)}')">${escapeHtml(m)}</div>`;
+      }).join('');
+
+      // Update known mirrors
+      mirrors.forEach(m => knownMirrors.add(m));
+    }
+
+    // ============================================================================
+    // Inspector
+    // ============================================================================
+
+    async function selectMirror(uri) {
+      selectedMirror = uri;
+
+      // Update selection in list
+      document.querySelectorAll('#mirrorsList .list-item').forEach(el => {
+        el.classList.toggle('selected', el.textContent === uri);
+      });
+
+      // Close previous inspector SSE
+      if (inspectorSSE) {
+        inspectorSSE.close();
+        inspectorSSE = null;
+      }
+
+      // Check if this is a UI mirror - render as form
+      if (uri.startsWith('bl:///ui/')) {
+        await renderUIInInspector(uri);
+        return;
+      }
+
+      // Get info
+      const infoPath = '/bl/registry/info?ref=' + encodeURIComponent(uri);
+      let info;
+      try {
+        info = await fetchJson(infoPath);
+      } catch (e) {
+        info = { error: e.message };
+      }
+
+      // Get current value
+      const valuePath = '/bl' + uri.replace('bl://', '');
+      let value;
+      try {
+        value = await fetchJson(valuePath);
+      } catch (e) {
+        value = { error: e.message };
+      }
+
+      renderInspector(uri, info, value);
+
+      // Subscribe for live updates
+      if (info && info.readable) {
+        inspectorSSE = subscribe(valuePath, (newValue) => {
+          updateInspectorValue(newValue);
+        });
+      }
+    }
+
+    function renderInspector(uri, info, value) {
+      const inspector = document.getElementById('inspector');
+
+      inspector.innerHTML = `
+        <div class="inspector-section">
+          <h3>URI</h3>
+          <div class="value-display">${escapeHtml(uri)}</div>
+        </div>
+
+        <div class="inspector-section">
+          <h3>Capabilities</h3>
+          <div class="inspector-field">
+            <span class="label">Type</span>
+            <span class="value">${info?.type || 'unknown'}</span>
+          </div>
+          <div class="inspector-field">
+            <span class="label">Readable</span>
+            <span class="value ${info?.readable}">${info?.readable ?? '?'}</span>
+          </div>
+          <div class="inspector-field">
+            <span class="label">Writable</span>
+            <span class="value ${info?.writable}">${info?.writable ?? '?'}</span>
+          </div>
+          <div class="inspector-field">
+            <span class="label">Ordering</span>
+            <span class="value">${info?.ordering || 'none'}</span>
+          </div>
+        </div>
+
+        <div class="inspector-section">
+          <h3>Value <span id="valueWatching"></span></h3>
+          <div class="value-display" id="valueDisplay">${formatValue(value)}</div>
+        </div>
+
+        ${info?.writable ? `
+        <div class="actions">
+          <button class="primary" onclick="openEditModal()">Edit</button>
+        </div>
+        ` : ''}
+      `;
+
+      if (info?.readable) {
+        document.getElementById('valueWatching').innerHTML = '<span class="watching-indicator"></span>';
+      }
+
+      // Make refs clickable
+      setupRefLinks();
+    }
+
+    function updateInspectorValue(value) {
+      const display = document.getElementById('valueDisplay');
+      if (display) {
+        display.innerHTML = formatValue(value);
+        setupRefLinks();
+      }
+    }
+
+    function formatValue(value) {
+      if (value === null) return '<span style="color:#888">null</span>';
+      if (value === undefined) return '<span style="color:#888">undefined</span>';
+
+      const json = JSON.stringify(value, null, 2);
+
+      // Highlight $ref values and make them clickable
+      return escapeHtml(json).replace(
+        /"\$ref":\s*"([^"]+)"/g,
+        '"$ref": "<span class="ref-link" data-ref="$1">$1</span>"'
+      );
+    }
+
+    function setupRefLinks() {
+      document.querySelectorAll('.ref-link').forEach(el => {
+        el.onclick = () => selectMirror(el.dataset.ref);
+      });
+    }
+
+    // ============================================================================
+    // Edit Modal
+    // ============================================================================
+
+    function openEditModal() {
+      const display = document.getElementById('valueDisplay');
+      const textarea = document.getElementById('editValue');
+
+      // Get current value (parse from display, or fetch fresh)
+      fetchJson('/bl' + selectedMirror.replace('bl://', '')).then(value => {
+        textarea.value = JSON.stringify(value, null, 2);
+        document.getElementById('editModal').classList.add('open');
+      });
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('open');
+    }
+
+    async function saveValue() {
+      const textarea = document.getElementById('editValue');
+      let value;
+
+      try {
+        value = JSON.parse(textarea.value);
+      } catch (e) {
+        alert('Invalid JSON: ' + e.message);
+        return;
+      }
+
+      try {
+        await putValue('/bl' + selectedMirror.replace('bl://', ''), value);
+        closeEditModal();
+      } catch (e) {
+        alert('Error saving: ' + e.message);
+      }
+    }
+
+    // ============================================================================
+    // Utilities
+    // ============================================================================
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/'/g, "\\'");
+    }
+
+    // ============================================================================
+    // UI Rendering Engine
+    // ============================================================================
+
+    /**
+     * Render a UI definition
+     * @param {Object} uiDef - UI definition from bl:///ui/...
+     * @param {Object} schema - Optional schema from bl:///schema/...
+     * @param {Object} data - Current data value
+     * @returns {string} HTML
+     */
+    function renderUI(uiDef, schema, data) {
+      if (!uiDef || !uiDef.type) {
+        return '<div class="empty-state">No UI definition</div>';
+      }
+
+      switch (uiDef.type) {
+        case 'form':
+          return renderFormUI(uiDef, schema, data);
+        case 'list':
+          return renderListUI(uiDef, schema, data);
+        case 'panel':
+          return renderPanelUI(uiDef, schema, data);
+        default:
+          return `<div class="empty-state">Unknown UI type: ${escapeHtml(uiDef.type)}</div>`;
+      }
+    }
+
+    /**
+     * Render a form UI
+     */
+    function renderFormUI(uiDef, schema, data) {
+      const fields = (uiDef.fields || []).map(field => {
+        const schemaField = schema?.properties?.[field.path];
+        const value = data ? getNestedValue(data, field.path) : undefined;
+        return renderField(field, schemaField, value);
+      }).join('');
+
+      const actions = (uiDef.actions || [{ label: 'Save', action: 'write' }]).map(action => {
+        const isPrimary = action.action === 'write' || action.primary;
+        return `<button class="${isPrimary ? 'primary' : 'secondary'}"
+                        data-action="${escapeAttr(action.action)}">${escapeHtml(action.label)}</button>`;
+      }).join('');
+
+      return `
+        <div class="ui-form" data-ui-type="form" data-data-ref="${escapeAttr(uiDef.data?.$ref || '')}">
+          ${uiDef.title ? `<div class="ui-form-title">${escapeHtml(uiDef.title)}</div>` : ''}
+          ${fields}
+          <div class="ui-actions">${actions}</div>
+        </div>
+      `;
+    }
+
+    /**
+     * Render a single form field
+     */
+    function renderField(field, schemaField, value) {
+      const widget = field.widget || inferWidget(schemaField, value);
+      const label = field.label || field.path;
+      const required = schemaField?.required || field.required;
+
+      let input;
+      switch (widget) {
+        case 'text':
+          input = `<input type="text" data-path="${escapeAttr(field.path)}"
+                          value="${escapeAttr(value ?? '')}"
+                          ${required ? 'required' : ''}>`;
+          break;
+
+        case 'number':
+          input = `<input type="number" data-path="${escapeAttr(field.path)}"
+                          value="${escapeAttr(value ?? '')}"
+                          ${schemaField?.minimum !== undefined ? `min="${schemaField.minimum}"` : ''}
+                          ${schemaField?.maximum !== undefined ? `max="${schemaField.maximum}"` : ''}
+                          ${required ? 'required' : ''}>`;
+          break;
+
+        case 'checkbox':
+          input = `<div class="checkbox-wrapper">
+                     <input type="checkbox" data-path="${escapeAttr(field.path)}"
+                            ${value ? 'checked' : ''}>
+                     <span class="checkbox-label">${escapeHtml(label)}</span>
+                   </div>`;
+          // For checkbox, don't show label twice
+          return `<div class="ui-field">${input}</div>`;
+
+        case 'select':
+          const options = (field.options || schemaField?.enum || []).map(opt => {
+            const optValue = typeof opt === 'object' ? opt.value : opt;
+            const optLabel = typeof opt === 'object' ? opt.label : opt;
+            return `<option value="${escapeAttr(optValue)}" ${optValue === value ? 'selected' : ''}>${escapeHtml(optLabel)}</option>`;
+          }).join('');
+          input = `<select data-path="${escapeAttr(field.path)}" ${required ? 'required' : ''}>
+                     <option value="">Select...</option>
+                     ${options}
+                   </select>`;
+          break;
+
+        case 'textarea':
+          input = `<textarea data-path="${escapeAttr(field.path)}"
+                             ${required ? 'required' : ''}>${escapeHtml(value ?? '')}</textarea>`;
+          break;
+
+        case 'json':
+          input = `<textarea data-path="${escapeAttr(field.path)}" data-type="json"
+                             ${required ? 'required' : ''}>${escapeHtml(JSON.stringify(value, null, 2) ?? '')}</textarea>`;
+          break;
+
+        case 'ref':
+          const refValue = value?.$ref || value;
+          input = `<div class="ref-display" data-path="${escapeAttr(field.path)}"
+                       onclick="selectMirror('${escapeAttr(refValue)}')">${escapeHtml(refValue || '(none)')}</div>`;
+          break;
+
+        case 'display':
+          input = `<div class="readonly-value">${escapeHtml(formatDisplayValue(value))}</div>`;
+          break;
+
+        default:
+          input = `<input type="text" data-path="${escapeAttr(field.path)}"
+                          value="${escapeAttr(value ?? '')}">`;
+      }
+
+      return `
+        <div class="ui-field">
+          <label>${escapeHtml(label)}${required ? ' *' : ''}</label>
+          ${input}
+        </div>
+      `;
+    }
+
+    /**
+     * Infer widget type from schema or value
+     */
+    function inferWidget(schemaField, value) {
+      if (schemaField?.enum) return 'select';
+      if (schemaField?.type === 'boolean' || typeof value === 'boolean') return 'checkbox';
+      if (schemaField?.type === 'number' || schemaField?.type === 'integer' || typeof value === 'number') return 'number';
+      if (schemaField?.type === 'object' || schemaField?.type === 'array') return 'json';
+      if (typeof value === 'object' && value !== null) return 'json';
+      return 'text';
+    }
+
+    /**
+     * Format a value for display widget
+     */
+    function formatDisplayValue(value) {
+      if (value === null || value === undefined) return '(empty)';
+      if (typeof value === 'object') return JSON.stringify(value, null, 2);
+      return String(value);
+    }
+
+    /**
+     * Get nested value from object by path (e.g., "user.name")
+     * Empty path returns the value itself (for simple values like numbers)
+     */
+    function getNestedValue(obj, path) {
+      if (obj === null || obj === undefined) return undefined;
+      if (!path || path === '') return obj; // Empty path = return value itself
+      const parts = path.split('.');
+      let current = obj;
+      for (const part of parts) {
+        if (current === null || current === undefined) return undefined;
+        current = current[part];
+      }
+      return current;
+    }
+
+    /**
+     * Set nested value in object by path
+     */
+    function setNestedValue(obj, path, value) {
+      const parts = path.split('.');
+      let current = obj;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!(parts[i] in current)) {
+          current[parts[i]] = {};
+        }
+        current = current[parts[i]];
+      }
+      current[parts[parts.length - 1]] = value;
+    }
+
+    /**
+     * Render a list UI
+     */
+    function renderListUI(uiDef, schema, data) {
+      if (!Array.isArray(data)) {
+        return '<div class="empty-state">List data must be an array</div>';
+      }
+
+      const items = data.map((item, index) => {
+        const display = uiDef.itemDisplay ? getNestedValue(item, uiDef.itemDisplay) : JSON.stringify(item);
+        return `<div class="ui-list-item" data-index="${index}">${escapeHtml(display)}</div>`;
+      }).join('');
+
+      return `
+        <div class="ui-list" data-ui-type="list">
+          ${uiDef.title ? `<div class="ui-list-title">${escapeHtml(uiDef.title)}</div>` : ''}
+          ${items || '<div class="empty-state">No items</div>'}
+        </div>
+      `;
+    }
+
+    /**
+     * Render a panel UI (sections)
+     */
+    function renderPanelUI(uiDef, schema, data) {
+      // Panel contains sections - each may have a ui ref or content
+      const sections = (uiDef.sections || []).map(section => {
+        let content;
+        if (section.ui?.$ref) {
+          // Section has a nested UI - show link to it
+          content = `<div class="ref-display" onclick="selectMirror('${escapeAttr(section.ui.$ref)}')">${escapeHtml(section.ui.$ref)}</div>`;
+        } else if (section.content) {
+          content = `<div class="readonly-value">${escapeHtml(section.content)}</div>`;
+        } else {
+          content = `<div class="empty-state">No content</div>`;
+        }
+
+        return `
+          <div class="inspector-section">
+            <h3>${escapeHtml(section.label || section.id)}</h3>
+            <div class="panel-section-content" data-section="${escapeAttr(section.id)}">
+              ${content}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="ui-panel" data-ui-type="panel">
+          ${uiDef.title ? `<div class="ui-form-title">${escapeHtml(uiDef.title)}</div>` : ''}
+          ${sections}
+        </div>
+      `;
+    }
+
+    /**
+     * Collect form values from rendered UI
+     * Returns the value directly if there's a single empty-path field (for simple values like numbers)
+     */
+    function collectFormValues(formEl) {
+      const inputs = Array.from(formEl.querySelectorAll('[data-path]'));
+      let values = {};
+      let emptyPathCount = 0;
+      let emptyPathValue = null;
+
+      for (const input of inputs) {
+        const path = input.dataset.path;
+        let value;
+
+        if (input.type === 'checkbox') {
+          value = input.checked;
+        } else if (input.type === 'number') {
+          value = input.value !== '' ? Number(input.value) : null;
+        } else if (input.dataset.type === 'json') {
+          try {
+            value = JSON.parse(input.value);
+          } catch {
+            value = input.value;
+          }
+        } else {
+          value = input.value;
+        }
+
+        // Empty path means the value IS the data (not nested)
+        if (path === '' || path === undefined) {
+          emptyPathCount++;
+          emptyPathValue = value;
+        } else {
+          setNestedValue(values, path, value);
+        }
+      }
+
+      // If the only field has empty path, return the value directly
+      // This handles simple values like numbers, strings, etc.
+      if (emptyPathCount > 0 && Object.keys(values).length === 0) {
+        return emptyPathValue;
+      }
+      return values;
+    }
+
+    /**
+     * Setup event handlers for UI forms
+     */
+    function setupUIHandlers(container) {
+      container.querySelectorAll('.ui-actions button').forEach(btn => {
+        btn.onclick = async () => {
+          const action = btn.dataset.action;
+          const form = btn.closest('.ui-form');
+          const dataRef = form?.dataset.dataRef;
+
+          if (action === 'write' && dataRef) {
+            const values = collectFormValues(form);
+            try {
+              await putValue('/bl' + dataRef.replace('bl://', ''), values);
+              // Visual feedback
+              btn.textContent = 'Saved!';
+              setTimeout(() => btn.textContent = 'Save', 1000);
+            } catch (e) {
+              alert('Error saving: ' + e.message);
+            }
+          } else if (action === 'reload' && dataRef) {
+            // Reload data from server
+            selectMirror(dataRef);
+          }
+        };
+      });
+    }
+
+    /**
+     * Render a UI mirror in the inspector
+     */
+    async function renderUIInInspector(uiUri) {
+      const inspector = document.getElementById('inspector');
+
+      // Fetch UI definition
+      const uiPath = '/bl' + uiUri.replace('bl://', '');
+      let uiDef;
+      try {
+        uiDef = await fetchJson(uiPath);
+      } catch (e) {
+        inspector.innerHTML = `<div class="empty-state">Error loading UI: ${escapeHtml(e.message)}</div>`;
+        return;
+      }
+
+      if (!uiDef) {
+        inspector.innerHTML = '<div class="empty-state">UI definition is empty</div>';
+        return;
+      }
+
+      // Fetch data if referenced
+      let data = null;
+      if (uiDef.data?.$ref) {
+        try {
+          const dataPath = '/bl' + uiDef.data.$ref.replace('bl://', '');
+          data = await fetchJson(dataPath);
+        } catch (e) {
+          console.warn('Could not load data:', e);
+        }
+      }
+
+      // Fetch schema if referenced
+      let schema = null;
+      if (uiDef.schema?.$ref) {
+        try {
+          const schemaPath = '/bl' + uiDef.schema.$ref.replace('bl://', '');
+          schema = await fetchJson(schemaPath);
+        } catch (e) {
+          console.warn('Could not load schema:', e);
+        }
+      }
+
+      // Render
+      inspector.innerHTML = renderUI(uiDef, schema, data);
+      setupUIHandlers(inspector);
+
+      // Subscribe for live updates if data ref exists
+      if (uiDef.data?.$ref) {
+        if (inspectorSSE) inspectorSSE.close();
+        const dataPath = '/bl' + uiDef.data.$ref.replace('bl://', '');
+        inspectorSSE = subscribe(dataPath, (newData) => {
+          // Re-render form with new data but preserve focus
+          const activeEl = document.activeElement;
+          const activePath = activeEl?.dataset?.path;
+          inspector.innerHTML = renderUI(uiDef, schema, newData);
+          setupUIHandlers(inspector);
+          // Restore focus
+          if (activePath) {
+            const el = inspector.querySelector(`[data-path="${activePath}"]`);
+            if (el) el.focus();
+          }
+        });
+      }
+    }
+
+    // Auto-connect on load
+    window.onload = () => connect();
+  </script>
+</body>
+</html>

@@ -4,6 +4,9 @@ bassline-web/node_modules/
 .pnp
 .pnp.js
 
+# rust
+gadgets-rust/target/
+
 # Testing
 coverage/
 bassline-web/coverage/
@@ -11,6 +14,8 @@ bassline-web/coverage/
 # Production
 build/
 dist/
+dist-browser/
+dist-node/
 bassline-web/build/
 bassline-web/dist/
 
@@ -85,3 +90,7 @@ bassline-web/.env.test
 *.tmp
 *.temp
 /bassline-web/.react-router/
+
+*storybook.log
+storybook-static
+apps/bassline-vscode/bassline-0.1.0.vsix
