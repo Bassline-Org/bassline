@@ -1,0 +1,60 @@
+#+title: General Organization
+
+* Core types and concepts
+** Gadget
+An isolated computational unit, computes a single conceptual step of some larger protocol. Can have state or it can be stateless, because no state exposed externally.
+
+** Mirror
+A reflective meta-object.
+Provides methods for reification of the running system.
+Provides methods for intercession of the running system.
+The important feature of this, is it allows opt-in meta-programming, without forcing everything to be reflective or aware of the full system at runtime.
+
+** Cell
+A kind of gadget that internally behaves as a semi-lattice / lattice over a partial order or total order respectively.
+By nature of it being a semi-lattice, all operations are associative, commutative, and idempotent.
+This means that ordering / timing of operations cannot matter for it's behavior.
+
+When under a total order, it means all elements are comparable meaning we can always find the join of any two values. This is more similar to how traditional CRDTs operate.
+
+Whereas under a partial order certain elements are mutually exclusive. Meaning that they will result in contradiction when we try to join them. However this is not a direct error in the system, and instead can be resolved using a [[*Mirror]] to resolve by performing intercession, since resolution of the contradictory state is a kind of meta-operation.
+
+A concrete example of this kind of ambiguity resolution would be fork choice rules in blockchain protocols. These represent protocols for determining which block is the most "correct", which isn't directly related to the validity of the blocks contents itself. But the totality of the chain from our perspective.
+
+/Idea: We might want to store the "root" of a cell's value. Which would just be the meet of two values or something, allowing us to invalidate entire values if we intercede and change the canonical root of a cell. For example it could just be the first non-bottom value we see./
+
+** Propagator
+A kind of gadget that semantically relates some gadgets to another set of gadgets. They are roughly equivalent to expressions in traditional systems.
+
+However unlike traditional expressions in languages, because cells don't care about ordering, we can propagate in any direction. Meaning we can build relations between other gadgets that allow us to express algebraic relations, not just simple "how to compute xyz".
+
+Propagators will run whenever any of their watched gadgets change values. For example, if a cell becomes more refined, or another propagator fires.
+
+These are often stateless, at least conceptually. (We can memoize etc, but they compute fresh derivations from sources).
+
+When constructing a propagator, each individual "hole" or variable, can have a maximum fan-in of 1. This is because propagators DO NOT gurantee an ACI execution. So if you want to "join" multiple gadgets into a propagator, they must be first put into a cell before being used as input.
+
+* How we get late binding in Bassline
+Traditional propagation networks required early binding for the system. Meaning that all cells for propagators must have been built ahead of time, before a propagator could be constructed.
+
+This is bad for a number of reasons, such as being error prone and brittle.
+
+So how do we remedy this? Well if you call from our description of [[*Mirror]] and [[*Propagator]] our gadgets allow for reification / intercession through meta-objects. And in the case of binding, this is naturally meta-data not important to the value something represents.
+
+So our conceptual approach to performing binding between gadgets in the system, is by performing intercession through a gadget's mirror, using a uri to represent the thing we are binding. /This could be another link system, but a uri appears to be complete for what we want to do, and is widely supported./
+
+* Reflection in a distributed setting
+One of the biggest hurdles we had to overcome when building this system, is finding a way of supporting rich meta-level interactions with the system, as well as making this work in a distributed setting, and not just locally.
+
+** Why we believe it's important
+This is a must-have for maximum portability, since rich reflection allows for the system to bootstrap itself without relying on loads of rigid configuration files etc. Not to mention most distributed protocols carry most of the complexity in the resolution layer, which exists above the normal "happy path" of the protocol. (Blockchain fallback protocols, conflict resolution, etc)
+
+Whereas if we have a highly uniform substrate with the ability of building meta-level protocols using the same "stuff", it greatly simplifies the development process of flexible and reliable distributed protocols, because rather than these meta-protocols being a burden on the implementer to correctly build out some spec, they can be represented in a universal manner.
+
+** How we do this
+For distributed settings, we must transport data. Meaning whatever we want to send over the wire, must be sent as data. For things like values, this is natural because the values already describe themselves. But for things like runtime objects, which could have pointers to other objects, it's less clear.
+We have the option of just serializing the complete object graph as data, but this is not good because often we only care about a single object, not the entire graph.
+
+Lazy languages have some good lessons here, because rather than eagerly evaluating everything, they evaluate what they need, but store the continuation of whatever series / expression they are representing.
+
+The good news is that uris can be used in a similar manner! It allows us to represent just enough information as data, that when paired with a domain specific resolver, can behave like a continuation that's serializable.
