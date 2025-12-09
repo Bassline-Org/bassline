@@ -6,10 +6,8 @@
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
-    "./resource": "./src/resource.js",
-    "./store": "./src/store.js",
-    "./materializer": "./src/materializer.js",
-    "./bassline": "./src/bassline.js"
+    "./bassline": "./src/bassline.js",
+    "./router": "./src/router.js"
   },
   "scripts": {
     "test": "vitest run"
