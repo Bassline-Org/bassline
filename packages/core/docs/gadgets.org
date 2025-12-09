@@ -4,6 +4,13 @@
 ** Gadget
 An isolated computational unit, computes a single conceptual step of some larger protocol. Can have state or it can be stateless, because no state exposed externally.
 
+** Resource
+A thing in the system, can either be a static piece of data, or represent a computational unit like a gadget.
+
+Resources can either be scalar, meaning they don't have any links to other resources in them, or they can be compound, where they contain links to other resources in them.
+
+This is the basis of our capability model, each individual runtime object in the system will optionally have a resource representation, which determines how we can view / interact with it.
+
 ** Mirror
 A reflective meta-object.
 Provides methods for reification of the running system.
@@ -58,3 +65,15 @@ We have the option of just serializing the complete object graph as data, but th
 Lazy languages have some good lessons here, because rather than eagerly evaluating everything, they evaluate what they need, but store the continuation of whatever series / expression they are representing.
 
 The good news is that uris can be used in a similar manner! It allows us to represent just enough information as data, that when paired with a domain specific resolver, can behave like a continuation that's serializable.
+
+* Uris in our system
+We utilize uris extensively in our system, as they give us fine-grained control over the resolution of data in our system.
+
+The most important feature we leverage, is custom application specific uri-schemes. These allow for domain specific encodings of actions to perform.
+
+Let's go over a few.
+
+** =bl:= Interactions with your bassline instance
+The bl: scheme specifies a url, which will perform an action with your running bassline instance.
+
+For example, to get all the sessions we can use: =bl:///sessions=. In this case, the empty authority indicates that we are using a local ; instance here.
