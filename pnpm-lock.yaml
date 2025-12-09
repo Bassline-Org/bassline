@@ -24,14 +24,16 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)
 
-  packages/core:
+  apps/cli:
     dependencies:
-      uuid:
-        specifier: ^10.0.0
-        version: 10.0.0
-      ws:
-        specifier: ^8.18.0
-        version: 8.18.3
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bassline/store-node':
+        specifier: workspace:*
+        version: link:../../packages/store-node
+
+  packages/core: {}
 
   packages/react:
     dependencies:
@@ -41,6 +43,12 @@ importers:
       react:
         specifier: ^18.0.0 || ^19.0.0
         version: 19.1.1
+
+  packages/store-node:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 
@@ -1129,11 +1137,6 @@ packages:
       picocolors: 1.1.1
     dev: true
 
-  /uuid@10.0.0:
-    resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
-    hasBin: true
-    dev: false
-
   /vite-node@3.2.4(@types/node@20.19.9):
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -1285,19 +1288,6 @@ packages:
       siginfo: 2.0.0
       stackback: 0.0.2
     dev: true
-
-  /ws@8.18.3:
-    resolution: {integrity: sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-    dev: false
 
   /yallist@3.1.1:
     resolution: {integrity: sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==}

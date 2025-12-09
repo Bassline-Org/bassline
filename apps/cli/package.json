@@ -1,0 +1,14 @@
+{
+  "name": "@bassline/cli",
+  "version": "1.0.0",
+  "description": "Bassline CLI",
+  "type": "module",
+  "bin": {
+    "bl": "./bin/bl.js"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "@bassline/store-node": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}
