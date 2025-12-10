@@ -59,6 +59,18 @@ await bl.put('bl:///cells/tags/value', {}, ['b', 'c'])
 | `/cells/:name/value` | PUT | Merge value |
 | `/cells/:name/reset` | PUT | Reset to bottom |
 
+## Dynamic Installation
+
+Install via the daemon's module system:
+
+```javascript
+await bl.put('bl:///install/cells', {}, {
+  path: './packages/cells/src/upgrade.js'
+})
+// Registers: bl._cells
+// Requires: bl._propagators (optional), bl._plumber (optional)
+```
+
 ## Related
 
 - [@bassline/propagators](../propagators) - Connect cells reactively

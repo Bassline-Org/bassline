@@ -69,6 +69,25 @@ ws.onmessage = (event) => {
 | `/server/ws/:port` | GET | Get server status |
 | `/server/ws/:port` | PUT | Start server |
 
+## Dynamic Installation
+
+Install via the daemon's module system:
+
+```javascript
+// HTTP server
+await bl.put('bl:///install/http-server', {}, {
+  path: './packages/server-node/src/upgrade-http-server.js',
+  ports: [9111]
+})
+
+// WebSocket server
+await bl.put('bl:///install/ws-server', {}, {
+  path: './packages/server-node/src/upgrade-ws-server.js',
+  ports: [9112]
+})
+// Requires: bl._plumber (optional, for subscriptions)
+```
+
 ## Related
 
 - [@bassline/core](../core) - Router and utilities

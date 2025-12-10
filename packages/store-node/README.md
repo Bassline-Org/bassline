@@ -55,6 +55,18 @@ mod.body.add(1, 2)  // call exported function
 - `createFileStore(dir, prefix)` - JSON file store
 - `createCodeStore(dir, prefix)` - JS module loader
 
+## Dynamic Installation
+
+Install via the daemon's module system:
+
+```javascript
+await bl.put('bl:///install/file-store', {}, {
+  path: './packages/store-node/src/upgrade-file-store.js',
+  dataDir: '.data',
+  prefix: '/data'
+})
+```
+
 ## Related
 
 - [@bassline/core](../core) - Router and utilities

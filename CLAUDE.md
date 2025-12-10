@@ -230,6 +230,73 @@ curl -X PUT "http://localhost:9111?uri=bl:///data/cells/counter" \
   -H "Content-Type: application/json" -d '{"value": 42}'
 ```
 
+## Dynamic Module System
+
+Modules can be installed at runtime via `PUT bl:///install/:name`:
+
+```javascript
+await bl.put('bl:///install/cells', {}, {
+  path: './packages/cells/src/upgrade.js',
+  // Additional config passed to the module
+})
+```
+
+### Upgrade Modules
+
+Each module provides an upgrade file exporting a default install function:
+
+```javascript
+// packages/cells/src/upgrade.js
+export default function installCells(bl, config = {}) {
+  const cells = createCellRoutes({ /* callbacks */ })
+  cells.install(bl)
+  bl._cells = cells  // Register for other modules
+}
+```
+
+Convention: `upgrade-*.js` or `upgrade.js` in each package.
+
+### Module Patterns
+
+**Registry**: Modules register themselves on `bl._*` for discovery:
+```javascript
+bl._links = links      // Link index
+bl._plumber = plumber  // Message router
+bl._cells = cells      // Cell manager
+bl._propagators = propagators
+```
+
+**Lookup**: Dependent modules find prerequisites from `bl`:
+```javascript
+// In propagators upgrade.js
+const propagators = createPropagatorRoutes({ bl })  // bl passed in
+```
+
+**Deferred Callbacks**: Use optional chaining for loose coupling:
+```javascript
+// Cells notify propagators if available
+onCellChange: ({ uri }) => {
+  bl._propagators?.onCellChange(uri)  // Safe if not installed
+}
+```
+
+### Bootstrap
+
+The standard bootstrap loads all modules in order:
+
+```bash
+BL_BOOTSTRAP=./apps/cli/src/bootstrap.js node apps/cli/src/daemon.js
+```
+
+Module dependency order:
+1. `links` - bidirectional ref tracking
+2. `plumber` - message routing
+3. `file-store` - persistence
+4. `http-server` - HTTP API
+5. `ws-server` - WebSocket (uses plumber)
+6. `propagators` - reactive computation
+7. `cells` - lattice values (uses propagators, plumber)
+
 ## Running
 
 ```bash
