@@ -1,9 +1,9 @@
-import { routes } from './router.js'
+import { routes } from '@bassline/core'
 
 /**
  * Built-in type definitions
  */
-const TYPES = {
+export const TYPES = {
   index: {
     name: 'Index',
     description: 'Root system index listing all available subsystems',
@@ -97,7 +97,7 @@ const TYPES = {
 
 /**
  * Install types routes
- * @param {import('./bassline.js').Bassline} bl - Bassline instance
+ * @param {import('@bassline/core').Bassline} bl - Bassline instance
  */
 export default function installTypes(bl) {
   const typeRoutes = routes('/types', r => {

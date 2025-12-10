@@ -4,7 +4,7 @@ import { createPlumber } from './plumber.js'
  * Install plumber into a Bassline instance.
  * Registers the plumber on bl._plumber for other modules to use.
  *
- * @param {import('./bassline.js').Bassline} bl - Bassline instance
+ * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @param {object} [config] - Configuration options
  * @param {object} [config.rules] - Initial rules to add { name: { match, port } }
  */

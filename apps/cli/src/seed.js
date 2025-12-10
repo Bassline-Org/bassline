@@ -340,6 +340,26 @@ Assigned to Carol for design exploration.
   await put('bl:///cells/tags/value', ['bassline', 'reactive'])
 
   // ═══════════════════════════════════════════════════════════════════
+  // MONITORS - Composed URL polling (Timer + Fetch + Cell)
+  // ═══════════════════════════════════════════════════════════════════
+  console.log('\n📡 Monitors')
+
+  // JSONPlaceholder monitor - reliable test API
+  await put('bl:///monitors/jsonplaceholder', {
+    url: 'https://jsonplaceholder.typicode.com/todos/1',
+    interval: 30000,   // every 30 seconds
+    enabled: false,    // start manually for demo
+    extract: 'title'   // just extract the title field
+  })
+
+  // Another example - posts API
+  await put('bl:///monitors/random-post', {
+    url: 'https://jsonplaceholder.typicode.com/posts/1',
+    interval: 60000,   // every minute
+    enabled: false
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
   // CONFIG / META
   // ═══════════════════════════════════════════════════════════════════
   console.log('\n⚙️  Config')
@@ -367,6 +387,12 @@ Assigned to Carol for design exploration.
   console.log('  bl:///cells/sum          (computed: a + b)')
   console.log('  bl:///cells/product      (computed: x * y)')
   console.log('  bl:///propagators        (list all propagators)')
+  console.log()
+  console.log('Monitors (Timer + Fetch + Cell):')
+  console.log('  bl:///monitors           (list all monitors)')
+  console.log('  bl:///monitors/jsonplaceholder')
+  console.log('  PUT bl:///monitors/jsonplaceholder/start  (start polling)')
+  console.log('  PUT bl:///monitors/jsonplaceholder/fetch  (trigger immediate fetch)')
   console.log()
 }
 
