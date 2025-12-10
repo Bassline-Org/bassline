@@ -1,21 +1,9 @@
 import { resourceClasses } from './index.jsx'
 import Badge from '../components/Badge.jsx'
-
-const TYPE_ICONS = {
-  'directory': '',
-  'cell': '',
-  'note': '',
-  'task': '',
-  'person': '',
-  'type': '',
-  'document': '',
-  'unknown': ''
-}
+import TypeIcon from '../components/TypeIcon.jsx'
 
 export default function Directory({ resource, uri, onNavigate }) {
   const entries = resource.body?.entries || []
-
-  const getIcon = (type) => TYPE_ICONS[type] || TYPE_ICONS['unknown']
 
   return (
     <div className={`directory-view ${resourceClasses(resource)}`}>
@@ -30,7 +18,9 @@ export default function Directory({ resource, uri, onNavigate }) {
         <ul className="entries">
           {entries.map(entry => (
             <li key={entry.name} className={`entry type-${entry.type || 'unknown'}`}>
-              <span className="entry-icon">{getIcon(entry.type)}</span>
+              <span className="entry-icon">
+                <TypeIcon type={entry.type || 'unknown'} size={16} />
+              </span>
               <a href="#" onClick={e => {
                 e.preventDefault()
                 onNavigate(entry.uri)

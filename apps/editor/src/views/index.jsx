@@ -6,6 +6,10 @@ import NoteView from './NoteView.jsx'
 import TaskView from './TaskView.jsx'
 import TypeView from './TypeView.jsx'
 import IndexView from './IndexView.jsx'
+import Dashboard from './Dashboard.jsx'
+import TypeExplorer from './TypeExplorer.jsx'
+import NetworkGraph from './NetworkGraph.jsx'
+import FuzzyCellView from './FuzzyCellView.jsx'
 
 // Convert headers/body to CSS classes
 export function resourceClasses(resource) {
@@ -16,6 +20,7 @@ export function resourceClasses(resource) {
   if (type) {
     // Extract just the type name from various formats
     const typeName = type
+      .replace('bl:///r/types/', '')  // Remote prefix (via remote-browser)
       .replace('bl:///types/', '')
       .replace('bl:///local/types/', '')
       .replace('bl:///data/types/', '')
@@ -36,6 +41,7 @@ export function resourceClasses(resource) {
 function normalizeType(type) {
   if (!type) return null
   return type
+    .replace('bl:///r/types/', '')  // Remote prefix (via remote-browser)
     .replace('bl:///types/', '')
     .replace('bl:///local/types/', '')
     .replace('bl:///data/types/', '')
@@ -46,15 +52,31 @@ function normalizeType(type) {
 const viewsByType = {
   'directory': Directory,
   'cell': CellView,
+  'fuzzy-cell': FuzzyCellView,
   'note': NoteView,
   'task': TaskView,
   'person': PersonView,
   'type': TypeView,
-  'index': IndexView
+  'index': IndexView,
+  'dashboard': Dashboard
+}
+
+// Special URI-based views (virtual routes)
+const viewsByUri = {
+  'bl:///explore/cells': (props) => <TypeExplorer {...props} type="cell" />,
+  'bl:///explore/propagators': (props) => <TypeExplorer {...props} type="propagator" />,
+  'bl:///explore/data': (props) => <TypeExplorer {...props} type="data" />,
+  'bl:///network': NetworkGraph
 }
 
 // ViewResolver component
 export function ViewResolver({ resource, uri, onNavigate, viewMode = 'pretty' }) {
+  // Check for special URI-based views first
+  const UriView = viewsByUri[uri]
+  if (UriView) {
+    return <UriView resource={resource} uri={uri} onNavigate={onNavigate} />
+  }
+
   const rawType = resource?.headers?.type
   const normalizedType = normalizeType(rawType)
   const PrettyView = viewsByType[normalizedType]
@@ -73,7 +95,8 @@ export function hasPrettyView(resource) {
 }
 
 // Export individual views
-export { Inspector, Directory, CellView, PersonView, NoteView, TaskView, TypeView, IndexView }
+export { Inspector, Directory, CellView, FuzzyCellView, PersonView, NoteView, TaskView, TypeView, IndexView, Dashboard, TypeExplorer, NetworkGraph }
 
 // Export views mapping for external use
 export const views = viewsByType
+export const virtualViews = viewsByUri

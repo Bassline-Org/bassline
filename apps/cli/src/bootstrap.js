@@ -65,6 +65,11 @@ export default async function bootstrap(bl) {
     path: './packages/cells/src/upgrade.js'
   })
 
+  // UI: Dashboard and Activity buffer
+  await bl.put('bl:///install/dashboard', {}, {
+    path: './packages/core/src/upgrade-dashboard.js'
+  })
+
   // Services: Claude (optional - requires ANTHROPIC_API_KEY)
   if (process.env.ANTHROPIC_API_KEY) {
     await bl.put('bl:///install/claude', {}, {

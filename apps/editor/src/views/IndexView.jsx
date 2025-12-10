@@ -1,15 +1,4 @@
-const SUBSYSTEM_ICONS = {
-  cells: '',
-  data: '',
-  install: '',
-  links: '',
-  plumb: '',
-  propagators: '',
-  server: '',
-  middleware: '',
-  trust: '',
-  types: ''
-}
+import TypeIcon from '../components/TypeIcon.jsx'
 
 export default function IndexView({ resource, onNavigate }) {
   const { name, description, subsystems } = resource.body
@@ -29,8 +18,8 @@ export default function IndexView({ resource, onNavigate }) {
                 className="link-preview"
                 onClick={e => { e.preventDefault(); onNavigate(sub.uri) }}
               >
-                <span>{SUBSYSTEM_ICONS[sub.name] || ''}</span>
-                {sub.name}
+                <TypeIcon type={sub.name} size={18} />
+                <span>{sub.name}</span>
               </a>
             </li>
           ))}

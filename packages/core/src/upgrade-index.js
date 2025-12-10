@@ -11,6 +11,9 @@ export default function installIndex(bl) {
       const subsystems = new Set()
 
       for (const route of bl.routes) {
+        // Skip routes without a pattern (e.g., fallback routes)
+        if (!route.pattern) continue
+
         // Extract the first path segment from each route pattern
         const match = route.pattern.match(/^\/([^/:]+)/)
         if (match) {

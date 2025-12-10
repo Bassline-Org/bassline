@@ -38,6 +38,7 @@ if (BOOTSTRAP === 'none') {
     await bootstrap.default(bl)
   } catch (e) {
     console.error('Bootstrap failed:', e.message)
+    console.error('Stack:', e.stack)
     console.log('Starting in minimal mode')
     console.log('  Install modules via: PUT bl:///install/:name { path: "..." }')
   }
