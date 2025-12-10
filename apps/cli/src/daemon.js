@@ -1,80 +1,44 @@
-import { Bassline, createLinkIndex, createPlumber } from '@bassline/core'
-import { createFileStore } from '@bassline/store-node'
-import { createHttpServerRoutes, createWsServerRoutes } from '@bassline/server-node'
-import { createCellRoutes } from '@bassline/cells'
-import { createPropagatorRoutes } from '@bassline/propagators'
+/**
+ * Minimal Bassline Daemon
+ *
+ * This daemon only installs the module loader. Everything else is loaded
+ * dynamically via bootstrap.js or manual PUT bl:///install/:name calls.
+ *
+ * Usage:
+ *   node daemon.js                                    # Uses default bootstrap
+ *   BL_BOOTSTRAP=./custom-bootstrap.js node daemon.js # Custom bootstrap
+ *   BL_BOOTSTRAP=none node daemon.js                  # No bootstrap (minimal)
+ */
+import { Bassline, createInstallRoutes } from '@bassline/core'
+import { fileURLToPath } from 'url'
+import { dirname, resolve } from 'path'
 
-const DATA_DIR = process.env.BL_DATA || '.bassline'
-const HTTP_PORT = parseInt(process.env.BL_HTTP_PORT || process.env.BL_PORT || '9111')
-const WS_PORT = parseInt(process.env.BL_WS_PORT || '9112')
+// Get the directory of this file for resolving bootstrap path
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
+// Create a minimal Bassline instance
 const bl = new Bassline()
-const links = createLinkIndex()
-const plumber = createPlumber()
 
-// Install core features
-links.install(bl)
-plumber.install(bl)
+// Only install the module loader - everything else is dynamic
+const installer = createInstallRoutes({ baseDir: process.cwd() })
+installer.install(bl)
 
-// Create propagators first (need reference for cell callback)
-const propagators = createPropagatorRoutes({
-  bl,
-  onPropagatorKill: ({ uri }) => {
-    plumber.dispatch({
-      uri,
-      headers: { type: 'bl:///types/resource-removed' },
-      body: { uri }
-    })
+// Determine bootstrap source
+const BOOTSTRAP = process.env.BL_BOOTSTRAP || resolve(__dirname, 'bootstrap.js')
+
+if (BOOTSTRAP === 'none') {
+  // Minimal mode - no bootstrap
+  console.log('Bassline daemon running (minimal)')
+  console.log('  Install modules via: PUT bl:///install/:name { path: "..." }')
+} else {
+  // Bootstrap with modules
+  try {
+    const bootstrap = await import(BOOTSTRAP)
+    await bootstrap.default(bl)
+  } catch (e) {
+    console.error('Bootstrap failed:', e.message)
+    console.log('Starting in minimal mode')
+    console.log('  Install modules via: PUT bl:///install/:name { path: "..." }')
   }
-})
-
-// Create cells with callback that fires propagators
-const cells = createCellRoutes({
-  onCellChange: ({ uri }) => {
-    propagators.onCellChange(uri)
-  },
-  onCellKill: ({ uri }) => {
-    plumber.dispatch({
-      uri,
-      headers: { type: 'bl:///types/resource-removed' },
-      body: { uri }
-    })
-  }
-})
-
-cells.install(bl)
-propagators.install(bl)
-
-// Wire up plumber: cell changes → propagators
-// Add rule to route cell-value changes to propagators port
-plumber.addRule('cell-to-propagators', {
-  match: { headers: { type: 'bl:///types/cell-value', changed: true } },
-  port: 'cell-changes'
-})
-
-// Propagators listen on the cell-changes port
-plumber.listen('cell-changes', (msg) => {
-  // Extract cell URI from the message URI (remove /value suffix)
-  const cellUri = msg.uri.replace(/\/value$/, '')
-  propagators.onCellChange(cellUri)
-})
-
-// Install file store - handles /data/:path*
-bl.install(createFileStore(DATA_DIR, '/data'))
-
-// Install server capabilities
-bl.install(createHttpServerRoutes())
-bl.install(createWsServerRoutes(plumber))
-
-// Bootstrap: start servers via resources
-await bl.put(`bl:///server/http/${HTTP_PORT}`, {}, {})
-await bl.put(`bl:///server/ws/${WS_PORT}`, {}, {})
-
-console.log('Bassline daemon running')
-console.log(`  Data:  ${DATA_DIR}`)
-console.log(`  HTTP:  http://localhost:${HTTP_PORT}`)
-console.log(`  WS:    ws://localhost:${WS_PORT}`)
-console.log(`\nResources:`)
-console.log(`  GET  http://localhost:${HTTP_PORT}?uri=bl:///data`)
-console.log(`  GET  http://localhost:${HTTP_PORT}?uri=bl:///server`)
-console.log(`  GET  http://localhost:${HTTP_PORT}?uri=bl:///plumb/rules`)
+}
