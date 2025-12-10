@@ -8,7 +8,8 @@
   },
   "dependencies": {
     "@bassline/core": "workspace:*",
-    "@bassline/store-node": "workspace:*"
+    "@bassline/store-node": "workspace:*",
+    "@bassline/server-node": "workspace:*"
   },
   "license": "AGPL-3.0"
 }
