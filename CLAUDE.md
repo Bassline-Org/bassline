@@ -490,11 +490,15 @@ packages/propagators/    # Reactive propagators
 packages/timers/         # Time-based event dispatch
 packages/fetch/          # HTTP requests
 packages/monitors/       # URL polling (Timer + Fetch + Cell)
-packages/dashboard/      # Dashboard and activity tracking
+packages/dashboard/      # Activity tracking
+packages/trust/          # Local trust computation and capability gating
+packages/services/       # External service integrations (Claude API)
 packages/store-node/     # File and code stores
 packages/server-node/    # HTTP and WebSocket servers
+packages/remote-browser/ # WebSocket client for browsers
+packages/react/          # React bindings
 
-apps/cli/                # Daemon and seed scripts
+apps/cli/                # Daemon, MCP server, seed scripts
 apps/editor/             # Web editor
 ```
 
@@ -567,18 +571,54 @@ BL_BOOTSTRAP=./apps/cli/src/bootstrap.js node apps/cli/src/daemon.js
 ```
 
 Module dependency order:
-1. `types` - built-in type definitions
-2. `links` - bidirectional ref tracking
-3. `plumber` - message routing
-4. `file-store` - persistence
-5. `http-server` - HTTP API
-6. `ws-server` - WebSocket (uses plumber)
-7. `propagators` - reactive computation
-8. `cells` - lattice values (uses propagators, plumber)
-9. `dashboard` - activity tracking (uses plumber)
-10. `timers` - time-based events (uses plumber)
-11. `fetch` - HTTP requests (uses plumber)
-12. `monitors` - URL polling (uses timers, cells, plumber)
+1. `index` - root resource listing
+2. `types` - built-in type definitions
+3. `links` - bidirectional ref tracking
+4. `plumber` - message routing
+5. `file-store` - persistence
+6. `http-server` - HTTP API
+7. `ws-server` - WebSocket (uses plumber)
+8. `propagators` - reactive computation
+9. `cells` - lattice values (uses propagators, plumber)
+10. `dashboard` - activity tracking (uses plumber)
+11. `timers` - time-based events (uses plumber)
+12. `fetch` - HTTP requests (uses plumber)
+13. `monitors` - URL polling (uses timers, cells, plumber)
+14. `claude` - Claude API (optional, requires ANTHROPIC_API_KEY)
+
+## MCP Server
+
+The MCP (Model Context Protocol) server exposes Bassline resources to Claude Code.
+
+Setup:
+```bash
+pnpm setup:mcp
+# Creates .mcp.json from .mcp.json.example with correct paths
+```
+
+Or configure manually in Claude Code settings:
+```json
+{
+  "mcpServers": {
+    "bassline": {
+      "command": "node",
+      "args": ["/path/to/bassline/apps/cli/src/mcp-stdio.js"],
+      "env": { "BL_URL": "http://localhost:9111" }
+    }
+  }
+}
+```
+
+Available tools:
+- `bassline_get` - GET a resource by URI
+- `bassline_put` - PUT a resource with body
+- `bassline_list` - List resources at a path
+- `bassline_links` - Query forward or back links
+
+Requires a running daemon:
+```bash
+pnpm dev  # Starts daemon on port 9111
+```
 
 ## Running
 

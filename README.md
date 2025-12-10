@@ -17,7 +17,7 @@ bl:///links/to/types/cell    # a query
 
 Because you can store them now and resolve them later. Middleware decides what they mean at runtime.
 
-You can sandbox things—middleware controls what's resolvable. You can move resources around without breaking anything. You can define new resource types just by writing handlers.
+You can sandbox things. Middleware controls what's resolvable. You can move resources around without breaking anything. You can define new resource types just by writing handlers.
 
 In distributed systems, no node has the complete picture. URIs let you point at things you don't have yet, and figure it out when you need to.
 
@@ -27,7 +27,7 @@ In distributed systems, no node has the complete picture. URIs let you point at 
 
 **Links go both ways.** The link index tracks who references what, so you can query in either direction.
 
-**Cells** are values with merge semantics. Write 5, then write 3, you still get 5 (max wins). Concurrent updates just merge—no coordination needed.
+**Cells** are values with merge semantics. Write 5, then write 3, you still get 5 (max wins). Concurrent updates merge without coordination.
 
 **Propagators** wire cells together. Change an input, the output updates.
 
@@ -62,7 +62,7 @@ curl -X PUT "http://localhost:9111?uri=bl:///cells/counter/value" \
   -H "Content-Type: application/json" -d '10'  # now 10
 ```
 
-Lattices: `maxNumber`, `minNumber`, `setUnion`, `lww`.
+Lattices: `maxNumber`, `minNumber`, `setUnion`, `setIntersection`, `lww`, `object`, `counter`, `boolean`.
 
 ## Propagators
 
@@ -73,18 +73,24 @@ curl -X PUT "http://localhost:9111?uri=bl:///propagators/add" \
   -d '{"inputs": ["bl:///cells/a", "bl:///cells/b"], "output": "bl:///cells/sum", "handler": "sum"}'
 ```
 
-Handlers: `sum`, `product`, `passthrough`, `constant`.
+Basic handlers: `sum`, `product`, `passthrough`, `constant`. See [CLAUDE.md](./CLAUDE.md) for full list.
 
 ## Packages
 
 ```
-packages/core/           # router, links, plumber
-packages/cells/          # cells
-packages/propagators/    # propagators
+packages/core/           # router, pattern matching
+packages/plumber/        # message routing
+packages/links/          # bidirectional refs
+packages/types/          # type definitions
+packages/cells/          # lattice-based cells
+packages/propagators/    # reactive computation
+packages/timers/         # time events
+packages/fetch/          # HTTP requests
+packages/monitors/       # URL polling
 packages/store-node/     # file storage
 packages/server-node/    # http + websocket
 
-apps/cli/                # daemon
+apps/cli/                # daemon, MCP server
 apps/editor/             # web ui
 ```
 
