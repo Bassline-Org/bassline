@@ -185,7 +185,15 @@ await bl.put('bl:///cells/counter/value', {}, 3)  // still 5, max wins
 await bl.put('bl:///cells/counter/value', {}, 10) // now 10
 ```
 
-Built-in lattices: `maxNumber`, `minNumber`, `setUnion`, `lww` (last-writer-wins).
+Built-in lattices:
+- `maxNumber` - values only go up
+- `minNumber` - values only go down
+- `setUnion` - accumulates set elements
+- `setIntersection` - constrains to common elements (empty = contradiction)
+- `lww` - last-writer-wins by timestamp
+- `object` - shallow merge objects
+- `counter` - increment-only (adds values)
+- `boolean` - once true, stays true
 
 ## Propagators
 
@@ -205,7 +213,138 @@ await bl.put('bl:///propagators/add', {}, {
 })
 ```
 
-Built-in handlers: `sum`, `product`, `passthrough`, `constant`.
+Built-in handlers:
+- **Basic**: `sum`, `product`, `passthrough`, `constant`
+- **Reducers**: `min`, `max`, `average`, `concat`, `first`, `last`
+- **Structural**: `pair` (tuple), `zip` (named object), `unzip` (extract key)
+- **Transformers**: `map` (apply handler to collection), `pick`, `format`, `coerce`
+- **Predicates**: `filter`, `when` (skip propagation if predicate fails)
+- **Composition**: `compose` (chain handlers)
+- **Arithmetic**: `negate`, `abs`, `round`, `floor`, `ceil`, `subtract`, `divide`, `modulo`, `power`
+- **Comparison**: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
+- **Logic**: `and`, `or`, `not`, `xor`
+- **String**: `split`, `join`, `trim`, `uppercase`, `lowercase`, `strSlice`, `replace`, `match`, `startsWith`, `endsWith`, `includes`
+- **Array**: `length`, `at`, `head`, `tail`, `init`, `reverse`, `sort`, `sortBy`, `unique`, `flatten`, `compact`, `take`, `drop`, `chunk`
+- **Array Reducers**: `sumBy`, `countBy`, `groupBy`, `indexBy`, `minBy`, `maxBy`
+- **Object**: `keys`, `values`, `entries`, `fromEntries`, `get`, `has`, `omit`, `defaults`, `merge`
+- **Type Checking**: `isNull`, `isNumber`, `isString`, `isArray`, `isObject`, `typeOf`
+- **Conditional**: `when`, `ifElse`, `cond`
+- **Utility**: `identity`, `always`, `tap`, `defaultTo`
+
+Example with config:
+```javascript
+// Apply a handler to each element of a collection
+await bl.put('bl:///propagators/coerce-all', {}, {
+  inputs: ['bl:///cells/strings'],
+  output: 'bl:///cells/numbers',
+  handler: 'map',
+  handlerConfig: { handler: 'coerce', config: { to: 'number' } }
+})
+
+// Structural: combine two cells into object
+await bl.put('bl:///propagators/combine', {}, {
+  inputs: ['bl:///cells/x', 'bl:///cells/y'],
+  output: 'bl:///cells/point',
+  handler: 'zip',
+  handlerConfig: { keys: ['x', 'y'] }
+})
+
+// Conditional: filter values greater than 0
+await bl.put('bl:///propagators/positive-only', {}, {
+  inputs: ['bl:///cells/value'],
+  output: 'bl:///cells/positive',
+  handler: 'filter',
+  handlerConfig: { handler: 'gt', config: { value: 0 } }
+})
+
+// String: replace pattern with regex
+await bl.put('bl:///propagators/clean', {}, {
+  inputs: ['bl:///cells/raw'],
+  output: 'bl:///cells/clean',
+  handler: 'replace',
+  handlerConfig: { pattern: '\\s+', flags: 'g', replacement: ' ' }
+})
+
+// Array reducer: group by key
+await bl.put('bl:///propagators/by-category', {}, {
+  inputs: ['bl:///cells/items'],
+  output: 'bl:///cells/grouped',
+  handler: 'groupBy',
+  handlerConfig: { key: 'category' }
+})
+
+// Working with LWW cells: compose to extract inner value first
+// LWW stores {value, timestamp}, so use pick/get to unwrap
+await bl.put('bl:///propagators/negate-lww', {}, {
+  inputs: ['bl:///cells/num'],
+  output: 'bl:///cells/negated',
+  handler: 'compose',
+  handlerConfig: {
+    steps: ['pick', 'negate'],
+    pick: { key: 'value' }
+  }
+})
+```
+
+## Plumber
+
+The plumber is a rule-based message router. It watches PUT operations and dispatches messages to named ports based on pattern matching.
+
+### How it works
+
+1. Routes install a "tap" on PUT operations
+2. When a PUT completes, the response is wrapped in a message: `{ uri, headers, body }`
+3. Rules match messages using regex patterns
+4. Matching messages are dispatched to ports
+5. Listeners on ports receive the messages
+
+### Adding Rules
+
+```javascript
+// Match all cell value changes
+bl._plumber.addRule('cell-changes', {
+  match: { headers: { type: 'bl:///types/cell-value', changed: true } },
+  port: 'cell-updates'
+})
+
+// Match specific URI prefix
+bl._plumber.addRule('user-data', {
+  match: { uri: '^bl:///data/users/.*' },
+  port: 'user-changes'
+})
+```
+
+### Listening to Ports
+
+```javascript
+bl._plumber.listen('cell-updates', (msg) => {
+  console.log('Cell changed:', msg.uri)
+  console.log('New value:', msg.body)
+})
+```
+
+### Pattern Matching
+
+- String values are treated as regex: `{ uri: '^bl:///cells/.*' }`
+- Objects match recursively: `{ headers: { type: 'cell' } }`
+- `null` or `undefined` values are wildcards (match anything)
+- All pattern keys must match for a rule to fire
+
+### Managing Rules
+
+```javascript
+// Via API
+await bl.get('bl:///plumb/rules')           // List all rules
+await bl.get('bl:///plumb/rules/my-rule')   // Get rule config
+await bl.put('bl:///plumb/rules/my-rule', {}, { match: {...}, port: '...' })
+```
+
+### Use Cases
+
+- Propagators use plumber to react to cell changes
+- WebSocket server broadcasts changes to clients
+- Activity logging and debugging
+- Custom reactive behaviors
 
 ## Package Structure
 

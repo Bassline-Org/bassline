@@ -21,7 +21,7 @@ import { getLattice, lattices } from './lattices.js'
  * @returns {object} Cell routes and store
  */
 export function createCellRoutes(options = {}) {
-  const { onCellChange, onCellKill } = options
+  const { onCellChange, onCellKill, onContradiction } = options
 
   /** @type {Map<string, {lattice: string, value: any, label?: string}>} */
   const store = new Map()
@@ -87,6 +87,25 @@ export function createCellRoutes(options = {}) {
 
     // Check if value actually moved up
     const changed = !lattice.lte(joinedValue, oldValue)
+
+    // Detect contradiction for setIntersection lattice
+    // Contradiction: join produces empty set from two non-empty, non-null sets
+    if (cell.lattice === 'setIntersection' && onContradiction) {
+      const isContradiction = (
+        Array.isArray(joinedValue) && joinedValue.length === 0 &&
+        Array.isArray(oldValue) && oldValue.length > 0 &&
+        Array.isArray(valueToMerge) && valueToMerge.length > 0
+      )
+      if (isContradiction) {
+        onContradiction({
+          uri: `bl:///cells/${name}`,
+          cell,
+          previousValue: oldValue,
+          incomingValue: valueToMerge,
+          result: joinedValue
+        })
+      }
+    }
 
     if (changed) {
       cell.value = joinedValue
