@@ -299,6 +299,47 @@ Assigned to Carol for design exploration.
   }).then(() => console.log('  ✓ bl:///plumb/rules/task-watcher'))
 
   // ═══════════════════════════════════════════════════════════════════
+  // REACTIVE CELLS & PROPAGATORS - Live constraint network
+  // ═══════════════════════════════════════════════════════════════════
+  console.log('\n🔄 Reactive Cells & Propagators')
+
+  // Create cells for a sum constraint: a + b = sum
+  await put('bl:///cells/a', { lattice: 'maxNumber', label: 'A' })
+  await put('bl:///cells/b', { lattice: 'maxNumber', label: 'B' })
+  await put('bl:///cells/sum', { lattice: 'maxNumber', label: 'Sum (A + B)' })
+
+  // Create propagator BEFORE setting values so it watches changes
+  await put('bl:///propagators/add-ab', {
+    inputs: ['bl:///cells/a', 'bl:///cells/b'],
+    output: 'bl:///cells/sum',
+    handler: 'sum'
+  })
+
+  // Set initial values - this triggers the propagator
+  await put('bl:///cells/a/value', 5)
+  await put('bl:///cells/b/value', 3)
+
+  // Create cells for a product constraint: x * y = product
+  await put('bl:///cells/x', { lattice: 'maxNumber', label: 'X' })
+  await put('bl:///cells/y', { lattice: 'maxNumber', label: 'Y' })
+  await put('bl:///cells/product', { lattice: 'maxNumber', label: 'Product (X * Y)' })
+
+  // Create propagator BEFORE setting values
+  await put('bl:///propagators/multiply-xy', {
+    inputs: ['bl:///cells/x', 'bl:///cells/y'],
+    output: 'bl:///cells/product',
+    handler: 'product'
+  })
+
+  // Set initial values - this triggers the propagator
+  await put('bl:///cells/x/value', 4)
+  await put('bl:///cells/y/value', 7)
+
+  // Create a set accumulator cell
+  await put('bl:///cells/tags', { lattice: 'setUnion', label: 'Tag Collection' })
+  await put('bl:///cells/tags/value', ['bassline', 'reactive'])
+
+  // ═══════════════════════════════════════════════════════════════════
   // CONFIG / META
   // ═══════════════════════════════════════════════════════════════════
   console.log('\n⚙️  Config')
@@ -316,11 +357,16 @@ Assigned to Carol for design exploration.
 
   console.log('\n✨ Seeding complete!\n')
   console.log('Try these URIs in the editor:')
-  console.log('  bl:///local/data')
-  console.log('  bl:///local/data/notes/welcome')
-  console.log('  bl:///local/data/cells')
-  console.log('  bl:///local/data/tasks')
-  console.log('  bl:///local/data/types')
+  console.log('  bl:///data')
+  console.log('  bl:///data/notes/welcome')
+  console.log('  bl:///data/tasks')
+  console.log('  bl:///data/types')
+  console.log()
+  console.log('Reactive cells and propagators:')
+  console.log('  bl:///cells              (list all cells)')
+  console.log('  bl:///cells/sum          (computed: a + b)')
+  console.log('  bl:///cells/product      (computed: x * y)')
+  console.log('  bl:///propagators        (list all propagators)')
   console.log()
 }
 

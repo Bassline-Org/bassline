@@ -128,6 +128,14 @@ export class Bassline {
    * })
    */
   route(pattern, config) {
+    // Check if route with this pattern already exists - merge handlers if so
+    const existing = this.routes.find(r => r.pattern === pattern)
+    if (existing) {
+      if (config.get) existing.config.get = config.get
+      if (config.put) existing.config.put = config.put
+      return this
+    }
+
     const paramNames = []
     let regexStr = pattern
 

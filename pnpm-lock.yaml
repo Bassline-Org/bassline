@@ -26,9 +26,15 @@ importers:
 
   apps/cli:
     dependencies:
+      '@bassline/cells':
+        specifier: workspace:*
+        version: link:../../packages/cells
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@bassline/propagators':
+        specifier: workspace:*
+        version: link:../../packages/propagators
       '@bassline/server-node':
         specifier: workspace:*
         version: link:../../packages/server-node
@@ -61,7 +67,22 @@ importers:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@20.19.9)
 
+  packages/cells:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core: {}
+
+  packages/propagators:
+    dependencies:
+      '@bassline/cells':
+        specifier: workspace:*
+        version: link:../cells
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/react:
     dependencies:

@@ -13,7 +13,9 @@
   "dependencies": {
     "@bassline/core": "workspace:*",
     "@bassline/store-node": "workspace:*",
-    "@bassline/server-node": "workspace:*"
+    "@bassline/server-node": "workspace:*",
+    "@bassline/cells": "workspace:*",
+    "@bassline/propagators": "workspace:*"
   },
   "license": "AGPL-3.0"
 }
