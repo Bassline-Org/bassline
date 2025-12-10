@@ -73,9 +73,70 @@ describe('matchesPattern', () => {
     })
   })
 
+  describe('primitive value patterns', () => {
+    it('matches boolean values with strict equality', () => {
+      expect(matchesPattern(true, true)).toBe(true)
+      expect(matchesPattern(true, false)).toBe(false)
+      expect(matchesPattern(false, false)).toBe(true)
+      expect(matchesPattern(false, true)).toBe(false)
+    })
+
+    it('matches number values with strict equality', () => {
+      expect(matchesPattern(42, 42)).toBe(true)
+      expect(matchesPattern(42, 43)).toBe(false)
+      expect(matchesPattern(0, 0)).toBe(true)
+      expect(matchesPattern(-1, -1)).toBe(true)
+    })
+
+    it('matches null with strict equality', () => {
+      expect(matchesPattern(null, null)).toBe(true)
+      expect(matchesPattern(null, undefined)).toBe(false)
+      expect(matchesPattern(null, false)).toBe(false)
+    })
+
+    it('matches undefined with strict equality', () => {
+      expect(matchesPattern(undefined, undefined)).toBe(true)
+      expect(matchesPattern(undefined, null)).toBe(false)
+    })
+
+    it('matches primitive values in object patterns', () => {
+      const pattern = { headers: { type: 'bl:///types/cell-value', changed: true } }
+      const target = { headers: { type: 'bl:///types/cell-value', changed: true } }
+      expect(matchesPattern(pattern, target)).toBe(true)
+    })
+
+    it('fails when primitive values do not match in object patterns', () => {
+      const pattern = { headers: { type: 'bl:///types/cell-value', changed: true } }
+      const target1 = { headers: { type: 'bl:///types/cell-value', changed: false } }
+      const target2 = { headers: { type: 'bl:///types/cell-value' } }
+      expect(matchesPattern(pattern, target1)).toBe(false)
+      expect(matchesPattern(pattern, target2)).toBe(false)
+    })
+
+    it('matches mixed primitive and string patterns', () => {
+      const pattern = { 
+        headers: { 
+          type: '^cell$',
+          count: 5,
+          active: true
+        } 
+      }
+      const target = {
+        headers: {
+          type: 'cell',
+          count: 5,
+          active: true
+        }
+      }
+      expect(matchesPattern(pattern, target)).toBe(true)
+    })
+  })
+
   describe('edge cases', () => {
-    it('returns false for null pattern', () => {
+    it('returns false for null pattern against non-null', () => {
       expect(matchesPattern(null, 'hello')).toBe(false)
+      expect(matchesPattern(null, 42)).toBe(false)
+      expect(matchesPattern(null, true)).toBe(false)
     })
 
     it('returns false for null target with object pattern', () => {

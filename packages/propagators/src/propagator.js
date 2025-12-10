@@ -21,7 +21,7 @@ import { routes } from '@bassline/core'
  * @returns {object} Propagator routes and control functions
  */
 export function createPropagatorRoutes(options = {}) {
-  const { bl } = options
+  const { bl, onPropagatorKill } = options
 
   /** @type {Map<string, {inputs: string[], output: string, handler: function, handlerName: string, config: object, enabled: boolean}>} */
   const store = new Map()
@@ -148,6 +148,22 @@ export function createPropagatorRoutes(options = {}) {
   }
 
   /**
+   * Kill (remove) a propagator with callback notification
+   * @param {string} name - Propagator name
+   * @returns {boolean} Whether the propagator existed and was removed
+   */
+  function killPropagator(name) {
+    const existed = store.has(name)
+    if (existed) {
+      removePropagator(name)
+      if (onPropagatorKill) {
+        onPropagatorKill({ uri: `bl:///propagators/${name}` })
+      }
+    }
+    return existed
+  }
+
+  /**
    * Fire a propagator - read inputs, call handler, write output
    * @param {string} name - Propagator name
    * @returns {Promise<{fired: boolean, result?: any}>}
@@ -268,6 +284,17 @@ export function createPropagatorRoutes(options = {}) {
         body: result
       }
     })
+
+    // Kill (remove) a propagator
+    r.put('/:name/kill', ({ params }) => {
+      const existed = killPropagator(params.name)
+      if (!existed) return null
+
+      return {
+        headers: { type: 'bl:///types/resource-removed' },
+        body: { uri: `bl:///propagators/${params.name}` }
+      }
+    })
   })
 
   /**
@@ -285,6 +312,7 @@ export function createPropagatorRoutes(options = {}) {
     getPropagator,
     createPropagator,
     removePropagator,
+    killPropagator,
     fire,
     onCellChange,
     listPropagators,

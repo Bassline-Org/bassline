@@ -17,12 +17,28 @@ links.install(bl)
 plumber.install(bl)
 
 // Create propagators first (need reference for cell callback)
-const propagators = createPropagatorRoutes({ bl })
+const propagators = createPropagatorRoutes({
+  bl,
+  onPropagatorKill: ({ uri }) => {
+    plumber.dispatch({
+      uri,
+      headers: { type: 'bl:///types/resource-removed' },
+      body: { uri }
+    })
+  }
+})
 
 // Create cells with callback that fires propagators
 const cells = createCellRoutes({
   onCellChange: ({ uri }) => {
     propagators.onCellChange(uri)
+  },
+  onCellKill: ({ uri }) => {
+    plumber.dispatch({
+      uri,
+      headers: { type: 'bl:///types/resource-removed' },
+      body: { uri }
+    })
   }
 })
 
