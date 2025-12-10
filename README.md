@@ -13,67 +13,65 @@ bl:///propagators/sum        # a reactive computation
 bl:///links/to/types/cell    # a query
 ```
 
-## Why URIs?
+## Design Principles
 
-Because you can store them now and resolve them later. Middleware decides what they mean at runtime.
+**Language Agnostic.** The resource model is protocol-based, not library-based. Any language that can make HTTP requests or speak WebSocket can interact with Bassline. The JavaScript implementation is one client among many.
 
-You can sandbox things. Middleware controls what's resolvable. You can move resources around without breaking anything. You can define new resource types just by writing handlers.
+**Location Transparent.** URIs name resources without encoding where they live. A cell at `bl:///cells/counter` could be local, on a remote node, or replicated across many. Resolution happens at runtime based on how middleware is configured.
 
-In distributed systems, no node has the complete picture. URIs let you point at things you don't have yet, and figure it out when you need to.
+**Late Binding.** Store URIs now, resolve them later. Middleware decides what they mean at runtime. You can sandbox things by controlling what's resolvable. You can move resources around without breaking references. You can define new resource types by writing handlers.
+
+**Partial Information.** In Bassline, we view every piece of information as partial, part of a bigger picture. Information is never complete. This allows you to build systems incrementally that evolve gracefully.
 
 ## The Building Blocks
 
-**Types are resources too.** `headers.type` points to a type definition you can fetch.
-
-**Links go both ways.** The link index tracks who references what, so you can query in either direction.
-
-**Cells** are values with merge semantics. Write 5, then write 3, you still get 5 (max wins). Concurrent updates merge without coordination.
+**Cells** let you have state without requiring a specific order. Concurrent writes merge using lattice semantics. Unlike CRDTs, cells support errors during merges. Errors are data that meta-merge rules can use to decide which value to keep.
 
 **Propagators** wire cells together. Change an input, the output updates.
 
+**Fully Reflective.** Types, links, routes, and the system itself are all resources. You can explore every part of the system dynamically at runtime.
+
 ## Quick Start
 
-```bash
-node apps/cli/src/daemon.js
+```javascript
+import { Bassline } from '@bassline/core'
 
-# store something
-curl -X PUT "http://localhost:9111?uri=bl:///data/users/alice" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Alice"}'
+const bl = new Bassline()
 
-# get it back
-curl "http://localhost:9111?uri=bl:///data/users/alice"
+// Store something
+await bl.put('bl:///data/users/alice', {}, { name: 'Alice' })
+
+// Get it back
+const result = await bl.get('bl:///data/users/alice')
+// → { headers: { type: 'bl:///types/document' }, body: { name: 'Alice' } }
 ```
 
 ## Cells
 
-```bash
-# create a cell
-curl -X PUT "http://localhost:9111?uri=bl:///cells/counter" \
-  -H "Content-Type: application/json" \
-  -d '{"lattice": "maxNumber"}'
+```javascript
+// Create a cell with a lattice
+await bl.put('bl:///cells/counter', {}, { lattice: 'maxNumber' })
 
-# write values (max wins)
-curl -X PUT "http://localhost:9111?uri=bl:///cells/counter/value" \
-  -H "Content-Type: application/json" -d '5'
-curl -X PUT "http://localhost:9111?uri=bl:///cells/counter/value" \
-  -H "Content-Type: application/json" -d '3'   # still 5
-curl -X PUT "http://localhost:9111?uri=bl:///cells/counter/value" \
-  -H "Content-Type: application/json" -d '10'  # now 10
+// Write values (max wins)
+await bl.put('bl:///cells/counter/value', {}, 5)
+await bl.put('bl:///cells/counter/value', {}, 3)   // still 5
+await bl.put('bl:///cells/counter/value', {}, 10)  // now 10
 ```
 
-Lattices: `maxNumber`, `minNumber`, `setUnion`, `setIntersection`, `lww`, `object`, `counter`, `boolean`.
+Lattices: `maxNumber`, `minNumber`, `setUnion`, `setIntersection`, `lww`, `object`, `counter`, `boolean`. See [packages/cells](./packages/cells) for details.
 
 ## Propagators
 
-```bash
-# a + b -> sum
-curl -X PUT "http://localhost:9111?uri=bl:///propagators/add" \
-  -H "Content-Type: application/json" \
-  -d '{"inputs": ["bl:///cells/a", "bl:///cells/b"], "output": "bl:///cells/sum", "handler": "sum"}'
+```javascript
+// Wire cells: a + b -> sum
+await bl.put('bl:///propagators/add', {}, {
+  inputs: ['bl:///cells/a', 'bl:///cells/b'],
+  output: 'bl:///cells/sum',
+  handler: 'sum'
+})
 ```
 
-Basic handlers: `sum`, `product`, `passthrough`, `constant`. See [CLAUDE.md](./CLAUDE.md) for full list.
+60+ built-in handlers for arithmetic, logic, strings, arrays, objects, and more. See [packages/propagators](./packages/propagators) for full list.
 
 ## Packages
 
