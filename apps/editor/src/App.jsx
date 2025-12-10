@@ -30,8 +30,8 @@ function AddressBar({ value, onChange }) {
 }
 
 export default function App() {
-  const [uri, setUri] = useState('bl:///local/data')
-  const [history, setHistory] = useState(['bl:///local/data'])
+  const [uri, setUri] = useState('bl:///local')
+  const [history, setHistory] = useState(['bl:///local'])
   const [viewMode, setViewMode] = useState('pretty')
   const { data, loading, error } = useResource(uri)
 

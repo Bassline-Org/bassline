@@ -64,6 +64,17 @@ export function createRemoteRoutes(options = {}) {
     const conn = { ws, config, pending, nextId: () => nextId++, ready: () => ready, queue }
 
     // Register routes for this mount point
+    // Root route (e.g., bl:///local → bl:///)
+    bl.route(`${config.mount}`, {
+      get: async () => {
+        return sendRequest(conn, { type: 'get', uri: 'bl:///' })
+      },
+      put: async ({ body }) => {
+        return sendRequest(conn, { type: 'put', uri: 'bl:///', body })
+      }
+    })
+
+    // Sub-path routes (e.g., bl:///local/data → bl:///data)
     bl.route(`${config.mount}/:path*`, {
       get: async ({ params }) => {
         const remoteUri = `bl:///${params.path}`

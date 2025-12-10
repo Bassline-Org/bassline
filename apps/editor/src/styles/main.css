@@ -26,6 +26,9 @@
   --type-person: #ffab91;
   --type-type: #fff59d;
   --type-directory: #90a4ae;
+  --type-index: #b39ddb;
+  --type-module: #80cbc4;
+  --type-remote: #ffcc80;
 
   /* Status colors */
   --status-todo: #888;
@@ -228,6 +231,9 @@ main {
 .view-card.type-task { border-left-color: var(--type-task); }
 .view-card.type-person { border-left-color: var(--type-person); }
 .view-card.type-type { border-left-color: var(--type-type); }
+.view-card.type-index { border-left-color: var(--type-index); }
+.view-card.type-module { border-left-color: var(--type-module); }
+.view-card.type-remote { border-left-color: var(--type-remote); }
 
 /* ═══════════════════════════════════════════════════════════════════
    Badges - Status, type, and tag badges
@@ -539,4 +545,68 @@ main {
 
 .view-toggle button:hover:not(.active) {
   background: var(--surface-1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Index View - Root system overview
+   ═══════════════════════════════════════════════════════════════════ */
+
+.index-view {
+  max-width: 800px;
+}
+
+.index-view h1 {
+  margin: 0 0 var(--space-sm) 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-family: var(--sans);
+  color: var(--type-index);
+}
+
+.index-view .description {
+  font-family: var(--sans);
+  color: var(--text-muted);
+  margin-bottom: var(--space-lg);
+  font-size: 1.1rem;
+}
+
+.index-view section h2 {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 var(--space-md) 0;
+}
+
+.index-view .subsystems-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-sm);
+}
+
+.index-view .subsystems-list li {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.index-view .subsystems-list li:hover {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+
+.index-view .subsystems-list .link-preview {
+  display: flex;
+  padding: var(--space-md);
+  background: transparent;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.index-view .subsystems-list .link-preview:hover {
+  background: transparent;
 }
