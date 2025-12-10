@@ -33,19 +33,54 @@ const result = await bl.get('bl:///cells/counter/value')
 
 ## Lattices
 
-Built-in lattices:
+A lattice defines how values merge. Each lattice provides:
+- `bottom()` - the minimal element
+- `join(a, b)` - combine two values (supremum)
+- `lte(a, b)` - compare two values (partial order)
 
-- `maxNumber` - maximum of numbers
-- `minNumber` - minimum of numbers
-- `setUnion` - union of arrays
-- `lww` - last-writer-wins (by timestamp)
+### Built-in Lattices
+
+| Lattice | Bottom | Join | Description |
+|---------|--------|------|-------------|
+| `maxNumber` | `-Infinity` | `Math.max(a, b)` | Values only increase |
+| `minNumber` | `Infinity` | `Math.min(a, b)` | Values only decrease |
+| `setUnion` | `[]` | Union of arrays | Accumulates elements |
+| `setIntersection` | `null` | Intersection | Constrains to common elements |
+| `lww` | `{value: null, timestamp: 0}` | Latest timestamp wins | Last-writer-wins |
+| `object` | `{}` | Shallow merge | Later values overwrite |
+| `counter` | `0` | `a + b` | Increment-only (adds values) |
+| `boolean` | `false` | `a \|\| b` | Once true, stays true |
+
+### Examples
 
 ```javascript
-// Set union example
+// Set union - accumulates elements
 await bl.put('bl:///cells/tags', {}, { lattice: 'setUnion' })
 await bl.put('bl:///cells/tags/value', {}, ['a', 'b'])
 await bl.put('bl:///cells/tags/value', {}, ['b', 'c'])
 // value is now ['a', 'b', 'c']
+
+// Counter - adds values together
+await bl.put('bl:///cells/visits', {}, { lattice: 'counter' })
+await bl.put('bl:///cells/visits/value', {}, 1)
+await bl.put('bl:///cells/visits/value', {}, 1)
+await bl.put('bl:///cells/visits/value', {}, 1)
+// value is now 3
+
+// LWW - latest timestamp wins
+await bl.put('bl:///cells/status', {}, { lattice: 'lww' })
+await bl.put('bl:///cells/status/value', {}, { value: 'online', timestamp: Date.now() })
+
+// Boolean - once true, stays true
+await bl.put('bl:///cells/seen', {}, { lattice: 'boolean' })
+await bl.put('bl:///cells/seen/value', {}, true)
+await bl.put('bl:///cells/seen/value', {}, false)  // still true
+
+// Set intersection - constrains to common elements
+await bl.put('bl:///cells/allowed', {}, { lattice: 'setIntersection' })
+await bl.put('bl:///cells/allowed/value', {}, ['a', 'b', 'c'])
+await bl.put('bl:///cells/allowed/value', {}, ['b', 'c', 'd'])
+// value is now ['b', 'c']
 ```
 
 ## Routes
