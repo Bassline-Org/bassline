@@ -1,66 +1,35 @@
-import { createServer } from 'node:http'
-import { Bassline } from '@bassline/core'
+import { Bassline, createLinkIndex, createPlumber } from '@bassline/core'
 import { createFileStore } from '@bassline/store-node'
+import { createHttpServerRoutes, createWsServerRoutes } from '@bassline/server-node'
 
 const DATA_DIR = process.env.BL_DATA || '.bassline'
-const PORT = process.env.BL_PORT || 9111
+const HTTP_PORT = parseInt(process.env.BL_HTTP_PORT || process.env.BL_PORT || '9111')
+const WS_PORT = parseInt(process.env.BL_WS_PORT || '9112')
 
 const bl = new Bassline()
+const links = createLinkIndex()
+const plumber = createPlumber()
+
+// Install core features
+links.install(bl)
+plumber.install(bl)
 
 // Install file store - handles /data/:path*
 bl.install(createFileStore(DATA_DIR, '/data'))
 
-createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`)
-  const uri = url.searchParams.get('uri')
+// Install server capabilities
+bl.install(createHttpServerRoutes())
+bl.install(createWsServerRoutes(plumber))
 
-  if (!uri) {
-    res.writeHead(400)
-    res.end(JSON.stringify({ error: 'Missing uri parameter' }))
-    return
-  }
+// Bootstrap: start servers via resources
+await bl.put(`bl:///server/http/${HTTP_PORT}`, {}, {})
+await bl.put(`bl:///server/ws/${WS_PORT}`, {}, {})
 
-  try {
-    if (req.method === 'GET') {
-      const result = await bl.get(uri)
-      if (!result) {
-        res.writeHead(404)
-        res.end(JSON.stringify({ error: 'Not found', uri }))
-        return
-      }
-      res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify(result))
-    } else if (req.method === 'PUT') {
-      let body = ''
-      req.on('data', c => body += c)
-      req.on('end', async () => {
-        try {
-          const parsed = JSON.parse(body)
-          const result = await bl.put(uri, {}, parsed)
-          if (!result) {
-            res.writeHead(404)
-            res.end(JSON.stringify({ error: 'No route for PUT', uri }))
-            return
-          }
-          res.setHeader('Content-Type', 'application/json')
-          res.end(JSON.stringify(result))
-        } catch (err) {
-          res.writeHead(400)
-          res.end(JSON.stringify({ error: err.message }))
-        }
-      })
-    } else {
-      res.writeHead(405)
-      res.end('Method not allowed')
-    }
-  } catch (err) {
-    res.writeHead(500)
-    res.end(JSON.stringify({ error: err.message }))
-  }
-}).listen(PORT, () => {
-  console.log(`Bassline daemon listening on port ${PORT}`)
-  console.log(`Data directory: ${DATA_DIR}`)
-  console.log(`\nEndpoints:`)
-  console.log(`  GET  http://localhost:${PORT}?uri=bl:///data`)
-  console.log(`  PUT  http://localhost:${PORT}?uri=bl:///data/path/to/doc`)
-})
+console.log('Bassline daemon running')
+console.log(`  Data:  ${DATA_DIR}`)
+console.log(`  HTTP:  http://localhost:${HTTP_PORT}`)
+console.log(`  WS:    ws://localhost:${WS_PORT}`)
+console.log(`\nResources:`)
+console.log(`  GET  http://localhost:${HTTP_PORT}?uri=bl:///data`)
+console.log(`  GET  http://localhost:${HTTP_PORT}?uri=bl:///server`)
+console.log(`  GET  http://localhost:${HTTP_PORT}?uri=bl:///plumb/rules`)

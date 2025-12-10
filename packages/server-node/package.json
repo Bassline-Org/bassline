@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/server-node",
+  "version": "1.0.0",
+  "description": "HTTP and WebSocket servers as Bassline resources",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./http": "./src/http.js",
+    "./ws": "./src/ws.js"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "license": "AGPL-3.0"
+}
