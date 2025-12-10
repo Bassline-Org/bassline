@@ -3,22 +3,52 @@ import { routes } from '@bassline/core'
 /**
  * Create service registry routes for service discovery.
  *
+ * Services register themselves and expose their operations for introspection.
+ * GET /services returns all services with their operation summaries.
+ *
  * @returns {object} Service routes and registration functions
  */
 export function createServiceRoutes() {
-  const services = new Map()  // name -> { info, routes }
+  const services = new Map()  // name -> { service, info }
+  let _bl = null
 
   const serviceRoutes = routes('/services', r => {
-    // List all registered services
-    r.get('/', () => ({
-      headers: { type: 'bl:///types/directory' },
-      body: {
-        entries: [...services.keys()].map(name => ({
-          name,
-          uri: `bl:///services/${name}`
-        }))
+    // List all registered services with operation summaries
+    r.get('/', async () => {
+      const entries = await Promise.all(
+        [...services.keys()].map(async name => {
+          try {
+            // Query each service for its info
+            const info = _bl ? await _bl.get(`bl:///services/${name}`) : null
+            const body = info?.body || {}
+
+            return {
+              name,
+              uri: `bl:///services/${name}`,
+              description: body.description,
+              version: body.version,
+              operations: body.operations?.map(op => ({
+                name: op.name,
+                method: op.method,
+                path: op.path,
+                description: op.description
+              }))
+            }
+          } catch {
+            // Service info not available
+            return {
+              name,
+              uri: `bl:///services/${name}`
+            }
+          }
+        })
+      )
+
+      return {
+        headers: { type: 'bl:///types/service-directory' },
+        body: { entries }
       }
-    }))
+    })
   })
 
   return {
@@ -44,6 +74,9 @@ export function createServiceRoutes() {
      * Install service routes into a Bassline instance
      * @param {import('@bassline/core').Bassline} bl
      */
-    install: (bl) => bl.install(serviceRoutes)
+    install: (bl) => {
+      _bl = bl
+      bl.install(serviceRoutes)
+    }
   }
 }

@@ -123,12 +123,6 @@ export default function ClaudePanel({ isOpen, onClose }) {
     setError(null)
 
     try {
-      // Build messages array for API
-      const apiMessages = [...messages, userMessage].map(m => ({
-        role: m.role,
-        content: m.content
-      }))
-
       // System prompt for Bassline context
       const system = `You are an AI assistant integrated with Bassline, a resource-based programming environment.
 You can help users understand and interact with their data.
@@ -140,24 +134,48 @@ Key concepts:
 
 Be concise and helpful. When discussing resources, mention their URIs.`
 
-      const response = await bl.put(`${REMOTE_PREFIX}/services/claude/messages`, {}, {
-        messages: apiMessages,
-        system,
-        max_tokens: 2048
-      })
+      let response
+      if (agentMode) {
+        // Agent mode: Use agentic loop with tools
+        response = await bl.put(`${REMOTE_PREFIX}/services/claude/agent`, {}, {
+          prompt: input,
+          system,
+          maxTurns: 10
+        })
 
-      if (response?.body?.content) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: response.body.content
-        }])
+        // Agent returns the final Claude response
+        if (response?.body?.content) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: response.body.content
+          }])
+        }
+      } else {
+        // Chat mode: Regular messages API
+        const apiMessages = [...messages, userMessage].map(m => ({
+          role: m.role,
+          content: m.content
+        }))
+
+        response = await bl.put(`${REMOTE_PREFIX}/services/claude/messages`, {}, {
+          messages: apiMessages,
+          system,
+          max_tokens: 2048
+        })
+
+        if (response?.body?.content) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: response.body.content
+          }])
+        }
       }
     } catch (err) {
       setError(err.message || 'Failed to get response')
     } finally {
       setLoading(false)
     }
-  }, [input, loading, messages, bl])
+  }, [input, loading, messages, bl, agentMode])
 
   const handleClear = () => {
     setMessages([])
