@@ -54,12 +54,44 @@ export const lww = {
   }
 }
 
+// Object lattice - deep merge with later values winning conflicts
+export const object = {
+  bottom: () => ({}),
+  join: (a, b) => {
+    // Shallow merge for now - b overwrites a for conflicts
+    return { ...(a || {}), ...(b || {}) }
+  },
+  lte: (a, b) => {
+    // a <= b if all keys in a exist in b with same values
+    const aObj = a || {}
+    const bObj = b || {}
+    return Object.keys(aObj).every(k => k in bObj)
+  }
+}
+
+// Counter lattice - increment only (add values together)
+export const counter = {
+  bottom: () => 0,
+  join: (a, b) => (a ?? 0) + (b ?? 0),
+  lte: (a, b) => (a ?? 0) <= (b ?? 0)  // Lower counts are below higher counts
+}
+
+// Boolean lattice - once true, stays true
+export const boolean = {
+  bottom: () => false,
+  join: (a, b) => a || b,
+  lte: (a, b) => !a || b  // false <= anything, true <= true only
+}
+
 // Registry of built-in lattices
 export const lattices = {
   maxNumber,
   minNumber,
   setUnion,
-  lww
+  lww,
+  object,
+  counter,
+  boolean
 }
 
 /**

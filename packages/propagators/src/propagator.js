@@ -8,7 +8,14 @@ import { routes } from '@bassline/core'
  * synchronously and the network naturally terminates.
  *
  * Handlers are registered as factories that receive a context object.
- * Built-in handlers: sum, product, passthrough, constant
+ *
+ * Built-in handlers:
+ * - Basic: sum, product, passthrough, constant
+ * - Reducers: min, max, average, concat, first, last
+ * - Structural: pair, zip, unzip
+ * - Transformers: map, pick, format, coerce
+ * - Predicates: filter (returns undefined to skip propagation)
+ * - Composition: compose (chain multiple handlers)
  *
  * Resource structure:
  * - GET  /propagators           → list all propagators
@@ -44,6 +51,97 @@ export function createPropagatorRoutes(options = {}) {
   handlerFactories.set('passthrough', () => (value) => value)
 
   handlerFactories.set('constant', (ctx) => () => ctx.value)
+
+  // --- Reducers ---
+
+  handlerFactories.set('min', () => (...values) => {
+    const nums = values.filter(v => typeof v === 'number')
+    return nums.length ? Math.min(...nums) : null
+  })
+
+  handlerFactories.set('max', () => (...values) => {
+    const nums = values.filter(v => typeof v === 'number')
+    return nums.length ? Math.max(...nums) : null
+  })
+
+  handlerFactories.set('average', () => (...values) => {
+    const nums = values.filter(v => typeof v === 'number')
+    return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null
+  })
+
+  handlerFactories.set('concat', () => (...values) => {
+    if (Array.isArray(values[0])) return values.flat()
+    return values.filter(v => v != null).join('')
+  })
+
+  handlerFactories.set('first', () => (...values) =>
+    values.find(v => v != null)
+  )
+
+  handlerFactories.set('last', () => (...values) =>
+    values.filter(v => v != null).pop()
+  )
+
+  // --- Structural ---
+
+  handlerFactories.set('pair', () => (...values) => values)
+
+  handlerFactories.set('zip', (ctx) => (...values) => {
+    const keys = ctx.keys || values.map((_, i) => `v${i}`)
+    return Object.fromEntries(keys.map((k, i) => [k, values[i]]))
+  })
+
+  handlerFactories.set('unzip', (ctx) => (obj) => obj?.[ctx.key])
+
+  // --- Transformers ---
+
+  handlerFactories.set('map', (ctx) => {
+    // Support both expr string and direct function
+    const fn = ctx.fn || new Function('x', `return ${ctx.expr}`)
+    return (...values) => ctx.multi ? values.map(fn) : fn(values[0])
+  })
+
+  handlerFactories.set('pick', (ctx) => (obj) => obj?.[ctx.key])
+
+  handlerFactories.set('format', (ctx) => (...values) =>
+    ctx.template.replace(/\{(\d+)\}/g, (_, i) => values[i] ?? '')
+  )
+
+  handlerFactories.set('coerce', (ctx) => (value) => {
+    switch (ctx.to) {
+      case 'number': return Number(value) || 0
+      case 'string': return String(value ?? '')
+      case 'boolean': return Boolean(value)
+      case 'json': return typeof value === 'string' ? JSON.parse(value) : value
+      default: return value
+    }
+  })
+
+  // --- Predicates ---
+
+  handlerFactories.set('filter', (ctx) => {
+    const pred = ctx.fn || new Function('x', `return ${ctx.predicate}`)
+    return (value) => pred(value) ? value : undefined  // undefined = skip
+  })
+
+  // --- Composition ---
+
+  handlerFactories.set('compose', (ctx) => {
+    // Chain multiple handlers: compose(['coerce', 'map'], {coerce: {to: 'number'}, map: {expr: 'x * 2'}})
+    const handlers = ctx.steps.map(step => {
+      if (typeof step === 'string') {
+        return getHandler(step, ctx[step] || {})
+      }
+      return getHandler(step.handler, step.config || {})
+    })
+    return (...values) => {
+      let result = values.length === 1 ? values[0] : values
+      for (const h of handlers) {
+        result = Array.isArray(result) ? h(...result) : h(result)
+      }
+      return result
+    }
+  })
 
   /**
    * Register a handler factory
@@ -193,6 +291,11 @@ export function createPropagatorRoutes(options = {}) {
     } catch (err) {
       console.error(`Propagator ${name} handler error:`, err)
       return { fired: false, error: err.message }
+    }
+
+    // Skip write if handler returns undefined (for filter semantics)
+    if (outputValue === undefined) {
+      return { fired: true, skipped: true }
     }
 
     // Write to output cell
