@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard and activity tracking for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}

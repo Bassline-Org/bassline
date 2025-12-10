@@ -1,0 +1,15 @@
+{
+  "name": "@bassline/services",
+  "version": "1.0.0",
+  "description": "External service integrations for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "@anthropic-ai/sdk": "^0.32.0"
+  },
+  "license": "AGPL-3.0"
+}

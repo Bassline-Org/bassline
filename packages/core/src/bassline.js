@@ -1,310 +1,372 @@
 /**
- * Bassline - The System
- *
- * Bassline is the ultimate mirror that resolves refs and manages all mirrors.
- * Refs are self-describing - they carry their own resolution information.
- *
- * @example
- * const bl = new Bassline();
- *
- * // Register middleware to handle ref patterns
- * bl.use('/cell', (ref, bl) => new Cell(ref, bl));
- * bl.use('/action/log', (ref, bl) => new LogAction(ref, bl));
- *
- * // All operations resolve refs to mirrors
- * bl.read('bl:///cell/counter');
- * bl.write('bl:///cell/counter', 42);
- * bl.watch('bl:///cell/counter', (value) => console.log(value));
+ * @typedef {Object} Response
+ * @property {Object} headers - Response headers (type, capabilities, etc.)
+ * @property {*} body - Response body (scalar or compound with links)
  */
 
-import { Ref, ref, isRef } from './types.js';
+/**
+ * @typedef {Object.<string, string>} Params
+ * Extracted path parameters (e.g., { name: 'counter' } for /cells/:name)
+ */
 
 /**
- * Bassline - Resolves refs to mirrors
+ * @typedef {Object.<string, *>} Headers
+ * Request headers for context, capabilities, etc.
+ */
+
+/**
+ * @typedef {Object} Context
+ * @property {Params} params - Extracted path parameters
+ * @property {Headers} headers - Request headers
+ * @property {URLSearchParams} query - Query parameters from the URI
+ * @property {*} [body] - Request body (only present for PUT)
+ * @property {Bassline} bl - Bassline instance for nested resolution
+ */
+
+/**
+ * @callback Handler
+ * @param {Context} ctx - Request context
+ * @returns {Response|null|Promise<Response|null>} Response, null, or Promise
+ */
+
+/**
+ * @typedef {Object} RouteConfig
+ * @property {Handler} [get] - Handler for GET requests
+ * @property {Handler} [put] - Handler for PUT requests
+ */
+
+/**
+ * @typedef {Object} TapContext
+ * @property {string} uri - The URI that was accessed
+ * @property {Headers} headers - Request headers
+ * @property {*} [body] - Request body (only present for PUT taps)
+ * @property {Response|null} result - Response from the handler
+ * @property {Bassline} bl - Bassline instance
+ */
+
+/**
+ * @callback Tap
+ * @param {TapContext} ctx - Tap context
+ * @returns {void}
+ */
+
+/**
+ * @typedef {Object} MiddlewareContext
+ * @property {string} verb - The HTTP verb ('get' or 'put')
+ * @property {string} uri - The full URI being accessed
+ * @property {Params} params - Extracted path parameters
+ * @property {Headers} headers - Request headers
+ * @property {URLSearchParams} query - Query parameters from the URI
+ * @property {*} [body] - Request body (only present for PUT)
+ * @property {Bassline} bl - Bassline instance
+ */
+
+/**
+ * @callback Middleware
+ * @param {MiddlewareContext} ctx - Middleware context
+ * @param {function(): Promise<Response|null>} next - Call to continue to next middleware/handler
+ * @returns {Response|null|Promise<Response|null>} Response, null, or Promise
+ */
+
+/**
+ * @typedef {Object} MiddlewareEntry
+ * @property {Middleware} fn - The middleware function
+ * @property {number} priority - Sort priority (lower runs first)
+ * @property {string} [id] - Optional identifier for removal
+ */
+
+/**
+ * Bassline - Minimal routing with pattern matching
  *
- * Refs are unique values that carry their own resolution information.
- * Middleware registers to handle patterns and create mirrors on demand.
+ * @example
+ * const bl = new Bassline()
+ *
+ * bl.route('/cells/:name', {
+ *   get: ({ params, query, bl }) => ({
+ *     headers: { type: 'cell' },
+ *     body: { value: `bl:///cells/${params.name}/value` }
+ *   })
+ * })
+ *
+ * bl.get('bl:///cells/counter')
+ * // → { headers: { type: 'cell' }, body: { value: 'bl:///cells/counter/value' } }
+ *
+ * // Taps observe operations without intercepting
+ * bl.tap('put', ({ uri, body }) => {
+ *   console.log(`PUT ${uri}:`, body)
+ * })
  */
 export class Bassline {
   constructor() {
-    /** @type {Map<string, Object>} ref.href → Mirror instance */
-    this._mirrors = new Map();
-
-    /** @type {Array<{pattern: string, resolve: function, onWrite?: function, onRead?: function}>} */
-    this._resolvers = [];
-
-    /** @type {Set<function>} Write listeners */
-    this._writeListeners = new Set();
-
-    /** @type {Set<function>} Read listeners */
-    this._readListeners = new Set();
+    /** @type {Array<{pattern: string, regex: RegExp, paramNames: string[], config: RouteConfig}>} */
+    this.routes = []
+    /** @type {{ get: Tap[], put: Tap[] }} */
+    this.taps = { get: [], put: [] }
+    /** @type {MiddlewareEntry[]} */
+    this.middleware = []
   }
 
-  // ============================================================================
-  // Middleware Registration
-  // ============================================================================
-
   /**
-   * Register middleware for a pattern
+   * Register middleware to intercept requests
+   * Middleware runs before route handlers in priority order (lower first)
+   * Returns an uninstaller function for clean removal
    *
-   * @param {string} pattern - Path pattern to match (e.g., '/cell', '/action/log')
-   * @param {function|Object} middleware - Resolver function or { resolve, onWrite?, onRead? }
+   * @param {Middleware} fn - Middleware function (ctx, next) => result
+   * @param {Object} [options] - Options
+   * @param {number} [options.priority=50] - Sort priority (lower runs first)
+   * @param {string} [options.id] - Optional identifier for introspection/removal
+   * @returns {function(): void} Uninstaller function
    *
    * @example
-   * // Simple resolver
-   * bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+   * // Logging middleware
+   * const uninstall = bl.use(async (ctx, next) => {
+   *   console.log(`${ctx.verb} ${ctx.uri}`)
+   *   return next()
+   * }, { priority: 10, id: 'logger' })
    *
-   * // With event listeners
-   * bl.use('/audit', {
-   *   resolve: (ref, bl) => new AuditMirror(ref, bl),
-   *   onWrite: (ref, value, result, bl) => console.log('Write:', ref.href)
-   * });
+   * // Later: uninstall()
+   *
+   * @example
+   * // Auth middleware - reject if no peer
+   * bl.use(async (ctx, next) => {
+   *   if (!ctx.headers.peer) {
+   *     return { headers: { error: 'unauthorized' }, body: null }
+   *   }
+   *   return next()
+   * }, { priority: 20, id: 'auth' })
    */
-  use(pattern, middleware) {
-    const normalPattern = this._normalizePath(pattern);
-
-    if (typeof middleware === 'function') {
-      middleware = { resolve: middleware };
-    }
-
-    this._resolvers.push({ pattern: normalPattern, ...middleware });
-
-    // Wire up event listeners if provided
-    if (middleware.onWrite) {
-      this._writeListeners.add(middleware.onWrite);
-    }
-    if (middleware.onRead) {
-      this._readListeners.add(middleware.onRead);
+  use(fn, { priority = 50, id } = {}) {
+    const entry = { fn, priority, id }
+    this.middleware.push(entry)
+    this.middleware.sort((a, b) => a.priority - b.priority)
+    return () => {
+      this.middleware = this.middleware.filter(m => m !== entry)
     }
   }
 
-  // ============================================================================
-  // Resolution
-  // ============================================================================
-
   /**
-   * Resolve a ref to its mirror
+   * Register a tap to observe operations
+   * Taps are called after handlers complete - they observe but don't intercept
    *
-   * If the mirror exists in cache, returns it.
-   * Otherwise finds matching middleware, creates mirror, caches and returns it.
+   * @param {'get'|'put'} verb - Which operation to observe
+   * @param {Tap} fn - Tap function
+   * @returns {this} For chaining
    *
-   * @param {Ref|string} refOrHref
-   * @returns {Object} The mirror
+   * @example
+   * // Log all writes
+   * bl.tap('put', ({ uri, body }) => {
+   *   console.log(`Written to ${uri}:`, body)
+   * })
+   *
+   * // Index links on write
+   * bl.tap('put', ({ uri, body }) => {
+   *   linkIndex.index(uri, body)
+   * })
    */
-  resolve(refOrHref) {
-    const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-
-    if (!isRef(r)) {
-      throw new Error(`resolve requires a Ref, got: ${typeof refOrHref}`);
+  tap(verb, fn) {
+    if (this.taps[verb]) {
+      this.taps[verb].push(fn)
     }
-
-    // Only handle bl:// scheme
-    if (r.scheme !== 'bl') {
-      throw new Error(`Unsupported scheme: ${r.scheme}`);
-    }
-
-    // Already exists in cache?
-    if (this._mirrors.has(r.href)) {
-      return this._mirrors.get(r.href);
-    }
-
-    // Find matching resolver
-    const resolver = this._findResolver(r.pathname);
-    if (!resolver) {
-      throw new Error(`No resolver for: ${r.href}`);
-    }
-
-    // Create mirror and cache it
-    const mirror = resolver.resolve(r, this);
-    this._mirrors.set(r.href, mirror);
-    return mirror;
+    return this
   }
 
   /**
-   * Find the best matching resolver for a pathname
-   * Uses longest-prefix-match
+   * Register a route with pattern matching
    *
-   * @param {string} pathname
-   * @returns {Object|null}
+   * Supports:
+   * - `:param` - matches a single path segment
+   * - `:param*` - matches remaining path segments (wildcard, must be last)
+   *
+   * @param {string} pattern - URL pattern with :param placeholders (e.g., '/cells/:name', '/data/:path*')
+   * @param {RouteConfig} config - Route configuration with get/put handlers
+   * @returns {this} For chaining
+   *
+   * @example
+   * bl.route('/users/:id', {
+   *   get: ({ params }) => ({ headers: {}, body: { id: params.id } }),
+   *   put: ({ params, body }) => { ... }
+   * })
+   *
+   * // Wildcard - matches /files/any/nested/path
+   * bl.route('/files/:path*', {
+   *   get: ({ params }) => ({ headers: {}, body: { path: params.path } })
+   * })
    */
-  _findResolver(pathname) {
-    let best = null;
-    let bestLen = -1;
+  route(pattern, config) {
+    // Check if route with this pattern already exists - merge handlers if so
+    const existing = this.routes.find(r => r.pattern === pattern)
+    if (existing) {
+      if (config.get) existing.config.get = config.get
+      if (config.put) existing.config.put = config.put
+      return this
+    }
 
-    for (const resolver of this._resolvers) {
-      const { pattern } = resolver;
-      if (pathname === pattern || pathname.startsWith(pattern + '/')) {
-        if (pattern.length > bestLen) {
-          best = resolver;
-          bestLen = pattern.length;
-        }
+    const paramNames = []
+    let regexStr = pattern
+
+    // Handle wildcard params (:param*) - must match rest of path
+    regexStr = regexStr.replace(/:(\w+)\*/g, (_, name) => {
+      paramNames.push(name)
+      return '(.+)'
+    })
+
+    // Handle regular params (:param) - single segment
+    regexStr = regexStr.replace(/:(\w+)/g, (_, name) => {
+      paramNames.push(name)
+      return '([^/]+)'
+    })
+
+    const regex = new RegExp(`^${regexStr}$`)
+    this.routes.push({ pattern, regex, paramNames, config })
+    this._sortRoutes()
+    return this
+  }
+
+  /** @private */
+  _sortRoutes() {
+    // More specific routes first (more segments, more literals, wildcards last)
+    this.routes.sort((a, b) => {
+      // Skip routes without patterns (sort them last)
+      if (!a.pattern) return 1
+      if (!b.pattern) return -1
+
+      // Wildcards are least specific
+      const wcA = a.pattern.includes('*') ? 1 : 0
+      const wcB = b.pattern.includes('*') ? 1 : 0
+      if (wcA !== wcB) return wcA - wcB
+
+      const segsA = a.pattern.split('/').filter(Boolean).length
+      const segsB = b.pattern.split('/').filter(Boolean).length
+      if (segsA !== segsB) return segsB - segsA
+
+      const litsA = a.pattern.split('/').filter(s => s && !s.startsWith(':')).length
+      const litsB = b.pattern.split('/').filter(s => s && !s.startsWith(':')).length
+      return litsB - litsA
+    })
+  }
+
+  /** @private */
+  _match(path) {
+    for (const route of this.routes) {
+      const match = path.match(route.regex)
+      if (match) {
+        const params = {}
+        route.paramNames.forEach((name, i) => params[name] = match[i + 1])
+        return { route, params }
       }
     }
-
-    return best;
-  }
-
-  // ============================================================================
-  // Uniform Resource Interface
-  // ============================================================================
-
-  /**
-   * Read from a resource
-   *
-   * @param {Ref|string} refOrHref - Resource to read
-   * @returns {*} The value
-   */
-  read(refOrHref) {
-    const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-    const mirror = this.resolve(r);
-
-    if (mirror.readable === false) {
-      throw new Error(`Resource is not readable: ${r.href}`);
-    }
-
-    const result = mirror.read();
-
-    // Notify listeners
-    for (const listener of this._readListeners) {
-      listener(r, result, this);
-    }
-
-    return result;
+    return null
   }
 
   /**
-   * Write to a resource
-   *
-   * @param {Ref|string} refOrHref - Resource to write
-   * @param {*} [value] - Value to write
-   * @returns {*} Result of the write
+   * Dispatch request through middleware chain then to route handler
+   * @private
+   * @param {MiddlewareContext} ctx - Request context
+   * @param {function(): Promise<Response|null>} handleRoute - Final route handler
+   * @returns {Promise<Response|null>}
    */
-  write(refOrHref, value) {
-    const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-    const mirror = this.resolve(r);
-
-    if (mirror.writable === false) {
-      throw new Error(`Resource is not writable: ${r.href}`);
-    }
-
-    const result = mirror.write(value);
-
-    // Notify listeners
-    for (const listener of this._writeListeners) {
-      listener(r, value, result, this);
-    }
-
-    return result;
-  }
-
-  /**
-   * Watch a resource for changes
-   *
-   * @param {Ref|string} refOrHref - Resource to watch
-   * @param {function} callback - Called on changes
-   * @returns {function} Unsubscribe function
-   */
-  watch(refOrHref, callback) {
-    const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-    const mirror = this.resolve(r);
-
-    if (!mirror.subscribe) {
-      throw new Error(`Resource does not support watching: ${r.href}`);
-    }
-
-    return mirror.subscribe(callback);
-  }
-
-  // ============================================================================
-  // Event Subscription
-  // ============================================================================
-
-  /**
-   * Subscribe to all writes in the system
-   *
-   * @param {function} callback - Called with (ref, value, result, bassline)
-   * @returns {function} Unsubscribe function
-   */
-  onWrite(callback) {
-    this._writeListeners.add(callback);
-    return () => this._writeListeners.delete(callback);
-  }
-
-  /**
-   * Subscribe to all reads in the system
-   *
-   * @param {function} callback - Called with (ref, result, bassline)
-   * @returns {function} Unsubscribe function
-   */
-  onRead(callback) {
-    this._readListeners.add(callback);
-    return () => this._readListeners.delete(callback);
-  }
-
-  // ============================================================================
-  // Introspection
-  // ============================================================================
-
-  /**
-   * List all resolved mirror refs
-   * @returns {string[]}
-   */
-  listMirrors() {
-    return Array.from(this._mirrors.keys());
-  }
-
-  /**
-   * List all registered resolver patterns
-   * @returns {string[]}
-   */
-  listResolvers() {
-    return this._resolvers.map(r => r.pattern);
-  }
-
-  /**
-   * Check if a ref has been resolved (is in cache)
-   * @param {Ref|string} refOrHref
-   * @returns {boolean}
-   */
-  hasResolved(refOrHref) {
-    const r = typeof refOrHref === 'string' ? ref(refOrHref) : refOrHref;
-    return this._mirrors.has(r.href);
-  }
-
-  // ============================================================================
-  // Lifecycle
-  // ============================================================================
-
-  /**
-   * Dispose all mirrors and clear state
-   */
-  dispose() {
-    for (const mirror of this._mirrors.values()) {
-      if (typeof mirror.dispose === 'function') {
-        mirror.dispose();
+  async _dispatch(ctx, handleRoute) {
+    let index = 0
+    const next = async () => {
+      if (index < this.middleware.length) {
+        return this.middleware[index++].fn(ctx, next)
       }
+      return handleRoute()
     }
-    this._mirrors.clear();
-    this._resolvers = [];
-    this._writeListeners.clear();
-    this._readListeners.clear();
+    return next()
   }
 
-  // ============================================================================
-  // Helpers
-  // ============================================================================
+  /**
+   * GET a resource by URI
+   *
+   * @param {string} uri - Full URI (e.g., 'bl:///cells/counter')
+   * @param {Headers} [headers={}] - Request headers
+   * @returns {Promise<Response|null>} Response or null if no matching route
+   *
+   * @example
+   * const response = await bl.get('bl:///cells/counter', { auth: 'token' })
+   * console.log(response.headers.type)  // 'cell'
+   * console.log(response.body.value)    // 'bl:///cells/counter/value'
+   */
+  async get(uri, headers = {}) {
+    const url = new URL(uri)
+    const matched = this._match(url.pathname)
+    if (!matched?.route.config.get) return null
+
+    const ctx = {
+      verb: 'get',
+      uri,
+      params: matched.params,
+      headers,
+      query: url.searchParams,
+      bl: this
+    }
+
+    const handleRoute = () => matched.route.config.get(ctx)
+    const result = await this._dispatch(ctx, handleRoute)
+
+    // Call taps after handler (ambient observation)
+    for (const tap of this.taps.get) {
+      tap({ uri, headers, result, bl: this })
+    }
+
+    return result
+  }
 
   /**
-   * Normalize a path (ensure leading /, no trailing /)
-   * @param {string} path
-   * @returns {string}
+   * PUT to a resource by URI
+   *
+   * @param {string} uri - Full URI (e.g., 'bl:///cells/counter/write')
+   * @param {Headers} [headers={}] - Request headers
+   * @param {*} body - Request body
+   * @returns {Promise<Response|null>} Response or null if no matching route
+   *
+   * @example
+   * const response = await bl.put('bl:///cells/counter/write', {}, 42)
    */
-  _normalizePath(path) {
-    let p = path;
-    if (!p.startsWith('/')) p = '/' + p;
-    if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
-    return p;
+  async put(uri, headers = {}, body) {
+    const url = new URL(uri)
+    const matched = this._match(url.pathname)
+    if (!matched?.route.config.put) return null
+
+    const ctx = {
+      verb: 'put',
+      uri,
+      params: matched.params,
+      headers,
+      query: url.searchParams,
+      body,
+      bl: this
+    }
+
+    const handleRoute = () => matched.route.config.put(ctx)
+    const result = await this._dispatch(ctx, handleRoute)
+
+    // Call taps after handler (ambient observation)
+    for (const tap of this.taps.put) {
+      tap({ uri, headers, body, result, bl: this })
+    }
+
+    return result
+  }
+
+  /**
+   * Install routes from a RouterBuilder
+   *
+   * @param {import('./router.js').RouterBuilder} routerBuilder - Router builder with route definitions
+   * @returns {this} For chaining
+   *
+   * @example
+   * import { routes } from './router.js'
+   *
+   * const cellRoutes = routes('/cells/:name', r => {
+   *   r.get('/', (params) => ({ headers: {}, body: 'cell' }))
+   * })
+   *
+   * bl.install(cellRoutes)
+   */
+  install(routerBuilder) {
+    routerBuilder.install(this)
+    return this
   }
 }
-
-export { ref, Ref, isRef };

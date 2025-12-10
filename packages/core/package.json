@@ -1,28 +1,16 @@
 {
-    "name": "@bassline/core",
-    "version": "1.0.0",
-    "description": "Bassline core: types, graph, mirrors, and URI routing",
-    "type": "module",
-    "module": "src/setup.js",
-    "bin": {
-        "bassline-server": "./bin/server.js"
-    },
-    "exports": {
-        ".": "./src/setup.js",
-        "./bassline": "./src/bassline.js",
-        "./types": "./src/types.js",
-        "./graph": "./src/graph/index.js",
-        "./graph/quad": "./src/graph/quad.js",
-        "./graph/graph": "./src/graph/graph.js",
-        "./mirror": "./src/mirror/index.js"
-    },
-    "dependencies": {
-        "uuid": "^10.0.0",
-        "ws": "^8.18.0"
-    },
-    "scripts": {
-        "test": "vitest run",
-        "serve": "node bin/server.js"
-    },
-    "license": "AGPL-3.0"
+  "name": "@bassline/core",
+  "version": "1.0.0",
+  "description": "Minimal resource model for reflective distributed programming",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./bassline": "./src/bassline.js",
+    "./router": "./src/router.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "license": "AGPL-3.0"
 }

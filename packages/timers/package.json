@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/timers",
+  "version": "1.0.0",
+  "description": "Timer resources for Bassline - time-based event dispatch through plumber",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}
