@@ -21,7 +21,7 @@ import { getLattice, lattices } from './lattices.js'
  * @returns {object} Cell routes and store
  */
 export function createCellRoutes(options = {}) {
-  const { onCellChange } = options
+  const { onCellChange, onCellKill } = options
 
   /** @type {Map<string, {lattice: string, value: any, label?: string}>} */
   const store = new Map()
@@ -100,6 +100,22 @@ export function createCellRoutes(options = {}) {
       cell.value = lattice.bottom()
     }
     return cell
+  }
+
+  /**
+   * Kill (remove) a cell
+   * @param {string} name - Cell name
+   * @returns {boolean} Whether the cell existed and was removed
+   */
+  function killCell(name) {
+    const existed = store.has(name)
+    if (existed) {
+      store.delete(name)
+      if (onCellKill) {
+        onCellKill({ uri: `bl:///cells/${name}` })
+      }
+    }
+    return existed
   }
 
   /**
@@ -206,6 +222,17 @@ export function createCellRoutes(options = {}) {
         body: cell?.value ?? null
       }
     })
+
+    // Kill (remove) a cell
+    r.put('/:name/kill', ({ params }) => {
+      const existed = killCell(params.name)
+      if (!existed) return null
+
+      return {
+        headers: { type: 'bl:///types/resource-removed' },
+        body: { uri: `bl:///cells/${params.name}` }
+      }
+    })
   })
 
   /**
@@ -223,6 +250,7 @@ export function createCellRoutes(options = {}) {
     createCell,
     mergeValue,
     resetCell,
+    killCell,
     listCells,
     lattices,
     _store: store

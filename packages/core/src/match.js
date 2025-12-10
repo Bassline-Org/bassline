@@ -20,7 +20,7 @@ export function matchesPattern(pattern, target) {
   }
 
   if (typeof pattern !== 'object' || pattern === null) {
-    return false
+    return pattern === target
   }
 
   if (typeof target !== 'object' || target === null) {
