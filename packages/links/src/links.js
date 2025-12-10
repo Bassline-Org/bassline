@@ -1,4 +1,4 @@
-import { routes } from './router.js'
+import { routes } from '@bassline/core'
 
 /**
  * Extract all refs from a value (recursively)
@@ -30,7 +30,7 @@ export function collectRefs(value) {
 /**
  * Create a link index that tracks forward and backward refs
  *
- * @returns {{ index: (uri: string, body: any) => void, routes: import('./router.js').RouterBuilder }}
+ * @returns {{ index: (uri: string, body: any) => void, routes: object }}
  *
  * @example
  * const links = createLinkIndex()
@@ -150,7 +150,7 @@ export function createLinkIndex() {
    * Create a tap function for automatic link indexing
    * Install this as a PUT tap to automatically index refs
    *
-   * @returns {import('./bassline.js').Tap}
+   * @returns {function}
    */
   function createTap() {
     return ({ uri, body, result }) => {
@@ -165,7 +165,7 @@ export function createLinkIndex() {
    * Install link index into a Bassline instance
    * Sets up both routes (for querying) and taps (for automatic indexing)
    *
-   * @param {import('./bassline.js').Bassline} bl
+   * @param {import('@bassline/core').Bassline} bl
    */
   function install(bl) {
     bl.install(linkRoutes)

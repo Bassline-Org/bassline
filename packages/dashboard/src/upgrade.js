@@ -5,7 +5,7 @@
  * - GET /dashboard - Returns dashboard type for UI rendering
  * - GET /activity - Returns recent activity events
  *
- * @param {import('./bassline.js').Bassline} bl
+ * @param {import('@bassline/core').Bassline} bl
  */
 export default function installDashboard(bl) {
   // Activity buffer - stores recent changes

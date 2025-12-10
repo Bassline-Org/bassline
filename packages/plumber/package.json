@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/plumber",
+  "version": "1.0.0",
+  "description": "Rule-based message routing for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}

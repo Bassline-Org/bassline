@@ -1,5 +1,4 @@
-import { routes } from './router.js'
-import { matchesPattern } from './match.js'
+import { routes, matchesPattern } from '@bassline/core'
 
 /**
  * Create a plumber for message routing based on pattern-matched rules
@@ -94,7 +93,7 @@ export function createPlumber() {
   /**
    * Create a tap for automatic message dispatching
    * Install this tap on PUT to automatically route messages
-   * @returns {import('./bassline.js').Tap}
+   * @returns {function}
    */
   function createTap() {
     return ({ uri, body, result }) => {
@@ -140,7 +139,7 @@ export function createPlumber() {
   /**
    * Install plumber into a Bassline instance
    * Sets up both routes (for rule management) and taps (for message routing)
-   * @param {import('./bassline.js').Bassline} bl
+   * @param {import('@bassline/core').Bassline} bl
    */
   function install(bl) {
     bl.install(plumbRoutes)

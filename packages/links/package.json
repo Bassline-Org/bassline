@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/links",
+  "version": "1.0.0",
+  "description": "Bidirectional link tracking for Bassline resources",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}

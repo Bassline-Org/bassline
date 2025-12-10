@@ -21,19 +21,19 @@ export default async function bootstrap(bl) {
     path: './packages/core/src/upgrade-index.js'
   })
 
-  // Core: types (built-in type definitions)
+  // Types: built-in type definitions
   await bl.put('bl:///install/types', {}, {
-    path: './packages/core/src/upgrade-types.js'
+    path: './packages/types/src/upgrade.js'
   })
 
-  // Core: links (bidirectional ref tracking)
+  // Links: bidirectional ref tracking
   await bl.put('bl:///install/links', {}, {
-    path: './packages/core/src/upgrade-links.js'
+    path: './packages/links/src/upgrade.js'
   })
 
-  // Core: plumber (message routing)
+  // Plumber: message routing
   await bl.put('bl:///install/plumber', {}, {
-    path: './packages/core/src/upgrade-plumber.js'
+    path: './packages/plumber/src/upgrade.js'
   })
 
   // Storage: file store
@@ -67,7 +67,7 @@ export default async function bootstrap(bl) {
 
   // UI: Dashboard and Activity buffer
   await bl.put('bl:///install/dashboard', {}, {
-    path: './packages/core/src/upgrade-dashboard.js'
+    path: './packages/dashboard/src/upgrade.js'
   })
 
   // Timers: time-based event dispatch
@@ -78,6 +78,11 @@ export default async function bootstrap(bl) {
   // Fetch: HTTP requests with async response
   await bl.put('bl:///install/fetch', {}, {
     path: './packages/fetch/src/upgrade.js'
+  })
+
+  // Monitors: URL polling composed from timer + fetch + cell
+  await bl.put('bl:///install/monitors', {}, {
+    path: './packages/monitors/src/upgrade.js'
   })
 
   // Services: Claude (optional - requires ANTHROPIC_API_KEY)

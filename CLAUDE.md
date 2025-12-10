@@ -438,34 +438,59 @@ await bl.get('bl:///fetch')           // List recent requests
 await bl.get('bl:///fetch/req-123')   // Get specific request result
 ```
 
-### Polling Pattern (Timer + Fetch)
+## Monitors
+
+Monitors compose Timer + Fetch + Cell to create automated URL polling pipelines. One PUT creates everything needed to poll a URL at an interval and store the result.
 
 ```javascript
-// Set up timer-driven polling
-await bl.put('bl:///timers/poll', {}, { interval: 30000, enabled: true })
-await bl.put('bl:///cells/status', {}, { lattice: 'lww' })
-
-bl._plumber.addRule('poll-trigger', {
-  match: { headers: { type: 'bl:///types/timer-tick' }, body: { timer: 'poll' } },
-  port: 'poll-trigger'
+// Create a monitor - automatically sets up timer, fetch, and cell
+await bl.put('bl:///monitors/github-status', {}, {
+  url: 'https://www.githubstatus.com/api/v2/status.json',
+  interval: 60000,           // poll every 60s
+  enabled: true,             // auto-start
+  extract: 'status.indicator', // optional: extract nested field
+  method: 'GET',             // HTTP method (default: GET)
+  headers: {}                // custom headers
 })
 
-bl._plumber.listen('poll-trigger', () => {
-  bl.put('bl:///fetch/request', {}, {
-    url: 'https://api.example.com/status',
-    responseCell: 'bl:///cells/status'
-  })
-})
+// Check monitor status and latest value
+await bl.get('bl:///monitors/github-status')
+// → { url, interval, enabled, running, lastFetch, lastValue, fetchCount, cell: 'bl:///cells/monitor-github-status' }
+
+// Control the monitor
+await bl.put('bl:///monitors/github-status/start', {}, {})  // start polling
+await bl.put('bl:///monitors/github-status/stop', {}, {})   // stop polling
+await bl.put('bl:///monitors/github-status/fetch', {}, {})  // trigger immediate fetch
+
+// List all monitors
+await bl.get('bl:///monitors')
 ```
+
+Each monitor:
+- Creates a backing cell at `bl:///cells/monitor-{name}`
+- Creates a timer at `bl:///timers/monitor-{name}`
+- Dispatches `monitor-update` events through plumber on each fetch
+- Supports optional field extraction with dot notation (`extract: 'data.value'`)
+
+Use cases:
+- Dashboard status indicators
+- External API monitoring
+- Data synchronization from remote services
+- Real-time feeds
 
 ## Package Structure
 
 ```
-packages/core/           # Router, links, plumber
+packages/core/           # Router, pattern matching, install system
+packages/plumber/        # Rule-based message routing
+packages/links/          # Bidirectional ref tracking
+packages/types/          # Built-in type definitions
 packages/cells/          # Lattice-based cells
 packages/propagators/    # Reactive propagators
 packages/timers/         # Time-based event dispatch
 packages/fetch/          # HTTP requests
+packages/monitors/       # URL polling (Timer + Fetch + Cell)
+packages/dashboard/      # Dashboard and activity tracking
 packages/store-node/     # File and code stores
 packages/server-node/    # HTTP and WebSocket servers
 
@@ -542,15 +567,18 @@ BL_BOOTSTRAP=./apps/cli/src/bootstrap.js node apps/cli/src/daemon.js
 ```
 
 Module dependency order:
-1. `links` - bidirectional ref tracking
-2. `plumber` - message routing
-3. `file-store` - persistence
-4. `http-server` - HTTP API
-5. `ws-server` - WebSocket (uses plumber)
-6. `propagators` - reactive computation
-7. `cells` - lattice values (uses propagators, plumber)
-8. `timers` - time-based events (uses plumber)
-9. `fetch` - HTTP requests (uses plumber)
+1. `types` - built-in type definitions
+2. `links` - bidirectional ref tracking
+3. `plumber` - message routing
+4. `file-store` - persistence
+5. `http-server` - HTTP API
+6. `ws-server` - WebSocket (uses plumber)
+7. `propagators` - reactive computation
+8. `cells` - lattice values (uses propagators, plumber)
+9. `dashboard` - activity tracking (uses plumber)
+10. `timers` - time-based events (uses plumber)
+11. `fetch` - HTTP requests (uses plumber)
+12. `monitors` - URL polling (uses timers, cells, plumber)
 
 ## Running
 

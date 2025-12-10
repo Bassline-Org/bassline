@@ -78,7 +78,31 @@ importers:
 
   packages/core: {}
 
+  packages/dashboard:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/fetch:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/links:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/monitors:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/plumber:
     dependencies:
       '@bassline/core':
         specifier: workspace:*
@@ -154,6 +178,12 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)
+
+  packages/types:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
 
 packages:
 
