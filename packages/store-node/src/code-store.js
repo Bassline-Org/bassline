@@ -1,6 +1,4 @@
 import { routes } from '@bassline/core'
-import { readdirSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
 
 /**
  * Create a code store for loading JavaScript modules
@@ -22,62 +20,52 @@ import { join } from 'node:path'
  * // → { headers: { type: 'module' }, body: { exports: [...] } }
  */
 export function createCodeStore(hostDir, prefix = '/code') {
+  const store = new Map();
+
   return routes(prefix, r => {
-    // List available modules
+    // List loaded modules
     r.get('/', () => {
-      if (!existsSync(hostDir)) {
-        return {
-          headers: { type: 'directory' },
-          body: { entries: [] }
-        }
-      }
+      const entries = Array.from(store.keys()).map(name => ({
+        name,
+        type: 'module',
+        uri: `bl://${prefix}/${name}`
+      }))
 
-      try {
-        const entries = readdirSync(hostDir)
-          .filter(name => name.endsWith('.js'))
-          .map(name => ({
-            name: name.replace(/\.js$/, ''),
-            type: 'module',
-            uri: `bl://${prefix}/${name.replace(/\.js$/, '')}`
-          }))
-
-        return {
-          headers: { type: 'directory' },
-          body: { entries }
-        }
-      } catch (err) {
-        return {
-          headers: { error: 'list-error' },
-          body: { message: err.message }
-        }
+      return {
+        headers: { type: 'directory' },
+        body: { entries }
       }
     })
 
-    // Get module info or load module
-    r.get('/:module', async ({ params }) => {
-      const modulePath = join(hostDir, params.module + '.js')
-
-      if (!existsSync(modulePath)) {
-        return null
-      }
-
-      try {
-        const mod = await import(modulePath)
-        const exports = Object.keys(mod)
-
-        return {
-          headers: { type: 'module' },
-          body: {
-            path: modulePath,
-            exports
-          }
+    r.route('/:module', {
+        get: async ({params}) => {
+            const mod = store.get(params.module);
+            if (mod) {
+                return {
+                    headers: {
+                        type: "js/module"
+                    },
+                    body: mod
+                }
+            }
+        },
+        put: async ({params, body}) => {
+            const mod = await import(body.path);
+            if(mod) {
+                store.set(params.module, mod);
+                return {
+                    headers: {status: "ok"},
+                    body: {}
+                }
+            } else {
+                return {
+                    headers: {
+                        status: 'err',
+                    },
+                    body: {}
+                }
+            }
         }
-      } catch (err) {
-        return {
-          headers: { error: 'load-error' },
-          body: { message: err.message }
-        }
-      }
     })
   })
 }
