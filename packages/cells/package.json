@@ -1,0 +1,18 @@
+{
+  "name": "@bassline/cells",
+  "version": "1.0.0",
+  "description": "Lattice-based cells for Bassline propagator networks",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./lattices": "./src/lattices.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}
