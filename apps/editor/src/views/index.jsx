@@ -5,6 +5,7 @@ import PersonView from './PersonView.jsx'
 import NoteView from './NoteView.jsx'
 import TaskView from './TaskView.jsx'
 import TypeView from './TypeView.jsx'
+import IndexView from './IndexView.jsx'
 
 // Convert headers/body to CSS classes
 export function resourceClasses(resource) {
@@ -48,7 +49,8 @@ const viewsByType = {
   'note': NoteView,
   'task': TaskView,
   'person': PersonView,
-  'type': TypeView
+  'type': TypeView,
+  'index': IndexView
 }
 
 // ViewResolver component
@@ -71,7 +73,7 @@ export function hasPrettyView(resource) {
 }
 
 // Export individual views
-export { Inspector, Directory, CellView, PersonView, NoteView, TaskView, TypeView }
+export { Inspector, Directory, CellView, PersonView, NoteView, TaskView, TypeView, IndexView }
 
 // Export views mapping for external use
 export const views = viewsByType

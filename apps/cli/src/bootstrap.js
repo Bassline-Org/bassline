@@ -16,6 +16,16 @@ const WS_PORT = parseInt(process.env.BL_WS_PORT || '9112')
  * @param {import('@bassline/core').Bassline} bl
  */
 export default async function bootstrap(bl) {
+  // Core: root index (lists all subsystems)
+  await bl.put('bl:///install/index', {}, {
+    path: './packages/core/src/upgrade-index.js'
+  })
+
+  // Core: types (built-in type definitions)
+  await bl.put('bl:///install/types', {}, {
+    path: './packages/core/src/upgrade-types.js'
+  })
+
   // Core: links (bidirectional ref tracking)
   await bl.put('bl:///install/links', {}, {
     path: './packages/core/src/upgrade-links.js'
