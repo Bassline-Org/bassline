@@ -1,124 +1,105 @@
 # Bassline
 
-A specification for reflective distributed programming.
+A programming environment for reflective distributed programming.
 
-## What Is This?
+## Everything is a Resource
 
-Bassline is rooted in **partial information**. In distributed systems, no node has the complete picture—you work with what you know, and merge what others know.
-
-**Mirrors** are the API for partial information:
-
-| Operation | Meaning |
-|-----------|---------|
-| `read()` | What do I know now? |
-| `write(value)` | Here's what I know |
-| `subscribe(cb)` | Tell me when you learn more |
-
-This simple interface enables powerful composition:
-
-- **Mirrors compose** - Folds over cells over remotes. Layers stack cleanly.
-- **Partial implementation** - Implement what you need, delegate what you don't.
-- **Semi-lattice semantics** - Concurrent updates merge without coordination.
-- **Layered properties** - Constraints enforced locally, shared as data, negotiated with peers.
-
-## The Core Insight
-
-**Refs are just URIs.** They're not tied to any scheme or implementation—they're the universal way to name things.
+Resources have URIs. You `get` and `put` them. They return `{ headers, body }`.
 
 ```
-bl:///cell/counter?initial=0     # A mutable value
-https://api.example.com/user/42  # A REST resource
-ws://node2:8080/events           # A WebSocket stream
-custom://my/protocol             # Whatever you define
+bl:///data/users/alice       # a document
+bl:///cells/counter          # a value that merges
+bl:///propagators/sum        # a reactive computation
+bl:///links/to/types/cell    # a query
 ```
 
-A ref is just "something to address"—data, action, connection, computation. The scheme tells you what kind. Middleware resolves it.
+## Design Principles
 
-## What This Enables
+**Language Agnostic.** The resource model is protocol-based, not library-based. Any language that can make HTTP requests or speak WebSocket can interact with Bassline. The JavaScript implementation is one client among many.
 
-**Sandboxing** - Middleware controls what's resolvable. Create isolated environments with restricted capabilities.
+**Location Transparent.** URIs name resources without encoding where they live. A cell at `bl:///cells/counter` could be local, on a remote node, or replicated across many. Resolution happens at runtime based on how middleware is configured.
 
-**Distributed** - Refs are location-transparent. Same interface whether local, remote, or replicated.
+**Late Binding.** Store URIs now, resolve them later. Middleware decides what they mean at runtime. You can sandbox things by controlling what's resolvable. You can move resources around without breaking references. You can define new resource types by writing handlers.
 
-**Protocol-extensible** - Define new resource types by creating mirrors and registering middleware.
+**Partial Information.** In Bassline, we view every piece of information as partial, part of a bigger picture. Information is never complete. This allows you to build systems incrementally that evolve gracefully.
 
-**Heterogeneous** - Any language can implement the spec. JavaScript, Rust, Python, Erlang—they all speak refs.
+## The Building Blocks
+
+**Cells** let you have state without requiring a specific order. Concurrent writes merge using lattice semantics. Unlike CRDTs, cells support errors during merges. Errors are data that meta-merge rules can use to decide which value to keep.
+
+**Propagators** wire cells together. Change an input, the output updates.
+
+**Fully Reflective.** Types, links, routes, and the system itself are all resources. You can explore every part of the system dynamically at runtime.
 
 ## Quick Start
 
 ```javascript
-import { createBassline } from '@bassline/core';
+import { Bassline } from '@bassline/core'
 
-const bl = createBassline();
+const bl = new Bassline()
 
-// Cells - mutable values
-bl.write('bl:///cell/counter', 42);
-bl.read('bl:///cell/counter'); // 42
+// Store something
+await bl.put('bl:///data/users/alice', {}, { name: 'Alice' })
 
-// Folds - computed values
-bl.write('bl:///cell/a', 10);
-bl.write('bl:///cell/b', 20);
-bl.read('bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b'); // 30
-
-// Watch for changes
-bl.watch('bl:///cell/counter', value => console.log(value));
-
-// Custom middleware
-bl.use('/price', (ref, bl) => new PriceFeed(ref, bl));
-bl.read('bl:///price/btc?symbol=BTCUSD');
+// Get it back
+const result = await bl.get('bl:///data/users/alice')
+// → { headers: { type: 'bl:///types/document' }, body: { name: 'Alice' } }
 ```
 
-## Reference Implementation
+## Cells
 
-This repo contains a JavaScript implementation in ~720 lines:
+```javascript
+// Create a cell with a lattice
+await bl.put('bl:///cells/counter', {}, { lattice: 'maxNumber' })
+
+// Write values (max wins)
+await bl.put('bl:///cells/counter/value', {}, 5)
+await bl.put('bl:///cells/counter/value', {}, 3)   // still 5
+await bl.put('bl:///cells/counter/value', {}, 10)  // now 10
+```
+
+Lattices: `maxNumber`, `minNumber`, `setUnion`, `setIntersection`, `lww`, `object`, `counter`, `boolean`. See [packages/cells](./packages/cells) for details.
+
+## Propagators
+
+```javascript
+// Wire cells: a + b -> sum
+await bl.put('bl:///propagators/add', {}, {
+  inputs: ['bl:///cells/a', 'bl:///cells/b'],
+  output: 'bl:///cells/sum',
+  handler: 'sum'
+})
+```
+
+60+ built-in handlers for arithmetic, logic, strings, arrays, objects, and more. See [packages/propagators](./packages/propagators) for full list.
+
+## Packages
 
 ```
-packages/core/src/
-├── bassline.js      # Middleware router + ref→mirror cache
-├── setup.js         # createBassline() with standard middleware
-├── types.js         # Word, Ref value types
-└── mirror/          # Cell, Fold, Remote, Registry mirrors
+packages/core/           # router, pattern matching
+packages/plumber/        # message routing
+packages/links/          # bidirectional refs
+packages/types/          # type definitions
+packages/cells/          # lattice-based cells
+packages/propagators/    # reactive computation
+packages/timers/         # time events
+packages/fetch/          # HTTP requests
+packages/monitors/       # URL polling
+packages/store-node/     # file storage
+packages/server-node/    # http + websocket
+
+apps/cli/                # daemon, MCP server
+apps/editor/             # web ui
 ```
 
 ## Running
 
 ```bash
 pnpm install
-pnpm test  # 182 tests
+pnpm test
 ```
 
-## BL/T Protocol
-
-Bassline includes a text-based wire protocol for shell-friendly interactions:
-
-```bash
-# Start a BL/T server
-node packages/core/bin/blt-server.js -p 9000 -c counter=0
-
-# Connect with netcat
-nc localhost 9000
-VERSION BL/1.0
-VERSION BL/1.0
-WRITE bl:///cell/counter 42
-OK
-READ bl:///cell/counter
-OK 42
-INFO bl:///cell/counter
-OK {"readable":true,"writable":true,"ordering":"causal"}
-```
-
-**Features:**
-- Human-readable, line-based format
-- Works with grep, awk, pipes
-- Tag correlation for request pipelining
-- Subscription support with EVENTs
-- Mirror introspection via INFO
-
-See [packages/core/docs/protocol.md](./packages/core/docs/protocol.md) for the full specification.
-
-## Documentation
-
-See [CLAUDE.md](./CLAUDE.md) for the full specification and implementation details.
+See [CLAUDE.md](./CLAUDE.md) for more.
 
 ## License
 

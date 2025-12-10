@@ -1,0 +1,21 @@
+{
+  "name": "@bassline/cli",
+  "version": "1.0.0",
+  "description": "Bassline CLI",
+  "type": "module",
+  "bin": {
+    "bl": "./bin/bl.js"
+  },
+  "scripts": {
+    "daemon": "node src/daemon.js",
+    "seed": "node src/seed.js"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "@bassline/store-node": "workspace:*",
+    "@bassline/server-node": "workspace:*",
+    "@bassline/cells": "workspace:*",
+    "@bassline/propagators": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}

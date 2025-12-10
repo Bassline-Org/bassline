@@ -1,268 +1,232 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Bassline, ref } from '../src/bassline.js';
-import { Cell } from '../src/mirror/cell.js';
-import { createBassline } from '../src/setup.js';
+import { describe, it, expect } from 'vitest'
+import { Bassline } from '../src/bassline.js'
+import { routes } from '../src/router.js'
 
 describe('Bassline', () => {
-  let bl;
+  describe('routing', () => {
+    it('matches exact paths', async () => {
+      const bl = new Bassline()
+      bl.route('/hello', {
+        get: () => ({ headers: {}, body: 'world' })
+      })
 
-  beforeEach(() => {
-    bl = new Bassline();
-  });
+      const result = await bl.get('bl:///hello')
+      expect(result.body).toBe('world')
+    })
 
-  afterEach(() => {
-    bl.dispose();
-  });
+    it('extracts path parameters', async () => {
+      const bl = new Bassline()
+      bl.route('/users/:id', {
+        get: ({ params }) => ({ headers: {}, body: params.id })
+      })
 
-  describe('middleware registration', () => {
-    it('should register middleware with use()', () => {
-      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
-      expect(bl.listResolvers()).toContain('/cell');
-    });
+      const result = await bl.get('bl:///users/123')
+      expect(result.body).toBe('123')
+    })
 
-    it('should normalize paths', () => {
-      bl.use('foo', (ref, bl) => new Cell(ref, bl));
-      bl.use('/bar/', (ref, bl) => new Cell(ref, bl));
-      expect(bl.listResolvers()).toContain('/foo');
-      expect(bl.listResolvers()).toContain('/bar');
-    });
-  });
+    it('extracts multiple parameters', async () => {
+      const bl = new Bassline()
+      bl.route('/users/:userId/posts/:postId', {
+        get: ({ params }) => ({ headers: {}, body: params })
+      })
 
-  describe('resolution', () => {
-    beforeEach(() => {
-      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
-    });
+      const result = await bl.get('bl:///users/alice/posts/42')
+      expect(result.body).toEqual({ userId: 'alice', postId: '42' })
+    })
 
-    it('should resolve refs to mirrors', () => {
-      const mirror = bl.resolve('bl:///cell/counter');
-      expect(mirror).toBeDefined();
-      expect(mirror.readable).toBe(true);
-    });
+    it('returns null for unmatched routes', async () => {
+      const bl = new Bassline()
+      bl.route('/exists', { get: () => ({ headers: {}, body: 'yes' }) })
 
-    it('should cache resolved mirrors', () => {
-      const mirror1 = bl.resolve('bl:///cell/counter');
-      const mirror2 = bl.resolve('bl:///cell/counter');
-      expect(mirror1).toBe(mirror2);
-    });
+      expect(await bl.get('bl:///missing')).toBeNull()
+    })
 
-    it('should use longest prefix match', () => {
-      bl.use('/cell/special', (ref, bl) => {
-        const c = new Cell(ref, bl);
-        c._special = true;
-        return c;
-      });
+    it('returns null when verb not defined', async () => {
+      const bl = new Bassline()
+      bl.route('/readonly', { get: () => ({ headers: {}, body: 'data' }) })
 
-      const regular = bl.resolve('bl:///cell/counter');
-      const special = bl.resolve('bl:///cell/special/foo');
+      expect(await bl.put('bl:///readonly', {}, 'value')).toBeNull()
+    })
+  })
 
-      expect(regular._special).toBeUndefined();
-      expect(special._special).toBe(true);
-    });
+  describe('route specificity', () => {
+    it('matches more specific routes first (more segments)', async () => {
+      const bl = new Bassline()
 
-    it('should throw for unsupported schemes', () => {
-      expect(() => bl.resolve('ws://localhost/test')).toThrow('Unsupported scheme');
-    });
+      // Register in "wrong" order
+      bl.route('/cells/:name', {
+        get: () => ({ headers: {}, body: 'cell' })
+      })
+      bl.route('/cells/:name/value', {
+        get: () => ({ headers: {}, body: 'value' })
+      })
 
-    it('should throw for unknown paths', () => {
-      expect(() => bl.resolve('bl:///unknown')).toThrow('No resolver');
-    });
-  });
+      expect((await bl.get('bl:///cells/counter')).body).toBe('cell')
+      expect((await bl.get('bl:///cells/counter/value')).body).toBe('value')
+    })
 
-  describe('read/write/watch', () => {
-    beforeEach(() => {
-      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
-    });
+    it('matches more specific routes first (more literals)', async () => {
+      const bl = new Bassline()
 
-    it('should read from a mirror', () => {
-      bl.write('bl:///cell/counter', 42);
-      expect(bl.read('bl:///cell/counter')).toBe(42);
-    });
+      bl.route('/:a/:b', {
+        get: () => ({ headers: {}, body: 'generic' })
+      })
+      bl.route('/cells/:name', {
+        get: () => ({ headers: {}, body: 'cells' })
+      })
 
-    it('should write to a mirror', () => {
-      bl.write('bl:///cell/counter', 100);
-      expect(bl.read('bl:///cell/counter')).toBe(100);
-    });
+      expect((await bl.get('bl:///cells/counter')).body).toBe('cells')
+      expect((await bl.get('bl:///foo/bar')).body).toBe('generic')
+    })
+  })
 
-    it('should watch a mirror', () => {
-      const values = [];
-      bl.watch('bl:///cell/counter', (v) => values.push(v));
+  describe('wildcard patterns', () => {
+    it('matches wildcard patterns', async () => {
+      const bl = new Bassline()
 
-      bl.write('bl:///cell/counter', 1);
-      bl.write('bl:///cell/counter', 2);
+      bl.route('/files/:path*', {
+        get: ({ params }) => ({ headers: {}, body: params.path })
+      })
 
-      expect(values).toEqual([1, 2]);
-    });
+      expect((await bl.get('bl:///files/a')).body).toBe('a')
+      expect((await bl.get('bl:///files/a/b/c')).body).toBe('a/b/c')
+      expect((await bl.get('bl:///files/deeply/nested/path/file.txt')).body).toBe('deeply/nested/path/file.txt')
+    })
 
-    it('should work with Ref objects', () => {
-      bl.write(ref('bl:///cell/counter'), 42);
-      expect(bl.read(ref('bl:///cell/counter'))).toBe(42);
-    });
+    it('prefers specific routes over wildcards', async () => {
+      const bl = new Bassline()
 
-    it('should throw for non-readable mirrors', () => {
-      bl.use('/writeonly', (r, bl) => ({
-        readable: false,
-        writable: true,
-        read() { throw new Error('not readable'); },
-        write() {},
-        subscribe() { return () => {}; }
-      }));
-      expect(() => bl.read('bl:///writeonly/test')).toThrow('not readable');
-    });
+      bl.route('/data/:path*', {
+        get: () => ({ headers: {}, body: 'wildcard' })
+      })
+      bl.route('/data/special', {
+        get: () => ({ headers: {}, body: 'specific' })
+      })
 
-    it('should throw for non-writable mirrors', () => {
-      bl.use('/readonly', (r, bl) => ({
-        readable: true,
-        writable: false,
-        read() { return 42; },
-        write() { throw new Error('not writable'); },
-        subscribe() { return () => {}; }
-      }));
-      expect(() => bl.write('bl:///readonly/test', 1)).toThrow('not writable');
-    });
-  });
+      expect((await bl.get('bl:///data/special')).body).toBe('specific')
+      expect((await bl.get('bl:///data/other')).body).toBe('wildcard')
+      expect((await bl.get('bl:///data/nested/path')).body).toBe('wildcard')
+    })
+  })
 
-  describe('event listeners', () => {
-    beforeEach(() => {
-      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
-    });
+  describe('context object', () => {
+    it('passes headers in context', async () => {
+      const bl = new Bassline()
+      bl.route('/resource', {
+        get: ({ headers }) => ({ headers: {}, body: headers.auth })
+      })
 
-    it('should notify write listeners', () => {
-      const writes = [];
-      bl.onWrite((ref, value, result, bassline) => {
-        writes.push({ href: ref.href, value });
-      });
+      const result = await bl.get('bl:///resource', { auth: 'token123' })
+      expect(result.body).toBe('token123')
+    })
 
-      bl.write('bl:///cell/a', 10);
-      bl.write('bl:///cell/b', 20);
+    it('passes query params in context', async () => {
+      const bl = new Bassline()
+      bl.route('/search', {
+        get: ({ query }) => ({ headers: {}, body: query.get('q') })
+      })
 
-      expect(writes).toHaveLength(2);
-      expect(writes[0].value).toBe(10);
-      expect(writes[1].value).toBe(20);
-    });
+      const result = await bl.get('bl:///search?q=hello')
+      expect(result.body).toBe('hello')
+    })
 
-    it('should notify read listeners', () => {
-      const reads = [];
-      bl.onRead((ref, result, bassline) => {
-        reads.push({ href: ref.href, result });
-      });
+    it('passes body in context for put', async () => {
+      const bl = new Bassline()
+      let received = null
+      bl.route('/resource', {
+        put: ({ headers, body }) => {
+          received = { headers, body }
+          return { headers: {}, body: 'ok' }
+        }
+      })
 
-      bl.write('bl:///cell/counter', 42);
-      bl.read('bl:///cell/counter');
+      await bl.put('bl:///resource', { auth: 'token' }, { value: 42 })
+      expect(received.headers.auth).toBe('token')
+      expect(received.body.value).toBe(42)
+    })
 
-      expect(reads).toHaveLength(1);
-      expect(reads[0].result).toBe(42);
-    });
+    it('provides bassline instance in context', async () => {
+      const bl = new Bassline()
+      bl.route('/a', {
+        get: () => ({ headers: {}, body: 'from-a' })
+      })
+      bl.route('/b', {
+        get: async ({ bl }) => {
+          const a = await bl.get('bl:///a')
+          return { headers: {}, body: `got: ${a.body}` }
+        }
+      })
 
-    it('should allow unsubscribe from listeners', () => {
-      const writes = [];
-      const unsub = bl.onWrite((ref, value) => writes.push(value));
+      expect((await bl.get('bl:///b')).body).toBe('got: from-a')
+    })
+  })
+})
 
-      bl.write('bl:///cell/a', 1);
-      unsub();
-      bl.write('bl:///cell/b', 2);
+describe('Router builder', () => {
+  it('creates routes with prefix', async () => {
+    const bl = new Bassline()
 
-      expect(writes).toEqual([1]);
-    });
+    const cellRoutes = routes('/cells/:name', r => {
+      r.get('/', () => ({ headers: {}, body: 'cell' }))
+      r.get('/value', () => ({ headers: {}, body: 'value' }))
+    })
 
-    it('should support middleware with event listeners', () => {
-      const logs = [];
-      bl.use('/logged', {
-        resolve: (ref, bl) => new Cell(ref, bl),
-        onWrite: (ref, value) => logs.push(`write: ${value}`),
-        onRead: (ref, result) => logs.push(`read: ${result}`)
-      });
+    bl.install(cellRoutes)
 
-      bl.write('bl:///logged/test', 42);
-      bl.read('bl:///logged/test');
+    expect((await bl.get('bl:///cells/counter')).body).toBe('cell')
+    expect((await bl.get('bl:///cells/counter/value')).body).toBe('value')
+  })
 
-      expect(logs).toContain('write: 42');
-      expect(logs).toContain('read: 42');
-    });
-  });
+  it('supports nested scopes', async () => {
+    const bl = new Bassline()
 
-  describe('introspection', () => {
-    it('should list resolved mirrors', () => {
-      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+    const apiRoutes = routes('/api', r => {
+      r.scope('/v1', r => {
+        r.get('/users', () => ({ headers: {}, body: 'users-v1' }))
+      })
+      r.scope('/v2', r => {
+        r.get('/users', () => ({ headers: {}, body: 'users-v2' }))
+      })
+    })
 
-      bl.resolve('bl:///cell/a');
-      bl.resolve('bl:///cell/b');
+    bl.install(apiRoutes)
 
-      const mirrors = bl.listMirrors();
-      expect(mirrors).toContain('bl:///cell/a');
-      expect(mirrors).toContain('bl:///cell/b');
-    });
+    expect((await bl.get('bl:///api/v1/users')).body).toBe('users-v1')
+    expect((await bl.get('bl:///api/v2/users')).body).toBe('users-v2')
+  })
 
-    it('should check if ref is resolved', () => {
-      bl.use('/cell', (ref, bl) => new Cell(ref, bl));
+  it('supports put routes', async () => {
+    const bl = new Bassline()
+    let stored = null
 
-      expect(bl.hasResolved('bl:///cell/test')).toBe(false);
-      bl.resolve('bl:///cell/test');
-      expect(bl.hasResolved('bl:///cell/test')).toBe(true);
-    });
-  });
-});
+    const dataRoutes = routes('/data', r => {
+      r.put('/:key', ({ params, body }) => {
+        stored = { key: params.key, value: body }
+        return { headers: {}, body: 'saved' }
+      })
+    })
 
-describe('Registry introspection', () => {
-  let bl;
+    bl.install(dataRoutes)
+    await bl.put('bl:///data/mykey', {}, 'myvalue')
 
-  beforeEach(() => {
-    bl = createBassline();
-  });
+    expect(stored).toEqual({ key: 'mykey', value: 'myvalue' })
+  })
 
-  afterEach(() => {
-    bl.dispose();
-  });
+  it('passes params through scopes', async () => {
+    const bl = new Bassline()
 
-  it('should list resolvers via registry', () => {
-    const resolvers = bl.read('bl:///registry');
-    expect(resolvers).toContain('/cell');
-    expect(resolvers).toContain('/fold/sum');
-    expect(resolvers).toContain('/registry');
-  });
+    const nestedRoutes = routes('/users/:userId', r => {
+      r.scope('/posts/:postId', r => {
+        r.get('/comments', ({ params }) => ({
+          headers: {},
+          body: params
+        }))
+      })
+    })
 
-  it('should list mirrors via registry', () => {
-    bl.write('bl:///cell/a', 1);
-    bl.write('bl:///cell/b', 2);
+    bl.install(nestedRoutes)
 
-    const mirrors = bl.read('bl:///registry/mirrors');
-    expect(mirrors).toContain('bl:///cell/a');
-    expect(mirrors).toContain('bl:///cell/b');
-  });
-
-  it('should get info about a specific mirror', () => {
-    bl.write('bl:///cell/counter', 42);
-
-    const info = bl.read('bl:///registry/info?ref=bl:///cell/counter');
-    expect(info).toEqual({
-      uri: 'bl:///cell/counter',
-      type: 'cell',
-      readable: true,
-      writable: true,
-      ordering: 'causal'
-    });
-  });
-
-  it('should get info about a fold mirror', () => {
-    bl.write('bl:///cell/a', 10);
-    bl.write('bl:///cell/b', 20);
-    bl.read('bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b');
-
-    const info = bl.read('bl:///registry/info?ref=bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b');
-    expect(info).toEqual({
-      uri: 'bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b',
-      type: 'sum',
-      readable: true,
-      writable: false,
-      ordering: 'none'
-    });
-  });
-
-  it('should return null for unresolved mirror', () => {
-    const info = bl.read('bl:///registry/info?ref=bl:///cell/nonexistent');
-    expect(info).toBeNull();
-  });
-
-  it('should throw error when ref parameter is missing', () => {
-    expect(() => bl.read('bl:///registry/info')).toThrow('Missing ref parameter');
-  });
-});
+    const result = await bl.get('bl:///users/alice/posts/42/comments')
+    expect(result.body).toEqual({ userId: 'alice', postId: '42' })
+  })
+})
