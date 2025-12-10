@@ -1,4 +1,5 @@
 import { createCellRoutes } from './cell.js'
+import { createFuzzyCellRoutes } from './fuzzy-routes.js'
 
 /**
  * Install cells into a Bassline instance.
@@ -40,4 +41,9 @@ export default function installCells(bl, config = {}) {
       bl._propagators.onCellChange(cellUri)
     })
   }
+
+  // Install fuzzy cells (requires bl for compactor access to Claude)
+  const fuzzyCells = createFuzzyCellRoutes({ bl })
+  fuzzyCells.install(bl)
+  bl._fuzzyCells = fuzzyCells
 }
