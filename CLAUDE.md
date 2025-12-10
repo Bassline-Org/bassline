@@ -1,30 +1,15 @@
 # Bassline
 
-A reflective distributed programming environment built on linked resources.
+A programming environment where everything is a resource.
 
-## What Is Bassline?
+## Overview
 
-Bassline is an environment where **everything is a resource** that can be inspected, linked, and queried. Programs don't just manipulate data - they can examine and modify themselves, their types, their views, and their relationships.
+Resources are addressed by URIs, accessed via `get` and `put`, returning `{ headers, body }`.
 
-The core abstraction is simple: resources addressed by URIs, accessed via `get` and `put`, returning `{ headers, body }`. But this minimal foundation supports rich semantics:
-
-- **Types as resources** - `headers.type` is a URI you can dereference to learn about the type
-- **Bidirectional links** - query what a resource references, and what references it
-- **Views as queries** - find views by querying links to a type
-- **Code as resources** - modules live in the system, can be loaded and invoked
-- **Late binding** - refs resolve when needed, enabling dynamic composition
-
-## The Vision: Hyper-programming
-
-Bassline aims to be a **hyper-programming environment** where development happens inside the system:
-
-- The editor is a resource
-- Types are resources that describe structure and behavior
-- Views are resources that link to the types they render
-- Finding views means querying links, not hardcoding
-- Everything is inspectable, everything is linked
-
-Inspired by Smalltalk's live objects, Glamorous Toolkit's moldable development, and the web's linked data model.
+- Types are resources - `headers.type` is a URI to a type definition
+- Links are bidirectional - query what references what
+- Cells are lattice-based values with monotonic merge semantics
+- Propagators connect cells for reactive computation
 
 ## Core Concepts
 
@@ -84,8 +69,6 @@ Resources contain refs. The link index tracks these in both directions:
 await bl.get('bl:///links/to/types/cell')
 // → includes this view, plus anything else linking to cell
 ```
-
-This decouples views from types - add new views without modifying the type.
 
 ## Implementation
 
@@ -183,22 +166,58 @@ const mod = await bl.get('bl:///code/math')
 mod.body.add(1, 2)  // invoke exports
 ```
 
-## Reference
+## Cells
+
+Cells hold values with lattice semantics. Values can only go up (monotonic).
+
+```javascript
+import { createCellRoutes } from '@bassline/cells'
+
+const cells = createCellRoutes()
+cells.install(bl)
+
+// Create a cell with a lattice
+await bl.put('bl:///cells/counter', {}, { lattice: 'maxNumber' })
+
+// Merge a value (lattice join)
+await bl.put('bl:///cells/counter/value', {}, 5)
+await bl.put('bl:///cells/counter/value', {}, 3)  // still 5, max wins
+await bl.put('bl:///cells/counter/value', {}, 10) // now 10
+```
+
+Built-in lattices: `maxNumber`, `minNumber`, `setUnion`, `lww` (last-writer-wins).
+
+## Propagators
+
+Propagators connect cells. When inputs change, they compute and write to outputs.
+
+```javascript
+import { createPropagatorRoutes } from '@bassline/propagators'
+
+const propagators = createPropagatorRoutes({ bl })
+propagators.install(bl)
+
+// Create a sum propagator: a + b → sum
+await bl.put('bl:///propagators/add', {}, {
+  inputs: ['bl:///cells/a', 'bl:///cells/b'],
+  output: 'bl:///cells/sum',
+  handler: 'sum'
+})
+```
+
+Built-in handlers: `sum`, `product`, `passthrough`, `constant`.
+
+## Package Structure
 
 ```
-packages/core/src/
-├── bassline.js      # Router with pattern matching
-├── router.js        # RouterBuilder for hierarchical routes
-├── links.js         # Bidirectional link index
-└── index.js
+packages/core/           # Router, links, plumber
+packages/cells/          # Lattice-based cells
+packages/propagators/    # Reactive propagators
+packages/store-node/     # File and code stores
+packages/server-node/    # HTTP and WebSocket servers
 
-packages/store-node/src/
-├── file-store.js    # JSON file persistence
-├── code-store.js    # JS module loader
-└── index.js
-
-apps/cli/src/
-└── daemon.js        # HTTP server
+apps/cli/                # Daemon and seed scripts
+apps/editor/             # Web editor
 ```
 
 ## HTTP Daemon
