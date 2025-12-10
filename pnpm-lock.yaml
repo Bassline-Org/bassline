@@ -121,6 +121,16 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/trust:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@20.19.9)
+
 packages:
 
   /@ampproject/remapping@2.3.0:

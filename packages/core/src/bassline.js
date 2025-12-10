@@ -51,6 +51,31 @@
  */
 
 /**
+ * @typedef {Object} MiddlewareContext
+ * @property {string} verb - The HTTP verb ('get' or 'put')
+ * @property {string} uri - The full URI being accessed
+ * @property {Params} params - Extracted path parameters
+ * @property {Headers} headers - Request headers
+ * @property {URLSearchParams} query - Query parameters from the URI
+ * @property {*} [body] - Request body (only present for PUT)
+ * @property {Bassline} bl - Bassline instance
+ */
+
+/**
+ * @callback Middleware
+ * @param {MiddlewareContext} ctx - Middleware context
+ * @param {function(): Promise<Response|null>} next - Call to continue to next middleware/handler
+ * @returns {Response|null|Promise<Response|null>} Response, null, or Promise
+ */
+
+/**
+ * @typedef {Object} MiddlewareEntry
+ * @property {Middleware} fn - The middleware function
+ * @property {number} priority - Sort priority (lower runs first)
+ * @property {string} [id] - Optional identifier for removal
+ */
+
+/**
  * Bassline - Minimal routing with pattern matching
  *
  * @example
@@ -77,6 +102,46 @@ export class Bassline {
     this.routes = []
     /** @type {{ get: Tap[], put: Tap[] }} */
     this.taps = { get: [], put: [] }
+    /** @type {MiddlewareEntry[]} */
+    this.middleware = []
+  }
+
+  /**
+   * Register middleware to intercept requests
+   * Middleware runs before route handlers in priority order (lower first)
+   * Returns an uninstaller function for clean removal
+   *
+   * @param {Middleware} fn - Middleware function (ctx, next) => result
+   * @param {Object} [options] - Options
+   * @param {number} [options.priority=50] - Sort priority (lower runs first)
+   * @param {string} [options.id] - Optional identifier for introspection/removal
+   * @returns {function(): void} Uninstaller function
+   *
+   * @example
+   * // Logging middleware
+   * const uninstall = bl.use(async (ctx, next) => {
+   *   console.log(`${ctx.verb} ${ctx.uri}`)
+   *   return next()
+   * }, { priority: 10, id: 'logger' })
+   *
+   * // Later: uninstall()
+   *
+   * @example
+   * // Auth middleware - reject if no peer
+   * bl.use(async (ctx, next) => {
+   *   if (!ctx.headers.peer) {
+   *     return { headers: { error: 'unauthorized' }, body: null }
+   *   }
+   *   return next()
+   * }, { priority: 20, id: 'auth' })
+   */
+  use(fn, { priority = 50, id } = {}) {
+    const entry = { fn, priority, id }
+    this.middleware.push(entry)
+    this.middleware.sort((a, b) => a.priority - b.priority)
+    return () => {
+      this.middleware = this.middleware.filter(m => m !== entry)
+    }
   }
 
   /**
@@ -190,6 +255,24 @@ export class Bassline {
   }
 
   /**
+   * Dispatch request through middleware chain then to route handler
+   * @private
+   * @param {MiddlewareContext} ctx - Request context
+   * @param {function(): Promise<Response|null>} handleRoute - Final route handler
+   * @returns {Promise<Response|null>}
+   */
+  async _dispatch(ctx, handleRoute) {
+    let index = 0
+    const next = async () => {
+      if (index < this.middleware.length) {
+        return this.middleware[index++].fn(ctx, next)
+      }
+      return handleRoute()
+    }
+    return next()
+  }
+
+  /**
    * GET a resource by URI
    *
    * @param {string} uri - Full URI (e.g., 'bl:///cells/counter')
@@ -207,12 +290,16 @@ export class Bassline {
     if (!matched?.route.config.get) return null
 
     const ctx = {
+      verb: 'get',
+      uri,
       params: matched.params,
       headers,
       query: url.searchParams,
       bl: this
     }
-    const result = await matched.route.config.get(ctx)
+
+    const handleRoute = () => matched.route.config.get(ctx)
+    const result = await this._dispatch(ctx, handleRoute)
 
     // Call taps after handler (ambient observation)
     for (const tap of this.taps.get) {
@@ -239,13 +326,17 @@ export class Bassline {
     if (!matched?.route.config.put) return null
 
     const ctx = {
+      verb: 'put',
+      uri,
       params: matched.params,
       headers,
       query: url.searchParams,
       body,
       bl: this
     }
-    const result = await matched.route.config.put(ctx)
+
+    const handleRoute = () => matched.route.config.put(ctx)
+    const result = await this._dispatch(ctx, handleRoute)
 
     // Call taps after handler (ambient observation)
     for (const tap of this.taps.put) {
