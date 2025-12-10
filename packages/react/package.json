@@ -1,0 +1,14 @@
+{
+  "name": "@bassline/react",
+  "version": "1.0.0",
+  "description": "React bindings for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "license": "AGPL-3.0"
+}
