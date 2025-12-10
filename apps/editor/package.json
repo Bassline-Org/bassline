@@ -12,6 +12,7 @@
     "@bassline/core": "workspace:*",
     "@bassline/react": "workspace:*",
     "@bassline/remote-browser": "workspace:*",
+    "@tabler/icons-react": "^3.35.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

@@ -14,6 +14,11 @@
  * // → true
  */
 export function matchesPattern(pattern, target) {
+  // undefined/null pattern matches everything (wildcard)
+  if (pattern === undefined || pattern === null) {
+    return true
+  }
+
   if (typeof pattern === 'string' || pattern instanceof RegExp) {
     const regex = typeof pattern === 'string' ? new RegExp(pattern) : pattern
     return typeof target === 'string' && regex.test(target)

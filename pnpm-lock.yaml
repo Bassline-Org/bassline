@@ -53,6 +53,9 @@ importers:
       '@bassline/remote-browser':
         specifier: workspace:*
         version: link:../../packages/remote-browser
+      '@tabler/icons-react':
+        specifier: ^3.35.0
+        version: 3.35.0(react@18.3.1)
       react:
         specifier: ^18.2.0
         version: 18.3.1
@@ -733,6 +736,19 @@ packages:
     requiresBuild: true
     dev: true
     optional: true
+
+  /@tabler/icons-react@3.35.0(react@18.3.1):
+    resolution: {integrity: sha512-XG7t2DYf3DyHT5jxFNp5xyLVbL4hMJYJhiSdHADzAjLRYfL7AnjlRfiHDHeXxkb2N103rEIvTsBRazxXtAUz2g==}
+    peerDependencies:
+      react: '>= 16'
+    dependencies:
+      '@tabler/icons': 3.35.0
+      react: 18.3.1
+    dev: false
+
+  /@tabler/icons@3.35.0:
+    resolution: {integrity: sha512-yYXe+gJ56xlZFiXwV9zVoe3FWCGuZ/D7/G4ZIlDtGxSx5CGQK110wrnT29gUj52kEZoxqF7oURTk97GQxELOFQ==}
+    dev: false
 
   /@types/babel__core@7.20.5:
     resolution: {integrity: sha512-qoQprZvz5wQFJwMDqeseRXWv3rqMvhgpbXFfVyWhbx9X47POIA6i/+dXefEmZKoAgOaTdaIgNSMqMIU61yRyzA==}

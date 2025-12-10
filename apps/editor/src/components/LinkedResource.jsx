@@ -1,13 +1,5 @@
 import { useResource } from '@bassline/react'
-
-const TYPE_ICONS = {
-  'cell': '',
-  'note': '',
-  'task': '',
-  'person': '',
-  'type': '',
-  'directory': ''
-}
+import TypeIcon from './TypeIcon.jsx'
 
 export default function LinkedResource({ uri, onNavigate }) {
   const { data, loading } = useResource(uri)
@@ -28,8 +20,7 @@ export default function LinkedResource({ uri, onNavigate }) {
       className={`link-preview type-${type}`}
       onClick={e => { e.preventDefault(); onNavigate(uri) }}
     >
-      {avatar && <span>{avatar}</span>}
-      {!avatar && TYPE_ICONS[type] && <span>{TYPE_ICONS[type]}</span>}
+      {avatar ? <span>{avatar}</span> : <TypeIcon type={type} size={14} />}
       {name}
     </a>
   )

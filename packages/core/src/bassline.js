@@ -226,6 +226,10 @@ export class Bassline {
   _sortRoutes() {
     // More specific routes first (more segments, more literals, wildcards last)
     this.routes.sort((a, b) => {
+      // Skip routes without patterns (sort them last)
+      if (!a.pattern) return 1
+      if (!b.pattern) return -1
+
       // Wildcards are least specific
       const wcA = a.pattern.includes('*') ? 1 : 0
       const wcB = b.pattern.includes('*') ? 1 : 0

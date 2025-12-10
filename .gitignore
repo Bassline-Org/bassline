@@ -118,3 +118,7 @@ apps/bassline-vscode/bassline-0.1.0.vsix
 .bassline/types/type.json
 apps/cli/.bassline/data/users/alice.json
 apps/cli/.bassline/data/users/bob.json
+scripts/util/kill-all.sh
+scripts/util/seed-test-data.sh
+scripts/util/start-daemon.sh
+scripts/util/test-api.sh
