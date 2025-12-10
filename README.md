@@ -1,124 +1,101 @@
 # Bassline
 
-A specification for reflective distributed programming.
+A programming environment for reflective distributed programming.
 
-## What Is This?
+## Everything is a Resource
 
-Bassline is rooted in **partial information**. In distributed systems, no node has the complete picture—you work with what you know, and merge what others know.
-
-**Mirrors** are the API for partial information:
-
-| Operation | Meaning |
-|-----------|---------|
-| `read()` | What do I know now? |
-| `write(value)` | Here's what I know |
-| `subscribe(cb)` | Tell me when you learn more |
-
-This simple interface enables powerful composition:
-
-- **Mirrors compose** - Folds over cells over remotes. Layers stack cleanly.
-- **Partial implementation** - Implement what you need, delegate what you don't.
-- **Semi-lattice semantics** - Concurrent updates merge without coordination.
-- **Layered properties** - Constraints enforced locally, shared as data, negotiated with peers.
-
-## The Core Insight
-
-**Refs are just URIs.** They're not tied to any scheme or implementation—they're the universal way to name things.
+Resources have URIs. You `get` and `put` them. They return `{ headers, body }`.
 
 ```
-bl:///cell/counter?initial=0     # A mutable value
-https://api.example.com/user/42  # A REST resource
-ws://node2:8080/events           # A WebSocket stream
-custom://my/protocol             # Whatever you define
+bl:///data/users/alice       # a document
+bl:///cells/counter          # a value that merges
+bl:///propagators/sum        # a reactive computation
+bl:///links/to/types/cell    # a query
 ```
 
-A ref is just "something to address"—data, action, connection, computation. The scheme tells you what kind. Middleware resolves it.
+## Why URIs?
 
-## What This Enables
+Because you can store them now and resolve them later. Middleware decides what they mean at runtime.
 
-**Sandboxing** - Middleware controls what's resolvable. Create isolated environments with restricted capabilities.
+You can sandbox things—middleware controls what's resolvable. You can move resources around without breaking anything. You can define new resource types just by writing handlers.
 
-**Distributed** - Refs are location-transparent. Same interface whether local, remote, or replicated.
+In distributed systems, no node has the complete picture. URIs let you point at things you don't have yet, and figure it out when you need to.
 
-**Protocol-extensible** - Define new resource types by creating mirrors and registering middleware.
+## The Building Blocks
 
-**Heterogeneous** - Any language can implement the spec. JavaScript, Rust, Python, Erlang—they all speak refs.
+**Types are resources too.** `headers.type` points to a type definition you can fetch.
+
+**Links go both ways.** The link index tracks who references what, so you can query in either direction.
+
+**Cells** are values with merge semantics. Write 5, then write 3, you still get 5 (max wins). Concurrent updates just merge—no coordination needed.
+
+**Propagators** wire cells together. Change an input, the output updates.
 
 ## Quick Start
 
-```javascript
-import { createBassline } from '@bassline/core';
+```bash
+node apps/cli/src/daemon.js
 
-const bl = createBassline();
+# store something
+curl -X PUT "http://localhost:9111?uri=bl:///data/users/alice" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice"}'
 
-// Cells - mutable values
-bl.write('bl:///cell/counter', 42);
-bl.read('bl:///cell/counter'); // 42
-
-// Folds - computed values
-bl.write('bl:///cell/a', 10);
-bl.write('bl:///cell/b', 20);
-bl.read('bl:///fold/sum?sources=bl:///cell/a,bl:///cell/b'); // 30
-
-// Watch for changes
-bl.watch('bl:///cell/counter', value => console.log(value));
-
-// Custom middleware
-bl.use('/price', (ref, bl) => new PriceFeed(ref, bl));
-bl.read('bl:///price/btc?symbol=BTCUSD');
+# get it back
+curl "http://localhost:9111?uri=bl:///data/users/alice"
 ```
 
-## Reference Implementation
+## Cells
 
-This repo contains a JavaScript implementation in ~720 lines:
+```bash
+# create a cell
+curl -X PUT "http://localhost:9111?uri=bl:///cells/counter" \
+  -H "Content-Type: application/json" \
+  -d '{"lattice": "maxNumber"}'
+
+# write values (max wins)
+curl -X PUT "http://localhost:9111?uri=bl:///cells/counter/value" \
+  -H "Content-Type: application/json" -d '5'
+curl -X PUT "http://localhost:9111?uri=bl:///cells/counter/value" \
+  -H "Content-Type: application/json" -d '3'   # still 5
+curl -X PUT "http://localhost:9111?uri=bl:///cells/counter/value" \
+  -H "Content-Type: application/json" -d '10'  # now 10
+```
+
+Lattices: `maxNumber`, `minNumber`, `setUnion`, `lww`.
+
+## Propagators
+
+```bash
+# a + b -> sum
+curl -X PUT "http://localhost:9111?uri=bl:///propagators/add" \
+  -H "Content-Type: application/json" \
+  -d '{"inputs": ["bl:///cells/a", "bl:///cells/b"], "output": "bl:///cells/sum", "handler": "sum"}'
+```
+
+Handlers: `sum`, `product`, `passthrough`, `constant`.
+
+## Packages
 
 ```
-packages/core/src/
-├── bassline.js      # Middleware router + ref→mirror cache
-├── setup.js         # createBassline() with standard middleware
-├── types.js         # Word, Ref value types
-└── mirror/          # Cell, Fold, Remote, Registry mirrors
+packages/core/           # router, links, plumber
+packages/cells/          # cells
+packages/propagators/    # propagators
+packages/store-node/     # file storage
+packages/server-node/    # http + websocket
+
+apps/cli/                # daemon
+apps/editor/             # web ui
 ```
 
 ## Running
 
 ```bash
 pnpm install
-pnpm test  # 182 tests
+pnpm test
 ```
 
-## BL/T Protocol
-
-Bassline includes a text-based wire protocol for shell-friendly interactions:
-
-```bash
-# Start a BL/T server
-node packages/core/bin/blt-server.js -p 9000 -c counter=0
-
-# Connect with netcat
-nc localhost 9000
-VERSION BL/1.0
-VERSION BL/1.0
-WRITE bl:///cell/counter 42
-OK
-READ bl:///cell/counter
-OK 42
-INFO bl:///cell/counter
-OK {"readable":true,"writable":true,"ordering":"causal"}
-```
-
-**Features:**
-- Human-readable, line-based format
-- Works with grep, awk, pipes
-- Tag correlation for request pipelining
-- Subscription support with EVENTs
-- Mirror introspection via INFO
-
-See [packages/core/docs/protocol.md](./packages/core/docs/protocol.md) for the full specification.
-
-## Documentation
-
-See [CLAUDE.md](./CLAUDE.md) for the full specification and implementation details.
+See [CLAUDE.md](./CLAUDE.md) for more.
 
 ## License
 
