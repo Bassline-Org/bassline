@@ -8,7 +8,7 @@ import { routes } from '@bassline/core'
  * synchronously and the network naturally terminates.
  *
  * Handlers are registered as factories that receive a context object.
- * Built-in handlers: sum, product, min, max, passthrough
+ * Built-in handlers: sum, product, passthrough, constant
  *
  * Resource structure:
  * - GET  /propagators           → list all propagators
@@ -39,14 +39,6 @@ export function createPropagatorRoutes(options = {}) {
 
   handlerFactories.set('product', () => (...values) =>
     values.reduce((a, b) => (a ?? 1) * (b ?? 1), 1)
-  )
-
-  handlerFactories.set('min', () => (...values) =>
-    Math.min(...values.filter(v => v != null))
-  )
-
-  handlerFactories.set('max', () => (...values) =>
-    Math.max(...values.filter(v => v != null))
   )
 
   handlerFactories.set('passthrough', () => (value) => value)
