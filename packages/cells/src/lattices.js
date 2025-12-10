@@ -83,11 +83,36 @@ export const boolean = {
   lte: (a, b) => !a || b  // false <= anything, true <= true only
 }
 
+// Set intersection lattice - values get more constrained (smaller)
+// Empty set [] is "top" (contradiction/unsatisfiable)
+// null means "unconstrained" (universal set / bottom)
+// Disjoint sets intersect to [] - a detectable contradiction state
+export const setIntersection = {
+  bottom: () => null,
+  join: (a, b) => {
+    if (a === null) return b
+    if (b === null) return a
+    if (!Array.isArray(a) || !Array.isArray(b)) return []
+    const setA = new Set(a)
+    return [...new Set([...b].filter(x => setA.has(x)))].sort()
+  },
+  lte: (a, b) => {
+    // a ≤ b means a is less constrained (superset of b)
+    if (a === null) return true   // unconstrained ≤ everything
+    if (b === null) return false  // constrained is not ≤ unconstrained
+    if (!Array.isArray(b)) return true
+    if (!Array.isArray(a)) return false
+    const setA = new Set(a)
+    return b.every(x => setA.has(x))  // b ⊆ a means a ≤ b in constraint ordering
+  }
+}
+
 // Registry of built-in lattices
 export const lattices = {
   maxNumber,
   minNumber,
   setUnion,
+  setIntersection,
   lww,
   object,
   counter,

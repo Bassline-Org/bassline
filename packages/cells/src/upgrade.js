@@ -22,6 +22,19 @@ export default function installCells(bl, config = {}) {
         headers: { type: 'bl:///types/resource-removed' },
         body: { uri }
       })
+    },
+    onContradiction: ({ uri, cell, previousValue, incomingValue, result }) => {
+      bl._plumber?.dispatch({
+        uri,
+        headers: { type: 'bl:///types/contradiction' },
+        body: {
+          uri,
+          lattice: cell.lattice,
+          previousValue,
+          incomingValue,
+          result
+        }
+      })
     }
   })
 
