@@ -21,7 +21,8 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "clean": "pnpm -r clean && rm -rf node_modules"
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "setup:mcp": "sed \"s|<PROJECT_PATH>|$(pwd)|g\" .mcp.json.example > .mcp.json && echo 'Created .mcp.json with project path:' && cat .mcp.json"
   },
   "devDependencies": {
     "@types/node": "^20.19.9",
