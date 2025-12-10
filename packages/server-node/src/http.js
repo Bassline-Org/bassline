@@ -73,8 +73,14 @@ export function createHttpServerRoutes() {
             const reqUrl = new URL(req.url, `http://localhost:${port}`)
             const uri = reqUrl.searchParams.get('uri') || `bl://${reqUrl.pathname}${reqUrl.search}`
 
+            // Extract peer identifier from header for trust/capability checks
+            const headers = {}
+            if (req.headers['x-bassline-peer']) {
+              headers.peer = req.headers['x-bassline-peer']
+            }
+
             if (req.method === 'GET') {
-              const result = await bl.get(uri)
+              const result = await bl.get(uri, headers)
               res.setHeader('Content-Type', 'application/json')
               res.end(JSON.stringify(result))
             } else if (req.method === 'PUT' || req.method === 'POST') {
@@ -83,7 +89,7 @@ export function createHttpServerRoutes() {
               req.on('end', async () => {
                 try {
                   const reqBody = data ? JSON.parse(data) : undefined
-                  const result = await bl.put(uri, {}, reqBody)
+                  const result = await bl.put(uri, headers, reqBody)
                   res.setHeader('Content-Type', 'application/json')
                   res.end(JSON.stringify(result))
                 } catch (err) {
