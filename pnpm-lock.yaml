@@ -78,6 +78,12 @@ importers:
 
   packages/core: {}
 
+  packages/fetch:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/propagators:
     dependencies:
       '@bassline/cells':
@@ -128,6 +134,12 @@ importers:
         version: link:../core
 
   packages/store-node:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/timers:
     dependencies:
       '@bassline/core':
         specifier: workspace:*

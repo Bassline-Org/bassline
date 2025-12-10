@@ -70,6 +70,16 @@ export default async function bootstrap(bl) {
     path: './packages/core/src/upgrade-dashboard.js'
   })
 
+  // Timers: time-based event dispatch
+  await bl.put('bl:///install/timers', {}, {
+    path: './packages/timers/src/upgrade.js'
+  })
+
+  // Fetch: HTTP requests with async response
+  await bl.put('bl:///install/fetch', {}, {
+    path: './packages/fetch/src/upgrade.js'
+  })
+
   // Services: Claude (optional - requires ANTHROPIC_API_KEY)
   if (process.env.ANTHROPIC_API_KEY) {
     await bl.put('bl:///install/claude', {}, {
