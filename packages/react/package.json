@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "React bindings for Bassline",
   "type": "module",
-  "main": "src/index.js",
+  "main": "src/index.jsx",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.jsx"
   },
   "peerDependencies": {
     "react": "^18.0.0"

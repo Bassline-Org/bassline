@@ -6,6 +6,10 @@
   "bin": {
     "bl": "./bin/bl.js"
   },
+  "scripts": {
+    "daemon": "node src/daemon.js",
+    "seed": "node src/seed.js"
+  },
   "dependencies": {
     "@bassline/core": "workspace:*",
     "@bassline/store-node": "workspace:*",

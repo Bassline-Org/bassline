@@ -81,7 +81,10 @@ export function createRemoteRoutes(options = {}) {
   function sendRequest(conn, msg) {
     return new Promise(resolve => {
       const id = conn.nextId()
-      conn.pending.set(id, resolve)
+      conn.pending.set(id, result => {
+        // Rewrite URIs in the response to include the mount prefix
+        resolve(rewriteUris(result, conn.config.mount))
+      })
       const payload = JSON.stringify({ ...msg, id })
       if (conn.ready()) {
         conn.ws.send(payload)
@@ -89,6 +92,37 @@ export function createRemoteRoutes(options = {}) {
         conn.queue.push(() => conn.ws.send(payload))
       }
     })
+  }
+
+  /**
+   * Recursively rewrite bl:/// URIs in a response to include mount prefix
+   * e.g. bl:///data/foo → bl:///local/data/foo when mount is /local
+   */
+  function rewriteUris(obj, mount) {
+    if (obj === null || obj === undefined) return obj
+
+    if (typeof obj === 'string') {
+      // Rewrite bl:/// URIs to include mount
+      if (obj.startsWith('bl:///')) {
+        const path = obj.slice(6) // Remove 'bl:///'
+        return `bl://${mount}/${path}`
+      }
+      return obj
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => rewriteUris(item, mount))
+    }
+
+    if (typeof obj === 'object') {
+      const result = {}
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = rewriteUris(value, mount)
+      }
+      return result
+    }
+
+    return obj
   }
 
   return routes('/remote/ws', r => {
