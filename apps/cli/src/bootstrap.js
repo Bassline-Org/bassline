@@ -65,6 +65,13 @@ export default async function bootstrap(bl) {
     path: './packages/cells/src/upgrade.js'
   })
 
+  // Services: Claude (optional - requires ANTHROPIC_API_KEY)
+  if (process.env.ANTHROPIC_API_KEY) {
+    await bl.put('bl:///install/claude', {}, {
+      path: './packages/services/src/upgrade-claude.js'
+    })
+  }
+
   console.log('Bassline daemon running')
   console.log(`  Data:  ${DATA_DIR}`)
   console.log(`  HTTP:  http://localhost:${HTTP_PORT}`)
