@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "bassline": {
+      "command": "node",
+      "args": ["<PROJECT_PATH>/apps/cli/src/mcp-stdio.js"],
+      "env": {
+        "BL_URL": "http://localhost:9111"
+      }
+    }
+  }
+}

@@ -81,6 +81,9 @@ bassline-web/.yarn-integrity
 .env.development
 .env.production
 .env.test
+
+# MCP configuration (contains machine-specific paths)
+.mcp.json
 bassline-web/.env
 bassline-web/.env.development
 bassline-web/.env.production
