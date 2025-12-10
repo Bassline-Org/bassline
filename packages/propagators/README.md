@@ -62,6 +62,22 @@ Built-in handlers:
 | `/propagators/:name` | GET | Get propagator info |
 | `/propagators/:name` | PUT | Create propagator |
 
+## Dynamic Installation
+
+Install via the daemon's module system:
+
+```javascript
+await bl.put('bl:///install/propagators', {}, {
+  path: './packages/propagators/src/upgrade.js',
+  handlers: {
+    // Optional custom handlers
+    myHandler: (inputs) => inputs[0] * 2
+  }
+})
+// Registers: bl._propagators
+// Requires: bl._plumber (optional)
+```
+
 ## Related
 
 - [@bassline/cells](../cells) - Lattice-based cells

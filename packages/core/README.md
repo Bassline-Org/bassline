@@ -100,6 +100,24 @@ plumber.listen('cell-updates', (msg) => {
 })
 ```
 
+## Dynamic Installation
+
+Install via the daemon's module system:
+
+```javascript
+// Links (bidirectional ref tracking)
+await bl.put('bl:///install/links', {}, {
+  path: './packages/core/src/upgrade-links.js'
+})
+// Registers: bl._links
+
+// Plumber (message routing)
+await bl.put('bl:///install/plumber', {}, {
+  path: './packages/core/src/upgrade-plumber.js'
+})
+// Registers: bl._plumber
+```
+
 ## Related
 
 - [@bassline/cells](../cells) - Lattice-based cells
