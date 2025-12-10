@@ -346,12 +346,126 @@ await bl.put('bl:///plumb/rules/my-rule', {}, { match: {...}, port: '...' })
 - Activity logging and debugging
 - Custom reactive behaviors
 
+## Timers
+
+Timers dispatch tick events through the plumber at configurable intervals.
+
+```javascript
+// Create and start a timer
+await bl.put('bl:///timers/heartbeat', {}, { interval: 1000, enabled: true })
+
+// Check timer status
+await bl.get('bl:///timers/heartbeat')
+// → { interval: 1000, enabled: true, running: true, tickCount: 42 }
+
+// Stop timer
+await bl.put('bl:///timers/heartbeat/stop', {}, {})
+
+// Restart timer
+await bl.put('bl:///timers/heartbeat/start', {}, {})
+```
+
+Each tick dispatches through plumber:
+```javascript
+{
+  uri: 'bl:///timers/heartbeat',
+  headers: { type: 'bl:///types/timer-tick' },
+  body: { timer: 'heartbeat', tick: 42, time: '2024-...' }
+}
+```
+
+Wire timers to cells via plumber rules:
+```javascript
+// Count timer ticks
+await bl.put('bl:///cells/ticks', {}, { lattice: 'counter' })
+
+bl._plumber.addRule('heartbeat-counter', {
+  match: { headers: { type: 'bl:///types/timer-tick' }, body: { timer: 'heartbeat' } },
+  port: 'heartbeat-ticks'
+})
+
+bl._plumber.listen('heartbeat-ticks', () => {
+  bl.put('bl:///cells/ticks/value', {}, 1)  // increment
+})
+```
+
+## Fetch
+
+Fetch makes HTTP requests with async responses dispatched through plumber.
+
+```javascript
+// Make a GET request
+await bl.put('bl:///fetch/request', {}, {
+  url: 'https://api.example.com/data',
+  method: 'GET',
+  headers: { 'Authorization': 'Bearer ...' }
+})
+
+// POST with body
+await bl.put('bl:///fetch/request', {}, {
+  url: 'https://api.example.com/create',
+  method: 'POST',
+  body: { name: 'test' }
+})
+
+// Auto-write response to a cell
+await bl.put('bl:///fetch/request', {}, {
+  url: 'https://api.example.com/status',
+  responseCell: 'bl:///cells/status'
+})
+```
+
+Responses dispatch through plumber:
+```javascript
+// Success
+{
+  uri: 'bl:///fetch/req-123',
+  headers: { type: 'bl:///types/fetch-response', status: 200 },
+  body: { requestId: 'req-123', url: '...', status: 200, headers: {...}, body: {...} }
+}
+
+// Error
+{
+  uri: 'bl:///fetch/req-123',
+  headers: { type: 'bl:///types/fetch-error' },
+  body: { requestId: 'req-123', url: '...', error: 'Connection refused' }
+}
+```
+
+List and inspect requests:
+```javascript
+await bl.get('bl:///fetch')           // List recent requests
+await bl.get('bl:///fetch/req-123')   // Get specific request result
+```
+
+### Polling Pattern (Timer + Fetch)
+
+```javascript
+// Set up timer-driven polling
+await bl.put('bl:///timers/poll', {}, { interval: 30000, enabled: true })
+await bl.put('bl:///cells/status', {}, { lattice: 'lww' })
+
+bl._plumber.addRule('poll-trigger', {
+  match: { headers: { type: 'bl:///types/timer-tick' }, body: { timer: 'poll' } },
+  port: 'poll-trigger'
+})
+
+bl._plumber.listen('poll-trigger', () => {
+  bl.put('bl:///fetch/request', {}, {
+    url: 'https://api.example.com/status',
+    responseCell: 'bl:///cells/status'
+  })
+})
+```
+
 ## Package Structure
 
 ```
 packages/core/           # Router, links, plumber
 packages/cells/          # Lattice-based cells
 packages/propagators/    # Reactive propagators
+packages/timers/         # Time-based event dispatch
+packages/fetch/          # HTTP requests
 packages/store-node/     # File and code stores
 packages/server-node/    # HTTP and WebSocket servers
 
@@ -435,6 +549,8 @@ Module dependency order:
 5. `ws-server` - WebSocket (uses plumber)
 6. `propagators` - reactive computation
 7. `cells` - lattice values (uses propagators, plumber)
+8. `timers` - time-based events (uses plumber)
+9. `fetch` - HTTP requests (uses plumber)
 
 ## Running
 
