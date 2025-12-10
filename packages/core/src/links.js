@@ -146,12 +146,40 @@ export function createLinkIndex() {
     })
   })
 
+  /**
+   * Create a tap function for automatic link indexing
+   * Install this as a PUT tap to automatically index refs
+   *
+   * @returns {import('./bassline.js').Tap}
+   */
+  function createTap() {
+    return ({ uri, body, result }) => {
+      // Only index successful writes
+      if (result && body !== undefined) {
+        index(uri, body)
+      }
+    }
+  }
+
+  /**
+   * Install link index into a Bassline instance
+   * Sets up both routes (for querying) and taps (for automatic indexing)
+   *
+   * @param {import('./bassline.js').Bassline} bl
+   */
+  function install(bl) {
+    bl.install(linkRoutes)
+    bl.tap('put', createTap())
+  }
+
   return {
     index,
     remove,
     getFrom,
     getTo,
     routes: linkRoutes,
+    createTap,
+    install,
     // Expose internals for debugging
     _from: from,
     _to: to

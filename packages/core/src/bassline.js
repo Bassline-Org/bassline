@@ -36,6 +36,21 @@
  */
 
 /**
+ * @typedef {Object} TapContext
+ * @property {string} uri - The URI that was accessed
+ * @property {Headers} headers - Request headers
+ * @property {*} [body] - Request body (only present for PUT taps)
+ * @property {Response|null} result - Response from the handler
+ * @property {Bassline} bl - Bassline instance
+ */
+
+/**
+ * @callback Tap
+ * @param {TapContext} ctx - Tap context
+ * @returns {void}
+ */
+
+/**
  * Bassline - Minimal routing with pattern matching
  *
  * @example
@@ -50,11 +65,44 @@
  *
  * bl.get('bl:///cells/counter')
  * // → { headers: { type: 'cell' }, body: { value: 'bl:///cells/counter/value' } }
+ *
+ * // Taps observe operations without intercepting
+ * bl.tap('put', ({ uri, body }) => {
+ *   console.log(`PUT ${uri}:`, body)
+ * })
  */
 export class Bassline {
   constructor() {
     /** @type {Array<{pattern: string, regex: RegExp, paramNames: string[], config: RouteConfig}>} */
     this.routes = []
+    /** @type {{ get: Tap[], put: Tap[] }} */
+    this.taps = { get: [], put: [] }
+  }
+
+  /**
+   * Register a tap to observe operations
+   * Taps are called after handlers complete - they observe but don't intercept
+   *
+   * @param {'get'|'put'} verb - Which operation to observe
+   * @param {Tap} fn - Tap function
+   * @returns {this} For chaining
+   *
+   * @example
+   * // Log all writes
+   * bl.tap('put', ({ uri, body }) => {
+   *   console.log(`Written to ${uri}:`, body)
+   * })
+   *
+   * // Index links on write
+   * bl.tap('put', ({ uri, body }) => {
+   *   linkIndex.index(uri, body)
+   * })
+   */
+  tap(verb, fn) {
+    if (this.taps[verb]) {
+      this.taps[verb].push(fn)
+    }
+    return this
   }
 
   /**
@@ -156,7 +204,14 @@ export class Bassline {
       query: url.searchParams,
       bl: this
     }
-    return matched.route.config.get(ctx)
+    const result = await matched.route.config.get(ctx)
+
+    // Call taps after handler (ambient observation)
+    for (const tap of this.taps.get) {
+      tap({ uri, headers, result, bl: this })
+    }
+
+    return result
   }
 
   /**
@@ -182,7 +237,14 @@ export class Bassline {
       body,
       bl: this
     }
-    return matched.route.config.put(ctx)
+    const result = await matched.route.config.put(ctx)
+
+    // Call taps after handler (ambient observation)
+    for (const tap of this.taps.put) {
+      tap({ uri, headers, body, result, bl: this })
+    }
+
+    return result
   }
 
   /**
