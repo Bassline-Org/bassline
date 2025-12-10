@@ -76,7 +76,14 @@ export function createCellRoutes(options = {}) {
 
     const lattice = getLattice(cell.lattice)
     const oldValue = cell.value
-    const joinedValue = lattice.join(oldValue, newValue)
+
+    // For LWW lattice, auto-wrap raw values with current timestamp
+    let valueToMerge = newValue
+    if (cell.lattice === 'lww' && typeof newValue?.timestamp !== 'number') {
+      valueToMerge = { value: newValue, timestamp: Date.now() }
+    }
+
+    const joinedValue = lattice.join(oldValue, valueToMerge)
 
     // Check if value actually moved up
     const changed = !lattice.lte(joinedValue, oldValue)
