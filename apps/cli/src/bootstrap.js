@@ -95,6 +95,11 @@ export default async function bootstrap(bl) {
     path: './packages/recipes/src/upgrade.js'
   })
 
+  // Vals: shareable resource compositions (uses recipes)
+  await bl.put('bl:///install/vals', {}, {
+    path: './packages/vals/src/upgrade.js'
+  })
+
   // Services: Claude (optional - requires ANTHROPIC_API_KEY)
   if (process.env.ANTHROPIC_API_KEY) {
     await bl.put('bl:///install/claude', {}, {

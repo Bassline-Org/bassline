@@ -131,6 +131,41 @@ export const TYPES = {
       type: { type: 'string', description: 'builtin or composed' },
       definition: { type: 'array', description: 'Hiccup-style definition [handler, config?, ...args]' }
     }
+  },
+  val: {
+    name: 'Val',
+    description: 'A shareable, forkable resource composition definition',
+    schema: {
+      name: { type: 'string', description: 'Val name' },
+      owner: { type: 'string', description: 'Val owner' },
+      description: { type: 'string', description: 'Val description' },
+      valType: { type: 'string', description: 'Type: propagator, recipe, handler, cell, plumber-rule' },
+      definition: { type: 'object', description: 'The val definition (varies by valType)' },
+      visibility: { type: 'string', description: 'Visibility: public, unlisted, private' },
+      tags: { type: 'array', description: 'Tags for categorization' },
+      parentVal: { type: 'string', description: 'Parent val URI if forked' },
+      parentVersion: { type: 'number', description: 'Parent version if forked' },
+      version: { type: 'number', description: 'Current version number' },
+      createdAt: { type: 'string', description: 'Creation timestamp' },
+      updatedAt: { type: 'string', description: 'Last update timestamp' }
+    }
+  },
+  'val-version': {
+    name: 'Val Version',
+    description: 'An immutable snapshot of a val at a specific version',
+    schema: {
+      version: { type: 'number', description: 'Version number' },
+      definition: { type: 'object', description: 'Val definition at this version' },
+      createdAt: { type: 'string', description: 'Creation timestamp' }
+    }
+  },
+  'val-saved': {
+    name: 'Val Saved Event',
+    description: 'Event dispatched when a val is created or updated',
+    schema: {
+      val: { type: 'string', description: 'Val key (owner/name)' },
+      version: { type: 'number', description: 'New version number' }
+    }
   }
 }
 
