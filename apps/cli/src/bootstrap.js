@@ -100,6 +100,11 @@ export default async function bootstrap(bl) {
     path: './packages/vals/src/upgrade.js'
   })
 
+  // Database: SQLite service
+  await bl.put('bl:///install/database', {}, {
+    path: './packages/database/src/upgrade.js'
+  })
+
   // Services: Claude (optional - requires ANTHROPIC_API_KEY)
   if (process.env.ANTHROPIC_API_KEY) {
     await bl.put('bl:///install/claude', {}, {

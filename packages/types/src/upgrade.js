@@ -166,6 +166,78 @@ export const TYPES = {
       val: { type: 'string', description: 'Val key (owner/name)' },
       version: { type: 'number', description: 'New version number' }
     }
+  },
+  service: {
+    name: 'Service',
+    description: 'An external service integration',
+    schema: {
+      name: { type: 'string', description: 'Service name' },
+      description: { type: 'string', description: 'Service description' },
+      version: { type: 'string', description: 'Service version' },
+      operations: { type: 'array', description: 'Available operations' }
+    }
+  },
+  'database-connection': {
+    name: 'Database Connection',
+    description: 'A database connection configuration',
+    schema: {
+      name: { type: 'string', description: 'Connection name' },
+      driver: { type: 'string', description: 'Database driver (sqlite, postgres, mysql)' },
+      path: { type: 'string', description: 'Database file path (SQLite)' },
+      readonly: { type: 'boolean', description: 'Readonly mode' },
+      connected: { type: 'boolean', description: 'Connection status' }
+    }
+  },
+  'database-result': {
+    name: 'Database Query Result',
+    description: 'Result from executing a database query',
+    schema: {
+      rows: { type: 'array', description: 'Result rows' },
+      columns: { type: 'array', description: 'Column metadata' },
+      rowCount: { type: 'number', description: 'Number of rows returned' }
+    }
+  },
+  'database-execute-result': {
+    name: 'Database Execute Result',
+    description: 'Result from executing a database statement',
+    schema: {
+      changes: { type: 'number', description: 'Number of rows affected' },
+      lastInsertRowid: { type: 'number', description: 'Last inserted row ID' }
+    }
+  },
+  'database-schema': {
+    name: 'Database Schema',
+    description: 'Database schema information',
+    schema: {
+      connection: { type: 'string', description: 'Connection name' },
+      tables: { type: 'array', description: 'Tables in the database' }
+    }
+  },
+  'database-table': {
+    name: 'Database Table',
+    description: 'Table schema information',
+    schema: {
+      name: { type: 'string', description: 'Table name' },
+      type: { type: 'string', description: 'table or view' },
+      columns: { type: 'array', description: 'Column definitions' },
+      indexes: { type: 'array', description: 'Index definitions' }
+    }
+  },
+  'database-change': {
+    name: 'Database Change Event',
+    description: 'Event dispatched when database is modified',
+    schema: {
+      connection: { type: 'string', description: 'Connection name' },
+      sql: { type: 'string', description: 'SQL statement executed' },
+      changes: { type: 'number', description: 'Number of rows affected' }
+    }
+  },
+  'database-pragma-result': {
+    name: 'Database PRAGMA Result',
+    description: 'Result from SQLite PRAGMA command',
+    schema: {
+      result: { type: 'any', description: 'PRAGMA result value' }
+    }
   }
 }
 
