@@ -2,9 +2,20 @@ import { createEffect, onMount, onCleanup, createSignal, Show } from 'solid-js'
 import cytoscape, { Core, NodeSingular } from 'cytoscape'
 // @ts-ignore - dagre typings
 import dagre from 'cytoscape-dagre'
+import { useWebSocket } from '@bassline/solid'
 
 // Register dagre layout
 cytoscape.use(dagre)
+
+// Flow entry from plumber history
+interface FlowEntry {
+  id: number
+  timestamp: string
+  uri: string
+  type?: string
+  matchedRules: string[]
+  dispatchedPorts: string[]
+}
 
 interface PlugboardGraphProps {
   sources: Array<{
@@ -43,6 +54,46 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
 
   const [selectedNode, setSelectedNode] = createSignal<SelectedNodeData | null>(null)
   const [zoom, setZoom] = createSignal(1)
+  const [recentFlows, setRecentFlows] = createSignal<FlowEntry[]>([])
+
+  const ws = useWebSocket()
+
+  // Animate edges when a flow entry comes through
+  function animateFlow(entry: FlowEntry) {
+    if (!cy) return
+
+    // Add to recent flows (keep last 10)
+    setRecentFlows(prev => [...prev.slice(-9), entry])
+
+    // Animate rule -> port edges for each matched rule
+    entry.matchedRules.forEach((ruleName, idx) => {
+      const port = entry.dispatchedPorts[idx] || entry.dispatchedPorts[0]
+      if (port) {
+        const edgeId = `rule-${ruleName}->port-${port}`
+        const edge = cy.getElementById(edgeId)
+        if (edge.length > 0) {
+          edge.addClass('flowing')
+          setTimeout(() => edge.removeClass('flowing'), 800)
+        }
+      }
+
+      // Also animate the rule node itself
+      const ruleNode = cy.getElementById(`rule-${ruleName}`)
+      if (ruleNode.length > 0) {
+        ruleNode.addClass('firing')
+        setTimeout(() => ruleNode.removeClass('firing'), 600)
+      }
+    })
+
+    // Animate port nodes that received messages
+    entry.dispatchedPorts.forEach(portName => {
+      const portNode = cy.getElementById(`port-${portName}`)
+      if (portNode.length > 0) {
+        portNode.addClass('receiving')
+        setTimeout(() => portNode.removeClass('receiving'), 600)
+      }
+    })
+  }
 
   // Build Cytoscape elements from props
   function buildElements() {
@@ -268,6 +319,40 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
             'line-color': '#58a6ff',
             'target-arrow-color': '#58a6ff'
           }
+        },
+        // Flow animation - edges lighting up when messages pass through
+        {
+          selector: 'edge.flowing',
+          style: {
+            'width': 4,
+            'line-color': '#58a6ff',
+            'target-arrow-color': '#58a6ff',
+            'line-style': 'solid',
+            'transition-property': 'line-color, width, target-arrow-color',
+            'transition-duration': '0.2s'
+          }
+        },
+        // Rule node firing animation
+        {
+          selector: 'node.rule.firing',
+          style: {
+            'background-color': '#f0883e',
+            'border-color': '#ffdf5d',
+            'border-width': 4,
+            'transition-property': 'background-color, border-color, border-width',
+            'transition-duration': '0.15s'
+          }
+        },
+        // Port node receiving animation
+        {
+          selector: 'node.port.receiving',
+          style: {
+            'background-color': '#58a6ff',
+            'border-color': '#a5d6ff',
+            'border-width': 4,
+            'transition-property': 'background-color, border-color, border-width',
+            'transition-duration': '0.15s'
+          }
         }
       ],
       layout: {
@@ -323,6 +408,48 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
     // Initial fit
     cy.fit(undefined, 50)
     setZoom(cy.zoom())
+
+  })
+
+  // Subscribe to WebSocket for live flow updates (separate effect to handle connection timing)
+  createEffect(() => {
+    const socket = ws
+    if (!socket) return
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data)
+        // WebSocket server wraps port messages as { type: 'message', port: '...', message: {...} }
+        if (msg.type === 'message' && msg.port === 'plumb-flow' && msg.message) {
+          const entry = msg.message as FlowEntry
+          if (entry.matchedRules && Array.isArray(entry.matchedRules) && entry.matchedRules.length > 0) {
+            animateFlow(entry)
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    const sendListen = () => {
+      socket.send(JSON.stringify({ type: 'listen', port: 'plumb-flow' }))
+    }
+
+    socket.addEventListener('message', handleMessage)
+
+    // Listen to plumb-flow port - handle both already-open and connecting states
+    if (socket.readyState === WebSocket.OPEN) {
+      sendListen()
+    } else {
+      socket.addEventListener('open', sendListen, { once: true })
+    }
+
+    onCleanup(() => {
+      socket.removeEventListener('message', handleMessage)
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'unlisten', port: 'plumb-flow' }))
+      }
+    })
   })
 
   // Update elements when props change
@@ -454,6 +581,13 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
           <div class="legend-color port" />
           <span>Ports</span>
         </div>
+        <Show when={ws}>
+          <div class="legend-divider" />
+          <div class={`live-indicator ${recentFlows().length > 0 ? 'active' : ''}`}>
+            <span class="live-dot" />
+            <span>LIVE</span>
+          </div>
+        </Show>
       </div>
 
       <div ref={containerRef} class="cytoscape-container" />
@@ -644,6 +778,48 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
           color: #8b949e;
           overflow: auto;
           max-height: 150px;
+        }
+
+        .legend-divider {
+          width: 1px;
+          height: 16px;
+          background: #30363d;
+        }
+
+        .live-indicator {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 10px;
+          font-weight: 600;
+          color: #8b949e;
+          padding: 2px 8px;
+          border-radius: 10px;
+          background: #21262d;
+          transition: all 0.3s ease;
+        }
+
+        .live-indicator.active {
+          background: rgba(35, 134, 54, 0.3);
+          color: #3fb950;
+        }
+
+        .live-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: #484f58;
+          transition: all 0.3s ease;
+        }
+
+        .live-indicator.active .live-dot {
+          background: #3fb950;
+          animation: live-pulse 1.5s infinite;
+        }
+
+        @keyframes live-pulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.4); }
+          50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(63, 185, 80, 0); }
         }
       `}</style>
     </div>
