@@ -47,97 +47,9 @@ const result = await bl.get('bl:///cells/sum/value')
 
 ## Handlers
 
-Handlers are registered as factories that receive a config object and return a function.
+Handlers are provided by `@bassline/handlers`. See [packages/handlers/README.md](../handlers/README.md) for the full list of 110 built-in handlers.
 
-### Built-in Handlers
-
-**Basic**
-- `sum` - add all inputs
-- `product` - multiply all inputs
-- `passthrough` - pass first input through
-- `constant` - output a constant value (config: `{ value }`)
-
-**Reducers**
-- `min`, `max` - minimum/maximum of inputs
-- `average` - average of inputs
-- `concat` - concatenate arrays or strings
-- `first`, `last` - first/last non-null input
-
-**Structural**
-- `pair` - combine inputs into array
-- `zip` - combine inputs into object (config: `{ keys: [...] }`)
-- `unzip` - extract key from object (config: `{ key }`)
-
-**Transformers**
-- `map` - apply handler to collection (config: `{ handler, config }`)
-- `pick` - extract key (config: `{ key }`)
-- `format` - template string (config: `{ template: 'Hello {0}' }`)
-- `coerce` - type conversion (config: `{ to: 'number'|'string'|'boolean'|'json' }`)
-
-**Predicates**
-- `filter` - skip propagation if predicate fails (config: `{ handler, config }`)
-- `when` - same as filter
-
-**Composition**
-- `compose` - chain handlers (config: `{ steps: ['handler1', 'handler2'], handler1: {...} }`)
-
-**Arithmetic**
-- `negate`, `abs`, `round`, `floor`, `ceil` - single input
-- `subtract`, `divide`, `modulo`, `power` - two inputs
-
-**Comparison** (config: `{ value }` for single input)
-- `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
-
-**Logic**
-- `and`, `or` - all/any inputs truthy
-- `not` - negate single input
-- `xor` - exclusive or of two inputs
-
-**String**
-- `split` (config: `{ delimiter }`)
-- `join` (config: `{ delimiter }`)
-- `trim`, `uppercase`, `lowercase`
-- `strSlice` (config: `{ start, end }`)
-- `replace` (config: `{ pattern, flags, replacement }`)
-- `match` (config: `{ pattern, flags }`)
-- `startsWith` (config: `{ prefix }`)
-- `endsWith` (config: `{ suffix }`)
-- `includes` (config: `{ substring }`)
-
-**Array**
-- `length`, `head`, `tail`, `init`, `reverse`
-- `at` (config: `{ index }`)
-- `sort` (config: `{ descending }`)
-- `sortBy` (config: `{ key, descending }`)
-- `unique`, `flatten`, `compact`
-- `take`, `drop` (config: `{ count }`)
-- `chunk` (config: `{ size }`)
-
-**Array Reducers**
-- `sumBy` (config: `{ key }`)
-- `countBy`, `groupBy`, `indexBy` (config: `{ key }`)
-- `minBy`, `maxBy` (config: `{ key }`)
-
-**Object**
-- `keys`, `values`, `entries`, `fromEntries`
-- `get` (config: `{ path: 'a.b.c' }`)
-- `has` (config: `{ path }`)
-- `omit` (config: `{ keys: [...] }`)
-- `defaults` (config: `{ defaults: {...} }`)
-- `merge` - shallow merge all inputs
-
-**Type Checking**
-- `isNull`, `isNumber`, `isString`, `isArray`, `isObject`, `typeOf`
-
-**Conditional**
-- `ifElse` (config: `{ predicate: {handler, config}, then: {handler, config}, else: {handler, config} }`)
-- `cond` (config: `{ cases: [{when: {...}, then: {...}}], default: {...} }`)
-
-**Utility**
-- `identity` - return input unchanged
-- `always` (config: `{ value }`)
-- `tap` - log and pass through (config: `{ label }`)
-- `defaultTo` (config: `{ value }`)
+Propagators access handlers via `bl._handlers.get(name, config)`.
 
 ### Examples
 
@@ -183,18 +95,20 @@ await bl.put('bl:///propagators/by-category', {}, {
 Install via the daemon's module system:
 
 ```javascript
+// Handlers must be installed first
+await bl.put('bl:///install/handlers', {}, {
+  path: './packages/handlers/src/upgrade.js'
+})
+
 await bl.put('bl:///install/propagators', {}, {
-  path: './packages/propagators/src/upgrade.js',
-  handlers: {
-    // Optional custom handlers
-    myHandler: (inputs) => inputs[0] * 2
-  }
+  path: './packages/propagators/src/upgrade.js'
 })
 // Registers: bl._propagators
-// Requires: bl._plumber (optional)
+// Requires: bl._handlers, bl._plumber (optional)
 ```
 
 ## Related
 
+- [@bassline/handlers](../handlers) - Handler registry and combinators (required)
 - [@bassline/cells](../cells) - Lattice-based cells
 - [@bassline/core](../core) - Router and utilities

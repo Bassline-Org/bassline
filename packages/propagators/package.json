@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@bassline/core": "workspace:*",
-    "@bassline/cells": "workspace:*"
+    "@bassline/cells": "workspace:*",
+    "@bassline/handlers": "workspace:*"
   },
   "license": "AGPL-3.0"
 }

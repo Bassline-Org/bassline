@@ -90,6 +90,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/handlers:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/links:
     dependencies:
       '@bassline/core':
@@ -116,6 +122,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/handlers':
+        specifier: workspace:*
+        version: link:../handlers
 
   packages/react:
     dependencies:

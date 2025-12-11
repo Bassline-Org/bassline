@@ -41,9 +41,20 @@ export function substitute(value, context) {
  *
  * @param {string} str - String to substitute in
  * @param {object} context - Substitution context
- * @returns {string} String with substitutions applied
+ * @returns {any} String with substitutions, or raw value if entire string is single placeholder
  */
 function substituteString(str, context) {
+  // If entire string is a single placeholder, return raw value (preserves type)
+  const singleMatch = str.match(/^\$\{([^}]+)\}$/)
+  if (singleMatch) {
+    const value = resolvePath(singleMatch[1], context)
+    if (value === undefined) {
+      throw new Error(`Template variable not found: ${singleMatch[1]}`)
+    }
+    return value
+  }
+
+  // Otherwise do normal string replacement
   return str.replace(/\$\{([^}]+)\}/g, (match, path) => {
     const value = resolvePath(path, context)
     if (value === undefined) {

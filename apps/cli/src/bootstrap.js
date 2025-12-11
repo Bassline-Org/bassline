@@ -55,7 +55,12 @@ export default async function bootstrap(bl) {
     ports: [WS_PORT]
   })
 
-  // Reactive: propagators
+  // Reactive: handlers (must come before propagators)
+  await bl.put('bl:///install/handlers', {}, {
+    path: './packages/handlers/src/upgrade.js'
+  })
+
+  // Reactive: propagators (uses handlers)
   await bl.put('bl:///install/propagators', {}, {
     path: './packages/propagators/src/upgrade.js'
   })

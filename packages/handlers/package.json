@@ -1,0 +1,19 @@
+{
+  "name": "@bassline/handlers",
+  "version": "1.0.0",
+  "description": "Handler registry and combinators for Bassline propagators",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./registry": "./src/registry.js",
+    "./compiler": "./src/compiler.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}
