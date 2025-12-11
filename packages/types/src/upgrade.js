@@ -92,6 +92,26 @@ export const TYPES = {
       output: { type: 'string', description: 'Output cell URI' },
       handler: { type: 'string', description: 'Handler function name' }
     }
+  },
+  recipe: {
+    name: 'Recipe',
+    description: 'A template for creating multiple coordinated resources',
+    schema: {
+      description: { type: 'string', description: 'Recipe description' },
+      params: { type: 'object', description: 'Parameter definitions with type and default' },
+      resources: { type: 'array', description: 'Resource templates to create on instantiation' }
+    }
+  },
+  instance: {
+    name: 'Instance',
+    description: 'An instantiated recipe with tracked resources',
+    schema: {
+      recipe: { type: 'string', description: 'Recipe URI' },
+      params: { type: 'object', description: 'Parameter values used' },
+      createdResources: { type: 'array', description: 'Resources created by this instance' },
+      state: { type: 'string', description: 'Instance state (active, deleted)' },
+      createdAt: { type: 'string', description: 'Creation timestamp' }
+    }
   }
 }
 

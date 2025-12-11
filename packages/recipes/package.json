@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/recipes",
+  "version": "1.0.0",
+  "description": "Recipe templates for composing multiple resources",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0"
+}
