@@ -26,9 +26,17 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
   const min = () => props.min ?? 0
   const max = () => props.max ?? 100
 
+  // Ensure value is a number (defensive against objects being passed)
+  const safeValue = () => {
+    const v = props.value
+    if (typeof v === 'number') return v
+    if (typeof v === 'string') return parseFloat(v) || 0
+    return 0
+  }
+
   // Track history
   createEffect(() => {
-    const val = props.value
+    const val = safeValue()
     if (val !== undefined && val !== null) {
       setHistory(prev => [...prev, val].slice(-20))
     }
@@ -36,7 +44,7 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
 
   // Calculate percentage for gauge fill
   const percentage = createMemo(() => {
-    const val = props.value ?? 0
+    const val = safeValue()
     const range = max() - min()
     if (range === 0) return 0
     return Math.min(100, Math.max(0, ((val - min()) / range) * 100))
@@ -44,7 +52,7 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
 
   // Get color based on thresholds or default gradient
   const gaugeColor = createMemo(() => {
-    const val = props.value ?? 0
+    const val = safeValue()
     const thresholds = props.thresholds || [
       { value: 25, color: '#f85149' },
       { value: 50, color: '#d29922' },
@@ -105,7 +113,7 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
 
       <div class="gauge-value-row">
         <span class="gauge-value" style={{ color: gaugeColor() }}>
-          {props.value ?? 0}
+          {safeValue()}
         </span>
         <span class="gauge-range">
           {min()} - {max()}

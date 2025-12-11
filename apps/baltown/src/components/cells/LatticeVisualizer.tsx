@@ -43,11 +43,22 @@ export default function LatticeVisualizer(props: LatticeVisualizerProps) {
     if (!data) return undefined
 
     // Handle different value structures
+    // Prioritize explicit value properties
     if (data.value !== undefined) return data.value
     if (data.body?.value !== undefined) return data.body.value
-    if (data.body !== undefined) return data.body
 
-    return data
+    // Don't fall back to body if it contains lattice metadata
+    // (that would insert an object into the DOM)
+    if (data.body !== undefined && typeof data.body !== 'object') {
+      return data.body
+    }
+
+    // For object bodies, only return if they don't look like cell metadata
+    if (data.body && typeof data.body === 'object' && !('lattice' in data.body)) {
+      return data.body
+    }
+
+    return undefined
   })
 
   // Extract timestamp for LWW

@@ -1,4 +1,5 @@
 import { createSignal, createEffect, For, Show, onCleanup, createMemo } from 'solid-js'
+import { useBassline } from '@bassline/solid'
 import CellNode from './CellNode'
 import PropagatorNode from './PropagatorNode'
 import { createEdgePath } from './ConnectionEdge'
@@ -44,6 +45,7 @@ interface PropagatorGraphProps {
   onCellClick?: (uri: string) => void
   onPropagatorClick?: (uri: string) => void
   firingPropagators?: Set<string>
+  onRefresh?: () => void
 }
 
 /**
@@ -57,6 +59,8 @@ interface PropagatorGraphProps {
  * - Mini-map navigation
  */
 export default function PropagatorGraph(props: PropagatorGraphProps) {
+  const bl = useBassline()
+
   let svgRef: SVGSVGElement | undefined
   let containerRef: HTMLDivElement | undefined
 
@@ -78,32 +82,70 @@ export default function PropagatorGraph(props: PropagatorGraphProps) {
   createEffect(() => {
     const positions: Record<string, { x: number; y: number }> = {}
 
-    // Position cells on the left
-    props.cells.forEach((cell, i) => {
+    // Identify which cells are inputs and which are outputs
+    const inputCellUris = new Set(props.propagators.flatMap(p => p.inputs || []))
+    const outputCellUris = new Set(props.propagators.map(p => p.output).filter(Boolean))
+
+    console.log('[Layout] inputCellUris:', [...inputCellUris])
+    console.log('[Layout] outputCellUris:', [...outputCellUris])
+
+    // Position INPUT cells on the left (cells that are only inputs, not outputs)
+    const pureInputCells = props.cells.filter(c => inputCellUris.has(c.uri) && !outputCellUris.has(c.uri))
+    console.log('[Layout] pureInputCells:', pureInputCells.map(c => c.uri))
+    pureInputCells.forEach((cell, i) => {
       positions[cell.uri] = {
         x: 0,
-        y: i * 80 - (props.cells.length - 1) * 40
+        y: i * 100 - (pureInputCells.length - 1) * 50
       }
+      console.log(`[Layout] Input cell ${cell.uri} at x=0`)
     })
 
     // Position propagators in the middle
     props.propagators.forEach((prop, i) => {
       positions[prop.uri] = {
-        x: 200,
-        y: i * 80 - (props.propagators.length - 1) * 40
+        x: 250,
+        y: i * 100 - (props.propagators.length - 1) * 50
       }
     })
 
-    // Position output cells on the right
-    const outputCells = new Set(props.propagators.map(p => p.output).filter(Boolean))
-    let outputIndex = 0
-    outputCells.forEach(uri => {
-      if (!positions[uri]) {
-        positions[uri] = {
-          x: 400,
-          y: outputIndex * 80 - (outputCells.size - 1) * 40
+    // Position OUTPUT cells on the right
+    const outputCells = props.cells.filter(c => outputCellUris.has(c.uri))
+    console.log('[Layout] outputCells to position:', outputCells.map(c => c.uri))
+    outputCells.forEach((cell, i) => {
+      positions[cell.uri] = {
+        x: 500,
+        y: i * 100 - (outputCells.length - 1) * 50
+      }
+      console.log(`[Layout] Output cell ${cell.uri} at x=500`)
+    })
+
+    // Position cells that are both inputs AND outputs (intermediate) in the middle-bottom
+    const intermediateCells = props.cells.filter(c => inputCellUris.has(c.uri) && outputCellUris.has(c.uri))
+    intermediateCells.forEach((cell, i) => {
+      positions[cell.uri] = {
+        x: 250,
+        y: 200 + i * 100
+      }
+    })
+
+    // Position any remaining cells (shouldn't happen but just in case)
+    props.cells.forEach((cell, i) => {
+      if (!positions[cell.uri]) {
+        positions[cell.uri] = {
+          x: 0,
+          y: i * 100 - (props.cells.length - 1) * 50
         }
-        outputIndex++
+      }
+    })
+
+    // Also position any output cells that weren't in props.cells
+    outputCellUris.forEach(uri => {
+      if (!positions[uri]) {
+        const existingOutputs = Object.keys(positions).filter(k => outputCellUris.has(k)).length
+        positions[uri] = {
+          x: 500,
+          y: existingOutputs * 100 - (outputCellUris.size - 1) * 50
+        }
       }
     })
 
@@ -192,6 +234,19 @@ export default function PropagatorGraph(props: PropagatorGraphProps) {
     })
 
     return result
+  })
+
+  // Debug logging for nodes and edges
+  createEffect(() => {
+    console.log('[PropagatorGraph] props.cells:', props.cells)
+    console.log('[PropagatorGraph] props.propagators:', props.propagators)
+    console.log('[PropagatorGraph] nodes:', nodes())
+    console.log('[PropagatorGraph] edges:', edges())
+    const pos = nodePositions()
+    console.log('[PropagatorGraph] nodePositions (detailed):')
+    Object.entries(pos).forEach(([uri, p]) => {
+      console.log(`  ${uri}: x=${p.x}, y=${p.y}`)
+    })
   })
 
   // Get selected node data
@@ -344,6 +399,46 @@ export default function PropagatorGraph(props: PropagatorGraphProps) {
     fitView()
   }
 
+  // Handle cell creation
+  function handleCellCreated(cellName: string) {
+    console.log('Cell created:', cellName)
+    props.onRefresh?.()
+  }
+
+  // Handle propagator creation
+  function handlePropagatorCreated(propagatorName: string) {
+    console.log('Propagator created:', propagatorName)
+    props.onRefresh?.()
+  }
+
+  // Handle node deletion
+  async function handleDeleteNode() {
+    const nodeUri = selectedNode()
+    if (!nodeUri) return
+
+    const node = nodes().find(n => n.id === nodeUri)
+    if (!node) return
+
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete ${node.name}?`)) {
+      return
+    }
+
+    try {
+      // Call the kill endpoint
+      await bl.put(`${nodeUri}/kill`, {}, {})
+
+      // Clear selection
+      setSelectedNode(null)
+
+      // Refresh the graph
+      props.onRefresh?.()
+    } catch (err) {
+      console.error('Failed to delete node:', err)
+      alert(`Failed to delete ${node.name}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    }
+  }
+
   // Setup event listeners
   createEffect(() => {
     window.addEventListener('mouseup', handleMouseUp)
@@ -366,6 +461,9 @@ export default function PropagatorGraph(props: PropagatorGraphProps) {
         onZoomOut={zoomOut}
         onFitView={fitView}
         onAutoLayout={autoLayout}
+        onAddCell={handleCellCreated}
+        onAddPropagator={handlePropagatorCreated}
+        onDelete={handleDeleteNode}
         hasSelection={!!selectedNode()}
       />
 
@@ -397,19 +495,35 @@ export default function PropagatorGraph(props: PropagatorGraphProps) {
             {(edge) => {
               const fromNode = nodes().find(n => n.id === edge.from)
               const toNode = nodes().find(n => n.id === edge.to)
-              if (!fromNode || !toNode) return null
+              if (!fromNode || !toNode) {
+                console.warn('[PropagatorGraph] Edge missing node:', {
+                  edge,
+                  fromNode: fromNode || `NOT FOUND: ${edge.from}`,
+                  toNode: toNode || `NOT FOUND: ${edge.to}`,
+                  availableNodeIds: nodes().map(n => n.id)
+                })
+                return null
+              }
 
-              const fromPort = fromNode.type === 'cell' ? 'right' : 'right'
-              const toPort = toNode.type === 'propagator' ? 'left' : 'left'
+              // Calculate correct port positions based on node types
+              // CellNode ports are at ±60, PropagatorNode ports are at ±50
+              const fromOffset = fromNode.type === 'cell' ? 60 : 50
+              const toOffset = toNode.type === 'cell' ? 60 : 50
 
-              const path = createEdgePath(
-                fromNode.x,
-                fromNode.y,
-                toNode.x,
-                toNode.y,
-                fromPort,
-                toPort
-              )
+              // Create edge path with correct port positions
+              const startX = fromNode.x + fromOffset
+              const startY = fromNode.y
+              const endX = toNode.x - toOffset
+              const endY = toNode.y
+
+              // Control points for smooth bezier
+              const dx = endX - startX
+              const cp1x = startX + dx * 0.5
+              const cp1y = startY
+              const cp2x = startX + dx * 0.5
+              const cp2y = endY
+
+              const path = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`
 
               const isFiring = props.firingPropagators?.has(edge.from) ||
                                props.firingPropagators?.has(edge.to)
@@ -504,14 +618,11 @@ export default function PropagatorGraph(props: PropagatorGraphProps) {
         node={selectedNodeData()}
         onClose={() => setSelectedNode(null)}
         onUpdate={(updates) => {
-          // Would update via Bassline API
-          console.log('Update node:', selectedNode(), updates)
+          // Updates are handled by the InspectorPanel itself
+          console.log('Node updated:', selectedNode(), updates)
+          props.onRefresh?.()
         }}
-        onDelete={() => {
-          // Would delete via Bassline API
-          console.log('Delete node:', selectedNode())
-          setSelectedNode(null)
-        }}
+        onDelete={handleDeleteNode}
       />
 
       <style>{`

@@ -13,9 +13,12 @@
     "@bassline/remote-browser": "workspace:*",
     "@bassline/solid": "workspace:*",
     "@solidjs/router": "^0.15.3",
+    "cytoscape": "^3.33.1",
+    "cytoscape-dagre": "^2.5.0",
     "solid-js": "^1.9.3"
   },
   "devDependencies": {
+    "@types/cytoscape": "^3.31.0",
     "vite": "^6.0.3",
     "vite-plugin-solid": "^2.11.0"
   }

@@ -1,5 +1,5 @@
-import { createMemo, Show } from 'solid-js'
-import { PropagatorGraph } from '../graph'
+import { createMemo, createEffect, Show } from 'solid-js'
+import { CytoscapeGraph } from '../graph'
 
 interface GraphViewProps {
   data: any
@@ -10,14 +10,44 @@ interface GraphViewProps {
  * GraphView - Flow diagram visualization
  */
 export default function GraphView(props: GraphViewProps) {
+  // Debug logging
+  createEffect(() => {
+    console.log('[GraphView] props.data:', props.data)
+    console.log('[GraphView] props.valType:', props.valType)
+  })
+  // For recipes, build a map of resource IDs to URIs for resolving ${ref.X} templates
+  const refMap = createMemo(() => {
+    const data = props.data
+    if (!data || props.valType !== 'recipe' || !data.resources) return {}
+
+    const map: Record<string, string> = {}
+    data.resources.forEach((r: any) => {
+      if (r.id) {
+        map[r.id] = r.uri
+      }
+    })
+    return map
+  })
+
+  // Resolve ${ref.X} references to actual URIs
+  function resolveRef(value: string): string {
+    if (!value) return value
+    const match = value.match(/^\$\{ref\.(\w+)\}$/)
+    if (match) {
+      const id = match[1]
+      return refMap()[id] || value
+    }
+    return value
+  }
+
   // Extract cells and propagators from the data
   const cells = createMemo(() => {
     const data = props.data
     if (!data) return []
 
     // For recipes, extract from resources
-    if (props.valType === 'recipe' && data.body?.resources) {
-      return data.body.resources
+    if (props.valType === 'recipe' && data.resources) {
+      return data.resources
         .filter((r: any) => r.body?.lattice)
         .map((r: any) => ({
           uri: r.uri,
@@ -27,9 +57,9 @@ export default function GraphView(props: GraphViewProps) {
     }
 
     // For propagators, extract input/output cells
-    if (props.valType === 'propagator' && data.body) {
-      const inputs = data.body.inputs || []
-      const output = data.body.output
+    if (props.valType === 'propagator') {
+      const inputs = data.inputs || []
+      const output = data.output
       const all = [...inputs, output].filter(Boolean)
 
       return all.map((uri: string) => ({
@@ -43,8 +73,8 @@ export default function GraphView(props: GraphViewProps) {
     if (props.valType === 'cell') {
       return [{
         uri: data.uri || 'bl:///cells/current',
-        lattice: data.body?.lattice || data.headers?.lattice || 'lww',
-        value: data.body?.value
+        lattice: data.lattice || 'lww',
+        value: data.value
       }]
     }
 
@@ -56,24 +86,25 @@ export default function GraphView(props: GraphViewProps) {
     if (!data) return []
 
     // For recipes, extract propagators from resources
-    if (props.valType === 'recipe' && data.body?.resources) {
-      return data.body.resources
+    if (props.valType === 'recipe' && data.resources) {
+      return data.resources
         .filter((r: any) => r.body?.inputs && r.body?.output)
         .map((r: any) => ({
           uri: r.uri,
-          inputs: r.body.inputs,
-          output: r.body.output,
+          // Resolve ${ref.X} references to actual URIs
+          inputs: (r.body.inputs || []).map((input: string) => resolveRef(input)),
+          output: resolveRef(r.body.output),
           handler: r.body.handler
         }))
     }
 
     // For propagators, use the propagator itself
-    if (props.valType === 'propagator' && data.body) {
+    if (props.valType === 'propagator') {
       return [{
-        uri: data.uri || 'bl:///propagators/current',
-        inputs: data.body.inputs || [],
-        output: data.body.output,
-        handler: data.body.handler
+        uri: 'bl:///propagators/current',
+        inputs: data.inputs || [],
+        output: data.output,
+        handler: data.handler
       }]
     }
 
@@ -82,6 +113,13 @@ export default function GraphView(props: GraphViewProps) {
 
   // Check if we have something to show
   const hasGraph = createMemo(() => cells().length > 0 || propagators().length > 0)
+
+  // Debug logging for extracted data
+  createEffect(() => {
+    console.log('[GraphView] cells:', cells())
+    console.log('[GraphView] propagators:', propagators())
+    console.log('[GraphView] hasGraph:', hasGraph())
+  })
 
   return (
     <div class="graph-view">
@@ -98,7 +136,7 @@ export default function GraphView(props: GraphViewProps) {
           <p>This val type doesn't have a flow diagram.</p>
         </div>
       }>
-        <PropagatorGraph
+        <CytoscapeGraph
           cells={cells()}
           propagators={propagators()}
         />
