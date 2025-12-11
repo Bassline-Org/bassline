@@ -112,6 +112,25 @@ export const TYPES = {
       state: { type: 'string', description: 'Instance state (active, deleted)' },
       createdAt: { type: 'string', description: 'Creation timestamp' }
     }
+  },
+  handler: {
+    name: 'Handler',
+    description: 'A named function for transforming values in propagators',
+    schema: {
+      name: { type: 'string', description: 'Handler name' },
+      builtin: { type: 'boolean', description: 'Whether this is a built-in handler' },
+      description: { type: 'string', description: 'Handler description' },
+      createdAt: { type: 'string', description: 'Creation timestamp (null for built-in)' },
+      entries: { type: 'array', description: 'Sub-resources (definition, docs)' }
+    }
+  },
+  'handler-definition': {
+    name: 'Handler Definition',
+    description: 'How a handler is implemented',
+    schema: {
+      type: { type: 'string', description: 'builtin or composed' },
+      definition: { type: 'array', description: 'Hiccup-style definition [handler, config?, ...args]' }
+    }
   }
 }
 

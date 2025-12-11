@@ -213,23 +213,14 @@ await bl.put('bl:///propagators/add', {}, {
 })
 ```
 
-Built-in handlers:
-- **Basic**: `sum`, `product`, `passthrough`, `constant`
-- **Reducers**: `min`, `max`, `average`, `concat`, `first`, `last`
-- **Structural**: `pair` (tuple), `zip` (named object), `unzip` (extract key)
-- **Transformers**: `map` (apply handler to collection), `pick`, `format`, `coerce`
-- **Predicates**: `filter`, `when` (skip propagation if predicate fails)
-- **Composition**: `compose` (chain handlers)
-- **Arithmetic**: `negate`, `abs`, `round`, `floor`, `ceil`, `subtract`, `divide`, `modulo`, `power`
-- **Comparison**: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`
-- **Logic**: `and`, `or`, `not`, `xor`
-- **String**: `split`, `join`, `trim`, `uppercase`, `lowercase`, `strSlice`, `replace`, `match`, `startsWith`, `endsWith`, `includes`
-- **Array**: `length`, `at`, `head`, `tail`, `init`, `reverse`, `sort`, `sortBy`, `unique`, `flatten`, `compact`, `take`, `drop`, `chunk`
-- **Array Reducers**: `sumBy`, `countBy`, `groupBy`, `indexBy`, `minBy`, `maxBy`
-- **Object**: `keys`, `values`, `entries`, `fromEntries`, `get`, `has`, `omit`, `defaults`, `merge`
-- **Type Checking**: `isNull`, `isNumber`, `isString`, `isArray`, `isObject`, `typeOf`
-- **Conditional**: `when`, `ifElse`, `cond`
-- **Utility**: `identity`, `always`, `tap`, `defaultTo`
+Handlers are provided by `@bassline/handlers` (110 built-in). See [packages/handlers/README.md](packages/handlers/README.md) for the full list.
+
+Common handlers:
+- **Reducers**: `sum`, `product`, `min`, `max`, `average`
+- **Structural**: `pair`, `zip`, `unzip`, `pick`
+- **Transformers**: `map`, `format`, `coerce`
+- **Predicates**: `filter`, `when`, `ifElse`, `cond`
+- **Combinators**: `pipe`, `fork`, `hook`, `converge`
 
 Example with config:
 ```javascript
@@ -486,7 +477,8 @@ packages/plumber/        # Rule-based message routing
 packages/links/          # Bidirectional ref tracking
 packages/types/          # Built-in type definitions
 packages/cells/          # Lattice-based cells
-packages/propagators/    # Reactive propagators
+packages/handlers/       # Handler registry and combinators
+packages/propagators/    # Reactive propagators (uses handlers)
 packages/timers/         # Time-based event dispatch
 packages/fetch/          # HTTP requests
 packages/monitors/       # URL polling (Timer + Fetch + Cell)
@@ -578,13 +570,15 @@ Module dependency order:
 5. `file-store` - persistence
 6. `http-server` - HTTP API
 7. `ws-server` - WebSocket (uses plumber)
-8. `propagators` - reactive computation
-9. `cells` - lattice values (uses propagators, plumber)
-10. `dashboard` - activity tracking (uses plumber)
-11. `timers` - time-based events (uses plumber)
-12. `fetch` - HTTP requests (uses plumber)
-13. `monitors` - URL polling (uses timers, cells, plumber)
-14. `claude` - Claude API (optional, requires ANTHROPIC_API_KEY)
+8. `handlers` - handler registry and combinators
+9. `propagators` - reactive computation (uses handlers)
+10. `cells` - lattice values (uses propagators, plumber)
+11. `dashboard` - activity tracking (uses plumber)
+12. `timers` - time-based events (uses plumber)
+13. `fetch` - HTTP requests (uses plumber)
+14. `monitors` - URL polling (uses timers, cells, plumber)
+15. `recipes` - template-based resource composition
+16. `claude` - Claude API (optional, requires ANTHROPIC_API_KEY)
 
 ## MCP Server
 
