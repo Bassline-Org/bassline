@@ -1,4 +1,4 @@
-import { createMemo, createEffect, Show } from 'solid-js'
+import { createMemo, Show } from 'solid-js'
 import { CytoscapeGraph } from '../graph'
 
 interface GraphViewProps {
@@ -10,11 +10,6 @@ interface GraphViewProps {
  * GraphView - Flow diagram visualization
  */
 export default function GraphView(props: GraphViewProps) {
-  // Debug logging
-  createEffect(() => {
-    console.log('[GraphView] props.data:', props.data)
-    console.log('[GraphView] props.valType:', props.valType)
-  })
   // For recipes, build a map of resource IDs to URIs for resolving ${ref.X} templates
   const refMap = createMemo(() => {
     const data = props.data
@@ -113,13 +108,6 @@ export default function GraphView(props: GraphViewProps) {
 
   // Check if we have something to show
   const hasGraph = createMemo(() => cells().length > 0 || propagators().length > 0)
-
-  // Debug logging for extracted data
-  createEffect(() => {
-    console.log('[GraphView] cells:', cells())
-    console.log('[GraphView] propagators:', propagators())
-    console.log('[GraphView] hasGraph:', hasGraph())
-  })
 
   return (
     <div class="graph-view">

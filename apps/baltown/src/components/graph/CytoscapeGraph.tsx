@@ -376,14 +376,12 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
   }
 
   // Handle cell creation
-  function handleCellCreated(cellName: string) {
-    console.log('Cell created:', cellName)
+  function handleCellCreated(_cellName: string) {
     props.onRefresh?.()
   }
 
   // Handle propagator creation
-  function handlePropagatorCreated(propagatorName: string) {
-    console.log('Propagator created:', propagatorName)
+  function handlePropagatorCreated(_propagatorName: string) {
     props.onRefresh?.()
   }
 
@@ -425,10 +423,7 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
       <InspectorPanel
         node={selectedNode()}
         onClose={() => setSelectedNode(null)}
-        onUpdate={(updates) => {
-          console.log('Node updated:', selectedNode()?.uri, updates)
-          props.onRefresh?.()
-        }}
+        onUpdate={() => props.onRefresh?.()}
         onDelete={handleDeleteNode}
       />
 
