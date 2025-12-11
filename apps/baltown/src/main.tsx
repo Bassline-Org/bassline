@@ -4,6 +4,7 @@ import { Router, Route } from '@solidjs/router'
 import { Bassline } from '@bassline/core'
 import { createRemoteRoutes } from '@bassline/remote-browser'
 import { BasslineProvider, WebSocketProvider } from '@bassline/solid'
+import { ToastProvider } from './context/ToastContext'
 import Layout from './Layout'
 import Home from './pages/Home'
 import Browse from './pages/Browse'
@@ -12,6 +13,7 @@ import ValView from './pages/ValView'
 import VersionHistory from './pages/VersionHistory'
 import Cells from './pages/Cells'
 import TemplateGallery from './pages/templates/TemplateGallery'
+import Plugboard from './pages/Plugboard'
 
 // Configuration
 const WS_PORT = 9112
@@ -31,17 +33,20 @@ bl.put('bl:///remote/ws/daemon', {}, {
 render(() => (
   <WebSocketProvider url={WS_URL}>
     <BasslineProvider value={bl}>
-      <Router root={Layout}>
-        <Route path="/" component={Home} />
-        <Route path="/browse" component={Browse} />
-        <Route path="/compose" component={Compose} />
-        <Route path="/compose/:type" component={Compose} />
-        <Route path="/v/:owner/:name" component={ValView} />
-        <Route path="/v/:owner/:name/edit" component={Compose} />
-        <Route path="/v/:owner/:name/versions" component={VersionHistory} />
-        <Route path="/cells" component={Cells} />
-        <Route path="/templates" component={TemplateGallery} />
-      </Router>
+      <ToastProvider>
+        <Router root={Layout}>
+          <Route path="/" component={Home} />
+          <Route path="/browse" component={Browse} />
+          <Route path="/compose" component={Compose} />
+          <Route path="/compose/:type" component={Compose} />
+          <Route path="/v/:owner/:name" component={ValView} />
+          <Route path="/v/:owner/:name/edit" component={Compose} />
+          <Route path="/v/:owner/:name/versions" component={VersionHistory} />
+          <Route path="/cells" component={Cells} />
+          <Route path="/templates" component={TemplateGallery} />
+          <Route path="/plugboard" component={Plugboard} />
+        </Router>
+      </ToastProvider>
     </BasslineProvider>
   </WebSocketProvider>
 ), document.getElementById('root')!)

@@ -29,6 +29,10 @@ export function createPlumber() {
   const rules = new Map()
   /** @type {Map<string, Set<function>>} */
   const ports = new Map()
+  /** @type {Array<object>} - Circular buffer for message history */
+  const messageHistory = []
+  const MAX_HISTORY = 50
+  let messageId = 0
 
   /**
    * Add a routing rule
@@ -80,11 +84,40 @@ export function createPlumber() {
    */
   function dispatch(message) {
     const matched = route(message)
-    for (const { rule } of matched) {
+    const matchedRules = []
+    const dispatchedPorts = []
+
+    for (const { name, rule } of matched) {
+      matchedRules.push(name)
       const listeners = ports.get(rule.port)
-      if (listeners) {
+      if (listeners && listeners.size > 0) {
+        dispatchedPorts.push(rule.port)
         for (const cb of listeners) {
           cb(message)
+        }
+      }
+    }
+
+    // Log to history if any rules matched
+    if (matchedRules.length > 0) {
+      const entry = {
+        id: ++messageId,
+        timestamp: new Date().toISOString(),
+        uri: message.uri,
+        type: message.headers?.type,
+        matchedRules,
+        dispatchedPorts
+      }
+      messageHistory.push(entry)
+      if (messageHistory.length > MAX_HISTORY) {
+        messageHistory.shift()
+      }
+
+      // Broadcast to plumb-flow port for live visualization
+      const flowListeners = ports.get('plumb-flow')
+      if (flowListeners && flowListeners.size > 0) {
+        for (const cb of flowListeners) {
+          cb(entry)
         }
       }
     }
@@ -104,6 +137,42 @@ export function createPlumber() {
   }
 
   const plumbRoutes = routes('/plumb', r => {
+    // Get message history for visualization
+    r.get('/history', () => ({
+      headers: { type: 'bl:///types/plumb-history' },
+      body: {
+        entries: [...messageHistory],
+        count: messageHistory.length,
+        maxHistory: MAX_HISTORY
+      }
+    }))
+
+    // Get plumber state for introspection/visualization
+    r.get('/state', () => ({
+      headers: { type: 'bl:///types/plumb-state' },
+      body: {
+        rules: [...rules.entries()].map(([name, rule]) => ({
+          name,
+          match: rule.match,
+          port: rule.port,
+          uri: `bl:///plumb/rules/${name}`
+        })),
+        ports: [...ports.entries()].map(([name, listeners]) => ({
+          name,
+          listenerCount: listeners.size
+        })),
+        // Known sources that dispatch to plumber
+        sources: [
+          { type: 'cells', events: ['cell-value', 'resource-removed', 'contradiction'] },
+          { type: 'timers', events: ['timer-tick'] },
+          { type: 'fetch', events: ['fetch-response', 'fetch-error'] },
+          { type: 'monitors', events: ['monitor-update', 'monitor-error'] },
+          { type: 'recipes', events: ['recipe-saved', 'instance-created'] },
+          { type: 'propagators', events: ['propagator-fired'] }
+        ]
+      }
+    }))
+
     // List all rules
     r.get('/rules', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -157,6 +226,7 @@ export function createPlumber() {
     install,
     // Expose internals for debugging
     _rules: rules,
-    _ports: ports
+    _ports: ports,
+    _messageHistory: messageHistory
   }
 }

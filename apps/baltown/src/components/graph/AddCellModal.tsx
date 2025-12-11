@@ -1,5 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 import { useBassline } from '@bassline/solid'
+import { useToast } from '../../context/ToastContext'
 
 interface AddCellModalProps {
   isOpen: boolean
@@ -20,6 +21,7 @@ const LATTICE_TYPES = [
 
 export default function AddCellModal(props: AddCellModalProps) {
   const bl = useBassline()
+  const { toast } = useToast()
 
   const [cellName, setCellName] = createSignal('')
   const [latticeType, setLatticeType] = createSignal('lww')
@@ -29,13 +31,13 @@ export default function AddCellModal(props: AddCellModalProps) {
   const handleCreate = async () => {
     const name = cellName().trim()
     if (!name) {
-      setError('Cell name is required')
+      toast.error('Cell name is required')
       return
     }
 
     // Validate name (alphanumeric, hyphens, underscores)
     if (!/^[a-z0-9_-]+$/i.test(name)) {
-      setError('Cell name must contain only letters, numbers, hyphens, and underscores')
+      toast.error('Cell name must contain only letters, numbers, hyphens, and underscores')
       return
     }
 
@@ -44,9 +46,11 @@ export default function AddCellModal(props: AddCellModalProps) {
 
     try {
       await bl.put(`bl:///r/cells/${name}`, {}, { lattice: latticeType() })
+      toast.success(`Cell "${name}" created`)
       props.onSuccess?.(name)
       handleClose()
     } catch (err: any) {
+      toast.error(err.message || 'Failed to create cell')
       setError(err.message || 'Failed to create cell')
     } finally {
       setCreating(false)

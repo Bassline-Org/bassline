@@ -3,8 +3,7 @@ import { Show, For, createSignal, Switch, Match } from 'solid-js'
 import { useBassline, useResource } from '@bassline/solid'
 import ForkTree from '../components/ForkTree'
 import { ExportButton } from '../components/ImportExport'
-import { ViewTabs, SourceView, GraphView, UsageView } from '../components/views'
-import { InstanceDashboard } from '../components/dashboard'
+import { ViewTabs, SourceView, GraphView, UsageView, InstancesView } from '../components/views'
 
 export default function ValView() {
   const params = useParams()
@@ -275,8 +274,8 @@ export default function ValView() {
 
             {/* Instances View - for recipes */}
             <Show when={currentView() === 'instances' && val().valType === 'recipe'}>
-              <InstanceDashboard
-                instanceUri={`bl:///vals/${params.owner}/${params.name}`}
+              <InstancesView
+                valUri={`bl:///r/vals/${params.owner}/${params.name}`}
               />
             </Show>
           </div>

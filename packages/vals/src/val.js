@@ -252,6 +252,9 @@ export function createValRoutes(options = {}) {
       params
     )
 
+    // Add source val reference for querying
+    instance.sourceVal = `bl:///vals/${owner}/${name}`
+
     // Clean up temporary recipe
     bl._recipes.deleteRecipe(recipeName)
 
@@ -403,6 +406,35 @@ export function createValRoutes(options = {}) {
             type: 'val'
           }))
         }
+      }
+    })
+
+    // Get instances of this val (recipe vals only)
+    r.get('/:owner/:name/instances', async ({ params }) => {
+      const val = getVal(params.owner, params.name)
+      if (!val) return null
+
+      // Find instances that match this val's sourceVal
+      const instances = []
+      if (bl._recipes && bl._recipes._instanceStore) {
+        const sourceVal = `bl:///vals/${params.owner}/${params.name}`
+        for (const [instanceName, instance] of bl._recipes._instanceStore) {
+          if (instance.sourceVal === sourceVal) {
+            instances.push({
+              name: instanceName,
+              uri: `bl:///instances/${instanceName}`,
+              type: 'instance',
+              state: instance.state,
+              resourceCount: instance.createdResources?.length || 0,
+              createdAt: instance.createdAt
+            })
+          }
+        }
+      }
+
+      return {
+        headers: { type: 'bl:///types/directory' },
+        body: { entries: instances }
       }
     })
 

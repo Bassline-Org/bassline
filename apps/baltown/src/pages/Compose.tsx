@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from '@solidjs/router'
 import { createSignal, createMemo, Show, For, onMount } from 'solid-js'
 import { useBassline, useResource } from '@bassline/solid'
+import { useToast } from '../context/ToastContext'
 import HandlerPicker from '../components/HandlerPicker'
 import HiccupComposer, { createEmptyComposition } from '../components/HiccupComposer'
 import RecipeEditor, { createEmptyRecipe } from '../components/RecipeEditor'
@@ -13,6 +14,7 @@ export default function Compose() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const bl = useBassline()
+  const { toast } = useToast()
 
   // Form state
   const [name, setName] = createSignal('')
@@ -149,7 +151,7 @@ export default function Compose() {
   // Save val
   async function handleSave() {
     if (!name()) {
-      setError('Name is required')
+      toast.error('Name is required')
       return
     }
 
@@ -164,8 +166,10 @@ export default function Compose() {
         tags: tags().split(',').map(t => t.trim()).filter(Boolean)
       })
 
+      toast.success(`Val "${name()}" saved!`)
       navigate(`/v/${owner()}/${name()}`)
-    } catch (err) {
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save')
       setError(err.message)
     } finally {
       setSaving(false)

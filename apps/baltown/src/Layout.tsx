@@ -54,6 +54,10 @@ export default function Layout(props: ParentProps) {
               <A href="/browse?resource=propagators">Propagators</A>
               <A href="/browse?resource=handlers">Handlers</A>
             </div>
+            <div class="sidebar-section">
+              <h3>System</h3>
+              <A href="/plugboard">Plugboard</A>
+            </div>
           </aside>
         </Show>
 
