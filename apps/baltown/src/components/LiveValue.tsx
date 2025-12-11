@@ -1,4 +1,4 @@
-import { Show, createMemo } from 'solid-js'
+import { Show, createMemo, createSignal, createEffect, on } from 'solid-js'
 import { useLiveResource } from '@bassline/solid'
 
 interface LiveValueProps {
@@ -12,9 +12,12 @@ interface LiveValueProps {
  * LiveValue - Display a cell's value with real-time updates
  *
  * Uses WebSocket subscription to receive live updates when the cell changes.
+ * Shows a pulse animation when values change.
  */
 export default function LiveValue(props: LiveValueProps) {
   const { data, loading, error, isLive } = useLiveResource(() => props.uri)
+  const [hasChanged, setHasChanged] = createSignal(false)
+  let previousValue: any = undefined
 
   // Extract value - handle both cell format and raw value
   const value = createMemo(() => {
@@ -28,6 +31,19 @@ export default function LiveValue(props: LiveValueProps) {
 
     return d
   })
+
+  // Detect value changes and trigger pulse animation
+  createEffect(on(value, (newValue) => {
+    const newStr = JSON.stringify(newValue)
+    const prevStr = JSON.stringify(previousValue)
+
+    if (previousValue !== undefined && newStr !== prevStr) {
+      setHasChanged(true)
+      // Remove the changed class after animation completes
+      setTimeout(() => setHasChanged(false), 600)
+    }
+    previousValue = newValue
+  }, { defer: true }))
 
   // Format value for display
   const displayValue = createMemo(() => {
@@ -71,7 +87,7 @@ export default function LiveValue(props: LiveValueProps) {
       </Show>
 
       <Show when={!loading() && !error()}>
-        <div class={`live-value-content type-${valueType()}`}>
+        <div class={`live-value-content type-${valueType()} ${hasChanged() ? 'value-changed' : ''}`}>
           <Show when={valueType() === 'object' || valueType() === 'array'}>
             <pre class="live-value-json">{displayValue()}</pre>
           </Show>
@@ -181,6 +197,27 @@ export default function LiveValue(props: LiveValueProps) {
         .type-null .live-value-primitive {
           color: #8b949e;
           font-style: italic;
+        }
+
+        /* Value change pulse animation */
+        .value-changed {
+          animation: value-pulse 0.6s ease-out;
+        }
+
+        @keyframes value-pulse {
+          0% {
+            background: rgba(88, 166, 255, 0.4);
+            box-shadow: 0 0 8px rgba(88, 166, 255, 0.6);
+          }
+          100% {
+            background: transparent;
+            box-shadow: none;
+          }
+        }
+
+        .live-value-content {
+          transition: background 0.3s ease;
+          border-radius: 4px;
         }
       `}</style>
     </div>

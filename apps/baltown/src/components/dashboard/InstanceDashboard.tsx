@@ -49,12 +49,25 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
     if (!d) return null
 
     const body = d.body ?? d
+
+    // Parse createdResources into cells and propagators by URI pattern
+    // Backend returns createdResources array, UI expects separate cells/propagators
+    const resources = body.createdResources ?? []
+    const cells = (body.cells ?? resources.filter((r: any) => r.uri?.includes('/cells/'))).map((r: any) => ({
+      id: r.id ?? r.uri?.split('/').pop() ?? 'cell',
+      uri: r.uri
+    }))
+    const propagators = (body.propagators ?? resources.filter((r: any) => r.uri?.includes('/propagators/'))).map((r: any) => ({
+      id: r.id ?? r.uri?.split('/').pop() ?? 'propagator',
+      uri: r.uri
+    }))
+
     return {
       name: body.name ?? props.instanceUri.split('/').pop() ?? 'instance',
       recipe: body.recipe ?? '',
       params: body.params ?? {},
-      cells: body.cells ?? [],
-      propagators: body.propagators ?? [],
+      cells,
+      propagators,
       createdAt: body.createdAt ?? d.headers?.createdAt,
       status: body.status ?? 'active'
     }

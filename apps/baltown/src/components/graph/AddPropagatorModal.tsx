@@ -1,5 +1,6 @@
 import { createSignal, createMemo, Show, For } from 'solid-js'
 import { useBassline, useResource } from '@bassline/solid'
+import { useToast } from '../../context/ToastContext'
 
 interface AddPropagatorModalProps {
   isOpen: boolean
@@ -28,6 +29,7 @@ const SIMPLE_HANDLERS = [
 
 export default function AddPropagatorModal(props: AddPropagatorModalProps) {
   const bl = useBassline()
+  const { toast } = useToast()
   const { data: cellsData } = useResource(() => 'bl:///r/cells')
 
   const [propagatorName, setPropagatorName] = createSignal('')
@@ -58,26 +60,26 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
   const handleCreate = async () => {
     const name = propagatorName().trim()
     if (!name) {
-      setError('Propagator name is required')
+      toast.error('Propagator name is required')
       return
     }
 
     // Validate name
     if (!/^[a-z0-9_-]+$/i.test(name)) {
-      setError('Name must contain only letters, numbers, hyphens, and underscores')
+      toast.error('Name must contain only letters, numbers, hyphens, and underscores')
       return
     }
 
     // Filter out empty input cells
     const inputs = inputCells().filter(c => c.trim()).map(c => `bl:///r/cells/${c.trim()}`)
     if (inputs.length === 0) {
-      setError('At least one input cell is required')
+      toast.error('At least one input cell is required')
       return
     }
 
     const output = outputCell().trim()
     if (!output) {
-      setError('Output cell is required')
+      toast.error('Output cell is required')
       return
     }
 
@@ -90,9 +92,11 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
         output: `bl:///r/cells/${output}`,
         handler: handler()
       })
+      toast.success(`Propagator "${name}" created`)
       props.onSuccess?.(name)
       handleClose()
     } catch (err: any) {
+      toast.error(err.message || 'Failed to create propagator')
       setError(err.message || 'Failed to create propagator')
     } finally {
       setCreating(false)
