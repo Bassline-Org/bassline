@@ -1,8 +1,10 @@
-import { Show } from 'solid-js'
+import { Show, createSignal } from 'solid-js'
+import AddCellModal from './AddCellModal'
+import AddPropagatorModal from './AddPropagatorModal'
 
 interface GraphToolbarProps {
-  onAddCell?: () => void
-  onAddPropagator?: () => void
+  onAddCell?: (cellName: string) => void
+  onAddPropagator?: (propagatorName: string) => void
   onDelete?: () => void
   onAutoLayout?: () => void
   onZoomIn?: () => void
@@ -17,32 +19,46 @@ interface GraphToolbarProps {
  * GraphToolbar - Controls for the propagator graph
  */
 export default function GraphToolbar(props: GraphToolbarProps) {
-  return (
-    <div class="graph-toolbar">
-      <div class="toolbar-group">
-        <button
-          class="toolbar-btn"
-          onClick={() => props.onAddCell?.()}
-          title="Add Cell"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="4" y="4" width="16" height="16" rx="2"/>
-            <path d="M12 8v8M8 12h8"/>
-          </svg>
-          <span>Cell</span>
-        </button>
+  const [showAddCellModal, setShowAddCellModal] = createSignal(false)
+  const [showAddPropagatorModal, setShowAddPropagatorModal] = createSignal(false)
 
-        <button
-          class="toolbar-btn"
-          onClick={() => props.onAddPropagator?.()}
-          title="Add Propagator"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 12h4l3-9 6 18 3-9h4"/>
-          </svg>
-          <span>Propagator</span>
-        </button>
-      </div>
+  const handleCellCreated = (cellName: string) => {
+    setShowAddCellModal(false)
+    props.onAddCell?.(cellName)
+  }
+
+  const handlePropagatorCreated = (propagatorName: string) => {
+    setShowAddPropagatorModal(false)
+    props.onAddPropagator?.(propagatorName)
+  }
+
+  return (
+    <>
+      <div class="graph-toolbar">
+        <div class="toolbar-group">
+          <button
+            class="toolbar-btn"
+            onClick={() => setShowAddCellModal(true)}
+            title="Add Cell"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+              <path d="M12 8v8M8 12h8"/>
+            </svg>
+            <span>Cell</span>
+          </button>
+
+          <button
+            class="toolbar-btn"
+            onClick={() => setShowAddPropagatorModal(true)}
+            title="Add Propagator"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 12h4l3-9 6 18 3-9h4"/>
+            </svg>
+            <span>Propagator</span>
+          </button>
+        </div>
 
       <div class="toolbar-divider" />
 
@@ -202,6 +218,19 @@ export default function GraphToolbar(props: GraphToolbarProps) {
           text-align: center;
         }
       `}</style>
-    </div>
+      </div>
+
+      <AddCellModal
+        isOpen={showAddCellModal()}
+        onClose={() => setShowAddCellModal(false)}
+        onSuccess={handleCellCreated}
+      />
+
+      <AddPropagatorModal
+        isOpen={showAddPropagatorModal()}
+        onClose={() => setShowAddPropagatorModal(false)}
+        onSuccess={handlePropagatorCreated}
+      />
+    </>
   )
 }

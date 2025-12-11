@@ -18,7 +18,30 @@ export default function ValView() {
   const [forking, setForking] = createSignal(false)
   const [instantiating, setInstantiating] = createSignal(false)
   const [instanceName, setInstanceName] = createSignal('')
-  const [instanceParams, setInstanceParams] = createSignal('{}')
+  const [instanceParamValues, setInstanceParamValues] = createSignal<Record<string, string>>({})
+  const [instantiateError, setInstantiateError] = createSignal('')
+
+  // Helper to update a single parameter value
+  function updateParamValue(key: string, value: string) {
+    setInstanceParamValues(prev => ({ ...prev, [key]: value }))
+  }
+
+  // Build params object from individual values
+  function getParamsObject(): Record<string, any> {
+    const values = instanceParamValues()
+    const result: Record<string, any> = {}
+    for (const [key, value] of Object.entries(values)) {
+      if (value.trim()) {
+        // Try to parse as JSON, fallback to string
+        try {
+          result[key] = JSON.parse(value)
+        } catch {
+          result[key] = value
+        }
+      }
+    }
+    return result
+  }
 
   // Current view tab
   const currentView = () => searchParams.view || 'overview'
@@ -42,18 +65,38 @@ export default function ValView() {
   // Instantiate a recipe val
   async function handleInstantiate() {
     setInstantiating(true)
-    try {
-      let parsedParams = {}
-      try { parsedParams = JSON.parse(instanceParams()) } catch {}
+    setInstantiateError('')
 
-      await bl.put(`${valUri()}/instantiate`, {}, {
+    // Check required params
+    const recipeParams = val()?.definition?.params || {}
+    const values = getParamsObject()
+    const missingRequired = Object.entries(recipeParams)
+      .filter(([key, config]: [string, any]) => config.required && !values[key])
+      .map(([key]) => key)
+
+    if (missingRequired.length > 0) {
+      setInstantiateError(`Missing required parameters: ${missingRequired.join(', ')}`)
+      setInstantiating(false)
+      return
+    }
+
+    try {
+      const result = await bl.put(`${valUri()}/instantiate`, {}, {
         instanceName: instanceName() || `${params.name}-instance`,
-        params: parsedParams
+        params: values
       })
 
-      refetch()
-    } catch (err) {
-      console.error('Instantiate failed:', err)
+      // Check for error response
+      if (result?.headers?.type === 'bl:///types/error') {
+        setInstantiateError(result.body?.error || 'Unknown error')
+      } else {
+        // Clear form and refresh
+        setInstanceName('')
+        setInstanceParamValues({})
+        refetch()
+      }
+    } catch (err: any) {
+      setInstantiateError(err.message || 'Failed to create instance')
     } finally {
       setInstantiating(false)
     }
@@ -152,21 +195,34 @@ export default function ValView() {
                     </div>
 
                     <Show when={Object.keys(val().definition?.params || {}).length > 0}>
-                      <div class="form-group">
-                        <label class="form-label">Parameters (JSON)</label>
-                        <textarea
-                          class="form-textarea"
-                          placeholder='{}'
-                          value={instanceParams()}
-                          onInput={(e) => setInstanceParams(e.currentTarget.value)}
-                        />
-                        <div class="param-hints">
-                          Required: {Object.entries(val().definition?.params || {})
-                            .filter(([_, v]: [string, any]) => v.required)
-                            .map(([k]) => k)
-                            .join(', ') || 'none'}
-                        </div>
+                      <div class="param-fields">
+                        <For each={Object.entries(val().definition?.params || {})}>
+                          {([key, config]: [string, any]) => (
+                            <div class="form-group">
+                              <label class="form-label">
+                                {key}
+                                <Show when={config.required}>
+                                  <span class="required-marker">*</span>
+                                </Show>
+                              </label>
+                              <input
+                                type="text"
+                                class="form-input"
+                                placeholder={config.description || `Enter ${key}`}
+                                value={instanceParamValues()[key] || ''}
+                                onInput={(e) => updateParamValue(key, e.currentTarget.value)}
+                              />
+                              <Show when={config.description}>
+                                <div class="param-description">{config.description}</div>
+                              </Show>
+                            </div>
+                          )}
+                        </For>
                       </div>
+                    </Show>
+
+                    <Show when={instantiateError()}>
+                      <div class="error-message">{instantiateError()}</div>
                     </Show>
 
                     <button
@@ -204,10 +260,10 @@ export default function ValView() {
               />
             </Show>
 
-            {/* Graph View - for propagators */}
-            <Show when={currentView() === 'graph' && val().valType === 'propagator'}>
+            {/* Graph View - for propagators and recipes */}
+            <Show when={currentView() === 'graph' && (val().valType === 'propagator' || val().valType === 'recipe')}>
               <GraphView
-                data={{ body: val().definition, uri: `bl:///vals/${params.owner}/${params.name}` }}
+                data={val().definition}
                 valType={val().valType}
               />
             </Show>
@@ -391,10 +447,32 @@ export default function ValView() {
           background: #21262d;
         }
 
-        .param-hints {
+        .param-fields {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+
+        .required-marker {
+          color: #f85149;
+          margin-left: 4px;
+        }
+
+        .param-description {
           font-size: 12px;
           color: #8b949e;
           margin-top: 4px;
+        }
+
+        .error-message {
+          background: #f8514922;
+          border: 1px solid #f85149;
+          border-radius: 6px;
+          padding: 12px;
+          color: #f85149;
+          font-size: 13px;
+          margin-bottom: 16px;
         }
       `}</style>
     </div>

@@ -20,9 +20,17 @@ export default function CounterControl(props: CounterControlProps) {
   const [updating, setUpdating] = createSignal(false)
   const [lastChange, setLastChange] = createSignal<number | null>(null)
 
+  // Ensure value is a number (defensive against objects being passed)
+  const safeValue = () => {
+    const v = props.value
+    if (typeof v === 'number') return v
+    if (typeof v === 'string') return parseFloat(v) || 0
+    return 0
+  }
+
   // Track value history
   createEffect(() => {
-    const val = props.value
+    const val = safeValue()
     if (val !== undefined && val !== null) {
       setHistory(prev => {
         const newHistory = [...prev, val].slice(-20)
@@ -74,7 +82,7 @@ export default function CounterControl(props: CounterControlProps) {
 
       <div class="counter-display">
         <span class={`counter-value ${lastChange() ? 'animate-bump' : ''}`}>
-          {props.value ?? 0}
+          {safeValue()}
         </span>
         <Show when={lastChange()}>
           <span class="counter-delta">+{lastChange()}</span>

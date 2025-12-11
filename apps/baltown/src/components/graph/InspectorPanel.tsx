@@ -1,4 +1,5 @@
-import { Show, For, createMemo } from 'solid-js'
+import { Show, For, createMemo, createSignal } from 'solid-js'
+import { useBassline } from '@bassline/solid'
 import { ConfigDispatcher } from '../handlers'
 
 interface NodeData {
@@ -26,6 +27,12 @@ interface InspectorPanelProps {
  * InspectorPanel - Node detail editing sidebar
  */
 export default function InspectorPanel(props: InspectorPanelProps) {
+  const bl = useBassline()
+
+  // State for operations
+  const [updating, setUpdating] = createSignal(false)
+  const [error, setError] = createSignal<string | null>(null)
+
   // Handler name for propagator
   const handlerName = createMemo(() => {
     const h = props.node?.handler
@@ -54,6 +61,59 @@ export default function InspectorPanel(props: InspectorPanelProps) {
     return String(v)
   })
 
+  // Update cell lattice type
+  async function updateCellLattice(lattice: string) {
+    if (!props.node || props.node.type !== 'cell') return
+
+    setUpdating(true)
+    setError(null)
+
+    try {
+      await bl.put(props.node.uri, {}, { lattice })
+      props.onUpdate?.({ lattice })
+    } catch (err) {
+      console.error('Failed to update cell lattice:', err)
+      setError(`Failed to update lattice: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  // Update propagator handler config
+  async function updatePropagatorConfig(config: any) {
+    if (!props.node || props.node.type !== 'propagator') return
+
+    setUpdating(true)
+    setError(null)
+
+    try {
+      // Build the updated propagator body
+      const body = {
+        inputs: props.node.inputs || [],
+        output: props.node.output,
+        handler: handlerName(),
+        handlerConfig: config
+      }
+
+      await bl.put(props.node.uri, {}, body)
+
+      // Update local state with new handler format
+      const newHandler = [handlerName(), config]
+      props.onUpdate?.({ handler: newHandler })
+    } catch (err) {
+      console.error('Failed to update propagator:', err)
+      setError(`Failed to update propagator: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  // Delete node (cell or propagator)
+  function deleteNode() {
+    // Delegate to parent's delete handler
+    props.onDelete?.()
+  }
+
   return (
     <div class={`inspector-panel ${props.node ? 'open' : ''}`}>
       <Show when={props.node}>
@@ -72,6 +132,22 @@ export default function InspectorPanel(props: InspectorPanelProps) {
         </div>
 
         <div class="inspector-body">
+          {/* Error message */}
+          <Show when={error()}>
+            <div class="error-banner">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4M12 16h.01"/>
+              </svg>
+              <span>{error()}</span>
+              <button class="error-close" onClick={() => setError(null)}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </Show>
+
           {/* URI */}
           <div class="field">
             <label>URI</label>
@@ -92,7 +168,8 @@ export default function InspectorPanel(props: InspectorPanelProps) {
               <label>Lattice Type</label>
               <select
                 value={props.node!.lattice ?? 'lww'}
-                onChange={(e) => props.onUpdate?.({ lattice: e.currentTarget.value })}
+                onChange={(e) => updateCellLattice(e.currentTarget.value)}
+                disabled={updating()}
               >
                 <option value="counter">counter</option>
                 <option value="maxNumber">maxNumber</option>
@@ -125,11 +202,7 @@ export default function InspectorPanel(props: InspectorPanelProps) {
                 <ConfigDispatcher
                   handler={handlerName()}
                   config={handlerConfig()}
-                  onChange={(config) => {
-                    // Update handler with new config
-                    const newHandler = [handlerName(), config]
-                    props.onUpdate?.({ handler: newHandler })
-                  }}
+                  onChange={(config) => updatePropagatorConfig(config)}
                 />
               </div>
             </Show>
@@ -165,7 +238,7 @@ export default function InspectorPanel(props: InspectorPanelProps) {
         </div>
 
         <div class="inspector-footer">
-          <button class="delete-btn" onClick={props.onDelete}>
+          <button class="delete-btn" onClick={deleteNode} disabled={updating()}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
             </svg>
@@ -191,6 +264,44 @@ export default function InspectorPanel(props: InspectorPanelProps) {
 
         .inspector-panel.open {
           right: 0;
+        }
+
+        .error-banner {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px;
+          background: #f8514922;
+          border: 1px solid #f85149;
+          border-radius: 6px;
+          color: #f85149;
+          font-size: 12px;
+          margin-bottom: 16px;
+        }
+
+        .error-banner svg {
+          flex-shrink: 0;
+        }
+
+        .error-banner span {
+          flex: 1;
+          line-height: 1.4;
+        }
+
+        .error-close {
+          background: none;
+          border: none;
+          color: #f85149;
+          cursor: pointer;
+          padding: 2px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .error-close:hover {
+          opacity: 0.8;
         }
 
         .inspector-header {
@@ -299,10 +410,16 @@ export default function InspectorPanel(props: InspectorPanelProps) {
           color: #c9d1d9;
           font-size: 13px;
           outline: none;
+          cursor: pointer;
         }
 
         .field select:focus {
           border-color: #58a6ff;
+        }
+
+        .field select:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .value-display {

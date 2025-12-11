@@ -22,6 +22,7 @@ const DEFAULT_TABS: Record<string, ViewTab[]> = {
   recipe: [
     { id: 'overview', name: 'Overview' },
     { id: 'source', name: 'Source' },
+    { id: 'graph', name: 'Graph' },
     { id: 'instances', name: 'Instances' },
     { id: 'usage', name: 'Usage' }
   ],
