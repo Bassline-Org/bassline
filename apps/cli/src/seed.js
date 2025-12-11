@@ -375,6 +375,92 @@ Assigned to Carol for design exploration.
     ]
   })
 
+  // ═══════════════════════════════════════════════════════════════════
+  // VALS - Resource compositions for baltown
+  // ═══════════════════════════════════════════════════════════════════
+  console.log('\n📦 Vals (Resource Compositions)')
+
+  // Example 1: Simple propagator val - double a number
+  await put('bl:///vals/examples/double', {
+    description: 'Double the input value',
+    valType: 'propagator',
+    definition: {
+      inputs: ['bl:///cells/input'],
+      output: 'bl:///cells/doubled',
+      handler: ['multiply', { value: 2 }]
+    },
+    tags: ['math', 'simple']
+  })
+
+  // Example 2: Handler composition - celsius to fahrenheit
+  await put('bl:///vals/examples/celsius-to-fahrenheit', {
+    description: 'Convert Celsius to Fahrenheit: (C * 9/5) + 32',
+    valType: 'handler',
+    definition: ['pipe',
+      ['multiply', { value: 9 }],
+      ['divide', { value: 5 }],
+      ['add', { value: 32 }]
+    ],
+    tags: ['conversion', 'temperature']
+  })
+
+  // Example 3: Cell val - shared counter
+  await put('bl:///vals/examples/counter-cell', {
+    description: 'A counter cell that only goes up',
+    valType: 'cell',
+    definition: {
+      lattice: 'counter',
+      initial: 0
+    },
+    tags: ['state', 'counter']
+  })
+
+  // Example 4: Recipe val - counter widget template
+  await put('bl:///vals/examples/counter-widget', {
+    description: 'A complete counter widget with value and doubled display',
+    valType: 'recipe',
+    definition: {
+      params: {
+        name: { required: true, description: 'Name for the counter' }
+      },
+      resources: [
+        {
+          id: 'counter',
+          uri: 'bl:///cells/${name}',
+          body: { lattice: 'counter' },
+          init: 0
+        },
+        {
+          id: 'doubled',
+          uri: 'bl:///cells/${name}-doubled',
+          body: { lattice: 'maxNumber' }
+        },
+        {
+          id: 'doubler',
+          uri: 'bl:///propagators/${name}-doubler',
+          body: {
+            inputs: ['${ref.counter}'],
+            output: '${ref.doubled}',
+            handler: ['multiply', { value: 2 }]
+          }
+        }
+      ]
+    },
+    tags: ['widget', 'counter', 'recipe']
+  })
+
+  // Example 5: Propagator val - sum two cells
+  await put('bl:///vals/examples/sum-cells', {
+    description: 'Sum two cell values into a third',
+    valType: 'propagator',
+    definition: {
+      inputs: ['bl:///cells/a', 'bl:///cells/b'],
+      output: 'bl:///cells/sum',
+      handler: 'sum'
+    },
+    tags: ['math', 'aggregation']
+  })
+
   console.log('\n✨ Seeding complete!\n')
   console.log('Try these URIs in the editor:')
   console.log('  bl:///data')
@@ -393,6 +479,10 @@ Assigned to Carol for design exploration.
   console.log('  bl:///monitors/jsonplaceholder')
   console.log('  PUT bl:///monitors/jsonplaceholder/start  (start polling)')
   console.log('  PUT bl:///monitors/jsonplaceholder/fetch  (trigger immediate fetch)')
+  console.log()
+  console.log('Vals (baltown):')
+  console.log('  bl:///vals               (list all vals)')
+  console.log('  http://localhost:5174    (baltown app)')
   console.log()
 }
 

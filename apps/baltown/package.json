@@ -1,0 +1,22 @@
+{
+  "name": "@bassline/baltown",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "@bassline/remote-browser": "workspace:*",
+    "@bassline/solid": "workspace:*",
+    "@solidjs/router": "^0.15.3",
+    "solid-js": "^1.9.3"
+  },
+  "devDependencies": {
+    "vite": "^6.0.3",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}

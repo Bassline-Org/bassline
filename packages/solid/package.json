@@ -1,0 +1,15 @@
+{
+  "name": "@bassline/solid",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.jsx",
+  "exports": {
+    ".": "./src/index.jsx"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.3"
+  },
+  "peerDependencies": {
+    "@bassline/core": "workspace:*"
+  }
+}
