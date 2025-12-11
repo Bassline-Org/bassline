@@ -85,6 +85,11 @@ export default async function bootstrap(bl) {
     path: './packages/monitors/src/upgrade.js'
   })
 
+  // Recipes: template-based resource composition
+  await bl.put('bl:///install/recipes', {}, {
+    path: './packages/recipes/src/upgrade.js'
+  })
+
   // Services: Claude (optional - requires ANTHROPIC_API_KEY)
   if (process.env.ANTHROPIC_API_KEY) {
     await bl.put('bl:///install/claude', {}, {
