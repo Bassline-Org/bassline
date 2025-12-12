@@ -4,6 +4,7 @@
   "description": "Handler registry and combinators for Bassline propagators",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./registry": "./src/registry.js",

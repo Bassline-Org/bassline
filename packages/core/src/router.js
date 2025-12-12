@@ -13,7 +13,6 @@
 
 /**
  * RouterBuilder - Define routes hierarchically with scoped prefixes
- *
  * @example
  * const cellRoutes = new RouterBuilder('/cells/:name')
  * cellRoutes.get('/', (params) => ({ headers: {}, body: 'cell' }))
@@ -22,7 +21,7 @@
  */
 export class RouterBuilder {
   /**
-   * @param {string} [prefix=''] - URL prefix for all routes in this builder
+   * @param {string} [prefix] - URL prefix for all routes in this builder
    */
   constructor(prefix = '') {
     /** @type {string} */
@@ -33,11 +32,9 @@ export class RouterBuilder {
 
   /**
    * Add a route with full config (get and/or put handlers)
-   *
    * @param {string} pattern - Route pattern (relative to prefix). Use '/' for the prefix itself.
    * @param {RouteConfig} config - Route configuration with get/put handlers
    * @returns {this} For chaining
-   *
    * @example
    * router.route('/value', {
    *   get: ({ params }) => ({ headers: {}, body: 42 }),
@@ -52,11 +49,9 @@ export class RouterBuilder {
 
   /**
    * Add a GET-only route
-   *
    * @param {string} pattern - Route pattern (relative to prefix)
    * @param {Handler} handler - GET handler function
    * @returns {this} For chaining
-   *
    * @example
    * router.get('/value', ({ params }) => ({
    *   headers: { type: 'scalar' },
@@ -69,11 +64,9 @@ export class RouterBuilder {
 
   /**
    * Add a PUT-only route
-   *
    * @param {string} pattern - Route pattern (relative to prefix)
    * @param {Handler} handler - PUT handler function
    * @returns {this} For chaining
-   *
    * @example
    * router.put('/write', ({ params, body }) => {
    *   store.save(params.name, body)
@@ -86,11 +79,9 @@ export class RouterBuilder {
 
   /**
    * Create a nested scope with an additional prefix
-   *
    * @param {string} prefix - Additional prefix for nested routes
    * @param {RouterCallback} fn - Callback to define nested routes
    * @returns {this} For chaining
-   *
    * @example
    * router.scope('/posts/:postId', r => {
    *   r.get('/', ({ params }) => ({ headers: {}, body: { postId: params.postId } }))
@@ -106,10 +97,8 @@ export class RouterBuilder {
 
   /**
    * Install all defined routes into a Bassline instance
-   *
    * @param {Bassline} bassline - Bassline instance to install routes into
    * @returns {Bassline} The bassline instance for chaining
-   *
    * @example
    * const bl = new Bassline()
    * router.install(bl)
@@ -124,11 +113,9 @@ export class RouterBuilder {
 
 /**
  * Create a scoped router builder with a prefix
- *
  * @param {string} prefix - URL prefix for all routes
  * @param {RouterCallback} fn - Callback to define routes
  * @returns {RouterBuilder} Router builder with defined routes
- *
  * @example
  * const cellRoutes = routes('/cells/:name', r => {
  *   r.get('/', ({ params }) => ({

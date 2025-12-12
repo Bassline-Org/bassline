@@ -4,6 +4,7 @@
   "description": "Propagators for reactive constraint networks in Bassline",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },

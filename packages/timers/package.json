@@ -4,6 +4,7 @@
   "description": "Timer resources for Bassline - time-based event dispatch through plumber",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },

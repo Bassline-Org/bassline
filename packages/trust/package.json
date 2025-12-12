@@ -4,6 +4,7 @@
   "description": "Trust system for Bassline - local trust computation and capability gating",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./upgrade": "./src/upgrade.js"

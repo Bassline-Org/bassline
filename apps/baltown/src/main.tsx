@@ -14,6 +14,10 @@ import VersionHistory from './pages/VersionHistory'
 import Cells from './pages/Cells'
 import TemplateGallery from './pages/templates/TemplateGallery'
 import Plugboard from './pages/Plugboard'
+import Workbench from './pages/Workbench'
+import ActionTest from './pages/ActionTest'
+import Canvas from './pages/Canvas'
+import EditorTest from './pages/EditorTest'
 
 // Configuration
 const WS_PORT = 9112
@@ -24,29 +28,40 @@ const bl = new Bassline()
 bl.install(createRemoteRoutes())
 
 // Connect to daemon
-bl.put('bl:///remote/ws/daemon', {}, {
-  uri: WS_URL,
-  mount: '/r'  // Access remote resources via bl:///r/*
-})
+bl.put(
+  'bl:///remote/ws/daemon',
+  {},
+  {
+    uri: WS_URL,
+    mount: '/r', // Access remote resources via bl:///r/*
+  }
+)
 
 // Render app
-render(() => (
-  <WebSocketProvider url={WS_URL}>
-    <BasslineProvider value={bl}>
-      <ToastProvider>
-        <Router root={Layout}>
-          <Route path="/" component={Home} />
-          <Route path="/browse" component={Browse} />
-          <Route path="/compose" component={Compose} />
-          <Route path="/compose/:type" component={Compose} />
-          <Route path="/v/:owner/:name" component={ValView} />
-          <Route path="/v/:owner/:name/edit" component={Compose} />
-          <Route path="/v/:owner/:name/versions" component={VersionHistory} />
-          <Route path="/cells" component={Cells} />
-          <Route path="/templates" component={TemplateGallery} />
-          <Route path="/plugboard" component={Plugboard} />
-        </Router>
-      </ToastProvider>
-    </BasslineProvider>
-  </WebSocketProvider>
-), document.getElementById('root')!)
+render(
+  () => (
+    <WebSocketProvider url={WS_URL}>
+      <BasslineProvider value={bl}>
+        <ToastProvider>
+          <Router root={Layout}>
+            <Route path="/" component={Home} />
+            <Route path="/browse" component={Browse} />
+            <Route path="/compose" component={Compose} />
+            <Route path="/compose/:type" component={Compose} />
+            <Route path="/v/:owner/:name" component={ValView} />
+            <Route path="/v/:owner/:name/edit" component={Compose} />
+            <Route path="/v/:owner/:name/versions" component={VersionHistory} />
+            <Route path="/cells" component={Cells} />
+            <Route path="/templates" component={TemplateGallery} />
+            <Route path="/plugboard" component={Plugboard} />
+            <Route path="/workbench" component={Workbench} />
+            <Route path="/actions" component={ActionTest} />
+            <Route path="/canvas" component={Canvas} />
+            <Route path="/editor-test" component={EditorTest} />
+          </Router>
+        </ToastProvider>
+      </BasslineProvider>
+    </WebSocketProvider>
+  ),
+  document.getElementById('root')!
+)

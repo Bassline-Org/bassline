@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false
+  },
+  "include": ["packages/*/src/**/*.js", "packages/*/src/**/*.jsx"],
+  "exclude": ["node_modules", "**/*.test.js", "**/test/**"]
+}

@@ -8,39 +8,51 @@
  */
 
 export function registerReducers({ registerBuiltin }) {
-  registerBuiltin('sum', () => (...values) =>
-    values.reduce((a, b) => (a ?? 0) + (b ?? 0), 0)
+  registerBuiltin(
+    'sum',
+    () =>
+      (...values) =>
+        values.reduce((a, b) => (a ?? 0) + (b ?? 0), 0)
   )
 
-  registerBuiltin('product', () => (...values) =>
-    values.reduce((a, b) => (a ?? 1) * (b ?? 1), 1)
+  registerBuiltin(
+    'product',
+    () =>
+      (...values) =>
+        values.reduce((a, b) => (a ?? 1) * (b ?? 1), 1)
   )
 
   registerBuiltin('min', () => (...values) => {
-    const nums = values.filter(v => typeof v === 'number')
+    const nums = values.filter((v) => typeof v === 'number')
     return nums.length ? Math.min(...nums) : null
   })
 
   registerBuiltin('max', () => (...values) => {
-    const nums = values.filter(v => typeof v === 'number')
+    const nums = values.filter((v) => typeof v === 'number')
     return nums.length ? Math.max(...nums) : null
   })
 
   registerBuiltin('average', () => (...values) => {
-    const nums = values.filter(v => typeof v === 'number')
+    const nums = values.filter((v) => typeof v === 'number')
     return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null
   })
 
   registerBuiltin('concat', () => (...values) => {
     if (Array.isArray(values[0])) return values.flat()
-    return values.filter(v => v != null).join('')
+    return values.filter((v) => v !== null && v !== undefined).join('')
   })
 
-  registerBuiltin('first', () => (...values) =>
-    values.find(v => v != null)
+  registerBuiltin(
+    'first',
+    () =>
+      (...values) =>
+        values.find((v) => v !== null && v !== undefined)
   )
 
-  registerBuiltin('last', () => (...values) =>
-    values.filter(v => v != null).pop()
+  registerBuiltin(
+    'last',
+    () =>
+      (...values) =>
+        values.filter((v) => v !== null && v !== undefined).pop()
   )
 }

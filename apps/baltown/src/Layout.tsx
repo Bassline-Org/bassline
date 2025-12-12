@@ -14,16 +14,40 @@ export default function Layout(props: ParentProps) {
       <header class="header">
         <div class="header-left">
           <button class="menu-btn" onClick={() => setSidebarOpen(!sidebarOpen())}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 12h18M3 6h18M3 18h18"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 12h18M3 6h18M3 18h18" />
             </svg>
           </button>
-          <A href="/" class="logo">baltown</A>
+          <A href="/" class="logo">
+            baltown
+          </A>
         </div>
         <nav class="header-nav">
-          <A href="/browse" class={location.pathname === '/browse' ? 'active' : ''}>Browse</A>
-          <A href="/templates" class={location.pathname === '/templates' ? 'active' : ''}>Templates</A>
-          <A href="/compose" class={location.pathname === '/compose' ? 'active' : ''}>Compose</A>
+          <A href="/workbench" class={location.pathname === '/workbench' ? 'active' : ''}>
+            Workbench
+          </A>
+          <A href="/canvas" class={location.pathname === '/canvas' ? 'active' : ''}>
+            Canvas
+          </A>
+          <A href="/actions" class={location.pathname === '/actions' ? 'active' : ''}>
+            Actions
+          </A>
+          <A href="/browse" class={location.pathname === '/browse' ? 'active' : ''}>
+            Browse
+          </A>
+          <A href="/templates" class={location.pathname === '/templates' ? 'active' : ''}>
+            Templates
+          </A>
+          <A href="/compose" class={location.pathname === '/compose' ? 'active' : ''}>
+            Compose
+          </A>
         </nav>
         <div class="header-right">
           <ImportButton />
@@ -37,6 +61,7 @@ export default function Layout(props: ParentProps) {
           <aside class="sidebar">
             <div class="sidebar-section">
               <h3>Quick Links</h3>
+              <A href="/workbench">Workbench</A>
               <A href="/browse">All Vals</A>
               <A href="/templates">Templates</A>
               <A href="/compose">New Val</A>
@@ -57,14 +82,14 @@ export default function Layout(props: ParentProps) {
             <div class="sidebar-section">
               <h3>System</h3>
               <A href="/plugboard">Plugboard</A>
+              <A href="/canvas">Canvas</A>
+              <A href="/actions">Actions (PoC)</A>
             </div>
           </aside>
         </Show>
 
         {/* Main Content */}
-        <main class="content">
-          {props.children}
-        </main>
+        <main class="content">{props.children}</main>
       </div>
     </div>
   )

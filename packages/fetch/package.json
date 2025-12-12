@@ -4,6 +4,7 @@
   "description": "HTTP fetch resources for Bassline - async HTTP requests through plumber",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },

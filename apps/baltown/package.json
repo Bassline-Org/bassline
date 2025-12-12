@@ -12,6 +12,7 @@
     "@bassline/core": "workspace:*",
     "@bassline/remote-browser": "workspace:*",
     "@bassline/solid": "workspace:*",
+    "@bassline/structure-editor": "workspace:*",
     "@solidjs/router": "^0.15.3",
     "cytoscape": "^3.33.1",
     "cytoscape-dagre": "^2.5.0",

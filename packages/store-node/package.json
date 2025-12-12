@@ -4,6 +4,7 @@
   "description": "Node.js stores for Bassline",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./file-store": "./src/file-store.js"
