@@ -10,7 +10,8 @@ import { createWsServerRoutes } from './ws.js'
 export default async function installWsServer(bl, config = {}) {
   const plumber = await bl.getModule('plumber')
 
-  bl.install(createWsServerRoutes(plumber))
+  const wsRoutes = createWsServerRoutes(plumber)
+  wsRoutes.install(bl)
   bl.setModule('ws-server', {})
 
   // Bootstrap servers from config

@@ -35,21 +35,21 @@ export default async function bootstrap(bl) {
     }
   )
 
+  // Plumber: message routing (before links, which sets up plumber rules)
+  await bl.put(
+    'bl:///install/plumber',
+    {},
+    {
+      path: './packages/plumber/src/upgrade.js',
+    }
+  )
+
   // Links: bidirectional ref tracking
   await bl.put(
     'bl:///install/links',
     {},
     {
       path: './packages/links/src/upgrade.js',
-    }
-  )
-
-  // Plumber: message routing
-  await bl.put(
-    'bl:///install/plumber',
-    {},
-    {
-      path: './packages/plumber/src/upgrade.js',
     }
   )
 
@@ -171,6 +171,15 @@ export default async function bootstrap(bl) {
     {},
     {
       path: './packages/vals/src/upgrade.js',
+    }
+  )
+
+  // Widgets: UI widget system (uses plumber)
+  await bl.put(
+    'bl:///install/widgets',
+    {},
+    {
+      path: './packages/widgets/src/upgrade.js',
     }
   )
 

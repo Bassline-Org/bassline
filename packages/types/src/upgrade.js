@@ -248,6 +248,142 @@ export const TYPES = {
       result: { type: 'any', description: 'PRAGMA result value' },
     },
   },
+
+  // Widget types
+  widget: {
+    name: 'Widget',
+    description: 'Base widget type for all UI widgets',
+    schema: {
+      name: { type: 'string', description: 'Widget name' },
+      primitive: { type: 'boolean', description: 'Whether this is a primitive widget' },
+      props: { type: 'object', description: 'Props schema' },
+      description: { type: 'string', description: 'Widget description' },
+    },
+  },
+  'widget-definition': {
+    name: 'Widget Definition',
+    description: 'How a widget is implemented',
+    schema: {
+      type: { type: 'string', description: 'primitive or composed' },
+      name: { type: 'string', description: 'Widget name (for primitives)' },
+      definition: {
+        type: 'array',
+        description: 'Hiccup-style definition [widget, props?, ...children]',
+      },
+    },
+  },
+  'props-schema': {
+    name: 'Props Schema',
+    description: 'Schema defining widget props',
+    schema: {},
+  },
+
+  // Widget category types (layout combinators)
+  'widgets/layout/box': {
+    name: 'Box Widget',
+    description: 'Basic container widget',
+    schema: {
+      style: { type: 'object', description: 'CSS styles' },
+      className: { type: 'string', description: 'CSS class name' },
+    },
+  },
+  'widgets/layout/stack': {
+    name: 'Stack Widget',
+    description: 'Flex-based vertical or horizontal stack',
+    schema: {
+      direction: { type: 'string', description: 'vertical or horizontal' },
+      gap: { type: 'number', description: 'Gap between children' },
+      align: { type: 'string', description: 'Cross-axis alignment' },
+      justify: { type: 'string', description: 'Main-axis justification' },
+    },
+  },
+  'widgets/layout/grid': {
+    name: 'Grid Widget',
+    description: 'CSS grid layout',
+    schema: {
+      columns: { type: 'string', description: 'Grid columns template' },
+      rows: { type: 'string', description: 'Grid rows template' },
+      gap: { type: 'number', description: 'Gap between cells' },
+    },
+  },
+
+  // Widget category types (atoms)
+  'widgets/atom/text': {
+    name: 'Text Widget',
+    description: 'Text content display',
+    schema: {
+      content: { type: 'string', description: 'Text content' },
+      variant: { type: 'string', description: 'Text style variant' },
+    },
+  },
+  'widgets/atom/button': {
+    name: 'Button Widget',
+    description: 'Clickable button element',
+    schema: {
+      label: { type: 'string', description: 'Button label' },
+      variant: { type: 'string', description: 'Button style variant' },
+      disabled: { type: 'boolean', description: 'Whether button is disabled' },
+      onClick: { type: 'string', description: 'Plumber port for click events' },
+    },
+  },
+  'widgets/atom/input': {
+    name: 'Input Widget',
+    description: 'Text input field',
+    schema: {
+      value: { type: 'string', description: 'Input value' },
+      type: { type: 'string', description: 'Input type (text, password, etc.)' },
+      placeholder: { type: 'string', description: 'Placeholder text' },
+      onChange: { type: 'string', description: 'Plumber port for change events' },
+    },
+  },
+
+  // Widget category types (compound)
+  'widgets/compound/dialog': {
+    name: 'Dialog Widget',
+    description: 'Modal dialog with trigger and content',
+    schema: {
+      open: { type: 'boolean', description: 'Whether dialog is open' },
+      onOpenChange: { type: 'string', description: 'Plumber port for open state changes' },
+    },
+  },
+  'widgets/compound/tabs': {
+    name: 'Tabs Widget',
+    description: 'Tabbed content navigation',
+    schema: {
+      value: { type: 'string', description: 'Active tab value' },
+      onValueChange: { type: 'string', description: 'Plumber port for tab changes' },
+    },
+  },
+
+  // Custom widget type
+  'widgets/custom': {
+    name: 'Custom Widget',
+    description: 'User-defined widget composition',
+    schema: {
+      name: { type: 'string', description: 'Widget name' },
+      props: { type: 'object', description: 'Props schema' },
+      definition: { type: 'array', description: 'Hiccup definition' },
+      description: { type: 'string', description: 'Widget description' },
+    },
+  },
+
+  // UI instance types
+  'ui-root': {
+    name: 'UI Root',
+    description: 'Root render surface',
+    schema: {
+      content: { type: 'any', description: 'Widget URI or inline definition' },
+    },
+  },
+  'widget-instance': {
+    name: 'Widget Instance',
+    description: 'A rendered widget instance',
+    schema: {
+      widget: { type: 'string', description: 'Widget definition URI' },
+      widgetConfig: { type: 'object', description: 'Instance configuration' },
+      state: { type: 'object', description: 'Runtime state' },
+    },
+  },
 }
 
 /**
@@ -287,7 +423,7 @@ const typesResource = resource((r) => {
  * Install types routes
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @param {object} [options] - Options
- * @param {string} [options.prefix='/types'] - Mount prefix
+ * @param {string} [options.prefix] - Mount prefix
  */
 export default function installTypes(bl, { prefix = '/types' } = {}) {
   bl.mount(prefix, typesResource)
