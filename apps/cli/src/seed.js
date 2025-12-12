@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 
 /**
  * Seed script for Bassline
@@ -7,6 +8,12 @@
 
 const BASE_URL = process.env.BL_URL || 'http://localhost:9111'
 
+/**
+ * PUT a resource to the Bassline server
+ * @param {string} uri - The resource URI
+ * @param {object} body - The resource body
+ * @returns {Promise<object>} The response JSON
+ */
 async function put(uri, body) {
   const url = `${BASE_URL}?uri=${encodeURIComponent(uri)}`
   const res = await fetch(url, {
@@ -299,7 +306,7 @@ Assigned to Carol for design exploration.
   await put('bl:///propagators/add-ab', {
     inputs: ['bl:///cells/a', 'bl:///cells/b'],
     output: 'bl:///cells/sum',
-    handler: 'sum',
+    fn: 'bl:///fn/sum',
   })
 
   // Set initial values - this triggers the propagator
@@ -315,7 +322,7 @@ Assigned to Carol for design exploration.
   await put('bl:///propagators/multiply-xy', {
     inputs: ['bl:///cells/x', 'bl:///cells/y'],
     output: 'bl:///cells/product',
-    handler: 'product',
+    fn: 'bl:///fn/product',
   })
 
   // Set initial values - this triggers the propagator
@@ -374,20 +381,21 @@ Assigned to Carol for design exploration.
     definition: {
       inputs: ['bl:///cells/input'],
       output: 'bl:///cells/doubled',
-      handler: ['multiply', { value: 2 }],
+      fn: 'bl:///fn/multiply',
+      fnConfig: { value: 2 },
     },
     tags: ['math', 'simple'],
   })
 
-  // Example 2: Handler composition - celsius to fahrenheit
+  // Example 2: Fn composition - celsius to fahrenheit
   await put('bl:///vals/examples/celsius-to-fahrenheit', {
     description: 'Convert Celsius to Fahrenheit: (C * 9/5) + 32',
-    valType: 'handler',
+    valType: 'fn',
     definition: [
-      'pipe',
-      ['multiply', { value: 9 }],
-      ['divide', { value: 5 }],
-      ['add', { value: 32 }],
+      'bl:///fn/pipe',
+      ['bl:///fn/multiply', { value: 9 }],
+      ['bl:///fn/divide', { value: 5 }],
+      ['bl:///fn/add', { value: 32 }],
     ],
     tags: ['conversion', 'temperature'],
   })
@@ -429,7 +437,8 @@ Assigned to Carol for design exploration.
           body: {
             inputs: ['${ref.counter}'],
             output: '${ref.doubled}',
-            handler: ['multiply', { value: 2 }],
+            fn: 'bl:///fn/multiply',
+            fnConfig: { value: 2 },
           },
         },
       ],
@@ -444,7 +453,7 @@ Assigned to Carol for design exploration.
     definition: {
       inputs: ['bl:///cells/a', 'bl:///cells/b'],
       output: 'bl:///cells/sum',
-      handler: 'sum',
+      fn: 'bl:///fn/sum',
     },
     tags: ['math', 'aggregation'],
   })

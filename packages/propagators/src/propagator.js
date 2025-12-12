@@ -8,7 +8,7 @@ import { ports, types } from '@bassline/plumber'
  * Each propagator creates its own plumber rules for its inputs,
  * so routing is visible and self-contained.
  *
- * Handlers are provided by @bassline/handlers and accessed via bl.getModule('handlers').
+ * Functions are provided by @bassline/fn and accessed via bl.getModule('fn').
  *
  * Resource structure:
  * - GET  /propagators           → list all propagators
@@ -23,19 +23,19 @@ import { ports, types } from '@bassline/plumber'
 export function createPropagatorRoutes(options = {}) {
   const { bl } = options
 
-  /** @type {Map<string, {inputs: string[], output: string, handler: Function, handlerName: string, handlerConfig: object, enabled: boolean}>} */
+  /** @type {Map<string, {inputs: string[], output: string, fn: Function, fnUri: string, fnConfig: object, enabled: boolean}>} */
   const store = new Map()
 
   /**
-   * Get a handler using promise-based late binding.
-   * Waits for handlers module if not yet installed.
-   * @param {string} name - Handler name
-   * @param {object} [config] - Handler config
-   * @returns {Promise<Function>} Handler function
+   * Get a function using promise-based late binding.
+   * Waits for fn module if not yet installed.
+   * @param {string} uri - Function URI (e.g., 'bl:///fn/sum')
+   * @param {object} [config] - Function config
+   * @returns {Promise<Function>} Function
    */
-  async function getHandler(name, config = {}) {
-    const handlers = await bl.getModule('handlers')
-    return handlers.get(name, config)
+  async function getFn(uri, config = {}) {
+    const fnModule = await bl.getModule('fn')
+    return fnModule.get(uri, config)
   }
 
   /**
@@ -98,8 +98,8 @@ export function createPropagatorRoutes(options = {}) {
    * @param {object} config - Propagator config
    * @param {string[]} config.inputs - Cell URIs to watch
    * @param {string} config.output - Cell URI to write to
-   * @param {string} config.handler - Handler name (references a registered factory)
-   * @param {object} [config.handlerConfig] - Config to pass to handler factory
+   * @param {string} config.fn - Function URI (e.g., 'bl:///fn/sum')
+   * @param {object} [config.fnConfig] - Config to pass to function factory
    * @param {boolean} [config.enabled] - Whether propagator is active
    * @returns {Promise<object>} The created propagator
    */
@@ -111,21 +111,21 @@ export function createPropagatorRoutes(options = {}) {
       await removeInputRules(name, existing.inputs)
     }
 
-    // Resolve handler (uses promise-based late binding)
-    const handlerName = config.handler || 'passthrough'
-    const handlerConfig = config.handlerConfig || {}
-    const handler = await getHandler(handlerName, handlerConfig)
+    // Resolve function (uses promise-based late binding)
+    const fnUri = config.fn || 'bl:///fn/passthrough'
+    const fnConfig = config.fnConfig || {}
+    const fn = await getFn(fnUri, fnConfig)
 
-    if (!handler) {
-      throw new Error(`Unknown handler: ${handlerName}`)
+    if (!fn) {
+      throw new Error(`Unknown function: ${fnUri}`)
     }
 
     const propagator = {
       inputs: config.inputs || [],
       output: config.output,
-      handler,
-      handlerName,
-      handlerConfig,
+      fn,
+      fnUri,
+      fnConfig,
       enabled: config.enabled !== false,
     }
 
@@ -199,12 +199,12 @@ export function createPropagatorRoutes(options = {}) {
       inputValues.push(result?.body)
     }
 
-    // Call the handler
+    // Call the function
     let outputValue
     try {
-      outputValue = propagator.handler(...inputValues)
+      outputValue = propagator.fn(...inputValues)
     } catch (err) {
-      console.error(`Propagator ${name} handler error:`, err)
+      console.error(`Propagator ${name} function error:`, err)
       return { fired: false, error: err.message }
     }
 
@@ -250,8 +250,8 @@ export function createPropagatorRoutes(options = {}) {
         body: {
           inputs: prop.inputs,
           output: prop.output,
-          handler: prop.handlerName,
-          handlerConfig: prop.handlerConfig,
+          fn: prop.fnUri,
+          fnConfig: prop.fnConfig,
           enabled: prop.enabled,
         },
       }
@@ -263,8 +263,8 @@ export function createPropagatorRoutes(options = {}) {
       const config = {
         inputs: body.inputs || [],
         output: body.output,
-        handler: body.handler || 'passthrough',
-        handlerConfig: body.handlerConfig || {},
+        fn: body.fn || 'bl:///fn/passthrough',
+        fnConfig: body.fnConfig || {},
         enabled: body.enabled !== false,
       }
 
@@ -289,8 +289,8 @@ export function createPropagatorRoutes(options = {}) {
         body: {
           inputs: prop.inputs,
           output: prop.output,
-          handler: prop.handlerName,
-          handlerConfig: prop.handlerConfig,
+          fn: prop.fnUri,
+          fnConfig: prop.fnConfig,
           enabled: prop.enabled,
         },
       }

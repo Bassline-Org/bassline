@@ -1,50 +1,55 @@
-# @bassline/handlers
+# @bassline/fn
 
-Handler registry and combinators for Bassline propagators.
+Function registry and combinators for Bassline propagators.
 
 ## Overview
 
-Handlers are pure functions that transform data. They're used by propagators to compute derived values. This package provides:
+Functions are pure transformations used by propagators to compute derived values. This package provides:
 
-- **Registry** - Storage and lookup for handlers
+- **Registry** - Storage and lookup for functions by URI
 - **Compiler** - Compiles Hiccup-style definitions into executable functions
-- **110 Built-in Handlers** - Organized by domain
-- **Routes** - REST API for handler management
+- **110 Built-in Functions** - Organized by domain
+- **Routes** - REST API for function management
 
 ## Installation
 
-Handlers are automatically installed before propagators in bootstrap:
+Functions are automatically installed before propagators in bootstrap:
 
 ```javascript
 // apps/cli/src/bootstrap.js
 await bl.put(
-  'bl:///install/handlers',
+  'bl:///install/fn',
   {},
   {
-    path: './packages/handlers/src/upgrade.js',
+    path: './packages/fn/src/upgrade.js',
   }
 )
 ```
 
 ## Usage
 
-Handlers are registered on `bl._handlers`:
+Functions are accessed via `bl.getModule('fn')`:
 
 ```javascript
-// Get a handler
-const sumHandler = bl._handlers.get('sum')
-const result = sumHandler(1, 2, 3) // → 6
+// Get a function
+const fnModule = await bl.getModule('fn')
+const sumFn = fnModule.get('bl:///fn/sum')
+const result = sumFn(1, 2, 3) // → 6
 
 // Get with config
-const multiplyBy2 = bl._handlers.get('multiply', { value: 2 })
+const multiplyBy2 = fnModule.get('bl:///fn/multiply', { value: 2 })
 multiplyBy2(5) // → 10
 
 // Compile a Hiccup-style definition
-const double = bl._handlers.compile(['pipe', 'identity', ['multiply', { value: 2 }]])
+const double = fnModule.compile([
+  'bl:///fn/pipe',
+  'bl:///fn/identity',
+  ['bl:///fn/multiply', { value: 2 }],
+])
 double(5) // → 10
 ```
 
-## Built-in Handlers (110)
+## Built-in Functions (110)
 
 ### Reducers
 
@@ -132,91 +137,81 @@ Config: `{ value }` for comparing against a constant
 
 ## Hiccup-Style Definitions
 
-Handlers can be defined using array syntax:
+Functions can be defined using array syntax:
 
 ```javascript
-// Simple handler reference
-;['sum'][
-  // Handler with config
-  ('multiply', { value: 2 })
+// Simple fn reference
+;['bl:///fn/sum'][
+  // Fn with config
+  ('bl:///fn/multiply', { value: 2 })
 ][
   // Composition (pipe)
-  ('pipe', 'identity', ['multiply', { value: 2 }])
+  ('bl:///fn/pipe', 'bl:///fn/identity', ['bl:///fn/multiply', { value: 2 }])
 ][
   // Fork: compute average as sum/length
-  ('fork', 'divide', 'sum', 'length')
+  ('bl:///fn/fork', 'bl:///fn/divide', 'bl:///fn/sum', 'bl:///fn/length')
 ][
   // Converge: normalize array
-  ('converge', 'map', ['identity', ['fork', 'divide', 'sum', 'length']])
+  ('bl:///fn/converge',
+  'bl:///fn/map',
+  ['bl:///fn/identity', ['bl:///fn/fork', 'bl:///fn/divide', 'bl:///fn/sum', 'bl:///fn/length']])
 ]
 ```
 
-## Custom Handlers
+## Custom Functions
 
-Create custom handlers via PUT:
+Create custom functions via PUT:
 
 ```javascript
 // Via HTTP
 await bl.put(
-  'bl:///handlers/double',
+  'bl:///fn/double',
   {},
   {
-    definition: ['pipe', 'identity', ['multiply', { value: 2 }]],
+    definition: ['bl:///fn/pipe', 'bl:///fn/identity', ['bl:///fn/multiply', { value: 2 }]],
     description: 'Double a number',
   }
 )
 
 // Via registry (programmatic)
-bl._handlers.registerCustom('triple', {
-  definition: ['multiply', { value: 3 }],
+const fnModule = await bl.getModule('fn')
+fnModule.registerCustom('bl:///fn/triple', {
+  definition: ['bl:///fn/multiply', { value: 3 }],
   description: 'Triple a number',
 })
 ```
 
 ## API
 
-| Route                        | Method | Description            |
-| ---------------------------- | ------ | ---------------------- |
-| `/handlers`                  | GET    | List all handlers      |
-| `/handlers/:name`            | GET    | Get handler info       |
-| `/handlers/:name/definition` | GET    | Get handler definition |
-| `/handlers/:name`            | PUT    | Create custom handler  |
-| `/handlers/:name/delete`     | PUT    | Delete custom handler  |
+| Route                  | Method | Description        |
+| ---------------------- | ------ | ------------------ |
+| `/fn`                  | GET    | List all functions |
+| `/fn/:name`            | GET    | Get fn info        |
+| `/fn/:name/definition` | GET    | Get fn definition  |
+| `/fn/:name`            | PUT    | Create custom fn   |
+| `/fn/:name/delete`     | PUT    | Delete custom fn   |
 
 ## Architecture
 
 ```
-packages/handlers/
+packages/fn/
 ├── src/
 │   ├── index.js           # Public exports
-│   ├── registry.js        # Handler storage
+│   ├── registry.js        # Function storage
 │   ├── compiler.js        # Hiccup compiler
 │   ├── routes.js          # REST routes
 │   ├── upgrade.js         # Install module
-│   ├── handlers/          # Handler implementations
-│   │   ├── reducers.js
-│   │   ├── binary-ops.js
-│   │   ├── arithmetic.js
-│   │   ├── comparison.js
-│   │   ├── logic.js
-│   │   ├── string.js
-│   │   ├── array.js
-│   │   ├── array-reducers.js
-│   │   ├── object.js
-│   │   ├── type.js
-│   │   ├── conditional.js
-│   │   ├── structural.js
-│   │   ├── utility.js
-│   │   └── composition.js
-│   └── combinators/       # Combinator implementations
-│       ├── unary.js
-│       ├── binary.js
-│       ├── ternary.js
-│       ├── variadic.js
-│       └── special.js
+│   ├── combinators.js     # Combinator implementations
+│   └── handlers/          # Function implementations
+│       ├── math.js
+│       ├── logic.js
+│       ├── collections.js
+│       ├── string.js
+│       ├── type.js
+│       └── control.js
 ```
 
 ## Related
 
-- [@bassline/propagators](../propagators) - Uses handlers for reactive computation
+- [@bassline/propagators](../propagators) - Uses functions for reactive computation
 - [@bassline/cells](../cells) - Lattice-based cells that propagators connect

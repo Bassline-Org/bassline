@@ -1,7 +1,7 @@
 /**
  * Combinators
  *
- * Higher-order functions for composing handlers:
+ * Higher-order functions for composing functions:
  * - Unary: pipe, sequence
  * - Binary: hook, both, flip
  * - Ternary: fork
@@ -14,34 +14,34 @@
 // pipe: left-to-right composition  pipe(f,g)(x) = g(f(x))
 export const pipe = (ctx, ...compiledArgs) => {
   const { get } = ctx
-  // If called from compileDefinition, compiledArgs are pre-compiled handlers
-  // If called from config, ctx.steps contains handler names
-  const handlers =
+  // If called from compileDefinition, compiledArgs are pre-compiled fns
+  // If called from config, ctx.steps contains fn names
+  const fns =
     compiledArgs.length > 0
       ? compiledArgs
       : (ctx.steps || []).map((step) =>
           typeof step === 'string'
             ? get(step, {})
-            : get(step.handler || step[0], step.config || step[1] || {})
+            : get(step.fn || step[0], step.config || step[1] || {})
         )
-  return (x) => handlers.reduce((val, fn) => fn(val), x)
+  return (x) => fns.reduce((val, fn) => fn(val), x)
 }
 
-// sequence: Run handlers in sequence, return last result (like progn)
-// Each handler gets the original input, not the previous output
+// sequence: Run fns in sequence, return last result (like progn)
+// Each fn gets the original input, not the previous output
 export const sequence = (ctx, ...compiledArgs) => {
   const { get } = ctx
-  const handlers =
+  const fns =
     compiledArgs.length > 0
       ? compiledArgs
       : (ctx.steps || []).map((step) =>
           typeof step === 'string'
             ? get(step, {})
-            : get(step.handler || step[0], step.config || step[1] || {})
+            : get(step.fn || step[0], step.config || step[1] || {})
         )
   return (x) => {
     let result = x
-    for (const fn of handlers) result = fn(x) // Each gets original x
+    for (const fn of fns) result = fn(x) // Each gets original x
     return result
   }
 }
@@ -73,9 +73,9 @@ export const both = (ctx, left, right) => {
 }
 
 // flip: Swap arguments  flip(f)(x,y) = f(y,x)
-export const flip = (ctx, fn) => {
+export const flip = (ctx, compiledFn) => {
   const { get } = ctx
-  const innerFn = fn || get(ctx.handler, ctx.config || {})
+  const innerFn = compiledFn || get(ctx.fn, ctx.fnConfig || {})
   return (x, y) => innerFn(y, x)
 }
 
@@ -100,13 +100,12 @@ export const fork = (ctx, left, middle, right) => {
 // converge: Multiple branches combined  converge(f, [g,h])(x) = f(g(x), h(x))
 export const converge = (ctx, combiner, ...branches) => {
   const { get } = ctx
-  const combinerFn =
-    combiner || get(ctx.combiner?.handler || ctx.combiner, ctx.combiner?.config || {})
+  const combinerFn = combiner || get(ctx.combiner?.fn || ctx.combiner, ctx.combiner?.config || {})
   const branchFns =
     branches.length > 0
       ? branches
       : (ctx.branches || []).map((b) =>
-          typeof b === 'string' ? get(b, {}) : get(b.handler, b.config || {})
+          typeof b === 'string' ? get(b, {}) : get(b.fn, b.config || {})
         )
   return (x) => combinerFn(...branchFns.map((fn) => fn(x)))
 }
@@ -119,8 +118,8 @@ export const K = (ctx) => () => ctx.value
 
 // duplicate: Apply argument twice  W(f)(x) = f(x,x)
 // Also known as the W combinator
-export const duplicate = (ctx, fn) => {
+export const duplicate = (ctx, compiledFn) => {
   const { get } = ctx
-  const innerFn = fn || get(ctx.handler, ctx.config || {})
+  const innerFn = compiledFn || get(ctx.fn, ctx.fnConfig || {})
   return (x) => innerFn(x, x)
 }

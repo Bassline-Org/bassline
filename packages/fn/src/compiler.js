@@ -1,34 +1,32 @@
 /**
- * Handler Compiler
+ * Fn Compiler
  *
- * Compiles Hiccup-style handler definitions into executable functions.
+ * Compiles Hiccup-style fn definitions into executable functions.
  *
  * Format: [combinator, config?, ...args]
  * - If second element is plain object (not array), it's config
  * - Remaining elements are arguments (strings or nested arrays)
  *
  * Examples:
- *   'sum'                              → sum handler
- *   ['pipe', 'negate', 'abs']          → pipe(negate, abs)
- *   ['fork', 'identity', 'add', 'negate'] → fork(identity, add, negate)
- *   ['map', { handler: 'negate' }]     → map with config
+ *   'bl:///fn/sum'                                → sum fn
+ *   ['bl:///fn/pipe', 'bl:///fn/negate', 'bl:///fn/abs']  → pipe(negate, abs)
+ *   ['bl:///fn/fork', 'bl:///fn/identity', 'bl:///fn/add', 'bl:///fn/negate'] → fork(identity, add, negate)
+ *   ['bl:///fn/map', { fn: 'bl:///fn/negate' }]   → map with config
  */
 
 const MAX_DEPTH = 50
 
 /**
  * Create a compiler function bound to a registry.
- *
  * @param {object} registry - Handler registry
- * @returns {function} Compiler function
+ * @returns {Function} Compiler function
  */
 export function createCompiler(registry) {
   /**
    * Compile a Hiccup-style definition into a handler function.
-   *
    * @param {any} def - Definition (string or array)
-   * @param {number} [depth=0] - Current recursion depth (for protection)
-   * @returns {function} Compiled handler
+   * @param {number} [depth] - Current recursion depth (for protection)
+   * @returns {Function} Compiled handler
    */
   function compile(def, depth = 0) {
     // Prevent infinite recursion from self-referencing or circular handlers

@@ -1,14 +1,14 @@
 /**
- * Handlers Upgrade Module
+ * Function Upgrade Module
  *
- * Installs the handler system into a Bassline instance.
+ * Installs the function system into a Bassline instance.
  */
 
-import { createHandlerRegistry } from './registry.js'
+import { createFnRegistry } from './registry.js'
 import { createCompiler } from './compiler.js'
-import { createHandlerRoutes } from './routes.js'
+import { createFnRoutes } from './routes.js'
 
-// Handler modules (named exports)
+// Function modules (named exports)
 import * as math from './handlers/math.js'
 import * as logic from './handlers/logic.js'
 import * as collections from './handlers/collections.js'
@@ -18,31 +18,32 @@ import * as control from './handlers/control.js'
 import * as combinators from './combinators.js'
 
 /**
- * Register all exports from a module as handlers.
- * @param {object} registry - Handler registry
+ * Register all exports from a module as functions.
+ * @param {object} registry - Function registry
  * @param {object} mod - Module with named exports
- * @param {object} [nameMap] - Optional name remapping (exportName -> handlerName)
+ * @param {object} [nameMap] - Optional name remapping (exportName -> fnName)
  */
 function registerModule(registry, mod, nameMap = {}) {
   for (const [exportName, factory] of Object.entries(mod)) {
-    const handlerName = nameMap[exportName] || exportName
-    registry.registerBuiltin(handlerName, factory)
+    const fnName = nameMap[exportName] || exportName
+    // Register with full URI
+    registry.registerBuiltin(`bl:///fn/${fnName}`, factory)
   }
 }
 
 /**
- * Install handlers into a Bassline instance.
+ * Install functions into a Bassline instance.
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  */
-export default function installHandlers(bl) {
+export default function installFn(bl) {
   // Create registry
-  const registry = createHandlerRegistry()
+  const registry = createFnRegistry()
 
   // Create compiler and wire it up
   const compile = createCompiler(registry)
   registry.setCompiler(compile)
 
-  // Register all handler modules
+  // Register all function modules with bl:///fn/ prefix
   registerModule(registry, math)
   registerModule(registry, logic)
   registerModule(registry, collections, { getPath: 'get' }) // Remap getPath -> get
@@ -51,12 +52,12 @@ export default function installHandlers(bl) {
   registerModule(registry, control)
   registerModule(registry, combinators)
 
-  // Create and install routes
-  const handlerRoutes = createHandlerRoutes({ registry, compile })
-  bl.install(handlerRoutes)
+  // Create and install routes at /fn
+  const fnRoutes = createFnRoutes({ registry, compile })
+  bl.install(fnRoutes)
 
-  // Register as module for late binding
-  const handlers = {
+  // Register as module for late binding (keep 'handlers' name for backward compat)
+  const fn = {
     registry,
     compile,
     get: registry.get,
@@ -69,7 +70,9 @@ export default function installHandlers(bl) {
     listCustom: registry.listCustom,
   }
 
-  bl.setModule('handlers', handlers)
+  // Register under both names for compatibility
+  bl.setModule('fn', fn)
+  bl.setModule('handlers', fn) // Backward compatibility
 
-  console.log(`Handlers installed: ${registry.listBuiltin().length} built-in handlers`)
+  console.log(`Functions installed: ${registry.listBuiltin().length} built-in functions`)
 }

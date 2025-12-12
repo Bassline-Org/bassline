@@ -1,7 +1,12 @@
+/* eslint-env node */
 /**
  * Seed example vals for baltown demo
  */
 
+/**
+ * Seed example vals into Bassline
+ * @param {import('@bassline/core').Bassline} bl - The Bassline instance
+ */
 export default async function seedVals(bl) {
   console.log('Seeding example vals...')
 
@@ -15,24 +20,25 @@ export default async function seedVals(bl) {
       definition: {
         inputs: ['bl:///cells/input'],
         output: 'bl:///cells/doubled',
-        handler: ['multiply', { value: 2 }],
+        fn: 'bl:///fn/multiply',
+        fnConfig: { value: 2 },
       },
       tags: ['math', 'simple'],
     }
   )
 
-  // Example 2: Handler composition - celsius to fahrenheit
+  // Example 2: Fn composition - celsius to fahrenheit
   await bl.put(
     'bl:///vals/examples/celsius-to-fahrenheit',
     {},
     {
       description: 'Convert Celsius to Fahrenheit: (C * 9/5) + 32',
-      valType: 'handler',
+      valType: 'fn',
       definition: [
-        'pipe',
-        ['multiply', { value: 9 }],
-        ['divide', { value: 5 }],
-        ['add', { value: 32 }],
+        'bl:///fn/pipe',
+        ['bl:///fn/multiply', { value: 9 }],
+        ['bl:///fn/divide', { value: 5 }],
+        ['bl:///fn/add', { value: 32 }],
       ],
       tags: ['conversion', 'temperature'],
     }
@@ -82,7 +88,8 @@ export default async function seedVals(bl) {
             body: {
               inputs: ['${ref.counter}'],
               output: '${ref.doubled}',
-              handler: ['multiply', { value: 2 }],
+              fn: 'bl:///fn/multiply',
+              fnConfig: { value: 2 },
             },
           },
         ],
@@ -101,20 +108,20 @@ export default async function seedVals(bl) {
       definition: {
         inputs: ['bl:///cells/a', 'bl:///cells/b'],
         output: 'bl:///cells/sum',
-        handler: 'sum',
+        fn: 'bl:///fn/sum',
       },
       tags: ['math', 'aggregation'],
     }
   )
 
-  // Example 6: Handler composition - format as currency
+  // Example 6: Fn composition - format as currency
   await bl.put(
     'bl:///vals/examples/format-currency',
     {},
     {
       description: 'Format a number as USD currency',
-      valType: 'handler',
-      definition: ['format', { template: '$${value}.00' }],
+      valType: 'fn',
+      definition: ['bl:///fn/format', { template: '$${value}.00' }],
       tags: ['formatting', 'currency'],
     }
   )
