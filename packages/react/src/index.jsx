@@ -1,5 +1,10 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 
+// Re-export new hooks
+export { useTmpState } from './hooks/useTmpState.js'
+export { usePlumberRule } from './hooks/usePlumberRule.js'
+export { useCell } from './hooks/useCell.js'
+
 /**
  * React context for Bassline instance
  */

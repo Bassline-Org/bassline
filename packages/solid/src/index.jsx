@@ -1,5 +1,10 @@
 import { createContext, useContext, createSignal, createResource, onCleanup } from 'solid-js'
 
+// Re-export new hooks
+export { useTmpState } from './hooks/useTmpState.js'
+export { usePlumberRule } from './hooks/usePlumberRule.js'
+export { useCell } from './hooks/useCell.js'
+
 /**
  * Solid.js context for Bassline instance
  */
