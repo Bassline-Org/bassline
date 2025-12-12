@@ -1,4 +1,5 @@
 import { resource } from '@bassline/core'
+import { types } from '@bassline/plumber'
 
 /**
  * Create timer routes for time-based event dispatch.
@@ -13,13 +14,12 @@ import { resource } from '@bassline/core'
  * - PUT  /timers/:name/start → start timer
  * - PUT  /timers/:name/stop  → stop timer
  * - PUT  /timers/:name/kill  → remove timer
- *
  * @param {object} options - Configuration options
- * @param {function} options.onTick - Callback when timer ticks (for plumber dispatch)
+ * @param {import('@bassline/core').Bassline} [options.bl] - Bassline instance for plumber notifications
  * @returns {object} Timer routes and management functions
  */
 export function createTimerRoutes(options = {}) {
-  const { onTick } = options
+  const { bl } = options
 
   /**
    * Timer store
@@ -73,13 +73,10 @@ export function createTimerRoutes(options = {}) {
     timer.enabled = true
     timer.intervalId = setInterval(() => {
       timer.tickCount++
-      if (onTick) {
-        onTick({
-          name,
-          tick: timer.tickCount,
-          time: new Date().toISOString(),
-        })
-      }
+      bl?.plumb(`bl:///timers/${name}`, `timer-${name}`, {
+        headers: { type: types.TIMER_TICK },
+        body: { timer: name, tick: timer.tickCount, time: new Date().toISOString() },
+      })
     }, timer.interval)
 
     return timer
@@ -149,7 +146,7 @@ export function createTimerRoutes(options = {}) {
             name,
             type: 'timer',
             uri: `bl:///timers/${name}`,
-            running: timer?.intervalId != null,
+            running: timer?.intervalId !== null,
           }
         }),
       },
@@ -166,7 +163,7 @@ export function createTimerRoutes(options = {}) {
           name: params.name,
           interval: timer.interval,
           enabled: timer.enabled,
-          running: timer.intervalId != null,
+          running: timer.intervalId !== null,
           tickCount: timer.tickCount,
           entries: [
             { name: 'start', uri: `bl:///timers/${params.name}/start` },
@@ -186,7 +183,7 @@ export function createTimerRoutes(options = {}) {
           name: params.name,
           interval: timer.interval,
           enabled: timer.enabled,
-          running: timer.intervalId != null,
+          running: timer.intervalId !== null,
           tickCount: timer.tickCount,
         },
       }
@@ -209,7 +206,7 @@ export function createTimerRoutes(options = {}) {
           name: params.name,
           interval: timer.interval,
           enabled: timer.enabled,
-          running: timer.intervalId != null,
+          running: timer.intervalId !== null,
           tickCount: timer.tickCount,
         },
       }
@@ -248,7 +245,7 @@ export function createTimerRoutes(options = {}) {
    * Install timer routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} bl
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/timers'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
   function install(bl, { prefix = '/timers' } = {}) {
     bl.mount(prefix, timerResource)

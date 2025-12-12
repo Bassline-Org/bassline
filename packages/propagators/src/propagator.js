@@ -1,4 +1,5 @@
 import { resource } from '@bassline/core'
+import { ports, types } from '@bassline/plumber'
 
 /**
  * Create propagator routes for reactive constraint networks.
@@ -17,11 +18,10 @@ import { resource } from '@bassline/core'
  * - PUT  /propagators/:name/kill → remove propagator
  * @param {object} options - Configuration
  * @param {object} options.bl - Bassline instance for reading/writing cells
- * @param {Function} [options.onPropagatorKill] - Callback when propagator is removed
  * @returns {object} Propagator routes and control functions
  */
 export function createPropagatorRoutes(options = {}) {
-  const { bl, onPropagatorKill } = options
+  const { bl } = options
 
   /** @type {Map<string, {inputs: string[], output: string, handler: Function, handlerName: string, config: object, enabled: boolean}>} */
   const store = new Map()
@@ -124,7 +124,7 @@ export function createPropagatorRoutes(options = {}) {
   }
 
   /**
-   * Kill (remove) a propagator with callback notification
+   * Kill (remove) a propagator with plumber notification
    * @param {string} name - Propagator name
    * @returns {boolean} Whether the propagator existed and was removed
    */
@@ -132,9 +132,10 @@ export function createPropagatorRoutes(options = {}) {
     const existed = store.has(name)
     if (existed) {
       removePropagator(name)
-      if (onPropagatorKill) {
-        onPropagatorKill({ uri: `bl:///propagators/${name}` })
-      }
+      bl?.plumb(`bl:///propagators/${name}`, ports.RESOURCE_REMOVED, {
+        headers: { type: types.RESOURCE_REMOVED },
+        body: { uri: `bl:///propagators/${name}` },
+      })
     }
     return existed
   }
@@ -278,23 +279,23 @@ export function createPropagatorRoutes(options = {}) {
     })
 
     // Handle cell change notifications from plumber
-    // Routing metadata (source, port) in request headers, payload in body
-    r.put('/on-cell-change', async ({ headers }) => {
-      const cellUri = headers.source
-      if (!cellUri) {
+    // The cell sends { source, value } in the body
+    r.put('/on-cell-change', async ({ body }) => {
+      const source = body?.source
+      if (!source) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: 'Missing source in request headers' },
+          body: { error: 'Missing source in body' },
         }
       }
 
       // Remove /value suffix if present to get the cell URI
-      const baseCellUri = cellUri.replace(/\/value$/, '')
-      await onCellChange(baseCellUri)
+      const cellUri = source.replace(/\/value$/, '')
+      await onCellChange(cellUri)
 
       return {
         headers: { type: 'bl:///types/propagator-triggered' },
-        body: { cellUri: baseCellUri },
+        body: { source: cellUri },
       }
     })
   })

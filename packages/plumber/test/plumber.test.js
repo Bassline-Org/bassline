@@ -44,6 +44,30 @@ describe('createPlumber', () => {
       const result = await bl.get('bl:///plumb/rules/missing')
       expect(result).toBeNull()
     })
+
+    it('kills an existing rule', async () => {
+      const bl = new Bassline()
+      const plumber = createPlumber()
+      plumber.install(bl)
+
+      await bl.put('bl:///plumb/rules/test-rule', {}, { match: { port: 'x' }, to: 'bl:///dest' })
+      expect(plumber._rules.has('test-rule')).toBe(true)
+
+      const result = await bl.put('bl:///plumb/rules/test-rule/kill', {}, {})
+      expect(result.headers.type).toBe('bl:///types/plumb-rule-killed')
+      expect(result.body.name).toBe('test-rule')
+      expect(result.body.killed).toBe(true)
+      expect(plumber._rules.has('test-rule')).toBe(false)
+    })
+
+    it('returns killed: false for non-existent rule', async () => {
+      const bl = new Bassline()
+      const plumber = createPlumber()
+      plumber.install(bl)
+
+      const result = await bl.put('bl:///plumb/rules/missing/kill', {}, {})
+      expect(result.body.killed).toBe(false)
+    })
   })
 
   describe('routing', () => {

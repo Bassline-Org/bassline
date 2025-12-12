@@ -3,33 +3,11 @@ import { createFuzzyCellRoutes } from './fuzzy-routes.js'
 
 /**
  * Install cells into a Bassline instance.
- * Uses bl._propagators for reactive updates if available.
- * Uses plumber for resource removal notifications and cell→propagator wiring.
+ * Uses plumber for notifications (cell changes, removals, contradictions).
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  */
 export default async function installCells(bl) {
-  const cells = createCellRoutes({
-    onCellChange: ({ uri }) => {
-      bl._propagators?.onCellChange(uri)
-    },
-    onCellKill: ({ uri }) => {
-      bl.put(
-        'bl:///plumb/send',
-        { source: uri, port: 'resource-removed' },
-        { headers: { type: 'bl:///types/resource-removed' }, body: { uri } }
-      )
-    },
-    onContradiction: ({ uri, cell, previousValue, incomingValue, result }) => {
-      bl.put(
-        'bl:///plumb/send',
-        { source: uri, port: 'contradictions' },
-        {
-          headers: { type: 'bl:///types/contradiction' },
-          body: { uri, lattice: cell.lattice, previousValue, incomingValue, result },
-        }
-      )
-    },
-  })
+  const cells = createCellRoutes({ bl })
 
   cells.install(bl)
   bl._cells = cells

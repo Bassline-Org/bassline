@@ -1,4 +1,5 @@
 import { resource } from '@bassline/core'
+import { ports, types } from '@bassline/plumber'
 import { getLattice, lattices } from './lattices'
 
 /**
@@ -16,12 +17,12 @@ import { getLattice, lattices } from './lattices'
  * - PUT  /cells/:name/value → merge value (lattice join)
  * - PUT  /cells/:name/reset → reset to bottom
  * @param {object} [options] - Configuration options
- * @param {Function} [options.onCellChange] - Callback when a cell value changes
+ * @param {import('@bassline/core').Bassline} [options.bl] - Bassline instance for plumber notifications
  * @returns {object} Cell routes and store
  */
 
 export function createCellRoutes(options = {}) {
-  const { onCellChange, onCellKill, onContradiction } = options
+  const { bl } = options
 
   /** @type {Map<string, {lattice: string, value: any, label?: string}>} */
   const store = new Map()
@@ -90,7 +91,7 @@ export function createCellRoutes(options = {}) {
 
     // Detect contradiction for setIntersection lattice
     // Contradiction: join produces empty set from two non-empty, non-null sets
-    if (cell.lattice === 'setIntersection' && onContradiction) {
+    if (cell.lattice === 'setIntersection') {
       const isContradiction =
         Array.isArray(joinedValue) &&
         joinedValue.length === 0 &&
@@ -99,12 +100,32 @@ export function createCellRoutes(options = {}) {
         Array.isArray(valueToMerge) &&
         valueToMerge.length > 0
       if (isContradiction) {
-        onContradiction({
-          uri: `bl:///cells/${name}`,
-          cell,
-          previousValue: oldValue,
-          incomingValue: valueToMerge,
-          result: joinedValue,
+        bl?.plumb(`bl:///cells/${name}`, ports.CONTRADICTIONS, {
+          headers: { type: types.CONTRADICTION },
+          body: {
+            uri: `bl:///cells/${name}`,
+            lattice: cell.lattice,
+            previousValue: oldValue,
+            incomingValue: valueToMerge,
+            result: joinedValue,
+          },
+        })
+      }
+    }
+
+    // Detect contradiction for LWW lattice
+    // Contradiction marker: { value: null, timestamp: -1 }
+    if (cell.lattice === 'lww') {
+      if (joinedValue?.timestamp === -1) {
+        bl?.plumb(`bl:///cells/${name}`, ports.CONTRADICTIONS, {
+          headers: { type: types.CONTRADICTION },
+          body: {
+            uri: `bl:///cells/${name}`,
+            lattice: cell.lattice,
+            previousValue: oldValue,
+            incomingValue: valueToMerge,
+            result: joinedValue,
+          },
         })
       }
     }
@@ -139,9 +160,10 @@ export function createCellRoutes(options = {}) {
     const existed = store.has(name)
     if (existed) {
       store.delete(name)
-      if (onCellKill) {
-        onCellKill({ uri: `bl:///cells/${name}` })
-      }
+      bl?.plumb(`bl:///cells/${name}`, ports.RESOURCE_REMOVED, {
+        headers: { type: types.RESOURCE_REMOVED },
+        body: { uri: `bl:///cells/${name}` },
+      })
     }
     return existed
   }
@@ -217,12 +239,12 @@ export function createCellRoutes(options = {}) {
     r.put('/:name/value', async ({ params, body }) => {
       const { changed, cell } = mergeValue(params.name, body)
 
-      // Notify on change (for propagator integration)
-      // Await callback to support propagation chains
-      if (changed && onCellChange) {
-        await onCellChange({
-          uri: `bl:///cells/${params.name}`,
-          cell,
+      // Notify on change (for propagator integration via plumber)
+      if (changed) {
+        const uri = `bl:///cells/${params.name}`
+        await bl?.plumb(uri, 'cell-updates', {
+          headers: { type: 'bl:///types/cell-value', changed: true },
+          body: { uri, value: cell.value },
         })
       }
 
@@ -236,13 +258,14 @@ export function createCellRoutes(options = {}) {
     })
 
     // Reset a cell to bottom
-    r.put('/:name/reset', ({ params }) => {
+    r.put('/:name/reset', async ({ params }) => {
       const cell = resetCell(params.name)
 
-      if (cell && onCellChange) {
-        onCellChange({
-          uri: `bl:///cells/${params.name}`,
-          cell,
+      if (cell) {
+        const uri = `bl:///cells/${params.name}`
+        await bl?.plumb(uri, 'cell-updates', {
+          headers: { type: 'bl:///types/cell-value', changed: true },
+          body: { uri, value: cell.value },
         })
       }
 

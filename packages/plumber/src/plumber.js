@@ -1,6 +1,34 @@
 import { resource, matchesPattern } from '@bassline/core'
 
 /**
+ * Well-known plumber ports
+ */
+export const ports = {
+  RESOURCE_REMOVED: 'resource-removed',
+  CONTRADICTIONS: 'contradictions',
+  TIMER_TICK: 'timer-tick',
+  FETCH_RESPONSES: 'fetch-responses',
+  FETCH_ERRORS: 'fetch-errors',
+  MONITOR_UPDATES: 'monitor-updates',
+  MONITOR_ERRORS: 'monitor-errors',
+  ROUTE_NOT_FOUND: 'route-not-found',
+}
+
+/**
+ * Well-known message types
+ */
+export const types = {
+  RESOURCE_REMOVED: 'bl:///types/resource-removed',
+  CONTRADICTION: 'bl:///types/contradiction',
+  TIMER_TICK: 'bl:///types/timer-tick',
+  FETCH_RESPONSE: 'bl:///types/fetch-response',
+  FETCH_ERROR: 'bl:///types/fetch-error',
+  MONITOR_UPDATE: 'bl:///types/monitor-update',
+  MONITOR_ERROR: 'bl:///types/monitor-error',
+  ROUTE_NOT_FOUND: 'bl:///types/route-not-found',
+}
+
+/**
  * Create a plumber for message routing based on pattern-matched rules
  *
  * Rules are stored as resources at `bl:///plumb/rules/:name`
@@ -168,6 +196,19 @@ export function createPlumber() {
           body,
         }
       },
+    })
+
+    // Kill (remove) a rule
+    r.put('/rules/:name/kill', ({ params }) => {
+      const name = params.name
+      const existed = rules.has(name)
+      if (existed) {
+        rules.delete(name)
+      }
+      return {
+        headers: { type: 'bl:///types/plumb-rule-killed' },
+        body: { name, killed: existed },
+      }
     })
   })
 
