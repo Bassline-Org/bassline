@@ -113,4 +113,3 @@ export default function TypeIcon({ type, size = 16, className = '', colored = tr
 }
 
 // Export mappings for direct access
-export { TYPE_ICONS, TYPE_COLORS }

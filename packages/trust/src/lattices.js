@@ -11,7 +11,7 @@
  */
 
 /**
- * @typedef {Object} TrustEstimate
+ * @typedef {object} TrustEstimate
  * @property {number} value - Trust value (0-1)
  * @property {number} samples - Number of observations
  * @property {number} variance - Statistical variance
@@ -21,19 +21,18 @@
  * Create initial trust estimate (no observations)
  * @returns {TrustEstimate}
  */
-export function initial() {
+function initial() {
   return { value: 0.5, samples: 0, variance: 0.25 }
 }
 
 /**
  * Merge two trust estimates using weighted combination
  * More samples = more weight in the merge
- *
  * @param {TrustEstimate} a - First estimate
  * @param {TrustEstimate} b - Second estimate
  * @returns {TrustEstimate} Combined estimate
  */
-export function merge(a, b) {
+function merge(a, b) {
   // Empty states
   if (!a || a.samples === 0) return b || initial()
   if (!b || b.samples === 0) return a
@@ -54,12 +53,11 @@ export function merge(a, b) {
 /**
  * Add a single observation to a trust estimate
  * outcome: 1 = positive, 0 = negative
- *
  * @param {TrustEstimate} estimate - Current estimate
  * @param {number} outcome - Observation (0 or 1)
  * @returns {TrustEstimate} Updated estimate
  */
-export function observe(estimate, outcome) {
+function observe(estimate, outcome) {
   const current = estimate || initial()
   const n = current.samples + 1
 
@@ -82,12 +80,11 @@ export function observe(estimate, outcome) {
 /**
  * Decay trust over time (reduce confidence without changing value)
  * Used when peer hasn't been seen recently
- *
  * @param {TrustEstimate} estimate - Current estimate
  * @param {number} factor - Decay factor (0-1, lower = more decay)
  * @returns {TrustEstimate} Decayed estimate
  */
-export function decay(estimate, factor = 0.9) {
+function decay(estimate, factor = 0.9) {
   if (!estimate) return initial()
   return {
     value: estimate.value,
@@ -98,25 +95,23 @@ export function decay(estimate, factor = 0.9) {
 
 /**
  * Check if trust meets a threshold
- *
  * @param {TrustEstimate} estimate - Trust estimate
  * @param {number} threshold - Required trust level (0-1)
- * @param {number} [minSamples=3] - Minimum samples required
+ * @param {number} [minSamples] - Minimum samples required
  * @returns {boolean} Whether trust exceeds threshold
  */
-export function meetsThreshold(estimate, threshold, minSamples = 3) {
+function meetsThreshold(estimate, threshold, minSamples = 3) {
   if (!estimate || estimate.samples < minSamples) return false
   return estimate.value >= threshold
 }
 
 /**
  * Get confidence interval for the trust value
- *
  * @param {TrustEstimate} estimate - Trust estimate
- * @param {number} [z=1.96] - Z-score (1.96 for 95% CI)
+ * @param {number} [z] - Z-score (1.96 for 95% CI)
  * @returns {{low: number, high: number}} Confidence interval
  */
-export function confidenceInterval(estimate, z = 1.96) {
+function confidenceInterval(estimate, z = 1.96) {
   if (!estimate || estimate.samples === 0) {
     return { low: 0, high: 1 }
   }

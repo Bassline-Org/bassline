@@ -6,7 +6,7 @@ import {
 } from '@bassline/structure-editor'
 import '@bassline/structure-editor/styles.css'
 
-export interface DataBlockProps {
+interface DataBlockProps {
   id: string
   content: JsonValue
   position: { x: number; y: number }
@@ -23,7 +23,7 @@ export interface DataBlockProps {
  * Contains a structure editor for editing JSON content.
  * Can be dragged to resource nodes to PUT data.
  */
-export function DataBlock(props: DataBlockProps) {
+function DataBlock(props: DataBlockProps) {
   let containerRef: HTMLDivElement | undefined
   let editorRef: HTMLDivElement | undefined
   let editorInstance: StructureEditor | undefined

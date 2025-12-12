@@ -221,4 +221,3 @@ export default function LatticeVisualizer(props: LatticeVisualizerProps) {
 }
 
 // Export individual components for direct use
-export { CounterControl, GaugeDisplay, TagChips, EditableField, ToggleSwitch, PropertyGrid }

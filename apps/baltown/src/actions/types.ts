@@ -13,7 +13,7 @@ export interface Resource {
 /**
  * Toast API for action feedback
  */
-export interface ToastAPI {
+interface ToastAPI {
   success: (msg: string) => void
   error: (msg: string) => void
   info: (msg: string) => void
@@ -85,7 +85,7 @@ export interface Action {
 /**
  * Action factory function type
  */
-export type ActionFactory = () => Action
+type ActionFactory = () => Action
 
 // ============================================
 // Stack Types - Phase 2
@@ -104,7 +104,7 @@ export type StackedActionStatus =
 /**
  * Targets collected by an action
  */
-export interface ActionTargets {
+interface ActionTargets {
   /** Graph resources (cells, propagators) */
   resources: Resource[]
   /** IDs of other stacked actions (for meta-actions) */

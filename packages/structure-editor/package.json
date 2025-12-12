@@ -17,7 +17,6 @@
   "dependencies": {
     "@tiptap/core": "^2.10.3",
     "@tiptap/pm": "^2.10.3",
-    "@tiptap/extension-document": "^2.10.3",
     "@tiptap/extension-paragraph": "^2.10.3",
     "@tiptap/extension-text": "^2.10.3",
     "@tiptap/extension-history": "^2.10.3"

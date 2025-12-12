@@ -95,21 +95,7 @@ export function hasPrettyView(resource) {
 }
 
 // Export individual views
-export {
-  Inspector,
-  Directory,
-  CellView,
-  FuzzyCellView,
-  PersonView,
-  NoteView,
-  TaskView,
-  TypeView,
-  IndexView,
-  Dashboard,
-  TypeExplorer,
-  NetworkGraph,
-}
 
 // Export views mapping for external use
-export const views = viewsByType
+const views = viewsByType
 export const virtualViews = viewsByUri

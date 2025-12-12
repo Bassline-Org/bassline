@@ -1,6 +1,6 @@
 import { createSignal, createRoot } from 'solid-js'
 
-export type SelectionType = 'cell' | 'propagator' | 'handler' | 'recipe' | 'none'
+type SelectionType = 'cell' | 'propagator' | 'handler' | 'recipe' | 'none'
 
 export interface SelectedResource {
   uri: string

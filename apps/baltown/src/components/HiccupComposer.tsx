@@ -457,7 +457,7 @@ export function createEmptyComposition(): HiccupNode {
 }
 
 // Helper to parse a JSON string into a hiccup node
-export function parseHiccup(json: string): HiccupNode | null {
+function parseHiccup(json: string): HiccupNode | null {
   try {
     const parsed = JSON.parse(json)
     if (typeof parsed === 'string') return parsed
