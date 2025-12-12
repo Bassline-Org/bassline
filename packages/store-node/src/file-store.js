@@ -4,11 +4,9 @@ import { join, dirname } from 'node:path'
 
 /**
  * Create file-based storage routes
- *
  * @param {string} dataDir - Directory to store files
- * @param {string} [defaultPrefix='/data'] - Default mount prefix
+ * @param {string} [defaultPrefix] - Default mount prefix
  * @returns {object} Resource with routes and install method
- *
  * @example
  * const bl = new Bassline()
  * bl.mount('/data', createFileStore('.bassline'))
@@ -52,7 +50,7 @@ export function createFileStore(dataDir, defaultPrefix = '/data') {
           const content = readFileSync(filePath, 'utf-8')
           const doc = JSON.parse(content)
           return {
-            headers: { type: doc.type || 'document' },
+            headers: { type: doc.type || 'bl:///types/document' },
             body: doc,
           }
         } catch (err) {
@@ -76,7 +74,7 @@ export function createFileStore(dataDir, defaultPrefix = '/data') {
 
           writeFileSync(filePath, JSON.stringify(body, null, 2))
           return {
-            headers: { type: body.type || 'document' },
+            headers: { type: body.type || 'bl:///types/document' },
             body,
           }
         } catch (err) {
@@ -105,11 +103,13 @@ export function createFileStore(dataDir, defaultPrefix = '/data') {
 
 /**
  * List directory contents
+ * @param dirPath
+ * @param urlPrefix
  * @private
  */
 function listDir(dirPath, urlPrefix) {
   if (!existsSync(dirPath)) {
-    return { headers: { type: 'directory' }, body: { entries: [] } }
+    return { headers: { type: 'bl:///types/directory' }, body: { entries: [] } }
   }
 
   try {
@@ -125,7 +125,7 @@ function listDir(dirPath, urlPrefix) {
     })
 
     return {
-      headers: { type: 'directory' },
+      headers: { type: 'bl:///types/directory' },
       body: { entries },
     }
   } catch (err) {

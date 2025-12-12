@@ -17,14 +17,13 @@ import { resource } from '@bassline/core'
  *
  * Monitor config:
  * {
- *   url: 'https://api.example.com/status',
- *   interval: 60000,        // poll every 60s
- *   enabled: true,          // auto-start
- *   extract: 'data.value',  // optional: extract nested field
- *   method: 'GET',          // HTTP method
- *   headers: {},            // custom headers
+ * url: 'https://api.example.com/status',
+ * interval: 60000,        // poll every 60s
+ * enabled: true,          // auto-start
+ * extract: 'data.value',  // optional: extract nested field
+ * method: 'GET',          // HTTP method
+ * headers: {},            // custom headers
  * }
- *
  * @param {object} options - Configuration options
  * @param {import('@bassline/core').Bassline} options.bl - Bassline instance
  * @returns {object} Monitor routes and management functions
@@ -54,7 +53,7 @@ export function createMonitorRoutes(options = {}) {
     const parts = path.split('.')
     let current = obj
     for (const part of parts) {
-      if (current == null) return undefined
+      if (current === null || current === undefined) return undefined
       current = current[part]
     }
     return current
@@ -278,11 +277,11 @@ export function createMonitorRoutes(options = {}) {
   }
 
   /**
-   * Delete a monitor completely
+   * Kill (remove) a monitor completely
    * @param {string} name - Monitor name
    * @returns {boolean} Whether monitor existed
    */
-  function deleteMonitor(name) {
+  function killMonitor(name) {
     const existed = store.has(name)
     if (!existed) return false
 
@@ -435,9 +434,9 @@ export function createMonitorRoutes(options = {}) {
       }
     })
 
-    // Delete monitor
-    r.put('/:name/delete', ({ params }) => {
-      const existed = deleteMonitor(params.name)
+    // Kill (remove) monitor
+    r.put('/:name/kill', ({ params }) => {
+      const existed = killMonitor(params.name)
       if (!existed) return null
 
       return {
@@ -449,12 +448,12 @@ export function createMonitorRoutes(options = {}) {
 
   /**
    * Install monitor routes into a Bassline instance
-   * @param {import('@bassline/core').Bassline} bl
+   * @param {import('@bassline/core').Bassline} bassline
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/monitors'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
-  function install(bl, { prefix = '/monitors' } = {}) {
-    bl.mount(prefix, monitorResource)
+  function install(bassline, { prefix = '/monitors' } = {}) {
+    bassline.mount(prefix, monitorResource)
   }
 
   /**
@@ -472,7 +471,7 @@ export function createMonitorRoutes(options = {}) {
     createMonitor,
     startMonitor,
     stopMonitor,
-    deleteMonitor,
+    killMonitor,
     getMonitor,
     listMonitors,
     doMonitorFetch,

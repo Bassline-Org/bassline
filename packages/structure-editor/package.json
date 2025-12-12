@@ -4,6 +4,7 @@
   "description": "Structural JSON editor built on Tiptap for Bassline",
   "type": "module",
   "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./src/index.ts",
     "./styles.css": "./src/styles.css",

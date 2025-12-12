@@ -109,26 +109,26 @@ const info = await bl.get('bl:///instances/page-views')
 // }
 ```
 
-## Deleting Instances
+## Killing Instances
 
 ```javascript
-await bl.put('bl:///instances/page-views/delete', {}, {})
+await bl.put('bl:///instances/page-views/kill', {}, {})
 ```
 
-Deletes all created resources in reverse order (propagators before cells).
+Kills all created resources in reverse order (propagators before cells).
 
 ## Routes
 
-| Route                     | Method | Description                   |
-| ------------------------- | ------ | ----------------------------- |
-| `/recipes`                | GET    | List all recipes              |
-| `/recipes/:name`          | GET    | Get recipe definition         |
-| `/recipes/:name`          | PUT    | Create/update recipe          |
-| `/recipes/:name/delete`   | PUT    | Delete recipe                 |
-| `/instances`              | GET    | List all instances            |
-| `/instances/:name`        | GET    | Get instance info             |
-| `/instances/:name`        | PUT    | Create instance from recipe   |
-| `/instances/:name/delete` | PUT    | Delete instance and resources |
+| Route                   | Method | Description                 |
+| ----------------------- | ------ | --------------------------- |
+| `/recipes`              | GET    | List all recipes            |
+| `/recipes/:name`        | GET    | Get recipe definition       |
+| `/recipes/:name`        | PUT    | Create/update recipe        |
+| `/recipes/:name/kill`   | PUT    | Kill (remove) recipe        |
+| `/instances`            | GET    | List all instances          |
+| `/instances/:name`      | GET    | Get instance info           |
+| `/instances/:name`      | PUT    | Create instance from recipe |
+| `/instances/:name/kill` | PUT    | Kill instance and resources |
 
 ## Plumber Events
 

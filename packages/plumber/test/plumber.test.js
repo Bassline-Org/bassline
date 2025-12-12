@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Bassline } from '../src/bassline.js'
+import { Bassline } from '@bassline/core'
 import { createPlumber } from '../src/plumber.js'
 
 describe('createPlumber', () => {
@@ -162,7 +162,7 @@ describe('createPlumber', () => {
 
       // Add a route to PUT to
       bl.route('/data/:key', {
-        put: ({ params, body }) => ({
+        put: ({ body }) => ({
           headers: { type: 'data' },
           body,
         }),

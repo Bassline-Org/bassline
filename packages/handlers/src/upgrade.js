@@ -8,36 +8,33 @@ import { createHandlerRegistry } from './registry.js'
 import { createCompiler } from './compiler.js'
 import { createHandlerRoutes } from './routes.js'
 
-// Handler registration
-import { registerReducers } from './handlers/reducers.js'
-import { registerBinaryOps } from './handlers/binary-ops.js'
-import { registerArithmetic } from './handlers/arithmetic.js'
-import { registerComparison } from './handlers/comparison.js'
-import { registerLogic } from './handlers/logic.js'
-import { registerString } from './handlers/string.js'
-import { registerArray } from './handlers/array.js'
-import { registerArrayReducers } from './handlers/array-reducers.js'
-import { registerObject } from './handlers/object.js'
-import { registerType } from './handlers/type.js'
-import { registerConditional } from './handlers/conditional.js'
-import { registerStructural } from './handlers/structural.js'
-import { registerUtility } from './handlers/utility.js'
-import { registerComposition } from './handlers/composition.js'
+// Handler modules (named exports)
+import * as math from './handlers/math.js'
+import * as logic from './handlers/logic.js'
+import * as collections from './handlers/collections.js'
+import * as string from './handlers/string.js'
+import * as type from './handlers/type.js'
+import * as control from './handlers/control.js'
+import * as combinators from './combinators.js'
 
-// Combinator registration
-import { registerUnaryCombinators } from './combinators/unary.js'
-import { registerBinaryCombinators } from './combinators/binary.js'
-import { registerTernaryCombinators } from './combinators/ternary.js'
-import { registerVariadicCombinators } from './combinators/variadic.js'
-import { registerSpecialCombinators } from './combinators/special.js'
+/**
+ * Register all exports from a module as handlers.
+ * @param {object} registry - Handler registry
+ * @param {object} mod - Module with named exports
+ * @param {object} [nameMap] - Optional name remapping (exportName -> handlerName)
+ */
+function registerModule(registry, mod, nameMap = {}) {
+  for (const [exportName, factory] of Object.entries(mod)) {
+    const handlerName = nameMap[exportName] || exportName
+    registry.registerBuiltin(handlerName, factory)
+  }
+}
 
 /**
  * Install handlers into a Bassline instance.
- *
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
- * @param {object} [config] - Configuration options
  */
-export default function installHandlers(bl, config = {}) {
+export default function installHandlers(bl) {
   // Create registry
   const registry = createHandlerRegistry()
 
@@ -45,35 +42,14 @@ export default function installHandlers(bl, config = {}) {
   const compile = createCompiler(registry)
   registry.setCompiler(compile)
 
-  // Register all built-in handlers
-  const ctx = {
-    registerBuiltin: registry.registerBuiltin,
-    get: registry.get,
-    getFactory: registry.getFactory,
-  }
-
-  // Handlers by domain
-  registerReducers(ctx)
-  registerBinaryOps(ctx)
-  registerArithmetic(ctx)
-  registerComparison(ctx)
-  registerLogic(ctx)
-  registerString(ctx)
-  registerArray(ctx)
-  registerArrayReducers(ctx)
-  registerObject(ctx)
-  registerType(ctx)
-  registerConditional(ctx)
-  registerStructural(ctx)
-  registerUtility(ctx)
-  registerComposition(ctx)
-
-  // Combinators
-  registerUnaryCombinators(ctx)
-  registerBinaryCombinators(ctx)
-  registerTernaryCombinators(ctx)
-  registerVariadicCombinators(ctx)
-  registerSpecialCombinators(ctx)
+  // Register all handler modules
+  registerModule(registry, math)
+  registerModule(registry, logic)
+  registerModule(registry, collections, { getPath: 'get' }) // Remap getPath -> get
+  registerModule(registry, string)
+  registerModule(registry, type)
+  registerModule(registry, control)
+  registerModule(registry, combinators)
 
   // Create and install routes
   const handlerRoutes = createHandlerRoutes({ registry, compile })

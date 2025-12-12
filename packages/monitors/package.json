@@ -4,7 +4,7 @@
   "description": "URL monitoring composed from timer + fetch + cell",
   "type": "module",
   "main": "src/index.js",
-  "types": "./src/index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },

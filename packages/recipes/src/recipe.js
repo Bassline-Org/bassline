@@ -11,13 +11,12 @@ import { substitute, validateParams } from './template.js'
  * - GET  /recipes           -> list all recipes
  * - GET  /recipes/:name     -> get recipe definition
  * - PUT  /recipes/:name     -> create/update recipe
- * - PUT  /recipes/:name/delete -> delete recipe
+ * - PUT  /recipes/:name/kill -> kill (remove) recipe
  *
  * - GET  /instances         -> list all instances
  * - GET  /instances/:name   -> get instance info
  * - PUT  /instances/:name   -> instantiate a recipe
- * - PUT  /instances/:name/delete -> delete instance and its resources
- *
+ * - PUT  /instances/:name/kill -> kill instance and its resources
  * @param {object} options - Configuration options
  * @param {import('@bassline/core').Bassline} options.bl - Bassline instance
  * @returns {object} Recipe routes and management functions
@@ -39,7 +38,6 @@ export function createRecipeRoutes(options = {}) {
 
   /**
    * Create or update a recipe definition.
-   *
    * @param {string} name - Recipe name
    * @param {object} definition - Recipe definition
    * @returns {object} Stored recipe
@@ -70,12 +68,11 @@ export function createRecipeRoutes(options = {}) {
   }
 
   /**
-   * Delete a recipe.
-   *
+   * Kill (remove) a recipe.
    * @param {string} name - Recipe name
    * @returns {boolean} Whether recipe existed
    */
-  function deleteRecipe(name) {
+  function killRecipe(name) {
     const existed = recipeStore.has(name)
     if (existed) {
       recipeStore.delete(name)
@@ -85,7 +82,6 @@ export function createRecipeRoutes(options = {}) {
 
   /**
    * Get a recipe by name.
-   *
    * @param {string} name - Recipe name
    * @returns {object|null} Recipe definition
    */
@@ -95,7 +91,6 @@ export function createRecipeRoutes(options = {}) {
 
   /**
    * List all recipe names.
-   *
    * @returns {string[]} Recipe names
    */
   function listRecipes() {
@@ -104,7 +99,6 @@ export function createRecipeRoutes(options = {}) {
 
   /**
    * Instantiate a recipe with given parameters.
-   *
    * @param {string} instanceName - Name for the instance
    * @param {string} recipeUri - Recipe URI (e.g., 'bl:///recipes/counter')
    * @param {object} params - Parameter values
@@ -190,29 +184,22 @@ export function createRecipeRoutes(options = {}) {
   }
 
   /**
-   * Delete an instance and all its created resources.
-   *
+   * Kill an instance and all its created resources.
    * @param {string} name - Instance name
    * @returns {Promise<boolean>} Whether instance existed
    */
-  async function deleteInstance(name) {
+  async function killInstance(name) {
     const instance = instanceStore.get(name)
     if (!instance) return false
 
-    // Delete resources in reverse order (propagators before cells)
-    const resourcesToDelete = [...instance.createdResources].reverse()
+    // Kill resources in reverse order (propagators before cells)
+    const resourcesToKill = [...instance.createdResources].reverse()
 
-    for (const resource of resourcesToDelete) {
+    for (const res of resourcesToKill) {
       try {
-        // Try kill first (for cells, propagators, timers)
-        await bl.put(`${resource.uri}/kill`, {}, {})
+        await bl.put(`${res.uri}/kill`, {}, {})
       } catch (err) {
-        // Try delete as fallback (for monitors)
-        try {
-          await bl.put(`${resource.uri}/delete`, {}, {})
-        } catch (err2) {
-          console.warn(`Failed to delete ${resource.uri}:`, err2.message)
-        }
+        console.warn(`Failed to kill ${res.uri}:`, err.message)
       }
     }
 
@@ -234,7 +221,6 @@ export function createRecipeRoutes(options = {}) {
 
   /**
    * Get an instance by name.
-   *
    * @param {string} name - Instance name
    * @returns {object|null} Instance state
    */
@@ -244,7 +230,6 @@ export function createRecipeRoutes(options = {}) {
 
   /**
    * List all instance names.
-   *
    * @returns {string[]} Instance names
    */
   function listInstances() {
@@ -292,9 +277,9 @@ export function createRecipeRoutes(options = {}) {
       }
     })
 
-    // Delete recipe
-    r.put('/:name/delete', ({ params }) => {
-      const existed = deleteRecipe(params.name)
+    // Kill (remove) recipe
+    r.put('/:name/kill', ({ params }) => {
+      const existed = killRecipe(params.name)
       if (!existed) return null
 
       return {
@@ -333,7 +318,7 @@ export function createRecipeRoutes(options = {}) {
         headers: { type: 'bl:///types/instance' },
         body: {
           ...instance,
-          entries: [{ name: 'delete', uri: `bl:///instances/${params.name}/delete` }],
+          entries: [{ name: 'kill', uri: `bl:///instances/${params.name}/kill` }],
         },
       }
     })
@@ -362,9 +347,9 @@ export function createRecipeRoutes(options = {}) {
       }
     })
 
-    // Delete instance
-    r.put('/:name/delete', async ({ params }) => {
-      const existed = await deleteInstance(params.name)
+    // Kill instance
+    r.put('/:name/kill', async ({ params }) => {
+      const existed = await killInstance(params.name)
       if (!existed) return null
 
       return {
@@ -376,11 +361,10 @@ export function createRecipeRoutes(options = {}) {
 
   /**
    * Install recipe routes into a Bassline instance.
-   *
    * @param {import('@bassline/core').Bassline} blInstance
    * @param {object} [options] - Options
-   * @param {string} [options.recipesPrefix='/recipes'] - Mount prefix for recipes
-   * @param {string} [options.instancesPrefix='/instances'] - Mount prefix for instances
+   * @param {string} [options.recipesPrefix] - Mount prefix for recipes
+   * @param {string} [options.instancesPrefix] - Mount prefix for instances
    */
   function install(
     blInstance,
@@ -395,11 +379,11 @@ export function createRecipeRoutes(options = {}) {
     instanceRoutes: instanceResource,
     install,
     createRecipe,
-    deleteRecipe,
+    killRecipe,
     getRecipe,
     listRecipes,
     instantiate,
-    deleteInstance,
+    killInstance,
     getInstance,
     listInstances,
     _recipeStore: recipeStore,

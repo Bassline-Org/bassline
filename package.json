@@ -20,7 +20,7 @@
     "dev:editor": "pnpm --filter @bassline/editor dev",
     "dev:all": "pnpm --parallel --stream dev",
     "build": "pnpm -r build",
-    "build:types": "tsc -p tsconfig.build.json",
+    "build:types": "pnpm --filter './packages/*' --filter '!@bassline/structure-editor' --parallel exec tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run packages/*/test/*.test.js",

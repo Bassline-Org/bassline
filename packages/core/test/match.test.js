@@ -88,15 +88,17 @@ describe('matchesPattern', () => {
       expect(matchesPattern(-1, -1)).toBe(true)
     })
 
-    it('matches null with strict equality', () => {
+    it('null pattern is a wildcard (matches anything)', () => {
       expect(matchesPattern(null, null)).toBe(true)
-      expect(matchesPattern(null, undefined)).toBe(false)
-      expect(matchesPattern(null, false)).toBe(false)
+      expect(matchesPattern(null, undefined)).toBe(true)
+      expect(matchesPattern(null, 'hello')).toBe(true)
+      expect(matchesPattern(null, 42)).toBe(true)
     })
 
-    it('matches undefined with strict equality', () => {
+    it('undefined pattern is a wildcard (matches anything)', () => {
       expect(matchesPattern(undefined, undefined)).toBe(true)
-      expect(matchesPattern(undefined, null)).toBe(false)
+      expect(matchesPattern(undefined, null)).toBe(true)
+      expect(matchesPattern(undefined, 'hello')).toBe(true)
     })
 
     it('matches primitive values in object patterns', () => {
@@ -133,10 +135,10 @@ describe('matchesPattern', () => {
   })
 
   describe('edge cases', () => {
-    it('returns false for null pattern against non-null', () => {
-      expect(matchesPattern(null, 'hello')).toBe(false)
-      expect(matchesPattern(null, 42)).toBe(false)
-      expect(matchesPattern(null, true)).toBe(false)
+    it('null/undefined patterns are wildcards (covered in primitive tests)', () => {
+      // null and undefined patterns match anything - see primitive tests
+      expect(matchesPattern(null, 'hello')).toBe(true)
+      expect(matchesPattern(undefined, 42)).toBe(true)
     })
 
     it('returns false for null target with object pattern', () => {

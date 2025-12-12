@@ -4,7 +4,7 @@
   "description": "WebSocket remote client for Bassline (browser)",
   "type": "module",
   "main": "src/index.js",
-  "types": "./src/index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },
@@ -15,6 +15,7 @@
     "@bassline/core": "workspace:*"
   },
   "devDependencies": {
+    "@bassline/plumber": "workspace:*",
     "@bassline/server-node": "workspace:*",
     "vitest": "^2.0.0",
     "ws": "^8.18.0"
