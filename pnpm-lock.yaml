@@ -326,7 +326,31 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/ui-web:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+      '@bassline/plumber':
+        specifier: workspace:*
+        version: link:../plumber
+      '@bassline/react':
+        specifier: workspace:*
+        version: link:../react
+      '@bassline/widgets':
+        specifier: workspace:*
+        version: link:../widgets
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+
   packages/vals:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+
+  packages/widgets:
     dependencies:
       '@bassline/core':
         specifier: workspace:*
