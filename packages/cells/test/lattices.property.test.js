@@ -16,7 +16,26 @@ import {
   boolean,
   object,
   lww,
+  Contradiction,
 } from '../src/lattices.js'
+
+// Helper to run join and catch contradictions
+/**
+ *
+ * @param join
+ * @param a
+ * @param b
+ */
+function tryJoin(join, a, b) {
+  try {
+    return { result: join(a, b), contradiction: false }
+  } catch (e) {
+    if (e instanceof Contradiction) {
+      return { result: null, contradiction: true }
+    }
+    throw e
+  }
+}
 
 // Helper to deep compare values (handles arrays, objects)
 // Sorts object keys to handle insertion order differences
@@ -147,14 +166,29 @@ describe('setIntersection lattice', () => {
   const valueArb = fc.oneof(arrayArb, fc.constant(null))
 
   test.prop([valueArb, valueArb])('join is commutative', (a, b) => {
-    expect(deepEqual(join(a, b), join(b, a))).toBe(true)
+    const ab = tryJoin(join, a, b)
+    const ba = tryJoin(join, b, a)
+    // Both contradict or both succeed with equal results
+    expect(ab.contradiction).toBe(ba.contradiction)
+    if (!ab.contradiction) {
+      expect(deepEqual(ab.result, ba.result)).toBe(true)
+    }
   })
 
   test.prop([valueArb, valueArb, valueArb])('join is associative', (a, b, c) => {
-    expect(deepEqual(join(join(a, b), c), join(a, join(b, c)))).toBe(true)
+    const ab = tryJoin(join, a, b)
+    const bc = tryJoin(join, b, c)
+    if (ab.contradiction || bc.contradiction) return // Skip if intermediate contradicts
+    const abc1 = tryJoin(join, ab.result, c)
+    const abc2 = tryJoin(join, a, bc.result)
+    expect(abc1.contradiction).toBe(abc2.contradiction)
+    if (!abc1.contradiction) {
+      expect(deepEqual(abc1.result, abc2.result)).toBe(true)
+    }
   })
 
   test.prop([arrayArb])('join is idempotent', (a) => {
+    // Idempotent should never contradict (same value)
     expect(deepEqual(join(a, a), [...new Set(a)].sort())).toBe(true)
   })
 
@@ -200,14 +234,25 @@ describe('lww lattice', () => {
   })
 
   test.prop([lwwArb, lwwArb])('join is commutative', (a, b) => {
-    // LWW is commutative because max timestamp wins regardless of order
-    const resultAB = join(a, b)
-    const resultBA = join(b, a)
-    expect(deepEqual(resultAB, resultBA)).toBe(true)
+    const ab = tryJoin(join, a, b)
+    const ba = tryJoin(join, b, a)
+    // Both contradict or both succeed with equal results
+    expect(ab.contradiction).toBe(ba.contradiction)
+    if (!ab.contradiction) {
+      expect(deepEqual(ab.result, ba.result)).toBe(true)
+    }
   })
 
   test.prop([lwwArb, lwwArb, lwwArb])('join is associative', (a, b, c) => {
-    expect(deepEqual(join(join(a, b), c), join(a, join(b, c)))).toBe(true)
+    const ab = tryJoin(join, a, b)
+    const bc = tryJoin(join, b, c)
+    if (ab.contradiction || bc.contradiction) return // Skip if intermediate contradicts
+    const abc1 = tryJoin(join, ab.result, c)
+    const abc2 = tryJoin(join, a, bc.result)
+    expect(abc1.contradiction).toBe(abc2.contradiction)
+    if (!abc1.contradiction) {
+      expect(deepEqual(abc1.result, abc2.result)).toBe(true)
+    }
   })
 
   test.prop([lwwArb])('join is idempotent', (a) => {

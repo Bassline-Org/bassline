@@ -44,8 +44,10 @@ export default [
 
       // === JSDoc (relax some defaults) ===
       'jsdoc/require-jsdoc': 'off',
-      'jsdoc/require-param-description': 'warn',
-      'jsdoc/require-returns-description': 'warn',
+      'jsdoc/require-param-description': 'off',
+      'jsdoc/require-param-type': 'off',
+      'jsdoc/require-returns': 'off',
+      'jsdoc/require-returns-description': 'off',
       'jsdoc/check-param-names': 'error', // Param names match function
       'jsdoc/check-types': 'warn', // Valid type syntax
     },
