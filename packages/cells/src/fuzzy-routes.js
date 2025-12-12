@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 import { FuzzyCell } from './fuzzy.js'
 import {
   createKnowledgeCompactor,
@@ -57,7 +57,7 @@ export function createFuzzyCellRoutes(options = {}) {
     }
   }
 
-  const fuzzyCellRoutes = routes('/fuzzy', r => {
+  const fuzzyCellResource = resource(r => {
     // List all fuzzy cells
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -146,9 +146,14 @@ export function createFuzzyCellRoutes(options = {}) {
   })
 
   return {
-    routes: fuzzyCellRoutes,
-    /** Install fuzzy cell routes into Bassline */
-    install: (bl) => bl.install(fuzzyCellRoutes),
+    routes: fuzzyCellResource,
+    /**
+     * Install fuzzy cell routes into Bassline
+     * @param {import('@bassline/core').Bassline} bl
+     * @param {object} [options] - Options
+     * @param {string} [options.prefix='/fuzzy'] - Mount prefix
+     */
+    install: (bl, { prefix = '/fuzzy' } = {}) => bl.mount(prefix, fuzzyCellResource),
     /** Access to the internal store for testing */
     _store: store,
     /** Create a compactor by name */

@@ -1,4 +1,4 @@
-import { routes } from './router.js'
+import { resource } from './router.js'
 
 /**
  * Create install routes for dynamic module loading.
@@ -45,7 +45,7 @@ export function createInstallRoutes(options = {}) {
     return installed.get(name) || null
   }
 
-  const installRoutes = routes('/install', r => {
+  const installResource = resource(r => {
     // List installed modules
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -110,13 +110,15 @@ export function createInstallRoutes(options = {}) {
   /**
    * Install routes into a Bassline instance
    * @param {import('./bassline.js').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/install'] - Mount prefix
    */
-  function install(bl) {
-    bl.install(installRoutes)
+  function install(bl, { prefix = '/install' } = {}) {
+    bl.mount(prefix, installResource)
   }
 
   return {
-    routes: installRoutes,
+    routes: installResource,
     install,
     listModules,
     getModule,

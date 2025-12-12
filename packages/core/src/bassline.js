@@ -351,21 +351,80 @@ export class Bassline {
   }
 
   /**
+   * Mount a resource at a specific path prefix
+   *
+   * This is the primary way to add routes from a `resource()` definition.
+   * Routes defined in the resource are relative to the mount point.
+   *
+   * @param {string} prefix - Path prefix to mount at (e.g., '/cells', '/v2/cells', '/ns/:ns/cells')
+   * @param {import('./router.js').RouterBuilder} routerBuilder - Router builder with route definitions
+   * @returns {this} For chaining
+   *
+   * @example
+   * import { resource } from './router.js'
+   *
+   * const cellResource = resource(r => {
+   *   r.get('/', () => ({ headers: {}, body: listCells() }))
+   *   r.get('/:name', ({ params }) => ({ headers: {}, body: getCell(params.name) }))
+   * })
+   *
+   * // Mount at different paths
+   * bl.mount('/cells', cellResource)
+   * bl.mount('/v2/cells', cellResource)
+   *
+   * // Mount with inherited params
+   * bl.mount('/namespaces/:ns/cells', cellResource)
+   * // Handlers receive params.ns from the mount prefix
+   */
+  mount(prefix, routerBuilder) {
+    // Normalize prefix: no trailing slash, empty string for root
+    const normalizedPrefix = prefix === '/' ? '' : prefix.replace(/\/$/, '')
+
+    for (const { pattern, config } of routerBuilder.definitions) {
+      // Pattern from resource is relative (e.g., '/', '/:name', '/:name/value')
+      // Combine with mount prefix
+      let fullPattern
+      if (pattern === '' || pattern === '/') {
+        fullPattern = normalizedPrefix || '/'
+      } else {
+        fullPattern = normalizedPrefix + pattern
+      }
+      this.route(fullPattern, config)
+    }
+    return this
+  }
+
+  /**
    * Install routes from a RouterBuilder
+   *
+   * For `routes()` builders (with fixed prefix), installs at their defined paths.
+   * For `resource()` builders (no prefix), mounts at root '/'.
+   * Use `mount()` instead for explicit control over where resources are mounted.
    *
    * @param {import('./router.js').RouterBuilder} routerBuilder - Router builder with route definitions
    * @returns {this} For chaining
    *
    * @example
-   * import { routes } from './router.js'
+   * import { routes, resource } from './router.js'
    *
+   * // Traditional routes with fixed prefix
    * const cellRoutes = routes('/cells/:name', r => {
    *   r.get('/', (params) => ({ headers: {}, body: 'cell' }))
    * })
+   * bl.install(cellRoutes)  // mounted at /cells/:name
    *
-   * bl.install(cellRoutes)
+   * // Resource without prefix - mounts at root
+   * const indexResource = resource(r => {
+   *   r.get('/', () => ({ headers: {}, body: 'index' }))
+   * })
+   * bl.install(indexResource)  // mounted at /
    */
   install(routerBuilder) {
+    if (routerBuilder.isResource) {
+      // Resource without fixed prefix - mount at root
+      return this.mount('/', routerBuilder)
+    }
+    // Traditional routes() with fixed prefix
     routerBuilder.install(this)
     return this
   }

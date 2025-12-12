@@ -12,20 +12,36 @@
  */
 
 /**
+ * @typedef {Object} RouterBuilderOptions
+ * @property {boolean} [isResource=false] - Whether this is a mountable resource (no fixed prefix)
+ */
+
+/**
  * RouterBuilder - Define routes hierarchically with scoped prefixes
  * @example
+ * // Traditional usage with fixed prefix
  * const cellRoutes = new RouterBuilder('/cells/:name')
  * cellRoutes.get('/', (params) => ({ headers: {}, body: 'cell' }))
  * cellRoutes.get('/value', (params) => ({ headers: {}, body: 42 }))
  * cellRoutes.install(bassline)
+ *
+ * @example
+ * // As a mountable resource (no fixed prefix)
+ * const cellRoutes = new RouterBuilder('', { isResource: true })
+ * cellRoutes.get('/', ...)
+ * cellRoutes.get('/:name', ...)
+ * // Mount at any path later via bl.mount('/cells', cellRoutes)
  */
 export class RouterBuilder {
   /**
-   * @param {string} [prefix] - URL prefix for all routes in this builder
+   * @param {string} [prefix=''] - URL prefix for all routes in this builder
+   * @param {RouterBuilderOptions} [options={}] - Configuration options
    */
-  constructor(prefix = '') {
+  constructor(prefix = '', options = {}) {
     /** @type {string} */
     this.prefix = prefix
+    /** @type {boolean} */
+    this.isResource = options.isResource ?? false
     /** @type {Array<{pattern: string, config: RouteConfig}>} */
     this.definitions = []
   }
@@ -89,7 +105,7 @@ export class RouterBuilder {
    * })
    */
   scope(prefix, fn) {
-    const scoped = new RouterBuilder(this.prefix + prefix)
+    const scoped = new RouterBuilder(this.prefix + prefix, { isResource: this.isResource })
     fn(scoped)
     this.definitions.push(...scoped.definitions)
     return this
@@ -136,6 +152,44 @@ export class RouterBuilder {
  */
 export function routes(prefix, fn) {
   const builder = new RouterBuilder(prefix)
+  fn(builder)
+  return builder
+}
+
+/**
+ * Create a mountable resource without a fixed prefix
+ *
+ * Unlike `routes()`, a resource defines routes relative to wherever it gets mounted.
+ * Use `bl.mount(prefix, resource)` to mount at a specific path.
+ *
+ * @param {RouterCallback} fn - Callback to define routes
+ * @returns {RouterBuilder} Router builder with defined routes (isResource=true)
+ *
+ * @example
+ * // Define routes without knowing the mount point
+ * const cellResource = resource(r => {
+ *   r.get('/', () => ({ headers: {}, body: { entries: listCells() } }))
+ *   r.get('/:name', ({ params }) => ({ headers: {}, body: getCell(params.name) }))
+ *   r.put('/:name', ({ params, body }) => {
+ *     createCell(params.name, body)
+ *     return { headers: {}, body: 'created' }
+ *   })
+ *   r.scope('/:name', r => {
+ *     r.get('/value', ({ params }) => ({ headers: {}, body: getValue(params.name) }))
+ *     r.put('/value', ({ params, body }) => {
+ *       setValue(params.name, body)
+ *       return { headers: {}, body }
+ *     })
+ *   })
+ * })
+ *
+ * // Mount at different paths
+ * bl.mount('/cells', cellResource)
+ * bl.mount('/v2/cells', cellResource)
+ * bl.mount('/namespaces/:ns/cells', cellResource)  // params.ns available in handlers
+ */
+export function resource(fn) {
+  const builder = new RouterBuilder('', { isResource: true })
   fn(builder)
   return builder
 }

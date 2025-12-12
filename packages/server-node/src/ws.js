@@ -1,18 +1,18 @@
 import { WebSocketServer } from 'ws'
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create WebSocket server routes
  * Servers are resources at `bl:///server/ws/:port`
  *
  * @param {object} plumber - Plumber instance for message routing
- * @returns {import('@bassline/core').RouterBuilder}
+ * @returns {object} Resource with routes and install method
  *
  * @example
  * const bl = new Bassline()
  * const plumber = createPlumber()
  * plumber.install(bl)
- * bl.install(createWsServerRoutes(plumber))
+ * bl.mount('/server/ws', createWsServerRoutes(plumber))
  *
  * // Start server
  * await bl.put('bl:///server/ws/9000', {}, {})
@@ -25,7 +25,7 @@ export function createWsServerRoutes(plumber) {
   /** @type {Map<number, {wss: WebSocketServer, clients: Set<WebSocket>, startTime: number}>} */
   const servers = new Map()
 
-  return routes('/server/ws', r => {
+  const wsResource = resource(r => {
     // List all WebSocket servers
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -129,4 +129,16 @@ export function createWsServerRoutes(plumber) {
       }
     })
   })
+
+  /**
+   * Install WebSocket server routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/server/ws'] - Mount prefix
+   */
+  wsResource.install = (bl, { prefix = '/server/ws' } = {}) => {
+    bl.mount(prefix, wsResource)
+  }
+
+  return wsResource
 }

@@ -1,13 +1,11 @@
-import { routes } from './router.js'
+import { resource } from './router.js'
 
 /**
- * Install middleware introspection routes
- * Exposes routes to list and inspect registered middleware
- *
- * @param {import('./bassline.js').Bassline} bl - Bassline instance
+ * Create middleware introspection resource
+ * @param {import('./bassline.js').Bassline} bl - Bassline instance to introspect
  */
-export default function installMiddleware(bl) {
-  const middlewareRoutes = routes('/middleware', r => {
+function createMiddlewareResource(bl) {
+  return resource(r => {
     // List all middleware
     r.get('/', () => ({
       headers: { type: 'bl:///types/list' },
@@ -32,6 +30,16 @@ export default function installMiddleware(bl) {
       }
     })
   })
+}
 
-  bl.install(middlewareRoutes)
+/**
+ * Install middleware introspection routes
+ * Exposes routes to list and inspect registered middleware
+ *
+ * @param {import('./bassline.js').Bassline} bl - Bassline instance
+ * @param {object} [options] - Options
+ * @param {string} [options.prefix='/middleware'] - Mount prefix
+ */
+export default function installMiddleware(bl, { prefix = '/middleware' } = {}) {
+  bl.mount(prefix, createMiddlewareResource(bl))
 }

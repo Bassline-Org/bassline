@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create monitor routes that compose Timer + Fetch + Cell.
@@ -309,7 +309,7 @@ export function createMonitorRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const monitorRoutes = routes('/monitors', r => {
+  const monitorResource = resource(r => {
     // List all monitors
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -446,9 +446,11 @@ export function createMonitorRoutes(options = {}) {
   /**
    * Install monitor routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/monitors'] - Mount prefix
    */
-  function install(bl) {
-    bl.install(monitorRoutes)
+  function install(bl, { prefix = '/monitors' } = {}) {
+    bl.mount(prefix, monitorResource)
   }
 
   /**
@@ -461,7 +463,7 @@ export function createMonitorRoutes(options = {}) {
   }
 
   return {
-    routes: monitorRoutes,
+    routes: monitorResource,
     install,
     createMonitor,
     startMonitor,

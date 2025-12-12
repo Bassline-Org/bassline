@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 import { trustEstimate } from './lattices.js'
 
 /**
@@ -106,7 +106,7 @@ export function createTrustSystem(options = {}) {
   }
 
   // Build routes
-  const trustRoutes = routes('/trust', r => {
+  const trustResource = resource(r => {
     // List all known peers
     r.get('/peers', () => ({
       headers: { type: 'bl:///types/list' },
@@ -169,8 +169,19 @@ export function createTrustSystem(options = {}) {
     })
   })
 
+  /**
+   * Install trust routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/trust'] - Mount prefix
+   */
+  function install(bl, { prefix = '/trust' } = {}) {
+    bl.mount(prefix, trustResource)
+  }
+
   return {
-    routes: trustRoutes,
+    routes: trustResource,
+    install,
     middleware,
     checkCapability,
     observe,
