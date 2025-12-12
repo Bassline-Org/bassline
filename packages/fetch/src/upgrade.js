@@ -9,7 +9,7 @@ export default function installFetch(bl) {
   const fetchService = createFetchRoutes({ bl })
 
   fetchService.install(bl)
-  bl._fetch = fetchService
+  bl.setModule('fetch', fetchService)
 
   console.log('Fetch installed')
 }

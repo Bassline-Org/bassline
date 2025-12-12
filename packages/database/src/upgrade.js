@@ -2,9 +2,8 @@ import { createDatabaseRoutes } from './database.js'
 
 /**
  * Install database service into Bassline instance.
- *
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
- * @param {Object} config - Configuration options
+ * @param {object} config - Configuration options
  * @param {string} config.defaultConnection - Default connection name
  * @param {string} config.defaultPath - Default SQLite database path
  */
@@ -29,8 +28,7 @@ export default function installDatabase(bl, config = {}) {
     })
   }
 
-  // Expose for other modules
-  bl._database = database
+  bl.setModule('database', database)
 
   console.log('Database service installed')
 }

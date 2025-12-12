@@ -12,8 +12,7 @@ export default function installRecipes(bl) {
   const recipes = createRecipeRoutes({ bl })
   recipes.install(bl)
 
-  // Expose for other modules
-  bl._recipes = recipes
+  bl.setModule('recipes', recipes)
 
   // Recipe and instance events are sent through plumber.
   // Consumers can add rules to route these events as needed:

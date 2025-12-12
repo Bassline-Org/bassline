@@ -55,11 +55,12 @@ export default function installHandlers(bl) {
   const handlerRoutes = createHandlerRoutes({ registry, compile })
   bl.install(handlerRoutes)
 
-  // Register on bl for other modules to use
-  bl._handlers = {
+  // Register as module for late binding
+  const handlers = {
     registry,
     compile,
     get: registry.get,
+    getSync: registry.getSync,
     getFactory: registry.getFactory,
     registerBuiltin: registry.registerBuiltin,
     registerCustom: registry.registerCustom,
@@ -67,6 +68,8 @@ export default function installHandlers(bl) {
     listBuiltin: registry.listBuiltin,
     listCustom: registry.listCustom,
   }
+
+  bl.setModule('handlers', handlers)
 
   console.log(`Handlers installed: ${registry.listBuiltin().length} built-in handlers`)
 }

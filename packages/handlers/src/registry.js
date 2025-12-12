@@ -3,6 +3,8 @@
  *
  * Stores handler factories (built-in) and custom handler definitions.
  * Provides a unified interface for registering and retrieving handlers.
+ * Uses promise-based late binding - get() returns a promise that resolves
+ * when the handler becomes available.
  */
 
 /**
@@ -16,6 +18,9 @@ export function createHandlerRegistry() {
   /** @type {Map<string, {definition: any, description: string, createdAt: string, compiled: Function}>} */
   const custom = new Map()
 
+  /** @type {Map<string, Array<{resolve: Function, config: object}>>} pending get() calls */
+  const pending = new Map()
+
   /** @type {Function | null} Compiler function, set later to avoid circular dependency */
   let compiler = null
 
@@ -28,12 +33,28 @@ export function createHandlerRegistry() {
   }
 
   /**
+   * Resolve any pending get() calls for a handler
+   * @param {string} name - Handler name
+   */
+  function resolvePending(name) {
+    const waiters = pending.get(name)
+    if (waiters) {
+      for (const { resolve, config } of waiters) {
+        resolve(getSync(name, config))
+      }
+      pending.delete(name)
+    }
+  }
+
+  /**
    * Register a built-in handler factory.
+   * Resolves any pending get() calls for this handler.
    * @param {string} name - Handler name
    * @param {Function} factory - Factory function (ctx, ...compiledArgs) => handler
    */
   function registerBuiltin(name, factory) {
     builtins.set(name, factory)
+    resolvePending(name)
   }
 
   /**
@@ -46,6 +67,7 @@ export function createHandlerRegistry() {
 
   /**
    * Register a custom handler with a definition.
+   * Resolves any pending get() calls for this handler.
    * @param {string} name - Handler name
    * @param {any} definition - Hiccup-style definition
    * @param {string} [description] - Handler description
@@ -65,6 +87,7 @@ export function createHandlerRegistry() {
     }
 
     custom.set(name, handler)
+    resolvePending(name)
     return handler
   }
 
@@ -78,12 +101,13 @@ export function createHandlerRegistry() {
   }
 
   /**
-   * Get a handler by name.
+   * Get a handler by name synchronously.
+   * Returns null if handler not found. Use get() for promise-based late binding.
    * @param {string} name - Handler name (can be URI like 'bl:///handlers/foo' or just 'foo')
    * @param {object} [config] - Config to pass to factory
    * @returns {Function | null}
    */
-  function get(name, config = {}) {
+  function getSync(name, config = {}) {
     // Strip bl:///handlers/ prefix if present
     const handlerName = name.replace(/^bl:\/\/\/handlers\//, '')
 
@@ -104,7 +128,32 @@ export function createHandlerRegistry() {
     const factory = builtins.get(handlerName)
     if (!factory) return null
     // Inject get into ctx so combinators can look up other handlers
-    return factory({ ...config, get })
+    return factory({ ...config, get: getSync })
+  }
+
+  /**
+   * Get a handler by name, waiting if not yet available.
+   * Returns a promise that resolves when the handler is registered.
+   * @param {string} name - Handler name (can be URI like 'bl:///handlers/foo' or just 'foo')
+   * @param {object} [config] - Config to pass to factory
+   * @returns {Promise<Function>} Promise that resolves to the handler
+   */
+  function get(name, config = {}) {
+    const handlerName = name.replace(/^bl:\/\/\/handlers\//, '')
+
+    // Check if handler exists
+    const handler = getSync(handlerName, config)
+    if (handler) {
+      return Promise.resolve(handler)
+    }
+
+    // Wait for handler to be registered
+    return new Promise((resolve) => {
+      if (!pending.has(handlerName)) {
+        pending.set(handlerName, [])
+      }
+      pending.get(handlerName).push({ resolve, config })
+    })
   }
 
   /**
@@ -177,6 +226,7 @@ export function createHandlerRegistry() {
     registerCustom,
     deleteCustom,
     get,
+    getSync,
     getFactory,
     getCustom,
     has,
@@ -186,5 +236,6 @@ export function createHandlerRegistry() {
     listCustom,
     _builtins: builtins,
     _custom: custom,
+    _pending: pending,
   }
 }
