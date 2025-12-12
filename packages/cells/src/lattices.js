@@ -45,7 +45,15 @@ export const lww = {
     // Handle raw values (auto-wrap with timestamp)
     const aWrapped = typeof a?.timestamp === 'number' ? a : { value: a, timestamp: 0 }
     const bWrapped = typeof b?.timestamp === 'number' ? b : { value: b, timestamp: 0 }
-    return aWrapped.timestamp >= bWrapped.timestamp ? aWrapped : bWrapped
+    // When timestamps differ, higher wins
+    if (aWrapped.timestamp !== bWrapped.timestamp) {
+      return aWrapped.timestamp > bWrapped.timestamp ? aWrapped : bWrapped
+    }
+    // When timestamps are equal, use deterministic tie-breaker (larger JSON string wins)
+    // This ensures commutativity: join(a,b) === join(b,a)
+    const aStr = JSON.stringify(aWrapped.value)
+    const bStr = JSON.stringify(bWrapped.value)
+    return aStr >= bStr ? aWrapped : bWrapped
   },
   lte: (a, b) => {
     const aWrapped = typeof a?.timestamp === 'number' ? a : { value: a, timestamp: 0 }

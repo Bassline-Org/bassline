@@ -15,9 +15,8 @@ import { getLattice, lattices } from './lattices.js'
  * - GET  /cells/:name/value → current value
  * - PUT  /cells/:name/value → merge value (lattice join)
  * - PUT  /cells/:name/reset → reset to bottom
- *
  * @param {object} [options] - Configuration options
- * @param {function} [options.onCellChange] - Callback when a cell value changes
+ * @param {Function} [options.onCellChange] - Callback when a cell value changes
  * @returns {object} Cell routes and store
  */
 export function createCellRoutes(options = {}) {
@@ -214,12 +213,13 @@ export function createCellRoutes(options = {}) {
     })
 
     // Merge a value (lattice join)
-    r.put('/:name/value', ({ params, body }) => {
+    r.put('/:name/value', async ({ params, body }) => {
       const { changed, cell } = mergeValue(params.name, body)
 
       // Notify on change (for propagator integration)
+      // Await callback to support propagation chains
       if (changed && onCellChange) {
-        onCellChange({
+        await onCellChange({
           uri: `bl:///cells/${params.name}`,
           cell,
         })
@@ -267,7 +267,7 @@ export function createCellRoutes(options = {}) {
    * Install cell routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} bl
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/cells'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
   function install(bl, { prefix = '/cells' } = {}) {
     bl.mount(prefix, cellResource)
