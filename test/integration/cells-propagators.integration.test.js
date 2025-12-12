@@ -19,7 +19,7 @@ describe('cells + propagators integration', () => {
   beforeEach(async () => {
     bl = new Bassline()
 
-    // Install plumber first (propagators depend on it)
+    // Install plumber first (propagators depend on it for routing)
     const plumber = createPlumber()
     bl.mount('/plumb', plumber.routes)
     bl._plumber = plumber
@@ -34,20 +34,10 @@ describe('cells + propagators integration', () => {
     cells.install(bl)
     bl._cells = cells
 
-    // Install propagators
+    // Install propagators (each propagator creates its own plumber rules)
     propagators = createPropagatorRoutes({ bl })
     propagators.install(bl)
     bl._propagators = propagators
-
-    // Set up plumber rule to route cell changes to propagators
-    await bl.put(
-      'bl:///plumb/rules/cell-to-propagator',
-      {},
-      {
-        match: { port: 'cell-updates' },
-        to: 'bl:///propagators/on-cell-change',
-      }
-    )
   })
 
   it('creates cells and retrieves values', async () => {
@@ -94,7 +84,7 @@ describe('cells + propagators integration', () => {
     await bl.put('bl:///cells/a/value', {}, 3)
     await bl.put('bl:///cells/b/value', {}, 4)
 
-    // Create a sum propagator
+    // Create a sum propagator - it fires on creation and computes initial value
     await bl.put(
       'bl:///propagators/add',
       {},
@@ -105,10 +95,7 @@ describe('cells + propagators integration', () => {
       }
     )
 
-    // Trigger propagation
-    await propagators.onCellChange('bl:///cells/a')
-
-    // Check result
+    // Check result (propagator fires on creation)
     const result = await bl.get('bl:///cells/sum/value')
     expect(result.body).toBe(7)
   })
@@ -120,7 +107,11 @@ describe('cells + propagators integration', () => {
     await bl.put('bl:///cells/double', {}, { lattice: 'maxNumber' })
     await bl.put('bl:///cells/quadruple', {}, { lattice: 'maxNumber' })
 
+    // Set initial value first
+    await bl.put('bl:///cells/a/value', {}, 5)
+
     // Set up propagators - use duplicate combinator with add to double values
+    // Propagators fire on creation, computing initial values
     await bl.put(
       'bl:///propagators/double',
       {},
@@ -131,6 +122,10 @@ describe('cells + propagators integration', () => {
         handlerConfig: { handler: 'add' },
       }
     )
+
+    // Check intermediate (5 + 5 = 10) - fired on creation
+    const doubleResult = await bl.get('bl:///cells/double/value')
+    expect(doubleResult.body).toBe(10)
 
     await bl.put(
       'bl:///propagators/quadruple',
@@ -143,19 +138,41 @@ describe('cells + propagators integration', () => {
       }
     )
 
-    // Set initial value
-    await bl.put('bl:///cells/a/value', {}, 5)
-
-    // Trigger propagation
-    await propagators.onCellChange('bl:///cells/a')
-
-    // Check intermediate (5 + 5 = 10)
-    const doubleResult = await bl.get('bl:///cells/double/value')
-    expect(doubleResult.body).toBe(10)
-
-    // Check final (10 + 10 = 20)
+    // Check final (10 + 10 = 20) - fired on creation
     const quadResult = await bl.get('bl:///cells/quadruple/value')
     expect(quadResult.body).toBe(20)
+  })
+
+  it('reacts to cell changes via plumber routing', async () => {
+    // Create cells
+    await bl.put('bl:///cells/input', {}, { lattice: 'maxNumber' })
+    await bl.put('bl:///cells/output', {}, { lattice: 'maxNumber' })
+
+    // Set initial value
+    await bl.put('bl:///cells/input/value', {}, 5)
+
+    // Create propagator that doubles the input
+    await bl.put(
+      'bl:///propagators/double',
+      {},
+      {
+        inputs: ['bl:///cells/input'],
+        output: 'bl:///cells/output',
+        handler: 'duplicate',
+        handlerConfig: { handler: 'add' },
+      }
+    )
+
+    // Initial value should be computed (5 + 5 = 10)
+    let result = await bl.get('bl:///cells/output/value')
+    expect(result.body).toBe(10)
+
+    // Change input - plumber routes cell-updates to propagator's /fire endpoint
+    await bl.put('bl:///cells/input/value', {}, 7)
+
+    // Output should update (7 + 7 = 14)
+    result = await bl.get('bl:///cells/output/value')
+    expect(result.body).toBe(14)
   })
 
   it('handles multiple inputs with reducers', async () => {
@@ -170,7 +187,7 @@ describe('cells + propagators integration', () => {
     await bl.put('bl:///cells/y/value', {}, 20)
     await bl.put('bl:///cells/z/value', {}, 30)
 
-    // Create propagator with 3 inputs
+    // Create propagator with 3 inputs - fires on creation
     await bl.put(
       'bl:///propagators/total',
       {},
@@ -181,11 +198,36 @@ describe('cells + propagators integration', () => {
       }
     )
 
-    // Trigger
-    await propagators.onCellChange('bl:///cells/x')
-
     const result = await bl.get('bl:///cells/total/value')
     expect(result.body).toBe(60)
+  })
+
+  it('cleans up plumber rules when propagator is killed', async () => {
+    // Create cells
+    await bl.put('bl:///cells/a', {}, { lattice: 'maxNumber' })
+    await bl.put('bl:///cells/b', {}, { lattice: 'maxNumber' })
+
+    // Create propagator
+    await bl.put(
+      'bl:///propagators/test',
+      {},
+      {
+        inputs: ['bl:///cells/a'],
+        output: 'bl:///cells/b',
+        handler: 'passthrough',
+      }
+    )
+
+    // Verify rule was created
+    const rule = await bl.get('bl:///plumb/rules/propagator-test-input-0')
+    expect(rule).not.toBeNull()
+
+    // Kill propagator
+    await bl.put('bl:///propagators/test/kill', {}, {})
+
+    // Verify rule was removed
+    const ruleAfter = await bl.get('bl:///plumb/rules/propagator-test-input-0')
+    expect(ruleAfter).toBeNull()
   })
 })
 

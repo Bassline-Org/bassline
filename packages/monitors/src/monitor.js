@@ -156,6 +156,7 @@ export function createMonitorRoutes(options = {}) {
    * @returns {Promise<object>} Monitor state
    */
   async function createMonitor(name, config) {
+    const isNew = !store.has(name)
     const existing = store.get(name)
 
     // Stop existing timer listener
@@ -181,6 +182,20 @@ export function createMonitorRoutes(options = {}) {
     await bl.put(cellUri, {}, { lattice: 'lww' }).catch(() => {
       // Cell might already exist, that's ok
     })
+
+    // Emit lifecycle event
+    const source = `bl:///monitors/${name}`
+    if (isNew) {
+      bl?.plumb(source, ports.RESOURCE_CREATED, {
+        headers: { type: types.RESOURCE_CREATED },
+        body: { source, resourceType: 'monitor', config },
+      })
+    } else {
+      bl?.plumb(source, ports.RESOURCE_UPDATED, {
+        headers: { type: types.RESOURCE_UPDATED },
+        body: { source, resourceType: 'monitor', changes: config },
+      })
+    }
 
     // Auto-start if enabled
     if (monitor.enabled && monitor.url) {
@@ -232,6 +247,13 @@ export function createMonitorRoutes(options = {}) {
     // Mark as running
     timerListeners.set(name, true)
 
+    // Emit RESOURCE_ENABLED event
+    const source = `bl:///monitors/${name}`
+    bl?.plumb(source, ports.RESOURCE_ENABLED, {
+      headers: { type: types.RESOURCE_ENABLED },
+      body: { source, resourceType: 'monitor' },
+    })
+
     // Do an immediate fetch
     doMonitorFetch(name)
 
@@ -247,6 +269,9 @@ export function createMonitorRoutes(options = {}) {
     const monitor = store.get(name)
     if (!monitor) return null
 
+    // Check if was running (to emit event only on actual state change)
+    const wasRunning = timerListeners.has(name)
+
     monitor.enabled = false
     const timerName = getTimerName(name)
 
@@ -256,6 +281,15 @@ export function createMonitorRoutes(options = {}) {
     // Remove running marker
     timerListeners.delete(name)
 
+    // Emit RESOURCE_DISABLED event only if it was running
+    if (wasRunning) {
+      const source = `bl:///monitors/${name}`
+      bl?.plumb(source, ports.RESOURCE_DISABLED, {
+        headers: { type: types.RESOURCE_DISABLED },
+        body: { source, resourceType: 'monitor' },
+      })
+    }
+
     // Note: We don't remove the plumber rule here - it's harmless if the timer isn't running
     // and will be reused if the monitor restarts. To fully remove, use killMonitor.
 
@@ -263,26 +297,33 @@ export function createMonitorRoutes(options = {}) {
   }
 
   /**
-   * Kill (remove) a monitor completely
+   * Kill (remove) a monitor completely, including all created resources
    * @param {string} name - Monitor name
-   * @returns {boolean} Whether monitor existed
+   * @returns {Promise<boolean>} Whether monitor existed
    */
-  function killMonitor(name) {
+  async function killMonitor(name) {
     const existed = store.has(name)
     if (!existed) return false
 
-    stopMonitor(name)
+    // Stop the monitor first
+    await stopMonitor(name)
 
-    // Kill the timer
     const timerName = getTimerName(name)
-    bl.put(`bl:///timers/${timerName}/kill`, {}, {})
+    const cellUri = getCellUri(name)
+
+    // Kill all created resources
+    await Promise.all([
+      bl.put(`bl:///timers/${timerName}/kill`, {}, {}).catch(() => {}),
+      bl.put(`${cellUri}/kill`, {}, {}).catch(() => {}),
+      bl.put(`bl:///plumb/rules/monitor-${name}-timer/kill`, {}, {}).catch(() => {}),
+    ])
 
     store.delete(name)
 
     // Notify through plumber
     bl?.plumb(`bl:///monitors/${name}`, ports.RESOURCE_REMOVED, {
       headers: { type: types.RESOURCE_REMOVED },
-      body: { uri: `bl:///monitors/${name}` },
+      body: { source: `bl:///monitors/${name}` },
     })
 
     return true
@@ -428,13 +469,13 @@ export function createMonitorRoutes(options = {}) {
     })
 
     // Kill (remove) monitor
-    r.put('/:name/kill', ({ params }) => {
-      const existed = killMonitor(params.name)
+    r.put('/:name/kill', async ({ params }) => {
+      const existed = await killMonitor(params.name)
       if (!existed) return null
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///monitors/${params.name}` },
+        body: { source: `bl:///monitors/${params.name}` },
       }
     })
 

@@ -5,8 +5,8 @@ import { ports, types } from '@bassline/plumber'
  * Create propagator routes for reactive constraint networks.
  *
  * Propagators watch cells and fire immediately when inputs change.
- * Since cells are ACI, no scheduler is needed - propagators fire
- * synchronously and the network naturally terminates.
+ * Each propagator creates its own plumber rules for its inputs,
+ * so routing is visible and self-contained.
  *
  * Handlers are provided by @bassline/handlers and accessed via bl._handlers.
  *
@@ -14,7 +14,7 @@ import { ports, types } from '@bassline/plumber'
  * - GET  /propagators           → list all propagators
  * - GET  /propagators/:name     → get propagator config
  * - PUT  /propagators/:name     → create/update propagator
- * - GET  /propagators/:name/fire → manually fire (for debugging)
+ * - PUT  /propagators/:name/fire → fire propagator (called by plumber)
  * - PUT  /propagators/:name/kill → remove propagator
  * @param {object} options - Configuration
  * @param {object} options.bl - Bassline instance for reading/writing cells
@@ -23,11 +23,8 @@ import { ports, types } from '@bassline/plumber'
 export function createPropagatorRoutes(options = {}) {
   const { bl } = options
 
-  /** @type {Map<string, {inputs: string[], output: string, handler: Function, handlerName: string, config: object, enabled: boolean}>} */
+  /** @type {Map<string, {inputs: string[], output: string, handler: Function, handlerName: string, handlerConfig: object, enabled: boolean}>} */
   const store = new Map()
-
-  /** @type {Map<string, Set<string>>} cell URI → Set of propagator names */
-  const watchers = new Map()
 
   /**
    * Get a handler from bl._handlers.
@@ -40,6 +37,51 @@ export function createPropagatorRoutes(options = {}) {
       throw new Error('Handlers not installed. Install @bassline/handlers before propagators.')
     }
     return bl._handlers.get(name, config)
+  }
+
+  /**
+   * Get the plumber rule name for a propagator input
+   * @param {string} propagatorName - Propagator name
+   * @param {number} inputIndex - Input index
+   * @returns {string} Rule name
+   */
+  function getRuleName(propagatorName, inputIndex) {
+    return `propagator-${propagatorName}-input-${inputIndex}`
+  }
+
+  /**
+   * Create plumber rules for a propagator's inputs
+   * @param {string} name - Propagator name
+   * @param {string[]} inputs - Input cell URIs
+   */
+  async function createInputRules(name, inputs) {
+    for (let i = 0; i < inputs.length; i++) {
+      const inputUri = inputs[i]
+      const ruleName = getRuleName(name, i)
+      await bl.put(
+        `bl:///plumb/rules/${ruleName}`,
+        {},
+        {
+          match: {
+            source: `^${inputUri.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+            port: 'cell-updates',
+          },
+          to: `bl:///propagators/${name}/fire`,
+        }
+      )
+    }
+  }
+
+  /**
+   * Remove plumber rules for a propagator's inputs
+   * @param {string} name - Propagator name
+   * @param {string[]} inputs - Input cell URIs
+   */
+  async function removeInputRules(name, inputs) {
+    for (let i = 0; i < inputs.length; i++) {
+      const ruleName = getRuleName(name, i)
+      await bl.put(`bl:///plumb/rules/${ruleName}/kill`, {}, {}).catch(() => {})
+    }
   }
 
   /**
@@ -60,15 +102,14 @@ export function createPropagatorRoutes(options = {}) {
    * @param {string} config.handler - Handler name (references a registered factory)
    * @param {object} [config.handlerConfig] - Config to pass to handler factory
    * @param {boolean} [config.enabled] - Whether propagator is active
+   * @returns {Promise<object>} The created propagator
    */
-  function createPropagator(name, config) {
+  async function createPropagator(name, config) {
     const existing = store.get(name)
 
-    // Unregister old watchers if updating
+    // Remove old plumber rules if updating
     if (existing) {
-      for (const inputUri of existing.inputs) {
-        watchers.get(inputUri)?.delete(name)
-      }
+      await removeInputRules(name, existing.inputs)
     }
 
     // Resolve handler
@@ -91,17 +132,14 @@ export function createPropagatorRoutes(options = {}) {
 
     store.set(name, propagator)
 
-    // Register watchers for each input
-    for (const inputUri of propagator.inputs) {
-      if (!watchers.has(inputUri)) {
-        watchers.set(inputUri, new Set())
-      }
-      watchers.get(inputUri).add(name)
+    // Create plumber rules for each input
+    if (propagator.inputs.length > 0) {
+      await createInputRules(name, propagator.inputs)
     }
 
     // Fire once on creation to compute initial value from existing inputs
     if (bl && propagator.inputs.length > 0) {
-      fire(name).catch((err) => {
+      await fire(name).catch((err) => {
         console.warn(`Propagator ${name} initial fire failed:`, err.message)
       })
     }
@@ -110,15 +148,13 @@ export function createPropagatorRoutes(options = {}) {
   }
 
   /**
-   * Remove a propagator
+   * Remove a propagator and its plumber rules
    * @param {string} name
    */
-  function removePropagator(name) {
+  async function removePropagator(name) {
     const propagator = store.get(name)
     if (propagator) {
-      for (const inputUri of propagator.inputs) {
-        watchers.get(inputUri)?.delete(name)
-      }
+      await removeInputRules(name, propagator.inputs)
       store.delete(name)
     }
   }
@@ -126,15 +162,16 @@ export function createPropagatorRoutes(options = {}) {
   /**
    * Kill (remove) a propagator with plumber notification
    * @param {string} name - Propagator name
-   * @returns {boolean} Whether the propagator existed and was removed
+   * @returns {Promise<boolean>} Whether the propagator existed and was removed
    */
-  function killPropagator(name) {
+  async function killPropagator(name) {
     const existed = store.has(name)
     if (existed) {
-      removePropagator(name)
-      bl?.plumb(`bl:///propagators/${name}`, ports.RESOURCE_REMOVED, {
+      await removePropagator(name)
+      const source = `bl:///propagators/${name}`
+      bl?.plumb(source, ports.RESOURCE_REMOVED, {
         headers: { type: types.RESOURCE_REMOVED },
-        body: { uri: `bl:///propagators/${name}` },
+        body: { source },
       })
     }
     return existed
@@ -184,19 +221,6 @@ export function createPropagatorRoutes(options = {}) {
   }
 
   /**
-   * Handle cell change - fire all watching propagators
-   * @param {string} cellUri - The cell that changed
-   */
-  async function onCellChange(cellUri) {
-    const watching = watchers.get(cellUri)
-    if (!watching) return
-
-    for (const propagatorName of watching) {
-      await fire(propagatorName)
-    }
-  }
-
-  /**
    * List all propagators
    * @returns {string[]}
    */
@@ -235,7 +259,8 @@ export function createPropagatorRoutes(options = {}) {
     })
 
     // Create/update a propagator
-    r.put('/:name', ({ params, body }) => {
+    r.put('/:name', async ({ params, body }) => {
+      const isNew = !store.has(params.name)
       const config = {
         inputs: body.inputs || [],
         output: body.output,
@@ -244,7 +269,21 @@ export function createPropagatorRoutes(options = {}) {
         enabled: body.enabled !== false,
       }
 
-      const prop = createPropagator(params.name, config)
+      const prop = await createPropagator(params.name, config)
+      const source = `bl:///propagators/${params.name}`
+
+      // Emit lifecycle event
+      if (isNew) {
+        bl?.plumb(source, ports.RESOURCE_CREATED, {
+          headers: { type: types.RESOURCE_CREATED },
+          body: { source, resourceType: 'propagator', config },
+        })
+      } else {
+        bl?.plumb(source, ports.RESOURCE_UPDATED, {
+          headers: { type: types.RESOURCE_UPDATED },
+          body: { source, resourceType: 'propagator', changes: config },
+        })
+      }
 
       return {
         headers: { type: 'bl:///types/propagator' },
@@ -258,8 +297,8 @@ export function createPropagatorRoutes(options = {}) {
       }
     })
 
-    // Manually fire a propagator (for debugging)
-    r.get('/:name/fire', async ({ params }) => {
+    // Fire a propagator (called by plumber when inputs change)
+    r.put('/:name/fire', async ({ params }) => {
       const result = await fire(params.name)
       return {
         headers: { type: 'bl:///types/propagator-result' },
@@ -268,34 +307,13 @@ export function createPropagatorRoutes(options = {}) {
     })
 
     // Kill (remove) a propagator
-    r.put('/:name/kill', ({ params }) => {
-      const existed = killPropagator(params.name)
+    r.put('/:name/kill', async ({ params }) => {
+      const existed = await killPropagator(params.name)
       if (!existed) return null
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///propagators/${params.name}` },
-      }
-    })
-
-    // Handle cell change notifications from plumber
-    // The cell sends { source, value } in the body
-    r.put('/on-cell-change', async ({ body }) => {
-      const source = body?.source
-      if (!source) {
-        return {
-          headers: { type: 'bl:///types/error' },
-          body: { error: 'Missing source in body' },
-        }
-      }
-
-      // Remove /value suffix if present to get the cell URI
-      const cellUri = source.replace(/\/value$/, '')
-      await onCellChange(cellUri)
-
-      return {
-        headers: { type: 'bl:///types/propagator-triggered' },
-        body: { source: cellUri },
+        body: { source: `bl:///propagators/${params.name}` },
       }
     })
   })
@@ -318,9 +336,7 @@ export function createPropagatorRoutes(options = {}) {
     removePropagator,
     killPropagator,
     fire,
-    onCellChange,
     listPropagators,
     _store: store,
-    _watchers: watchers,
   }
 }

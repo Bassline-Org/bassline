@@ -194,6 +194,26 @@ export function createLinkIndex() {
         },
       }
     })
+
+    // Handle resource-removed events from plumber
+    // Cleans up both forward refs and backlinks for the removed resource
+    r.put('/on-resource-removed', ({ body }) => {
+      const source = body?.source
+      if (!source) {
+        return {
+          headers: { type: 'bl:///types/cleanup-result' },
+          body: { cleaned: false, reason: 'no source in body' },
+        }
+      }
+
+      // Remove all links for this resource
+      remove(source)
+
+      return {
+        headers: { type: 'bl:///types/cleanup-result' },
+        body: { cleaned: true, source },
+      }
+    })
   })
 
   /**
