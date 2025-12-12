@@ -4,7 +4,13 @@ import { resource, matchesPattern } from '@bassline/core'
  * Well-known plumber ports
  */
 export const ports = {
+  // Resource lifecycle events
+  RESOURCE_CREATED: 'resource-created',
+  RESOURCE_UPDATED: 'resource-updated',
   RESOURCE_REMOVED: 'resource-removed',
+  RESOURCE_ENABLED: 'resource-enabled',
+  RESOURCE_DISABLED: 'resource-disabled',
+  // Domain events
   CONTRADICTIONS: 'contradictions',
   TIMER_TICK: 'timer-tick',
   FETCH_RESPONSES: 'fetch-responses',
@@ -18,7 +24,13 @@ export const ports = {
  * Well-known message types
  */
 export const types = {
+  // Resource lifecycle types
+  RESOURCE_CREATED: 'bl:///types/resource-created',
+  RESOURCE_UPDATED: 'bl:///types/resource-updated',
   RESOURCE_REMOVED: 'bl:///types/resource-removed',
+  RESOURCE_ENABLED: 'bl:///types/resource-enabled',
+  RESOURCE_DISABLED: 'bl:///types/resource-disabled',
+  // Domain types
   CONTRADICTION: 'bl:///types/contradiction',
   TIMER_TICK: 'bl:///types/timer-tick',
   FETCH_RESPONSE: 'bl:///types/fetch-response',
@@ -157,12 +169,45 @@ export function createPlumber() {
         })),
         // Known sources that dispatch to plumber
         sources: [
-          { type: 'cells', events: ['cell-value', 'resource-removed', 'contradiction'] },
-          { type: 'timers', events: ['timer-tick'] },
+          {
+            type: 'cells',
+            events: [
+              'resource-created',
+              'resource-updated',
+              'resource-removed',
+              'cell-updates',
+              'contradiction',
+            ],
+          },
+          {
+            type: 'propagators',
+            events: ['resource-created', 'resource-updated', 'resource-removed'],
+          },
+          {
+            type: 'timers',
+            events: [
+              'resource-created',
+              'resource-updated',
+              'resource-removed',
+              'resource-enabled',
+              'resource-disabled',
+              'timer-tick',
+            ],
+          },
+          {
+            type: 'monitors',
+            events: [
+              'resource-created',
+              'resource-updated',
+              'resource-removed',
+              'resource-enabled',
+              'resource-disabled',
+              'monitor-update',
+              'monitor-error',
+            ],
+          },
           { type: 'fetch', events: ['fetch-response', 'fetch-error'] },
-          { type: 'monitors', events: ['monitor-update', 'monitor-error'] },
           { type: 'recipes', events: ['recipe-saved', 'instance-created'] },
-          { type: 'propagators', events: ['propagator-fired'] },
         ],
       },
     }))

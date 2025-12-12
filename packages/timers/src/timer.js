@@ -1,5 +1,5 @@
 import { resource } from '@bassline/core'
-import { types } from '@bassline/plumber'
+import { ports, types } from '@bassline/plumber'
 
 /**
  * Create timer routes for time-based event dispatch.
@@ -34,6 +34,7 @@ export function createTimerRoutes(options = {}) {
    * @returns {object} Timer state
    */
   function createTimer(name, config) {
+    const isNew = !store.has(name)
     const existing = store.get(name)
 
     // Stop existing timer if running
@@ -49,6 +50,20 @@ export function createTimerRoutes(options = {}) {
     }
 
     store.set(name, timer)
+
+    // Emit lifecycle event
+    const source = `bl:///timers/${name}`
+    if (isNew) {
+      bl?.plumb(source, ports.RESOURCE_CREATED, {
+        headers: { type: types.RESOURCE_CREATED },
+        body: { source, resourceType: 'timer', config },
+      })
+    } else {
+      bl?.plumb(source, ports.RESOURCE_UPDATED, {
+        headers: { type: types.RESOURCE_UPDATED },
+        body: { source, resourceType: 'timer', changes: config },
+      })
+    }
 
     // Auto-start if enabled
     if (timer.enabled) {
@@ -79,6 +94,13 @@ export function createTimerRoutes(options = {}) {
       })
     }, timer.interval)
 
+    // Emit RESOURCE_ENABLED event
+    const source = `bl:///timers/${name}`
+    bl?.plumb(source, ports.RESOURCE_ENABLED, {
+      headers: { type: types.RESOURCE_ENABLED },
+      body: { source, resourceType: 'timer' },
+    })
+
     return timer
   }
 
@@ -91,11 +113,23 @@ export function createTimerRoutes(options = {}) {
     const timer = store.get(name)
     if (!timer) return null
 
+    // Check if was running (to emit event only on actual state change)
+    const wasRunning = timer.intervalId !== null
+
     if (timer.intervalId) {
       clearInterval(timer.intervalId)
       timer.intervalId = null
     }
     timer.enabled = false
+
+    // Emit RESOURCE_DISABLED event only if it was running
+    if (wasRunning) {
+      const source = `bl:///timers/${name}`
+      bl?.plumb(source, ports.RESOURCE_DISABLED, {
+        headers: { type: types.RESOURCE_DISABLED },
+        body: { source, resourceType: 'timer' },
+      })
+    }
 
     return timer
   }
@@ -115,6 +149,14 @@ export function createTimerRoutes(options = {}) {
     }
 
     store.delete(name)
+
+    // Emit RESOURCE_REMOVED event
+    const source = `bl:///timers/${name}`
+    bl?.plumb(source, ports.RESOURCE_REMOVED, {
+      headers: { type: types.RESOURCE_REMOVED },
+      body: { source },
+    })
+
     return true
   }
 
@@ -236,7 +278,7 @@ export function createTimerRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///timers/${params.name}` },
+        body: { source: `bl:///timers/${params.name}` },
       }
     })
   })

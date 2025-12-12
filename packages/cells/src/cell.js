@@ -159,9 +159,10 @@ export function createCellRoutes(options = {}) {
     const existed = store.has(name)
     if (existed) {
       store.delete(name)
-      bl?.plumb(`bl:///cells/${name}`, ports.RESOURCE_REMOVED, {
+      const source = `bl:///cells/${name}`
+      bl?.plumb(source, ports.RESOURCE_REMOVED, {
         headers: { type: types.RESOURCE_REMOVED },
-        body: { uri: `bl:///cells/${name}` },
+        body: { source },
       })
     }
     return existed
@@ -208,7 +209,22 @@ export function createCellRoutes(options = {}) {
 
     // Create/configure a cell
     r.put('/:name', ({ params, body }) => {
+      const isNew = !store.has(params.name)
       const cell = createCell(params.name, body)
+      const source = `bl:///cells/${params.name}`
+
+      // Emit lifecycle event
+      if (isNew) {
+        bl?.plumb(source, ports.RESOURCE_CREATED, {
+          headers: { type: types.RESOURCE_CREATED },
+          body: { source, resourceType: 'cell', config: body },
+        })
+      } else {
+        bl?.plumb(source, ports.RESOURCE_UPDATED, {
+          headers: { type: types.RESOURCE_UPDATED },
+          body: { source, resourceType: 'cell', changes: body },
+        })
+      }
 
       return {
         headers: { type: 'bl:///types/cell' },
@@ -281,7 +297,7 @@ export function createCellRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///cells/${params.name}` },
+        body: { source: `bl:///cells/${params.name}` },
       }
     })
   })
