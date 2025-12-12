@@ -2,19 +2,16 @@ import { createWsServerRoutes } from './ws.js'
 
 /**
  * Install WebSocket server routes into a Bassline instance.
- * Requires plumber to be installed first (bl._plumber).
- *
+ * Waits for plumber module to be available via late binding.
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @param {object} [config] - Configuration options
  * @param {number[]} [config.ports] - Ports to start servers on
  */
 export default async function installWsServer(bl, config = {}) {
-  const plumber = bl._plumber
-  if (!plumber) {
-    throw new Error('plumber must be installed before ws-server')
-  }
+  const plumber = await bl.getModule('plumber')
 
   bl.install(createWsServerRoutes(plumber))
+  bl.setModule('ws-server', {})
 
   // Bootstrap servers from config
   if (config.ports) {

@@ -96,7 +96,11 @@
  * })
  */
 export class Bassline {
-  constructor() {
+  /**
+   * @param {object} [options] - Constructor options
+   * @param {number} [options.moduleTimeout] - Default timeout for getModule() in ms (default: 5 minutes)
+   */
+  constructor({ moduleTimeout = 300000 } = {}) {
     /** @type {Array<{pattern: string, regex: RegExp, paramNames: string[], config: RouteConfig}>} */
     this.routes = []
     /** @type {{ get: Tap[], put: Tap[] }} */
@@ -105,8 +109,10 @@ export class Bassline {
     this.middleware = []
     /** @type {Map<string, any>} */
     this._modules = new Map()
-    /** @type {Map<string, Array<Function>>} */
+    /** @type {Map<string, Array<{resolve: Function, reject: Function, timer: NodeJS.Timeout}>>} */
     this._modulePending = new Map()
+    /** @type {number} */
+    this.moduleTimeout = moduleTimeout
   }
 
   /**
@@ -127,7 +133,8 @@ export class Bassline {
     // Resolve any pending requests
     const pending = this._modulePending.get(name)
     if (pending) {
-      for (const resolve of pending) {
+      for (const { resolve, timer } of pending) {
+        clearTimeout(timer)
         resolve(module)
       }
       this._modulePending.delete(name)
@@ -153,23 +160,47 @@ export class Bassline {
   /**
    * Get a module by name, waiting if not yet available
    * @param {string} name - Module name
+   * @param {object} [options] - Options
+   * @param {number} [options.timeout] - Override default timeout (ms)
    * @returns {Promise<any>} Promise that resolves to the module
+   * @throws {Error} If timeout expires before module is registered
    * @example
    * const cells = await bl.getModule('cells')
    * const handlers = await bl.getModule('handlers')
    * const sum = handlers.get('sum', {})
+   *
+   * // With custom timeout
+   * const quickModule = await bl.getModule('quick', { timeout: 1000 })
    */
-  getModule(name) {
+  getModule(name, { timeout } = {}) {
     const module = this._modules.get(name)
     if (module !== undefined) {
       return Promise.resolve(module)
     }
-    // Wait for setModule to be called
-    return new Promise((resolve) => {
+
+    const timeoutMs = timeout ?? this.moduleTimeout
+
+    // Wait for setModule to be called, with timeout
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        // Remove this pending entry
+        const pending = this._modulePending.get(name)
+        if (pending) {
+          const index = pending.findIndex((p) => p.timer === timer)
+          if (index !== -1) {
+            pending.splice(index, 1)
+          }
+          if (pending.length === 0) {
+            this._modulePending.delete(name)
+          }
+        }
+        reject(new Error(`Module '${name}' not registered within ${timeoutMs}ms`))
+      }, timeoutMs)
+
       if (!this._modulePending.has(name)) {
         this._modulePending.set(name, [])
       }
-      this._modulePending.get(name).push(resolve)
+      this._modulePending.get(name).push({ resolve, reject, timer })
     })
   }
 
