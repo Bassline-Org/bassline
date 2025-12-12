@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Bassline } from '../src/bassline.js'
-import { routes } from '../src/router.js'
+import { routes, resource } from '../src/router.js'
 
 describe('Bassline', () => {
   describe('routing', () => {
@@ -228,5 +228,182 @@ describe('Router builder', () => {
 
     const result = await bl.get('bl:///users/alice/posts/42/comments')
     expect(result.body).toEqual({ userId: 'alice', postId: '42' })
+  })
+})
+
+describe('Mountable resources', () => {
+  describe('resource()', () => {
+    it('creates a router builder with isResource flag', () => {
+      const r = resource(r => {
+        r.get('/', () => ({ headers: {}, body: 'index' }))
+      })
+
+      expect(r.isResource).toBe(true)
+      expect(r.prefix).toBe('')
+    })
+
+    it('defines routes relative to root', () => {
+      const r = resource(r => {
+        r.get('/', () => ({ headers: {}, body: 'index' }))
+        r.get('/:id', () => ({ headers: {}, body: 'item' }))
+      })
+
+      // Patterns should be relative (no prefix baked in)
+      // '/' becomes '' (empty) since prefix is '', and mount() handles this
+      expect(r.definitions.map(d => d.pattern)).toEqual(['', '/:id'])
+    })
+
+    it('supports scopes within resources', () => {
+      const r = resource(r => {
+        r.get('/', () => ({ headers: {}, body: 'index' }))
+        r.scope('/:id', r => {
+          r.get('/details', () => ({ headers: {}, body: 'details' }))
+          r.put('/update', () => ({ headers: {}, body: 'updated' }))
+        })
+      })
+
+      expect(r.definitions.map(d => d.pattern)).toEqual([
+        '',  // '/' with empty prefix becomes ''
+        '/:id/details',
+        '/:id/update'
+      ])
+    })
+  })
+
+  describe('bl.mount()', () => {
+    it('mounts a resource at a specific path', async () => {
+      const bl = new Bassline()
+
+      const cellResource = resource(r => {
+        r.get('/', () => ({ headers: {}, body: 'list' }))
+        r.get('/:name', ({ params }) => ({ headers: {}, body: `cell:${params.name}` }))
+      })
+
+      bl.mount('/cells', cellResource)
+
+      expect((await bl.get('bl:///cells')).body).toBe('list')
+      expect((await bl.get('bl:///cells/counter')).body).toBe('cell:counter')
+    })
+
+    it('allows mounting same resource at multiple paths', async () => {
+      const bl = new Bassline()
+
+      const itemResource = resource(r => {
+        r.get('/:id', ({ params }) => ({ headers: {}, body: params.id }))
+      })
+
+      bl.mount('/v1/items', itemResource)
+      bl.mount('/v2/items', itemResource)
+
+      expect((await bl.get('bl:///v1/items/foo')).body).toBe('foo')
+      expect((await bl.get('bl:///v2/items/bar')).body).toBe('bar')
+    })
+
+    it('inherits params from mount prefix', async () => {
+      const bl = new Bassline()
+
+      const cellResource = resource(r => {
+        r.get('/', ({ params }) => ({ headers: {}, body: params }))
+        r.get('/:name', ({ params }) => ({ headers: {}, body: params }))
+      })
+
+      bl.mount('/namespaces/:ns/cells', cellResource)
+
+      const listResult = await bl.get('bl:///namespaces/prod/cells')
+      expect(listResult.body).toEqual({ ns: 'prod' })
+
+      const itemResult = await bl.get('bl:///namespaces/prod/cells/counter')
+      expect(itemResult.body).toEqual({ ns: 'prod', name: 'counter' })
+    })
+
+    it('handles nested scopes in mounted resources', async () => {
+      const bl = new Bassline()
+
+      const userResource = resource(r => {
+        r.get('/', () => ({ headers: {}, body: 'users' }))
+        r.scope('/:userId', r => {
+          r.get('/', ({ params }) => ({ headers: {}, body: `user:${params.userId}` }))
+          r.scope('/posts', r => {
+            r.get('/:postId', ({ params }) => ({
+              headers: {},
+              body: { userId: params.userId, postId: params.postId }
+            }))
+          })
+        })
+      })
+
+      bl.mount('/api/users', userResource)
+
+      expect((await bl.get('bl:///api/users')).body).toBe('users')
+      expect((await bl.get('bl:///api/users/alice')).body).toBe('user:alice')
+      expect((await bl.get('bl:///api/users/alice/posts/42')).body).toEqual({
+        userId: 'alice',
+        postId: '42'
+      })
+    })
+
+    it('handles root mount', async () => {
+      const bl = new Bassline()
+
+      const indexResource = resource(r => {
+        r.get('/', () => ({ headers: {}, body: 'root' }))
+        r.get('/about', () => ({ headers: {}, body: 'about' }))
+      })
+
+      bl.mount('/', indexResource)
+
+      expect((await bl.get('bl:///')).body).toBe('root')
+      expect((await bl.get('bl:///about')).body).toBe('about')
+    })
+
+    it('supports both get and put handlers', async () => {
+      const bl = new Bassline()
+      let stored = null
+
+      const dataResource = resource(r => {
+        r.get('/:key', ({ params }) => ({
+          headers: {},
+          body: stored?.[params.key] ?? null
+        }))
+        r.put('/:key', ({ params, body }) => {
+          stored = stored || {}
+          stored[params.key] = body
+          return { headers: {}, body: 'saved' }
+        })
+      })
+
+      bl.mount('/data', dataResource)
+
+      await bl.put('bl:///data/foo', {}, 'bar')
+      expect((await bl.get('bl:///data/foo')).body).toBe('bar')
+    })
+  })
+
+  describe('bl.install() with resources', () => {
+    it('mounts resource at root when using install()', async () => {
+      const bl = new Bassline()
+
+      const indexResource = resource(r => {
+        r.get('/', () => ({ headers: {}, body: 'index' }))
+        r.get('/status', () => ({ headers: {}, body: 'ok' }))
+      })
+
+      bl.install(indexResource)
+
+      expect((await bl.get('bl:///')).body).toBe('index')
+      expect((await bl.get('bl:///status')).body).toBe('ok')
+    })
+
+    it('still works with traditional routes()', async () => {
+      const bl = new Bassline()
+
+      const cellRoutes = routes('/cells', r => {
+        r.get('/', () => ({ headers: {}, body: 'cells' }))
+      })
+
+      bl.install(cellRoutes)
+
+      expect((await bl.get('bl:///cells')).body).toBe('cells')
+    })
   })
 })

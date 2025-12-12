@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create val routes for resource composition definitions.
@@ -262,7 +262,7 @@ export function createValRoutes(options = {}) {
   }
 
   // Val routes
-  const valRoutes = routes('/vals', r => {
+  const valResource = resource(r => {
     // List all vals
     r.get('/', ({ headers }) => ({
       headers: { type: 'bl:///types/directory' },
@@ -465,13 +465,15 @@ export function createValRoutes(options = {}) {
    * Install val routes into a Bassline instance.
    *
    * @param {import('@bassline/core').Bassline} blInstance
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/vals'] - Mount prefix
    */
-  function install(blInstance) {
-    blInstance.install(valRoutes)
+  function install(blInstance, { prefix = '/vals' } = {}) {
+    blInstance.mount(prefix, valResource)
   }
 
   return {
-    routes: valRoutes,
+    routes: valResource,
     install,
     createVal,
     deleteVal,

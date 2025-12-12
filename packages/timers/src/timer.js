@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create timer routes for time-based event dispatch.
@@ -138,7 +138,7 @@ export function createTimerRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const timerRoutes = routes('/timers', r => {
+  const timerResource = resource(r => {
     // List all timers
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -247,9 +247,11 @@ export function createTimerRoutes(options = {}) {
   /**
    * Install timer routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/timers'] - Mount prefix
    */
-  function install(bl) {
-    bl.install(timerRoutes)
+  function install(bl, { prefix = '/timers' } = {}) {
+    bl.mount(prefix, timerResource)
   }
 
   /**
@@ -262,7 +264,7 @@ export function createTimerRoutes(options = {}) {
   }
 
   return {
-    routes: timerRoutes,
+    routes: timerResource,
     install,
     createTimer,
     startTimer,
