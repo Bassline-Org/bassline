@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 import { getLattice, lattices } from './lattices.js'
 
 /**
@@ -152,7 +152,7 @@ export function createCellRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const cellRoutes = routes('/cells', r => {
+  const cellResource = resource(r => {
     // List all cells
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -264,13 +264,15 @@ export function createCellRoutes(options = {}) {
   /**
    * Install cell routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/cells'] - Mount prefix
    */
-  function install(bl) {
-    bl.install(cellRoutes)
+  function install(bl, { prefix = '/cells' } = {}) {
+    bl.mount(prefix, cellResource)
   }
 
   return {
-    routes: cellRoutes,
+    routes: cellResource,
     install,
     getCell,
     createCell,

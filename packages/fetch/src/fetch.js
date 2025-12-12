@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create fetch routes for HTTP requests with async response dispatch.
@@ -164,7 +164,7 @@ export function createFetchRoutes(options = {}) {
     return [...store.keys()].reverse()
   }
 
-  const fetchRoutes = routes('/fetch', r => {
+  const fetchResource = resource(r => {
     // List recent requests
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -223,13 +223,15 @@ export function createFetchRoutes(options = {}) {
   /**
    * Install fetch routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/fetch'] - Mount prefix
    */
-  function install(bl) {
-    bl.install(fetchRoutes)
+  function install(bl, { prefix = '/fetch' } = {}) {
+    bl.mount(prefix, fetchResource)
   }
 
   return {
-    routes: fetchRoutes,
+    routes: fetchResource,
     install,
     doFetch,
     getRequest,

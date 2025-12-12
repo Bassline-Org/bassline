@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 import { substitute, validateParams } from './template.js'
 
 /**
@@ -252,7 +252,7 @@ export function createRecipeRoutes(options = {}) {
   }
 
   // Recipe routes
-  const recipeRoutes = routes('/recipes', r => {
+  const recipeResource = resource(r => {
     // List all recipes
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -305,7 +305,7 @@ export function createRecipeRoutes(options = {}) {
   })
 
   // Instance routes
-  const instanceRoutes = routes('/instances', r => {
+  const instanceResource = resource(r => {
     // List all instances
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -384,15 +384,18 @@ export function createRecipeRoutes(options = {}) {
    * Install recipe routes into a Bassline instance.
    *
    * @param {import('@bassline/core').Bassline} blInstance
+   * @param {object} [options] - Options
+   * @param {string} [options.recipesPrefix='/recipes'] - Mount prefix for recipes
+   * @param {string} [options.instancesPrefix='/instances'] - Mount prefix for instances
    */
-  function install(blInstance) {
-    blInstance.install(recipeRoutes)
-    blInstance.install(instanceRoutes)
+  function install(blInstance, { recipesPrefix = '/recipes', instancesPrefix = '/instances' } = {}) {
+    blInstance.mount(recipesPrefix, recipeResource)
+    blInstance.mount(instancesPrefix, instanceResource)
   }
 
   return {
-    recipeRoutes,
-    instanceRoutes,
+    recipeRoutes: recipeResource,
+    instanceRoutes: instanceResource,
     install,
     createRecipe,
     deleteRecipe,

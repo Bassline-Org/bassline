@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Built-in type definitions
@@ -242,39 +242,44 @@ export const TYPES = {
 }
 
 /**
+ * Types resource
+ */
+const typesResource = resource(r => {
+  // List all types
+  r.get('/', () => ({
+    headers: { type: 'bl:///types/directory' },
+    body: {
+      entries: Object.entries(TYPES).map(([name, def]) => ({
+        name,
+        type: 'type',
+        uri: `bl:///types/${name}`,
+        description: def.description
+      }))
+    }
+  }))
+
+  // Get specific type
+  r.get('/:name', ({ params }) => {
+    const def = TYPES[params.name]
+    if (!def) return null
+
+    return {
+      headers: { type: 'bl:///types/type' },
+      body: {
+        name: def.name,
+        description: def.description,
+        schema: def.schema
+      }
+    }
+  })
+})
+
+/**
  * Install types routes
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
+ * @param {object} [options] - Options
+ * @param {string} [options.prefix='/types'] - Mount prefix
  */
-export default function installTypes(bl) {
-  const typeRoutes = routes('/types', r => {
-    // List all types
-    r.get('/', () => ({
-      headers: { type: 'bl:///types/directory' },
-      body: {
-        entries: Object.entries(TYPES).map(([name, def]) => ({
-          name,
-          type: 'type',
-          uri: `bl:///types/${name}`,
-          description: def.description
-        }))
-      }
-    }))
-
-    // Get specific type
-    r.get('/:name', ({ params }) => {
-      const def = TYPES[params.name]
-      if (!def) return null
-
-      return {
-        headers: { type: 'bl:///types/type' },
-        body: {
-          name: def.name,
-          description: def.description,
-          schema: def.schema
-        }
-      }
-    })
-  })
-
-  bl.install(typeRoutes)
+export default function installTypes(bl, { prefix = '/types' } = {}) {
+  bl.mount(prefix, typesResource)
 }

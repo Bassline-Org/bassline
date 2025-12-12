@@ -1,15 +1,15 @@
 import { createServer } from 'node:http'
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create HTTP server routes
  * Servers are resources at `bl:///server/http/:port`
  *
- * @returns {import('@bassline/core').RouterBuilder}
+ * @returns {object} Resource with routes and install method
  *
  * @example
  * const bl = new Bassline()
- * bl.install(createHttpServerRoutes())
+ * bl.mount('/server/http', createHttpServerRoutes())
  *
  * // Start server
  * await bl.put('bl:///server/http/8080', {}, {})
@@ -22,7 +22,7 @@ export function createHttpServerRoutes() {
   /** @type {Map<number, {server: import('http').Server, config: object, connections: Set<import('net').Socket>, startTime: number}>} */
   const servers = new Map()
 
-  return routes('/server/http', r => {
+  const httpResource = resource(r => {
     // List all HTTP servers
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -122,4 +122,16 @@ export function createHttpServerRoutes() {
       }
     })
   })
+
+  /**
+   * Install HTTP server routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/server/http'] - Mount prefix
+   */
+  httpResource.install = (bl, { prefix = '/server/http' } = {}) => {
+    bl.mount(prefix, httpResource)
+  }
+
+  return httpResource
 }

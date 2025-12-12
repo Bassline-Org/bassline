@@ -1,15 +1,15 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create routes for managing WebSocket remote connections
  *
  * @param {object} [options]
  * @param {typeof WebSocket} [options.WebSocket] - WebSocket constructor (defaults to global WebSocket)
- * @returns {import('@bassline/core').RouterBuilder}
+ * @returns {object} Resource with routes and install method
  *
  * @example
  * const bl = new Bassline()
- * bl.install(createRemoteRoutes())
+ * bl.mount('/remote/ws', createRemoteRoutes())
  *
  * // Create a remote connection that mounts at /server1
  * await bl.put('bl:///remote/ws/server1', {}, {
@@ -136,7 +136,7 @@ export function createRemoteRoutes(options = {}) {
     return obj
   }
 
-  return routes('/remote/ws', r => {
+  const remoteResource = resource(r => {
     // List all remote connections
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -189,4 +189,16 @@ export function createRemoteRoutes(options = {}) {
       }
     })
   })
+
+  /**
+   * Install remote routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [opts] - Options
+   * @param {string} [opts.prefix='/remote/ws'] - Mount prefix
+   */
+  remoteResource.install = (bl, { prefix = '/remote/ws' } = {}) => {
+    bl.mount(prefix, remoteResource)
+  }
+
+  return remoteResource
 }

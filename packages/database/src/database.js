@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 import { createSQLiteConnection } from './sqlite.js'
 
 /**
@@ -34,7 +34,7 @@ export function createDatabaseRoutes(options = {}) {
     return entry.connection
   }
 
-  const databaseRoutes = routes('/database', r => {
+  const databaseResource = resource(r => {
     // Service info
     r.get('/', () => ({
       headers: { type: 'bl:///types/service' },
@@ -244,12 +244,18 @@ export function createDatabaseRoutes(options = {}) {
     })
   })
 
-  function install(blInstance) {
-    blInstance.install(databaseRoutes)
+  /**
+   * Install database routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} blInstance
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/database'] - Mount prefix
+   */
+  function install(blInstance, { prefix = '/database' } = {}) {
+    blInstance.mount(prefix, databaseResource)
   }
 
   return {
-    routes: databaseRoutes,
+    routes: databaseResource,
     install,
     getConnection,
     _connections: connections

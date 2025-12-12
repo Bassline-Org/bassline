@@ -1,4 +1,4 @@
-import { routes, matchesPattern } from '@bassline/core'
+import { resource, matchesPattern } from '@bassline/core'
 
 /**
  * Create a plumber for message routing based on pattern-matched rules
@@ -136,7 +136,7 @@ export function createPlumber() {
     }
   }
 
-  const plumbRoutes = routes('/plumb', r => {
+  const plumbResource = resource(r => {
     // Get message history for visualization
     r.get('/history', () => ({
       headers: { type: 'bl:///types/plumb-history' },
@@ -209,9 +209,11 @@ export function createPlumber() {
    * Install plumber into a Bassline instance
    * Sets up both routes (for rule management) and taps (for message routing)
    * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/plumb'] - Mount prefix
    */
-  function install(bl) {
-    bl.install(plumbRoutes)
+  function install(bl, { prefix = '/plumb' } = {}) {
+    bl.mount(prefix, plumbResource)
     bl.tap('put', createTap())
   }
 
@@ -222,7 +224,7 @@ export function createPlumber() {
     listen,
     dispatch,
     createTap,
-    routes: plumbRoutes,
+    routes: plumbResource,
     install,
     // Expose internals for debugging
     _rules: rules,

@@ -1,15 +1,15 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create a code store for loading JavaScript modules
  *
  * @param {string} hostDir - Directory containing JS modules
- * @param {string} [prefix='/code'] - URL prefix for these routes
- * @returns {import('@bassline/core').RouterBuilder}
+ * @param {string} [defaultPrefix='/code'] - Default mount prefix
+ * @returns {object} Resource with routes and install method
  *
  * @example
  * const bl = new Bassline()
- * bl.install(createCodeStore('./src', '/code'))
+ * bl.mount('/code', createCodeStore('./src'))
  *
  * // List available modules
  * bl.get('bl:///code')
@@ -19,16 +19,17 @@ import { routes } from '@bassline/core'
  * bl.get('bl:///code/my-module')
  * // → { headers: { type: 'module' }, body: { exports: [...] } }
  */
-export function createCodeStore(hostDir, prefix = '/code') {
+export function createCodeStore(hostDir, defaultPrefix = '/code') {
   const store = new Map();
+  let mountedPrefix = defaultPrefix;
 
-  return routes(prefix, r => {
+  const codeResource = resource(r => {
     // List loaded modules
     r.get('/', () => {
       const entries = Array.from(store.keys()).map(name => ({
         name,
         type: 'module',
-        uri: `bl://${prefix}/${name}`
+        uri: `bl://${mountedPrefix}/${name}`
       }))
 
       return {
@@ -68,4 +69,17 @@ export function createCodeStore(hostDir, prefix = '/code') {
         }
     })
   })
+
+  /**
+   * Install code store routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix] - Mount prefix (defaults to defaultPrefix)
+   */
+  codeResource.install = (bl, { prefix = defaultPrefix } = {}) => {
+    mountedPrefix = prefix
+    bl.mount(prefix, codeResource)
+  }
+
+  return codeResource
 }
