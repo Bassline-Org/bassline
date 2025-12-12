@@ -1,6 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 
-export interface ResourceNodeProps {
+interface ResourceNodeProps {
   id: string
   uri: string
   position: { x: number; y: number }
@@ -14,7 +14,7 @@ export interface ResourceNodeProps {
  *
  * Represents a Bassline resource. Click to GET, drop data to PUT.
  */
-export function ResourceNode(props: ResourceNodeProps) {
+function ResourceNode(props: ResourceNodeProps) {
   const [isHovering, setIsHovering] = createSignal(false)
   const [isDropTarget, setIsDropTarget] = createSignal(false)
 

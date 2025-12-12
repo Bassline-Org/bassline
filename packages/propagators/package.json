@@ -12,9 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@bassline/core": "workspace:*",
-    "@bassline/cells": "workspace:*",
-    "@bassline/handlers": "workspace:*"
+    "@bassline/core": "workspace:*"
   },
   "license": "AGPL-3.0"
 }

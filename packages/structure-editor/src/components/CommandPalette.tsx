@@ -95,5 +95,3 @@ export function CommandPalette(props: CommandPaletteProps) {
     </Show>
   )
 }
-
-export default CommandPalette

@@ -52,7 +52,7 @@ interface ImportModalProps {
 /**
  * Modal for importing a val from JSON file
  */
-export function ImportModal(props: ImportModalProps) {
+function ImportModal(props: ImportModalProps) {
   const bl = useBassline()
   const navigate = useNavigate()
 

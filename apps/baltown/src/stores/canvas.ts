@@ -1,12 +1,12 @@
 import { createSignal, createRoot, batch } from 'solid-js'
 
 // Types
-export interface Position {
+interface Position {
   x: number
   y: number
 }
 
-export interface DataBlock {
+interface DataBlock {
   id: string
   position: Position
   content: any // JSON content
@@ -14,13 +14,13 @@ export interface DataBlock {
   height?: number
 }
 
-export interface ResourceNode {
+interface ResourceNode {
   id: string
   uri: string
   position: Position
 }
 
-export interface CanvasTransform {
+interface CanvasTransform {
   scale: number
   panX: number
   panY: number

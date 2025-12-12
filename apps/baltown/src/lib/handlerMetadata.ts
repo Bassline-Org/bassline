@@ -375,7 +375,7 @@ export function handlerRequiresConfig(name: string): boolean {
 }
 
 // Get handlers by UI type
-export function getHandlersByUIType(uiType: UIType): string[] {
+function getHandlersByUIType(uiType: UIType): string[] {
   return Object.entries(HANDLER_METADATA)
     .filter(([_, meta]) => meta.uiType === uiType)
     .map(([name]) => name)
