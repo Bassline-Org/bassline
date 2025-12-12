@@ -193,68 +193,83 @@ describe('plumber integration', () => {
     receivedMessages = []
 
     plumber = createPlumber()
-    bl.mount('/plumb', plumber.routes)
+    plumber.install(bl, { tap: false })
     bl._plumber = plumber
 
-    // Listen on a test port
-    plumber.listen('test-port', (msg) => {
-      receivedMessages.push(msg)
+    // Create a handler route to receive messages
+    bl.route('/test-handler', {
+      put: ({ body }) => {
+        receivedMessages.push(body)
+        return { headers: {}, body }
+      },
     })
   })
 
   it('routes messages based on rules', async () => {
-    // Add a rule
-    plumber.addRule('test-rule', {
-      match: { headers: { type: 'test-event' } },
-      port: 'test-port',
-    })
+    // Add a rule via resource API
+    await bl.put(
+      'bl:///plumb/rules/test-rule',
+      {},
+      {
+        match: { type: 'test-event' },
+        to: 'bl:///test-handler',
+      }
+    )
 
-    // Dispatch a matching message
-    plumber.dispatch({
-      uri: 'bl:///test',
-      headers: { type: 'test-event' },
-      body: { data: 'hello' },
-    })
+    // Send a matching message - routing in headers, payload in body
+    await bl.put(
+      'bl:///plumb/send',
+      { source: 'bl:///test', port: 'test-port' },
+      { headers: { type: 'test-event' }, body: { data: 'hello' } }
+    )
 
     expect(receivedMessages).toHaveLength(1)
-    expect(receivedMessages[0].body.data).toBe('hello')
+    expect(receivedMessages[0].data).toBe('hello')
   })
 
   it('does not route non-matching messages', async () => {
-    plumber.addRule('test-rule', {
-      match: { headers: { type: 'test-event' } },
-      port: 'test-port',
-    })
+    await bl.put(
+      'bl:///plumb/rules/test-rule',
+      {},
+      {
+        match: { type: 'test-event' },
+        to: 'bl:///test-handler',
+      }
+    )
 
-    // Dispatch a non-matching message
-    plumber.dispatch({
-      uri: 'bl:///test',
-      headers: { type: 'other-event' },
-      body: { data: 'ignored' },
-    })
+    // Send a non-matching message
+    await bl.put(
+      'bl:///plumb/send',
+      { source: 'bl:///test', port: 'test-port' },
+      { headers: { type: 'other-event' }, body: { data: 'ignored' } }
+    )
 
     expect(receivedMessages).toHaveLength(0)
   })
 
   it('supports regex matching in rules', async () => {
-    plumber.addRule('uri-rule', {
-      match: { uri: '^bl:///cells/.*' },
-      port: 'test-port',
-    })
+    await bl.put(
+      'bl:///plumb/rules/source-rule',
+      {},
+      {
+        match: { source: '^bl:///cells/.*' },
+        to: 'bl:///test-handler',
+      }
+    )
 
-    plumber.dispatch({
-      uri: 'bl:///cells/counter',
-      headers: {},
-      body: {},
-    })
+    await bl.put(
+      'bl:///plumb/send',
+      { source: 'bl:///cells/counter', port: 'cell-updates' },
+      { headers: { type: 'bl:///types/cell-value' }, body: { from: 'cells' } }
+    )
 
-    plumber.dispatch({
-      uri: 'bl:///data/something',
-      headers: {},
-      body: {},
-    })
+    await bl.put(
+      'bl:///plumb/send',
+      { source: 'bl:///data/something', port: 'data-updates' },
+      { headers: { type: 'bl:///types/data' }, body: { from: 'data' } }
+    )
 
     expect(receivedMessages).toHaveLength(1)
-    expect(receivedMessages[0].uri).toBe('bl:///cells/counter')
+    expect(receivedMessages[0].from).toBe('cells')
   })
 })

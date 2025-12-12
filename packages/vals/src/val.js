@@ -22,7 +22,6 @@ import { resource } from '@bassline/core'
  * - GET  /vals/:owner/:name/versions -> version history
  * - PUT  /vals/:owner/:name/fork -> fork val
  * - PUT  /vals/:owner/:name/instantiate -> instantiate recipe val
- *
  * @param {object} options - Configuration options
  * @param {import('@bassline/core').Bassline} options.bl - Bassline instance
  * @returns {object} Val routes and management functions
@@ -44,6 +43,8 @@ export function createValRoutes(options = {}) {
 
   /**
    * Create a unique key for a val
+   * @param owner
+   * @param name
    */
   function valKey(owner, name) {
     return `${owner}/${name}`
@@ -51,7 +52,6 @@ export function createValRoutes(options = {}) {
 
   /**
    * Create or update a val definition.
-   *
    * @param {string} owner - Val owner
    * @param {string} name - Val name
    * @param {object} definition - Val definition
@@ -112,22 +112,21 @@ export function createValRoutes(options = {}) {
       bl._links.index(`bl:///vals/${key}`, { parentVal: { $ref: parentVal } })
     }
 
-    // Dispatch event through plumber
-    if (bl._plumber) {
-      bl._plumber.dispatch({
-        uri: `bl:///vals/${key}`,
-        method: 'put',
+    // Send event through plumber
+    bl.put(
+      'bl:///plumb/send',
+      { source: `bl:///vals/${key}`, port: 'val-saved' },
+      {
         headers: { type: 'bl:///types/val-saved', version },
         body: { val: key, version },
-      })
-    }
+      }
+    )
 
     return val
   }
 
   /**
    * Delete a val.
-   *
    * @param {string} owner - Val owner
    * @param {string} name - Val name
    * @returns {boolean} Whether val existed
@@ -144,7 +143,6 @@ export function createValRoutes(options = {}) {
 
   /**
    * Get a val by owner and name.
-   *
    * @param {string} owner - Val owner
    * @param {string} name - Val name
    * @returns {object|null} Val definition
@@ -155,7 +153,6 @@ export function createValRoutes(options = {}) {
 
   /**
    * Get a specific version of a val.
-   *
    * @param {string} owner - Val owner
    * @param {string} name - Val name
    * @param {number} version - Version number
@@ -167,7 +164,6 @@ export function createValRoutes(options = {}) {
 
   /**
    * List all vals, optionally filtered by owner.
-   *
    * @param {string} [owner] - Filter by owner
    * @returns {object[]} Val summaries
    */
@@ -193,7 +189,6 @@ export function createValRoutes(options = {}) {
 
   /**
    * List versions of a val.
-   *
    * @param {string} owner - Val owner
    * @param {string} name - Val name
    * @returns {object[]} Version summaries
@@ -215,7 +210,6 @@ export function createValRoutes(options = {}) {
 
   /**
    * Instantiate a recipe val - create actual resources from the definition.
-   *
    * @param {string} owner - Val owner
    * @param {string} name - Val name
    * @param {string} instanceName - Name for the instance
@@ -264,7 +258,7 @@ export function createValRoutes(options = {}) {
   // Val routes
   const valResource = resource((r) => {
     // List all vals
-    r.get('/', ({ headers }) => ({
+    r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
         entries: listVals().map((v) => ({
@@ -275,7 +269,7 @@ export function createValRoutes(options = {}) {
     }))
 
     // List user's vals
-    r.get('/:owner', ({ params, headers }) => ({
+    r.get('/:owner', ({ params }) => ({
       headers: { type: 'bl:///types/directory' },
       body: {
         entries: listVals(params.owner).map((v) => ({
@@ -299,8 +293,14 @@ export function createValRoutes(options = {}) {
         body: {
           ...val,
           entries: [
-            { name: 'versions', uri: `bl:///vals/${params.owner}/${params.name}/versions` },
-            { name: 'forks', uri: `bl:///vals/${params.owner}/${params.name}/forks` },
+            {
+              name: 'versions',
+              uri: `bl:///vals/${params.owner}/${params.name}/versions`,
+            },
+            {
+              name: 'forks',
+              uri: `bl:///vals/${params.owner}/${params.name}/forks`,
+            },
           ],
         },
       }
@@ -326,7 +326,7 @@ export function createValRoutes(options = {}) {
     })
 
     // Delete val
-    r.put('/:owner/:name/delete', ({ params, headers }) => {
+    r.put('/:owner/:name/delete', ({ params }) => {
       const existed = deleteVal(params.owner, params.name)
       if (!existed) return null
 
@@ -462,10 +462,9 @@ export function createValRoutes(options = {}) {
 
   /**
    * Install val routes into a Bassline instance.
-   *
    * @param {import('@bassline/core').Bassline} blInstance
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/vals'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
   function install(blInstance, { prefix = '/vals' } = {}) {
     blInstance.mount(prefix, valResource)

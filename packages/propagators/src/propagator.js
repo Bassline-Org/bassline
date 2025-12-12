@@ -15,16 +15,15 @@ import { resource } from '@bassline/core'
  * - PUT  /propagators/:name     → create/update propagator
  * - GET  /propagators/:name/fire → manually fire (for debugging)
  * - PUT  /propagators/:name/kill → remove propagator
- *
  * @param {object} options - Configuration
  * @param {object} options.bl - Bassline instance for reading/writing cells
- * @param {function} [options.onPropagatorKill] - Callback when propagator is removed
+ * @param {Function} [options.onPropagatorKill] - Callback when propagator is removed
  * @returns {object} Propagator routes and control functions
  */
 export function createPropagatorRoutes(options = {}) {
   const { bl, onPropagatorKill } = options
 
-  /** @type {Map<string, {inputs: string[], output: string, handler: function, handlerName: string, config: object, enabled: boolean}>} */
+  /** @type {Map<string, {inputs: string[], output: string, handler: Function, handlerName: string, config: object, enabled: boolean}>} */
   const store = new Map()
 
   /** @type {Map<string, Set<string>>} cell URI → Set of propagator names */
@@ -34,7 +33,7 @@ export function createPropagatorRoutes(options = {}) {
    * Get a handler from bl._handlers.
    * @param {string} name - Handler name
    * @param {object} [config] - Handler config
-   * @returns {function|null}
+   * @returns {Function | null}
    */
   function getHandler(name, config = {}) {
     if (!bl?._handlers) {
@@ -60,7 +59,7 @@ export function createPropagatorRoutes(options = {}) {
    * @param {string} config.output - Cell URI to write to
    * @param {string} config.handler - Handler name (references a registered factory)
    * @param {object} [config.handlerConfig] - Config to pass to handler factory
-   * @param {boolean} [config.enabled=true] - Whether propagator is active
+   * @param {boolean} [config.enabled] - Whether propagator is active
    */
   function createPropagator(name, config) {
     const existing = store.get(name)
@@ -277,13 +276,34 @@ export function createPropagatorRoutes(options = {}) {
         body: { uri: `bl:///propagators/${params.name}` },
       }
     })
+
+    // Handle cell change notifications from plumber
+    // Routing metadata (source, port) in request headers, payload in body
+    r.put('/on-cell-change', async ({ headers }) => {
+      const cellUri = headers.source
+      if (!cellUri) {
+        return {
+          headers: { type: 'bl:///types/error' },
+          body: { error: 'Missing source in request headers' },
+        }
+      }
+
+      // Remove /value suffix if present to get the cell URI
+      const baseCellUri = cellUri.replace(/\/value$/, '')
+      await onCellChange(baseCellUri)
+
+      return {
+        headers: { type: 'bl:///types/propagator-triggered' },
+        body: { cellUri: baseCellUri },
+      }
+    })
   })
 
   /**
    * Install propagator routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} blInstance
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/propagators'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
   function install(blInstance, { prefix = '/propagators' } = {}) {
     blInstance.mount(prefix, propagatorResource)

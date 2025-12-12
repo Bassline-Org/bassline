@@ -9,6 +9,7 @@ import { createSQLiteConnection } from './sqlite.js'
  * - Query execution
  * - Schema introspection
  * - Transaction support
+ * @param options
  */
 export function createDatabaseRoutes(options = {}) {
   const { bl } = options
@@ -18,6 +19,7 @@ export function createDatabaseRoutes(options = {}) {
 
   /**
    * Get or create a connection
+   * @param name
    */
   function getConnection(name) {
     if (!connections.has(name)) {
@@ -78,10 +80,22 @@ export function createDatabaseRoutes(options = {}) {
           readonly: entry.config.readonly || false,
           connected: !!entry.connection,
           entries: [
-            { name: 'query', uri: `bl:///database/connections/${params.name}/query` },
-            { name: 'execute', uri: `bl:///database/connections/${params.name}/execute` },
-            { name: 'schema', uri: `bl:///database/connections/${params.name}/schema` },
-            { name: 'pragma', uri: `bl:///database/connections/${params.name}/pragma` },
+            {
+              name: 'query',
+              uri: `bl:///database/connections/${params.name}/query`,
+            },
+            {
+              name: 'execute',
+              uri: `bl:///database/connections/${params.name}/execute`,
+            },
+            {
+              name: 'schema',
+              uri: `bl:///database/connections/${params.name}/schema`,
+            },
+            {
+              name: 'pragma',
+              uri: `bl:///database/connections/${params.name}/pragma`,
+            },
           ],
         },
       }
@@ -107,9 +121,18 @@ export function createDatabaseRoutes(options = {}) {
           driver: 'sqlite',
           ...config,
           entries: [
-            { name: 'query', uri: `bl:///database/connections/${params.name}/query` },
-            { name: 'execute', uri: `bl:///database/connections/${params.name}/execute` },
-            { name: 'schema', uri: `bl:///database/connections/${params.name}/schema` },
+            {
+              name: 'query',
+              uri: `bl:///database/connections/${params.name}/query`,
+            },
+            {
+              name: 'execute',
+              uri: `bl:///database/connections/${params.name}/execute`,
+            },
+            {
+              name: 'schema',
+              uri: `bl:///database/connections/${params.name}/schema`,
+            },
           ],
         },
       }
@@ -140,7 +163,7 @@ export function createDatabaseRoutes(options = {}) {
     })
 
     // Execute statement (INSERT, UPDATE, DELETE)
-    r.put('/connections/:name/execute', ({ params, body }) => {
+    r.put('/connections/:name/execute', async ({ params, body }) => {
       const conn = getConnection(params.name)
       const { sql, params: stmtParams = [] } = body
 
@@ -150,22 +173,20 @@ export function createDatabaseRoutes(options = {}) {
 
       const result = conn.execute(sql, stmtParams)
 
-      // Dispatch change event through plumber
-      if (bl._plumber) {
-        bl._plumber.dispatch({
-          uri: `bl:///database/connections/${params.name}`,
-          headers: {
-            type: 'bl:///types/database-change',
-            changes: result.changes,
-          },
+      // Send change event through plumber
+      await bl.put(
+        'bl:///plumb/send',
+        { source: `bl:///database/connections/${params.name}`, port: 'database-changes' },
+        {
+          headers: { type: 'bl:///types/database-change', changes: result.changes },
           body: {
             connection: params.name,
             sql,
             changes: result.changes,
             lastInsertRowid: result.lastInsertRowid,
           },
-        })
-      }
+        }
+      )
 
       return {
         headers: {
@@ -246,7 +267,7 @@ export function createDatabaseRoutes(options = {}) {
    * Install database routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} blInstance
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/database'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
   function install(blInstance, { prefix = '/database' } = {}) {
     blInstance.mount(prefix, databaseResource)

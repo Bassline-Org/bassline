@@ -4,56 +4,35 @@ import { resource, matchesPattern } from '@bassline/core'
  * Create a plumber for message routing based on pattern-matched rules
  *
  * Rules are stored as resources at `bl:///plumb/rules/:name`
- * Ports are named destinations for message delivery
- *
- * @returns {Object} Plumber with rule management, routing, and port subscription
- *
+ * Messages are sent via `PUT bl:///plumb/send`
+ * @returns {object} Plumber with rule management and routing
  * @example
  * const plumber = createPlumber()
- * bl.install(plumber.routes)
- * bl.tap('put', plumber.createTap())
+ * plumber.install(bl)
  *
- * // Add a rule via API
- * bl.put('bl:///plumb/rules/cell-watcher', {}, {
- *   match: { headers: { type: '^cell$' } },
- *   port: 'cell-updates'
+ * // Add a rule via resource API
+ * await bl.put('bl:///plumb/rules/cell-watcher', {}, {
+ *   match: { type: 'bl:///types/cell-value' },
+ *   to: 'bl:///propagators/on-cell-change'
  * })
  *
- * // Listen on a port
- * plumber.listen('cell-updates', (msg) => {
- *   console.log('Cell changed:', msg.uri)
- * })
+ * // Send a message - routing metadata in headers, payload in body
+ * await bl.put('bl:///plumb/send',
+ *   { source: 'bl:///cells/counter', port: 'cell-updates' },
+ *   { headers: { type: 'bl:///types/cell-value' }, body: { value: 42 } }
+ * )
  */
 export function createPlumber() {
-  /** @type {Map<string, {match: object, port: string}>} */
+  /** @type {Map<string, {match: object, to: string}>} */
   const rules = new Map()
-  /** @type {Map<string, Set<function>>} */
-  const ports = new Map()
   /** @type {Array<object>} - Circular buffer for message history */
   const messageHistory = []
   const MAX_HISTORY = 50
   let messageId = 0
 
   /**
-   * Add a routing rule
-   * @param {string} name - Rule name
-   * @param {{match: object, port: string}} rule - Rule definition
-   */
-  function addRule(name, rule) {
-    rules.set(name, rule)
-  }
-
-  /**
-   * Remove a routing rule
-   * @param {string} name - Rule name
-   */
-  function removeRule(name) {
-    rules.delete(name)
-  }
-
-  /**
    * Find all rules that match a message
-   * @param {object} message - Message to match against rules
+   * @param {object} message - Message to match (source, port, type)
    * @returns {Array<{name: string, rule: object}>}
    */
   function route(message) {
@@ -67,76 +46,84 @@ export function createPlumber() {
   }
 
   /**
-   * Subscribe to messages on a port
-   * @param {string} port - Port name
-   * @param {function} callback - Callback for messages
-   * @returns {function} Unsubscribe function
+   * Send a message through the plumber
+   * Finds matching rules and PUTs the payload to each destination
+   * @param {object} routingInfo - Routing metadata { source, port, type }
+   * @param {object} payload - Message to forward { headers, body }
+   * @param {object} bl - Bassline instance
+   * @returns {Promise<{matchedRules: string[], destinations: string[]}>}
    */
-  function listen(port, callback) {
-    if (!ports.has(port)) ports.set(port, new Set())
-    ports.get(port).add(callback)
-    return () => ports.get(port).delete(callback)
-  }
-
-  /**
-   * Dispatch a message to matching ports
-   * @param {object} message - Message to dispatch
-   */
-  function dispatch(message) {
-    const matched = route(message)
+  async function send(routingInfo, payload, bl) {
+    const matched = route(routingInfo)
     const matchedRules = []
-    const dispatchedPorts = []
+    const destinations = []
 
     for (const { name, rule } of matched) {
       matchedRules.push(name)
-      const listeners = ports.get(rule.port)
-      if (listeners && listeners.size > 0) {
-        dispatchedPorts.push(rule.port)
-        for (const cb of listeners) {
-          cb(message)
-        }
+      if (rule.to) {
+        destinations.push(rule.to)
+        await bl.put(rule.to, payload.headers || {}, payload.body)
       }
     }
 
-    // Log to history if any rules matched
+    // Log to history
     if (matchedRules.length > 0) {
       const entry = {
         id: ++messageId,
         timestamp: new Date().toISOString(),
-        uri: message.uri,
-        type: message.headers?.type,
+        source: routingInfo.source,
+        port: routingInfo.port,
+        type: routingInfo.type,
         matchedRules,
-        dispatchedPorts,
+        destinations,
       }
       messageHistory.push(entry)
       if (messageHistory.length > MAX_HISTORY) {
         messageHistory.shift()
       }
-
-      // Broadcast to plumb-flow port for live visualization
-      const flowListeners = ports.get('plumb-flow')
-      if (flowListeners && flowListeners.size > 0) {
-        for (const cb of flowListeners) {
-          cb(entry)
-        }
-      }
     }
+
+    return { matchedRules, destinations }
   }
 
   /**
-   * Create a tap for automatic message dispatching
-   * Install this tap on PUT to automatically route messages
-   * @returns {function}
+   * Create a tap for automatic message routing on PUT
+   * @returns {Function}
    */
   function createTap() {
-    return ({ uri, body, result }) => {
-      if (result) {
-        dispatch({ uri, ...result })
+    return async ({ uri, result, bl }) => {
+      if (result && result.headers) {
+        // Auto-dispatch PUT results through plumber
+        await send(
+          { source: uri, type: result.headers.type },
+          { headers: result.headers, body: result.body },
+          bl
+        )
       }
     }
   }
 
   const plumbResource = resource((r) => {
+    // Send a message through the plumber
+    // Routing metadata in request headers (source, port)
+    // Payload to forward in body ({ headers, body })
+    r.put('/send', async ({ headers, body, bl }) => {
+      const routingInfo = {
+        source: headers.source,
+        port: headers.port,
+        type: body.headers?.type,
+      }
+      const result = await send(routingInfo, body, bl)
+      return {
+        headers: { type: 'bl:///types/plumb-sent' },
+        body: {
+          sent: true,
+          matchedRules: result.matchedRules,
+          destinations: result.destinations,
+        },
+      }
+    })
+
     // Get message history for visualization
     r.get('/history', () => ({
       headers: { type: 'bl:///types/plumb-history' },
@@ -154,12 +141,8 @@ export function createPlumber() {
         rules: [...rules.entries()].map(([name, rule]) => ({
           name,
           match: rule.match,
-          port: rule.port,
+          to: rule.to,
           uri: `bl:///plumb/rules/${name}`,
-        })),
-        ports: [...ports.entries()].map(([name, listeners]) => ({
-          name,
-          listenerCount: listeners.size,
         })),
         // Known sources that dispatch to plumber
         sources: [
@@ -196,7 +179,7 @@ export function createPlumber() {
         }
       },
       put: ({ params, body }) => {
-        addRule(params.name, body)
+        rules.set(params.name, body)
         return {
           headers: { type: 'bl:///types/plumb-rule' },
           body,
@@ -207,28 +190,28 @@ export function createPlumber() {
 
   /**
    * Install plumber into a Bassline instance
-   * Sets up both routes (for rule management) and taps (for message routing)
+   * Sets up routes for rule management and /send endpoint
+   * Optionally installs tap for automatic PUT routing
    * @param {import('@bassline/core').Bassline} bl
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/plumb'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
+   * @param {boolean} [options.tap] - Whether to install automatic PUT tap
    */
-  function install(bl, { prefix = '/plumb' } = {}) {
+  function install(bl, { prefix = '/plumb', tap = true } = {}) {
     bl.mount(prefix, plumbResource)
-    bl.tap('put', createTap())
+    if (tap) {
+      bl.tap('put', createTap())
+    }
   }
 
   return {
-    addRule,
-    removeRule,
     route,
-    listen,
-    dispatch,
+    send,
     createTap,
     routes: plumbResource,
     install,
-    // Expose internals for debugging
+    // Expose internals for debugging/testing
     _rules: rules,
-    _ports: ports,
     _messageHistory: messageHistory,
   }
 }

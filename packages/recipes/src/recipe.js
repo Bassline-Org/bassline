@@ -54,15 +54,15 @@ export function createRecipeRoutes(options = {}) {
 
     recipeStore.set(name, recipe)
 
-    // Dispatch event through plumber
-    if (bl._plumber) {
-      bl._plumber.dispatch({
-        uri: `bl:///recipes/${name}`,
-        method: 'put',
+    // Send event through plumber
+    bl.put(
+      'bl:///plumb/send',
+      { source: `bl:///recipes/${name}`, port: 'recipe-saved' },
+      {
         headers: { type: 'bl:///types/recipe-saved' },
         body: { recipe: name },
-      })
-    }
+      }
+    )
 
     return recipe
   }
@@ -166,19 +166,19 @@ export function createRecipeRoutes(options = {}) {
 
     instanceStore.set(instanceName, instance)
 
-    // Dispatch event through plumber
-    if (bl._plumber) {
-      bl._plumber.dispatch({
-        uri: `bl:///instances/${instanceName}`,
-        method: 'put',
+    // Send event through plumber
+    bl.put(
+      'bl:///plumb/send',
+      { source: `bl:///instances/${instanceName}`, port: 'instance-created' },
+      {
         headers: { type: 'bl:///types/instance-created' },
         body: {
           instance: instanceName,
           recipe: recipeUri,
           resources: createdResources.map((r) => r.uri),
         },
-      })
-    }
+      }
+    )
 
     return instance
   }
@@ -206,15 +206,15 @@ export function createRecipeRoutes(options = {}) {
     instance.state = 'deleted'
     instanceStore.delete(name)
 
-    // Dispatch event through plumber
-    if (bl._plumber) {
-      bl._plumber.dispatch({
-        uri: `bl:///instances/${name}`,
-        method: 'delete',
+    // Send event through plumber
+    bl.put(
+      'bl:///plumb/send',
+      { source: `bl:///instances/${name}`, port: 'instance-deleted' },
+      {
         headers: { type: 'bl:///types/instance-deleted' },
         body: { instance: name },
-      })
-    }
+      }
+    )
 
     return true
   }
