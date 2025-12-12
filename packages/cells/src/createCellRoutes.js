@@ -1,5 +1,5 @@
 import { resource } from '@bassline/core'
-import { getLattice, lattices } from './lattices.js'
+import { getLattice, lattices } from './lattices'
 
 /**
  * Create cell routes for lattice-based CRDT cells.
@@ -19,6 +19,7 @@ import { getLattice, lattices } from './lattices.js'
  * @param {Function} [options.onCellChange] - Callback when a cell value changes
  * @returns {object} Cell routes and store
  */
+
 export function createCellRoutes(options = {}) {
   const { onCellChange, onCellKill, onContradiction } = options
 
@@ -27,8 +28,8 @@ export function createCellRoutes(options = {}) {
 
   /**
    * Get a cell by name
-   * @param {string} name the name of the cell
-   * @returns {object|null} cell
+   * @param {string} name
+   * @returns {object|null}
    */
   function getCell(name) {
     return store.get(name) || null
@@ -98,20 +99,6 @@ export function createCellRoutes(options = {}) {
         Array.isArray(valueToMerge) &&
         valueToMerge.length > 0
       if (isContradiction) {
-        onContradiction({
-          uri: `bl:///cells/${name}`,
-          cell,
-          previousValue: oldValue,
-          incomingValue: valueToMerge,
-          result: joinedValue,
-        })
-      }
-    }
-
-    // Detect contradiction for LWW lattice
-    // Contradiction marker: { value: null, timestamp: -1 }
-    if (cell.lattice === 'lww' && onContradiction) {
-      if (joinedValue?.timestamp === -1) {
         onContradiction({
           uri: `bl:///cells/${name}`,
           cell,

@@ -10,6 +10,14 @@
  * - lte(a, b): Compare two values (partial order)
  */
 
+export class Contradiction extends Error {
+  constructor(previous, current) {
+    super('Contradiction: incompatible values')
+    this.previous = previous
+    this.current = current
+  }
+}
+
 // Maximum number lattice - values only go up
 export const maxNumber = {
   bottom: () => -Infinity,
@@ -40,20 +48,19 @@ export const setUnion = {
 
 // Last-writer-wins lattice - compares by timestamp
 export const lww = {
-  bottom: () => ({ value: null, timestamp: 0 }),
+  bottom: () => ({ value: null, timestamp: -Infinity }),
   join: (a, b) => {
     // Handle raw values (auto-wrap with timestamp)
     const aWrapped = typeof a?.timestamp === 'number' ? a : { value: a, timestamp: 0 }
     const bWrapped = typeof b?.timestamp === 'number' ? b : { value: b, timestamp: 0 }
-    // When timestamps differ, higher wins
-    if (aWrapped.timestamp !== bWrapped.timestamp) {
-      return aWrapped.timestamp > bWrapped.timestamp ? aWrapped : bWrapped
+    // Equal timestamps with different values is a contradiction
+    if (
+      aWrapped.timestamp === bWrapped.timestamp &&
+      JSON.stringify(aWrapped.value) !== JSON.stringify(bWrapped.value)
+    ) {
+      throw new Contradiction(a, b)
     }
-    // When timestamps are equal, use deterministic tie-breaker (larger JSON string wins)
-    // This ensures commutativity: join(a,b) === join(b,a)
-    const aStr = JSON.stringify(aWrapped.value)
-    const bStr = JSON.stringify(bWrapped.value)
-    return aStr >= bStr ? aWrapped : bWrapped
+    return aWrapped.timestamp >= bWrapped.timestamp ? aWrapped : bWrapped
   },
   lte: (a, b) => {
     const aWrapped = typeof a?.timestamp === 'number' ? a : { value: a, timestamp: 0 }
@@ -95,14 +102,30 @@ export const boolean = {
 // Empty set [] is "top" (contradiction/unsatisfiable)
 // null means "unconstrained" (universal set / bottom)
 // Disjoint sets intersect to [] - a detectable contradiction state
+const intersection = (a, b) => {
+  const setA = new Set(a ?? [])
+  const setB = new Set(b ?? [])
+  const common = new Set()
+  for (const val of setA.values()) {
+    if (setB.has(val)) {
+      common.add(val)
+    }
+  }
+  return Array.from(common.values())
+}
+
 export const setIntersection = {
   bottom: () => null,
   join: (a, b) => {
     if (a === null) return b
     if (b === null) return a
     if (!Array.isArray(a) || !Array.isArray(b)) return []
-    const setA = new Set(a)
-    return [...new Set([...b].filter((x) => setA.has(x)))].sort()
+    const result = [...intersection(a, b)].sort()
+    // Only contradiction if both non-empty but result is empty
+    if (result.length === 0 && a.length > 0 && b.length > 0) {
+      throw new Contradiction(a, b)
+    }
+    return result
   },
   lte: (a, b) => {
     // a ≤ b means a is less constrained (superset of b)
