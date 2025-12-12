@@ -11,7 +11,6 @@ import { runAgentLoop } from './mcp-server.js'
  * - PUT /services/claude/complete - Simple text completion
  *
  * Also attaches bl.agent() helper for agentic loops.
- *
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @param {object} [config] - Configuration options
  * @param {string} [config.apiKey] - Anthropic API key (defaults to env var)
@@ -26,10 +25,10 @@ export default function installClaude(bl, config = {}) {
   }
 
   // Install service registry if not present
-  if (!bl._services) {
+  if (!bl.hasModule('services')) {
     const services = createServiceRoutes()
     services.install(bl)
-    bl._services = services
+    bl.setModule('services', services)
   }
 
   // Create and install Claude service
@@ -40,10 +39,11 @@ export default function installClaude(bl, config = {}) {
   claude.install(bl)
 
   // Register in service registry
-  bl._services.register('claude', claude)
+  bl.getModule('services').then((services) => {
+    services.register('claude', claude)
+  })
 
-  // Store reference for other modules
-  bl._claude = claude
+  bl.setModule('claude', claude)
 
   // Attach agent loop helper to bl instance
   bl.agent = (prompt, options = {}) => runAgentLoop(bl, claude, { prompt, ...options })

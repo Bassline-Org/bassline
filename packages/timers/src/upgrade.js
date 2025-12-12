@@ -9,7 +9,7 @@ export default function installTimers(bl) {
   const timers = createTimerRoutes({ bl })
 
   timers.install(bl)
-  bl._timers = timers
+  bl.setModule('timers', timers)
 
   console.log('Timers installed')
 }

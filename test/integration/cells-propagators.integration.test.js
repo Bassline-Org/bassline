@@ -23,21 +23,26 @@ describe('cells + propagators integration', () => {
     const plumber = createPlumber()
     bl.mount('/plumb', plumber.routes)
     bl._plumber = plumber
+    bl.setModule('plumber', plumber)
 
-    // Install handlers
+    // Install handlers (propagators use bl.getModule('handlers'))
     const handlerSystem = createHandlerSystem()
     bl.mount('/handlers', handlerSystem.routes)
-    bl._handlers = handlerSystem.registry
+    bl.setModule('handlers', {
+      get: handlerSystem.registry.get,
+      getSync: handlerSystem.registry.getSync,
+      registry: handlerSystem.registry,
+    })
 
     // Install cells (uses bl.plumb() for change notifications)
     cells = createCellRoutes({ bl })
     cells.install(bl)
-    bl._cells = cells
+    bl.setModule('cells', cells)
 
     // Install propagators (each propagator creates its own plumber rules)
     propagators = createPropagatorRoutes({ bl })
     propagators.install(bl)
-    bl._propagators = propagators
+    bl.setModule('propagators', propagators)
   })
 
   it('creates cells and retrieves values', async () => {

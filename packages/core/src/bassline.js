@@ -103,6 +103,83 @@ export class Bassline {
     this.taps = { get: [], put: [] }
     /** @type {MiddlewareEntry[]} */
     this.middleware = []
+    /** @type {Map<string, any>} */
+    this._modules = new Map()
+    /** @type {Map<string, Array<Function>>} */
+    this._modulePending = new Map()
+  }
+
+  /**
+   * Register a module for late binding
+   * Resolves any pending getModule() calls for this name
+   * Sends module-registered event through plumber
+   * @param {string} name - Module name (e.g., 'cells', 'plumber', 'handlers')
+   * @param {any} module - Module instance
+   * @returns {this} For chaining
+   * @example
+   * bl.setModule('cells', cellsModule)
+   * bl.setModule('handlers', handlerRegistry)
+   */
+  setModule(name, module) {
+    const isNew = !this._modules.has(name)
+    this._modules.set(name, module)
+
+    // Resolve any pending requests
+    const pending = this._modulePending.get(name)
+    if (pending) {
+      for (const resolve of pending) {
+        resolve(module)
+      }
+      this._modulePending.delete(name)
+    }
+
+    // Notify through plumber
+    const source = `bl:///modules/${name}`
+    if (isNew) {
+      this.plumb(source, 'module-registered', {
+        headers: { type: 'bl:///types/module-registered' },
+        body: { name, source },
+      })
+    } else {
+      this.plumb(source, 'module-updated', {
+        headers: { type: 'bl:///types/module-updated' },
+        body: { name, source },
+      })
+    }
+
+    return this
+  }
+
+  /**
+   * Get a module by name, waiting if not yet available
+   * @param {string} name - Module name
+   * @returns {Promise<any>} Promise that resolves to the module
+   * @example
+   * const cells = await bl.getModule('cells')
+   * const handlers = await bl.getModule('handlers')
+   * const sum = handlers.get('sum', {})
+   */
+  getModule(name) {
+    const module = this._modules.get(name)
+    if (module !== undefined) {
+      return Promise.resolve(module)
+    }
+    // Wait for setModule to be called
+    return new Promise((resolve) => {
+      if (!this._modulePending.has(name)) {
+        this._modulePending.set(name, [])
+      }
+      this._modulePending.get(name).push(resolve)
+    })
+  }
+
+  /**
+   * Check if a module is available (non-blocking)
+   * @param {string} name - Module name
+   * @returns {boolean} True if module is registered
+   */
+  hasModule(name) {
+    return this._modules.has(name)
   }
 
   /**

@@ -60,14 +60,15 @@ export default function installDashboard(bl) {
   //   PUT bl:///plumb/rules/activity { match: { type: '.*' }, to: 'bl:///dashboard/track' }
   // For now, activity is only recorded via manual bl._activity.record() calls.
 
-  // Expose activity recorder for manual use
-  bl._activity = {
+  // Expose activity recorder for late binding
+  const activity = {
     record: recordActivity,
     getRecent: (n = 20) => activityBuffer.slice(-n).reverse(),
     clear: () => {
       activityBuffer.length = 0
     },
   }
+  bl.setModule('activity', activity)
 
   console.log('Dashboard and Activity buffer installed')
 }

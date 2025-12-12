@@ -8,7 +8,7 @@ import { ports, types } from '@bassline/plumber'
  * Each propagator creates its own plumber rules for its inputs,
  * so routing is visible and self-contained.
  *
- * Handlers are provided by @bassline/handlers and accessed via bl._handlers.
+ * Handlers are provided by @bassline/handlers and accessed via bl.getModule('handlers').
  *
  * Resource structure:
  * - GET  /propagators           → list all propagators
@@ -27,16 +27,15 @@ export function createPropagatorRoutes(options = {}) {
   const store = new Map()
 
   /**
-   * Get a handler from bl._handlers.
+   * Get a handler using promise-based late binding.
+   * Waits for handlers module if not yet installed.
    * @param {string} name - Handler name
    * @param {object} [config] - Handler config
-   * @returns {Function | null}
+   * @returns {Promise<Function>} Handler function
    */
-  function getHandler(name, config = {}) {
-    if (!bl?._handlers) {
-      throw new Error('Handlers not installed. Install @bassline/handlers before propagators.')
-    }
-    return bl._handlers.get(name, config)
+  async function getHandler(name, config = {}) {
+    const handlers = await bl.getModule('handlers')
+    return handlers.get(name, config)
   }
 
   /**
@@ -112,10 +111,10 @@ export function createPropagatorRoutes(options = {}) {
       await removeInputRules(name, existing.inputs)
     }
 
-    // Resolve handler
+    // Resolve handler (uses promise-based late binding)
     const handlerName = config.handler || 'passthrough'
     const handlerConfig = config.handlerConfig || {}
-    const handler = getHandler(handlerName, handlerConfig)
+    const handler = await getHandler(handlerName, handlerConfig)
 
     if (!handler) {
       throw new Error(`Unknown handler: ${handlerName}`)
