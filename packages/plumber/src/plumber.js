@@ -86,23 +86,6 @@ export function createPlumber() {
     return { matchedRules, destinations }
   }
 
-  /**
-   * Create a tap for automatic message routing on PUT
-   * @returns {Function}
-   */
-  function createTap() {
-    return async ({ uri, result, bl }) => {
-      if (result && result.headers) {
-        // Auto-dispatch PUT results through plumber
-        await send(
-          { source: uri, type: result.headers.type },
-          { headers: result.headers, body: result.body },
-          bl
-        )
-      }
-    }
-  }
-
   const plumbResource = resource((r) => {
     // Send a message through the plumber
     // Routing metadata in request headers (source, port)
@@ -191,23 +174,17 @@ export function createPlumber() {
   /**
    * Install plumber into a Bassline instance
    * Sets up routes for rule management and /send endpoint
-   * Optionally installs tap for automatic PUT routing
    * @param {import('@bassline/core').Bassline} bl
    * @param {object} [options] - Options
    * @param {string} [options.prefix] - Mount prefix
-   * @param {boolean} [options.tap] - Whether to install automatic PUT tap
    */
-  function install(bl, { prefix = '/plumb', tap = true } = {}) {
+  function install(bl, { prefix = '/plumb' } = {}) {
     bl.mount(prefix, plumbResource)
-    if (tap) {
-      bl.tap('put', createTap())
-    }
   }
 
   return {
     route,
     send,
-    createTap,
     routes: plumbResource,
     install,
     // Expose internals for debugging/testing

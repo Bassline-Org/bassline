@@ -7,7 +7,7 @@ describe('createPlumber', () => {
     it('adds and retrieves rules via PUT/GET', async () => {
       const bl = new Bassline()
       const plumber = createPlumber()
-      plumber.install(bl, { tap: false })
+      plumber.install(bl)
 
       await bl.put(
         'bl:///plumb/rules/test-rule',
@@ -26,7 +26,7 @@ describe('createPlumber', () => {
     it('lists all rules', async () => {
       const bl = new Bassline()
       const plumber = createPlumber()
-      plumber.install(bl, { tap: false })
+      plumber.install(bl)
 
       await bl.put('bl:///plumb/rules/rule-1', {}, { match: { port: 'a' }, to: 'bl:///a' })
       await bl.put('bl:///plumb/rules/rule-2', {}, { match: { port: 'b' }, to: 'bl:///b' })
@@ -39,7 +39,7 @@ describe('createPlumber', () => {
     it('returns null for non-existent rules', async () => {
       const bl = new Bassline()
       const plumber = createPlumber()
-      plumber.install(bl, { tap: false })
+      plumber.install(bl)
 
       const result = await bl.get('bl:///plumb/rules/missing')
       expect(result).toBeNull()
@@ -89,7 +89,7 @@ describe('createPlumber', () => {
     it('sends messages to matching destinations', async () => {
       const bl = new Bassline()
       const plumber = createPlumber()
-      plumber.install(bl, { tap: false })
+      plumber.install(bl)
 
       // Track what gets PUT to the destination
       const received = []
@@ -133,7 +133,7 @@ describe('createPlumber', () => {
     it('sends to multiple matching destinations', async () => {
       const bl = new Bassline()
       const plumber = createPlumber()
-      plumber.install(bl, { tap: false })
+      plumber.install(bl)
 
       const received = { a: [], b: [] }
       bl.route('/dest-a', {
@@ -167,7 +167,7 @@ describe('createPlumber', () => {
     it('returns empty results when no rules match', async () => {
       const bl = new Bassline()
       const plumber = createPlumber()
-      plumber.install(bl, { tap: false })
+      plumber.install(bl)
 
       const result = await bl.put(
         'bl:///plumb/send',
@@ -180,52 +180,11 @@ describe('createPlumber', () => {
     })
   })
 
-  describe('automatic tap on PUT', () => {
-    it('routes PUT results through plumber when tap is enabled', async () => {
-      const bl = new Bassline()
-      const plumber = createPlumber()
-      plumber.install(bl, { tap: true })
-
-      // Track what gets routed
-      const received = []
-      bl.route('/handler', {
-        put: ({ body }) => {
-          received.push(body)
-          return { headers: {}, body }
-        },
-      })
-
-      // Add a rule matching by type
-      await bl.put(
-        'bl:///plumb/rules/catch-data',
-        {},
-        {
-          match: { type: 'bl:///types/data' },
-          to: 'bl:///handler',
-        }
-      )
-
-      // Add a data route
-      bl.route('/data/:key', {
-        put: ({ body }) => ({
-          headers: { type: 'bl:///types/data' },
-          body,
-        }),
-      })
-
-      // PUT to data - should auto-route to handler
-      await bl.put('bl:///data/test', {}, { value: 42 })
-
-      expect(received).toHaveLength(1)
-      expect(received[0].value).toBe(42)
-    })
-  })
-
   describe('message history', () => {
     it('tracks sent messages in history', async () => {
       const bl = new Bassline()
       const plumber = createPlumber()
-      plumber.install(bl, { tap: false })
+      plumber.install(bl)
 
       bl.route('/dest', {
         put: ({ body }) => ({ headers: {}, body }),

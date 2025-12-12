@@ -3,7 +3,6 @@ import { resource } from '@bassline/core'
 /**
  * Extract all refs from a value (recursively)
  * Looks for bl:// URIs and $ref markers
- *
  * @param {*} value - Value to scan for refs
  * @returns {string[]} Array of ref URIs found
  */
@@ -29,9 +28,7 @@ export function collectRefs(value) {
 
 /**
  * Create a link index that tracks forward and backward refs
- *
  * @returns {{ index: (uri: string, body: any) => void, routes: object }}
- *
  * @example
  * const links = createLinkIndex()
  * bl.install(links.routes)
@@ -55,6 +52,8 @@ export function createLinkIndex() {
   /**
    * Index refs from a resource body
    * Call this after every PUT
+   * @param uri
+   * @param body
    */
   function index(uri, body) {
     // Clear old forward links
@@ -86,6 +85,7 @@ export function createLinkIndex() {
 
   /**
    * Remove all links for a resource (call on DELETE)
+   * @param uri
    */
   function remove(uri) {
     index(uri, null)
@@ -93,6 +93,7 @@ export function createLinkIndex() {
 
   /**
    * Get forward refs (what does this point to?)
+   * @param uri
    */
   function getFrom(uri) {
     return from.get(uri) ? [...from.get(uri)] : []
@@ -100,6 +101,7 @@ export function createLinkIndex() {
 
   /**
    * Get backlinks (what points to this?)
+   * @param uri
    */
   function getTo(uri) {
     return to.get(uri) ? [...to.get(uri)] : []
@@ -113,9 +115,57 @@ export function createLinkIndex() {
         entries: [
           { name: 'from', type: 'query', uri: 'bl:///links/from' },
           { name: 'to', type: 'query', uri: 'bl:///links/to' },
+          { name: 'query', type: 'query', uri: 'bl:///links/query' },
         ],
       },
     }))
+
+    // List all resources with outgoing refs
+    r.get('/from', () => ({
+      headers: { type: 'bl:///types/directory' },
+      body: {
+        entries: [...from.keys()].map((uri) => ({
+          uri,
+          type: 'link-source',
+          refCount: from.get(uri).size,
+        })),
+      },
+    }))
+
+    // List all resources with incoming refs
+    r.get('/to', () => ({
+      headers: { type: 'bl:///types/directory' },
+      body: {
+        entries: [...to.keys()].map((uri) => ({
+          uri,
+          type: 'link-target',
+          refCount: to.get(uri).size,
+        })),
+      },
+    }))
+
+    // Flexible query with regex patterns in headers
+    r.get('/query', ({ headers }) => {
+      const fromPattern = headers.from ? new RegExp(headers.from) : null
+      const toPattern = headers.to ? new RegExp(headers.to) : null
+
+      const links = []
+
+      // Iterate all links and filter by patterns
+      for (const [sourceUri, targets] of from) {
+        if (fromPattern && !fromPattern.test(sourceUri)) continue
+
+        for (const targetUri of targets) {
+          if (toPattern && !toPattern.test(targetUri)) continue
+          links.push({ from: sourceUri, to: targetUri })
+        }
+      }
+
+      return {
+        headers: { type: 'bl:///types/link-query-result' },
+        body: { links, count: links.length },
+      }
+    })
 
     // Forward refs: what does this URI point to?
     r.get('/from/:uri*', ({ params }) => {
@@ -149,8 +199,7 @@ export function createLinkIndex() {
   /**
    * Create a tap function for automatic link indexing
    * Install this as a PUT tap to automatically index refs
-   *
-   * @returns {function}
+   * @returns {Function}
    */
   function createTap() {
     return ({ uri, body, result }) => {
@@ -164,10 +213,9 @@ export function createLinkIndex() {
   /**
    * Install link index into a Bassline instance
    * Sets up both routes (for querying) and taps (for automatic indexing)
-   *
    * @param {import('@bassline/core').Bassline} bl
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/links'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
   function install(bl, { prefix = '/links' } = {}) {
     bl.mount(prefix, linkResource)

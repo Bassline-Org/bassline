@@ -193,7 +193,7 @@ describe('plumber integration', () => {
     receivedMessages = []
 
     plumber = createPlumber()
-    plumber.install(bl, { tap: false })
+    plumber.install(bl)
     bl._plumber = plumber
 
     // Create a handler route to receive messages
