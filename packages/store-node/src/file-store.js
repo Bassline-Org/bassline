@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 
@@ -6,27 +6,30 @@ import { join, dirname } from 'node:path'
  * Create file-based storage routes
  *
  * @param {string} dataDir - Directory to store files
- * @param {string} [prefix='/data'] - URL prefix for these routes
- * @returns {import('@bassline/core').RouterBuilder}
+ * @param {string} [defaultPrefix='/data'] - Default mount prefix
+ * @returns {object} Resource with routes and install method
  *
  * @example
  * const bl = new Bassline()
- * bl.install(createFileStore('.bassline', '/data'))
+ * bl.mount('/data', createFileStore('.bassline'))
  *
  * // Store JSON documents
  * bl.put('bl:///data/cells/counter', {}, { type: 'cell', value: 42 })
  * bl.get('bl:///data/cells/counter')
  * // → { headers: { type: 'document' }, body: { type: 'cell', value: 42 } }
  */
-export function createFileStore(dataDir, prefix = '/data') {
+export function createFileStore(dataDir, defaultPrefix = '/data') {
   // Ensure data directory exists
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true })
   }
 
-  return routes(prefix, r => {
+  // Keep prefix reference for listDir
+  let mountedPrefix = defaultPrefix
+
+  const fileResource = resource(r => {
     // List contents at root
-    r.get('/', () => listDir(dataDir, prefix))
+    r.get('/', () => listDir(dataDir, mountedPrefix))
 
     // Get/put documents by path (wildcard matches nested paths)
     r.route('/:path*', {
@@ -37,7 +40,7 @@ export function createFileStore(dataDir, prefix = '/data') {
 
         // Check if it's a directory
         if (existsSync(dirPath) && statSync(dirPath).isDirectory()) {
-          return listDir(dirPath, `${prefix}/${subPath}`)
+          return listDir(dirPath, `${mountedPrefix}/${subPath}`)
         }
 
         // Try to read as file
@@ -85,6 +88,19 @@ export function createFileStore(dataDir, prefix = '/data') {
       }
     })
   })
+
+  /**
+   * Install file store routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix] - Mount prefix (defaults to defaultPrefix)
+   */
+  fileResource.install = (bl, { prefix = defaultPrefix } = {}) => {
+    mountedPrefix = prefix
+    bl.mount(prefix, fileResource)
+  }
+
+  return fileResource
 }
 
 /**

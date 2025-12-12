@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Extract all refs from a value (recursively)
@@ -105,7 +105,7 @@ export function createLinkIndex() {
     return to.get(uri) ? [...to.get(uri)] : []
   }
 
-  const linkRoutes = routes('/links', r => {
+  const linkResource = resource(r => {
     // List all indexed resources
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -166,9 +166,11 @@ export function createLinkIndex() {
    * Sets up both routes (for querying) and taps (for automatic indexing)
    *
    * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/links'] - Mount prefix
    */
-  function install(bl) {
-    bl.install(linkRoutes)
+  function install(bl, { prefix = '/links' } = {}) {
+    bl.mount(prefix, linkResource)
     bl.tap('put', createTap())
   }
 
@@ -177,7 +179,7 @@ export function createLinkIndex() {
     remove,
     getFrom,
     getTo,
-    routes: linkRoutes,
+    routes: linkResource,
     createTap,
     install,
     // Expose internals for debugging

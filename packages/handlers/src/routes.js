@@ -10,7 +10,7 @@
  * - PUT  /handlers/:name/delete → delete custom handler
  */
 
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create handler routes.
@@ -18,12 +18,12 @@ import { routes } from '@bassline/core'
  * @param {object} options - Configuration
  * @param {object} options.registry - Handler registry
  * @param {function} options.compile - Compiler function
- * @returns {object} Routes object
+ * @returns {object} Routes object with install method
  */
 export function createHandlerRoutes(options) {
   const { registry, compile } = options
 
-  return routes('/handlers', r => {
+  const handlerResource = resource(r => {
     // List all handlers (built-in + custom)
     r.get('/', () => {
       const allNames = registry.listAll()
@@ -133,4 +133,16 @@ export function createHandlerRoutes(options) {
       }
     })
   })
+
+  /**
+   * Install handler routes into a Bassline instance
+   * @param {import('@bassline/core').Bassline} bl
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/handlers'] - Mount prefix
+   */
+  handlerResource.install = (bl, { prefix = '/handlers' } = {}) => {
+    bl.mount(prefix, handlerResource)
+  }
+
+  return handlerResource
 }

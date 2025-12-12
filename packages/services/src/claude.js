@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 import { runAgentLoop } from './mcp-server.js'
 
 /**
@@ -21,7 +21,7 @@ export function createClaudeService(options = {}) {
   // Store bl reference when installed (for agent route)
   let _bl = null
 
-  const claudeRoutes = routes('/services/claude', r => {
+  const claudeResource = resource(r => {
     // Service info with structured operations
     r.get('/', () => ({
       headers: { type: 'bl:///types/service' },
@@ -175,7 +175,7 @@ export function createClaudeService(options = {}) {
   })
 
   return {
-    routes: claudeRoutes,
+    routes: claudeResource,
     /** The Anthropic client for direct access */
     client,
     /** Default model */
@@ -183,10 +183,12 @@ export function createClaudeService(options = {}) {
     /**
      * Install Claude routes into a Bassline instance
      * @param {import('@bassline/core').Bassline} bl
+     * @param {object} [options] - Options
+     * @param {string} [options.prefix='/services/claude'] - Mount prefix
      */
-    install: (bl) => {
+    install: (bl, { prefix = '/services/claude' } = {}) => {
       _bl = bl
-      bl.install(claudeRoutes)
+      bl.mount(prefix, claudeResource)
     }
   }
 }

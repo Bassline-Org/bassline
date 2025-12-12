@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create service registry routes for service discovery.
@@ -12,7 +12,7 @@ export function createServiceRoutes() {
   const services = new Map()  // name -> { service, info }
   let _bl = null
 
-  const serviceRoutes = routes('/services', r => {
+  const serviceResource = resource(r => {
     // List all registered services with operation summaries
     r.get('/', async () => {
       const entries = await Promise.all(
@@ -52,7 +52,7 @@ export function createServiceRoutes() {
   })
 
   return {
-    routes: serviceRoutes,
+    routes: serviceResource,
     /**
      * Register a service
      * @param {string} name - Service name
@@ -73,10 +73,12 @@ export function createServiceRoutes() {
     /**
      * Install service routes into a Bassline instance
      * @param {import('@bassline/core').Bassline} bl
+     * @param {object} [options] - Options
+     * @param {string} [options.prefix='/services'] - Mount prefix
      */
-    install: (bl) => {
+    install: (bl, { prefix = '/services' } = {}) => {
       _bl = bl
-      bl.install(serviceRoutes)
+      bl.mount(prefix, serviceResource)
     }
   }
 }

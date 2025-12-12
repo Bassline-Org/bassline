@@ -1,4 +1,4 @@
-import { routes } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create propagator routes for reactive constraint networks.
@@ -204,7 +204,7 @@ export function createPropagatorRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const propagatorRoutes = routes('/propagators', r => {
+  const propagatorResource = resource(r => {
     // List all propagators
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -282,13 +282,15 @@ export function createPropagatorRoutes(options = {}) {
   /**
    * Install propagator routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} blInstance
+   * @param {object} [options] - Options
+   * @param {string} [options.prefix='/propagators'] - Mount prefix
    */
-  function install(blInstance) {
-    blInstance.install(propagatorRoutes)
+  function install(blInstance, { prefix = '/propagators' } = {}) {
+    blInstance.mount(prefix, propagatorResource)
   }
 
   return {
-    routes: propagatorRoutes,
+    routes: propagatorResource,
     install,
     getPropagator,
     createPropagator,
