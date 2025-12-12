@@ -11,17 +11,14 @@ import { runAgentLoop } from './mcp-server.js'
  * @returns {object} Claude service with routes and client
  */
 export function createClaudeService(options = {}) {
-  const {
-    apiKey = process.env.ANTHROPIC_API_KEY,
-    model = 'claude-sonnet-4-20250514'
-  } = options
+  const { apiKey = process.env.ANTHROPIC_API_KEY, model = 'claude-sonnet-4-20250514' } = options
 
   const client = new Anthropic({ apiKey })
 
   // Store bl reference when installed (for agent route)
   let _bl = null
 
-  const claudeResource = resource(r => {
+  const claudeResource = resource((r) => {
     // Service info with structured operations
     r.get('/', () => ({
       headers: { type: 'bl:///types/service' },
@@ -44,11 +41,11 @@ export function createClaudeService(options = {}) {
                 model: { type: 'string', description: 'Model override' },
                 tools: { type: 'array', description: 'Tool definitions for function calling' },
                 max_tokens: { type: 'number', default: 4096 },
-                temperature: { type: 'number', description: '0-1 sampling temperature' }
+                temperature: { type: 'number', description: '0-1 sampling temperature' },
               },
-              required: ['messages']
+              required: ['messages'],
             },
-            output: { description: 'Full Anthropic API response' }
+            output: { description: 'Full Anthropic API response' },
           },
           {
             name: 'complete',
@@ -60,18 +57,18 @@ export function createClaudeService(options = {}) {
               properties: {
                 prompt: { type: 'string', description: 'The prompt to complete' },
                 system: { type: 'string', description: 'System prompt' },
-                max_tokens: { type: 'number', default: 4096 }
+                max_tokens: { type: 'number', default: 4096 },
               },
-              required: ['prompt']
+              required: ['prompt'],
             },
             output: {
               type: 'object',
               properties: {
                 text: { type: 'string', description: 'Generated text' },
                 usage: { type: 'object', description: 'Token usage stats' },
-                stop_reason: { type: 'string' }
-              }
-            }
+                stop_reason: { type: 'string' },
+              },
+            },
           },
           {
             name: 'agent',
@@ -83,31 +80,24 @@ export function createClaudeService(options = {}) {
               properties: {
                 prompt: { type: 'string', description: 'Task for the agent to perform' },
                 system: { type: 'string', description: 'System prompt' },
-                maxTurns: { type: 'number', default: 10, description: 'Max tool-use iterations' }
+                maxTurns: { type: 'number', default: 10, description: 'Max tool-use iterations' },
               },
-              required: ['prompt']
+              required: ['prompt'],
             },
-            output: { description: 'Final Claude response after tool execution completes' }
-          }
-        ]
-      }
+            output: { description: 'Final Claude response after tool execution completes' },
+          },
+        ],
+      },
     }))
 
     // Messages API - full access to Claude messages
     r.put('/messages', async ({ body }) => {
-      const {
-        messages,
-        system,
-        tools,
-        max_tokens = 4096,
-        temperature,
-        stop_sequences
-      } = body
+      const { messages, system, tools, max_tokens = 4096, temperature, stop_sequences } = body
 
       const params = {
         model: body.model || model,
         max_tokens,
-        messages
+        messages,
       }
 
       if (system) params.system = system
@@ -119,7 +109,7 @@ export function createClaudeService(options = {}) {
 
       return {
         headers: { type: 'bl:///types/claude-response' },
-        body: response
+        body: response,
       }
     })
 
@@ -130,7 +120,7 @@ export function createClaudeService(options = {}) {
       const params = {
         model: body.model || model,
         max_tokens,
-        messages: [{ role: 'user', content: prompt }]
+        messages: [{ role: 'user', content: prompt }],
       }
 
       if (system) params.system = system
@@ -139,8 +129,8 @@ export function createClaudeService(options = {}) {
 
       // Extract text from response
       const text = response.content
-        .filter(c => c.type === 'text')
-        .map(c => c.text)
+        .filter((c) => c.type === 'text')
+        .map((c) => c.text)
         .join('')
 
       return {
@@ -148,8 +138,8 @@ export function createClaudeService(options = {}) {
         body: {
           text,
           usage: response.usage,
-          stop_reason: response.stop_reason
-        }
+          stop_reason: response.stop_reason,
+        },
       }
     })
 
@@ -161,15 +151,19 @@ export function createClaudeService(options = {}) {
 
       const { prompt, system, maxTurns = 10 } = body
 
-      const result = await runAgentLoop(_bl, { client, model }, {
-        prompt,
-        system,
-        maxTurns
-      })
+      const result = await runAgentLoop(
+        _bl,
+        { client, model },
+        {
+          prompt,
+          system,
+          maxTurns,
+        }
+      )
 
       return {
         headers: { type: 'bl:///types/agent-result' },
-        body: result
+        body: result,
       }
     })
   })
@@ -189,6 +183,6 @@ export function createClaudeService(options = {}) {
     install: (bl, { prefix = '/services/claude' } = {}) => {
       _bl = bl
       bl.mount(prefix, claudeResource)
-    }
+    },
   }
 }

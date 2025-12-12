@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useBassline } from '@bassline/react'
-import { IconCircle, IconArrowRight, IconRefresh, IconZoomIn, IconZoomOut, IconFocus } from '@tabler/icons-react'
+import {
+  IconCircle,
+  IconArrowRight,
+  IconRefresh,
+  IconZoomIn,
+  IconZoomOut,
+  IconFocus,
+} from '@tabler/icons-react'
 import { REMOTE_PREFIX } from '../config.js'
 
 /**
@@ -22,13 +29,13 @@ function useForceSimulation(nodes, edges, width, height) {
         x: width / 2 + Math.cos(angle) * radius + (Math.random() - 0.5) * 50,
         y: height / 2 + Math.sin(angle) * radius + (Math.random() - 0.5) * 50,
         vx: 0,
-        vy: 0
+        vy: 0,
       }
     })
 
     // Create edge lookup
     const edgeMap = {}
-    edges.forEach(e => {
+    edges.forEach((e) => {
       if (!edgeMap[e.source]) edgeMap[e.source] = []
       if (!edgeMap[e.target]) edgeMap[e.target] = []
       edgeMap[e.source].push(e.target)
@@ -44,15 +51,15 @@ function useForceSimulation(nodes, edges, width, height) {
       const alpha = 1 - iteration / maxIterations
 
       // Repulsion between all nodes
-      nodes.forEach(node1 => {
-        nodes.forEach(node2 => {
+      nodes.forEach((node1) => {
+        nodes.forEach((node2) => {
           if (node1.id === node2.id) return
           const p1 = pos[node1.id]
           const p2 = pos[node2.id]
           const dx = p2.x - p1.x
           const dy = p2.y - p1.y
           const dist = Math.sqrt(dx * dx + dy * dy) || 1
-          const force = -500 * alpha / (dist * dist)
+          const force = (-500 * alpha) / (dist * dist)
           const fx = (dx / dist) * force
           const fy = (dy / dist) * force
           p1.vx -= fx
@@ -63,7 +70,7 @@ function useForceSimulation(nodes, edges, width, height) {
       })
 
       // Attraction along edges
-      edges.forEach(edge => {
+      edges.forEach((edge) => {
         const p1 = pos[edge.source]
         const p2 = pos[edge.target]
         if (!p1 || !p2) return
@@ -80,14 +87,14 @@ function useForceSimulation(nodes, edges, width, height) {
       })
 
       // Center gravity
-      nodes.forEach(node => {
+      nodes.forEach((node) => {
         const p = pos[node.id]
         p.vx += (width / 2 - p.x) * 0.01 * alpha
         p.vy += (height / 2 - p.y) * 0.01 * alpha
       })
 
       // Apply velocity with damping
-      nodes.forEach(node => {
+      nodes.forEach((node) => {
         const p = pos[node.id]
         p.vx *= 0.8
         p.vy *= 0.8
@@ -134,7 +141,7 @@ export default function NetworkGraph({ onNavigate }) {
       if (containerRef.current) {
         setDimensions({
           width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight
+          height: containerRef.current.clientHeight,
         })
       }
     }
@@ -155,7 +162,7 @@ export default function NetworkGraph({ onNavigate }) {
       try {
         const cellsRes = await bl.get(`${REMOTE_PREFIX}/cells`)
         if (cellsRes?.body?.entries) {
-          cellsRes.body.entries.forEach(cell => {
+          cellsRes.body.entries.forEach((cell) => {
             const id = cell.uri || `cell:${cell.name}`
             if (!nodeIds.has(id)) {
               nodeIds.add(id)
@@ -164,7 +171,7 @@ export default function NetworkGraph({ onNavigate }) {
                 type: 'cell',
                 label: cell.label || cell.name,
                 value: cell.value,
-                uri: cell.uri
+                uri: cell.uri,
               })
             }
           })
@@ -175,7 +182,7 @@ export default function NetworkGraph({ onNavigate }) {
       try {
         const propsRes = await bl.get(`${REMOTE_PREFIX}/propagators`)
         if (propsRes?.body?.entries) {
-          propsRes.body.entries.forEach(prop => {
+          propsRes.body.entries.forEach((prop) => {
             const id = prop.uri || `prop:${prop.name}`
             if (!nodeIds.has(id)) {
               nodeIds.add(id)
@@ -184,17 +191,17 @@ export default function NetworkGraph({ onNavigate }) {
                 type: 'propagator',
                 label: prop.label || prop.name,
                 firing: prop.firing,
-                uri: prop.uri
+                uri: prop.uri,
               })
             }
 
             // Create edges for inputs/output
             if (prop.inputs) {
-              prop.inputs.forEach(input => {
+              prop.inputs.forEach((input) => {
                 newEdges.push({
                   source: input,
                   target: id,
-                  type: 'input'
+                  type: 'input',
                 })
               })
             }
@@ -202,7 +209,7 @@ export default function NetworkGraph({ onNavigate }) {
               newEdges.push({
                 source: id,
                 target: prop.output,
-                type: 'output'
+                type: 'output',
               })
             }
           })
@@ -230,8 +237,8 @@ export default function NetworkGraph({ onNavigate }) {
     }
   }
 
-  const handleZoomIn = () => setZoom(z => Math.min(z * 1.2, 3))
-  const handleZoomOut = () => setZoom(z => Math.max(z / 1.2, 0.3))
+  const handleZoomIn = () => setZoom((z) => Math.min(z * 1.2, 3))
+  const handleZoomOut = () => setZoom((z) => Math.max(z / 1.2, 0.3))
   const handleReset = () => setZoom(1)
 
   if (loading) {
@@ -269,7 +276,8 @@ export default function NetworkGraph({ onNavigate }) {
           <IconFocus size={16} />
         </button>
         <span className="network-graph-stats">
-          {nodes.filter(n => n.type === 'cell').length} cells, {nodes.filter(n => n.type === 'propagator').length} propagators
+          {nodes.filter((n) => n.type === 'cell').length} cells,{' '}
+          {nodes.filter((n) => n.type === 'propagator').length} propagators
         </span>
       </div>
 
@@ -313,7 +321,7 @@ export default function NetworkGraph({ onNavigate }) {
         })}
 
         {/* Nodes */}
-        {nodes.map(node => {
+        {nodes.map((node) => {
           const pos = positions[node.id]
           if (!pos) return null
 
@@ -413,11 +421,7 @@ export default function NetworkGraph({ onNavigate }) {
               Value: <strong>{String(selectedNode.value)}</strong>
             </div>
           )}
-          {selectedNode.uri && (
-            <div className="network-graph-details-uri">
-              {selectedNode.uri}
-            </div>
-          )}
+          {selectedNode.uri && <div className="network-graph-details-uri">{selectedNode.uri}</div>}
         </div>
       )}
     </div>

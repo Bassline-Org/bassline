@@ -20,53 +20,53 @@ import { resource } from '@bassline/core'
  * // → { headers: { type: 'module' }, body: { exports: [...] } }
  */
 export function createCodeStore(hostDir, defaultPrefix = '/code') {
-  const store = new Map();
-  let mountedPrefix = defaultPrefix;
+  const store = new Map()
+  let mountedPrefix = defaultPrefix
 
-  const codeResource = resource(r => {
+  const codeResource = resource((r) => {
     // List loaded modules
     r.get('/', () => {
-      const entries = Array.from(store.keys()).map(name => ({
+      const entries = Array.from(store.keys()).map((name) => ({
         name,
         type: 'module',
-        uri: `bl://${mountedPrefix}/${name}`
+        uri: `bl://${mountedPrefix}/${name}`,
       }))
 
       return {
         headers: { type: 'directory' },
-        body: { entries }
+        body: { entries },
       }
     })
 
     r.route('/:module', {
-        get: async ({params}) => {
-            const mod = store.get(params.module);
-            if (mod) {
-                return {
-                    headers: {
-                        type: "js/module"
-                    },
-                    body: mod
-                }
-            }
-        },
-        put: async ({params, body}) => {
-            const mod = await import(body.path);
-            if(mod) {
-                store.set(params.module, mod);
-                return {
-                    headers: {status: "ok"},
-                    body: {}
-                }
-            } else {
-                return {
-                    headers: {
-                        status: 'err',
-                    },
-                    body: {}
-                }
-            }
+      get: async ({ params }) => {
+        const mod = store.get(params.module)
+        if (mod) {
+          return {
+            headers: {
+              type: 'js/module',
+            },
+            body: mod,
+          }
         }
+      },
+      put: async ({ params, body }) => {
+        const mod = await import(body.path)
+        if (mod) {
+          store.set(params.module, mod)
+          return {
+            headers: { status: 'ok' },
+            body: {},
+          }
+        } else {
+          return {
+            headers: {
+              status: 'err',
+            },
+            body: {},
+          }
+        }
+      },
     })
   })
 

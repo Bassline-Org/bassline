@@ -174,10 +174,22 @@
   margin-right: 4px;
 }
 
-.tag.propagator { background: #1f6feb22; color: #58a6ff; }
-.tag.recipe { background: #238636aa; color: #3fb950; }
-.tag.handler { background: #a371f7aa; color: #a371f7; }
-.tag.cell { background: #f78166aa; color: #f78166; }
+.tag.propagator {
+  background: #1f6feb22;
+  color: #58a6ff;
+}
+.tag.recipe {
+  background: #238636aa;
+  color: #3fb950;
+}
+.tag.handler {
+  background: #a371f7aa;
+  color: #a371f7;
+}
+.tag.cell {
+  background: #f78166aa;
+  color: #f78166;
+}
 
 /* Buttons */
 .btn {
@@ -218,17 +230,32 @@
   gap: 16px;
 }
 
-.grid-2 { grid-template-columns: repeat(2, 1fr); }
-.grid-3 { grid-template-columns: repeat(3, 1fr); }
-.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+.grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+.grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
 
 @media (max-width: 1024px) {
-  .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    display: none;
+  }
 }
 
 /* Forms */

@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useBassline, useWebSocket } from '@bassline/react'
-import { IconCircle, IconArrowRight, IconRefresh, IconActivity, IconWifi, IconWifiOff } from '@tabler/icons-react'
+import {
+  IconCircle,
+  IconArrowRight,
+  IconRefresh,
+  IconActivity,
+  IconWifi,
+  IconWifiOff,
+} from '@tabler/icons-react'
 import { REMOTE_PREFIX } from '../config.js'
 
 /**
@@ -29,10 +36,7 @@ function CellSummary({ cell, onClick, isNew }) {
   const value = formatValue(cell.value)
 
   return (
-    <div
-      className={`cell-summary ${isNew ? 'flash-cell' : ''}`}
-      onClick={onClick}
-    >
+    <div className={`cell-summary ${isNew ? 'flash-cell' : ''}`} onClick={onClick}>
       <span className="cell-name">
         <IconCircle size={12} style={{ marginRight: 6, color: 'var(--type-cell)' }} />
         {name}
@@ -50,10 +54,7 @@ function PropagatorSummary({ propagator, onClick, isNew }) {
   const status = propagator.firing ? 'firing' : 'idle'
 
   return (
-    <div
-      className={`propagator-summary ${isNew ? 'flash-propagator' : ''}`}
-      onClick={onClick}
-    >
+    <div className={`propagator-summary ${isNew ? 'flash-propagator' : ''}`} onClick={onClick}>
       <span className="propagator-name">
         <IconArrowRight size={12} style={{ marginRight: 6, color: 'var(--type-propagator)' }} />
         {name}
@@ -103,14 +104,14 @@ export default function Dashboard({ onNavigate }) {
 
   // Track when a cell/propagator changes for flash animation
   const markChanged = useCallback((uri) => {
-    setRecentlyChanged(prev => new Set([...prev, uri]))
+    setRecentlyChanged((prev) => new Set([...prev, uri]))
 
     // Clear the flash after animation duration
     if (changeTimeouts.current[uri]) {
       clearTimeout(changeTimeouts.current[uri])
     }
     changeTimeouts.current[uri] = setTimeout(() => {
-      setRecentlyChanged(prev => {
+      setRecentlyChanged((prev) => {
         const next = new Set(prev)
         next.delete(uri)
         return next
@@ -265,11 +266,7 @@ export default function Dashboard({ onNavigate }) {
             Offline
           </span>
         )}
-        <button
-          className="btn btn-small"
-          onClick={handleRefresh}
-          title="Refresh data"
-        >
+        <button className="btn btn-small" onClick={handleRefresh} title="Refresh data">
           <IconRefresh size={12} />
         </button>
       </div>
@@ -333,9 +330,7 @@ export default function Dashboard({ onNavigate }) {
         {activity.length === 0 ? (
           <div className="empty">No recent activity</div>
         ) : (
-          activity.map((item, i) => (
-            <ActivityItem key={item.id || i} activity={item} />
-          ))
+          activity.map((item, i) => <ActivityItem key={item.id || i} activity={item} />)
         )}
       </div>
     </div>

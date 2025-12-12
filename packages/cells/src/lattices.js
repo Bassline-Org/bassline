@@ -14,14 +14,14 @@
 export const maxNumber = {
   bottom: () => -Infinity,
   join: (a, b) => Math.max(a, b),
-  lte: (a, b) => a <= b
+  lte: (a, b) => a <= b,
 }
 
 // Minimum number lattice - values only go down toward bottom
 export const minNumber = {
   bottom: () => Infinity,
   join: (a, b) => Math.min(a, b),
-  lte: (a, b) => a >= b  // Reversed - smaller is "higher" in this lattice
+  lte: (a, b) => a >= b, // Reversed - smaller is "higher" in this lattice
 }
 
 // Set union lattice - accumulates elements
@@ -34,8 +34,8 @@ export const setUnion = {
   lte: (a, b) => {
     const setA = new Set(a)
     const setB = new Set(b)
-    return [...setA].every(x => setB.has(x))
-  }
+    return [...setA].every((x) => setB.has(x))
+  },
 }
 
 // Last-writer-wins lattice - compares by timestamp
@@ -51,7 +51,7 @@ export const lww = {
     const aWrapped = typeof a?.timestamp === 'number' ? a : { value: a, timestamp: 0 }
     const bWrapped = typeof b?.timestamp === 'number' ? b : { value: b, timestamp: 0 }
     return aWrapped.timestamp <= bWrapped.timestamp
-  }
+  },
 }
 
 // Object lattice - deep merge with later values winning conflicts
@@ -65,22 +65,22 @@ export const object = {
     // a <= b if all keys in a exist in b with same values
     const aObj = a || {}
     const bObj = b || {}
-    return Object.keys(aObj).every(k => k in bObj)
-  }
+    return Object.keys(aObj).every((k) => k in bObj)
+  },
 }
 
 // Counter lattice - increment only (add values together)
 export const counter = {
   bottom: () => 0,
   join: (a, b) => (a ?? 0) + (b ?? 0),
-  lte: (a, b) => (a ?? 0) <= (b ?? 0)  // Lower counts are below higher counts
+  lte: (a, b) => (a ?? 0) <= (b ?? 0), // Lower counts are below higher counts
 }
 
 // Boolean lattice - once true, stays true
 export const boolean = {
   bottom: () => false,
   join: (a, b) => a || b,
-  lte: (a, b) => !a || b  // false <= anything, true <= true only
+  lte: (a, b) => !a || b, // false <= anything, true <= true only
 }
 
 // Set intersection lattice - values get more constrained (smaller)
@@ -94,17 +94,17 @@ export const setIntersection = {
     if (b === null) return a
     if (!Array.isArray(a) || !Array.isArray(b)) return []
     const setA = new Set(a)
-    return [...new Set([...b].filter(x => setA.has(x)))].sort()
+    return [...new Set([...b].filter((x) => setA.has(x)))].sort()
   },
   lte: (a, b) => {
     // a ≤ b means a is less constrained (superset of b)
-    if (a === null) return true   // unconstrained ≤ everything
-    if (b === null) return false  // constrained is not ≤ unconstrained
+    if (a === null) return true // unconstrained ≤ everything
+    if (b === null) return false // constrained is not ≤ unconstrained
     if (!Array.isArray(b)) return true
     if (!Array.isArray(a)) return false
     const setA = new Set(a)
-    return b.every(x => setA.has(x))  // b ⊆ a means a ≤ b in constraint ordering
-  }
+    return b.every((x) => setA.has(x)) // b ⊆ a means a ≤ b in constraint ordering
+  },
 }
 
 // Registry of built-in lattices
@@ -116,7 +116,7 @@ export const lattices = {
   lww,
   object,
   counter,
-  boolean
+  boolean,
 }
 
 /**

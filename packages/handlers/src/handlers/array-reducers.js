@@ -5,36 +5,46 @@
  */
 
 export function registerArrayReducers({ registerBuiltin, get }) {
-  registerBuiltin('sumBy', (ctx) => (arr) =>
-    (arr || []).reduce((sum, x) => sum + (x?.[ctx.key] ?? 0), 0)
+  registerBuiltin(
+    'sumBy',
+    (ctx) => (arr) => (arr || []).reduce((sum, x) => sum + (x?.[ctx.key] ?? 0), 0)
   )
 
-  registerBuiltin('countBy', (ctx) => (arr) =>
-    (arr || []).reduce((acc, x) => {
-      const k = x?.[ctx.key]
-      acc[k] = (acc[k] ?? 0) + 1
-      return acc
-    }, {})
+  registerBuiltin(
+    'countBy',
+    (ctx) => (arr) =>
+      (arr || []).reduce((acc, x) => {
+        const k = x?.[ctx.key]
+        acc[k] = (acc[k] ?? 0) + 1
+        return acc
+      }, {})
   )
 
-  registerBuiltin('groupBy', (ctx) => (arr) =>
-    (arr || []).reduce((acc, x) => {
-      const k = x?.[ctx.key]
-      ;(acc[k] ??= []).push(x)
-      return acc
-    }, {})
+  registerBuiltin(
+    'groupBy',
+    (ctx) => (arr) =>
+      (arr || []).reduce((acc, x) => {
+        const k = x?.[ctx.key]
+        ;(acc[k] ??= []).push(x)
+        return acc
+      }, {})
   )
 
-  registerBuiltin('indexBy', (ctx) => (arr) =>
-    Object.fromEntries((arr || []).map(x => [x?.[ctx.key], x]))
+  registerBuiltin(
+    'indexBy',
+    (ctx) => (arr) => Object.fromEntries((arr || []).map((x) => [x?.[ctx.key], x]))
   )
 
-  registerBuiltin('minBy', (ctx) => (arr) =>
-    (arr || []).reduce((min, x) => (x?.[ctx.key] < min?.[ctx.key] ? x : min), arr?.[0])
+  registerBuiltin(
+    'minBy',
+    (ctx) => (arr) =>
+      (arr || []).reduce((min, x) => (x?.[ctx.key] < min?.[ctx.key] ? x : min), arr?.[0])
   )
 
-  registerBuiltin('maxBy', (ctx) => (arr) =>
-    (arr || []).reduce((max, x) => (x?.[ctx.key] > max?.[ctx.key] ? x : max), arr?.[0])
+  registerBuiltin(
+    'maxBy',
+    (ctx) => (arr) =>
+      (arr || []).reduce((max, x) => (x?.[ctx.key] > max?.[ctx.key] ? x : max), arr?.[0])
   )
 
   // fold: General array reduction with a binary operation

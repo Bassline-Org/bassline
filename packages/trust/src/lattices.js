@@ -44,10 +44,9 @@ export function merge(a, b) {
   const value = (a.value * a.samples + b.value * b.samples) / totalSamples
 
   // Combined variance (simplified - pools variance and adds cross-term)
-  const variance = (
+  const variance =
     (a.variance * a.samples + b.variance * b.samples) / totalSamples +
     (a.samples * b.samples * Math.pow(a.value - b.value, 2)) / (totalSamples * totalSamples)
-  )
 
   return { value, samples: totalSamples, variance }
 }
@@ -68,14 +67,15 @@ export function observe(estimate, outcome) {
   const delta = outcome - current.value
   const newValue = current.value + delta / n
   const delta2 = outcome - newValue
-  const newVariance = current.samples === 0
-    ? 0.25 // High initial variance
-    : ((current.variance * (current.samples - 1)) + delta * delta2) / (n - 1)
+  const newVariance =
+    current.samples === 0
+      ? 0.25 // High initial variance
+      : (current.variance * (current.samples - 1) + delta * delta2) / (n - 1)
 
   return {
     value: newValue,
     samples: n,
-    variance: Math.max(0.001, newVariance) // Floor to prevent zero variance
+    variance: Math.max(0.001, newVariance), // Floor to prevent zero variance
   }
 }
 
@@ -92,7 +92,7 @@ export function decay(estimate, factor = 0.9) {
   return {
     value: estimate.value,
     samples: Math.floor(estimate.samples * factor),
-    variance: Math.min(0.25, estimate.variance / factor) // Increase variance as samples decay
+    variance: Math.min(0.25, estimate.variance / factor), // Increase variance as samples decay
   }
 }
 
@@ -123,7 +123,7 @@ export function confidenceInterval(estimate, z = 1.96) {
   const se = Math.sqrt(estimate.variance / estimate.samples)
   return {
     low: Math.max(0, estimate.value - z * se),
-    high: Math.min(1, estimate.value + z * se)
+    high: Math.min(1, estimate.value + z * se),
   }
 }
 
@@ -133,5 +133,5 @@ export const trustEstimate = {
   observe,
   decay,
   meetsThreshold,
-  confidenceInterval
+  confidenceInterval,
 }

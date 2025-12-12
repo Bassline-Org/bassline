@@ -7,7 +7,7 @@
 export function registerComposition({ registerBuiltin, get }) {
   // compose: Chain multiple handlers (old API for compatibility)
   registerBuiltin('compose', (ctx) => {
-    const handlers = ctx.steps.map(step => {
+    const handlers = ctx.steps.map((step) => {
       if (typeof step === 'string') {
         return get(step, ctx[step] || {})
       }

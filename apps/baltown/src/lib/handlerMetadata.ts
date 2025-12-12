@@ -31,42 +31,42 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Arithmetic',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Value to add', step: 1 }
+    uiOptions: { label: 'Value to add', step: 1 },
   },
   subtract: {
     description: 'Subtract a constant value',
     category: 'Arithmetic',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Value to subtract', step: 1 }
+    uiOptions: { label: 'Value to subtract', step: 1 },
   },
   multiply: {
     description: 'Multiply by a constant',
     category: 'Arithmetic',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Multiplier', step: 0.1 }
+    uiOptions: { label: 'Multiplier', step: 0.1 },
   },
   divide: {
     description: 'Divide by a constant',
     category: 'Arithmetic',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Divisor', step: 0.1, min: 0.001 }
+    uiOptions: { label: 'Divisor', step: 0.1, min: 0.001 },
   },
   modulo: {
     description: 'Modulo by a constant',
     category: 'Arithmetic',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Modulo value', step: 1, min: 1 }
+    uiOptions: { label: 'Modulo value', step: 1, min: 1 },
   },
   power: {
     description: 'Raise to a power',
     category: 'Arithmetic',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Exponent', step: 1 }
+    uiOptions: { label: 'Exponent', step: 1 },
   },
 
   // Comparison handlers
@@ -75,42 +75,42 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Comparison',
     config: { value: 'any' },
     uiType: 'comparison',
-    uiOptions: { operator: '=' }
+    uiOptions: { operator: '=' },
   },
   neq: {
     description: 'Not equal to value',
     category: 'Comparison',
     config: { value: 'any' },
     uiType: 'comparison',
-    uiOptions: { operator: '!=' }
+    uiOptions: { operator: '!=' },
   },
   gt: {
     description: 'Greater than value',
     category: 'Comparison',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Greater than' }
+    uiOptions: { label: 'Greater than' },
   },
   gte: {
     description: 'Greater than or equal',
     category: 'Comparison',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Greater than or equal to' }
+    uiOptions: { label: 'Greater than or equal to' },
   },
   lt: {
     description: 'Less than value',
     category: 'Comparison',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Less than' }
+    uiOptions: { label: 'Less than' },
   },
   lte: {
     description: 'Less than or equal',
     category: 'Comparison',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Less than or equal to' }
+    uiOptions: { label: 'Less than or equal to' },
   },
 
   // Key selection handlers
@@ -119,77 +119,77 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Object',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to pick' }
+    uiOptions: { mode: 'single', placeholder: 'Key to pick' },
   },
   get: {
     description: 'Get value at path (supports dot notation)',
     category: 'Object',
     config: { path: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'path', placeholder: 'Path (e.g., user.name)' }
+    uiOptions: { mode: 'path', placeholder: 'Path (e.g., user.name)' },
   },
   has: {
     description: 'Check if object has key',
     category: 'Object',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to check' }
+    uiOptions: { mode: 'single', placeholder: 'Key to check' },
   },
   omit: {
     description: 'Omit keys from object',
     category: 'Object',
     config: { keys: 'array' },
     uiType: 'multiKeySelector',
-    uiOptions: { placeholder: 'Keys to omit' }
+    uiOptions: { placeholder: 'Keys to omit' },
   },
   groupBy: {
     description: 'Group array by key',
     category: 'ArrayReducers',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to group by' }
+    uiOptions: { mode: 'single', placeholder: 'Key to group by' },
   },
   sortBy: {
     description: 'Sort array by key',
     category: 'ArrayReducers',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to sort by' }
+    uiOptions: { mode: 'single', placeholder: 'Key to sort by' },
   },
   indexBy: {
     description: 'Index array by key',
     category: 'ArrayReducers',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to index by' }
+    uiOptions: { mode: 'single', placeholder: 'Key to index by' },
   },
   sumBy: {
     description: 'Sum values by key',
     category: 'ArrayReducers',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to sum' }
+    uiOptions: { mode: 'single', placeholder: 'Key to sum' },
   },
   countBy: {
     description: 'Count by key',
     category: 'ArrayReducers',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to count by' }
+    uiOptions: { mode: 'single', placeholder: 'Key to count by' },
   },
   minBy: {
     description: 'Find minimum by key',
     category: 'ArrayReducers',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to find min' }
+    uiOptions: { mode: 'single', placeholder: 'Key to find min' },
   },
   maxBy: {
     description: 'Find maximum by key',
     category: 'ArrayReducers',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single', placeholder: 'Key to find max' }
+    uiOptions: { mode: 'single', placeholder: 'Key to find max' },
   },
 
   // Array index handlers
@@ -198,28 +198,28 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Array',
     config: { index: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Index', step: 1, min: 0 }
+    uiOptions: { label: 'Index', step: 1, min: 0 },
   },
   take: {
     description: 'Take first N elements',
     category: 'Array',
     config: { count: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Count', step: 1, min: 1 }
+    uiOptions: { label: 'Count', step: 1, min: 1 },
   },
   drop: {
     description: 'Drop first N elements',
     category: 'Array',
     config: { count: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Count', step: 1, min: 1 }
+    uiOptions: { label: 'Count', step: 1, min: 1 },
   },
   chunk: {
     description: 'Split into chunks of size N',
     category: 'Array',
     config: { size: 'number' },
     uiType: 'numeric',
-    uiOptions: { label: 'Chunk size', step: 1, min: 1 }
+    uiOptions: { label: 'Chunk size', step: 1, min: 1 },
   },
 
   // Nested handler configs
@@ -228,28 +228,28 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Array',
     config: { handler: 'handler', config: 'object' },
     uiType: 'nested',
-    uiOptions: { type: 'predicate' }
+    uiOptions: { type: 'predicate' },
   },
   map: {
     description: 'Transform each element',
     category: 'Array',
     config: { handler: 'handler', config: 'object' },
     uiType: 'nested',
-    uiOptions: { type: 'transform' }
+    uiOptions: { type: 'transform' },
   },
   when: {
     description: 'Apply handler conditionally',
     category: 'Conditional',
     config: { handler: 'handler', config: 'object' },
     uiType: 'nested',
-    uiOptions: { type: 'predicate' }
+    uiOptions: { type: 'predicate' },
   },
   tap: {
     description: 'Execute handler for side effect',
     category: 'Utility',
     config: { handler: 'handler', config: 'object' },
     uiType: 'nested',
-    uiOptions: { type: 'any' }
+    uiOptions: { type: 'any' },
   },
 
   // Conditional handlers
@@ -258,14 +258,14 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Conditional',
     config: { predicate: 'handler', then: 'handler', else: 'handler' },
     uiType: 'conditional',
-    uiOptions: { type: 'ifElse' }
+    uiOptions: { type: 'ifElse' },
   },
   cond: {
     description: 'Multiple condition branches',
     category: 'Conditional',
     config: { cases: 'array', default: 'handler' },
     uiType: 'conditional',
-    uiOptions: { type: 'cond' }
+    uiOptions: { type: 'cond' },
   },
 
   // String handlers
@@ -274,35 +274,35 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'String',
     config: { template: 'string' },
     uiType: 'template',
-    uiOptions: { placeholder: 'Hello {0}, you have {1} messages' }
+    uiOptions: { placeholder: 'Hello {0}, you have {1} messages' },
   },
   replace: {
     description: 'Replace pattern in string',
     category: 'String',
     config: { pattern: 'string', replacement: 'string', flags: 'string' },
     uiType: 'regex',
-    uiOptions: {}
+    uiOptions: {},
   },
   match: {
     description: 'Match pattern in string',
     category: 'String',
     config: { pattern: 'string', flags: 'string' },
     uiType: 'regex',
-    uiOptions: { noReplacement: true }
+    uiOptions: { noReplacement: true },
   },
   split: {
     description: 'Split string by delimiter',
     category: 'String',
     config: { delimiter: 'string' },
     uiType: 'template',
-    uiOptions: { label: 'Delimiter', presets: [',', ';', '\\n', '\\t', ' '] }
+    uiOptions: { label: 'Delimiter', presets: [',', ';', '\\n', '\\t', ' '] },
   },
   join: {
     description: 'Join array with delimiter',
     category: 'Array',
     config: { delimiter: 'string' },
     uiType: 'template',
-    uiOptions: { label: 'Delimiter', presets: [',', ', ', ' ', '\\n'] }
+    uiOptions: { label: 'Delimiter', presets: [',', ', ', ' ', '\\n'] },
   },
 
   // Type coercion
@@ -311,7 +311,7 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Type',
     config: { to: 'string' },
     uiType: 'typeSelector',
-    uiOptions: { types: ['number', 'string', 'boolean', 'json'] }
+    uiOptions: { types: ['number', 'string', 'boolean', 'json'] },
   },
 
   // Structural handlers
@@ -320,7 +320,7 @@ export const HANDLER_METADATA: Record<string, HandlerMetadata> = {
     category: 'Structural',
     config: { keys: 'array' },
     uiType: 'multiKeySelector',
-    uiOptions: { ordered: true, placeholder: 'Keys for zipped object' }
+    uiOptions: { ordered: true, placeholder: 'Keys for zipped object' },
   },
 
   // No config handlers

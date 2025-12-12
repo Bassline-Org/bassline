@@ -8,9 +8,7 @@ export default function TypeView({ resource, uri }) {
       <h1>{name || 'Unnamed Type'}</h1>
       <div className="uri">{uri}</div>
 
-      {description && (
-        <p className="type-description">{description}</p>
-      )}
+      {description && <p className="type-description">{description}</p>}
 
       {schema && Object.keys(schema).length > 0 && (
         <section className="type-schema">

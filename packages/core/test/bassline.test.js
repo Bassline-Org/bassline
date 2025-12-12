@@ -7,7 +7,7 @@ describe('Bassline', () => {
     it('matches exact paths', async () => {
       const bl = new Bassline()
       bl.route('/hello', {
-        get: () => ({ headers: {}, body: 'world' })
+        get: () => ({ headers: {}, body: 'world' }),
       })
 
       const result = await bl.get('bl:///hello')
@@ -17,7 +17,7 @@ describe('Bassline', () => {
     it('extracts path parameters', async () => {
       const bl = new Bassline()
       bl.route('/users/:id', {
-        get: ({ params }) => ({ headers: {}, body: params.id })
+        get: ({ params }) => ({ headers: {}, body: params.id }),
       })
 
       const result = await bl.get('bl:///users/123')
@@ -27,7 +27,7 @@ describe('Bassline', () => {
     it('extracts multiple parameters', async () => {
       const bl = new Bassline()
       bl.route('/users/:userId/posts/:postId', {
-        get: ({ params }) => ({ headers: {}, body: params })
+        get: ({ params }) => ({ headers: {}, body: params }),
       })
 
       const result = await bl.get('bl:///users/alice/posts/42')
@@ -55,10 +55,10 @@ describe('Bassline', () => {
 
       // Register in "wrong" order
       bl.route('/cells/:name', {
-        get: () => ({ headers: {}, body: 'cell' })
+        get: () => ({ headers: {}, body: 'cell' }),
       })
       bl.route('/cells/:name/value', {
-        get: () => ({ headers: {}, body: 'value' })
+        get: () => ({ headers: {}, body: 'value' }),
       })
 
       expect((await bl.get('bl:///cells/counter')).body).toBe('cell')
@@ -69,10 +69,10 @@ describe('Bassline', () => {
       const bl = new Bassline()
 
       bl.route('/:a/:b', {
-        get: () => ({ headers: {}, body: 'generic' })
+        get: () => ({ headers: {}, body: 'generic' }),
       })
       bl.route('/cells/:name', {
-        get: () => ({ headers: {}, body: 'cells' })
+        get: () => ({ headers: {}, body: 'cells' }),
       })
 
       expect((await bl.get('bl:///cells/counter')).body).toBe('cells')
@@ -85,22 +85,24 @@ describe('Bassline', () => {
       const bl = new Bassline()
 
       bl.route('/files/:path*', {
-        get: ({ params }) => ({ headers: {}, body: params.path })
+        get: ({ params }) => ({ headers: {}, body: params.path }),
       })
 
       expect((await bl.get('bl:///files/a')).body).toBe('a')
       expect((await bl.get('bl:///files/a/b/c')).body).toBe('a/b/c')
-      expect((await bl.get('bl:///files/deeply/nested/path/file.txt')).body).toBe('deeply/nested/path/file.txt')
+      expect((await bl.get('bl:///files/deeply/nested/path/file.txt')).body).toBe(
+        'deeply/nested/path/file.txt'
+      )
     })
 
     it('prefers specific routes over wildcards', async () => {
       const bl = new Bassline()
 
       bl.route('/data/:path*', {
-        get: () => ({ headers: {}, body: 'wildcard' })
+        get: () => ({ headers: {}, body: 'wildcard' }),
       })
       bl.route('/data/special', {
-        get: () => ({ headers: {}, body: 'specific' })
+        get: () => ({ headers: {}, body: 'specific' }),
       })
 
       expect((await bl.get('bl:///data/special')).body).toBe('specific')
@@ -113,7 +115,7 @@ describe('Bassline', () => {
     it('passes headers in context', async () => {
       const bl = new Bassline()
       bl.route('/resource', {
-        get: ({ headers }) => ({ headers: {}, body: headers.auth })
+        get: ({ headers }) => ({ headers: {}, body: headers.auth }),
       })
 
       const result = await bl.get('bl:///resource', { auth: 'token123' })
@@ -123,7 +125,7 @@ describe('Bassline', () => {
     it('passes query params in context', async () => {
       const bl = new Bassline()
       bl.route('/search', {
-        get: ({ query }) => ({ headers: {}, body: query.get('q') })
+        get: ({ query }) => ({ headers: {}, body: query.get('q') }),
       })
 
       const result = await bl.get('bl:///search?q=hello')
@@ -137,7 +139,7 @@ describe('Bassline', () => {
         put: ({ headers, body }) => {
           received = { headers, body }
           return { headers: {}, body: 'ok' }
-        }
+        },
       })
 
       await bl.put('bl:///resource', { auth: 'token' }, { value: 42 })
@@ -148,13 +150,13 @@ describe('Bassline', () => {
     it('provides bassline instance in context', async () => {
       const bl = new Bassline()
       bl.route('/a', {
-        get: () => ({ headers: {}, body: 'from-a' })
+        get: () => ({ headers: {}, body: 'from-a' }),
       })
       bl.route('/b', {
         get: async ({ bl }) => {
           const a = await bl.get('bl:///a')
           return { headers: {}, body: `got: ${a.body}` }
-        }
+        },
       })
 
       expect((await bl.get('bl:///b')).body).toBe('got: from-a')
@@ -166,7 +168,7 @@ describe('Router builder', () => {
   it('creates routes with prefix', async () => {
     const bl = new Bassline()
 
-    const cellRoutes = routes('/cells/:name', r => {
+    const cellRoutes = routes('/cells/:name', (r) => {
       r.get('/', () => ({ headers: {}, body: 'cell' }))
       r.get('/value', () => ({ headers: {}, body: 'value' }))
     })
@@ -180,11 +182,11 @@ describe('Router builder', () => {
   it('supports nested scopes', async () => {
     const bl = new Bassline()
 
-    const apiRoutes = routes('/api', r => {
-      r.scope('/v1', r => {
+    const apiRoutes = routes('/api', (r) => {
+      r.scope('/v1', (r) => {
         r.get('/users', () => ({ headers: {}, body: 'users-v1' }))
       })
-      r.scope('/v2', r => {
+      r.scope('/v2', (r) => {
         r.get('/users', () => ({ headers: {}, body: 'users-v2' }))
       })
     })
@@ -199,7 +201,7 @@ describe('Router builder', () => {
     const bl = new Bassline()
     let stored = null
 
-    const dataRoutes = routes('/data', r => {
+    const dataRoutes = routes('/data', (r) => {
       r.put('/:key', ({ params, body }) => {
         stored = { key: params.key, value: body }
         return { headers: {}, body: 'saved' }
@@ -215,11 +217,11 @@ describe('Router builder', () => {
   it('passes params through scopes', async () => {
     const bl = new Bassline()
 
-    const nestedRoutes = routes('/users/:userId', r => {
-      r.scope('/posts/:postId', r => {
+    const nestedRoutes = routes('/users/:userId', (r) => {
+      r.scope('/posts/:postId', (r) => {
         r.get('/comments', ({ params }) => ({
           headers: {},
-          body: params
+          body: params,
         }))
       })
     })
@@ -234,7 +236,7 @@ describe('Router builder', () => {
 describe('Mountable resources', () => {
   describe('resource()', () => {
     it('creates a router builder with isResource flag', () => {
-      const r = resource(r => {
+      const r = resource((r) => {
         r.get('/', () => ({ headers: {}, body: 'index' }))
       })
 
@@ -243,29 +245,29 @@ describe('Mountable resources', () => {
     })
 
     it('defines routes relative to root', () => {
-      const r = resource(r => {
+      const r = resource((r) => {
         r.get('/', () => ({ headers: {}, body: 'index' }))
         r.get('/:id', () => ({ headers: {}, body: 'item' }))
       })
 
       // Patterns should be relative (no prefix baked in)
       // '/' becomes '' (empty) since prefix is '', and mount() handles this
-      expect(r.definitions.map(d => d.pattern)).toEqual(['', '/:id'])
+      expect(r.definitions.map((d) => d.pattern)).toEqual(['', '/:id'])
     })
 
     it('supports scopes within resources', () => {
-      const r = resource(r => {
+      const r = resource((r) => {
         r.get('/', () => ({ headers: {}, body: 'index' }))
-        r.scope('/:id', r => {
+        r.scope('/:id', (r) => {
           r.get('/details', () => ({ headers: {}, body: 'details' }))
           r.put('/update', () => ({ headers: {}, body: 'updated' }))
         })
       })
 
-      expect(r.definitions.map(d => d.pattern)).toEqual([
-        '',  // '/' with empty prefix becomes ''
+      expect(r.definitions.map((d) => d.pattern)).toEqual([
+        '', // '/' with empty prefix becomes ''
         '/:id/details',
-        '/:id/update'
+        '/:id/update',
       ])
     })
   })
@@ -274,7 +276,7 @@ describe('Mountable resources', () => {
     it('mounts a resource at a specific path', async () => {
       const bl = new Bassline()
 
-      const cellResource = resource(r => {
+      const cellResource = resource((r) => {
         r.get('/', () => ({ headers: {}, body: 'list' }))
         r.get('/:name', ({ params }) => ({ headers: {}, body: `cell:${params.name}` }))
       })
@@ -288,7 +290,7 @@ describe('Mountable resources', () => {
     it('allows mounting same resource at multiple paths', async () => {
       const bl = new Bassline()
 
-      const itemResource = resource(r => {
+      const itemResource = resource((r) => {
         r.get('/:id', ({ params }) => ({ headers: {}, body: params.id }))
       })
 
@@ -302,7 +304,7 @@ describe('Mountable resources', () => {
     it('inherits params from mount prefix', async () => {
       const bl = new Bassline()
 
-      const cellResource = resource(r => {
+      const cellResource = resource((r) => {
         r.get('/', ({ params }) => ({ headers: {}, body: params }))
         r.get('/:name', ({ params }) => ({ headers: {}, body: params }))
       })
@@ -319,14 +321,14 @@ describe('Mountable resources', () => {
     it('handles nested scopes in mounted resources', async () => {
       const bl = new Bassline()
 
-      const userResource = resource(r => {
+      const userResource = resource((r) => {
         r.get('/', () => ({ headers: {}, body: 'users' }))
-        r.scope('/:userId', r => {
+        r.scope('/:userId', (r) => {
           r.get('/', ({ params }) => ({ headers: {}, body: `user:${params.userId}` }))
-          r.scope('/posts', r => {
+          r.scope('/posts', (r) => {
             r.get('/:postId', ({ params }) => ({
               headers: {},
-              body: { userId: params.userId, postId: params.postId }
+              body: { userId: params.userId, postId: params.postId },
             }))
           })
         })
@@ -338,14 +340,14 @@ describe('Mountable resources', () => {
       expect((await bl.get('bl:///api/users/alice')).body).toBe('user:alice')
       expect((await bl.get('bl:///api/users/alice/posts/42')).body).toEqual({
         userId: 'alice',
-        postId: '42'
+        postId: '42',
       })
     })
 
     it('handles root mount', async () => {
       const bl = new Bassline()
 
-      const indexResource = resource(r => {
+      const indexResource = resource((r) => {
         r.get('/', () => ({ headers: {}, body: 'root' }))
         r.get('/about', () => ({ headers: {}, body: 'about' }))
       })
@@ -360,10 +362,10 @@ describe('Mountable resources', () => {
       const bl = new Bassline()
       let stored = null
 
-      const dataResource = resource(r => {
+      const dataResource = resource((r) => {
         r.get('/:key', ({ params }) => ({
           headers: {},
-          body: stored?.[params.key] ?? null
+          body: stored?.[params.key] ?? null,
         }))
         r.put('/:key', ({ params, body }) => {
           stored = stored || {}
@@ -383,7 +385,7 @@ describe('Mountable resources', () => {
     it('mounts resource at root when using install()', async () => {
       const bl = new Bassline()
 
-      const indexResource = resource(r => {
+      const indexResource = resource((r) => {
         r.get('/', () => ({ headers: {}, body: 'index' }))
         r.get('/status', () => ({ headers: {}, body: 'ok' }))
       })
@@ -397,7 +399,7 @@ describe('Mountable resources', () => {
     it('still works with traditional routes()', async () => {
       const bl = new Bassline()
 
-      const cellRoutes = routes('/cells', r => {
+      const cellRoutes = routes('/cells', (r) => {
         r.get('/', () => ({ headers: {}, body: 'cells' }))
       })
 

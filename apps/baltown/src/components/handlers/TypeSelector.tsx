@@ -26,7 +26,7 @@ export default function TypeSelector(props: TypeSelectorProps) {
   // Filter types if custom list provided
   const availableTypes = () => {
     if (!props.types) return DEFAULT_TYPES
-    return DEFAULT_TYPES.filter(t => props.types!.includes(t.value))
+    return DEFAULT_TYPES.filter((t) => props.types!.includes(t.value))
   }
 
   function selectType(type: string) {
@@ -57,7 +57,10 @@ export default function TypeSelector(props: TypeSelectorProps) {
 
       <div class="type-preview">
         <span class="preview-label">Convert to:</span>
-        <span class="preview-type" style={{ color: availableTypes().find(t => t.value === selected())?.color }}>
+        <span
+          class="preview-type"
+          style={{ color: availableTypes().find((t) => t.value === selected())?.color }}
+        >
           {selected()}
         </span>
       </div>

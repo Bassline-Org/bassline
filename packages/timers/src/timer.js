@@ -45,7 +45,7 @@ export function createTimerRoutes(options = {}) {
       interval: config.interval ?? existing?.interval ?? 1000,
       enabled: config.enabled ?? existing?.enabled ?? false,
       intervalId: null,
-      tickCount: existing?.tickCount ?? 0
+      tickCount: existing?.tickCount ?? 0,
     }
 
     store.set(name, timer)
@@ -77,7 +77,7 @@ export function createTimerRoutes(options = {}) {
         onTick({
           name,
           tick: timer.tickCount,
-          time: new Date().toISOString()
+          time: new Date().toISOString(),
         })
       }
     }, timer.interval)
@@ -138,21 +138,21 @@ export function createTimerRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const timerResource = resource(r => {
+  const timerResource = resource((r) => {
     // List all timers
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listTimers().map(name => {
+        entries: listTimers().map((name) => {
           const timer = store.get(name)
           return {
             name,
             type: 'timer',
             uri: `bl:///timers/${name}`,
-            running: timer?.intervalId != null
+            running: timer?.intervalId != null,
           }
-        })
-      }
+        }),
+      },
     }))
 
     // Get timer config & status
@@ -170,9 +170,9 @@ export function createTimerRoutes(options = {}) {
           tickCount: timer.tickCount,
           entries: [
             { name: 'start', uri: `bl:///timers/${params.name}/start` },
-            { name: 'stop', uri: `bl:///timers/${params.name}/stop` }
-          ]
-        }
+            { name: 'stop', uri: `bl:///timers/${params.name}/stop` },
+          ],
+        },
       }
     })
 
@@ -187,8 +187,8 @@ export function createTimerRoutes(options = {}) {
           interval: timer.interval,
           enabled: timer.enabled,
           running: timer.intervalId != null,
-          tickCount: timer.tickCount
-        }
+          tickCount: timer.tickCount,
+        },
       }
     })
 
@@ -210,8 +210,8 @@ export function createTimerRoutes(options = {}) {
           interval: timer.interval,
           enabled: timer.enabled,
           running: timer.intervalId != null,
-          tickCount: timer.tickCount
-        }
+          tickCount: timer.tickCount,
+        },
       }
     })
 
@@ -227,8 +227,8 @@ export function createTimerRoutes(options = {}) {
           interval: timer.interval,
           enabled: timer.enabled,
           running: false,
-          tickCount: timer.tickCount
-        }
+          tickCount: timer.tickCount,
+        },
       }
     })
 
@@ -239,7 +239,7 @@ export function createTimerRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///timers/${params.name}` }
+        body: { uri: `bl:///timers/${params.name}` },
       }
     })
   })
@@ -273,6 +273,6 @@ export function createTimerRoutes(options = {}) {
     getTimer,
     listTimers,
     cleanup,
-    _store: store
+    _store: store,
   }
 }

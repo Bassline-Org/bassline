@@ -34,11 +34,16 @@ function AddressBar({ value, onChange, onCommandPalette }) {
       <input
         type="text"
         value={input}
-        onChange={e => setInput(e.target.value)}
+        onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="bl:///local/data"
       />
-      <button type="button" className="address-bar-cmd" onClick={onCommandPalette} title="Command Palette (Cmd+K)">
+      <button
+        type="button"
+        className="address-bar-cmd"
+        onClick={onCommandPalette}
+        title="Command Palette (Cmd+K)"
+      >
         <IconCommand size={14} />
       </button>
     </form>
@@ -58,16 +63,19 @@ export default function App() {
   const { data, loading, error, refetch } = useResource(uri)
 
   const toggleSidebar = useCallback(() => {
-    setSidebarCollapsed(prev => !prev)
+    setSidebarCollapsed((prev) => !prev)
   }, [])
 
-  const navigate = useCallback((newUri) => {
-    // Trim history forward if we're not at the end
-    const newHistory = [...history.slice(0, historyIndex + 1), newUri]
-    setHistory(newHistory)
-    setHistoryIndex(newHistory.length - 1)
-    setUri(newUri)
-  }, [history, historyIndex])
+  const navigate = useCallback(
+    (newUri) => {
+      // Trim history forward if we're not at the end
+      const newHistory = [...history.slice(0, historyIndex + 1), newUri]
+      setHistory(newHistory)
+      setHistoryIndex(newHistory.length - 1)
+      setUri(newUri)
+    },
+    [history, historyIndex]
+  )
 
   const goBack = useCallback(() => {
     if (historyIndex > 0) {
@@ -127,7 +135,11 @@ export default function App() {
         <button onClick={goBack} disabled={historyIndex <= 0} title="Back (Cmd+[)">
           <IconArrowLeft size={16} />
         </button>
-        <button onClick={goForward} disabled={historyIndex >= history.length - 1} title="Forward (Cmd+])">
+        <button
+          onClick={goForward}
+          disabled={historyIndex >= history.length - 1}
+          title="Forward (Cmd+])"
+        >
           <IconArrowLeft size={16} style={{ transform: 'rotate(180deg)' }} />
         </button>
         <button onClick={refetch} title="Refresh (Cmd+R)">
@@ -136,9 +148,7 @@ export default function App() {
       </div>
       <Breadcrumbs uri={uri} onNavigate={navigate} />
       <AddressBar value={uri} onChange={navigate} onCommandPalette={openCommandPalette} />
-      {data && hasPrettyView(data) && (
-        <ViewToggle mode={viewMode} onChange={setViewMode} />
-      )}
+      {data && hasPrettyView(data) && <ViewToggle mode={viewMode} onChange={setViewMode} />}
     </header>
   )
 
@@ -154,15 +164,13 @@ export default function App() {
   )
 
   return (
-    <AppLayout
-      toolbar={toolbar}
-      sidebar={sidebar}
-      sidebarCollapsed={sidebarCollapsed}
-    >
+    <AppLayout toolbar={toolbar} sidebar={sidebar} sidebarCollapsed={sidebarCollapsed}>
       <main>
         {loading && !virtualViews[uri] && <div className="loading pulse">Loading...</div>}
         {error && !virtualViews[uri] && <div className="error-card">Error: {error.message}</div>}
-        {(data || virtualViews[uri]) && <ViewResolver resource={data} uri={uri} onNavigate={navigate} viewMode={viewMode} />}
+        {(data || virtualViews[uri]) && (
+          <ViewResolver resource={data} uri={uri} onNavigate={navigate} viewMode={viewMode} />
+        )}
         {!loading && !error && !data && !virtualViews[uri] && <div className="empty">No data</div>}
       </main>
       <CommandPalette
@@ -179,10 +187,7 @@ export default function App() {
           navigate(uri)
         }}
       />
-      <ClaudePanel
-        isOpen={claudePanelOpen}
-        onClose={closeClaudePanel}
-      />
+      <ClaudePanel isOpen={claudePanelOpen} onClose={closeClaudePanel} />
     </AppLayout>
   )
 }

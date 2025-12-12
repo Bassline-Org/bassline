@@ -37,13 +37,13 @@ export class RouterBuilder {
    * @param {string} [prefix=''] - URL prefix for all routes in this builder
    * @param {RouterBuilderOptions} [options={}] - Configuration options
    */
-  constructor(prefix = '', options = {}) {
+  constructor(prefix = "", options = {}) {
     /** @type {string} */
-    this.prefix = prefix
+    this.prefix = prefix;
     /** @type {boolean} */
-    this.isResource = options.isResource ?? false
+    this.isResource = options.isResource ?? false;
     /** @type {Array<{pattern: string, config: RouteConfig}>} */
-    this.definitions = []
+    this.definitions = [];
   }
 
   /**
@@ -58,9 +58,9 @@ export class RouterBuilder {
    * })
    */
   route(pattern, config) {
-    const fullPattern = pattern === '/' ? this.prefix : this.prefix + pattern
-    this.definitions.push({ pattern: fullPattern, config })
-    return this
+    const fullPattern = pattern === "/" ? this.prefix : this.prefix + pattern;
+    this.definitions.push({ pattern: fullPattern, config });
+    return this;
   }
 
   /**
@@ -75,7 +75,7 @@ export class RouterBuilder {
    * }))
    */
   get(pattern, handler) {
-    return this.route(pattern, { get: handler })
+    return this.route(pattern, { get: handler });
   }
 
   /**
@@ -90,7 +90,7 @@ export class RouterBuilder {
    * })
    */
   put(pattern, handler) {
-    return this.route(pattern, { put: handler })
+    return this.route(pattern, { put: handler });
   }
 
   /**
@@ -105,10 +105,12 @@ export class RouterBuilder {
    * })
    */
   scope(prefix, fn) {
-    const scoped = new RouterBuilder(this.prefix + prefix, { isResource: this.isResource })
-    fn(scoped)
-    this.definitions.push(...scoped.definitions)
-    return this
+    const scoped = new RouterBuilder(this.prefix + prefix, {
+      isResource: this.isResource,
+    });
+    fn(scoped);
+    this.definitions.push(...scoped.definitions);
+    return this;
   }
 
   /**
@@ -121,9 +123,9 @@ export class RouterBuilder {
    */
   install(bassline) {
     for (const { pattern, config } of this.definitions) {
-      bassline.route(pattern, config)
+      bassline.route(pattern, config);
     }
-    return bassline
+    return bassline;
   }
 }
 
@@ -151,9 +153,9 @@ export class RouterBuilder {
  * bl.install(cellRoutes)
  */
 export function routes(prefix, fn) {
-  const builder = new RouterBuilder(prefix)
-  fn(builder)
-  return builder
+  const builder = new RouterBuilder(prefix);
+  fn(builder);
+  return builder;
 }
 
 /**
@@ -189,7 +191,7 @@ export function routes(prefix, fn) {
  * bl.mount('/namespaces/:ns/cells', cellResource)  // params.ns available in handlers
  */
 export function resource(fn) {
-  const builder = new RouterBuilder('', { isResource: true })
-  fn(builder)
-  return builder
+  const builder = new RouterBuilder("", { isResource: true });
+  fn(builder);
+  return builder;
 }

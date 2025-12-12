@@ -10,24 +10,27 @@ export const TYPES = {
     schema: {
       name: { type: 'string', description: 'System name' },
       description: { type: 'string', description: 'System description' },
-      subsystems: { type: 'array', description: 'Available subsystems' }
-    }
+      subsystems: { type: 'array', description: 'Available subsystems' },
+    },
   },
   directory: {
     name: 'Directory',
     description: 'A collection of resources',
     schema: {
-      entries: { type: 'array', description: 'Directory entries' }
-    }
+      entries: { type: 'array', description: 'Directory entries' },
+    },
   },
   cell: {
     name: 'Cell',
     description: 'A lattice-based reactive value with monotonic merge semantics',
     schema: {
       value: { type: 'any', description: 'Current cell value' },
-      lattice: { type: 'string', description: 'Lattice type (maxNumber, minNumber, setUnion, lww)' },
-      label: { type: 'string', description: 'Human-readable label' }
-    }
+      lattice: {
+        type: 'string',
+        description: 'Lattice type (maxNumber, minNumber, setUnion, lww)',
+      },
+      label: { type: 'string', description: 'Human-readable label' },
+    },
   },
   note: {
     name: 'Note',
@@ -35,8 +38,8 @@ export const TYPES = {
     schema: {
       title: { type: 'string', description: 'Note title' },
       content: { type: 'string', description: 'Note content' },
-      tags: { type: 'array', description: 'Tags for categorization' }
-    }
+      tags: { type: 'array', description: 'Tags for categorization' },
+    },
   },
   task: {
     name: 'Task',
@@ -45,8 +48,8 @@ export const TYPES = {
       title: { type: 'string', description: 'Task title' },
       status: { type: 'string', description: 'Task status (todo, in progress, done)' },
       assignee: { type: 'string', description: 'Assigned person URI' },
-      due: { type: 'string', description: 'Due date' }
-    }
+      due: { type: 'string', description: 'Due date' },
+    },
   },
   person: {
     name: 'Person',
@@ -55,8 +58,8 @@ export const TYPES = {
       name: { type: 'string', description: 'Full name' },
       email: { type: 'string', description: 'Email address' },
       role: { type: 'string', description: 'Role or title' },
-      avatar: { type: 'string', description: 'Avatar emoji or URL' }
-    }
+      avatar: { type: 'string', description: 'Avatar emoji or URL' },
+    },
   },
   type: {
     name: 'Type',
@@ -64,16 +67,16 @@ export const TYPES = {
     schema: {
       name: { type: 'string', description: 'Type name' },
       description: { type: 'string', description: 'Type description' },
-      schema: { type: 'object', description: 'Schema defining fields' }
-    }
+      schema: { type: 'object', description: 'Schema defining fields' },
+    },
   },
   module: {
     name: 'Module',
     description: 'An installed module or upgrade',
     schema: {
       path: { type: 'string', description: 'Module path' },
-      installedAt: { type: 'string', description: 'Installation timestamp' }
-    }
+      installedAt: { type: 'string', description: 'Installation timestamp' },
+    },
   },
   remote: {
     name: 'Remote',
@@ -81,8 +84,8 @@ export const TYPES = {
     schema: {
       uri: { type: 'string', description: 'WebSocket URI' },
       mount: { type: 'string', description: 'Mount point path' },
-      status: { type: 'string', description: 'Connection status' }
-    }
+      status: { type: 'string', description: 'Connection status' },
+    },
   },
   propagator: {
     name: 'Propagator',
@@ -90,8 +93,8 @@ export const TYPES = {
     schema: {
       inputs: { type: 'array', description: 'Input cell URIs' },
       output: { type: 'string', description: 'Output cell URI' },
-      handler: { type: 'string', description: 'Handler function name' }
-    }
+      handler: { type: 'string', description: 'Handler function name' },
+    },
   },
   recipe: {
     name: 'Recipe',
@@ -99,8 +102,8 @@ export const TYPES = {
     schema: {
       description: { type: 'string', description: 'Recipe description' },
       params: { type: 'object', description: 'Parameter definitions with type and default' },
-      resources: { type: 'array', description: 'Resource templates to create on instantiation' }
-    }
+      resources: { type: 'array', description: 'Resource templates to create on instantiation' },
+    },
   },
   instance: {
     name: 'Instance',
@@ -110,8 +113,8 @@ export const TYPES = {
       params: { type: 'object', description: 'Parameter values used' },
       createdResources: { type: 'array', description: 'Resources created by this instance' },
       state: { type: 'string', description: 'Instance state (active, deleted)' },
-      createdAt: { type: 'string', description: 'Creation timestamp' }
-    }
+      createdAt: { type: 'string', description: 'Creation timestamp' },
+    },
   },
   handler: {
     name: 'Handler',
@@ -121,16 +124,19 @@ export const TYPES = {
       builtin: { type: 'boolean', description: 'Whether this is a built-in handler' },
       description: { type: 'string', description: 'Handler description' },
       createdAt: { type: 'string', description: 'Creation timestamp (null for built-in)' },
-      entries: { type: 'array', description: 'Sub-resources (definition, docs)' }
-    }
+      entries: { type: 'array', description: 'Sub-resources (definition, docs)' },
+    },
   },
   'handler-definition': {
     name: 'Handler Definition',
     description: 'How a handler is implemented',
     schema: {
       type: { type: 'string', description: 'builtin or composed' },
-      definition: { type: 'array', description: 'Hiccup-style definition [handler, config?, ...args]' }
-    }
+      definition: {
+        type: 'array',
+        description: 'Hiccup-style definition [handler, config?, ...args]',
+      },
+    },
   },
   val: {
     name: 'Val',
@@ -139,7 +145,10 @@ export const TYPES = {
       name: { type: 'string', description: 'Val name' },
       owner: { type: 'string', description: 'Val owner' },
       description: { type: 'string', description: 'Val description' },
-      valType: { type: 'string', description: 'Type: propagator, recipe, handler, cell, plumber-rule' },
+      valType: {
+        type: 'string',
+        description: 'Type: propagator, recipe, handler, cell, plumber-rule',
+      },
       definition: { type: 'object', description: 'The val definition (varies by valType)' },
       visibility: { type: 'string', description: 'Visibility: public, unlisted, private' },
       tags: { type: 'array', description: 'Tags for categorization' },
@@ -147,8 +156,8 @@ export const TYPES = {
       parentVersion: { type: 'number', description: 'Parent version if forked' },
       version: { type: 'number', description: 'Current version number' },
       createdAt: { type: 'string', description: 'Creation timestamp' },
-      updatedAt: { type: 'string', description: 'Last update timestamp' }
-    }
+      updatedAt: { type: 'string', description: 'Last update timestamp' },
+    },
   },
   'val-version': {
     name: 'Val Version',
@@ -156,16 +165,16 @@ export const TYPES = {
     schema: {
       version: { type: 'number', description: 'Version number' },
       definition: { type: 'object', description: 'Val definition at this version' },
-      createdAt: { type: 'string', description: 'Creation timestamp' }
-    }
+      createdAt: { type: 'string', description: 'Creation timestamp' },
+    },
   },
   'val-saved': {
     name: 'Val Saved Event',
     description: 'Event dispatched when a val is created or updated',
     schema: {
       val: { type: 'string', description: 'Val key (owner/name)' },
-      version: { type: 'number', description: 'New version number' }
-    }
+      version: { type: 'number', description: 'New version number' },
+    },
   },
   service: {
     name: 'Service',
@@ -174,8 +183,8 @@ export const TYPES = {
       name: { type: 'string', description: 'Service name' },
       description: { type: 'string', description: 'Service description' },
       version: { type: 'string', description: 'Service version' },
-      operations: { type: 'array', description: 'Available operations' }
-    }
+      operations: { type: 'array', description: 'Available operations' },
+    },
   },
   'database-connection': {
     name: 'Database Connection',
@@ -185,8 +194,8 @@ export const TYPES = {
       driver: { type: 'string', description: 'Database driver (sqlite, postgres, mysql)' },
       path: { type: 'string', description: 'Database file path (SQLite)' },
       readonly: { type: 'boolean', description: 'Readonly mode' },
-      connected: { type: 'boolean', description: 'Connection status' }
-    }
+      connected: { type: 'boolean', description: 'Connection status' },
+    },
   },
   'database-result': {
     name: 'Database Query Result',
@@ -194,24 +203,24 @@ export const TYPES = {
     schema: {
       rows: { type: 'array', description: 'Result rows' },
       columns: { type: 'array', description: 'Column metadata' },
-      rowCount: { type: 'number', description: 'Number of rows returned' }
-    }
+      rowCount: { type: 'number', description: 'Number of rows returned' },
+    },
   },
   'database-execute-result': {
     name: 'Database Execute Result',
     description: 'Result from executing a database statement',
     schema: {
       changes: { type: 'number', description: 'Number of rows affected' },
-      lastInsertRowid: { type: 'number', description: 'Last inserted row ID' }
-    }
+      lastInsertRowid: { type: 'number', description: 'Last inserted row ID' },
+    },
   },
   'database-schema': {
     name: 'Database Schema',
     description: 'Database schema information',
     schema: {
       connection: { type: 'string', description: 'Connection name' },
-      tables: { type: 'array', description: 'Tables in the database' }
-    }
+      tables: { type: 'array', description: 'Tables in the database' },
+    },
   },
   'database-table': {
     name: 'Database Table',
@@ -220,8 +229,8 @@ export const TYPES = {
       name: { type: 'string', description: 'Table name' },
       type: { type: 'string', description: 'table or view' },
       columns: { type: 'array', description: 'Column definitions' },
-      indexes: { type: 'array', description: 'Index definitions' }
-    }
+      indexes: { type: 'array', description: 'Index definitions' },
+    },
   },
   'database-change': {
     name: 'Database Change Event',
@@ -229,22 +238,22 @@ export const TYPES = {
     schema: {
       connection: { type: 'string', description: 'Connection name' },
       sql: { type: 'string', description: 'SQL statement executed' },
-      changes: { type: 'number', description: 'Number of rows affected' }
-    }
+      changes: { type: 'number', description: 'Number of rows affected' },
+    },
   },
   'database-pragma-result': {
     name: 'Database PRAGMA Result',
     description: 'Result from SQLite PRAGMA command',
     schema: {
-      result: { type: 'any', description: 'PRAGMA result value' }
-    }
-  }
+      result: { type: 'any', description: 'PRAGMA result value' },
+    },
+  },
 }
 
 /**
  * Types resource
  */
-const typesResource = resource(r => {
+const typesResource = resource((r) => {
   // List all types
   r.get('/', () => ({
     headers: { type: 'bl:///types/directory' },
@@ -253,9 +262,9 @@ const typesResource = resource(r => {
         name,
         type: 'type',
         uri: `bl:///types/${name}`,
-        description: def.description
-      }))
-    }
+        description: def.description,
+      })),
+    },
   }))
 
   // Get specific type
@@ -268,8 +277,8 @@ const typesResource = resource(r => {
       body: {
         name: def.name,
         description: def.description,
-        schema: def.schema
-      }
+        schema: def.schema,
+      },
     }
   })
 })

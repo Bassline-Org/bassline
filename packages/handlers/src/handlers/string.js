@@ -12,12 +12,15 @@ export function registerString({ registerBuiltin }) {
   registerBuiltin('lowercase', () => (s) => String(s).toLowerCase())
   registerBuiltin('strSlice', (ctx) => (s) => String(s).slice(ctx.start ?? 0, ctx.end))
 
-  registerBuiltin('replace', (ctx) => (s) =>
-    String(s).replace(new RegExp(ctx.pattern, ctx.flags ?? ''), ctx.replacement ?? '')
+  registerBuiltin(
+    'replace',
+    (ctx) => (s) =>
+      String(s).replace(new RegExp(ctx.pattern, ctx.flags ?? ''), ctx.replacement ?? '')
   )
 
-  registerBuiltin('match', (ctx) => (s) =>
-    String(s).match(new RegExp(ctx.pattern, ctx.flags ?? ''))
+  registerBuiltin(
+    'match',
+    (ctx) => (s) => String(s).match(new RegExp(ctx.pattern, ctx.flags ?? ''))
   )
 
   registerBuiltin('startsWith', (ctx) => (s) => String(s).startsWith(ctx.prefix))

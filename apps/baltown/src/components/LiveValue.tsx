@@ -33,17 +33,23 @@ export default function LiveValue(props: LiveValueProps) {
   })
 
   // Detect value changes and trigger pulse animation
-  createEffect(on(value, (newValue) => {
-    const newStr = JSON.stringify(newValue)
-    const prevStr = JSON.stringify(previousValue)
+  createEffect(
+    on(
+      value,
+      (newValue) => {
+        const newStr = JSON.stringify(newValue)
+        const prevStr = JSON.stringify(previousValue)
 
-    if (previousValue !== undefined && newStr !== prevStr) {
-      setHasChanged(true)
-      // Remove the changed class after animation completes
-      setTimeout(() => setHasChanged(false), 600)
-    }
-    previousValue = newValue
-  }, { defer: true }))
+        if (previousValue !== undefined && newStr !== prevStr) {
+          setHasChanged(true)
+          // Remove the changed class after animation completes
+          setTimeout(() => setHasChanged(false), 600)
+        }
+        previousValue = newValue
+      },
+      { defer: true }
+    )
+  )
 
   // Format value for display
   const displayValue = createMemo(() => {
@@ -71,7 +77,9 @@ export default function LiveValue(props: LiveValueProps) {
         <div class="live-value-header">
           <span class="live-value-label">{props.label || props.uri}</span>
           <Show when={isLive()}>
-            <span class="live-indicator" title="Live updates active">LIVE</span>
+            <span class="live-indicator" title="Live updates active">
+              LIVE
+            </span>
           </Show>
         </div>
       </Show>
@@ -87,7 +95,9 @@ export default function LiveValue(props: LiveValueProps) {
       </Show>
 
       <Show when={!loading() && !error()}>
-        <div class={`live-value-content type-${valueType()} ${hasChanged() ? 'value-changed' : ''}`}>
+        <div
+          class={`live-value-content type-${valueType()} ${hasChanged() ? 'value-changed' : ''}`}
+        >
           <Show when={valueType() === 'object' || valueType() === 'array'}>
             <pre class="live-value-json">{displayValue()}</pre>
           </Show>

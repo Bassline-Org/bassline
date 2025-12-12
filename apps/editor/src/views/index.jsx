@@ -20,7 +20,7 @@ export function resourceClasses(resource) {
   if (type) {
     // Extract just the type name from various formats
     const typeName = type
-      .replace('bl:///r/types/', '')  // Remote prefix (via remote-browser)
+      .replace('bl:///r/types/', '') // Remote prefix (via remote-browser)
       .replace('bl:///types/', '')
       .replace('bl:///local/types/', '')
       .replace('bl:///data/types/', '')
@@ -41,7 +41,7 @@ export function resourceClasses(resource) {
 function normalizeType(type) {
   if (!type) return null
   return type
-    .replace('bl:///r/types/', '')  // Remote prefix (via remote-browser)
+    .replace('bl:///r/types/', '') // Remote prefix (via remote-browser)
     .replace('bl:///types/', '')
     .replace('bl:///local/types/', '')
     .replace('bl:///data/types/', '')
@@ -50,15 +50,15 @@ function normalizeType(type) {
 
 // Type → Component mapping
 const viewsByType = {
-  'directory': Directory,
-  'cell': CellView,
+  directory: Directory,
+  cell: CellView,
   'fuzzy-cell': FuzzyCellView,
-  'note': NoteView,
-  'task': TaskView,
-  'person': PersonView,
-  'type': TypeView,
-  'index': IndexView,
-  'dashboard': Dashboard
+  note: NoteView,
+  task: TaskView,
+  person: PersonView,
+  type: TypeView,
+  index: IndexView,
+  dashboard: Dashboard,
 }
 
 // Special URI-based views (virtual routes)
@@ -66,7 +66,7 @@ const viewsByUri = {
   'bl:///explore/cells': (props) => <TypeExplorer {...props} type="cell" />,
   'bl:///explore/propagators': (props) => <TypeExplorer {...props} type="propagator" />,
   'bl:///explore/data': (props) => <TypeExplorer {...props} type="data" />,
-  'bl:///network': NetworkGraph
+  'bl:///network': NetworkGraph,
 }
 
 // ViewResolver component
@@ -82,7 +82,7 @@ export function ViewResolver({ resource, uri, onNavigate, viewMode = 'pretty' })
   const PrettyView = viewsByType[normalizedType]
 
   // Use Inspector for raw mode or when no pretty view exists
-  const View = (viewMode === 'raw' || !PrettyView) ? Inspector : PrettyView
+  const View = viewMode === 'raw' || !PrettyView ? Inspector : PrettyView
 
   return <View resource={resource} uri={uri} onNavigate={onNavigate} />
 }
@@ -95,7 +95,20 @@ export function hasPrettyView(resource) {
 }
 
 // Export individual views
-export { Inspector, Directory, CellView, FuzzyCellView, PersonView, NoteView, TaskView, TypeView, IndexView, Dashboard, TypeExplorer, NetworkGraph }
+export {
+  Inspector,
+  Directory,
+  CellView,
+  FuzzyCellView,
+  PersonView,
+  NoteView,
+  TaskView,
+  TypeView,
+  IndexView,
+  Dashboard,
+  TypeExplorer,
+  NetworkGraph,
+}
 
 // Export views mapping for external use
 export const views = viewsByType

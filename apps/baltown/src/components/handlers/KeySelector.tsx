@@ -29,7 +29,10 @@ export default function KeySelector(props: KeySelectorProps) {
     const val = inputValue()
     if (!val) return []
     if (isMulti()) {
-      return val.split(',').map(k => k.trim()).filter(Boolean)
+      return val
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean)
     }
     return [val]
   })
@@ -38,14 +41,11 @@ export default function KeySelector(props: KeySelectorProps) {
   const filteredSuggestions = createMemo(() => {
     if (!props.suggestions?.length) return []
     const input = inputValue().toLowerCase()
-    const lastPart = isMulti()
-      ? input.split(',').pop()?.trim() || ''
-      : input
+    const lastPart = isMulti() ? input.split(',').pop()?.trim() || '' : input
 
-    return props.suggestions.filter(s =>
-      s.toLowerCase().includes(lastPart) &&
-      !currentKeys().includes(s)
-    ).slice(0, 10)
+    return props.suggestions
+      .filter((s) => s.toLowerCase().includes(lastPart) && !currentKeys().includes(s))
+      .slice(0, 10)
   })
 
   function handleInput(e: Event) {
@@ -92,10 +92,10 @@ export default function KeySelector(props: KeySelectorProps) {
 
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setFocusedIndex(prev => Math.min(prev + 1, suggestions.length - 1))
+      setFocusedIndex((prev) => Math.min(prev + 1, suggestions.length - 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setFocusedIndex(prev => Math.max(prev - 1, -1))
+      setFocusedIndex((prev) => Math.max(prev - 1, -1))
     } else if (e.key === 'Enter' && focusedIndex() >= 0) {
       e.preventDefault()
       selectSuggestion(suggestions[focusedIndex()])
@@ -106,7 +106,7 @@ export default function KeySelector(props: KeySelectorProps) {
 
   // Remove a key chip (multi mode)
   function removeKey(key: string) {
-    const keys = currentKeys().filter(k => k !== key)
+    const keys = currentKeys().filter((k) => k !== key)
     setInputValue(keys.join(', '))
     props.onChange(keys)
   }
@@ -119,7 +119,9 @@ export default function KeySelector(props: KeySelectorProps) {
             {(key) => (
               <span class="key-chip">
                 {key}
-                <button class="chip-remove" onClick={() => removeKey(key)}>×</button>
+                <button class="chip-remove" onClick={() => removeKey(key)}>
+                  ×
+                </button>
               </span>
             )}
           </For>
@@ -129,8 +131,15 @@ export default function KeySelector(props: KeySelectorProps) {
       <div class="input-wrapper">
         <Show when={isPath()}>
           <span class="path-icon">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
             </svg>
           </span>
         </Show>
@@ -139,7 +148,9 @@ export default function KeySelector(props: KeySelectorProps) {
           type="text"
           class={`key-input ${isPath() ? 'with-icon' : ''}`}
           value={inputValue()}
-          placeholder={props.placeholder || (isMulti() ? 'Enter keys, comma-separated' : 'Enter key')}
+          placeholder={
+            props.placeholder || (isMulti() ? 'Enter keys, comma-separated' : 'Enter key')
+          }
           onInput={handleInput}
           onFocus={() => setShowSuggestions(true)}
           onBlur={handleBlur}

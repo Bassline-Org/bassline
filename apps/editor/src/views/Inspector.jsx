@@ -9,7 +9,13 @@ function JsonTree({ data, onClickUri, depth = 0 }) {
     // Check if it's a URI
     if (data.startsWith('bl:///')) {
       return (
-        <a href="#" onClick={e => { e.preventDefault(); onClickUri(data) }}>
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault()
+            onClickUri(data)
+          }}
+        >
           "{data}"
         </a>
       )
@@ -46,11 +52,13 @@ function JsonTree({ data, onClickUri, depth = 0 }) {
         {entries.map(([key, value], i) => (
           <span key={key}>
             {'  '.repeat(depth + 1)}
-            <span className="key">"{key}"</span>: <JsonTree data={value} onClickUri={onClickUri} depth={depth + 1} />
+            <span className="key">"{key}"</span>:{' '}
+            <JsonTree data={value} onClickUri={onClickUri} depth={depth + 1} />
             {i < entries.length - 1 ? ',\n' : '\n'}
           </span>
         ))}
-        {'  '.repeat(depth)}{'}'}
+        {'  '.repeat(depth)}
+        {'}'}
       </span>
     )
   }
@@ -64,11 +72,15 @@ export default function Inspector({ resource, uri, onNavigate }) {
       <h2>{uri}</h2>
       <section>
         <h3>Headers</h3>
-        <pre><JsonTree data={resource.headers} onClickUri={onNavigate} /></pre>
+        <pre>
+          <JsonTree data={resource.headers} onClickUri={onNavigate} />
+        </pre>
       </section>
       <section>
         <h3>Body</h3>
-        <pre><JsonTree data={resource.body} onClickUri={onNavigate} /></pre>
+        <pre>
+          <JsonTree data={resource.body} onClickUri={onNavigate} />
+        </pre>
       </section>
     </div>
   )

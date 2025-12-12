@@ -19,12 +19,12 @@ const bl = new Bassline()
 bl.route('/users/:id', {
   get: ({ params }) => ({
     headers: { type: 'bl:///types/user' },
-    body: { id: params.id, name: 'Alice' }
+    body: { id: params.id, name: 'Alice' },
   }),
   put: ({ params, body }) => {
     // store.set(params.id, body)
     return { headers: {}, body }
-  }
+  },
 })
 
 // Use resources
@@ -51,10 +51,12 @@ await bl.put(uri, headers, body)
 Builder for hierarchical route definitions.
 
 ```javascript
-const userRoutes = routes('/users', r => {
+const userRoutes = routes('/users', (r) => {
   r.get('/', () => ({ body: users }))
   r.get('/:id', ({ params }) => ({ body: users[params.id] }))
-  r.put('/:id', ({ params, body }) => { users[params.id] = body })
+  r.put('/:id', ({ params, body }) => {
+    users[params.id] = body
+  })
 })
 
 bl.install(userRoutes)
@@ -74,8 +76,8 @@ links.install(bl)
 links.index('bl:///doc/1', { refs: ['bl:///doc/2'] })
 
 // Query
-await bl.get('bl:///links/from/doc/1')  // what does doc/1 reference?
-await bl.get('bl:///links/to/doc/2')    // what references doc/2?
+await bl.get('bl:///links/from/doc/1') // what does doc/1 reference?
+await bl.get('bl:///links/to/doc/2') // what references doc/2?
 ```
 
 ### createPlumber
@@ -91,7 +93,7 @@ plumber.install(bl)
 // Add routing rule
 plumber.addRule('cells', {
   match: { headers: { type: 'bl:///types/cell' } },
-  port: 'cell-updates'
+  port: 'cell-updates',
 })
 
 // Listen on port
@@ -106,15 +108,23 @@ Install via the daemon's module system:
 
 ```javascript
 // Links (bidirectional ref tracking)
-await bl.put('bl:///install/links', {}, {
-  path: './packages/core/src/upgrade-links.js'
-})
+await bl.put(
+  'bl:///install/links',
+  {},
+  {
+    path: './packages/core/src/upgrade-links.js',
+  }
+)
 // Registers: bl._links
 
 // Plumber (message routing)
-await bl.put('bl:///install/plumber', {}, {
-  path: './packages/core/src/upgrade-plumber.js'
-})
+await bl.put(
+  'bl:///install/plumber',
+  {},
+  {
+    path: './packages/core/src/upgrade-plumber.js',
+  }
+)
 // Registers: bl._plumber
 ```
 

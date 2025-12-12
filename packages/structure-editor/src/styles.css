@@ -1,7 +1,7 @@
 /* Structure Editor Styles */
 
 .structure-editor {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 14px;
   line-height: 1.5;
   background: #0d1117;
@@ -167,7 +167,7 @@
 }
 
 /* Command palette hint */
-.structure-editor[data-command-active="true"]::after {
+.structure-editor[data-command-active='true']::after {
   content: 'Commands: object, array, string, number, true, false, null';
   position: absolute;
   bottom: -24px;
@@ -177,22 +177,22 @@
 }
 
 /* Collapsed state */
-.json-object[data-collapsed="true"] > .json-pair,
-.json-array[data-collapsed="true"] > .json-element {
+.json-object[data-collapsed='true'] > .json-pair,
+.json-array[data-collapsed='true'] > .json-element {
   display: none;
 }
 
-.json-object[data-collapsed="true"]::after,
-.json-array[data-collapsed="true"]::after {
+.json-object[data-collapsed='true']::after,
+.json-array[data-collapsed='true']::after {
   display: inline;
   margin-left: 4px;
 }
 
-.json-object[data-collapsed="true"]::before {
+.json-object[data-collapsed='true']::before {
   content: '{ ... }';
 }
 
-.json-array[data-collapsed="true"]::before {
+.json-array[data-collapsed='true']::before {
   content: '[ ... ]';
 }
 

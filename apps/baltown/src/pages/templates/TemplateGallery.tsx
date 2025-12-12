@@ -23,10 +23,10 @@ export const TEMPLATES: Template[] = [
     preview: {
       inputs: ['bl:///cells/a', 'bl:///cells/b'],
       output: 'bl:///cells/result',
-      handler: 'sum'
+      handler: 'sum',
     },
     popularity: 156,
-    tags: ['math', 'reduce', 'popular']
+    tags: ['math', 'reduce', 'popular'],
   },
   {
     id: 'data-filter',
@@ -37,10 +37,10 @@ export const TEMPLATES: Template[] = [
       inputs: ['bl:///cells/items'],
       output: 'bl:///cells/filtered',
       handler: 'filter',
-      handlerConfig: { handler: 'gt', config: { value: 0 } }
+      handlerConfig: { handler: 'gt', config: { value: 0 } },
     },
     popularity: 89,
-    tags: ['filter', 'array', 'predicate']
+    tags: ['filter', 'array', 'predicate'],
   },
   {
     id: 'format-transform',
@@ -51,10 +51,10 @@ export const TEMPLATES: Template[] = [
       inputs: ['bl:///cells/name', 'bl:///cells/count'],
       output: 'bl:///cells/message',
       handler: 'format',
-      handlerConfig: { template: 'Hello {0}, you have {1} items' }
+      handlerConfig: { template: 'Hello {0}, you have {1} items' },
     },
     popularity: 67,
-    tags: ['string', 'format', 'template']
+    tags: ['string', 'format', 'template'],
   },
   {
     id: 'conditional-logic',
@@ -69,11 +69,11 @@ export const TEMPLATES: Template[] = [
         predicate: 'gt',
         predicateConfig: { value: 10 },
         then: 'identity',
-        else: ['multiply', { value: 2 }]
-      }
+        else: ['multiply', { value: 2 }],
+      },
     },
     popularity: 45,
-    tags: ['conditional', 'logic', 'branch']
+    tags: ['conditional', 'logic', 'branch'],
   },
   {
     id: 'data-pipeline',
@@ -83,10 +83,10 @@ export const TEMPLATES: Template[] = [
     preview: {
       inputs: ['bl:///cells/raw'],
       output: 'bl:///cells/processed',
-      handler: ['pipe', 'trim', 'lowercase', ['split', { delimiter: ',' }]]
+      handler: ['pipe', 'trim', 'lowercase', ['split', { delimiter: ',' }]],
     },
     popularity: 112,
-    tags: ['pipe', 'chain', 'transform']
+    tags: ['pipe', 'chain', 'transform'],
   },
 
   // Recipe templates
@@ -100,11 +100,11 @@ export const TEMPLATES: Template[] = [
       resources: [
         { id: 'status', type: 'cell', lattice: 'lww' },
         { id: 'lastUpdate', type: 'cell', lattice: 'lww' },
-        { id: 'errorCount', type: 'cell', lattice: 'counter' }
-      ]
+        { id: 'errorCount', type: 'cell', lattice: 'counter' },
+      ],
     },
     popularity: 78,
-    tags: ['monitoring', 'dashboard', 'status']
+    tags: ['monitoring', 'dashboard', 'status'],
   },
   {
     id: 'state-machine',
@@ -115,11 +115,11 @@ export const TEMPLATES: Template[] = [
       params: { name: { required: true }, initialState: { default: 'idle' } },
       resources: [
         { id: 'state', type: 'cell', lattice: 'lww' },
-        { id: 'history', type: 'cell', lattice: 'setUnion' }
-      ]
+        { id: 'history', type: 'cell', lattice: 'setUnion' },
+      ],
     },
     popularity: 56,
-    tags: ['state', 'machine', 'transitions']
+    tags: ['state', 'machine', 'transitions'],
   },
   {
     id: 'config-registry',
@@ -130,11 +130,11 @@ export const TEMPLATES: Template[] = [
       params: { name: { required: true } },
       resources: [
         { id: 'config', type: 'cell', lattice: 'object' },
-        { id: 'validated', type: 'propagator' }
-      ]
+        { id: 'validated', type: 'propagator' },
+      ],
     },
     popularity: 34,
-    tags: ['config', 'registry', 'settings']
+    tags: ['config', 'registry', 'settings'],
   },
 
   // Handler templates
@@ -145,16 +145,21 @@ export const TEMPLATES: Template[] = [
     category: 'handler',
     preview: ['pipe', ['multiply', { value: 9 }], ['divide', { value: 5 }], ['add', { value: 32 }]],
     popularity: 23,
-    tags: ['convert', 'temperature', 'math']
+    tags: ['convert', 'temperature', 'math'],
   },
   {
     id: 'slug-generator',
     name: 'Slug Generator',
     description: 'Convert text to URL-friendly slug format.',
     category: 'handler',
-    preview: ['pipe', 'lowercase', 'trim', ['replace', { pattern: '\\s+', replacement: '-', flags: 'g' }]],
+    preview: [
+      'pipe',
+      'lowercase',
+      'trim',
+      ['replace', { pattern: '\\s+', replacement: '-', flags: 'g' }],
+    ],
     popularity: 41,
-    tags: ['string', 'url', 'format']
+    tags: ['string', 'url', 'format'],
   },
 
   // Cell templates
@@ -165,7 +170,7 @@ export const TEMPLATES: Template[] = [
     category: 'cell',
     preview: { lattice: 'counter', initial: 0 },
     popularity: 98,
-    tags: ['counter', 'clicks', 'metrics']
+    tags: ['counter', 'clicks', 'metrics'],
   },
   {
     id: 'status-toggle',
@@ -174,7 +179,7 @@ export const TEMPLATES: Template[] = [
     category: 'cell',
     preview: { lattice: 'boolean', initial: false },
     popularity: 67,
-    tags: ['boolean', 'toggle', 'flag']
+    tags: ['boolean', 'toggle', 'flag'],
   },
   {
     id: 'tag-collection',
@@ -183,7 +188,7 @@ export const TEMPLATES: Template[] = [
     category: 'cell',
     preview: { lattice: 'setUnion', initial: [] },
     popularity: 54,
-    tags: ['tags', 'set', 'collection']
+    tags: ['tags', 'set', 'collection'],
   },
   {
     id: 'config-object',
@@ -192,7 +197,7 @@ export const TEMPLATES: Template[] = [
     category: 'cell',
     preview: { lattice: 'object', initial: {} },
     popularity: 43,
-    tags: ['config', 'object', 'settings']
+    tags: ['config', 'object', 'settings'],
   },
   {
     id: 'high-score',
@@ -201,8 +206,8 @@ export const TEMPLATES: Template[] = [
     category: 'cell',
     preview: { lattice: 'maxNumber', initial: 0 },
     popularity: 38,
-    tags: ['max', 'score', 'metrics']
-  }
+    tags: ['max', 'score', 'metrics'],
+  },
 ]
 
 /**
@@ -221,17 +226,18 @@ export default function TemplateGallery() {
     // Filter by search
     const query = searchQuery().toLowerCase()
     if (query) {
-      result = result.filter(t =>
-        t.name.toLowerCase().includes(query) ||
-        t.description.toLowerCase().includes(query) ||
-        t.tags.some(tag => tag.includes(query))
+      result = result.filter(
+        (t) =>
+          t.name.toLowerCase().includes(query) ||
+          t.description.toLowerCase().includes(query) ||
+          t.tags.some((tag) => tag.includes(query))
       )
     }
 
     // Filter by category
     const category = selectedCategory()
     if (category) {
-      result = result.filter(t => t.category === category)
+      result = result.filter((t) => t.category === category)
     }
 
     // Sort
@@ -246,10 +252,10 @@ export default function TemplateGallery() {
 
   // Category counts
   const categoryCounts = createMemo(() => ({
-    propagator: TEMPLATES.filter(t => t.category === 'propagator').length,
-    recipe: TEMPLATES.filter(t => t.category === 'recipe').length,
-    handler: TEMPLATES.filter(t => t.category === 'handler').length,
-    cell: TEMPLATES.filter(t => t.category === 'cell').length
+    propagator: TEMPLATES.filter((t) => t.category === 'propagator').length,
+    recipe: TEMPLATES.filter((t) => t.category === 'recipe').length,
+    handler: TEMPLATES.filter((t) => t.category === 'handler').length,
+    cell: TEMPLATES.filter((t) => t.category === 'cell').length,
   }))
 
   function useTemplate(template: Template) {
@@ -268,9 +274,16 @@ export default function TemplateGallery() {
 
       <div class="gallery-controls">
         <div class="search-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="M21 21l-4.35-4.35"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
           </svg>
           <input
             type="text"
@@ -324,9 +337,16 @@ export default function TemplateGallery() {
 
       <Show when={filteredTemplates().length === 0}>
         <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="M21 21l-4.35-4.35"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
           </svg>
           <h3>No templates found</h3>
           <p>Try a different search term or category</p>

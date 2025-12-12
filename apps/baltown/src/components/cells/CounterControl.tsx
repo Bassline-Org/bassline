@@ -32,7 +32,7 @@ export default function CounterControl(props: CounterControlProps) {
   createEffect(() => {
     const val = safeValue()
     if (val !== undefined && val !== null) {
-      setHistory(prev => {
+      setHistory((prev) => {
         const newHistory = [...prev, val].slice(-20)
         return newHistory
       })
@@ -81,34 +81,20 @@ export default function CounterControl(props: CounterControlProps) {
       </Show>
 
       <div class="counter-display">
-        <span class={`counter-value ${lastChange() ? 'animate-bump' : ''}`}>
-          {safeValue()}
-        </span>
+        <span class={`counter-value ${lastChange() ? 'animate-bump' : ''}`}>{safeValue()}</span>
         <Show when={lastChange()}>
           <span class="counter-delta">+{lastChange()}</span>
         </Show>
       </div>
 
       <div class="counter-buttons">
-        <button
-          class="counter-btn"
-          onClick={() => increment(1)}
-          disabled={updating()}
-        >
+        <button class="counter-btn" onClick={() => increment(1)} disabled={updating()}>
           +1
         </button>
-        <button
-          class="counter-btn"
-          onClick={() => increment(5)}
-          disabled={updating()}
-        >
+        <button class="counter-btn" onClick={() => increment(5)} disabled={updating()}>
           +5
         </button>
-        <button
-          class="counter-btn"
-          onClick={() => increment(10)}
-          disabled={updating()}
-        >
+        <button class="counter-btn" onClick={() => increment(10)} disabled={updating()}>
           +10
         </button>
       </div>

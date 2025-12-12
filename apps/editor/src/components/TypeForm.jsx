@@ -37,7 +37,7 @@ function FormField({ name, definition, value, onChange, error }) {
     max,
     minLength,
     maxLength,
-    placeholder
+    placeholder,
   } = definition
 
   const handleChange = (e) => {
@@ -61,15 +61,12 @@ function FormField({ name, definition, value, onChange, error }) {
           {name}
           {required && <span className="required">*</span>}
         </label>
-        <select
-          id={name}
-          value={value ?? ''}
-          onChange={handleChange}
-          required={required}
-        >
+        <select id={name} value={value ?? ''} onChange={handleChange} required={required}>
           <option value="">Select...</option>
-          {enumValues.map(opt => (
-            <option key={opt} value={opt}>{opt}</option>
+          {enumValues.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
           ))}
         </select>
         {description && <span className="field-description">{description}</span>}
@@ -91,7 +88,10 @@ function FormField({ name, definition, value, onChange, error }) {
     }
 
     const handleRemove = (index) => {
-      onChange(name, arrayValue.filter((_, i) => i !== index))
+      onChange(
+        name,
+        arrayValue.filter((_, i) => i !== index)
+      )
     }
 
     const handleKeyDown = (e) => {
@@ -174,12 +174,7 @@ function FormField({ name, definition, value, onChange, error }) {
     return (
       <div className={`form-field form-field-checkbox ${error ? 'has-error' : ''}`}>
         <label htmlFor={name}>
-          <input
-            type="checkbox"
-            id={name}
-            checked={!!value}
-            onChange={handleChange}
-          />
+          <input type="checkbox" id={name} checked={!!value} onChange={handleChange} />
           {name}
           {required && <span className="required">*</span>}
         </label>
@@ -315,7 +310,7 @@ export default function TypeForm({
   onChange,
   onCancel,
   loading = false,
-  submitLabel = 'Save'
+  submitLabel = 'Save',
 }) {
   const [values, setValues] = useState(initialValues)
   const [errors, setErrors] = useState({})
@@ -328,14 +323,17 @@ export default function TypeForm({
     setTouched({})
   }, [initialValues])
 
-  const handleChange = useCallback((field, value) => {
-    setValues(prev => {
-      const next = { ...prev, [field]: value }
-      onChange?.(next)
-      return next
-    })
-    setTouched(prev => ({ ...prev, [field]: true }))
-  }, [onChange])
+  const handleChange = useCallback(
+    (field, value) => {
+      setValues((prev) => {
+        const next = { ...prev, [field]: value }
+        onChange?.(next)
+        return next
+      })
+      setTouched((prev) => ({ ...prev, [field]: true }))
+    },
+    [onChange]
+  )
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -383,26 +381,13 @@ export default function TypeForm({
 
       <div className="type-form-actions">
         {onCancel && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={onCancel}
-            disabled={loading}
-          >
+          <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={loading}>
             <IconX size={14} />
             Cancel
           </button>
         )}
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={loading}
-        >
-          {loading ? (
-            <span className="loading-spinner" />
-          ) : (
-            <IconCheck size={14} />
-          )}
+        <button type="submit" className="btn btn-primary" disabled={loading}>
+          {loading ? <span className="loading-spinner" /> : <IconCheck size={14} />}
           {submitLabel}
         </button>
       </div>

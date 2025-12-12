@@ -29,11 +29,7 @@ export const WebSocketContext = createContext(null)
  * }
  */
 export function BasslineProvider({ value, children }) {
-  return (
-    <BasslineContext.Provider value={value}>
-      {children}
-    </BasslineContext.Provider>
-  )
+  return <BasslineContext.Provider value={value}>{children}</BasslineContext.Provider>
 }
 
 /**
@@ -225,7 +221,7 @@ export function useHotkey(key, handler, options = {}) {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const isMetaMatch = meta ? (e.metaKey || e.ctrlKey) : true
+      const isMetaMatch = meta ? e.metaKey || e.ctrlKey : true
       const isCtrlMatch = ctrl ? e.ctrlKey : true
       const isShiftMatch = shift ? e.shiftKey : true
       const isKeyMatch = e.key.toLowerCase() === key.toLowerCase()
@@ -294,9 +290,5 @@ export function WebSocketProvider({ url, children }) {
     }
   }, [url])
 
-  return (
-    <WebSocketContext.Provider value={ws}>
-      {children}
-    </WebSocketContext.Provider>
-  )
+  return <WebSocketContext.Provider value={ws}>{children}</WebSocketContext.Provider>
 }

@@ -18,10 +18,7 @@ import { runAgentLoop } from './mcp-server.js'
  * @param {string} [config.model] - Default model to use
  */
 export default function installClaude(bl, config = {}) {
-  const {
-    apiKey = process.env.ANTHROPIC_API_KEY,
-    model
-  } = config
+  const { apiKey = process.env.ANTHROPIC_API_KEY, model } = config
 
   if (!apiKey) {
     console.warn('No ANTHROPIC_API_KEY - Claude service disabled')

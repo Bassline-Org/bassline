@@ -63,7 +63,7 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
     if (!cy) return
 
     // Add to recent flows (keep last 10)
-    setRecentFlows(prev => [...prev.slice(-9), entry])
+    setRecentFlows((prev) => [...prev.slice(-9), entry])
 
     // Animate rule -> port edges for each matched rule
     entry.matchedRules.forEach((ruleName, idx) => {
@@ -86,7 +86,7 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
     })
 
     // Animate port nodes that received messages
-    entry.dispatchedPorts.forEach(portName => {
+    entry.dispatchedPorts.forEach((portName) => {
       const portNode = cy.getElementById(`port-${portName}`)
       if (portNode.length > 0) {
         portNode.addClass('receiving')
@@ -102,42 +102,42 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
     const addedPorts = new Set<string>()
 
     // 1. Add source nodes (left column)
-    props.sources.forEach(source => {
+    props.sources.forEach((source) => {
       nodes.push({
         data: {
           id: `source-${source.type}`,
           label: source.type,
           type: 'source',
-          sourceData: source
+          sourceData: source,
         },
-        classes: 'source'
+        classes: 'source',
       })
     })
 
     // 2. Add port nodes FIRST (right column) - ports with listeners
-    props.ports.forEach(port => {
+    props.ports.forEach((port) => {
       nodes.push({
         data: {
           id: `port-${port.name}`,
           label: `${port.name}\n(${port.listenerCount})`,
           type: 'port',
-          portData: port
+          portData: port,
         },
-        classes: port.listenerCount > 0 ? 'port active' : 'port inactive'
+        classes: port.listenerCount > 0 ? 'port active' : 'port inactive',
       })
       addedPorts.add(port.name)
     })
 
     // 3. Add rule nodes (center column) and collect edges
-    props.rules.forEach(rule => {
+    props.rules.forEach((rule) => {
       nodes.push({
         data: {
           id: `rule-${rule.name}`,
           label: rule.name,
           type: 'rule',
-          ruleData: rule
+          ruleData: rule,
         },
-        classes: 'rule'
+        classes: 'rule',
       })
 
       // Add port node if it doesn't exist yet (rule references port with no listeners)
@@ -147,22 +147,22 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
             id: `port-${rule.port}`,
             label: `${rule.port}\n(no listeners)`,
             type: 'port',
-            portData: { name: rule.port, listenerCount: 0 }
+            portData: { name: rule.port, listenerCount: 0 },
           },
-          classes: 'port inactive'
+          classes: 'port inactive',
         })
         addedPorts.add(rule.port)
       }
     })
 
     // 4. Add edges AFTER all nodes exist
-    props.rules.forEach(rule => {
+    props.rules.forEach((rule) => {
       // Connect sources to rules based on match pattern heuristics
-      props.sources.forEach(source => {
+      props.sources.forEach((source) => {
         const matchStr = JSON.stringify(rule.match).toLowerCase()
-        const mightMatch = source.events.some(event =>
-          matchStr.includes(event.toLowerCase()) ||
-          matchStr.includes(source.type.toLowerCase())
+        const mightMatch = source.events.some(
+          (event) =>
+            matchStr.includes(event.toLowerCase()) || matchStr.includes(source.type.toLowerCase())
         )
         if (mightMatch) {
           edges.push({
@@ -170,8 +170,8 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
               id: `source-${source.type}->rule-${rule.name}`,
               source: `source-${source.type}`,
               target: `rule-${rule.name}`,
-              edgeType: 'source-to-rule'
-            }
+              edgeType: 'source-to-rule',
+            },
           })
         }
       })
@@ -183,8 +183,8 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
             id: `rule-${rule.name}->port-${rule.port}`,
             source: `rule-${rule.name}`,
             target: `port-${rule.port}`,
-            edgeType: 'rule-to-port'
-          }
+            edgeType: 'rule-to-port',
+          },
         })
       }
     })
@@ -206,60 +206,60 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
         {
           selector: 'node.source',
           style: {
-            'shape': 'round-rectangle',
-            'width': 100,
-            'height': 40,
+            shape: 'round-rectangle',
+            width: 100,
+            height: 40,
             'background-color': '#238636',
             'border-width': 2,
             'border-color': '#3fb950',
-            'label': 'data(label)',
+            label: 'data(label)',
             'text-valign': 'center',
             'text-halign': 'center',
-            'color': '#ffffff',
+            color: '#ffffff',
             'font-size': '11px',
             'font-family': 'monospace',
-            'font-weight': 'bold'
-          }
+            'font-weight': 'bold',
+          },
         },
         // Rule nodes (orange diamonds)
         {
           selector: 'node.rule',
           style: {
-            'shape': 'diamond',
-            'width': 110,
-            'height': 70,
+            shape: 'diamond',
+            width: 110,
+            height: 70,
             'background-color': '#9a6700',
             'border-width': 2,
             'border-color': '#f0883e',
-            'label': 'data(label)',
+            label: 'data(label)',
             'text-valign': 'center',
             'text-halign': 'center',
-            'color': '#ffffff',
+            color: '#ffffff',
             'font-size': '10px',
             'font-family': 'monospace',
             'text-wrap': 'ellipsis',
-            'text-max-width': '90px'
-          }
+            'text-max-width': '90px',
+          },
         },
         // Port nodes (blue rectangles)
         {
           selector: 'node.port',
           style: {
-            'shape': 'round-rectangle',
-            'width': 110,
-            'height': 50,
+            shape: 'round-rectangle',
+            width: 110,
+            height: 50,
             'background-color': '#1f6feb',
             'border-width': 2,
             'border-color': '#58a6ff',
-            'label': 'data(label)',
+            label: 'data(label)',
             'text-valign': 'center',
             'text-halign': 'center',
-            'color': '#ffffff',
+            color: '#ffffff',
             'font-size': '10px',
             'font-family': 'monospace',
             'text-wrap': 'wrap',
-            'text-max-width': '100px'
-          }
+            'text-max-width': '100px',
+          },
         },
         // Inactive ports (no listeners)
         {
@@ -267,70 +267,70 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
           style: {
             'background-color': '#21262d',
             'border-color': '#30363d',
-            'color': '#8b949e'
-          }
+            color: '#8b949e',
+          },
         },
         // Active ports
         {
           selector: 'node.port.active',
           style: {
             'background-color': '#1f6feb',
-            'border-color': '#58a6ff'
-          }
+            'border-color': '#58a6ff',
+          },
         },
         // Selected nodes
         {
           selector: 'node:selected',
           style: {
             'border-width': 3,
-            'border-color': '#ffffff'
-          }
+            'border-color': '#ffffff',
+          },
         },
         // Edges from sources to rules
         {
           selector: 'edge[edgeType="source-to-rule"]',
           style: {
-            'width': 2,
+            width: 2,
             'line-color': '#3fb950',
             'target-arrow-color': '#3fb950',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'arrow-scale': 0.8,
-            'line-style': 'dashed'
-          }
+            'line-style': 'dashed',
+          },
         },
         // Edges from rules to ports
         {
           selector: 'edge[edgeType="rule-to-port"]',
           style: {
-            'width': 2,
+            width: 2,
             'line-color': '#f0883e',
             'target-arrow-color': '#f0883e',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
-            'arrow-scale': 0.8
-          }
+            'arrow-scale': 0.8,
+          },
         },
         // Highlighted edges
         {
           selector: 'edge.highlighted',
           style: {
-            'width': 3,
+            width: 3,
             'line-color': '#58a6ff',
-            'target-arrow-color': '#58a6ff'
-          }
+            'target-arrow-color': '#58a6ff',
+          },
         },
         // Flow animation - edges lighting up when messages pass through
         {
           selector: 'edge.flowing',
           style: {
-            'width': 4,
+            width: 4,
             'line-color': '#58a6ff',
             'target-arrow-color': '#58a6ff',
             'line-style': 'solid',
             'transition-property': 'line-color, width, target-arrow-color',
-            'transition-duration': '0.2s'
-          }
+            'transition-duration': '0.2s',
+          },
         },
         // Rule node firing animation
         {
@@ -340,8 +340,8 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
             'border-color': '#ffdf5d',
             'border-width': 4,
             'transition-property': 'background-color, border-color, border-width',
-            'transition-duration': '0.15s'
-          }
+            'transition-duration': '0.15s',
+          },
         },
         // Port node receiving animation
         {
@@ -351,20 +351,20 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
             'border-color': '#a5d6ff',
             'border-width': 4,
             'transition-property': 'background-color, border-color, border-width',
-            'transition-duration': '0.15s'
-          }
-        }
+            'transition-duration': '0.15s',
+          },
+        },
       ],
       layout: {
         name: 'dagre',
         rankDir: 'LR', // Left to right
         nodeSep: 60,
         rankSep: 180,
-        padding: 50
+        padding: 50,
       } as any,
       minZoom: 0.2,
       maxZoom: 3,
-      wheelSensitivity: 0.3
+      wheelSensitivity: 0.3,
     })
 
     // Handle node selection
@@ -380,7 +380,7 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
         id: data.id,
         type: data.type,
         label: data.label,
-        data: data.sourceData || data.ruleData || data.portData
+        data: data.sourceData || data.ruleData || data.portData,
       })
 
       if (data.type === 'source') {
@@ -408,7 +408,6 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
     // Initial fit
     cy.fit(undefined, 50)
     setZoom(cy.zoom())
-
   })
 
   // Subscribe to WebSocket for live flow updates (separate effect to handle connection timing)
@@ -422,7 +421,11 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
         // WebSocket server wraps port messages as { type: 'message', port: '...', message: {...} }
         if (msg.type === 'message' && msg.port === 'plumb-flow' && msg.message) {
           const entry = msg.message as FlowEntry
-          if (entry.matchedRules && Array.isArray(entry.matchedRules) && entry.matchedRules.length > 0) {
+          if (
+            entry.matchedRules &&
+            Array.isArray(entry.matchedRules) &&
+            entry.matchedRules.length > 0
+          ) {
             animateFlow(entry)
           }
         }
@@ -468,7 +471,7 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
       rankDir: 'LR',
       nodeSep: 60,
       rankSep: 180,
-      padding: 50
+      padding: 50,
     } as any).run()
 
     cy.fit(undefined, 50)
@@ -504,7 +507,7 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
       rankDir: 'LR',
       nodeSep: 60,
       rankSep: 180,
-      padding: 50
+      padding: 50,
     } as any).run()
     cy?.fit(undefined, 50)
     setZoom(cy?.zoom() || 1)
@@ -514,26 +517,32 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
     <div class="plugboard-graph-container">
       <div class="plugboard-toolbar">
         <div class="toolbar-group">
-          <button
-            class="toolbar-btn"
-            onClick={autoLayout}
-            title="Auto Layout"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
+          <button class="toolbar-btn" onClick={autoLayout} title="Auto Layout">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
             </svg>
           </button>
 
-          <button
-            class="toolbar-btn"
-            onClick={fitView}
-            title="Fit View"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>
+          <button class="toolbar-btn" onClick={fitView} title="Fit View">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3" />
             </svg>
           </button>
         </div>
@@ -541,27 +550,33 @@ export default function PlugboardGraph(props: PlugboardGraphProps) {
         <div class="toolbar-divider" />
 
         <div class="toolbar-group zoom-controls">
-          <button
-            class="toolbar-btn"
-            onClick={zoomOut}
-            title="Zoom Out"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="M21 21l-4.35-4.35M8 11h6"/>
+          <button class="toolbar-btn" onClick={zoomOut} title="Zoom Out">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35M8 11h6" />
             </svg>
           </button>
 
           <span class="zoom-level">{Math.round(zoom() * 100)}%</span>
 
-          <button
-            class="toolbar-btn"
-            onClick={zoomIn}
-            title="Zoom In"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>
+          <button class="toolbar-btn" onClick={zoomIn} title="Zoom In">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
             </svg>
           </button>
         </div>

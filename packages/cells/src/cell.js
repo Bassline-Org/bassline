@@ -53,7 +53,7 @@ export function createCellRoutes(options = {}) {
     const cell = {
       lattice: latticeName,
       value: existing?.value ?? lattice.bottom(),
-      label: config.label || existing?.label || name
+      label: config.label || existing?.label || name,
     }
 
     store.set(name, cell)
@@ -91,18 +91,20 @@ export function createCellRoutes(options = {}) {
     // Detect contradiction for setIntersection lattice
     // Contradiction: join produces empty set from two non-empty, non-null sets
     if (cell.lattice === 'setIntersection' && onContradiction) {
-      const isContradiction = (
-        Array.isArray(joinedValue) && joinedValue.length === 0 &&
-        Array.isArray(oldValue) && oldValue.length > 0 &&
-        Array.isArray(valueToMerge) && valueToMerge.length > 0
-      )
+      const isContradiction =
+        Array.isArray(joinedValue) &&
+        joinedValue.length === 0 &&
+        Array.isArray(oldValue) &&
+        oldValue.length > 0 &&
+        Array.isArray(valueToMerge) &&
+        valueToMerge.length > 0
       if (isContradiction) {
         onContradiction({
           uri: `bl:///cells/${name}`,
           cell,
           previousValue: oldValue,
           incomingValue: valueToMerge,
-          result: joinedValue
+          result: joinedValue,
         })
       }
     }
@@ -152,17 +154,17 @@ export function createCellRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const cellResource = resource(r => {
+  const cellResource = resource((r) => {
     // List all cells
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listCells().map(name => ({
+        entries: listCells().map((name) => ({
           name,
           type: 'cell',
-          uri: `bl:///cells/${name}`
-        }))
-      }
+          uri: `bl:///cells/${name}`,
+        })),
+      },
     }))
 
     // Get cell as a directory of sub-resources
@@ -177,9 +179,9 @@ export function createCellRoutes(options = {}) {
           label: cell.label,
           entries: [
             { name: 'value', uri: `bl:///cells/${params.name}/value` },
-            { name: 'reset', uri: `bl:///cells/${params.name}/reset` }
-          ]
-        }
+            { name: 'reset', uri: `bl:///cells/${params.name}/reset` },
+          ],
+        },
       }
     })
 
@@ -194,9 +196,9 @@ export function createCellRoutes(options = {}) {
           label: cell.label,
           entries: [
             { name: 'value', uri: `bl:///cells/${params.name}/value` },
-            { name: 'reset', uri: `bl:///cells/${params.name}/reset` }
-          ]
-        }
+            { name: 'reset', uri: `bl:///cells/${params.name}/reset` },
+          ],
+        },
       }
     })
 
@@ -207,7 +209,7 @@ export function createCellRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/cell-value' },
-        body: cell.value
+        body: cell.value,
       }
     })
 
@@ -219,16 +221,16 @@ export function createCellRoutes(options = {}) {
       if (changed && onCellChange) {
         onCellChange({
           uri: `bl:///cells/${params.name}`,
-          cell
+          cell,
         })
       }
 
       return {
         headers: {
           type: 'bl:///types/cell-value',
-          changed
+          changed,
         },
-        body: cell.value
+        body: cell.value,
       }
     })
 
@@ -239,13 +241,13 @@ export function createCellRoutes(options = {}) {
       if (cell && onCellChange) {
         onCellChange({
           uri: `bl:///cells/${params.name}`,
-          cell
+          cell,
         })
       }
 
       return {
         headers: { type: 'bl:///types/cell-value' },
-        body: cell?.value ?? null
+        body: cell?.value ?? null,
       }
     })
 
@@ -256,7 +258,7 @@ export function createCellRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///cells/${params.name}` }
+        body: { uri: `bl:///cells/${params.name}` },
       }
     })
   })
@@ -281,6 +283,6 @@ export function createCellRoutes(options = {}) {
     killCell,
     listCells,
     lattices,
-    _store: store
+    _store: store,
   }
 }

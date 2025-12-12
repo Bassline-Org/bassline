@@ -14,32 +14,60 @@ const CATEGORY_COLORS = {
   propagator: { bg: '#f0883e22', color: '#f0883e' },
   recipe: { bg: '#3fb95022', color: '#3fb950' },
   handler: { bg: '#f778ba22', color: '#f778ba' },
-  cell: { bg: '#388bfd22', color: '#58a6ff' }
+  cell: { bg: '#388bfd22', color: '#58a6ff' },
 }
 
 const CATEGORY_ICONS = {
   propagator: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M4 12h4l3-9 6 18 3-9h4"/>
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
+      <path d="M4 12h4l3-9 6 18 3-9h4" />
     </svg>
   ),
   recipe: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
     </svg>
   ),
   handler: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-      <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
     </svg>
   ),
   cell: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <rect x="4" y="4" width="16" height="16" rx="2"/>
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
+      <rect x="4" y="4" width="16" height="16" rx="2" />
     </svg>
-  )
+  ),
 }
 
 /**
@@ -55,7 +83,7 @@ export default function TemplateCard(props: TemplateCardProps) {
           class="category-icon"
           style={{
             background: colors().bg,
-            color: colors().color
+            color: colors().color,
           }}
         >
           {CATEGORY_ICONS[props.category]}
@@ -80,7 +108,7 @@ export default function TemplateCard(props: TemplateCardProps) {
         <Show when={props.popularity !== undefined}>
           <span class="popularity">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
             </svg>
             {props.popularity}
           </span>
@@ -89,16 +117,30 @@ export default function TemplateCard(props: TemplateCardProps) {
         <div class="card-actions">
           <Show when={props.onPreview}>
             <button class="btn preview" onClick={props.onPreview}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
               </svg>
               Preview
             </button>
           </Show>
           <button class="btn use" onClick={props.onUse}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 5v14M5 12h14"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 5v14M5 12h14" />
             </svg>
             Use Template
           </button>

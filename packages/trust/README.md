@@ -5,11 +5,13 @@ Local trust computation and capability gating for distributed Bassline nodes.
 ## Why Trust?
 
 In distributed systems, nodes interact with peers they don't fully control. Traditional approaches use:
+
 - **ACLs** (Access Control Lists) - Static permissions declared upfront
 - **Capabilities** - Tokens that grant specific access
 - **Central authority** - A trusted server that validates everyone
 
 These all have problems in truly distributed settings:
+
 - ACLs require knowing all peers ahead of time
 - Capabilities can be stolen or replayed
 - Central authorities are single points of failure
@@ -31,10 +33,14 @@ This means peer A might trust peer B while peer C doesn't - and that's correct! 
 The trust system can be installed at runtime:
 
 ```javascript
-await bl.put('bl:///install/trust', {}, {
-  path: './packages/trust/src/upgrade.js',
-  thresholds: { read: 0.2, write: 0.5, install: 0.8 }
-})
+await bl.put(
+  'bl:///install/trust',
+  {},
+  {
+    path: './packages/trust/src/upgrade.js',
+    thresholds: { read: 0.2, write: 0.5, install: 0.8 },
+  }
+)
 ```
 
 This is powerful because:
@@ -57,6 +63,7 @@ Trust is modeled as a statistical estimate with monotonic merge semantics:
 ```
 
 When merging observations (e.g., from different sources or time periods):
+
 - Values combine via weighted average
 - Sample counts add
 - Variance updates using proper statistical combination
@@ -67,16 +74,16 @@ This means trust naturally converges as you gather more data, and uncertainty de
 
 Instead of binary allow/deny, capabilities require different trust levels:
 
-| Capability | Default Threshold | Rationale |
-|------------|------------------|-----------|
-| `read` | 0.2 | Low bar - reading is generally safe |
-| `write` | 0.5 | Medium - changes require more confidence |
-| `install` | 0.8 | High - code execution is risky |
+| Capability | Default Threshold | Rationale                                |
+| ---------- | ----------------- | ---------------------------------------- |
+| `read`     | 0.2               | Low bar - reading is generally safe      |
+| `write`    | 0.5               | Medium - changes require more confidence |
+| `install`  | 0.8               | High - code execution is risky           |
 
 New peers start with neutral trust (0.5) but need samples before meeting thresholds:
 
 ```javascript
-meetsThreshold(estimate, threshold, minSamples = 3)
+meetsThreshold(estimate, threshold, (minSamples = 3))
 ```
 
 This prevents gaming by requiring actual interaction history.
@@ -113,28 +120,37 @@ Trust middleware checks: checkCapability('alice', 'read')
 This separation allows different identification schemes:
 
 **Simple string IDs** (current):
+
 ```bash
 curl -H "x-bassline-peer: alice" ...
 ```
 
 **Public keys** (with signature middleware):
+
 ```javascript
-bl.use(async (ctx, next) => {
-  const sig = ctx.headers['x-bassline-signature']
-  const pubkey = verifySignature(sig, ctx.body)
-  ctx.headers.peer = pubkey  // Set from verified identity
-  return next()
-}, { priority: 10 })  // Runs before trust middleware
+bl.use(
+  async (ctx, next) => {
+    const sig = ctx.headers['x-bassline-signature']
+    const pubkey = verifySignature(sig, ctx.body)
+    ctx.headers.peer = pubkey // Set from verified identity
+    return next()
+  },
+  { priority: 10 }
+) // Runs before trust middleware
 ```
 
 **JWT tokens** (with token middleware):
+
 ```javascript
-bl.use(async (ctx, next) => {
-  const token = ctx.headers['authorization']?.split(' ')[1]
-  const claims = verifyJWT(token)
-  ctx.headers.peer = claims.sub
-  return next()
-}, { priority: 10 })
+bl.use(
+  async (ctx, next) => {
+    const token = ctx.headers['authorization']?.split(' ')[1]
+    const claims = verifyJWT(token)
+    ctx.headers.peer = claims.sub
+    return next()
+  },
+  { priority: 10 }
+)
 ```
 
 ## Install
@@ -152,39 +168,43 @@ import { createTrustSystem } from '@bassline/trust'
 
 const trust = createTrustSystem({
   thresholds: { read: 0.2, write: 0.5, install: 0.8 },
-  sampleRate: 0.1  // Verify 10% of requests
+  sampleRate: 0.1, // Verify 10% of requests
 })
 
 bl.install(trust.routes)
 bl.use(trust.middleware, { priority: 20, id: 'trust' })
 
 // Record observations
-trust.observe('alice', 1)  // positive
-trust.observe('alice', 0)  // negative
+trust.observe('alice', 1) // positive
+trust.observe('alice', 0) // negative
 
 // Check capabilities
-trust.checkCapability('alice', 'read')  // true/false
+trust.checkCapability('alice', 'read') // true/false
 ```
 
 ### Dynamic Installation
 
 ```javascript
-await bl.put('bl:///install/trust', {}, {
-  path: './packages/trust/src/upgrade.js',
-  sampleRate: 0.1,
-  thresholds: { read: 0.2, write: 0.5, install: 0.8 }
-})
+await bl.put(
+  'bl:///install/trust',
+  {},
+  {
+    path: './packages/trust/src/upgrade.js',
+    sampleRate: 0.1,
+    thresholds: { read: 0.2, write: 0.5, install: 0.8 },
+  }
+)
 ```
 
 ## Routes
 
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/trust/peers` | GET | List all known peers with trust info |
-| `/trust/peers/:id` | GET | Get trust info for specific peer |
-| `/trust/observe` | PUT | Record an observation `{ peer, outcome }` |
-| `/trust/thresholds` | GET | Get current thresholds |
-| `/trust/thresholds` | PUT | Update thresholds |
+| Route               | Method | Description                               |
+| ------------------- | ------ | ----------------------------------------- |
+| `/trust/peers`      | GET    | List all known peers with trust info      |
+| `/trust/peers/:id`  | GET    | Get trust info for specific peer          |
+| `/trust/observe`    | PUT    | Record an observation `{ peer, outcome }` |
+| `/trust/thresholds` | GET    | Get current thresholds                    |
+| `/trust/thresholds` | PUT    | Update thresholds                         |
 
 ## Example: Building Trust
 

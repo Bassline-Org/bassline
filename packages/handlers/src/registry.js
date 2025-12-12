@@ -62,7 +62,7 @@ export function createHandlerRegistry() {
       definition,
       description,
       createdAt: custom.get(name)?.createdAt || new Date().toISOString(),
-      compiled
+      compiled,
     }
 
     custom.set(name, handler)
@@ -95,7 +95,7 @@ export function createHandlerRegistry() {
       if (config && Object.keys(config).length > 0) {
         console.warn(
           `Config passed to custom handler '${handlerName}' will be ignored. ` +
-          `Custom handlers have their config baked into their definition.`
+            `Custom handlers have their config baked into their definition.`
         )
       }
       return customHandler.compiled
@@ -185,6 +185,6 @@ export function createHandlerRegistry() {
     listBuiltin,
     listCustom,
     _builtins: builtins,
-    _custom: custom
+    _custom: custom,
   }
 }

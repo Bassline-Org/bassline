@@ -11,18 +11,36 @@ interface NestedHandlerEditorProps {
 }
 
 // Group handlers by category
-const HANDLER_CATEGORIES = Object.entries(HANDLER_METADATA).reduce((acc, [name, meta]) => {
-  const cat = meta.category
-  if (!acc[cat]) acc[cat] = []
-  acc[cat].push({ name, ...meta })
-  return acc
-}, {} as Record<string, Array<{ name: string } & HandlerMetadata>>)
+const HANDLER_CATEGORIES = Object.entries(HANDLER_METADATA).reduce(
+  (acc, [name, meta]) => {
+    const cat = meta.category
+    if (!acc[cat]) acc[cat] = []
+    acc[cat].push({ name, ...meta })
+    return acc
+  },
+  {} as Record<string, Array<{ name: string } & HandlerMetadata>>
+)
 
 // Filter handlers for predicates (return boolean)
 const PREDICATE_HANDLERS = [
-  'gt', 'gte', 'lt', 'lte', 'eq', 'neq',
-  'isEmpty', 'isNull', 'isNumber', 'isString', 'isArray', 'isObject', 'isBoolean',
-  'has', 'not', 'and', 'or', 'match'
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'eq',
+  'neq',
+  'isEmpty',
+  'isNull',
+  'isNumber',
+  'isString',
+  'isArray',
+  'isObject',
+  'isBoolean',
+  'has',
+  'not',
+  'and',
+  'or',
+  'match',
 ]
 
 /**
@@ -51,14 +69,13 @@ export default function NestedHandlerEditor(props: NestedHandlerEditorProps) {
 
       // Filter by type if specified
       if (props.type === 'predicate') {
-        filtered = handlers.filter(h => PREDICATE_HANDLERS.includes(h.name))
+        filtered = handlers.filter((h) => PREDICATE_HANDLERS.includes(h.name))
       }
 
       // Filter by search query
       if (query) {
-        filtered = filtered.filter(h =>
-          h.name.toLowerCase().includes(query) ||
-          h.description.toLowerCase().includes(query)
+        filtered = filtered.filter(
+          (h) => h.name.toLowerCase().includes(query) || h.description.toLowerCase().includes(query)
         )
       }
 
@@ -102,20 +119,25 @@ export default function NestedHandlerEditor(props: NestedHandlerEditorProps) {
       </Show>
 
       <div class="handler-selector">
-        <button
-          class="handler-select-btn"
-          onClick={() => setShowPicker(!showPicker())}
-        >
-          <Show when={selectedHandler()} fallback={
-            <span class="placeholder">Select a handler...</span>
-          }>
+        <button class="handler-select-btn" onClick={() => setShowPicker(!showPicker())}>
+          <Show
+            when={selectedHandler()}
+            fallback={<span class="placeholder">Select a handler...</span>}
+          >
             <span class="handler-name">{selectedHandler()}</span>
             <Show when={handlerMeta()}>
               <span class="handler-desc">{handlerMeta()!.description}</span>
             </Show>
           </Show>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 9l6 6 6-6"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
 
@@ -161,7 +183,9 @@ export default function NestedHandlerEditor(props: NestedHandlerEditorProps) {
             Handler Config
             <Show when={handlerMeta()?.config}>
               <span class="config-schema">
-                {Object.entries(handlerMeta()!.config || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                {Object.entries(handlerMeta()!.config || {})
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join(', ')}
               </span>
             </Show>
           </label>

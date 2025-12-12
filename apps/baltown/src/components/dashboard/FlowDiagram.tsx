@@ -39,26 +39,26 @@ export default function FlowDiagram(props: FlowDiagramProps) {
     const result: FlowNode[] = []
 
     // Add cells
-    props.cells.forEach(cell => {
+    props.cells.forEach((cell) => {
       result.push({
         id: cell.uri,
         type: 'cell',
         label: cell.uri.split('/').pop() || 'cell',
         uri: cell.uri,
         value: cell.value,
-        lattice: cell.lattice
+        lattice: cell.lattice,
       })
     })
 
     // Add propagators
-    props.propagators.forEach(prop => {
+    props.propagators.forEach((prop) => {
       const handler = Array.isArray(prop.handler) ? prop.handler[0] : prop.handler
       result.push({
         id: prop.uri,
         type: 'propagator',
         label: prop.uri.split('/').pop() || 'prop',
         uri: prop.uri,
-        handler: handler || 'custom'
+        handler: handler || 'custom',
       })
     })
 
@@ -69,13 +69,13 @@ export default function FlowDiagram(props: FlowDiagramProps) {
   const edges = createMemo(() => {
     const result: FlowEdge[] = []
 
-    props.propagators.forEach(prop => {
+    props.propagators.forEach((prop) => {
       // Input edges
-      prop.inputs.forEach(input => {
+      prop.inputs.forEach((input) => {
         result.push({
           from: input,
           to: prop.uri,
-          label: 'in'
+          label: 'in',
         })
       })
 
@@ -84,7 +84,7 @@ export default function FlowDiagram(props: FlowDiagramProps) {
         result.push({
           from: prop.uri,
           to: prop.output,
-          label: 'out'
+          label: 'out',
         })
       }
     })
@@ -97,27 +97,27 @@ export default function FlowDiagram(props: FlowDiagramProps) {
     const inputCells = new Set<string>()
     const outputCells = new Set<string>()
 
-    props.propagators.forEach(prop => {
-      prop.inputs.forEach(i => inputCells.add(i))
+    props.propagators.forEach((prop) => {
+      prop.inputs.forEach((i) => inputCells.add(i))
       if (prop.output) outputCells.add(prop.output)
     })
 
     // Remove cells that are both input and output
-    const pureInputs = [...inputCells].filter(c => !outputCells.has(c))
-    const pureOutputs = [...outputCells].filter(c => !inputCells.has(c))
-    const mixed = [...inputCells].filter(c => outputCells.has(c))
+    const pureInputs = [...inputCells].filter((c) => !outputCells.has(c))
+    const pureOutputs = [...outputCells].filter((c) => !inputCells.has(c))
+    const mixed = [...inputCells].filter((c) => outputCells.has(c))
 
     return {
       inputCells: pureInputs,
-      propagators: props.propagators.map(p => p.uri),
+      propagators: props.propagators.map((p) => p.uri),
       mixedCells: mixed,
-      outputCells: pureOutputs
+      outputCells: pureOutputs,
     }
   })
 
   // Get node by id
   function getNode(id: string): FlowNode | undefined {
-    return nodes().find(n => n.id === id)
+    return nodes().find((n) => n.id === id)
   }
 
   // Format value for display
@@ -141,13 +141,17 @@ export default function FlowDiagram(props: FlowDiagramProps) {
               const node = getNode(uri)
               return (
                 <Show when={node}>
-                  <div
-                    class="flow-node cell"
-                    onClick={() => props.onNodeClick?.(node!)}
-                  >
+                  <div class="flow-node cell" onClick={() => props.onNodeClick?.(node!)}>
                     <div class="node-icon cell-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="4" y="4" width="16" height="16" rx="2"/>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
                       </svg>
                     </div>
                     <div class="node-content">
@@ -166,9 +170,7 @@ export default function FlowDiagram(props: FlowDiagramProps) {
 
         {/* Arrows */}
         <div class="flow-arrows left-arrows">
-          <For each={layout().inputCells}>
-            {() => <div class="arrow-line">→</div>}
-          </For>
+          <For each={layout().inputCells}>{() => <div class="arrow-line">→</div>}</For>
         </div>
 
         {/* Propagators Column */}
@@ -179,13 +181,17 @@ export default function FlowDiagram(props: FlowDiagramProps) {
               const node = getNode(uri)
               return (
                 <Show when={node}>
-                  <div
-                    class="flow-node propagator"
-                    onClick={() => props.onNodeClick?.(node!)}
-                  >
+                  <div class="flow-node propagator" onClick={() => props.onNodeClick?.(node!)}>
                     <div class="node-icon prop-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 12h4l3-9 6 18 3-9h4"/>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="M4 12h4l3-9 6 18 3-9h4" />
                       </svg>
                     </div>
                     <div class="node-content">
@@ -201,9 +207,7 @@ export default function FlowDiagram(props: FlowDiagramProps) {
 
         {/* Arrows */}
         <div class="flow-arrows right-arrows">
-          <For each={layout().propagators}>
-            {() => <div class="arrow-line">→</div>}
-          </For>
+          <For each={layout().propagators}>{() => <div class="arrow-line">→</div>}</For>
         </div>
 
         {/* Output Cells Column */}
@@ -214,14 +218,18 @@ export default function FlowDiagram(props: FlowDiagramProps) {
               const node = getNode(uri)
               return (
                 <Show when={node}>
-                  <div
-                    class="flow-node cell output"
-                    onClick={() => props.onNodeClick?.(node!)}
-                  >
+                  <div class="flow-node cell output" onClick={() => props.onNodeClick?.(node!)}>
                     <div class="node-icon cell-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="4" y="4" width="16" height="16" rx="2"/>
-                        <path d="M9 12l2 2 4-4"/>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                        <path d="M9 12l2 2 4-4" />
                       </svg>
                     </div>
                     <div class="node-content">
@@ -243,14 +251,18 @@ export default function FlowDiagram(props: FlowDiagramProps) {
               const node = getNode(uri)
               return (
                 <Show when={node}>
-                  <div
-                    class="flow-node cell mixed"
-                    onClick={() => props.onNodeClick?.(node!)}
-                  >
+                  <div class="flow-node cell mixed" onClick={() => props.onNodeClick?.(node!)}>
                     <div class="node-icon cell-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="4" y="4" width="16" height="16" rx="2"/>
-                        <path d="M8 12h8M12 8v8"/>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                        <path d="M8 12h8M12 8v8" />
                       </svg>
                     </div>
                     <div class="node-content">
@@ -268,8 +280,15 @@ export default function FlowDiagram(props: FlowDiagramProps) {
 
       <Show when={nodes().length === 0}>
         <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <path d="M4 12h4l3-9 6 18 3-9h4"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <path d="M4 12h4l3-9 6 18 3-9h4" />
           </svg>
           <p>No data flow to display</p>
         </div>

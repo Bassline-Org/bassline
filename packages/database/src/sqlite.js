@@ -10,11 +10,7 @@ import Database from 'better-sqlite3'
  * @returns {Object} Database connection with query methods
  */
 export function createSQLiteConnection(config = {}) {
-  const {
-    path = ':memory:',
-    readonly = false,
-    fileMustExist = false
-  } = config
+  const { path = ':memory:', readonly = false, fileMustExist = false } = config
 
   const db = new Database(path, { readonly, fileMustExist })
 
@@ -35,11 +31,11 @@ export function createSQLiteConnection(config = {}) {
 
     return {
       rows,
-      columns: stmt.columns().map(col => ({
+      columns: stmt.columns().map((col) => ({
         name: col.name,
-        type: col.type || 'unknown'
+        type: col.type || 'unknown',
       })),
-      rowCount: rows.length
+      rowCount: rows.length,
     }
   }
 
@@ -55,7 +51,7 @@ export function createSQLiteConnection(config = {}) {
 
     return {
       changes: info.changes,
-      lastInsertRowid: info.lastInsertRowid
+      lastInsertRowid: info.lastInsertRowid,
     }
   }
 
@@ -83,30 +79,30 @@ export function createSQLiteConnection(config = {}) {
     ).rows
 
     const schema = {
-      tables: tables.map(table => {
+      tables: tables.map((table) => {
         // Get columns for this table
-        const columns = query(`PRAGMA table_info(${table.name})`).rows.map(col => ({
+        const columns = query(`PRAGMA table_info(${table.name})`).rows.map((col) => ({
           name: col.name,
           type: col.type,
           nullable: col.notnull === 0,
           defaultValue: col.dflt_value,
-          primaryKey: col.pk === 1
+          primaryKey: col.pk === 1,
         }))
 
         // Get indexes
-        const indexes = query(`PRAGMA index_list(${table.name})`).rows.map(idx => ({
+        const indexes = query(`PRAGMA index_list(${table.name})`).rows.map((idx) => ({
           name: idx.name,
           unique: idx.unique === 1,
-          columns: query(`PRAGMA index_info(${idx.name})`).rows.map(c => c.name)
+          columns: query(`PRAGMA index_info(${idx.name})`).rows.map((c) => c.name),
         }))
 
         return {
           name: table.name,
           type: table.type,
           columns,
-          indexes
+          indexes,
         }
-      })
+      }),
     }
 
     return schema
@@ -136,6 +132,6 @@ export function createSQLiteConnection(config = {}) {
     pragma,
     close,
     // Expose raw db for advanced use
-    _db: db
+    _db: db,
   }
 }

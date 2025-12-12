@@ -106,7 +106,7 @@ export function createPlumber() {
         uri: message.uri,
         type: message.headers?.type,
         matchedRules,
-        dispatchedPorts
+        dispatchedPorts,
       }
       messageHistory.push(entry)
       if (messageHistory.length > MAX_HISTORY) {
@@ -136,15 +136,15 @@ export function createPlumber() {
     }
   }
 
-  const plumbResource = resource(r => {
+  const plumbResource = resource((r) => {
     // Get message history for visualization
     r.get('/history', () => ({
       headers: { type: 'bl:///types/plumb-history' },
       body: {
         entries: [...messageHistory],
         count: messageHistory.length,
-        maxHistory: MAX_HISTORY
-      }
+        maxHistory: MAX_HISTORY,
+      },
     }))
 
     // Get plumber state for introspection/visualization
@@ -155,11 +155,11 @@ export function createPlumber() {
           name,
           match: rule.match,
           port: rule.port,
-          uri: `bl:///plumb/rules/${name}`
+          uri: `bl:///plumb/rules/${name}`,
         })),
         ports: [...ports.entries()].map(([name, listeners]) => ({
           name,
-          listenerCount: listeners.size
+          listenerCount: listeners.size,
         })),
         // Known sources that dispatch to plumber
         sources: [
@@ -168,21 +168,21 @@ export function createPlumber() {
           { type: 'fetch', events: ['fetch-response', 'fetch-error'] },
           { type: 'monitors', events: ['monitor-update', 'monitor-error'] },
           { type: 'recipes', events: ['recipe-saved', 'instance-created'] },
-          { type: 'propagators', events: ['propagator-fired'] }
-        ]
-      }
+          { type: 'propagators', events: ['propagator-fired'] },
+        ],
+      },
     }))
 
     // List all rules
     r.get('/rules', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: [...rules.keys()].map(name => ({
+        entries: [...rules.keys()].map((name) => ({
           name,
           type: 'plumb-rule',
-          uri: `bl:///plumb/rules/${name}`
-        }))
-      }
+          uri: `bl:///plumb/rules/${name}`,
+        })),
+      },
     }))
 
     // Get/put individual rules
@@ -192,16 +192,16 @@ export function createPlumber() {
         if (!rule) return null
         return {
           headers: { type: 'bl:///types/plumb-rule' },
-          body: rule
+          body: rule,
         }
       },
       put: ({ params, body }) => {
         addRule(params.name, body)
         return {
           headers: { type: 'bl:///types/plumb-rule' },
-          body
+          body,
         }
-      }
+      },
     })
   })
 
@@ -229,6 +229,6 @@ export function createPlumber() {
     // Expose internals for debugging
     _rules: rules,
     _ports: ports,
-    _messageHistory: messageHistory
+    _messageHistory: messageHistory,
   }
 }

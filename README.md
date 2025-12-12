@@ -54,8 +54,8 @@ await bl.put('bl:///cells/counter', {}, { lattice: 'maxNumber' })
 
 // Write values (max wins)
 await bl.put('bl:///cells/counter/value', {}, 5)
-await bl.put('bl:///cells/counter/value', {}, 3)   // still 5
-await bl.put('bl:///cells/counter/value', {}, 10)  // now 10
+await bl.put('bl:///cells/counter/value', {}, 3) // still 5
+await bl.put('bl:///cells/counter/value', {}, 10) // now 10
 ```
 
 Lattices: `maxNumber`, `minNumber`, `setUnion`, `setIntersection`, `lww`, `object`, `counter`, `boolean`. See [packages/cells](./packages/cells) for details.
@@ -64,11 +64,15 @@ Lattices: `maxNumber`, `minNumber`, `setUnion`, `setIntersection`, `lww`, `objec
 
 ```javascript
 // Wire cells: a + b -> sum
-await bl.put('bl:///propagators/add', {}, {
-  inputs: ['bl:///cells/a', 'bl:///cells/b'],
-  output: 'bl:///cells/sum',
-  handler: 'sum'
-})
+await bl.put(
+  'bl:///propagators/add',
+  {},
+  {
+    inputs: ['bl:///cells/a', 'bl:///cells/b'],
+    output: 'bl:///cells/sum',
+    handler: 'sum',
+  }
+)
 ```
 
 60+ built-in handlers for arithmetic, logic, strings, arrays, objects, and more. See [packages/propagators](./packages/propagators) for full list.

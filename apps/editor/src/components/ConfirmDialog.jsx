@@ -12,16 +12,19 @@ export default function ConfirmDialog({
   resourceName,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
-  variant = 'danger'
+  variant = 'danger',
 }) {
   if (!isOpen) return null
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal confirm-dialog" onClick={e => e.stopPropagation()}>
+      <div className="modal confirm-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>
-            <IconAlertTriangle size={18} style={{ color: 'var(--error)', marginRight: '8px', verticalAlign: 'middle' }} />
+            <IconAlertTriangle
+              size={18}
+              style={{ color: 'var(--error)', marginRight: '8px', verticalAlign: 'middle' }}
+            />
             {title}
           </h2>
           <button className="modal-close" onClick={onClose}>
@@ -31,9 +34,7 @@ export default function ConfirmDialog({
 
         <div className="modal-body">
           <p>{message}</p>
-          {resourceName && (
-            <p className="resource-name">{resourceName}</p>
-          )}
+          {resourceName && <p className="resource-name">{resourceName}</p>}
         </div>
 
         <div className="modal-actions">
@@ -42,7 +43,10 @@ export default function ConfirmDialog({
           </button>
           <button
             className={`btn ${variant === 'danger' ? 'btn-danger' : 'btn-primary'}`}
-            onClick={() => { onConfirm(); onClose(); }}
+            onClick={() => {
+              onConfirm()
+              onClose()
+            }}
           >
             {confirmLabel}
           </button>

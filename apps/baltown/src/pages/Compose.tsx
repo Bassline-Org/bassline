@@ -50,7 +50,7 @@ export default function Compose() {
     const templateType = searchParams.type
 
     if (templateId) {
-      const template = TEMPLATES.find(t => t.id === templateId)
+      const template = TEMPLATES.find((t) => t.id === templateId)
       if (template) {
         // Set basic info from template
         setName(template.id)
@@ -102,9 +102,9 @@ export default function Compose() {
     if (type === 'propagator') {
       const config = handlerConfig()
       const def: any = {
-        inputs: inputs().filter(i => i.trim()),
+        inputs: inputs().filter((i) => i.trim()),
         output: output(),
-        handler: handler()
+        handler: handler(),
       }
       // Only include handlerConfig if it has values
       if (Object.keys(config).length > 0) {
@@ -120,11 +120,13 @@ export default function Compose() {
 
     if (type === 'cell') {
       let initial = initialValue()
-      try { initial = JSON.parse(initial) } catch {}
+      try {
+        initial = JSON.parse(initial)
+      } catch {}
 
       return {
         lattice: lattice(),
-        initial
+        initial,
       }
     }
 
@@ -138,14 +140,21 @@ export default function Compose() {
 
   // Preview JSON
   const preview = createMemo(() => {
-    return JSON.stringify({
-      name: name(),
-      owner: owner(),
-      description: description(),
-      valType: valType(),
-      definition: definition(),
-      tags: tags().split(',').map(t => t.trim()).filter(Boolean)
-    }, null, 2)
+    return JSON.stringify(
+      {
+        name: name(),
+        owner: owner(),
+        description: description(),
+        valType: valType(),
+        definition: definition(),
+        tags: tags()
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+      },
+      null,
+      2
+    )
   })
 
   // Save val
@@ -159,12 +168,19 @@ export default function Compose() {
     setError('')
 
     try {
-      await bl.put(`bl:///r/vals/${owner()}/${name()}`, {}, {
-        description: description(),
-        valType: valType(),
-        definition: definition(),
-        tags: tags().split(',').map(t => t.trim()).filter(Boolean)
-      })
+      await bl.put(
+        `bl:///r/vals/${owner()}/${name()}`,
+        {},
+        {
+          description: description(),
+          valType: valType(),
+          definition: definition(),
+          tags: tags()
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+        }
+      )
 
       toast.success(`Val "${name()}" saved!`)
       navigate(`/v/${owner()}/${name()}`)
@@ -287,11 +303,15 @@ export default function Compose() {
                         value={input}
                         onInput={(e) => updateInput(i(), e.currentTarget.value)}
                       />
-                      <button class="btn btn-secondary" onClick={() => removeInput(i())}>-</button>
+                      <button class="btn btn-secondary" onClick={() => removeInput(i())}>
+                        -
+                      </button>
                     </div>
                   )}
                 </For>
-                <button class="btn btn-secondary" onClick={addInput}>+ Add Input</button>
+                <button class="btn btn-secondary" onClick={addInput}>
+                  + Add Input
+                </button>
               </div>
 
               <div class="form-group">
@@ -307,10 +327,7 @@ export default function Compose() {
 
               <div class="form-group">
                 <label class="form-label">Handler</label>
-                <HandlerPicker
-                  value={handler()}
-                  onChange={setHandler}
-                />
+                <HandlerPicker value={handler()} onChange={setHandler} />
               </div>
 
               <Show when={handler() && handlerRequiresConfig(handler())}>
@@ -326,9 +343,7 @@ export default function Compose() {
 
               <Show when={handler() && !handlerRequiresConfig(handler())}>
                 <div class="form-group">
-                  <div class="no-config-hint">
-                    This handler doesn't require configuration
-                  </div>
+                  <div class="no-config-hint">This handler doesn't require configuration</div>
                 </div>
               </Show>
             </div>
@@ -338,13 +353,13 @@ export default function Compose() {
           <Show when={valType() === 'handler'}>
             <div class="form-section">
               <h3>Handler Composition</h3>
-              <p class="form-hint">Build a handler composition visually. Click handler names to change them, use + Add to compose.</p>
+              <p class="form-hint">
+                Build a handler composition visually. Click handler names to change them, use + Add
+                to compose.
+              </p>
 
               <div class="form-group">
-                <HiccupComposer
-                  value={handlerComposition()}
-                  onChange={setHandlerComposition}
-                />
+                <HiccupComposer value={handlerComposition()} onChange={setHandlerComposition} />
               </div>
             </div>
           </Show>
@@ -376,7 +391,7 @@ export default function Compose() {
                 <label class="form-label">Initial Value (JSON)</label>
                 <textarea
                   class="form-textarea"
-                  placeholder='null'
+                  placeholder="null"
                   value={initialValue()}
                   onInput={(e) => setInitialValue(e.currentTarget.value)}
                 />
@@ -388,12 +403,12 @@ export default function Compose() {
           <Show when={valType() === 'recipe'}>
             <div class="form-section">
               <h3>Recipe Definition</h3>
-              <p class="form-hint">Define parameters and resources that will be created when the recipe is instantiated.</p>
+              <p class="form-hint">
+                Define parameters and resources that will be created when the recipe is
+                instantiated.
+              </p>
 
-              <RecipeEditor
-                value={recipeDefinition()}
-                onChange={setRecipeDefinition}
-              />
+              <RecipeEditor value={recipeDefinition()} onChange={setRecipeDefinition} />
             </div>
           </Show>
 
@@ -402,11 +417,7 @@ export default function Compose() {
           </Show>
 
           <div class="form-actions">
-            <button
-              class="btn btn-primary"
-              onClick={handleSave}
-              disabled={saving()}
-            >
+            <button class="btn btn-primary" onClick={handleSave} disabled={saving()}>
               {saving() ? 'Saving...' : 'Save Val'}
             </button>
           </div>

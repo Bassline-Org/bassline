@@ -25,7 +25,7 @@ Your task is to restructure and consolidate information while preserving all imp
 - Keep recent items more detailed
 - Organize by topic or theme
 - Never discard unique information
-- Return valid JSON array only, no markdown, no explanation`
+- Return valid JSON array only, no markdown, no explanation`,
   } = options
 
   return async (accumulated, delta, context) => {
@@ -43,8 +43,11 @@ Your task is to restructure and consolidate information while preserving all imp
     }
 
     try {
-      const result = await bl.put('bl:///services/claude/complete', {}, {
-        prompt: `Current knowledge base (to consolidate):
+      const result = await bl.put(
+        'bl:///services/claude/complete',
+        {},
+        {
+          prompt: `Current knowledge base (to consolidate):
 ${JSON.stringify(toCompact, null, 2)}
 
 Recent entries (preserve verbatim, shown for context only):
@@ -52,8 +55,9 @@ ${JSON.stringify(recent, null, 2)}
 
 Consolidate the "Current knowledge base" into a more organized structure.
 Return ONLY a JSON array of the consolidated entries.`,
-        system: systemPrompt
-      })
+          system: systemPrompt,
+        }
+      )
 
       // Parse response - look for JSON array
       const text = result.body.text.trim()
@@ -84,7 +88,7 @@ export function createDedupeCompactor(options = {}) {
 
   return async (accumulated, delta) => {
     const seen = new Set()
-    return accumulated.filter(item => {
+    return accumulated.filter((item) => {
       const key = keyFn(item)
       if (seen.has(key)) return false
       seen.add(key)
@@ -104,18 +108,16 @@ export function createDedupeCompactor(options = {}) {
 export function createTimeWindowCompactor(options = {}) {
   const {
     maxAge = 24 * 60 * 60 * 1000,
-    timestampFields = ['timestamp', 'createdAt', 'at', 'time']
+    timestampFields = ['timestamp', 'createdAt', 'at', 'time'],
   } = options
 
   return async (accumulated) => {
     const cutoff = Date.now() - maxAge
-    return accumulated.filter(item => {
+    return accumulated.filter((item) => {
       // Find timestamp in item
       for (const field of timestampFields) {
         if (item[field] !== undefined) {
-          const ts = typeof item[field] === 'string'
-            ? new Date(item[field]).getTime()
-            : item[field]
+          const ts = typeof item[field] === 'string' ? new Date(item[field]).getTime() : item[field]
           return ts > cutoff
         }
       }

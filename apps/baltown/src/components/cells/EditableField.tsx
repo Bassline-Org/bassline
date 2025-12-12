@@ -67,7 +67,9 @@ export default function EditableField(props: EditableFieldProps) {
 
       // Try to parse as JSON if it looks like JSON
       if (value.startsWith('{') || value.startsWith('[')) {
-        try { value = JSON.parse(value) } catch {}
+        try {
+          value = JSON.parse(value)
+        } catch {}
       } else if (value === 'true') {
         value = true
       } else if (value === 'false') {
@@ -93,15 +95,25 @@ export default function EditableField(props: EditableFieldProps) {
 
       <Show when={!editing()}>
         <div class="field-display" onClick={startEdit}>
-          <Show when={displayValue()} fallback={
-            <span class="field-placeholder">{props.placeholder || 'Click to edit...'}</span>
-          }>
+          <Show
+            when={displayValue()}
+            fallback={
+              <span class="field-placeholder">{props.placeholder || 'Click to edit...'}</span>
+            }
+          >
             <span class="field-value">{displayValue()}</span>
           </Show>
           <span class="field-edit-icon">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
           </span>
         </div>
@@ -121,18 +133,10 @@ export default function EditableField(props: EditableFieldProps) {
             autofocus
           />
           <div class="field-actions">
-            <button
-              class="field-btn save"
-              onClick={saveValue}
-              disabled={saving()}
-            >
+            <button class="field-btn save" onClick={saveValue} disabled={saving()}>
               {saving() ? '...' : 'Save'}
             </button>
-            <button
-              class="field-btn cancel"
-              onClick={cancelEdit}
-              disabled={saving()}
-            >
+            <button class="field-btn cancel" onClick={cancelEdit} disabled={saving()}>
               Cancel
             </button>
           </div>

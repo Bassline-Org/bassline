@@ -15,7 +15,7 @@ export default function installFetch(bl, config = {}) {
         uri: `bl:///fetch/${requestId}`,
         headers: {
           type: 'bl:///types/fetch-response',
-          status
+          status,
         },
         body: {
           requestId,
@@ -25,24 +25,24 @@ export default function installFetch(bl, config = {}) {
           statusText,
           headers,
           body,
-          responseCell
-        }
+          responseCell,
+        },
       })
     },
     onError: ({ requestId, url, method, error }) => {
       bl._plumber?.dispatch({
         uri: `bl:///fetch/${requestId}`,
         headers: {
-          type: 'bl:///types/fetch-error'
+          type: 'bl:///types/fetch-error',
         },
         body: {
           requestId,
           url,
           method,
-          error
-        }
+          error,
+        },
       })
-    }
+    },
   })
 
   fetchService.install(bl)

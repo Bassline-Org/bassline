@@ -49,7 +49,7 @@ export default function installHandlers(bl, config = {}) {
   const ctx = {
     registerBuiltin: registry.registerBuiltin,
     get: registry.get,
-    getFactory: registry.getFactory
+    getFactory: registry.getFactory,
   }
 
   // Handlers by domain
@@ -89,7 +89,7 @@ export default function installHandlers(bl, config = {}) {
     registerCustom: registry.registerCustom,
     listAll: registry.listAll,
     listBuiltin: registry.listBuiltin,
-    listCustom: registry.listCustom
+    listCustom: registry.listCustom,
   }
 
   console.log(`Handlers installed: ${registry.listBuiltin().length} built-in handlers`)

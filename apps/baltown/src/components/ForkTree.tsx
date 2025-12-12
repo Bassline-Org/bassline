@@ -39,7 +39,7 @@ export default function ForkTree(props: ForkTreeProps) {
     return {
       owner: match[1],
       name: match[2],
-      uri: `bl:///r/vals/${match[1]}/${match[2]}`
+      uri: `bl:///r/vals/${match[1]}/${match[2]}`,
     }
   }
 
@@ -53,8 +53,8 @@ export default function ForkTree(props: ForkTreeProps) {
         if (!response?.body?.links) return []
 
         // Filter to only parentVal references (forks)
-        const forkLinks = response.body.links.filter((link: any) =>
-          link.path === 'parentVal' || link.path === 'body.parentVal'
+        const forkLinks = response.body.links.filter(
+          (link: any) => link.path === 'parentVal' || link.path === 'body.parentVal'
         )
 
         // Parse URIs and fetch val info
@@ -67,7 +67,7 @@ export default function ForkTree(props: ForkTreeProps) {
               return {
                 ...parsed,
                 description: val?.body?.description,
-                valType: val?.body?.valType
+                valType: val?.body?.valType,
               }
             } catch {
               return parsed
@@ -96,7 +96,7 @@ export default function ForkTree(props: ForkTreeProps) {
           ...parsed,
           description: val?.body?.description,
           valType: val?.body?.valType,
-          parentVal: val?.body?.parentVal
+          parentVal: val?.body?.parentVal,
         }
       } catch {
         return parsed
@@ -113,12 +113,15 @@ export default function ForkTree(props: ForkTreeProps) {
       if (!parentParsed) return []
 
       try {
-        const response = await bl.get(`bl:///links/to/r/vals/${parentParsed.owner}/${parentParsed.name}`)
+        const response = await bl.get(
+          `bl:///links/to/r/vals/${parentParsed.owner}/${parentParsed.name}`
+        )
         if (!response?.body?.links) return []
 
-        const siblingLinks = response.body.links.filter((link: any) =>
-          (link.path === 'parentVal' || link.path === 'body.parentVal') &&
-          !link.from.includes(`/${props.owner}/${props.name}`)
+        const siblingLinks = response.body.links.filter(
+          (link: any) =>
+            (link.path === 'parentVal' || link.path === 'body.parentVal') &&
+            !link.from.includes(`/${props.owner}/${props.name}`)
         )
 
         const siblingInfos = await Promise.all(
@@ -129,7 +132,7 @@ export default function ForkTree(props: ForkTreeProps) {
               const val = await bl.get(parsed.uri)
               return {
                 ...parsed,
-                valType: val?.body?.valType
+                valType: val?.body?.valType,
               }
             } catch {
               return parsed
@@ -162,7 +165,7 @@ export default function ForkTree(props: ForkTreeProps) {
           const val = await bl.get(parsed.uri)
           chain.push({
             ...parsed,
-            parentVal: val?.body?.parentVal
+            parentVal: val?.body?.parentVal,
           })
           currentUri = val?.body?.parentVal
         } catch {

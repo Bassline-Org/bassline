@@ -6,7 +6,12 @@
 
 export function registerStructural({ registerBuiltin, get }) {
   // pair: Combine inputs into array
-  registerBuiltin('pair', () => (...values) => values)
+  registerBuiltin(
+    'pair',
+    () =>
+      (...values) =>
+        values
+  )
 
   // zip: Combine inputs into object with named keys
   registerBuiltin('zip', (ctx) => (...values) => {
@@ -26,7 +31,7 @@ export function registerStructural({ registerBuiltin, get }) {
     if (!innerHandler) throw new Error(`map: unknown handler '${ctx.handler}'`)
     return (collection) => {
       if (!Array.isArray(collection)) return innerHandler(collection)
-      return collection.map(item => innerHandler(item))
+      return collection.map((item) => innerHandler(item))
     }
   })
 }

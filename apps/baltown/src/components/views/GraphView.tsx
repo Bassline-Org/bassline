@@ -47,7 +47,7 @@ export default function GraphView(props: GraphViewProps) {
         .map((r: any) => ({
           uri: r.uri,
           lattice: r.body?.lattice,
-          value: undefined
+          value: undefined,
         }))
     }
 
@@ -60,17 +60,19 @@ export default function GraphView(props: GraphViewProps) {
       return all.map((uri: string) => ({
         uri,
         lattice: 'lww',
-        value: undefined
+        value: undefined,
       }))
     }
 
     // For cells, just show the cell itself
     if (props.valType === 'cell') {
-      return [{
-        uri: data.uri || 'bl:///cells/current',
-        lattice: data.lattice || 'lww',
-        value: data.value
-      }]
+      return [
+        {
+          uri: data.uri || 'bl:///cells/current',
+          lattice: data.lattice || 'lww',
+          value: data.value,
+        },
+      ]
     }
 
     return []
@@ -89,18 +91,20 @@ export default function GraphView(props: GraphViewProps) {
           // Resolve ${ref.X} references to actual URIs
           inputs: (r.body.inputs || []).map((input: string) => resolveRef(input)),
           output: resolveRef(r.body.output),
-          handler: r.body.handler
+          handler: r.body.handler,
         }))
     }
 
     // For propagators, use the propagator itself
     if (props.valType === 'propagator') {
-      return [{
-        uri: 'bl:///propagators/current',
-        inputs: data.inputs || [],
-        output: data.output,
-        handler: data.handler
-      }]
+      return [
+        {
+          uri: 'bl:///propagators/current',
+          inputs: data.inputs || [],
+          output: data.output,
+          handler: data.handler,
+        },
+      ]
     }
 
     return []
@@ -111,23 +115,30 @@ export default function GraphView(props: GraphViewProps) {
 
   return (
     <div class="graph-view">
-      <Show when={hasGraph()} fallback={
-        <div class="empty-state">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <circle cx="5" cy="12" r="3"/>
-            <circle cx="19" cy="12" r="3"/>
-            <circle cx="12" cy="5" r="3"/>
-            <circle cx="12" cy="19" r="3"/>
-            <path d="M8 12h8M12 8v8"/>
-          </svg>
-          <h3>No graph to display</h3>
-          <p>This val type doesn't have a flow diagram.</p>
-        </div>
-      }>
-        <CytoscapeGraph
-          cells={cells()}
-          propagators={propagators()}
-        />
+      <Show
+        when={hasGraph()}
+        fallback={
+          <div class="empty-state">
+            <svg
+              width="64"
+              height="64"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1"
+            >
+              <circle cx="5" cy="12" r="3" />
+              <circle cx="19" cy="12" r="3" />
+              <circle cx="12" cy="5" r="3" />
+              <circle cx="12" cy="19" r="3" />
+              <path d="M8 12h8M12 8v8" />
+            </svg>
+            <h3>No graph to display</h3>
+            <p>This val type doesn't have a flow diagram.</p>
+          </div>
+        }
+      >
+        <CytoscapeGraph cells={cells()} propagators={propagators()} />
       </Show>
 
       <style>{`

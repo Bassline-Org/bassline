@@ -18,7 +18,10 @@ export default function LinkedResource({ uri, onNavigate }) {
     <a
       href="#"
       className={`link-preview type-${type}`}
-      onClick={e => { e.preventDefault(); onNavigate(uri) }}
+      onClick={(e) => {
+        e.preventDefault()
+        onNavigate(uri)
+      }}
     >
       {avatar ? <span>{avatar}</span> : <TypeIcon type={type} size={14} />}
       {name}

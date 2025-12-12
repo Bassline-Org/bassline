@@ -23,9 +23,12 @@ export default function InstancesView(props: InstancesViewProps) {
   const [selectedInstance, setSelectedInstance] = createSignal<string | null>(null)
 
   // Fetch instances list
-  const { data: instancesData, loading, error, refetch } = useResource(
-    () => `${props.valUri}/instances`
-  )
+  const {
+    data: instancesData,
+    loading,
+    error,
+    refetch,
+  } = useResource(() => `${props.valUri}/instances`)
 
   const instances = createMemo((): InstanceEntry[] => {
     const data = instancesData()
@@ -46,77 +49,113 @@ export default function InstancesView(props: InstancesViewProps) {
 
       <Show when={error()}>
         <div class="error-state">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 8v4M12 16h.01"/>
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
           </svg>
           <h4>Failed to load instances</h4>
           <p>{error()?.message || 'Unknown error'}</p>
-          <button class="btn btn-secondary" onClick={refetch}>Retry</button>
+          <button class="btn btn-secondary" onClick={refetch}>
+            Retry
+          </button>
         </div>
       </Show>
 
       <Show when={!loading() && !error()}>
-        <Show when={selectedInstance()} fallback={
-          <div class="instances-list-view">
-            <div class="list-header">
-              <h3>Instances</h3>
-              <span class="instance-count">{instances().length} instance{instances().length !== 1 ? 's' : ''}</span>
-            </div>
+        <Show
+          when={selectedInstance()}
+          fallback={
+            <div class="instances-list-view">
+              <div class="list-header">
+                <h3>Instances</h3>
+                <span class="instance-count">
+                  {instances().length} instance{instances().length !== 1 ? 's' : ''}
+                </span>
+              </div>
 
-            <Show when={hasInstances()} fallback={
-              <div class="empty-state">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <path d="M12 8v8M8 12h8"/>
-                </svg>
-                <h4>No instances yet</h4>
-                <p>Create an instance using the form above to see it here.</p>
-              </div>
-            }>
-              <div class="instances-grid">
-                <For each={instances()}>
-                  {(instance) => (
-                    <button
-                      class="instance-card"
-                      onClick={() => setSelectedInstance(instance.uri)}
+              <Show
+                when={hasInstances()}
+                fallback={
+                  <div class="empty-state">
+                    <svg
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1"
                     >
-                      <div class="instance-header">
-                        <span class="instance-name">{instance.name}</span>
-                        <span class={`state-badge ${instance.state || 'created'}`}>
-                          {instance.state || 'created'}
-                        </span>
-                      </div>
-                      <div class="instance-meta">
-                        <span class="resource-count">
-                          {instance.resourceCount} resource{instance.resourceCount !== 1 ? 's' : ''}
-                        </span>
-                        <Show when={instance.createdAt}>
-                          <span class="created-at">
-                            {new Date(instance.createdAt!).toLocaleDateString()}
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M12 8v8M8 12h8" />
+                    </svg>
+                    <h4>No instances yet</h4>
+                    <p>Create an instance using the form above to see it here.</p>
+                  </div>
+                }
+              >
+                <div class="instances-grid">
+                  <For each={instances()}>
+                    {(instance) => (
+                      <button
+                        class="instance-card"
+                        onClick={() => setSelectedInstance(instance.uri)}
+                      >
+                        <div class="instance-header">
+                          <span class="instance-name">{instance.name}</span>
+                          <span class={`state-badge ${instance.state || 'created'}`}>
+                            {instance.state || 'created'}
                           </span>
-                        </Show>
-                      </div>
-                      <div class="view-arrow">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M9 18l6-6-6-6"/>
-                        </svg>
-                      </div>
-                    </button>
-                  )}
-                </For>
-              </div>
-            </Show>
-          </div>
-        }>
+                        </div>
+                        <div class="instance-meta">
+                          <span class="resource-count">
+                            {instance.resourceCount} resource
+                            {instance.resourceCount !== 1 ? 's' : ''}
+                          </span>
+                          <Show when={instance.createdAt}>
+                            <span class="created-at">
+                              {new Date(instance.createdAt!).toLocaleDateString()}
+                            </span>
+                          </Show>
+                        </div>
+                        <div class="view-arrow">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                        </div>
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </Show>
+            </div>
+          }
+        >
           {/* Instance detail view */}
           <div class="instance-detail-view">
-            <button
-              class="back-btn"
-              onClick={() => setSelectedInstance(null)}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M15 18l-6-6 6-6"/>
+            <button class="back-btn" onClick={() => setSelectedInstance(null)}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M15 18l-6-6 6-6" />
               </svg>
               Back to instances
             </button>

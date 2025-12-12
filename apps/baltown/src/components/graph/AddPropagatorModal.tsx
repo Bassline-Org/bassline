@@ -24,7 +24,7 @@ const SIMPLE_HANDLERS = [
   { value: 'identity', label: 'Identity', description: 'Pass through unchanged' },
   { value: 'pick', label: 'Pick', description: 'Extract object property' },
   { value: 'filter', label: 'Filter', description: 'Filter by predicate' },
-  { value: 'map', label: 'Map', description: 'Transform each element' }
+  { value: 'map', label: 'Map', description: 'Transform each element' },
 ]
 
 export default function AddPropagatorModal(props: AddPropagatorModalProps) {
@@ -71,7 +71,9 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
     }
 
     // Filter out empty input cells
-    const inputs = inputCells().filter(c => c.trim()).map(c => `bl:///r/cells/${c.trim()}`)
+    const inputs = inputCells()
+      .filter((c) => c.trim())
+      .map((c) => `bl:///r/cells/${c.trim()}`)
     if (inputs.length === 0) {
       toast.error('At least one input cell is required')
       return
@@ -87,11 +89,15 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
     setError('')
 
     try {
-      await bl.put(`bl:///r/propagators/${name}`, {}, {
-        inputs,
-        output: `bl:///r/cells/${output}`,
-        handler: handler()
-      })
+      await bl.put(
+        `bl:///r/propagators/${name}`,
+        {},
+        {
+          inputs,
+          output: `bl:///r/cells/${output}`,
+          handler: handler(),
+        }
+      )
       toast.success(`Propagator "${name}" created`)
       props.onSuccess?.(name)
       handleClose()
@@ -118,7 +124,9 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
         <div class="modal-content" onClick={(e) => e.stopPropagation()}>
           <div class="modal-header">
             <h2>Add Propagator</h2>
-            <button class="modal-close" onClick={handleClose}>&times;</button>
+            <button class="modal-close" onClick={handleClose}>
+              &times;
+            </button>
           </div>
 
           <div class="modal-body">
@@ -141,32 +149,37 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
                 value={handler()}
                 onChange={(e) => setHandler(e.currentTarget.value)}
               >
-                {SIMPLE_HANDLERS.map(h => (
+                {SIMPLE_HANDLERS.map((h) => (
                   <option value={h.value}>{h.label}</option>
                 ))}
               </select>
               <p class="form-hint">
-                {SIMPLE_HANDLERS.find(h => h.value === handler())?.description}
+                {SIMPLE_HANDLERS.find((h) => h.value === handler())?.description}
               </p>
             </div>
 
             <div class="form-group">
               <div class="form-label-row">
                 <label class="form-label">Input Cells</label>
-                <button class="btn-link" onClick={addInputCell}>+ Add Input</button>
+                <button class="btn-link" onClick={addInputCell}>
+                  + Add Input
+                </button>
               </div>
               <For each={inputCells()}>
                 {(cell, index) => (
                   <div class="input-row">
-                    <Show when={availableCells().length > 0} fallback={
-                      <input
-                        type="text"
-                        class="form-input"
-                        placeholder="cell-name"
-                        value={cell}
-                        onInput={(e) => updateInputCell(index(), e.currentTarget.value)}
-                      />
-                    }>
+                    <Show
+                      when={availableCells().length > 0}
+                      fallback={
+                        <input
+                          type="text"
+                          class="form-input"
+                          placeholder="cell-name"
+                          value={cell}
+                          onInput={(e) => updateInputCell(index(), e.currentTarget.value)}
+                        />
+                      }
+                    >
                       <select
                         class="form-select"
                         value={cell}
@@ -184,9 +197,16 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
                         onClick={() => removeInputCell(index())}
                         title="Remove input"
                       >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <line x1="18" y1="6" x2="6" y2="18"/>
-                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                        >
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
                       </button>
                     </Show>
@@ -197,15 +217,18 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
 
             <div class="form-group">
               <label class="form-label">Output Cell</label>
-              <Show when={availableCells().length > 0} fallback={
-                <input
-                  type="text"
-                  class="form-input"
-                  placeholder="result"
-                  value={outputCell()}
-                  onInput={(e) => setOutputCell(e.currentTarget.value)}
-                />
-              }>
+              <Show
+                when={availableCells().length > 0}
+                fallback={
+                  <input
+                    type="text"
+                    class="form-input"
+                    placeholder="result"
+                    value={outputCell()}
+                    onInput={(e) => setOutputCell(e.currentTarget.value)}
+                  />
+                }
+              >
                 <select
                   class="form-select"
                   value={outputCell()}
@@ -217,7 +240,9 @@ export default function AddPropagatorModal(props: AddPropagatorModalProps) {
                   </For>
                 </select>
               </Show>
-              <p class="form-hint">Cell to write the result to (will be created if it doesn't exist)</p>
+              <p class="form-hint">
+                Cell to write the result to (will be created if it doesn't exist)
+              </p>
             </div>
 
             <Show when={error()}>

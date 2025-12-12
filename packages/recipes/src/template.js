@@ -22,7 +22,7 @@ export function substitute(value, context) {
   }
 
   if (Array.isArray(value)) {
-    return value.map(item => substitute(item, context))
+    return value.map((item) => substitute(item, context))
   }
 
   if (value !== null && typeof value === 'object') {

@@ -62,7 +62,7 @@ export function createFetchRoutes(options = {}) {
       method,
       status: 'pending',
       startTime: new Date().toISOString(),
-      responseCell
+      responseCell,
     })
     trimStore()
 
@@ -73,8 +73,8 @@ export function createFetchRoutes(options = {}) {
           method,
           headers: {
             'Content-Type': 'application/json',
-            ...headers
-          }
+            ...headers,
+          },
         }
 
         if (body && method !== 'GET' && method !== 'HEAD') {
@@ -101,7 +101,7 @@ export function createFetchRoutes(options = {}) {
             status: response.status,
             statusText: response.statusText,
             headers: responseHeaders,
-            body: responseBody
+            body: responseBody,
           }
         }
 
@@ -120,7 +120,7 @@ export function createFetchRoutes(options = {}) {
             statusText: response.statusText,
             headers: responseHeaders,
             body: responseBody,
-            responseCell
+            responseCell,
           })
         }
       } catch (err) {
@@ -138,7 +138,7 @@ export function createFetchRoutes(options = {}) {
             requestId,
             url,
             method,
-            error: err.message
+            error: err.message,
           })
         }
       }
@@ -164,22 +164,22 @@ export function createFetchRoutes(options = {}) {
     return [...store.keys()].reverse()
   }
 
-  const fetchResource = resource(r => {
+  const fetchResource = resource((r) => {
     // List recent requests
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listRequests().map(id => {
+        entries: listRequests().map((id) => {
           const req = store.get(id)
           return {
             name: id,
             type: 'fetch-request',
             uri: `bl:///fetch/${id}`,
             status: req?.status,
-            url: req?.url
+            url: req?.url,
           }
-        })
-      }
+        }),
+      },
     }))
 
     // Get request by ID
@@ -191,8 +191,8 @@ export function createFetchRoutes(options = {}) {
         headers: { type: 'bl:///types/fetch-request' },
         body: {
           id: params.id,
-          ...req
-        }
+          ...req,
+        },
       }
     })
 
@@ -201,7 +201,7 @@ export function createFetchRoutes(options = {}) {
       if (!body?.url) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: 'url is required' }
+          body: { error: 'url is required' },
         }
       }
 
@@ -214,8 +214,8 @@ export function createFetchRoutes(options = {}) {
           url: body.url,
           method: body.method || 'GET',
           status: 'pending',
-          message: 'Request initiated. Response will be dispatched through plumber.'
-        }
+          message: 'Request initiated. Response will be dispatched through plumber.',
+        },
       }
     })
   })
@@ -236,6 +236,6 @@ export function createFetchRoutes(options = {}) {
     doFetch,
     getRequest,
     listRequests,
-    _store: store
+    _store: store,
   }
 }

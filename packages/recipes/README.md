@@ -29,36 +29,40 @@ recipes.install(bl)
 ## Defining a Recipe
 
 ```javascript
-await bl.put('bl:///recipes/counter-dashboard', {}, {
-  description: 'Counter with formatted display',
-  params: {
-    name: { type: 'string', required: true },
-    initial: { type: 'number', default: 0 }
-  },
-  resources: [
-    {
-      id: 'count',
-      uri: 'bl:///cells/${name}',
-      body: { lattice: 'counter' },
-      init: '${initial}'
+await bl.put(
+  'bl:///recipes/counter-dashboard',
+  {},
+  {
+    description: 'Counter with formatted display',
+    params: {
+      name: { type: 'string', required: true },
+      initial: { type: 'number', default: 0 },
     },
-    {
-      id: 'display',
-      uri: 'bl:///cells/${name}-display',
-      body: { lattice: 'lww' }
-    },
-    {
-      id: 'formatter',
-      uri: 'bl:///propagators/${name}-format',
-      body: {
-        inputs: ['${ref.count}'],
-        output: '${ref.display}',
-        handler: 'format',
-        handlerConfig: { template: 'Count: {0}' }
-      }
-    }
-  ]
-})
+    resources: [
+      {
+        id: 'count',
+        uri: 'bl:///cells/${name}',
+        body: { lattice: 'counter' },
+        init: '${initial}',
+      },
+      {
+        id: 'display',
+        uri: 'bl:///cells/${name}-display',
+        body: { lattice: 'lww' },
+      },
+      {
+        id: 'formatter',
+        uri: 'bl:///propagators/${name}-format',
+        body: {
+          inputs: ['${ref.count}'],
+          output: '${ref.display}',
+          handler: 'format',
+          handlerConfig: { template: 'Count: {0}' },
+        },
+      },
+    ],
+  }
+)
 ```
 
 ## Template Substitution
@@ -71,13 +75,18 @@ Resources are created in array order. Dependencies must come first.
 ## Instantiating a Recipe
 
 ```javascript
-await bl.put('bl:///instances/page-views', {}, {
-  recipe: 'bl:///recipes/counter-dashboard',
-  params: { name: 'page-views', initial: 0 }
-})
+await bl.put(
+  'bl:///instances/page-views',
+  {},
+  {
+    recipe: 'bl:///recipes/counter-dashboard',
+    params: { name: 'page-views', initial: 0 },
+  }
+)
 ```
 
 This creates:
+
 - `bl:///cells/page-views` (counter cell)
 - `bl:///cells/page-views-display` (display cell)
 - `bl:///propagators/page-views-format` (formatter)
@@ -110,16 +119,16 @@ Deletes all created resources in reverse order (propagators before cells).
 
 ## Routes
 
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/recipes` | GET | List all recipes |
-| `/recipes/:name` | GET | Get recipe definition |
-| `/recipes/:name` | PUT | Create/update recipe |
-| `/recipes/:name/delete` | PUT | Delete recipe |
-| `/instances` | GET | List all instances |
-| `/instances/:name` | GET | Get instance info |
-| `/instances/:name` | PUT | Create instance from recipe |
-| `/instances/:name/delete` | PUT | Delete instance and resources |
+| Route                     | Method | Description                   |
+| ------------------------- | ------ | ----------------------------- |
+| `/recipes`                | GET    | List all recipes              |
+| `/recipes/:name`          | GET    | Get recipe definition         |
+| `/recipes/:name`          | PUT    | Create/update recipe          |
+| `/recipes/:name/delete`   | PUT    | Delete recipe                 |
+| `/instances`              | GET    | List all instances            |
+| `/instances/:name`        | GET    | Get instance info             |
+| `/instances/:name`        | PUT    | Create instance from recipe   |
+| `/instances/:name/delete` | PUT    | Delete instance and resources |
 
 ## Plumber Events
 
@@ -143,9 +152,13 @@ bl._plumber.listen('instance-changes', (msg) => {
 Install via the daemon's module system:
 
 ```javascript
-await bl.put('bl:///install/recipes', {}, {
-  path: './packages/recipes/src/upgrade.js'
-})
+await bl.put(
+  'bl:///install/recipes',
+  {},
+  {
+    path: './packages/recipes/src/upgrade.js',
+  }
+)
 // Registers: bl._recipes
 // Requires: bl._plumber (optional)
 ```

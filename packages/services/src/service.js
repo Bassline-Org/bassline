@@ -9,14 +9,14 @@ import { resource } from '@bassline/core'
  * @returns {object} Service routes and registration functions
  */
 export function createServiceRoutes() {
-  const services = new Map()  // name -> { service, info }
+  const services = new Map() // name -> { service, info }
   let _bl = null
 
-  const serviceResource = resource(r => {
+  const serviceResource = resource((r) => {
     // List all registered services with operation summaries
     r.get('/', async () => {
       const entries = await Promise.all(
-        [...services.keys()].map(async name => {
+        [...services.keys()].map(async (name) => {
           try {
             // Query each service for its info
             const info = _bl ? await _bl.get(`bl:///services/${name}`) : null
@@ -27,18 +27,18 @@ export function createServiceRoutes() {
               uri: `bl:///services/${name}`,
               description: body.description,
               version: body.version,
-              operations: body.operations?.map(op => ({
+              operations: body.operations?.map((op) => ({
                 name: op.name,
                 method: op.method,
                 path: op.path,
-                description: op.description
-              }))
+                description: op.description,
+              })),
             }
           } catch {
             // Service info not available
             return {
               name,
-              uri: `bl:///services/${name}`
+              uri: `bl:///services/${name}`,
             }
           }
         })
@@ -46,7 +46,7 @@ export function createServiceRoutes() {
 
       return {
         headers: { type: 'bl:///types/service-directory' },
-        body: { entries }
+        body: { entries },
       }
     })
   })
@@ -79,6 +79,6 @@ export function createServiceRoutes() {
     install: (bl, { prefix = '/services' } = {}) => {
       _bl = bl
       bl.mount(prefix, serviceResource)
-    }
+    },
   }
 }

@@ -20,7 +20,7 @@ export default function Plugboard() {
     return {
       sources: d.sources ?? [],
       rules: d.rules ?? [],
-      ports: d.ports ?? []
+      ports: d.ports ?? [],
     }
   })
 
@@ -28,7 +28,10 @@ export default function Plugboard() {
     sources: plumberState().sources.length,
     rules: plumberState().rules.length,
     ports: plumberState().ports.length,
-    activeListeners: plumberState().ports.reduce((sum: number, p: any) => sum + (p.listenerCount || 0), 0)
+    activeListeners: plumberState().ports.reduce(
+      (sum: number, p: any) => sum + (p.listenerCount || 0),
+      0
+    ),
   }))
 
   return (
@@ -39,9 +42,16 @@ export default function Plugboard() {
           <p class="subtitle">Message routing visualization</p>
         </div>
         <button class="refresh-btn" onClick={refetch} title="Refresh">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 4v6h-6M1 20v-6h6"/>
-            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M23 4v6h-6M1 20v-6h6" />
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
           </svg>
           Refresh
         </button>
@@ -79,13 +89,22 @@ export default function Plugboard() {
 
       <Show when={error()}>
         <div class="error-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 8v4M12 16h.01"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
           </svg>
           <h3>Failed to load plumber state</h3>
           <p>{error()?.message || 'Unknown error'}</p>
-          <button class="btn btn-secondary" onClick={refetch}>Retry</button>
+          <button class="btn btn-secondary" onClick={refetch}>
+            Retry
+          </button>
         </div>
       </Show>
 
@@ -104,11 +123,12 @@ export default function Plugboard() {
             <h3>How it works</h3>
             <p>
               The plumber routes messages from <strong>sources</strong> (cells, timers, fetch)
-              through <strong>rules</strong> (pattern matchers) to <strong>ports</strong> (named queues).
+              through <strong>rules</strong> (pattern matchers) to <strong>ports</strong> (named
+              queues).
             </p>
             <p>
-              Dashed green lines show potential source-to-rule connections.
-              Solid orange lines show rule-to-port routing.
+              Dashed green lines show potential source-to-rule connections. Solid orange lines show
+              rule-to-port routing.
             </p>
           </div>
 

@@ -3,7 +3,7 @@ import { resource } from './router.js'
 /**
  * Root index resource that lists all available subsystems
  */
-const indexResource = resource(r => {
+const indexResource = resource((r) => {
   r.get('/', ({ bl }) => {
     // Collect all top-level route patterns
     const subsystems = new Set()
@@ -24,11 +24,11 @@ const indexResource = resource(r => {
       body: {
         name: 'Bassline',
         description: 'Everything is a resource',
-        subsystems: [...subsystems].sort().map(name => ({
+        subsystems: [...subsystems].sort().map((name) => ({
           name,
-          uri: `bl:///${name}`
-        }))
-      }
+          uri: `bl:///${name}`,
+        })),
+      },
     }
   })
 })

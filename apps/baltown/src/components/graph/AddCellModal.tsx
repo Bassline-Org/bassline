@@ -14,9 +14,13 @@ const LATTICE_TYPES = [
   { value: 'maxNumber', label: 'Max Number', description: 'Values only increase' },
   { value: 'minNumber', label: 'Min Number', description: 'Values only decrease' },
   { value: 'setUnion', label: 'Set Union', description: 'Accumulates set elements' },
-  { value: 'setIntersection', label: 'Set Intersection', description: 'Constrains to common elements' },
+  {
+    value: 'setIntersection',
+    label: 'Set Intersection',
+    description: 'Constrains to common elements',
+  },
   { value: 'boolean', label: 'Boolean', description: 'Once true, stays true' },
-  { value: 'object', label: 'Object', description: 'Shallow merge objects' }
+  { value: 'object', label: 'Object', description: 'Shallow merge objects' },
 ]
 
 export default function AddCellModal(props: AddCellModalProps) {
@@ -78,7 +82,9 @@ export default function AddCellModal(props: AddCellModalProps) {
         <div class="modal-content" onClick={(e) => e.stopPropagation()} onKeyDown={handleKeyDown}>
           <div class="modal-header">
             <h2>Add Cell</h2>
-            <button class="modal-close" onClick={handleClose}>&times;</button>
+            <button class="modal-close" onClick={handleClose}>
+              &times;
+            </button>
           </div>
 
           <div class="modal-body">
@@ -102,12 +108,12 @@ export default function AddCellModal(props: AddCellModalProps) {
                 value={latticeType()}
                 onChange={(e) => setLatticeType(e.currentTarget.value)}
               >
-                {LATTICE_TYPES.map(lt => (
+                {LATTICE_TYPES.map((lt) => (
                   <option value={lt.value}>{lt.label}</option>
                 ))}
               </select>
               <p class="form-hint">
-                {LATTICE_TYPES.find(lt => lt.value === latticeType())?.description}
+                {LATTICE_TYPES.find((lt) => lt.value === latticeType())?.description}
               </p>
             </div>
 

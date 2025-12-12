@@ -21,13 +21,17 @@ export default function TaskView({ resource, uri, onNavigate }) {
           {assignee && (
             <>
               <dt>Assignee</dt>
-              <dd><LinkedResource uri={assignee} onNavigate={onNavigate} /></dd>
+              <dd>
+                <LinkedResource uri={assignee} onNavigate={onNavigate} />
+              </dd>
             </>
           )}
           {parent && (
             <>
               <dt>Parent</dt>
-              <dd><LinkedResource uri={parent} onNavigate={onNavigate} /></dd>
+              <dd>
+                <LinkedResource uri={parent} onNavigate={onNavigate} />
+              </dd>
             </>
           )}
         </dl>

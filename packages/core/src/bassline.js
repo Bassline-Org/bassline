@@ -140,7 +140,7 @@ export class Bassline {
     this.middleware.push(entry)
     this.middleware.sort((a, b) => a.priority - b.priority)
     return () => {
-      this.middleware = this.middleware.filter(m => m !== entry)
+      this.middleware = this.middleware.filter((m) => m !== entry)
     }
   }
 
@@ -194,7 +194,7 @@ export class Bassline {
    */
   route(pattern, config) {
     // Check if route with this pattern already exists - merge handlers if so
-    const existing = this.routes.find(r => r.pattern === pattern)
+    const existing = this.routes.find((r) => r.pattern === pattern)
     if (existing) {
       if (config.get) existing.config.get = config.get
       if (config.put) existing.config.put = config.put
@@ -239,8 +239,8 @@ export class Bassline {
       const segsB = b.pattern.split('/').filter(Boolean).length
       if (segsA !== segsB) return segsB - segsA
 
-      const litsA = a.pattern.split('/').filter(s => s && !s.startsWith(':')).length
-      const litsB = b.pattern.split('/').filter(s => s && !s.startsWith(':')).length
+      const litsA = a.pattern.split('/').filter((s) => s && !s.startsWith(':')).length
+      const litsB = b.pattern.split('/').filter((s) => s && !s.startsWith(':')).length
       return litsB - litsA
     })
   }
@@ -251,7 +251,7 @@ export class Bassline {
       const match = path.match(route.regex)
       if (match) {
         const params = {}
-        route.paramNames.forEach((name, i) => params[name] = match[i + 1])
+        route.paramNames.forEach((name, i) => (params[name] = match[i + 1]))
         return { route, params }
       }
     }
@@ -299,7 +299,7 @@ export class Bassline {
       params: matched.params,
       headers,
       query: url.searchParams,
-      bl: this
+      bl: this,
     }
 
     const handleRoute = () => matched.route.config.get(ctx)
@@ -336,7 +336,7 @@ export class Bassline {
       headers,
       query: url.searchParams,
       body,
-      bl: this
+      bl: this,
     }
 
     const handleRoute = () => matched.route.config.put(ctx)

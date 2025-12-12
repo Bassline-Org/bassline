@@ -55,11 +55,7 @@ export default function NumericConfigEditor(props: NumericConfigEditorProps) {
 
       <div class="numeric-controls">
         <div class="numeric-input-group">
-          <button
-            class="nudge-btn"
-            onClick={() => nudge(-step())}
-            title={`Decrease by ${step()}`}
-          >
+          <button class="nudge-btn" onClick={() => nudge(-step())} title={`Decrease by ${step()}`}>
             −
           </button>
 
@@ -73,11 +69,7 @@ export default function NumericConfigEditor(props: NumericConfigEditorProps) {
             onInput={handleInputChange}
           />
 
-          <button
-            class="nudge-btn"
-            onClick={() => nudge(step())}
-            title={`Increase by ${step()}`}
-          >
+          <button class="nudge-btn" onClick={() => nudge(step())} title={`Increase by ${step()}`}>
             +
           </button>
         </div>

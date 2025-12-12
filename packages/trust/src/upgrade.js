@@ -21,7 +21,7 @@ import { createTrustSystem } from './index.js'
 export default function installTrust(bl, config = {}) {
   const trust = createTrustSystem({
     sampleRate: config.sampleRate,
-    thresholds: config.thresholds
+    thresholds: config.thresholds,
   })
 
   // Install routes
@@ -30,7 +30,7 @@ export default function installTrust(bl, config = {}) {
   // Install middleware with configurable priority
   const uninstallMiddleware = bl.use(trust.middleware, {
     priority: config.middlewarePriority ?? 20,
-    id: 'trust'
+    id: 'trust',
   })
 
   // Register on bl for other modules
@@ -38,6 +38,6 @@ export default function installTrust(bl, config = {}) {
     checkCapability: trust.checkCapability,
     observe: trust.observe,
     getTrust: trust.getTrust,
-    uninstall: uninstallMiddleware
+    uninstall: uninstallMiddleware,
   }
 }

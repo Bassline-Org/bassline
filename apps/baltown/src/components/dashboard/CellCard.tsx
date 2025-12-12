@@ -20,7 +20,7 @@ export default function CellCard(props: CellCardProps) {
   createEffect(() => {
     const val = data()
     if (val !== undefined) {
-      setHistory(prev => {
+      setHistory((prev) => {
         const newEntry = { value: val?.body ?? val, timestamp: Date.now() }
         return [...prev.slice(-19), newEntry]
       })
@@ -38,7 +38,7 @@ export default function CellCard(props: CellCardProps) {
     return {
       lattice: headers.lattice ?? body?.lattice ?? 'lww',
       value: body?.value ?? body,
-      name: props.uri.split('/').pop() || 'cell'
+      name: props.uri.split('/').pop() || 'cell',
     }
   })
 
@@ -49,7 +49,8 @@ export default function CellCard(props: CellCardProps) {
 
     const recent = h.slice(-5)
     const first = typeof recent[0]?.value === 'number' ? recent[0].value : null
-    const last = typeof recent[recent.length - 1]?.value === 'number' ? recent[recent.length - 1].value : null
+    const last =
+      typeof recent[recent.length - 1]?.value === 'number' ? recent[recent.length - 1].value : null
 
     if (first === null || last === null) return null
     if (last > first) return 'up'
@@ -91,9 +92,7 @@ export default function CellCard(props: CellCardProps) {
         </Show>
 
         <Show when={error()}>
-          <div class="cell-error">
-            Error: {error()?.message || 'Failed to load'}
-          </div>
+          <div class="cell-error">Error: {error()?.message || 'Failed to load'}</div>
         </Show>
 
         <Show when={!loading() && !error() && data()}>

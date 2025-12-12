@@ -24,10 +24,10 @@ export function createTrustSystem(options = {}) {
 
   // Capability thresholds
   let thresholds = {
-    read: 0.2,    // Low bar for reading
-    write: 0.5,   // Medium bar for writing
+    read: 0.2, // Low bar for reading
+    write: 0.5, // Medium bar for writing
     install: 0.8, // High bar for installing code
-    ...options.thresholds
+    ...options.thresholds,
   }
 
   const sampleRate = options.sampleRate ?? 0.1
@@ -91,8 +91,8 @@ export function createTrustSystem(options = {}) {
         body: {
           message: `Peer ${peer} lacks trust for ${capability}`,
           required: thresholds[capability],
-          current: peer ? getTrust(peer).value : null
-        }
+          current: peer ? getTrust(peer).value : null,
+        },
       }
     }
 
@@ -106,7 +106,7 @@ export function createTrustSystem(options = {}) {
   }
 
   // Build routes
-  const trustResource = resource(r => {
+  const trustResource = resource((r) => {
     // List all known peers
     r.get('/peers', () => ({
       headers: { type: 'bl:///types/list' },
@@ -114,9 +114,9 @@ export function createTrustSystem(options = {}) {
         entries: [...peers.entries()].map(([id, trust]) => ({
           id,
           ...trust,
-          confidence: trustEstimate.confidenceInterval(trust)
-        }))
-      }
+          confidence: trustEstimate.confidenceInterval(trust),
+        })),
+      },
     }))
 
     // Get trust for specific peer
@@ -131,9 +131,9 @@ export function createTrustSystem(options = {}) {
           capabilities: {
             read: trustEstimate.meetsThreshold(trust, thresholds.read),
             write: trustEstimate.meetsThreshold(trust, thresholds.write),
-            install: trustEstimate.meetsThreshold(trust, thresholds.install)
-          }
-        }
+            install: trustEstimate.meetsThreshold(trust, thresholds.install),
+          },
+        },
       }
     })
 
@@ -143,20 +143,20 @@ export function createTrustSystem(options = {}) {
       if (!peer || outcome === undefined) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { message: 'peer and outcome required' }
+          body: { message: 'peer and outcome required' },
         }
       }
       const updated = observe(peer, outcome)
       return {
         headers: { type: 'bl:///types/trust' },
-        body: { peer, ...updated }
+        body: { peer, ...updated },
       }
     })
 
     // Get thresholds
     r.get('/thresholds', () => ({
       headers: { type: 'bl:///types/config' },
-      body: thresholds
+      body: thresholds,
     }))
 
     // Set thresholds
@@ -164,7 +164,7 @@ export function createTrustSystem(options = {}) {
       thresholds = { ...thresholds, ...body }
       return {
         headers: { type: 'bl:///types/config' },
-        body: thresholds
+        body: thresholds,
       }
     })
   })
@@ -185,7 +185,7 @@ export function createTrustSystem(options = {}) {
     middleware,
     checkCapability,
     observe,
-    getTrust
+    getTrust,
   }
 }
 

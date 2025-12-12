@@ -34,7 +34,7 @@ export function createDatabaseRoutes(options = {}) {
     return entry.connection
   }
 
-  const databaseResource = resource(r => {
+  const databaseResource = resource((r) => {
     // Service info
     r.get('/', () => ({
       headers: { type: 'bl:///types/service' },
@@ -43,27 +43,25 @@ export function createDatabaseRoutes(options = {}) {
         description: 'SQLite database service',
         version: '1.0.0',
         driver: 'sqlite',
-        entries: [
-          { name: 'connections', uri: 'bl:///database/connections' }
-        ]
-      }
+        entries: [{ name: 'connections', uri: 'bl:///database/connections' }],
+      },
     }))
 
     // List connections
     r.get('/connections', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: [...connections.keys()].map(name => {
+        entries: [...connections.keys()].map((name) => {
           const entry = connections.get(name)
           return {
             name,
             type: 'database-connection',
             uri: `bl:///database/connections/${name}`,
             path: entry.config.path,
-            connected: !!entry.connection
+            connected: !!entry.connection,
           }
-        })
-      }
+        }),
+      },
     }))
 
     // Get connection info
@@ -83,9 +81,9 @@ export function createDatabaseRoutes(options = {}) {
             { name: 'query', uri: `bl:///database/connections/${params.name}/query` },
             { name: 'execute', uri: `bl:///database/connections/${params.name}/execute` },
             { name: 'schema', uri: `bl:///database/connections/${params.name}/schema` },
-            { name: 'pragma', uri: `bl:///database/connections/${params.name}/pragma` }
-          ]
-        }
+            { name: 'pragma', uri: `bl:///database/connections/${params.name}/pragma` },
+          ],
+        },
       }
     })
 
@@ -94,12 +92,12 @@ export function createDatabaseRoutes(options = {}) {
       const config = {
         path: body.path || ':memory:',
         readonly: body.readonly || false,
-        fileMustExist: body.fileMustExist || false
+        fileMustExist: body.fileMustExist || false,
       }
 
       connections.set(params.name, {
         config,
-        connection: null // Lazy initialized
+        connection: null, // Lazy initialized
       })
 
       return {
@@ -111,9 +109,9 @@ export function createDatabaseRoutes(options = {}) {
           entries: [
             { name: 'query', uri: `bl:///database/connections/${params.name}/query` },
             { name: 'execute', uri: `bl:///database/connections/${params.name}/execute` },
-            { name: 'schema', uri: `bl:///database/connections/${params.name}/schema` }
-          ]
-        }
+            { name: 'schema', uri: `bl:///database/connections/${params.name}/schema` },
+          ],
+        },
       }
     })
 
@@ -131,13 +129,13 @@ export function createDatabaseRoutes(options = {}) {
       return {
         headers: {
           type: 'bl:///types/database-result',
-          rowCount: result.rowCount
+          rowCount: result.rowCount,
         },
         body: {
           rows: result.rows,
           columns: result.columns,
-          rowCount: result.rowCount
-        }
+          rowCount: result.rowCount,
+        },
       }
     })
 
@@ -158,26 +156,26 @@ export function createDatabaseRoutes(options = {}) {
           uri: `bl:///database/connections/${params.name}`,
           headers: {
             type: 'bl:///types/database-change',
-            changes: result.changes
+            changes: result.changes,
           },
           body: {
             connection: params.name,
             sql,
             changes: result.changes,
-            lastInsertRowid: result.lastInsertRowid
-          }
+            lastInsertRowid: result.lastInsertRowid,
+          },
         })
       }
 
       return {
         headers: {
           type: 'bl:///types/database-execute-result',
-          changes: result.changes
+          changes: result.changes,
         },
         body: {
           changes: result.changes,
-          lastInsertRowid: result.lastInsertRowid
-        }
+          lastInsertRowid: result.lastInsertRowid,
+        },
       }
     })
 
@@ -190,11 +188,11 @@ export function createDatabaseRoutes(options = {}) {
         headers: { type: 'bl:///types/database-schema' },
         body: {
           connection: params.name,
-          tables: schema.tables.map(t => ({
+          tables: schema.tables.map((t) => ({
             ...t,
-            uri: `bl:///database/connections/${params.name}/schema/${t.name}`
-          }))
-        }
+            uri: `bl:///database/connections/${params.name}/schema/${t.name}`,
+          })),
+        },
       }
     })
 
@@ -202,13 +200,13 @@ export function createDatabaseRoutes(options = {}) {
     r.get('/connections/:name/schema/:table', ({ params }) => {
       const conn = getConnection(params.name)
       const schema = conn.introspect()
-      const table = schema.tables.find(t => t.name === params.table)
+      const table = schema.tables.find((t) => t.name === params.table)
 
       if (!table) return null
 
       return {
         headers: { type: 'bl:///types/database-table' },
-        body: table
+        body: table,
       }
     })
 
@@ -225,7 +223,7 @@ export function createDatabaseRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/database-pragma-result' },
-        body: { result }
+        body: { result },
       }
     })
 
@@ -239,7 +237,7 @@ export function createDatabaseRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/database-connection' },
-        body: { name: params.name, connected: false }
+        body: { name: params.name, connected: false },
       }
     })
   })
@@ -258,6 +256,6 @@ export function createDatabaseRoutes(options = {}) {
     routes: databaseResource,
     install,
     getConnection,
-    _connections: connections
+    _connections: connections,
   }
 }

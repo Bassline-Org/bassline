@@ -9,10 +9,8 @@ import { createDatabaseRoutes } from './database.js'
  * @param {string} config.defaultPath - Default SQLite database path
  */
 export default function installDatabase(bl, config = {}) {
-  const {
-    defaultConnection = 'main',
-    defaultPath = process.env.BL_DATABASE || '.data/db.sqlite'
-  } = config
+  const { defaultConnection = 'main', defaultPath = process.env.BL_DATABASE || '.data/db.sqlite' } =
+    config
 
   // Create database routes
   const database = createDatabaseRoutes({ bl })
@@ -20,9 +18,13 @@ export default function installDatabase(bl, config = {}) {
 
   // Create default connection if path provided
   if (defaultPath) {
-    bl.put(`bl:///database/connections/${defaultConnection}`, {}, {
-      path: defaultPath
-    }).catch(err => {
+    bl.put(
+      `bl:///database/connections/${defaultConnection}`,
+      {},
+      {
+        path: defaultPath,
+      }
+    ).catch((err) => {
       console.warn(`Failed to create default database connection: ${err.message}`)
     })
   }

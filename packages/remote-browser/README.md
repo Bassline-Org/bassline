@@ -18,10 +18,14 @@ const bl = new Bassline()
 bl.install(createRemoteRoutes())
 
 // Connect to a remote server, mount at /server1
-await bl.put('bl:///remote/ws/server1', {}, {
-  uri: 'ws://localhost:9112',
-  mount: '/server1'
-})
+await bl.put(
+  'bl:///remote/ws/server1',
+  {},
+  {
+    uri: 'ws://localhost:9112',
+    mount: '/server1',
+  }
+)
 
 // Access remote resources through the mount point
 const user = await bl.get('bl:///server1/data/users/alice')
@@ -40,11 +44,11 @@ const status = await bl.get('bl:///remote/ws/server1')
 
 ## Routes
 
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/remote/ws` | GET | List connections |
-| `/remote/ws/:name` | GET | Get connection status |
-| `/remote/ws/:name` | PUT | Create connection |
+| Route              | Method | Description           |
+| ------------------ | ------ | --------------------- |
+| `/remote/ws`       | GET    | List connections      |
+| `/remote/ws/:name` | GET    | Get connection status |
+| `/remote/ws/:name` | PUT    | Create connection     |
 
 ## Related
 

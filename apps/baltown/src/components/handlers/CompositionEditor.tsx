@@ -9,11 +9,24 @@ interface CompositionEditorProps {
 }
 
 // Handler picker categories
-const CATEGORY_ORDER = ['Reducers', 'Arithmetic', 'Comparison', 'Array', 'ArrayReducers', 'Object', 'String', 'Logic', 'Type', 'Utility', 'Structural', 'Conditional']
+const CATEGORY_ORDER = [
+  'Reducers',
+  'Arithmetic',
+  'Comparison',
+  'Array',
+  'ArrayReducers',
+  'Object',
+  'String',
+  'Logic',
+  'Type',
+  'Utility',
+  'Structural',
+  'Conditional',
+]
 
 const HANDLER_LIST = Object.entries(HANDLER_METADATA).map(([name, meta]) => ({
   name,
-  ...meta
+  ...meta,
 }))
 
 /**
@@ -35,7 +48,9 @@ export default function CompositionEditor(props: CompositionEditorProps) {
   }
 
   // Get handler config from entry
-  function getHandlerConfig(entry: string | [string, Record<string, any>]): Record<string, any> | undefined {
+  function getHandlerConfig(
+    entry: string | [string, Record<string, any>]
+  ): Record<string, any> | undefined {
     return Array.isArray(entry) ? entry[1] : undefined
   }
 
@@ -43,25 +58,27 @@ export default function CompositionEditor(props: CompositionEditorProps) {
   function filteredHandlers() {
     const query = searchQuery().toLowerCase()
     if (!query) return HANDLER_LIST
-    return HANDLER_LIST.filter(h =>
-      h.name.toLowerCase().includes(query) ||
-      h.description.toLowerCase().includes(query) ||
-      h.category.toLowerCase().includes(query)
+    return HANDLER_LIST.filter(
+      (h) =>
+        h.name.toLowerCase().includes(query) ||
+        h.description.toLowerCase().includes(query) ||
+        h.category.toLowerCase().includes(query)
     )
   }
 
   // Group handlers by category
   function groupedHandlers() {
     const groups: Record<string, typeof HANDLER_LIST> = {}
-    filteredHandlers().forEach(h => {
+    filteredHandlers().forEach((h) => {
       if (!groups[h.category]) groups[h.category] = []
       groups[h.category].push(h)
     })
 
     // Sort by category order
-    return CATEGORY_ORDER
-      .filter(cat => groups[cat])
-      .map(cat => ({ category: cat, handlers: groups[cat] }))
+    return CATEGORY_ORDER.filter((cat) => groups[cat]).map((cat) => ({
+      category: cat,
+      handlers: groups[cat],
+    }))
   }
 
   function openPicker(index: number) {
@@ -129,7 +146,10 @@ export default function CompositionEditor(props: CompositionEditorProps) {
   const typeLabels = {
     pipe: { label: 'Pipeline', desc: 'Execute handlers in sequence, passing output to next input' },
     fork: { label: 'Fork', desc: 'Execute all handlers on same input, collect outputs' },
-    compose: { label: 'Compose', desc: 'Combine handlers right-to-left (mathematical composition)' }
+    compose: {
+      label: 'Compose',
+      desc: 'Combine handlers right-to-left (mathematical composition)',
+    },
   }
 
   return (
@@ -166,24 +186,25 @@ export default function CompositionEditor(props: CompositionEditorProps) {
                 >
                   <div class="handler-grip">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                      <circle cx="8" cy="6" r="2"/>
-                      <circle cx="16" cy="6" r="2"/>
-                      <circle cx="8" cy="12" r="2"/>
-                      <circle cx="16" cy="12" r="2"/>
-                      <circle cx="8" cy="18" r="2"/>
-                      <circle cx="16" cy="18" r="2"/>
+                      <circle cx="8" cy="6" r="2" />
+                      <circle cx="16" cy="6" r="2" />
+                      <circle cx="8" cy="12" r="2" />
+                      <circle cx="16" cy="12" r="2" />
+                      <circle cx="8" cy="18" r="2" />
+                      <circle cx="16" cy="18" r="2" />
                     </svg>
                   </div>
 
-                  <div class="handler-info" onClick={() => setEditingIndex(editingIndex() === index() ? -1 : index())}>
+                  <div
+                    class="handler-info"
+                    onClick={() => setEditingIndex(editingIndex() === index() ? -1 : index())}
+                  >
                     <span class="handler-name">{name}</span>
                     <Show when={meta}>
                       <span class="handler-category">{meta!.category}</span>
                     </Show>
                     <Show when={config && Object.keys(config).length > 0}>
-                      <span class="handler-config-badge">
-                        {Object.keys(config!).length} config
-                      </span>
+                      <span class="handler-config-badge">{Object.keys(config!).length} config</span>
                     </Show>
                   </div>
 
@@ -192,8 +213,15 @@ export default function CompositionEditor(props: CompositionEditorProps) {
                     onClick={() => removeHandler(index())}
                     title="Remove handler"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M18 6L6 18M6 6l12 12"/>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
@@ -203,7 +231,9 @@ export default function CompositionEditor(props: CompositionEditorProps) {
                     <For each={Object.entries(meta!.config || {})}>
                       {([key, type]) => (
                         <div class="config-field">
-                          <label>{key} ({type})</label>
+                          <label>
+                            {key} ({type})
+                          </label>
                           <input
                             type={type === 'number' ? 'number' : 'text'}
                             value={config?.[key] ?? ''}
@@ -221,8 +251,15 @@ export default function CompositionEditor(props: CompositionEditorProps) {
 
                 <Show when={props.type === 'pipe' && index() < props.handlers.length - 1}>
                   <div class="pipe-arrow">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 5v14M19 12l-7 7-7-7"/>
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M12 5v14M19 12l-7 7-7-7" />
                     </svg>
                   </div>
                 </Show>
@@ -232,8 +269,15 @@ export default function CompositionEditor(props: CompositionEditorProps) {
         </For>
 
         <button class="add-handler-btn" onClick={() => openPicker(props.handlers.length)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 5v14M5 12h14"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M12 5v14M5 12h14" />
           </svg>
           Add Handler
         </button>
@@ -251,8 +295,15 @@ export default function CompositionEditor(props: CompositionEditorProps) {
                 autofocus
               />
               <button class="close-picker" onClick={() => setShowPicker(false)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 6L6 18M6 6l12 12"/>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
@@ -265,10 +316,7 @@ export default function CompositionEditor(props: CompositionEditorProps) {
                     <div class="category-handlers">
                       <For each={handlers}>
                         {(h) => (
-                          <button
-                            class="picker-handler"
-                            onClick={() => addHandler(h.name)}
-                          >
+                          <button class="picker-handler" onClick={() => addHandler(h.name)}>
                             <span class="handler-name">{h.name}</span>
                             <span class="handler-desc">{h.description}</span>
                           </button>

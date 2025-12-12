@@ -105,16 +105,16 @@ export function createLinkIndex() {
     return to.get(uri) ? [...to.get(uri)] : []
   }
 
-  const linkResource = resource(r => {
+  const linkResource = resource((r) => {
     // List all indexed resources
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
         entries: [
           { name: 'from', type: 'query', uri: 'bl:///links/from' },
-          { name: 'to', type: 'query', uri: 'bl:///links/to' }
-        ]
-      }
+          { name: 'to', type: 'query', uri: 'bl:///links/to' },
+        ],
+      },
     }))
 
     // Forward refs: what does this URI point to?
@@ -126,8 +126,8 @@ export function createLinkIndex() {
         body: {
           source: uri,
           direction: 'from',
-          refs
-        }
+          refs,
+        },
       }
     })
 
@@ -140,8 +140,8 @@ export function createLinkIndex() {
         body: {
           target: uri,
           direction: 'to',
-          refs
-        }
+          refs,
+        },
       }
     })
   })
@@ -184,6 +184,6 @@ export function createLinkIndex() {
     install,
     // Expose internals for debugging
     _from: from,
-    _to: to
+    _to: to,
   }
 }

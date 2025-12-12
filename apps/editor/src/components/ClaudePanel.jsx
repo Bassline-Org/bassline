@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useBassline } from '@bassline/react'
-import { IconX, IconSend, IconRobot, IconTool, IconLoader2, IconToggleLeft, IconToggleRight } from '@tabler/icons-react'
+import {
+  IconX,
+  IconSend,
+  IconRobot,
+  IconTool,
+  IconLoader2,
+  IconToggleLeft,
+  IconToggleRight,
+} from '@tabler/icons-react'
 import { REMOTE_PREFIX } from '../config.js'
 
 /**
@@ -13,8 +21,11 @@ function formatToolCall(toolUse) {
     name,
     summary: Object.entries(input)
       .slice(0, 2)
-      .map(([k, v]) => `${k}: ${typeof v === 'string' ? v.slice(0, 30) : JSON.stringify(v).slice(0, 30)}`)
-      .join(', ')
+      .map(
+        ([k, v]) =>
+          `${k}: ${typeof v === 'string' ? v.slice(0, 30) : JSON.stringify(v).slice(0, 30)}`
+      )
+      .join(', '),
   }
 }
 
@@ -33,7 +44,11 @@ function Message({ message, isStreaming }) {
     if (Array.isArray(content)) {
       return content.map((block, i) => {
         if (block.type === 'text') {
-          return <p key={i} className="message-text">{block.text}</p>
+          return (
+            <p key={i} className="message-text">
+              {block.text}
+            </p>
+          )
         }
         if (block.type === 'tool_use') {
           const { name, summary } = formatToolCall(block)
@@ -49,7 +64,11 @@ function Message({ message, isStreaming }) {
           return (
             <div key={i} className="tool-result">
               <span className="tool-result-label">Result:</span>
-              <code>{typeof block.content === 'string' ? block.content.slice(0, 100) : JSON.stringify(block.content).slice(0, 100)}</code>
+              <code>
+                {typeof block.content === 'string'
+                  ? block.content.slice(0, 100)
+                  : JSON.stringify(block.content).slice(0, 100)}
+              </code>
             </div>
           )
         }
@@ -66,9 +85,7 @@ function Message({ message, isStreaming }) {
         {role === 'assistant' ? <IconRobot size={14} /> : null}
         <span>{role === 'user' ? 'You' : 'Claude'}</span>
       </div>
-      <div className="message-content">
-        {renderContent()}
-      </div>
+      <div className="message-content">{renderContent()}</div>
     </div>
   )
 }
@@ -91,7 +108,7 @@ export default function ClaudePanel({ isOpen, onClose }) {
   useEffect(() => {
     if (isOpen && serviceAvailable === null) {
       bl.get(`${REMOTE_PREFIX}/services/claude`)
-        .then(res => {
+        .then((res) => {
           setServiceAvailable(res?.body?.capabilities?.length > 0)
         })
         .catch(() => {
@@ -112,19 +129,20 @@ export default function ClaudePanel({ isOpen, onClose }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const handleSubmit = useCallback(async (e) => {
-    e.preventDefault()
-    if (!input.trim() || loading) return
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault()
+      if (!input.trim() || loading) return
 
-    const userMessage = { role: 'user', content: input }
-    setMessages(prev => [...prev, userMessage])
-    setInput('')
-    setLoading(true)
-    setError(null)
+      const userMessage = { role: 'user', content: input }
+      setMessages((prev) => [...prev, userMessage])
+      setInput('')
+      setLoading(true)
+      setError(null)
 
-    try {
-      // System prompt for Bassline context
-      const system = `You are an AI assistant integrated with Bassline, a resource-based programming environment.
+      try {
+        // System prompt for Bassline context
+        const system = `You are an AI assistant integrated with Bassline, a resource-based programming environment.
 You can help users understand and interact with their data.
 
 Key concepts:
@@ -134,48 +152,64 @@ Key concepts:
 
 Be concise and helpful. When discussing resources, mention their URIs.`
 
-      let response
-      if (agentMode) {
-        // Agent mode: Use agentic loop with tools
-        response = await bl.put(`${REMOTE_PREFIX}/services/claude/agent`, {}, {
-          prompt: input,
-          system,
-          maxTurns: 10
-        })
+        let response
+        if (agentMode) {
+          // Agent mode: Use agentic loop with tools
+          response = await bl.put(
+            `${REMOTE_PREFIX}/services/claude/agent`,
+            {},
+            {
+              prompt: input,
+              system,
+              maxTurns: 10,
+            }
+          )
 
-        // Agent returns the final Claude response
-        if (response?.body?.content) {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: response.body.content
-          }])
+          // Agent returns the final Claude response
+          if (response?.body?.content) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: response.body.content,
+              },
+            ])
+          }
+        } else {
+          // Chat mode: Regular messages API
+          const apiMessages = [...messages, userMessage].map((m) => ({
+            role: m.role,
+            content: m.content,
+          }))
+
+          response = await bl.put(
+            `${REMOTE_PREFIX}/services/claude/messages`,
+            {},
+            {
+              messages: apiMessages,
+              system,
+              max_tokens: 2048,
+            }
+          )
+
+          if (response?.body?.content) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: response.body.content,
+              },
+            ])
+          }
         }
-      } else {
-        // Chat mode: Regular messages API
-        const apiMessages = [...messages, userMessage].map(m => ({
-          role: m.role,
-          content: m.content
-        }))
-
-        response = await bl.put(`${REMOTE_PREFIX}/services/claude/messages`, {}, {
-          messages: apiMessages,
-          system,
-          max_tokens: 2048
-        })
-
-        if (response?.body?.content) {
-          setMessages(prev => [...prev, {
-            role: 'assistant',
-            content: response.body.content
-          }])
-        }
+      } catch (err) {
+        setError(err.message || 'Failed to get response')
+      } finally {
+        setLoading(false)
       }
-    } catch (err) {
-      setError(err.message || 'Failed to get response')
-    } finally {
-      setLoading(false)
-    }
-  }, [input, loading, messages, bl, agentMode])
+    },
+    [input, loading, messages, bl, agentMode]
+  )
 
   const handleClear = () => {
     setMessages([])
@@ -192,7 +226,7 @@ Be concise and helpful. When discussing resources, mention their URIs.`
 
   return (
     <div className="claude-panel-overlay" onClick={onClose}>
-      <div className="claude-panel" onClick={e => e.stopPropagation()}>
+      <div className="claude-panel" onClick={(e) => e.stopPropagation()}>
         <div className="claude-panel-header">
           <h2>
             <IconRobot size={20} style={{ marginRight: 8 }} />
@@ -216,7 +250,9 @@ Be concise and helpful. When discussing resources, mention their URIs.`
         {serviceAvailable === false && (
           <div className="claude-service-unavailable">
             <p>Claude service is not available.</p>
-            <p className="hint">Set ANTHROPIC_API_KEY environment variable and restart the daemon.</p>
+            <p className="hint">
+              Set ANTHROPIC_API_KEY environment variable and restart the daemon.
+            </p>
           </div>
         )}
 
@@ -261,18 +297,19 @@ Be concise and helpful. When discussing resources, mention their URIs.`
                 </div>
               )}
 
-              {error && (
-                <div className="claude-error">
-                  {error}
-                </div>
-              )}
+              {error && <div className="claude-error">{error}</div>}
 
               <div ref={messagesEndRef} />
             </div>
 
             <form className="claude-input-form" onSubmit={handleSubmit}>
               {messages.length > 0 && (
-                <button type="button" className="clear-btn" onClick={handleClear} title="Clear conversation">
+                <button
+                  type="button"
+                  className="clear-btn"
+                  onClick={handleClear}
+                  title="Clear conversation"
+                >
                   Clear
                 </button>
               )}
@@ -280,7 +317,7 @@ Be concise and helpful. When discussing resources, mention their URIs.`
                 ref={inputRef}
                 type="text"
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask Claude..."
                 disabled={loading || serviceAvailable === false}

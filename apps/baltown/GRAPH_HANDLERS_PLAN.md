@@ -253,14 +253,12 @@ interface CytoscapeGraphProps {
 **Files to Modify:**
 
 1. `apps/baltown/src/components/graph/CytoscapeGraph.tsx`
-
    - Add handler node styling (hexagon, orange)
    - Add handlers prop and render handler nodes
    - Handle handler node selection
    - Add double-click to create handler
 
 2. `apps/baltown/src/components/graph/GraphToolbar.tsx`
-
    - Add "Handler" button
    - Create AddHandlerModal component
 
@@ -277,7 +275,6 @@ interface CytoscapeGraphProps {
 **Files to Modify:**
 
 1. `apps/baltown/src/components/graph/CytoscapeGraph.tsx`
-
    - Track editing handler state
    - Calculate popup position from node position
    - Show InlineHandlerEditor when editing
@@ -310,7 +307,6 @@ interface CytoscapeGraphProps {
 **Files to Modify:**
 
 1. `apps/baltown/src/components/graph/CytoscapeGraph.tsx`
-
    - Detect when handler is fully connected
    - Show "ready to promote" state
    - Handle promotion action

@@ -51,7 +51,7 @@ export function createRecipeRoutes(options = {}) {
       params: definition.params || {},
       resources: definition.resources || [],
       createdAt: recipeStore.get(name)?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     }
 
     recipeStore.set(name, recipe)
@@ -62,7 +62,7 @@ export function createRecipeRoutes(options = {}) {
         uri: `bl:///recipes/${name}`,
         method: 'put',
         headers: { type: 'bl:///types/recipe-saved' },
-        body: { recipe: name }
+        body: { recipe: name },
       })
     }
 
@@ -125,7 +125,7 @@ export function createRecipeRoutes(options = {}) {
     // Build substitution context
     const context = {
       params: resolvedParams,
-      ref: {}
+      ref: {},
     }
 
     // Create resources in order
@@ -167,7 +167,7 @@ export function createRecipeRoutes(options = {}) {
       params: resolvedParams,
       createdResources,
       state: 'active',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     }
 
     instanceStore.set(instanceName, instance)
@@ -181,8 +181,8 @@ export function createRecipeRoutes(options = {}) {
         body: {
           instance: instanceName,
           recipe: recipeUri,
-          resources: createdResources.map(r => r.uri)
-        }
+          resources: createdResources.map((r) => r.uri),
+        },
       })
     }
 
@@ -225,7 +225,7 @@ export function createRecipeRoutes(options = {}) {
         uri: `bl:///instances/${name}`,
         method: 'delete',
         headers: { type: 'bl:///types/instance-deleted' },
-        body: { instance: name }
+        body: { instance: name },
       })
     }
 
@@ -252,12 +252,12 @@ export function createRecipeRoutes(options = {}) {
   }
 
   // Recipe routes
-  const recipeResource = resource(r => {
+  const recipeResource = resource((r) => {
     // List all recipes
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listRecipes().map(name => {
+        entries: listRecipes().map((name) => {
           const recipe = recipeStore.get(name)
           return {
             name,
@@ -265,10 +265,10 @@ export function createRecipeRoutes(options = {}) {
             uri: `bl:///recipes/${name}`,
             description: recipe?.description,
             paramCount: Object.keys(recipe?.params || {}).length,
-            resourceCount: recipe?.resources?.length || 0
+            resourceCount: recipe?.resources?.length || 0,
           }
-        })
-      }
+        }),
+      },
     }))
 
     // Get recipe definition
@@ -278,7 +278,7 @@ export function createRecipeRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/recipe' },
-        body: recipe
+        body: recipe,
       }
     })
 
@@ -288,7 +288,7 @@ export function createRecipeRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/recipe' },
-        body: recipe
+        body: recipe,
       }
     })
 
@@ -299,18 +299,18 @@ export function createRecipeRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///recipes/${params.name}` }
+        body: { uri: `bl:///recipes/${params.name}` },
       }
     })
   })
 
   // Instance routes
-  const instanceResource = resource(r => {
+  const instanceResource = resource((r) => {
     // List all instances
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listInstances().map(name => {
+        entries: listInstances().map((name) => {
           const instance = instanceStore.get(name)
           return {
             name,
@@ -318,10 +318,10 @@ export function createRecipeRoutes(options = {}) {
             uri: `bl:///instances/${name}`,
             recipe: instance?.recipe,
             state: instance?.state,
-            resourceCount: instance?.createdResources?.length || 0
+            resourceCount: instance?.createdResources?.length || 0,
           }
-        })
-      }
+        }),
+      },
     }))
 
     // Get instance info
@@ -333,10 +333,8 @@ export function createRecipeRoutes(options = {}) {
         headers: { type: 'bl:///types/instance' },
         body: {
           ...instance,
-          entries: [
-            { name: 'delete', uri: `bl:///instances/${params.name}/delete` }
-          ]
-        }
+          entries: [{ name: 'delete', uri: `bl:///instances/${params.name}/delete` }],
+        },
       }
     })
 
@@ -345,25 +343,21 @@ export function createRecipeRoutes(options = {}) {
       if (!body?.recipe) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: 'Missing required field: recipe' }
+          body: { error: 'Missing required field: recipe' },
         }
       }
 
       try {
-        const instance = await instantiate(
-          params.name,
-          body.recipe,
-          body.params || {}
-        )
+        const instance = await instantiate(params.name, body.recipe, body.params || {})
 
         return {
           headers: { type: 'bl:///types/instance' },
-          body: instance
+          body: instance,
         }
       } catch (err) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: err.message }
+          body: { error: err.message },
         }
       }
     })
@@ -375,7 +369,7 @@ export function createRecipeRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///instances/${params.name}` }
+        body: { uri: `bl:///instances/${params.name}` },
       }
     })
   })
@@ -388,7 +382,10 @@ export function createRecipeRoutes(options = {}) {
    * @param {string} [options.recipesPrefix='/recipes'] - Mount prefix for recipes
    * @param {string} [options.instancesPrefix='/instances'] - Mount prefix for instances
    */
-  function install(blInstance, { recipesPrefix = '/recipes', instancesPrefix = '/instances' } = {}) {
+  function install(
+    blInstance,
+    { recipesPrefix = '/recipes', instancesPrefix = '/instances' } = {}
+  ) {
     blInstance.mount(recipesPrefix, recipeResource)
     blInstance.mount(instancesPrefix, instanceResource)
   }
@@ -406,6 +403,6 @@ export function createRecipeRoutes(options = {}) {
     getInstance,
     listInstances,
     _recipeStore: recipeStore,
-    _instanceStore: instanceStore
+    _instanceStore: instanceStore,
   }
 }

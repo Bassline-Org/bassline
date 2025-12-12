@@ -84,12 +84,12 @@ const bl = new Bassline()
 bl.route('/cells/:name', {
   get: ({ params }) => ({
     headers: { type: 'bl:///types/cell' },
-    body: { value: store.get(params.name) }
+    body: { value: store.get(params.name) },
   }),
   put: ({ params, body }) => {
     store.set(params.name, body)
     return { headers: { type: 'bl:///types/cell' }, body }
-  }
+  },
 })
 ```
 
@@ -98,8 +98,8 @@ Handlers receive context: `{ params, query, headers, body, bl }`
 ### Route Patterns
 
 ```javascript
-'/users/:id'      // Single segment parameter
-'/files/:path*'   // Wildcard (matches rest of path)
+'/users/:id' // Single segment parameter
+'/files/:path*' // Wildcard (matches rest of path)
 ```
 
 ### Router Builder
@@ -149,7 +149,7 @@ bl.install(createFileStore('.data', '/data'))
 
 await bl.put('bl:///data/doc', {}, { content: '...' })
 await bl.get('bl:///data/doc')
-await bl.get('bl:///data')  // list directory
+await bl.get('bl:///data') // list directory
 ```
 
 ### Code Store
@@ -163,7 +163,7 @@ bl.install(createCodeStore(null, '/code'))
 
 await bl.put('bl:///code/math', {}, { path: './math.js' })
 const mod = await bl.get('bl:///code/math')
-mod.body.add(1, 2)  // invoke exports
+mod.body.add(1, 2) // invoke exports
 ```
 
 ## Cells
@@ -181,11 +181,12 @@ await bl.put('bl:///cells/counter', {}, { lattice: 'maxNumber' })
 
 // Merge a value (lattice join)
 await bl.put('bl:///cells/counter/value', {}, 5)
-await bl.put('bl:///cells/counter/value', {}, 3)  // still 5, max wins
+await bl.put('bl:///cells/counter/value', {}, 3) // still 5, max wins
 await bl.put('bl:///cells/counter/value', {}, 10) // now 10
 ```
 
 Built-in lattices:
+
 - `maxNumber` - values only go up
 - `minNumber` - values only go down
 - `setUnion` - accumulates set elements
@@ -206,16 +207,21 @@ const propagators = createPropagatorRoutes({ bl })
 propagators.install(bl)
 
 // Create a sum propagator: a + b → sum
-await bl.put('bl:///propagators/add', {}, {
-  inputs: ['bl:///cells/a', 'bl:///cells/b'],
-  output: 'bl:///cells/sum',
-  handler: 'sum'
-})
+await bl.put(
+  'bl:///propagators/add',
+  {},
+  {
+    inputs: ['bl:///cells/a', 'bl:///cells/b'],
+    output: 'bl:///cells/sum',
+    handler: 'sum',
+  }
+)
 ```
 
 Handlers are provided by `@bassline/handlers` (110 built-in). See [packages/handlers/README.md](packages/handlers/README.md) for the full list.
 
 Common handlers:
+
 - **Reducers**: `sum`, `product`, `min`, `max`, `average`
 - **Structural**: `pair`, `zip`, `unzip`, `pick`
 - **Transformers**: `map`, `format`, `coerce`
@@ -223,58 +229,83 @@ Common handlers:
 - **Combinators**: `pipe`, `fork`, `hook`, `converge`
 
 Example with config:
+
 ```javascript
 // Apply a handler to each element of a collection
-await bl.put('bl:///propagators/coerce-all', {}, {
-  inputs: ['bl:///cells/strings'],
-  output: 'bl:///cells/numbers',
-  handler: 'map',
-  handlerConfig: { handler: 'coerce', config: { to: 'number' } }
-})
+await bl.put(
+  'bl:///propagators/coerce-all',
+  {},
+  {
+    inputs: ['bl:///cells/strings'],
+    output: 'bl:///cells/numbers',
+    handler: 'map',
+    handlerConfig: { handler: 'coerce', config: { to: 'number' } },
+  }
+)
 
 // Structural: combine two cells into object
-await bl.put('bl:///propagators/combine', {}, {
-  inputs: ['bl:///cells/x', 'bl:///cells/y'],
-  output: 'bl:///cells/point',
-  handler: 'zip',
-  handlerConfig: { keys: ['x', 'y'] }
-})
+await bl.put(
+  'bl:///propagators/combine',
+  {},
+  {
+    inputs: ['bl:///cells/x', 'bl:///cells/y'],
+    output: 'bl:///cells/point',
+    handler: 'zip',
+    handlerConfig: { keys: ['x', 'y'] },
+  }
+)
 
 // Conditional: filter values greater than 0
-await bl.put('bl:///propagators/positive-only', {}, {
-  inputs: ['bl:///cells/value'],
-  output: 'bl:///cells/positive',
-  handler: 'filter',
-  handlerConfig: { handler: 'gt', config: { value: 0 } }
-})
+await bl.put(
+  'bl:///propagators/positive-only',
+  {},
+  {
+    inputs: ['bl:///cells/value'],
+    output: 'bl:///cells/positive',
+    handler: 'filter',
+    handlerConfig: { handler: 'gt', config: { value: 0 } },
+  }
+)
 
 // String: replace pattern with regex
-await bl.put('bl:///propagators/clean', {}, {
-  inputs: ['bl:///cells/raw'],
-  output: 'bl:///cells/clean',
-  handler: 'replace',
-  handlerConfig: { pattern: '\\s+', flags: 'g', replacement: ' ' }
-})
+await bl.put(
+  'bl:///propagators/clean',
+  {},
+  {
+    inputs: ['bl:///cells/raw'],
+    output: 'bl:///cells/clean',
+    handler: 'replace',
+    handlerConfig: { pattern: '\\s+', flags: 'g', replacement: ' ' },
+  }
+)
 
 // Array reducer: group by key
-await bl.put('bl:///propagators/by-category', {}, {
-  inputs: ['bl:///cells/items'],
-  output: 'bl:///cells/grouped',
-  handler: 'groupBy',
-  handlerConfig: { key: 'category' }
-})
+await bl.put(
+  'bl:///propagators/by-category',
+  {},
+  {
+    inputs: ['bl:///cells/items'],
+    output: 'bl:///cells/grouped',
+    handler: 'groupBy',
+    handlerConfig: { key: 'category' },
+  }
+)
 
 // Working with LWW cells: compose to extract inner value first
 // LWW stores {value, timestamp}, so use pick/get to unwrap
-await bl.put('bl:///propagators/negate-lww', {}, {
-  inputs: ['bl:///cells/num'],
-  output: 'bl:///cells/negated',
-  handler: 'compose',
-  handlerConfig: {
-    steps: ['pick', 'negate'],
-    pick: { key: 'value' }
+await bl.put(
+  'bl:///propagators/negate-lww',
+  {},
+  {
+    inputs: ['bl:///cells/num'],
+    output: 'bl:///cells/negated',
+    handler: 'compose',
+    handlerConfig: {
+      steps: ['pick', 'negate'],
+      pick: { key: 'value' },
+    },
   }
-})
+)
 ```
 
 ## Plumber
@@ -295,13 +326,13 @@ The plumber is a rule-based message router. It watches PUT operations and dispat
 // Match all cell value changes
 bl._plumber.addRule('cell-changes', {
   match: { headers: { type: 'bl:///types/cell-value', changed: true } },
-  port: 'cell-updates'
+  port: 'cell-updates',
 })
 
 // Match specific URI prefix
 bl._plumber.addRule('user-data', {
   match: { uri: '^bl:///data/users/.*' },
-  port: 'user-changes'
+  port: 'user-changes',
 })
 ```
 
@@ -357,6 +388,7 @@ await bl.put('bl:///timers/heartbeat/start', {}, {})
 ```
 
 Each tick dispatches through plumber:
+
 ```javascript
 {
   uri: 'bl:///timers/heartbeat',
@@ -366,17 +398,18 @@ Each tick dispatches through plumber:
 ```
 
 Wire timers to cells via plumber rules:
+
 ```javascript
 // Count timer ticks
 await bl.put('bl:///cells/ticks', {}, { lattice: 'counter' })
 
 bl._plumber.addRule('heartbeat-counter', {
   match: { headers: { type: 'bl:///types/timer-tick' }, body: { timer: 'heartbeat' } },
-  port: 'heartbeat-ticks'
+  port: 'heartbeat-ticks',
 })
 
 bl._plumber.listen('heartbeat-ticks', () => {
-  bl.put('bl:///cells/ticks/value', {}, 1)  // increment
+  bl.put('bl:///cells/ticks/value', {}, 1) // increment
 })
 ```
 
@@ -386,27 +419,40 @@ Fetch makes HTTP requests with async responses dispatched through plumber.
 
 ```javascript
 // Make a GET request
-await bl.put('bl:///fetch/request', {}, {
-  url: 'https://api.example.com/data',
-  method: 'GET',
-  headers: { 'Authorization': 'Bearer ...' }
-})
+await bl.put(
+  'bl:///fetch/request',
+  {},
+  {
+    url: 'https://api.example.com/data',
+    method: 'GET',
+    headers: { Authorization: 'Bearer ...' },
+  }
+)
 
 // POST with body
-await bl.put('bl:///fetch/request', {}, {
-  url: 'https://api.example.com/create',
-  method: 'POST',
-  body: { name: 'test' }
-})
+await bl.put(
+  'bl:///fetch/request',
+  {},
+  {
+    url: 'https://api.example.com/create',
+    method: 'POST',
+    body: { name: 'test' },
+  }
+)
 
 // Auto-write response to a cell
-await bl.put('bl:///fetch/request', {}, {
-  url: 'https://api.example.com/status',
-  responseCell: 'bl:///cells/status'
-})
+await bl.put(
+  'bl:///fetch/request',
+  {},
+  {
+    url: 'https://api.example.com/status',
+    responseCell: 'bl:///cells/status',
+  }
+)
 ```
 
 Responses dispatch through plumber:
+
 ```javascript
 // Success
 {
@@ -424,9 +470,10 @@ Responses dispatch through plumber:
 ```
 
 List and inspect requests:
+
 ```javascript
-await bl.get('bl:///fetch')           // List recent requests
-await bl.get('bl:///fetch/req-123')   // Get specific request result
+await bl.get('bl:///fetch') // List recent requests
+await bl.get('bl:///fetch/req-123') // Get specific request result
 ```
 
 ## Monitors
@@ -435,35 +482,41 @@ Monitors compose Timer + Fetch + Cell to create automated URL polling pipelines.
 
 ```javascript
 // Create a monitor - automatically sets up timer, fetch, and cell
-await bl.put('bl:///monitors/github-status', {}, {
-  url: 'https://www.githubstatus.com/api/v2/status.json',
-  interval: 60000,           // poll every 60s
-  enabled: true,             // auto-start
-  extract: 'status.indicator', // optional: extract nested field
-  method: 'GET',             // HTTP method (default: GET)
-  headers: {}                // custom headers
-})
+await bl.put(
+  'bl:///monitors/github-status',
+  {},
+  {
+    url: 'https://www.githubstatus.com/api/v2/status.json',
+    interval: 60000, // poll every 60s
+    enabled: true, // auto-start
+    extract: 'status.indicator', // optional: extract nested field
+    method: 'GET', // HTTP method (default: GET)
+    headers: {}, // custom headers
+  }
+)
 
 // Check monitor status and latest value
 await bl.get('bl:///monitors/github-status')
 // → { url, interval, enabled, running, lastFetch, lastValue, fetchCount, cell: 'bl:///cells/monitor-github-status' }
 
 // Control the monitor
-await bl.put('bl:///monitors/github-status/start', {}, {})  // start polling
-await bl.put('bl:///monitors/github-status/stop', {}, {})   // stop polling
-await bl.put('bl:///monitors/github-status/fetch', {}, {})  // trigger immediate fetch
+await bl.put('bl:///monitors/github-status/start', {}, {}) // start polling
+await bl.put('bl:///monitors/github-status/stop', {}, {}) // stop polling
+await bl.put('bl:///monitors/github-status/fetch', {}, {}) // trigger immediate fetch
 
 // List all monitors
 await bl.get('bl:///monitors')
 ```
 
 Each monitor:
+
 - Creates a backing cell at `bl:///cells/monitor-{name}`
 - Creates a timer at `bl:///timers/monitor-{name}`
 - Dispatches `monitor-update` events through plumber on each fetch
 - Supports optional field extraction with dot notation (`extract: 'data.value'`)
 
 Use cases:
+
 - Dashboard status indicators
 - External API monitoring
 - Data synchronization from remote services
@@ -509,10 +562,14 @@ curl -X PUT "http://localhost:9111?uri=bl:///data/cells/counter" \
 Modules can be installed at runtime via `PUT bl:///install/:name`:
 
 ```javascript
-await bl.put('bl:///install/cells', {}, {
-  path: './packages/cells/src/upgrade.js',
-  // Additional config passed to the module
-})
+await bl.put(
+  'bl:///install/cells',
+  {},
+  {
+    path: './packages/cells/src/upgrade.js',
+    // Additional config passed to the module
+  }
+)
 ```
 
 ### Upgrade Modules
@@ -522,9 +579,11 @@ Each module provides an upgrade file exporting a default install function:
 ```javascript
 // packages/cells/src/upgrade.js
 export default function installCells(bl, config = {}) {
-  const cells = createCellRoutes({ /* callbacks */ })
+  const cells = createCellRoutes({
+    /* callbacks */
+  })
   cells.install(bl)
-  bl._cells = cells  // Register for other modules
+  bl._cells = cells // Register for other modules
 }
 ```
 
@@ -533,24 +592,27 @@ Convention: `upgrade-*.js` or `upgrade.js` in each package.
 ### Module Patterns
 
 **Registry**: Modules register themselves on `bl._*` for discovery:
+
 ```javascript
-bl._links = links      // Link index
-bl._plumber = plumber  // Message router
-bl._cells = cells      // Cell manager
+bl._links = links // Link index
+bl._plumber = plumber // Message router
+bl._cells = cells // Cell manager
 bl._propagators = propagators
 ```
 
 **Lookup**: Dependent modules find prerequisites from `bl`:
+
 ```javascript
 // In propagators upgrade.js
-const propagators = createPropagatorRoutes({ bl })  // bl passed in
+const propagators = createPropagatorRoutes({ bl }) // bl passed in
 ```
 
 **Deferred Callbacks**: Use optional chaining for loose coupling:
+
 ```javascript
 // Cells notify propagators if available
 onCellChange: ({ uri }) => {
-  bl._propagators?.onCellChange(uri)  // Safe if not installed
+  bl._propagators?.onCellChange(uri) // Safe if not installed
 }
 ```
 
@@ -563,6 +625,7 @@ BL_BOOTSTRAP=./apps/cli/src/bootstrap.js node apps/cli/src/daemon.js
 ```
 
 Module dependency order:
+
 1. `index` - root resource listing
 2. `types` - built-in type definitions
 3. `links` - bidirectional ref tracking
@@ -585,12 +648,14 @@ Module dependency order:
 The MCP (Model Context Protocol) server exposes Bassline resources to Claude Code.
 
 Setup:
+
 ```bash
 pnpm setup:mcp
 # Creates .mcp.json from .mcp.json.example with correct paths
 ```
 
 Or configure manually in Claude Code settings:
+
 ```json
 {
   "mcpServers": {
@@ -604,12 +669,14 @@ Or configure manually in Claude Code settings:
 ```
 
 Available tools:
+
 - `bassline_get` - GET a resource by URI
 - `bassline_put` - PUT a resource with body
 - `bassline_list` - List resources at a path
 - `bassline_links` - Query forward or back links
 
 Requires a running daemon:
+
 ```bash
 pnpm dev  # Starts daemon on port 9111
 ```

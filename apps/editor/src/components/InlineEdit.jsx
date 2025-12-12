@@ -20,7 +20,7 @@ export default function InlineEdit({
   formatDisplay,
   className = '',
   disabled = false,
-  placeholder = 'Click to edit'
+  placeholder = 'Click to edit',
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState('')
@@ -58,23 +58,26 @@ export default function InlineEdit({
   }, [value, type, formatDisplay, placeholder])
 
   // Parse edit value to correct type
-  const parseValue = useCallback((str) => {
-    if (type === 'number') {
-      const num = Number(str)
-      if (isNaN(num)) throw new Error('Invalid number')
-      return num
-    }
-    if (type === 'boolean') {
-      const lower = str.toLowerCase().trim()
-      if (lower === 'true' || lower === '1' || lower === 'yes') return true
-      if (lower === 'false' || lower === '0' || lower === 'no') return false
-      throw new Error('Invalid boolean (use true/false)')
-    }
-    if (type === 'json' || type === 'object') {
-      return JSON.parse(str)
-    }
-    return str
-  }, [type])
+  const parseValue = useCallback(
+    (str) => {
+      if (type === 'number') {
+        const num = Number(str)
+        if (isNaN(num)) throw new Error('Invalid number')
+        return num
+      }
+      if (type === 'boolean') {
+        const lower = str.toLowerCase().trim()
+        if (lower === 'true' || lower === '1' || lower === 'yes') return true
+        if (lower === 'false' || lower === '0' || lower === 'no') return false
+        throw new Error('Invalid boolean (use true/false)')
+      }
+      if (type === 'json' || type === 'object') {
+        return JSON.parse(str)
+      }
+      return str
+    },
+    [type]
+  )
 
   const handleSave = async () => {
     setError(null)

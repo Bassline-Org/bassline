@@ -79,42 +79,61 @@ export default function SourceView(props: SourceViewProps) {
       <div class="source-header">
         <span class="source-label">JSON Source</span>
         <div class="source-actions">
-          <button
-            class="action-btn"
-            onClick={copyToClipboard}
-            title="Copy to clipboard"
-          >
-            <Show when={copied()} fallback={
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2"/>
-                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-              </svg>
-            }>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"/>
+          <button class="action-btn" onClick={copyToClipboard} title="Copy to clipboard">
+            <Show
+              when={copied()}
+              fallback={
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+              }
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="20 6 9 17 4 12" />
               </svg>
             </Show>
           </button>
-          <button
-            class="action-btn"
-            onClick={downloadJSON}
-            title="Download JSON"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
+          <button class="action-btn" onClick={downloadJSON} title="Download JSON">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
           <Show when={props.editable && !editing()}>
-            <button
-              class="action-btn edit"
-              onClick={startEditing}
-              title="Edit source"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            <button class="action-btn edit" onClick={startEditing} title="Edit source">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
             </button>
           </Show>
@@ -140,16 +159,27 @@ export default function SourceView(props: SourceViewProps) {
           />
           <Show when={error()}>
             <div class="editor-error">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 8v4M12 16h.01"/>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 8v4M12 16h.01" />
               </svg>
               {error()}
             </div>
           </Show>
           <div class="editor-actions">
-            <button class="btn save" onClick={saveChanges}>Save Changes</button>
-            <button class="btn cancel" onClick={cancelEditing}>Cancel</button>
+            <button class="btn save" onClick={saveChanges}>
+              Save Changes
+            </button>
+            <button class="btn cancel" onClick={cancelEditing}>
+              Cancel
+            </button>
           </div>
         </div>
       </Show>
@@ -328,19 +358,21 @@ export default function SourceView(props: SourceViewProps) {
 
 // Simple JSON syntax highlighting
 function highlightJSON(json: string): string {
-  return json
-    // Keys (before colon)
-    .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
-    // String values (after colon or in arrays)
-    .replace(/: "([^"]*)"([,\n\]}])/g, ': <span class="json-string">"$1"</span>$2')
-    .replace(/\["([^"]*)"/g, '[<span class="json-string">"$1"</span>')
-    .replace(/, "([^"]*)"/g, ', <span class="json-string">"$1"</span>')
-    // Numbers
-    .replace(/: (\d+\.?\d*)([,\n\]}])/g, ': <span class="json-number">$1</span>$2')
-    // Booleans
-    .replace(/: (true|false)([,\n\]}])/g, ': <span class="json-boolean">$1</span>$2')
-    // Null
-    .replace(/: (null)([,\n\]}])/g, ': <span class="json-null">$1</span>$2')
-    // Brackets
-    .replace(/([{}\[\]])/g, '<span class="json-bracket">$1</span>')
+  return (
+    json
+      // Keys (before colon)
+      .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+      // String values (after colon or in arrays)
+      .replace(/: "([^"]*)"([,\n\]}])/g, ': <span class="json-string">"$1"</span>$2')
+      .replace(/\["([^"]*)"/g, '[<span class="json-string">"$1"</span>')
+      .replace(/, "([^"]*)"/g, ', <span class="json-string">"$1"</span>')
+      // Numbers
+      .replace(/: (\d+\.?\d*)([,\n\]}])/g, ': <span class="json-number">$1</span>$2')
+      // Booleans
+      .replace(/: (true|false)([,\n\]}])/g, ': <span class="json-boolean">$1</span>$2')
+      // Null
+      .replace(/: (null)([,\n\]}])/g, ': <span class="json-null">$1</span>$2')
+      // Brackets
+      .replace(/([{}\[\]])/g, '<span class="json-bracket">$1</span>')
+  )
 }
