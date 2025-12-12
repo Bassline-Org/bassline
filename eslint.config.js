@@ -7,7 +7,7 @@ export default [
   jsdoc.configs['flat/recommended-typescript-flavor'],
   prettier,
   {
-    files: ['packages/*/src/**/*.js'],
+    files: ['packages/*/src/**/*.js', 'apps/*/src/**/*.js'],
     languageOptions: {
       globals: {
         // Node.js globals

@@ -1,5 +1,5 @@
 /**
- * Integration tests for cells + propagators + handlers working together.
+ * Integration tests for cells + propagators + functions working together.
  *
  * These tests verify that the core reactive system functions correctly
  * when multiple packages are composed together.
@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { Bassline } from '../../packages/core/src/bassline.js'
 import { createCellRoutes } from '../../packages/cells/src/cell.js'
 import { createPropagatorRoutes } from '../../packages/propagators/src/propagator.js'
-import { createHandlerSystem } from '../../packages/handlers/src/index.js'
+import { createFnSystem } from '../../packages/fn/src/index.js'
 import { createPlumber } from '../../packages/plumber/src/plumber.js'
 
 describe('cells + propagators integration', () => {
@@ -25,13 +25,13 @@ describe('cells + propagators integration', () => {
     bl._plumber = plumber
     bl.setModule('plumber', plumber)
 
-    // Install handlers (propagators use bl.getModule('handlers'))
-    const handlerSystem = createHandlerSystem()
-    bl.mount('/handlers', handlerSystem.routes)
-    bl.setModule('handlers', {
-      get: handlerSystem.registry.get,
-      getSync: handlerSystem.registry.getSync,
-      registry: handlerSystem.registry,
+    // Install functions (propagators use bl.getModule('fn'))
+    const fnSystem = createFnSystem()
+    bl.mount('/fn', fnSystem.routes)
+    bl.setModule('fn', {
+      get: fnSystem.registry.get,
+      getSync: fnSystem.registry.getSync,
+      registry: fnSystem.registry,
     })
 
     // Install cells (uses bl.plumb() for change notifications)
@@ -96,7 +96,7 @@ describe('cells + propagators integration', () => {
       {
         inputs: ['bl:///cells/a', 'bl:///cells/b'],
         output: 'bl:///cells/sum',
-        handler: 'sum',
+        fn: 'bl:///fn/sum',
       }
     )
 
@@ -123,8 +123,8 @@ describe('cells + propagators integration', () => {
       {
         inputs: ['bl:///cells/a'],
         output: 'bl:///cells/double',
-        handler: 'duplicate',
-        handlerConfig: { handler: 'add' },
+        fn: 'bl:///fn/duplicate',
+        fnConfig: { fn: 'bl:///fn/add' },
       }
     )
 
@@ -138,8 +138,8 @@ describe('cells + propagators integration', () => {
       {
         inputs: ['bl:///cells/double'],
         output: 'bl:///cells/quadruple',
-        handler: 'duplicate',
-        handlerConfig: { handler: 'add' },
+        fn: 'bl:///fn/duplicate',
+        fnConfig: { fn: 'bl:///fn/add' },
       }
     )
 
@@ -163,8 +163,8 @@ describe('cells + propagators integration', () => {
       {
         inputs: ['bl:///cells/input'],
         output: 'bl:///cells/output',
-        handler: 'duplicate',
-        handlerConfig: { handler: 'add' },
+        fn: 'bl:///fn/duplicate',
+        fnConfig: { fn: 'bl:///fn/add' },
       }
     )
 
@@ -199,7 +199,7 @@ describe('cells + propagators integration', () => {
       {
         inputs: ['bl:///cells/x', 'bl:///cells/y', 'bl:///cells/z'],
         output: 'bl:///cells/total',
-        handler: 'sum',
+        fn: 'bl:///fn/sum',
       }
     )
 
@@ -219,7 +219,7 @@ describe('cells + propagators integration', () => {
       {
         inputs: ['bl:///cells/a'],
         output: 'bl:///cells/b',
-        handler: 'passthrough',
+        fn: 'bl:///fn/passthrough',
       }
     )
 

@@ -1,5 +1,5 @@
 /**
- * Control Handlers
+ * Control Functions
  *
  * Control flow, structural transformations, and utility operations:
  * - Conditional: filter, when, ifElse, cond
@@ -12,37 +12,37 @@
 
 export const filter = (ctx) => {
   const { get } = ctx
-  const predHandler = get(ctx.handler, ctx.config || {})
-  if (!predHandler) throw new Error(`filter: unknown handler '${ctx.handler}'`)
-  return (value) => (predHandler(value) ? value : undefined)
+  const predFn = get(ctx.fn, ctx.fnConfig || {})
+  if (!predFn) throw new Error(`filter: unknown fn '${ctx.fn}'`)
+  return (value) => (predFn(value) ? value : undefined)
 }
 
 // when: Alias for filter (kept for compatibility)
 export const when = (ctx) => {
   const { get } = ctx
-  const predHandler = get(ctx.handler, ctx.config || {})
-  if (!predHandler) throw new Error(`when: unknown handler '${ctx.handler}'`)
-  return (value) => (predHandler(value) ? value : undefined)
+  const predFn = get(ctx.fn, ctx.fnConfig || {})
+  if (!predFn) throw new Error(`when: unknown fn '${ctx.fn}'`)
+  return (value) => (predFn(value) ? value : undefined)
 }
 
 export const ifElse = (ctx) => {
   const { get } = ctx
-  const pred = get(ctx.predicate.handler, ctx.predicate.config || {})
-  const thenH = get(ctx.then.handler, ctx.then.config || {})
-  const elseH = get(ctx.else.handler, ctx.else.config || {})
-  return (value) => (pred(value) ? thenH(value) : elseH(value))
+  const pred = get(ctx.predicate.fn, ctx.predicate.fnConfig || {})
+  const thenFn = get(ctx.then.fn, ctx.then.fnConfig || {})
+  const elseFn = get(ctx.else.fn, ctx.else.fnConfig || {})
+  return (value) => (pred(value) ? thenFn(value) : elseFn(value))
 }
 
 export const cond = (ctx) => {
   const { get } = ctx
   return (value) => {
     for (const { when: whenCase, then } of ctx.cases) {
-      const pred = get(whenCase.handler, whenCase.config || {})
+      const pred = get(whenCase.fn, whenCase.fnConfig || {})
       if (pred(value)) {
-        return get(then.handler, then.config || {})(value)
+        return get(then.fn, then.fnConfig || {})(value)
       }
     }
-    return ctx.default ? get(ctx.default.handler, ctx.default.config || {})(value) : value
+    return ctx.default ? get(ctx.default.fn, ctx.default.fnConfig || {})(value) : value
   }
 }
 
@@ -66,11 +66,11 @@ export const pick = (ctx) => (obj) => obj?.[ctx.key]
 
 export const map = (ctx) => {
   const { get } = ctx
-  const innerHandler = get(ctx.handler, ctx.config || {})
-  if (!innerHandler) throw new Error(`map: unknown handler '${ctx.handler}'`)
+  const innerFn = get(ctx.fn, ctx.fnConfig || {})
+  if (!innerFn) throw new Error(`map: unknown fn '${ctx.fn}'`)
   return (collection) => {
-    if (!Array.isArray(collection)) return innerHandler(collection)
-    return collection.map((item) => innerHandler(item))
+    if (!Array.isArray(collection)) return innerFn(collection)
+    return collection.map((item) => innerFn(item))
   }
 }
 
@@ -78,16 +78,16 @@ export const map = (ctx) => {
 
 export const compose = (ctx) => {
   const { get } = ctx
-  const handlers = ctx.steps.map((step) => {
+  const fns = ctx.steps.map((step) => {
     if (typeof step === 'string') {
       return get(step, ctx[step] || {})
     }
-    return get(step.handler, step.config || {})
+    return get(step.fn, step.fnConfig || {})
   })
   return (...values) => {
     let result = values.length === 1 ? values[0] : values
-    for (const h of handlers) {
-      result = Array.isArray(result) ? h(...result) : h(result)
+    for (const fn of fns) {
+      result = Array.isArray(result) ? fn(...result) : fn(result)
     }
     return result
   }

@@ -213,14 +213,14 @@ await bl.put(
   {
     inputs: ['bl:///cells/a', 'bl:///cells/b'],
     output: 'bl:///cells/sum',
-    handler: 'sum',
+    fn: 'bl:///fn/sum',
   }
 )
 ```
 
-Handlers are provided by `@bassline/handlers` (110 built-in). See [packages/handlers/README.md](packages/handlers/README.md) for the full list.
+Functions are provided by `@bassline/fn` (110 built-in). See [packages/fn/README.md](packages/fn/README.md) for the full list.
 
-Common handlers:
+Common functions:
 
 - **Reducers**: `sum`, `product`, `min`, `max`, `average`
 - **Structural**: `pair`, `zip`, `unzip`, `pick`
@@ -231,15 +231,15 @@ Common handlers:
 Example with config:
 
 ```javascript
-// Apply a handler to each element of a collection
+// Apply a fn to each element of a collection
 await bl.put(
   'bl:///propagators/coerce-all',
   {},
   {
     inputs: ['bl:///cells/strings'],
     output: 'bl:///cells/numbers',
-    handler: 'map',
-    handlerConfig: { handler: 'coerce', config: { to: 'number' } },
+    fn: 'bl:///fn/map',
+    fnConfig: { fn: 'bl:///fn/coerce', fnConfig: { to: 'number' } },
   }
 )
 
@@ -250,8 +250,8 @@ await bl.put(
   {
     inputs: ['bl:///cells/x', 'bl:///cells/y'],
     output: 'bl:///cells/point',
-    handler: 'zip',
-    handlerConfig: { keys: ['x', 'y'] },
+    fn: 'bl:///fn/zip',
+    fnConfig: { keys: ['x', 'y'] },
   }
 )
 
@@ -262,8 +262,8 @@ await bl.put(
   {
     inputs: ['bl:///cells/value'],
     output: 'bl:///cells/positive',
-    handler: 'filter',
-    handlerConfig: { handler: 'gt', config: { value: 0 } },
+    fn: 'bl:///fn/filter',
+    fnConfig: { fn: 'bl:///fn/gt', fnConfig: { value: 0 } },
   }
 )
 
@@ -274,8 +274,8 @@ await bl.put(
   {
     inputs: ['bl:///cells/raw'],
     output: 'bl:///cells/clean',
-    handler: 'replace',
-    handlerConfig: { pattern: '\\s+', flags: 'g', replacement: ' ' },
+    fn: 'bl:///fn/replace',
+    fnConfig: { pattern: '\\s+', flags: 'g', replacement: ' ' },
   }
 )
 
@@ -286,8 +286,8 @@ await bl.put(
   {
     inputs: ['bl:///cells/items'],
     output: 'bl:///cells/grouped',
-    handler: 'groupBy',
-    handlerConfig: { key: 'category' },
+    fn: 'bl:///fn/groupBy',
+    fnConfig: { key: 'category' },
   }
 )
 
@@ -299,10 +299,10 @@ await bl.put(
   {
     inputs: ['bl:///cells/num'],
     output: 'bl:///cells/negated',
-    handler: 'compose',
-    handlerConfig: {
-      steps: ['pick', 'negate'],
-      pick: { key: 'value' },
+    fn: 'bl:///fn/compose',
+    fnConfig: {
+      steps: ['bl:///fn/pick', 'bl:///fn/negate'],
+      'bl:///fn/pick': { key: 'value' },
     },
   }
 )
@@ -530,8 +530,8 @@ packages/plumber/        # Rule-based message routing
 packages/links/          # Bidirectional ref tracking
 packages/types/          # Built-in type definitions
 packages/cells/          # Lattice-based cells
-packages/handlers/       # Handler registry and combinators
-packages/propagators/    # Reactive propagators (uses handlers)
+packages/fn/             # Function registry and combinators
+packages/propagators/    # Reactive propagators (uses fn)
 packages/timers/         # Time-based event dispatch
 packages/fetch/          # HTTP requests
 packages/monitors/       # URL polling (Timer + Fetch + Cell)
@@ -633,8 +633,8 @@ Module dependency order:
 5. `file-store` - persistence
 6. `http-server` - HTTP API
 7. `ws-server` - WebSocket (uses plumber)
-8. `handlers` - handler registry and combinators
-9. `propagators` - reactive computation (uses handlers)
+8. `fn` - function registry and combinators
+9. `propagators` - reactive computation (uses fn)
 10. `cells` - lattice values (uses propagators, plumber)
 11. `dashboard` - activity tracking (uses plumber)
 12. `timers` - time-based events (uses plumber)

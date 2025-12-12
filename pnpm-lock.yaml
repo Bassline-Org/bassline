@@ -157,7 +157,7 @@ importers:
         specifier: workspace:*
         version: link:../plumber
 
-  packages/handlers:
+  packages/fn:
     dependencies:
       '@bassline/core':
         specifier: workspace:*
@@ -293,6 +293,22 @@ importers:
       '@bassline/plumber':
         specifier: workspace:*
         version: link:../plumber
+
+  packages/tmp:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+      '@bassline/fn':
+        specifier: workspace:*
+        version: link:../fn
+      '@bassline/plumber':
+        specifier: workspace:*
+        version: link:../plumber
+    devDependencies:
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.9)
 
   packages/trust:
     dependencies:
@@ -4223,9 +4239,10 @@ packages:
       debug: 4.4.1
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 5.4.21(@types/node@20.19.9)
+      vite: 6.4.1(@types/node@20.19.9)
     transitivePeerDependencies:
       - '@types/node'
+      - jiti
       - less
       - lightningcss
       - sass
@@ -4234,6 +4251,8 @@ packages:
       - sugarss
       - supports-color
       - terser
+      - tsx
+      - yaml
     dev: true
 
   /vite-plugin-solid@2.11.10(solid-js@1.9.10)(vite@6.4.1):
@@ -4527,6 +4546,7 @@ packages:
       vite-node: 3.2.4(@types/node@20.19.9)
       why-is-node-running: 2.3.0
     transitivePeerDependencies:
+      - jiti
       - less
       - lightningcss
       - msw
@@ -4536,6 +4556,8 @@ packages:
       - sugarss
       - supports-color
       - terser
+      - tsx
+      - yaml
     dev: true
 
   /w3c-keyname@2.2.8:

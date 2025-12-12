@@ -1,0 +1,21 @@
+{
+  "name": "@bassline/tmp",
+  "version": "0.1.0",
+  "description": "Ephemeral state and temporary functions for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "@bassline/plumber": "workspace:*",
+    "@bassline/fn": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

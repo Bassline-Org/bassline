@@ -1,3 +1,4 @@
+/* eslint-env node */
 /**
  * Standard Bassline bootstrap module.
  * Installs all core modules via the dynamic install system.
@@ -13,7 +14,7 @@ const WS_PORT = parseInt(process.env.BL_WS_PORT || '9112')
 
 /**
  * Bootstrap a Bassline instance with all standard modules
- * @param {import('@bassline/core').Bassline} bl
+ * @param {import('@bassline/core').Bassline} bl - The Bassline instance
  */
 export default async function bootstrap(bl) {
   // Core: root index (lists all subsystems)
@@ -83,21 +84,30 @@ export default async function bootstrap(bl) {
     }
   )
 
-  // Reactive: handlers (must come before propagators)
+  // Reactive: functions (must come before propagators)
   await bl.put(
-    'bl:///install/handlers',
+    'bl:///install/fn',
     {},
     {
-      path: './packages/handlers/src/upgrade.js',
+      path: './packages/fn/src/upgrade.js',
     }
   )
 
-  // Reactive: propagators (uses handlers)
+  // Reactive: propagators (uses fn)
   await bl.put(
     'bl:///install/propagators',
     {},
     {
       path: './packages/propagators/src/upgrade.js',
+    }
+  )
+
+  // Ephemeral: tmp (state and fn)
+  await bl.put(
+    'bl:///install/tmp',
+    {},
+    {
+      path: './packages/tmp/src/upgrade.js',
     }
   )
 
