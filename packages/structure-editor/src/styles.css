@@ -1,0 +1,289 @@
+/* Structure Editor Styles */
+
+.structure-editor {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #0d1117;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 12px;
+  min-height: 100px;
+}
+
+.structure-editor:focus-within {
+  border-color: #58a6ff;
+  outline: none;
+}
+
+/* ProseMirror editor styles */
+.structure-editor .ProseMirror {
+  outline: none;
+  min-height: 40px;
+  cursor: text;
+}
+
+.structure-editor .ProseMirror:focus {
+  outline: none;
+}
+
+.structure-editor .ProseMirror p {
+  margin: 0;
+}
+
+/* Placeholder */
+.structure-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #6e7681;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* JSON Object */
+.json-object {
+  position: relative;
+  padding: 4px 0 4px 16px;
+  border-left: 2px solid #30363d;
+  margin: 4px 0;
+}
+
+.json-object::before {
+  content: '{';
+  position: absolute;
+  left: -8px;
+  top: 0;
+  color: #8b949e;
+  font-weight: bold;
+}
+
+.json-object::after {
+  content: '}';
+  color: #8b949e;
+  font-weight: bold;
+  display: block;
+  margin-left: -8px;
+}
+
+/* JSON Array */
+.json-array {
+  position: relative;
+  padding: 4px 0 4px 16px;
+  border-left: 2px solid #a371f7;
+  margin: 4px 0;
+}
+
+.json-array::before {
+  content: '[';
+  position: absolute;
+  left: -8px;
+  top: 0;
+  color: #a371f7;
+  font-weight: bold;
+}
+
+.json-array::after {
+  content: ']';
+  color: #a371f7;
+  font-weight: bold;
+  display: block;
+  margin-left: -8px;
+}
+
+/* JSON Pair (key-value) */
+.json-pair {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 2px 0;
+}
+
+/* JSON Key */
+.json-key {
+  color: #7ee787;
+  min-width: 20px;
+}
+
+.json-key::after {
+  content: ':';
+  color: #8b949e;
+  margin-left: 2px;
+}
+
+/* JSON Value */
+.json-value {
+  flex: 1;
+}
+
+/* JSON Element (array item) */
+.json-element {
+  margin: 2px 0;
+}
+
+.json-element::before {
+  content: '-';
+  color: #a371f7;
+  margin-right: 8px;
+}
+
+/* JSON Primitives */
+.json-primitive {
+  display: inline;
+}
+
+.json-primitive.json-string {
+  color: #a5d6ff;
+}
+
+.json-primitive.json-string::before,
+.json-primitive.json-string::after {
+  content: '"';
+  color: #8b949e;
+}
+
+.json-primitive.json-number {
+  color: #79c0ff;
+}
+
+.json-primitive.json-boolean {
+  color: #ff7b72;
+  font-weight: 500;
+}
+
+.json-primitive.json-null {
+  color: #8b949e;
+  font-style: italic;
+}
+
+/* Selection highlight */
+.structure-editor .ProseMirror ::selection {
+  background: rgba(56, 139, 253, 0.4);
+}
+
+/* Cursor */
+.structure-editor .ProseMirror .ProseMirror-cursor {
+  border-left: 2px solid #58a6ff;
+}
+
+/* Command palette hint */
+.structure-editor[data-command-active="true"]::after {
+  content: 'Commands: object, array, string, number, true, false, null';
+  position: absolute;
+  bottom: -24px;
+  left: 0;
+  font-size: 11px;
+  color: #8b949e;
+}
+
+/* Collapsed state */
+.json-object[data-collapsed="true"] > .json-pair,
+.json-array[data-collapsed="true"] > .json-element {
+  display: none;
+}
+
+.json-object[data-collapsed="true"]::after,
+.json-array[data-collapsed="true"]::after {
+  display: inline;
+  margin-left: 4px;
+}
+
+.json-object[data-collapsed="true"]::before {
+  content: '{ ... }';
+}
+
+.json-array[data-collapsed="true"]::before {
+  content: '[ ... ]';
+}
+
+/* Command Palette */
+.command-palette {
+  position: absolute;
+  z-index: 1000;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  min-width: 280px;
+  max-width: 400px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.command-palette__header {
+  padding: 8px 12px;
+  background: #21262d;
+  border-bottom: 1px solid #30363d;
+  font-size: 13px;
+  color: #8b949e;
+}
+
+.command-palette__prefix {
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+.command-palette__query {
+  color: #c9d1d9;
+}
+
+.command-palette__list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.command-palette__item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: background 0.1s;
+}
+
+.command-palette__item:hover,
+.command-palette__item--selected {
+  background: #21262d;
+}
+
+.command-palette__item--selected {
+  background: #1f6feb;
+}
+
+.command-palette__item-name {
+  color: #58a6ff;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.command-palette__item--selected .command-palette__item-name {
+  color: #fff;
+}
+
+.command-palette__item-desc {
+  color: #8b949e;
+  font-size: 12px;
+}
+
+.command-palette__item--selected .command-palette__item-desc {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.command-palette__hint {
+  padding: 6px 12px;
+  background: #21262d;
+  border-top: 1px solid #30363d;
+  font-size: 11px;
+  color: #6e7681;
+  display: flex;
+  gap: 12px;
+}
+
+.command-palette__hint kbd {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 10px;
+  font-family: inherit;
+}

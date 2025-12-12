@@ -53,6 +53,13 @@ bassline-web/.vite/
 *.tsbuildinfo
 bassline-web/*.tsbuildinfo
 
+# Generated type declarations (from JSDoc)
+packages/**/*.d.ts
+packages/**/*.d.ts.map
+
+# Generated documentation
+docs/
+
 # Optional npm cache directory
 .npm
 bassline-web/.npm

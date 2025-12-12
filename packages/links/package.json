@@ -4,6 +4,7 @@
   "description": "Bidirectional link tracking for Bassline resources",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },

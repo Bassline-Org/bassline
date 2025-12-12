@@ -4,6 +4,7 @@
   "description": "HTTP and WebSocket servers as Bassline resources",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./http": "./src/http.js",

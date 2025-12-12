@@ -4,6 +4,7 @@
   "description": "WebSocket remote client for Bassline (browser)",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },

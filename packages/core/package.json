@@ -4,6 +4,7 @@
   "description": "Minimal resource model for reflective distributed programming",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./bassline": "./src/bassline.js",

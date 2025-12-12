@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.jsx",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.jsx"
   },

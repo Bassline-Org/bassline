@@ -1,4 +1,4 @@
-import { createSignal, createMemo, For, Show } from 'solid-js'
+import { createSignal, createMemo, For, Show, onMount, onCleanup } from 'solid-js'
 import { useResource } from '@bassline/solid'
 
 // Handler categories with descriptions based on packages/handlers/README.md
@@ -14,8 +14,8 @@ const HANDLER_CATEGORIES = {
       average: { description: 'Return average of numeric values', config: null },
       concat: { description: 'Concatenate arrays or strings', config: null },
       first: { description: 'Return first non-null value', config: null },
-      last: { description: 'Return last non-null value', config: null }
-    }
+      last: { description: 'Return last non-null value', config: null },
+    },
   },
   binary: {
     name: 'Binary Operations',
@@ -26,8 +26,8 @@ const HANDLER_CATEGORIES = {
       multiply: { description: 'Multiply input by value', config: { value: 'number' } },
       divide: { description: 'Divide input by value', config: { value: 'number' } },
       modulo: { description: 'Return input modulo value', config: { value: 'number' } },
-      power: { description: 'Raise input to power', config: { value: 'number' } }
-    }
+      power: { description: 'Raise input to power', config: { value: 'number' } },
+    },
   },
   arithmetic: {
     name: 'Arithmetic (Unary)',
@@ -37,8 +37,8 @@ const HANDLER_CATEGORIES = {
       abs: { description: 'Return absolute value', config: null },
       round: { description: 'Round to nearest integer', config: null },
       floor: { description: 'Round down to integer', config: null },
-      ceil: { description: 'Round up to integer', config: null }
-    }
+      ceil: { description: 'Round up to integer', config: null },
+    },
   },
   comparison: {
     name: 'Comparison',
@@ -50,8 +50,8 @@ const HANDLER_CATEGORIES = {
       gte: { description: 'Greater than or equal', config: { value: 'number' } },
       lt: { description: 'Less than value', config: { value: 'number' } },
       lte: { description: 'Less than or equal', config: { value: 'number' } },
-      deepEq: { description: 'Deep equality check', config: { value: 'any' } }
-    }
+      deepEq: { description: 'Deep equality check', config: { value: 'any' } },
+    },
   },
   logic: {
     name: 'Logic',
@@ -60,8 +60,8 @@ const HANDLER_CATEGORIES = {
       and: { description: 'Logical AND of all inputs', config: null },
       or: { description: 'Logical OR of all inputs', config: null },
       not: { description: 'Logical NOT', config: null },
-      xor: { description: 'Logical XOR', config: null }
-    }
+      xor: { description: 'Logical XOR', config: null },
+    },
   },
   string: {
     name: 'String',
@@ -73,12 +73,15 @@ const HANDLER_CATEGORIES = {
       uppercase: { description: 'Convert to uppercase', config: null },
       lowercase: { description: 'Convert to lowercase', config: null },
       strSlice: { description: 'Extract substring', config: { start: 'number', end: 'number' } },
-      replace: { description: 'Replace pattern with string', config: { pattern: 'string', replacement: 'string' } },
+      replace: {
+        description: 'Replace pattern with string',
+        config: { pattern: 'string', replacement: 'string' },
+      },
       match: { description: 'Match against regex pattern', config: { pattern: 'string' } },
       startsWith: { description: 'Check if starts with prefix', config: { value: 'string' } },
       endsWith: { description: 'Check if ends with suffix', config: { value: 'string' } },
-      includes: { description: 'Check if contains substring', config: { value: 'string' } }
-    }
+      includes: { description: 'Check if contains substring', config: { value: 'string' } },
+    },
   },
   array: {
     name: 'Array',
@@ -97,8 +100,8 @@ const HANDLER_CATEGORIES = {
       compact: { description: 'Remove null/undefined', config: null },
       take: { description: 'Take first n elements', config: { count: 'number' } },
       drop: { description: 'Drop first n elements', config: { count: 'number' } },
-      chunk: { description: 'Split into chunks', config: { size: 'number' } }
-    }
+      chunk: { description: 'Split into chunks', config: { size: 'number' } },
+    },
   },
   arrayReducers: {
     name: 'Array Reducers',
@@ -116,8 +119,11 @@ const HANDLER_CATEGORIES = {
       minBy: { description: 'Min by key', config: { key: 'string' } },
       maxBy: { description: 'Max by key', config: { key: 'string' } },
       fold: { description: 'Reduce with handler', config: { handler: 'string', initial: 'any' } },
-      scan: { description: 'Reduce keeping intermediates', config: { handler: 'string', initial: 'any' } }
-    }
+      scan: {
+        description: 'Reduce keeping intermediates',
+        config: { handler: 'string', initial: 'any' },
+      },
+    },
   },
   object: {
     name: 'Object',
@@ -131,8 +137,8 @@ const HANDLER_CATEGORIES = {
       has: { description: 'Check if property exists', config: { key: 'string' } },
       omit: { description: 'Remove keys', config: { keys: 'array' } },
       defaults: { description: 'Apply default values', config: { defaults: 'object' } },
-      merge: { description: 'Merge objects', config: null }
-    }
+      merge: { description: 'Merge objects', config: null },
+    },
   },
   type: {
     name: 'Type Checking',
@@ -143,18 +149,24 @@ const HANDLER_CATEGORIES = {
       isString: { description: 'Check if string', config: null },
       isArray: { description: 'Check if array', config: null },
       isObject: { description: 'Check if object', config: null },
-      typeOf: { description: 'Get type name', config: null }
-    }
+      typeOf: { description: 'Get type name', config: null },
+    },
   },
   conditional: {
     name: 'Conditional',
     description: 'Conditional logic handlers',
     handlers: {
       filter: { description: 'Filter by predicate handler', config: { handler: 'string' } },
-      when: { description: 'Apply handler if predicate', config: { predicate: 'string', handler: 'string' } },
-      ifElse: { description: 'If-then-else with handlers', config: { predicate: 'string', onTrue: 'string', onFalse: 'string' } },
-      cond: { description: 'Multiple conditions', config: { conditions: 'array' } }
-    }
+      when: {
+        description: 'Apply handler if predicate',
+        config: { predicate: 'string', handler: 'string' },
+      },
+      ifElse: {
+        description: 'If-then-else with handlers',
+        config: { predicate: 'string', onTrue: 'string', onFalse: 'string' },
+      },
+      cond: { description: 'Multiple conditions', config: { conditions: 'array' } },
+    },
   },
   structural: {
     name: 'Structural',
@@ -164,8 +176,8 @@ const HANDLER_CATEGORIES = {
       zip: { description: 'Combine into object', config: { keys: 'array' } },
       unzip: { description: 'Split object to arrays', config: null },
       pick: { description: 'Select keys', config: { keys: 'array' } },
-      map: { description: 'Apply handler to each', config: { handler: 'string' } }
-    }
+      map: { description: 'Apply handler to each', config: { handler: 'string' } },
+    },
   },
   utility: {
     name: 'Utility',
@@ -178,8 +190,8 @@ const HANDLER_CATEGORIES = {
       tap: { description: 'Side effect, return input', config: { handler: 'string' } },
       defaultTo: { description: 'Default if null', config: { value: 'any' } },
       format: { description: 'Format string template', config: { template: 'string' } },
-      coerce: { description: 'Convert to type', config: { to: 'string' } }
-    }
+      coerce: { description: 'Convert to type', config: { to: 'string' } },
+    },
   },
   combinators: {
     name: 'Combinators',
@@ -193,9 +205,12 @@ const HANDLER_CATEGORIES = {
       flip: { description: 'f(y,x) instead of f(x,y)', config: null },
       fork: { description: 'Apply multiple handlers', config: null },
       converge: { description: 'Converge results', config: null },
-      tryCatch: { description: 'Try handler, catch errors', config: { handler: 'string', fallback: 'string' } }
-    }
-  }
+      tryCatch: {
+        description: 'Try handler, catch errors',
+        config: { handler: 'string', fallback: 'string' },
+      },
+    },
+  },
 }
 
 interface HandlerPickerProps {
@@ -209,6 +224,20 @@ export default function HandlerPicker(props: HandlerPickerProps) {
   const [search, setSearch] = createSignal('')
   const [selectedCategory, setSelectedCategory] = createSignal<string | null>(null)
   const [expanded, setExpanded] = createSignal(false)
+  const [dropdownPosition, setDropdownPosition] = createSignal({ top: 0, left: 0, width: 0 })
+  let inputRef: HTMLDivElement | undefined
+  let containerRef: HTMLDivElement | undefined
+
+  // Close dropdown when clicking outside
+  onMount(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (expanded() && containerRef && !containerRef.contains(e.target as Node)) {
+        setExpanded(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    onCleanup(() => document.removeEventListener('mousedown', handleClickOutside))
+  })
 
   // Filter handlers based on search
   const filteredCategories = createMemo(() => {
@@ -219,8 +248,10 @@ export default function HandlerPicker(props: HandlerPickerProps) {
     for (const [catKey, category] of Object.entries(HANDLER_CATEGORIES)) {
       const matchingHandlers: typeof category.handlers = {} as any
       for (const [name, info] of Object.entries(category.handlers)) {
-        if (name.toLowerCase().includes(searchTerm) ||
-            info.description.toLowerCase().includes(searchTerm)) {
+        if (
+          name.toLowerCase().includes(searchTerm) ||
+          info.description.toLowerCase().includes(searchTerm)
+        ) {
           matchingHandlers[name] = info
         }
       }
@@ -240,7 +271,7 @@ export default function HandlerPicker(props: HandlerPickerProps) {
       if (handlerName in category.handlers) {
         return {
           name: handlerName,
-          ...category.handlers[handlerName as keyof typeof category.handlers]
+          ...category.handlers[handlerName as keyof typeof category.handlers],
         }
       }
     }
@@ -252,9 +283,46 @@ export default function HandlerPicker(props: HandlerPickerProps) {
     setExpanded(false)
   }
 
+  function toggleExpanded() {
+    if (!expanded() && inputRef) {
+      const rect = inputRef.getBoundingClientRect()
+      const dropdownWidth = 450 // Fixed width for better readability
+      const dropdownHeight = 450 // Approximate max height
+      const viewportWidth = window.innerWidth
+      const viewportHeight = window.innerHeight
+      const padding = 16 // Padding from viewport edges
+
+      // Calculate left position, ensure dropdown doesn't overflow right edge
+      let left = rect.left
+      if (left + dropdownWidth > viewportWidth - padding) {
+        left = Math.max(padding, viewportWidth - dropdownWidth - padding)
+      }
+
+      // Calculate top position, flip above if not enough room below
+      let top = rect.bottom + 4
+      if (top + dropdownHeight > viewportHeight - padding) {
+        // Try placing above the input
+        const aboveTop = rect.top - dropdownHeight - 4
+        if (aboveTop > padding) {
+          top = aboveTop
+        } else {
+          // Just cap it at viewport bottom with scroll
+          top = Math.min(top, viewportHeight - dropdownHeight - padding)
+        }
+      }
+
+      setDropdownPosition({
+        top,
+        left,
+        width: dropdownWidth,
+      })
+    }
+    setExpanded(!expanded())
+  }
+
   return (
-    <div class="handler-picker">
-      <div class="picker-input" onClick={() => setExpanded(!expanded())}>
+    <div ref={containerRef} class="handler-picker">
+      <div ref={inputRef} class="picker-input" onClick={toggleExpanded}>
         <Show when={props.value} fallback={<span class="placeholder">Select a handler...</span>}>
           <span class="selected-handler">
             <code>{props.value}</code>
@@ -267,7 +335,15 @@ export default function HandlerPicker(props: HandlerPickerProps) {
       </div>
 
       <Show when={expanded()}>
-        <div class="picker-dropdown">
+        <div
+          class="picker-dropdown"
+          style={{
+            position: 'fixed',
+            top: `${dropdownPosition().top}px`,
+            left: `${dropdownPosition().left}px`,
+            width: `${dropdownPosition().width}px`,
+          }}
+        >
           <input
             type="text"
             class="picker-search"
@@ -283,7 +359,9 @@ export default function HandlerPicker(props: HandlerPickerProps) {
                 <div class="picker-category">
                   <div
                     class={`category-header ${selectedCategory() === catKey ? 'expanded' : ''}`}
-                    onClick={() => setSelectedCategory(selectedCategory() === catKey ? null : catKey)}
+                    onClick={() =>
+                      setSelectedCategory(selectedCategory() === catKey ? null : catKey)
+                    }
                   >
                     <span class="category-name">{category.name}</span>
                     <span class="category-count">{Object.keys(category.handlers).length}</span>
@@ -299,7 +377,9 @@ export default function HandlerPicker(props: HandlerPickerProps) {
                             <code class="handler-name">{name}</code>
                             <span class="handler-description">{info.description}</span>
                             <Show when={info.config}>
-                              <span class="has-config" title="Requires config">*</span>
+                              <span class="has-config" title="Requires config">
+                                *
+                              </span>
                             </Show>
                           </div>
                         )}
@@ -360,18 +440,13 @@ export default function HandlerPicker(props: HandlerPickerProps) {
         }
 
         .picker-dropdown {
-          position: absolute;
-          top: 100%;
-          left: 0;
-          right: 0;
-          margin-top: 4px;
           background: #161b22;
           border: 1px solid #30363d;
-          border-radius: 6px;
-          max-height: 400px;
+          border-radius: 8px;
+          max-height: 450px;
           overflow-y: auto;
-          z-index: 100;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+          z-index: 10000;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.5);
         }
 
         .picker-search {

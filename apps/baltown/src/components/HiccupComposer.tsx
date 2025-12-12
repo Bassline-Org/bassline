@@ -23,12 +23,7 @@ export default function HiccupComposer(props: HiccupComposerProps) {
   return (
     <div class="hiccup-composer">
       <div class="composer-tree">
-        <HiccupNode
-          node={props.value}
-          onChange={props.onChange}
-          depth={0}
-          path={[]}
-        />
+        <HiccupNode node={props.value} onChange={props.onChange} depth={0} path={[]} />
       </div>
 
       <div class="composer-preview">
@@ -90,9 +85,13 @@ function HiccupNode(props: HiccupNodeProps) {
 
   // Parse node structure
   const isArray = () => Array.isArray(props.node)
-  const handlerName = () => isArray() ? (props.node as any[])[0] : props.node
-  const hasConfig = () => isArray() && (props.node as any[]).length > 1 && typeof (props.node as any[])[1] === 'object' && !Array.isArray((props.node as any[])[1])
-  const config = () => hasConfig() ? (props.node as any[])[1] : null
+  const handlerName = () => (isArray() ? (props.node as any[])[0] : props.node)
+  const hasConfig = () =>
+    isArray() &&
+    (props.node as any[]).length > 1 &&
+    typeof (props.node as any[])[1] === 'object' &&
+    !Array.isArray((props.node as any[])[1])
+  const config = () => (hasConfig() ? (props.node as any[])[1] : null)
   const children = () => {
     if (!isArray()) return []
     const arr = props.node as any[]
@@ -103,7 +102,21 @@ function HiccupNode(props: HiccupNodeProps) {
   // Check if this handler is a combinator (can have children)
   const isCombinator = () => {
     const name = handlerName()
-    return ['pipe', 'sequence', 'compose', 'fork', 'converge', 'both', 'hook', 'tryCatch', 'map', 'filter', 'when', 'ifElse', 'cond'].includes(name)
+    return [
+      'pipe',
+      'sequence',
+      'compose',
+      'fork',
+      'converge',
+      'both',
+      'hook',
+      'tryCatch',
+      'map',
+      'filter',
+      'when',
+      'ifElse',
+      'cond',
+    ].includes(name)
   }
 
   // Get handler info from categories
@@ -122,7 +135,7 @@ function HiccupNode(props: HiccupNodeProps) {
     if (!isArray()) {
       props.onChange(newName)
     } else {
-      const arr = [...props.node as any[]]
+      const arr = [...(props.node as any[])]
       arr[0] = newName
       props.onChange(arr as HiccupNode)
     }
@@ -136,7 +149,7 @@ function HiccupNode(props: HiccupNodeProps) {
       if (!isArray()) {
         props.onChange([handlerName(), newConfig])
       } else {
-        const arr = [...props.node as any[]]
+        const arr = [...(props.node as any[])]
         if (hasConfig()) {
           arr[1] = newConfig
         } else {
@@ -153,7 +166,7 @@ function HiccupNode(props: HiccupNodeProps) {
   // Remove config
   function removeConfig() {
     if (isArray() && hasConfig()) {
-      const arr = [...props.node as any[]]
+      const arr = [...(props.node as any[])]
       arr.splice(1, 1)
       if (arr.length === 1) {
         props.onChange(arr[0])
@@ -165,7 +178,7 @@ function HiccupNode(props: HiccupNodeProps) {
 
   // Add child handler
   function addChild() {
-    const arr = isArray() ? [...props.node as any[]] : [props.node]
+    const arr = isArray() ? [...(props.node as any[])] : [props.node]
     arr.push('identity')
     props.onChange(arr as HiccupNode)
   }
@@ -173,7 +186,7 @@ function HiccupNode(props: HiccupNodeProps) {
   // Update child at index
   function updateChild(index: number, newChild: HiccupNode) {
     if (!isArray()) return
-    const arr = [...props.node as any[]]
+    const arr = [...(props.node as any[])]
     const startIdx = hasConfig() ? 2 : 1
     arr[startIdx + index] = newChild
     props.onChange(arr as HiccupNode)
@@ -182,7 +195,7 @@ function HiccupNode(props: HiccupNodeProps) {
   // Remove child at index
   function removeChild(index: number) {
     if (!isArray()) return
-    const arr = [...props.node as any[]]
+    const arr = [...(props.node as any[])]
     const startIdx = hasConfig() ? 2 : 1
     arr.splice(startIdx + index, 1)
     if (arr.length === 1) {
@@ -202,49 +215,56 @@ function HiccupNode(props: HiccupNodeProps) {
   }
 
   return (
-    <div class="hiccup-node" style={{ "margin-left": `${props.depth * 20}px` }}>
+    <div class="hiccup-node" style={{ 'margin-left': `${props.depth * 20}px` }}>
       <div class="node-header">
-        <Show when={!editing()} fallback={
-          <div class="node-picker">
-            <HandlerPicker
-              value={handlerName()}
-              onChange={updateHandler}
-            />
-          </div>
-        }>
+        <Show
+          when={!editing()}
+          fallback={
+            <div class="node-picker">
+              <HandlerPicker value={handlerName()} onChange={updateHandler} />
+            </div>
+          }
+        >
           <span class="node-name" onClick={() => setEditing(true)}>
             {handlerName()}
           </span>
         </Show>
 
         <Show when={handlerRequiresConfig(handlerName())}>
-          <Show when={!configEditing()} fallback={
-            <div class="config-editor-expanded" onClick={(e) => e.stopPropagation()}>
-              <ConfigDispatcher
-                handler={handlerName()}
-                config={config() ?? {}}
-                onChange={(newConfig) => {
-                  if (!isArray()) {
-                    props.onChange([handlerName(), newConfig])
-                  } else {
-                    const arr = [...props.node as any[]]
-                    if (hasConfig()) {
-                      arr[1] = newConfig
+          <Show
+            when={!configEditing()}
+            fallback={
+              <div class="config-editor-expanded" onClick={(e) => e.stopPropagation()}>
+                <ConfigDispatcher
+                  handler={handlerName()}
+                  config={config() ?? {}}
+                  onChange={(newConfig) => {
+                    if (!isArray()) {
+                      props.onChange([handlerName(), newConfig])
                     } else {
-                      arr.splice(1, 0, newConfig)
+                      const arr = [...(props.node as any[])]
+                      if (hasConfig()) {
+                        arr[1] = newConfig
+                      } else {
+                        arr.splice(1, 0, newConfig)
+                      }
+                      props.onChange(arr as HiccupNode)
                     }
-                    props.onChange(arr as HiccupNode)
-                  }
-                }}
-              />
-              <button class="btn-sm done-btn" onClick={() => setConfigEditing(false)}>Done</button>
-            </div>
-          }>
+                  }}
+                />
+                <button class="btn-sm done-btn" onClick={() => setConfigEditing(false)}>
+                  Done
+                </button>
+              </div>
+            }
+          >
             <Show when={hasConfig()}>
               <span class="node-config" onClick={() => setConfigEditing(true)}>
                 {JSON.stringify(config())}
               </span>
-              <button class="btn-icon" onClick={removeConfig} title="Remove config">×</button>
+              <button class="btn-icon" onClick={removeConfig} title="Remove config">
+                ×
+              </button>
             </Show>
             <Show when={!hasConfig()}>
               <button class="btn-sm secondary" onClick={() => setConfigEditing(true)}>
@@ -255,11 +275,21 @@ function HiccupNode(props: HiccupNodeProps) {
         </Show>
 
         <Show when={isCombinator()}>
-          <button class="btn-sm secondary" onClick={addChild}>+ Add</button>
+          <button class="btn-sm secondary" onClick={addChild}>
+            + Add
+          </button>
         </Show>
 
         <Show when={props.depth > 0}>
-          <button class="btn-icon delete" onClick={() => {/* handled by parent */}} title="Remove">×</button>
+          <button
+            class="btn-icon delete"
+            onClick={() => {
+              /* handled by parent */
+            }}
+            title="Remove"
+          >
+            ×
+          </button>
         </Show>
       </div>
 
@@ -317,7 +347,7 @@ function HiccupNode(props: HiccupNodeProps) {
 
         .node-picker {
           flex: 1;
-          max-width: 300px;
+          min-width: 250px;
         }
 
         .node-config {

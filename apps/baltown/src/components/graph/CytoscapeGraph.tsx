@@ -9,6 +9,18 @@ import InspectorPanel from './InspectorPanel'
 // Register dagre layout
 cytoscape.use(dagre)
 
+// Handler node data structure for graph-based handlers
+export interface HandlerNodeData {
+  id: string
+  uri: string
+  label: string
+  handler: string | any[] // Handler name or hiccup composition
+  config?: Record<string, any>
+  inputConnections: string[] // URIs of connected input cells
+  outputConnection: string | null // URI of connected output cell
+  position?: { x: number; y: number }
+}
+
 interface CytoscapeGraphProps {
   cells: Array<{
     uri: string
@@ -21,15 +33,23 @@ interface CytoscapeGraphProps {
     output: string
     handler?: string | any[]
   }>
-  onCellClick?: (uri: string) => void
-  onPropagatorClick?: (uri: string) => void
+  handlers?: HandlerNodeData[]
+  onCellClick?: (uri: string, event?: MouseEvent) => void
+  onPropagatorClick?: (uri: string, event?: MouseEvent) => void
+  onHandlerClick?: (uri: string, event?: MouseEvent) => void
+  onCanvasContextMenu?: (
+    position: { x: number; y: number },
+    screenPosition: { x: number; y: number }
+  ) => void
+  onNodeContextMenu?: (uri: string, type: string, screenPosition: { x: number; y: number }) => void
+  onHandlerConnect?: (handlerId: string, cellId: string, type: 'input' | 'output') => void
   firingPropagators?: Set<string>
   onRefresh?: () => void
 }
 
 interface SelectedNodeData {
   id: string
-  type: 'cell' | 'propagator'
+  type: 'cell' | 'propagator' | 'handler'
   uri: string
   name: string
   x: number
@@ -37,8 +57,11 @@ interface SelectedNodeData {
   lattice?: string
   value?: any
   handler?: string | any[]
+  config?: Record<string, any>
   inputs?: string[]
   output?: string
+  inputConnections?: string[]
+  outputConnection?: string | null
 }
 
 /**
@@ -59,7 +82,7 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
     const seenCells = new Set<string>()
 
     // Add cells as nodes
-    props.cells.forEach(cell => {
+    props.cells.forEach((cell) => {
       seenCells.add(cell.uri)
       nodes.push({
         data: {
@@ -68,19 +91,81 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
           type: 'cell',
           uri: cell.uri,
           lattice: cell.lattice,
-          value: cell.value
+          value: cell.value,
         },
-        classes: 'cell'
+        classes: 'cell',
       })
     })
 
+    // Add handler nodes (unpromoted handlers on canvas)
+    props.handlers?.forEach((handler) => {
+      const handlerName =
+        typeof handler.handler === 'string'
+          ? handler.handler
+          : Array.isArray(handler.handler)
+            ? handler.handler[0]
+            : 'handler'
+
+      // Determine handler state for styling
+      const hasInputs = handler.inputConnections.length > 0
+      const hasOutput = handler.outputConnection !== null
+      const isReady = hasInputs && hasOutput
+      const isPartial = hasInputs || hasOutput
+
+      let stateClass = 'incomplete'
+      if (isReady) stateClass = 'ready'
+      else if (isPartial) stateClass = 'partial'
+
+      nodes.push({
+        data: {
+          id: handler.uri,
+          label: handlerName,
+          type: 'handler',
+          uri: handler.uri,
+          handler: handler.handler,
+          config: handler.config,
+          inputConnections: handler.inputConnections,
+          outputConnection: handler.outputConnection,
+        },
+        classes: `handler ${stateClass}`,
+        position: handler.position,
+      })
+
+      // Add edges from input cells to handler
+      handler.inputConnections.forEach((input) => {
+        if (seenCells.has(input)) {
+          edges.push({
+            data: {
+              id: `${input}->${handler.uri}`,
+              source: input,
+              target: handler.uri,
+              edgeType: 'handler-input',
+            },
+          })
+        }
+      })
+
+      // Add edge from handler to output cell
+      if (handler.outputConnection && seenCells.has(handler.outputConnection)) {
+        edges.push({
+          data: {
+            id: `${handler.uri}->${handler.outputConnection}`,
+            source: handler.uri,
+            target: handler.outputConnection,
+            edgeType: 'handler-output',
+          },
+        })
+      }
+    })
+
     // Add propagators as nodes
-    props.propagators.forEach(prop => {
-      const handlerName = typeof prop.handler === 'string'
-        ? prop.handler
-        : Array.isArray(prop.handler)
-          ? prop.handler[0]
-          : '?'
+    props.propagators.forEach((prop) => {
+      const handlerName =
+        typeof prop.handler === 'string'
+          ? prop.handler
+          : Array.isArray(prop.handler)
+            ? prop.handler[0]
+            : '?'
 
       nodes.push({
         data: {
@@ -90,13 +175,13 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
           uri: prop.uri,
           handler: prop.handler,
           inputs: prop.inputs,
-          output: prop.output
+          output: prop.output,
         },
-        classes: 'propagator'
+        classes: 'propagator',
       })
 
       // Add edges from inputs to propagator
-      prop.inputs?.forEach(input => {
+      prop.inputs?.forEach((input) => {
         // Add input cell if not already added
         if (!seenCells.has(input)) {
           seenCells.add(input)
@@ -105,9 +190,9 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
               id: input,
               label: input.split('/').pop() || 'cell',
               type: 'cell',
-              uri: input
+              uri: input,
             },
-            classes: 'cell'
+            classes: 'cell',
           })
         }
 
@@ -116,8 +201,8 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
             id: `${input}->${prop.uri}`,
             source: input,
             target: prop.uri,
-            edgeType: 'input'
-          }
+            edgeType: 'input',
+          },
         })
       })
 
@@ -130,9 +215,9 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
               id: prop.output,
               label: prop.output.split('/').pop() || 'output',
               type: 'cell',
-              uri: prop.output
+              uri: prop.output,
             },
-            classes: 'cell output'
+            classes: 'cell output',
           })
         }
 
@@ -141,8 +226,8 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
             id: `${prop.uri}->${prop.output}`,
             source: prop.uri,
             target: prop.output,
-            edgeType: 'output'
-          }
+            edgeType: 'output',
+          },
         })
       }
     })
@@ -164,93 +249,153 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
         {
           selector: 'node.cell',
           style: {
-            'shape': 'round-rectangle',
-            'width': 120,
-            'height': 50,
+            shape: 'round-rectangle',
+            width: 120,
+            height: 50,
             'background-color': '#21262d',
             'border-width': 2,
             'border-color': '#30363d',
-            'label': 'data(label)',
+            label: 'data(label)',
             'text-valign': 'center',
             'text-halign': 'center',
-            'color': '#c9d1d9',
+            color: '#c9d1d9',
             'font-size': '12px',
-            'font-family': 'monospace'
-          }
+            'font-family': 'monospace',
+          },
         },
         // Output cells - green tint
         {
           selector: 'node.cell.output',
           style: {
-            'border-color': '#3fb950'
-          }
+            'border-color': '#3fb950',
+          },
         },
         // Propagator nodes - diamonds
         {
           selector: 'node.propagator',
           style: {
-            'shape': 'diamond',
-            'width': 100,
-            'height': 60,
+            shape: 'diamond',
+            width: 100,
+            height: 60,
             'background-color': '#161b22',
             'border-width': 2,
             'border-color': '#58a6ff',
-            'label': 'data(label)',
+            label: 'data(label)',
             'text-valign': 'center',
             'text-halign': 'center',
-            'color': '#58a6ff',
+            color: '#58a6ff',
             'font-size': '11px',
-            'font-family': 'monospace'
-          }
+            'font-family': 'monospace',
+          },
+        },
+        // Handler nodes - hexagons (orange)
+        {
+          selector: 'node.handler',
+          style: {
+            shape: 'hexagon',
+            width: 140,
+            height: 80,
+            'background-color': '#161b22',
+            'border-width': 2,
+            'border-color': '#f0883e',
+            'border-style': 'dashed',
+            label: 'data(label)',
+            'text-valign': 'center',
+            'text-halign': 'center',
+            color: '#f0883e',
+            'font-size': '12px',
+            'font-family': 'monospace',
+          },
+        },
+        // Handler states
+        {
+          selector: 'node.handler.incomplete',
+          style: {
+            'border-style': 'dashed',
+            'border-color': '#f0883e',
+            opacity: 0.8,
+          },
+        },
+        {
+          selector: 'node.handler.partial',
+          style: {
+            'border-style': 'solid',
+            'border-color': '#f0883e',
+          },
+        },
+        {
+          selector: 'node.handler.ready',
+          style: {
+            'border-style': 'solid',
+            'border-color': '#3fb950',
+            color: '#3fb950',
+          },
+        },
+        // Handler edges - orange/dashed
+        {
+          selector: 'edge[edgeType="handler-input"]',
+          style: {
+            'line-color': '#f0883e',
+            'target-arrow-color': '#f0883e',
+            'line-style': 'dashed',
+          },
+        },
+        {
+          selector: 'edge[edgeType="handler-output"]',
+          style: {
+            'line-color': '#f0883e',
+            'target-arrow-color': '#f0883e',
+            'line-style': 'dashed',
+          },
         },
         // Selected nodes
         {
           selector: 'node:selected',
           style: {
             'border-width': 3,
-            'border-color': '#f0883e'
-          }
+            'border-color': '#f0883e',
+          },
         },
         // Edges
         {
           selector: 'edge',
           style: {
-            'width': 2,
+            width: 2,
             'line-color': '#30363d',
             'target-arrow-color': '#30363d',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
-            'arrow-scale': 0.8
-          }
+            'arrow-scale': 0.8,
+          },
         },
         // Output edges - green
         {
           selector: 'edge[edgeType="output"]',
           style: {
             'line-color': '#3fb950',
-            'target-arrow-color': '#3fb950'
-          }
+            'target-arrow-color': '#3fb950',
+          },
         },
         // Highlighted edges (connected to selected)
         {
           selector: 'edge.highlighted',
           style: {
-            'width': 3,
+            width: 3,
             'line-color': '#58a6ff',
-            'target-arrow-color': '#58a6ff'
-          }
-        }
+            'target-arrow-color': '#58a6ff',
+          },
+        },
       ],
       layout: {
         name: 'dagre',
         rankDir: 'LR', // Left to right
         nodeSep: 80,
         rankSep: 150,
-        padding: 50
+        padding: 50,
       } as any,
       minZoom: 0.2,
       maxZoom: 3,
-      wheelSensitivity: 0.3
+      wheelSensitivity: 0.3,
     })
 
     // Handle node selection
@@ -273,14 +418,22 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
         lattice: data.lattice,
         value: data.value,
         handler: data.handler,
+        config: data.config,
         inputs: data.inputs,
-        output: data.output
+        output: data.output,
+        inputConnections: data.inputConnections,
+        outputConnection: data.outputConnection,
       })
 
+      // Pass the original mouse event for modifier key detection
+      const mouseEvent = evt.originalEvent as MouseEvent | undefined
+
       if (data.type === 'cell') {
-        props.onCellClick?.(data.uri)
-      } else {
-        props.onPropagatorClick?.(data.uri)
+        props.onCellClick?.(data.uri, mouseEvent)
+      } else if (data.type === 'propagator') {
+        props.onPropagatorClick?.(data.uri, mouseEvent)
+      } else if (data.type === 'handler') {
+        props.onHandlerClick?.(data.uri, mouseEvent)
       }
     })
 
@@ -290,6 +443,34 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
         setSelectedNode(null)
         cy?.edges().removeClass('highlighted')
       }
+    })
+
+    // Handle right-click on canvas to show context menu
+    cy.on('cxttap', (evt) => {
+      const originalEvent = evt.originalEvent as MouseEvent
+      originalEvent.preventDefault()
+
+      if (evt.target === cy) {
+        // Right-click on empty canvas - show create menu
+        const pos = evt.position
+        props.onCanvasContextMenu?.(
+          { x: pos.x, y: pos.y },
+          { x: originalEvent.clientX, y: originalEvent.clientY }
+        )
+      }
+    })
+
+    // Handle right-click on nodes to show node context menu
+    cy.on('cxttap', 'node', (evt) => {
+      const originalEvent = evt.originalEvent as MouseEvent
+      originalEvent.preventDefault()
+
+      const node = evt.target as NodeSingular
+      const data = node.data()
+      props.onNodeContextMenu?.(data.uri, data.type, {
+        x: originalEvent.clientX,
+        y: originalEvent.clientY,
+      })
     })
 
     // Track zoom changes
@@ -318,7 +499,7 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
       rankDir: 'LR',
       nodeSep: 80,
       rankSep: 150,
-      padding: 50
+      padding: 50,
     } as any).run()
 
     cy.fit(undefined, 50)
@@ -329,7 +510,7 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
   createEffect(() => {
     if (!cy || !props.firingPropagators) return
 
-    cy.nodes('.propagator').forEach(node => {
+    cy.nodes('.propagator').forEach((node) => {
       if (props.firingPropagators?.has(node.data('uri'))) {
         node.style('border-color', '#58a6ff')
         node.style('border-width', 4)
@@ -364,13 +545,15 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
   }
 
   function autoLayout() {
-    cy?.layout({
-      name: 'dagre',
-      rankDir: 'LR',
-      nodeSep: 80,
-      rankSep: 150,
-      padding: 50
-    } as any).run()
+    cy
+      ?.layout({
+        name: 'dagre',
+        rankDir: 'LR',
+        nodeSep: 80,
+        rankSep: 150,
+        padding: 50,
+      } as any)
+      .run()
     cy?.fit(undefined, 50)
     setZoom(cy?.zoom() || 1)
   }
@@ -400,7 +583,9 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
       props.onRefresh?.()
     } catch (err) {
       console.error('Failed to delete node:', err)
-      alert(`Failed to delete ${node.name}: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      alert(
+        `Failed to delete ${node.name}: ${err instanceof Error ? err.message : 'Unknown error'}`
+      )
     }
   }
 

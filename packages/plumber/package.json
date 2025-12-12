@@ -4,6 +4,7 @@
   "description": "Rule-based message routing for Bassline",
   "type": "module",
   "main": "src/index.js",
+  "types": "./src/index.d.ts",
   "exports": {
     ".": "./src/index.js"
   },
