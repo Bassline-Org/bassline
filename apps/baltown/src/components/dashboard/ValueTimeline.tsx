@@ -21,10 +21,11 @@ export default function ValueTimeline(props: ValueTimelineProps) {
   // Extract numeric values for sparkline
   const numericValues = createMemo(() => {
     return props.history
-      .map(h => {
+      .map((h) => {
         const v = h.value
         if (typeof v === 'number') return v
-        if (v && typeof v === 'object' && 'value' in v && typeof v.value === 'number') return v.value
+        if (v && typeof v === 'object' && 'value' in v && typeof v.value === 'number')
+          return v.value
         return null
       })
       .filter((v): v is number => v !== null)
@@ -90,7 +91,7 @@ export default function ValueTimeline(props: ValueTimelineProps) {
       max: Math.max(...values),
       avg: values.reduce((a, b) => a + b, 0) / values.length,
       current: values[values.length - 1],
-      change: values.length > 1 ? values[values.length - 1] - values[values.length - 2] : 0
+      change: values.length > 1 ? values[values.length - 1] - values[values.length - 2] : 0,
     }
   })
 
@@ -105,9 +106,21 @@ export default function ValueTimeline(props: ValueTimelineProps) {
 
       <Show when={props.showSparkline !== false && numericValues().length >= 2}>
         <div class="sparkline-container" style={{ height: `${height()}px` }}>
-          <svg width="100%" height="100%" viewBox={`0 0 200 ${height()}`} preserveAspectRatio="none">
+          <svg
+            width="100%"
+            height="100%"
+            viewBox={`0 0 200 ${height()}`}
+            preserveAspectRatio="none"
+          >
             {/* Grid lines */}
-            <line x1="0" y1={height() / 2} x2="200" y2={height() / 2} stroke="#21262d" stroke-dasharray="4"/>
+            <line
+              x1="0"
+              y1={height() / 2}
+              x2="200"
+              y2={height() / 2}
+              stroke="#21262d"
+              stroke-dasharray="4"
+            />
 
             {/* Sparkline */}
             <path
@@ -126,10 +139,9 @@ export default function ValueTimeline(props: ValueTimelineProps) {
                 const min = Math.min(...values)
                 const max = Math.max(...values)
                 const range = max - min || 1
-                const lastY = (height() - 20) - ((values[values.length - 1] - min) / range) * (height() - 20) + 10
-                return (
-                  <circle cx="200" cy={lastY} r="4" fill="#58a6ff" />
-                )
+                const lastY =
+                  height() - 20 - ((values[values.length - 1] - min) / range) * (height() - 20) + 10
+                return <circle cx="200" cy={lastY} r="4" fill="#58a6ff" />
               })()}
             </Show>
           </svg>
@@ -152,7 +164,8 @@ export default function ValueTimeline(props: ValueTimelineProps) {
           <div class="stat">
             <span class="stat-label">Change</span>
             <span class={`stat-value ${stats()!.change >= 0 ? 'positive' : 'negative'}`}>
-              {stats()!.change >= 0 ? '+' : ''}{stats()!.change.toFixed(2)}
+              {stats()!.change >= 0 ? '+' : ''}
+              {stats()!.change.toFixed(2)}
             </span>
           </div>
           <div class="stat">

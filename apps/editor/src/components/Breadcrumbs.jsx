@@ -15,7 +15,13 @@ export default function Breadcrumbs({ uri, onNavigate }) {
             {isLast ? (
               <span className="current">{part}</span>
             ) : (
-              <a href="#" onClick={e => { e.preventDefault(); onNavigate(href) }}>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  onNavigate(href)
+                }}
+              >
                 {part}
               </a>
             )}

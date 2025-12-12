@@ -114,12 +114,14 @@ export default function ConfigDispatcher(props: ConfigDispatcherProps) {
       </Show>
 
       <Show when={meta()}>
-        <Switch fallback={
-          <div class="no-config">
-            <span class="no-config-icon">✓</span>
-            <span class="no-config-text">No configuration needed</span>
-          </div>
-        }>
+        <Switch
+          fallback={
+            <div class="no-config">
+              <span class="no-config-icon">✓</span>
+              <span class="no-config-text">No configuration needed</span>
+            </div>
+          }
+        >
           <Match when={meta()!.uiType === 'numeric'}>
             <NumericConfigEditor
               value={props.config.value ?? 0}

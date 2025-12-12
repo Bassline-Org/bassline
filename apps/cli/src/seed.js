@@ -12,7 +12,7 @@ async function put(uri, body) {
   const res = await fetch(url, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`PUT ${uri} failed: ${res.status}`)
   console.log(`  ✓ ${uri}`)
@@ -33,8 +33,8 @@ async function seed() {
     description: 'A reactive value container',
     schema: {
       value: { type: 'any', required: true },
-      label: { type: 'string' }
-    }
+      label: { type: 'string' },
+    },
   })
 
   await put('bl:///data/types/note', {
@@ -45,8 +45,8 @@ async function seed() {
       title: { type: 'string', required: true },
       content: { type: 'string' },
       tags: { type: 'array', items: 'string' },
-      links: { type: 'array', items: 'uri' }
-    }
+      links: { type: 'array', items: 'uri' },
+    },
   })
 
   await put('bl:///data/types/task', {
@@ -57,8 +57,8 @@ async function seed() {
       title: { type: 'string', required: true },
       status: { type: 'enum', values: ['todo', 'in-progress', 'done'] },
       assignee: { type: 'uri' },
-      parent: { type: 'uri' }
-    }
+      parent: { type: 'uri' },
+    },
   })
 
   await put('bl:///data/types/person', {
@@ -69,8 +69,8 @@ async function seed() {
       name: { type: 'string', required: true },
       email: { type: 'string' },
       role: { type: 'string' },
-      avatar: { type: 'string' }
-    }
+      avatar: { type: 'string' },
+    },
   })
 
   await put('bl:///data/types/type', {
@@ -80,8 +80,8 @@ async function seed() {
     schema: {
       name: { type: 'string', required: true },
       description: { type: 'string' },
-      schema: { type: 'object' }
-    }
+      schema: { type: 'object' },
+    },
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -94,7 +94,7 @@ async function seed() {
     name: 'Alice Chen',
     email: 'alice@example.com',
     role: 'architect',
-    avatar: '👩‍💻'
+    avatar: '👩‍💻',
   })
 
   await put('bl:///data/people/bob', {
@@ -102,7 +102,7 @@ async function seed() {
     name: 'Bob Smith',
     email: 'bob@example.com',
     role: 'developer',
-    avatar: '👨‍🔧'
+    avatar: '👨‍🔧',
   })
 
   await put('bl:///data/people/carol', {
@@ -110,7 +110,7 @@ async function seed() {
     name: 'Carol White',
     email: 'carol@example.com',
     role: 'designer',
-    avatar: '👩‍🎨'
+    avatar: '👩‍🎨',
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -121,25 +121,25 @@ async function seed() {
   await put('bl:///data/cells/counter', {
     type: 'bl:///data/types/cell',
     label: 'Counter',
-    value: 42
+    value: 42,
   })
 
   await put('bl:///data/cells/temperature', {
     type: 'bl:///data/types/cell',
     label: 'Temperature (°C)',
-    value: 21.5
+    value: 21.5,
   })
 
   await put('bl:///data/cells/online-users', {
     type: 'bl:///data/types/cell',
     label: 'Online Users',
-    value: 7
+    value: 7,
   })
 
   await put('bl:///data/cells/build-status', {
     type: 'bl:///data/types/cell',
     label: 'Build Status',
-    value: 'passing'
+    value: 'passing',
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -162,10 +162,7 @@ Key concepts:
 Try navigating around! Click any URI to explore.
     `.trim(),
     tags: ['intro', 'docs'],
-    links: [
-      'bl:///data/notes/architecture',
-      'bl:///data/notes/types'
-    ]
+    links: ['bl:///data/notes/architecture', 'bl:///data/notes/types'],
   })
 
   await put('bl:///data/notes/architecture', {
@@ -182,10 +179,7 @@ The system is built on a few core primitives:
 All these are composable routes that install into a Bassline instance.
     `.trim(),
     tags: ['architecture', 'docs'],
-    links: [
-      'bl:///data/notes/welcome',
-      'bl:///data/types/cell'
-    ]
+    links: ['bl:///data/notes/welcome', 'bl:///data/types/cell'],
   })
 
   await put('bl:///data/notes/types', {
@@ -202,11 +196,7 @@ This enables:
 See the types directory for examples.
     `.trim(),
     tags: ['types', 'docs'],
-    links: [
-      'bl:///data/types/cell',
-      'bl:///data/types/note',
-      'bl:///data/types/type'
-    ]
+    links: ['bl:///data/types/cell', 'bl:///data/types/note', 'bl:///data/types/type'],
   })
 
   await put('bl:///data/notes/ideas/graph-viz', {
@@ -222,10 +212,7 @@ Could query the link index to build the graph dynamically.
 Assigned to Carol for design exploration.
     `.trim(),
     tags: ['idea', 'visualization'],
-    links: [
-      'bl:///data/people/carol',
-      'bl:///data/tasks/graph-view'
-    ]
+    links: ['bl:///data/people/carol', 'bl:///data/tasks/graph-view'],
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -237,7 +224,7 @@ Assigned to Carol for design exploration.
     type: 'bl:///data/types/task',
     title: 'Complete Editor V1',
     status: 'in-progress',
-    assignee: 'bl:///data/people/alice'
+    assignee: 'bl:///data/people/alice',
   })
 
   await put('bl:///data/tasks/address-bar', {
@@ -245,7 +232,7 @@ Assigned to Carol for design exploration.
     title: 'Implement address bar navigation',
     status: 'done',
     parent: 'bl:///data/tasks/editor-v1',
-    assignee: 'bl:///data/people/alice'
+    assignee: 'bl:///data/people/alice',
   })
 
   await put('bl:///data/tasks/view-resolver', {
@@ -253,7 +240,7 @@ Assigned to Carol for design exploration.
     title: 'Type-based view resolution',
     status: 'done',
     parent: 'bl:///data/tasks/editor-v1',
-    assignee: 'bl:///data/people/bob'
+    assignee: 'bl:///data/people/bob',
   })
 
   await put('bl:///data/tasks/graph-view', {
@@ -261,7 +248,7 @@ Assigned to Carol for design exploration.
     title: 'Design graph visualization view',
     status: 'todo',
     parent: 'bl:///data/tasks/editor-v1',
-    assignee: 'bl:///data/people/carol'
+    assignee: 'bl:///data/people/carol',
   })
 
   await put('bl:///data/tasks/realtime-sync', {
@@ -269,7 +256,7 @@ Assigned to Carol for design exploration.
     title: 'WebSocket live updates',
     status: 'todo',
     parent: 'bl:///data/tasks/editor-v1',
-    assignee: 'bl:///data/people/bob'
+    assignee: 'bl:///data/people/bob',
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -285,8 +272,8 @@ Assigned to Carol for design exploration.
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       match: { body: { type: 'bl:///data/types/cell' } },
-      port: 'cell-updates'
-    })
+      port: 'cell-updates',
+    }),
   }).then(() => console.log('  ✓ bl:///plumb/rules/cell-watcher'))
 
   await fetch(plumbUrl('task-watcher'), {
@@ -294,8 +281,8 @@ Assigned to Carol for design exploration.
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       match: { body: { type: 'bl:///data/types/task' } },
-      port: 'task-updates'
-    })
+      port: 'task-updates',
+    }),
   }).then(() => console.log('  ✓ bl:///plumb/rules/task-watcher'))
 
   // ═══════════════════════════════════════════════════════════════════
@@ -312,7 +299,7 @@ Assigned to Carol for design exploration.
   await put('bl:///propagators/add-ab', {
     inputs: ['bl:///cells/a', 'bl:///cells/b'],
     output: 'bl:///cells/sum',
-    handler: 'sum'
+    handler: 'sum',
   })
 
   // Set initial values - this triggers the propagator
@@ -328,7 +315,7 @@ Assigned to Carol for design exploration.
   await put('bl:///propagators/multiply-xy', {
     inputs: ['bl:///cells/x', 'bl:///cells/y'],
     output: 'bl:///cells/product',
-    handler: 'product'
+    handler: 'product',
   })
 
   // Set initial values - this triggers the propagator
@@ -347,16 +334,16 @@ Assigned to Carol for design exploration.
   // JSONPlaceholder monitor - reliable test API
   await put('bl:///monitors/jsonplaceholder', {
     url: 'https://jsonplaceholder.typicode.com/todos/1',
-    interval: 30000,   // every 30 seconds
-    enabled: false,    // start manually for demo
-    extract: 'title'   // just extract the title field
+    interval: 30000, // every 30 seconds
+    enabled: false, // start manually for demo
+    extract: 'title', // just extract the title field
   })
 
   // Another example - posts API
   await put('bl:///monitors/random-post', {
     url: 'https://jsonplaceholder.typicode.com/posts/1',
-    interval: 60000,   // every minute
-    enabled: false
+    interval: 60000, // every minute
+    enabled: false,
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -371,8 +358,8 @@ Assigned to Carol for design exploration.
     recentUris: [
       'bl:///data/notes/welcome',
       'bl:///data/cells/counter',
-      'bl:///data/tasks/editor-v1'
-    ]
+      'bl:///data/tasks/editor-v1',
+    ],
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -387,21 +374,22 @@ Assigned to Carol for design exploration.
     definition: {
       inputs: ['bl:///cells/input'],
       output: 'bl:///cells/doubled',
-      handler: ['multiply', { value: 2 }]
+      handler: ['multiply', { value: 2 }],
     },
-    tags: ['math', 'simple']
+    tags: ['math', 'simple'],
   })
 
   // Example 2: Handler composition - celsius to fahrenheit
   await put('bl:///vals/examples/celsius-to-fahrenheit', {
     description: 'Convert Celsius to Fahrenheit: (C * 9/5) + 32',
     valType: 'handler',
-    definition: ['pipe',
+    definition: [
+      'pipe',
       ['multiply', { value: 9 }],
       ['divide', { value: 5 }],
-      ['add', { value: 32 }]
+      ['add', { value: 32 }],
     ],
-    tags: ['conversion', 'temperature']
+    tags: ['conversion', 'temperature'],
   })
 
   // Example 3: Cell val - shared counter
@@ -410,9 +398,9 @@ Assigned to Carol for design exploration.
     valType: 'cell',
     definition: {
       lattice: 'counter',
-      initial: 0
+      initial: 0,
     },
-    tags: ['state', 'counter']
+    tags: ['state', 'counter'],
   })
 
   // Example 4: Recipe val - counter widget template
@@ -421,19 +409,19 @@ Assigned to Carol for design exploration.
     valType: 'recipe',
     definition: {
       params: {
-        name: { required: true, description: 'Name for the counter' }
+        name: { required: true, description: 'Name for the counter' },
       },
       resources: [
         {
           id: 'counter',
           uri: 'bl:///cells/${name}',
           body: { lattice: 'counter' },
-          init: 0
+          init: 0,
         },
         {
           id: 'doubled',
           uri: 'bl:///cells/${name}-doubled',
-          body: { lattice: 'maxNumber' }
+          body: { lattice: 'maxNumber' },
         },
         {
           id: 'doubler',
@@ -441,12 +429,12 @@ Assigned to Carol for design exploration.
           body: {
             inputs: ['${ref.counter}'],
             output: '${ref.doubled}',
-            handler: ['multiply', { value: 2 }]
-          }
-        }
-      ]
+            handler: ['multiply', { value: 2 }],
+          },
+        },
+      ],
     },
-    tags: ['widget', 'counter', 'recipe']
+    tags: ['widget', 'counter', 'recipe'],
   })
 
   // Example 5: Propagator val - sum two cells
@@ -456,9 +444,9 @@ Assigned to Carol for design exploration.
     definition: {
       inputs: ['bl:///cells/a', 'bl:///cells/b'],
       output: 'bl:///cells/sum',
-      handler: 'sum'
+      handler: 'sum',
     },
-    tags: ['math', 'aggregation']
+    tags: ['math', 'aggregation'],
   })
 
   console.log('\n✨ Seeding complete!\n')
@@ -486,7 +474,7 @@ Assigned to Carol for design exploration.
   console.log()
 }
 
-seed().catch(err => {
+seed().catch((err) => {
   console.error('Seed failed:', err)
   process.exit(1)
 })

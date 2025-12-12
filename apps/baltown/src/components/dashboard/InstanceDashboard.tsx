@@ -53,13 +53,17 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
     // Parse createdResources into cells and propagators by URI pattern
     // Backend returns createdResources array, UI expects separate cells/propagators
     const resources = body.createdResources ?? []
-    const cells = (body.cells ?? resources.filter((r: any) => r.uri?.includes('/cells/'))).map((r: any) => ({
-      id: r.id ?? r.uri?.split('/').pop() ?? 'cell',
-      uri: r.uri
-    }))
-    const propagators = (body.propagators ?? resources.filter((r: any) => r.uri?.includes('/propagators/'))).map((r: any) => ({
+    const cells = (body.cells ?? resources.filter((r: any) => r.uri?.includes('/cells/'))).map(
+      (r: any) => ({
+        id: r.id ?? r.uri?.split('/').pop() ?? 'cell',
+        uri: r.uri,
+      })
+    )
+    const propagators = (
+      body.propagators ?? resources.filter((r: any) => r.uri?.includes('/propagators/'))
+    ).map((r: any) => ({
       id: r.id ?? r.uri?.split('/').pop() ?? 'propagator',
-      uri: r.uri
+      uri: r.uri,
     }))
 
     return {
@@ -69,7 +73,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
       cells,
       propagators,
       createdAt: body.createdAt ?? d.headers?.createdAt,
-      status: body.status ?? 'active'
+      status: body.status ?? 'active',
     }
   })
 
@@ -80,7 +84,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
 
     // For now, treat all cells as potential inputs
     // In a real implementation, you'd analyze the propagator graph
-    return inst.cells.map(c => c.uri)
+    return inst.cells.map((c) => c.uri)
   })
 
   const outputCells = createMemo(() => {
@@ -89,7 +93,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
 
     // Find cells that are propagator outputs
     const outputs = new Set<string>()
-    inst.propagators.forEach(async p => {
+    inst.propagators.forEach(async (p) => {
       try {
         const propData = await bl.get(p.uri)
         if (propData.body?.output) {
@@ -108,7 +112,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
     totalFires: fireCount(),
     uptime: Date.now() - startTime(),
     lastActivity: lastActivity(),
-    liveConnections: isLive() ? 1 : 0
+    liveConnections: isLive() ? 1 : 0,
   }))
 
   // Track cell value changes
@@ -119,10 +123,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
     // Subscribe to cell updates
     const handler = (msg: any) => {
       if (msg.uri === cell) {
-        setCellHistory(prev => [
-          ...prev.slice(-49),
-          { value: msg.body, timestamp: Date.now() }
-        ])
+        setCellHistory((prev) => [...prev.slice(-49), { value: msg.body, timestamp: Date.now() }])
         setLastActivity(Date.now())
       }
     }
@@ -132,7 +133,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
     const interval = setInterval(async () => {
       try {
         const data = await bl.get(cell)
-        setCellHistory(prev => {
+        setCellHistory((prev) => {
           const last = prev[prev.length - 1]
           if (!last || JSON.stringify(last.value) !== JSON.stringify(data.body)) {
             return [...prev.slice(-49), { value: data.body, timestamp: Date.now() }]
@@ -164,9 +165,16 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
 
       <Show when={error()}>
         <div class="error-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 8v4M12 16h.01"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
           </svg>
           <h3>Failed to load instance</h3>
           <p>{error()?.message || 'Unknown error'}</p>
@@ -179,9 +187,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
           <div class="header-info">
             <div class="instance-title">
               <h2>{instance()!.name}</h2>
-              <span class={`status-badge ${instance()!.status}`}>
-                {instance()!.status}
-              </span>
+              <span class={`status-badge ${instance()!.status}`}>{instance()!.status}</span>
               <Show when={isLive()}>
                 <span class="live-badge">
                   <span class="live-dot" />
@@ -194,16 +200,30 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
 
           <div class="header-actions">
             <button class="action-btn" title="Refresh">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 4v6h-6M1 20v-6h6"/>
-                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M23 4v6h-6M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
               </svg>
             </button>
             <button class="action-btn" title="Export">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
             </button>
           </div>
@@ -216,21 +236,18 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
         <div class="dashboard-grid">
           {/* Left column: Inputs */}
           <div class="grid-column inputs-column">
-            <InputPanel
-              cellUris={inputCells()}
-              title="Input Cells"
-            />
+            <InputPanel cellUris={inputCells()} title="Input Cells" />
           </div>
 
           {/* Center column: Flow diagram */}
           <div class="grid-column flow-column">
             <h3 class="column-title">Data Flow</h3>
             <FlowDiagram
-              cells={instance()!.cells.map(c => ({ uri: c.uri }))}
-              propagators={instance()!.propagators.map(p => ({
+              cells={instance()!.cells.map((c) => ({ uri: c.uri }))}
+              propagators={instance()!.propagators.map((p) => ({
                 uri: p.uri,
                 inputs: [],
-                output: ''
+                output: '',
               }))}
               onNodeClick={handleNodeClick}
             />
@@ -241,9 +258,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
             <h3 class="column-title">Propagators</h3>
             <div class="prop-list">
               <For each={instance()!.propagators}>
-                {(prop) => (
-                  <PropagatorStatus uri={prop.uri} compact />
-                )}
+                {(prop) => <PropagatorStatus uri={prop.uri} compact />}
               </For>
             </div>
           </div>
@@ -265,14 +280,7 @@ export default function InstanceDashboard(props: InstanceDashboardProps) {
           <div class="outputs-section">
             <h3 class="section-title">Output Values</h3>
             <div class="outputs-grid">
-              <For each={outputCells()}>
-                {(uri) => (
-                  <CellCard
-                    uri={uri}
-                    showControls={false}
-                  />
-                )}
-              </For>
+              <For each={outputCells()}>{(uri) => <CellCard uri={uri} showControls={false} />}</For>
             </div>
           </div>
         </Show>

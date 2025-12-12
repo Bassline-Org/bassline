@@ -12,21 +12,21 @@ export default function NoteView({ resource, uri, onNavigate }) {
 
       {tags?.length > 0 && (
         <div className="note-tags">
-          {tags.map(tag => (
-            <Badge key={tag} variant="tag-badge">{tag}</Badge>
+          {tags.map((tag) => (
+            <Badge key={tag} variant="tag-badge">
+              {tag}
+            </Badge>
           ))}
         </div>
       )}
 
-      {content && (
-        <div className="note-content">{content}</div>
-      )}
+      {content && <div className="note-content">{content}</div>}
 
       {links?.length > 0 && (
         <div className="note-links">
           <h3>Links</h3>
           <ul>
-            {links.map(link => (
+            {links.map((link) => (
               <li key={link}>
                 <LinkedResource uri={link} onNavigate={onNavigate} />
               </li>

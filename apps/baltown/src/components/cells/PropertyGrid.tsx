@@ -76,7 +76,9 @@ export default function PropertyGrid(props: PropertyGridProps) {
       let value: any = editValue()
 
       // Try to parse as JSON
-      try { value = JSON.parse(value) } catch {
+      try {
+        value = JSON.parse(value)
+      } catch {
         // Keep as string if not valid JSON
       }
 
@@ -99,7 +101,9 @@ export default function PropertyGrid(props: PropertyGridProps) {
     setSaving(true)
     try {
       let value: any = newValue()
-      try { value = JSON.parse(value) } catch {}
+      try {
+        value = JSON.parse(value)
+      } catch {}
 
       const newObj = { ...props.value, [key]: value }
       await bl.put(`${props.uri}/value`, {}, newObj)
@@ -124,9 +128,7 @@ export default function PropertyGrid(props: PropertyGridProps) {
       </div>
 
       <Show when={entries().length === 0}>
-        <div class="grid-empty">
-          No properties. Add some below.
-        </div>
+        <div class="grid-empty">No properties. Add some below.</div>
       </Show>
 
       <div class="grid-entries">
@@ -139,10 +141,7 @@ export default function PropertyGrid(props: PropertyGridProps) {
               <div class="grid-entry">
                 <div class="entry-row">
                   <Show when={isObject}>
-                    <button
-                      class="expand-btn"
-                      onClick={() => toggleExpand(key)}
-                    >
+                    <button class="expand-btn" onClick={() => toggleExpand(key)}>
                       {isExpanded() ? '▼' : '▶'}
                     </button>
                   </Show>
@@ -151,10 +150,7 @@ export default function PropertyGrid(props: PropertyGridProps) {
                   <span class="entry-type">{getTypeIndicator(value)}</span>
 
                   <Show when={editingKey() !== key}>
-                    <span
-                      class="entry-value"
-                      onClick={() => startEdit(key, value)}
-                    >
+                    <span class="entry-value" onClick={() => startEdit(key, value)}>
                       {formatValue(value)}
                     </span>
                   </Show>
@@ -171,17 +167,10 @@ export default function PropertyGrid(props: PropertyGridProps) {
                       }}
                       autofocus
                     />
-                    <button
-                      class="entry-btn save"
-                      onClick={saveEdit}
-                      disabled={saving()}
-                    >
+                    <button class="entry-btn save" onClick={saveEdit} disabled={saving()}>
                       Save
                     </button>
-                    <button
-                      class="entry-btn cancel"
-                      onClick={() => setEditingKey(null)}
-                    >
+                    <button class="entry-btn cancel" onClick={() => setEditingKey(null)}>
                       Cancel
                     </button>
                   </Show>
@@ -215,11 +204,7 @@ export default function PropertyGrid(props: PropertyGridProps) {
             onInput={(e) => setNewValue(e.currentTarget.value)}
             onKeyDown={(e) => e.key === 'Enter' && addProperty()}
           />
-          <button
-            class="add-btn"
-            onClick={addProperty}
-            disabled={saving() || !newKey().trim()}
-          >
+          <button class="add-btn" onClick={addProperty} disabled={saving() || !newKey().trim()}>
             Add
           </button>
         </div>

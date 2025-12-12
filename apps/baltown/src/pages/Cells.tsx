@@ -14,9 +14,9 @@ export default function Cells() {
     const entries = cells()?.entries || []
     const query = filter().toLowerCase()
     if (!query) return entries
-    return entries.filter((cell: any) =>
-      cell.name.toLowerCase().includes(query) ||
-      cell.lattice?.toLowerCase().includes(query)
+    return entries.filter(
+      (cell: any) =>
+        cell.name.toLowerCase().includes(query) || cell.lattice?.toLowerCase().includes(query)
     )
   }
 
@@ -36,9 +36,7 @@ export default function Cells() {
       <div class="page-header">
         <div>
           <h1 class="page-title">Live Cells</h1>
-          <p class="page-subtitle">
-            Real-time view of all cells with lattice-aware controls
-          </p>
+          <p class="page-subtitle">Real-time view of all cells with lattice-aware controls</p>
         </div>
         <div class="header-actions">
           <input
@@ -55,10 +53,10 @@ export default function Cells() {
               title="Grid view"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
               </svg>
             </button>
             <button
@@ -67,13 +65,15 @@ export default function Cells() {
               title="List view"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="3" y="4" width="18" height="4" rx="1"/>
-                <rect x="3" y="10" width="18" height="4" rx="1"/>
-                <rect x="3" y="16" width="18" height="4" rx="1"/>
+                <rect x="3" y="4" width="18" height="4" rx="1" />
+                <rect x="3" y="10" width="18" height="4" rx="1" />
+                <rect x="3" y="16" width="18" height="4" rx="1" />
               </svg>
             </button>
           </div>
-          <button class="btn btn-secondary" onClick={refetch}>Refresh</button>
+          <button class="btn btn-secondary" onClick={refetch}>
+            Refresh
+          </button>
         </div>
       </div>
 
@@ -85,17 +85,24 @@ export default function Cells() {
         <div class="empty-state">
           <h3>Connection Error</h3>
           <p>Make sure the Bassline daemon is running</p>
-          <button class="btn btn-secondary" onClick={refetch}>Retry</button>
+          <button class="btn btn-secondary" onClick={refetch}>
+            Retry
+          </button>
         </div>
       </Show>
 
       <Show when={!loading() && !error()}>
-        <Show when={filteredCells().length > 0} fallback={
-          <div class="empty-state">
-            <h3>No cells found</h3>
-            <p>{filter() ? 'Try a different search term' : 'Create some cells to see them here'}</p>
-          </div>
-        }>
+        <Show
+          when={filteredCells().length > 0}
+          fallback={
+            <div class="empty-state">
+              <h3>No cells found</h3>
+              <p>
+                {filter() ? 'Try a different search term' : 'Create some cells to see them here'}
+              </p>
+            </div>
+          }
+        >
           {/* Stats bar */}
           <div class="cells-stats">
             <span class="stat">{filteredCells().length} cells</span>
@@ -121,10 +128,7 @@ export default function Cells() {
                       </Show>
                     </div>
                     <div class="cell-content">
-                      <LatticeVisualizer
-                        uri={`bl:///r/cells/${cell.name}`}
-                        showControls={true}
-                      />
+                      <LatticeVisualizer uri={`bl:///r/cells/${cell.name}`} showControls={true} />
                     </div>
                   </div>
                 )}

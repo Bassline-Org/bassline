@@ -23,7 +23,7 @@ import { resource } from '@bassline/core'
 export function createHandlerRoutes(options) {
   const { registry, compile } = options
 
-  const handlerResource = resource(r => {
+  const handlerResource = resource((r) => {
     // List all handlers (built-in + custom)
     r.get('/', () => {
       const allNames = registry.listAll()
@@ -31,13 +31,13 @@ export function createHandlerRoutes(options) {
       return {
         headers: { type: 'bl:///types/directory' },
         body: {
-          entries: allNames.map(name => ({
+          entries: allNames.map((name) => ({
             name,
             type: 'handler',
             uri: `bl:///handlers/${name}`,
-            builtin: registry.isBuiltin(name)
-          }))
-        }
+            builtin: registry.isBuiltin(name),
+          })),
+        },
       }
     })
 
@@ -56,10 +56,8 @@ export function createHandlerRoutes(options) {
           builtin: registry.isBuiltin(name),
           description: custom?.description || '',
           createdAt: custom?.createdAt || null,
-          entries: [
-            { name: 'definition', uri: `bl:///handlers/${name}/definition` }
-          ]
-        }
+          entries: [{ name: 'definition', uri: `bl:///handlers/${name}/definition` }],
+        },
       }
     })
 
@@ -76,16 +74,16 @@ export function createHandlerRoutes(options) {
           headers: { type: 'bl:///types/handler-definition' },
           body: {
             type: 'composed',
-            definition: custom.definition
-          }
+            definition: custom.definition,
+          },
         }
       }
 
       return {
         headers: { type: 'bl:///types/handler-definition' },
         body: {
-          type: 'builtin'
-        }
+          type: 'builtin',
+        },
       }
     })
 
@@ -96,7 +94,7 @@ export function createHandlerRoutes(options) {
       if (!body?.definition) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: 'Missing required field: definition' }
+          body: { error: 'Missing required field: definition' },
         }
       }
 
@@ -109,13 +107,13 @@ export function createHandlerRoutes(options) {
             name,
             builtin: false,
             description: handler.description,
-            createdAt: handler.createdAt
-          }
+            createdAt: handler.createdAt,
+          },
         }
       } catch (err) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: err.message }
+          body: { error: err.message },
         }
       }
     })
@@ -129,7 +127,7 @@ export function createHandlerRoutes(options) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///handlers/${name}` }
+        body: { uri: `bl:///handlers/${name}` },
       }
     })
   })

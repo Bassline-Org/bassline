@@ -22,7 +22,7 @@ export function createHttpServerRoutes() {
   /** @type {Map<number, {server: import('http').Server, config: object, connections: Set<import('net').Socket>, startTime: number}>} */
   const servers = new Map()
 
-  const httpResource = resource(r => {
+  const httpResource = resource((r) => {
     // List all HTTP servers
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -31,9 +31,9 @@ export function createHttpServerRoutes() {
           name: String(port),
           type: 'server',
           uri: `bl:///server/http/${port}`,
-          status: s.server.listening ? 'running' : 'stopped'
-        }))
-      }
+          status: s.server.listening ? 'running' : 'stopped',
+        })),
+      },
     }))
 
     r.route('/:port', {
@@ -49,8 +49,8 @@ export function createHttpServerRoutes() {
             status: s.server.listening ? 'running' : 'stopped',
             connections: s.connections.size,
             uptime: Date.now() - s.startTime,
-            config: s.config
-          }
+            config: s.config,
+          },
         }
       },
 
@@ -61,7 +61,7 @@ export function createHttpServerRoutes() {
         if (servers.has(port)) {
           const existing = servers.get(port)
           existing.server.close()
-          existing.connections.forEach(conn => conn.destroy())
+          existing.connections.forEach((conn) => conn.destroy())
         }
 
         const connections = new Set()
@@ -85,7 +85,7 @@ export function createHttpServerRoutes() {
               res.end(JSON.stringify(result))
             } else if (req.method === 'PUT' || req.method === 'POST') {
               let data = ''
-              req.on('data', chunk => data += chunk)
+              req.on('data', (chunk) => (data += chunk))
               req.on('end', async () => {
                 try {
                   const reqBody = data ? JSON.parse(data) : undefined
@@ -107,7 +107,7 @@ export function createHttpServerRoutes() {
           }
         })
 
-        server.on('connection', conn => {
+        server.on('connection', (conn) => {
           connections.add(conn)
           conn.on('close', () => connections.delete(conn))
         })
@@ -117,9 +117,9 @@ export function createHttpServerRoutes() {
 
         return {
           headers: { type: 'bl:///types/server' },
-          body: { port, status: 'running', config: body }
+          body: { port, status: 'running', config: body },
         }
-      }
+      },
     })
   })
 

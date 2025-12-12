@@ -45,11 +45,11 @@ describe('matchesPattern', () => {
 
     it('matches deeply nested properties', () => {
       const pattern = {
-        headers: { type: '^cell$' }
+        headers: { type: '^cell$' },
       }
       const target = {
         headers: { type: 'cell', other: 'stuff' },
-        body: 'ignored'
+        body: 'ignored',
       }
       expect(matchesPattern(pattern, target)).toBe(true)
     })
@@ -57,11 +57,11 @@ describe('matchesPattern', () => {
     it('fails if any property does not match', () => {
       const pattern = {
         uri: '^bl:///data/.*',
-        headers: { type: '^cell$' }
+        headers: { type: '^cell$' },
       }
       const target = {
         uri: 'bl:///data/users',
-        headers: { type: 'document' }
+        headers: { type: 'document' },
       }
       expect(matchesPattern(pattern, target)).toBe(false)
     })
@@ -114,19 +114,19 @@ describe('matchesPattern', () => {
     })
 
     it('matches mixed primitive and string patterns', () => {
-      const pattern = { 
-        headers: { 
+      const pattern = {
+        headers: {
           type: '^cell$',
           count: 5,
-          active: true
-        } 
+          active: true,
+        },
       }
       const target = {
         headers: {
           type: 'cell',
           count: 5,
-          active: true
-        }
+          active: true,
+        },
       }
       expect(matchesPattern(pattern, target)).toBe(true)
     })

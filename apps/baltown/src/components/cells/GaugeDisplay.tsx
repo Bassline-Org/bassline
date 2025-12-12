@@ -38,7 +38,7 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
   createEffect(() => {
     const val = safeValue()
     if (val !== undefined && val !== null) {
-      setHistory(prev => [...prev, val].slice(-20))
+      setHistory((prev) => [...prev, val].slice(-20))
     }
   })
 
@@ -56,7 +56,7 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
     const thresholds = props.thresholds || [
       { value: 25, color: '#f85149' },
       { value: 50, color: '#d29922' },
-      { value: 75, color: '#3fb950' }
+      { value: 75, color: '#3fb950' },
     ]
 
     // Find matching threshold (percentage-based)
@@ -125,11 +125,11 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
           class="gauge-fill"
           style={{
             width: `${percentage()}%`,
-            background: gaugeColor()
+            background: gaugeColor(),
           }}
         />
         <div class="gauge-markers">
-          {props.thresholds?.map(t => (
+          {props.thresholds?.map((t) => (
             <div
               class="gauge-marker"
               style={{ left: `${t.value}%` }}
@@ -166,7 +166,9 @@ export default function GaugeDisplay(props: GaugeDisplayProps) {
           <input
             type="number"
             class="form-input"
-            placeholder={props.latticeType === 'minNumber' ? 'New lower value...' : 'New higher value...'}
+            placeholder={
+              props.latticeType === 'minNumber' ? 'New lower value...' : 'New higher value...'
+            }
             value={inputValue()}
             onInput={(e) => setInputValue(e.currentTarget.value)}
             onKeyDown={(e) => e.key === 'Enter' && updateValue()}

@@ -56,8 +56,15 @@ export default function ToggleSwitch(props: ToggleSwitchProps) {
           <span class="toggle-track">
             <span class="toggle-thumb">
               <Show when={isOn()}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <path d="M20 6L9 17l-5-5"/>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                >
+                  <path d="M20 6L9 17l-5-5" />
                 </svg>
               </Show>
             </span>
@@ -65,16 +72,21 @@ export default function ToggleSwitch(props: ToggleSwitchProps) {
         </button>
 
         <span class="toggle-status">
-          {isOn()
-            ? (props.onLabel || 'Enabled')
-            : (props.offLabel || 'Disabled')}
+          {isOn() ? props.onLabel || 'Enabled' : props.offLabel || 'Disabled'}
         </span>
 
         <Show when={isOn()}>
           <span class="toggle-locked" title="Boolean lattice: once true, always true">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-              <path d="M7 11V7a5 5 0 0110 0v4"/>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
             </svg>
           </span>
         </Show>
@@ -90,8 +102,12 @@ export default function ToggleSwitch(props: ToggleSwitchProps) {
       <Show when={celebrating()}>
         <div class="celebration">
           <span class="confetti">!</span>
-          <span class="confetti" style="animation-delay: 0.1s">!</span>
-          <span class="confetti" style="animation-delay: 0.2s">!</span>
+          <span class="confetti" style="animation-delay: 0.1s">
+            !
+          </span>
+          <span class="confetti" style="animation-delay: 0.2s">
+            !
+          </span>
         </div>
       </Show>
 

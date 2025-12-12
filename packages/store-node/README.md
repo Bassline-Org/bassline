@@ -47,7 +47,7 @@ await bl.put('bl:///code/math', {}, { path: './math.js' })
 
 // Load and use
 const mod = await bl.get('bl:///code/math')
-mod.body.add(1, 2)  // call exported function
+mod.body.add(1, 2) // call exported function
 ```
 
 ## Exports
@@ -60,11 +60,15 @@ mod.body.add(1, 2)  // call exported function
 Install via the daemon's module system:
 
 ```javascript
-await bl.put('bl:///install/file-store', {}, {
-  path: './packages/store-node/src/upgrade-file-store.js',
-  dataDir: '.data',
-  prefix: '/data'
-})
+await bl.put(
+  'bl:///install/file-store',
+  {},
+  {
+    path: './packages/store-node/src/upgrade-file-store.js',
+    dataDir: '.data',
+    prefix: '/data',
+  }
+)
 ```
 
 ## Related

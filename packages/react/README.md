@@ -45,9 +45,7 @@ function UserProfile({ userId }) {
 Context provider for Bassline instance.
 
 ```jsx
-<BasslineProvider value={bl}>
-  {children}
-</BasslineProvider>
+<BasslineProvider value={bl}>{children}</BasslineProvider>
 ```
 
 ### useBassline

@@ -20,12 +20,12 @@ export default function installRecipes(bl) {
   if (bl._plumber) {
     bl._plumber.addRule('recipe-events', {
       match: { headers: { type: '^bl:///types/recipe-' } },
-      port: 'recipe-changes'
+      port: 'recipe-changes',
     })
 
     bl._plumber.addRule('instance-events', {
       match: { headers: { type: '^bl:///types/instance-' } },
-      port: 'instance-changes'
+      port: 'instance-changes',
     })
   }
 

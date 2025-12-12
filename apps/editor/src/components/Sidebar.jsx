@@ -8,7 +8,7 @@ import {
   IconPlus,
   IconRobot,
   IconChevronLeft,
-  IconChevronRight
+  IconChevronRight,
 } from '@tabler/icons-react'
 import { REMOTE_PREFIX } from '../config.js'
 
@@ -17,40 +17,40 @@ const NAV_ITEMS = [
     label: 'Dashboard',
     uri: `${REMOTE_PREFIX}/dashboard`,
     icon: IconLayoutGrid,
-    color: 'var(--type-view)'
+    color: 'var(--type-view)',
   },
   {
     label: 'Cells',
     uri: 'bl:///explore/cells',
     matchPrefix: `${REMOTE_PREFIX}/cells`,
     icon: IconCircle,
-    color: 'var(--type-cell)'
+    color: 'var(--type-cell)',
   },
   {
     label: 'Propagators',
     uri: 'bl:///explore/propagators',
     matchPrefix: `${REMOTE_PREFIX}/propagators`,
     icon: IconArrowRight,
-    color: 'var(--type-propagator)'
+    color: 'var(--type-propagator)',
   },
   {
     label: 'Data',
     uri: `${REMOTE_PREFIX}/data`,
     icon: IconDatabase,
-    color: 'var(--type-data)'
+    color: 'var(--type-data)',
   },
   {
     label: 'Network',
     uri: 'bl:///network',
     icon: IconNetwork,
-    color: 'var(--type-propagator)'
+    color: 'var(--type-propagator)',
   },
   {
     label: 'Types',
     uri: `${REMOTE_PREFIX}/types`,
     icon: IconSchema,
-    color: 'var(--type-type)'
-  }
+    color: 'var(--type-type)',
+  },
 ]
 
 function NavItem({ item, isActive, onNavigate }) {
@@ -79,7 +79,7 @@ export default function Sidebar({
   collapsed = false,
   onToggleCollapse,
   onCreateNew,
-  onOpenClaude
+  onOpenClaude,
 }) {
   // Check if an item is active based on current URI
   const isActive = (item) => {
@@ -105,13 +105,8 @@ export default function Sidebar({
       </div>
 
       <div className="sidebar-nav">
-        {NAV_ITEMS.map(item => (
-          <NavItem
-            key={item.uri}
-            item={item}
-            isActive={isActive(item)}
-            onNavigate={onNavigate}
-          />
+        {NAV_ITEMS.map((item) => (
+          <NavItem key={item.uri} item={item} isActive={isActive(item)} onNavigate={onNavigate} />
         ))}
       </div>
 

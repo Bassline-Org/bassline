@@ -19,7 +19,7 @@ import {
   IconSettings,
   IconShield,
   IconTable,
-  IconQuestionMark
+  IconQuestionMark,
 } from '@tabler/icons-react'
 
 // Type name to icon component mapping
@@ -61,7 +61,7 @@ const TYPE_ICONS = {
   network: IconNetwork,
 
   // Fallback
-  unknown: IconQuestionMark
+  unknown: IconQuestionMark,
 }
 
 // Type name to CSS color variable
@@ -93,7 +93,7 @@ const TYPE_COLORS = {
   activity: 'var(--accent)',
   explore: 'var(--accent)',
   network: 'var(--type-propagator)',
-  unknown: 'var(--text-muted)'
+  unknown: 'var(--text-muted)',
 }
 
 /**
@@ -107,7 +107,7 @@ const TYPE_COLORS = {
 export default function TypeIcon({ type, size = 16, className = '', colored = true }) {
   const normalizedType = type?.toLowerCase() || 'unknown'
   const Icon = TYPE_ICONS[normalizedType] || TYPE_ICONS.unknown
-  const color = colored ? (TYPE_COLORS[normalizedType] || TYPE_COLORS.unknown) : 'currentColor'
+  const color = colored ? TYPE_COLORS[normalizedType] || TYPE_COLORS.unknown : 'currentColor'
 
   return <Icon size={size} className={className} style={{ color }} />
 }

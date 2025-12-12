@@ -22,16 +22,21 @@ export default function InputPanel(props: InputPanelProps) {
       </Show>
 
       <div class="input-list">
-        <For each={props.cellUris}>
-          {(uri) => <InputCell uri={uri} compact={props.compact} />}
-        </For>
+        <For each={props.cellUris}>{(uri) => <InputCell uri={uri} compact={props.compact} />}</For>
       </div>
 
       <Show when={props.cellUris.length === 0}>
         <div class="empty-state">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <rect x="4" y="4" width="16" height="16" rx="2"/>
-            <path d="M9 9h6M9 13h6M9 17h4"/>
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="M9 9h6M9 13h6M9 17h4" />
           </svg>
           <p>No input cells</p>
         </div>
@@ -132,11 +137,7 @@ function InputCell(props: InputCellProps) {
           <div class="loading-placeholder" />
         </Show>
         <Show when={!loading()}>
-          <LatticeVisualizer
-            uri={props.uri}
-            compact={props.compact}
-            showControls={true}
-          />
+          <LatticeVisualizer uri={props.uri} compact={props.compact} showControls={true} />
         </Show>
       </div>
 

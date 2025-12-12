@@ -11,12 +11,15 @@ export default function IndexView({ resource, onNavigate }) {
       <section>
         <h2>Subsystems</h2>
         <ul className="subsystems-list">
-          {subsystems?.map(sub => (
+          {subsystems?.map((sub) => (
             <li key={sub.name}>
               <a
                 href="#"
                 className="link-preview"
-                onClick={e => { e.preventDefault(); onNavigate(sub.uri) }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  onNavigate(sub.uri)
+                }}
               >
                 <TypeIcon type={sub.name} size={18} />
                 <span>{sub.name}</span>

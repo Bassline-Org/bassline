@@ -49,7 +49,7 @@ export function createHandlerSystem() {
   return {
     registry,
     compile,
-    routes
+    routes,
   }
 }
 

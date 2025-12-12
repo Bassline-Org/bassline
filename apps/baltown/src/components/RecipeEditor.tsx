@@ -38,7 +38,7 @@ export default function RecipeEditor(props: RecipeEditorProps) {
   const paramNames = createMemo(() => Object.keys(props.value.params || {}))
 
   // Get all resource IDs for ref hints
-  const resourceIds = createMemo(() => (props.value.resources || []).map(r => r.id))
+  const resourceIds = createMemo(() => (props.value.resources || []).map((r) => r.id))
 
   // Update params
   function updateParams(params: Record<string, RecipeParam>) {
@@ -68,10 +68,7 @@ export default function RecipeEditor(props: RecipeEditorProps) {
       </div>
 
       <Show when={activeTab() === 'params'}>
-        <ParamsEditor
-          params={props.value.params || {}}
-          onChange={updateParams}
-        />
+        <ParamsEditor params={props.value.params || {}} onChange={updateParams} />
       </Show>
 
       <Show when={activeTab() === 'resources'}>
@@ -85,12 +82,8 @@ export default function RecipeEditor(props: RecipeEditorProps) {
 
       <div class="template-hints">
         <span class="hint-label">Template variables:</span>
-        <For each={paramNames()}>
-          {(name) => <code class="hint-var">${`{${name}}`}</code>}
-        </For>
-        <For each={resourceIds()}>
-          {(id) => <code class="hint-ref">${`{ref.${id}}`}</code>}
-        </For>
+        <For each={paramNames()}>{(name) => <code class="hint-var">${`{${name}}`}</code>}</For>
+        <For each={resourceIds()}>{(id) => <code class="hint-ref">${`{ref.${id}}`}</code>}</For>
       </div>
 
       <style>{`
@@ -178,7 +171,7 @@ function ParamsEditor(props: ParamsEditorProps) {
 
     props.onChange({
       ...props.params,
-      [name]: { required: true, description: '' }
+      [name]: { required: true, description: '' },
     })
     setNewParamName('')
   }
@@ -186,7 +179,7 @@ function ParamsEditor(props: ParamsEditorProps) {
   function updateParam(name: string, updates: Partial<RecipeParam>) {
     props.onChange({
       ...props.params,
-      [name]: { ...props.params[name], ...updates }
+      [name]: { ...props.params[name], ...updates },
     })
   }
 
@@ -206,11 +199,15 @@ function ParamsEditor(props: ParamsEditorProps) {
           onInput={(e) => setNewParamName(e.currentTarget.value)}
           onKeyDown={(e) => e.key === 'Enter' && addParam()}
         />
-        <button class="btn-add" onClick={addParam}>Add Parameter</button>
+        <button class="btn-add" onClick={addParam}>
+          Add Parameter
+        </button>
       </div>
 
       <Show when={Object.keys(props.params).length === 0}>
-        <div class="empty-params">No parameters defined. Add parameters to make your recipe configurable.</div>
+        <div class="empty-params">
+          No parameters defined. Add parameters to make your recipe configurable.
+        </div>
       </Show>
 
       <For each={Object.entries(props.params)}>
@@ -226,7 +223,9 @@ function ParamsEditor(props: ParamsEditorProps) {
                 />
                 Required
               </label>
-              <button class="btn-remove" onClick={() => removeParam(name)}>Remove</button>
+              <button class="btn-remove" onClick={() => removeParam(name)}>
+                Remove
+              </button>
             </div>
             <input
               type="text"
@@ -353,10 +352,7 @@ function ResourcesEditor(props: ResourcesEditorProps) {
 
   function addResource() {
     const newId = `resource${props.resources.length + 1}`
-    props.onChange([
-      ...props.resources,
-      { id: newId, uri: 'bl:///cells/', body: {} }
-    ])
+    props.onChange([...props.resources, { id: newId, uri: 'bl:///cells/', body: {} }])
     setExpandedIndex(props.resources.length)
   }
 
@@ -382,13 +378,18 @@ function ResourcesEditor(props: ResourcesEditorProps) {
   return (
     <div class="resources-editor">
       <Show when={props.resources.length === 0}>
-        <div class="empty-resources">No resources defined. Add resources to create when the recipe is instantiated.</div>
+        <div class="empty-resources">
+          No resources defined. Add resources to create when the recipe is instantiated.
+        </div>
       </Show>
 
       <For each={props.resources}>
         {(resource, i) => (
           <div class={`resource-item ${expandedIndex() === i() ? 'expanded' : ''}`}>
-            <div class="resource-header" onClick={() => setExpandedIndex(expandedIndex() === i() ? null : i())}>
+            <div
+              class="resource-header"
+              onClick={() => setExpandedIndex(expandedIndex() === i() ? null : i())}
+            >
               <span class="resource-icon">{getResourceIcon(resource.uri)}</span>
               <code class="resource-id">{resource.id}</code>
               <span class="resource-uri">{resource.uri}</span>
@@ -450,9 +451,23 @@ function ResourcesEditor(props: ResourcesEditorProps) {
                 </Show>
 
                 <div class="resource-actions">
-                  <button class="btn-action" onClick={() => moveResource(i(), -1)} disabled={i() === 0}>↑</button>
-                  <button class="btn-action" onClick={() => moveResource(i(), 1)} disabled={i() === props.resources.length - 1}>↓</button>
-                  <button class="btn-action delete" onClick={() => removeResource(i())}>Delete</button>
+                  <button
+                    class="btn-action"
+                    onClick={() => moveResource(i(), -1)}
+                    disabled={i() === 0}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    class="btn-action"
+                    onClick={() => moveResource(i(), 1)}
+                    disabled={i() === props.resources.length - 1}
+                  >
+                    ↓
+                  </button>
+                  <button class="btn-action delete" onClick={() => removeResource(i())}>
+                    Delete
+                  </button>
                 </div>
               </div>
             </Show>
@@ -460,7 +475,9 @@ function ResourcesEditor(props: ResourcesEditorProps) {
         )}
       </For>
 
-      <button class="btn-add-resource" onClick={addResource}>+ Add Resource</button>
+      <button class="btn-add-resource" onClick={addResource}>
+        + Add Resource
+      </button>
 
       <style>{`
         .resources-editor {
@@ -620,6 +637,6 @@ function getResourceIcon(uri: string): string {
 export function createEmptyRecipe(): RecipeDefinition {
   return {
     params: {},
-    resources: []
+    resources: [],
   }
 }

@@ -25,7 +25,7 @@ export function createWsServerRoutes(plumber) {
   /** @type {Map<number, {wss: WebSocketServer, clients: Set<WebSocket>, startTime: number}>} */
   const servers = new Map()
 
-  const wsResource = resource(r => {
+  const wsResource = resource((r) => {
     // List all WebSocket servers
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -34,9 +34,9 @@ export function createWsServerRoutes(plumber) {
           name: String(port),
           type: 'server',
           uri: `bl:///server/ws/${port}`,
-          clients: s.clients.size
-        }))
-      }
+          clients: s.clients.size,
+        })),
+      },
     }))
 
     r.route('/:port', {
@@ -50,8 +50,8 @@ export function createWsServerRoutes(plumber) {
           body: {
             port,
             clients: s.clients.size,
-            uptime: Date.now() - s.startTime
-          }
+            uptime: Date.now() - s.startTime,
+          },
         }
       },
 
@@ -61,7 +61,7 @@ export function createWsServerRoutes(plumber) {
         // Close existing server if any
         if (servers.has(port)) {
           const existing = servers.get(port)
-          existing.clients.forEach(ws => ws.close())
+          existing.clients.forEach((ws) => ws.close())
           existing.wss.close()
         }
 
@@ -111,12 +111,12 @@ export function createWsServerRoutes(plumber) {
 
           ws.on('close', () => {
             clients.delete(ws)
-            unlistens.forEach(fn => fn())
+            unlistens.forEach((fn) => fn())
           })
 
           ws.on('error', () => {
             clients.delete(ws)
-            unlistens.forEach(fn => fn())
+            unlistens.forEach((fn) => fn())
           })
         })
 
@@ -124,9 +124,9 @@ export function createWsServerRoutes(plumber) {
 
         return {
           headers: { type: 'bl:///types/server' },
-          body: { port, status: 'running' }
+          body: { port, status: 'running' },
         }
-      }
+      },
     })
   })
 

@@ -24,7 +24,7 @@ export class FuzzyCell {
       compactThreshold = 100,
       compactProbability = 0.1,
       minCompactInterval = 60000,
-      compactor = null
+      compactor = null,
     } = options
 
     this.accumulated = []
@@ -54,7 +54,7 @@ export class FuzzyCell {
     return {
       accumulated: this.accumulated,
       pending: this.pendingDelta.length,
-      stats: this.stats
+      stats: this.stats,
     }
   }
 
@@ -65,7 +65,7 @@ export class FuzzyCell {
     return {
       accumulated: this.accumulated,
       pending: this.pendingDelta.length,
-      stats: this.stats
+      stats: this.stats,
     }
   }
 
@@ -98,7 +98,7 @@ export class FuzzyCell {
         compacted: true,
         before,
         after: this.accumulated.length,
-        deltaSize: delta.length
+        deltaSize: delta.length,
       }
     } catch (err) {
       return { compacted: false, reason: 'error', error: err.message }
@@ -137,8 +137,8 @@ export class FuzzyCell {
       config: {
         compactThreshold: this.compactThreshold,
         compactProbability: this.compactProbability,
-        minCompactInterval: this.minCompactInterval
-      }
+        minCompactInterval: this.minCompactInterval,
+      },
     }
   }
 
@@ -150,7 +150,7 @@ export class FuzzyCell {
   static fromJSON(data, options = {}) {
     const cell = new FuzzyCell({
       ...data.config,
-      ...options
+      ...options,
     })
     cell.accumulated = data.accumulated || []
     cell.pendingDelta = data.pendingDelta || []

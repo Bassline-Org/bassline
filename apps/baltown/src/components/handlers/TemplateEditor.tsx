@@ -23,7 +23,7 @@ export default function TemplateEditor(props: TemplateEditorProps) {
   // Extract variables from template
   const variables = createMemo(() => {
     const matches = inputValue().matchAll(/\{(\w+)\}/g)
-    return [...matches].map(m => m[1])
+    return [...matches].map((m) => m[1])
   })
 
   // Generate preview with sample data
@@ -88,8 +88,15 @@ export default function TemplateEditor(props: TemplateEditorProps) {
             onClick={() => setShowPresets(!showPresets())}
             title="Show presets"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 9l-7 7-7-7"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M19 9l-7 7-7-7" />
             </svg>
           </button>
         </Show>
@@ -99,10 +106,7 @@ export default function TemplateEditor(props: TemplateEditorProps) {
         <div class="presets-dropdown">
           <For each={props.presets}>
             {(preset) => (
-              <div
-                class="preset-item"
-                onClick={() => selectPreset(preset)}
-              >
+              <div class="preset-item" onClick={() => selectPreset(preset)}>
                 <code>{preset}</code>
               </div>
             )}
@@ -113,20 +117,24 @@ export default function TemplateEditor(props: TemplateEditorProps) {
       <Show when={variables().length > 0}>
         <div class="variables-info">
           <span class="variables-label">Variables:</span>
-          <For each={variables()}>
-            {(v) => (
-              <span class="variable-tag">{`{${v}}`}</span>
-            )}
-          </For>
+          <For each={variables()}>{(v) => <span class="variable-tag">{`{${v}}`}</span>}</For>
         </div>
       </Show>
 
       <div class="quick-insert">
         <span class="quick-label">Insert:</span>
-        <button class="insert-btn" onClick={() => insertVariable('0')}>{'{0}'}</button>
-        <button class="insert-btn" onClick={() => insertVariable('1')}>{'{1}'}</button>
-        <button class="insert-btn" onClick={() => insertVariable('name')}>{'{name}'}</button>
-        <button class="insert-btn" onClick={() => insertVariable('value')}>{'{value}'}</button>
+        <button class="insert-btn" onClick={() => insertVariable('0')}>
+          {'{0}'}
+        </button>
+        <button class="insert-btn" onClick={() => insertVariable('1')}>
+          {'{1}'}
+        </button>
+        <button class="insert-btn" onClick={() => insertVariable('name')}>
+          {'{name}'}
+        </button>
+        <button class="insert-btn" onClick={() => insertVariable('value')}>
+          {'{value}'}
+        </button>
       </div>
 
       <Show when={props.showPreview && preview()}>

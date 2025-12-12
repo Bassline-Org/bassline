@@ -4,7 +4,7 @@ import {
   createKnowledgeCompactor,
   createDedupeCompactor,
   createTimeWindowCompactor,
-  createSlidingWindowCompactor
+  createSlidingWindowCompactor,
 } from './compactors.js'
 
 /**
@@ -23,7 +23,7 @@ import {
  */
 export function createFuzzyCellRoutes(options = {}) {
   const { bl } = options
-  const store = new Map()  // name → FuzzyCell
+  const store = new Map() // name → FuzzyCell
 
   /**
    * Get a compactor function by name
@@ -57,17 +57,17 @@ export function createFuzzyCellRoutes(options = {}) {
     }
   }
 
-  const fuzzyCellResource = resource(r => {
+  const fuzzyCellResource = resource((r) => {
     // List all fuzzy cells
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: [...store.keys()].map(name => ({
+        entries: [...store.keys()].map((name) => ({
           name,
           uri: `bl:///fuzzy/${name}`,
-          stats: store.get(name).stats
-        }))
-      }
+          stats: store.get(name).stats,
+        })),
+      },
     }))
 
     // Get fuzzy cell info
@@ -76,7 +76,7 @@ export function createFuzzyCellRoutes(options = {}) {
       if (!cell) return null
       return {
         headers: { type: 'bl:///types/fuzzy-cell' },
-        body: cell.read()
+        body: cell.read(),
       }
     })
 
@@ -102,7 +102,7 @@ export function createFuzzyCellRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/fuzzy-cell' },
-        body: cell.read()
+        body: cell.read(),
       }
     })
 
@@ -119,7 +119,7 @@ export function createFuzzyCellRoutes(options = {}) {
       const result = await cell.write(body)
       return {
         headers: { type: 'bl:///types/fuzzy-cell-value' },
-        body: result
+        body: result,
       }
     })
 
@@ -131,7 +131,7 @@ export function createFuzzyCellRoutes(options = {}) {
       const result = await cell.compact()
       return {
         headers: { type: 'bl:///types/compact-result' },
-        body: result
+        body: result,
       }
     })
 
@@ -140,7 +140,7 @@ export function createFuzzyCellRoutes(options = {}) {
       const existed = store.delete(params.name)
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { removed: existed, uri: `bl:///fuzzy/${params.name}` }
+        body: { removed: existed, uri: `bl:///fuzzy/${params.name}` },
       }
     })
   })
@@ -157,6 +157,6 @@ export function createFuzzyCellRoutes(options = {}) {
     /** Access to the internal store for testing */
     _store: store,
     /** Create a compactor by name */
-    getCompactor
+    getCompactor,
   }
 }

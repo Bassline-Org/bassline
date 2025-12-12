@@ -64,7 +64,7 @@ export function createCompiler(registry) {
     }
 
     // Recursively compile args
-    const compiledArgs = args.map(arg => compile(arg, depth + 1))
+    const compiledArgs = args.map((arg) => compile(arg, depth + 1))
 
     // Get factory and create handler with compiled args
     const factory = registry.getFactory(name)

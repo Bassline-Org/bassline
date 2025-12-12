@@ -16,10 +16,10 @@ export default function installTimers(bl, config = {}) {
         body: {
           timer: name,
           tick,
-          time
-        }
+          time,
+        },
       })
-    }
+    },
   })
 
   timers.install(bl)

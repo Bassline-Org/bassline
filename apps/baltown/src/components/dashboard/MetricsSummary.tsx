@@ -48,67 +48,109 @@ export default function MetricsSummary(props: MetricsSummaryProps) {
       label: 'Cells',
       value: props.metrics.cells ?? 0,
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="4" y="4" width="16" height="16" rx="2"/>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" />
         </svg>
       ),
-      color: '#58a6ff'
+      color: '#58a6ff',
     },
     {
       label: 'Propagators',
       value: props.metrics.propagators ?? 0,
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 12h4l3-9 6 18 3-9h4"/>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M4 12h4l3-9 6 18 3-9h4" />
         </svg>
       ),
-      color: '#f0883e'
+      color: '#f0883e',
     },
     {
       label: 'Fires',
       value: props.metrics.totalFires ?? 0,
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
         </svg>
       ),
-      color: '#3fb950'
+      color: '#3fb950',
     },
     {
       label: 'Uptime',
       value: formattedUptime() ?? '—',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 6v6l4 2"/>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 6v6l4 2" />
         </svg>
       ),
       color: '#a371f7',
-      isText: true
+      isText: true,
     },
     {
       label: 'Last Activity',
       value: lastActivityAgo() ?? '—',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 8v4l3 3"/>
-          <circle cx="12" cy="12" r="10"/>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M12 8v4l3 3" />
+          <circle cx="12" cy="12" r="10" />
         </svg>
       ),
       color: '#8b949e',
-      isText: true
+      isText: true,
     },
     {
       label: 'Live',
       value: props.metrics.liveConnections ?? 0,
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/>
-          <circle cx="12" cy="12" r="3"/>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
         </svg>
       ),
-      color: '#3fb950'
-    }
+      color: '#3fb950',
+    },
   ])
 
   return (
@@ -117,9 +159,7 @@ export default function MetricsSummary(props: MetricsSummaryProps) {
         <For each={metrics()}>
           {(metric) => (
             <div class="metric-card" style={{ '--metric-color': metric.color }}>
-              <div class="metric-icon">
-                {metric.icon}
-              </div>
+              <div class="metric-icon">{metric.icon}</div>
               <div class="metric-content">
                 <span class="metric-value">{metric.value}</span>
                 <span class="metric-label">{metric.label}</span>
@@ -131,11 +171,20 @@ export default function MetricsSummary(props: MetricsSummaryProps) {
 
       <Show when={props.metrics.errors && props.metrics.errors > 0}>
         <div class="error-banner">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 8v4M12 16h.01"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
           </svg>
-          <span>{props.metrics.errors} error{props.metrics.errors > 1 ? 's' : ''} detected</span>
+          <span>
+            {props.metrics.errors} error{props.metrics.errors > 1 ? 's' : ''} detected
+          </span>
         </div>
       </Show>
 

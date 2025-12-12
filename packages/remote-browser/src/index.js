@@ -38,7 +38,7 @@ export function createRemoteRoutes(options = {}) {
 
     ws.onopen = () => {
       ready = true
-      queue.forEach(fn => fn())
+      queue.forEach((fn) => fn())
       queue.length = 0
     }
 
@@ -71,7 +71,7 @@ export function createRemoteRoutes(options = {}) {
       },
       put: async ({ body }) => {
         return sendRequest(conn, { type: 'put', uri: 'bl:///', body })
-      }
+      },
     })
 
     // Sub-path routes (e.g., bl:///local/data → bl:///data)
@@ -83,16 +83,16 @@ export function createRemoteRoutes(options = {}) {
       put: async ({ params, body }) => {
         const remoteUri = `bl:///${params.path}`
         return sendRequest(conn, { type: 'put', uri: remoteUri, body })
-      }
+      },
     })
 
     return conn
   }
 
   function sendRequest(conn, msg) {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const id = conn.nextId()
-      conn.pending.set(id, result => {
+      conn.pending.set(id, (result) => {
         // Rewrite URIs in the response to include the mount prefix
         resolve(rewriteUris(result, conn.config.mount))
       })
@@ -122,7 +122,7 @@ export function createRemoteRoutes(options = {}) {
     }
 
     if (Array.isArray(obj)) {
-      return obj.map(item => rewriteUris(item, mount))
+      return obj.map((item) => rewriteUris(item, mount))
     }
 
     if (typeof obj === 'object') {
@@ -136,7 +136,7 @@ export function createRemoteRoutes(options = {}) {
     return obj
   }
 
-  const remoteResource = resource(r => {
+  const remoteResource = resource((r) => {
     // List all remote connections
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -145,9 +145,9 @@ export function createRemoteRoutes(options = {}) {
           name,
           type: 'remote',
           uri: `bl:///remote/ws/${name}`,
-          status: conn.ready() ? 'connected' : 'connecting'
-        }))
-      }
+          status: conn.ready() ? 'connected' : 'connecting',
+        })),
+      },
     }))
 
     // Get/put individual connections
@@ -161,8 +161,8 @@ export function createRemoteRoutes(options = {}) {
           body: {
             status: conn.ready() ? 'connected' : 'connecting',
             uri: conn.config.uri,
-            mount: conn.config.mount
-          }
+            mount: conn.config.mount,
+          },
         }
       },
 
@@ -183,10 +183,10 @@ export function createRemoteRoutes(options = {}) {
           body: {
             status: 'connecting',
             uri: body.uri,
-            mount: body.mount
-          }
+            mount: body.mount,
+          },
         }
-      }
+      },
     })
   })
 

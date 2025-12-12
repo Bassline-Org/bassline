@@ -12,8 +12,12 @@ export default function Home() {
         <h1>Welcome to baltown</h1>
         <p>Create, share, and remix resource compositions</p>
         <div class="hero-actions">
-          <A href="/compose" class="btn btn-primary">Create New Val</A>
-          <A href="/browse" class="btn btn-secondary">Browse Vals</A>
+          <A href="/compose" class="btn btn-primary">
+            Create New Val
+          </A>
+          <A href="/browse" class="btn btn-secondary">
+            Browse Vals
+          </A>
         </div>
       </div>
 
@@ -58,7 +62,9 @@ export default function Home() {
             <h2 class="page-title">Recent Vals</h2>
             <p class="page-subtitle">Latest compositions from the community</p>
           </div>
-          <A href="/browse" class="btn btn-secondary">View All</A>
+          <A href="/browse" class="btn btn-secondary">
+            View All
+          </A>
         </div>
 
         <Show when={loading()}>
@@ -69,18 +75,25 @@ export default function Home() {
           <div class="empty-state">
             <h3>Connection Error</h3>
             <p>Make sure the Bassline daemon is running</p>
-            <button class="btn btn-secondary" onClick={refetch}>Retry</button>
+            <button class="btn btn-secondary" onClick={refetch}>
+              Retry
+            </button>
           </div>
         </Show>
 
         <Show when={!loading() && !error()}>
-          <Show when={vals()?.entries?.length > 0} fallback={
-            <div class="empty-state">
-              <h3>No vals yet</h3>
-              <p>Be the first to create one!</p>
-              <A href="/compose" class="btn btn-primary">Create Val</A>
-            </div>
-          }>
+          <Show
+            when={vals()?.entries?.length > 0}
+            fallback={
+              <div class="empty-state">
+                <h3>No vals yet</h3>
+                <p>Be the first to create one!</p>
+                <A href="/compose" class="btn btn-primary">
+                  Create Val
+                </A>
+              </div>
+            }
+          >
             <div class="grid grid-3">
               <For each={vals()?.entries?.slice(0, 6)}>
                 {(val) => (
@@ -95,9 +108,7 @@ export default function Home() {
                     </div>
                     <Show when={val.tags?.length > 0}>
                       <div class="card-tags">
-                        <For each={val.tags}>
-                          {(tag) => <span class="tag">{tag}</span>}
-                        </For>
+                        <For each={val.tags}>{(tag) => <span class="tag">{tag}</span>}</For>
                       </div>
                     </Show>
                   </A>

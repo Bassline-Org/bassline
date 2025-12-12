@@ -92,7 +92,7 @@ export default function InspectorPanel(props: InspectorPanelProps) {
         inputs: props.node.inputs || [],
         output: props.node.output,
         handler: handlerName(),
-        handlerConfig: config
+        handlerConfig: config,
       }
 
       await bl.put(props.node.uri, {}, body)
@@ -102,7 +102,9 @@ export default function InspectorPanel(props: InspectorPanelProps) {
       props.onUpdate?.({ handler: newHandler })
     } catch (err) {
       console.error('Failed to update propagator:', err)
-      setError(`Failed to update propagator: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      setError(
+        `Failed to update propagator: ${err instanceof Error ? err.message : 'Unknown error'}`
+      )
     } finally {
       setUpdating(false)
     }
@@ -119,14 +121,19 @@ export default function InspectorPanel(props: InspectorPanelProps) {
       <Show when={props.node}>
         <div class="inspector-header">
           <div class="header-info">
-            <span class={`node-type ${props.node!.type}`}>
-              {props.node!.type}
-            </span>
+            <span class={`node-type ${props.node!.type}`}>{props.node!.type}</span>
             <h3 class="node-name">{props.node!.name}</h3>
           </div>
           <button class="close-btn" onClick={props.onClose}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 6L6 18M6 6l12 12"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M18 6L6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
@@ -135,14 +142,28 @@ export default function InspectorPanel(props: InspectorPanelProps) {
           {/* Error message */}
           <Show when={error()}>
             <div class="error-banner">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 8v4M12 16h.01"/>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 8v4M12 16h.01" />
               </svg>
               <span>{error()}</span>
               <button class="error-close" onClick={() => setError(null)}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 6L6 18M6 6l12 12"/>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
@@ -154,9 +175,16 @@ export default function InspectorPanel(props: InspectorPanelProps) {
             <div class="uri-display">
               <code>{props.node!.uri}</code>
               <button class="copy-btn" title="Copy URI">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="9" y="9" width="13" height="13" rx="2"/>
-                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
                 </svg>
               </button>
             </div>
@@ -239,8 +267,15 @@ export default function InspectorPanel(props: InspectorPanelProps) {
 
         <div class="inspector-footer">
           <button class="delete-btn" onClick={deleteNode} disabled={updating()}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" />
             </svg>
             Delete
           </button>

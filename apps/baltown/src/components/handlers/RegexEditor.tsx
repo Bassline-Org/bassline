@@ -83,9 +83,7 @@ export default function RegexEditor(props: RegexEditorProps) {
 
   function toggleFlag(flag: string) {
     const current = flags()
-    const newFlags = current.includes(flag)
-      ? current.replace(flag, '')
-      : current + flag
+    const newFlags = current.includes(flag) ? current.replace(flag, '') : current + flag
     setFlags(newFlags)
     props.onFlagsChange?.(newFlags)
   }
@@ -109,19 +107,21 @@ export default function RegexEditor(props: RegexEditorProps) {
             onInput={handlePatternChange}
           />
           <span class="regex-slash">/</span>
-          <input
-            type="text"
-            class="flags-input"
-            value={flags()}
-            readonly
-          />
+          <input type="text" class="flags-input" value={flags()} readonly />
           <button
             class="patterns-btn"
             onClick={() => setShowPatterns(!showPatterns())}
             title="Common patterns"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 6h16M4 12h16M4 18h7"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M4 6h16M4 12h16M4 18h7" />
             </svg>
           </button>
         </div>
@@ -198,9 +198,16 @@ export default function RegexEditor(props: RegexEditorProps) {
 
             <Show when={!testResult().success}>
               <div class="regex-error">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M12 8v4M12 16h.01"/>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v4M12 16h.01" />
                 </svg>
                 {testResult().error}
               </div>

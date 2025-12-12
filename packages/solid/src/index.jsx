@@ -29,11 +29,7 @@ const WebSocketContext = createContext(null)
  * }
  */
 export function BasslineProvider(props) {
-  return (
-    <BasslineContext.Provider value={props.value}>
-      {props.children}
-    </BasslineContext.Provider>
-  )
+  return <BasslineContext.Provider value={props.value}>{props.children}</BasslineContext.Provider>
 }
 
 /**
@@ -69,17 +65,14 @@ export function useBassline() {
 export function useResource(uri) {
   const bl = useBassline()
 
-  const [resource, { refetch, mutate }] = createResource(
-    uri,
-    async (u) => {
-      if (!u) return null
-      try {
-        return await bl.get(u)
-      } catch (err) {
-        throw err
-      }
+  const [resource, { refetch, mutate }] = createResource(uri, async (u) => {
+    if (!u) return null
+    try {
+      return await bl.get(u)
+    } catch (err) {
+      throw err
     }
-  )
+  })
 
   return {
     data: () => resource()?.body,
@@ -88,7 +81,7 @@ export function useResource(uri) {
     loading: () => resource.loading,
     error: () => resource.error,
     refetch,
-    mutate
+    mutate,
   }
 }
 
@@ -137,17 +130,14 @@ export function useLiveResource(uri, options = {}) {
 
   const [isLive, setIsLive] = createSignal(false)
 
-  const [resource, { refetch, mutate }] = createResource(
-    uri,
-    async (u) => {
-      if (!u) return null
-      try {
-        return await bl.get(u)
-      } catch (err) {
-        throw err
-      }
+  const [resource, { refetch, mutate }] = createResource(uri, async (u) => {
+    if (!u) return null
+    try {
+      return await bl.get(u)
+    } catch (err) {
+      throw err
     }
-  )
+  })
 
   // WebSocket subscription
   if (subscribe && ws) {
@@ -191,7 +181,7 @@ export function useLiveResource(uri, options = {}) {
     error: () => resource.error,
     refetch,
     mutate,
-    isLive
+    isLive,
   }
 }
 
@@ -234,11 +224,7 @@ export function WebSocketProvider(props) {
     })
   }
 
-  return (
-    <WebSocketContext.Provider value={ws()}>
-      {props.children}
-    </WebSocketContext.Provider>
-  )
+  return <WebSocketContext.Provider value={ws()}>{props.children}</WebSocketContext.Provider>
 }
 
 /**
@@ -252,7 +238,7 @@ export function useHotkey(key, handler, options = {}) {
   const { meta = false, ctrl = false, shift = false, preventDefault = true } = options
 
   const handleKeyDown = (e) => {
-    const isMetaMatch = meta ? (e.metaKey || e.ctrlKey) : true
+    const isMetaMatch = meta ? e.metaKey || e.ctrlKey : true
     const isCtrlMatch = ctrl ? e.ctrlKey : true
     const isShiftMatch = shift ? e.shiftKey : true
     const isKeyMatch = e.key.toLowerCase() === key.toLowerCase()

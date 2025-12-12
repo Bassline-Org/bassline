@@ -8,7 +8,7 @@ describe('createPlumber', () => {
       const plumber = createPlumber()
       plumber.addRule('test-rule', {
         match: { uri: '^bl:///data/.*' },
-        port: 'test-port'
+        port: 'test-port',
       })
 
       const rule = plumber._rules.get('test-rule')
@@ -30,11 +30,11 @@ describe('createPlumber', () => {
       const plumber = createPlumber()
       plumber.addRule('data-rule', {
         match: { uri: '^bl:///data/.*' },
-        port: 'data-port'
+        port: 'data-port',
       })
       plumber.addRule('cell-rule', {
         match: { headers: { type: '^cell$' } },
-        port: 'cell-port'
+        port: 'cell-port',
       })
 
       const dataMatches = plumber.route({ uri: 'bl:///data/users' })
@@ -50,11 +50,11 @@ describe('createPlumber', () => {
       const plumber = createPlumber()
       plumber.addRule('rule-1', {
         match: { uri: '^bl:///' },
-        port: 'port-1'
+        port: 'port-1',
       })
       plumber.addRule('rule-2', {
         match: { uri: '.*' },
-        port: 'port-2'
+        port: 'port-2',
       })
 
       const matches = plumber.route({ uri: 'bl:///anything' })
@@ -65,7 +65,7 @@ describe('createPlumber', () => {
       const plumber = createPlumber()
       plumber.addRule('specific', {
         match: { uri: '^bl:///data/.*' },
-        port: 'data'
+        port: 'data',
       })
 
       const matches = plumber.route({ uri: 'bl:///other/path' })
@@ -78,7 +78,7 @@ describe('createPlumber', () => {
       const plumber = createPlumber()
       plumber.addRule('test', {
         match: { uri: '.*' },
-        port: 'test-port'
+        port: 'test-port',
       })
 
       const received = []
@@ -129,10 +129,14 @@ describe('createPlumber', () => {
       plumber.install(bl)
 
       // Add a rule via PUT
-      await bl.put('bl:///plumb/rules/test-rule', {}, {
-        match: { uri: '^bl:///data/.*' },
-        port: 'data-port'
-      })
+      await bl.put(
+        'bl:///plumb/rules/test-rule',
+        {},
+        {
+          match: { uri: '^bl:///data/.*' },
+          port: 'data-port',
+        }
+      )
 
       // Retrieve the rule via GET
       const result = await bl.get('bl:///plumb/rules/test-rule')
@@ -153,15 +157,15 @@ describe('createPlumber', () => {
       // Add a rule that matches anything
       plumber.addRule('all', {
         match: { uri: '.*' },
-        port: 'all-changes'
+        port: 'all-changes',
       })
 
       // Add a route to PUT to
       bl.route('/data/:key', {
         put: ({ params, body }) => ({
           headers: { type: 'data' },
-          body
-        })
+          body,
+        }),
       })
 
       // Listen on the port

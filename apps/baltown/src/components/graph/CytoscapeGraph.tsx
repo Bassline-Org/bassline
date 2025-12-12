@@ -545,15 +545,13 @@ export default function CytoscapeGraph(props: CytoscapeGraphProps) {
   }
 
   function autoLayout() {
-    cy
-      ?.layout({
-        name: 'dagre',
-        rankDir: 'LR',
-        nodeSep: 80,
-        rankSep: 150,
-        padding: 50,
-      } as any)
-      .run()
+    cy?.layout({
+      name: 'dagre',
+      rankDir: 'LR',
+      nodeSep: 80,
+      rankSep: 150,
+      padding: 50,
+    } as any).run()
     cy?.fit(undefined, 50)
     setZoom(cy?.zoom() || 1)
   }

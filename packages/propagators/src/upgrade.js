@@ -16,9 +16,9 @@ export default function installPropagators(bl, config = {}) {
       bl._plumber?.dispatch({
         uri,
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri }
+        body: { uri },
       })
-    }
+    },
   })
 
   propagators.install(bl)

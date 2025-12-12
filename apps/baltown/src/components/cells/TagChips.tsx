@@ -73,9 +73,7 @@ export default function TagChips(props: TagChipsProps) {
       </div>
 
       <Show when={tags().length === 0}>
-        <div class="tag-chips-empty">
-          No items yet. Add some below.
-        </div>
+        <div class="tag-chips-empty">No items yet. Add some below.</div>
       </Show>
 
       <div class="tag-chips-list">
@@ -86,7 +84,7 @@ export default function TagChips(props: TagChipsProps) {
               style={{
                 '--chip-color': getTagColor(String(tag)),
                 background: `${getTagColor(String(tag))}22`,
-                border: `1px solid ${getTagColor(String(tag))}44`
+                border: `1px solid ${getTagColor(String(tag))}44`,
               }}
             >
               <span class="tag-text">{String(tag)}</span>
@@ -105,11 +103,7 @@ export default function TagChips(props: TagChipsProps) {
             onInput={(e) => setNewTag(e.currentTarget.value)}
             onKeyDown={(e) => e.key === 'Enter' && addTag()}
           />
-          <button
-            class="tag-add-btn"
-            onClick={addTag}
-            disabled={adding() || !newTag().trim()}
-          >
+          <button class="tag-add-btn" onClick={addTag} disabled={adding() || !newTag().trim()}>
             {adding() ? '...' : 'Add'}
           </button>
         </div>

@@ -22,8 +22,8 @@ export function ExportButton(props: ExportButtonProps) {
         description: props.val.description,
         valType: props.val.valType,
         definition: props.val.definition,
-        tags: props.val.tags || []
-      }
+        tags: props.val.tags || [],
+      },
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -98,12 +98,16 @@ export function ImportModal(props: ImportModalProps) {
       const owner = overrideOwner() || 'anonymous'
       const name = overrideName() || val.name
 
-      await bl.put(`bl:///r/vals/${owner}/${name}`, {}, {
-        description: val.description,
-        valType: val.valType,
-        definition: val.definition,
-        tags: val.tags || []
-      })
+      await bl.put(
+        `bl:///r/vals/${owner}/${name}`,
+        {},
+        {
+          description: val.description,
+          valType: val.valType,
+          definition: val.definition,
+          tags: val.tags || [],
+        }
+      )
 
       props.onClose()
       navigate(`/v/${owner}/${name}`)
@@ -126,7 +130,9 @@ export function ImportModal(props: ImportModalProps) {
         <div class="modal-content" onClick={(e) => e.stopPropagation()}>
           <div class="modal-header">
             <h2>Import Val</h2>
-            <button class="modal-close" onClick={handleClose}>&times;</button>
+            <button class="modal-close" onClick={handleClose}>
+              &times;
+            </button>
           </div>
 
           <div class="modal-body">
@@ -197,7 +203,9 @@ export function ImportModal(props: ImportModalProps) {
           </div>
 
           <div class="modal-footer">
-            <button class="btn btn-secondary" onClick={handleClose}>Cancel</button>
+            <button class="btn btn-secondary" onClick={handleClose}>
+              Cancel
+            </button>
             <button
               class="btn btn-primary"
               onClick={handleImport}

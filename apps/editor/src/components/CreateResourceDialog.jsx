@@ -1,13 +1,30 @@
 import { useState, useEffect, useRef } from 'react'
 import { useBassline, useResource } from '@bassline/react'
-import { IconX, IconCircle, IconArrowRight, IconPlus, IconSparkles, IconLoader2 } from '@tabler/icons-react'
+import {
+  IconX,
+  IconCircle,
+  IconArrowRight,
+  IconPlus,
+  IconSparkles,
+  IconLoader2,
+} from '@tabler/icons-react'
 import { REMOTE_PREFIX } from '../config.js'
 
 // Schemas for creating resources
 const CELL_SCHEMA = {
-  name: { type: 'string', required: true, pattern: '^[a-zA-Z][a-zA-Z0-9_-]*$', description: 'Identifier (letters, numbers, - _)' },
+  name: {
+    type: 'string',
+    required: true,
+    pattern: '^[a-zA-Z][a-zA-Z0-9_-]*$',
+    description: 'Identifier (letters, numbers, - _)',
+  },
   label: { type: 'string', description: 'Display name (optional)' },
-  lattice: { type: 'string', enum: ['maxNumber', 'minNumber', 'setUnion', 'lww'], required: true, description: 'Merge strategy' }
+  lattice: {
+    type: 'string',
+    enum: ['maxNumber', 'minNumber', 'setUnion', 'lww'],
+    required: true,
+    description: 'Merge strategy',
+  },
 }
 
 const PROPAGATOR_HANDLERS = ['sum', 'product', 'passthrough', 'constant']
@@ -15,7 +32,12 @@ const PROPAGATOR_HANDLERS = ['sum', 'product', 'passthrough', 'constant']
 /**
  * CreateResourceDialog - Modal for creating cells and propagators
  */
-export default function CreateResourceDialog({ isOpen, onClose, resourceType = 'cell', onCreated }) {
+export default function CreateResourceDialog({
+  isOpen,
+  onClose,
+  resourceType = 'cell',
+  onCreated,
+}) {
   const bl = useBassline()
   const [type, setType] = useState(resourceType)
   const [loading, setLoading] = useState(false)
@@ -80,17 +102,28 @@ For propagators, return: { "type": "propagator", "name": "identifier", "handler"
 Respond ONLY with a valid JSON object, nothing else.`
 
     try {
-      const response = await bl.put(`${REMOTE_PREFIX}/services/claude/messages`, {}, {
-        messages: [{ role: 'user', content: `Create a ${type} based on this description: ${aiDescription}` }],
-        system: systemPrompt,
-        max_tokens: 256
-      })
+      const response = await bl.put(
+        `${REMOTE_PREFIX}/services/claude/messages`,
+        {},
+        {
+          messages: [
+            {
+              role: 'user',
+              content: `Create a ${type} based on this description: ${aiDescription}`,
+            },
+          ],
+          system: systemPrompt,
+          max_tokens: 256,
+        }
+      )
 
       // Extract the text response
       const content = response?.body?.content
       const text = Array.isArray(content)
-        ? content.find(c => c.type === 'text')?.text
-        : typeof content === 'string' ? content : null
+        ? content.find((c) => c.type === 'text')?.text
+        : typeof content === 'string'
+          ? content
+          : null
 
       if (!text) {
         throw new Error('No response from Claude')
@@ -103,12 +136,18 @@ Respond ONLY with a valid JSON object, nothing else.`
       if (result.type === 'cell' || type === 'cell') {
         if (result.name) setCellName(result.name)
         if (result.label) setCellLabel(result.label)
-        if (result.lattice && ['maxNumber', 'minNumber', 'setUnion', 'lww'].includes(result.lattice)) {
+        if (
+          result.lattice &&
+          ['maxNumber', 'minNumber', 'setUnion', 'lww'].includes(result.lattice)
+        ) {
           setCellLattice(result.lattice)
         }
       } else if (result.type === 'propagator' || type === 'propagator') {
         if (result.name) setPropName(result.name)
-        if (result.handler && ['sum', 'product', 'passthrough', 'constant'].includes(result.handler)) {
+        if (
+          result.handler &&
+          ['sum', 'product', 'passthrough', 'constant'].includes(result.handler)
+        ) {
           setPropHandler(result.handler)
         }
       }
@@ -135,10 +174,14 @@ Respond ONLY with a valid JSON object, nothing else.`
     setLoading(true)
     try {
       const uri = `${REMOTE_PREFIX}/cells/${cellName}`
-      await bl.put(uri, {}, {
-        lattice: cellLattice,
-        label: cellLabel || undefined
-      })
+      await bl.put(
+        uri,
+        {},
+        {
+          lattice: cellLattice,
+          label: cellLabel || undefined,
+        }
+      )
       onCreated?.(uri)
       onClose()
     } catch (err) {
@@ -169,11 +212,15 @@ Respond ONLY with a valid JSON object, nothing else.`
     setLoading(true)
     try {
       const uri = `${REMOTE_PREFIX}/propagators/${propName}`
-      await bl.put(uri, {}, {
-        inputs: propInputs.map(name => `bl:///cells/${name}`),
-        output: `bl:///cells/${propOutput}`,
-        handler: propHandler
-      })
+      await bl.put(
+        uri,
+        {},
+        {
+          inputs: propInputs.map((name) => `bl:///cells/${name}`),
+          output: `bl:///cells/${propOutput}`,
+          handler: propHandler,
+        }
+      )
       onCreated?.(uri)
       onClose()
     } catch (err) {
@@ -184,10 +231,8 @@ Respond ONLY with a valid JSON object, nothing else.`
   }
 
   const toggleInput = (name) => {
-    setPropInputs(prev =>
-      prev.includes(name)
-        ? prev.filter(n => n !== name)
-        : [...prev, name]
+    setPropInputs((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
     )
   }
 
@@ -195,7 +240,7 @@ Respond ONLY with a valid JSON object, nothing else.`
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal create-dialog" onClick={e => e.stopPropagation()}>
+      <div className="modal create-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Create New Resource</h2>
           <button className="modal-close" onClick={onClose}>
@@ -231,13 +276,14 @@ Respond ONLY with a valid JSON object, nothing else.`
             <input
               type="text"
               value={aiDescription}
-              onChange={e => setAiDescription(e.target.value)}
-              placeholder={type === 'cell'
-                ? "e.g., A cell to track the highest temperature reading"
-                : "e.g., A propagator that sums two values"
+              onChange={(e) => setAiDescription(e.target.value)}
+              placeholder={
+                type === 'cell'
+                  ? 'e.g., A cell to track the highest temperature reading'
+                  : 'e.g., A propagator that sums two values'
               }
               disabled={aiLoading}
-              onKeyDown={e => e.key === 'Enter' && handleAiGenerate()}
+              onKeyDown={(e) => e.key === 'Enter' && handleAiGenerate()}
             />
             <button
               type="button"
@@ -245,7 +291,11 @@ Respond ONLY with a valid JSON object, nothing else.`
               onClick={handleAiGenerate}
               disabled={aiLoading || !aiDescription.trim()}
             >
-              {aiLoading ? <IconLoader2 size={14} className="spinner" /> : <IconSparkles size={14} />}
+              {aiLoading ? (
+                <IconLoader2 size={14} className="spinner" />
+              ) : (
+                <IconSparkles size={14} />
+              )}
               {aiLoading ? 'Generating...' : 'Generate'}
             </button>
           </div>
@@ -266,7 +316,7 @@ Respond ONLY with a valid JSON object, nothing else.`
                 id="cell-name"
                 type="text"
                 value={cellName}
-                onChange={e => setCellName(e.target.value)}
+                onChange={(e) => setCellName(e.target.value)}
                 placeholder="counter"
                 required
               />
@@ -279,7 +329,7 @@ Respond ONLY with a valid JSON object, nothing else.`
                 id="cell-label"
                 type="text"
                 value={cellLabel}
-                onChange={e => setCellLabel(e.target.value)}
+                onChange={(e) => setCellLabel(e.target.value)}
                 placeholder="My Counter (optional)"
               />
               <span className="field-description">Display name</span>
@@ -292,7 +342,7 @@ Respond ONLY with a valid JSON object, nothing else.`
               <select
                 id="cell-lattice"
                 value={cellLattice}
-                onChange={e => setCellLattice(e.target.value)}
+                onChange={(e) => setCellLattice(e.target.value)}
                 required
               >
                 <option value="maxNumber">maxNumber (keeps highest)</option>
@@ -304,7 +354,12 @@ Respond ONLY with a valid JSON object, nothing else.`
             </div>
 
             <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onClose}
+                disabled={loading}
+              >
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={loading}>
@@ -326,7 +381,7 @@ Respond ONLY with a valid JSON object, nothing else.`
                 id="prop-name"
                 type="text"
                 value={propName}
-                onChange={e => setPropName(e.target.value)}
+                onChange={(e) => setPropName(e.target.value)}
                 placeholder="sum-ab"
                 required
               />
@@ -341,7 +396,7 @@ Respond ONLY with a valid JSON object, nothing else.`
                 {existingCells.length === 0 ? (
                   <span className="field-description">No cells found. Create some first.</span>
                 ) : (
-                  existingCells.map(cell => (
+                  existingCells.map((cell) => (
                     <label key={cell.name} className="cell-option">
                       <input
                         type="checkbox"
@@ -366,11 +421,11 @@ Respond ONLY with a valid JSON object, nothing else.`
               <select
                 id="prop-output"
                 value={propOutput}
-                onChange={e => setPropOutput(e.target.value)}
+                onChange={(e) => setPropOutput(e.target.value)}
                 required
               >
                 <option value="">Select output cell...</option>
-                {existingCells.map(cell => (
+                {existingCells.map((cell) => (
                   <option key={cell.name} value={cell.name}>
                     {cell.label || cell.name}
                   </option>
@@ -386,7 +441,7 @@ Respond ONLY with a valid JSON object, nothing else.`
               <select
                 id="prop-handler"
                 value={propHandler}
-                onChange={e => setPropHandler(e.target.value)}
+                onChange={(e) => setPropHandler(e.target.value)}
                 required
               >
                 <option value="sum">sum (add inputs)</option>
@@ -398,7 +453,12 @@ Respond ONLY with a valid JSON object, nothing else.`
             </div>
 
             <div className="form-actions">
-              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={loading}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={onClose}
+                disabled={loading}
+              >
                 Cancel
               </button>
               <button type="submit" className="btn btn-primary" disabled={loading}>

@@ -19,7 +19,7 @@ const bl = new Bassline()
 
 const propagators = createPropagatorRoutes({ bl })
 const cells = createCellRoutes({
-  onCellChange: ({ uri }) => propagators.onCellChange(uri)
+  onCellChange: ({ uri }) => propagators.onCellChange(uri),
 })
 
 cells.install(bl)
@@ -31,11 +31,15 @@ await bl.put('bl:///cells/b', {}, { lattice: 'maxNumber' })
 await bl.put('bl:///cells/sum', {}, { lattice: 'maxNumber' })
 
 // Create propagator: a + b → sum
-await bl.put('bl:///propagators/add', {}, {
-  inputs: ['bl:///cells/a', 'bl:///cells/b'],
-  output: 'bl:///cells/sum',
-  handler: 'sum'
-})
+await bl.put(
+  'bl:///propagators/add',
+  {},
+  {
+    inputs: ['bl:///cells/a', 'bl:///cells/b'],
+    output: 'bl:///cells/sum',
+    handler: 'sum',
+  }
+)
 
 // Set values
 await bl.put('bl:///cells/a/value', {}, 5)
@@ -55,40 +59,52 @@ Propagators access handlers via `bl._handlers.get(name, config)`.
 
 ```javascript
 // Transform: coerce strings to numbers
-await bl.put('bl:///propagators/parse', {}, {
-  inputs: ['bl:///cells/raw'],
-  output: 'bl:///cells/num',
-  handler: 'coerce',
-  handlerConfig: { to: 'number' }
-})
+await bl.put(
+  'bl:///propagators/parse',
+  {},
+  {
+    inputs: ['bl:///cells/raw'],
+    output: 'bl:///cells/num',
+    handler: 'coerce',
+    handlerConfig: { to: 'number' },
+  }
+)
 
 // Compose: extract value then negate
-await bl.put('bl:///propagators/negate-lww', {}, {
-  inputs: ['bl:///cells/lww-cell'],
-  output: 'bl:///cells/negated',
-  handler: 'compose',
-  handlerConfig: {
-    steps: ['pick', 'negate'],
-    pick: { key: 'value' }
+await bl.put(
+  'bl:///propagators/negate-lww',
+  {},
+  {
+    inputs: ['bl:///cells/lww-cell'],
+    output: 'bl:///cells/negated',
+    handler: 'compose',
+    handlerConfig: {
+      steps: ['pick', 'negate'],
+      pick: { key: 'value' },
+    },
   }
-})
+)
 
 // Group by key
-await bl.put('bl:///propagators/by-category', {}, {
-  inputs: ['bl:///cells/items'],
-  output: 'bl:///cells/grouped',
-  handler: 'groupBy',
-  handlerConfig: { key: 'category' }
-})
+await bl.put(
+  'bl:///propagators/by-category',
+  {},
+  {
+    inputs: ['bl:///cells/items'],
+    output: 'bl:///cells/grouped',
+    handler: 'groupBy',
+    handlerConfig: { key: 'category' },
+  }
+)
 ```
 
 ## Routes
 
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/propagators` | GET | List all propagators |
-| `/propagators/:name` | GET | Get propagator info |
-| `/propagators/:name` | PUT | Create propagator |
+| Route                | Method | Description          |
+| -------------------- | ------ | -------------------- |
+| `/propagators`       | GET    | List all propagators |
+| `/propagators/:name` | GET    | Get propagator info  |
+| `/propagators/:name` | PUT    | Create propagator    |
 
 ## Dynamic Installation
 
@@ -96,13 +112,21 @@ Install via the daemon's module system:
 
 ```javascript
 // Handlers must be installed first
-await bl.put('bl:///install/handlers', {}, {
-  path: './packages/handlers/src/upgrade.js'
-})
+await bl.put(
+  'bl:///install/handlers',
+  {},
+  {
+    path: './packages/handlers/src/upgrade.js',
+  }
+)
 
-await bl.put('bl:///install/propagators', {}, {
-  path: './packages/propagators/src/upgrade.js'
-})
+await bl.put(
+  'bl:///install/propagators',
+  {},
+  {
+    path: './packages/propagators/src/upgrade.js',
+  }
+)
 // Registers: bl._propagators
 // Requires: bl._handlers, bl._plumber (optional)
 ```

@@ -5,28 +5,28 @@ import { resource } from './router.js'
  * @param {import('./bassline.js').Bassline} bl - Bassline instance to introspect
  */
 function createMiddlewareResource(bl) {
-  return resource(r => {
+  return resource((r) => {
     // List all middleware
     r.get('/', () => ({
       headers: { type: 'bl:///types/list' },
       body: {
-        entries: bl.middleware.map(m => ({
+        entries: bl.middleware.map((m) => ({
           id: m.id || null,
-          priority: m.priority
-        }))
-      }
+          priority: m.priority,
+        })),
+      },
     }))
 
     // Get middleware by id
     r.get('/:id', ({ params }) => {
-      const entry = bl.middleware.find(m => m.id === params.id)
+      const entry = bl.middleware.find((m) => m.id === params.id)
       if (!entry) return null
       return {
         headers: { type: 'bl:///types/middleware' },
         body: {
           id: entry.id,
-          priority: entry.priority
-        }
+          priority: entry.priority,
+        },
       }
     })
   })

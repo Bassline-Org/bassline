@@ -13,7 +13,10 @@ export default function VersionHistory() {
   const { data: versions, loading: versionsLoading, error } = useResource(versionsUri)
 
   // Fetch specific version when selected
-  const versionUri = () => selectedVersion() ? `bl:///r/vals/${params.owner}/${params.name}/versions/${selectedVersion()}` : null
+  const versionUri = () =>
+    selectedVersion()
+      ? `bl:///r/vals/${params.owner}/${params.name}/versions/${selectedVersion()}`
+      : null
   const { data: versionData } = useResource(versionUri)
 
   return (
@@ -46,9 +49,10 @@ export default function VersionHistory() {
       <Show when={!versionsLoading() && !error()}>
         <div class="version-layout">
           <div class="version-list">
-            <Show when={versions()?.entries?.length > 0} fallback={
-              <div class="empty-state">No versions found</div>
-            }>
+            <Show
+              when={versions()?.entries?.length > 0}
+              fallback={<div class="empty-state">No versions found</div>}
+            >
               <For each={versions()?.entries}>
                 {(version) => (
                   <div
@@ -73,16 +77,21 @@ export default function VersionHistory() {
           </div>
 
           <div class="version-detail">
-            <Show when={selectedVersion() && versionData()} fallback={
-              <div class="empty-state">
-                <p>Select a version to view its definition</p>
-              </div>
-            }>
+            <Show
+              when={selectedVersion() && versionData()}
+              fallback={
+                <div class="empty-state">
+                  <p>Select a version to view its definition</p>
+                </div>
+              }
+            >
               <div class="card">
                 <div class="card-header">
                   <span class="card-title">Version {selectedVersion()} Definition</span>
                 </div>
-                <pre class="json-preview">{JSON.stringify(versionData()?.definition || versionData(), null, 2)}</pre>
+                <pre class="json-preview">
+                  {JSON.stringify(versionData()?.definition || versionData(), null, 2)}
+                </pre>
               </div>
 
               <Show when={selectedVersion() !== val()?.version}>

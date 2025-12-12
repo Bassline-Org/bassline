@@ -36,7 +36,7 @@ export default function PropagatorStatus(props: PropagatorStatusProps) {
       handler: body.handler,
       lastFired: body.lastFired,
       fireCount: body.fireCount ?? 0,
-      status: body.status ?? 'idle'
+      status: body.status ?? 'idle',
     }
   }
 
@@ -44,7 +44,7 @@ export default function PropagatorStatus(props: PropagatorStatusProps) {
   createEffect(() => {
     const info = propInfo()
     if (info?.lastFired) {
-      setRecentFires(prev => [...prev.slice(-9), info.lastFired!])
+      setRecentFires((prev) => [...prev.slice(-9), info.lastFired!])
     }
   })
 
@@ -84,7 +84,9 @@ export default function PropagatorStatus(props: PropagatorStatusProps) {
   }
 
   return (
-    <div class={`propagator-status ${props.compact ? 'compact' : ''} ${propInfo()?.status ?? 'idle'}`}>
+    <div
+      class={`propagator-status ${props.compact ? 'compact' : ''} ${propInfo()?.status ?? 'idle'}`}
+    >
       <Show when={loading()}>
         <div class="status-loading">
           <div class="loading-bar" />
@@ -93,9 +95,16 @@ export default function PropagatorStatus(props: PropagatorStatusProps) {
 
       <Show when={error()}>
         <div class="status-error">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 8v4M12 16h.01"/>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
           </svg>
           Error
         </div>
@@ -107,8 +116,15 @@ export default function PropagatorStatus(props: PropagatorStatusProps) {
             <Show when={propInfo()!.status === 'firing'}>
               <div class="firing-pulse" />
             </Show>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 12h4l3-9 6 18 3-9h4"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M4 12h4l3-9 6 18 3-9h4" />
             </svg>
           </div>
 
@@ -139,9 +155,7 @@ export default function PropagatorStatus(props: PropagatorStatusProps) {
               <span class="detail-label">Inputs:</span>
               <div class="input-list">
                 <For each={propInfo()!.inputs}>
-                  {(input) => (
-                    <span class="input-uri">{input.split('/').pop()}</span>
-                  )}
+                  {(input) => <span class="input-uri">{input.split('/').pop()}</span>}
                 </For>
               </div>
             </div>

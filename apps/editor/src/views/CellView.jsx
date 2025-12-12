@@ -46,18 +46,21 @@ export default function CellView({ resource, uri, onRefresh, onNavigate }) {
     return ''
   }
 
-  const handleSave = useCallback(async (newValue) => {
-    if (!valueUri) throw new Error('Cannot determine cell URI')
+  const handleSave = useCallback(
+    async (newValue) => {
+      if (!valueUri) throw new Error('Cannot determine cell URI')
 
-    setSaving(true)
-    try {
-      await bl.put(valueUri, {}, newValue)
-      setLastSaved(new Date())
-      onRefresh?.()
-    } finally {
-      setSaving(false)
-    }
-  }, [bl, valueUri, onRefresh])
+      setSaving(true)
+      try {
+        await bl.put(valueUri, {}, newValue)
+        setLastSaved(new Date())
+        onRefresh?.()
+      } finally {
+        setSaving(false)
+      }
+    },
+    [bl, valueUri, onRefresh]
+  )
 
   const handleRefresh = () => {
     onRefresh?.()
@@ -95,11 +98,7 @@ export default function CellView({ resource, uri, onRefresh, onNavigate }) {
             </div>
           )}
         </div>
-        <button
-          className="btn btn-small"
-          onClick={handleRefresh}
-          title="Refresh"
-        >
+        <button className="btn btn-small" onClick={handleRefresh} title="Refresh">
           <IconRefresh size={14} />
         </button>
         <button
@@ -124,14 +123,10 @@ export default function CellView({ resource, uri, onRefresh, onNavigate }) {
       </div>
 
       {lastSaved && (
-        <div className="cell-saved-indicator">
-          Saved at {lastSaved.toLocaleTimeString()}
-        </div>
+        <div className="cell-saved-indicator">Saved at {lastSaved.toLocaleTimeString()}</div>
       )}
 
-      <div className="cell-view-hint">
-        Double-click the value to edit
-      </div>
+      <div className="cell-view-hint">Double-click the value to edit</div>
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}

@@ -20,7 +20,7 @@ export default function installCells(bl, config = {}) {
       bl._plumber?.dispatch({
         uri,
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri }
+        body: { uri },
       })
     },
     onContradiction: ({ uri, cell, previousValue, incomingValue, result }) => {
@@ -32,10 +32,10 @@ export default function installCells(bl, config = {}) {
           lattice: cell.lattice,
           previousValue,
           incomingValue,
-          result
-        }
+          result,
+        },
       })
-    }
+    },
   })
 
   cells.install(bl)
@@ -45,7 +45,7 @@ export default function installCells(bl, config = {}) {
   if (bl._plumber && bl._propagators) {
     bl._plumber.addRule('cell-to-propagators', {
       match: { headers: { type: 'bl:///types/cell-value', changed: true } },
-      port: 'cell-changes'
+      port: 'cell-changes',
     })
 
     bl._plumber.listen('cell-changes', (msg) => {

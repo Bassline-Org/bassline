@@ -246,7 +246,9 @@ a:hover {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 2px 2px 0 var(--border);
-  transition: transform 0.05s, box-shadow 0.05s;
+  transition:
+    transform 0.05s,
+    box-shadow 0.05s;
 }
 
 .sidebar-create-btn:hover {
@@ -280,7 +282,9 @@ a:hover {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 3px 3px 0 var(--border);
-  transition: transform 0.05s, box-shadow 0.05s;
+  transition:
+    transform 0.05s,
+    box-shadow 0.05s;
 }
 
 .toolbar button:hover:not(:disabled) {
@@ -368,11 +372,22 @@ main {
 }
 
 /* JSON tree */
-.string { color: #a5d6a7; }
-.number { color: #81d4fa; }
-.boolean { color: #ce93d8; }
-.null, .undefined { color: #666; }
-.key { color: #fff; }
+.string {
+  color: #a5d6a7;
+}
+.number {
+  color: #81d4fa;
+}
+.boolean {
+  color: #ce93d8;
+}
+.null,
+.undefined {
+  color: #666;
+}
+.key {
+  color: #fff;
+}
 
 /* Directory view */
 .entries {
@@ -394,10 +409,20 @@ main {
 }
 
 /* Data-driven styles */
-.type-directory .entry { padding: 0.35rem 0; }
-.type-server .status { font-weight: bold; }
-.type-remote.status-connected { border-left: 3px solid var(--success); padding-left: 0.5rem; }
-.type-remote.status-connecting { border-left: 3px solid var(--warning); padding-left: 0.5rem; }
+.type-directory .entry {
+  padding: 0.35rem 0;
+}
+.type-server .status {
+  font-weight: bold;
+}
+.type-remote.status-connected {
+  border-left: 3px solid var(--success);
+  padding-left: 0.5rem;
+}
+.type-remote.status-connecting {
+  border-left: 3px solid var(--warning);
+  padding-left: 0.5rem;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    View Cards - Pretty document display
@@ -427,14 +452,30 @@ main {
 }
 
 /* Type-specific accent borders */
-.view-card.type-cell { border-left-color: var(--type-cell); }
-.view-card.type-note { border-left-color: var(--type-note); }
-.view-card.type-task { border-left-color: var(--type-task); }
-.view-card.type-person { border-left-color: var(--type-person); }
-.view-card.type-type { border-left-color: var(--type-type); }
-.view-card.type-index { border-left-color: var(--type-index); }
-.view-card.type-module { border-left-color: var(--type-module); }
-.view-card.type-remote { border-left-color: var(--type-remote); }
+.view-card.type-cell {
+  border-left-color: var(--type-cell);
+}
+.view-card.type-note {
+  border-left-color: var(--type-note);
+}
+.view-card.type-task {
+  border-left-color: var(--type-task);
+}
+.view-card.type-person {
+  border-left-color: var(--type-person);
+}
+.view-card.type-type {
+  border-left-color: var(--type-type);
+}
+.view-card.type-index {
+  border-left-color: var(--type-index);
+}
+.view-card.type-module {
+  border-left-color: var(--type-module);
+}
+.view-card.type-remote {
+  border-left-color: var(--type-remote);
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    Badges - Status, type, and tag badges
@@ -453,12 +494,27 @@ main {
   color: var(--text-muted);
 }
 
-.badge.status-todo { border-color: var(--status-todo); color: var(--status-todo); }
-.badge.status-in-progress { border-color: var(--status-in-progress); color: var(--status-in-progress); }
-.badge.status-done { border-color: var(--status-done); color: var(--status-done); }
+.badge.status-todo {
+  border-color: var(--status-todo);
+  color: var(--status-todo);
+}
+.badge.status-in-progress {
+  border-color: var(--status-in-progress);
+  color: var(--status-in-progress);
+}
+.badge.status-done {
+  border-color: var(--status-done);
+  color: var(--status-done);
+}
 
-.badge.type-badge { border-color: var(--border); color: var(--text-muted); }
-.badge.tag-badge { border-color: var(--accent); color: var(--accent); }
+.badge.type-badge {
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.badge.tag-badge {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    Cell View
@@ -487,8 +543,12 @@ main {
   color: var(--type-task);
 }
 
-.cell-view .cell-value.value-boolean.true { color: var(--success); }
-.cell-view .cell-value.value-boolean.false { color: var(--error); }
+.cell-view .cell-value.value-boolean.true {
+  color: var(--success);
+}
+.cell-view .cell-value.value-boolean.false {
+  color: var(--error);
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    Person View
@@ -722,7 +782,7 @@ main {
   font-size: 0.875rem;
 }
 
-.type-form .form-field-checkbox input[type="checkbox"] {
+.type-form .form-field-checkbox input[type='checkbox'] {
   width: auto;
   cursor: pointer;
 }
@@ -802,7 +862,9 @@ main {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -964,7 +1026,9 @@ main {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .index-view .subsystems-list li:hover {
@@ -988,13 +1052,34 @@ main {
    Type-specific Badge Colors (Outline Style)
    ═══════════════════════════════════════════════════════════════════ */
 
-.badge.type-cell { border-color: var(--type-cell); color: var(--type-cell); }
-.badge.type-propagator { border-color: var(--type-propagator); color: var(--type-propagator); }
-.badge.type-data { border-color: var(--type-data); color: var(--type-data); }
-.badge.type-code { border-color: var(--type-code); color: var(--type-code); }
-.badge.type-link { border-color: var(--type-link); color: var(--type-link); }
-.badge.type-view { border-color: var(--type-view); color: var(--type-view); }
-.badge.type-directory { border-color: var(--type-directory); color: var(--type-directory); }
+.badge.type-cell {
+  border-color: var(--type-cell);
+  color: var(--type-cell);
+}
+.badge.type-propagator {
+  border-color: var(--type-propagator);
+  color: var(--type-propagator);
+}
+.badge.type-data {
+  border-color: var(--type-data);
+  color: var(--type-data);
+}
+.badge.type-code {
+  border-color: var(--type-code);
+  color: var(--type-code);
+}
+.badge.type-link {
+  border-color: var(--type-link);
+  color: var(--type-link);
+}
+.badge.type-view {
+  border-color: var(--type-view);
+  color: var(--type-view);
+}
+.badge.type-directory {
+  border-color: var(--type-directory);
+  color: var(--type-directory);
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    Section Headers - UPPERCASE Brutalist Style
@@ -1016,23 +1101,40 @@ main {
    ═══════════════════════════════════════════════════════════════════ */
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes flash {
-  0% { background-color: var(--accent); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: var(--accent);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 @keyframes flash-cell {
-  0% { box-shadow: inset 0 0 0 2px var(--type-cell); }
-  100% { box-shadow: inset 0 0 0 2px transparent; }
+  0% {
+    box-shadow: inset 0 0 0 2px var(--type-cell);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
 }
 
 @keyframes flash-propagator {
-  0% { box-shadow: inset 0 0 0 2px var(--type-propagator); }
-  100% { box-shadow: inset 0 0 0 2px transparent; }
+  0% {
+    box-shadow: inset 0 0 0 2px var(--type-propagator);
+  }
+  100% {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
 }
 
 /* Apply to live elements */
@@ -1054,7 +1156,10 @@ main {
 
 /* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .pulse, .flash, .flash-cell, .flash-propagator {
+  .pulse,
+  .flash,
+  .flash-cell,
+  .flash-propagator {
     animation: none;
   }
 }
@@ -1076,7 +1181,9 @@ main {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 3px 3px 0 var(--border);
-  transition: transform 0.05s, box-shadow 0.05s;
+  transition:
+    transform 0.05s,
+    box-shadow 0.05s;
 }
 
 .btn:hover {
@@ -1370,8 +1477,12 @@ main {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .command-palette {
@@ -1379,13 +1490,21 @@ main {
   max-width: 90vw;
   background: var(--surface-1);
   border: 2px solid var(--border);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 4px 4px 0 var(--border);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    4px 4px 0 var(--border);
   animation: slideDown 0.15s ease-out;
 }
 
 @keyframes slideDown {
-  from { transform: translateY(-20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .command-palette-input {
@@ -1445,7 +1564,9 @@ main {
   padding: var(--space-sm) var(--space-md);
   cursor: pointer;
   border-left: 3px solid transparent;
-  transition: background 0.05s, border-color 0.05s;
+  transition:
+    background 0.05s,
+    border-color 0.05s;
 }
 
 .command-palette-item:hover,
@@ -1992,7 +2113,9 @@ kbd {
   color: var(--text-muted);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s ease, background 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
 }
 
 .inline-edit-trigger:hover {
@@ -2207,7 +2330,9 @@ kbd {
 .modal {
   background: var(--surface-1);
   border: 2px solid var(--border);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 4px 4px 0 var(--border);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    4px 4px 0 var(--border);
   min-width: 400px;
   max-width: 600px;
   max-height: 90vh;
@@ -2268,7 +2393,9 @@ kbd {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .type-tab:hover {
@@ -2332,7 +2459,7 @@ kbd {
   background: var(--surface-3);
 }
 
-.cell-option input[type="checkbox"] {
+.cell-option input[type='checkbox'] {
   accent-color: var(--type-cell);
 }
 
@@ -2405,8 +2532,12 @@ kbd {
 }
 
 @keyframes slideIn {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .claude-panel-header {
@@ -2655,7 +2786,7 @@ kbd {
   opacity: 0.5;
 }
 
-.claude-input-form button[type="submit"] {
+.claude-input-form button[type='submit'] {
   padding: 8px 16px;
   background: var(--accent);
   border: 2px solid var(--accent);
@@ -2665,12 +2796,12 @@ kbd {
   align-items: center;
 }
 
-.claude-input-form button[type="submit"]:hover {
+.claude-input-form button[type='submit']:hover {
   background: #0055dd;
   border-color: #0055dd;
 }
 
-.claude-input-form button[type="submit"]:disabled {
+.claude-input-form button[type='submit']:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -2681,8 +2812,12 @@ kbd {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Sidebar Claude button */

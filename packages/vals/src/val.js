@@ -80,7 +80,7 @@ export function createValRoutes(options = {}) {
             valType: source.valType,
             definition: source.definition,
             description: source.description,
-            tags: source.tags
+            tags: source.tags,
           }
         }
       }
@@ -98,7 +98,7 @@ export function createValRoutes(options = {}) {
       parentVersion,
       version,
       createdAt: existing?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     }
 
     valStore.set(key, val)
@@ -118,7 +118,7 @@ export function createValRoutes(options = {}) {
         uri: `bl:///vals/${key}`,
         method: 'put',
         headers: { type: 'bl:///types/val-saved', version },
-        body: { val: key, version }
+        body: { val: key, version },
       })
     }
 
@@ -183,7 +183,7 @@ export function createValRoutes(options = {}) {
             valType: val.valType,
             description: val.description,
             version: val.version,
-            tags: val.tags
+            tags: val.tags,
           })
         }
       }
@@ -206,7 +206,7 @@ export function createValRoutes(options = {}) {
         versions.push({
           version: version.version,
           uri: `bl:///vals/${key}`,
-          createdAt: version.updatedAt
+          createdAt: version.updatedAt,
         })
       }
     }
@@ -242,7 +242,7 @@ export function createValRoutes(options = {}) {
     bl._recipes.createRecipe(recipeName, {
       description: val.description,
       params: val.definition.params || {},
-      resources: val.definition.resources || []
+      resources: val.definition.resources || [],
     })
 
     // Instantiate it
@@ -262,27 +262,27 @@ export function createValRoutes(options = {}) {
   }
 
   // Val routes
-  const valResource = resource(r => {
+  const valResource = resource((r) => {
     // List all vals
     r.get('/', ({ headers }) => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listVals().map(v => ({
+        entries: listVals().map((v) => ({
           ...v,
-          type: 'val'
-        }))
-      }
+          type: 'val',
+        })),
+      },
     }))
 
     // List user's vals
     r.get('/:owner', ({ params, headers }) => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listVals(params.owner).map(v => ({
+        entries: listVals(params.owner).map((v) => ({
           ...v,
-          type: 'val'
-        }))
-      }
+          type: 'val',
+        })),
+      },
     }))
 
     // Get val definition
@@ -294,15 +294,15 @@ export function createValRoutes(options = {}) {
         headers: {
           type: 'bl:///types/val',
           visibility: val.visibility,
-          version: val.version
+          version: val.version,
         },
         body: {
           ...val,
           entries: [
             { name: 'versions', uri: `bl:///vals/${params.owner}/${params.name}/versions` },
-            { name: 'forks', uri: `bl:///vals/${params.owner}/${params.name}/forks` }
-          ]
-        }
+            { name: 'forks', uri: `bl:///vals/${params.owner}/${params.name}/forks` },
+          ],
+        },
       }
     })
 
@@ -319,9 +319,9 @@ export function createValRoutes(options = {}) {
       return {
         headers: {
           type: 'bl:///types/val',
-          version: val.version
+          version: val.version,
         },
-        body: val
+        body: val,
       }
     })
 
@@ -332,7 +332,7 @@ export function createValRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///vals/${params.owner}/${params.name}` }
+        body: { uri: `bl:///vals/${params.owner}/${params.name}` },
       }
     })
 
@@ -343,12 +343,12 @@ export function createValRoutes(options = {}) {
       return {
         headers: { type: 'bl:///types/directory' },
         body: {
-          entries: versions.map(v => ({
+          entries: versions.map((v) => ({
             ...v,
             name: `v${v.version}`,
-            type: 'val-version'
-          }))
-        }
+            type: 'val-version',
+          })),
+        },
       }
     })
 
@@ -359,7 +359,7 @@ export function createValRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/val-version', version: version.version },
-        body: version
+        body: version,
       }
     })
 
@@ -375,12 +375,12 @@ export function createValRoutes(options = {}) {
         fork: `bl:///vals/${params.owner}/${params.name}`,
         forkVersion: body?.version || source.version,
         description: body?.description || source.description,
-        tags: body?.tags || source.tags
+        tags: body?.tags || source.tags,
       })
 
       return {
         headers: { type: 'bl:///types/val', version: forked.version },
-        body: forked
+        body: forked,
       }
     })
 
@@ -392,20 +392,19 @@ export function createValRoutes(options = {}) {
       let forks = []
       if (bl._links) {
         const links = await bl.get(`bl:///links/to${uri.slice(4)}`)
-        forks = links?.body?.refs?.filter(ref =>
-          ref.startsWith('bl:///vals/') && ref !== uri
-        ) || []
+        forks =
+          links?.body?.refs?.filter((ref) => ref.startsWith('bl:///vals/') && ref !== uri) || []
       }
 
       return {
         headers: { type: 'bl:///types/directory' },
         body: {
-          entries: forks.map(uri => ({
+          entries: forks.map((uri) => ({
             uri,
             name: uri.split('/').pop(),
-            type: 'val'
-          }))
-        }
+            type: 'val',
+          })),
+        },
       }
     })
 
@@ -426,7 +425,7 @@ export function createValRoutes(options = {}) {
               type: 'instance',
               state: instance.state,
               resourceCount: instance.createdResources?.length || 0,
-              createdAt: instance.createdAt
+              createdAt: instance.createdAt,
             })
           }
         }
@@ -434,7 +433,7 @@ export function createValRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/directory' },
-        body: { entries: instances }
+        body: { entries: instances },
       }
     })
 
@@ -450,12 +449,12 @@ export function createValRoutes(options = {}) {
 
         return {
           headers: { type: 'bl:///types/instance' },
-          body: instance
+          body: instance,
         }
       } catch (err) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: err.message }
+          body: { error: err.message },
         }
       }
     })
@@ -483,6 +482,6 @@ export function createValRoutes(options = {}) {
     listVersions,
     instantiateVal,
     _valStore: valStore,
-    _versionStore: versionStore
+    _versionStore: versionStore,
   }
 }

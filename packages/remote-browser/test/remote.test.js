@@ -26,7 +26,7 @@ describe('Remote WebSocket Mounts', () => {
       put: ({ params, body }) => {
         store.set(params.path, body)
         return { headers: { type: 'bl:///types/data' }, body }
-      }
+      },
     })
 
     // Install real WS server routes
@@ -44,7 +44,7 @@ describe('Remote WebSocket Mounts', () => {
     clientBl.install(createRemoteRoutes({ WebSocket }))
 
     // Wait for server to be ready
-    await new Promise(resolve => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, 100))
   })
 
   afterAll(async () => {
@@ -53,17 +53,21 @@ describe('Remote WebSocket Mounts', () => {
   })
 
   it('should create a remote connection', async () => {
-    const result = await clientBl.put('bl:///remote/ws/server1', {}, {
-      uri: `ws://localhost:${PORT}`,
-      mount: '/server1'
-    })
+    const result = await clientBl.put(
+      'bl:///remote/ws/server1',
+      {},
+      {
+        uri: `ws://localhost:${PORT}`,
+        mount: '/server1',
+      }
+    )
 
     expect(result.headers.type).toBe('bl:///types/remote')
     expect(result.body.status).toBe('connecting')
     expect(result.body.mount).toBe('/server1')
 
     // Wait for connection to establish
-    await new Promise(resolve => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 200))
   })
 
   it('should show connection as connected', async () => {
@@ -78,10 +82,14 @@ describe('Remote WebSocket Mounts', () => {
   })
 
   it('should PUT to remote resources through mount', async () => {
-    await clientBl.put('bl:///server1/data/users/charlie', {}, {
-      name: 'Charlie',
-      role: 'guest'
-    })
+    await clientBl.put(
+      'bl:///server1/data/users/charlie',
+      {},
+      {
+        name: 'Charlie',
+        role: 'guest',
+      }
+    )
 
     // Verify it was stored on the server
     const charlie = await serverBl.get('bl:///data/users/charlie')

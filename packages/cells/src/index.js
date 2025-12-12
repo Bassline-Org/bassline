@@ -9,7 +9,7 @@ export {
   createDedupeCompactor,
   createTimeWindowCompactor,
   createSlidingWindowCompactor,
-  createCompositeCompactor
+  createCompositeCompactor,
 } from './compactors.js'
 
 // Upgrade modules for dynamic installation

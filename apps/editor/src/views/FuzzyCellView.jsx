@@ -1,6 +1,14 @@
 import { useState, useCallback } from 'react'
 import { useBassline } from '@bassline/react'
-import { IconBrain, IconRefresh, IconPlayerPlay, IconTrash, IconPlus, IconChevronDown, IconChevronRight } from '@tabler/icons-react'
+import {
+  IconBrain,
+  IconRefresh,
+  IconPlayerPlay,
+  IconTrash,
+  IconPlus,
+  IconChevronDown,
+  IconChevronRight,
+} from '@tabler/icons-react'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { REMOTE_PREFIX } from '../config.js'
 
@@ -41,9 +49,7 @@ function EntryItem({ entry, index, expanded, onToggle }) {
             {expanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
           </span>
         )}
-        <span className="fuzzy-entry-preview">
-          {expanded ? formatted : preview}
-        </span>
+        <span className="fuzzy-entry-preview">{expanded ? formatted : preview}</span>
       </div>
     </div>
   )
@@ -77,28 +83,31 @@ export default function FuzzyCellView({ resource, uri, onRefresh, onNavigate }) 
     }
   }, [bl, cellName, onRefresh])
 
-  const handleAddEntry = useCallback(async (e) => {
-    e.preventDefault()
-    if (!cellName || !newEntry.trim()) return
+  const handleAddEntry = useCallback(
+    async (e) => {
+      e.preventDefault()
+      if (!cellName || !newEntry.trim()) return
 
-    setAdding(true)
-    try {
-      // Try to parse as JSON, otherwise send as string
-      let value = newEntry.trim()
+      setAdding(true)
       try {
-        value = JSON.parse(value)
-      } catch {
-        // Keep as string
+        // Try to parse as JSON, otherwise send as string
+        let value = newEntry.trim()
+        try {
+          value = JSON.parse(value)
+        } catch {
+          // Keep as string
+        }
+        await bl.put(`${REMOTE_PREFIX}/fuzzy/${cellName}/value`, {}, value)
+        setNewEntry('')
+        onRefresh?.()
+      } catch (err) {
+        console.error('Add entry failed:', err)
+      } finally {
+        setAdding(false)
       }
-      await bl.put(`${REMOTE_PREFIX}/fuzzy/${cellName}/value`, {}, value)
-      setNewEntry('')
-      onRefresh?.()
-    } catch (err) {
-      console.error('Add entry failed:', err)
-    } finally {
-      setAdding(false)
-    }
-  }, [bl, cellName, newEntry, onRefresh])
+    },
+    [bl, cellName, newEntry, onRefresh]
+  )
 
   const handleDelete = useCallback(async () => {
     if (!cellName) return
@@ -133,11 +142,7 @@ export default function FuzzyCellView({ resource, uri, onRefresh, onNavigate }) 
           <div className="uri">{uri}</div>
           <div className="fuzzy-cell-name">{cellName}</div>
         </div>
-        <button
-          className="btn btn-small"
-          onClick={onRefresh}
-          title="Refresh"
-        >
+        <button className="btn btn-small" onClick={onRefresh} title="Refresh">
           <IconRefresh size={14} />
         </button>
         <button
@@ -203,16 +208,12 @@ export default function FuzzyCellView({ resource, uri, onRefresh, onNavigate }) 
       <form className="fuzzy-cell-add-form" onSubmit={handleAddEntry}>
         <textarea
           value={newEntry}
-          onChange={e => setNewEntry(e.target.value)}
+          onChange={(e) => setNewEntry(e.target.value)}
           placeholder="Add a new entry (text or JSON)..."
           rows={3}
           disabled={adding}
         />
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={adding || !newEntry.trim()}
-        >
+        <button type="submit" className="btn btn-primary" disabled={adding || !newEntry.trim()}>
           <IconPlus size={14} />
           {adding ? 'Adding...' : 'Add Entry'}
         </button>

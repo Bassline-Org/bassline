@@ -31,7 +31,7 @@ export default function ConditionalEditor(props: ConditionalEditorProps) {
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({
     predicate: true,
     then: true,
-    else: true
+    else: true,
   })
 
   // Helper to update nested config
@@ -47,7 +47,7 @@ export default function ConditionalEditor(props: ConditionalEditorProps) {
       predicate: 'eq',
       predicateConfig: { value: '' },
       handler: 'identity',
-      handlerConfig: {}
+      handlerConfig: {},
     })
     updateConfig('cases', cases)
   }
@@ -75,17 +75,20 @@ export default function ConditionalEditor(props: ConditionalEditorProps) {
           <div class="branch if-branch">
             <div
               class="branch-header"
-              onClick={() => setExpanded(e => ({ ...e, predicate: !e.predicate }))}
+              onClick={() => setExpanded((e) => ({ ...e, predicate: !e.predicate }))}
             >
               <span class="branch-label">IF</span>
-              <span class="branch-summary">
-                {props.config.predicate || 'Select predicate...'}
-              </span>
+              <span class="branch-summary">{props.config.predicate || 'Select predicate...'}</span>
               <svg
                 class={`expand-icon ${expanded().predicate ? 'expanded' : ''}`}
-                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
               >
-                <path d="M6 9l6 6 6-6"/>
+                <path d="M6 9l6 6 6-6" />
               </svg>
             </div>
             <Show when={expanded().predicate}>
@@ -113,17 +116,20 @@ export default function ConditionalEditor(props: ConditionalEditorProps) {
           <div class="branch then-branch">
             <div
               class="branch-header"
-              onClick={() => setExpanded(e => ({ ...e, then: !e.then }))}
+              onClick={() => setExpanded((e) => ({ ...e, then: !e.then }))}
             >
               <span class="branch-label then">THEN</span>
-              <span class="branch-summary">
-                {props.config.then || 'Select handler...'}
-              </span>
+              <span class="branch-summary">{props.config.then || 'Select handler...'}</span>
               <svg
                 class={`expand-icon ${expanded().then ? 'expanded' : ''}`}
-                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
               >
-                <path d="M6 9l6 6 6-6"/>
+                <path d="M6 9l6 6 6-6" />
               </svg>
             </div>
             <Show when={expanded().then}>
@@ -143,17 +149,20 @@ export default function ConditionalEditor(props: ConditionalEditorProps) {
           <div class="branch else-branch">
             <div
               class="branch-header"
-              onClick={() => setExpanded(e => ({ ...e, else: !e.else }))}
+              onClick={() => setExpanded((e) => ({ ...e, else: !e.else }))}
             >
               <span class="branch-label else">ELSE</span>
-              <span class="branch-summary">
-                {props.config.else || 'Select handler...'}
-              </span>
+              <span class="branch-summary">{props.config.else || 'Select handler...'}</span>
               <svg
                 class={`expand-icon ${expanded().else ? 'expanded' : ''}`}
-                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
               >
-                <path d="M6 9l6 6 6-6"/>
+                <path d="M6 9l6 6 6-6" />
               </svg>
             </div>
             <Show when={expanded().else}>
@@ -184,8 +193,15 @@ export default function ConditionalEditor(props: ConditionalEditorProps) {
                     onClick={() => removeCase(index())}
                     title="Remove case"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M18 6L6 18M6 6l12 12"/>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path d="M18 6L6 18M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
@@ -218,8 +234,15 @@ export default function ConditionalEditor(props: ConditionalEditorProps) {
           </For>
 
           <button class="add-case-btn" onClick={addCase}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 5v14M5 12h14"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 5v14M5 12h14" />
             </svg>
             Add Case
           </button>

@@ -95,9 +95,9 @@ export function createMonitorRoutes(options = {}) {
       const fetchOptions = {
         method: monitor.method,
         headers: {
-          'Accept': 'application/json',
-          ...monitor.headers
-        }
+          Accept: 'application/json',
+          ...monitor.headers,
+        },
       }
 
       const response = await fetch(monitor.url, fetchOptions)
@@ -129,8 +129,8 @@ export function createMonitorRoutes(options = {}) {
             monitor: name,
             value,
             fetchCount: monitor.fetchCount,
-            time: monitor.lastFetch
-          }
+            time: monitor.lastFetch,
+          },
         })
       }
 
@@ -148,8 +148,8 @@ export function createMonitorRoutes(options = {}) {
           body: {
             monitor: name,
             error: err.message,
-            time: new Date().toISOString()
-          }
+            time: new Date().toISOString(),
+          },
         })
       }
 
@@ -179,7 +179,7 @@ export function createMonitorRoutes(options = {}) {
       lastFetch: existing?.lastFetch,
       lastValue: existing?.lastValue,
       lastError: existing?.lastError,
-      fetchCount: existing?.fetchCount ?? 0
+      fetchCount: existing?.fetchCount ?? 0,
     }
 
     store.set(name, monitor)
@@ -215,10 +215,14 @@ export function createMonitorRoutes(options = {}) {
     const timerName = getTimerName(name)
 
     // Create/configure the timer
-    bl.put(`bl:///timers/${timerName}`, {}, {
-      interval: monitor.interval,
-      enabled: true
-    })
+    bl.put(
+      `bl:///timers/${timerName}`,
+      {},
+      {
+        interval: monitor.interval,
+        enabled: true,
+      }
+    )
 
     // Listen for timer ticks via plumber
     if (bl._plumber) {
@@ -231,9 +235,9 @@ export function createMonitorRoutes(options = {}) {
       bl._plumber.addRule(`monitor-${name}-timer`, {
         match: {
           uri: `^bl:///timers/${timerName}`,
-          headers: { type: 'bl:///types/timer-tick' }
+          headers: { type: 'bl:///types/timer-tick' },
         },
-        port: `timer-${timerName}`
+        port: `timer-${timerName}`,
       })
     }
 
@@ -309,12 +313,12 @@ export function createMonitorRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const monitorResource = resource(r => {
+  const monitorResource = resource((r) => {
     // List all monitors
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listMonitors().map(name => {
+        entries: listMonitors().map((name) => {
           const monitor = store.get(name)
           return {
             name,
@@ -322,10 +326,10 @@ export function createMonitorRoutes(options = {}) {
             uri: `bl:///monitors/${name}`,
             running: timerListeners.has(name),
             url: monitor?.url,
-            lastFetch: monitor?.lastFetch
+            lastFetch: monitor?.lastFetch,
           }
-        })
-      }
+        }),
+      },
     }))
 
     // Get monitor config & status
@@ -352,9 +356,9 @@ export function createMonitorRoutes(options = {}) {
           entries: [
             { name: 'start', uri: `bl:///monitors/${params.name}/start` },
             { name: 'stop', uri: `bl:///monitors/${params.name}/stop` },
-            { name: 'fetch', uri: `bl:///monitors/${params.name}/fetch` }
-          ]
-        }
+            { name: 'fetch', uri: `bl:///monitors/${params.name}/fetch` },
+          ],
+        },
       }
     })
 
@@ -371,8 +375,8 @@ export function createMonitorRoutes(options = {}) {
           enabled: monitor.enabled,
           running: timerListeners.has(params.name),
           cell: getCellUri(params.name),
-          fetchCount: monitor.fetchCount
-        }
+          fetchCount: monitor.fetchCount,
+        },
       }
     })
 
@@ -382,7 +386,7 @@ export function createMonitorRoutes(options = {}) {
       if (!monitor) {
         return {
           headers: { type: 'bl:///types/error' },
-          body: { error: 'Monitor not found. Create it first with PUT /monitors/:name' }
+          body: { error: 'Monitor not found. Create it first with PUT /monitors/:name' },
         }
       }
 
@@ -393,8 +397,8 @@ export function createMonitorRoutes(options = {}) {
         body: {
           name: params.name,
           running: timerListeners.has(params.name),
-          message: 'Monitor started'
-        }
+          message: 'Monitor started',
+        },
       }
     })
 
@@ -408,8 +412,8 @@ export function createMonitorRoutes(options = {}) {
         body: {
           name: params.name,
           running: false,
-          message: 'Monitor stopped'
-        }
+          message: 'Monitor stopped',
+        },
       }
     })
 
@@ -426,8 +430,8 @@ export function createMonitorRoutes(options = {}) {
           name: params.name,
           value,
           error: monitor.lastError,
-          time: monitor.lastFetch
-        }
+          time: monitor.lastFetch,
+        },
       }
     })
 
@@ -438,7 +442,7 @@ export function createMonitorRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///monitors/${params.name}` }
+        body: { uri: `bl:///monitors/${params.name}` },
       }
     })
   })
@@ -473,6 +477,6 @@ export function createMonitorRoutes(options = {}) {
     listMonitors,
     doMonitorFetch,
     cleanup,
-    _store: store
+    _store: store,
   }
 }

@@ -53,7 +53,7 @@ export default function UsageView(props: UsageViewProps) {
         uri,
         type,
         name,
-        relationshipType: link.relationship || 'references'
+        relationshipType: link.relationship || 'references',
       }
     })
   })
@@ -63,7 +63,7 @@ export default function UsageView(props: UsageViewProps) {
     const items = usageItems()
     const groups: Record<string, UsageItem[]> = {}
 
-    items.forEach(item => {
+    items.forEach((item) => {
       if (!groups[item.type]) groups[item.type] = []
       groups[item.type].push(item)
     })
@@ -97,9 +97,16 @@ export default function UsageView(props: UsageViewProps) {
 
       <Show when={!backlinks.loading && usageItems().length === 0}>
         <div class="empty-state">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
-            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+          >
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
           </svg>
           <h4>No references found</h4>
           <p>Nothing currently references this resource.</p>
@@ -323,34 +330,69 @@ function ItemIcon(props: { type: string }) {
   switch (props.type) {
     case 'propagator':
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 12h4l3-9 6 18 3-9h4"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M4 12h4l3-9 6 18 3-9h4" />
         </svg>
       )
     case 'cell':
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="4" y="4" width="16" height="16" rx="2"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="4" y="4" width="16" height="16" rx="2" />
         </svg>
       )
     case 'recipe':
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
         </svg>
       )
     case 'handler':
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5z" />
+          <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
         </svg>
       )
     default:
       return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <circle cx="12" cy="12" r="10" />
         </svg>
       )
   }

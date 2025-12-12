@@ -11,7 +11,7 @@ import {
   IconFilter,
   IconTrash,
   IconChevronDown,
-  IconChevronRight
+  IconChevronRight,
 } from '@tabler/icons-react'
 import { REMOTE_PREFIX } from '../config.js'
 
@@ -22,7 +22,7 @@ const TYPE_CONFIG = {
   cell: { icon: IconCircle, color: 'var(--type-cell)', label: 'Cells' },
   propagator: { icon: IconArrowRight, color: 'var(--type-propagator)', label: 'Propagators' },
   data: { icon: IconDatabase, color: 'var(--type-data)', label: 'Data' },
-  code: { icon: IconCode, color: 'var(--type-code)', label: 'Code' }
+  code: { icon: IconCode, color: 'var(--type-code)', label: 'Code' },
 }
 
 /**
@@ -67,10 +67,10 @@ function StatsPanel({ items, type }) {
       count: items.length,
       withValue: 0,
       minValue: null,
-      maxValue: null
+      maxValue: null,
     }
 
-    items.forEach(item => {
+    items.forEach((item) => {
       if (item.value !== undefined && item.value !== null) {
         result.withValue++
         const numValue = typeof item.value === 'number' ? item.value : null
@@ -121,15 +121,14 @@ function SortableHeader({ column, label, sortBy, sortDir, onSort }) {
   const isActive = sortBy === column
 
   return (
-    <th
-      className={`sortable ${isActive ? 'active' : ''}`}
-      onClick={() => onSort(column)}
-    >
+    <th className={`sortable ${isActive ? 'active' : ''}`} onClick={() => onSort(column)}>
       {label}
-      {isActive && (sortDir === 'asc' ?
-        <IconSortAscending size={12} style={{ marginLeft: 4 }} /> :
-        <IconSortDescending size={12} style={{ marginLeft: 4 }} />
-      )}
+      {isActive &&
+        (sortDir === 'asc' ? (
+          <IconSortAscending size={12} style={{ marginLeft: 4 }} />
+        ) : (
+          <IconSortDescending size={12} style={{ marginLeft: 4 }} />
+        ))}
     </th>
   )
 }
@@ -194,7 +193,7 @@ export default function TypeExplorer({ type = 'cell', onNavigate }) {
     // Apply filter
     if (filter) {
       const lowerFilter = filter.toLowerCase()
-      filtered = items.filter(item => {
+      filtered = items.filter((item) => {
         const name = (item.label || item.name || '').toLowerCase()
         const value = formatValue(item.value).toLowerCase()
         return name.includes(lowerFilter) || value.includes(lowerFilter)
@@ -230,7 +229,7 @@ export default function TypeExplorer({ type = 'cell', onNavigate }) {
 
   const handleSort = (column) => {
     if (sortBy === column) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     } else {
       setSortBy(column)
       setSortDir('asc')
@@ -241,7 +240,7 @@ export default function TypeExplorer({ type = 'cell', onNavigate }) {
     if (selectedItems.size === displayItems.length) {
       setSelectedItems(new Set())
     } else {
-      setSelectedItems(new Set(displayItems.map(i => i.uri || i.name)))
+      setSelectedItems(new Set(displayItems.map((i) => i.uri || i.name)))
     }
   }
 
@@ -344,7 +343,7 @@ export default function TypeExplorer({ type = 'cell', onNavigate }) {
             type="text"
             placeholder="Filter..."
             value={filter}
-            onChange={e => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value)}
           />
         </div>
         {selectedItems.size > 0 && (
@@ -360,7 +359,9 @@ export default function TypeExplorer({ type = 'cell', onNavigate }) {
       {/* Table */}
       {displayItems.length === 0 ? (
         <div className="empty">
-          {filter ? `No ${config.label.toLowerCase()} match "${filter}"` : `No ${config.label.toLowerCase()} yet`}
+          {filter
+            ? `No ${config.label.toLowerCase()} match "${filter}"`
+            : `No ${config.label.toLowerCase()} yet`}
         </div>
       ) : (
         <table className="type-explorer-table">
@@ -374,16 +375,32 @@ export default function TypeExplorer({ type = 'cell', onNavigate }) {
                 />
               </th>
               <th className="expand-col"></th>
-              <SortableHeader column="name" label="Name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+              <SortableHeader
+                column="name"
+                label="Name"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
               {type === 'cell' && (
-                <SortableHeader column="value" label="Value" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader
+                  column="value"
+                  label="Value"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
               )}
               {type === 'cell' && (
-                <SortableHeader column="lattice" label="Lattice" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                <SortableHeader
+                  column="lattice"
+                  label="Lattice"
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                />
               )}
-              {type === 'propagator' && (
-                <th>Status</th>
-              )}
+              {type === 'propagator' && <th>Status</th>}
               <th>Last Change</th>
             </tr>
           </thead>
@@ -401,18 +418,15 @@ export default function TypeExplorer({ type = 'cell', onNavigate }) {
                     className={`${isSelected ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}`}
                     onClick={() => handleRowClick(item)}
                   >
-                    <td className="checkbox-col" onClick={e => e.stopPropagation()}>
+                    <td className="checkbox-col" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleSelect(item)}
                       />
                     </td>
-                    <td className="expand-col" onClick={e => handleExpand(item, e)}>
-                      {isExpanded ?
-                        <IconChevronDown size={14} /> :
-                        <IconChevronRight size={14} />
-                      }
+                    <td className="expand-col" onClick={(e) => handleExpand(item, e)}>
+                      {isExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
                     </td>
                     <td className="name-col">
                       <Icon size={12} style={{ color: config.color, marginRight: 6 }} />

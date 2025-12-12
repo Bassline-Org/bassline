@@ -87,7 +87,7 @@ export function createPropagatorRoutes(options = {}) {
       handler,
       handlerName,
       handlerConfig,
-      enabled: config.enabled !== false
+      enabled: config.enabled !== false,
     }
 
     store.set(name, propagator)
@@ -102,7 +102,7 @@ export function createPropagatorRoutes(options = {}) {
 
     // Fire once on creation to compute initial value from existing inputs
     if (bl && propagator.inputs.length > 0) {
-      fire(name).catch(err => {
+      fire(name).catch((err) => {
         console.warn(`Propagator ${name} initial fire failed:`, err.message)
       })
     }
@@ -204,17 +204,17 @@ export function createPropagatorRoutes(options = {}) {
     return [...store.keys()]
   }
 
-  const propagatorResource = resource(r => {
+  const propagatorResource = resource((r) => {
     // List all propagators
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
       body: {
-        entries: listPropagators().map(name => ({
+        entries: listPropagators().map((name) => ({
           name,
           type: 'propagator',
-          uri: `bl:///propagators/${name}`
-        }))
-      }
+          uri: `bl:///propagators/${name}`,
+        })),
+      },
     }))
 
     // Get a propagator
@@ -229,8 +229,8 @@ export function createPropagatorRoutes(options = {}) {
           output: prop.output,
           handler: prop.handlerName,
           handlerConfig: prop.handlerConfig,
-          enabled: prop.enabled
-        }
+          enabled: prop.enabled,
+        },
       }
     })
 
@@ -241,7 +241,7 @@ export function createPropagatorRoutes(options = {}) {
         output: body.output,
         handler: body.handler || 'passthrough',
         handlerConfig: body.handlerConfig || {},
-        enabled: body.enabled !== false
+        enabled: body.enabled !== false,
       }
 
       const prop = createPropagator(params.name, config)
@@ -253,8 +253,8 @@ export function createPropagatorRoutes(options = {}) {
           output: prop.output,
           handler: prop.handlerName,
           handlerConfig: prop.handlerConfig,
-          enabled: prop.enabled
-        }
+          enabled: prop.enabled,
+        },
       }
     })
 
@@ -263,7 +263,7 @@ export function createPropagatorRoutes(options = {}) {
       const result = await fire(params.name)
       return {
         headers: { type: 'bl:///types/propagator-result' },
-        body: result
+        body: result,
       }
     })
 
@@ -274,7 +274,7 @@ export function createPropagatorRoutes(options = {}) {
 
       return {
         headers: { type: 'bl:///types/resource-removed' },
-        body: { uri: `bl:///propagators/${params.name}` }
+        body: { uri: `bl:///propagators/${params.name}` },
       }
     })
   })
@@ -300,6 +300,6 @@ export function createPropagatorRoutes(options = {}) {
     onCellChange,
     listPropagators,
     _store: store,
-    _watchers: watchers
+    _watchers: watchers,
   }
 }

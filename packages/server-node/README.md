@@ -46,11 +46,13 @@ Real-time resource access and subscriptions.
 ```javascript
 const ws = new WebSocket('ws://localhost:9112')
 
-ws.send(JSON.stringify({
-  id: 1,
-  type: 'get',
-  uri: 'bl:///data/users/alice'
-}))
+ws.send(
+  JSON.stringify({
+    id: 1,
+    type: 'get',
+    uri: 'bl:///data/users/alice',
+  })
+)
 
 ws.onmessage = (event) => {
   const { id, result } = JSON.parse(event.data)
@@ -60,14 +62,14 @@ ws.onmessage = (event) => {
 
 ## Routes
 
-| Route | Method | Description |
-|-------|--------|-------------|
-| `/server/http` | GET | List HTTP servers |
-| `/server/http/:port` | GET | Get server status |
-| `/server/http/:port` | PUT | Start server |
-| `/server/ws` | GET | List WebSocket servers |
-| `/server/ws/:port` | GET | Get server status |
-| `/server/ws/:port` | PUT | Start server |
+| Route                | Method | Description            |
+| -------------------- | ------ | ---------------------- |
+| `/server/http`       | GET    | List HTTP servers      |
+| `/server/http/:port` | GET    | Get server status      |
+| `/server/http/:port` | PUT    | Start server           |
+| `/server/ws`         | GET    | List WebSocket servers |
+| `/server/ws/:port`   | GET    | Get server status      |
+| `/server/ws/:port`   | PUT    | Start server           |
 
 ## Dynamic Installation
 
@@ -75,16 +77,24 @@ Install via the daemon's module system:
 
 ```javascript
 // HTTP server
-await bl.put('bl:///install/http-server', {}, {
-  path: './packages/server-node/src/upgrade-http-server.js',
-  ports: [9111]
-})
+await bl.put(
+  'bl:///install/http-server',
+  {},
+  {
+    path: './packages/server-node/src/upgrade-http-server.js',
+    ports: [9111],
+  }
+)
 
 // WebSocket server
-await bl.put('bl:///install/ws-server', {}, {
-  path: './packages/server-node/src/upgrade-ws-server.js',
-  ports: [9112]
-})
+await bl.put(
+  'bl:///install/ws-server',
+  {},
+  {
+    path: './packages/server-node/src/upgrade-ws-server.js',
+    ports: [9112],
+  }
+)
 // Requires: bl._plumber (optional, for subscriptions)
 ```
 

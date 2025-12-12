@@ -45,7 +45,7 @@ export function createInstallRoutes(options = {}) {
     return installed.get(name) || null
   }
 
-  const installResource = resource(r => {
+  const installResource = resource((r) => {
     // List installed modules
     r.get('/', () => ({
       headers: { type: 'bl:///types/directory' },
@@ -55,9 +55,9 @@ export function createInstallRoutes(options = {}) {
           type: 'module',
           uri: `bl:///install/${name}`,
           path: info.path,
-          installedAt: info.installedAt
-        }))
-      }
+          installedAt: info.installedAt,
+        })),
+      },
     }))
 
     // Get module info
@@ -66,7 +66,7 @@ export function createInstallRoutes(options = {}) {
       if (!info) return null
       return {
         headers: { type: 'bl:///types/module' },
-        body: info
+        body: info,
       }
     })
 
@@ -96,13 +96,13 @@ export function createInstallRoutes(options = {}) {
       const info = {
         path,
         installedAt: new Date().toISOString(),
-        config: Object.keys(config).length > 0 ? config : undefined
+        config: Object.keys(config).length > 0 ? config : undefined,
       }
       installed.set(params.name, info)
 
       return {
         headers: { type: 'bl:///types/module' },
-        body: info
+        body: info,
       }
     })
   })
@@ -122,6 +122,6 @@ export function createInstallRoutes(options = {}) {
     install,
     listModules,
     getModule,
-    _installed: installed
+    _installed: installed,
   }
 }

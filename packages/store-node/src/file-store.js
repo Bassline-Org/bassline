@@ -27,7 +27,7 @@ export function createFileStore(dataDir, defaultPrefix = '/data') {
   // Keep prefix reference for listDir
   let mountedPrefix = defaultPrefix
 
-  const fileResource = resource(r => {
+  const fileResource = resource((r) => {
     // List contents at root
     r.get('/', () => listDir(dataDir, mountedPrefix))
 
@@ -53,12 +53,12 @@ export function createFileStore(dataDir, defaultPrefix = '/data') {
           const doc = JSON.parse(content)
           return {
             headers: { type: doc.type || 'document' },
-            body: doc
+            body: doc,
           }
         } catch (err) {
           return {
             headers: { error: 'read-error' },
-            body: { message: err.message }
+            body: { message: err.message },
           }
         }
       },
@@ -77,15 +77,15 @@ export function createFileStore(dataDir, defaultPrefix = '/data') {
           writeFileSync(filePath, JSON.stringify(body, null, 2))
           return {
             headers: { type: body.type || 'document' },
-            body
+            body,
           }
         } catch (err) {
           return {
             headers: { error: 'write-error' },
-            body: { message: err.message }
+            body: { message: err.message },
           }
         }
-      }
+      },
     })
   })
 
@@ -113,25 +113,25 @@ function listDir(dirPath, urlPrefix) {
   }
 
   try {
-    const entries = readdirSync(dirPath).map(name => {
+    const entries = readdirSync(dirPath).map((name) => {
       const fullPath = join(dirPath, name)
       const isDir = statSync(fullPath).isDirectory()
       const baseName = name.replace(/\.json$/, '')
       return {
         name: baseName,
         type: isDir ? 'directory' : 'document',
-        uri: `bl://${urlPrefix}/${baseName}`
+        uri: `bl://${urlPrefix}/${baseName}`,
       }
     })
 
     return {
       headers: { type: 'directory' },
-      body: { entries }
+      body: { entries },
     }
   } catch (err) {
     return {
       headers: { error: 'list-error' },
-      body: { message: err.message }
+      body: { message: err.message },
     }
   }
 }

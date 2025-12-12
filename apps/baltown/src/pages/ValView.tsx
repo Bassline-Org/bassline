@@ -22,7 +22,7 @@ export default function ValView() {
 
   // Helper to update a single parameter value
   function updateParamValue(key: string, value: string) {
-    setInstanceParamValues(prev => ({ ...prev, [key]: value }))
+    setInstanceParamValues((prev) => ({ ...prev, [key]: value }))
   }
 
   // Build params object from individual values
@@ -44,15 +44,20 @@ export default function ValView() {
 
   // Current view tab
   const currentView = () => searchParams.view || 'overview'
-  const setCurrentView = (view: string) => setSearchParams({ view: view === 'overview' ? undefined : view })
+  const setCurrentView = (view: string) =>
+    setSearchParams({ view: view === 'overview' ? undefined : view })
 
   // Fork the val
   async function handleFork() {
     setForking(true)
     try {
-      await bl.put(`${valUri()}/fork`, { peer: 'anonymous' }, {
-        name: `${params.name}-fork`
-      })
+      await bl.put(
+        `${valUri()}/fork`,
+        { peer: 'anonymous' },
+        {
+          name: `${params.name}-fork`,
+        }
+      )
       navigate(`/v/anonymous/${params.name}-fork`)
     } catch (err) {
       console.error('Fork failed:', err)
@@ -80,10 +85,14 @@ export default function ValView() {
     }
 
     try {
-      const result = await bl.put(`${valUri()}/instantiate`, {}, {
-        instanceName: instanceName() || `${params.name}-instance`,
-        params: values
-      })
+      const result = await bl.put(
+        `${valUri()}/instantiate`,
+        {},
+        {
+          instanceName: instanceName() || `${params.name}-instance`,
+          params: values,
+        }
+      )
 
       // Check for error response
       if (result?.headers?.type === 'bl:///types/error') {
@@ -111,7 +120,9 @@ export default function ValView() {
         <div class="empty-state">
           <h3>Error loading val</h3>
           <p>{error()?.message}</p>
-          <button class="btn btn-secondary" onClick={refetch}>Retry</button>
+          <button class="btn btn-secondary" onClick={refetch}>
+            Retry
+          </button>
         </div>
       </Show>
 
@@ -127,14 +138,12 @@ export default function ValView() {
             </div>
             <div class="val-actions">
               <ExportButton val={val()} owner={params.owner} name={params.name} />
-              <button
-                class="btn btn-secondary"
-                onClick={handleFork}
-                disabled={forking()}
-              >
+              <button class="btn btn-secondary" onClick={handleFork} disabled={forking()}>
                 {forking() ? 'Forking...' : 'Fork'}
               </button>
-              <A href={`/v/${params.owner}/${params.name}/edit`} class="btn btn-secondary">Edit</A>
+              <A href={`/v/${params.owner}/${params.name}/edit`} class="btn btn-secondary">
+                Edit
+              </A>
             </div>
           </div>
 
@@ -143,16 +152,17 @@ export default function ValView() {
             <span class="meta-item">v{val().version}</span>
             <Show when={val().parentVal}>
               <span class="meta-item">
-                Forked from <A href={val().parentVal.replace('bl:///vals/', '/v/')}>{val().parentVal.split('/').slice(-2).join('/')}</A>
+                Forked from{' '}
+                <A href={val().parentVal.replace('bl:///vals/', '/v/')}>
+                  {val().parentVal.split('/').slice(-2).join('/')}
+                </A>
               </span>
             </Show>
           </div>
 
           <Show when={val().tags?.length > 0}>
             <div class="val-tags">
-              <For each={val().tags}>
-                {(tag) => <span class="tag">{tag}</span>}
-              </For>
+              <For each={val().tags}>{(tag) => <span class="tag">{tag}</span>}</For>
             </div>
           </Show>
         </div>
@@ -247,10 +257,14 @@ export default function ValView() {
                 editable={true}
                 onSave={async (newDef) => {
                   try {
-                    await bl.put(valUri(), {}, {
-                      ...val(),
-                      definition: newDef
-                    })
+                    await bl.put(
+                      valUri(),
+                      {},
+                      {
+                        ...val(),
+                        definition: newDef,
+                      }
+                    )
                     refetch()
                   } catch (err) {
                     console.error('Failed to update definition:', err)
@@ -260,11 +274,13 @@ export default function ValView() {
             </Show>
 
             {/* Graph View - for propagators and recipes */}
-            <Show when={currentView() === 'graph' && (val().valType === 'propagator' || val().valType === 'recipe')}>
-              <GraphView
-                data={val().definition}
-                valType={val().valType}
-              />
+            <Show
+              when={
+                currentView() === 'graph' &&
+                (val().valType === 'propagator' || val().valType === 'recipe')
+              }
+            >
+              <GraphView data={val().definition} valType={val().valType} />
             </Show>
 
             {/* Usage View */}
@@ -274,9 +290,7 @@ export default function ValView() {
 
             {/* Instances View - for recipes */}
             <Show when={currentView() === 'instances' && val().valType === 'recipe'}>
-              <InstancesView
-                valUri={`bl:///r/vals/${params.owner}/${params.name}`}
-              />
+              <InstancesView valUri={`bl:///r/vals/${params.owner}/${params.name}`} />
             </Show>
           </div>
 
@@ -314,9 +328,14 @@ export default function ValView() {
                   Version History (v{val().version})
                 </A>
                 <Show when={val().entries}>
-                  <For each={val().entries.filter(e => e.name !== 'versions' && e.name !== 'forks')}>
+                  <For
+                    each={val().entries.filter((e) => e.name !== 'versions' && e.name !== 'forks')}
+                  >
                     {(entry) => (
-                      <A href={entry.uri.replace(/bl:\/\/\/(?:r\/)?vals\//, '/v/')} class="link-item">
+                      <A
+                        href={entry.uri.replace(/bl:\/\/\/(?:r\/)?vals\//, '/v/')}
+                        class="link-item"
+                      >
                         {entry.name}
                       </A>
                     )}

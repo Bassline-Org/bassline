@@ -9,6 +9,7 @@ This plan transforms baltown from a JSON-centric developer tool into a user-frie
 ## Core Problem
 
 Currently, most interactions in baltown show raw JSON:
+
 - Propagator definitions: JSON with inputs/output/handler
 - Cell definitions: JSON with lattice/initial
 - Recipe instances: JSON parameter input
@@ -34,17 +35,18 @@ This creates friction for users who think in terms of **data flow** and **visual
 
 Replace generic JSON display with lattice-specific widgets:
 
-| Lattice | Widget | Features |
-|---------|--------|----------|
-| `counter` | Counter buttons | +1, +5, +10 buttons, sparkline history |
-| `maxNumber` | Gauge/slider | Visual range, threshold markers |
-| `minNumber` | Inverted gauge | Floor tracking |
-| `setUnion` | Tag chips | Add/remove tags, animated entry |
-| `lww` | Editable field | Timestamp display, edit history |
-| `boolean` | Toggle switch | Locked when true, celebration animation |
-| `object` | Key-value editor | Property grid, diff view |
+| Lattice     | Widget           | Features                                |
+| ----------- | ---------------- | --------------------------------------- |
+| `counter`   | Counter buttons  | +1, +5, +10 buttons, sparkline history  |
+| `maxNumber` | Gauge/slider     | Visual range, threshold markers         |
+| `minNumber` | Inverted gauge   | Floor tracking                          |
+| `setUnion`  | Tag chips        | Add/remove tags, animated entry         |
+| `lww`       | Editable field   | Timestamp display, edit history         |
+| `boolean`   | Toggle switch    | Locked when true, celebration animation |
+| `object`    | Key-value editor | Property grid, diff view                |
 
 **Components to Create:**
+
 ```
 src/components/cells/
 ├── CounterControl.tsx      # +/- buttons, sparkline
@@ -57,6 +59,7 @@ src/components/cells/
 ```
 
 **Key Features:**
+
 - Smooth animations on value change (fade-in, slide-up, pulse)
 - History sparklines showing last 20 values
 - Hover tooltips with metadata (last change, lattice type)
@@ -67,18 +70,19 @@ src/components/cells/
 
 Replace JSON textarea with type-aware config editors:
 
-| Handler Category | Config Type | UI Pattern |
-|-----------------|-------------|------------|
-| Numeric (`multiply`, `add`) | `{ value: number }` | Slider + number input |
-| Comparison (`gt`, `lt`, `eq`) | `{ value: any }` | Type-aware comparison input |
-| Key selectors (`groupBy`, `pick`) | `{ key: string }` | Autocomplete dropdown |
-| Nested handlers (`filter`, `map`) | `{ handler, config }` | Recursive handler picker |
-| Conditional (`ifElse`, `cond`) | branches | Flowchart diagram |
-| Composition (`pipe`, `fork`) | handlers array | Drag-and-drop sequence |
-| Template (`format`) | `{ template: string }` | Template editor with hints |
-| Regex (`replace`, `match`) | `{ pattern, flags }` | Regex builder with test |
+| Handler Category                  | Config Type            | UI Pattern                  |
+| --------------------------------- | ---------------------- | --------------------------- |
+| Numeric (`multiply`, `add`)       | `{ value: number }`    | Slider + number input       |
+| Comparison (`gt`, `lt`, `eq`)     | `{ value: any }`       | Type-aware comparison input |
+| Key selectors (`groupBy`, `pick`) | `{ key: string }`      | Autocomplete dropdown       |
+| Nested handlers (`filter`, `map`) | `{ handler, config }`  | Recursive handler picker    |
+| Conditional (`ifElse`, `cond`)    | branches               | Flowchart diagram           |
+| Composition (`pipe`, `fork`)      | handlers array         | Drag-and-drop sequence      |
+| Template (`format`)               | `{ template: string }` | Template editor with hints  |
+| Regex (`replace`, `match`)        | `{ pattern, flags }`   | Regex builder with test     |
 
 **Components to Create:**
+
 ```
 src/components/handlers/
 ├── NumericConfigEditor.tsx     # Slider/spinner for numbers
@@ -92,20 +96,21 @@ src/components/handlers/
 ```
 
 **Metadata Enhancement:**
+
 ```typescript
 const HANDLER_METADATA = {
   multiply: {
     description: 'Multiply input by value',
     config: { value: 'number' },
     uiType: 'numeric',
-    uiOptions: { min: -1000, max: 1000, step: 0.1 }
+    uiOptions: { min: -1000, max: 1000, step: 0.1 },
   },
   groupBy: {
     description: 'Group array by key',
     config: { key: 'string' },
     uiType: 'keySelector',
-    uiOptions: { mode: 'single' }
-  }
+    uiOptions: { mode: 'single' },
+  },
   // ... for all 110 handlers
 }
 ```
@@ -117,6 +122,7 @@ const HANDLER_METADATA = {
 Transform recipe instances from JSON to interactive dashboards:
 
 **Dashboard Layout:**
+
 ```
 ┌─────────────────────────────────────────────────────┐
 │ Recipe Instance: my-counter                         │
@@ -138,6 +144,7 @@ Transform recipe instances from JSON to interactive dashboards:
 ```
 
 **Components to Create:**
+
 ```
 src/components/dashboard/
 ├── InstanceDashboard.tsx      # Main dashboard container
@@ -150,6 +157,7 @@ src/components/dashboard/
 ```
 
 **Features:**
+
 - Live WebSocket updates to all cells
 - Propagator execution animations
 - Input widgets matched to cell lattice types
@@ -164,6 +172,7 @@ Visual node-graph editor for propagator networks:
 **Technology Choice:** Rete.js with Solid.js plugin (or custom SVG)
 
 **Visual Representation:**
+
 ```
 [Cell: a] ──┐
             ├──> [Prop: sum] ──> [Cell: result]
@@ -171,11 +180,13 @@ Visual node-graph editor for propagator networks:
 ```
 
 **Node Types:**
+
 - **Cell nodes**: Rounded rectangle, color by lattice, show live value
 - **Propagator nodes**: Diamond/pill shape, show handler name
 - **Edges**: Animated flow direction, highlight on fire
 
 **Components to Create:**
+
 ```
 src/components/graph/
 ├── PropagatorGraph.tsx        # Main canvas component
@@ -188,6 +199,7 @@ src/components/graph/
 ```
 
 **Interactions:**
+
 - Pan/zoom with mouse
 - Click node to edit
 - Drag to create connections
@@ -201,6 +213,7 @@ src/components/graph/
 Like Notion, offer multiple views of the same val:
 
 **Routes:**
+
 ```
 /v/:owner/:name              # Default view (pretty-printed)
 /v/:owner/:name/source       # Raw JSON source
@@ -210,6 +223,7 @@ Like Notion, offer multiple views of the same val:
 ```
 
 **View Tabs Component:**
+
 ```tsx
 <ViewTabs>
   <ViewTab name="Overview" icon="📋" />
@@ -226,24 +240,28 @@ Like Notion, offer multiple views of the same val:
 Pre-built templates for common patterns:
 
 **Propagator Templates:**
+
 - Math Reducer (sum, average, product)
 - Data Filter (keep values > X)
 - Format Transform (template strings)
 - Conditional Logic (if-then-else)
 
 **Recipe Templates:**
+
 - Monitoring Dashboard
 - Data Pipeline (fetch → transform → store)
 - State Machine
 - Configuration Registry
 
 **Cell Templates:**
+
 - Click Counter
 - Status Toggle
 - Tag Collection
 - Config Object
 
 **UI:**
+
 ```
 Create Val → Select Type → Choose Template (optional)
                               ↓
@@ -266,7 +284,7 @@ const typeRenderers = {
   'bl:///types/propagator': PropagatorRenderer,
   'bl:///types/recipe': RecipeRenderer,
   'bl:///types/handler': HandlerRenderer,
-  'default': JSONRenderer
+  default: JSONRenderer,
 }
 
 export function getRenderer(typeUri: string) {
@@ -285,7 +303,7 @@ export function useLiveResourceWithHistory(uri: string, historySize = 20) {
   createEffect(() => {
     const value = data()
     if (value !== undefined) {
-      setHistory(prev => [...prev.slice(-historySize + 1), value])
+      setHistory((prev) => [...prev.slice(-historySize + 1), value])
     }
   })
 
@@ -301,14 +319,18 @@ export const valueChangeAnimation = {
   fadeIn: 'animate-fade-in 300ms ease-out',
   slideUp: 'animate-slide-up 200ms ease-out',
   pulse: 'animate-pulse 500ms ease-in-out',
-  highlight: 'animate-highlight 1s ease-out'
+  highlight: 'animate-highlight 1s ease-out',
 }
 
 export function animateValueChange(element: HTMLElement, type: keyof typeof valueChangeAnimation) {
   element.style.animation = valueChangeAnimation[type]
-  element.addEventListener('animationend', () => {
-    element.style.animation = ''
-  }, { once: true })
+  element.addEventListener(
+    'animationend',
+    () => {
+      element.style.animation = ''
+    },
+    { once: true }
+  )
 }
 ```
 
@@ -376,14 +398,14 @@ apps/baltown/src/
 
 ## Priority Matrix
 
-| Phase | Impact | Effort | Priority |
-|-------|--------|--------|----------|
-| 1. Lattice-aware cells | High | Medium | **P0** |
-| 2. Handler config UIs | High | Medium | **P0** |
-| 3. Instance dashboards | High | High | **P1** |
-| 4. Flow visualization | High | High | **P1** |
-| 5. Multi-view system | Medium | Medium | **P2** |
-| 6. Template gallery | Medium | Low | **P2** |
+| Phase                  | Impact | Effort | Priority |
+| ---------------------- | ------ | ------ | -------- |
+| 1. Lattice-aware cells | High   | Medium | **P0**   |
+| 2. Handler config UIs  | High   | Medium | **P0**   |
+| 3. Instance dashboards | High   | High   | **P1**   |
+| 4. Flow visualization  | High   | High   | **P1**   |
+| 5. Multi-view system   | Medium | Medium | **P2**   |
+| 6. Template gallery    | Medium | Low    | **P2**   |
 
 ---
 

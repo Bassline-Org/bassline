@@ -16,15 +16,18 @@ export default function Directory({ resource, uri, onNavigate }) {
         <div className="empty">Empty directory</div>
       ) : (
         <ul className="entries">
-          {entries.map(entry => (
+          {entries.map((entry) => (
             <li key={entry.name} className={`entry type-${entry.type || 'unknown'}`}>
               <span className="entry-icon">
                 <TypeIcon type={entry.type || 'unknown'} size={16} />
               </span>
-              <a href="#" onClick={e => {
-                e.preventDefault()
-                onNavigate(entry.uri)
-              }}>
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  onNavigate(entry.uri)
+                }}
+              >
                 {entry.name}
               </a>
               {entry.type && entry.type !== 'directory' && (

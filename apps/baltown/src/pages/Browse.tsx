@@ -15,16 +15,17 @@ export default function Browse() {
     // Filter by type if specified
     const typeFilter = searchParams.type
     if (typeFilter) {
-      entries = entries.filter(v => v.valType === typeFilter)
+      entries = entries.filter((v) => v.valType === typeFilter)
     }
 
     // Filter by search term
     const searchTerm = search().toLowerCase()
     if (searchTerm) {
-      entries = entries.filter(v =>
-        v.name.toLowerCase().includes(searchTerm) ||
-        v.description?.toLowerCase().includes(searchTerm) ||
-        v.owner?.toLowerCase().includes(searchTerm)
+      entries = entries.filter(
+        (v) =>
+          v.name.toLowerCase().includes(searchTerm) ||
+          v.description?.toLowerCase().includes(searchTerm) ||
+          v.owner?.toLowerCase().includes(searchTerm)
       )
     }
 
@@ -42,7 +43,9 @@ export default function Browse() {
             </Show>
           </p>
         </div>
-        <A href="/compose" class="btn btn-primary">Create Val</A>
+        <A href="/compose" class="btn btn-primary">
+          Create Val
+        </A>
       </div>
 
       <div class="filters">
@@ -55,11 +58,33 @@ export default function Browse() {
         />
 
         <div class="filter-tags">
-          <A href="/browse" class={`filter-tag ${!searchParams.type ? 'active' : ''}`}>All</A>
-          <A href="/browse?type=propagator" class={`filter-tag ${searchParams.type === 'propagator' ? 'active' : ''}`}>Propagators</A>
-          <A href="/browse?type=recipe" class={`filter-tag ${searchParams.type === 'recipe' ? 'active' : ''}`}>Recipes</A>
-          <A href="/browse?type=handler" class={`filter-tag ${searchParams.type === 'handler' ? 'active' : ''}`}>Handlers</A>
-          <A href="/browse?type=cell" class={`filter-tag ${searchParams.type === 'cell' ? 'active' : ''}`}>Cells</A>
+          <A href="/browse" class={`filter-tag ${!searchParams.type ? 'active' : ''}`}>
+            All
+          </A>
+          <A
+            href="/browse?type=propagator"
+            class={`filter-tag ${searchParams.type === 'propagator' ? 'active' : ''}`}
+          >
+            Propagators
+          </A>
+          <A
+            href="/browse?type=recipe"
+            class={`filter-tag ${searchParams.type === 'recipe' ? 'active' : ''}`}
+          >
+            Recipes
+          </A>
+          <A
+            href="/browse?type=handler"
+            class={`filter-tag ${searchParams.type === 'handler' ? 'active' : ''}`}
+          >
+            Handlers
+          </A>
+          <A
+            href="/browse?type=cell"
+            class={`filter-tag ${searchParams.type === 'cell' ? 'active' : ''}`}
+          >
+            Cells
+          </A>
         </div>
       </div>
 
@@ -71,22 +96,30 @@ export default function Browse() {
         <div class="empty-state">
           <h3>Connection Error</h3>
           <p>Make sure the Bassline daemon is running</p>
-          <button class="btn btn-secondary" onClick={refetch}>Retry</button>
+          <button class="btn btn-secondary" onClick={refetch}>
+            Retry
+          </button>
         </div>
       </Show>
 
       <Show when={!loading() && !error()}>
-        <Show when={filteredVals().length > 0} fallback={
-          <div class="empty-state">
-            <h3>No vals found</h3>
-            <Show when={search() || searchParams.type} fallback={
-              <p>Be the first to create one!</p>
-            }>
-              <p>Try adjusting your filters</p>
-            </Show>
-            <A href="/compose" class="btn btn-primary">Create Val</A>
-          </div>
-        }>
+        <Show
+          when={filteredVals().length > 0}
+          fallback={
+            <div class="empty-state">
+              <h3>No vals found</h3>
+              <Show
+                when={search() || searchParams.type}
+                fallback={<p>Be the first to create one!</p>}
+              >
+                <p>Try adjusting your filters</p>
+              </Show>
+              <A href="/compose" class="btn btn-primary">
+                Create Val
+              </A>
+            </div>
+          }
+        >
           <div class="grid grid-3">
             <For each={filteredVals()}>
               {(val) => (
@@ -101,9 +134,7 @@ export default function Browse() {
                   </div>
                   <Show when={val.tags?.length > 0}>
                     <div class="card-tags">
-                      <For each={val.tags}>
-                        {(tag) => <span class="tag">{tag}</span>}
-                      </For>
+                      <For each={val.tags}>{(tag) => <span class="tag">{tag}</span>}</For>
                     </div>
                   </Show>
                 </A>

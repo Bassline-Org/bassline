@@ -25,24 +25,24 @@ export function ToastProvider(props: ParentProps) {
 
   const addToast = (message: string, type: ToastType) => {
     const id = nextId++
-    setToasts(t => [...t, { id, message, type }])
+    setToasts((t) => [...t, { id, message, type }])
 
     // Auto-dismiss after 4 seconds
     const timer = setTimeout(() => {
-      setToasts(t => t.filter(x => x.id !== id))
+      setToasts((t) => t.filter((x) => x.id !== id))
     }, 4000)
 
     onCleanup(() => clearTimeout(timer))
   }
 
   const removeToast = (id: number) => {
-    setToasts(t => t.filter(x => x.id !== id))
+    setToasts((t) => t.filter((x) => x.id !== id))
   }
 
   const toast = {
     success: (msg: string) => addToast(msg, 'success'),
     error: (msg: string) => addToast(msg, 'error'),
-    info: (msg: string) => addToast(msg, 'info')
+    info: (msg: string) => addToast(msg, 'info'),
   }
 
   return (
@@ -51,7 +51,7 @@ export function ToastProvider(props: ParentProps) {
       <Portal>
         <div class="toast-container">
           <For each={toasts()}>
-            {t => (
+            {(t) => (
               <div class={`toast toast-${t.type}`} onClick={() => removeToast(t.id)}>
                 <span class="toast-icon">
                   {t.type === 'success' && '✓'}

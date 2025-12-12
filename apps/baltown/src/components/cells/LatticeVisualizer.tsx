@@ -89,9 +89,7 @@ export default function LatticeVisualizer(props: LatticeVisualizerProps) {
       </Show>
 
       <Show when={error()}>
-        <div class="lattice-error">
-          Error: {error()?.message || 'Failed to load cell'}
-        </div>
+        <div class="lattice-error">Error: {error()?.message || 'Failed to load cell'}</div>
       </Show>
 
       <Show when={!loading() && !error() && cellData()}>
@@ -99,14 +97,16 @@ export default function LatticeVisualizer(props: LatticeVisualizerProps) {
           <div class="lattice-live-badge">LIVE</div>
         </Show>
 
-        <Switch fallback={
-          <EditableField
-            uri={props.uri}
-            value={value()}
-            label={props.label}
-            timestamp={timestamp()}
-          />
-        }>
+        <Switch
+          fallback={
+            <EditableField
+              uri={props.uri}
+              value={value()}
+              label={props.label}
+              timestamp={timestamp()}
+            />
+          }
+        >
           <Match when={latticeType() === 'counter'}>
             <CounterControl
               uri={props.uri}
@@ -146,14 +146,16 @@ export default function LatticeVisualizer(props: LatticeVisualizerProps) {
           </Match>
 
           <Match when={latticeType() === 'boolean'}>
-            <ToggleSwitch
-              uri={props.uri}
-              value={unwrappedValue() ?? false}
-              label={props.label}
-            />
+            <ToggleSwitch uri={props.uri} value={unwrappedValue() ?? false} label={props.label} />
           </Match>
 
-          <Match when={latticeType() === 'object' && typeof unwrappedValue() === 'object' && !Array.isArray(unwrappedValue())}>
+          <Match
+            when={
+              latticeType() === 'object' &&
+              typeof unwrappedValue() === 'object' &&
+              !Array.isArray(unwrappedValue())
+            }
+          >
             <PropertyGrid
               uri={props.uri}
               value={unwrappedValue() ?? {}}

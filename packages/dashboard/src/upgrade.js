@@ -18,9 +18,9 @@ export default function installDashboard(bl) {
       headers: { type: 'bl:///types/dashboard' },
       body: {
         title: 'System Dashboard',
-        description: 'High-density view of cells, propagators, and activity'
-      }
-    })
+        description: 'High-density view of cells, propagators, and activity',
+      },
+    }),
   })
 
   // Activity buffer route
@@ -30,9 +30,9 @@ export default function installDashboard(bl) {
       body: {
         entries: activityBuffer.slice().reverse(),
         count: activityBuffer.length,
-        maxSize: MAX_ACTIVITY
-      }
-    })
+        maxSize: MAX_ACTIVITY,
+      },
+    }),
   })
 
   // Record activity when plumber is available
@@ -48,7 +48,7 @@ export default function installDashboard(bl) {
       uri,
       method: method || 'put',
       time: time || new Date().toISOString(),
-      delta: event.delta || null
+      delta: event.delta || null,
     })
 
     // Trim to max size
@@ -62,7 +62,7 @@ export default function installDashboard(bl) {
     // Add a rule to route PUT events to our activity port
     bl._plumber.addRule('activity-tracker', {
       match: { method: 'put' },
-      port: 'activity'
+      port: 'activity',
     })
 
     // Listen on the activity port
@@ -70,7 +70,7 @@ export default function installDashboard(bl) {
       recordActivity({
         uri: msg.uri,
         method: 'put',
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
       })
     })
   }
@@ -79,7 +79,9 @@ export default function installDashboard(bl) {
   bl._activity = {
     record: recordActivity,
     getRecent: (n = 20) => activityBuffer.slice(-n).reverse(),
-    clear: () => { activityBuffer.length = 0 }
+    clear: () => {
+      activityBuffer.length = 0
+    },
   }
 
   console.log('Dashboard and Activity buffer installed')
