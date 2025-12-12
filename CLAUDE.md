@@ -522,6 +522,91 @@ Use cases:
 - Data synchronization from remote services
 - Real-time feeds
 
+## Widgets
+
+Widgets provide a resource-driven UI component system. Widget definitions are stored at `bl:///widgets/*` and instances at `bl:///ui/*`.
+
+### Widget Types
+
+- **Primitives**: Platform-specific implementations (button, stack, text, etc.)
+- **Custom**: Compositions of other widgets via hiccup-style definitions
+
+### Hiccup Syntax
+
+Widgets use hiccup-style arrays: `[widgetName, props?, ...children]`
+
+```javascript
+// Simple button
+;['button', { label: 'Click me', onClick: 'btn-clicked' }][
+  // Nested layout
+  ('stack',
+  { direction: 'vertical', gap: 16 },
+  ['heading', { level: 1, content: 'Hello' }],
+  ['button', { label: 'Submit', variant: 'primary' }])
+][
+  // Props interpolation with $
+  ('button', { label: '$buttonLabel', onClick: '$onSubmit' })
+]
+```
+
+### Widget Routes
+
+```javascript
+// List all widgets
+await bl.get('bl:///widgets')
+
+// Get widget definition
+await bl.get('bl:///widgets/my-button')
+
+// Create custom widget
+await bl.put(
+  'bl:///widgets/my-button',
+  {},
+  {
+    definition: ['button', { label: 'My Button', variant: 'primary' }],
+  }
+)
+
+// Delete widget
+await bl.put('bl:///widgets/my-button/delete', {}, {})
+```
+
+### UI Instances
+
+Instances are live widget resources with state:
+
+```javascript
+// Create an instance
+await bl.put(
+  'bl:///ui/app/sidebar',
+  {},
+  {
+    definition: ['stack', { direction: 'vertical' }, ['text', { content: 'Sidebar' }]],
+  }
+)
+
+// Get instance
+await bl.get('bl:///ui/app/sidebar')
+
+// Get/update instance state
+await bl.get('bl:///ui/app/sidebar/state')
+await bl.put('bl:///ui/app/sidebar/state', {}, { expanded: true })
+
+// Send control commands
+await bl.put('bl:///ui/app/sidebar/ctl', {}, { command: 'reset' })
+await bl.put('bl:///ui/app/sidebar/ctl', {}, { command: 'setState', count: 5 })
+```
+
+### Instance Sub-Resources
+
+Each instance exposes:
+
+- `/state` - Instance state (GET/PUT)
+- `/props` - Instance props (GET)
+- `/ctl` - Control commands (PUT): `reset`, `setState`, `focus`, `blur`, `scrollIntoView`
+- `/children` - List child instances (GET)
+- `/delete` - Delete instance (PUT)
+
 ## Package Structure
 
 ```
@@ -532,19 +617,28 @@ packages/types/          # Built-in type definitions
 packages/cells/          # Lattice-based cells
 packages/fn/             # Function registry and combinators
 packages/propagators/    # Reactive propagators (uses fn)
+packages/tmp/            # Ephemeral state and temporary functions
 packages/timers/         # Time-based event dispatch
 packages/fetch/          # HTTP requests
 packages/monitors/       # URL polling (Timer + Fetch + Cell)
+packages/recipes/        # Template-based resource composition
+packages/vals/           # Shareable resource compositions (uses recipes)
+packages/widgets/        # Widget registry and hiccup compiler
 packages/dashboard/      # Activity tracking
+packages/database/       # SQLite service
 packages/trust/          # Local trust computation and capability gating
 packages/services/       # External service integrations (Claude API)
 packages/store-node/     # File and code stores
 packages/server-node/    # HTTP and WebSocket servers
 packages/remote-browser/ # WebSocket client for browsers
 packages/react/          # React bindings
+packages/solid/          # SolidJS bindings
+packages/ui-web/         # React-based widget renderer
+packages/structure-editor/ # Tiptap-based structural JSON editor
 
 apps/cli/                # Daemon, MCP server, seed scripts
 apps/editor/             # Web editor
+apps/baltown/            # Graph visualization editor (Solid.js)
 ```
 
 ## HTTP Daemon
@@ -628,20 +722,24 @@ Module dependency order:
 
 1. `index` - root resource listing
 2. `types` - built-in type definitions
-3. `links` - bidirectional ref tracking
-4. `plumber` - message routing
+3. `plumber` - message routing (before links, which sets up plumber rules)
+4. `links` - bidirectional ref tracking (uses plumber)
 5. `file-store` - persistence
 6. `http-server` - HTTP API
 7. `ws-server` - WebSocket (uses plumber)
 8. `fn` - function registry and combinators
 9. `propagators` - reactive computation (uses fn)
-10. `cells` - lattice values (uses propagators, plumber)
-11. `dashboard` - activity tracking (uses plumber)
-12. `timers` - time-based events (uses plumber)
-13. `fetch` - HTTP requests (uses plumber)
-14. `monitors` - URL polling (uses timers, cells, plumber)
-15. `recipes` - template-based resource composition
-16. `claude` - Claude API (optional, requires ANTHROPIC_API_KEY)
+10. `tmp` - ephemeral state and functions
+11. `cells` - lattice values (uses propagators, plumber)
+12. `dashboard` - activity tracking (uses plumber)
+13. `timers` - time-based events (uses plumber)
+14. `fetch` - HTTP requests (uses plumber)
+15. `monitors` - URL polling (uses timers, cells, plumber)
+16. `recipes` - template-based resource composition
+17. `vals` - shareable resource compositions (uses recipes)
+18. `widgets` - UI widget system (uses plumber)
+19. `database` - SQLite service
+20. `claude` - Claude API (optional, requires ANTHROPIC_API_KEY)
 
 ## MCP Server
 
