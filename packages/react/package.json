@@ -4,7 +4,7 @@
   "description": "React bindings for Bassline",
   "type": "module",
   "main": "src/index.jsx",
-  "types": "./src/index.d.ts",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./src/index.jsx"
   },

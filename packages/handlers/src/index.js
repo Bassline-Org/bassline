@@ -1,61 +1,54 @@
 /**
- * @bassline/handlers
+ * @module @bassline/handlers
  *
  * Handler registry and combinators for Bassline propagators.
  */
 
-// Import all modules for local use
+// Core modules
 import { createHandlerRegistry } from './registry.js'
 import { createCompiler } from './compiler.js'
 import { createHandlerRoutes } from './routes.js'
 
-// Handler registration functions
-import { registerReducers } from './handlers/reducers.js'
-import { registerBinaryOps } from './handlers/binary-ops.js'
-import { registerArithmetic } from './handlers/arithmetic.js'
-import { registerComparison } from './handlers/comparison.js'
-import { registerLogic } from './handlers/logic.js'
-import { registerString } from './handlers/string.js'
-import { registerArray } from './handlers/array.js'
-import { registerArrayReducers } from './handlers/array-reducers.js'
-import { registerObject } from './handlers/object.js'
-import { registerType } from './handlers/type.js'
-import { registerConditional } from './handlers/conditional.js'
-import { registerStructural } from './handlers/structural.js'
-import { registerUtility } from './handlers/utility.js'
-import { registerComposition } from './handlers/composition.js'
+// Handler modules (named exports)
+import * as math from './handlers/math.js'
+import * as logic from './handlers/logic.js'
+import * as collections from './handlers/collections.js'
+import * as string from './handlers/string.js'
+import * as type from './handlers/type.js'
+import * as control from './handlers/control.js'
+import * as combinators from './combinators.js'
 
-// Combinator registration functions
-import { registerUnaryCombinators } from './combinators/unary.js'
-import { registerBinaryCombinators } from './combinators/binary.js'
-import { registerTernaryCombinators } from './combinators/ternary.js'
-import { registerVariadicCombinators } from './combinators/variadic.js'
-import { registerSpecialCombinators } from './combinators/special.js'
+// Re-export core modules
+export { createHandlerRegistry, createCompiler, createHandlerRoutes }
 
-// Re-export all imports for external consumers
-export {
-  createHandlerRegistry,
-  createCompiler,
-  createHandlerRoutes,
-  registerReducers,
-  registerBinaryOps,
-  registerArithmetic,
-  registerComparison,
-  registerLogic,
-  registerString,
-  registerArray,
-  registerArrayReducers,
-  registerObject,
-  registerType,
-  registerConditional,
-  registerStructural,
-  registerUtility,
-  registerComposition,
-  registerUnaryCombinators,
-  registerBinaryCombinators,
-  registerTernaryCombinators,
-  registerVariadicCombinators,
-  registerSpecialCombinators,
+// Re-export handler modules for direct access
+export { math, logic, collections, string, type, control, combinators }
+
+/**
+ * Register all exports from a module as handlers.
+ * @param {object} registry - Handler registry
+ * @param {object} mod - Module with named exports
+ * @param {object} [nameMap] - Optional name remapping (exportName -> handlerName)
+ */
+function registerModule(registry, mod, nameMap = {}) {
+  for (const [exportName, factory] of Object.entries(mod)) {
+    const handlerName = nameMap[exportName] || exportName
+    registry.registerBuiltin(handlerName, factory)
+  }
+}
+
+/**
+ * Register all built-in handlers with a registry.
+ * @param {object} registry - Handler registry
+ */
+export function registerAllHandlers(registry) {
+  registerModule(registry, math)
+  registerModule(registry, logic)
+  registerModule(registry, collections, { getPath: 'get' }) // Remap getPath -> get
+  registerModule(registry, string)
+  registerModule(registry, type)
+  registerModule(registry, control)
+  registerModule(registry, combinators)
 }
 
 /**
@@ -77,33 +70,4 @@ export function createHandlerSystem() {
     compile,
     routes,
   }
-}
-
-/**
- * Register all built-in handlers with a registry.
- * @param {object} registry - Handler registry
- */
-export function registerAllHandlers(registry) {
-  // Handlers by domain
-  registry.registerAll(registerReducers)
-  registry.registerAll(registerBinaryOps)
-  registry.registerAll(registerArithmetic)
-  registry.registerAll(registerComparison)
-  registry.registerAll(registerLogic)
-  registry.registerAll(registerString)
-  registry.registerAll(registerArray)
-  registry.registerAll(registerArrayReducers)
-  registry.registerAll(registerObject)
-  registry.registerAll(registerType)
-  registry.registerAll(registerConditional)
-  registry.registerAll(registerStructural)
-  registry.registerAll(registerUtility)
-  registry.registerAll(registerComposition)
-
-  // Combinators
-  registry.registerAll(registerUnaryCombinators)
-  registry.registerAll(registerBinaryCombinators)
-  registry.registerAll(registerTernaryCombinators)
-  registry.registerAll(registerVariadicCombinators)
-  registry.registerAll(registerSpecialCombinators)
 }

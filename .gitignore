@@ -54,8 +54,7 @@ bassline-web/.vite/
 bassline-web/*.tsbuildinfo
 
 # Generated type declarations (from JSDoc)
-packages/**/*.d.ts
-packages/**/*.d.ts.map
+packages/*/dist/
 
 # Generated documentation
 docs/

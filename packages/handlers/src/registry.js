@@ -7,22 +7,21 @@
 
 /**
  * Create a handler registry.
- *
  * @returns {object} Registry with handler management functions
  */
 export function createHandlerRegistry() {
-  /** @type {Map<string, function>} handler name → factory function */
+  /** @type {Map<string, Function>} handler name → factory function */
   const builtins = new Map()
 
-  /** @type {Map<string, {definition: any, description: string, createdAt: string, compiled: function}>} */
+  /** @type {Map<string, {definition: any, description: string, createdAt: string, compiled: Function}>} */
   const custom = new Map()
 
-  /** @type {function|null} Compiler function, set later to avoid circular dependency */
+  /** @type {Function | null} Compiler function, set later to avoid circular dependency */
   let compiler = null
 
   /**
    * Set the compiler function for custom handlers.
-   * @param {function} fn - Compiler function
+   * @param {Function} fn - Compiler function
    */
   function setCompiler(fn) {
     compiler = fn
@@ -31,7 +30,7 @@ export function createHandlerRegistry() {
   /**
    * Register a built-in handler factory.
    * @param {string} name - Handler name
-   * @param {function} factory - Factory function (ctx, ...compiledArgs) => handler
+   * @param {Function} factory - Factory function (ctx, ...compiledArgs) => handler
    */
   function registerBuiltin(name, factory) {
     builtins.set(name, factory)
@@ -39,7 +38,7 @@ export function createHandlerRegistry() {
 
   /**
    * Register multiple built-in handlers from a registration function.
-   * @param {function} registerFn - Function that calls registerBuiltin for each handler
+   * @param {Function} registerFn - Function that calls registerBuiltin for each handler
    */
   function registerAll(registerFn) {
     registerFn({ registerBuiltin, get, getFactory })
@@ -82,7 +81,7 @@ export function createHandlerRegistry() {
    * Get a handler by name.
    * @param {string} name - Handler name (can be URI like 'bl:///handlers/foo' or just 'foo')
    * @param {object} [config] - Config to pass to factory
-   * @returns {function|null}
+   * @returns {Function | null}
    */
   function get(name, config = {}) {
     // Strip bl:///handlers/ prefix if present
@@ -104,13 +103,14 @@ export function createHandlerRegistry() {
     // Then built-in factories
     const factory = builtins.get(handlerName)
     if (!factory) return null
-    return factory(config)
+    // Inject get into ctx so combinators can look up other handlers
+    return factory({ ...config, get })
   }
 
   /**
    * Get a handler factory by name (for combinators that need to pass compiled args).
    * @param {string} name - Handler name
-   * @returns {function|null}
+   * @returns {Function | null}
    */
   function getFactory(name) {
     const handlerName = name.replace(/^bl:\/\/\/handlers\//, '')

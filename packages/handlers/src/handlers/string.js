@@ -4,26 +4,25 @@
  * String manipulation operations.
  */
 
-export function registerString({ registerBuiltin }) {
-  registerBuiltin('split', (ctx) => (s) => String(s).split(ctx.delimiter ?? ','))
-  registerBuiltin('join', (ctx) => (arr) => arr.join(ctx.delimiter ?? ','))
-  registerBuiltin('trim', () => (s) => String(s).trim())
-  registerBuiltin('uppercase', () => (s) => String(s).toUpperCase())
-  registerBuiltin('lowercase', () => (s) => String(s).toLowerCase())
-  registerBuiltin('strSlice', (ctx) => (s) => String(s).slice(ctx.start ?? 0, ctx.end))
+export const split = (ctx) => (s) => String(s).split(ctx.delimiter ?? ',')
 
-  registerBuiltin(
-    'replace',
-    (ctx) => (s) =>
-      String(s).replace(new RegExp(ctx.pattern, ctx.flags ?? ''), ctx.replacement ?? '')
-  )
+export const join = (ctx) => (arr) => arr.join(ctx.delimiter ?? ',')
 
-  registerBuiltin(
-    'match',
-    (ctx) => (s) => String(s).match(new RegExp(ctx.pattern, ctx.flags ?? ''))
-  )
+export const trim = () => (s) => String(s).trim()
 
-  registerBuiltin('startsWith', (ctx) => (s) => String(s).startsWith(ctx.prefix))
-  registerBuiltin('endsWith', (ctx) => (s) => String(s).endsWith(ctx.suffix))
-  registerBuiltin('includes', (ctx) => (s) => String(s).includes(ctx.substring))
-}
+export const uppercase = () => (s) => String(s).toUpperCase()
+
+export const lowercase = () => (s) => String(s).toLowerCase()
+
+export const strSlice = (ctx) => (s) => String(s).slice(ctx.start ?? 0, ctx.end)
+
+export const replace = (ctx) => (s) =>
+  String(s).replace(new RegExp(ctx.pattern, ctx.flags ?? ''), ctx.replacement ?? '')
+
+export const match = (ctx) => (s) => String(s).match(new RegExp(ctx.pattern, ctx.flags ?? ''))
+
+export const startsWith = (ctx) => (s) => String(s).startsWith(ctx.prefix)
+
+export const endsWith = (ctx) => (s) => String(s).endsWith(ctx.suffix)
+
+export const includes = (ctx) => (s) => String(s).includes(ctx.substring)
