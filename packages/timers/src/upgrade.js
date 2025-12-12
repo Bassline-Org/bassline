@@ -2,23 +2,20 @@ import { createTimerRoutes } from './timer.js'
 
 /**
  * Install timers into a Bassline instance.
- * Timers dispatch tick events through the plumber.
- *
+ * Timers send tick events through the plumber.
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
- * @param {object} [config] - Configuration options (unused)
  */
-export default function installTimers(bl, config = {}) {
+export default function installTimers(bl) {
   const timers = createTimerRoutes({
     onTick: ({ name, tick, time }) => {
-      bl._plumber?.dispatch({
-        uri: `bl:///timers/${name}`,
-        headers: { type: 'bl:///types/timer-tick' },
-        body: {
-          timer: name,
-          tick,
-          time,
-        },
-      })
+      bl.put(
+        'bl:///plumb/send',
+        { source: `bl:///timers/${name}`, port: `timer-${name}` },
+        {
+          headers: { type: 'bl:///types/timer-tick' },
+          body: { timer: name, tick, time },
+        }
+      )
     },
   })
 

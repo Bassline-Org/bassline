@@ -4,7 +4,6 @@
  * Provides:
  * - GET /dashboard - Returns dashboard type for UI rendering
  * - GET /activity - Returns recent activity events
- *
  * @param {import('@bassline/core').Bassline} bl
  */
 export default function installDashboard(bl) {
@@ -57,23 +56,9 @@ export default function installDashboard(bl) {
     }
   }
 
-  // Register with plumber if available
-  if (bl._plumber) {
-    // Add a rule to route PUT events to our activity port
-    bl._plumber.addRule('activity-tracker', {
-      match: { method: 'put' },
-      port: 'activity',
-    })
-
-    // Listen on the activity port
-    bl._plumber.listen('activity', (msg) => {
-      recordActivity({
-        uri: msg.uri,
-        method: 'put',
-        time: new Date().toISOString(),
-      })
-    })
-  }
+  // Activity tracking can be enabled by adding a plumber rule:
+  //   PUT bl:///plumb/rules/activity { match: { type: '.*' }, to: 'bl:///dashboard/track' }
+  // For now, activity is only recorded via manual bl._activity.record() calls.
 
   // Expose activity recorder for manual use
   bl._activity = {

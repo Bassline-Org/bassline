@@ -118,11 +118,11 @@ export function createMonitorRoutes(options = {}) {
       const cellUri = getCellUri(name)
       await bl.put(cellUri, {}, value)
 
-      // Dispatch through plumber if available
-      if (bl._plumber) {
-        bl._plumber.dispatch({
-          uri: `bl:///monitors/${name}`,
-          method: 'update',
+      // Send update through plumber
+      await bl.put(
+        'bl:///plumb/send',
+        { source: `bl:///monitors/${name}`, port: 'monitor-updates' },
+        {
           headers: { type: 'bl:///types/monitor-update' },
           body: {
             monitor: name,
@@ -130,27 +130,27 @@ export function createMonitorRoutes(options = {}) {
             fetchCount: monitor.fetchCount,
             time: monitor.lastFetch,
           },
-        })
-      }
+        }
+      )
 
       return value
     } catch (err) {
       monitor.lastError = err.message
       monitor.lastValue = undefined
 
-      // Dispatch error through plumber
-      if (bl._plumber) {
-        bl._plumber.dispatch({
-          uri: `bl:///monitors/${name}`,
-          method: 'error',
+      // Send error through plumber
+      await bl.put(
+        'bl:///plumb/send',
+        { source: `bl:///monitors/${name}`, port: 'monitor-errors' },
+        {
           headers: { type: 'bl:///types/monitor-error' },
           body: {
             monitor: name,
             error: err.message,
             time: new Date().toISOString(),
           },
-        })
-      }
+        }
+      )
 
       return null
     }
@@ -160,13 +160,13 @@ export function createMonitorRoutes(options = {}) {
    * Create or update a monitor
    * @param {string} name - Monitor name
    * @param {object} config - Monitor config
-   * @returns {object} Monitor state
+   * @returns {Promise<object>} Monitor state
    */
-  function createMonitor(name, config) {
+  async function createMonitor(name, config) {
     const existing = store.get(name)
 
     // Stop existing timer listener
-    stopMonitor(name)
+    await stopMonitor(name)
 
     const monitor = {
       url: config.url ?? existing?.url,
@@ -185,24 +185,24 @@ export function createMonitorRoutes(options = {}) {
 
     // Create the backing cell (lww for latest value)
     const cellUri = getCellUri(name)
-    bl.put(cellUri, {}, { lattice: 'lww' }).catch(() => {
+    await bl.put(cellUri, {}, { lattice: 'lww' }).catch(() => {
       // Cell might already exist, that's ok
     })
 
     // Auto-start if enabled
     if (monitor.enabled && monitor.url) {
-      startMonitor(name)
+      await startMonitor(name)
     }
 
     return monitor
   }
 
   /**
-   * Start a monitor (creates timer and listens for ticks)
+   * Start a monitor (creates timer and sets up plumber rule)
    * @param {string} name - Monitor name
-   * @returns {object|null} Monitor state
+   * @returns {Promise<object|null>} Monitor state
    */
-  function startMonitor(name) {
+  async function startMonitor(name) {
     const monitor = store.get(name)
     if (!monitor) return null
     if (!monitor.url) return monitor
@@ -214,7 +214,7 @@ export function createMonitorRoutes(options = {}) {
     const timerName = getTimerName(name)
 
     // Create/configure the timer
-    bl.put(
+    await bl.put(
       `bl:///timers/${timerName}`,
       {},
       {
@@ -223,22 +223,21 @@ export function createMonitorRoutes(options = {}) {
       }
     )
 
-    // Listen for timer ticks via plumber
-    if (bl._plumber) {
-      const unsubscribe = bl._plumber.listen(`timer-${timerName}`, () => {
-        doMonitorFetch(name)
-      })
-      timerListeners.set(name, unsubscribe)
-
-      // Add plumber rule for this timer
-      bl._plumber.addRule(`monitor-${name}-timer`, {
+    // Add plumber rule to route timer ticks to this monitor's on-tick endpoint
+    await bl.put(
+      `bl:///plumb/rules/monitor-${name}-timer`,
+      {},
+      {
         match: {
-          uri: `^bl:///timers/${timerName}`,
-          headers: { type: 'bl:///types/timer-tick' },
+          source: `^bl:///timers/${timerName}`,
+          type: 'bl:///types/timer-tick',
         },
-        port: `timer-${timerName}`,
-      })
-    }
+        to: `bl:///monitors/${name}/on-tick`,
+      }
+    )
+
+    // Mark as running
+    timerListeners.set(name, true)
 
     // Do an immediate fetch
     doMonitorFetch(name)
@@ -249,9 +248,9 @@ export function createMonitorRoutes(options = {}) {
   /**
    * Stop a monitor
    * @param {string} name - Monitor name
-   * @returns {object|null} Monitor state
+   * @returns {Promise<object|null>} Monitor state
    */
-  function stopMonitor(name) {
+  async function stopMonitor(name) {
     const monitor = store.get(name)
     if (!monitor) return null
 
@@ -259,19 +258,13 @@ export function createMonitorRoutes(options = {}) {
     const timerName = getTimerName(name)
 
     // Stop the timer
-    bl.put(`bl:///timers/${timerName}/stop`, {}, {})
+    await bl.put(`bl:///timers/${timerName}/stop`, {}, {})
 
-    // Remove listener
-    const unsubscribe = timerListeners.get(name)
-    if (unsubscribe) {
-      unsubscribe()
-      timerListeners.delete(name)
-    }
+    // Remove running marker
+    timerListeners.delete(name)
 
-    // Remove plumber rule
-    if (bl._plumber) {
-      bl._plumber.removeRule(`monitor-${name}-timer`)
-    }
+    // Note: We don't remove the plumber rule here - it's harmless if the timer isn't running
+    // and will be reused if the monitor restarts. To fully remove, use killMonitor.
 
     return monitor
   }
@@ -362,8 +355,8 @@ export function createMonitorRoutes(options = {}) {
     })
 
     // Create/configure monitor
-    r.put('/:name', ({ params, body }) => {
-      const monitor = createMonitor(params.name, body || {})
+    r.put('/:name', async ({ params, body }) => {
+      const monitor = await createMonitor(params.name, body || {})
 
       return {
         headers: { type: 'bl:///types/monitor' },
@@ -380,7 +373,7 @@ export function createMonitorRoutes(options = {}) {
     })
 
     // Start monitor
-    r.put('/:name/start', ({ params }) => {
+    r.put('/:name/start', async ({ params }) => {
       let monitor = getMonitor(params.name)
       if (!monitor) {
         return {
@@ -389,7 +382,7 @@ export function createMonitorRoutes(options = {}) {
         }
       }
 
-      monitor = startMonitor(params.name)
+      monitor = await startMonitor(params.name)
 
       return {
         headers: { type: 'bl:///types/monitor' },
@@ -402,8 +395,8 @@ export function createMonitorRoutes(options = {}) {
     })
 
     // Stop monitor
-    r.put('/:name/stop', ({ params }) => {
-      const monitor = stopMonitor(params.name)
+    r.put('/:name/stop', async ({ params }) => {
+      const monitor = await stopMonitor(params.name)
       if (!monitor) return null
 
       return {
@@ -442,6 +435,20 @@ export function createMonitorRoutes(options = {}) {
       return {
         headers: { type: 'bl:///types/resource-removed' },
         body: { uri: `bl:///monitors/${params.name}` },
+      }
+    })
+
+    // Handle timer tick from plumber (alternative to listen-based approach)
+    // Message format: { source: 'bl:///timers/monitor-foo', type, put: { headers, body } }
+    r.put('/:name/on-tick', async ({ params }) => {
+      const monitor = getMonitor(params.name)
+      if (!monitor) return null
+
+      await doMonitorFetch(params.name)
+
+      return {
+        headers: { type: 'bl:///types/monitor-tick-handled' },
+        body: { monitor: params.name },
       }
     })
   })

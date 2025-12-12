@@ -6,7 +6,6 @@ import { createRecipeRoutes } from './recipe.js'
  * Recipes enable template-based composition of multiple resources.
  * One PUT to /instances creates cells, propagators, and other
  * resources defined in a recipe template.
- *
  * @param {import('@bassline/core').Bassline} bl
  */
 export default function installRecipes(bl) {
@@ -16,18 +15,9 @@ export default function installRecipes(bl) {
   // Expose for other modules
   bl._recipes = recipes
 
-  // Set up plumber rules for recipe events
-  if (bl._plumber) {
-    bl._plumber.addRule('recipe-events', {
-      match: { headers: { type: '^bl:///types/recipe-' } },
-      port: 'recipe-changes',
-    })
-
-    bl._plumber.addRule('instance-events', {
-      match: { headers: { type: '^bl:///types/instance-' } },
-      port: 'instance-changes',
-    })
-  }
+  // Recipe and instance events are sent through plumber.
+  // Consumers can add rules to route these events as needed:
+  //   PUT bl:///plumb/rules/my-rule { match: { type: 'bl:///types/recipe-saved' }, to: 'bl:///my/handler' }
 
   console.log('Recipes installed')
 }
