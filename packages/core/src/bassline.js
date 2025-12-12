@@ -1,6 +1,6 @@
 /**
- * @typedef {Object} Response
- * @property {Object} headers - Response headers (type, capabilities, etc.)
+ * @typedef {object} Response
+ * @property {object} headers - Response headers (type, capabilities, etc.)
  * @property {*} body - Response body (scalar or compound with links)
  */
 
@@ -15,7 +15,7 @@
  */
 
 /**
- * @typedef {Object} Context
+ * @typedef {object} Context
  * @property {Params} params - Extracted path parameters
  * @property {Headers} headers - Request headers
  * @property {URLSearchParams} query - Query parameters from the URI
@@ -30,13 +30,13 @@
  */
 
 /**
- * @typedef {Object} RouteConfig
+ * @typedef {object} RouteConfig
  * @property {Handler} [get] - Handler for GET requests
  * @property {Handler} [put] - Handler for PUT requests
  */
 
 /**
- * @typedef {Object} TapContext
+ * @typedef {object} TapContext
  * @property {string} uri - The URI that was accessed
  * @property {Headers} headers - Request headers
  * @property {*} [body] - Request body (only present for PUT taps)
@@ -51,7 +51,7 @@
  */
 
 /**
- * @typedef {Object} MiddlewareContext
+ * @typedef {object} MiddlewareContext
  * @property {string} verb - The HTTP verb ('get' or 'put')
  * @property {string} uri - The full URI being accessed
  * @property {Params} params - Extracted path parameters
@@ -69,7 +69,7 @@
  */
 
 /**
- * @typedef {Object} MiddlewareEntry
+ * @typedef {object} MiddlewareEntry
  * @property {Middleware} fn - The middleware function
  * @property {number} priority - Sort priority (lower runs first)
  * @property {string} [id] - Optional identifier for removal
@@ -77,7 +77,6 @@
 
 /**
  * Bassline - Minimal routing with pattern matching
- *
  * @example
  * const bl = new Bassline()
  *
@@ -110,13 +109,11 @@ export class Bassline {
    * Register middleware to intercept requests
    * Middleware runs before route handlers in priority order (lower first)
    * Returns an uninstaller function for clean removal
-   *
    * @param {Middleware} fn - Middleware function (ctx, next) => result
-   * @param {Object} [options] - Options
-   * @param {number} [options.priority=50] - Sort priority (lower runs first)
+   * @param {object} [options] - Options
+   * @param {number} [options.priority] - Sort priority (lower runs first)
    * @param {string} [options.id] - Optional identifier for introspection/removal
    * @returns {function(): void} Uninstaller function
-   *
    * @example
    * // Logging middleware
    * const uninstall = bl.use(async (ctx, next) => {
@@ -125,7 +122,6 @@ export class Bassline {
    * }, { priority: 10, id: 'logger' })
    *
    * // Later: uninstall()
-   *
    * @example
    * // Auth middleware - reject if no peer
    * bl.use(async (ctx, next) => {
@@ -147,11 +143,9 @@ export class Bassline {
   /**
    * Register a tap to observe operations
    * Taps are called after handlers complete - they observe but don't intercept
-   *
    * @param {'get'|'put'} verb - Which operation to observe
    * @param {Tap} fn - Tap function
    * @returns {this} For chaining
-   *
    * @example
    * // Log all writes
    * bl.tap('put', ({ uri, body }) => {
@@ -176,11 +170,9 @@ export class Bassline {
    * Supports:
    * - `:param` - matches a single path segment
    * - `:param*` - matches remaining path segments (wildcard, must be last)
-   *
    * @param {string} pattern - URL pattern with :param placeholders (e.g., '/cells/:name', '/data/:path*')
    * @param {RouteConfig} config - Route configuration with get/put handlers
    * @returns {this} For chaining
-   *
    * @example
    * bl.route('/users/:id', {
    *   get: ({ params }) => ({ headers: {}, body: { id: params.id } }),
@@ -245,7 +237,10 @@ export class Bassline {
     })
   }
 
-  /** @private */
+  /**
+   * @param path
+   * @private
+   */
   _match(path) {
     for (const route of this.routes) {
       const match = path.match(route.regex)
@@ -278,11 +273,9 @@ export class Bassline {
 
   /**
    * GET a resource by URI
-   *
    * @param {string} uri - Full URI (e.g., 'bl:///cells/counter')
-   * @param {Headers} [headers={}] - Request headers
+   * @param {Headers} [headers] - Request headers
    * @returns {Promise<Response|null>} Response or null if no matching route
-   *
    * @example
    * const response = await bl.get('bl:///cells/counter', { auth: 'token' })
    * console.log(response.headers.type)  // 'cell'
@@ -291,7 +284,13 @@ export class Bassline {
   async get(uri, headers = {}) {
     const url = new URL(uri)
     const matched = this._match(url.pathname)
-    if (!matched?.route.config.get) return null
+    if (!matched?.route.config.get) {
+      this.plumb(uri, 'route-not-found', {
+        headers: { type: 'bl:///types/route-not-found' },
+        body: { uri, method: 'GET' },
+      })
+      return null
+    }
 
     const ctx = {
       verb: 'get',
@@ -314,20 +313,47 @@ export class Bassline {
   }
 
   /**
+   * Send a message through the plumber
+   * Falls back to console.warn if plumber not installed
+   * @param {string} source - Source URI (e.g., 'bl:///cells/counter')
+   * @param {string} port - Port name (e.g., 'cell-updates', 'resource-removed')
+   * @param {object} options - Message options
+   * @param {object} [options.headers] - Message headers (including type)
+   * @param {*} [options.body] - Message body
+   * @returns {Promise<Response|null>} Response from plumber or undefined if not installed
+   * @example
+   * bl.plumb('bl:///cells/counter', 'resource-removed', {
+   *   headers: { type: 'bl:///types/resource-removed' },
+   *   body: { uri: 'bl:///cells/counter' }
+   * })
+   */
+  plumb(source, port, { headers = {}, body = {} } = {}) {
+    if (this._plumber) {
+      return this.put('bl:///plumb/send', { source, port }, { headers, body })
+    } else {
+      console.warn(`[plumb] ${port}: ${source}`, { headers, body })
+    }
+  }
+
+  /**
    * PUT to a resource by URI
-   *
    * @param {string} uri - Full URI (e.g., 'bl:///cells/counter/write')
-   * @param {Headers} [headers={}] - Request headers
+   * @param {Headers} [headers] - Request headers
    * @param {*} body - Request body
    * @returns {Promise<Response|null>} Response or null if no matching route
-   *
    * @example
    * const response = await bl.put('bl:///cells/counter/write', {}, 42)
    */
   async put(uri, headers = {}, body) {
     const url = new URL(uri)
     const matched = this._match(url.pathname)
-    if (!matched?.route.config.put) return null
+    if (!matched?.route.config.put) {
+      this.plumb(uri, 'route-not-found', {
+        headers: { type: 'bl:///types/route-not-found' },
+        body: { uri, method: 'PUT' },
+      })
+      return null
+    }
 
     const ctx = {
       verb: 'put',
@@ -355,11 +381,9 @@ export class Bassline {
    *
    * This is the primary way to add routes from a `resource()` definition.
    * Routes defined in the resource are relative to the mount point.
-   *
    * @param {string} prefix - Path prefix to mount at (e.g., '/cells', '/v2/cells', '/ns/:ns/cells')
    * @param {import('./router.js').RouterBuilder} routerBuilder - Router builder with route definitions
    * @returns {this} For chaining
-   *
    * @example
    * import { resource } from './router.js'
    *
@@ -400,10 +424,8 @@ export class Bassline {
    * For `routes()` builders (with fixed prefix), installs at their defined paths.
    * For `resource()` builders (no prefix), mounts at root '/'.
    * Use `mount()` instead for explicit control over where resources are mounted.
-   *
    * @param {import('./router.js').RouterBuilder} routerBuilder - Router builder with route definitions
    * @returns {this} For chaining
-   *
    * @example
    * import { routes, resource } from './router.js'
    *

@@ -16,7 +16,7 @@ describe('cells + propagators integration', () => {
   let cells
   let propagators
 
-  beforeEach(() => {
+  beforeEach(async () => {
     bl = new Bassline()
 
     // Install plumber first (propagators depend on it)
@@ -29,12 +29,8 @@ describe('cells + propagators integration', () => {
     bl.mount('/handlers', handlerSystem.routes)
     bl._handlers = handlerSystem.registry
 
-    // Install cells with propagator notification
-    cells = createCellRoutes({
-      onCellChange: async ({ uri }) => {
-        await propagators?.onCellChange(uri)
-      },
-    })
+    // Install cells (uses bl.plumb() for change notifications)
+    cells = createCellRoutes({ bl })
     cells.install(bl)
     bl._cells = cells
 
@@ -42,6 +38,16 @@ describe('cells + propagators integration', () => {
     propagators = createPropagatorRoutes({ bl })
     propagators.install(bl)
     bl._propagators = propagators
+
+    // Set up plumber rule to route cell changes to propagators
+    await bl.put(
+      'bl:///plumb/rules/cell-to-propagator',
+      {},
+      {
+        match: { port: 'cell-updates' },
+        to: 'bl:///propagators/on-cell-change',
+      }
+    )
   })
 
   it('creates cells and retrieves values', async () => {

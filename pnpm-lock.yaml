@@ -127,6 +127,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/plumber':
+        specifier: workspace:*
+        version: link:../plumber
 
   packages/core: {}
 
@@ -150,6 +153,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/plumber':
+        specifier: workspace:*
+        version: link:../plumber
 
   packages/handlers:
     dependencies:
@@ -168,6 +174,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/plumber':
+        specifier: workspace:*
+        version: link:../plumber
 
   packages/plumber:
     dependencies:
@@ -180,6 +189,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/plumber':
+        specifier: workspace:*
+        version: link:../plumber
 
   packages/react:
     dependencies:
@@ -278,6 +290,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      '@bassline/plumber':
+        specifier: workspace:*
+        version: link:../plumber
 
   packages/trust:
     dependencies:

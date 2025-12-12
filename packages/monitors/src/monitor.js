@@ -1,4 +1,5 @@
 import { resource } from '@bassline/core'
+import { ports, types } from '@bassline/plumber'
 
 /**
  * Create monitor routes that compose Timer + Fetch + Cell.
@@ -119,19 +120,15 @@ export function createMonitorRoutes(options = {}) {
       await bl.put(cellUri, {}, value)
 
       // Send update through plumber
-      await bl.put(
-        'bl:///plumb/send',
-        { source: `bl:///monitors/${name}`, port: 'monitor-updates' },
-        {
-          headers: { type: 'bl:///types/monitor-update' },
-          body: {
-            monitor: name,
-            value,
-            fetchCount: monitor.fetchCount,
-            time: monitor.lastFetch,
-          },
-        }
-      )
+      bl?.plumb(`bl:///monitors/${name}`, ports.MONITOR_UPDATES, {
+        headers: { type: types.MONITOR_UPDATE },
+        body: {
+          monitor: name,
+          value,
+          fetchCount: monitor.fetchCount,
+          time: monitor.lastFetch,
+        },
+      })
 
       return value
     } catch (err) {
@@ -139,18 +136,14 @@ export function createMonitorRoutes(options = {}) {
       monitor.lastValue = undefined
 
       // Send error through plumber
-      await bl.put(
-        'bl:///plumb/send',
-        { source: `bl:///monitors/${name}`, port: 'monitor-errors' },
-        {
-          headers: { type: 'bl:///types/monitor-error' },
-          body: {
-            monitor: name,
-            error: err.message,
-            time: new Date().toISOString(),
-          },
-        }
-      )
+      bl?.plumb(`bl:///monitors/${name}`, ports.MONITOR_ERRORS, {
+        headers: { type: types.MONITOR_ERROR },
+        body: {
+          monitor: name,
+          error: err.message,
+          time: new Date().toISOString(),
+        },
+      })
 
       return null
     }
@@ -285,6 +278,13 @@ export function createMonitorRoutes(options = {}) {
     bl.put(`bl:///timers/${timerName}/kill`, {}, {})
 
     store.delete(name)
+
+    // Notify through plumber
+    bl?.plumb(`bl:///monitors/${name}`, ports.RESOURCE_REMOVED, {
+      headers: { type: types.RESOURCE_REMOVED },
+      body: { uri: `bl:///monitors/${name}` },
+    })
+
     return true
   }
 

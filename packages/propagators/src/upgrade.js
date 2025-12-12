@@ -8,16 +8,7 @@ import { createPropagatorRoutes } from './propagator.js'
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  */
 export default function installPropagators(bl) {
-  const propagators = createPropagatorRoutes({
-    bl,
-    onPropagatorKill: ({ uri }) => {
-      bl.put(
-        'bl:///plumb/send',
-        { source: uri, port: 'resource-removed' },
-        { headers: { type: 'bl:///types/resource-removed' }, body: { uri } }
-      )
-    },
-  })
+  const propagators = createPropagatorRoutes({ bl })
 
   propagators.install(bl)
   bl._propagators = propagators

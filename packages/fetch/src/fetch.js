@@ -1,4 +1,5 @@
 import { resource } from '@bassline/core'
+import { ports, types } from '@bassline/plumber'
 
 /**
  * Create fetch routes for HTTP requests with async response dispatch.
@@ -10,15 +11,12 @@ import { resource } from '@bassline/core'
  * - GET  /fetch           → list recent requests
  * - GET  /fetch/:id       → get request status/result
  * - PUT  /fetch/request   → initiate a new fetch
- *
  * @param {object} options - Configuration options
- * @param {function} options.onResponse - Callback when fetch succeeds
- * @param {function} options.onError - Callback when fetch fails
- * @param {import('@bassline/core').Bassline} [options.bl] - Bassline instance for responseCell
+ * @param {import('@bassline/core').Bassline} [options.bl] - Bassline instance for plumber and responseCell
  * @returns {object} Fetch routes and management functions
  */
 export function createFetchRoutes(options = {}) {
-  const { onResponse, onError, bl } = options
+  const { bl } = options
 
   /**
    * Request store - tracks recent requests
@@ -110,9 +108,10 @@ export function createFetchRoutes(options = {}) {
           await bl.put(responseCell, {}, responseBody)
         }
 
-        // Dispatch response
-        if (onResponse) {
-          onResponse({
+        // Dispatch response through plumber
+        bl?.plumb(`bl:///fetch/${requestId}`, ports.FETCH_RESPONSES, {
+          headers: { type: types.FETCH_RESPONSE, status: response.status },
+          body: {
             requestId,
             url,
             method,
@@ -121,8 +120,8 @@ export function createFetchRoutes(options = {}) {
             headers: responseHeaders,
             body: responseBody,
             responseCell,
-          })
-        }
+          },
+        })
       } catch (err) {
         // Update store
         const record = store.get(requestId)
@@ -132,15 +131,16 @@ export function createFetchRoutes(options = {}) {
           record.error = err.message
         }
 
-        // Dispatch error
-        if (onError) {
-          onError({
+        // Dispatch error through plumber
+        bl?.plumb(`bl:///fetch/${requestId}`, ports.FETCH_ERRORS, {
+          headers: { type: types.FETCH_ERROR },
+          body: {
             requestId,
             url,
             method,
             error: err.message,
-          })
-        }
+          },
+        })
       }
     })()
 
@@ -224,7 +224,7 @@ export function createFetchRoutes(options = {}) {
    * Install fetch routes into a Bassline instance
    * @param {import('@bassline/core').Bassline} bl
    * @param {object} [options] - Options
-   * @param {string} [options.prefix='/fetch'] - Mount prefix
+   * @param {string} [options.prefix] - Mount prefix
    */
   function install(bl, { prefix = '/fetch' } = {}) {
     bl.mount(prefix, fetchResource)

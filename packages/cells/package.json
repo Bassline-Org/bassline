@@ -13,7 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@bassline/core": "workspace:*"
+    "@bassline/core": "workspace:*",
+    "@bassline/plumber": "workspace:*"
   },
   "license": "AGPL-3.0"
 }
