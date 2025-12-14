@@ -157,61 +157,6 @@ export function createPlumber() {
       },
     }))
 
-    // Get plumber state for introspection/visualization
-    r.get('/state', () => ({
-      headers: { type: 'bl:///types/plumb-state' },
-      body: {
-        rules: [...rules.entries()].map(([name, rule]) => ({
-          name,
-          match: rule.match,
-          to: rule.to,
-          uri: `bl:///plumb/rules/${name}`,
-        })),
-        // Known sources that dispatch to plumber
-        sources: [
-          {
-            type: 'cells',
-            events: [
-              'resource-created',
-              'resource-updated',
-              'resource-removed',
-              'cell-updates',
-              'contradiction',
-            ],
-          },
-          {
-            type: 'propagators',
-            events: ['resource-created', 'resource-updated', 'resource-removed'],
-          },
-          {
-            type: 'timers',
-            events: [
-              'resource-created',
-              'resource-updated',
-              'resource-removed',
-              'resource-enabled',
-              'resource-disabled',
-              'timer-tick',
-            ],
-          },
-          {
-            type: 'monitors',
-            events: [
-              'resource-created',
-              'resource-updated',
-              'resource-removed',
-              'resource-enabled',
-              'resource-disabled',
-              'monitor-update',
-              'monitor-error',
-            ],
-          },
-          { type: 'fetch', events: ['fetch-response', 'fetch-error'] },
-          { type: 'recipes', events: ['recipe-saved', 'instance-created'] },
-        ],
-      },
-    }))
-
     // List all rules
     r.get('/rules', () => ({
       headers: { type: 'bl:///types/directory' },

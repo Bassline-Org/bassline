@@ -6,7 +6,10 @@
   "main": "src/index.jsx",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.jsx"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.jsx"
+    }
   },
   "scripts": {
     "test": "vitest run"

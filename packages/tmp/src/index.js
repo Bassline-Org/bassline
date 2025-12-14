@@ -28,3 +28,6 @@ export function createTmpSystem(options = {}) {
     fn,
   }
 }
+
+// Export install function
+export { default as installTmp } from './upgrade.js'

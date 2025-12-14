@@ -81,3 +81,6 @@ export function createFnSystem() {
 
 // Keep old name for backward compatibility
 export const createHandlerSystem = createFnSystem
+
+// Export install function
+export { default as installFn } from './upgrade.js'

@@ -6,8 +6,14 @@
   "main": "src/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./lattices": "./src/lattices.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./lattices": {
+      "types": "./dist/lattices.d.ts",
+      "default": "./src/lattices.js"
+    }
   },
   "scripts": {
     "test": "vitest run"
