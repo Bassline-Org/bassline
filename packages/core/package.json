@@ -6,9 +6,18 @@
   "main": "src/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./bassline": "./src/bassline.js",
-    "./router": "./src/router.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./bassline": {
+      "types": "./dist/bassline.d.ts",
+      "default": "./src/bassline.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "default": "./src/router.js"
+    }
   },
   "scripts": {
     "test": "vitest run"
