@@ -407,14 +407,4 @@ class TclRuntime {
   }
 }
 
-const runtime = new TclRuntime()
-
-runtime.run(`
-
-    puts hello world
-
-    set x 10
-
-    set y [set x]
-
-    puts $x $y`)
+export { TclRuntime, TclParser, MissingProc, InvalidProc }
