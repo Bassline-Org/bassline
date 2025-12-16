@@ -162,6 +162,8 @@
  * For example, during variable substitution the entire value of the variable becomes part of a single word, even if the variable's value contains spaces.
  */
 import { CharStream, matches, none, any, EoiError } from './reader.js'
+import { TBracket, TWord, TVar, TclToken, TStr } from './tokens.js'
+import { TclObject } from './types.js'
 
 const isHorizontalWs = matches(/[ \t]/)
 const isCommandSep = matches(/[\n;]/)
@@ -205,7 +207,7 @@ class TclParser extends CharStream {
     if (char === '$') {
       this.next()
       const variable = this.takeUntil(isVarDelimiter)
-      return this.rt.getVar(variable)
+      return new TVar(variable)
     }
 
     // Rule 7: Command Substitution
@@ -226,33 +228,14 @@ class TclParser extends CharStream {
         if (this.peek() === '[') depth++
         command += this.next()
       }
-      const res = this.rt.run(command)
-      return res?.toString() ?? ''
+      return new TBracket(command)
     }
 
-    // Rule 6: Script Substitution
-    if (char === '{') {
-      let depth = 1
-      let word = ''
-      this.next()
-      while (!this.done() && depth > 0) {
-        if (this.peek() === '{') depth++
-        if (this.peek() === '}') {
-          depth--
-          if (depth === 0) {
-            this.next()
-            break
-          }
-        }
-        word += this.next()
-      }
-
-      return word
-    }
-
-    const part = this.next()
-    if (isHorizontalWs(part)) return ''
-    return part
+    let part = this.next()
+    while (!this.done() && !/[ \t\$\[\n\;]/.test(this.peek())) part += this.next()
+    const t = new TclToken(part)
+    console.log(t)
+    return t
   }
 
   _readExpansion() {
@@ -261,12 +244,6 @@ class TclParser extends CharStream {
 
   parseCommand() {
     const words = []
-    let word = ''
-    const storeWord = () => {
-      if (word === '') return
-      words.push(word)
-      word = ''
-    }
 
     if (this.done()) return
 
@@ -279,33 +256,62 @@ class TclParser extends CharStream {
       // We run this in a loop to handle things like variable substitution
       // since substition can be done like: $foo$bar is a single word with two
       // substitutions, that produce a single word
-      while (!this.done() && none(isHorizontalWs, isCommandSep)(this.peek())) {
-        const char = this.peek()
-        // Rule 4: Double Quotes
-        // If word starts with ", then we consume to closing " and break early
-        if (char === '"') {
-          this.next()
-          word = this.takeUntil((char) => char === '"')
-          this.next()
-          continue
-        }
-
-        // Rule 5: Expansion pattern
-        // check for expansion pattern {*}<non whitespace>
-        if (isExpansion(this.peek(4))) {
-          // Discard leading {*}
-          this.read(3)
-          const toSplice = this._readExpansion()
-          for (const w of toSplice ?? []) {
-            words.push(w)
+      const char = this.peek()
+      // Rule 4: Double Quotes
+      // If word starts with ", then we consume to closing " and substitute inside
+      if (char === '"') {
+        this.next()
+        let str = ''
+        while (!this.done() && this.peek() !== '"') {
+          const char = this.peek()
+          if (char === '$') {
+            str += this._readWordPart().sub(this.rt)
+            continue
           }
-          continue
+          str += this.next()
         }
-
-        word += this._readWordPart()
+        words.push(new TStr(str))
+        this.next()
+        continue
       }
-      // store the accumulated word in the arr
-      storeWord()
+
+      // Rule 5: Expansion pattern
+      // check for expansion pattern {*}<non whitespace>
+      if (isExpansion(this.peek(4))) {
+        // Discard leading {*}
+        this.read(3)
+        const toSplice = this._readExpansion()
+        for (const w of toSplice ?? []) {
+          words.push(w)
+        }
+        continue
+      }
+
+      // Rule 6: Script Substitution
+      if (char === '{') {
+        let depth = 1
+        let contents = ''
+        this.next()
+        while (!this.done() && depth > 0) {
+          if (this.peek() === '{') depth++
+          if (this.peek() === '}') {
+            depth--
+            if (depth === 0) {
+              this.next()
+              break
+            }
+          }
+          contents += this.next()
+        }
+        words.push(new TStr(contents))
+        continue
+      }
+
+      const word = new TWord()
+      while (!this.done() && none(isHorizontalWs, isCommandSep)(this.peek())) {
+        word.add(this._readWordPart())
+      }
+      words.push(word)
       // when parsing individual words, we consume horizontal whitespace to place at at either the start of the next word, or a command delimiter
       this.takeWhile(isHorizontalWs)
     }
@@ -313,7 +319,14 @@ class TclParser extends CharStream {
     this._trimStart()
 
     if (words.length > 0) {
-      return words
+      return words.map((token) => {
+        const subbed = token.sub(this.rt)
+        const word = new TclObject(this.rt, subbed)
+        console.log(token)
+        console.log(subbed)
+        console.log(word)
+        return word
+      })
     }
   }
 }
@@ -324,7 +337,7 @@ class TclRuntime {
    */
   vars = {}
   /**
-   * @typedef {(args: Array<string>, rt: TclRuntime) => any} TclCommand
+   * @typedef {(args: Array<any>, rt: TclRuntime) => any} TclCommand
    * @type {Record<string, TclCommand>}
    */
   procs = {
@@ -334,8 +347,8 @@ class TclRuntime {
     },
     set: (args, rt) => {
       const [name, val] = args
-      if (args.length === 1) return this.getVar(name)
-      return this.setVar(name, val)
+      if (args.length === 1) return this.getVar(name.str)
+      return this.setVar(name.str, val.variable ?? val.str)
     },
   }
 
@@ -388,7 +401,10 @@ class TclRuntime {
    */
   _runProc(name, args) {
     const p = this.procs[name]
-    if (!p) throw new MissingProc(name)
+    if (!p) {
+      console.log(name)
+      throw new MissingProc(name)
+    }
     return p(args, this)
   }
 
@@ -399,7 +415,10 @@ class TclRuntime {
 
     while (command !== undefined) {
       const [cmd, ...args] = command
-      res = this._runProc(cmd, args)
+      console.log('proc str: ', cmd)
+      const p = this.getProc(cmd.str)
+      console.log(p)
+      res = p(args, this)
 
       command = parser.parseCommand()
     }
@@ -408,3 +427,11 @@ class TclRuntime {
 }
 
 export { TclRuntime, TclParser, MissingProc, InvalidProc }
+
+const foo = `
+set x 10
+set y set
+$y z $x`
+
+const rt = new TclRuntime()
+rt.run(foo)
