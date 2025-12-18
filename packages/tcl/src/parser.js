@@ -42,6 +42,21 @@ export class Runtime {
       let val = v
 
       switch (t) {
+        case TT.ARR: {
+          const { name, index, literal } = v
+          if (literal) {
+            const arr = this.get(name)
+            const value = arr[index]
+            if (value === undefined) throw new Error(`No such element '${index}' in array '${name}'`)
+            val = value
+          } else {
+            const arr = this.get(name)
+            const value = arr[this.run(index)]
+            if (value === undefined) throw new Error(`No such element '${index}' in array '${name}'`)
+            val = value
+          }
+          break
+        }
         case TT.VAR:
           val = this.get(v)
           break
