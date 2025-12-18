@@ -5,24 +5,15 @@ When used standalone, Bassline refers to the protocol we are working on.
 
 Example: *Have you seen Bassline? It&rsquo;s so sick!*
 
-
-## It's an organization
-
-Bassline is also the name of our organization that helps develop the Bassline Protocol.
-
-Example: *&ldquo;I work for Bassline, the coolest company on the planet!&rdquo;*
-
 ## It's a resource
-
-> **Reminder**: A resource is an addressable &ldquo;thing&rdquo;, it has two operations:
-> - get (to ask a question)
-> - put (to give some information).
 
 When discussing **a Bassline**, we are referring to:
 
 **A resource that describes the set of resources available**
 
-It's a description of what we can do and how we can do it, kind of like a road map or atlas. 
+> **Reminder**: A [resource](./Resource-Kinds.md) is an addressable &ldquo;thing&rdquo;
+
+It provides answers to what we can do and how we can do it, kind of like a road map or atlas. 
 
 ---
 
