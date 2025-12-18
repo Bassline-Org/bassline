@@ -4,6 +4,7 @@ export const TT = {
   STR: Symbol('STR'),
   CMD: Symbol('CMD'),
   VAR: Symbol('VAR'),
+  ARR: Symbol('ARR'),
   SEP: Symbol('SEP'),
   EOL: Symbol('EOL'),
   EOF: Symbol('EOF'),
@@ -59,8 +60,31 @@ export function* tokenize(src) {
     '[': () => [TT.CMD, balanced('[', ']')],
     $: () => {
       i++
-      const v = take(word)
-      return v ? [TT.VAR, v] : [TT.STR, '$']
+
+      // ${name} braced form, NO SUBSTITUTION IN NAME!
+      if (peek() === '{') {
+        // unlike normal braces, they cannot contain nested braces
+        const name = take(c => c !== '}')
+        // Check for arrayName(index) form
+        const arrMatch = name.match(/^([^(}]+)\(([^}]+)\)$/)
+        if (arrMatch) {
+          return [TT.ARR, { name: arrMatch[1], index: arrMatch[2], literal: true }]
+        }
+        return [TT.VAR, name]
+      }
+
+      const name = take(c => /[a-zA-Z0-9_]/.test(c) || c === ':')
+      if (!name) return [TT.STR, '$']
+
+      // $name(index), unbraced form for array access, substitution performed on index
+      if (peek() === '(') {
+        // The index also cannot contain nested parentheses
+        const index = take(c => c !== ')')
+        return [TT.ARR, { name, index, literal: false }]
+      }
+
+      // $name, unbraced form for scalar access, name will be substituted
+      return [TT.VAR, name]
     },
     '{': () => (type === TT.SEP || type === TT.EOL) && [TT.STR, balanced('{', '}')],
     '"': () => {
