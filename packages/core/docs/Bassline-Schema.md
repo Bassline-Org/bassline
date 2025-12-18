@@ -12,6 +12,8 @@ All exposed resources are addressable relative to Bassline resource. Making the 
 
 The goal here is to describe a minimal shape for compound resources to describe themselves, such that we can establish a common base(line) to build and extend.
 
+> IMPORTANT: A Bassline is **NOT** the description! A Bassline is a live resource that describes other live resources, it's not static data!
+
 ## The Schema
 
 A Bassline description is a JSON document with two primary parts:
