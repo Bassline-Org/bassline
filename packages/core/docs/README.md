@@ -1,21 +1,18 @@
 # What is Bassline? 🤨
 
-A surprisingly difficult question to answer simply!
-
-## As a protocol
+## It's a protocol
 When used standalone, Bassline refers to the protocol we are working on.
 
 Example: *Have you seen Bassline? It&rsquo;s so sick!*
 
 
-## As an organization
+## It's an organization
 
 Bassline is also the name of our organization that helps develop the Bassline Protocol.
 
 Example: *&ldquo;I work for Bassline, the coolest company on the planet!&rdquo;*
 
-
-## As a resource
+## It's a resource
 
 > **Reminder**: A resource is an addressable &ldquo;thing&rdquo;, it has two operations:
 > - get (to ask a question)
@@ -33,12 +30,11 @@ It's a description of what we can do and how we can do it, kind of like a road m
 
 A bassline is kind of like a directory or package.
 
-When we `get` a bassline resource, we will receive information that describes what that bassline offers. 
-
-[Link to the schema document](./Bassline-Schema.md)
+When we `get` a bassline resource, we will receive information that describes what that bassline offers.
 
 
 ---
+
 ### Bassline of ?
 A bassline can reference other basslines. Meaning in `bassline A`, we can refer to `bassline B`, since a bassline is a resource.
 
