@@ -114,6 +114,69 @@ If you want to expose things like addressing information on how others can reach
 
 ## Examples
 
+### Bassline of Ethereum
+
+```json
+{
+  "resources": {
+    "/block/:height": {
+      "get": {
+        "description": "Get data from a particular block",
+        "returns": { /* The block spec*/ }
+      },
+    },
+    "/block/:height/txns": {
+      "get": {
+        "description": "Get the transactions from a particular block",
+        "returns": { /* Array of txns spec */ }
+      },
+    },
+    "/balance/:address": {
+      "get": {
+        "description": "Returns the recent wei balance of an account"
+      }
+    },
+    "/balance/:address/:height": {
+      "get": {
+        "description": "Returns the wei balance of an account at the block height"
+      }
+    },
+    "/tx/send": {
+      "put": {
+        "description": "Submit a signed transaction to the network",
+        "returns": "Txn hash / Error"
+      }
+    },
+    "/call/:address": {
+      "get": {
+        "description": "Perform an eth_call to an address"
+      }
+    },
+    "/peers": {
+      "get": {
+        "description": "Returns all known peers of this node"
+      }
+    },
+    "/sig/:address/verify": {
+      "get": {
+        "description": "Verify a signature from the address provided"
+      }
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Bassline of Ethereum, defines the minimal shape for ethereum rpc interactions through Bassline",
+    "see-also": {
+      "Bassline of Eth-Tokens": {
+        "route": "/tokens",
+        "description": "A bassline for ERC-20 specific resource interactions!"
+      }
+    },
+    "how-i-feel": "bassed"
+  }
+}
+```
+
 ### Bassline of Cells
 
 ```json
@@ -162,34 +225,6 @@ If you want to expose things like addressing information on how others can reach
 }
 ```
 
-### Event Log Bassline
-
-```json
-{
-  "resources": {
-    "/events": {
-      "get": {
-        "description": "Query events by time range",
-        "parameters": {
-          "after": "timestamp",
-          "before": "timestamp"
-        }
-      },
-      "put": {
-        "description": "Append event to log",
-        "accepts": {
-          "type": "string",
-          "data": "object",
-          "timestamp": "number"
-        }
-      }
-    },
-  },
-  "metadata": {
-    "version": "1.0.0"
-  }
-}
-```
 
 ### Read-only Config Bassline
 
