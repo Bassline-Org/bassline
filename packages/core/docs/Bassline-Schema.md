@@ -56,8 +56,6 @@ For when a resource can answer questions others may find useful.
 All fields are optional. 
 
 
-**But please make sure you add descriptions! :)**
-
 ```json
 "get": {
   "description": "What this returns",
@@ -72,8 +70,6 @@ For when a resource can make use of information we provide it.
 
 All fields are optional. 
 
-
-**But seriously, DESCRIPTIONS!**
 
 ```json
 "put": {

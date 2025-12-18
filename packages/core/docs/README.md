@@ -28,6 +28,17 @@ When discussing **a Bassline**, we are referring to:
 It's a description of what we can do and how we can do it, kind of like a road map or atlas. 
 
 ---
+
+### What does a Bassline look like?
+
+A bassline is kind of like a directory or package.
+
+When we `get` a bassline resource, we will receive information that describes what that bassline offers. 
+
+[Link to the schema document](./Bassline-Schema.md)
+
+
+---
 ### Bassline of ?
 A bassline can reference other basslines. Meaning in `bassline A`, we can refer to `bassline B`, since a bassline is a resource.
 
@@ -42,16 +53,7 @@ For example, `Bassline A` might reference `Bassline of Friends`, which tells us 
 > Whether it&rsquo;s a local bassline or a remote bassline. They all make up the total Bassline of our system
 
 
-# What does a Bassline look like?
-
-A bassline is kind of like a directory or package.
-
-When we `get` a bassline resource, we will receive information that describes what that bassline offers. 
-
-[Link to the schema document](./Bassline-Schema.md)
-
-
-# How do we build a Bassline?
+## How do we build a Bassline?
 
 A Bassline is a resource that describes other resource behaviors and tells us how we can use them.
 
@@ -59,5 +61,5 @@ If you can `get` from a resource, and it matches the [schema](./Bassline-Schema.
 
 >A Bassline simply answers "what?" and "how?" for our system
 
-# Learn more
+## Learn more
 Check out the [schema](./Bassline-Schema.md) document to read specifics and examples
