@@ -116,6 +116,8 @@ If you want to expose things like addressing information on how others can reach
 
 ### Bassline of Ethereum
 
+An example specification for what the Bassline of Ethereum interactions would look like in our system.
+
 ```json
 {
   "resources": {
@@ -179,6 +181,8 @@ If you want to expose things like addressing information on how others can reach
 
 ### Bassline of Cells
 
+Commonly used patterns also have their own bassline, allowing clients to dynamically learn how they can interact with things.
+
 ```json
 {
   "resources": {
@@ -225,8 +229,9 @@ If you want to expose things like addressing information on how others can reach
 }
 ```
 
-
 ### Read-only Config Bassline
+
+Basslines can also just expose read-only resources. For example, when using BassJump (todo: link) your editor config can be exposed as a resource.
 
 ```json
 {
