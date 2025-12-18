@@ -17,20 +17,29 @@ Example: *&ldquo;I work for Bassline, the coolest company on the planet!&rdquo;*
 
 ## As a resource
 
-*Note: A resource is an addressable &ldquo;thing&rdquo;, that supports two operations, get (to ask a question) and put (to give some information).*
+> **Reminder**: A resource is an addressable &ldquo;thing&rdquo;, it has two operations:
+> - get (to ask a question)
+> - put (to give some information).
 
 When discussing **a Bassline**, we are referring to:
+
 **A resource that describes the set of resources available**
 
 It's a description of what we can do and how we can do it, kind of like a road map or atlas. 
 
-A bassline can reference other basslines. Meaning in bassline A, we can refer to bassline B, since a bassline is a resource.
+---
+### Bassline of ?
+A bassline can reference other basslines. Meaning in `bassline A`, we can refer to `bassline B`, since a bassline is a resource.
 
-When we are referring to a &ldquo;nested&rdquo; Bassline, it&rsquo;s common to refer to it as a &ldquo;Bassline of xyz&rdquo;, since it helps convey that this is the Bassline of some part of a larger system.
+When we are referring to a &ldquo;nested&rdquo; Bassline, it&rsquo;s common to refer to it as a &ldquo;Bassline of xyz&rdquo;.
 
-For example, `Bassline A` might reference `Bassline of Friends`, which conveys that Friends is a bassline itself, that is used to define a part of `Bassline A`.
+This helps convey that this is the *Bassline of some part of* a larger system.
 
-*Concept: Whenever we are interacting with other resources from our &ldquo;root&rdquo;, every `Bassline` is a `Bassline of xyz`. Whether it&rsquo;s a local bassline or a remote bassline. They all make up the total Bassline of our system*
+For example, `Bassline A` might reference `Bassline of Friends`, which tells us that Friends is a bassline itself, that is used to define a part of `Bassline A`.
+
+> Whenever we are interacting with other resources from our &ldquo;root&rdquo;, every `Bassline` is a `Bassline of xyz`. 
+>
+> Whether it&rsquo;s a local bassline or a remote bassline. They all make up the total Bassline of our system
 
 
 # What does a Bassline look like?
