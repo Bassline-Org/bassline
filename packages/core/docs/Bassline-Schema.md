@@ -8,7 +8,7 @@ Schema ID: `https://bassline.dev/schemas/bassline-v1.json`
 
 A Bassline is an addressable resource that describes some addressable resources that give the system new capabilities.
 
-All exposed resources are addressable relative to Bassline resource. Making the Bassline act as both a router & package.
+All exposed resources are addressable relative to the Bassline resource. Making the Bassline act as both a router & package.
 
 The goal here is to describe a minimal shape for compound resources to describe themselves, such that we can establish a common base(line) to build and extend.
 
