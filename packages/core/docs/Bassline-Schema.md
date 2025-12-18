@@ -52,6 +52,7 @@ This section describes the resources exposed by the Bassline, and what operation
 ### GET Operation
 
 For when a resource can answer questions others may find useful.
+
 All fields are optional. 
 
 
@@ -67,7 +68,8 @@ All fields are optional.
 
 ### PUT Operation
 
-For when a resource can make use of information we provide it
+For when a resource can make use of information we provide it.
+
 All fields are optional. 
 
 
