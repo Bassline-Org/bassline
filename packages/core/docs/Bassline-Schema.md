@@ -45,7 +45,7 @@ This section describes the resources exposed by the Bassline, and what operation
 
 - Paths must start with `/`
 
-- Each resource must have at least `get` or `put` (or both, but you shouldn't talk about resources you don't want to expose!)
+- Each resource must have at least `get` or `put` (or both)
 
 - Paths can include parameters by prefixing a path segment with a `:`, such as `:name`.
 
