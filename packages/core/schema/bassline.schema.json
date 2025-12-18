@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bassline.dev/schemas/bassline-v1.json",
+  "title": "Bassline Interface Description",
+  "description": "The minimal JSON schema for describing a Bassline, which is a logical grouping of resources and their associated capabilities.",
+  "type": "object",
+  "required": ["resources"],
+  "properties": {
+    "resources": {
+      "type": "object",
+      "description": "Map of resource paths to their specifications. Paths are relative to the Bassline location, which behaves as the logical root.",
+      "patternProperties": {
+        "^/": {
+          "$ref": "#/$defs/resource"
+        }
+      },
+      "additionalProperties": false,
+      "minProperties": 1
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional extensible metadata about this Bassline. Can contain version info, descriptions, capabilities, or any domain-specific data.",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "description": "A resource exposed by the Bassline. Must support at least one operation (GET or PUT).",
+      "properties": {
+        "get": {
+          "$ref": "#/$defs/getOperation"
+        },
+        "put": {
+          "$ref": "#/$defs/putOperation"
+        }
+      },
+      "anyOf": [{ "required": ["get"] }, { "required": ["put"] }],
+      "additionalProperties": false
+    },
+    "getOperation": {
+      "type": "object",
+      "description": "GET operation: Request some information from a resource.",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable Description of what this GET returns"
+        },
+        "returns": {
+          "description": "Description of the return value shape or type"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Query parameters this GET accepts",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "putOperation": {
+      "type": "object",
+      "description": "PUT operation: Provide information to the resource.",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this PUT does"
+        },
+        "accepts": {
+          "description": "Description of the request body shape or type"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Query parameters this PUT accepts",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "examples": [
+    {
+      "resources": {
+        "/cells/:name": {
+          "get": {
+            "description": "Get cell information",
+            "returns": {
+              "name": "string",
+              "lattice": "string",
+              "value": "any"
+            }
+          },
+          "put": {
+            "description": "Create or configure cell",
+            "accepts": {
+              "lattice": "string"
+            }
+          }
+        },
+        "/cells/:name/value": {
+          "get": {
+            "description": "Get current cell value"
+          },
+          "put": {
+            "description": "Merge information into cell",
+            "accepts": "any"
+          }
+        }
+      },
+      "metadata": {
+        "version": "1.0.0",
+        "author": "goose",
+        "description": "Bassline of Cells"
+      }
+    },
+    {
+      "resources": {
+        "/events": {
+          "get": {
+            "description": "Query events",
+            "parameters": {
+              "after": "timestamp",
+              "type": "event type filter"
+            },
+            "returns": "array of events"
+          },
+          "put": {
+            "description": "Append event to log",
+            "accepts": {
+              "type": "string",
+              "data": "object",
+              "timestamp": "number"
+            }
+          }
+        }
+      },
+      "metadata": {
+        "version": "1.0.0",
+        "description": "Bassline of Event Sourcing"
+      }
+    },
+    {
+      "resources": {
+        "/config/theme": {
+          "get": {
+            "description": "Current theme",
+            "returns": "string"
+          }
+        },
+        "/config/features": {
+          "get": {
+            "description": "Enabled features",
+            "returns": "array"
+          }
+        }
+      },
+      "metadata": {
+        "immutable": true,
+        "version": "1.0.0",
+        "description": "Bassline of some read-only theme system"
+      }
+    }
+  ]
+}
