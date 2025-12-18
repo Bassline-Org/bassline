@@ -154,9 +154,9 @@ If you want to expose things like addressing information on how others can reach
     "version": "1.0.0",
     "description": "Bassline of Cells, providing monotonic data structures for coordination-free distributed state!",
     "relevantPapers": [{
-      title: "Propagation networks : a flexible and expressive substrate for computation",
-      author: "Alexey Radul",
-      link: "https://dspace.mit.edu/handle/1721.1/54635"
+      "title": "Propagation networks : a flexible and expressive substrate for computation",
+      "author": "Alexey Radul",
+      "link": "https://dspace.mit.edu/handle/1721.1/54635"
     }]
   }
 }
