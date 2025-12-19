@@ -1,12 +1,20 @@
 // Token Types
 export const TT = {
+  // An escaped character / sequence: \n
   ESC: Symbol('ESC'),
+  // A double quote delimited string: "hello $world"
   STR: Symbol('STR'),
+  // A bracket delimited string: [command]
   CMD: Symbol('CMD'),
+  // A variable reference: $foo
   VAR: Symbol('VAR'),
+  // An array reference: $foo(index)
   ARR: Symbol('ARR'),
+  // A horizontal seperator: space, tab
   SEP: Symbol('SEP'),
+  // A command terminator: newline or semicolon
   EOL: Symbol('EOL'),
+  // End of file
   EOF: Symbol('EOF'),
 }
 
@@ -14,14 +22,19 @@ export const TT = {
 export const RC = { BREAK: Symbol('BREAK'), CONTINUE: Symbol('CONTINUE'), RETURN: Symbol('RETURN') }
 
 export function* tokenize(src) {
+  // mutable state
   let i = 0,
     type = TT.EOL,
     quoted = false
 
   // classification fns
-  const ws = c => ' \t\r'.includes(c),
+  const ws = c => ' \t'.includes(c),
     eol = c => '\n;'.includes(c),
     word = c => /\w/.test(c),
+    kind = c => {
+      if (!quoted && ws(c)) return TT.SEP
+      if (!quoted && eol(c)) return TT.EOL
+    },
     strEnd = c => '$['.includes(c) || (!quoted && ' \t\n\r;'.includes(c)) || (quoted && c === '"'),
     // stream manipulation functions
     peek = () => src[i],
@@ -35,20 +48,17 @@ export function* tokenize(src) {
       return src.slice(s, i)
     },
     balanced = (open, close) => {
-      let deTTh = 1,
-        brace = 0,
+      let depth = 1,
         start = ++i
-      while (!done() && deTTh) {
+      while (!done() && depth > 0) {
         const c = peek()
         if (c === '\\') i++
-        else if (c === open && !brace) deTTh++
-        else if (c === close && !brace) deTTh--
-        else if (c === '{') brace++
-        else if (c === '}' && brace) brace--
-        if (deTTh) i++
+        else if (c === open) depth++
+        else if (c === close) depth--
+        i++
       }
-      const text = src.slice(start, i++)
-      return text
+      if (depth > 0) throw new Error(`Unbalanced delimiter: ${open}, expected ${close} starting at ${start}`)
+      return src.slice(start, i++)
     }
 
   const handlers = {
@@ -96,23 +106,20 @@ export function* tokenize(src) {
     '#': () => type === TT.EOL && (skip(c => c !== '\n'), null),
   }
 
-  const string = () => {
-    let start = i
-    while (!done() && !strEnd(peek())) {
-      if (peek() === '\\') i++
-      i++
-    }
-
-    if (quoted && peek() === '"') {
-      quoted = false
-      i++
-      return [TT.STR, src.slice(start, i - 1)]
-    }
-    return i > start ? [TT.ESC, src.slice(start, i)] : null
-  }
-
   while (!done()) {
-    const tok = handlers[peek()]?.() ?? string()
+    let char = peek()
+
+    if (!quoted && ws(char)) {
+      skip(ws)
+      yield { t: TT.SEP }
+      continue
+    }
+
+    if (!quoted && eol(char)) {
+      skip(c => ws(c) || eol(c))
+      yield { t: TT.EOL }
+    }
+
     if (tok) {
       type = tok[0]
       yield { t: type, v: tok[1] }

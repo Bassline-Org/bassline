@@ -1,0 +1,19 @@
+{
+  "name": "@bassline/node",
+  "version": "1.0.0",
+  "description": "Node.js platform: HTTP/WS servers and file store",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.js",
+    "./http": "./src/http.js",
+    "./ws": "./src/ws.js",
+    "./store": "./src/store.js"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "license": "AGPL-3.0"
+}

@@ -25,9 +25,11 @@ const installer = createInstallRoutes({ baseDir: process.cwd() })
 installer.install(bl)
 
 // Determine bootstrap source
-const BOOTSTRAP = process.env.BL_BOOTSTRAP || resolve(__dirname, 'bootstrap.js')
+const BOOTSTRAP = process.env.BL_BOOTSTRAP
+  ? resolve(process.cwd(), process.env.BL_BOOTSTRAP)
+  : resolve(__dirname, 'bootstrap.js')
 
-if (BOOTSTRAP === 'none') {
+if (process.env.BL_BOOTSTRAP === 'none') {
   // Minimal mode - no bootstrap
   console.log('Bassline daemon running (minimal)')
   console.log('  Install modules via: PUT bl:///install/:name { path: "..." }')
