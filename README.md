@@ -1,99 +1,98 @@
 # Bassline
 
-A programming environment for reflective distributed programming.
+A minimal protocol for reflexive distributed systems.
 
-## Everything is a Resource
+## Resources
 
-Resources have URIs. You `get` and `put` them. They return `{ headers, body }`.
-
-```
-bl:///data/users/alice       # a document
-bl:///cells/counter          # a value that merges
-bl:///propagators/sum        # a reactive computation
-bl:///links/to/types/cell    # a query
-```
-
-## Design Principles
-
-**Language Agnostic.** The resource model is protocol-based, not library-based. Any language that can make HTTP requests or speak WebSocket can interact with Bassline. The JavaScript implementation is one client among many.
-
-**Location Transparent.** URIs name resources without encoding where they live. A cell at `bl:///cells/counter` could be local, on a remote node, or replicated across many. Resolution happens at runtime based on how middleware is configured.
-
-**Late Binding.** Store URIs now, resolve them later. Middleware decides what they mean at runtime. You can sandbox things by controlling what's resolvable. You can move resources around without breaking references. You can define new resource types by writing handlers.
-
-**Partial Information.** In Bassline, we view every piece of information as partial, part of a bigger picture. Information is never complete. This allows you to build systems incrementally that evolve gracefully.
-
-## The Building Blocks
-
-**Cells** let you have state without requiring a specific order. Concurrent writes merge using lattice semantics. Unlike CRDTs, cells support errors during merges. Errors are data that meta-merge rules can use to decide which value to keep.
-
-**Propagators** wire cells together. Change an input, the output updates.
-
-**Fully Reflective.** Types, links, routes, and the system itself are all resources. You can explore every part of the system dynamically at runtime.
-
-## Quick Start
+A resource is something you can `get` from or `put` to.
 
 ```javascript
-import { Bassline } from '@bassline/core'
-
-const bl = new Bassline()
-
-// Store something
-await bl.put('bl:///data/users/alice', {}, { name: 'Alice' })
-
-// Get it back
-const result = await bl.get('bl:///data/users/alice')
-// → { headers: { type: 'bl:///types/document' }, body: { name: 'Alice' } }
+{
+  get: async (headers) => ({ headers, body }),
+  put: async (headers, body) => ({ headers, body })
+}
 ```
 
-## Cells
+That's the whole interface. Resources compose through routing, which takes about 35 lines total. See [packages/core/src/resource.js](./packages/core/src/resource.js).
+
+## Basslines
+
+A bassline is a resource that does two things: it describes what's available, and it routes to those things.
 
 ```javascript
-// Create a cell with a lattice
-await bl.put('bl:///cells/counter', {}, { lattice: 'maxNumber' })
-
-// Write values (max wins)
-await bl.put('bl:///cells/counter/value', {}, 5)
-await bl.put('bl:///cells/counter/value', {}, 3) // still 5
-await bl.put('bl:///cells/counter/value', {}, 10) // now 10
+const app = routes({
+  '': resource({
+    get: async () => ({
+      headers: { type: '/types/bassline' },
+      body: {
+        name: 'my-app',
+        resources: {
+          '/cells': { description: 'State' },
+          '/data': { description: 'Documents' },
+        },
+      },
+    }),
+  }),
+  cells: cellsResource,
+  data: dataResource,
+})
 ```
 
-Lattices: `maxNumber`, `minNumber`, `setUnion`, `setIntersection`, `lww`, `object`, `counter`, `boolean`. See [packages/cells](./packages/cells) for details.
+When you GET a bassline, it tells you what exists. When you PUT or GET through it, it handles the actual routing. Description and behavior live together.
 
-## Propagators
+This makes resources act like packages. They declare their contents and manage access to them. A bassline can contain other basslines, giving you nested namespaces.
+
+Paths are always relative. `/cells/counter` in one bassline is different from `/cells/counter` in another. Resources never need to know their absolute location. You get isolation and composability from this naturally.
+
+Because the bassline handles routing, it controls what actually happens. It can filter requests, transform responses, delegate to other resources, or deny access entirely. The description is what's advertised. The routing is what's enforced.
+
+See [packages/core/docs/Bassline-Schema.md](./packages/core/docs/Bassline-Schema.md) for the schema.
+
+## The Kit Pattern
+
+When a resource needs to reach outside itself, it uses `h.kit`:
 
 ```javascript
-// Wire cells: a + b -> sum
-await bl.put(
-  'bl:///propagators/add',
-  {},
-  {
-    inputs: ['bl:///cells/a', 'bl:///cells/b'],
-    output: 'bl:///cells/sum',
-    handler: 'sum',
-  }
-)
+const worker = resource({
+  put: async (h, task) => {
+    const config = await h.kit.get({ path: '/config' })
+    await h.kit.put({ path: '/results' }, processTask(task, config.body))
+    return { headers: {}, body: { done: true } }
+  },
+})
 ```
 
-60+ built-in handlers for arithmetic, logic, strings, arrays, objects, and more. See [packages/propagators](./packages/propagators) for full list.
+Kit is just a resource passed in through headers. The caller decides what it routes to. Could be local, remote, sandboxed, logged. The resource using it doesn't know or care.
+
+This works across network boundaries because transports are resources too. When crossing the wire, the transport passes a link that routes back through itself. Resources stay portable.
+
+## Resource Kinds
+
+Patterns for thinking about resources based on how they behave.
+
+Cells accumulate partial information through merging. Writes don't replace, they merge. Good for distributed state where ordering can't be coordinated.
+
+Propagators connect cells. When inputs change, they recompute and write outputs. Reactive dataflow.
+
+Oracles answer questions. Read-only. Databases, function registries, evaluators.
+
+Scouts discover things autonomously and report what they find. Monitors, crawlers, peer discovery.
+
+See [packages/core/docs/Resource-Kinds.md](./packages/core/docs/Resource-Kinds.md) for details.
 
 ## Packages
 
 ```
-packages/core/           # router, pattern matching
-packages/plumber/        # message routing
-packages/links/          # bidirectional refs
-packages/types/          # type definitions
-packages/cells/          # lattice-based cells
-packages/propagators/    # reactive computation
-packages/timers/         # time events
-packages/fetch/          # HTTP requests
-packages/monitors/       # URL polling
-packages/store-node/     # file storage
-packages/server-node/    # http + websocket
+packages/core/       Resource primitives, cells, propagators, plumber, functions, timers
+packages/node/       Node.js: HTTP server, WebSocket server, file store
+packages/remote/     WebSocket client for connecting to remote basslines
+packages/database/   SQLite
+packages/services/   AI integration (Claude)
+packages/trust/      Capability-based trust
+packages/tcl/        Tcl scripting
 
-apps/cli/                # daemon, MCP server
-apps/editor/             # web ui
+apps/cli/            Daemon and MCP server
+apps/tui/            Terminal UI
 ```
 
 ## Running
@@ -102,8 +101,6 @@ apps/editor/             # web ui
 pnpm install
 pnpm test
 ```
-
-See [CLAUDE.md](./CLAUDE.md) for more.
 
 ## License
 
