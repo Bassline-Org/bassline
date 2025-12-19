@@ -33,9 +33,9 @@ export const createFileStore = (root) => {
         }
       } catch (err) {
         if (err.code === 'ENOENT') {
-          return { headers: { status: 404 }, body: null }
+          return { headers: { condition: 'not-found' }, body: null }
         }
-        return { headers: { status: 500, error: err.message }, body: null }
+        return { headers: { condition: 'error', message: err.message }, body: null }
       }
     },
 
@@ -47,7 +47,7 @@ export const createFileStore = (root) => {
         await writeFile(fullPath, data, 'utf-8')
         return { headers: {}, body }
       } catch (err) {
-        return { headers: { status: 500, error: err.message }, body: null }
+        return { headers: { condition: 'error', message: err.message }, body: null }
       }
     }
   })

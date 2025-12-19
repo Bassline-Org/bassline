@@ -86,7 +86,7 @@ export const createFetch = () => {
     unknown: bind('id', resource({
       get: async (h) => {
         const req = requests.get(h.params.id)
-        if (!req) return { headers: { status: 404 }, body: null }
+        if (!req) return { headers: { condition: 'not-found' }, body: null }
         return { headers: {}, body: req }
       }
     }))
