@@ -17,22 +17,13 @@ class Stringable extends String {
   }
 }
 
-// const script = `
+const script = `
 
-// set x foo
-// set y bar
+set x {a b c d e f}
+set y hello
 
-// set $x$y baz
+puts [string concat hello $x]
+puts $x(3)
 
-// puts {foo $y}
-// puts "foo $y"
-// puts [string length $x$y]
-
-// set greet [string repeat "ohhello " 500]
-// set script {string repeat "hello" 500}
-
-// puts [string concat a {*}{b c}]
-// puts [string concat a {b c}]
-
-// `
-// foo.run(script)
+`
+foo.run(script)

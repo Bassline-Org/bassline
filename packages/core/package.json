@@ -4,20 +4,17 @@
   "description": "Minimal resource model for reflective distributed programming",
   "type": "module",
   "main": "src/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.js"
-    },
-    "./bassline": {
-      "types": "./dist/bassline.d.ts",
-      "default": "./src/bassline.js"
-    },
-    "./router": {
-      "types": "./dist/router.d.ts",
-      "default": "./src/router.js"
-    }
+    ".": "./src/index.js",
+    "./resource": "./src/resource.js",
+    "./store": "./src/store.js",
+    "./plumber": "./src/plumber.js",
+    "./cells": "./src/cells.js",
+    "./propagators": "./src/propagators.js",
+    "./fn": "./src/fn.js",
+    "./timers": "./src/timers.js",
+    "./fetch": "./src/fetch.js",
+    "./types": "./src/types.js"
   },
   "scripts": {
     "test": "vitest run"
