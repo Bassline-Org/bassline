@@ -15,8 +15,7 @@
     "@bassline/core": "workspace:*"
   },
   "devDependencies": {
-    "@bassline/plumber": "workspace:*",
-    "@bassline/server-node": "workspace:*",
+    "@bassline/node": "workspace:*",
     "vitest": "^2.0.0",
     "ws": "^8.18.0"
   },
