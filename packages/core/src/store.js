@@ -41,7 +41,7 @@ export const createMemoryStore = (initial = {}) => {
     get: async (h) => {
       const value = getByPath(h.path)
       if (value === undefined) {
-        return { headers: { status: 404 }, body: null }
+        return { headers: { condition: 'not-found' }, body: null }
       }
       // If it's an object with children, return keys (directory-like)
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {

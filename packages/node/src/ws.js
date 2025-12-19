@@ -36,7 +36,7 @@ export const createWsServer = () => {
         get: async (h) => {
           const port = parseInt(h.params.port)
           const entry = servers.get(port)
-          if (!entry) return { headers: { status: 404 }, body: null }
+          if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
           return {
             headers: { type: '/types/ws-server' },
@@ -101,7 +101,7 @@ export const createWsServer = () => {
         put: async (h) => {
           const port = parseInt(h.params.port)
           const entry = servers.get(port)
-          if (!entry) return { headers: { status: 404 }, body: null }
+          if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
           entry.clients.forEach(ws => ws.close())
           entry.wss.close()
@@ -115,7 +115,7 @@ export const createWsServer = () => {
         put: async (h, body) => {
           const port = parseInt(h.params.port)
           const entry = servers.get(port)
-          if (!entry) return { headers: { status: 404 }, body: null }
+          if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
           const msg = JSON.stringify({ type: 'broadcast', body })
           entry.clients.forEach(ws => ws.send(msg))

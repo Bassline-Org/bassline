@@ -30,13 +30,13 @@ export function createServices() {
       unknown: bind('name', resource({
         get: async (h) => {
           const service = registry.get(h.params.name)
-          if (!service) return { headers: { status: 404 }, body: null }
+          if (!service) return { headers: { condition: 'not-found' }, body: null }
           return service.get({ ...h, path: '/' })
         },
 
         put: async (h, body) => {
           const service = registry.get(h.params.name)
-          if (!service) return { headers: { status: 404 }, body: null }
+          if (!service) return { headers: { condition: 'not-found' }, body: null }
           return service.put({ ...h, path: '/' }, body)
         }
       }))

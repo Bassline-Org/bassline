@@ -62,7 +62,7 @@ export function createDatabase() {
         '': resource({
           get: async (h) => {
             const entry = connections.get(h.params.name)
-            if (!entry) return { headers: { status: 404 }, body: null }
+            if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
             return {
               headers: { type: '/types/database-connection' },
@@ -160,7 +160,7 @@ export function createDatabase() {
               const schema = conn.introspect()
               const table = schema.tables.find(t => t.name === h.params.table)
 
-              if (!table) return { headers: { status: 404 }, body: null }
+              if (!table) return { headers: { condition: 'not-found' }, body: null }
 
               return {
                 headers: { type: '/types/database-table' },

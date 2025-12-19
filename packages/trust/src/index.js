@@ -103,8 +103,8 @@ export function createTrust(options = {}) {
         const { peer, outcome } = body
         if (!peer || outcome === undefined) {
           return {
-            headers: { status: 400 },
-            body: { error: 'peer and outcome required' }
+            headers: { condition: 'invalid', message: 'peer and outcome required' },
+            body: null
           }
         }
         const updated = observe(peer, outcome)

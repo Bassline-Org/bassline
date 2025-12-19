@@ -109,12 +109,12 @@ export const createFn = (customFns = {}) => {
     unknown: bind('name', resource({
       get: async (h) => {
         const fn = fns[h.params.name]
-        if (!fn) return { headers: { status: 404 }, body: null }
+        if (!fn) return { headers: { condition: 'not-found' }, body: null }
         return { headers: { type: '/types/fn' }, body: fn }
       },
       put: async (h, body) => {
         if (typeof body !== 'function') {
-          return { headers: { status: 400 }, body: { error: 'body must be a function' } }
+          return { headers: { condition: 'invalid', message: 'body must be a function' }, body: null }
         }
         fns[h.params.name] = body
         return { headers: {}, body: { registered: h.params.name } }

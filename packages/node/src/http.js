@@ -32,7 +32,7 @@ export const createHttpServer = () => {
         get: async (h) => {
           const port = parseInt(h.params.port)
           const entry = servers.get(port)
-          if (!entry) return { headers: { status: 404 }, body: null }
+          if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
           return {
             headers: { type: '/types/http-server' },
@@ -73,7 +73,7 @@ export const createHttpServer = () => {
                 // Proxy GET to kit
                 const result = kit
                   ? await kit.get({ path, ...headers })
-                  : { headers: { status: 500 }, body: { error: 'no kit' } }
+                  : { headers: { condition: 'error', message: 'no kit' }, body: null }
                 res.setHeader('Content-Type', 'application/json')
                 res.end(JSON.stringify(result))
               } else if (req.method === 'PUT' || req.method === 'POST') {
@@ -85,7 +85,7 @@ export const createHttpServer = () => {
                     // Proxy PUT to kit
                     const result = kit
                       ? await kit.put({ path, ...headers }, reqBody)
-                      : { headers: { status: 500 }, body: { error: 'no kit' } }
+                      : { headers: { condition: 'error', message: 'no kit' }, body: null }
                     res.setHeader('Content-Type', 'application/json')
                     res.end(JSON.stringify(result))
                   } catch (err) {
@@ -122,7 +122,7 @@ export const createHttpServer = () => {
         put: async (h) => {
           const port = parseInt(h.params.port)
           const entry = servers.get(port)
-          if (!entry) return { headers: { status: 404 }, body: null }
+          if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
           entry.server.close()
           entry.connections.forEach(conn => conn.destroy())

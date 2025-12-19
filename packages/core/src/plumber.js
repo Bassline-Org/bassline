@@ -49,7 +49,7 @@ export const createPlumber = () => {
       unknown: bind('name', resource({
         get: async (h) => {
           const rule = rules.get(h.params.name)
-          if (!rule) return { headers: { status: 404 }, body: null }
+          if (!rule) return { headers: { condition: 'not-found' }, body: null }
           return { headers: {}, body: rule }
         },
         put: async (h, body) => {

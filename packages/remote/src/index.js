@@ -93,7 +93,7 @@ export function createRemote(options = {}) {
       '': resource({
         get: async (h) => {
           const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { status: 404 }, body: null }
+          if (!conn) return { headers: { condition: 'not-found' }, body: null }
 
           return {
             headers: { type: '/types/remote-connection' },
@@ -129,7 +129,7 @@ export function createRemote(options = {}) {
       close: resource({
         put: async (h) => {
           const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { status: 404 }, body: null }
+          if (!conn) return { headers: { condition: 'not-found' }, body: null }
 
           conn.ws.close()
           connections.delete(h.params.name)
@@ -144,7 +144,7 @@ export function createRemote(options = {}) {
       proxy: bind('proxyPath', resource({
         get: async (h) => {
           const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { status: 404 }, body: null }
+          if (!conn) return { headers: { condition: 'not-found' }, body: null }
 
           // Reconstruct the full path from segment + remaining path
           const fullPath = h.params.proxyPath + (h.path && h.path !== '/' ? h.path : '')
@@ -153,7 +153,7 @@ export function createRemote(options = {}) {
 
         put: async (h, body) => {
           const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { status: 404 }, body: null }
+          if (!conn) return { headers: { condition: 'not-found' }, body: null }
 
           const fullPath = h.params.proxyPath + (h.path && h.path !== '/' ? h.path : '')
           return sendRequest(conn, { type: 'put', path: '/' + fullPath, body })

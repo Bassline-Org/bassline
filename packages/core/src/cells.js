@@ -54,12 +54,12 @@ export const createCells = () => {
   const cellResource = resource({
     get: async (h) => {
       const cell = cells.get(h.params.name)
-      if (!cell) return { headers: { status: 404 }, body: null }
+      if (!cell) return { headers: { condition: 'not-found' }, body: null }
       return { headers: { type: '/types/cell' }, body: cell }
     },
     put: async (h, body) => {
       const lattice = lattices[body.lattice]
-      if (!lattice) return { headers: { status: 400 }, body: { error: `Unknown lattice: ${body.lattice}` } }
+      if (!lattice) return { headers: { condition: 'invalid', message: `Unknown lattice: ${body.lattice}` }, body: null }
       cells.set(h.params.name, { lattice: body.lattice, value: lattice.initial })
       return { headers: {}, body: { lattice: body.lattice, value: lattice.initial } }
     }
@@ -68,12 +68,12 @@ export const createCells = () => {
   const valueResource = resource({
     get: async (h) => {
       const cell = cells.get(h.params.name)
-      if (!cell) return { headers: { status: 404 }, body: null }
+      if (!cell) return { headers: { condition: 'not-found' }, body: null }
       return { headers: { type: '/types/cell-value' }, body: cell.value }
     },
     put: async (h, body) => {
       const cell = cells.get(h.params.name)
-      if (!cell) return { headers: { status: 404 }, body: null }
+      if (!cell) return { headers: { condition: 'not-found' }, body: null }
 
       const lattice = lattices[cell.lattice]
       const oldValue = cell.value

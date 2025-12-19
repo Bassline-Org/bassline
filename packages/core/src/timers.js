@@ -60,7 +60,7 @@ export const createTimers = () => {
       '': resource({
         get: async (h) => {
           const timer = timers.get(h.params.name)
-          if (!timer) return { headers: { status: 404 }, body: null }
+          if (!timer) return { headers: { condition: 'not-found' }, body: null }
           return { headers: { type: '/types/timer' }, body: timer.config }
         },
         put: async (h, body) => {
@@ -87,7 +87,7 @@ export const createTimers = () => {
       start: resource({
         put: async (h) => {
           const timer = timers.get(h.params.name)
-          if (!timer) return { headers: { status: 404 }, body: null }
+          if (!timer) return { headers: { condition: 'not-found' }, body: null }
           const kit = h.kit ?? timer.kit
           if (kit) startTimer(h.params.name, timer.config, kit)
           return { headers: {}, body: timer.config }
@@ -97,7 +97,7 @@ export const createTimers = () => {
       stop: resource({
         put: async (h) => {
           const timer = timers.get(h.params.name)
-          if (!timer) return { headers: { status: 404 }, body: null }
+          if (!timer) return { headers: { condition: 'not-found' }, body: null }
           stopTimer(h.params.name)
           return { headers: {}, body: timer.config }
         }

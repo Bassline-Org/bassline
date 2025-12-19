@@ -34,7 +34,7 @@ export const createPropagators = () => {
       '': resource({
         get: async (h) => {
           const prop = propagators.get(h.params.name)
-          if (!prop) return { headers: { status: 404 }, body: null }
+          if (!prop) return { headers: { condition: 'not-found' }, body: null }
           return { headers: { type: '/types/propagator' }, body: prop }
         },
         put: async (h, body) => {
@@ -46,8 +46,8 @@ export const createPropagators = () => {
       run: resource({
         put: async (h) => {
           const prop = propagators.get(h.params.name)
-          if (!prop) return { headers: { status: 404 }, body: null }
-          if (!h.kit) return { headers: { status: 500 }, body: { error: 'no kit' } }
+          if (!prop) return { headers: { condition: 'not-found' }, body: null }
+          if (!h.kit) return { headers: { condition: 'error', message: 'no kit' }, body: null }
 
           // Get all input values via kit (semantic paths)
           const inputValues = await Promise.all(
@@ -59,7 +59,7 @@ export const createPropagators = () => {
           const fn = fnResult.body
 
           if (typeof fn !== 'function') {
-            return { headers: { status: 500 }, body: { error: 'fn is not a function' } }
+            return { headers: { condition: 'error', message: 'fn is not a function' }, body: null }
           }
 
           // Compute result
