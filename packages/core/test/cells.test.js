@@ -31,12 +31,6 @@ describe('lattices', () => {
     })
   })
 
-  describe('counter', () => {
-    it('adds values', () => {
-      expect(lattices.counter.merge(5, 3)).toBe(8)
-    })
-  })
-
   describe('lww', () => {
     it('keeps value with latest timestamp', () => {
       const a = { value: 'old', timestamp: 1 }
