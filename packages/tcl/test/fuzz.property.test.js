@@ -19,14 +19,14 @@ function createSafeRuntime() {
 
 describe('Fuzz Testing', () => {
   describe('Random Input', () => {
-    it('handles random alphanumeric strings', () => {
+    it('handles random alphanumeric strings', async () => {
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.string({ unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789 \n'.split('')), maxLength: 30 }),
-          input => {
+          async input => {
             const rt = createSafeRuntime()
             try {
-              rt.run(input)
+              await rt.run(input)
             } catch (err) {
               expect(err).toBeInstanceOf(Error)
             }
@@ -37,66 +37,14 @@ describe('Fuzz Testing', () => {
       )
     })
 
-    it('handles random braces', () => {
+    it('handles random braces', async () => {
       fc.assert(
-        fc.property(fc.array(fc.constantFrom('{', '}', 'x', ' '), { minLength: 1, maxLength: 15 }), chars => {
-          const rt = createSafeRuntime()
-          try {
-            rt.run(chars.join(''))
-          } catch (err) {
-            expect(err).toBeInstanceOf(Error)
-          }
-          return true
-        }),
-        { numRuns: 15 }
-      )
-    })
-
-    it('handles random brackets', () => {
-      fc.assert(
-        fc.property(fc.array(fc.constantFrom('[', ']', 'x', ' '), { minLength: 1, maxLength: 15 }), chars => {
-          const rt = createSafeRuntime()
-          try {
-            rt.run(chars.join(''))
-          } catch (err) {
-            expect(err).toBeInstanceOf(Error)
-          }
-          return true
-        }),
-        { numRuns: 15 }
-      )
-    })
-
-    it('handles random dollar signs', () => {
-      fc.assert(
-        fc.property(fc.array(fc.constantFrom('$', 'x', ' ', '{', '}'), { minLength: 1, maxLength: 15 }), chars => {
-          const rt = createSafeRuntime()
-          try {
-            rt.run(chars.join(''))
-          } catch (err) {
-            expect(err).toBeInstanceOf(Error)
-          }
-          return true
-        }),
-        { numRuns: 15 }
-      )
-    })
-  })
-
-  describe('Grammar-based', () => {
-    it('random set commands', () => {
-      fc.assert(
-        fc.property(
-          fc.string({ unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz_'.split('')), minLength: 1, maxLength: 8 }),
-          fc.string({
-            unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789'.split('')),
-            minLength: 1,
-            maxLength: 10,
-          }),
-          (name, value) => {
+        fc.asyncProperty(
+          fc.array(fc.constantFrom('{', '}', 'x', ' '), { minLength: 1, maxLength: 15 }),
+          async chars => {
             const rt = createSafeRuntime()
             try {
-              rt.run(`set ${name} {${value}}`)
+              await rt.run(chars.join(''))
             } catch (err) {
               expect(err).toBeInstanceOf(Error)
             }
@@ -107,12 +55,73 @@ describe('Fuzz Testing', () => {
       )
     })
 
-    it('random expr commands', () => {
+    it('handles random brackets', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: -50, max: 50 }), fc.integer({ min: -50, max: 50 }), (a, b) => {
+        fc.asyncProperty(
+          fc.array(fc.constantFrom('[', ']', 'x', ' '), { minLength: 1, maxLength: 15 }),
+          async chars => {
+            const rt = createSafeRuntime()
+            try {
+              await rt.run(chars.join(''))
+            } catch (err) {
+              expect(err).toBeInstanceOf(Error)
+            }
+            return true
+          }
+        ),
+        { numRuns: 15 }
+      )
+    })
+
+    it('handles random dollar signs', async () => {
+      fc.assert(
+        fc.asyncProperty(
+          fc.array(fc.constantFrom('$', 'x', ' ', '{', '}'), { minLength: 1, maxLength: 15 }),
+          async chars => {
+            const rt = createSafeRuntime()
+            try {
+              await rt.run(chars.join(''))
+            } catch (err) {
+              expect(err).toBeInstanceOf(Error)
+            }
+            return true
+          }
+        ),
+        { numRuns: 15 }
+      )
+    })
+  })
+
+  describe('Grammar-based', () => {
+    it('random set commands', async () => {
+      fc.assert(
+        fc.asyncProperty(
+          fc.string({ unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz_'.split('')), minLength: 1, maxLength: 8 }),
+          fc.string({
+            unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789'.split('')),
+            minLength: 1,
+            maxLength: 10,
+          }),
+          async (name, value) => {
+            const rt = createSafeRuntime()
+            try {
+              await rt.run(`set ${name} {${value}}`)
+            } catch (err) {
+              expect(err).toBeInstanceOf(Error)
+            }
+            return true
+          }
+        ),
+        { numRuns: 15 }
+      )
+    })
+
+    it('random expr commands', async () => {
+      fc.assert(
+        fc.asyncProperty(fc.integer({ min: -50, max: 50 }), fc.integer({ min: -50, max: 50 }), async (a, b) => {
           const rt = createSafeRuntime()
           try {
-            rt.run(`expr {${a} + ${b}}`)
+            await rt.run(`expr {${a} + ${b}}`)
           } catch (err) {
             expect(err).toBeInstanceOf(Error)
           }
@@ -135,21 +144,21 @@ describe('Fuzz Testing', () => {
   })
 
   describe('Stress', () => {
-    it('handles rapid variable creation', () => {
+    it('handles rapid variable creation', async () => {
       const rt = createSafeRuntime()
-      for (let i = 0; i < 50; i++) rt.run(`set v${i} ${i}`)
+      for (let i = 0; i < 50; i++) await rt.run(`set v${i} ${i}`)
       expect(rt.getVar('v0')).toBe('0')
       expect(rt.getVar('v49')).toBe('49')
     })
 
-    it('handles nested if statements', () => {
+    it('handles nested if statements', async () => {
       const rt = createSafeRuntime()
       const depth = 10
       let script = 'set x 0\n'
       for (let i = 0; i < depth; i++) script += 'if {1} {\n'
       script += 'set x done\n'
       for (let i = 0; i < depth; i++) script += '}\n'
-      rt.run(script)
+      await rt.run(script)
       expect(rt.getVar('x')).toBe('done')
     })
   })

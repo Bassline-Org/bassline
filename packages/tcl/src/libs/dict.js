@@ -160,7 +160,7 @@ export const dict = {
   'dict size': ([dictStr]) => String(parseDict(dictStr).size),
 
   // dict for {keyVar valVar} dict body - iterate
-  'dict for': ([varsStr, dictStr, body], rt) => {
+  'dict for': async ([varsStr, dictStr, body], rt) => {
     const vars = parseList(varsStr)
     if (vars.length !== 2) {
       throw new Error('dict for: must have exactly two variable names')
@@ -173,7 +173,7 @@ export const dict = {
       rt.setVar(keyVar, key)
       rt.setVar(valVar, value)
       try {
-        result = rt.run(body)
+        result = await rt.run(body)
       } catch (e) {
         if (e === RC.BREAK) break
         if (e !== RC.CONTINUE) throw e
@@ -183,7 +183,7 @@ export const dict = {
   },
 
   // dict map {keyVar valVar} dict body - functional map
-  'dict map': ([varsStr, dictStr, body], rt) => {
+  'dict map': async ([varsStr, dictStr, body], rt) => {
     const vars = parseList(varsStr)
     if (vars.length !== 2) {
       throw new Error('dict map: must have exactly two variable names')
@@ -196,7 +196,7 @@ export const dict = {
       rt.setVar(keyVar, key)
       rt.setVar(valVar, value)
       try {
-        const newValue = rt.run(body)
+        const newValue = await rt.run(body)
         result.set(key, newValue)
       } catch (e) {
         if (e === RC.BREAK) break
@@ -207,7 +207,7 @@ export const dict = {
   },
 
   // dict filter dict filterType arg - filter entries
-  'dict filter': (args, rt) => {
+  'dict filter': async (args, rt) => {
     const [dictStr, filterType, ...rest] = args
     const dict = parseDict(dictStr)
     const result = new Map()
@@ -231,7 +231,7 @@ export const dict = {
       for (const [key, value] of dict) {
         rt.setVar(keyVar, key)
         rt.setVar(valVar, value)
-        const scriptResult = rt.run(script)
+        const scriptResult = await rt.run(script)
         if (scriptResult !== '0' && scriptResult !== '') {
           result.set(key, value)
         }
@@ -333,7 +333,7 @@ export const dict = {
   },
 
   // dict update varName key varName ... body - local vars for keys
-  'dict update': (args, rt) => {
+  'dict update': async (args, rt) => {
     const varName = args[0]
     const body = args[args.length - 1]
     const mappings = args.slice(1, -1)
@@ -359,7 +359,7 @@ export const dict = {
     let controlFlowException = null
 
     try {
-      result = rt.run(body)
+      result = await rt.run(body)
     } catch (e) {
       if (e === RC.RETURN || e === RC.BREAK || e === RC.CONTINUE) {
         controlFlowException = e
@@ -390,7 +390,7 @@ export const dict = {
   },
 
   // dict with varName ?key ...? body - expose keys as vars
-  'dict with': (args, rt) => {
+  'dict with': async (args, rt) => {
     const varName = args[0]
     const body = args[args.length - 1]
     const keys = args.slice(1, -1)
@@ -414,7 +414,7 @@ export const dict = {
     let controlFlowException = null
 
     try {
-      result = rt.run(body)
+      result = await rt.run(body)
     } catch (e) {
       if (e === RC.RETURN || e === RC.BREAK || e === RC.CONTINUE) {
         controlFlowException = e

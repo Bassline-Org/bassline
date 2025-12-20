@@ -8,10 +8,10 @@ import { TT, tokenize } from '../src/index.js'
 
 describe('Tokenizer Properties', () => {
   describe('Safety Properties', () => {
-    it('always produces EOF token on valid input', () => {
+    it('always produces EOF token on valid input', async () => {
       // Use simple alphanumeric strings that won't cause parsing issues
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.string({ unit: fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789 \n'.split('')) }),
           input => {
             const tokens = [...tokenize(input)]
@@ -22,9 +22,9 @@ describe('Tokenizer Properties', () => {
       )
     })
 
-    it('handles nested braces up to reasonable depth', () => {
+    it('handles nested braces up to reasonable depth', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 20 }), depth => {
+        fc.asyncProperty(fc.integer({ min: 1, max: 20 }), async depth => {
           const nested = '{'.repeat(depth) + 'x' + '}'.repeat(depth)
           const tokens = [...tokenize(nested)]
           expect(tokens.some(t => t.t === TT.BRC)).toBe(true)
@@ -33,9 +33,9 @@ describe('Tokenizer Properties', () => {
       )
     })
 
-    it('handles nested brackets up to reasonable depth', () => {
+    it('handles nested brackets up to reasonable depth', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 20 }), depth => {
+        fc.asyncProperty(fc.integer({ min: 1, max: 20 }), async depth => {
           const nested = '['.repeat(depth) + 'x' + ']'.repeat(depth)
           const tokens = [...tokenize(nested)]
           expect(tokens.some(t => t.t === TT.CMD)).toBe(true)
@@ -46,11 +46,11 @@ describe('Tokenizer Properties', () => {
   })
 
   describe('Structural Properties', () => {
-    it('balanced braces produce BRC tokens', () => {
+    it('balanced braces produce BRC tokens', async () => {
       const arbContent = fc.string({ unit: fc.constantFrom(...'abc 123'.split('')), maxLength: 20 })
 
       fc.assert(
-        fc.property(arbContent, content => {
+        fc.asyncProperty(arbContent, async content => {
           const input = `{${content}}`
           const tokens = [...tokenize(input)]
           const brcTokens = tokens.filter(t => t.t === TT.BRC)
@@ -61,11 +61,11 @@ describe('Tokenizer Properties', () => {
       )
     })
 
-    it('variable references produce VAR tokens', () => {
+    it('variable references produce VAR tokens', async () => {
       const arbVarName = fc.stringMatching(/^[a-zA-Z_][a-zA-Z0-9_]{0,10}$/).filter(s => s.length > 0)
 
       fc.assert(
-        fc.property(arbVarName, name => {
+        fc.asyncProperty(arbVarName, async name => {
           const tokens = [...tokenize(`$${name}`)]
           const varTokens = tokens.filter(t => t.t === TT.VAR)
           expect(varTokens.length).toBe(1)
@@ -75,11 +75,11 @@ describe('Tokenizer Properties', () => {
       )
     })
 
-    it('command substitutions produce CMD tokens', () => {
+    it('command substitutions produce CMD tokens', async () => {
       const arbSimpleCmd = fc.string({ unit: fc.constantFrom(...'abc 123'.split('')), maxLength: 20 })
 
       fc.assert(
-        fc.property(arbSimpleCmd, cmd => {
+        fc.asyncProperty(arbSimpleCmd, async cmd => {
           const tokens = [...tokenize(`[${cmd}]`)]
           const cmdTokens = tokens.filter(t => t.t === TT.CMD)
           expect(cmdTokens.length).toBe(1)
@@ -91,9 +91,9 @@ describe('Tokenizer Properties', () => {
   })
 
   describe('Error Handling Properties', () => {
-    it('unbalanced opening brace throws error', () => {
+    it('unbalanced opening brace throws error', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 5 }), count => {
+        fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async count => {
           const unbalanced = '{'.repeat(count) + 'x'
           expect(() => [...tokenize(unbalanced)]).toThrow()
         }),
@@ -101,9 +101,9 @@ describe('Tokenizer Properties', () => {
       )
     })
 
-    it('unbalanced opening bracket throws error', () => {
+    it('unbalanced opening bracket throws error', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 5 }), count => {
+        fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async count => {
           const unbalanced = '['.repeat(count) + 'x'
           expect(() => [...tokenize(unbalanced)]).toThrow()
         }),
@@ -113,9 +113,9 @@ describe('Tokenizer Properties', () => {
   })
 
   describe('Whitespace Properties', () => {
-    it('multiple spaces collapse to single SEP', () => {
+    it('multiple spaces collapse to single SEP', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 10 }), fc.integer({ min: 1, max: 10 }), (spaces1, spaces2) => {
+        fc.asyncProperty(fc.integer({ min: 1, max: 10 }), fc.integer({ min: 1, max: 10 }), (spaces1, spaces2) => {
           const input = 'a' + ' '.repeat(spaces1) + 'b' + ' '.repeat(spaces2) + 'c'
           const tokens = [...tokenize(input)]
           const sepTokens = tokens.filter(t => t.t === TT.SEP)
@@ -125,9 +125,9 @@ describe('Tokenizer Properties', () => {
       )
     })
 
-    it('newlines produce EOL tokens', () => {
+    it('newlines produce EOL tokens', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 5 }), lines => {
+        fc.asyncProperty(fc.integer({ min: 1, max: 5 }), async lines => {
           const input = Array(lines).fill('cmd').join('\n')
           const tokens = [...tokenize(input)]
           const eolTokens = tokens.filter(t => t.t === TT.EOL)

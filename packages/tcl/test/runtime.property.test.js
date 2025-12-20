@@ -31,12 +31,12 @@ const arbSafeValue = fc.string({
 
 describe('Runtime Properties', () => {
   describe('Safety Properties', () => {
-    it('handles simple commands without crashing', () => {
+    it('handles simple commands without crashing', async () => {
       fc.assert(
-        fc.property(arbVarName, arbSafeValue, (name, value) => {
+        fc.asyncProperty(arbVarName, arbSafeValue, async (name, value) => {
           const rt = createRuntime()
           try {
-            rt.run(`set ${name} ${value}`)
+            await rt.run(`set ${name} ${value}`)
           } catch (err) {
             expect(err).toBeInstanceOf(Error)
           }
@@ -45,13 +45,13 @@ describe('Runtime Properties', () => {
       )
     })
 
-    it('errors are Error instances', () => {
+    it('errors are Error instances', async () => {
       const rt = createRuntime()
       const badScripts = ['nonexistent_cmd', '{unclosed', '[unclosed']
 
       for (const script of badScripts) {
         try {
-          rt.run(script)
+          await rt.run(script)
         } catch (err) {
           expect(err).toBeInstanceOf(Error)
         }
@@ -60,24 +60,24 @@ describe('Runtime Properties', () => {
   })
 
   describe('Variable Properties', () => {
-    it('set then get returns same value', () => {
+    it('set then get returns same value', async () => {
       fc.assert(
-        fc.property(arbVarName, arbSafeValue, (name, value) => {
+        fc.asyncProperty(arbVarName, arbSafeValue, async (name, value) => {
           const rt = createRuntime()
-          rt.run(`set ${name} {${value}}`)
+          await rt.run(`set ${name} {${value}}`)
           expect(rt.getVar(name)).toBe(value)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('variables are independent', () => {
+    it('variables are independent', async () => {
       fc.assert(
-        fc.property(arbVarName, arbVarName, arbSafeValue, arbSafeValue, (name1, name2, value1, value2) => {
+        fc.asyncProperty(arbVarName, arbVarName, arbSafeValue, arbSafeValue, async (name1, name2, value1, value2) => {
           fc.pre(name1 !== name2)
           const rt = createRuntime()
-          rt.run(`set ${name1} {${value1}}`)
-          rt.run(`set ${name2} {${value2}}`)
+          await rt.run(`set ${name1} {${value1}}`)
+          await rt.run(`set ${name2} {${value2}}`)
           expect(rt.getVar(name1)).toBe(value1)
           expect(rt.getVar(name2)).toBe(value2)
         }),
@@ -85,12 +85,12 @@ describe('Runtime Properties', () => {
       )
     })
 
-    it('overwriting variable updates value', () => {
+    it('overwriting variable updates value', async () => {
       fc.assert(
-        fc.property(arbVarName, arbSafeValue, arbSafeValue, (name, value1, value2) => {
+        fc.asyncProperty(arbVarName, arbSafeValue, arbSafeValue, async (name, value1, value2) => {
           const rt = createRuntime()
-          rt.run(`set ${name} {${value1}}`)
-          rt.run(`set ${name} {${value2}}`)
+          await rt.run(`set ${name} {${value1}}`)
+          await rt.run(`set ${name} {${value2}}`)
           expect(rt.getVar(name)).toBe(value2)
         }),
         { numRuns: 20 }
@@ -99,33 +99,33 @@ describe('Runtime Properties', () => {
   })
 
   describe('Control Flow Properties', () => {
-    it('if with true condition executes then branch', () => {
+    it('if with true condition executes then branch', async () => {
       fc.assert(
-        fc.property(arbSafeValue, arbSafeValue, (thenVal, elseVal) => {
+        fc.asyncProperty(arbSafeValue, arbSafeValue, async (thenVal, elseVal) => {
           const rt = createRuntime()
-          rt.run(`if {1} {set result {${thenVal}}} else {set result {${elseVal}}}`)
+          await rt.run(`if {1} {set result {${thenVal}}} else {set result {${elseVal}}}`)
           expect(rt.getVar('result')).toBe(thenVal)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('if with false condition executes else branch', () => {
+    it('if with false condition executes else branch', async () => {
       fc.assert(
-        fc.property(arbSafeValue, arbSafeValue, (thenVal, elseVal) => {
+        fc.asyncProperty(arbSafeValue, arbSafeValue, async (thenVal, elseVal) => {
           const rt = createRuntime()
-          rt.run(`if {0} {set result {${thenVal}}} else {set result {${elseVal}}}`)
+          await rt.run(`if {0} {set result {${thenVal}}} else {set result {${elseVal}}}`)
           expect(rt.getVar('result')).toBe(elseVal)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('while loop executes correct number of times', () => {
+    it('while loop executes correct number of times', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 10 }), count => {
+        fc.asyncProperty(fc.integer({ min: 0, max: 10 }), async count => {
           const rt = createRuntime()
-          rt.run(`
+          await rt.run(`
             set i 0
             set sum 0
             while {$i < ${count}} { incr sum; incr i }
@@ -136,11 +136,11 @@ describe('Runtime Properties', () => {
       )
     })
 
-    it('for loop executes correct number of times', () => {
+    it('for loop executes correct number of times', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 10 }), count => {
+        fc.asyncProperty(fc.integer({ min: 0, max: 10 }), async count => {
           const rt = createRuntime()
-          rt.run(`
+          await rt.run(`
             set sum 0
             for {set i 0} {$i < ${count}} {incr i} { incr sum }
           `)
@@ -152,32 +152,32 @@ describe('Runtime Properties', () => {
   })
 
   describe('Error Handling Properties', () => {
-    it('catch returns 0 on success', () => {
+    it('catch returns 0 on success', async () => {
       const rt = createRuntime()
-      const result = rt.run('catch {set x 1}')
+      const result = await rt.run('catch {set x 1}')
       expect(result).toBe('0')
     })
 
-    it('catch returns 1 on error', () => {
+    it('catch returns 1 on error', async () => {
       const rt = createRuntime()
-      const result = rt.run('catch {error "test error"}')
+      const result = await rt.run('catch {error "test error"}')
       expect(result).toBe('1')
     })
 
-    it('catch stores result in variable', () => {
+    it('catch stores result in variable', async () => {
       const rt = createRuntime()
-      rt.run('catch {set x hello} result')
+      await rt.run('catch {set x hello} result')
       expect(rt.getVar('result')).toBe('hello')
     })
   })
 
   describe('Incr Properties', () => {
-    it('incr adds increment value', () => {
+    it('incr adds increment value', async () => {
       fc.assert(
-        fc.property(fc.integer({ min: -50, max: 50 }), fc.integer({ min: -50, max: 50 }), (start, inc) => {
+        fc.asyncProperty(fc.integer({ min: -50, max: 50 }), fc.integer({ min: -50, max: 50 }), async (start, inc) => {
           const rt = createRuntime()
-          rt.run(`set x ${start}`)
-          rt.run(`incr x ${inc}`)
+          await rt.run(`set x ${start}`)
+          await rt.run(`incr x ${inc}`)
           expect(rt.getVar('x')).toBe(String(start + inc))
         }),
         { numRuns: 20 }
