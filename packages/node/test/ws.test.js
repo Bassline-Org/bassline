@@ -42,17 +42,18 @@ describe('createWsServer', () => {
   async function connect(port) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(`ws://localhost:${port}`)
+      ws.setMaxListeners(25) // Allow concurrent sendMsg calls in tests
       const timeout = setTimeout(() => {
         ws.close()
         reject(new Error('Connection timeout'))
       }, 2000)
 
-      ws.on('open', () => {
+      ws.once('open', () => {
         clearTimeout(timeout)
         activeClients.push(ws)
         resolve(ws)
       })
-      ws.on('error', err => {
+      ws.once('error', err => {
         clearTimeout(timeout)
         reject(err)
       })
@@ -152,7 +153,7 @@ describe('createWsServer', () => {
 
       const client = await connect(testPort)
       let closed = false
-      client.on('close', () => {
+      client.once('close', () => {
         closed = true
       })
 
@@ -211,7 +212,7 @@ describe('createWsServer', () => {
       const client = await connect(testPort)
 
       const response = await new Promise(resolve => {
-        client.on('message', data => resolve(JSON.parse(data.toString())))
+        client.once('message', data => resolve(JSON.parse(data.toString())))
         client.send('{ invalid json }')
       })
 
@@ -229,10 +230,11 @@ describe('createWsServer', () => {
       const client2 = await connect(testPort)
 
       const received = { c1: null, c2: null }
-      client1.on('message', data => {
+      // Use once to avoid listener accumulation
+      client1.once('message', data => {
         received.c1 = JSON.parse(data.toString())
       })
-      client2.on('message', data => {
+      client2.once('message', data => {
         received.c2 = JSON.parse(data.toString())
       })
 
@@ -414,7 +416,7 @@ describe('createWsServer', () => {
 
       const clients = await Promise.all([connect(testPort), connect(testPort), connect(testPort)])
 
-      const closedPromises = clients.map(c => new Promise(resolve => c.on('close', resolve)))
+      const closedPromises = clients.map(c => new Promise(resolve => c.once('close', resolve)))
 
       await wsServer.put({ path: `/${testPort}/stop` })
       await Promise.all(closedPromises)

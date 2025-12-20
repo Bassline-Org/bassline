@@ -1,21 +1,14 @@
 // Token Types
 export const TT = {
-  // An escaped character / sequence: \n
-  ESC: Symbol('ESC'),
-  // A double quote delimited string: "hello $world"
-  STR: Symbol('STR'),
-  // A bracket delimited string: [command]
-  CMD: Symbol('CMD'),
-  // A variable reference: $foo
-  VAR: Symbol('VAR'),
-  // An array reference: $foo(index)
-  ARR: Symbol('ARR'),
-  // A horizontal seperator: space, tab
-  SEP: Symbol('SEP'),
-  // A command terminator: newline or semicolon
-  EOL: Symbol('EOL'),
-  // End of file
-  EOF: Symbol('EOF'),
+  STR: Symbol('STR'), // Bare word or literal part of quoted string
+  BRC: Symbol('BRC'), // Braced string {literal} - NO substitution
+  CMD: Symbol('CMD'), // Command substitution [...]
+  VAR: Symbol('VAR'), // Variable $name
+  ARR: Symbol('ARR'), // Array $name(index)
+  ESC: Symbol('ESC'), // Backslash escape \x
+  SEP: Symbol('SEP'), // Word separator
+  EOL: Symbol('EOL'), // Command terminator
+  EOF: Symbol('EOF'), // End of input
 }
 
 // Return Cases
@@ -24,6 +17,7 @@ export const RC = { BREAK: Symbol('BREAK'), CONTINUE: Symbol('CONTINUE'), RETURN
 export function* tokenize(src) {
   // mutable state
   let i = 0,
+    start = 0,
     type = TT.EOL,
     quoted = false
 
@@ -52,52 +46,17 @@ export function* tokenize(src) {
         i++
       }
       if (depth > 0) throw new Error(`Unbalanced delimiter: ${open}, expected ${close} starting at ${start}`)
-      return src.slice(start, i++)
+      return src.slice(start, i - 1)
     }
 
-  const handlers = {
-    ' ': () => !quoted && (skip(ws), [TT.SEP]),
-    '\t': () => !quoted && (skip(ws), [TT.SEP]),
-    '\r': () => !quoted && (skip(ws), [TT.SEP]),
-    '\n': () => !quoted && (skip(c => ws(c) || eol(c)), [TT.EOL]),
-    ';': () => !quoted && (skip(c => ws(c) || eol(c)), [TT.EOL]),
-    '[': () => [TT.CMD, balanced('[', ']')],
-    $: () => {
-      i++
+  // Check if char is a word-break (ends a bare word)
+  const isWordBreak = c => ws(c) || eol(c) || '[]$"\\'.includes(c)
 
-      // ${name} braced form, NO SUBSTITUTION IN NAME!
-      if (peek() === '{') {
-        // unlike normal braces, they cannot contain nested braces
-        const name = take(c => c !== '}')
-        // Check for arrayName(index) form
-        const arrMatch = name.match(/^([^(}]+)\(([^}]+)\)$/)
-        if (arrMatch) {
-          return [TT.ARR, { name: arrMatch[1], index: arrMatch[2], literal: true }]
-        }
-        return [TT.VAR, name]
-      }
-
-      const name = take(c => /[a-zA-Z0-9_]/.test(c) || c === ':')
-      if (!name) return [TT.STR, '$']
-
-      // $name(index), unbraced form for array access, substitution performed on index
-      if (peek() === '(') {
-        // The index also cannot contain nested parentheses
-        const index = take(c => c !== ')')
-        return [TT.ARR, { name, index, literal: false }]
-      }
-
-      // $name, unbraced form for scalar access, name will be substituted
-      return [TT.VAR, name]
-    },
-    '{': () => (type === TT.SEP || type === TT.EOL) && [TT.STR, balanced('{', '}')],
-    '"': () => {
-      if (!(type === TT.SEP || type === TT.EOL) && quoted) return null
-      quoted = true
-      i++
-      return null
-    },
-    '#': () => type === TT.EOL && (skip(c => c !== '\n'), null),
+  // Flush accumulated quoted string content before a substitution
+  const flushQuoted = function* () {
+    if (quoted && i > start) {
+      yield { t: TT.STR, v: src.slice(start, i) }
+    }
   }
 
   while (!done()) {
@@ -105,28 +64,144 @@ export function* tokenize(src) {
 
     if (!quoted && ws(char)) {
       skip(ws)
-      yield { t: TT.SEP }
+      type = TT.SEP
+      start = i
+      yield { t: type }
       continue
     }
 
     if (!quoted && eol(char)) {
       skip(c => ws(c) || eol(c))
-      yield { t: TT.EOL }
+      type = TT.EOL
+      start = i
+      yield { t: type }
       continue
     }
 
-    // Try handler for current character
-    const handler = handlers[char]
-    if (handler) {
-      const tok = handler()
-      if (tok) {
-        type = tok[0]
-        yield { t: type, v: tok[1] }
+    // Rule 10: Comments only at start of command
+    if (!quoted && char === '#' && type === TT.EOL) {
+      skip(c => c !== '\n')
+      continue
+    }
+
+    if (char === '[') {
+      yield* flushQuoted()
+      type = TT.CMD
+      yield { t: TT.CMD, v: balanced('[', ']') }
+      start = i // update start for next quoted segment
+      continue
+    }
+
+    // Unmatched ] outside of command substitution - treat as literal or error
+    if (char === ']') {
+      if (quoted) {
+        // Inside quoted string, just accumulate
+        i++
+        continue
+      }
+      // Outside quotes, treat as literal string token
+      type = TT.STR
+      yield { t: TT.STR, v: ']' }
+      i++
+      continue
+    }
+
+    if (char === '{') {
+      if (!(type === TT.SEP || type === TT.EOL)) {
+        i++
+        continue
+      }
+      type = TT.BRC
+      yield { t: TT.BRC, v: balanced('{', '}') }
+      continue
+    }
+
+    if (char === '"') {
+      if (quoted) {
+        type = TT.STR
+        yield { t: type, v: src.slice(start, i) }
+        quoted = false
+      } else {
+        quoted = true
+        start = i + 1 // start after the opening quote
+      }
+      i++
+      continue
+    }
+
+    if (char === '$') {
+      yield* flushQuoted()
+      i++
+
+      // ${name} braced form, NO SUBSTITUTION IN NAME!
+      if (peek() === '{') {
+        i++ // skip {
+        // unlike normal braces, they cannot contain nested braces
+        const name = take(c => c !== '}')
+        i++ // skip }
+        // Check for arrayName(index) form
+        const arrMatch = name.match(/^([^(}]+)\(([^}]+)\)$/)
+        if (arrMatch) {
+          type = TT.ARR
+          yield { t: TT.ARR, v: { name: arrMatch[1], index: arrMatch[2], literal: true } }
+          start = i
+          continue
+        }
+        type = TT.VAR
+        yield { t: TT.VAR, v: name }
+        start = i
+        continue
+      }
+
+      const name = take(c => /[a-zA-Z0-9_]/.test(c) || c === ':' || c === '/')
+      if (!name) {
+        type = TT.STR
+        yield { t: TT.STR, v: '$' }
+        start = i
+        continue
+      }
+
+      // $name(index), unbraced form for array access, substitution performed on index
+      if (peek() === '(') {
+        i++ // skip (
+        // The index also cannot contain nested parentheses
+        const index = take(c => c !== ')')
+        i++ // skip )
+        type = TT.ARR
+        yield { t: TT.ARR, v: { name, index, literal: false } }
+        start = i
+        continue
+      }
+
+      // $name, unbraced form for scalar access, name will be substituted
+      type = TT.VAR
+      yield { t: TT.VAR, v: name }
+      start = i
+      continue
+    }
+
+    // Rule 9: Backslash substitution
+    if (char === '\\') {
+      yield* flushQuoted()
+      type = TT.ESC
+      yield { t: TT.ESC, v: src.slice(i, i + 2) }
+      i += 2
+      start = i
+      continue
+    }
+
+    // Default: consume bare word token
+    if (!quoted) {
+      const wordStart = i
+      while (!done() && !isWordBreak(peek())) i++
+      if (i > wordStart) {
+        type = TT.STR
+        yield { t: TT.STR, v: src.slice(wordStart, i) }
       }
       continue
     }
 
-    // Default: consume as string/word token
+    // Inside quoted string: accumulate chars
     i++
   }
 
