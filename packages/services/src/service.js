@@ -1,82 +1,68 @@
-import { routes } from '@bassline/core'
+import { resource, routes, bind } from '@bassline/core'
 
 /**
- * Create service registry routes for service discovery.
+ * Create service registry resource
  *
- * Services register themselves and expose their operations for introspection.
- * GET /services returns all services with their operation summaries.
+ * Routes:
+ *   GET  /           → list all registered services
+ *   GET  /:name      → get service info (delegates to registered service)
  *
- * @returns {object} Service routes and registration functions
+ * Services are registered as sub-resources at creation time.
  */
-export function createServiceRoutes() {
-  const services = new Map()  // name -> { service, info }
-  let _bl = null
-
-  const serviceRoutes = routes('/services', r => {
-    // List all registered services with operation summaries
-    r.get('/', async () => {
-      const entries = await Promise.all(
-        [...services.keys()].map(async name => {
-          try {
-            // Query each service for its info
-            const info = _bl ? await _bl.get(`bl:///services/${name}`) : null
-            const body = info?.body || {}
-
-            return {
-              name,
-              uri: `bl:///services/${name}`,
-              description: body.description,
-              version: body.version,
-              operations: body.operations?.map(op => ({
-                name: op.name,
-                method: op.method,
-                path: op.path,
-                description: op.description
-              }))
-            }
-          } catch {
-            // Service info not available
-            return {
-              name,
-              uri: `bl:///services/${name}`
-            }
-          }
-        })
-      )
-
-      return {
-        headers: { type: 'bl:///types/service-directory' },
-        body: { entries }
-      }
-    })
-  })
+export function createServices() {
+  const registry = new Map()
 
   return {
-    routes: serviceRoutes,
+    routes: routes({
+      '': resource({
+        get: async () => ({
+          headers: { type: '/types/service-directory' },
+          body: {
+            name: 'services',
+            description: 'Service registry',
+            resources: Object.fromEntries([...registry.keys()].map(name => [`/${name}`, {}])),
+          },
+        }),
+      }),
+
+      unknown: bind(
+        'name',
+        resource({
+          get: async h => {
+            const service = registry.get(h.params.name)
+            if (!service) return { headers: { condition: 'not-found' }, body: null }
+            return service.get({ ...h, path: '/' })
+          },
+
+          put: async (h, body) => {
+            const service = registry.get(h.params.name)
+            if (!service) return { headers: { condition: 'not-found' }, body: null }
+            return service.put({ ...h, path: '/' }, body)
+          },
+        })
+      ),
+    }),
+
     /**
-     * Register a service
+     * Register a service resource
      * @param {string} name - Service name
-     * @param {object} service - Service object with info and routes
+     * @param {object} serviceResource - Resource with get/put
      */
-    register: (name, service) => services.set(name, service),
+    register: (name, serviceResource) => {
+      registry.set(name, serviceResource)
+    },
+
     /**
      * Get a registered service
      * @param {string} name - Service name
-     * @returns {object|undefined}
      */
-    get: (name) => services.get(name),
+    get: name => registry.get(name),
+
     /**
      * List all registered service names
-     * @returns {string[]}
      */
-    list: () => [...services.keys()],
-    /**
-     * Install service routes into a Bassline instance
-     * @param {import('@bassline/core').Bassline} bl
-     */
-    install: (bl) => {
-      _bl = bl
-      bl.install(serviceRoutes)
-    }
+    list: () => [...registry.keys()],
   }
 }
+
+export default createServices

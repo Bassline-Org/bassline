@@ -1,0 +1,36 @@
+{
+  "source": {
+    "include": [
+      "packages/core/src",
+      "packages/cells/src",
+      "packages/handlers/src",
+      "packages/propagators/src",
+      "packages/plumber/src",
+      "packages/links/src",
+      "packages/types/src",
+      "packages/timers/src",
+      "packages/fetch/src",
+      "packages/monitors/src",
+      "packages/recipes/src",
+      "packages/dashboard/src",
+      "packages/trust/src",
+      "packages/services/src",
+      "packages/store-node/src",
+      "packages/server-node/src",
+      "packages/remote-browser/src",
+      "packages/database/src",
+      "packages/vals/src"
+    ],
+    "includePattern": ".+\\.js$",
+    "excludePattern": "(node_modules|test|\\.d\\.ts)"
+  },
+  "opts": {
+    "destination": "./docs",
+    "recurse": true
+  },
+  "plugins": ["plugins/markdown"],
+  "templates": {
+    "cleverLinks": true,
+    "monospaceLinks": true
+  }
+}

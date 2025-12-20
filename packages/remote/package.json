@@ -1,0 +1,23 @@
+{
+  "name": "@bassline/remote",
+  "version": "1.0.0",
+  "description": "WebSocket remote client for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@bassline/node": "workspace:*",
+    "vitest": "^2.0.0",
+    "ws": "^8.18.0"
+  },
+  "license": "AGPL-3.0"
+}

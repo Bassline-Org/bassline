@@ -13,7 +13,7 @@ export async function get(uri) {
 export async function put(uri, json) {
   const res = await fetch(`${BASE}?uri=${encodeURIComponent(uri)}`, {
     method: 'PUT',
-    body: json
+    body: json,
   })
   if (!res.ok) {
     console.error('Error:', await res.text())

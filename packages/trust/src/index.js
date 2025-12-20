@@ -1,40 +1,28 @@
-import { routes } from '@bassline/core'
+import { resource, routes, bind } from '@bassline/core'
 import { trustEstimate } from './lattices.js'
 
 /**
- * Create trust system routes and middleware
+ * Create trust system resource
  *
  * Routes:
- * - GET  /trust/peers           - List known peers
- * - GET  /trust/peers/:id       - Get trust info for peer
- * - PUT  /trust/observe         - Record an observation
- * - GET  /trust/thresholds      - Get capability thresholds
- * - PUT  /trust/thresholds      - Set capability thresholds
- *
- * @param {Object} options
- * @param {Object} [options.thresholds] - Capability thresholds { read: 0.2, write: 0.5, install: 0.8 }
- * @param {number} [options.sampleRate=0.1] - Fraction of requests to sample for verification
- * @returns {{ routes: import('@bassline/core').RouterBuilder, middleware: Function, checkCapability: Function, observe: Function }}
+ * GET  /peers           → list known peers
+ * GET  /peers/:id       → get trust info for peer
+ * PUT  /observe         → record an observation
+ * GET  /thresholds      → get capability thresholds
+ * PUT  /thresholds      → set capability thresholds
+ * @param {object} options
+ * @param {object} [options.thresholds] - { read: 0.2, write: 0.5, install: 0.8 }
  */
-export function createTrustSystem(options = {}) {
-  // In-memory peer trust store
-  // In a real system, this would be backed by cells
-  /** @type {Map<string, import('./lattices.js').TrustEstimate>} */
+export function createTrust(options = {}) {
   const peers = new Map()
 
-  // Capability thresholds
   let thresholds = {
-    read: 0.2,    // Low bar for reading
-    write: 0.5,   // Medium bar for writing
-    install: 0.8, // High bar for installing code
-    ...options.thresholds
+    read: 0.2,
+    write: 0.5,
+    install: 0.8,
+    ...options.thresholds,
   }
 
-  const sampleRate = options.sampleRate ?? 0.1
-
-  /**
-   * Get trust for a peer, creating initial if not exists
-   */
   function getTrust(peerId) {
     if (!peers.has(peerId)) {
       peers.set(peerId, trustEstimate.initial())
@@ -42,11 +30,6 @@ export function createTrustSystem(options = {}) {
     return peers.get(peerId)
   }
 
-  /**
-   * Record an observation for a peer
-   * @param {string} peerId - Peer identifier
-   * @param {number} outcome - 1 for positive, 0 for negative
-   */
   function observe(peerId, outcome) {
     const current = getTrust(peerId)
     const updated = trustEstimate.observe(current, outcome)
@@ -54,128 +37,109 @@ export function createTrustSystem(options = {}) {
     return updated
   }
 
-  /**
-   * Check if a peer can perform a capability
-   * @param {string} peerId - Peer identifier
-   * @param {string} capability - Capability name (read, write, install)
-   * @returns {boolean}
-   */
   function checkCapability(peerId, capability) {
-    // Anonymous/local requests always allowed
     if (!peerId) return true
-
     const threshold = thresholds[capability]
-    if (threshold === undefined) return true // Unknown capability = allow
-
+    if (threshold === undefined) return true
     const trust = getTrust(peerId)
     return trustEstimate.meetsThreshold(trust, threshold)
   }
 
-  /**
-   * Middleware for capability gating
-   * Checks trust before allowing requests through
-   */
-  function middleware(ctx, next) {
-    const peer = ctx.headers?.peer
-
-    // Determine required capability based on verb and URI
-    let capability = 'read'
-    if (ctx.verb === 'put') {
-      capability = ctx.uri?.includes('/install/') ? 'install' : 'write'
-    }
-
-    // Check capability
-    if (!checkCapability(peer, capability)) {
-      return {
-        headers: { type: 'bl:///types/error', error: 'insufficient-trust' },
+  const trustRoutes = routes({
+    '': resource({
+      get: async () => ({
+        headers: { type: '/types/trust-service' },
         body: {
-          message: `Peer ${peer} lacks trust for ${capability}`,
-          required: thresholds[capability],
-          current: peer ? getTrust(peer).value : null
-        }
-      }
-    }
+          name: 'trust',
+          description: 'Local trust computation and capability gating',
+          resources: {
+            '/peers': {},
+            '/thresholds': {},
+            '/observe': { method: 'PUT' },
+          },
+        },
+      }),
+    }),
 
-    // Random sampling for verification (non-blocking)
-    if (peer && Math.random() < sampleRate) {
-      // Could do async verification here and record outcome later
-      // For now, just record that we saw them (neutral observation)
-    }
+    peers: routes({
+      '': resource({
+        get: async () => ({
+          headers: { type: '/types/bassline' },
+          body: {
+            name: 'peers',
+            resources: Object.fromEntries(
+              [...peers.entries()].map(([id, trust]) => [
+                `/${id}`,
+                { ...trust, confidence: trustEstimate.confidenceInterval(trust) },
+              ])
+            ),
+          },
+        }),
+      }),
 
-    return next()
-  }
+      unknown: bind(
+        'id',
+        resource({
+          get: async h => {
+            const trust = getTrust(h.params.id)
+            return {
+              headers: { type: '/types/trust' },
+              body: {
+                id: h.params.id,
+                ...trust,
+                confidence: trustEstimate.confidenceInterval(trust),
+                capabilities: {
+                  read: trustEstimate.meetsThreshold(trust, thresholds.read),
+                  write: trustEstimate.meetsThreshold(trust, thresholds.write),
+                  install: trustEstimate.meetsThreshold(trust, thresholds.install),
+                },
+              },
+            }
+          },
+        })
+      ),
+    }),
 
-  // Build routes
-  const trustRoutes = routes('/trust', r => {
-    // List all known peers
-    r.get('/peers', () => ({
-      headers: { type: 'bl:///types/list' },
-      body: {
-        entries: [...peers.entries()].map(([id, trust]) => ({
-          id,
-          ...trust,
-          confidence: trustEstimate.confidenceInterval(trust)
-        }))
-      }
-    }))
-
-    // Get trust for specific peer
-    r.get('/peers/:id', ({ params }) => {
-      const trust = getTrust(params.id)
-      return {
-        headers: { type: 'bl:///types/trust' },
-        body: {
-          id: params.id,
-          ...trust,
-          confidence: trustEstimate.confidenceInterval(trust),
-          capabilities: {
-            read: trustEstimate.meetsThreshold(trust, thresholds.read),
-            write: trustEstimate.meetsThreshold(trust, thresholds.write),
-            install: trustEstimate.meetsThreshold(trust, thresholds.install)
+    observe: resource({
+      put: async (h, body) => {
+        const { peer, outcome } = body
+        if (!peer || outcome === undefined) {
+          return {
+            headers: { condition: 'invalid', message: 'peer and outcome required' },
+            body: null,
           }
         }
-      }
-    })
-
-    // Record an observation
-    r.put('/observe', ({ body }) => {
-      const { peer, outcome } = body
-      if (!peer || outcome === undefined) {
+        const updated = observe(peer, outcome)
         return {
-          headers: { type: 'bl:///types/error' },
-          body: { message: 'peer and outcome required' }
+          headers: { type: '/types/trust' },
+          body: { peer, ...updated },
         }
-      }
-      const updated = observe(peer, outcome)
-      return {
-        headers: { type: 'bl:///types/trust' },
-        body: { peer, ...updated }
-      }
-    })
+      },
+    }),
 
-    // Get thresholds
-    r.get('/thresholds', () => ({
-      headers: { type: 'bl:///types/config' },
-      body: thresholds
-    }))
+    thresholds: resource({
+      get: async () => ({
+        headers: { type: '/types/config' },
+        body: thresholds,
+      }),
 
-    // Set thresholds
-    r.put('/thresholds', ({ body }) => {
-      thresholds = { ...thresholds, ...body }
-      return {
-        headers: { type: 'bl:///types/config' },
-        body: thresholds
-      }
-    })
+      put: async (h, body) => {
+        thresholds = { ...thresholds, ...body }
+        return {
+          headers: { type: '/types/config' },
+          body: thresholds,
+        }
+      },
+    }),
   })
 
-  return {
-    routes: trustRoutes,
-    middleware,
-    checkCapability,
-    observe,
-    getTrust
-  }
+  // Expose helpers for middleware use
+  trustRoutes.checkCapability = checkCapability
+  trustRoutes.observe = observe
+  trustRoutes.getTrust = getTrust
+
+  return trustRoutes
 }
 
 export { trustEstimate } from './lattices.js'
+export default createTrust

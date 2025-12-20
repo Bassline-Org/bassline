@@ -1,0 +1,19 @@
+{
+  "name": "@bassline/database",
+  "version": "1.0.0",
+  "description": "Database service for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*",
+    "better-sqlite3": "^11.7.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  }
+}
