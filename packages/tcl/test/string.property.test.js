@@ -29,23 +29,23 @@ const arbNonEmptyString = fc.string({
 
 describe('String Properties', () => {
   describe('Length Properties', () => {
-    it('string length returns correct count', () => {
+    it('string length returns correct count', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const len = Number(rt.run(`string length {${str}}`))
+          const len = Number(await rt.run(`string length {${str}}`))
           expect(len).toBe(str.length)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('string concat length equals sum of lengths', () => {
+    it('string concat length equals sum of lengths', async () => {
       fc.assert(
-        fc.property(arbString, arbString, (s1, s2) => {
+        fc.asyncProperty(arbString, arbString, async (s1, s2) => {
           const rt = createRuntime()
-          const result = rt.run(`string concat {${s1}} {${s2}}`)
-          const resultLen = Number(rt.run(`string length {${result}}`))
+          const result = await rt.run(`string concat {${s1}} {${s2}}`)
+          const resultLen = Number(await rt.run(`string length {${result}}`))
 
           expect(resultLen).toBe(s1.length + s2.length)
         }),
@@ -53,12 +53,12 @@ describe('String Properties', () => {
       )
     })
 
-    it('string repeat length equals original * count', () => {
+    it('string repeat length equals original * count', async () => {
       fc.assert(
-        fc.property(arbString, fc.integer({ min: 0, max: 5 }), (str, count) => {
+        fc.asyncProperty(arbString, fc.integer({ min: 0, max: 5 }), async (str, count) => {
           const rt = createRuntime()
-          const result = rt.run(`string repeat {${str}} ${count}`)
-          const resultLen = Number(rt.run(`string length {${result}}`))
+          const result = await rt.run(`string repeat {${str}} ${count}`)
+          const resultLen = Number(await rt.run(`string length {${result}}`))
 
           expect(resultLen).toBe(str.length * count)
         }),
@@ -66,12 +66,12 @@ describe('String Properties', () => {
       )
     })
 
-    it('string reverse preserves length', () => {
+    it('string reverse preserves length', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const reversed = rt.run(`string reverse {${str}}`)
-          const reversedLen = Number(rt.run(`string length {${reversed}}`))
+          const reversed = await rt.run(`string reverse {${str}}`)
+          const reversedLen = Number(await rt.run(`string length {${reversed}}`))
 
           expect(reversedLen).toBe(str.length)
         }),
@@ -81,100 +81,100 @@ describe('String Properties', () => {
   })
 
   describe('Reverse Properties', () => {
-    it('string reverse is involutive', () => {
+    it('string reverse is involutive', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const twice = rt.run(`string reverse [string reverse {${str}}]`)
+          const twice = await rt.run(`string reverse [string reverse {${str}}]`)
           expect(twice).toBe(str)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('single char reverses to itself', () => {
+    it('single char reverses to itself', async () => {
       fc.assert(
-        fc.property(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'.split('')), char => {
+        fc.asyncProperty(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz'.split('')), async char => {
           const rt = createRuntime()
-          const reversed = rt.run(`string reverse {${char}}`)
+          const reversed = await rt.run(`string reverse {${char}}`)
           expect(reversed).toBe(char)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('empty string reverses to itself', () => {
+    it('empty string reverses to itself', async () => {
       const rt = createRuntime()
-      const reversed = rt.run('string reverse {}')
+      const reversed = await rt.run('string reverse {}')
       expect(reversed).toBe('')
     })
   })
 
   describe('Case Conversion Properties', () => {
-    it('tolower is idempotent', () => {
+    it('tolower is idempotent', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const once = rt.run(`string tolower {${str}}`)
-          const twice = rt.run(`string tolower [string tolower {${str}}]`)
+          const once = await rt.run(`string tolower {${str}}`)
+          const twice = await rt.run(`string tolower [string tolower {${str}}]`)
           expect(once).toBe(twice)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('toupper is idempotent', () => {
+    it('toupper is idempotent', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const once = rt.run(`string toupper {${str}}`)
-          const twice = rt.run(`string toupper [string toupper {${str}}]`)
+          const once = await rt.run(`string toupper {${str}}`)
+          const twice = await rt.run(`string toupper [string toupper {${str}}]`)
           expect(once).toBe(twice)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('tolower preserves length', () => {
+    it('tolower preserves length', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const lower = rt.run(`string tolower {${str}}`)
+          const lower = await rt.run(`string tolower {${str}}`)
           expect(lower.length).toBe(str.length)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('toupper preserves length', () => {
+    it('toupper preserves length', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const upper = rt.run(`string toupper {${str}}`)
+          const upper = await rt.run(`string toupper {${str}}`)
           expect(upper.length).toBe(str.length)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('toupper of tolower equals toupper', () => {
+    it('toupper of tolower equals toupper', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const lowerThenUpper = rt.run(`string toupper [string tolower {${str}}]`)
-          const justUpper = rt.run(`string toupper {${str}}`)
+          const lowerThenUpper = await rt.run(`string toupper [string tolower {${str}}]`)
+          const justUpper = await rt.run(`string toupper {${str}}`)
           expect(lowerThenUpper).toBe(justUpper)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('tolower of toupper equals tolower', () => {
+    it('tolower of toupper equals tolower', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const upperThenLower = rt.run(`string tolower [string toupper {${str}}]`)
-          const justLower = rt.run(`string tolower {${str}}`)
+          const upperThenLower = await rt.run(`string tolower [string toupper {${str}}]`)
+          const justLower = await rt.run(`string tolower {${str}}`)
           expect(upperThenLower).toBe(justLower)
         }),
         { numRuns: 20 }
@@ -183,34 +183,34 @@ describe('String Properties', () => {
   })
 
   describe('Comparison Properties', () => {
-    it('string equal is reflexive', () => {
+    it('string equal is reflexive', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const result = rt.run(`string equal {${str}} {${str}}`)
+          const result = await rt.run(`string equal {${str}} {${str}}`)
           expect(result).toBe('1')
         }),
         { numRuns: 20 }
       )
     })
 
-    it('string compare with self returns 0', () => {
+    it('string compare with self returns 0', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const result = Number(rt.run(`string compare {${str}} {${str}}`))
+          const result = Number(await rt.run(`string compare {${str}} {${str}}`))
           expect(result).toBe(0)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('string compare is antisymmetric', () => {
+    it('string compare is antisymmetric', async () => {
       fc.assert(
-        fc.property(arbString, arbString, (s1, s2) => {
+        fc.asyncProperty(arbString, arbString, async (s1, s2) => {
           const rt = createRuntime()
-          const cmp1 = Number(rt.run(`string compare {${s1}} {${s2}}`))
-          const cmp2 = Number(rt.run(`string compare {${s2}} {${s1}}`))
+          const cmp1 = Number(await rt.run(`string compare {${s1}} {${s2}}`))
+          const cmp2 = Number(await rt.run(`string compare {${s2}} {${s1}}`))
 
           // If cmp1 > 0, then cmp2 < 0 (and vice versa), or both are 0
           // Use + 0 to normalize -0 to 0 for comparison
@@ -222,35 +222,35 @@ describe('String Properties', () => {
   })
 
   describe('Indexing Properties', () => {
-    it('string index returns correct character', () => {
+    it('string index returns correct character', async () => {
       fc.assert(
-        fc.property(arbNonEmptyString, fc.nat(), (str, idx) => {
+        fc.asyncProperty(arbNonEmptyString, fc.nat(), async (str, idx) => {
           const i = idx % str.length
           const rt = createRuntime()
 
-          const char = rt.run(`string index {${str}} ${i}`)
+          const char = await rt.run(`string index {${str}} ${i}`)
           expect(char).toBe(str[i])
         }),
         { numRuns: 20 }
       )
     })
 
-    it('string first returns 0 for first char', () => {
+    it('string first returns 0 for first char', async () => {
       fc.assert(
-        fc.property(arbNonEmptyString, str => {
+        fc.asyncProperty(arbNonEmptyString, async str => {
           const rt = createRuntime()
-          const first = rt.run(`string first {${str}}`)
+          const first = await rt.run(`string first {${str}}`)
           expect(first).toBe(str[0])
         }),
         { numRuns: 15 }
       )
     })
 
-    it('string last returns last char', () => {
+    it('string last returns last char', async () => {
       fc.assert(
-        fc.property(arbNonEmptyString, str => {
+        fc.asyncProperty(arbNonEmptyString, async str => {
           const rt = createRuntime()
-          const last = rt.run(`string last {${str}}`)
+          const last = await rt.run(`string last {${str}}`)
           expect(last).toBe(str[str.length - 1])
         }),
         { numRuns: 15 }
@@ -259,46 +259,46 @@ describe('String Properties', () => {
   })
 
   describe('Range Properties', () => {
-    it('string range 0 to length-1 returns original', () => {
+    it('string range 0 to length-1 returns original', async () => {
       fc.assert(
-        fc.property(arbNonEmptyString, str => {
+        fc.asyncProperty(arbNonEmptyString, async str => {
           const rt = createRuntime()
-          const result = rt.run(`string range {${str}} 0 ${str.length - 1}`)
+          const result = await rt.run(`string range {${str}} 0 ${str.length - 1}`)
           expect(result).toBe(str)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('string range 0 to end returns original', () => {
+    it('string range 0 to end returns original', async () => {
       fc.assert(
-        fc.property(arbNonEmptyString, str => {
+        fc.asyncProperty(arbNonEmptyString, async str => {
           const rt = createRuntime()
-          const result = rt.run(`string range {${str}} 0 end`)
+          const result = await rt.run(`string range {${str}} 0 end`)
           expect(result).toBe(str)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('string range single char returns that char', () => {
+    it('string range single char returns that char', async () => {
       fc.assert(
-        fc.property(arbNonEmptyString, fc.nat(), (str, idx) => {
+        fc.asyncProperty(arbNonEmptyString, fc.nat(), async (str, idx) => {
           const i = idx % str.length
           const rt = createRuntime()
-          const result = rt.run(`string range {${str}} ${i} ${i}`)
+          const result = await rt.run(`string range {${str}} ${i} ${i}`)
           expect(result).toBe(str[i])
         }),
         { numRuns: 20 }
       )
     })
 
-    it('string range end-N works correctly', () => {
+    it('string range end-N works correctly', async () => {
       fc.assert(
-        fc.property(arbNonEmptyString, str => {
+        fc.asyncProperty(arbNonEmptyString, async str => {
           fc.pre(str.length >= 2)
           const rt = createRuntime()
-          const result = rt.run(`string range {${str}} end-1 end`)
+          const result = await rt.run(`string range {${str}} end-1 end`)
           expect(result).toBe(str.slice(-2))
         }),
         { numRuns: 15 }
@@ -307,35 +307,35 @@ describe('String Properties', () => {
   })
 
   describe('Trim Properties', () => {
-    it('trim is idempotent', () => {
+    it('trim is idempotent', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const once = rt.run(`string trim {${str}}`)
-          const twice = rt.run(`string trim [string trim {${str}}]`)
+          const once = await rt.run(`string trim {${str}}`)
+          const twice = await rt.run(`string trim [string trim {${str}}]`)
           expect(once).toBe(twice)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('trimleft followed by trimright equals trim', () => {
+    it('trimleft followed by trimright equals trim', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const leftThenRight = rt.run(`string trimright [string trimleft {${str}}]`)
-          const justTrim = rt.run(`string trim {${str}}`)
+          const leftThenRight = await rt.run(`string trimright [string trimleft {${str}}]`)
+          const justTrim = await rt.run(`string trim {${str}}`)
           expect(leftThenRight).toBe(justTrim)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('trim never increases length', () => {
+    it('trim never increases length', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const trimmed = rt.run(`string trim {${str}}`)
+          const trimmed = await rt.run(`string trim {${str}}`)
           expect(trimmed.length).toBeLessThanOrEqual(str.length)
         }),
         { numRuns: 15 }
@@ -344,34 +344,34 @@ describe('String Properties', () => {
   })
 
   describe('Repeat Properties', () => {
-    it('repeat 0 times gives empty string', () => {
+    it('repeat 0 times gives empty string', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const result = rt.run(`string repeat {${str}} 0`)
+          const result = await rt.run(`string repeat {${str}} 0`)
           expect(result).toBe('')
         }),
         { numRuns: 15 }
       )
     })
 
-    it('repeat 1 time gives original', () => {
+    it('repeat 1 time gives original', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const result = rt.run(`string repeat {${str}} 1`)
+          const result = await rt.run(`string repeat {${str}} 1`)
           expect(result).toBe(str)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('repeat 2 times equals concat with self', () => {
+    it('repeat 2 times equals concat with self', async () => {
       fc.assert(
-        fc.property(arbString, str => {
+        fc.asyncProperty(arbString, async str => {
           const rt = createRuntime()
-          const repeated = rt.run(`string repeat {${str}} 2`)
-          const concated = rt.run(`string concat {${str}} {${str}}`)
+          const repeated = await rt.run(`string repeat {${str}} 2`)
+          const concated = await rt.run(`string concat {${str}} {${str}}`)
           expect(repeated).toBe(concated)
         }),
         { numRuns: 15 }

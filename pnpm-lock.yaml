@@ -82,6 +82,22 @@ importers:
         specifier: ^5.7.0
         version: 5.9.2
 
+  packages/blit:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+      '@bassline/database':
+        specifier: workspace:*
+        version: link:../database
+      '@bassline/tcl':
+        specifier: workspace:*
+        version: link:../tcl
+    devDependencies:
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@20.19.9)
+
   packages/core: {}
 
   packages/database:
@@ -133,6 +149,9 @@ importers:
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      fast-check:
+        specifier: ^4.4.0
+        version: 4.4.0
       vitest:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.9)

@@ -8,9 +8,9 @@ import { globToRegex } from '../glob.js'
 let procCounter = 0
 
 // Helper to evaluate expression with error wrapping
-function safeExpr(cond, rt) {
+async function safeExpr(cond, rt) {
   try {
-    return Number(expr(cond, rt))
+    return Number(await expr(cond, rt))
   } catch (err) {
     throw TclError.from(err, { script: cond, command: 'expr' })
   }
@@ -21,16 +21,16 @@ export const std = {
   puts: ([msg]) => (console.log(msg), msg),
 
   // Infix expression evaluator (Tcl-compatible)
-  expr: (args, rt) => expr(args.join(' '), rt),
+  expr: async (args, rt) => await expr(args.join(' '), rt),
 
   // Conditions are evaluated as expressions
-  if: ([cond, then, , elseBranch], rt) => rt.run(safeExpr(cond, rt) ? then : (elseBranch ?? '')),
+  if: async ([cond, then, , elseBranch], rt) => await rt.run((await safeExpr(cond, rt)) ? then : (elseBranch ?? '')),
 
-  while: ([cond, body], rt) => {
+  while: async ([cond, body], rt) => {
     let result = ''
-    while (safeExpr(cond, rt)) {
+    while (await safeExpr(cond, rt)) {
       try {
-        result = rt.run(body)
+        result = await rt.run(body)
       } catch (e) {
         if (e === RC.BREAK) break
         if (e !== RC.CONTINUE) throw e
@@ -41,7 +41,7 @@ export const std = {
 
   proc: ([name, params, body], rt) => {
     const paramList = parseList(params)
-    const fn = (args, caller) => {
+    const fn = async (args, caller) => {
       // Create a child namespace for local scope
       const savedCurrent = caller.current
       const localNs = caller.current.child(`_proc_${++procCounter}`)
@@ -52,7 +52,7 @@ export const std = {
 
       paramList.forEach((p, i) => caller.setVar(p, args[i] ?? ''))
       try {
-        return caller.run(body)
+        return await caller.run(body)
       } catch (e) {
         if (e !== RC.RETURN) throw e
         return caller.result
@@ -82,24 +82,24 @@ export const std = {
   },
 
   // for {init} {cond} {next} body - cond is an expression
-  for: ([init, cond, next, body], rt) => {
-    rt.run(init)
+  for: async ([init, cond, next, body], rt) => {
+    await rt.run(init)
     let result = ''
-    while (safeExpr(cond, rt)) {
+    while (await safeExpr(cond, rt)) {
       try {
-        result = rt.run(body)
+        result = await rt.run(body)
       } catch (e) {
         if (e === RC.BREAK) break
         if (e !== RC.CONTINUE) throw e
       }
-      rt.run(next)
+      await rt.run(next)
     }
     return result
   },
 
   // foreach varName list body
   // foreach {v1 v2} list body - multiple vars
-  foreach: (args, rt) => {
+  foreach: async (args, rt) => {
     const body = args[args.length - 1]
     let result = ''
 
@@ -124,7 +124,7 @@ export const std = {
       }
 
       try {
-        result = rt.run(body)
+        result = await rt.run(body)
       } catch (e) {
         if (e === RC.BREAK) break
         if (e !== RC.CONTINUE) throw e
@@ -135,7 +135,7 @@ export const std = {
 
   // switch ?options? string { pattern body ... }
   // switch ?options? string pattern body ?pattern body ...?
-  switch: (args, rt) => {
+  switch: async (args, rt) => {
     let opts = { mode: 'exact' }
     let i = 0
 
@@ -171,7 +171,7 @@ export const std = {
 
       // Check for default
       if (pattern === 'default') {
-        return rt.run(body)
+        return await rt.run(body)
       }
 
       let match = false
@@ -187,7 +187,7 @@ export const std = {
       if (match) {
         // Handle fall-through with '-'
         if (body === '-') continue
-        return rt.run(body)
+        return await rt.run(body)
       }
     }
     return ''
@@ -207,10 +207,10 @@ export const std = {
   },
 
   // catch script ?resultVar? ?optionsVar?
-  catch: (args, rt) => {
+  catch: async (args, rt) => {
     const [script, resultVar, optionsVar] = args
     try {
-      const result = rt.run(script)
+      const result = await rt.run(script)
       if (resultVar) rt.setVar(resultVar, result)
       if (optionsVar) rt.setVar(optionsVar, '')
       return '0'
@@ -233,7 +233,7 @@ export const std = {
   },
 
   // eval script
-  eval: ([script], rt) => rt.run(script),
+  eval: async ([script], rt) => await rt.run(script),
 
   // source - placeholder (would load from file)
   source: ([filename], rt) => {

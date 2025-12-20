@@ -3,16 +3,16 @@
 export const namespace = {
   // namespace subcommand ?args...?
   // This is an ensemble command that dispatches to subcommands
-  namespace: (args, rt) => {
+  namespace: async (args, rt) => {
     const [subcmd, ...rest] = args
     const subcommands = {
       // namespace eval path script - evaluate script in namespace
-      eval: () => {
+      eval: async () => {
         const [path, script] = rest
         const saved = rt.current
         rt.current = rt.resolve(path, true)
         try {
-          return rt.run(script)
+          return await rt.run(script)
         } finally {
           rt.current = saved
         }
@@ -175,7 +175,7 @@ export const namespace = {
     if (!subcmd || !subcommands[subcmd]) {
       throw new Error(`Unknown namespace subcommand: ${subcmd}`)
     }
-    return subcommands[subcmd]()
+    return await subcommands[subcmd]()
   },
 
   // variable name ?value? - declare namespace variable
@@ -226,7 +226,7 @@ export const namespace = {
   },
 
   // uplevel ?level? script
-  uplevel: (args, rt) => {
+  uplevel: async (args, rt) => {
     let level = 1
     let script = args[0]
     if (/^#?\d+$/.test(args[0]) && args.length > 1) {
@@ -240,7 +240,7 @@ export const namespace = {
     const saved = rt.current
     rt.current = frame.ns
     try {
-      return rt.run(script)
+      return await rt.run(script)
     } finally {
       rt.current = saved
     }

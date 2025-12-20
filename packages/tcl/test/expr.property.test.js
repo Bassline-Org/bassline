@@ -19,19 +19,19 @@ function createRuntime() {
 }
 
 // Helper to evaluate and convert to number
-function evalExpr(exprStr, rt) {
-  return Number(expr(exprStr, rt))
+async function evalExpr(exprStr, rt) {
+  return Number(await expr(exprStr, rt))
 }
 
 describe('Expression Evaluator Properties', () => {
   describe('Safety Properties', () => {
-    it('never crashes on arbitrary string input', () => {
+    it('never crashes on arbitrary string input', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.string(), input => {
+        fc.asyncProperty(fc.string(), async input => {
           try {
-            expr(input, rt)
+            await expr(input, rt)
           } catch (err) {
             expect(err).toBeInstanceOf(Error)
           }
@@ -40,14 +40,14 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('handles very long expressions without stack overflow', () => {
+    it('handles very long expressions without stack overflow', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 10, max: 50 }), count => {
+        fc.asyncProperty(fc.integer({ min: 10, max: 50 }), async count => {
           const exprStr = Array(count).fill('1').join(' + ')
           try {
-            const result = evalExpr(exprStr, rt)
+            const result = await evalExpr(exprStr, rt)
             expect(result).toBe(count)
           } catch (err) {
             expect(err).toBeInstanceOf(Error)
@@ -57,14 +57,14 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('handles deeply nested parentheses', () => {
+    it('handles deeply nested parentheses', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 30 }), depth => {
+        fc.asyncProperty(fc.integer({ min: 1, max: 30 }), async depth => {
           const exprStr = '('.repeat(depth) + '42' + ')'.repeat(depth)
           try {
-            const result = evalExpr(exprStr, rt)
+            const result = await evalExpr(exprStr, rt)
             expect(result).toBe(42)
           } catch (err) {
             expect(err).toBeInstanceOf(Error)
@@ -76,43 +76,43 @@ describe('Expression Evaluator Properties', () => {
   })
 
   describe('Arithmetic Properties', () => {
-    it('addition is commutative: a + b === b + a', () => {
+    it('addition is commutative: a + b === b + a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -1000, max: 1000 }), fc.integer({ min: -1000, max: 1000 }), (a, b) => {
-          const result1 = evalExpr(`${a} + ${b}`, rt)
-          const result2 = evalExpr(`${b} + ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: -1000, max: 1000 }), fc.integer({ min: -1000, max: 1000 }), async (a, b) => {
+          const result1 = await evalExpr(`${a} + ${b}`, rt)
+          const result2 = await evalExpr(`${b} + ${a}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('multiplication is commutative: a * b === b * a', () => {
+    it('multiplication is commutative: a * b === b * a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -100, max: 100 }), fc.integer({ min: -100, max: 100 }), (a, b) => {
-          const result1 = evalExpr(`${a} * ${b}`, rt)
-          const result2 = evalExpr(`${b} * ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: -100, max: 100 }), fc.integer({ min: -100, max: 100 }), async (a, b) => {
+          const result1 = await evalExpr(`${a} * ${b}`, rt)
+          const result2 = await evalExpr(`${b} * ${a}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('addition is associative: (a + b) + c === a + (b + c)', () => {
+    it('addition is associative: (a + b) + c === a + (b + c)', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.integer({ min: -1000, max: 1000 }),
           fc.integer({ min: -1000, max: 1000 }),
           fc.integer({ min: -1000, max: 1000 }),
-          (a, b, c) => {
-            const result1 = evalExpr(`(${a} + ${b}) + ${c}`, rt)
-            const result2 = evalExpr(`${a} + (${b} + ${c})`, rt)
+          async (a, b, c) => {
+            const result1 = await evalExpr(`(${a} + ${b}) + ${c}`, rt)
+            const result2 = await evalExpr(`${a} + (${b} + ${c})`, rt)
             expect(result1).toBe(result2)
           }
         ),
@@ -120,53 +120,53 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('zero is additive identity: a + 0 === a', () => {
+    it('zero is additive identity: a + 0 === a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -10000, max: 10000 }), a => {
-          const result = evalExpr(`${a} + 0`, rt)
+        fc.asyncProperty(fc.integer({ min: -10000, max: 10000 }), async a => {
+          const result = await evalExpr(`${a} + 0`, rt)
           expect(result).toBe(a)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('one is multiplicative identity: a * 1 === a', () => {
+    it('one is multiplicative identity: a * 1 === a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -10000, max: 10000 }), a => {
-          const result = evalExpr(`${a} * 1`, rt)
+        fc.asyncProperty(fc.integer({ min: -10000, max: 10000 }), async a => {
+          const result = await evalExpr(`${a} * 1`, rt)
           expect(result).toBe(a)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('zero is multiplicative annihilator: a * 0 === 0', () => {
+    it('zero is multiplicative annihilator: a * 0 === 0', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -10000, max: 10000 }), a => {
-          const result = evalExpr(`${a} * 0`, rt)
+        fc.asyncProperty(fc.integer({ min: -10000, max: 10000 }), async a => {
+          const result = await evalExpr(`${a} * 0`, rt)
           expect(result).toBe(0)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('distributive property: a * (b + c) === a*b + a*c', () => {
+    it('distributive property: a * (b + c) === a*b + a*c', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.integer({ min: -50, max: 50 }),
           fc.integer({ min: -50, max: 50 }),
           fc.integer({ min: -50, max: 50 }),
-          (a, b, c) => {
-            const result1 = evalExpr(`${a} * (${b} + ${c})`, rt)
-            const result2 = evalExpr(`${a} * ${b} + ${a} * ${c}`, rt)
+          async (a, b, c) => {
+            const result1 = await evalExpr(`${a} * (${b} + ${c})`, rt)
+            const result2 = await evalExpr(`${a} * ${b} + ${a} * ${c}`, rt)
             expect(result1).toBe(result2)
           }
         ),
@@ -176,13 +176,13 @@ describe('Expression Evaluator Properties', () => {
   })
 
   describe('Comparison Properties', () => {
-    it('< and >= are complementary', () => {
+    it('< and >= are complementary', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer(), fc.integer(), (a, b) => {
-          const lt = evalExpr(`${a} < ${b}`, rt)
-          const gte = evalExpr(`${a} >= ${b}`, rt)
+        fc.asyncProperty(fc.integer(), fc.integer(), async (a, b) => {
+          const lt = await evalExpr(`${a} < ${b}`, rt)
+          const gte = await evalExpr(`${a} >= ${b}`, rt)
           // One should be 1, other should be 0
           expect(lt + gte).toBe(1)
         }),
@@ -190,52 +190,52 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('> and <= are complementary', () => {
+    it('> and <= are complementary', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer(), fc.integer(), (a, b) => {
-          const gt = evalExpr(`${a} > ${b}`, rt)
-          const lte = evalExpr(`${a} <= ${b}`, rt)
+        fc.asyncProperty(fc.integer(), fc.integer(), async (a, b) => {
+          const gt = await evalExpr(`${a} > ${b}`, rt)
+          const lte = await evalExpr(`${a} <= ${b}`, rt)
           expect(gt + lte).toBe(1)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('== and != are complementary', () => {
+    it('== and != are complementary', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer(), fc.integer(), (a, b) => {
-          const eq = evalExpr(`${a} == ${b}`, rt)
-          const neq = evalExpr(`${a} != ${b}`, rt)
+        fc.asyncProperty(fc.integer(), fc.integer(), async (a, b) => {
+          const eq = await evalExpr(`${a} == ${b}`, rt)
+          const neq = await evalExpr(`${a} != ${b}`, rt)
           expect(eq + neq).toBe(1)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('equality is reflexive: a == a', () => {
+    it('equality is reflexive: a == a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer(), a => {
-          const result = evalExpr(`${a} == ${a}`, rt)
+        fc.asyncProperty(fc.integer(), async a => {
+          const result = await evalExpr(`${a} == ${a}`, rt)
           expect(result).toBe(1)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('trichotomy: exactly one of a < b, a == b, a > b is true', () => {
+    it('trichotomy: exactly one of a < b, a == b, a > b is true', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer(), fc.integer(), (a, b) => {
-          const lt = evalExpr(`${a} < ${b}`, rt)
-          const eq = evalExpr(`${a} == ${b}`, rt)
-          const gt = evalExpr(`${a} > ${b}`, rt)
+        fc.asyncProperty(fc.integer(), fc.integer(), async (a, b) => {
+          const lt = await evalExpr(`${a} < ${b}`, rt)
+          const eq = await evalExpr(`${a} == ${b}`, rt)
+          const gt = await evalExpr(`${a} > ${b}`, rt)
           expect(lt + eq + gt).toBe(1)
         }),
         { numRuns: 50 }
@@ -244,45 +244,45 @@ describe('Expression Evaluator Properties', () => {
   })
 
   describe('Logical Properties', () => {
-    it('&& is commutative for boolean values', () => {
+    it('&& is commutative for boolean values', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.boolean(), fc.boolean(), (a, b) => {
+        fc.asyncProperty(fc.boolean(), fc.boolean(), async (a, b) => {
           const aNum = a ? 1 : 0
           const bNum = b ? 1 : 0
-          const result1 = evalExpr(`${aNum} && ${bNum}`, rt)
-          const result2 = evalExpr(`${bNum} && ${aNum}`, rt)
+          const result1 = await evalExpr(`${aNum} && ${bNum}`, rt)
+          const result2 = await evalExpr(`${bNum} && ${aNum}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 10 }
       )
     })
 
-    it('|| is commutative for boolean values', () => {
+    it('|| is commutative for boolean values', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.boolean(), fc.boolean(), (a, b) => {
+        fc.asyncProperty(fc.boolean(), fc.boolean(), async (a, b) => {
           const aNum = a ? 1 : 0
           const bNum = b ? 1 : 0
-          const result1 = evalExpr(`${aNum} || ${bNum}`, rt)
-          const result2 = evalExpr(`${bNum} || ${aNum}`, rt)
+          const result1 = await evalExpr(`${aNum} || ${bNum}`, rt)
+          const result2 = await evalExpr(`${bNum} || ${aNum}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 10 }
       )
     })
 
-    it('De Morgan: !(a && b) === !a || !b', () => {
+    it('De Morgan: !(a && b) === !a || !b', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.boolean(), fc.boolean(), (a, b) => {
+        fc.asyncProperty(fc.boolean(), fc.boolean(), async (a, b) => {
           const aNum = a ? 1 : 0
           const bNum = b ? 1 : 0
-          const result1 = evalExpr(`!(${aNum} && ${bNum})`, rt)
-          const result2 = evalExpr(`!${aNum} || !${bNum}`, rt)
+          const result1 = await evalExpr(`!(${aNum} && ${bNum})`, rt)
+          const result2 = await evalExpr(`!${aNum} || !${bNum}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 10 }
@@ -291,24 +291,24 @@ describe('Expression Evaluator Properties', () => {
   })
 
   describe('Ternary Operator Properties', () => {
-    it('ternary with true condition returns first branch', () => {
+    it('ternary with true condition returns first branch', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 100 }), fc.integer({ min: 1, max: 100 }), (a, b) => {
-          const result = evalExpr(`1 ? ${a} : ${b}`, rt)
+        fc.asyncProperty(fc.integer({ min: 1, max: 100 }), fc.integer({ min: 1, max: 100 }), async (a, b) => {
+          const result = await evalExpr(`1 ? ${a} : ${b}`, rt)
           expect(result).toBe(a)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('ternary with false condition returns second branch', () => {
+    it('ternary with false condition returns second branch', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 100 }), fc.integer({ min: 1, max: 100 }), (a, b) => {
-          const result = evalExpr(`0 ? ${a} : ${b}`, rt)
+        fc.asyncProperty(fc.integer({ min: 1, max: 100 }), fc.integer({ min: 1, max: 100 }), async (a, b) => {
+          const result = await evalExpr(`0 ? ${a} : ${b}`, rt)
           expect(result).toBe(b)
         }),
         { numRuns: 20 }
@@ -317,100 +317,100 @@ describe('Expression Evaluator Properties', () => {
   })
 
   describe('Bitwise Operator Properties', () => {
-    it('bitwise AND is commutative: a & b === b & a', () => {
+    it('bitwise AND is commutative: a & b === b & a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), (a, b) => {
-          const result1 = evalExpr(`${a} & ${b}`, rt)
-          const result2 = evalExpr(`${b} & ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), async (a, b) => {
+          const result1 = await evalExpr(`${a} & ${b}`, rt)
+          const result2 = await evalExpr(`${b} & ${a}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('bitwise OR is commutative: a | b === b | a', () => {
+    it('bitwise OR is commutative: a | b === b | a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), (a, b) => {
-          const result1 = evalExpr(`${a} | ${b}`, rt)
-          const result2 = evalExpr(`${b} | ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), async (a, b) => {
+          const result1 = await evalExpr(`${a} | ${b}`, rt)
+          const result2 = await evalExpr(`${b} | ${a}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('bitwise XOR is commutative: a ^ b === b ^ a', () => {
+    it('bitwise XOR is commutative: a ^ b === b ^ a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), (a, b) => {
-          const result1 = evalExpr(`${a} ^ ${b}`, rt)
-          const result2 = evalExpr(`${b} ^ ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 255 }), fc.integer({ min: 0, max: 255 }), async (a, b) => {
+          const result1 = await evalExpr(`${a} ^ ${b}`, rt)
+          const result2 = await evalExpr(`${b} ^ ${a}`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('a & a === a (idempotent)', () => {
+    it('a & a === a (idempotent)', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 255 }), a => {
-          const result = evalExpr(`${a} & ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 255 }), async a => {
+          const result = await evalExpr(`${a} & ${a}`, rt)
           expect(result).toBe(a)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('a | a === a (idempotent)', () => {
+    it('a | a === a (idempotent)', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 255 }), a => {
-          const result = evalExpr(`${a} | ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 255 }), async a => {
+          const result = await evalExpr(`${a} | ${a}`, rt)
           expect(result).toBe(a)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('a ^ a === 0 (self XOR is zero)', () => {
+    it('a ^ a === 0 (self XOR is zero)', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 255 }), a => {
-          const result = evalExpr(`${a} ^ ${a}`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 255 }), async a => {
+          const result = await evalExpr(`${a} ^ ${a}`, rt)
           expect(result).toBe(0)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('left shift doubles value: a << 1 === a * 2', () => {
+    it('left shift doubles value: a << 1 === a * 2', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 1000 }), a => {
-          const shift = evalExpr(`${a} << 1`, rt)
-          const mult = evalExpr(`${a} * 2`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 1000 }), async a => {
+          const shift = await evalExpr(`${a} << 1`, rt)
+          const mult = await evalExpr(`${a} * 2`, rt)
           expect(shift).toBe(mult)
         }),
         { numRuns: 30 }
       )
     })
 
-    it('right shift halves value (floor): a >> 1 === int(a / 2)', () => {
+    it('right shift halves value (floor): a >> 1 === int(a / 2)', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 1000 }), a => {
-          const shift = evalExpr(`${a} >> 1`, rt)
+        fc.asyncProperty(fc.integer({ min: 0, max: 1000 }), async a => {
+          const shift = await evalExpr(`${a} >> 1`, rt)
           const div = Math.floor(a / 2)
           expect(shift).toBe(div)
         }),
@@ -420,28 +420,31 @@ describe('Expression Evaluator Properties', () => {
   })
 
   describe('String Comparison Properties', () => {
-    it('eq is reflexive: string equals itself', () => {
+    it('eq is reflexive: string equals itself', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 8 }), s => {
-          const result = evalExpr(`"${s}" eq "${s}"`, rt)
-          expect(result).toBe(1)
-        }),
+        fc.asyncProperty(
+          fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 8 }),
+          async s => {
+            const result = await evalExpr(`"${s}" eq "${s}"`, rt)
+            expect(result).toBe(1)
+          }
+        ),
         { numRuns: 20 }
       )
     })
 
-    it('eq and ne are complementary', () => {
+    it('eq and ne are complementary', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
-          (a, b) => {
-            const eq = evalExpr(`"${a}" eq "${b}"`, rt)
-            const ne = evalExpr(`"${a}" ne "${b}"`, rt)
+          async (a, b) => {
+            const eq = await evalExpr(`"${a}" eq "${b}"`, rt)
+            const ne = await evalExpr(`"${a}" ne "${b}"`, rt)
             expect(eq + ne).toBe(1)
           }
         ),
@@ -449,17 +452,17 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('string comparison trichotomy: exactly one of lt, eq, gt is true', () => {
+    it('string comparison trichotomy: exactly one of lt, eq, gt is true', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
-          (a, b) => {
-            const lt = evalExpr(`"${a}" lt "${b}"`, rt)
-            const eq = evalExpr(`"${a}" eq "${b}"`, rt)
-            const gt = evalExpr(`"${a}" gt "${b}"`, rt)
+          async (a, b) => {
+            const lt = await evalExpr(`"${a}" lt "${b}"`, rt)
+            const eq = await evalExpr(`"${a}" eq "${b}"`, rt)
+            const gt = await evalExpr(`"${a}" gt "${b}"`, rt)
             expect(lt + eq + gt).toBe(1)
           }
         ),
@@ -467,16 +470,16 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('lt and ge are complementary', () => {
+    it('lt and ge are complementary', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
-          (a, b) => {
-            const lt = evalExpr(`"${a}" lt "${b}"`, rt)
-            const ge = evalExpr(`"${a}" ge "${b}"`, rt)
+          async (a, b) => {
+            const lt = await evalExpr(`"${a}" lt "${b}"`, rt)
+            const ge = await evalExpr(`"${a}" ge "${b}"`, rt)
             expect(lt + ge).toBe(1)
           }
         ),
@@ -484,16 +487,16 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('gt and le are complementary', () => {
+    it('gt and le are complementary', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
-          (a, b) => {
-            const gt = evalExpr(`"${a}" gt "${b}"`, rt)
-            const le = evalExpr(`"${a}" le "${b}"`, rt)
+          async (a, b) => {
+            const gt = await evalExpr(`"${a}" gt "${b}"`, rt)
+            const le = await evalExpr(`"${a}" le "${b}"`, rt)
             expect(gt + le).toBe(1)
           }
         ),
@@ -501,16 +504,16 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('string comparison is antisymmetric: a lt b implies b gt a', () => {
+    it('string comparison is antisymmetric: a lt b implies b gt a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
           fc.string({ unit: fc.constantFrom(...'abcdefghij'.split('')), minLength: 1, maxLength: 5 }),
-          (a, b) => {
-            const aLtB = evalExpr(`"${a}" lt "${b}"`, rt)
-            const bGtA = evalExpr(`"${b}" gt "${a}"`, rt)
+          async (a, b) => {
+            const aLtB = await evalExpr(`"${a}" lt "${b}"`, rt)
+            const bGtA = await evalExpr(`"${b}" gt "${a}"`, rt)
             expect(aLtB).toBe(bGtA)
           }
         ),
@@ -520,153 +523,158 @@ describe('Expression Evaluator Properties', () => {
   })
 
   describe('List Operator Properties', () => {
-    it('element in list returns 1', () => {
+    it('element in list returns 1', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.string({ unit: fc.constantFrom(...'abcdef'.split('')), minLength: 1, maxLength: 4 }), elem => {
-          const result = evalExpr(`"${elem}" in {${elem} other stuff}`, rt)
-          expect(result).toBe(1)
-        }),
+        fc.asyncProperty(
+          fc.string({ unit: fc.constantFrom(...'abcdef'.split('')), minLength: 1, maxLength: 4 }),
+          async elem => {
+            const result = await evalExpr(`"${elem}" in {${elem} other stuff}`, rt)
+            expect(result).toBe(1)
+          }
+        ),
         { numRuns: 20 }
       )
     })
 
-    it('element not in list returns 0', () => {
+    it('element not in list returns 0', async () => {
       const rt = createRuntime()
 
-      const result = evalExpr('"xyz" in {a b c}', rt)
+      const result = await evalExpr('"xyz" in {a b c}', rt)
       expect(result).toBe(0)
     })
 
-    it('ni is complement of in', () => {
+    it('ni is complement of in', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.string({ unit: fc.constantFrom(...'abc'.split('')), minLength: 1, maxLength: 3 }), elem => {
-          const inList = evalExpr(`"${elem}" in {a b c d}`, rt)
-          const notIn = evalExpr(`"${elem}" ni {a b c d}`, rt)
-          expect(inList + notIn).toBe(1)
-        }),
+        fc.asyncProperty(
+          fc.string({ unit: fc.constantFrom(...'abc'.split('')), minLength: 1, maxLength: 3 }),
+          async elem => {
+            const inList = await evalExpr(`"${elem}" in {a b c d}`, rt)
+            const notIn = await evalExpr(`"${elem}" ni {a b c d}`, rt)
+            expect(inList + notIn).toBe(1)
+          }
+        ),
         { numRuns: 20 }
       )
     })
   })
 
   describe('Lazy Evaluation Properties', () => {
-    it('ternary does not evaluate false branch when condition is true', () => {
+    it('ternary does not evaluate false branch when condition is true', async () => {
       const rt = createRuntime()
-      rt.register('error', args => {
+      rt.register('error', async args => {
         throw new Error(args[0])
       })
 
       // Should not throw because false branch is not evaluated
-      expect(() => expr('1 ? 42 : [error "should not evaluate"]', rt)).not.toThrow()
-      const result = evalExpr('1 ? 42 : [error "should not evaluate"]', rt)
+      const result = await evalExpr('1 ? 42 : [error "should not evaluate"]', rt)
       expect(result).toBe(42)
     })
 
-    it('ternary does not evaluate true branch when condition is false', () => {
+    it('ternary does not evaluate true branch when condition is false', async () => {
       const rt = createRuntime()
-      rt.register('error', args => {
+      rt.register('error', async args => {
         throw new Error(args[0])
       })
 
       // Should not throw because true branch is not evaluated
-      expect(() => expr('0 ? [error "should not evaluate"] : 42', rt)).not.toThrow()
-      const result = evalExpr('0 ? [error "should not evaluate"] : 42', rt)
+      const result = await evalExpr('0 ? [error "should not evaluate"] : 42', rt)
       expect(result).toBe(42)
     })
 
-    it('|| does not evaluate right operand when left is truthy', () => {
+    it('|| does not evaluate right operand when left is truthy', async () => {
       const rt = createRuntime()
-      rt.register('error', args => {
+      rt.register('error', async args => {
         throw new Error(args[0])
       })
 
       // Should not throw because right side is not evaluated
-      expect(() => expr('1 || [error "should not evaluate"]', rt)).not.toThrow()
-      const result = evalExpr('1 || [error "should not evaluate"]', rt)
+      const result = await evalExpr('1 || [error "should not evaluate"]', rt)
       expect(result).toBe(1)
     })
 
-    it('|| evaluates right operand when left is falsy', () => {
+    it('|| evaluates right operand when left is falsy', async () => {
       const rt = createRuntime()
-      rt.register('error', args => {
+      rt.register('error', async args => {
         throw new Error(args[0])
       })
 
       // Should throw because right side is evaluated
-      expect(() => expr('0 || [error "this should throw"]', rt)).toThrow('this should throw')
+      await expect(expr('0 || [error "this should throw"]', rt)).rejects.toThrow('this should throw')
     })
 
-    it('&& does not evaluate right operand when left is falsy', () => {
+    it('&& does not evaluate right operand when left is falsy', async () => {
       const rt = createRuntime()
-      rt.register('error', args => {
+      rt.register('error', async args => {
         throw new Error(args[0])
       })
 
       // Should not throw because right side is not evaluated
-      expect(() => expr('0 && [error "should not evaluate"]', rt)).not.toThrow()
-      const result = evalExpr('0 && [error "should not evaluate"]', rt)
+      const result = await evalExpr('0 && [error "should not evaluate"]', rt)
       expect(result).toBe(0)
     })
 
-    it('&& evaluates right operand when left is truthy', () => {
+    it('&& evaluates right operand when left is truthy', async () => {
       const rt = createRuntime()
-      rt.register('error', args => {
+      rt.register('error', async args => {
         throw new Error(args[0])
       })
 
       // Should throw because right side is evaluated
-      expect(() => expr('1 && [error "this should throw"]', rt)).toThrow('this should throw')
+      await expect(expr('1 && [error "this should throw"]', rt)).rejects.toThrow('this should throw')
     })
 
-    it('nested lazy evaluation works correctly', () => {
+    it('nested lazy evaluation works correctly', async () => {
       const rt = createRuntime()
-      rt.register('error', args => {
+      rt.register('error', async args => {
         throw new Error(args[0])
       })
 
-      // Complex nested case
-      expect(() => expr('1 ? (0 || 1) : [error "no"]', rt)).not.toThrow()
-      expect(() => expr('0 ? [error "no"] : (1 && 1)', rt)).not.toThrow()
-      expect(() => expr('1 && (0 ? [error "no"] : 1)', rt)).not.toThrow()
+      // Complex nested case - should not throw because false branches are not evaluated
+      const r1 = await evalExpr('1 ? (0 || 1) : [error "no"]', rt)
+      expect(r1).toBe(1)
+      const r2 = await evalExpr('0 ? [error "no"] : (1 && 1)', rt)
+      expect(r2).toBe(1)
+      const r3 = await evalExpr('1 && (0 ? [error "no"] : 1)', rt)
+      expect(r3).toBe(1)
     })
   })
 
   describe('Math Function Properties', () => {
-    it('abs is always non-negative', () => {
+    it('abs is always non-negative', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -10000, max: 10000 }), a => {
-          const result = evalExpr(`abs(${a})`, rt)
+        fc.asyncProperty(fc.integer({ min: -10000, max: 10000 }), async a => {
+          const result = await evalExpr(`abs(${a})`, rt)
           expect(result).toBeGreaterThanOrEqual(0)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('abs(a) === abs(-a)', () => {
+    it('abs(a) === abs(-a)', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -10000, max: 10000 }), a => {
-          const result1 = evalExpr(`abs(${a})`, rt)
-          const result2 = evalExpr(`abs(${-a})`, rt)
+        fc.asyncProperty(fc.integer({ min: -10000, max: 10000 }), async a => {
+          const result1 = await evalExpr(`abs(${a})`, rt)
+          const result2 = await evalExpr(`abs(${-a})`, rt)
           expect(result1).toBe(result2)
         }),
         { numRuns: 50 }
       )
     })
 
-    it('max(a, b) >= a and max(a, b) >= b', () => {
+    it('max(a, b) >= a and max(a, b) >= b', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer(), fc.integer(), (a, b) => {
-          const result = evalExpr(`max(${a}, ${b})`, rt)
+        fc.asyncProperty(fc.integer(), fc.integer(), async (a, b) => {
+          const result = await evalExpr(`max(${a}, ${b})`, rt)
           expect(result).toBeGreaterThanOrEqual(a)
           expect(result).toBeGreaterThanOrEqual(b)
         }),
@@ -674,12 +682,12 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('min(a, b) <= a and min(a, b) <= b', () => {
+    it('min(a, b) <= a and min(a, b) <= b', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer(), fc.integer(), (a, b) => {
-          const result = evalExpr(`min(${a}, ${b})`, rt)
+        fc.asyncProperty(fc.integer(), fc.integer(), async (a, b) => {
+          const result = await evalExpr(`min(${a}, ${b})`, rt)
           expect(result).toBeLessThanOrEqual(a)
           expect(result).toBeLessThanOrEqual(b)
         }),
@@ -687,12 +695,12 @@ describe('Expression Evaluator Properties', () => {
       )
     })
 
-    it('pow(a, 1) === a', () => {
+    it('pow(a, 1) === a', async () => {
       const rt = createRuntime()
 
       fc.assert(
-        fc.property(fc.integer({ min: -100, max: 100 }), a => {
-          const result = evalExpr(`pow(${a}, 1)`, rt)
+        fc.asyncProperty(fc.integer({ min: -100, max: 100 }), async a => {
+          const result = await evalExpr(`pow(${a}, 1)`, rt)
           expect(result).toBe(a)
         }),
         { numRuns: 20 }
