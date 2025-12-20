@@ -50,7 +50,7 @@ export function createShell(opts = {}) {
     eval: resource({
       put: async (h, script) => {
         try {
-          const result = rt.run(script)
+          const result = await rt.run(script)
           return {
             headers: { status: 200 },
             body: { result },

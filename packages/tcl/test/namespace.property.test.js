@@ -37,40 +37,47 @@ const arbValue = fc.string({
 
 describe('Namespace Properties', () => {
   describe('Namespace Isolation', () => {
-    it('variables in different namespaces are independent', () => {
+    it('variables in different namespaces are independent', async () => {
       fc.assert(
-        fc.property(arbNsName, arbNsName, arbVarName, arbValue, arbValue, (ns1, ns2, varName, val1, val2) => {
-          fc.pre(ns1 !== ns2) // Different namespace names
+        fc.asyncProperty(
+          arbNsName,
+          arbNsName,
+          arbVarName,
+          arbValue,
+          arbValue,
+          async (ns1, ns2, varName, val1, val2) => {
+            fc.pre(ns1 !== ns2) // Different namespace names
 
-          const rt = createRuntime()
+            const rt = createRuntime()
 
-          // Set variable in first namespace
-          rt.run(`namespace eval ${ns1} { set ${varName} {${val1}} }`)
+            // Set variable in first namespace
+            await rt.run(`namespace eval ${ns1} { set ${varName} {${val1}} }`)
 
-          // Set same-named variable in second namespace
-          rt.run(`namespace eval ${ns2} { set ${varName} {${val2}} }`)
+            // Set same-named variable in second namespace
+            await rt.run(`namespace eval ${ns2} { set ${varName} {${val2}} }`)
 
-          // Values should be independent
-          const result1 = rt.run(`namespace eval ${ns1} { set ${varName} }`)
-          const result2 = rt.run(`namespace eval ${ns2} { set ${varName} }`)
+            // Values should be independent
+            const result1 = await rt.run(`namespace eval ${ns1} { set ${varName} }`)
+            const result2 = await rt.run(`namespace eval ${ns2} { set ${varName} }`)
 
-          expect(result1).toBe(val1)
-          expect(result2).toBe(val2)
-        }),
+            expect(result1).toBe(val1)
+            expect(result2).toBe(val2)
+          }
+        ),
         { numRuns: 20 }
       )
     })
 
-    it('child namespace variables dont affect parent', () => {
+    it('child namespace variables dont affect parent', async () => {
       fc.assert(
-        fc.property(arbNsName, arbVarName, arbValue, arbValue, (nsName, varName, parentVal, childVal) => {
+        fc.asyncProperty(arbNsName, arbVarName, arbValue, arbValue, async (nsName, varName, parentVal, childVal) => {
           const rt = createRuntime()
 
           // Set in root namespace
-          rt.run(`set ${varName} {${parentVal}}`)
+          await rt.run(`set ${varName} {${parentVal}}`)
 
           // Set in child namespace
-          rt.run(`namespace eval ${nsName} { set ${varName} {${childVal}} }`)
+          await rt.run(`namespace eval ${nsName} { set ${varName} {${childVal}} }`)
 
           // Root value should be unchanged
           expect(rt.getVar(varName)).toBe(parentVal)
@@ -79,28 +86,28 @@ describe('Namespace Properties', () => {
       )
     })
 
-    it('namespace current returns correct path', () => {
+    it('namespace current returns correct path', async () => {
       fc.assert(
-        fc.property(arbNsName, nsName => {
+        fc.asyncProperty(arbNsName, async nsName => {
           const rt = createRuntime()
 
           // In root namespace
-          expect(rt.run('namespace current')).toBe('/')
+          expect(await rt.run('namespace current')).toBe('/')
 
           // In child namespace
-          const current = rt.run(`namespace eval ${nsName} { namespace current }`)
+          const current = await rt.run(`namespace eval ${nsName} { namespace current }`)
           expect(current).toBe(`/${nsName}`)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('nested namespaces have correct paths', () => {
+    it('nested namespaces have correct paths', async () => {
       fc.assert(
-        fc.property(arbNsName, arbNsName, (parent, child) => {
+        fc.asyncProperty(arbNsName, arbNsName, async (parent, child) => {
           const rt = createRuntime()
 
-          const current = rt.run(`namespace eval ${parent} { namespace eval ${child} { namespace current } }`)
+          const current = await rt.run(`namespace eval ${parent} { namespace eval ${child} { namespace current } }`)
           expect(current).toBe(`/${parent}/${child}`)
         }),
         { numRuns: 15 }
@@ -109,53 +116,53 @@ describe('Namespace Properties', () => {
   })
 
   describe('Namespace Existence', () => {
-    it('namespace exists after eval', () => {
+    it('namespace exists after eval', async () => {
       fc.assert(
-        fc.property(arbNsName, nsName => {
+        fc.asyncProperty(arbNsName, async nsName => {
           const rt = createRuntime()
 
           // Doesn't exist before
-          expect(rt.run(`namespace exists ${nsName}`)).toBe('0')
+          expect(await rt.run(`namespace exists ${nsName}`)).toBe('0')
 
           // Create it
-          rt.run(`namespace eval ${nsName} {}`)
+          await rt.run(`namespace eval ${nsName} {}`)
 
           // Now exists
-          expect(rt.run(`namespace exists ${nsName}`)).toBe('1')
+          expect(await rt.run(`namespace exists ${nsName}`)).toBe('1')
         }),
         { numRuns: 15 }
       )
     })
 
-    it('namespace delete removes namespace', () => {
+    it('namespace delete removes namespace', async () => {
       fc.assert(
-        fc.property(arbNsName, nsName => {
+        fc.asyncProperty(arbNsName, async nsName => {
           const rt = createRuntime()
 
           // Create and then delete
-          rt.run(`namespace eval ${nsName} {}`)
-          rt.run(`namespace delete ${nsName}`)
+          await rt.run(`namespace eval ${nsName} {}`)
+          await rt.run(`namespace delete ${nsName}`)
 
           // No longer exists
-          expect(rt.run(`namespace exists ${nsName}`)).toBe('0')
+          expect(await rt.run(`namespace exists ${nsName}`)).toBe('0')
         }),
         { numRuns: 15 }
       )
     })
 
-    it('namespace children lists created children', () => {
+    it('namespace children lists created children', async () => {
       fc.assert(
-        fc.property(arbNsName, arbNsName, (child1, child2) => {
+        fc.asyncProperty(arbNsName, arbNsName, async (child1, child2) => {
           fc.pre(child1 !== child2)
 
           const rt = createRuntime()
 
           // Create children
-          rt.run(`namespace eval ${child1} {}`)
-          rt.run(`namespace eval ${child2} {}`)
+          await rt.run(`namespace eval ${child1} {}`)
+          await rt.run(`namespace eval ${child2} {}`)
 
           // List children
-          const children = rt.run('namespace children')
+          const children = await rt.run('namespace children')
 
           expect(children).toContain(`/${child1}`)
           expect(children).toContain(`/${child2}`)
@@ -166,38 +173,38 @@ describe('Namespace Properties', () => {
   })
 
   describe('Namespace Path Operations', () => {
-    it('qualifiers extracts namespace part', () => {
+    it('qualifiers extracts namespace part', async () => {
       fc.assert(
-        fc.property(arbNsName, arbNsName, arbVarName, (ns1, ns2, name) => {
+        fc.asyncProperty(arbNsName, arbNsName, arbVarName, async (ns1, ns2, name) => {
           const rt = createRuntime()
 
-          const qual = rt.run(`namespace qualifiers ${ns1}/${ns2}/${name}`)
+          const qual = await rt.run(`namespace qualifiers ${ns1}/${ns2}/${name}`)
           expect(qual).toBe(`${ns1}/${ns2}`)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('tail extracts simple name', () => {
+    it('tail extracts simple name', async () => {
       fc.assert(
-        fc.property(arbNsName, arbNsName, arbVarName, (ns1, ns2, name) => {
+        fc.asyncProperty(arbNsName, arbNsName, arbVarName, async (ns1, ns2, name) => {
           const rt = createRuntime()
 
-          const tail = rt.run(`namespace tail ${ns1}/${ns2}/${name}`)
+          const tail = await rt.run(`namespace tail ${ns1}/${ns2}/${name}`)
           expect(tail).toBe(name)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('qualifiers + tail reconstructs path', () => {
+    it('qualifiers + tail reconstructs path', async () => {
       fc.assert(
-        fc.property(arbNsName, arbVarName, (nsName, varName) => {
+        fc.asyncProperty(arbNsName, arbVarName, async (nsName, varName) => {
           const rt = createRuntime()
           const fullPath = `${nsName}/${varName}`
 
-          const qual = rt.run(`namespace qualifiers ${fullPath}`)
-          const tail = rt.run(`namespace tail ${fullPath}`)
+          const qual = await rt.run(`namespace qualifiers ${fullPath}`)
+          const tail = await rt.run(`namespace tail ${fullPath}`)
 
           expect(`${qual}/${tail}`).toBe(fullPath)
         }),
@@ -207,16 +214,16 @@ describe('Namespace Properties', () => {
   })
 
   describe('Variable Linking', () => {
-    it('global links to root namespace variable', () => {
+    it('global links to root namespace variable', async () => {
       fc.assert(
-        fc.property(arbNsName, arbVarName, arbValue, (nsName, varName, value) => {
+        fc.asyncProperty(arbNsName, arbVarName, arbValue, async (nsName, varName, value) => {
           const rt = createRuntime()
 
           // Set global variable
-          rt.run(`set ${varName} {${value}}`)
+          await rt.run(`set ${varName} {${value}}`)
 
           // Access from child namespace via global
-          const result = rt.run(`namespace eval ${nsName} { global ${varName}; set ${varName} }`)
+          const result = await rt.run(`namespace eval ${nsName} { global ${varName}; set ${varName} }`)
 
           expect(result).toBe(value)
         }),
@@ -224,16 +231,16 @@ describe('Namespace Properties', () => {
       )
     })
 
-    it('global modification affects root', () => {
+    it('global modification affects root', async () => {
       fc.assert(
-        fc.property(arbNsName, arbVarName, arbValue, arbValue, (nsName, varName, original, newVal) => {
+        fc.asyncProperty(arbNsName, arbVarName, arbValue, arbValue, async (nsName, varName, original, newVal) => {
           const rt = createRuntime()
 
           // Set global variable
-          rt.run(`set ${varName} {${original}}`)
+          await rt.run(`set ${varName} {${original}}`)
 
           // Modify from child namespace via global
-          rt.run(`namespace eval ${nsName} { global ${varName}; set ${varName} {${newVal}} }`)
+          await rt.run(`namespace eval ${nsName} { global ${varName}; set ${varName} {${newVal}} }`)
 
           // Root variable should be modified
           expect(rt.getVar(varName)).toBe(newVal)
@@ -244,19 +251,19 @@ describe('Namespace Properties', () => {
   })
 
   describe('Proc Scoping', () => {
-    it('proc variables are local by default', () => {
+    it('proc variables are local by default', async () => {
       fc.assert(
-        fc.property(arbVarName, arbValue, arbValue, (varName, outerVal, innerVal) => {
+        fc.asyncProperty(arbVarName, arbValue, arbValue, async (varName, outerVal, innerVal) => {
           const rt = createRuntime()
 
           // Set outer variable
-          rt.run(`set ${varName} {${outerVal}}`)
+          await rt.run(`set ${varName} {${outerVal}}`)
 
           // Define proc that sets same-named local variable
-          rt.run(`proc testproc {} { set ${varName} {${innerVal}}; return $${varName} }`)
+          await rt.run(`proc testproc {} { set ${varName} {${innerVal}}; return $${varName} }`)
 
           // Call proc
-          const procResult = rt.run('testproc')
+          const procResult = await rt.run('testproc')
 
           // Proc returns inner value
           expect(procResult).toBe(innerVal)
@@ -268,16 +275,16 @@ describe('Namespace Properties', () => {
       )
     })
 
-    it('proc parameters become local variables', () => {
+    it('proc parameters become local variables', async () => {
       fc.assert(
-        fc.property(arbVarName, arbValue, (paramName, value) => {
+        fc.asyncProperty(arbVarName, arbValue, async (paramName, value) => {
           const rt = createRuntime()
 
           // Define proc with parameter
-          rt.run(`proc echo {${paramName}} { return $${paramName} }`)
+          await rt.run(`proc echo {${paramName}} { return $${paramName} }`)
 
           // Call with value
-          const result = rt.run(`echo {${value}}`)
+          const result = await rt.run(`echo {${value}}`)
 
           expect(result).toBe(value)
         }),
@@ -285,19 +292,19 @@ describe('Namespace Properties', () => {
       )
     })
 
-    it('upvar links to caller variable', () => {
+    it('upvar links to caller variable', async () => {
       fc.assert(
-        fc.property(arbVarName, arbValue, arbValue, (varName, original, newVal) => {
+        fc.asyncProperty(arbVarName, arbValue, arbValue, async (varName, original, newVal) => {
           const rt = createRuntime()
 
           // Define proc that modifies caller's variable
-          rt.run(`proc modifier {vname newval} { upvar 1 $vname local; set local $newval }`)
+          await rt.run(`proc modifier {vname newval} { upvar 1 $vname local; set local $newval }`)
 
           // Set variable
-          rt.run(`set ${varName} {${original}}`)
+          await rt.run(`set ${varName} {${original}}`)
 
           // Call modifier
-          rt.run(`modifier ${varName} {${newVal}}`)
+          await rt.run(`modifier ${varName} {${newVal}}`)
 
           // Variable should be modified
           expect(rt.getVar(varName)).toBe(newVal)
@@ -308,131 +315,133 @@ describe('Namespace Properties', () => {
   })
 
   describe('Namespace Export/Import', () => {
-    it('exported proc can be imported', () => {
+    it('exported proc can be imported', async () => {
       fc.assert(
-        fc.property(arbNsName, nsName => {
+        fc.asyncProperty(arbNsName, async nsName => {
           const rt = createRuntime()
 
           // Create namespace with exported proc
-          rt.run(`namespace eval ${nsName} { proc greet {} { return hello }; namespace export greet }`)
+          await rt.run(`namespace eval ${nsName} { proc greet {} { return hello }; namespace export greet }`)
 
           // Import into root namespace
-          rt.run(`namespace import ${nsName}/greet`)
+          await rt.run(`namespace import ${nsName}/greet`)
 
           // Should be callable without namespace prefix
-          const result = rt.run('greet')
+          const result = await rt.run('greet')
           expect(result).toBe('hello')
         }),
         { numRuns: 10 }
       )
     })
 
-    it('export with pattern exports multiple procs', () => {
+    it('export with pattern exports multiple procs', async () => {
       const rt = createRuntime()
 
       // Create namespace with multiple procs
-      rt.run(
+      await rt.run(
         'namespace eval mylib { proc foo {} { return foo }; proc foobar {} { return foobar }; proc bar {} { return bar }; namespace export foo* }'
       )
 
       // Import all matching exports
-      rt.run('namespace import mylib/*')
+      await rt.run('namespace import mylib/*')
 
       // foo and foobar should be available, but not bar
-      expect(rt.run('foo')).toBe('foo')
-      expect(rt.run('foobar')).toBe('foobar')
-      const result = rt.run('catch { bar }')
+      expect(await rt.run('foo')).toBe('foo')
+      expect(await rt.run('foobar')).toBe('foobar')
+      const result = await rt.run('catch { bar }')
       expect(result).toBe('1') // bar not imported
     })
 
-    it('namespace forget removes imported command', () => {
+    it('namespace forget removes imported command', async () => {
       const rt = createRuntime()
 
       // Create namespace and export
-      rt.run('namespace eval lib { proc cmd {} { return result }; namespace export cmd }')
+      await rt.run('namespace eval lib { proc cmd {} { return result }; namespace export cmd }')
 
       // Import
-      rt.run('namespace import lib/cmd')
+      await rt.run('namespace import lib/cmd')
 
       // Should work
-      expect(rt.run('cmd')).toBe('result')
+      expect(await rt.run('cmd')).toBe('result')
 
       // Forget it
-      rt.run('namespace forget lib/cmd')
+      await rt.run('namespace forget lib/cmd')
 
       // Should no longer exist
-      const result = rt.run('catch { cmd }')
+      const result = await rt.run('catch { cmd }')
       expect(result).toBe('1')
     })
 
-    it('import -force overwrites existing command', () => {
+    it('import -force overwrites existing command', async () => {
       const rt = createRuntime()
 
       // Create two namespaces with same-named proc
-      rt.run('namespace eval lib1 { proc cmd {} { return lib1 }; namespace export cmd }')
-      rt.run('namespace eval lib2 { proc cmd {} { return lib2 }; namespace export cmd }')
+      await rt.run('namespace eval lib1 { proc cmd {} { return lib1 }; namespace export cmd }')
+      await rt.run('namespace eval lib2 { proc cmd {} { return lib2 }; namespace export cmd }')
 
       // Import from lib1
-      rt.run('namespace import lib1/cmd')
-      expect(rt.run('cmd')).toBe('lib1')
+      await rt.run('namespace import lib1/cmd')
+      expect(await rt.run('cmd')).toBe('lib1')
 
       // Import from lib2 with -force (overwrite)
-      rt.run('namespace import -force lib2/cmd')
-      expect(rt.run('cmd')).toBe('lib2')
+      await rt.run('namespace import -force lib2/cmd')
+      expect(await rt.run('cmd')).toBe('lib2')
     })
 
-    it('export -clear removes previous exports', () => {
+    it('export -clear removes previous exports', async () => {
       const rt = createRuntime()
 
       // Create namespace with exports
-      rt.run('namespace eval lib { proc foo {} { return foo }; proc bar {} { return bar }; namespace export foo bar }')
+      await rt.run(
+        'namespace eval lib { proc foo {} { return foo }; proc bar {} { return bar }; namespace export foo bar }'
+      )
 
       // Import bar
-      rt.run('namespace import lib/bar')
-      expect(rt.run('bar')).toBe('bar')
+      await rt.run('namespace import lib/bar')
+      expect(await rt.run('bar')).toBe('bar')
 
       // Forget bar
-      rt.run('namespace forget lib/bar')
+      await rt.run('namespace forget lib/bar')
 
       // Clear exports and only export foo
-      rt.run('namespace eval lib { namespace export -clear foo }')
+      await rt.run('namespace eval lib { namespace export -clear foo }')
 
       // Now importing bar should fail (not exported anymore)
-      rt.run('namespace import lib/*')
+      await rt.run('namespace import lib/*')
 
       // foo should work
-      expect(rt.run('foo')).toBe('foo')
+      expect(await rt.run('foo')).toBe('foo')
 
       // bar should fail (not exported)
-      const result = rt.run('catch { bar }')
+      const result = await rt.run('catch { bar }')
       expect(result).toBe('1')
     })
   })
 
   describe('Error Cases', () => {
-    it('accessing non-existent namespace variable throws', () => {
+    it('accessing non-existent namespace variable throws', async () => {
       fc.assert(
-        fc.property(arbNsName, arbVarName, (nsName, varName) => {
+        fc.asyncProperty(arbNsName, arbVarName, async (nsName, varName) => {
           const rt = createRuntime()
 
           // Create namespace but don't set variable
-          rt.run(`namespace eval ${nsName} {}`)
+          await rt.run(`namespace eval ${nsName} {}`)
 
           // Accessing non-existent variable should throw
-          const result = rt.run(`catch { namespace eval ${nsName} { set ${varName} } }`)
+          const result = await rt.run(`catch { namespace eval ${nsName} { set ${varName} } }`)
           expect(result).toBe('1') // catch returns 1 on error
         }),
         { numRuns: 10 }
       )
     })
 
-    it('namespace parent of root returns empty', () => {
+    it('namespace parent of root returns empty', async () => {
       const rt = createRuntime()
-      const parent = rt.run('namespace parent')
+      const parent = await rt.run('namespace parent')
       expect(parent).toBe('')
     })
 
-    it('circular variable links are detected and throw error', () => {
+    it('circular variable links are detected and throw error', async () => {
       const rt = createRuntime()
 
       // Create a circular link by directly manipulating the links map
@@ -443,15 +452,15 @@ describe('Namespace Properties', () => {
       ns.links.set('y', { ns, name: 'x' })
 
       // Attempting to access the circular link should throw
-      const result = rt.run('catch { set x 1 }')
+      const result = await rt.run('catch { set x 1 }')
       expect(result).toBe('1')
 
       // Verify the error message mentions circular link
-      const errorMsg = rt.run('catch { set x 1 } msg; set msg')
+      const errorMsg = await rt.run('catch { set x 1 } msg; set msg')
       expect(errorMsg).toContain('circular')
     })
 
-    it('longer circular variable links are detected', () => {
+    it('longer circular variable links are detected', async () => {
       const rt = createRuntime()
 
       // Create a longer circular link: a -> b -> c -> a
@@ -462,10 +471,10 @@ describe('Namespace Properties', () => {
       ns.links.set('c', { ns, name: 'a' })
 
       // Attempting to access the circular link should throw
-      const result = rt.run('catch { set a 1 }')
+      const result = await rt.run('catch { set a 1 }')
       expect(result).toBe('1')
 
-      const errorMsg = rt.run('catch { set a 1 } msg; set msg')
+      const errorMsg = await rt.run('catch { set a 1 } msg; set msg')
       expect(errorMsg).toContain('circular')
     })
   })

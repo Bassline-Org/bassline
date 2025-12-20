@@ -524,7 +524,7 @@ class ExprParser {
   }
 
   // Get value of an operand (returns {v: value, isFloat: boolean})
-  getValue(tok) {
+  async getValue(tok) {
     switch (tok.t) {
       case ET.NUM:
         return { v: tok.v, isFloat: false }
@@ -535,7 +535,7 @@ class ExprParser {
       case ET.VAR:
         return { v: this.rt.getVar(tok.v), isFloat: false }
       case ET.CMD:
-        return { v: this.rt.run(tok.v), isFloat: false }
+        return { v: await this.rt.run(tok.v), isFloat: false }
       default:
         throw new Error(`expr: unexpected token ${tok.t}`)
     }
@@ -567,8 +567,8 @@ class ExprParser {
   }
 
   // Parse expression (entry point)
-  parse() {
-    const result = this.parseTernary()
+  async parse() {
+    const result = await this.parseTernary()
     if (this.peek().t !== ET.EOF) {
       throw new Error(`expr: unexpected token after expression`)
     }
@@ -576,15 +576,15 @@ class ExprParser {
   }
 
   // Ternary: expr ? expr : expr (right-to-left, lazy)
-  parseTernary() {
-    const cond = this.parseOr()
+  async parseTernary() {
+    const cond = await this.parseOr()
     if (this.peek().t === ET.OP && this.peek().v === '?') {
       this.advance() // consume ?
 
       // Lazy evaluation: only evaluate the chosen branch
       if (this.toNum(cond)) {
         // Evaluate true branch
-        const trueVal = this.parseTernary()
+        const trueVal = await this.parseTernary()
         this.expect(ET.OP) // expect :
         // Skip false branch without evaluating
         this.skipTernary()
@@ -594,7 +594,7 @@ class ExprParser {
         this.skipTernary()
         this.expect(ET.OP) // expect :
         // Evaluate false branch
-        const falseVal = this.parseTernary()
+        const falseVal = await this.parseTernary()
         return falseVal
       }
     }
@@ -602,8 +602,8 @@ class ExprParser {
   }
 
   // Logical OR: || (lazy)
-  parseOr() {
-    let left = this.parseAnd()
+  async parseOr() {
+    let left = await this.parseAnd()
     while (this.peek().t === ET.OP && this.peek().v === '||') {
       this.advance()
       // Lazy: if left is true, don't evaluate right - skip it
@@ -611,15 +611,15 @@ class ExprParser {
         this.skipAnd() // skip without evaluating
         left = 1
       } else {
-        left = this.toNum(this.parseAnd()) ? 1 : 0
+        left = this.toNum(await this.parseAnd()) ? 1 : 0
       }
     }
     return left
   }
 
   // Logical AND: && (lazy)
-  parseAnd() {
-    let left = this.parseBitOr()
+  async parseAnd() {
+    let left = await this.parseBitOr()
     while (this.peek().t === ET.OP && this.peek().v === '&&') {
       this.advance()
       // Lazy: if left is false, don't evaluate right - skip it
@@ -627,48 +627,48 @@ class ExprParser {
         this.skipBitOr() // skip without evaluating
         left = 0
       } else {
-        left = this.toNum(this.parseBitOr()) ? 1 : 0
+        left = this.toNum(await this.parseBitOr()) ? 1 : 0
       }
     }
     return left
   }
 
   // Bitwise OR: |
-  parseBitOr() {
-    let left = this.parseBitXor()
+  async parseBitOr() {
+    let left = await this.parseBitXor()
     while (this.peek().t === ET.OP && this.peek().v === '|') {
       this.advance()
-      left = (this.toNum(left) | this.toNum(this.parseBitXor())) >>> 0
+      left = (this.toNum(left) | this.toNum(await this.parseBitXor())) >>> 0
     }
     return left
   }
 
   // Bitwise XOR: ^
-  parseBitXor() {
-    let left = this.parseBitAnd()
+  async parseBitXor() {
+    let left = await this.parseBitAnd()
     while (this.peek().t === ET.OP && this.peek().v === '^') {
       this.advance()
-      left = (this.toNum(left) ^ this.toNum(this.parseBitAnd())) >>> 0
+      left = (this.toNum(left) ^ this.toNum(await this.parseBitAnd())) >>> 0
     }
     return left
   }
 
   // Bitwise AND: &
-  parseBitAnd() {
-    let left = this.parseListOp()
+  async parseBitAnd() {
+    let left = await this.parseListOp()
     while (this.peek().t === ET.OP && this.peek().v === '&') {
       this.advance()
-      left = (this.toNum(left) & this.toNum(this.parseListOp())) >>> 0
+      left = (this.toNum(left) & this.toNum(await this.parseListOp())) >>> 0
     }
     return left
   }
 
   // List operators: in, ni
-  parseListOp() {
-    let left = this.parseStrEquality()
+  async parseListOp() {
+    let left = await this.parseStrEquality()
     while (this.peek().t === ET.OP && (this.peek().v === 'in' || this.peek().v === 'ni')) {
       const op = this.advance().v
-      const right = this.parseStrEquality()
+      const right = await this.parseStrEquality()
       const list = parseList(String(this.unwrap(right)))
       const found = list.includes(String(this.unwrap(left)))
       left = op === 'in' ? (found ? 1 : 0) : found ? 0 : 1
@@ -677,11 +677,11 @@ class ExprParser {
   }
 
   // String equality: eq, ne
-  parseStrEquality() {
-    let left = this.parseNumEquality()
+  async parseStrEquality() {
+    let left = await this.parseNumEquality()
     while (this.peek().t === ET.OP && (this.peek().v === 'eq' || this.peek().v === 'ne')) {
       const op = this.advance().v
-      const right = this.parseNumEquality()
+      const right = await this.parseNumEquality()
       const l = String(this.unwrap(left))
       const r = String(this.unwrap(right))
       if (op === 'eq') left = l === r ? 1 : 0
@@ -691,11 +691,11 @@ class ExprParser {
   }
 
   // Numeric equality: ==, !=
-  parseNumEquality() {
-    let left = this.parseStrRelation()
+  async parseNumEquality() {
+    let left = await this.parseStrRelation()
     while (this.peek().t === ET.OP && (this.peek().v === '==' || this.peek().v === '!=')) {
       const op = this.advance().v
-      const right = this.parseStrRelation()
+      const right = await this.parseStrRelation()
       // Use numeric comparison if both are numeric, otherwise string
       if (this.isNumeric(left) && this.isNumeric(right)) {
         if (op === '==') left = this.toNum(left) === this.toNum(right) ? 1 : 0
@@ -711,11 +711,11 @@ class ExprParser {
   }
 
   // String relational: lt, gt, le, ge
-  parseStrRelation() {
-    let left = this.parseNumRelation()
+  async parseStrRelation() {
+    let left = await this.parseNumRelation()
     while (this.peek().t === ET.OP && ['lt', 'gt', 'le', 'ge'].includes(this.peek().v)) {
       const op = this.advance().v
-      const right = this.parseNumRelation()
+      const right = await this.parseNumRelation()
       const cmp = String(this.unwrap(left)).localeCompare(String(this.unwrap(right)))
       if (op === 'lt') left = cmp < 0 ? 1 : 0
       else if (op === 'gt') left = cmp > 0 ? 1 : 0
@@ -726,11 +726,11 @@ class ExprParser {
   }
 
   // Numeric relational: <, >, <=, >=
-  parseNumRelation() {
-    let left = this.parseShift()
+  async parseNumRelation() {
+    let left = await this.parseShift()
     while (this.peek().t === ET.OP && ['<', '>', '<=', '>='].includes(this.peek().v)) {
       const op = this.advance().v
-      const right = this.parseShift()
+      const right = await this.parseShift()
       const l = this.toNum(left),
         r = this.toNum(right)
       if (op === '<') left = l < r ? 1 : 0
@@ -742,11 +742,11 @@ class ExprParser {
   }
 
   // Shift: <<, >>
-  parseShift() {
-    let left = this.parseAdd()
+  async parseShift() {
+    let left = await this.parseAdd()
     while (this.peek().t === ET.OP && (this.peek().v === '<<' || this.peek().v === '>>')) {
       const op = this.advance().v
-      const right = this.parseAdd()
+      const right = await this.parseAdd()
       if (op === '<<') left = this.toNum(left) << this.toNum(right)
       else left = this.toNum(left) >> this.toNum(right)
     }
@@ -754,11 +754,11 @@ class ExprParser {
   }
 
   // Additive: +, -
-  parseAdd() {
-    let left = this.parseMul()
+  async parseAdd() {
+    let left = await this.parseMul()
     while (this.peek().t === ET.OP && (this.peek().v === '+' || this.peek().v === '-')) {
       const op = this.advance().v
-      const right = this.parseMul()
+      const right = await this.parseMul()
       if (op === '+') left = this.toNum(left) + this.toNum(right)
       else left = this.toNum(left) - this.toNum(right)
     }
@@ -766,11 +766,11 @@ class ExprParser {
   }
 
   // Multiplicative: *, /, %
-  parseMul() {
-    let left = this.parseExp()
+  async parseMul() {
+    let left = await this.parseExp()
     while (this.peek().t === ET.OP && ['*', '/', '%'].includes(this.peek().v)) {
       const op = this.advance().v
-      const right = this.parseExp()
+      const right = await this.parseExp()
 
       // Check if either operand is explicitly a float (e.g., 7.0)
       const leftIsFloat = this.isExplicitFloat(left)
@@ -812,40 +812,40 @@ class ExprParser {
   }
 
   // Exponentiation: ** (right-to-left)
-  parseExp() {
-    const left = this.parseUnary()
+  async parseExp() {
+    const left = await this.parseUnary()
     if (this.peek().t === ET.OP && this.peek().v === '**') {
       this.advance()
-      const right = this.parseExp() // right-to-left recursion
+      const right = await this.parseExp() // right-to-left recursion
       return Math.pow(this.toNum(left), this.toNum(right))
     }
     return left
   }
 
   // Unary: -, +, !, ~
-  parseUnary() {
+  async parseUnary() {
     if (this.peek().t === ET.OP) {
       const op = this.peek().v
       if (op === '-' || op === '+' || op === '!' || op === '~') {
         this.advance()
-        const val = this.parseUnary()
+        const val = await this.parseUnary()
         if (op === '-') return -this.toNum(val)
         if (op === '+') return +this.toNum(val)
         if (op === '!') return this.toNum(val) ? 0 : 1
         if (op === '~') return ~this.toNum(val)
       }
     }
-    return this.parsePrimary()
+    return await this.parsePrimary()
   }
 
   // Primary: number, string, variable, command, function call, parenthesized expr
-  parsePrimary() {
+  async parsePrimary() {
     const tok = this.peek()
 
     // Parenthesized expression
     if (tok.t === ET.LPAREN) {
       this.advance()
-      const result = this.parseTernary()
+      const result = await this.parseTernary()
       this.expect(ET.RPAREN)
       return result
     }
@@ -860,10 +860,10 @@ class ExprParser {
 
       const args = []
       if (this.peek().t !== ET.RPAREN) {
-        args.push(this.parseTernary())
+        args.push(await this.parseTernary())
         while (this.peek().t === ET.COMMA) {
           this.advance()
-          args.push(this.parseTernary())
+          args.push(await this.parseTernary())
         }
       }
       this.expect(ET.RPAREN)
@@ -876,7 +876,7 @@ class ExprParser {
     // Literals and references
     if (tok.t === ET.NUM || tok.t === ET.FLOAT || tok.t === ET.STR || tok.t === ET.VAR || tok.t === ET.CMD) {
       this.advance()
-      return this.getValue(tok)
+      return await this.getValue(tok)
     }
 
     throw new Error(`expr: unexpected token ${tok.t}`)
@@ -884,9 +884,9 @@ class ExprParser {
 }
 
 // Main expr function
-export function expr(src, rt) {
+export async function expr(src, rt) {
   const parser = new ExprParser(src, rt)
-  const rawResult = parser.parse()
+  const rawResult = await parser.parse()
 
   // Unwrap if it's a wrapped value
   const result = parser.unwrap(rawResult)

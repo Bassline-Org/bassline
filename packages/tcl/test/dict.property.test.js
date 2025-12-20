@@ -40,15 +40,15 @@ function formatDictArgs(pairs) {
 
 describe('Dict Properties', () => {
   describe('Size Properties', () => {
-    it('dict size returns correct count', () => {
+    it('dict size returns correct count', async () => {
       fc.assert(
-        fc.property(arbDict, pairs => {
+        fc.asyncProperty(arbDict, async pairs => {
           const rt = createRuntime()
           const args = formatDictArgs(pairs)
 
           // Create dict
-          rt.run(`set d [dict create ${args}]`)
-          const size = Number(rt.run('dict size $d'))
+          await rt.run(`set d [dict create ${args}]`)
+          const size = Number(await rt.run('dict size $d'))
 
           // Size should equal number of unique keys
           const uniqueKeys = new Set(pairs.map(([k]) => k))
@@ -58,9 +58,9 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict set increases size by one for new key', () => {
+    it('dict set increases size by one for new key', async () => {
       fc.assert(
-        fc.property(arbDict, arbKey, arbValue, (pairs, newKey, value) => {
+        fc.asyncProperty(arbDict, arbKey, arbValue, async (pairs, newKey, value) => {
           const rt = createRuntime()
           const args = formatDictArgs(pairs)
 
@@ -68,11 +68,11 @@ describe('Dict Properties', () => {
           const filteredPairs = pairs.filter(([k]) => k !== newKey)
           const filteredArgs = formatDictArgs(filteredPairs)
 
-          rt.run(`set d [dict create ${filteredArgs}]`)
-          const sizeBefore = Number(rt.run('dict size $d'))
+          await rt.run(`set d [dict create ${filteredArgs}]`)
+          const sizeBefore = Number(await rt.run('dict size $d'))
 
-          rt.run(`dict set d {${newKey}} {${value}}`)
-          const sizeAfter = Number(rt.run('dict size $d'))
+          await rt.run(`dict set d {${newKey}} {${value}}`)
+          const sizeAfter = Number(await rt.run('dict size $d'))
 
           expect(sizeAfter).toBe(sizeBefore + 1)
         }),
@@ -80,20 +80,20 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict unset decreases size by one', () => {
+    it('dict unset decreases size by one', async () => {
       fc.assert(
-        fc.property(arbDict, pairs => {
+        fc.asyncProperty(arbDict, async pairs => {
           fc.pre(pairs.length > 0)
           const rt = createRuntime()
           const args = formatDictArgs(pairs)
 
-          rt.run(`set d [dict create ${args}]`)
-          const sizeBefore = Number(rt.run('dict size $d'))
+          await rt.run(`set d [dict create ${args}]`)
+          const sizeBefore = Number(await rt.run('dict size $d'))
 
           // Unset first key
           const keyToRemove = pairs[0][0]
-          rt.run(`dict unset d {${keyToRemove}}`)
-          const sizeAfter = Number(rt.run('dict size $d'))
+          await rt.run(`dict unset d {${keyToRemove}}`)
+          const sizeAfter = Number(await rt.run('dict size $d'))
 
           expect(sizeAfter).toBe(sizeBefore - 1)
         }),
@@ -103,13 +103,13 @@ describe('Dict Properties', () => {
   })
 
   describe('Get/Set Properties', () => {
-    it('dict get returns what was set', () => {
+    it('dict get returns what was set', async () => {
       fc.assert(
-        fc.property(arbKey, arbValue, (key, value) => {
+        fc.asyncProperty(arbKey, arbValue, async (key, value) => {
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key}} {${value}}]`)
-          const result = rt.run(`dict get $d {${key}}`)
+          await rt.run(`set d [dict create {${key}} {${value}}]`)
+          const result = await rt.run(`dict get $d {${key}}`)
 
           expect(result).toBe(value)
         }),
@@ -117,14 +117,14 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict set overwrites existing value', () => {
+    it('dict set overwrites existing value', async () => {
       fc.assert(
-        fc.property(arbKey, arbValue, arbValue, (key, val1, val2) => {
+        fc.asyncProperty(arbKey, arbValue, arbValue, async (key, val1, val2) => {
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key}} {${val1}}]`)
-          rt.run(`dict set d {${key}} {${val2}}`)
-          const result = rt.run(`dict get $d {${key}}`)
+          await rt.run(`set d [dict create {${key}} {${val1}}]`)
+          await rt.run(`dict set d {${key}} {${val2}}`)
+          const result = await rt.run(`dict get $d {${key}}`)
 
           expect(result).toBe(val2)
         }),
@@ -132,17 +132,17 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict set maintains other keys', () => {
+    it('dict set maintains other keys', async () => {
       fc.assert(
-        fc.property(arbKey, arbKey, arbValue, arbValue, arbValue, (key1, key2, val1, val2, newVal) => {
+        fc.asyncProperty(arbKey, arbKey, arbValue, arbValue, arbValue, async (key1, key2, val1, val2, newVal) => {
           fc.pre(key1 !== key2)
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key1}} {${val1}} {${key2}} {${val2}}]`)
-          rt.run(`dict set d {${key1}} {${newVal}}`)
+          await rt.run(`set d [dict create {${key1}} {${val1}} {${key2}} {${val2}}]`)
+          await rt.run(`dict set d {${key1}} {${newVal}}`)
 
           // key2 value should be unchanged
-          const result = rt.run(`dict get $d {${key2}}`)
+          const result = await rt.run(`dict get $d {${key2}}`)
           expect(result).toBe(val2)
         }),
         { numRuns: 15 }
@@ -151,13 +151,13 @@ describe('Dict Properties', () => {
   })
 
   describe('Exists Properties', () => {
-    it('dict exists returns 1 for existing key', () => {
+    it('dict exists returns 1 for existing key', async () => {
       fc.assert(
-        fc.property(arbKey, arbValue, (key, value) => {
+        fc.asyncProperty(arbKey, arbValue, async (key, value) => {
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key}} {${value}}]`)
-          const result = rt.run(`dict exists $d {${key}}`)
+          await rt.run(`set d [dict create {${key}} {${value}}]`)
+          const result = await rt.run(`dict exists $d {${key}}`)
 
           expect(result).toBe('1')
         }),
@@ -165,14 +165,14 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict exists returns 0 for non-existent key', () => {
+    it('dict exists returns 0 for non-existent key', async () => {
       fc.assert(
-        fc.property(arbKey, arbKey, arbValue, (existingKey, missingKey, value) => {
+        fc.asyncProperty(arbKey, arbKey, arbValue, async (existingKey, missingKey, value) => {
           fc.pre(existingKey !== missingKey)
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${existingKey}} {${value}}]`)
-          const result = rt.run(`dict exists $d {${missingKey}}`)
+          await rt.run(`set d [dict create {${existingKey}} {${value}}]`)
+          const result = await rt.run(`dict exists $d {${missingKey}}`)
 
           expect(result).toBe('0')
         }),
@@ -180,14 +180,14 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict exists returns 0 after unset', () => {
+    it('dict exists returns 0 after unset', async () => {
       fc.assert(
-        fc.property(arbKey, arbValue, (key, value) => {
+        fc.asyncProperty(arbKey, arbValue, async (key, value) => {
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key}} {${value}}]`)
-          rt.run(`dict unset d {${key}}`)
-          const result = rt.run(`dict exists $d {${key}}`)
+          await rt.run(`set d [dict create {${key}} {${value}}]`)
+          await rt.run(`dict unset d {${key}}`)
+          const result = await rt.run(`dict exists $d {${key}}`)
 
           expect(result).toBe('0')
         }),
@@ -197,15 +197,15 @@ describe('Dict Properties', () => {
   })
 
   describe('Keys/Values Properties', () => {
-    it('dict keys count equals dict size', () => {
+    it('dict keys count equals dict size', async () => {
       fc.assert(
-        fc.property(arbDict, pairs => {
+        fc.asyncProperty(arbDict, async pairs => {
           const rt = createRuntime()
           const args = formatDictArgs(pairs)
 
-          rt.run(`set d [dict create ${args}]`)
-          const size = Number(rt.run('dict size $d'))
-          const keys = rt.run('dict keys $d')
+          await rt.run(`set d [dict create ${args}]`)
+          const size = Number(await rt.run('dict size $d'))
+          const keys = await rt.run('dict keys $d')
           const keyCount = keys ? keys.split(/\s+/).length : 0
 
           expect(keyCount).toBe(size)
@@ -214,15 +214,15 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict values count equals dict size', () => {
+    it('dict values count equals dict size', async () => {
       fc.assert(
-        fc.property(arbDict, pairs => {
+        fc.asyncProperty(arbDict, async pairs => {
           const rt = createRuntime()
           const args = formatDictArgs(pairs)
 
-          rt.run(`set d [dict create ${args}]`)
-          const size = Number(rt.run('dict size $d'))
-          const values = rt.run('dict values $d')
+          await rt.run(`set d [dict create ${args}]`)
+          const size = Number(await rt.run('dict size $d'))
+          const values = await rt.run('dict values $d')
           const valueCount = values ? values.split(/\s+/).length : 0
 
           expect(valueCount).toBe(size)
@@ -233,52 +233,52 @@ describe('Dict Properties', () => {
   })
 
   describe('Merge Properties', () => {
-    it('merge with empty dict is identity', () => {
+    it('merge with empty dict is identity', async () => {
       fc.assert(
-        fc.property(arbKey, arbValue, (key, value) => {
+        fc.asyncProperty(arbKey, arbValue, async (key, value) => {
           const rt = createRuntime()
 
-          rt.run(`set d1 [dict create {${key}} {${value}}]`)
-          rt.run('set d2 [dict create]')
-          rt.run('set merged [dict merge $d1 $d2]')
+          await rt.run(`set d1 [dict create {${key}} {${value}}]`)
+          await rt.run('set d2 [dict create]')
+          await rt.run('set merged [dict merge $d1 $d2]')
 
-          const result = rt.run('dict get $merged {' + key + '}')
+          const result = await rt.run('dict get $merged {' + key + '}')
           expect(result).toBe(value)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('merge combines all keys', () => {
+    it('merge combines all keys', async () => {
       fc.assert(
-        fc.property(arbKey, arbKey, arbValue, arbValue, (key1, key2, val1, val2) => {
+        fc.asyncProperty(arbKey, arbKey, arbValue, arbValue, async (key1, key2, val1, val2) => {
           fc.pre(key1 !== key2)
           const rt = createRuntime()
 
-          rt.run(`set d1 [dict create {${key1}} {${val1}}]`)
-          rt.run(`set d2 [dict create {${key2}} {${val2}}]`)
-          rt.run('set merged [dict merge $d1 $d2]')
+          await rt.run(`set d1 [dict create {${key1}} {${val1}}]`)
+          await rt.run(`set d2 [dict create {${key2}} {${val2}}]`)
+          await rt.run('set merged [dict merge $d1 $d2]')
 
-          const size = Number(rt.run('dict size $merged'))
+          const size = Number(await rt.run('dict size $merged'))
           expect(size).toBe(2)
 
-          expect(rt.run(`dict get $merged {${key1}}`)).toBe(val1)
-          expect(rt.run(`dict get $merged {${key2}}`)).toBe(val2)
+          expect(await rt.run(`dict get $merged {${key1}}`)).toBe(val1)
+          expect(await rt.run(`dict get $merged {${key2}}`)).toBe(val2)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('merge last dict wins for duplicate keys', () => {
+    it('merge last dict wins for duplicate keys', async () => {
       fc.assert(
-        fc.property(arbKey, arbValue, arbValue, (key, val1, val2) => {
+        fc.asyncProperty(arbKey, arbValue, arbValue, async (key, val1, val2) => {
           const rt = createRuntime()
 
-          rt.run(`set d1 [dict create {${key}} {${val1}}]`)
-          rt.run(`set d2 [dict create {${key}} {${val2}}]`)
-          rt.run('set merged [dict merge $d1 $d2]')
+          await rt.run(`set d1 [dict create {${key}} {${val1}}]`)
+          await rt.run(`set d2 [dict create {${key}} {${val2}}]`)
+          await rt.run('set merged [dict merge $d1 $d2]')
 
-          const result = rt.run(`dict get $merged {${key}}`)
+          const result = await rt.run(`dict get $merged {${key}}`)
           expect(result).toBe(val2)
         }),
         { numRuns: 15 }
@@ -287,19 +287,19 @@ describe('Dict Properties', () => {
   })
 
   describe('Incr Properties', () => {
-    it('dict incr adds to numeric value', () => {
+    it('dict incr adds to numeric value', async () => {
       fc.assert(
-        fc.property(
+        fc.asyncProperty(
           arbKey,
           fc.integer({ min: 0, max: 50 }),
           fc.integer({ min: 1, max: 10 }),
-          (key, initial, increment) => {
+          async (key, initial, increment) => {
             const rt = createRuntime()
 
-            rt.run(`set d [dict create {${key}} ${initial}]`)
-            rt.run(`dict incr d {${key}} ${increment}`)
+            await rt.run(`set d [dict create {${key}} ${initial}]`)
+            await rt.run(`dict incr d {${key}} ${increment}`)
 
-            const result = Number(rt.run(`dict get $d {${key}}`))
+            const result = Number(await rt.run(`dict get $d {${key}}`))
             expect(result).toBe(initial + increment)
           }
         ),
@@ -307,15 +307,15 @@ describe('Dict Properties', () => {
       )
     })
 
-    it('dict incr with no increment adds 1', () => {
+    it('dict incr with no increment adds 1', async () => {
       fc.assert(
-        fc.property(arbKey, fc.integer({ min: 0, max: 50 }), (key, initial) => {
+        fc.asyncProperty(arbKey, fc.integer({ min: 0, max: 50 }), async (key, initial) => {
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key}} ${initial}]`)
-          rt.run(`dict incr d {${key}}`)
+          await rt.run(`set d [dict create {${key}} ${initial}]`)
+          await rt.run(`dict incr d {${key}}`)
 
-          const result = Number(rt.run(`dict get $d {${key}}`))
+          const result = Number(await rt.run(`dict get $d {${key}}`))
           expect(result).toBe(initial + 1)
         }),
         { numRuns: 15 }
@@ -324,38 +324,38 @@ describe('Dict Properties', () => {
   })
 
   describe('Replace/Remove Properties', () => {
-    it('dict replace returns new dict with value changed', () => {
+    it('dict replace returns new dict with value changed', async () => {
       fc.assert(
-        fc.property(arbKey, arbValue, arbValue, (key, val1, val2) => {
+        fc.asyncProperty(arbKey, arbValue, arbValue, async (key, val1, val2) => {
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key}} {${val1}}]`)
-          rt.run(`set d2 [dict replace $d {${key}} {${val2}}]`)
+          await rt.run(`set d [dict create {${key}} {${val1}}]`)
+          await rt.run(`set d2 [dict replace $d {${key}} {${val2}}]`)
 
           // New dict has new value
-          expect(rt.run(`dict get $d2 {${key}}`)).toBe(val2)
+          expect(await rt.run(`dict get $d2 {${key}}`)).toBe(val2)
           // Original unchanged
-          expect(rt.run(`dict get $d {${key}}`)).toBe(val1)
+          expect(await rt.run(`dict get $d {${key}}`)).toBe(val1)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('dict remove returns new dict without key', () => {
+    it('dict remove returns new dict without key', async () => {
       fc.assert(
-        fc.property(arbKey, arbKey, arbValue, arbValue, (key1, key2, val1, val2) => {
+        fc.asyncProperty(arbKey, arbKey, arbValue, arbValue, async (key1, key2, val1, val2) => {
           fc.pre(key1 !== key2)
           const rt = createRuntime()
 
-          rt.run(`set d [dict create {${key1}} {${val1}} {${key2}} {${val2}}]`)
-          rt.run(`set d2 [dict remove $d {${key1}}]`)
+          await rt.run(`set d [dict create {${key1}} {${val1}} {${key2}} {${val2}}]`)
+          await rt.run(`set d2 [dict remove $d {${key1}}]`)
 
           // New dict missing key1
-          expect(rt.run(`dict exists $d2 {${key1}}`)).toBe('0')
+          expect(await rt.run(`dict exists $d2 {${key1}}`)).toBe('0')
           // But has key2
-          expect(rt.run(`dict exists $d2 {${key2}}`)).toBe('1')
+          expect(await rt.run(`dict exists $d2 {${key2}}`)).toBe('1')
           // Original unchanged
-          expect(rt.run(`dict exists $d {${key1}}`)).toBe('1')
+          expect(await rt.run(`dict exists $d {${key1}}`)).toBe('1')
         }),
         { numRuns: 15 }
       )
