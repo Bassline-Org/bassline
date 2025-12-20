@@ -239,9 +239,9 @@ describe('End-to-End Scenarios', () => {
 
   it('plumber routes messages to multiple cells', async () => {
     const cells = createCells()
-    // Use object lattice since we're sending objects, not arrays
-    await cells.put({ path: '/logs' }, { lattice: 'counter' })
-    await cells.put({ path: '/errors' }, { lattice: 'counter' })
+    // Use setUnion to collect message IDs
+    await cells.put({ path: '/logs' }, { lattice: 'setUnion' })
+    await cells.put({ path: '/errors' }, { lattice: 'setUnion' })
 
     const plumber = createPlumber()
     await plumber.put(
@@ -259,12 +259,13 @@ describe('End-to-End Scenarios', () => {
       }
     )
 
-    // Kit routes to cells and wraps message in +1 count
+    // Kit routes to cells and adds message ID to the set
+    let msgId = 0
     const kit = resource({
       get: async h => cells.get(h),
       put: async (h, _body) => {
-        // For counting, each message increments by 1
-        return cells.put(h, 1)
+        // Add unique message ID to the set
+        return cells.put(h, [++msgId])
       },
     })
 
@@ -273,13 +274,13 @@ describe('End-to-End Scenarios', () => {
     await plumber.put({ path: '/send', kit }, { level: 'error', msg: 'Oops' })
     await plumber.put({ path: '/send', kit }, { level: 'info', msg: 'World' })
 
-    // Check logs - should have counted 3 messages
+    // Check logs - should have 3 message IDs
     const logs = await cells.get({ path: '/logs/value' })
-    expect(logs.body).toBe(3)
+    expect(logs.body.length).toBe(3)
 
-    // Check errors - should only have 1 error
+    // Check errors - should only have 1 error message ID
     const errors = await cells.get({ path: '/errors/value' })
-    expect(errors.body).toBe(1)
+    expect(errors.body.length).toBe(1)
   })
 
   it('bassline self-describes its resources', async () => {

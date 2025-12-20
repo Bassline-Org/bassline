@@ -348,45 +348,6 @@ describe('Lattice Properties', () => {
     })
   })
 
-  describe('counter', () => {
-    it('is associative', () => {
-      const { merge } = lattices.counter
-      const values = [
-        [1, 2, 3],
-        [5, 1, 9],
-        [0, 0, 0],
-      ]
-
-      for (const [a, b, c] of values) {
-        expect(merge(merge(a, b), c)).toBe(merge(a, merge(b, c)))
-      }
-    })
-
-    it('is commutative', () => {
-      const { merge } = lattices.counter
-      const pairs = [
-        [1, 2],
-        [5, 3],
-        [0, 10],
-      ]
-
-      for (const [a, b] of pairs) {
-        expect(merge(a, b)).toBe(merge(b, a))
-      }
-    })
-
-    it('has identity', () => {
-      const { merge, initial } = lattices.counter
-      const values = [1, 5, 0, 10]
-
-      for (const a of values) {
-        expect(merge(initial, a)).toBe(a)
-      }
-    })
-
-    // Note: counter is NOT idempotent: merge(5, 5) = 10 != 5
-  })
-
   describe('boolean (OR)', () => {
     it('is associative', () => {
       const { merge } = lattices.boolean

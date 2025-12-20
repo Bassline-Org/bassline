@@ -7,11 +7,7 @@ export default defineConfig({
     // Test organization by type
     // Run all: pnpm test
     // Run specific: pnpm test:unit, pnpm test:property, pnpm test:integration
-    include: [
-      'packages/*/test/**/*.test.js',
-      'packages/*/test/**/*.property.test.js',
-      'test/**/*.test.js',
-    ],
+    include: ['packages/*/test/**/*.test.js', 'packages/*/test/**/*.property.test.js', 'test/**/*.test.js'],
   },
 })
 

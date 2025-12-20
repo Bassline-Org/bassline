@@ -1,20 +1,21 @@
 /**
- * @bassline/tcl - Tcl-style scripting for Bassline
+ * @bassline/tcl - Tcl-inspired shell for Bassline
  *
- * A minimal Tcl interpreter for inspector scripting areas.
- *
- * Usage:
- *   import { createInterpreter } from '@bassline/tcl'
- *   import { loadStandardCommands } from '@bassline/tcl/commands'
- *   import { loadBasslineCommands } from '@bassline/tcl/bassline'
- *
- *   const interp = createInterpreter()
- *   loadStandardCommands(interp)
- *   loadBasslineCommands(interp, bl)
- *
- *   interp.run('get [uri bl:///cells/counter]')
+ * A minimal scripting layer using / as namespace separator.
  */
 
-export { createInterpreter, parseScript, parseTclList } from './tcl.js'
-export { loadStandardCommands, createVariableCommands } from './commands.js'
-export { loadBasslineCommands, createBasslineCommands } from './bassline.js'
+export { TT, tokenize, RC } from './tok.js'
+export { Runtime } from './runtime.js'
+export { createShell } from './shell.js'
+
+// Standard libraries
+export { std } from './libs/std.js'
+export { string } from './libs/string.js'
+export { namespace } from './libs/namespace.js'
+export { list, parseList, formatList } from './libs/list.js'
+export { dict, dictCmd } from './libs/dict.js'
+export { event } from './libs/event.js'
+export { info } from './libs/info.js'
+export { createChanCommands, setupChannels } from './libs/chan.js'
+export { Channel, ChannelRegistry, createStdChannels, createStringChannel } from './channel.js'
+export { expr } from './expr.js'
