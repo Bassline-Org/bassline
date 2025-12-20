@@ -2,6 +2,16 @@
 
 A minimal protocol for reflexive distributed systems.
 
+Built with <3 by your friends at Bassline :)
+
+## 🚧 IMPORTANT NOTE! 🚧
+
+This is stable not yet!
+
+We just recently made this public to share, and you are welcome to play with it or check out the code. But you probably shouldn't use this for anything serious as we are ironing our concrete usage patterns.
+
+But do reach out if you have any questions!
+
 ## Resources
 
 A resource is something you can `get` from or `put` to.
@@ -13,42 +23,11 @@ A resource is something you can `get` from or `put` to.
 }
 ```
 
-That's the whole interface. Resources compose through routing, which takes about 35 lines total. See [packages/core/src/resource.js](./packages/core/src/resource.js).
+Resources compose through routing, and we only interact with resources through local addressing. See [packages/core/src/resource.js](./packages/core/src/resource.js).
 
-## Basslines
+Routing can do more than just find things! For example the `/unknown` route is our fallback route, which let's us have load binding of modules & other resources in the system.
 
-A bassline is a resource that does two things: it describes what's available, and it routes to those things.
-
-```javascript
-const app = routes({
-  '': resource({
-    get: async () => ({
-      headers: { type: '/types/bassline' },
-      body: {
-        name: 'my-app',
-        resources: {
-          '/cells': { description: 'State' },
-          '/data': { description: 'Documents' },
-        },
-      },
-    }),
-  }),
-  cells: cellsResource,
-  data: dataResource,
-})
-```
-
-When you GET a bassline, it tells you what exists. When you PUT or GET through it, it handles the actual routing. Description and behavior live together.
-
-This makes resources act like packages. They declare their contents and manage access to them. A bassline can contain other basslines, giving you nested namespaces.
-
-Paths are always relative. `/cells/counter` in one bassline is different from `/cells/counter` in another. Resources never need to know their absolute location. You get isolation and composability from this naturally.
-
-Because the bassline handles routing, it controls what actually happens. It can filter requests, transform responses, delegate to other resources, or deny access entirely. The description is what's advertised. The routing is what's enforced.
-
-See [packages/core/docs/Bassline-Schema.md](./packages/core/docs/Bassline-Schema.md) for the schema.
-
-## The Kit Pattern
+## Kits
 
 When a resource needs to reach outside itself, it uses `h.kit`:
 
@@ -64,7 +43,9 @@ const worker = resource({
 
 Kit is just a resource passed in through headers. The caller decides what it routes to. Could be local, remote, sandboxed, logged. The resource using it doesn't know or care.
 
-This works across network boundaries because transports are resources too. When crossing the wire, the transport passes a link that routes back through itself. Resources stay portable.
+Because of local addressing, kit interactions represent semantic actions, not concrete locations of things, so we can have quite flexible resource interactions.
+
+This can work across network boundaries because our transports are resources too. So when crossing the wire, the transport passes a link that routes back through itself. Local addressing keeps this sane.
 
 ## Resource Kinds
 
@@ -72,13 +53,13 @@ Patterns for thinking about resources based on how they behave.
 
 Cells accumulate partial information through merging. Writes don't replace, they merge. Good for distributed state where ordering can't be coordinated.
 
-Propagators connect cells. When inputs change, they recompute and write outputs. Reactive dataflow.
+Propagators connect cells. When inputs change, they recompute and write outputs. Reactive dataflow, and while pure they maintain lattice properties.
 
-Oracles answer questions. Read-only. Databases, function registries, evaluators.
+Oracles answer questions. Databases, function registries, evaluators are all cases of these.
 
 Scouts discover things autonomously and report what they find. Monitors, crawlers, peer discovery.
 
-See [packages/core/docs/Resource-Kinds.md](./packages/core/docs/Resource-Kinds.md) for details.
+See [packages/core/docs/Resource-Kinds.md](./packages/core/docs/Resource-Kinds.md) for some more details (there are still stubs, unfortunate!).
 
 ## Packages
 
@@ -88,10 +69,10 @@ packages/node/       Node.js: HTTP server, WebSocket server, file store
 packages/remote/     WebSocket client for connecting to remote basslines
 packages/database/   SQLite
 packages/services/   AI integration (Claude)
-packages/trust/      Capability-based trust
-packages/tcl/        Tcl scripting
+packages/trust/      Capability-based trust experiments
+packages/tcl/        Our TCL interpreter (right now it maintains tcl semantics, but we have plans to have basslines relate directly to commands)
 
-apps/cli/            Daemon and MCP server
+apps/cli/            Daemon and MCP server (actively getting ripped out and replaced with blits)
 apps/tui/            Terminal UI
 ```
 
