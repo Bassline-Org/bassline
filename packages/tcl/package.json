@@ -1,0 +1,30 @@
+{
+  "name": "@bassline/tcl",
+  "version": "0.1.0",
+  "description": "Tcl-style scripting language for Bassline",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./commands": "./src/commands.js",
+    "./bassline": "./src/bassline.js",
+    "./upgrade": "./src/upgrade.js"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@bassline/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "tcl",
+    "interpreter",
+    "scripting",
+    "bassline"
+  ],
+  "license": "AGPL-3.0"
+}

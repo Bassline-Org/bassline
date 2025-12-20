@@ -2,6 +2,7 @@
   "name": "bassline",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Getchyo groove on",
   "repository": {
     "type": "git",
@@ -19,15 +20,45 @@
     "dev:editor": "pnpm --filter @bassline/editor dev",
     "dev:all": "pnpm --parallel --stream dev",
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
+    "build:types": "pnpm --filter './packages/*' --filter '!@bassline/structure-editor' --parallel exec tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run packages/*/test/*.test.js",
+    "test:property": "vitest run '**/*.property.test.js'",
+    "test:integration": "vitest run test/integration/",
     "typecheck": "pnpm -r typecheck",
+    "lint": "eslint packages/*/src/**/*.js",
+    "lint:fix": "eslint packages/*/src/**/*.js --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "knip": "knip",
+    "docs": "jsdoc -c jsdoc.config.json",
     "clean": "pnpm -r clean && rm -rf node_modules",
-    "setup:mcp": "sed \"s|<PROJECT_PATH>|$(pwd)|g\" .mcp.json.example > .mcp.json && echo 'Created .mcp.json with project path:' && cat .mcp.json"
+    "setup:mcp": "sed \"s|<PROJECT_PATH>|$(pwd)|g\" .mcp.json.example > .mcp.json && echo 'Created .mcp.json with project path:' && cat .mcp.json",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@fast-check/vitest": "^0.2.4",
     "@types/node": "^20.19.9",
     "@types/react": "^19.1.13",
-    "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^9.16.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^50.6.1",
+    "husky": "^9.1.7",
+    "jsdoc": "^4.0.4",
+    "knip": "^5.73.3",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
     "typescript": "^5.3.3",
     "vitest": "^3.2.4"
   }

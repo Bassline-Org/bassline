@@ -11,11 +11,7 @@
     "seed": "node src/seed.js"
   },
   "dependencies": {
-    "@bassline/core": "workspace:*",
-    "@bassline/store-node": "workspace:*",
-    "@bassline/server-node": "workspace:*",
-    "@bassline/cells": "workspace:*",
-    "@bassline/propagators": "workspace:*"
+    "@bassline/core": "workspace:*"
   },
   "license": "AGPL-3.0"
 }

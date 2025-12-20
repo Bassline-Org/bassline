@@ -1,189 +1,177 @@
 import { describe, it, expect } from 'vitest'
-import { Bassline } from '../src/bassline.js'
 import { createPlumber } from '../src/plumber.js'
+import { createMockKit } from './helpers.js'
 
 describe('createPlumber', () => {
-  describe('rule management', () => {
-    it('adds and retrieves rules', () => {
-      const plumber = createPlumber()
-      plumber.addRule('test-rule', {
-        match: { uri: '^bl:///data/.*' },
-        port: 'test-port'
-      })
+  it('lists plumber at root', async () => {
+    const plumber = createPlumber()
+    const result = await plumber.get({ path: '/' })
 
-      const rule = plumber._rules.get('test-rule')
-      expect(rule.match.uri).toBe('^bl:///data/.*')
-      expect(rule.port).toBe('test-port')
+    expect(result.headers.type).toBe('/types/bassline')
+    expect(result.body.name).toBe('plumber')
+  })
+
+  it('lists rules (initially empty)', async () => {
+    const plumber = createPlumber()
+    const result = await plumber.get({ path: '/rules' })
+
+    expect(result.body).toEqual({})
+  })
+
+  it('creates rule', async () => {
+    const plumber = createPlumber()
+    const rule = { match: { type: 'user' }, to: '/cells/users' }
+
+    const result = await plumber.put({ path: '/rules/user-rule' }, rule)
+
+    expect(result.body).toEqual(rule)
+  })
+
+  it('gets rule by name', async () => {
+    const plumber = createPlumber()
+    const rule = { match: { type: 'event' }, to: '/events' }
+
+    await plumber.put({ path: '/rules/event-rule' }, rule)
+
+    const result = await plumber.get({ path: '/rules/event-rule' })
+    expect(result.body).toEqual(rule)
+  })
+
+  it('returns not-found for missing rule', async () => {
+    const plumber = createPlumber()
+    const result = await plumber.get({ path: '/rules/missing' })
+
+    expect(result.headers.condition).toBe('not-found')
+  })
+
+  it('lists all rules', async () => {
+    const plumber = createPlumber()
+
+    await plumber.put({ path: '/rules/rule1' }, { match: {}, to: '/a' })
+    await plumber.put({ path: '/rules/rule2' }, { match: {}, to: '/b' })
+
+    const result = await plumber.get({ path: '/rules' })
+    expect(result.body).toHaveProperty('rule1')
+    expect(result.body).toHaveProperty('rule2')
+  })
+
+  describe('send', () => {
+    it('returns empty matched array when no rules', async () => {
+      const plumber = createPlumber()
+      const result = await plumber.put({ path: '/send' }, { test: 'data' })
+
+      expect(result.body.matched).toEqual([])
     })
 
-    it('removes rules', () => {
+    it('matches rule and dispatches via kit', async () => {
+      const kit = createMockKit()
       const plumber = createPlumber()
-      plumber.addRule('test-rule', { match: {}, port: 'test' })
-      plumber.removeRule('test-rule')
 
-      expect(plumber._rules.has('test-rule')).toBe(false)
+      await plumber.put({ path: '/rules/test' }, { match: { type: 'greeting' }, to: '/cells/greetings/value' })
+
+      const result = await plumber.put({ path: '/send', kit }, { type: 'greeting', message: 'hello' })
+
+      expect(result.body.matched).toContain('test')
+
+      const calls = kit.calls()
+      expect(calls.length).toBe(1)
+      expect(calls[0].headers.path).toBe('/cells/greetings/value')
+      expect(calls[0].body.message).toBe('hello')
+    })
+
+    it('matches multiple rules', async () => {
+      const kit = createMockKit()
+      const plumber = createPlumber()
+
+      await plumber.put({ path: '/rules/r1' }, { match: {}, to: '/a' })
+      await plumber.put({ path: '/rules/r2' }, { match: {}, to: '/b' })
+
+      const result = await plumber.put({ path: '/send', kit }, { data: 'test' })
+
+      expect(result.body.matched.length).toBe(2)
+      expect(kit.calls().length).toBe(2)
+    })
+
+    it('does not dispatch when rule has no to path', async () => {
+      const kit = createMockKit()
+      const plumber = createPlumber()
+
+      await plumber.put({ path: '/rules/log' }, { match: {} })
+
+      const result = await plumber.put({ path: '/send', kit }, { data: 'test' })
+
+      expect(result.body.matched).toContain('log')
+      expect(kit.calls().length).toBe(0)
+    })
+
+    it('works without kit', async () => {
+      const plumber = createPlumber()
+
+      await plumber.put({ path: '/rules/r1' }, { match: {}, to: '/a' })
+
+      // Should not throw
+      const result = await plumber.put({ path: '/send' }, { data: 'test' })
+      expect(result.body.matched).toContain('r1')
     })
   })
 
-  describe('routing', () => {
-    it('finds matching rules for a message', () => {
+  describe('pattern matching', () => {
+    it('matches empty pattern to anything', async () => {
       const plumber = createPlumber()
-      plumber.addRule('data-rule', {
-        match: { uri: '^bl:///data/.*' },
-        port: 'data-port'
-      })
-      plumber.addRule('cell-rule', {
-        match: { headers: { type: '^cell$' } },
-        port: 'cell-port'
-      })
+      await plumber.put({ path: '/rules/all' }, { match: {} })
 
-      const dataMatches = plumber.route({ uri: 'bl:///data/users' })
-      expect(dataMatches).toHaveLength(1)
-      expect(dataMatches[0].name).toBe('data-rule')
-
-      const cellMatches = plumber.route({ headers: { type: 'cell' } })
-      expect(cellMatches).toHaveLength(1)
-      expect(cellMatches[0].name).toBe('cell-rule')
+      const result = await plumber.put({ path: '/send' }, { any: 'data' })
+      expect(result.body.matched).toContain('all')
     })
 
-    it('returns multiple matching rules', () => {
+    it('matches null/undefined pattern to anything', async () => {
       const plumber = createPlumber()
-      plumber.addRule('rule-1', {
-        match: { uri: '^bl:///' },
-        port: 'port-1'
-      })
-      plumber.addRule('rule-2', {
-        match: { uri: '.*' },
-        port: 'port-2'
-      })
+      await plumber.put({ path: '/rules/all' }, { match: null })
 
-      const matches = plumber.route({ uri: 'bl:///anything' })
-      expect(matches).toHaveLength(2)
+      const result = await plumber.put({ path: '/send' }, { any: 'data' })
+      expect(result.body.matched).toContain('all')
     })
 
-    it('returns empty array when no rules match', () => {
+    it('matches exact values', async () => {
       const plumber = createPlumber()
-      plumber.addRule('specific', {
-        match: { uri: '^bl:///data/.*' },
-        port: 'data'
-      })
+      // Note: patterns are treated as regex, so use ^ and $ for exact match
+      await plumber.put({ path: '/rules/exact' }, { match: { status: '^active$' } })
 
-      const matches = plumber.route({ uri: 'bl:///other/path' })
-      expect(matches).toHaveLength(0)
-    })
-  })
+      const r1 = await plumber.put({ path: '/send' }, { status: 'active' })
+      expect(r1.body.matched).toContain('exact')
 
-  describe('ports and listeners', () => {
-    it('dispatches messages to listeners on matching ports', () => {
-      const plumber = createPlumber()
-      plumber.addRule('test', {
-        match: { uri: '.*' },
-        port: 'test-port'
-      })
-
-      const received = []
-      plumber.listen('test-port', (msg) => received.push(msg))
-
-      plumber.dispatch({ uri: 'bl:///anything', body: 42 })
-
-      expect(received).toHaveLength(1)
-      expect(received[0].uri).toBe('bl:///anything')
-      expect(received[0].body).toBe(42)
+      const r2 = await plumber.put({ path: '/send' }, { status: 'inactive' })
+      expect(r2.body.matched).not.toContain('exact')
     })
 
-    it('supports multiple listeners on same port', () => {
+    it('matches nested objects', async () => {
       const plumber = createPlumber()
-      plumber.addRule('test', { match: { uri: '.*' }, port: 'port' })
+      await plumber.put({ path: '/rules/nested' }, { match: { user: { role: 'admin' } } })
 
-      const received1 = []
-      const received2 = []
-      plumber.listen('port', (msg) => received1.push(msg))
-      plumber.listen('port', (msg) => received2.push(msg))
+      const r1 = await plumber.put({ path: '/send' }, { user: { role: 'admin', name: 'Alice' } })
+      expect(r1.body.matched).toContain('nested')
 
-      plumber.dispatch({ uri: 'bl:///test' })
-
-      expect(received1).toHaveLength(1)
-      expect(received2).toHaveLength(1)
+      const r2 = await plumber.put({ path: '/send' }, { user: { role: 'user', name: 'Bob' } })
+      expect(r2.body.matched).not.toContain('nested')
     })
 
-    it('returns unsubscribe function', () => {
+    it('matches regex patterns for strings', async () => {
       const plumber = createPlumber()
-      plumber.addRule('test', { match: { uri: '.*' }, port: 'port' })
+      await plumber.put({ path: '/rules/regex' }, { match: { email: '@example\\.com$' } })
 
-      const received = []
-      const unsubscribe = plumber.listen('port', (msg) => received.push(msg))
+      const r1 = await plumber.put({ path: '/send' }, { email: 'test@example.com' })
+      expect(r1.body.matched).toContain('regex')
 
-      plumber.dispatch({ uri: 'bl:///first' })
-      unsubscribe()
-      plumber.dispatch({ uri: 'bl:///second' })
-
-      expect(received).toHaveLength(1)
-      expect(received[0].uri).toBe('bl:///first')
-    })
-  })
-
-  describe('integration with Bassline', () => {
-    it('provides routes for rule management', async () => {
-      const bl = new Bassline()
-      const plumber = createPlumber()
-      plumber.install(bl)
-
-      // Add a rule via PUT
-      await bl.put('bl:///plumb/rules/test-rule', {}, {
-        match: { uri: '^bl:///data/.*' },
-        port: 'data-port'
-      })
-
-      // Retrieve the rule via GET
-      const result = await bl.get('bl:///plumb/rules/test-rule')
-      expect(result.body.match.uri).toBe('^bl:///data/.*')
-      expect(result.body.port).toBe('data-port')
-
-      // List all rules
-      const list = await bl.get('bl:///plumb/rules')
-      expect(list.body.entries).toHaveLength(1)
-      expect(list.body.entries[0].name).toBe('test-rule')
+      const r2 = await plumber.put({ path: '/send' }, { email: 'test@other.com' })
+      expect(r2.body.matched).not.toContain('regex')
     })
 
-    it('dispatches via tap on PUT', async () => {
-      const bl = new Bassline()
+    it('does not match primitives against objects', async () => {
       const plumber = createPlumber()
-      plumber.install(bl)
+      await plumber.put({ path: '/rules/obj' }, { match: { data: { nested: true } } })
 
-      // Add a rule that matches anything
-      plumber.addRule('all', {
-        match: { uri: '.*' },
-        port: 'all-changes'
-      })
-
-      // Add a route to PUT to
-      bl.route('/data/:key', {
-        put: ({ params, body }) => ({
-          headers: { type: 'data' },
-          body
-        })
-      })
-
-      // Listen on the port
-      const received = []
-      plumber.listen('all-changes', (msg) => received.push(msg))
-
-      // PUT should trigger the tap which dispatches to the port
-      await bl.put('bl:///data/test', {}, { value: 42 })
-
-      expect(received).toHaveLength(1)
-      expect(received[0].uri).toBe('bl:///data/test')
-      expect(received[0].headers.type).toBe('data')
-      expect(received[0].body.value).toBe(42)
-    })
-
-    it('returns null for non-existent rules', async () => {
-      const bl = new Bassline()
-      const plumber = createPlumber()
-      plumber.install(bl)
-
-      const result = await bl.get('bl:///plumb/rules/missing')
-      expect(result).toBeNull()
+      const result = await plumber.put({ path: '/send' }, { data: 'string' })
+      expect(result.body.matched).not.toContain('obj')
     })
   })
 })

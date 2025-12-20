@@ -20,34 +20,36 @@ const BL_URL = process.env.BL_URL || 'http://localhost:9111'
 const TOOLS = [
   {
     name: 'bassline_get',
-    description: 'Get a resource from Bassline by URI. Returns the resource headers and body. Common URIs: bl:///cells (list cells), bl:///data (list data), bl:///propagators (list propagators), bl:///types (list types), bl:///links (list link queries).',
+    description:
+      'Get a resource from Bassline by URI. Returns the resource headers and body. Common URIs: bl:///cells (list cells), bl:///data (list data), bl:///propagators (list propagators), bl:///types (list types), bl:///links (list link queries).',
     inputSchema: {
       type: 'object',
       properties: {
         uri: {
           type: 'string',
-          description: 'Resource URI (e.g., bl:///cells/counter, bl:///data/users, bl:///types)'
-        }
+          description: 'Resource URI (e.g., bl:///cells/counter, bl:///data/users, bl:///types)',
+        },
       },
-      required: ['uri']
-    }
+      required: ['uri'],
+    },
   },
   {
     name: 'bassline_put',
-    description: 'Put/update a resource in Bassline. For cells, use bl:///cells/<name> with body {lattice: "maxNumber"|"minNumber"|"setUnion"|"lww"}. For cell values, use bl:///cells/<name>/value with the value as body.',
+    description:
+      'Put/update a resource in Bassline. For cells, use bl:///cells/<name> with body {lattice: "maxNumber"|"minNumber"|"setUnion"|"lww"}. For cell values, use bl:///cells/<name>/value with the value as body.',
     inputSchema: {
       type: 'object',
       properties: {
         uri: {
           type: 'string',
-          description: 'Resource URI'
+          description: 'Resource URI',
         },
         body: {
-          description: 'Resource body (any JSON value)'
-        }
+          description: 'Resource body (any JSON value)',
+        },
       },
-      required: ['uri', 'body']
-    }
+      required: ['uri', 'body'],
+    },
   },
   {
     name: 'bassline_list',
@@ -57,31 +59,32 @@ const TOOLS = [
       properties: {
         path: {
           type: 'string',
-          description: 'Path to list (e.g., cells, data, data/users, propagators, types)'
-        }
+          description: 'Path to list (e.g., cells, data, data/users, propagators, types)',
+        },
       },
-      required: ['path']
-    }
+      required: ['path'],
+    },
   },
   {
     name: 'bassline_links',
-    description: 'Query links to or from a resource. Use "to" for backlinks (what references this?), "from" for forward refs (what does this reference?).',
+    description:
+      'Query links to or from a resource. Use "to" for backlinks (what references this?), "from" for forward refs (what does this reference?).',
     inputSchema: {
       type: 'object',
       properties: {
         direction: {
           type: 'string',
           enum: ['to', 'from'],
-          description: 'Link direction: "to" for backlinks, "from" for forward refs'
+          description: 'Link direction: "to" for backlinks, "from" for forward refs',
         },
         uri: {
           type: 'string',
-          description: 'Resource URI to query links for'
-        }
+          description: 'Resource URI to query links for',
+        },
       },
-      required: ['direction', 'uri']
-    }
-  }
+      required: ['direction', 'uri'],
+    },
+  },
 ]
 
 // HTTP client for Bassline daemon
@@ -98,7 +101,7 @@ async function blPut(uri, body) {
   const res = await fetch(`${BL_URL}?uri=${encodeURIComponent(uri)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
   })
   if (!res.ok) {
     const text = await res.text()
@@ -147,7 +150,7 @@ const handlers = {
     } catch (err) {
       return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true }
     }
-  }
+  },
 }
 
 // MCP protocol handler
@@ -162,20 +165,20 @@ function handleRequest(request) {
         result: {
           protocolVersion: '2024-11-05',
           capabilities: {
-            tools: {}
+            tools: {},
           },
           serverInfo: {
             name: 'bassline',
-            version: '1.0.0'
-          }
-        }
+            version: '1.0.0',
+          },
+        },
       }
 
     case 'tools/list':
       return {
         jsonrpc: '2.0',
         id,
-        result: { tools: TOOLS }
+        result: { tools: TOOLS },
       }
 
     case 'tools/call':
@@ -193,8 +196,8 @@ function handleRequest(request) {
         id,
         error: {
           code: -32601,
-          message: `Method not found: ${method}`
-        }
+          message: `Method not found: ${method}`,
+        },
       }
   }
 }
@@ -209,8 +212,8 @@ async function handleToolCall(params, id) {
       id,
       error: {
         code: -32602,
-        message: `Unknown tool: ${name}`
-      }
+        message: `Unknown tool: ${name}`,
+      },
     }
   }
 
@@ -219,7 +222,7 @@ async function handleToolCall(params, id) {
     return {
       jsonrpc: '2.0',
       id,
-      result
+      result,
     }
   } catch (err) {
     return {
@@ -227,8 +230,8 @@ async function handleToolCall(params, id) {
       id,
       result: {
         content: [{ type: 'text', text: `Error: ${err.message}` }],
-        isError: true
-      }
+        isError: true,
+      },
     }
   }
 }
@@ -238,7 +241,7 @@ async function main() {
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: false
+    terminal: false,
   })
 
   // Log to stderr so it doesn't interfere with MCP protocol
@@ -246,7 +249,7 @@ async function main() {
 
   log(`Starting MCP server, connecting to ${BL_URL}`)
 
-  rl.on('line', async (line) => {
+  rl.on('line', async line => {
     if (!line.trim()) return
 
     try {
@@ -262,14 +265,16 @@ async function main() {
       }
     } catch (err) {
       log('Parse error:', err.message)
-      console.log(JSON.stringify({
-        jsonrpc: '2.0',
-        id: null,
-        error: {
-          code: -32700,
-          message: 'Parse error'
-        }
-      }))
+      console.log(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: null,
+          error: {
+            code: -32700,
+            message: 'Parse error',
+          },
+        })
+      )
     }
   })
 

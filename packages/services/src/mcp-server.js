@@ -4,7 +4,6 @@
  * These tools can be passed to Claude's tool_use feature,
  * enabling bidirectional integration where Claude can
  * read and write Bassline resources.
- *
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @returns {Array<object>} Array of tool definitions with handlers
  */
@@ -18,10 +17,10 @@ export function createMCPTools(bl) {
         properties: {
           uri: {
             type: 'string',
-            description: 'Resource URI (e.g., bl:///cells/counter, bl:///data/users)'
-          }
+            description: 'Resource URI (e.g., bl:///cells/counter, bl:///data/users)',
+          },
         },
-        required: ['uri']
+        required: ['uri'],
       },
       handler: async ({ uri }) => {
         try {
@@ -30,7 +29,7 @@ export function createMCPTools(bl) {
         } catch (err) {
           return `Error: ${err.message}`
         }
-      }
+      },
     },
     {
       name: 'bassline_put',
@@ -40,13 +39,13 @@ export function createMCPTools(bl) {
         properties: {
           uri: {
             type: 'string',
-            description: 'Resource URI'
+            description: 'Resource URI',
           },
           body: {
-            description: 'Resource body (can be any JSON value)'
-          }
+            description: 'Resource body (can be any JSON value)',
+          },
         },
-        required: ['uri', 'body']
+        required: ['uri', 'body'],
       },
       handler: async ({ uri, body }) => {
         try {
@@ -55,7 +54,7 @@ export function createMCPTools(bl) {
         } catch (err) {
           return `Error: ${err.message}`
         }
-      }
+      },
     },
     {
       name: 'bassline_list',
@@ -65,10 +64,10 @@ export function createMCPTools(bl) {
         properties: {
           path: {
             type: 'string',
-            description: 'Path to list (e.g., /cells, /data, /services)'
-          }
+            description: 'Path to list (e.g., /cells, /data, /services)',
+          },
         },
-        required: ['path']
+        required: ['path'],
       },
       handler: async ({ path }) => {
         try {
@@ -80,7 +79,7 @@ export function createMCPTools(bl) {
         } catch (err) {
           return `Error: ${err.message}`
         }
-      }
+      },
     },
     {
       name: 'bassline_links',
@@ -91,14 +90,14 @@ export function createMCPTools(bl) {
           direction: {
             type: 'string',
             enum: ['to', 'from'],
-            description: 'Link direction: "to" for backlinks, "from" for forward refs'
+            description: 'Link direction: "to" for backlinks, "from" for forward refs',
           },
           uri: {
             type: 'string',
-            description: 'Resource URI to query links for'
-          }
+            description: 'Resource URI to query links for',
+          },
         },
-        required: ['direction', 'uri']
+        required: ['direction', 'uri'],
       },
       handler: async ({ direction, uri }) => {
         try {
@@ -109,30 +108,24 @@ export function createMCPTools(bl) {
         } catch (err) {
           return `Error: ${err.message}`
         }
-      }
-    }
+      },
+    },
   ]
 }
 
 /**
  * Run an agentic loop where Claude can use tools to interact with Bassline.
- *
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @param {object} claudeService - Claude service from createClaudeService
  * @param {object} options - Loop options
  * @param {string} options.prompt - Initial user prompt
  * @param {string} [options.system] - System prompt
- * @param {number} [options.maxTurns=10] - Maximum conversation turns
+ * @param {number} [options.maxTurns] - Maximum conversation turns
  * @param {string} [options.model] - Override model
  * @returns {Promise<object>} Final Claude response
  */
 export async function runAgentLoop(bl, claudeService, options = {}) {
-  const {
-    prompt,
-    system,
-    maxTurns = 10,
-    model = claudeService.model
-  } = options
+  const { prompt, system, maxTurns = 10, model = claudeService.model } = options
 
   const tools = createMCPTools(bl)
   const messages = [{ role: 'user', content: prompt }]
@@ -146,8 +139,8 @@ export async function runAgentLoop(bl, claudeService, options = {}) {
       tools: tools.map(t => ({
         name: t.name,
         description: t.description,
-        input_schema: t.input_schema
-      }))
+        input_schema: t.input_schema,
+      })),
     })
 
     // Add assistant response to history
@@ -161,17 +154,17 @@ export async function runAgentLoop(bl, claudeService, options = {}) {
     }
 
     // Execute tools and collect results
-    const toolResults = await Promise.all(toolUses.map(async tu => {
-      const tool = tools.find(t => t.name === tu.name)
-      const result = tool
-        ? await tool.handler(tu.input)
-        : `Unknown tool: ${tu.name}`
-      return {
-        type: 'tool_result',
-        tool_use_id: tu.id,
-        content: result
-      }
-    }))
+    const toolResults = await Promise.all(
+      toolUses.map(async tu => {
+        const tool = tools.find(t => t.name === tu.name)
+        const result = tool ? await tool.handler(tu.input) : `Unknown tool: ${tu.name}`
+        return {
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: result,
+        }
+      })
+    )
 
     // Add tool results to history
     messages.push({ role: 'user', content: toolResults })

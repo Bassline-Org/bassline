@@ -1,3 +1,4 @@
+/* eslint-env node */
 /**
  * Standard Bassline bootstrap module.
  * Installs all core modules via the dynamic install system.
@@ -13,83 +14,193 @@ const WS_PORT = parseInt(process.env.BL_WS_PORT || '9112')
 
 /**
  * Bootstrap a Bassline instance with all standard modules
- * @param {import('@bassline/core').Bassline} bl
+ * @param {import('@bassline/core').Bassline} bl - The Bassline instance
  */
 export default async function bootstrap(bl) {
   // Core: root index (lists all subsystems)
-  await bl.put('bl:///install/index', {}, {
-    path: './packages/core/src/upgrade-index.js'
-  })
+  await bl.put(
+    'bl:///install/index',
+    {},
+    {
+      path: './packages/core/src/upgrade-index.js',
+    }
+  )
 
   // Types: built-in type definitions
-  await bl.put('bl:///install/types', {}, {
-    path: './packages/types/src/upgrade.js'
-  })
+  await bl.put(
+    'bl:///install/types',
+    {},
+    {
+      path: './packages/types/src/upgrade.js',
+    }
+  )
+
+  // Plumber: message routing (before links, which sets up plumber rules)
+  await bl.put(
+    'bl:///install/plumber',
+    {},
+    {
+      path: './packages/plumber/src/upgrade.js',
+    }
+  )
 
   // Links: bidirectional ref tracking
-  await bl.put('bl:///install/links', {}, {
-    path: './packages/links/src/upgrade.js'
-  })
-
-  // Plumber: message routing
-  await bl.put('bl:///install/plumber', {}, {
-    path: './packages/plumber/src/upgrade.js'
-  })
+  await bl.put(
+    'bl:///install/links',
+    {},
+    {
+      path: './packages/links/src/upgrade.js',
+    }
+  )
 
   // Storage: file store
-  await bl.put('bl:///install/file-store', {}, {
-    path: './packages/store-node/src/upgrade-file-store.js',
-    dataDir: DATA_DIR,
-    prefix: '/data'
-  })
+  await bl.put(
+    'bl:///install/file-store',
+    {},
+    {
+      path: './packages/store-node/src/upgrade-file-store.js',
+      dataDir: DATA_DIR,
+      prefix: '/data',
+    }
+  )
 
   // Server: HTTP
-  await bl.put('bl:///install/http-server', {}, {
-    path: './packages/server-node/src/upgrade-http-server.js',
-    ports: [HTTP_PORT]
-  })
+  await bl.put(
+    'bl:///install/http-server',
+    {},
+    {
+      path: './packages/server-node/src/upgrade-http-server.js',
+      ports: [HTTP_PORT],
+    }
+  )
 
   // Server: WebSocket (requires plumber)
-  await bl.put('bl:///install/ws-server', {}, {
-    path: './packages/server-node/src/upgrade-ws-server.js',
-    ports: [WS_PORT]
-  })
+  await bl.put(
+    'bl:///install/ws-server',
+    {},
+    {
+      path: './packages/server-node/src/upgrade-ws-server.js',
+      ports: [WS_PORT],
+    }
+  )
 
-  // Reactive: propagators
-  await bl.put('bl:///install/propagators', {}, {
-    path: './packages/propagators/src/upgrade.js'
-  })
+  // Reactive: functions (must come before propagators)
+  await bl.put(
+    'bl:///install/fn',
+    {},
+    {
+      path: './packages/fn/src/upgrade.js',
+    }
+  )
+
+  // Reactive: propagators (uses fn)
+  await bl.put(
+    'bl:///install/propagators',
+    {},
+    {
+      path: './packages/propagators/src/upgrade.js',
+    }
+  )
+
+  // Ephemeral: tmp (state and fn)
+  await bl.put(
+    'bl:///install/tmp',
+    {},
+    {
+      path: './packages/tmp/src/upgrade.js',
+    }
+  )
 
   // Reactive: cells (uses propagators and plumber)
-  await bl.put('bl:///install/cells', {}, {
-    path: './packages/cells/src/upgrade.js'
-  })
+  await bl.put(
+    'bl:///install/cells',
+    {},
+    {
+      path: './packages/cells/src/upgrade.js',
+    }
+  )
 
   // UI: Dashboard and Activity buffer
-  await bl.put('bl:///install/dashboard', {}, {
-    path: './packages/dashboard/src/upgrade.js'
-  })
+  await bl.put(
+    'bl:///install/dashboard',
+    {},
+    {
+      path: './packages/dashboard/src/upgrade.js',
+    }
+  )
 
   // Timers: time-based event dispatch
-  await bl.put('bl:///install/timers', {}, {
-    path: './packages/timers/src/upgrade.js'
-  })
+  await bl.put(
+    'bl:///install/timers',
+    {},
+    {
+      path: './packages/timers/src/upgrade.js',
+    }
+  )
 
   // Fetch: HTTP requests with async response
-  await bl.put('bl:///install/fetch', {}, {
-    path: './packages/fetch/src/upgrade.js'
-  })
+  await bl.put(
+    'bl:///install/fetch',
+    {},
+    {
+      path: './packages/fetch/src/upgrade.js',
+    }
+  )
 
   // Monitors: URL polling composed from timer + fetch + cell
-  await bl.put('bl:///install/monitors', {}, {
-    path: './packages/monitors/src/upgrade.js'
-  })
+  await bl.put(
+    'bl:///install/monitors',
+    {},
+    {
+      path: './packages/monitors/src/upgrade.js',
+    }
+  )
+
+  // Recipes: template-based resource composition
+  await bl.put(
+    'bl:///install/recipes',
+    {},
+    {
+      path: './packages/recipes/src/upgrade.js',
+    }
+  )
+
+  // Vals: shareable resource compositions (uses recipes)
+  await bl.put(
+    'bl:///install/vals',
+    {},
+    {
+      path: './packages/vals/src/upgrade.js',
+    }
+  )
+
+  // Widgets: UI widget system (uses plumber)
+  await bl.put(
+    'bl:///install/widgets',
+    {},
+    {
+      path: './packages/widgets/src/upgrade.js',
+    }
+  )
+
+  // Database: SQLite service
+  await bl.put(
+    'bl:///install/database',
+    {},
+    {
+      path: './packages/database/src/upgrade.js',
+    }
+  )
 
   // Services: Claude (optional - requires ANTHROPIC_API_KEY)
   if (process.env.ANTHROPIC_API_KEY) {
-    await bl.put('bl:///install/claude', {}, {
-      path: './packages/services/src/upgrade-claude.js'
-    })
+    await bl.put(
+      'bl:///install/claude',
+      {},
+      {
+        path: './packages/services/src/upgrade-claude.js',
+      }
+    )
   }
 
   console.log('Bassline daemon running')
