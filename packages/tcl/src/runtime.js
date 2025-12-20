@@ -252,7 +252,7 @@ export class Runtime {
   }
 
   // Evaluate a single token's value
-  eval({ t, v }) {
+  async eval({ t, v }) {
     switch (t) {
       case TT.STR:
       case TT.BRC:
@@ -267,29 +267,29 @@ export class Runtime {
         if (typeof arr !== 'object' || arr === null) {
           throw new Error(`'${name}' is not an array`)
         }
-        const key = literal ? index : this.subst(index)
+        const key = literal ? index : await this.subst(index)
         if (!(key in arr)) throw new Error(`No such element '${key}' in array '${name}'`)
         return arr[key]
       }
       case TT.CMD:
-        return this.run(v)
+        return await this.run(v)
     }
   }
 
   // Apply substitutions only (no command execution)
-  subst(src) {
+  async subst(src) {
     let result = ''
     for (const tok of tokenize(src)) {
-      const val = this.eval(tok)
+      const val = await this.eval(tok)
       if (val !== undefined) result += val
     }
     return result
   }
 
   // Safely call a command, wrapping errors in TclError
-  safeCall(cmdName, cmd, args) {
+  async safeCall(cmdName, cmd, args) {
     try {
-      return cmd(args, this)
+      return await cmd(args, this)
     } catch (err) {
       // Re-throw control flow exceptions as-is
       if (err === RC.RETURN || err === RC.BREAK || err === RC.CONTINUE) {
@@ -301,7 +301,7 @@ export class Runtime {
   }
 
   // Run a script (full command evaluation)
-  run(src) {
+  async run(src) {
     let argv = []
     let prev = TT.EOL
     this.result = ''
@@ -319,14 +319,14 @@ export class Runtime {
           if (argv.length) {
             const cmdName = argv[0]
             const cmd = this.getCmd(cmdName)
-            this.result = this.safeCall(cmdName, cmd, argv.slice(1)) ?? this.result
+            this.result = (await this.safeCall(cmdName, cmd, argv.slice(1))) ?? this.result
           }
           argv = []
           prev = t
           continue
         }
 
-        const val = this.eval(tok)
+        const val = await this.eval(tok)
         if (prev === TT.SEP || prev === TT.EOL) {
           argv.push(val)
         } else {

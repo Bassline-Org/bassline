@@ -18,13 +18,17 @@ export const event = {
       case 'add': {
         const [varName, opsStr, script] = rest
         const ops = parseList(opsStr)
-        const callback = (name, op, oldVal, newVal) => {
+        const callback = async (name, op, oldVal, newVal) => {
           // Set trace variables before running script
           rt.setVar('_trace_name', name)
           rt.setVar('_trace_op', op)
           rt.setVar('_trace_old', oldVal ?? '')
           rt.setVar('_trace_new', newVal ?? '')
-          rt.run(script)
+          try {
+            await rt.run(script)
+          } catch {
+            // Fire-and-forget: errors in trace scripts are silently ignored
+          }
         }
         // Store script reference for removal
         callback._script = script
@@ -98,10 +102,14 @@ export const event = {
         timeout: null,
       })
       // Use queueMicrotask for idle callbacks
-      queueMicrotask(() => {
+      queueMicrotask(async () => {
         if (rt.afterEvents.has(id)) {
           rt.afterEvents.delete(id)
-          rt.run(script)
+          try {
+            await rt.run(script)
+          } catch {
+            // Fire-and-forget: errors in after scripts are silently ignored
+          }
         }
       })
       return id
@@ -121,9 +129,13 @@ export const event = {
     // Schedule script execution
     const script = args.slice(1).join(' ')
     const id = `after#${++rt.afterId}`
-    const timeout = setTimeout(() => {
+    const timeout = setTimeout(async () => {
       rt.afterEvents.delete(id)
-      rt.run(script)
+      try {
+        await rt.run(script)
+      } catch {
+        // Fire-and-forget: errors in after scripts are silently ignored
+      }
     }, ms)
 
     rt.afterEvents.set(id, { script, type: 'timer', timeout })

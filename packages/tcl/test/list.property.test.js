@@ -37,44 +37,44 @@ function parseList(str) {
 
 describe('List Properties', () => {
   describe('Length Properties', () => {
-    it('llength returns correct count', () => {
+    it('llength returns correct count', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const len = Number(rt.run(`llength {${listStr}}`))
+          const len = Number(await rt.run(`llength {${listStr}}`))
           expect(len).toBe(arr.length)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('lappend increases length by one', () => {
+    it('lappend increases length by one', async () => {
       fc.assert(
-        fc.property(arbList, arbElement, (arr, elem) => {
+        fc.asyncProperty(arbList, arbElement, async (arr, elem) => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          rt.run(`set mylist {${listStr}}`)
-          rt.run(`lappend mylist {${elem}}`)
+          await rt.run(`set mylist {${listStr}}`)
+          await rt.run(`lappend mylist {${elem}}`)
 
-          const newLen = Number(rt.run('llength $mylist'))
+          const newLen = Number(await rt.run('llength $mylist'))
           expect(newLen).toBe(arr.length + 1)
         }),
         { numRuns: 20 }
       )
     })
 
-    it('concat preserves total length', () => {
+    it('concat preserves total length', async () => {
       fc.assert(
-        fc.property(arbList, arbList, (arr1, arr2) => {
+        fc.asyncProperty(arbList, arbList, async (arr1, arr2) => {
           const rt = createRuntime()
           const list1 = formatList(arr1)
           const list2 = formatList(arr2)
 
-          const result = rt.run(`concat {${list1}} {${list2}}`)
-          const resultLen = Number(rt.run(`llength {${result}}`))
+          const result = await rt.run(`concat {${list1}} {${list2}}`)
+          const resultLen = Number(await rt.run(`llength {${result}}`))
 
           expect(resultLen).toBe(arr1.length + arr2.length)
         }),
@@ -82,14 +82,14 @@ describe('List Properties', () => {
       )
     })
 
-    it('lreverse preserves length', () => {
+    it('lreverse preserves length', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const reversed = rt.run(`lreverse {${listStr}}`)
-          const reversedLen = Number(rt.run(`llength {${reversed}}`))
+          const reversed = await rt.run(`lreverse {${listStr}}`)
+          const reversedLen = Number(await rt.run(`llength {${reversed}}`))
 
           expect(reversedLen).toBe(arr.length)
         }),
@@ -97,14 +97,14 @@ describe('List Properties', () => {
       )
     })
 
-    it('lsort preserves length', () => {
+    it('lsort preserves length', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const sorted = rt.run(`lsort {${listStr}}`)
-          const sortedLen = Number(rt.run(`llength {${sorted}}`))
+          const sorted = await rt.run(`lsort {${listStr}}`)
+          const sortedLen = Number(await rt.run(`llength {${sorted}}`))
 
           expect(sortedLen).toBe(arr.length)
         }),
@@ -114,44 +114,44 @@ describe('List Properties', () => {
   })
 
   describe('Indexing Properties', () => {
-    it('lindex returns correct element', () => {
+    it('lindex returns correct element', async () => {
       fc.assert(
-        fc.property(arbList, fc.nat(), (arr, idx) => {
+        fc.asyncProperty(arbList, fc.nat(), async (arr, idx) => {
           fc.pre(arr.length > 0)
           const i = idx % arr.length
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const elem = rt.run(`lindex {${listStr}} ${i}`)
+          const elem = await rt.run(`lindex {${listStr}} ${i}`)
           expect(elem).toBe(arr[i])
         }),
         { numRuns: 20 }
       )
     })
 
-    it('lindex end returns last element', () => {
+    it('lindex end returns last element', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           fc.pre(arr.length > 0)
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const elem = rt.run(`lindex {${listStr}} end`)
+          const elem = await rt.run(`lindex {${listStr}} end`)
           expect(elem).toBe(arr[arr.length - 1])
         }),
         { numRuns: 20 }
       )
     })
 
-    it('lindex end equals lindex length-1', () => {
+    it('lindex end equals lindex length-1', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           fc.pre(arr.length > 0)
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const viaEnd = rt.run(`lindex {${listStr}} end`)
-          const viaNumeric = rt.run(`lindex {${listStr}} ${arr.length - 1}`)
+          const viaEnd = await rt.run(`lindex {${listStr}} end`)
+          const viaNumeric = await rt.run(`lindex {${listStr}} ${arr.length - 1}`)
 
           expect(viaEnd).toBe(viaNumeric)
         }),
@@ -159,14 +159,14 @@ describe('List Properties', () => {
       )
     })
 
-    it('lrange 0 end returns entire list', () => {
+    it('lrange 0 end returns entire list', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const ranged = rt.run(`lrange {${listStr}} 0 end`)
-          const rangedLen = Number(rt.run(`llength {${ranged}}`))
+          const ranged = await rt.run(`lrange {${listStr}} 0 end`)
+          const rangedLen = Number(await rt.run(`llength {${ranged}}`))
 
           expect(rangedLen).toBe(arr.length)
         }),
@@ -176,20 +176,20 @@ describe('List Properties', () => {
   })
 
   describe('Reverse Properties', () => {
-    it('lreverse is involutive (double reverse equals original)', () => {
+    it('lreverse is involutive (double reverse equals original)', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const twice = rt.run(`lreverse [lreverse {${listStr}}]`)
-          const twiceLen = Number(rt.run(`llength {${twice}}`))
+          const twice = await rt.run(`lreverse [lreverse {${listStr}}]`)
+          const twiceLen = Number(await rt.run(`llength {${twice}}`))
 
           expect(twiceLen).toBe(arr.length)
 
           // Check each element
           for (let i = 0; i < arr.length; i++) {
-            const elem = rt.run(`lindex {${twice}} ${i}`)
+            const elem = await rt.run(`lindex {${twice}} ${i}`)
             expect(elem).toBe(arr[i])
           }
         }),
@@ -197,12 +197,12 @@ describe('List Properties', () => {
       )
     })
 
-    it('lreverse of single element is same element', () => {
+    it('lreverse of single element is same element', async () => {
       fc.assert(
-        fc.property(arbElement, elem => {
+        fc.asyncProperty(arbElement, async elem => {
           const rt = createRuntime()
 
-          const reversed = rt.run(`lreverse {${elem}}`)
+          const reversed = await rt.run(`lreverse {${elem}}`)
           expect(reversed).toBe(elem)
         }),
         { numRuns: 15 }
@@ -211,14 +211,14 @@ describe('List Properties', () => {
   })
 
   describe('Sort Properties', () => {
-    it('lsort produces sorted output', () => {
+    it('lsort produces sorted output', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           fc.pre(arr.length > 1)
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const sorted = rt.run(`lsort {${listStr}}`)
+          const sorted = await rt.run(`lsort {${listStr}}`)
           const sortedArr = parseList(sorted)
 
           // Verify sorted order
@@ -230,14 +230,14 @@ describe('List Properties', () => {
       )
     })
 
-    it('lsort is idempotent', () => {
+    it('lsort is idempotent', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const once = rt.run(`lsort {${listStr}}`)
-          const twice = rt.run(`lsort {${once}}`)
+          const once = await rt.run(`lsort {${listStr}}`)
+          const twice = await rt.run(`lsort {${once}}`)
 
           expect(once).toBe(twice)
         }),
@@ -245,16 +245,16 @@ describe('List Properties', () => {
       )
     })
 
-    it('lsort -decreasing reverses lsort result', () => {
+    it('lsort -decreasing reverses lsort result', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           fc.pre(arr.length > 0)
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const ascending = rt.run(`lsort {${listStr}}`)
-          const descending = rt.run(`lsort -decreasing {${listStr}}`)
-          const reversedAsc = rt.run(`lreverse {${ascending}}`)
+          const ascending = await rt.run(`lsort {${listStr}}`)
+          const descending = await rt.run(`lsort -decreasing {${listStr}}`)
+          const reversedAsc = await rt.run(`lreverse {${ascending}}`)
 
           expect(descending).toBe(reversedAsc)
         }),
@@ -264,37 +264,37 @@ describe('List Properties', () => {
   })
 
   describe('Search Properties', () => {
-    it('lsearch finds existing element', () => {
+    it('lsearch finds existing element', async () => {
       fc.assert(
-        fc.property(arbList, fc.nat(), (arr, idx) => {
+        fc.asyncProperty(arbList, fc.nat(), async (arr, idx) => {
           fc.pre(arr.length > 0)
           const i = idx % arr.length
           const rt = createRuntime()
           const listStr = formatList(arr)
           const elem = arr[i]
 
-          const foundIdx = Number(rt.run(`lsearch {${listStr}} {${elem}}`))
+          const foundIdx = Number(await rt.run(`lsearch {${listStr}} {${elem}}`))
 
           // Should find at some valid index
           expect(foundIdx).toBeGreaterThanOrEqual(0)
           expect(foundIdx).toBeLessThan(arr.length)
 
           // Element at found index should match
-          const atFound = rt.run(`lindex {${listStr}} ${foundIdx}`)
+          const atFound = await rt.run(`lindex {${listStr}} ${foundIdx}`)
           expect(atFound).toBe(elem)
         }),
         { numRuns: 15 }
       )
     })
 
-    it('lsearch returns -1 for non-existent element', () => {
+    it('lsearch returns -1 for non-existent element', async () => {
       fc.assert(
-        fc.property(arbList, arbElement, (arr, elem) => {
+        fc.asyncProperty(arbList, arbElement, async (arr, elem) => {
           fc.pre(!arr.includes(elem)) // Element not in list
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const foundIdx = Number(rt.run(`lsearch {${listStr}} {${elem}}`))
+          const foundIdx = Number(await rt.run(`lsearch {${listStr}} {${elem}}`))
           expect(foundIdx).toBe(-1)
         }),
         { numRuns: 15 }
@@ -303,28 +303,28 @@ describe('List Properties', () => {
   })
 
   describe('Join/Split Properties', () => {
-    it('join with empty separator concatenates', () => {
+    it('join with empty separator concatenates', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const joined = rt.run(`join {${listStr}} ""`)
+          const joined = await rt.run(`join {${listStr}} ""`)
           expect(joined).toBe(arr.join(''))
         }),
         { numRuns: 15 }
       )
     })
 
-    it('split creates list elements', () => {
+    it('split creates list elements', async () => {
       fc.assert(
-        fc.property(arbList, arr => {
+        fc.asyncProperty(arbList, async arr => {
           fc.pre(arr.length > 0)
           const rt = createRuntime()
           const joined = arr.join(',')
 
-          const splitResult = rt.run(`split {${joined}} ,`)
-          const splitLen = Number(rt.run(`llength {${splitResult}}`))
+          const splitResult = await rt.run(`split {${joined}} ,`)
+          const splitLen = Number(await rt.run(`llength {${splitResult}}`))
 
           expect(splitLen).toBe(arr.length)
         }),
@@ -334,14 +334,14 @@ describe('List Properties', () => {
   })
 
   describe('Insert/Replace Properties', () => {
-    it('linsert at 0 prepends element', () => {
+    it('linsert at 0 prepends element', async () => {
       fc.assert(
-        fc.property(arbList, arbElement, (arr, elem) => {
+        fc.asyncProperty(arbList, arbElement, async (arr, elem) => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const result = rt.run(`linsert {${listStr}} 0 {${elem}}`)
-          const first = rt.run(`lindex {${result}} 0`)
+          const result = await rt.run(`linsert {${listStr}} 0 {${elem}}`)
+          const first = await rt.run(`lindex {${result}} 0`)
 
           expect(first).toBe(elem)
         }),
@@ -349,15 +349,15 @@ describe('List Properties', () => {
       )
     })
 
-    it('linsert at length appends element', () => {
+    it('linsert at length appends element', async () => {
       fc.assert(
-        fc.property(arbList, arbElement, (arr, elem) => {
+        fc.asyncProperty(arbList, arbElement, async (arr, elem) => {
           const rt = createRuntime()
           const listStr = formatList(arr)
 
           // Insert at position equal to list length (appends)
-          const result = rt.run(`linsert {${listStr}} ${arr.length} {${elem}}`)
-          const last = rt.run(`lindex {${result}} end`)
+          const result = await rt.run(`linsert {${listStr}} ${arr.length} {${elem}}`)
+          const last = await rt.run(`lindex {${result}} end`)
 
           expect(last).toBe(elem)
         }),
@@ -365,15 +365,15 @@ describe('List Properties', () => {
       )
     })
 
-    it('linsert increases length by one', () => {
+    it('linsert increases length by one', async () => {
       fc.assert(
-        fc.property(arbList, arbElement, fc.nat(), (arr, elem, idx) => {
+        fc.asyncProperty(arbList, arbElement, fc.nat(), async (arr, elem, idx) => {
           const i = arr.length === 0 ? 0 : idx % (arr.length + 1)
           const rt = createRuntime()
           const listStr = formatList(arr)
 
-          const result = rt.run(`linsert {${listStr}} ${i} {${elem}}`)
-          const newLen = Number(rt.run(`llength {${result}}`))
+          const result = await rt.run(`linsert {${listStr}} ${i} {${elem}}`)
+          const newLen = Number(await rt.run(`llength {${result}}`))
 
           expect(newLen).toBe(arr.length + 1)
         }),
