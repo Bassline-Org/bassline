@@ -1,6 +1,8 @@
 // List commands - strings that represent lists (EIAS)
 // Lists are space-delimited words. Braces {} or quotes "" group words.
 
+import { globToRegex } from '../glob.js'
+
 // Parse a Tcl list string into an array of elements
 export function parseList(str) {
   if (!str || typeof str !== 'string') return []
@@ -281,7 +283,7 @@ export const list = {
       if (opts.mode === 'exact') {
         match = list[j] === pattern
       } else if (opts.mode === 'glob') {
-        const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+        const regex = globToRegex(pattern)
         match = regex.test(list[j])
       } else if (opts.mode === 'regexp') {
         match = new RegExp(pattern).test(list[j])

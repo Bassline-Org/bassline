@@ -62,6 +62,7 @@ export class Runtime {
     this.traces = new Map() // Variable traces: varPath -> [{ops, callback}]
     this.afterEvents = new Map() // Scheduled events: id -> {script, timeout}
     this.afterId = 0 // Counter for after event IDs
+    this.inTrace = false // Reentrancy guard for trace callbacks
   }
 
   // Get the canonical path for a variable (for trace lookup)
@@ -100,13 +101,23 @@ export class Runtime {
 
   // Fire traces for an operation
   fireTraces(varName, op, oldValue, newValue) {
+    // Reentrancy guard - prevent infinite recursion when trace callbacks
+    // set variables that themselves have traces
+    if (this.inTrace) return
+
     const path = this.varPath(varName)
     const traces = this.traces.get(path)
     if (!traces) return
-    for (const { ops, callback } of traces) {
-      if (ops.includes(op)) {
-        callback(varName, op, oldValue, newValue)
+
+    this.inTrace = true
+    try {
+      for (const { ops, callback } of traces) {
+        if (ops.includes(op)) {
+          callback(varName, op, oldValue, newValue)
+        }
       }
+    } finally {
+      this.inTrace = false
     }
   }
 
@@ -167,8 +178,14 @@ export class Runtime {
     let [ns, localName] = this.parseName(name)
     if (!ns) ns = this.current
 
-    // Follow links
+    // Follow links with cycle detection
+    const visited = new Set()
     while (ns.links && ns.links.has(localName)) {
+      const key = `${ns.path()}:${localName}`
+      if (visited.has(key)) {
+        throw new Error(`circular variable link detected for '${localName}'`)
+      }
+      visited.add(key)
       const link = ns.links.get(localName)
       ns = link.ns
       localName = link.name
@@ -251,7 +268,7 @@ export class Runtime {
           throw new Error(`'${name}' is not an array`)
         }
         const key = literal ? index : this.subst(index)
-        if (arr[key] === undefined) throw new Error(`No such element '${key}' in array '${name}'`)
+        if (!(key in arr)) throw new Error(`No such element '${key}' in array '${name}'`)
         return arr[key]
       }
       case TT.CMD:

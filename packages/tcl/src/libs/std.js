@@ -2,6 +2,10 @@ import { RC } from '../tok.js'
 import { TclError } from '../error.js'
 import { parseList } from './list.js'
 import { expr } from '../expr.js'
+import { globToRegex } from '../glob.js'
+
+// Counter for unique proc namespaces
+let procCounter = 0
 
 // Helper to evaluate expression with error wrapping
 function safeExpr(cond, rt) {
@@ -40,7 +44,7 @@ export const std = {
     const fn = (args, caller) => {
       // Create a child namespace for local scope
       const savedCurrent = caller.current
-      const localNs = caller.current.child(`_proc_${Date.now()}`)
+      const localNs = caller.current.child(`_proc_${++procCounter}`)
 
       // Push call frame for upvar/uplevel
       caller.pushFrame(savedCurrent)
@@ -174,7 +178,7 @@ export const std = {
       if (opts.mode === 'exact') {
         match = str === pattern
       } else if (opts.mode === 'glob') {
-        const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+        const regex = globToRegex(pattern)
         match = regex.test(str)
       } else if (opts.mode === 'regexp') {
         match = new RegExp(pattern).test(str)
