@@ -1,22 +1,21 @@
 import { readFile, writeFile, mkdir, readdir, stat } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
-import { resource, routes, bind, splitPath } from '@bassline/core'
+import { resource } from '@bassline/core'
 
 /**
  * Create a file-based store resource.
  *
  * API (same for all store backends):
- *   GET { path: '/foo/bar.json' }  → { headers: {}, body: <contents> }
- *   PUT { path: '/foo/bar.json' }, data → { headers: {}, body: data }
- *   GET { path: '/foo' } (directory) → { headers: {}, body: [entries...] }
- *
+ * GET { path: '/foo/bar.json' }  → { headers: {}, body: <contents> }
+ * PUT { path: '/foo/bar.json' }, data → { headers: {}, body: data }
+ * GET { path: '/foo' } (directory) → { headers: {}, body: [entries...] }
  * @param {string} root - Base directory for storage
  */
-export const createFileStore = (root) => {
-  const resolve = (path) => join(root, path ?? '')
+export const createFileStore = root => {
+  const resolve = path => join(root, path ?? '')
 
   return resource({
-    get: async (h) => {
+    get: async h => {
       const fullPath = resolve(h.path)
       try {
         const info = await stat(fullPath)
@@ -49,7 +48,7 @@ export const createFileStore = (root) => {
       } catch (err) {
         return { headers: { condition: 'error', message: err.message }, body: null }
       }
-    }
+    },
   })
 }
 

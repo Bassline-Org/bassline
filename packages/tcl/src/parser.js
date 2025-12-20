@@ -1,4 +1,4 @@
-import { TT, RC, tokenize } from './tok.js'
+import { TT, tokenize } from './tok.js'
 
 export class Runtime {
   constructor({ parent = null, cmds = {}, vars = {} } = {}) {

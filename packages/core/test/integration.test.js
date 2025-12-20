@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest'
-import { resource, routes, bind } from '../src/resource.js'
-import { createCells, lattices } from '../src/cells.js'
+import { describe, it, expect } from 'vitest'
+import { resource, routes } from '../src/resource.js'
+import { createCells } from '../src/cells.js'
 import { createPlumber } from '../src/plumber.js'
 import { createPropagators } from '../src/propagators.js'
 import { createFn, builtins } from '../src/fn.js'
@@ -22,10 +22,7 @@ describe('Kit Isolation', () => {
     await cells.put({ path: '/counter' }, { lattice: 'maxNumber' })
 
     // plumber's rule can reference cells, but without kit it won't dispatch
-    await plumber.put(
-      { path: '/rules/test' },
-      { match: {}, to: '/cells/counter/value' }
-    )
+    await plumber.put({ path: '/rules/test' }, { match: {}, to: '/cells/counter/value' })
 
     // Send without kit - rule matches but nothing is dispatched
     const result = await plumber.put({ path: '/send' }, { data: 'test' })
@@ -43,15 +40,12 @@ describe('Kit Isolation', () => {
 
     // Create kit that routes to cells
     const kit = resource({
-      get: async (h) => cells.get(h),
-      put: async (h, b) => cells.put(h, b)
+      get: async h => cells.get(h),
+      put: async (h, b) => cells.put(h, b),
     })
 
     // Create rule
-    await plumber.put(
-      { path: '/rules/count' },
-      { match: { type: 'event' }, to: '/events/value' }
-    )
+    await plumber.put({ path: '/rules/count' }, { match: { type: 'event' }, to: '/events/value' })
 
     // Send with kit
     await plumber.put({ path: '/send', kit }, { type: 'event' })
@@ -67,10 +61,10 @@ describe('Kit Isolation', () => {
     const world2 = createMemoryStore({ config: { mode: 'prod' } })
 
     const worker = resource({
-      get: async (h) => {
+      get: async h => {
         const config = await h.kit.get({ path: '/config/mode' })
         return { headers: {}, body: { mode: config.body } }
-      }
+      },
     })
 
     const result1 = await worker.get({ path: '/', kit: world1 })
@@ -85,7 +79,7 @@ describe('Kit Isolation', () => {
 
     // Kit that blocks access to /secret
     const restrictedKit = resource({
-      get: async (h) => {
+      get: async h => {
         if (h.path.includes('secret')) {
           return { headers: { condition: 'forbidden' }, body: null }
         }
@@ -96,13 +90,13 @@ describe('Kit Isolation', () => {
           return { headers: { condition: 'forbidden' }, body: null }
         }
         return data.put(h, b)
-      }
+      },
     })
 
     const worker = resource({
-      get: async (h) => {
+      get: async h => {
         return h.kit.get({ path: '/secret' })
-      }
+      },
     })
 
     const result = await worker.get({ path: '/', kit: restrictedKit })
@@ -116,7 +110,7 @@ describe('Error Conditions', () => {
     const faulty = resource({
       get: async () => {
         throw new Error('Something went wrong')
-      }
+      },
     })
 
     const result = await faulty.get({ path: '/' })
@@ -132,7 +126,7 @@ describe('Error Conditions', () => {
     const faulty = resource({
       get: async () => {
         throw new Error('Oops')
-      }
+      },
     })
 
     await faulty.get({ path: '/test', kit })
@@ -149,7 +143,7 @@ describe('Error Conditions', () => {
     const faulty = resource({
       get: async () => {
         throw new Error('Test error')
-      }
+      },
     })
 
     // Should not throw, even without kit
@@ -163,7 +157,7 @@ describe('Error Conditions', () => {
       get: async () => {
         await new Promise(resolve => setTimeout(resolve, 1))
         throw new Error('Async error')
-      }
+      },
     })
 
     const result = await faulty.get({ path: '/' })
@@ -175,8 +169,10 @@ describe('Error Conditions', () => {
   it('errors in nested routes are caught', async () => {
     const app = routes({
       broken: resource({
-        get: async () => { throw new Error('Nested error') }
-      })
+        get: async () => {
+          throw new Error('Nested error')
+        },
+      }),
     })
 
     const result = await app.get({ path: '/broken' })
@@ -199,16 +195,19 @@ describe('End-to-End Scenarios', () => {
 
     // Set up propagator
     const propagators = createPropagators()
-    await propagators.put({ path: '/adder' }, {
-      inputs: ['a', 'b'],
-      output: '/sum/value',
-      fn: '/fn/sum'
-    })
+    await propagators.put(
+      { path: '/adder' },
+      {
+        inputs: ['a', 'b'],
+        output: '/sum/value',
+        fn: '/fn/sum',
+      }
+    )
 
     // Create kit that routes to appropriate resources
     // Note: propagator writes to semantic path /output, which kit maps to actual destination
     const kit = resource({
-      get: async (h) => {
+      get: async h => {
         if (h.path.startsWith('/inputs/')) {
           const name = h.path.split('/')[2]
           return cells.get({ path: `/${name}/value` })
@@ -224,7 +223,7 @@ describe('End-to-End Scenarios', () => {
           return cells.put({ path: '/sum/value' }, b)
         }
         return { headers: { condition: 'not-found' }, body: null }
-      }
+      },
     })
 
     // Run propagator
@@ -245,22 +244,28 @@ describe('End-to-End Scenarios', () => {
     await cells.put({ path: '/errors' }, { lattice: 'counter' })
 
     const plumber = createPlumber()
-    await plumber.put({ path: '/rules/log-all' }, {
-      match: {},
-      to: '/logs/value'
-    })
-    await plumber.put({ path: '/rules/errors' }, {
-      match: { level: '^error$' },
-      to: '/errors/value'
-    })
+    await plumber.put(
+      { path: '/rules/log-all' },
+      {
+        match: {},
+        to: '/logs/value',
+      }
+    )
+    await plumber.put(
+      { path: '/rules/errors' },
+      {
+        match: { level: '^error$' },
+        to: '/errors/value',
+      }
+    )
 
     // Kit routes to cells and wraps message in +1 count
     const kit = resource({
-      get: async (h) => cells.get(h),
-      put: async (h, b) => {
+      get: async h => cells.get(h),
+      put: async (h, _body) => {
         // For counting, each message increments by 1
         return cells.put(h, 1)
-      }
+      },
     })
 
     // Send messages
@@ -316,7 +321,7 @@ describe('Concurrent Access', () => {
       cells.put({ path: '/counter/value' }, 5),
       cells.put({ path: '/counter/value' }, 10),
       cells.put({ path: '/counter/value' }, 3),
-      cells.put({ path: '/counter/value' }, 8)
+      cells.put({ path: '/counter/value' }, 8),
     ])
 
     const result = await cells.get({ path: '/counter/value' })
@@ -330,10 +335,10 @@ describe('Concurrent Access', () => {
 
     // Concurrent writes
     await Promise.all([
-      cells.put({ path: '/items/value' }, ['a'] ),
-      cells.put({ path: '/items/value' }, ['b'] ),
-      cells.put({ path: '/items/value' }, ['c'] ),
-      cells.put({ path: '/items/value' }, ['a'] ) // duplicate
+      cells.put({ path: '/items/value' }, ['a']),
+      cells.put({ path: '/items/value' }, ['b']),
+      cells.put({ path: '/items/value' }, ['c']),
+      cells.put({ path: '/items/value' }, ['a']), // duplicate
     ])
 
     const result = await cells.get({ path: '/items/value' })

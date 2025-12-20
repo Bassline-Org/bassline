@@ -71,16 +71,14 @@ export function createInterpreter(options = {}) {
 }
 
 // Predicates
-const isWhitespace = (ch) => ch === ' ' || ch === '\t'
-const isSeparator = (ch) => ch === '\n' || ch === ';'
-const isWordChar = (ch) =>
-  (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch === '_'
-const isWordBreak = (ch) => ' \t\n;[]{}"'.includes(ch)
-const isHexDigit = (ch) =>
-  (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
+const isWhitespace = ch => ch === ' ' || ch === '\t'
+const isSeparator = ch => ch === '\n' || ch === ';'
+const isWordChar = ch => (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch === '_'
+const isWordBreak = ch => ' \t\n;[]{}"'.includes(ch)
+const isHexDigit = ch => (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')
 const isHex = (s, len) => s.length === len && [...s].every(isHexDigit)
-const isBraced = (word) => word[0] === '{' && word[word.length - 1] === '}'
-const isExpansion = (word) => word.startsWith('{*}') && word.length > 3
+const isBraced = word => word[0] === '{' && word[word.length - 1] === '}'
+const isExpansion = word => word.startsWith('{*}') && word.length > 3
 
 // Combinators
 const takeWhile = (str, i, pred) => {
@@ -131,7 +129,7 @@ export function parseScript(script) {
       }
       i++
     } else if (ch === '#' && current.length === 0) {
-      i = skipWhile(script, i, (c) => c !== '\n')
+      i = skipWhile(script, i, c => c !== '\n')
     } else {
       const [word, next] = readWord(script, i)
       current.push(word)
@@ -178,7 +176,7 @@ function readQuoted(str, i) {
 }
 
 function readBare(str, i) {
-  const [word, end] = takeWhile(str, i, (ch) => !isWordBreak(ch))
+  const [word, end] = takeWhile(str, i, ch => !isWordBreak(ch))
   return [word, end]
 }
 
@@ -240,7 +238,7 @@ export function parseTclList(str) {
       items.push(str.slice(i + 1, j))
       i = j + 1
     } else {
-      const [word, end] = takeWhile(str, i, (ch) => !isWhitespace(ch))
+      const [word, end] = takeWhile(str, i, ch => !isWhitespace(ch))
       items.push(word)
       i = end
     }

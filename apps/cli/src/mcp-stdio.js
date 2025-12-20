@@ -249,7 +249,7 @@ async function main() {
 
   log(`Starting MCP server, connecting to ${BL_URL}`)
 
-  rl.on('line', async (line) => {
+  rl.on('line', async line => {
     if (!line.trim()) return
 
     try {
@@ -284,7 +284,7 @@ async function main() {
   })
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error('Fatal error:', err)
   process.exit(1)
 })

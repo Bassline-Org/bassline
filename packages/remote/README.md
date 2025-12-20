@@ -1,57 +1,86 @@
-# @bassline/remote-browser
+# @bassline/remote
 
-WebSocket client for connecting to remote Bassline servers from browsers.
+WebSocket client for connecting to remote Bassline servers.
 
 ## Install
 
 ```bash
-pnpm add @bassline/remote-browser
+pnpm add @bassline/remote
 ```
 
 ## Usage
 
 ```javascript
-import { Bassline } from '@bassline/core'
-import { createRemoteRoutes } from '@bassline/remote-browser'
+import { createRemote } from '@bassline/remote'
 
-const bl = new Bassline()
-bl.install(createRemoteRoutes())
+const remote = createRemote()
 
-// Connect to a remote server, mount at /server1
-await bl.put(
-  'bl:///remote/ws/server1',
-  {},
+// Connect to a remote server
+await remote.put(
+  { path: '/server1' },
   {
     uri: 'ws://localhost:9112',
-    mount: '/server1',
   }
 )
 
-// Access remote resources through the mount point
-const user = await bl.get('bl:///server1/data/users/alice')
-// Proxies to bl:///data/users/alice on the remote server
-
 // Check connection status
-const status = await bl.get('bl:///remote/ws/server1')
-// { body: { status: 'connected', uri: 'ws://...', mount: '/server1' } }
+const status = await remote.get({ path: '/server1' })
+// → { body: { name: 'server1', uri: 'ws://...', status: 'connected' } }
+
+// Proxy requests to remote server
+const user = await remote.get({ path: '/server1/proxy/users/alice' })
+// Proxies to /users/alice on the remote server
+
+await remote.put({ path: '/server1/proxy/users/bob' }, { name: 'Bob' })
+// Proxies PUT to /users/bob on the remote server
+
+// Close connection
+await remote.put({ path: '/server1/close' }, {})
 ```
 
 ## How It Works
 
-1. Create a remote connection with a mount point
-2. All requests to the mount point are forwarded over WebSocket
-3. Remote URIs in responses are rewritten to include the mount prefix
+1. Create a connection with a name and WebSocket URI
+2. Use `/name/proxy/...` to proxy requests to the remote
+3. Requests are serialized as JSON over WebSocket
+4. Responses are returned as normal `{ headers, body }`
 
 ## Routes
 
-| Route              | Method | Description           |
-| ------------------ | ------ | --------------------- |
-| `/remote/ws`       | GET    | List connections      |
-| `/remote/ws/:name` | GET    | Get connection status |
-| `/remote/ws/:name` | PUT    | Create connection     |
+| Route            | Method | Description                 |
+| ---------------- | ------ | --------------------------- |
+| `/`              | GET    | List all connections        |
+| `/:name`         | GET    | Connection status           |
+| `/:name`         | PUT    | Create connection `{ uri }` |
+| `/:name/close`   | PUT    | Close connection            |
+| `/:name/proxy/*` | GET    | Proxy GET to remote         |
+| `/:name/proxy/*` | PUT    | Proxy PUT to remote         |
+
+## Browser Usage
+
+Works in browsers with the native WebSocket:
+
+```javascript
+import { createRemote } from '@bassline/remote'
+
+const remote = createRemote()
+
+await remote.put({ path: '/api' }, { uri: 'wss://api.example.com' })
+const data = await remote.get({ path: '/api/proxy/data' })
+```
+
+## Custom WebSocket
+
+Pass a custom WebSocket constructor for Node.js or testing:
+
+```javascript
+import WebSocket from 'ws'
+import { createRemote } from '@bassline/remote'
+
+const remote = createRemote({ WebSocket })
+```
 
 ## Related
 
-- [@bassline/core](../core) - Router and utilities
-- [@bassline/react](../react) - React bindings
-- [@bassline/server-node](../server-node) - WebSocket server
+- [@bassline/core](../core) - Resource primitives
+- [@bassline/node](../node) - WebSocket server

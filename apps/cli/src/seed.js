@@ -272,7 +272,7 @@ Assigned to Carol for design exploration.
   console.log('\n🔧 Plumber Rules')
 
   // Note: These go to /plumb/rules via the daemon, not /data
-  const plumbUrl = (name) => `${BASE_URL}?uri=bl:///plumb/rules/${name}`
+  const plumbUrl = name => `${BASE_URL}?uri=bl:///plumb/rules/${name}`
 
   await fetch(plumbUrl('cell-watcher'), {
     method: 'PUT',
@@ -362,11 +362,7 @@ Assigned to Carol for design exploration.
     type: 'config',
     theme: 'dark',
     defaultUri: 'bl:///data',
-    recentUris: [
-      'bl:///data/notes/welcome',
-      'bl:///data/cells/counter',
-      'bl:///data/tasks/editor-v1',
-    ],
+    recentUris: ['bl:///data/notes/welcome', 'bl:///data/cells/counter', 'bl:///data/tasks/editor-v1'],
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -483,7 +479,7 @@ Assigned to Carol for design exploration.
   console.log()
 }
 
-seed().catch((err) => {
+seed().catch(err => {
   console.error('Seed failed:', err)
   process.exit(1)
 })

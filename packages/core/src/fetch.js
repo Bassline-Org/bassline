@@ -23,10 +23,10 @@ export const createFetch = () => {
           name: 'fetch',
           description: 'HTTP request dispatch',
           resources: {
-            '/request': { description: 'Make HTTP request' }
-          }
-        }
-      })
+            '/request': { description: 'Make HTTP request' },
+          },
+        },
+      }),
     }),
 
     request: resource({
@@ -38,9 +38,9 @@ export const createFetch = () => {
         fetch(body.url, {
           method: body.method || 'GET',
           headers: body.headers,
-          body: body.body ? JSON.stringify(body.body) : undefined
+          body: body.body ? JSON.stringify(body.body) : undefined,
         })
-          .then(async (res) => {
+          .then(async res => {
             let responseBody
             const contentType = res.headers.get('content-type') || ''
             if (contentType.includes('application/json')) {
@@ -54,7 +54,7 @@ export const createFetch = () => {
               url: body.url,
               status: res.status,
               headers: Object.fromEntries(res.headers.entries()),
-              body: responseBody
+              body: responseBody,
             }
 
             requests.set(id, result)
@@ -64,11 +64,11 @@ export const createFetch = () => {
               await kit.put({ path: '/response' }, result)
             }
           })
-          .catch(async (err) => {
+          .catch(async err => {
             const result = {
               requestId: id,
               url: body.url,
-              error: err.message
+              error: err.message,
             }
 
             requests.set(id, result)
@@ -80,16 +80,19 @@ export const createFetch = () => {
           })
 
         return { headers: {}, body: { requestId: id } }
-      }
+      },
     }),
 
-    unknown: bind('id', resource({
-      get: async (h) => {
-        const req = requests.get(h.params.id)
-        if (!req) return { headers: { condition: 'not-found' }, body: null }
-        return { headers: {}, body: req }
-      }
-    }))
+    unknown: bind(
+      'id',
+      resource({
+        get: async h => {
+          const req = requests.get(h.params.id)
+          if (!req) return { headers: { condition: 'not-found' }, body: null }
+          return { headers: {}, body: req }
+        },
+      })
+    ),
   })
 }
 

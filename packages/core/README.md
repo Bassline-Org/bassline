@@ -1,6 +1,6 @@
 # @bassline/core
 
-URI router and utilities for Bassline.
+Resource primitives and utilities for Bassline.
 
 ## Install
 
@@ -8,129 +8,206 @@ URI router and utilities for Bassline.
 pnpm add @bassline/core
 ```
 
-## Usage
+## Core Primitives
+
+The entire resource model is ~35 lines:
 
 ```javascript
-import { Bassline, routes } from '@bassline/core'
+import { resource, routes, bind } from '@bassline/core'
 
-const bl = new Bassline()
-
-// Define routes
-bl.route('/users/:id', {
-  get: ({ params }) => ({
-    headers: { type: 'bl:///types/user' },
-    body: { id: params.id, name: 'Alice' },
-  }),
-  put: ({ params, body }) => {
-    // store.set(params.id, body)
-    return { headers: {}, body }
-  },
+// A resource has get and put
+const counter = resource({
+  get: async h => ({ headers: {}, body: count }),
+  put: async (h, body) => ({ headers: {}, body: (count += body) }),
 })
 
-// Use resources
-const user = await bl.get('bl:///users/123')
-await bl.put('bl:///users/123', {}, { name: 'Bob' })
+// Routes dispatch by path segment
+const app = routes({
+  counter,
+  users: bind('id', userResource), // captures :id param
+  unknown: fallbackResource, // handles unmatched paths
+})
+
+// Use it
+const result = await app.get({ path: '/counter' })
+await app.put({ path: '/users/alice' }, { name: 'Alice' })
 ```
 
 ## Exports
 
-### Bassline
-
-Pattern-matching URI router.
+### Resource Primitives
 
 ```javascript
-const bl = new Bassline()
-bl.route(pattern, handlers)
-bl.install(routerBuilder)
-await bl.get(uri)
-await bl.put(uri, headers, body)
-```
+import { resource, routes, bind, splitPath, notFound } from '@bassline/core'
 
-### routes
-
-Builder for hierarchical route definitions.
-
-```javascript
-const userRoutes = routes('/users', (r) => {
-  r.get('/', () => ({ body: users }))
-  r.get('/:id', ({ params }) => ({ body: users[params.id] }))
-  r.put('/:id', ({ params, body }) => {
-    users[params.id] = body
-  })
+// Create a resource
+const myResource = resource({
+  get: async headers => ({ headers: {}, body: 'hello' }),
+  put: async (headers, body) => ({ headers: {}, body }),
 })
 
-bl.install(userRoutes)
+// Compose with routing
+const app = routes({
+  '': myResource, // handles root path
+  items: itemsResource, // handles /items/*
+  unknown: fallbackResource, // handles unmatched
+})
+
+// Bind path parameters
+const userRoutes = bind(
+  'id',
+  resource({
+    get: async h => ({ headers: {}, body: { id: h.params.id } }),
+  })
+)
 ```
 
-### createLinkIndex
+### Cells
 
-Bidirectional link tracking.
+Lattice-based state that merges monotonically.
 
 ```javascript
-import { createLinkIndex } from '@bassline/core'
+import { createCells, lattices } from '@bassline/core'
 
-const links = createLinkIndex()
-links.install(bl)
+const cells = createCells()
 
-// Index refs
-links.index('bl:///doc/1', { refs: ['bl:///doc/2'] })
+// Create a cell with maxNumber lattice
+await cells.put({ path: '/counter' }, { lattice: 'maxNumber' })
 
-// Query
-await bl.get('bl:///links/from/doc/1') // what does doc/1 reference?
-await bl.get('bl:///links/to/doc/2') // what references doc/2?
+// Set value - merges with lattice
+await cells.put({ path: '/counter/value' }, 5)
+await cells.put({ path: '/counter/value' }, 3) // still 5, max wins
+
+const result = await cells.get({ path: '/counter/value' })
+// → { headers: {}, body: 5 }
 ```
 
-### createPlumber
+Available lattices: `maxNumber`, `minNumber`, `setUnion`, `lww` (last-writer-wins)
 
-Message routing based on pattern rules.
+### Propagators
+
+Reactive computation between cells.
+
+```javascript
+import { createPropagators } from '@bassline/core'
+
+const propagators = createPropagators()
+
+// Create a propagator that sums two cells
+await propagators.put(
+  { path: '/sum', kit },
+  {
+    inputs: ['/cells/a', '/cells/b'],
+    output: '/cells/total',
+    fn: '/fn/sum',
+  }
+)
+
+// When /cells/a or /cells/b change, /cells/total is recomputed
+```
+
+### Plumber
+
+Message routing based on pattern matching.
 
 ```javascript
 import { createPlumber } from '@bassline/core'
 
 const plumber = createPlumber()
-plumber.install(bl)
 
-// Add routing rule
-plumber.addRule('cells', {
-  match: { headers: { type: 'bl:///types/cell' } },
-  port: 'cell-updates',
-})
+// Add a routing rule
+await plumber.put(
+  { path: '/rules/log-errors' },
+  {
+    match: { headers: { level: 'error' } },
+    to: '/cells/errors',
+  }
+)
 
-// Listen on port
-plumber.listen('cell-updates', (msg) => {
-  console.log('Cell changed:', msg)
-})
+// Send a message
+await plumber.put({ path: '/send', kit }, { level: 'error', msg: 'Oops' })
+// Message routed to /cells/errors via kit
 ```
 
-## Dynamic Installation
+### Functions
 
-Install via the daemon's module system:
+Registry for named functions.
 
 ```javascript
-// Links (bidirectional ref tracking)
-await bl.put(
-  'bl:///install/links',
-  {},
-  {
-    path: './packages/core/src/upgrade-links.js',
-  }
-)
-// Registers: bl._links
+import { createFn, builtins } from '@bassline/core'
 
-// Plumber (message routing)
-await bl.put(
-  'bl:///install/plumber',
-  {},
+const fn = createFn()
+
+// Register a function
+await fn.put({ path: '/double' }, { fn: x => x * 2 })
+
+// Get and call
+const result = await fn.get({ path: '/double' })
+result.body.fn(21) // → 42
+
+// Builtins available: sum, product, max, min, count, first, last, identity
+```
+
+### Timers
+
+Time-based events.
+
+```javascript
+import { createTimers } from '@bassline/core'
+
+const timers = createTimers()
+
+// Create a timer that fires every second
+await timers.put(
+  { path: '/heartbeat', kit },
   {
-    path: './packages/core/src/upgrade-plumber.js',
+    interval: 1000,
+    to: '/cells/heartbeat',
   }
 )
-// Registers: bl._plumber
+
+// Stop a timer
+await timers.put({ path: '/heartbeat/stop' }, {})
 ```
+
+### Memory Store
+
+In-memory key-value storage with directory semantics.
+
+```javascript
+import { createMemoryStore } from '@bassline/core'
+
+const store = createMemoryStore({ initial: 'data' })
+
+await store.put({ path: '/users/alice' }, { name: 'Alice' })
+const user = await store.get({ path: '/users/alice' })
+// → { headers: {}, body: { name: 'Alice' } }
+
+// Directory listing
+const users = await store.get({ path: '/users' })
+// → { headers: { type: 'directory' }, body: ['alice'] }
+```
+
+## The Kit Pattern
+
+Resources access the outside world through `h.kit`:
+
+```javascript
+const worker = resource({
+  put: async (h, task) => {
+    // Access external resources via kit
+    const config = await h.kit.get({ path: '/config' })
+    await h.kit.put({ path: '/results' }, processTask(task, config.body))
+    return { headers: {}, body: { done: true } }
+  },
+})
+```
+
+Kit is just a resource passed in headers. The caller controls what it routes to.
 
 ## Related
 
-- [@bassline/cells](../cells) - Lattice-based cells
-- [@bassline/propagators](../propagators) - Reactive propagators
-- [@bassline/store-node](../store-node) - File and code stores
-- [@bassline/server-node](../server-node) - HTTP and WebSocket servers
+- [@bassline/node](../node) - HTTP/WebSocket servers, file store
+- [@bassline/remote](../remote) - WebSocket client
+- [@bassline/database](../database) - SQLite
+- [@bassline/trust](../trust) - Capability-based trust

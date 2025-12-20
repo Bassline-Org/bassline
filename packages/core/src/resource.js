@@ -1,21 +1,26 @@
 const notFound = async () => ({ headers: { condition: 'not-found' }, body: null })
 
-const safe = (handler) => async (h, b) => {
+const safe = handler => async (h, b) => {
   try {
     return await handler(h, b)
   } catch (e) {
-    h?.kit?.put?.({ path: '/condition' }, {
-      error: e.message,
-      stack: e.stack,
-      context: { path: h?.path, params: h?.params }
-    }).catch(() => {})
+    h?.kit
+      ?.put?.(
+        { path: '/condition' },
+        {
+          error: e.message,
+          stack: e.stack,
+          context: { path: h?.path, params: h?.params },
+        }
+      )
+      .catch(() => {})
     return { headers: { condition: 'error', message: e.message }, body: null }
   }
 }
 
 const resource = ({ get = notFound, put = notFound } = {}) => ({
   get: safe(get),
-  put: safe(put)
+  put: safe(put),
 })
 
 const splitPath = path => {

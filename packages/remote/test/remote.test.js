@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createRemote } from '../src/index.js'
 
 describe('createRemote', () => {
   let remote
-  let mockServers = new Map()
+  const mockServers = new Map()
 
   beforeEach(() => {
     // Create a mock WebSocket that simulates server behavior
@@ -161,7 +161,7 @@ describe('createRemote', () => {
   describe('request proxying', () => {
     it('proxies GET requests', async () => {
       const server = createMockServer({
-        get: { '/test': { data: 'from remote' } }
+        get: { '/test': { data: 'from remote' } },
       })
       mockServers.set('ws://localhost:9111', server)
 
@@ -193,7 +193,7 @@ describe('createRemote', () => {
 
     it('handles nested paths', async () => {
       const server = createMockServer({
-        get: { '/a/b/c/d': { nested: true } }
+        get: { '/a/b/c/d': { nested: true } },
       })
       mockServers.set('ws://localhost:9111', server)
 
@@ -213,7 +213,7 @@ describe('createRemote', () => {
 
     it('queues requests until connection is ready', async () => {
       const server = createMockServer({
-        get: { '/test': { queued: true } }
+        get: { '/test': { queued: true } },
       })
       mockServers.set('ws://localhost:9111', server)
 
@@ -243,7 +243,7 @@ describe('createRemote', () => {
 
       const [result1, result2] = await Promise.all([
         remote.get({ path: '/server1/proxy/test' }),
-        remote.get({ path: '/server2/proxy/test' })
+        remote.get({ path: '/server2/proxy/test' }),
       ])
 
       expect(result1.body.server).toBe(1)
@@ -273,8 +273,8 @@ describe('createRemote', () => {
         get: {
           '/a': { letter: 'a' },
           '/b': { letter: 'b' },
-          '/c': { letter: 'c' }
-        }
+          '/c': { letter: 'c' },
+        },
       })
       mockServers.set('ws://localhost:9111', server)
 
@@ -284,7 +284,7 @@ describe('createRemote', () => {
       const results = await Promise.all([
         remote.get({ path: '/server1/proxy/a' }),
         remote.get({ path: '/server1/proxy/b' }),
-        remote.get({ path: '/server1/proxy/c' })
+        remote.get({ path: '/server1/proxy/c' }),
       ])
 
       expect(results.map(r => r.body.letter)).toEqual(['a', 'b', 'c'])
@@ -293,7 +293,7 @@ describe('createRemote', () => {
     it('maintains request-response correlation', async () => {
       let requestCount = 0
       const server = createMockServer()
-      server.onGet = (path) => {
+      server.onGet = path => {
         requestCount++
         return { headers: {}, body: { requestNum: requestCount, path } }
       }
@@ -303,9 +303,7 @@ describe('createRemote', () => {
       await delay(20)
 
       const results = await Promise.all(
-        Array.from({ length: 10 }, (_, i) =>
-          remote.get({ path: `/server1/proxy/path${i}` })
-        )
+        Array.from({ length: 10 }, (_, i) => remote.get({ path: `/server1/proxy/path${i}` }))
       )
 
       // Each result should have its corresponding path
@@ -320,7 +318,7 @@ describe('createRemote', () => {
       const server = createMockServer()
       server.onGet = () => ({
         headers: { condition: 'error', message: 'Server error' },
-        body: null
+        body: null,
       })
       mockServers.set('ws://localhost:9111', server)
 
@@ -336,7 +334,7 @@ describe('createRemote', () => {
       const server = createMockServer()
       server.onGet = () => ({
         headers: { condition: 'not-found' },
-        body: null
+        body: null,
       })
       mockServers.set('ws://localhost:9111', server)
 
@@ -458,7 +456,7 @@ function createMockServer(routes = {}) {
   const server = {
     routes: {
       get: routes.get || {},
-      put: routes.put || {}
+      put: routes.put || {},
     },
     onGet: null,
     onPut: null,
@@ -476,9 +474,7 @@ function createMockServer(routes = {}) {
           result = server.onGet(msg.path)
         } else {
           const data = server.routes.get[msg.path]
-          result = data
-            ? { headers: {}, body: data }
-            : { headers: { condition: 'not-found' }, body: null }
+          result = data ? { headers: {}, body: data } : { headers: { condition: 'not-found' }, body: null }
         }
       } else if (msg.type === 'put') {
         if (server.onPut) {
@@ -489,7 +485,7 @@ function createMockServer(routes = {}) {
       }
 
       ws.onmessage({ data: JSON.stringify({ type: 'response', id: msg.id, result }) })
-    }
+    },
   }
 
   return server

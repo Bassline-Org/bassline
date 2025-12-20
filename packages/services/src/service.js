@@ -20,26 +20,27 @@ export function createServices() {
           body: {
             name: 'services',
             description: 'Service registry',
-            resources: Object.fromEntries(
-              [...registry.keys()].map(name => [`/${name}`, {}])
-            )
-          }
-        })
+            resources: Object.fromEntries([...registry.keys()].map(name => [`/${name}`, {}])),
+          },
+        }),
       }),
 
-      unknown: bind('name', resource({
-        get: async (h) => {
-          const service = registry.get(h.params.name)
-          if (!service) return { headers: { condition: 'not-found' }, body: null }
-          return service.get({ ...h, path: '/' })
-        },
+      unknown: bind(
+        'name',
+        resource({
+          get: async h => {
+            const service = registry.get(h.params.name)
+            if (!service) return { headers: { condition: 'not-found' }, body: null }
+            return service.get({ ...h, path: '/' })
+          },
 
-        put: async (h, body) => {
-          const service = registry.get(h.params.name)
-          if (!service) return { headers: { condition: 'not-found' }, body: null }
-          return service.put({ ...h, path: '/' }, body)
-        }
-      }))
+          put: async (h, body) => {
+            const service = registry.get(h.params.name)
+            if (!service) return { headers: { condition: 'not-found' }, body: null }
+            return service.put({ ...h, path: '/' }, body)
+          },
+        })
+      ),
     }),
 
     /**
@@ -55,12 +56,12 @@ export function createServices() {
      * Get a registered service
      * @param {string} name - Service name
      */
-    get: (name) => registry.get(name),
+    get: name => registry.get(name),
 
     /**
      * List all registered service names
      */
-    list: () => [...registry.keys()]
+    list: () => [...registry.keys()],
   }
 }
 

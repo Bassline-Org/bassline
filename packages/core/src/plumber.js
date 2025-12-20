@@ -2,6 +2,8 @@ import { resource, routes, bind } from './resource.js'
 
 /**
  * Pattern matcher for plumber rules
+ * @param pattern
+ * @param target
  */
 const match = (pattern, target) => {
   if (pattern === undefined || pattern === null) return true
@@ -33,30 +35,33 @@ export const createPlumber = () => {
           description: 'Message routing via pattern matching',
           resources: {
             '/rules': { description: 'Rule management' },
-            '/send': { description: 'Dispatch messages' }
-          }
-        }
-      })
+            '/send': { description: 'Dispatch messages' },
+          },
+        },
+      }),
     }),
 
     rules: routes({
       '': resource({
         get: async () => ({
           headers: {},
-          body: Object.fromEntries(rules)
-        })
+          body: Object.fromEntries(rules),
+        }),
       }),
-      unknown: bind('name', resource({
-        get: async (h) => {
-          const rule = rules.get(h.params.name)
-          if (!rule) return { headers: { condition: 'not-found' }, body: null }
-          return { headers: {}, body: rule }
-        },
-        put: async (h, body) => {
-          rules.set(h.params.name, body)
-          return { headers: {}, body }
-        }
-      }))
+      unknown: bind(
+        'name',
+        resource({
+          get: async h => {
+            const rule = rules.get(h.params.name)
+            if (!rule) return { headers: { condition: 'not-found' }, body: null }
+            return { headers: {}, body: rule }
+          },
+          put: async (h, body) => {
+            rules.set(h.params.name, body)
+            return { headers: {}, body }
+          },
+        })
+      ),
     }),
 
     send: resource({
@@ -71,8 +76,8 @@ export const createPlumber = () => {
           }
         }
         return { headers: {}, body: { matched } }
-      }
-    })
+      },
+    }),
   })
 }
 

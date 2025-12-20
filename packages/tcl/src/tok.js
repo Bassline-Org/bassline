@@ -30,12 +30,6 @@ export function* tokenize(src) {
   // classification fns
   const ws = c => ' \t'.includes(c),
     eol = c => '\n;'.includes(c),
-    word = c => /\w/.test(c),
-    kind = c => {
-      if (!quoted && ws(c)) return TT.SEP
-      if (!quoted && eol(c)) return TT.EOL
-    },
-    strEnd = c => '$['.includes(c) || (!quoted && ' \t\n\r;'.includes(c)) || (quoted && c === '"'),
     // stream manipulation functions
     peek = () => src[i],
     done = () => i >= src.length,
@@ -107,7 +101,7 @@ export function* tokenize(src) {
   }
 
   while (!done()) {
-    let char = peek()
+    const char = peek()
 
     if (!quoted && ws(char)) {
       skip(ws)
@@ -118,12 +112,22 @@ export function* tokenize(src) {
     if (!quoted && eol(char)) {
       skip(c => ws(c) || eol(c))
       yield { t: TT.EOL }
+      continue
     }
 
-    if (tok) {
-      type = tok[0]
-      yield { t: type, v: tok[1] }
+    // Try handler for current character
+    const handler = handlers[char]
+    if (handler) {
+      const tok = handler()
+      if (tok) {
+        type = tok[0]
+        yield { t: type, v: tok[1] }
+      }
+      continue
     }
+
+    // Default: consume as string/word token
+    i++
   }
 
   if (type !== TT.EOL) yield { t: TT.EOL }

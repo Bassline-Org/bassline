@@ -4,17 +4,16 @@ import { resource, routes, bind } from '@bassline/core'
  * Create remote WebSocket client resource
  *
  * Routes:
- *   GET  /                → list connections
- *   GET  /:name           → connection status
- *   PUT  /:name           → create connection
- *   PUT  /:name/close     → close connection
- *   GET  /:name/proxy/:path* → proxy GET to remote
- *   PUT  /:name/proxy/:path* → proxy PUT to remote
+ * GET  /                → list connections
+ * GET  /:name           → connection status
+ * PUT  /:name           → create connection
+ * PUT  /:name/close     → close connection
+ * GET  /:name/proxy/:path* → proxy GET to remote
+ * PUT  /:name/proxy/:path* → proxy PUT to remote
  *
  * Unlike the old API that dynamically registered routes at mount points,
  * this version uses an explicit /proxy sub-resource. Users access remote
  * resources via: /remote/server1/proxy/data/users/alice
- *
  * @param {object} options
  * @param {typeof WebSocket} [options.WebSocket] - WebSocket constructor
  */
@@ -35,7 +34,7 @@ export function createRemote(options = {}) {
       queue.length = 0
     }
 
-    ws.onmessage = (event) => {
+    ws.onmessage = event => {
       const msg = JSON.parse(typeof event.data === 'string' ? event.data : event.data.toString())
       if (msg.type === 'response') {
         const resolver = pending.get(msg.id)
@@ -46,8 +45,12 @@ export function createRemote(options = {}) {
       }
     }
 
-    ws.onerror = () => { ready = false }
-    ws.onclose = () => { ready = false }
+    ws.onerror = () => {
+      ready = false
+    }
+    ws.onclose = () => {
+      ready = false
+    }
 
     return {
       ws,
@@ -55,12 +58,12 @@ export function createRemote(options = {}) {
       pending,
       nextId: () => nextId++,
       ready: () => ready,
-      queue
+      queue,
     }
   }
 
   function sendRequest(conn, msg) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const id = conn.nextId()
       conn.pending.set(id, resolve)
       const payload = JSON.stringify({ ...msg, id })
@@ -82,84 +85,90 @@ export function createRemote(options = {}) {
           resources: Object.fromEntries(
             [...connections.entries()].map(([name, conn]) => [
               `/${name}`,
-              { uri: conn.config.uri, status: conn.ready() ? 'connected' : 'connecting' }
+              { uri: conn.config.uri, status: conn.ready() ? 'connected' : 'connecting' },
             ])
-          )
-        }
-      })
+          ),
+        },
+      }),
     }),
 
-    unknown: bind('name', routes({
-      '': resource({
-        get: async (h) => {
-          const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { condition: 'not-found' }, body: null }
+    unknown: bind(
+      'name',
+      routes({
+        '': resource({
+          get: async h => {
+            const conn = connections.get(h.params.name)
+            if (!conn) return { headers: { condition: 'not-found' }, body: null }
 
-          return {
-            headers: { type: '/types/remote-connection' },
-            body: {
-              name: h.params.name,
-              uri: conn.config.uri,
-              status: conn.ready() ? 'connected' : 'connecting'
+            return {
+              headers: { type: '/types/remote-connection' },
+              body: {
+                name: h.params.name,
+                uri: conn.config.uri,
+                status: conn.ready() ? 'connected' : 'connecting',
+              },
             }
-          }
-        },
+          },
 
-        put: async (h, body) => {
-          // Close existing connection if any
-          const existing = connections.get(h.params.name)
-          if (existing) {
-            existing.ws.close()
-          }
-
-          const conn = createConnection(h.params.name, body)
-          connections.set(h.params.name, conn)
-
-          return {
-            headers: { type: '/types/remote-connection' },
-            body: {
-              name: h.params.name,
-              uri: body.uri,
-              status: 'connecting'
+          put: async (h, body) => {
+            // Close existing connection if any
+            const existing = connections.get(h.params.name)
+            if (existing) {
+              existing.ws.close()
             }
-          }
-        }
-      }),
 
-      close: resource({
-        put: async (h) => {
-          const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { condition: 'not-found' }, body: null }
+            const conn = createConnection(h.params.name, body)
+            connections.set(h.params.name, conn)
 
-          conn.ws.close()
-          connections.delete(h.params.name)
+            return {
+              headers: { type: '/types/remote-connection' },
+              body: {
+                name: h.params.name,
+                uri: body.uri,
+                status: 'connecting',
+              },
+            }
+          },
+        }),
 
-          return {
-            headers: {},
-            body: { name: h.params.name, status: 'closed' }
-          }
-        }
-      }),
+        close: resource({
+          put: async h => {
+            const conn = connections.get(h.params.name)
+            if (!conn) return { headers: { condition: 'not-found' }, body: null }
 
-      proxy: bind('proxyPath', resource({
-        get: async (h) => {
-          const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { condition: 'not-found' }, body: null }
+            conn.ws.close()
+            connections.delete(h.params.name)
 
-          // Reconstruct the full path from segment + remaining path
-          const fullPath = h.params.proxyPath + (h.path && h.path !== '/' ? h.path : '')
-          return sendRequest(conn, { type: 'get', path: '/' + fullPath })
-        },
+            return {
+              headers: {},
+              body: { name: h.params.name, status: 'closed' },
+            }
+          },
+        }),
 
-        put: async (h, body) => {
-          const conn = connections.get(h.params.name)
-          if (!conn) return { headers: { condition: 'not-found' }, body: null }
+        proxy: bind(
+          'proxyPath',
+          resource({
+            get: async h => {
+              const conn = connections.get(h.params.name)
+              if (!conn) return { headers: { condition: 'not-found' }, body: null }
 
-          const fullPath = h.params.proxyPath + (h.path && h.path !== '/' ? h.path : '')
-          return sendRequest(conn, { type: 'put', path: '/' + fullPath, body })
-        }
-      }))
-    }))
+              // Reconstruct the full path from segment + remaining path
+              const fullPath = h.params.proxyPath + (h.path && h.path !== '/' ? h.path : '')
+              return sendRequest(conn, { type: 'get', path: '/' + fullPath })
+            },
+
+            put: async (h, body) => {
+              const conn = connections.get(h.params.name)
+              if (!conn) return { headers: { condition: 'not-found' }, body: null }
+
+              const fullPath = h.params.proxyPath + (h.path && h.path !== '/' ? h.path : '')
+              return sendRequest(conn, { type: 'put', path: '/' + fullPath, body })
+            },
+          })
+        ),
+      })
+    ),
   })
 }
 

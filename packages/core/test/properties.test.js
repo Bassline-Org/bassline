@@ -56,11 +56,17 @@ describe('Routing Laws', () => {
 
       const app = routes({
         foo: resource({
-          get: async () => { calls.push('foo'); return { headers: {}, body: 'foo' } }
+          get: async () => {
+            calls.push('foo')
+            return { headers: {}, body: 'foo' }
+          },
         }),
         unknown: resource({
-          get: async () => { calls.push('unknown'); return { headers: {}, body: 'unknown' } }
-        })
+          get: async () => {
+            calls.push('unknown')
+            return { headers: {}, body: 'unknown' }
+          },
+        }),
       })
 
       await app.get({ path: '/foo' })
@@ -72,8 +78,8 @@ describe('Routing Laws', () => {
     it('empty string routes to root', async () => {
       const app = routes({
         '': resource({
-          get: async () => ({ headers: {}, body: 'root' })
-        })
+          get: async () => ({ headers: {}, body: 'root' }),
+        }),
       })
 
       const result = await app.get({ path: '/' })
@@ -84,16 +90,16 @@ describe('Routing Laws', () => {
       // (A . B) . C === A . (B . C) for nested routes
 
       const leaf = resource({
-        get: async (h) => ({ headers: {}, body: h.path })
+        get: async h => ({ headers: {}, body: h.path }),
       })
 
       // Left association: routes({ a: routes({ b: routes({ c: leaf }) }) })
       const left = routes({
         a: routes({
           b: routes({
-            c: leaf
-          })
-        })
+            c: leaf,
+          }),
+        }),
       })
 
       // Right association: routes({ a: routes({ b: routes({ c: leaf }) }) })
@@ -101,9 +107,9 @@ describe('Routing Laws', () => {
       const right = routes({
         a: routes({
           b: routes({
-            c: leaf
-          })
-        })
+            c: leaf,
+          }),
+        }),
       })
 
       const path = '/a/b/c/rest'
@@ -117,11 +123,17 @@ describe('Routing Laws', () => {
   describe('bind properties', () => {
     it('bind preserves existing params', async () => {
       const app = routes({
-        users: bind('userId', routes({
-          posts: bind('postId', resource({
-            get: async (h) => ({ headers: {}, body: h.params })
-          }))
-        }))
+        users: bind(
+          'userId',
+          routes({
+            posts: bind(
+              'postId',
+              resource({
+                get: async h => ({ headers: {}, body: h.params }),
+              })
+            ),
+          })
+        ),
       })
 
       const result = await app.get({ path: '/users/alice/posts/123' })
@@ -133,18 +145,24 @@ describe('Routing Laws', () => {
     it('bind is composable', async () => {
       // bind(a, bind(b, target)) captures both a and b
       const target = resource({
-        get: async (h) => ({
+        get: async h => ({
           headers: {},
-          body: { keys: Object.keys(h.params).sort() }
-        })
+          body: { keys: Object.keys(h.params).sort() },
+        }),
       })
 
       const app = routes({
-        one: bind('first', routes({
-          two: bind('second', routes({
-            three: bind('third', target)
-          }))
-        }))
+        one: bind(
+          'first',
+          routes({
+            two: bind(
+              'second',
+              routes({
+                three: bind('third', target),
+              })
+            ),
+          })
+        ),
       })
 
       const result = await app.get({ path: '/one/a/two/b/three/c' })
@@ -156,11 +174,17 @@ describe('Routing Laws', () => {
       // If we have bind('x', bind('x', ...)), both should be preserved
       // Actually, the later bind would overwrite, which is expected JS object behavior
       const app = routes({
-        a: bind('name', routes({
-          b: bind('name', resource({
-            get: async (h) => ({ headers: {}, body: h.params })
-          }))
-        }))
+        a: bind(
+          'name',
+          routes({
+            b: bind(
+              'name',
+              resource({
+                get: async h => ({ headers: {}, body: h.params }),
+              })
+            ),
+          })
+        ),
       })
 
       const result = await app.get({ path: '/a/first/b/second' })
@@ -175,7 +199,12 @@ describe('Lattice Properties', () => {
   describe('maxNumber', () => {
     it('is associative: merge(merge(a, b), c) === merge(a, merge(b, c))', () => {
       const { merge } = lattices.maxNumber
-      const values = [[1, 2, 3], [5, 1, 9], [0, 0, 0], [-1, 5, 3]]
+      const values = [
+        [1, 2, 3],
+        [5, 1, 9],
+        [0, 0, 0],
+        [-1, 5, 3],
+      ]
 
       for (const [a, b, c] of values) {
         const left = merge(merge(a, b), c)
@@ -186,7 +215,12 @@ describe('Lattice Properties', () => {
 
     it('is commutative: merge(a, b) === merge(b, a)', () => {
       const { merge } = lattices.maxNumber
-      const pairs = [[1, 2], [5, 3], [0, -1], [10, 10]]
+      const pairs = [
+        [1, 2],
+        [5, 3],
+        [0, -1],
+        [10, 10],
+      ]
 
       for (const [a, b] of pairs) {
         expect(merge(a, b)).toBe(merge(b, a))
@@ -215,7 +249,12 @@ describe('Lattice Properties', () => {
   describe('minNumber', () => {
     it('is associative', () => {
       const { merge } = lattices.minNumber
-      const values = [[1, 2, 3], [5, 1, 9], [0, 0, 0], [-1, 5, 3]]
+      const values = [
+        [1, 2, 3],
+        [5, 1, 9],
+        [0, 0, 0],
+        [-1, 5, 3],
+      ]
 
       for (const [a, b, c] of values) {
         expect(merge(merge(a, b), c)).toBe(merge(a, merge(b, c)))
@@ -224,7 +263,11 @@ describe('Lattice Properties', () => {
 
     it('is commutative', () => {
       const { merge } = lattices.minNumber
-      const pairs = [[1, 2], [5, 3], [0, -1]]
+      const pairs = [
+        [1, 2],
+        [5, 3],
+        [0, -1],
+      ]
 
       for (const [a, b] of pairs) {
         expect(merge(a, b)).toBe(merge(b, a))
@@ -255,8 +298,12 @@ describe('Lattice Properties', () => {
       const { merge } = lattices.setUnion
       const values = [
         [[1], [2], [3]],
-        [[1, 2], [2, 3], [3, 4]],
-        [[], [1], [2]]
+        [
+          [1, 2],
+          [2, 3],
+          [3, 4],
+        ],
+        [[], [1], [2]],
       ]
 
       for (const [a, b, c] of values) {
@@ -269,9 +316,12 @@ describe('Lattice Properties', () => {
     it('is commutative', () => {
       const { merge } = lattices.setUnion
       const pairs = [
-        [[1, 2], [3, 4]],
+        [
+          [1, 2],
+          [3, 4],
+        ],
         [[1], [1, 2]],
-        [[], [1]]
+        [[], [1]],
       ]
 
       for (const [a, b] of pairs) {
@@ -301,7 +351,11 @@ describe('Lattice Properties', () => {
   describe('counter', () => {
     it('is associative', () => {
       const { merge } = lattices.counter
-      const values = [[1, 2, 3], [5, 1, 9], [0, 0, 0]]
+      const values = [
+        [1, 2, 3],
+        [5, 1, 9],
+        [0, 0, 0],
+      ]
 
       for (const [a, b, c] of values) {
         expect(merge(merge(a, b), c)).toBe(merge(a, merge(b, c)))
@@ -310,7 +364,11 @@ describe('Lattice Properties', () => {
 
     it('is commutative', () => {
       const { merge } = lattices.counter
-      const pairs = [[1, 2], [5, 3], [0, 10]]
+      const pairs = [
+        [1, 2],
+        [5, 3],
+        [0, 10],
+      ]
 
       for (const [a, b] of pairs) {
         expect(merge(a, b)).toBe(merge(b, a))
@@ -335,7 +393,7 @@ describe('Lattice Properties', () => {
       const values = [
         [true, true, true],
         [true, false, true],
-        [false, false, false]
+        [false, false, false],
       ]
 
       for (const [a, b, c] of values) {
@@ -345,7 +403,11 @@ describe('Lattice Properties', () => {
 
     it('is commutative', () => {
       const { merge } = lattices.boolean
-      const pairs = [[true, false], [false, false], [true, true]]
+      const pairs = [
+        [true, false],
+        [false, false],
+        [true, true],
+      ]
 
       for (const [a, b] of pairs) {
         expect(merge(a, b)).toBe(merge(b, a))
@@ -372,7 +434,7 @@ describe('Lattice Properties', () => {
       const { merge } = lattices.object
       const values = [
         [{ a: 1 }, { b: 2 }, { c: 3 }],
-        [{ x: 1 }, { y: 2 }, { z: 3 }]
+        [{ x: 1 }, { y: 2 }, { z: 3 }],
       ]
 
       for (const [a, b, c] of values) {
@@ -406,8 +468,16 @@ describe('Lattice Properties', () => {
     it('is associative', () => {
       const { merge } = lattices.lww
       const values = [
-        [{ value: 'a', timestamp: 1 }, { value: 'b', timestamp: 2 }, { value: 'c', timestamp: 3 }],
-        [{ value: 'x', timestamp: 3 }, { value: 'y', timestamp: 1 }, { value: 'z', timestamp: 2 }]
+        [
+          { value: 'a', timestamp: 1 },
+          { value: 'b', timestamp: 2 },
+          { value: 'c', timestamp: 3 },
+        ],
+        [
+          { value: 'x', timestamp: 3 },
+          { value: 'y', timestamp: 1 },
+          { value: 'z', timestamp: 2 },
+        ],
       ]
 
       for (const [a, b, c] of values) {
@@ -418,8 +488,14 @@ describe('Lattice Properties', () => {
     it('is commutative', () => {
       const { merge } = lattices.lww
       const pairs = [
-        [{ value: 'a', timestamp: 1 }, { value: 'b', timestamp: 2 }],
-        [{ value: 'x', timestamp: 5 }, { value: 'y', timestamp: 3 }]
+        [
+          { value: 'a', timestamp: 1 },
+          { value: 'b', timestamp: 2 },
+        ],
+        [
+          { value: 'x', timestamp: 5 },
+          { value: 'y', timestamp: 3 },
+        ],
       ]
 
       for (const [a, b] of pairs) {
@@ -431,7 +507,7 @@ describe('Lattice Properties', () => {
       const { merge } = lattices.lww
       const values = [
         { value: 'a', timestamp: 1 },
-        { value: 'b', timestamp: 100 }
+        { value: 'b', timestamp: 100 },
       ]
 
       for (const a of values) {
@@ -445,7 +521,7 @@ describe('Lattice Properties', () => {
 
 describe('Resource Algebra', () => {
   it('resource is a functor (preserves identity)', async () => {
-    const identity = async (h) => ({ headers: {}, body: h })
+    const identity = async h => ({ headers: {}, body: h })
 
     const r = resource({ get: identity })
     const result = await r.get({ path: '/test' })
@@ -456,11 +532,11 @@ describe('Resource Algebra', () => {
   it('routes distributes over composition', async () => {
     // routes({ a: R1, b: R2 }) behaves like combining R1 and R2
     const r1 = resource({
-      get: async () => ({ headers: {}, body: 'r1' })
+      get: async () => ({ headers: {}, body: 'r1' }),
     })
 
     const r2 = resource({
-      get: async () => ({ headers: {}, body: 'r2' })
+      get: async () => ({ headers: {}, body: 'r2' }),
     })
 
     const combined = routes({ a: r1, b: r2 })
@@ -472,7 +548,7 @@ describe('Resource Algebra', () => {
   it('not-found is absorbing', async () => {
     // Routing to non-existent path always gives not-found
     const app = routes({
-      foo: resource({ get: async () => ({ headers: {}, body: 'foo' }) })
+      foo: resource({ get: async () => ({ headers: {}, body: 'foo' }) }),
     })
 
     const result1 = await app.get({ path: '/bar' })
