@@ -5,6 +5,7 @@
  */
 
 export { TT, tokenize, RC } from './tok.js'
+export { TclError } from './error.js'
 export { Runtime } from './runtime.js'
 export { createShell } from './shell.js'
 

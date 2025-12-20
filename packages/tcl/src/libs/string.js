@@ -8,7 +8,20 @@ export const commands = {
   first: ([str]) => String(str?.[0] ?? ''),
   last: ([str]) => String(str?.[str.length - 1] ?? ''),
   index: ([str, index]) => String(str?.[parseInt(index, 10)] ?? ''),
-  range: ([str, start, end]) => String(str.slice(parseInt(start, 10), parseInt(end, 10))),
+  range: ([str, start, end]) => {
+    const len = str?.length ?? 0
+    const parseIndex = idx => {
+      if (idx === 'end') return len - 1
+      if (typeof idx === 'string' && idx.startsWith('end-')) {
+        return len - 1 - parseInt(idx.slice(4), 10)
+      }
+      return parseInt(idx, 10)
+    }
+    const s = parseIndex(start)
+    const e = parseIndex(end)
+    if (s < 0 || e < s || s >= len) return ''
+    return str.slice(s, e + 1) // +1 because Tcl range is inclusive
+  },
   repeat: ([str, count]) => {
     let result = ''
     for (let i = 0; i < parseInt(count, 10); i++) {

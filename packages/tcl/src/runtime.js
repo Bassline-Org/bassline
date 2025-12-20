@@ -1,4 +1,5 @@
-import { TT, tokenize } from './tok.js'
+import { TT, tokenize, RC } from './tok.js'
+import { TclError } from './error.js'
 
 // Escape sequence interpretation
 const escapes = {
@@ -268,37 +269,65 @@ export class Runtime {
     return result
   }
 
+  // Safely call a command, wrapping errors in TclError
+  safeCall(cmdName, cmd, args) {
+    try {
+      return cmd(args, this)
+    } catch (err) {
+      // Re-throw control flow exceptions as-is
+      if (err === RC.RETURN || err === RC.BREAK || err === RC.CONTINUE) {
+        throw err
+      }
+      // Wrap other errors in TclError with context
+      throw TclError.from(err, { command: cmdName })
+    }
+  }
+
   // Run a script (full command evaluation)
   run(src) {
     let argv = []
     let prev = TT.EOL
     this.result = ''
 
-    for (const tok of tokenize(src)) {
-      const { t } = tok
+    try {
+      for (const tok of tokenize(src)) {
+        const { t } = tok
 
-      if (t === TT.SEP) {
-        prev = t
-        continue
-      }
-
-      if (t === TT.EOL || t === TT.EOF) {
-        if (argv.length) {
-          const cmd = this.getCmd(argv[0])
-          this.result = cmd(argv.slice(1), this) ?? this.result
+        if (t === TT.SEP) {
+          prev = t
+          continue
         }
-        argv = []
-        prev = t
-        continue
-      }
 
-      const val = this.eval(tok)
-      if (prev === TT.SEP || prev === TT.EOL) {
-        argv.push(val)
-      } else {
-        argv[argv.length - 1] += val
+        if (t === TT.EOL || t === TT.EOF) {
+          if (argv.length) {
+            const cmdName = argv[0]
+            const cmd = this.getCmd(cmdName)
+            this.result = this.safeCall(cmdName, cmd, argv.slice(1)) ?? this.result
+          }
+          argv = []
+          prev = t
+          continue
+        }
+
+        const val = this.eval(tok)
+        if (prev === TT.SEP || prev === TT.EOL) {
+          argv.push(val)
+        } else {
+          argv[argv.length - 1] += val
+        }
+        prev = t
       }
-      prev = t
+    } catch (err) {
+      // Re-throw control flow exceptions as-is
+      if (err === RC.RETURN || err === RC.BREAK || err === RC.CONTINUE) {
+        throw err
+      }
+      // Re-throw TclErrors as-is
+      if (err instanceof TclError) {
+        throw err
+      }
+      // Wrap tokenizer and other errors
+      throw TclError.from(err, { script: src.length > 100 ? src.slice(0, 100) + '...' : src })
     }
     return this.result
   }

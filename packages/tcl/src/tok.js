@@ -92,6 +92,20 @@ export function* tokenize(src) {
       continue
     }
 
+    // Unmatched ] outside of command substitution - treat as literal or error
+    if (char === ']') {
+      if (quoted) {
+        // Inside quoted string, just accumulate
+        i++
+        continue
+      }
+      // Outside quotes, treat as literal string token
+      type = TT.STR
+      yield { t: TT.STR, v: ']' }
+      i++
+      continue
+    }
+
     if (char === '{') {
       if (!(type === TT.SEP || type === TT.EOL)) {
         i++
