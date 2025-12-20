@@ -18,6 +18,7 @@
     "@bassline/core": "workspace:*"
   },
   "devDependencies": {
+    "fast-check": "^4.4.0",
     "vitest": "^2.1.0"
   },
   "keywords": [

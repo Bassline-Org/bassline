@@ -1,6 +1,16 @@
 import { RC } from '../tok.js'
+import { TclError } from '../error.js'
 import { parseList } from './list.js'
 import { expr } from '../expr.js'
+
+// Helper to evaluate expression with error wrapping
+function safeExpr(cond, rt) {
+  try {
+    return Number(expr(cond, rt))
+  } catch (err) {
+    throw TclError.from(err, { script: cond, command: 'expr' })
+  }
+}
 
 export const std = {
   set: ([name, value], rt) => (value === undefined ? rt.getVar(name) : rt.setVar(name, value)),
@@ -10,11 +20,11 @@ export const std = {
   expr: (args, rt) => expr(args.join(' '), rt),
 
   // Conditions are evaluated as expressions
-  if: ([cond, then, , elseBranch], rt) => rt.run(Number(expr(cond, rt)) ? then : (elseBranch ?? '')),
+  if: ([cond, then, , elseBranch], rt) => rt.run(safeExpr(cond, rt) ? then : (elseBranch ?? '')),
 
   while: ([cond, body], rt) => {
     let result = ''
-    while (Number(expr(cond, rt))) {
+    while (safeExpr(cond, rt)) {
       try {
         result = rt.run(body)
       } catch (e) {
@@ -71,7 +81,7 @@ export const std = {
   for: ([init, cond, next, body], rt) => {
     rt.run(init)
     let result = ''
-    while (Number(expr(cond, rt))) {
+    while (safeExpr(cond, rt)) {
       try {
         result = rt.run(body)
       } catch (e) {
@@ -212,7 +222,7 @@ export const std = {
 
   // error message ?info? ?code?
   error: ([message, info, code]) => {
-    const err = new Error(message)
+    const err = new TclError(message)
     err.info = info
     err.code = code
     throw err
