@@ -5,7 +5,8 @@ import { parseList } from './libs/list.js'
 
 // Token types for expr
 const ET = {
-  NUM: 'NUM', // Number literal
+  NUM: 'NUM', // Number literal (integer)
+  FLOAT: 'FLOAT', // Number literal (explicitly float, e.g. 7.0)
   STR: 'STR', // String literal
   VAR: 'VAR', // Variable reference $name
   CMD: 'CMD', // Command substitution [...]
@@ -86,8 +87,11 @@ function* tokenizeExpr(src) {
         advance()
       }
 
+      let isFloat = false
+
       // Decimal point
       if (peek() === '.' && (isDigit(src[i + 1]) || !/[a-zA-Z]/.test(src[i + 1] || ''))) {
+        isFloat = true
         num += advance()
         while (i < len && (isDigit(peek()) || peek() === '_')) {
           if (peek() !== '_') num += peek()
@@ -97,24 +101,25 @@ function* tokenizeExpr(src) {
 
       // Exponent
       if (peek() === 'e' || peek() === 'E') {
+        isFloat = true
         num += advance()
         if (peek() === '+' || peek() === '-') num += advance()
         while (i < len && isDigit(peek())) num += advance()
       }
 
-      yield { t: ET.NUM, v: parseFloat(num) }
+      yield { t: isFloat ? ET.FLOAT : ET.NUM, v: parseFloat(num) }
       continue
     }
 
     // Special float values
     if (c === 'I' && src.slice(i, i + 3) === 'Inf') {
       i += 3
-      yield { t: ET.NUM, v: Infinity }
+      yield { t: ET.FLOAT, v: Infinity }
       continue
     }
     if (c === 'N' && src.slice(i, i + 3) === 'NaN') {
       i += 3
-      yield { t: ET.NUM, v: NaN }
+      yield { t: ET.FLOAT, v: NaN }
       continue
     }
 
@@ -337,33 +342,228 @@ class ExprParser {
     return tok
   }
 
-  // Get value of an operand
+  // Save current position
+  savePos() {
+    return this.pos
+  }
+
+  // Restore position
+  restorePos(pos) {
+    this.pos = pos
+  }
+
+  // Skip tokens until we're past a sub-expression at the current precedence level
+  // This is used for lazy evaluation - we skip tokens without evaluating
+  skipTernary() {
+    this.skipOr()
+    if (this.peek().t === ET.OP && this.peek().v === '?') {
+      this.advance() // skip ?
+      this.skipTernary() // skip true branch
+      this.expect(ET.OP) // skip :
+      this.skipTernary() // skip false branch
+    }
+  }
+
+  skipOr() {
+    this.skipAnd()
+    while (this.peek().t === ET.OP && this.peek().v === '||') {
+      this.advance()
+      this.skipAnd()
+    }
+  }
+
+  skipAnd() {
+    this.skipBitOr()
+    while (this.peek().t === ET.OP && this.peek().v === '&&') {
+      this.advance()
+      this.skipBitOr()
+    }
+  }
+
+  skipBitOr() {
+    this.skipBitXor()
+    while (this.peek().t === ET.OP && this.peek().v === '|') {
+      this.advance()
+      this.skipBitXor()
+    }
+  }
+
+  skipBitXor() {
+    this.skipBitAnd()
+    while (this.peek().t === ET.OP && this.peek().v === '^') {
+      this.advance()
+      this.skipBitAnd()
+    }
+  }
+
+  skipBitAnd() {
+    this.skipListOp()
+    while (this.peek().t === ET.OP && this.peek().v === '&') {
+      this.advance()
+      this.skipListOp()
+    }
+  }
+
+  skipListOp() {
+    this.skipStrEquality()
+    while (this.peek().t === ET.OP && (this.peek().v === 'in' || this.peek().v === 'ni')) {
+      this.advance()
+      this.skipStrEquality()
+    }
+  }
+
+  skipStrEquality() {
+    this.skipNumEquality()
+    while (this.peek().t === ET.OP && (this.peek().v === 'eq' || this.peek().v === 'ne')) {
+      this.advance()
+      this.skipNumEquality()
+    }
+  }
+
+  skipNumEquality() {
+    this.skipStrRelation()
+    while (this.peek().t === ET.OP && (this.peek().v === '==' || this.peek().v === '!=')) {
+      this.advance()
+      this.skipStrRelation()
+    }
+  }
+
+  skipStrRelation() {
+    this.skipNumRelation()
+    while (this.peek().t === ET.OP && ['lt', 'gt', 'le', 'ge'].includes(this.peek().v)) {
+      this.advance()
+      this.skipNumRelation()
+    }
+  }
+
+  skipNumRelation() {
+    this.skipShift()
+    while (this.peek().t === ET.OP && ['<', '>', '<=', '>='].includes(this.peek().v)) {
+      this.advance()
+      this.skipShift()
+    }
+  }
+
+  skipShift() {
+    this.skipAdd()
+    while (this.peek().t === ET.OP && (this.peek().v === '<<' || this.peek().v === '>>')) {
+      this.advance()
+      this.skipAdd()
+    }
+  }
+
+  skipAdd() {
+    this.skipMul()
+    while (this.peek().t === ET.OP && (this.peek().v === '+' || this.peek().v === '-')) {
+      this.advance()
+      this.skipMul()
+    }
+  }
+
+  skipMul() {
+    this.skipExp()
+    while (this.peek().t === ET.OP && ['*', '/', '%'].includes(this.peek().v)) {
+      this.advance()
+      this.skipExp()
+    }
+  }
+
+  skipExp() {
+    this.skipUnary()
+    if (this.peek().t === ET.OP && this.peek().v === '**') {
+      this.advance()
+      this.skipExp() // right-to-left
+    }
+  }
+
+  skipUnary() {
+    if (this.peek().t === ET.OP) {
+      const op = this.peek().v
+      if (op === '-' || op === '+' || op === '!' || op === '~') {
+        this.advance()
+        this.skipUnary()
+        return
+      }
+    }
+    this.skipPrimary()
+  }
+
+  skipPrimary() {
+    const tok = this.peek()
+
+    // Parenthesized expression
+    if (tok.t === ET.LPAREN) {
+      this.advance()
+      this.skipTernary()
+      this.expect(ET.RPAREN)
+      return
+    }
+
+    // Function call
+    if (tok.t === ET.FUNC) {
+      this.advance()
+      this.expect(ET.LPAREN)
+      if (this.peek().t !== ET.RPAREN) {
+        this.skipTernary()
+        while (this.peek().t === ET.COMMA) {
+          this.advance()
+          this.skipTernary()
+        }
+      }
+      this.expect(ET.RPAREN)
+      return
+    }
+
+    // Literals and references - just skip the token
+    if (tok.t === ET.NUM || tok.t === ET.FLOAT || tok.t === ET.STR || tok.t === ET.VAR || tok.t === ET.CMD) {
+      this.advance()
+      return
+    }
+
+    throw new Error(`expr: unexpected token ${tok.t} while skipping`)
+  }
+
+  // Get value of an operand (returns {v: value, isFloat: boolean})
   getValue(tok) {
     switch (tok.t) {
       case ET.NUM:
-        return tok.v
+        return { v: tok.v, isFloat: false }
+      case ET.FLOAT:
+        return { v: tok.v, isFloat: true }
       case ET.STR:
-        return tok.v
+        return { v: tok.v, isFloat: false }
       case ET.VAR:
-        return this.rt.getVar(tok.v)
+        return { v: this.rt.getVar(tok.v), isFloat: false }
       case ET.CMD:
-        return this.rt.run(tok.v)
+        return { v: this.rt.run(tok.v), isFloat: false }
       default:
         throw new Error(`expr: unexpected token ${tok.t}`)
     }
   }
 
+  // Unwrap value (for backward compatibility in most operations)
+  unwrap(val) {
+    return typeof val === 'object' && val !== null && 'v' in val ? val.v : val
+  }
+
+  // Check if value is explicitly a float
+  isExplicitFloat(val) {
+    return typeof val === 'object' && val !== null && val.isFloat === true
+  }
+
   // Try to convert to number, return original if not possible
   toNum(v) {
-    if (typeof v === 'number') return v
-    const n = Number(v)
-    return Number.isNaN(n) ? v : n
+    const val = this.unwrap(v)
+    if (typeof val === 'number') return val
+    const n = Number(val)
+    return Number.isNaN(n) ? val : n
   }
 
   // Check if value is numeric
   isNumeric(v) {
-    if (typeof v === 'number') return true
-    return !Number.isNaN(Number(v))
+    const val = this.unwrap(v)
+    if (typeof val === 'number') return true
+    return !Number.isNaN(Number(val))
   }
 
   // Parse expression (entry point)
@@ -380,11 +580,23 @@ class ExprParser {
     const cond = this.parseOr()
     if (this.peek().t === ET.OP && this.peek().v === '?') {
       this.advance() // consume ?
-      const trueVal = this.parseTernary() // recursive for right-to-left
-      this.expect(ET.OP) // expect :
-      const falseVal = this.parseTernary()
+
       // Lazy evaluation: only evaluate the chosen branch
-      return this.toNum(cond) ? trueVal : falseVal
+      if (this.toNum(cond)) {
+        // Evaluate true branch
+        const trueVal = this.parseTernary()
+        this.expect(ET.OP) // expect :
+        // Skip false branch without evaluating
+        this.skipTernary()
+        return trueVal
+      } else {
+        // Skip true branch without evaluating
+        this.skipTernary()
+        this.expect(ET.OP) // expect :
+        // Evaluate false branch
+        const falseVal = this.parseTernary()
+        return falseVal
+      }
     }
     return cond
   }
@@ -394,9 +606,9 @@ class ExprParser {
     let left = this.parseAnd()
     while (this.peek().t === ET.OP && this.peek().v === '||') {
       this.advance()
-      // Lazy: if left is true, don't evaluate right
+      // Lazy: if left is true, don't evaluate right - skip it
       if (this.toNum(left)) {
-        this.parseAnd() // consume but ignore
+        this.skipAnd() // skip without evaluating
         left = 1
       } else {
         left = this.toNum(this.parseAnd()) ? 1 : 0
@@ -410,9 +622,9 @@ class ExprParser {
     let left = this.parseBitOr()
     while (this.peek().t === ET.OP && this.peek().v === '&&') {
       this.advance()
-      // Lazy: if left is false, don't evaluate right
+      // Lazy: if left is false, don't evaluate right - skip it
       if (!this.toNum(left)) {
-        this.parseBitOr() // consume but ignore
+        this.skipBitOr() // skip without evaluating
         left = 0
       } else {
         left = this.toNum(this.parseBitOr()) ? 1 : 0
@@ -457,8 +669,8 @@ class ExprParser {
     while (this.peek().t === ET.OP && (this.peek().v === 'in' || this.peek().v === 'ni')) {
       const op = this.advance().v
       const right = this.parseStrEquality()
-      const list = parseList(String(right))
-      const found = list.includes(String(left))
+      const list = parseList(String(this.unwrap(right)))
+      const found = list.includes(String(this.unwrap(left)))
       left = op === 'in' ? (found ? 1 : 0) : found ? 0 : 1
     }
     return left
@@ -470,8 +682,10 @@ class ExprParser {
     while (this.peek().t === ET.OP && (this.peek().v === 'eq' || this.peek().v === 'ne')) {
       const op = this.advance().v
       const right = this.parseNumEquality()
-      if (op === 'eq') left = String(left) === String(right) ? 1 : 0
-      else left = String(left) !== String(right) ? 1 : 0
+      const l = String(this.unwrap(left))
+      const r = String(this.unwrap(right))
+      if (op === 'eq') left = l === r ? 1 : 0
+      else left = l !== r ? 1 : 0
     }
     return left
   }
@@ -487,8 +701,10 @@ class ExprParser {
         if (op === '==') left = this.toNum(left) === this.toNum(right) ? 1 : 0
         else left = this.toNum(left) !== this.toNum(right) ? 1 : 0
       } else {
-        if (op === '==') left = String(left) === String(right) ? 1 : 0
-        else left = String(left) !== String(right) ? 1 : 0
+        const l = String(this.unwrap(left))
+        const r = String(this.unwrap(right))
+        if (op === '==') left = l === r ? 1 : 0
+        else left = l !== r ? 1 : 0
       }
     }
     return left
@@ -500,7 +716,7 @@ class ExprParser {
     while (this.peek().t === ET.OP && ['lt', 'gt', 'le', 'ge'].includes(this.peek().v)) {
       const op = this.advance().v
       const right = this.parseNumRelation()
-      const cmp = String(left).localeCompare(String(right))
+      const cmp = String(this.unwrap(left)).localeCompare(String(this.unwrap(right)))
       if (op === 'lt') left = cmp < 0 ? 1 : 0
       else if (op === 'gt') left = cmp > 0 ? 1 : 0
       else if (op === 'le') left = cmp <= 0 ? 1 : 0
@@ -555,17 +771,34 @@ class ExprParser {
     while (this.peek().t === ET.OP && ['*', '/', '%'].includes(this.peek().v)) {
       const op = this.advance().v
       const right = this.parseExp()
+
+      // Check if either operand is explicitly a float (e.g., 7.0)
+      const leftIsFloat = this.isExplicitFloat(left)
+      const rightIsFloat = this.isExplicitFloat(right)
+
       const l = this.toNum(left),
         r = this.toNum(right)
+
       if (op === '*') left = l * r
       else if (op === '/') {
-        // Tcl division: -57 / 10 = -6 (floor division for integers)
-        if (Number.isInteger(l) && Number.isInteger(r)) {
+        // Division by zero is an error
+        if (r === 0) {
+          throw new Error('divide by zero')
+        }
+        // Tcl division: use float division if either operand is explicitly float
+        // Otherwise use floor division for integers
+        if (leftIsFloat || rightIsFloat) {
+          left = l / r
+        } else if (Number.isInteger(l) && Number.isInteger(r)) {
           left = Math.floor(l / r)
         } else {
           left = l / r
         }
       } else {
+        // Modulo by zero is also an error
+        if (r === 0) {
+          throw new Error('divide by zero')
+        }
         // Tcl modulus: consistent with floor division
         // -57 % 10 = 3 (so that -57 = -6 * 10 + 3)
         if (Number.isInteger(l) && Number.isInteger(r)) {
@@ -641,7 +874,7 @@ class ExprParser {
     }
 
     // Literals and references
-    if (tok.t === ET.NUM || tok.t === ET.STR || tok.t === ET.VAR || tok.t === ET.CMD) {
+    if (tok.t === ET.NUM || tok.t === ET.FLOAT || tok.t === ET.STR || tok.t === ET.VAR || tok.t === ET.CMD) {
       this.advance()
       return this.getValue(tok)
     }
@@ -653,7 +886,10 @@ class ExprParser {
 // Main expr function
 export function expr(src, rt) {
   const parser = new ExprParser(src, rt)
-  const result = parser.parse()
+  const rawResult = parser.parse()
+
+  // Unwrap if it's a wrapped value
+  const result = parser.unwrap(rawResult)
 
   // Format result
   if (typeof result === 'number') {

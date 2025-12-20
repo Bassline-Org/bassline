@@ -2,6 +2,8 @@
 // Dicts are plists: lists with even elements alternating key/value
 
 import { parseList, formatList } from './list.js'
+import { RC } from '../tok.js'
+import { globToRegex } from '../glob.js'
 
 // Parse a dict string into a Map
 function parseDict(str) {
@@ -136,7 +138,7 @@ export const dict = {
     const dict = parseDict(dictStr)
     let keys = [...dict.keys()]
     if (pattern) {
-      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+      const regex = globToRegex(pattern)
       keys = keys.filter(k => regex.test(k))
     }
     return formatList(keys)
@@ -148,7 +150,7 @@ export const dict = {
     const dict = parseDict(dictStr)
     let values = [...dict.values()]
     if (pattern) {
-      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+      const regex = globToRegex(pattern)
       values = values.filter(v => regex.test(v))
     }
     return formatList(values)
@@ -170,7 +172,12 @@ export const dict = {
     for (const [key, value] of dict) {
       rt.setVar(keyVar, key)
       rt.setVar(valVar, value)
-      result = rt.run(body)
+      try {
+        result = rt.run(body)
+      } catch (e) {
+        if (e === RC.BREAK) break
+        if (e !== RC.CONTINUE) throw e
+      }
     }
     return result
   },
@@ -188,8 +195,13 @@ export const dict = {
     for (const [key, value] of dict) {
       rt.setVar(keyVar, key)
       rt.setVar(valVar, value)
-      const newValue = rt.run(body)
-      result.set(key, newValue)
+      try {
+        const newValue = rt.run(body)
+        result.set(key, newValue)
+      } catch (e) {
+        if (e === RC.BREAK) break
+        if (e !== RC.CONTINUE) throw e
+      }
     }
     return formatDict(result)
   },
@@ -202,13 +214,13 @@ export const dict = {
 
     if (filterType === 'key') {
       const pattern = rest[0]
-      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+      const regex = globToRegex(pattern)
       for (const [key, value] of dict) {
         if (regex.test(key)) result.set(key, value)
       }
     } else if (filterType === 'value') {
       const pattern = rest[0]
-      const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+      const regex = globToRegex(pattern)
       for (const [key, value] of dict) {
         if (regex.test(value)) result.set(key, value)
       }
@@ -219,7 +231,8 @@ export const dict = {
       for (const [key, value] of dict) {
         rt.setVar(keyVar, key)
         rt.setVar(valVar, value)
-        if (rt.run(script) !== '0' && rt.run(script) !== '') {
+        const scriptResult = rt.run(script)
+        if (scriptResult !== '0' && scriptResult !== '') {
           result.set(key, value)
         }
       }
@@ -341,10 +354,21 @@ export const dict = {
       }
     }
 
-    // Run body
-    const result = rt.run(body)
+    // Run body, capturing any control flow exceptions
+    let result
+    let controlFlowException = null
 
-    // Update dict from local variables
+    try {
+      result = rt.run(body)
+    } catch (e) {
+      if (e === RC.RETURN || e === RC.BREAK || e === RC.CONTINUE) {
+        controlFlowException = e
+      } else {
+        throw e
+      }
+    }
+
+    // Update dict from local variables (even if control flow exception occurred)
     for (let i = 0; i < mappings.length; i += 2) {
       const key = mappings[i]
       const localVar = mappings[i + 1]
@@ -356,6 +380,12 @@ export const dict = {
     }
 
     rt.setVar(varName, formatDict(dict))
+
+    // Re-throw control flow exception after updating dict
+    if (controlFlowException) {
+      throw controlFlowException
+    }
+
     return result
   },
 
@@ -379,10 +409,21 @@ export const dict = {
       rt.setVar(key, value)
     }
 
-    // Run body
-    const result = rt.run(body)
+    // Run body, capturing any control flow exceptions
+    let result
+    let controlFlowException = null
 
-    // Update dict from local variables
+    try {
+      result = rt.run(body)
+    } catch (e) {
+      if (e === RC.RETURN || e === RC.BREAK || e === RC.CONTINUE) {
+        controlFlowException = e
+      } else {
+        throw e
+      }
+    }
+
+    // Update dict from local variables (even if control flow exception occurred)
     for (const key of dict.keys()) {
       try {
         dict.set(key, rt.getVar(key))
@@ -398,6 +439,11 @@ export const dict = {
       rt.setVar(varName, dictSetPath(rootStr, keys, formatDict(dict)))
     } else {
       rt.setVar(varName, formatDict(dict))
+    }
+
+    // Re-throw control flow exception after updating dict
+    if (controlFlowException) {
+      throw controlFlowException
     }
 
     return result

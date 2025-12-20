@@ -307,6 +307,108 @@ describe('Namespace Properties', () => {
     })
   })
 
+  describe('Namespace Export/Import', () => {
+    it('exported proc can be imported', () => {
+      fc.assert(
+        fc.property(arbNsName, nsName => {
+          const rt = createRuntime()
+
+          // Create namespace with exported proc
+          rt.run(`namespace eval ${nsName} { proc greet {} { return hello }; namespace export greet }`)
+
+          // Import into root namespace
+          rt.run(`namespace import ${nsName}/greet`)
+
+          // Should be callable without namespace prefix
+          const result = rt.run('greet')
+          expect(result).toBe('hello')
+        }),
+        { numRuns: 10 }
+      )
+    })
+
+    it('export with pattern exports multiple procs', () => {
+      const rt = createRuntime()
+
+      // Create namespace with multiple procs
+      rt.run(
+        'namespace eval mylib { proc foo {} { return foo }; proc foobar {} { return foobar }; proc bar {} { return bar }; namespace export foo* }'
+      )
+
+      // Import all matching exports
+      rt.run('namespace import mylib/*')
+
+      // foo and foobar should be available, but not bar
+      expect(rt.run('foo')).toBe('foo')
+      expect(rt.run('foobar')).toBe('foobar')
+      const result = rt.run('catch { bar }')
+      expect(result).toBe('1') // bar not imported
+    })
+
+    it('namespace forget removes imported command', () => {
+      const rt = createRuntime()
+
+      // Create namespace and export
+      rt.run('namespace eval lib { proc cmd {} { return result }; namespace export cmd }')
+
+      // Import
+      rt.run('namespace import lib/cmd')
+
+      // Should work
+      expect(rt.run('cmd')).toBe('result')
+
+      // Forget it
+      rt.run('namespace forget lib/cmd')
+
+      // Should no longer exist
+      const result = rt.run('catch { cmd }')
+      expect(result).toBe('1')
+    })
+
+    it('import -force overwrites existing command', () => {
+      const rt = createRuntime()
+
+      // Create two namespaces with same-named proc
+      rt.run('namespace eval lib1 { proc cmd {} { return lib1 }; namespace export cmd }')
+      rt.run('namespace eval lib2 { proc cmd {} { return lib2 }; namespace export cmd }')
+
+      // Import from lib1
+      rt.run('namespace import lib1/cmd')
+      expect(rt.run('cmd')).toBe('lib1')
+
+      // Import from lib2 with -force (overwrite)
+      rt.run('namespace import -force lib2/cmd')
+      expect(rt.run('cmd')).toBe('lib2')
+    })
+
+    it('export -clear removes previous exports', () => {
+      const rt = createRuntime()
+
+      // Create namespace with exports
+      rt.run('namespace eval lib { proc foo {} { return foo }; proc bar {} { return bar }; namespace export foo bar }')
+
+      // Import bar
+      rt.run('namespace import lib/bar')
+      expect(rt.run('bar')).toBe('bar')
+
+      // Forget bar
+      rt.run('namespace forget lib/bar')
+
+      // Clear exports and only export foo
+      rt.run('namespace eval lib { namespace export -clear foo }')
+
+      // Now importing bar should fail (not exported anymore)
+      rt.run('namespace import lib/*')
+
+      // foo should work
+      expect(rt.run('foo')).toBe('foo')
+
+      // bar should fail (not exported)
+      const result = rt.run('catch { bar }')
+      expect(result).toBe('1')
+    })
+  })
+
   describe('Error Cases', () => {
     it('accessing non-existent namespace variable throws', () => {
       fc.assert(
@@ -328,6 +430,43 @@ describe('Namespace Properties', () => {
       const rt = createRuntime()
       const parent = rt.run('namespace parent')
       expect(parent).toBe('')
+    })
+
+    it('circular variable links are detected and throw error', () => {
+      const rt = createRuntime()
+
+      // Create a circular link by directly manipulating the links map
+      // This simulates a scenario where x -> y and y -> x in the same namespace
+      const ns = rt.current
+      if (!ns.links) ns.links = new Map()
+      ns.links.set('x', { ns, name: 'y' })
+      ns.links.set('y', { ns, name: 'x' })
+
+      // Attempting to access the circular link should throw
+      const result = rt.run('catch { set x 1 }')
+      expect(result).toBe('1')
+
+      // Verify the error message mentions circular link
+      const errorMsg = rt.run('catch { set x 1 } msg; set msg')
+      expect(errorMsg).toContain('circular')
+    })
+
+    it('longer circular variable links are detected', () => {
+      const rt = createRuntime()
+
+      // Create a longer circular link: a -> b -> c -> a
+      const ns = rt.current
+      if (!ns.links) ns.links = new Map()
+      ns.links.set('a', { ns, name: 'b' })
+      ns.links.set('b', { ns, name: 'c' })
+      ns.links.set('c', { ns, name: 'a' })
+
+      // Attempting to access the circular link should throw
+      const result = rt.run('catch { set a 1 }')
+      expect(result).toBe('1')
+
+      const errorMsg = rt.run('catch { set a 1 } msg; set msg')
+      expect(errorMsg).toContain('circular')
     })
   })
 })
