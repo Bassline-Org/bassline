@@ -17,7 +17,7 @@ describe('createServices', () => {
       const services = createServices()
 
       const mockService = resource({
-        get: async () => ({ headers: {}, body: 'test' })
+        get: async () => ({ headers: {}, body: 'test' }),
       })
 
       services.register('test', mockService)
@@ -34,7 +34,7 @@ describe('createServices', () => {
     it('registers service', () => {
       const services = createServices()
       const mockService = resource({
-        get: async () => ({ headers: {}, body: 'hello' })
+        get: async () => ({ headers: {}, body: 'hello' }),
       })
 
       services.register('hello', mockService)
@@ -75,10 +75,10 @@ describe('createServices', () => {
       const services = createServices()
 
       const mockService = resource({
-        get: async (h) => ({
+        get: async h => ({
           headers: { type: '/types/mock' },
-          body: { receivedPath: h.path }
-        })
+          body: { receivedPath: h.path },
+        }),
       })
 
       services.register('mock', mockService)
@@ -95,8 +95,8 @@ describe('createServices', () => {
       const mockService = resource({
         put: async (h, body) => ({
           headers: {},
-          body: { received: body }
-        })
+          body: { received: body },
+        }),
       })
 
       services.register('echo', mockService)
@@ -121,10 +121,10 @@ describe('createServices', () => {
       let receivedHeaders = null
 
       const mockService = resource({
-        get: async (h) => {
+        get: async h => {
           receivedHeaders = h
           return { headers: {}, body: 'ok' }
-        }
+        },
       })
 
       services.register('test', mockService)
@@ -132,7 +132,7 @@ describe('createServices', () => {
       await services.routes.get({
         path: '/test',
         params: { custom: 'param' },
-        kit: { fake: 'kit' }
+        kit: { fake: 'kit' },
       })
 
       // Params includes both custom param and bound name
@@ -145,20 +145,20 @@ describe('createServices', () => {
     it('services are independent', async () => {
       const services = createServices()
 
-      let callCount = { a: 0, b: 0 }
+      const callCount = { a: 0, b: 0 }
 
       const serviceA = resource({
         get: async () => {
           callCount.a++
           return { headers: {}, body: 'a' }
-        }
+        },
       })
 
       const serviceB = resource({
         get: async () => {
           callCount.b++
           return { headers: {}, body: 'b' }
-        }
+        },
       })
 
       services.register('a', serviceA)

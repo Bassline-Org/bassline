@@ -113,8 +113,8 @@ describe('createSQLiteConnection', () => {
           conn.execute('INSERT INTO test (name) VALUES (?)', ['Bob'])
           conn.execute('INSERT INTO test (name) VALUES (?)', ['Alice']) // Duplicate
         })
-      } catch (e) {
-        // Expected
+      } catch {
+        // Expected - unique constraint violation
       }
 
       // Transaction should have rolled back - only Alice exists
@@ -416,9 +416,12 @@ describe('createDatabase resource', () => {
       await db.put({ path: '/connections/test' }, { path: ':memory:' })
 
       // Connect by querying
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'SELECT 1'
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'SELECT 1',
+        }
+      )
 
       // Now close
       const result = await db.put({ path: '/connections/test/close' })
@@ -430,20 +433,29 @@ describe('createDatabase resource', () => {
   describe('query operations', () => {
     beforeEach(async () => {
       await db.put({ path: '/connections/test' }, { path: ':memory:' })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)'
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)',
+        }
+      )
     })
 
     it('executes SELECT query', async () => {
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO users (name, age) VALUES (?, ?)',
-        params: ['Alice', 30]
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO users (name, age) VALUES (?, ?)',
+          params: ['Alice', 30],
+        }
+      )
 
-      const result = await db.put({ path: '/connections/test/query' }, {
-        sql: 'SELECT * FROM users'
-      })
+      const result = await db.put(
+        { path: '/connections/test/query' },
+        {
+          sql: 'SELECT * FROM users',
+        }
+      )
 
       expect(result.headers.type).toBe('/types/database-result')
       expect(result.body.rowCount).toBe(1)
@@ -451,27 +463,39 @@ describe('createDatabase resource', () => {
     })
 
     it('returns columns in query result', async () => {
-      const result = await db.put({ path: '/connections/test/query' }, {
-        sql: 'SELECT id, name, age FROM users'
-      })
+      const result = await db.put(
+        { path: '/connections/test/query' },
+        {
+          sql: 'SELECT id, name, age FROM users',
+        }
+      )
 
       expect(result.body.columns.map(c => c.name)).toEqual(['id', 'name', 'age'])
     })
 
     it('handles parameterized queries', async () => {
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO users (name, age) VALUES (?, ?)',
-        params: ['Alice', 30]
-      })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO users (name, age) VALUES (?, ?)',
-        params: ['Bob', 25]
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO users (name, age) VALUES (?, ?)',
+          params: ['Alice', 30],
+        }
+      )
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO users (name, age) VALUES (?, ?)',
+          params: ['Bob', 25],
+        }
+      )
 
-      const result = await db.put({ path: '/connections/test/query' }, {
-        sql: 'SELECT * FROM users WHERE age > ?',
-        params: [27]
-      })
+      const result = await db.put(
+        { path: '/connections/test/query' },
+        {
+          sql: 'SELECT * FROM users WHERE age > ?',
+          params: [27],
+        }
+      )
 
       expect(result.body.rowCount).toBe(1)
       expect(result.body.rows[0].name).toBe('Alice')
@@ -488,16 +512,22 @@ describe('createDatabase resource', () => {
   describe('execute operations', () => {
     beforeEach(async () => {
       await db.put({ path: '/connections/test' }, { path: ':memory:' })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)'
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)',
+        }
+      )
     })
 
     it('returns changes count for INSERT', async () => {
-      const result = await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO users (name) VALUES (?)',
-        params: ['Alice']
-      })
+      const result = await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO users (name) VALUES (?)',
+          params: ['Alice'],
+        }
+      )
 
       expect(result.headers.type).toBe('/types/database-execute-result')
       expect(result.body.changes).toBe(1)
@@ -505,33 +535,48 @@ describe('createDatabase resource', () => {
     })
 
     it('returns changes count for UPDATE', async () => {
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO users (name) VALUES (?)',
-        params: ['Alice']
-      })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO users (name) VALUES (?)',
-        params: ['Bob']
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO users (name) VALUES (?)',
+          params: ['Alice'],
+        }
+      )
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO users (name) VALUES (?)',
+          params: ['Bob'],
+        }
+      )
 
-      const result = await db.put({ path: '/connections/test/execute' }, {
-        sql: 'UPDATE users SET name = ?',
-        params: ['Updated']
-      })
+      const result = await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'UPDATE users SET name = ?',
+          params: ['Updated'],
+        }
+      )
 
       expect(result.body.changes).toBe(2)
     })
 
     it('returns changes count for DELETE', async () => {
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO users (name) VALUES (?)',
-        params: ['Alice']
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO users (name) VALUES (?)',
+          params: ['Alice'],
+        }
+      )
 
-      const result = await db.put({ path: '/connections/test/execute' }, {
-        sql: 'DELETE FROM users WHERE name = ?',
-        params: ['Alice']
-      })
+      const result = await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'DELETE FROM users WHERE name = ?',
+          params: ['Alice'],
+        }
+      )
 
       expect(result.body.changes).toBe(1)
     })
@@ -543,13 +588,16 @@ describe('createDatabase resource', () => {
         put: async (h, body) => {
           notifications.push({ path: h.path, body })
           return { headers: {}, body: null }
-        }
+        },
       })
 
-      await db.put({ path: '/connections/test/execute', kit }, {
-        sql: 'INSERT INTO users (name) VALUES (?)',
-        params: ['Alice']
-      })
+      await db.put(
+        { path: '/connections/test/execute', kit },
+        {
+          sql: 'INSERT INTO users (name) VALUES (?)',
+          params: ['Alice'],
+        }
+      )
 
       expect(notifications).toHaveLength(1)
       expect(notifications[0].path).toBe('/plumber/send')
@@ -561,12 +609,18 @@ describe('createDatabase resource', () => {
   describe('schema operations', () => {
     beforeEach(async () => {
       await db.put({ path: '/connections/test' }, { path: ':memory:' })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)'
-      })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, title TEXT)'
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL)',
+        }
+      )
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, title TEXT)',
+        }
+      )
     })
 
     it('returns full schema', async () => {
@@ -598,9 +652,12 @@ describe('createDatabase resource', () => {
     })
 
     it('executes pragma command', async () => {
-      const result = await db.put({ path: '/connections/test/pragma' }, {
-        pragma: 'table_list'
-      })
+      const result = await db.put(
+        { path: '/connections/test/pragma' },
+        {
+          pragma: 'table_list',
+        }
+      )
 
       expect(result.headers.type).toBe('/types/database-pragma-result')
       expect(result.body.result).toBeDefined()
@@ -635,18 +692,27 @@ describe('createDatabase resource', () => {
 
     it('returns error for constraint violation', async () => {
       await db.put({ path: '/connections/test' }, { path: ':memory:' })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT UNIQUE)'
-      })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO test (name) VALUES (?)',
-        params: ['Alice']
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT UNIQUE)',
+        }
+      )
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO test (name) VALUES (?)',
+          params: ['Alice'],
+        }
+      )
 
-      const result = await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO test (name) VALUES (?)',
-        params: ['Alice']
-      })
+      const result = await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO test (name) VALUES (?)',
+          params: ['Alice'],
+        }
+      )
 
       expect(result.headers.condition).toBe('error')
       expect(result.headers.message).toContain('UNIQUE constraint')
@@ -658,23 +724,35 @@ describe('createDatabase resource', () => {
       await db.put({ path: '/connections/db1' }, { path: ':memory:' })
       await db.put({ path: '/connections/db2' }, { path: ':memory:' })
 
-      await db.put({ path: '/connections/db1/execute' }, {
-        sql: 'CREATE TABLE test (val INTEGER)'
-      })
-      await db.put({ path: '/connections/db2/execute' }, {
-        sql: 'CREATE TABLE test (val INTEGER)'
-      })
+      await db.put(
+        { path: '/connections/db1/execute' },
+        {
+          sql: 'CREATE TABLE test (val INTEGER)',
+        }
+      )
+      await db.put(
+        { path: '/connections/db2/execute' },
+        {
+          sql: 'CREATE TABLE test (val INTEGER)',
+        }
+      )
 
-      await db.put({ path: '/connections/db1/execute' }, {
-        sql: 'INSERT INTO test VALUES (1)'
-      })
-      await db.put({ path: '/connections/db2/execute' }, {
-        sql: 'INSERT INTO test VALUES (2)'
-      })
+      await db.put(
+        { path: '/connections/db1/execute' },
+        {
+          sql: 'INSERT INTO test VALUES (1)',
+        }
+      )
+      await db.put(
+        { path: '/connections/db2/execute' },
+        {
+          sql: 'INSERT INTO test VALUES (2)',
+        }
+      )
 
       const [result1, result2] = await Promise.all([
         db.put({ path: '/connections/db1/query' }, { sql: 'SELECT val FROM test' }),
-        db.put({ path: '/connections/db2/query' }, { sql: 'SELECT val FROM test' })
+        db.put({ path: '/connections/db2/query' }, { sql: 'SELECT val FROM test' }),
       ])
 
       expect(result1.body.rows[0].val).toBe(1)
@@ -683,22 +761,34 @@ describe('createDatabase resource', () => {
 
     it('handles rapid sequential queries', async () => {
       await db.put({ path: '/connections/test' }, { path: ':memory:' })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'CREATE TABLE counter (val INTEGER)'
-      })
-      await db.put({ path: '/connections/test/execute' }, {
-        sql: 'INSERT INTO counter VALUES (0)'
-      })
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'CREATE TABLE counter (val INTEGER)',
+        }
+      )
+      await db.put(
+        { path: '/connections/test/execute' },
+        {
+          sql: 'INSERT INTO counter VALUES (0)',
+        }
+      )
 
       for (let i = 0; i < 50; i++) {
-        await db.put({ path: '/connections/test/execute' }, {
-          sql: 'UPDATE counter SET val = val + 1'
-        })
+        await db.put(
+          { path: '/connections/test/execute' },
+          {
+            sql: 'UPDATE counter SET val = val + 1',
+          }
+        )
       }
 
-      const result = await db.put({ path: '/connections/test/query' }, {
-        sql: 'SELECT val FROM counter'
-      })
+      const result = await db.put(
+        { path: '/connections/test/query' },
+        {
+          sql: 'SELECT val FROM counter',
+        }
+      )
 
       expect(result.body.rows[0].val).toBe(50)
     })

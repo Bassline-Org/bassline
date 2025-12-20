@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resource, routes, bind, splitPath, notFound } from '../src/resource.js'
-import { createMockKit, headers } from './helpers.js'
+import { createMockKit } from './helpers.js'
 
 describe('splitPath', () => {
   it('splits path into segment and remaining', () => {
@@ -34,7 +34,7 @@ describe('resource', () => {
   it('creates resource with get and put', () => {
     const r = resource({
       get: async () => ({ headers: {}, body: 'get' }),
-      put: async () => ({ headers: {}, body: 'put' })
+      put: async () => ({ headers: {}, body: 'put' }),
     })
 
     expect(r).toHaveProperty('get')
@@ -49,7 +49,9 @@ describe('resource', () => {
 
   it('wraps handlers with try-catch', async () => {
     const r = resource({
-      get: async () => { throw new Error('test error') }
+      get: async () => {
+        throw new Error('test error')
+      },
     })
 
     const result = await r.get({})
@@ -61,7 +63,9 @@ describe('resource', () => {
   it('signals conditions via kit when available', async () => {
     const kit = createMockKit()
     const r = resource({
-      get: async () => { throw new Error('test error') }
+      get: async () => {
+        throw new Error('test error')
+      },
     })
 
     await r.get({ kit, path: '/test' })
@@ -74,7 +78,9 @@ describe('resource', () => {
 
   it('gracefully handles missing kit', async () => {
     const r = resource({
-      get: async () => { throw new Error('test error') }
+      get: async () => {
+        throw new Error('test error')
+      },
     })
 
     // Should not throw even without kit
@@ -87,11 +93,11 @@ describe('routes', () => {
   it('dispatches to named routes', async () => {
     const app = routes({
       foo: resource({
-        get: async () => ({ headers: {}, body: 'foo' })
+        get: async () => ({ headers: {}, body: 'foo' }),
       }),
       bar: resource({
-        get: async () => ({ headers: {}, body: 'bar' })
-      })
+        get: async () => ({ headers: {}, body: 'bar' }),
+      }),
     })
 
     const fooResult = await app.get({ path: '/foo' })
@@ -104,8 +110,8 @@ describe('routes', () => {
   it('dispatches to root with empty string key', async () => {
     const app = routes({
       '': resource({
-        get: async () => ({ headers: {}, body: 'root' })
-      })
+        get: async () => ({ headers: {}, body: 'root' }),
+      }),
     })
 
     const result = await app.get({ path: '/' })
@@ -115,8 +121,8 @@ describe('routes', () => {
   it('falls back to unknown handler', async () => {
     const app = routes({
       unknown: resource({
-        get: async (h) => ({ headers: {}, body: `unknown: ${h.segment}` })
-      })
+        get: async h => ({ headers: {}, body: `unknown: ${h.segment}` }),
+      }),
     })
 
     const result = await app.get({ path: '/anything' })
@@ -126,8 +132,8 @@ describe('routes', () => {
   it('returns not-found for unmatched routes', async () => {
     const app = routes({
       foo: resource({
-        get: async () => ({ headers: {}, body: 'foo' })
-      })
+        get: async () => ({ headers: {}, body: 'foo' }),
+      }),
     })
 
     const result = await app.get({ path: '/bar' })
@@ -137,8 +143,8 @@ describe('routes', () => {
   it('passes remaining path to nested resource', async () => {
     const app = routes({
       foo: resource({
-        get: async (h) => ({ headers: {}, body: h.path })
-      })
+        get: async h => ({ headers: {}, body: h.path }),
+      }),
     })
 
     const result = await app.get({ path: '/foo/bar/baz' })
@@ -148,8 +154,8 @@ describe('routes', () => {
   it('adds segment to headers', async () => {
     const app = routes({
       foo: resource({
-        get: async (h) => ({ headers: {}, body: h.segment })
-      })
+        get: async h => ({ headers: {}, body: h.segment }),
+      }),
     })
 
     const result = await app.get({ path: '/foo' })
@@ -160,9 +166,9 @@ describe('routes', () => {
     const app = routes({
       api: routes({
         users: resource({
-          get: async () => ({ headers: {}, body: 'users' })
-        })
-      })
+          get: async () => ({ headers: {}, body: 'users' }),
+        }),
+      }),
     })
 
     const result = await app.get({ path: '/api/users' })
@@ -173,9 +179,12 @@ describe('routes', () => {
 describe('bind', () => {
   it('captures path segment as param', async () => {
     const app = routes({
-      users: bind('id', resource({
-        get: async (h) => ({ headers: {}, body: { id: h.params.id } })
-      }))
+      users: bind(
+        'id',
+        resource({
+          get: async h => ({ headers: {}, body: { id: h.params.id } }),
+        })
+      ),
     })
 
     const result = await app.get({ path: '/users/123' })
@@ -184,14 +193,20 @@ describe('bind', () => {
 
   it('accumulates params through nested binds', async () => {
     const app = routes({
-      users: bind('userId', routes({
-        posts: bind('postId', resource({
-          get: async (h) => ({
-            headers: {},
-            body: { userId: h.params.userId, postId: h.params.postId }
-          })
-        }))
-      }))
+      users: bind(
+        'userId',
+        routes({
+          posts: bind(
+            'postId',
+            resource({
+              get: async h => ({
+                headers: {},
+                body: { userId: h.params.userId, postId: h.params.postId },
+              }),
+            })
+          ),
+        })
+      ),
     })
 
     const result = await app.get({ path: '/users/alice/posts/42' })
@@ -201,12 +216,15 @@ describe('bind', () => {
 
   it('preserves existing params', async () => {
     const app = routes({
-      users: bind('id', resource({
-        get: async (h) => ({
-          headers: {},
-          body: { id: h.params.id, existing: h.params.existing }
+      users: bind(
+        'id',
+        resource({
+          get: async h => ({
+            headers: {},
+            body: { id: h.params.id, existing: h.params.existing },
+          }),
         })
-      }))
+      ),
     })
 
     const result = await app.get({ path: '/users/123', params: { existing: 'value' } })
@@ -216,9 +234,12 @@ describe('bind', () => {
 
   it('advances path after capture', async () => {
     const app = routes({
-      users: bind('id', resource({
-        get: async (h) => ({ headers: {}, body: { path: h.path } })
-      }))
+      users: bind(
+        'id',
+        resource({
+          get: async h => ({ headers: {}, body: { path: h.path } }),
+        })
+      ),
     })
 
     const result = await app.get({ path: '/users/123/details' })

@@ -26,104 +26,107 @@ export const createWsServer = () => {
           description: 'WebSocket servers that proxy to bassline',
           resources: Object.fromEntries(
             [...servers.keys()].map(port => [`/${port}`, { clients: servers.get(port).clients.size }])
-          )
-        }
-      })
+          ),
+        },
+      }),
     }),
 
-    unknown: bind('port', routes({
-      '': resource({
-        get: async (h) => {
-          const port = parseInt(h.params.port)
-          const entry = servers.get(port)
-          if (!entry) return { headers: { condition: 'not-found' }, body: null }
+    unknown: bind(
+      'port',
+      routes({
+        '': resource({
+          get: async h => {
+            const port = parseInt(h.params.port)
+            const entry = servers.get(port)
+            if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
-          return {
-            headers: { type: '/types/ws-server' },
-            body: {
-              port,
-              clients: entry.clients.size,
-              uptime: Date.now() - entry.startTime
+            return {
+              headers: { type: '/types/ws-server' },
+              body: {
+                port,
+                clients: entry.clients.size,
+                uptime: Date.now() - entry.startTime,
+              },
             }
-          }
-        },
+          },
 
-        put: async (h, body) => {
-          const port = parseInt(h.params.port)
-          const kit = h.kit
+          put: async (h, _body) => {
+            const port = parseInt(h.params.port)
+            const kit = h.kit
 
-          // Close existing server if any
-          const existing = servers.get(port)
-          if (existing) {
-            existing.clients.forEach(ws => ws.close())
-            existing.wss.close()
-          }
+            // Close existing server if any
+            const existing = servers.get(port)
+            if (existing) {
+              existing.clients.forEach(ws => ws.close())
+              existing.wss.close()
+            }
 
-          const clients = new Set()
-          const startTime = Date.now()
-          const wss = new WebSocketServer({ port })
+            const clients = new Set()
+            const startTime = Date.now()
+            const wss = new WebSocketServer({ port })
 
-          wss.on('connection', ws => {
-            clients.add(ws)
+            wss.on('connection', ws => {
+              clients.add(ws)
 
-            ws.on('message', async data => {
-              try {
-                const msg = JSON.parse(data.toString())
+              ws.on('message', async data => {
+                try {
+                  const msg = JSON.parse(data.toString())
 
-                if (msg.type === 'get' && kit) {
-                  const result = await kit.get({ path: msg.path, ...msg.headers })
-                  ws.send(JSON.stringify({ type: 'response', id: msg.id, result }))
+                  if (msg.type === 'get' && kit) {
+                    const result = await kit.get({ path: msg.path, ...msg.headers })
+                    ws.send(JSON.stringify({ type: 'response', id: msg.id, result }))
+                  }
+
+                  if (msg.type === 'put' && kit) {
+                    const result = await kit.put({ path: msg.path, ...msg.headers }, msg.body)
+                    ws.send(JSON.stringify({ type: 'response', id: msg.id, result }))
+                  }
+                } catch (err) {
+                  ws.send(JSON.stringify({ type: 'error', error: err.message }))
                 }
+              })
 
-                if (msg.type === 'put' && kit) {
-                  const result = await kit.put({ path: msg.path, ...msg.headers }, msg.body)
-                  ws.send(JSON.stringify({ type: 'response', id: msg.id, result }))
-                }
-              } catch (err) {
-                ws.send(JSON.stringify({ type: 'error', error: err.message }))
-              }
+              ws.on('close', () => clients.delete(ws))
+              ws.on('error', () => clients.delete(ws))
             })
 
-            ws.on('close', () => clients.delete(ws))
-            ws.on('error', () => clients.delete(ws))
-          })
+            servers.set(port, { wss, clients, startTime, kit })
 
-          servers.set(port, { wss, clients, startTime, kit })
+            return {
+              headers: { type: '/types/ws-server' },
+              body: { port, status: 'running' },
+            }
+          },
+        }),
 
-          return {
-            headers: { type: '/types/ws-server' },
-            body: { port, status: 'running' }
-          }
-        }
-      }),
+        stop: resource({
+          put: async h => {
+            const port = parseInt(h.params.port)
+            const entry = servers.get(port)
+            if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
-      stop: resource({
-        put: async (h) => {
-          const port = parseInt(h.params.port)
-          const entry = servers.get(port)
-          if (!entry) return { headers: { condition: 'not-found' }, body: null }
+            entry.clients.forEach(ws => ws.close())
+            entry.wss.close()
+            servers.delete(port)
 
-          entry.clients.forEach(ws => ws.close())
-          entry.wss.close()
-          servers.delete(port)
+            return { headers: {}, body: { port, status: 'stopped' } }
+          },
+        }),
 
-          return { headers: {}, body: { port, status: 'stopped' } }
-        }
-      }),
+        broadcast: resource({
+          put: async (h, body) => {
+            const port = parseInt(h.params.port)
+            const entry = servers.get(port)
+            if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
-      broadcast: resource({
-        put: async (h, body) => {
-          const port = parseInt(h.params.port)
-          const entry = servers.get(port)
-          if (!entry) return { headers: { condition: 'not-found' }, body: null }
+            const msg = JSON.stringify({ type: 'broadcast', body })
+            entry.clients.forEach(ws => ws.send(msg))
 
-          const msg = JSON.stringify({ type: 'broadcast', body })
-          entry.clients.forEach(ws => ws.send(msg))
-
-          return { headers: {}, body: { sent: entry.clients.size } }
-        }
+            return { headers: {}, body: { sent: entry.clients.size } }
+          },
+        }),
       })
-    }))
+    ),
   })
 }
 

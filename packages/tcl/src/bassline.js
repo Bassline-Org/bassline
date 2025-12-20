@@ -99,7 +99,7 @@ export function createBasslineCommands(bl) {
         }
       } else {
         // Join all parts and add bl:/// prefix
-        const path = args.map((p) => p.replace(/^\/|\/$/g, '')).join('/')
+        const path = args.map(p => p.replace(/^\/|\/$/g, '')).join('/')
         result = `bl:///${path}`
       }
 

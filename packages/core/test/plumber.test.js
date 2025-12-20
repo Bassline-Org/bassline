@@ -67,15 +67,9 @@ describe('createPlumber', () => {
       const kit = createMockKit()
       const plumber = createPlumber()
 
-      await plumber.put(
-        { path: '/rules/test' },
-        { match: { type: 'greeting' }, to: '/cells/greetings/value' }
-      )
+      await plumber.put({ path: '/rules/test' }, { match: { type: 'greeting' }, to: '/cells/greetings/value' })
 
-      const result = await plumber.put(
-        { path: '/send', kit },
-        { type: 'greeting', message: 'hello' }
-      )
+      const result = await plumber.put({ path: '/send', kit }, { type: 'greeting', message: 'hello' })
 
       expect(result.body.matched).toContain('test')
 
@@ -92,10 +86,7 @@ describe('createPlumber', () => {
       await plumber.put({ path: '/rules/r1' }, { match: {}, to: '/a' })
       await plumber.put({ path: '/rules/r2' }, { match: {}, to: '/b' })
 
-      const result = await plumber.put(
-        { path: '/send', kit },
-        { data: 'test' }
-      )
+      const result = await plumber.put({ path: '/send', kit }, { data: 'test' })
 
       expect(result.body.matched.length).toBe(2)
       expect(kit.calls().length).toBe(2)
@@ -107,10 +98,7 @@ describe('createPlumber', () => {
 
       await plumber.put({ path: '/rules/log' }, { match: {} })
 
-      const result = await plumber.put(
-        { path: '/send', kit },
-        { data: 'test' }
-      )
+      const result = await plumber.put({ path: '/send', kit }, { data: 'test' })
 
       expect(result.body.matched).toContain('log')
       expect(kit.calls().length).toBe(0)
@@ -158,50 +146,29 @@ describe('createPlumber', () => {
 
     it('matches nested objects', async () => {
       const plumber = createPlumber()
-      await plumber.put(
-        { path: '/rules/nested' },
-        { match: { user: { role: 'admin' } } }
-      )
+      await plumber.put({ path: '/rules/nested' }, { match: { user: { role: 'admin' } } })
 
-      const r1 = await plumber.put(
-        { path: '/send' },
-        { user: { role: 'admin', name: 'Alice' } }
-      )
+      const r1 = await plumber.put({ path: '/send' }, { user: { role: 'admin', name: 'Alice' } })
       expect(r1.body.matched).toContain('nested')
 
-      const r2 = await plumber.put(
-        { path: '/send' },
-        { user: { role: 'user', name: 'Bob' } }
-      )
+      const r2 = await plumber.put({ path: '/send' }, { user: { role: 'user', name: 'Bob' } })
       expect(r2.body.matched).not.toContain('nested')
     })
 
     it('matches regex patterns for strings', async () => {
       const plumber = createPlumber()
-      await plumber.put(
-        { path: '/rules/regex' },
-        { match: { email: '@example\\.com$' } }
-      )
+      await plumber.put({ path: '/rules/regex' }, { match: { email: '@example\\.com$' } })
 
-      const r1 = await plumber.put(
-        { path: '/send' },
-        { email: 'test@example.com' }
-      )
+      const r1 = await plumber.put({ path: '/send' }, { email: 'test@example.com' })
       expect(r1.body.matched).toContain('regex')
 
-      const r2 = await plumber.put(
-        { path: '/send' },
-        { email: 'test@other.com' }
-      )
+      const r2 = await plumber.put({ path: '/send' }, { email: 'test@other.com' })
       expect(r2.body.matched).not.toContain('regex')
     })
 
     it('does not match primitives against objects', async () => {
       const plumber = createPlumber()
-      await plumber.put(
-        { path: '/rules/obj' },
-        { match: { data: { nested: true } } }
-      )
+      await plumber.put({ path: '/rules/obj' }, { match: { data: { nested: true } } })
 
       const result = await plumber.put({ path: '/send' }, { data: 'string' })
       expect(result.body.matched).not.toContain('obj')

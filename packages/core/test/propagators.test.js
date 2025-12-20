@@ -16,7 +16,7 @@ describe('createPropagators', () => {
     const config = {
       inputs: ['a', 'b'],
       output: '/cells/sum/value',
-      fn: '/fn/sum'
+      fn: '/fn/sum',
     }
 
     const result = await propagators.put({ path: '/adder' }, config)
@@ -47,16 +47,19 @@ describe('createPropagators', () => {
       const kit = createMockKit({
         '/inputs/a': { headers: {}, body: 10 },
         '/inputs/b': { headers: {}, body: 20 },
-        '/fn': { headers: {}, body: (a, b) => a + b }
+        '/fn': { headers: {}, body: (a, b) => a + b },
       })
 
       const propagators = createPropagators()
 
-      await propagators.put({ path: '/adder' }, {
-        inputs: ['a', 'b'],
-        output: '/output',
-        fn: '/fn/sum'
-      })
+      await propagators.put(
+        { path: '/adder' },
+        {
+          inputs: ['a', 'b'],
+          output: '/output',
+          fn: '/fn/sum',
+        }
+      )
 
       const result = await propagators.put({ path: '/adder/run', kit }, null)
 
@@ -73,11 +76,14 @@ describe('createPropagators', () => {
     it('returns error without kit', async () => {
       const propagators = createPropagators()
 
-      await propagators.put({ path: '/test' }, {
-        inputs: ['x'],
-        output: '/output',
-        fn: '/fn/identity'
-      })
+      await propagators.put(
+        { path: '/test' },
+        {
+          inputs: ['x'],
+          output: '/output',
+          fn: '/fn/identity',
+        }
+      )
 
       const result = await propagators.put({ path: '/test/run' }, null)
 
@@ -88,16 +94,19 @@ describe('createPropagators', () => {
     it('returns error when fn is not a function', async () => {
       const kit = createMockKit({
         '/inputs/a': { headers: {}, body: 10 },
-        '/fn': { headers: {}, body: 'not a function' }
+        '/fn': { headers: {}, body: 'not a function' },
       })
 
       const propagators = createPropagators()
 
-      await propagators.put({ path: '/test' }, {
-        inputs: ['a'],
-        output: '/output',
-        fn: '/fn/bad'
-      })
+      await propagators.put(
+        { path: '/test' },
+        {
+          inputs: ['a'],
+          output: '/output',
+          fn: '/fn/bad',
+        }
+      )
 
       const result = await propagators.put({ path: '/test/run', kit }, null)
 

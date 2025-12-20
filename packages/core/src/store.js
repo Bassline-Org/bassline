@@ -1,4 +1,4 @@
-import { resource, routes, bind, splitPath } from './resource.js'
+import { resource } from './resource.js'
 
 /**
  * Create an in-memory store resource.
@@ -7,13 +7,12 @@ import { resource, routes, bind, splitPath } from './resource.js'
  *   GET { path: '/foo/bar' }     → { headers: {}, body: <value> }
  *   PUT { path: '/foo/bar' }, v  → { headers: {}, body: v }
  *   GET { path: '/foo' }         → { headers: {}, body: [children...] } (if directory-like)
- *
  * @param {object} initial - Initial data (nested object structure)
  */
 export const createMemoryStore = (initial = {}) => {
   const data = { ...initial }
 
-  const getByPath = (path) => {
+  const getByPath = path => {
     const parts = (path ?? '').split('/').filter(Boolean)
     let current = data
     for (const part of parts) {
@@ -38,7 +37,7 @@ export const createMemoryStore = (initial = {}) => {
   }
 
   return resource({
-    get: async (h) => {
+    get: async h => {
       const value = getByPath(h.path)
       if (value === undefined) {
         return { headers: { condition: 'not-found' }, body: null }
@@ -53,7 +52,7 @@ export const createMemoryStore = (initial = {}) => {
     put: async (h, body) => {
       setByPath(h.path, body)
       return { headers: {}, body }
-    }
+    },
   })
 }
 

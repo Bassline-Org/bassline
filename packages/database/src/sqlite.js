@@ -2,12 +2,11 @@ import Database from 'better-sqlite3'
 
 /**
  * Create a SQLite database connection.
- *
- * @param {Object} config - Configuration
+ * @param {object} config - Configuration
  * @param {string} config.path - Database file path (or ':memory:')
  * @param {boolean} config.readonly - Open in readonly mode
  * @param {boolean} config.fileMustExist - Throw if file doesn't exist
- * @returns {Object} Database connection with query methods
+ * @returns {object} Database connection with query methods
  */
 export function createSQLiteConnection(config = {}) {
   const { path = ':memory:', readonly = false, fileMustExist = false } = config
@@ -23,7 +22,7 @@ export function createSQLiteConnection(config = {}) {
    * Execute a query and return results
    * @param {string} sql - SQL query
    * @param {Array} params - Query parameters
-   * @returns {Object} { rows, columns, rowCount }
+   * @returns {object} { rows, columns, rowCount }
    */
   function query(sql, params = []) {
     const stmt = db.prepare(sql)
@@ -31,7 +30,7 @@ export function createSQLiteConnection(config = {}) {
 
     return {
       rows,
-      columns: stmt.columns().map((col) => ({
+      columns: stmt.columns().map(col => ({
         name: col.name,
         type: col.type || 'unknown',
       })),
@@ -43,7 +42,7 @@ export function createSQLiteConnection(config = {}) {
    * Execute a statement (INSERT, UPDATE, DELETE)
    * @param {string} sql - SQL statement
    * @param {Array} params - Statement parameters
-   * @returns {Object} { changes, lastInsertRowid }
+   * @returns {object} { changes, lastInsertRowid }
    */
   function execute(sql, params = []) {
     const stmt = db.prepare(sql)
@@ -67,7 +66,7 @@ export function createSQLiteConnection(config = {}) {
 
   /**
    * Get database schema information
-   * @returns {Object} Schema metadata
+   * @returns {object} Schema metadata
    */
   function introspect() {
     // Get all tables
@@ -79,9 +78,9 @@ export function createSQLiteConnection(config = {}) {
     ).rows
 
     const schema = {
-      tables: tables.map((table) => {
+      tables: tables.map(table => {
         // Get columns for this table
-        const columns = query(`PRAGMA table_info(${table.name})`).rows.map((col) => ({
+        const columns = query(`PRAGMA table_info(${table.name})`).rows.map(col => ({
           name: col.name,
           type: col.type,
           nullable: col.notnull === 0,
@@ -90,10 +89,10 @@ export function createSQLiteConnection(config = {}) {
         }))
 
         // Get indexes
-        const indexes = query(`PRAGMA index_list(${table.name})`).rows.map((idx) => ({
+        const indexes = query(`PRAGMA index_list(${table.name})`).rows.map(idx => ({
           name: idx.name,
           unique: idx.unique === 1,
-          columns: query(`PRAGMA index_info(${idx.name})`).rows.map((c) => c.name),
+          columns: query(`PRAGMA index_info(${idx.name})`).rows.map(c => c.name),
         }))
 
         return {
@@ -110,7 +109,7 @@ export function createSQLiteConnection(config = {}) {
 
   /**
    * Execute a PRAGMA command
-   * @param {string} pragma - PRAGMA statement
+   * @param {string} pragmaStr - PRAGMA statement
    * @returns {*} Result
    */
   function pragma(pragmaStr) {

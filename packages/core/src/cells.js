@@ -6,19 +6,15 @@ import { resource, routes, bind } from './resource.js'
 export const lattices = {
   maxNumber: {
     initial: -Infinity,
-    merge: (a, b) => Math.max(a ?? -Infinity, b ?? -Infinity)
+    merge: (a, b) => Math.max(a ?? -Infinity, b ?? -Infinity),
   },
   minNumber: {
     initial: Infinity,
-    merge: (a, b) => Math.min(a ?? Infinity, b ?? Infinity)
+    merge: (a, b) => Math.min(a ?? Infinity, b ?? Infinity),
   },
   setUnion: {
     initial: [],
-    merge: (a, b) => [...new Set([...(a ?? []), ...(b ?? [])])]
-  },
-  counter: {
-    initial: 0,
-    merge: (a, b) => (a ?? 0) + (b ?? 0)
+    merge: (a, b) => [...new Set([...(a ?? []), ...(b ?? [])])],
   },
   lww: {
     initial: { value: null, timestamp: 0 },
@@ -26,16 +22,16 @@ export const lattices = {
       const ta = a?.timestamp ?? 0
       const tb = b?.timestamp ?? Date.now()
       return tb >= ta ? { value: b?.value ?? b, timestamp: tb } : a
-    }
+    },
   },
   boolean: {
     initial: false,
-    merge: (a, b) => a || b
+    merge: (a, b) => a || b,
   },
   object: {
     initial: {},
-    merge: (a, b) => ({ ...(a ?? {}), ...(b ?? {}) })
-  }
+    merge: (a, b) => ({ ...(a ?? {}), ...(b ?? {}) }),
+  },
 }
 
 /**
@@ -52,21 +48,22 @@ export const createCells = () => {
   const cells = new Map()
 
   const cellResource = resource({
-    get: async (h) => {
+    get: async h => {
       const cell = cells.get(h.params.name)
       if (!cell) return { headers: { condition: 'not-found' }, body: null }
       return { headers: { type: '/types/cell' }, body: cell }
     },
     put: async (h, body) => {
       const lattice = lattices[body.lattice]
-      if (!lattice) return { headers: { condition: 'invalid', message: `Unknown lattice: ${body.lattice}` }, body: null }
+      if (!lattice)
+        return { headers: { condition: 'invalid', message: `Unknown lattice: ${body.lattice}` }, body: null }
       cells.set(h.params.name, { lattice: body.lattice, value: lattice.initial })
       return { headers: {}, body: { lattice: body.lattice, value: lattice.initial } }
-    }
+    },
   })
 
   const valueResource = resource({
-    get: async (h) => {
+    get: async h => {
       const cell = cells.get(h.params.name)
       if (!cell) return { headers: { condition: 'not-found' }, body: null }
       return { headers: { type: '/types/cell-value' }, body: cell.value }
@@ -86,7 +83,7 @@ export const createCells = () => {
       }
 
       return { headers: { changed }, body: cell.value }
-    }
+    },
   })
 
   return routes({
@@ -97,14 +94,17 @@ export const createCells = () => {
           name: 'cells',
           description: 'Lattice-based state accumulation',
           lattices: Object.keys(lattices),
-          resources: Object.fromEntries([...cells.keys()].map(k => [`/${k}`, {}]))
-        }
-      })
+          resources: Object.fromEntries([...cells.keys()].map(k => [`/${k}`, {}])),
+        },
+      }),
     }),
-    unknown: bind('name', routes({
-      '': cellResource,
-      value: valueResource
-    }))
+    unknown: bind(
+      'name',
+      routes({
+        '': cellResource,
+        value: valueResource,
+      })
+    ),
   })
 }
 

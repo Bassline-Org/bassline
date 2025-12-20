@@ -54,7 +54,7 @@ export function createTclRoutes(options = {}) {
 
   // Session-based routes at /tcl
   // NOTE: More specific routes must come before less specific ones
-  const tclResource = resource((r) => {
+  const tclResource = resource(r => {
     // List all sessions
     r.get('/', () => {
       const list = Array.from(sessions.entries()).map(([id, s]) => ({
@@ -138,7 +138,7 @@ export function createTclRoutes(options = {}) {
   })
 
   // Legacy /eval routes for backward compatibility
-  const evalResource = resource((r) => {
+  const evalResource = resource(r => {
     r.get('/', () => ({
       headers: { type: 'bl:///types/evaluator' },
       body: {

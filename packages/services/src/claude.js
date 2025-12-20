@@ -6,20 +6,16 @@ import { runAgentLoop } from './mcp-server.js'
  * Create Claude service resource
  *
  * Routes:
- *   GET  /           → service info with operations
- *   PUT  /messages   → full Claude messages API
- *   PUT  /complete   → simple text completion
- *   PUT  /agent      → agentic loop with Bassline tools
- *
+ * GET  /           → service info with operations
+ * PUT  /messages   → full Claude messages API
+ * PUT  /complete   → simple text completion
+ * PUT  /agent      → agentic loop with Bassline tools
  * @param {object} options
  * @param {string} [options.apiKey] - Anthropic API key (defaults to ANTHROPIC_API_KEY env)
- * @param {string} [options.model='claude-sonnet-4-20250514'] - Default model
+ * @param {string} [options.model] - Default model
  */
 export function createClaude(options = {}) {
-  const {
-    apiKey = process.env.ANTHROPIC_API_KEY,
-    model = 'claude-sonnet-4-20250514'
-  } = options
+  const { apiKey = process.env.ANTHROPIC_API_KEY, model = 'claude-sonnet-4-20250514' } = options
 
   const client = new Anthropic({ apiKey })
 
@@ -34,10 +30,10 @@ export function createClaude(options = {}) {
           operations: [
             { name: 'messages', method: 'PUT', path: '/messages' },
             { name: 'complete', method: 'PUT', path: '/complete' },
-            { name: 'agent', method: 'PUT', path: '/agent' }
-          ]
-        }
-      })
+            { name: 'agent', method: 'PUT', path: '/agent' },
+          ],
+        },
+      }),
     }),
 
     messages: resource({
@@ -47,7 +43,7 @@ export function createClaude(options = {}) {
         const params = {
           model: body.model || model,
           max_tokens,
-          messages
+          messages,
         }
 
         if (system) params.system = system
@@ -59,9 +55,9 @@ export function createClaude(options = {}) {
 
         return {
           headers: { type: '/types/claude-response' },
-          body: response
+          body: response,
         }
-      }
+      },
     }),
 
     complete: resource({
@@ -71,7 +67,7 @@ export function createClaude(options = {}) {
         const params = {
           model: body.model || model,
           max_tokens,
-          messages: [{ role: 'user', content: prompt }]
+          messages: [{ role: 'user', content: prompt }],
         }
 
         if (system) params.system = system
@@ -85,9 +81,9 @@ export function createClaude(options = {}) {
 
         return {
           headers: { type: '/types/completion' },
-          body: { text, usage: response.usage, stop_reason: response.stop_reason }
+          body: { text, usage: response.usage, stop_reason: response.stop_reason },
         }
-      }
+      },
     }),
 
     agent: resource({
@@ -100,22 +96,18 @@ export function createClaude(options = {}) {
 
         // Create a bl-like interface from kit for the agent loop
         const blInterface = {
-          get: async (uri) => h.kit.get({ path: uri.replace(/^bl:\/\//, '') }),
-          put: async (uri, headers, reqBody) => h.kit.put({ path: uri.replace(/^bl:\/\//, ''), ...headers }, reqBody)
+          get: async uri => h.kit.get({ path: uri.replace(/^bl:\/\//, '') }),
+          put: async (uri, headers, reqBody) => h.kit.put({ path: uri.replace(/^bl:\/\//, ''), ...headers }, reqBody),
         }
 
-        const result = await runAgentLoop(
-          blInterface,
-          { client, model },
-          { prompt, system, maxTurns }
-        )
+        const result = await runAgentLoop(blInterface, { client, model }, { prompt, system, maxTurns })
 
         return {
           headers: { type: '/types/agent-result' },
-          body: result
+          body: result,
         }
-      }
-    })
+      },
+    }),
   })
 }
 

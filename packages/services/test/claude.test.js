@@ -8,18 +8,18 @@ vi.mock('@anthropic-ai/sdk', () => {
       constructor(config) {
         this.config = config
         this.messages = {
-          create: vi.fn(async (params) => ({
+          create: vi.fn(async params => ({
             id: 'msg_test_123',
             type: 'message',
             role: 'assistant',
             content: [{ type: 'text', text: 'Mock response' }],
             model: params.model,
             stop_reason: 'end_turn',
-            usage: { input_tokens: 10, output_tokens: 20 }
-          }))
+            usage: { input_tokens: 10, output_tokens: 20 },
+          })),
         }
       }
-    }
+    },
   }
 })
 
@@ -61,9 +61,12 @@ describe('createClaude', () => {
     it('creates message with required params', async () => {
       const claude = createClaude({ apiKey: 'test-key' })
 
-      const result = await claude.put({ path: '/messages' }, {
-        messages: [{ role: 'user', content: 'Hello' }]
-      })
+      const result = await claude.put(
+        { path: '/messages' },
+        {
+          messages: [{ role: 'user', content: 'Hello' }],
+        }
+      )
 
       expect(result.headers.type).toBe('/types/claude-response')
       expect(result.body.id).toBe('msg_test_123')
@@ -73,13 +76,16 @@ describe('createClaude', () => {
     it('passes optional parameters', async () => {
       const claude = createClaude({ apiKey: 'test-key' })
 
-      await claude.put({ path: '/messages' }, {
-        messages: [{ role: 'user', content: 'Hello' }],
-        system: 'You are helpful',
-        temperature: 0.7,
-        max_tokens: 1000,
-        stop_sequences: ['STOP']
-      })
+      await claude.put(
+        { path: '/messages' },
+        {
+          messages: [{ role: 'user', content: 'Hello' }],
+          system: 'You are helpful',
+          temperature: 0.7,
+          max_tokens: 1000,
+          stop_sequences: ['STOP'],
+        }
+      )
 
       // The mock captures the call - we just verify no errors
       expect(true).toBe(true)
@@ -88,14 +94,19 @@ describe('createClaude', () => {
     it('passes tools when provided', async () => {
       const claude = createClaude({ apiKey: 'test-key' })
 
-      await claude.put({ path: '/messages' }, {
-        messages: [{ role: 'user', content: 'Use a tool' }],
-        tools: [{
-          name: 'get_weather',
-          description: 'Get weather',
-          input_schema: { type: 'object', properties: {} }
-        }]
-      })
+      await claude.put(
+        { path: '/messages' },
+        {
+          messages: [{ role: 'user', content: 'Use a tool' }],
+          tools: [
+            {
+              name: 'get_weather',
+              description: 'Get weather',
+              input_schema: { type: 'object', properties: {} },
+            },
+          ],
+        }
+      )
 
       expect(true).toBe(true)
     })
@@ -103,10 +114,13 @@ describe('createClaude', () => {
     it('allows model override per request', async () => {
       const claude = createClaude({ apiKey: 'test-key', model: 'default-model' })
 
-      const result = await claude.put({ path: '/messages' }, {
-        messages: [{ role: 'user', content: 'Hello' }],
-        model: 'override-model'
-      })
+      const result = await claude.put(
+        { path: '/messages' },
+        {
+          messages: [{ role: 'user', content: 'Hello' }],
+          model: 'override-model',
+        }
+      )
 
       expect(result.body.model).toBe('override-model')
     })
@@ -116,9 +130,12 @@ describe('createClaude', () => {
     it('completes simple prompt', async () => {
       const claude = createClaude({ apiKey: 'test-key' })
 
-      const result = await claude.put({ path: '/complete' }, {
-        prompt: 'What is 2+2?'
-      })
+      const result = await claude.put(
+        { path: '/complete' },
+        {
+          prompt: 'What is 2+2?',
+        }
+      )
 
       expect(result.headers.type).toBe('/types/completion')
       expect(result.body.text).toBe('Mock response')
@@ -129,10 +146,13 @@ describe('createClaude', () => {
     it('passes system prompt', async () => {
       const claude = createClaude({ apiKey: 'test-key' })
 
-      await claude.put({ path: '/complete' }, {
-        prompt: 'Hello',
-        system: 'Respond in French'
-      })
+      await claude.put(
+        { path: '/complete' },
+        {
+          prompt: 'Hello',
+          system: 'Respond in French',
+        }
+      )
 
       expect(true).toBe(true)
     })
@@ -140,10 +160,13 @@ describe('createClaude', () => {
     it('uses custom max_tokens', async () => {
       const claude = createClaude({ apiKey: 'test-key' })
 
-      await claude.put({ path: '/complete' }, {
-        prompt: 'Hello',
-        max_tokens: 100
-      })
+      await claude.put(
+        { path: '/complete' },
+        {
+          prompt: 'Hello',
+          max_tokens: 100,
+        }
+      )
 
       expect(true).toBe(true)
     })
@@ -153,9 +176,12 @@ describe('createClaude', () => {
     it('requires kit', async () => {
       const claude = createClaude({ apiKey: 'test-key' })
 
-      const result = await claude.put({ path: '/agent' }, {
-        prompt: 'Do something'
-      })
+      const result = await claude.put(
+        { path: '/agent' },
+        {
+          prompt: 'Do something',
+        }
+      )
 
       expect(result.headers.condition).toBe('error')
       expect(result.headers.message).toContain('kit')
@@ -166,24 +192,27 @@ describe('createClaude', () => {
 
       const kitCalls = []
       const kit = resource({
-        get: async (h) => {
+        get: async h => {
           kitCalls.push({ method: 'get', path: h.path })
           return { headers: {}, body: { data: 'test' } }
         },
         put: async (h, b) => {
           kitCalls.push({ method: 'put', path: h.path, body: b })
           return { headers: {}, body: 'ok' }
-        }
+        },
       })
 
       // The agent endpoint will fail because runAgentLoop expects specific setup
       // but we can verify the kit interface is created correctly
       try {
-        await claude.put({ path: '/agent', kit }, {
-          prompt: 'Test',
-          maxTurns: 1
-        })
-      } catch (e) {
+        await claude.put(
+          { path: '/agent', kit },
+          {
+            prompt: 'Test',
+            maxTurns: 1,
+          }
+        )
+      } catch {
         // Expected - runAgentLoop has complex dependencies
       }
 
@@ -199,10 +228,10 @@ describe('createClaude', () => {
         default: class {
           constructor() {
             this.messages = {
-              create: vi.fn().mockRejectedValue(new Error('API Error'))
+              create: vi.fn().mockRejectedValue(new Error('API Error')),
             }
           }
-        }
+        },
       }))
 
       // This test documents expected behavior - errors should be caught

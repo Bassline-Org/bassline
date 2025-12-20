@@ -205,7 +205,10 @@ describe('builtins', () => {
     })
 
     it('zip zips arrays', () => {
-      expect(builtins.zip([1, 2], ['a', 'b'])).toEqual([[1, 'a'], [2, 'b']])
+      expect(builtins.zip([1, 2], ['a', 'b'])).toEqual([
+        [1, 'a'],
+        [2, 'b'],
+      ])
     })
   })
 
@@ -271,7 +274,7 @@ describe('createFn', () => {
 
   it('accepts custom functions on creation', async () => {
     const fn = createFn({
-      custom: (a, b) => a * b + 1
+      custom: (a, b) => a * b + 1,
     })
 
     const result = await fn.get({ path: '/custom' })
@@ -280,7 +283,7 @@ describe('createFn', () => {
 
   it('registers new functions via put', async () => {
     const fn = createFn()
-    const customFn = (x) => x * x
+    const customFn = x => x * x
 
     await fn.put({ path: '/square' }, customFn)
 

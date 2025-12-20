@@ -13,8 +13,8 @@ describe('createMemoryStore', () => {
   it('can be initialized with data', async () => {
     const store = createMemoryStore({
       users: {
-        alice: { name: 'Alice' }
-      }
+        alice: { name: 'Alice' },
+      },
     })
 
     // Objects are treated as directories, returning keys

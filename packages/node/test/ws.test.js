@@ -32,7 +32,7 @@ describe('createWsServer', () => {
       for (const port of Object.keys(list.body.resources || {})) {
         await wsServer.put({ path: `${port}/stop` })
       }
-    } catch (e) {
+    } catch {
       // Ignore cleanup errors
     }
     await delay(100) // Allow cleanup
@@ -52,7 +52,7 @@ describe('createWsServer', () => {
         activeClients.push(ws)
         resolve(ws)
       })
-      ws.on('error', (err) => {
+      ws.on('error', err => {
         clearTimeout(timeout)
         reject(err)
       })
@@ -152,7 +152,9 @@ describe('createWsServer', () => {
 
       const client = await connect(testPort)
       let closed = false
-      client.on('close', () => { closed = true })
+      client.on('close', () => {
+        closed = true
+      })
 
       // Restart server
       await wsServer.put({ path: `/${testPort}`, kit }, {})
@@ -183,7 +185,7 @@ describe('createWsServer', () => {
         put: async (h, b) => {
           receivedBody = b
           return { headers: {}, body: { received: true } }
-        }
+        },
       })
 
       await wsServer.put({ path: `/${testPort}`, kit }, {})
@@ -194,7 +196,7 @@ describe('createWsServer', () => {
         type: 'put',
         id: '1',
         path: '/test',
-        body: { data: 'test' }
+        body: { data: 'test' },
       })
 
       expect(response.result.body.received).toBe(true)
@@ -227,8 +229,12 @@ describe('createWsServer', () => {
       const client2 = await connect(testPort)
 
       const received = { c1: null, c2: null }
-      client1.on('message', data => { received.c1 = JSON.parse(data.toString()) })
-      client2.on('message', data => { received.c2 = JSON.parse(data.toString()) })
+      client1.on('message', data => {
+        received.c1 = JSON.parse(data.toString())
+      })
+      client2.on('message', data => {
+        received.c2 = JSON.parse(data.toString())
+      })
 
       const result = await wsServer.put({ path: `/${testPort}/broadcast` }, { hello: 'world' })
 
@@ -286,7 +292,7 @@ describe('createWsServer', () => {
           await delay(100)
           return { headers: {}, body: { slow: true } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await wsServer.put({ path: `/${testPort}`, kit: slowKit }, {})
@@ -307,7 +313,7 @@ describe('createWsServer', () => {
         get: async () => {
           throw new Error('Backend exploded')
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await wsServer.put({ path: `/${testPort}`, kit: errorKit }, {})
@@ -333,7 +339,7 @@ describe('createWsServer', () => {
           }
           return { headers: {}, body: { success: true } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await wsServer.put({ path: `/${testPort}`, kit: flakyKit }, {})
@@ -363,7 +369,7 @@ describe('createWsServer', () => {
           receivedCount++
           return { headers: {}, body: { count: receivedCount } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await wsServer.put({ path: `/${testPort}`, kit: counterKit }, {})
@@ -372,9 +378,7 @@ describe('createWsServer', () => {
       const client = await connect(testPort)
 
       // Fire 20 messages rapidly
-      const promises = Array.from({ length: 20 }, (_, i) =>
-        sendMsg(client, { type: 'get', id: `${i}`, path: '/test' })
-      )
+      const promises = Array.from({ length: 20 }, (_, i) => sendMsg(client, { type: 'get', id: `${i}`, path: '/test' }))
 
       const results = await Promise.all(promises)
 
@@ -387,11 +391,11 @@ describe('createWsServer', () => {
     it('handles deeply nested paths', async () => {
       let receivedPath = null
       const kit = resource({
-        get: async (h) => {
+        get: async h => {
           receivedPath = h.path
           return { headers: {}, body: {} }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await wsServer.put({ path: `/${testPort}`, kit }, {})
@@ -408,15 +412,9 @@ describe('createWsServer', () => {
       await wsServer.put({ path: `/${testPort}`, kit }, {})
       await delay(100)
 
-      const clients = await Promise.all([
-        connect(testPort),
-        connect(testPort),
-        connect(testPort),
-      ])
+      const clients = await Promise.all([connect(testPort), connect(testPort), connect(testPort)])
 
-      const closedPromises = clients.map(c =>
-        new Promise(resolve => c.on('close', resolve))
-      )
+      const closedPromises = clients.map(c => new Promise(resolve => c.on('close', resolve)))
 
       await wsServer.put({ path: `/${testPort}/stop` })
       await Promise.all(closedPromises)
@@ -432,7 +430,7 @@ describe('createWsServer', () => {
 function createMockKit(returnValue = {}) {
   return resource({
     get: async () => ({ headers: {}, body: returnValue }),
-    put: async () => ({ headers: {}, body: returnValue })
+    put: async () => ({ headers: {}, body: returnValue }),
   })
 }
 

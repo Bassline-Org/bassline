@@ -122,7 +122,7 @@ describe('createHttpServer', () => {
         put: async (h, b) => {
           receivedBody = b
           return { headers: {}, body: { received: true } }
-        }
+        },
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
@@ -130,7 +130,7 @@ describe('createHttpServer', () => {
       const response = await fetch(`http://localhost:${testPort}/test`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: 'test' })
+        body: JSON.stringify({ data: 'test' }),
       })
       const data = await response.json()
 
@@ -145,7 +145,7 @@ describe('createHttpServer', () => {
         put: async (h, b) => {
           receivedBody = b
           return { headers: {}, body: { received: true } }
-        }
+        },
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
@@ -153,7 +153,7 @@ describe('createHttpServer', () => {
       await fetch(`http://localhost:${testPort}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ posted: true })
+        body: JSON.stringify({ posted: true }),
       })
 
       expect(receivedBody).toEqual({ posted: true })
@@ -164,7 +164,7 @@ describe('createHttpServer', () => {
       await httpServer.put({ path: `/${testPort}`, kit }, {})
 
       const response = await fetch(`http://localhost:${testPort}/test`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
 
       expect(response.status).toBe(405)
@@ -173,11 +173,11 @@ describe('createHttpServer', () => {
     it('uses path query parameter when provided', async () => {
       let receivedPath = null
       const kit = resource({
-        get: async (h) => {
+        get: async h => {
           receivedPath = h.path
           return { headers: {}, body: {} }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
@@ -189,16 +189,16 @@ describe('createHttpServer', () => {
     it('passes peer header to kit', async () => {
       let receivedPeer = null
       const kit = resource({
-        get: async (h) => {
+        get: async h => {
           receivedPeer = h.peer
           return { headers: {}, body: {} }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
       await fetch(`http://localhost:${testPort}/test`, {
-        headers: { 'X-Bassline-Peer': 'alice' }
+        headers: { 'X-Bassline-Peer': 'alice' },
       })
 
       expect(receivedPeer).toBe('alice')
@@ -211,7 +211,7 @@ describe('createHttpServer', () => {
       const response = await fetch(`http://localhost:${testPort}/test`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: '{ invalid json }'
+        body: '{ invalid json }',
       })
 
       expect(response.status).toBe(400)
@@ -236,7 +236,7 @@ describe('createHttpServer', () => {
           await delay(100) // Slow response
           return { headers: {}, body: { slow: true } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: slowKit }, {})
@@ -255,7 +255,7 @@ describe('createHttpServer', () => {
         get: async () => {
           throw new Error('Backend exploded')
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: errorKit }, {})
@@ -281,7 +281,7 @@ describe('createHttpServer', () => {
           }
           return { headers: {}, body: { success: true } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: flakyKit }, {})
@@ -307,9 +307,9 @@ describe('createHttpServer', () => {
       const errorResponseKit = resource({
         get: async () => ({
           headers: { condition: 'error', message: 'Database unavailable' },
-          body: null
+          body: null,
         }),
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: errorResponseKit }, {})
@@ -323,7 +323,7 @@ describe('createHttpServer', () => {
     })
 
     it('handles backend with varying latency', async () => {
-      let latencies = []
+      const latencies = []
       const jitteryKit = resource({
         get: async () => {
           const latency = Math.random() * 50
@@ -331,7 +331,7 @@ describe('createHttpServer', () => {
           await delay(latency)
           return { headers: {}, body: { latency } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: jitteryKit }, {})
@@ -353,15 +353,13 @@ describe('createHttpServer', () => {
           requestCount++
           return { headers: {}, body: { count: requestCount } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: counterKit }, {})
 
       // Fire 20 concurrent requests
-      const requests = Array.from({ length: 20 }, () =>
-        fetch(`http://localhost:${testPort}/test`).then(r => r.json())
-      )
+      const requests = Array.from({ length: 20 }, () => fetch(`http://localhost:${testPort}/test`).then(r => r.json()))
 
       const results = await Promise.all(requests)
 
@@ -375,7 +373,7 @@ describe('createHttpServer', () => {
           await delay(100)
           return { headers: {}, body: {} }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: slowKit }, {})
@@ -409,10 +407,9 @@ describe('createHttpServer', () => {
 
       await httpServer.put({ path: `/${testPort}`, kit: kit2 }, {})
 
-      const request2 = fetch(`http://localhost:${testPort}/test`)
-        .then(r => r.json())
+      const request2 = fetch(`http://localhost:${testPort}/test`).then(r => r.json())
 
-      const [result1, result2] = await Promise.all([request1, request2])
+      const [_result1, result2] = await Promise.all([request1, request2])
 
       // Second request should use new kit
       expect(result2.body.version).toBe(2)
@@ -427,7 +424,7 @@ describe('createHttpServer', () => {
         put: async (h, b) => {
           receivedBody = b
           return { headers: {}, body: { received: true } }
-        }
+        },
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
@@ -435,7 +432,7 @@ describe('createHttpServer', () => {
       await fetch(`http://localhost:${testPort}/test`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: ''
+        body: '',
       })
 
       expect(receivedBody).toBeUndefined()
@@ -444,11 +441,11 @@ describe('createHttpServer', () => {
     it('handles deeply nested paths', async () => {
       let receivedPath = null
       const kit = resource({
-        get: async (h) => {
+        get: async h => {
           receivedPath = h.path
           return { headers: {}, body: {} }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
@@ -460,11 +457,11 @@ describe('createHttpServer', () => {
     it('handles special characters in path', async () => {
       let receivedPath = null
       const kit = resource({
-        get: async (h) => {
+        get: async h => {
           receivedPath = h.path
           return { headers: {}, body: {} }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
@@ -482,7 +479,7 @@ describe('createHttpServer', () => {
         put: async (h, b) => {
           receivedSize = JSON.stringify(b).length
           return { headers: {}, body: { size: receivedSize } }
-        }
+        },
       })
 
       await httpServer.put({ path: `/${testPort}`, kit }, {})
@@ -491,7 +488,7 @@ describe('createHttpServer', () => {
       const response = await fetch(`http://localhost:${testPort}/test`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(largeBody)
+        body: JSON.stringify(largeBody),
       })
       const result = await response.json()
 
@@ -504,7 +501,7 @@ describe('createHttpServer', () => {
           await delay(200)
           return { headers: {}, body: { completed: true } }
         },
-        put: async () => ({ headers: {}, body: null })
+        put: async () => ({ headers: {}, body: null }),
       })
 
       await httpServer.put({ path: `/${testPort}`, kit: slowKit }, {})
@@ -531,7 +528,7 @@ describe('createHttpServer', () => {
 function createMockKit(returnValue = {}) {
   return resource({
     get: async () => ({ headers: {}, body: returnValue }),
-    put: async () => ({ headers: {}, body: returnValue })
+    put: async () => ({ headers: {}, body: returnValue }),
   })
 }
 

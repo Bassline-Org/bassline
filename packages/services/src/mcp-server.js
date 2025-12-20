@@ -4,7 +4,6 @@
  * These tools can be passed to Claude's tool_use feature,
  * enabling bidirectional integration where Claude can
  * read and write Bassline resources.
- *
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @returns {Array<object>} Array of tool definitions with handlers
  */
@@ -116,13 +115,12 @@ export function createMCPTools(bl) {
 
 /**
  * Run an agentic loop where Claude can use tools to interact with Bassline.
- *
  * @param {import('@bassline/core').Bassline} bl - Bassline instance
  * @param {object} claudeService - Claude service from createClaudeService
  * @param {object} options - Loop options
  * @param {string} options.prompt - Initial user prompt
  * @param {string} [options.system] - System prompt
- * @param {number} [options.maxTurns=10] - Maximum conversation turns
+ * @param {number} [options.maxTurns] - Maximum conversation turns
  * @param {string} [options.model] - Override model
  * @returns {Promise<object>} Final Claude response
  */
@@ -138,7 +136,7 @@ export async function runAgentLoop(bl, claudeService, options = {}) {
       max_tokens: 4096,
       system,
       messages,
-      tools: tools.map((t) => ({
+      tools: tools.map(t => ({
         name: t.name,
         description: t.description,
         input_schema: t.input_schema,
@@ -149,7 +147,7 @@ export async function runAgentLoop(bl, claudeService, options = {}) {
     messages.push({ role: 'assistant', content: response.content })
 
     // Check for tool use
-    const toolUses = response.content.filter((c) => c.type === 'tool_use')
+    const toolUses = response.content.filter(c => c.type === 'tool_use')
     if (toolUses.length === 0) {
       // No tool use - conversation complete
       return response
@@ -157,8 +155,8 @@ export async function runAgentLoop(bl, claudeService, options = {}) {
 
     // Execute tools and collect results
     const toolResults = await Promise.all(
-      toolUses.map(async (tu) => {
-        const tool = tools.find((t) => t.name === tu.name)
+      toolUses.map(async tu => {
+        const tool = tools.find(t => t.name === tu.name)
         const result = tool ? await tool.handler(tu.input) : `Unknown tool: ${tu.name}`
         return {
           type: 'tool_result',

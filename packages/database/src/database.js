@@ -37,9 +37,9 @@ export function createDatabase() {
         body: {
           name: 'database',
           description: 'SQLite database service',
-          resources: { '/connections': {} }
-        }
-      })
+          resources: { '/connections': {} },
+        },
+      }),
     }),
 
     connections: routes({
@@ -53,155 +53,161 @@ export function createDatabase() {
                 const entry = connections.get(name)
                 return [`/${name}`, { path: entry.config.path, connected: !!entry.connection }]
               })
-            )
-          }
-        })
+            ),
+          },
+        }),
       }),
 
-      unknown: bind('name', routes({
-        '': resource({
-          get: async (h) => {
-            const entry = connections.get(h.params.name)
-            if (!entry) return { headers: { condition: 'not-found' }, body: null }
-
-            return {
-              headers: { type: '/types/database-connection' },
-              body: {
-                name: h.params.name,
-                driver: 'sqlite',
-                path: entry.config.path,
-                readonly: entry.config.readonly || false,
-                connected: !!entry.connection
-              }
-            }
-          },
-
-          put: async (h, body) => {
-            const config = {
-              path: body.path || ':memory:',
-              readonly: body.readonly || false,
-              fileMustExist: body.fileMustExist || false
-            }
-
-            connections.set(h.params.name, { config, connection: null })
-
-            return {
-              headers: { type: '/types/database-connection' },
-              body: { name: h.params.name, driver: 'sqlite', ...config }
-            }
-          }
-        }),
-
-        query: resource({
-          put: async (h, body) => {
-            const conn = getConnection(h.params.name)
-            const { sql, params: queryParams = [] } = body
-
-            if (!sql) throw new Error('Missing sql parameter')
-
-            const result = conn.query(sql, queryParams)
-
-            return {
-              headers: { type: '/types/database-result', rowCount: result.rowCount },
-              body: { rows: result.rows, columns: result.columns, rowCount: result.rowCount }
-            }
-          }
-        }),
-
-        execute: resource({
-          put: async (h, body) => {
-            const conn = getConnection(h.params.name)
-            const { sql, params: stmtParams = [] } = body
-
-            if (!sql) throw new Error('Missing sql parameter')
-
-            const result = conn.execute(sql, stmtParams)
-
-            // Notify via kit if available
-            if (h.kit) {
-              await h.kit.put(
-                { path: '/plumber/send' },
-                {
-                  source: `/database/connections/${h.params.name}`,
-                  port: 'database-changes',
-                  body: {
-                    connection: h.params.name,
-                    sql,
-                    changes: result.changes,
-                    lastInsertRowid: result.lastInsertRowid
-                  }
-                }
-              )
-            }
-
-            return {
-              headers: { type: '/types/database-execute-result', changes: result.changes },
-              body: { changes: result.changes, lastInsertRowid: result.lastInsertRowid }
-            }
-          }
-        }),
-
-        schema: routes({
+      unknown: bind(
+        'name',
+        routes({
           '': resource({
-            get: async (h) => {
-              const conn = getConnection(h.params.name)
-              const schema = conn.introspect()
+            get: async h => {
+              const entry = connections.get(h.params.name)
+              if (!entry) return { headers: { condition: 'not-found' }, body: null }
 
               return {
-                headers: { type: '/types/database-schema' },
-                body: { connection: h.params.name, tables: schema.tables }
+                headers: { type: '/types/database-connection' },
+                body: {
+                  name: h.params.name,
+                  driver: 'sqlite',
+                  path: entry.config.path,
+                  readonly: entry.config.readonly || false,
+                  connected: !!entry.connection,
+                },
               }
-            }
+            },
+
+            put: async (h, body) => {
+              const config = {
+                path: body.path || ':memory:',
+                readonly: body.readonly || false,
+                fileMustExist: body.fileMustExist || false,
+              }
+
+              connections.set(h.params.name, { config, connection: null })
+
+              return {
+                headers: { type: '/types/database-connection' },
+                body: { name: h.params.name, driver: 'sqlite', ...config },
+              }
+            },
           }),
 
-          unknown: bind('table', resource({
-            get: async (h) => {
+          query: resource({
+            put: async (h, body) => {
               const conn = getConnection(h.params.name)
-              const schema = conn.introspect()
-              const table = schema.tables.find(t => t.name === h.params.table)
+              const { sql, params: queryParams = [] } = body
 
-              if (!table) return { headers: { condition: 'not-found' }, body: null }
+              if (!sql) throw new Error('Missing sql parameter')
+
+              const result = conn.query(sql, queryParams)
 
               return {
-                headers: { type: '/types/database-table' },
-                body: table
+                headers: { type: '/types/database-result', rowCount: result.rowCount },
+                body: { rows: result.rows, columns: result.columns, rowCount: result.rowCount },
               }
-            }
-          }))
-        }),
+            },
+          }),
 
-        pragma: resource({
-          put: async (h, body) => {
-            const conn = getConnection(h.params.name)
-            const { pragma } = body
+          execute: resource({
+            put: async (h, body) => {
+              const conn = getConnection(h.params.name)
+              const { sql, params: stmtParams = [] } = body
 
-            if (!pragma) throw new Error('Missing pragma parameter')
+              if (!sql) throw new Error('Missing sql parameter')
 
-            const result = conn.pragma(pragma)
+              const result = conn.execute(sql, stmtParams)
 
-            return {
-              headers: { type: '/types/database-pragma-result' },
-              body: { result }
-            }
-          }
-        }),
+              // Notify via kit if available
+              if (h.kit) {
+                await h.kit.put(
+                  { path: '/plumber/send' },
+                  {
+                    source: `/database/connections/${h.params.name}`,
+                    port: 'database-changes',
+                    body: {
+                      connection: h.params.name,
+                      sql,
+                      changes: result.changes,
+                      lastInsertRowid: result.lastInsertRowid,
+                    },
+                  }
+                )
+              }
 
-        close: resource({
-          put: async (h) => {
-            const entry = connections.get(h.params.name)
-            if (entry?.connection) {
-              entry.connection.close()
-              entry.connection = null
-            }
+              return {
+                headers: { type: '/types/database-execute-result', changes: result.changes },
+                body: { changes: result.changes, lastInsertRowid: result.lastInsertRowid },
+              }
+            },
+          }),
 
-            return {
-              headers: { type: '/types/database-connection' },
-              body: { name: h.params.name, connected: false }
-            }
-          }
+          schema: routes({
+            '': resource({
+              get: async h => {
+                const conn = getConnection(h.params.name)
+                const schema = conn.introspect()
+
+                return {
+                  headers: { type: '/types/database-schema' },
+                  body: { connection: h.params.name, tables: schema.tables },
+                }
+              },
+            }),
+
+            unknown: bind(
+              'table',
+              resource({
+                get: async h => {
+                  const conn = getConnection(h.params.name)
+                  const schema = conn.introspect()
+                  const table = schema.tables.find(t => t.name === h.params.table)
+
+                  if (!table) return { headers: { condition: 'not-found' }, body: null }
+
+                  return {
+                    headers: { type: '/types/database-table' },
+                    body: table,
+                  }
+                },
+              })
+            ),
+          }),
+
+          pragma: resource({
+            put: async (h, body) => {
+              const conn = getConnection(h.params.name)
+              const { pragma } = body
+
+              if (!pragma) throw new Error('Missing pragma parameter')
+
+              const result = conn.pragma(pragma)
+
+              return {
+                headers: { type: '/types/database-pragma-result' },
+                body: { result },
+              }
+            },
+          }),
+
+          close: resource({
+            put: async h => {
+              const entry = connections.get(h.params.name)
+              if (entry?.connection) {
+                entry.connection.close()
+                entry.connection = null
+              }
+
+              return {
+                headers: { type: '/types/database-connection' },
+                body: { name: h.params.name, connected: false },
+              }
+            },
+          }),
         })
-      }))
-    })
+      ),
+    }),
   })
 }
 

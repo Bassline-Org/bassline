@@ -22,6 +22,7 @@ await h.kit.put({ path: '/plumber/rules/log-all' }, { match: {}, to: '/cells/act
 ```
 
 Kit is a superpower because it's a resource with an `unknown` handler, enabling:
+
 - Lazy loading modules on first access
 - Dynamic routing based on capability/context
 - Transparent proxying to remote resources
@@ -93,39 +94,53 @@ Every resource has the same interface:
 Patterns for thinking about resources based on their behavior:
 
 ### Cell
+
 Lattice-based accumulation. Values merge monotonically (only go "up").
+
 ```javascript
 await kit.put({ path: '/cells/counter' }, { lattice: 'maxNumber' })
 await kit.put({ path: '/cells/counter/value' }, 5)
-await kit.put({ path: '/cells/counter/value' }, 3)  // still 5, max wins
+await kit.put({ path: '/cells/counter/value' }, 3) // still 5, max wins
 ```
 
 ### Propagator
+
 Reactive computation between cells. When inputs change, recomputes and writes output.
+
 ```javascript
-await kit.put({ path: '/propagators/sum' }, {
-  inputs: ['/cells/a', '/cells/b'],
-  output: '/cells/total',
-  fn: '/fn/sum'
-})
+await kit.put(
+  { path: '/propagators/sum' },
+  {
+    inputs: ['/cells/a', '/cells/b'],
+    output: '/cells/total',
+    fn: '/fn/sum',
+  }
+)
 ```
 
 ### Oracle
+
 Read-only, answers questions. Databases, function registries, type definitions.
+
 ```javascript
-const result = await kit.get({ path: '/fn/sum' })        // function lookup
+const result = await kit.get({ path: '/fn/sum' }) // function lookup
 const rows = await kit.get({ path: '/db/users?id=123' }) // query
 ```
 
 ### Scout
+
 Autonomous discovery. Finds things and reports via kit.
+
 ```javascript
 // A scout that polls a URL and reports changes
-await kit.put({ path: '/scouts/github-status' }, {
-  url: 'https://api.github.com/status',
-  interval: 60000,
-  reportTo: '/cells/github-status'
-})
+await kit.put(
+  { path: '/scouts/github-status' },
+  {
+    url: 'https://api.github.com/status',
+    interval: 60000,
+    reportTo: '/cells/github-status',
+  }
+)
 ```
 
 ## Basslines
@@ -133,24 +148,26 @@ await kit.put({ path: '/scouts/github-status' }, {
 A bassline is a compound resource that describes and routes to other resources - like a directory or namespace.
 
 Basslines are decoupled from the resources they expose. They can:
+
 - Wire resources together via kit (not direct references)
 - Be defined separately from the resources they describe
 - Be generated or configured dynamically
 
 ```javascript
 // A bassline that routes via kit - completely decoupled
-const createBassline = (resourcePaths) => routes({
-  '': resource({
-    get: async () => ({
-      headers: { type: '/types/bassline' },
-      body: { resources: resourcePaths }
-    })
-  }),
-  unknown: resource({
-    get: async (h) => h.kit.get({ path: '/' + h.segment + h.path }),
-    put: async (h, b) => h.kit.put({ path: '/' + h.segment + h.path }, b),
+const createBassline = resourcePaths =>
+  routes({
+    '': resource({
+      get: async () => ({
+        headers: { type: '/types/bassline' },
+        body: { resources: resourcePaths },
+      }),
+    }),
+    unknown: resource({
+      get: async h => h.kit.get({ path: '/' + h.segment + h.path }),
+      put: async (h, b) => h.kit.put({ path: '/' + h.segment + h.path }, b),
+    }),
   })
-})
 
 // The bassline delegates to kit - caller controls what world it sees
 const app = createBassline({
@@ -172,8 +189,8 @@ const counter = resource({
 const app = routes({
   cells: cellsResource,
   propagators: propagatorsResource,
-  users: bind('id', userResource),  // captures :id param
-  unknown: fallbackResource,         // handles unmatched paths
+  users: bind('id', userResource), // captures :id param
+  unknown: fallbackResource, // handles unmatched paths
 })
 
 // Using kit for external access
@@ -184,7 +201,7 @@ const worker = resource({
     const result = doWork(task, config.body)
     await h.kit.put({ path: '/results' }, result)
     return { headers: {}, body: { done: true } }
-  }
+  },
 })
 ```
 

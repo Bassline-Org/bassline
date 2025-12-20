@@ -5,12 +5,11 @@ import { trustEstimate } from './lattices.js'
  * Create trust system resource
  *
  * Routes:
- *   GET  /peers           → list known peers
- *   GET  /peers/:id       → get trust info for peer
- *   PUT  /observe         → record an observation
- *   GET  /thresholds      → get capability thresholds
- *   PUT  /thresholds      → set capability thresholds
- *
+ * GET  /peers           → list known peers
+ * GET  /peers/:id       → get trust info for peer
+ * PUT  /observe         → record an observation
+ * GET  /thresholds      → get capability thresholds
+ * PUT  /thresholds      → set capability thresholds
  * @param {object} options
  * @param {object} [options.thresholds] - { read: 0.2, write: 0.5, install: 0.8 }
  */
@@ -21,7 +20,7 @@ export function createTrust(options = {}) {
     read: 0.2,
     write: 0.5,
     install: 0.8,
-    ...options.thresholds
+    ...options.thresholds,
   }
 
   function getTrust(peerId) {
@@ -56,10 +55,10 @@ export function createTrust(options = {}) {
           resources: {
             '/peers': {},
             '/thresholds': {},
-            '/observe': { method: 'PUT' }
-          }
-        }
-      })
+            '/observe': { method: 'PUT' },
+          },
+        },
+      }),
     }),
 
     peers: routes({
@@ -71,31 +70,34 @@ export function createTrust(options = {}) {
             resources: Object.fromEntries(
               [...peers.entries()].map(([id, trust]) => [
                 `/${id}`,
-                { ...trust, confidence: trustEstimate.confidenceInterval(trust) }
+                { ...trust, confidence: trustEstimate.confidenceInterval(trust) },
               ])
-            )
-          }
-        })
+            ),
+          },
+        }),
       }),
 
-      unknown: bind('id', resource({
-        get: async (h) => {
-          const trust = getTrust(h.params.id)
-          return {
-            headers: { type: '/types/trust' },
-            body: {
-              id: h.params.id,
-              ...trust,
-              confidence: trustEstimate.confidenceInterval(trust),
-              capabilities: {
-                read: trustEstimate.meetsThreshold(trust, thresholds.read),
-                write: trustEstimate.meetsThreshold(trust, thresholds.write),
-                install: trustEstimate.meetsThreshold(trust, thresholds.install)
-              }
+      unknown: bind(
+        'id',
+        resource({
+          get: async h => {
+            const trust = getTrust(h.params.id)
+            return {
+              headers: { type: '/types/trust' },
+              body: {
+                id: h.params.id,
+                ...trust,
+                confidence: trustEstimate.confidenceInterval(trust),
+                capabilities: {
+                  read: trustEstimate.meetsThreshold(trust, thresholds.read),
+                  write: trustEstimate.meetsThreshold(trust, thresholds.write),
+                  install: trustEstimate.meetsThreshold(trust, thresholds.install),
+                },
+              },
             }
-          }
-        }
-      }))
+          },
+        })
+      ),
     }),
 
     observe: resource({
@@ -104,31 +106,31 @@ export function createTrust(options = {}) {
         if (!peer || outcome === undefined) {
           return {
             headers: { condition: 'invalid', message: 'peer and outcome required' },
-            body: null
+            body: null,
           }
         }
         const updated = observe(peer, outcome)
         return {
           headers: { type: '/types/trust' },
-          body: { peer, ...updated }
+          body: { peer, ...updated },
         }
-      }
+      },
     }),
 
     thresholds: resource({
       get: async () => ({
         headers: { type: '/types/config' },
-        body: thresholds
+        body: thresholds,
       }),
 
       put: async (h, body) => {
         thresholds = { ...thresholds, ...body }
         return {
           headers: { type: '/types/config' },
-          body: thresholds
+          body: thresholds,
         }
-      }
-    })
+      },
+    }),
   })
 
   // Expose helpers for middleware use

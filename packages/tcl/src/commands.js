@@ -264,12 +264,13 @@ export const stringCommands = {
       case 'equal':
         return rest[0] === rest[1] ? '1' : '0'
 
-      case 'match':
+      case 'match': {
         // Simple glob matching
         const pattern = rest[0]
         const str = rest[1]
         const regex = new RegExp('^' + pattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
         return regex.test(str) ? '1' : '0'
+      }
 
       default:
         throw new Error(`string: unknown subcommand ${subcmd}`)

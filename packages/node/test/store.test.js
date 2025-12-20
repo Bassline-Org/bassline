@@ -220,7 +220,7 @@ describe('createFileStore', () => {
       const operations = [
         store.get({ path: '/data.json' }),
         store.put({ path: '/data.json' }, { updated: true }),
-        store.get({ path: '/data.json' })
+        store.get({ path: '/data.json' }),
       ]
 
       const results = await Promise.all(operations)
