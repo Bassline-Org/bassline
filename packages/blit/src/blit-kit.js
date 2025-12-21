@@ -1,6 +1,6 @@
 import { resource, routes } from '@bassline/core/resource'
 import { createCells } from '@bassline/core/cells'
-import { Runtime, std, list, dictCmd, namespace } from '@bassline/tcl'
+import { Runtime, std, list, dictCmd, namespace, info, string, event } from '@bassline/tcl'
 import { createSQLiteStore } from './sqlite-store.js'
 
 /**
@@ -43,6 +43,9 @@ export const createBlitKit = (conn, parentKit = null, options = {}) => {
   for (const [name, cmd] of Object.entries(list)) rt.register(name, cmd)
   for (const [name, cmd] of Object.entries(dictCmd)) rt.register(name, cmd)
   for (const [name, cmd] of Object.entries(namespace)) rt.register(name, cmd)
+  for (const [name, cmd] of Object.entries(info)) rt.register(name, cmd)
+  for (const [name, cmd] of Object.entries(string)) rt.register(name, cmd)
+  for (const [name, cmd] of Object.entries(event)) rt.register(name, cmd)
 
   // Delegate to parent kit (or return not-found)
   const delegate = resource({

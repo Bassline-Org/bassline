@@ -28,18 +28,29 @@ const splitPath = path => {
   return [segment, rest.length ? '/' + rest.join('/') : '/']
 }
 
-function routes(map) {
-  const dispatch = async (method, headers, body) => {
-    const [segment, remaining] = splitPath(headers.path)
-    // For root path (segment undefined), use '' key; otherwise lookup segment or fall back to unknown
-    const target = segment === undefined ? map[''] : (map[segment] ?? map.unknown)
-    if (!target) return notFound()
-    // For unknown handler, pass full path so bind can capture the segment
-    const isUnknown = map[segment] === undefined && map.unknown !== undefined
-    const passPath = isUnknown ? headers.path : remaining
-    return target[method]?.({ ...headers, path: passPath, segment }, body) ?? notFound()
-  }
+const pathRoot = headers => {
+  const [segment, remaining] = splitPath(headers.path)
+  return [segment, { ...headers, path: remaining }]
+}
 
+const byKey = key => headers => {
+  return [headers[key], headers]
+}
+
+const disp = (map, dispatchFn) => async (method, headers, body) => {
+  const [key, rest] = await dispatchFn(headers)
+  const target = map[key ?? ''] ?? map.unknown
+  if (!target) return notFound()
+  // For unknown handler, pass original headers
+  const isUnknown = map[key] === undefined && map.unknown !== undefined
+  if (isUnknown) {
+    return target[method]?.(headers, body) ?? notFound()
+  }
+  return target[method]?.(rest, body) ?? notFound()
+}
+
+function routes(map, dispatchFn = pathRoot) {
+  const dispatch = disp(map, dispatchFn)
   return resource({
     get: h => dispatch('get', h),
     put: (h, b) => dispatch('put', h, b),
@@ -57,4 +68,4 @@ const bind = (name, target) => {
   })
 }
 
-export { resource, routes, bind, splitPath, notFound }
+export { resource, routes, bind, splitPath, notFound, pathRoot, byKey }

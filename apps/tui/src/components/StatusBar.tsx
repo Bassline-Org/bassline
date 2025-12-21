@@ -1,32 +1,32 @@
 import React from 'react'
 import { Box, Text, useInput } from 'ink'
-import { Connection } from '../connections.js'
+import { basename } from 'path'
 
 interface StatusBarProps {
-  connection: Connection
-  session?: string
-  onDisconnect: () => void
+  blitPath?: string
+  onQuit: () => void
   canQuit?: boolean
 }
 
-export default function StatusBar({ connection, session = 'default', onDisconnect, canQuit = true }: StatusBarProps) {
+export default function StatusBar({ blitPath, onQuit, canQuit = true }: StatusBarProps) {
   useInput(input => {
     if (canQuit && input === 'q') {
-      onDisconnect()
+      onQuit()
     }
   })
+
+  const blitName = blitPath ? basename(blitPath, '.blit') : 'untitled'
 
   return (
     <Box borderStyle="single" borderTop={true} borderBottom={false} borderLeft={false} borderRight={false} paddingX={1}>
       <Text>
-        <Text color={connection.color || 'green'}>●</Text>
-        <Text bold color={connection.color || 'green'}>
+        <Text color="green">●</Text>
+        <Text bold color="green">
           {' '}
-          {connection.name}
+          {blitName}
         </Text>
-        <Text dimColor> │ </Text>
-        <Text color="magenta">{session}</Text>
-        <Text dimColor> [s] sessions [c] connections [?] help [q] quit</Text>
+        <Text dimColor> │ {blitPath}</Text>
+        <Text dimColor> [Ctrl+S] checkpoint [?] help [q] quit</Text>
       </Text>
     </Box>
   )
