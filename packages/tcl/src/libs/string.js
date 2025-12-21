@@ -1,5 +1,7 @@
 import { std } from './std.js'
 
+import { parseList } from './list.js'
+
 export const commands = {
   length: ([str]) => String(str?.length ?? 0),
   concat: ([...strs]) => strs.join(''),
@@ -8,6 +10,35 @@ export const commands = {
   first: ([str]) => String(str?.[0] ?? ''),
   last: ([str]) => String(str?.[str.length - 1] ?? ''),
   index: ([str, index]) => String(str?.[parseInt(index, 10)] ?? ''),
+  is: ([type, str]) => {
+    switch (type) {
+      case 'integer':
+        return /^-?\d+$/.test(str) ? '1' : '0'
+      case 'double':
+      case 'float':
+        return !isNaN(parseFloat(str)) && isFinite(str) ? '1' : '0'
+      case 'boolean':
+      case 'bool':
+        return /^(true|false|yes|no|on|off|0|1)$/i.test(str) ? '1' : '0'
+      case 'alpha':
+        return /^[a-zA-Z]+$/.test(str) ? '1' : '0'
+      case 'alnum':
+        return /^[a-zA-Z0-9]+$/.test(str) ? '1' : '0'
+      case 'digit':
+        return /^\d+$/.test(str) ? '1' : '0'
+      case 'space':
+        return /^\s+$/.test(str) ? '1' : '0'
+      case 'list':
+        try {
+          parseList(str)
+          return '1'
+        } catch {
+          return '0'
+        }
+      default:
+        throw new Error(`string is: unknown class "${type}"`)
+    }
+  },
   range: ([str, start, end]) => {
     const len = str?.length ?? 0
     const parseIndex = idx => {

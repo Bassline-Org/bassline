@@ -20,7 +20,7 @@ export const tclDictToObject = str => {
 }
 
 /**
- * Convert a JS object to a TCL dict string
+ * Convert a JS object to a TCL dict string (recursive)
  * @param {object} obj - JS object
  * @returns {string} - TCL dict string
  */
@@ -28,7 +28,20 @@ export const objectToTclDict = obj => {
   if (!obj || typeof obj !== 'object') {
     return ''
   }
-  return formatDict(new Map(Object.entries(obj)))
+  // Recursively format values
+  const entries = Object.entries(obj).map(([k, v]) => {
+    if (v === null || v === undefined) {
+      return [k, '{}']
+    }
+    if (typeof v === 'object' && !Array.isArray(v)) {
+      return [k, `{${objectToTclDict(v)}}`]
+    }
+    if (Array.isArray(v)) {
+      return [k, formatList(v.map(item => (typeof item === 'object' ? `{${objectToTclDict(item)}}` : String(item))))]
+    }
+    return [k, String(v)]
+  })
+  return formatDict(new Map(entries))
 }
 
 /**
@@ -56,12 +69,14 @@ export const formatValue = v => {
 /**
  * Format a resource response as a TCL dict with headers and body
  * @param {{headers: object, body: any}} response - Resource response
- * @returns {string} - TCL dict like "{headers {...} body ...}"
+ * @returns {string} - TCL dict like "headers {...} body ..."
  */
 export const formatTclResponse = ({ headers, body }) => {
   const h = objectToTclDict(headers || {})
   const b = formatValue(body)
-  return `{headers {${h}} body ${b}}`
+  // Dict/object bodies need braces to be a valid single dict value
+  const bodyVal = typeof body === 'object' && body !== null && !Array.isArray(body) ? `{${b}}` : b
+  return `headers {${h}} body ${bodyVal}`
 }
 
 /**
