@@ -118,4 +118,4 @@ const bind = (name, target) => {
   })
 }
 
-export { resource, routes, bind, splitPath, notFound, pathRoot, byKey, detectType, BASSLINE_TYPE }
+export { resource, routes, bind, splitPath, notFound, pathRoot, byKey, detectType, BASSLINE_TYPE, typed }
