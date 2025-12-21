@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createSQLiteConnection } from '@bassline/database'
-import { Runtime, std, list, dictCmd } from '@bassline/tcl'
+import { Runtime, std, list, dictCmd, namespace } from '@bassline/tcl'
 import { createSQLiteStore, createBlitKit, createBlits, createBlitCommands, initSchema } from '../src/index.js'
 
 describe('schema', () => {
@@ -25,6 +25,7 @@ describe('schema', () => {
     expect(tables).toContain('_cells')
     expect(tables).toContain('_store')
     expect(tables).toContain('_fn')
+    expect(tables).toContain('_ns')
   })
 
   it('is idempotent', () => {
@@ -35,7 +36,7 @@ describe('schema', () => {
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '\\_%' ESCAPE '\\'`
     ).rows
 
-    expect(tables.length).toBe(4)
+    expect(tables.length).toBe(5)
   })
 })
 
@@ -417,5 +418,122 @@ describe('blits resource', () => {
 
     const result = await blits.get({ path: '/test/store/mykey' })
     expect(result.body).toEqual({ value: 'hello' })
+  })
+
+  it('evaluates TCL via /tcl/eval', async () => {
+    await blits.put({ path: '/test' }, { path: testDbPath })
+
+    // Set a variable
+    await blits.put({ path: '/test/tcl/eval' }, 'set x 42')
+
+    // Read it back
+    const result = await blits.put({ path: '/test/tcl/eval' }, 'set x')
+    expect(result.body).toBe('42')
+  })
+
+  it('persists TCL variables through checkpoint', async () => {
+    await blits.put({ path: '/test' }, { path: testDbPath })
+
+    // Set variables and define a proc
+    await blits.put({ path: '/test/tcl/eval' }, 'set myvar "hello world"')
+    await blits.put({ path: '/test/tcl/eval' }, 'set count 123')
+    await blits.put({ path: '/test/tcl/eval' }, 'proc double {x} { expr {$x * 2} }')
+
+    // Checkpoint
+    await blits.put({ path: '/test/checkpoint' }, {})
+
+    // Close and reload
+    await blits.put({ path: '/test/close' }, {})
+    await blits.put({ path: '/test' }, { path: testDbPath })
+
+    // Variables should be restored
+    const myvar = await blits.put({ path: '/test/tcl/eval' }, 'set myvar')
+    expect(myvar.body).toBe('hello world')
+
+    const count = await blits.put({ path: '/test/tcl/eval' }, 'set count')
+    expect(count.body).toBe('123')
+
+    // Proc should be restored
+    const doubled = await blits.put({ path: '/test/tcl/eval' }, 'double 21')
+    expect(doubled.body).toBe('42')
+  })
+})
+
+describe('TCL runtime serialization', () => {
+  // Helper to create a runtime with all standard commands
+  const createRuntime = () => {
+    const rt = new Runtime()
+    for (const [n, fn] of Object.entries(std)) rt.register(n, fn)
+    for (const [n, fn] of Object.entries(list)) rt.register(n, fn)
+    for (const [n, fn] of Object.entries(dictCmd)) rt.register(n, fn)
+    for (const [n, fn] of Object.entries(namespace)) rt.register(n, fn)
+    return rt
+  }
+
+  it('serializes and restores variables', async () => {
+    const rt = createRuntime()
+
+    // Set some variables
+    await rt.run('set x 10')
+    await rt.run('set name "Alice"')
+    await rt.run('set data {a 1 b 2}')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Create new runtime and restore
+    const rt2 = createRuntime()
+    rt2.fromJSON(json)
+
+    // Check variables restored
+    expect(await rt2.run('set x')).toBe('10')
+    expect(await rt2.run('set name')).toBe('Alice')
+    expect(await rt2.run('set data')).toBe('a 1 b 2')
+  })
+
+  it('serializes and restores namespaces', async () => {
+    const rt = createRuntime()
+
+    // Create namespace with variables
+    await rt.run('namespace eval myns { set foo bar }')
+    await rt.run('namespace eval myns/nested { set baz qux }')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Create new runtime and restore
+    const rt2 = createRuntime()
+    rt2.fromJSON(json)
+
+    // Check namespace variables restored
+    expect(await rt2.run('namespace eval myns { set foo }')).toBe('bar')
+    expect(await rt2.run('namespace eval myns/nested { set baz }')).toBe('qux')
+  })
+
+  it('skips temporary proc namespaces', async () => {
+    const rt = createRuntime()
+
+    // Define and call a proc (creates _proc_N namespace)
+    await rt.run('proc test {} { set local 1 }')
+    await rt.run('test')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Should not include _proc_* namespaces
+    expect(json.root.children).not.toHaveProperty('_proc_1')
+  })
+
+  it('serializes exports', async () => {
+    const rt = createRuntime()
+
+    // Create namespace with exports
+    await rt.run('namespace eval myns { namespace export foo* }')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Check exports are included
+    expect(json.root.children.myns.exports).toContain('foo*')
   })
 })
