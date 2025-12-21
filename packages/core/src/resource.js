@@ -1,4 +1,23 @@
-const notFound = async () => ({ headers: { condition: 'not-found' }, body: null })
+const BASSLINE_TYPE = Symbol('$BASSLINE_TYPE')
+const JS_TYPES = {
+  arr: 'js/arr',
+  obj: 'js/obj',
+  str: 'js/str',
+  num: 'js/num',
+  bigInt: 'js/bigInt',
+  null: 'js/null',
+  undefined: 'js/undefined',
+  bool: 'js/boolean',
+  fn: 'js/function',
+  sym: 'js/symbol',
+  error: 'js/error',
+}
+const typed = (type, headers, body = null) => ({
+  headers: { ...headers, type },
+  body,
+})
+
+const notFound = async () => typed(JS_TYPES.error, { condition: 'not-found' }, null)
 
 const safe = handler => async (h, b) => {
   try {
@@ -6,7 +25,7 @@ const safe = handler => async (h, b) => {
   } catch (e) {
     h?.kit
       ?.put?.(
-        { path: '/condition' },
+        { type: JS_TYPES.error, path: '/condition' },
         {
           error: e.message,
           stack: e.stack,
@@ -14,13 +33,44 @@ const safe = handler => async (h, b) => {
         }
       )
       .catch(() => {})
-    return { headers: { condition: 'error', message: e.message }, body: null }
+    return { headers: { type: JS_TYPES.error, condition: 'error' }, body: { error: e.message } }
+  }
+}
+
+const detectType = value => {
+  if (Array.isArray(value)) return JS_TYPES.arr
+  switch (typeof value) {
+    case 'number':
+      return JS_TYPES.num
+    case 'boolean':
+      return JS_TYPES.bool
+    case 'bigint':
+      return JS_TYPES.bigInt
+    case 'function':
+      return JS_TYPES.fn
+    case 'symbol':
+      return JS_TYPES.sym
+    case 'string':
+      return JS_TYPES.str
+    case 'undefined':
+      return JS_TYPES.undefined
+    case 'object': {
+      if (value === null) return JS_TYPES.null
+      if (value instanceof Error) return JS_TYPES.error
+      if (value[BASSLINE_TYPE]) return value[BASSLINE_TYPE]
+      return JS_TYPES.obj
+    }
   }
 }
 
 const resource = ({ get = notFound, put = notFound } = {}) => ({
   get: safe(get),
-  put: safe(put),
+  put: safe(async (headers, body) => {
+    if (!headers?.type) {
+      headers.type = detectType(body)
+    }
+    return await put(headers, body)
+  }),
 })
 
 const splitPath = path => {
@@ -68,4 +118,4 @@ const bind = (name, target) => {
   })
 }
 
-export { resource, routes, bind, splitPath, notFound, pathRoot, byKey }
+export { resource, routes, bind, splitPath, notFound, pathRoot, byKey, detectType, BASSLINE_TYPE }
