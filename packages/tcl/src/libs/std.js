@@ -61,8 +61,9 @@ export const std = {
         caller.popFrame()
       }
     }
-    // Attach metadata for introspection
+    // Attach metadata for introspection and serialization
     fn._isProc = true
+    fn._name = name
     fn._params = paramList
     fn._body = body
     rt.register(name, fn)

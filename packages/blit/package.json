@@ -5,7 +5,10 @@
   "type": "module",
   "main": "src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./blit-kit": "./src/blit-kit.js",
+    "./schema": "./src/schema.js",
+    "./commands": "./src/commands.js"
   },
   "dependencies": {
     "@bassline/core": "workspace:*",
