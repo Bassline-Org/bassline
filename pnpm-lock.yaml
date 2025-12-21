@@ -53,6 +53,18 @@ importers:
 
   apps/tui:
     dependencies:
+      '@bassline/blit':
+        specifier: workspace:*
+        version: link:../../packages/blit
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@bassline/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@bassline/tcl':
+        specifier: workspace:*
+        version: link:../../packages/tcl
       '@inkjs/ui':
         specifier: ^2.0.0
         version: 2.0.0(ink@5.2.1)
@@ -142,6 +154,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../core
+      ohm-js:
+        specifier: ^17.3.0
+        version: 17.3.0
     devDependencies:
       fast-check:
         specifier: ^4.4.0
@@ -2735,6 +2750,11 @@ packages:
         optional: true
     dependencies:
       whatwg-url: 5.0.0
+    dev: false
+
+  /ohm-js@17.3.0:
+    resolution: {integrity: sha512-LySMdjweN1hKBMMV8lM44+1wiewkndDNNJxtgVAscs7y683MXCdQZLsIaw64/p8NuqYbKOWZoHIOA5DU/xchoA==}
+    engines: {node: '>=0.12.1'}
     dev: false
 
   /once@1.4.0:

@@ -1,20 +1,58 @@
 import React, { useState, useEffect } from 'react'
 import { Box, Text, useInput } from 'ink'
 import TextInput from 'ink-text-input'
-import { loadPageList } from '../pages.js'
+import { useBlit } from '../blit-context.js'
 
-export default function Sidebar({ onSelectPage, onCreatePage, onDeletePage, currentPageId, focused = true }) {
-  const [pages, setPages] = useState([])
+interface Page {
+  id: string
+  title: string
+  modified: string
+}
+
+interface SidebarProps {
+  onSelectPage: (id: string) => void
+  onCreatePage: (title: string) => void
+  onDeletePage: (id: string) => void
+  currentPageId?: string
+  focused?: boolean
+}
+
+export default function Sidebar({
+  onSelectPage,
+  onCreatePage,
+  onDeletePage,
+  currentPageId,
+  focused = true,
+}: SidebarProps) {
+  const kit = useBlit()
+  const [pages, setPages] = useState<Page[]>([])
   const [selected, setSelected] = useState(0)
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const refresh = () => {
-    const list = loadPageList()
-    setPages(list)
+  const refresh = async () => {
+    // Get all store keys and filter for pages (page:uuid format)
+    const result = await kit.get({ path: '/store' })
+    const allKeys = (result.body as string[]) || []
+    const pageKeys = allKeys.filter(k => k.startsWith('page:'))
+
+    // Load each page's metadata
+    const loadedPages: Page[] = []
+    for (const key of pageKeys) {
+      const pageResult = await kit.get({ path: `/store/${key}` })
+      if (pageResult.body) {
+        const page = pageResult.body as { id: string; title: string; modified: string }
+        loadedPages.push({ id: page.id, title: page.title, modified: page.modified })
+      }
+    }
+
+    // Sort by modified date (most recent first)
+    loadedPages.sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime())
+
+    setPages(loadedPages)
     // Keep selection in bounds
-    setSelected(s => Math.min(s, Math.max(0, list.length - 1)))
+    setSelected(s => Math.min(s, Math.max(0, loadedPages.length - 1)))
   }
 
   useEffect(() => {
