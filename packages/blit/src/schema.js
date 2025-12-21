@@ -29,6 +29,12 @@ export const SCHEMA = {
       value TEXT NOT NULL
     )
   `,
+  _ns: `
+    CREATE TABLE IF NOT EXISTS _ns (
+      id TEXT PRIMARY KEY DEFAULT 'root',
+      state TEXT NOT NULL
+    )
+  `,
 }
 
 /**

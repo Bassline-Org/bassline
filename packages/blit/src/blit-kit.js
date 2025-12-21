@@ -1,5 +1,6 @@
 import { resource, routes } from '@bassline/core/resource'
 import { createCells } from '@bassline/core/cells'
+import { Runtime, std, list, dictCmd, namespace } from '@bassline/tcl'
 import { createSQLiteStore } from './sqlite-store.js'
 
 /**
@@ -27,12 +28,21 @@ const readonly = target =>
  * @param {object} parentKit - Parent kit for delegation (optional)
  * @param {object} options - Options
  * @param {boolean} options.readonly - Make kit readonly (GET only)
- * @returns {object} { kit, cells, hydrate, checkpoint }
+ * @returns {object} { kit, cells, rt, hydrate, checkpoint }
  */
 export const createBlitKit = (conn, parentKit = null, options = {}) => {
   const cells = createCells()
   const store = createSQLiteStore(conn, '_store')
   const fn = createSQLiteStore(conn, '_fn')
+
+  // Create TCL runtime for this blit
+  const rt = new Runtime()
+
+  // Register standard TCL libraries
+  for (const [name, cmd] of Object.entries(std)) rt.register(name, cmd)
+  for (const [name, cmd] of Object.entries(list)) rt.register(name, cmd)
+  for (const [name, cmd] of Object.entries(dictCmd)) rt.register(name, cmd)
+  for (const [name, cmd] of Object.entries(namespace)) rt.register(name, cmd)
 
   // Delegate to parent kit (or return not-found)
   const delegate = resource({
@@ -68,7 +78,7 @@ export const createBlitKit = (conn, parentKit = null, options = {}) => {
    * Hydrate cells from _cells table.
    * Call this on blit load to restore cell state.
    */
-  const hydrate = async () => {
+  const hydrateCells = async () => {
     const result = conn.query('SELECT key, lattice, value FROM _cells')
     for (const row of result.rows) {
       // Create the cell with its lattice
@@ -86,11 +96,52 @@ export const createBlitKit = (conn, parentKit = null, options = {}) => {
   }
 
   /**
+   * Hydrate TCL runtime state from _ns table.
+   */
+  const hydrateTcl = () => {
+    const result = conn.query(`SELECT state FROM _ns WHERE id = 'root'`)
+    if (result.rows.length > 0) {
+      try {
+        const data = JSON.parse(result.rows[0].state)
+        rt.fromJSON(data)
+      } catch {
+        // If state isn't valid JSON, skip it
+      }
+    }
+  }
+
+  /**
+   * Hydrate procs from _fn table.
+   * Procs are stored as TCL source and re-evaluated.
+   */
+  const hydrateFn = async () => {
+    const result = conn.query('SELECT key, value FROM _fn')
+    for (const row of result.rows) {
+      try {
+        // value is proc source: "proc name {params} {body}"
+        await rt.run(row.value)
+      } catch {
+        // Skip invalid proc definitions
+      }
+    }
+  }
+
+  /**
+   * Hydrate all state from SQLite.
+   * Call this on blit load to restore state.
+   */
+  const hydrate = async () => {
+    await hydrateCells()
+    hydrateTcl()
+    await hydrateFn()
+  }
+
+  /**
    * Checkpoint cells to _cells table.
    * Call this to persist current cell state.
    * Handles both additions/updates and deletions.
    */
-  const checkpoint = async () => {
+  const checkpointCells = async () => {
     // Get list of cells
     const cellList = await cells.get({ path: '/' })
     const currentCells = new Set()
@@ -119,5 +170,61 @@ export const createBlitKit = (conn, parentKit = null, options = {}) => {
     }
   }
 
-  return { kit, cells, hydrate, checkpoint }
+  /**
+   * Checkpoint TCL runtime state to _ns table.
+   */
+  const checkpointTcl = () => {
+    const state = JSON.stringify(rt.toJSON())
+    conn.execute(
+      `INSERT INTO _ns (id, state) VALUES ('root', ?)
+       ON CONFLICT(id) DO UPDATE SET state = excluded.state`,
+      [state]
+    )
+  }
+
+  /**
+   * Checkpoint procs to _fn table.
+   * Collects all user-defined procs and stores their source.
+   */
+  const checkpointFn = () => {
+    // Collect all procs from all namespaces
+    const collectProcs = (ns, path = '') => {
+      const procs = []
+      for (const [name, cmd] of ns.commands) {
+        if (cmd._isProc) {
+          const fullName = path ? `${path}/${name}` : name
+          const params = cmd._params.join(' ')
+          const source = `proc ${fullName} {${params}} {${cmd._body}}`
+          procs.push({ name: fullName, source })
+        }
+      }
+      for (const [childName, child] of ns.children) {
+        // Skip temporary proc namespaces
+        if (childName.startsWith('_proc_')) continue
+        const childPath = path ? `${path}/${childName}` : childName
+        procs.push(...collectProcs(child, childPath))
+      }
+      return procs
+    }
+
+    const procs = collectProcs(rt.root)
+
+    // Clear and re-insert (simpler than diffing)
+    conn.execute('DELETE FROM _fn')
+    for (const { name, source } of procs) {
+      conn.execute('INSERT INTO _fn (key, value) VALUES (?, ?)', [name, source])
+    }
+  }
+
+  /**
+   * Checkpoint all state to SQLite.
+   * Call this to persist current state.
+   */
+  const checkpoint = async () => {
+    await checkpointCells()
+    checkpointTcl()
+    checkpointFn()
+  }
+
+  return { kit, cells, rt, hydrate, checkpoint }
 }
