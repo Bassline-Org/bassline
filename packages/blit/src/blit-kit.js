@@ -2,6 +2,7 @@ import { resource, routes } from '@bassline/core/resource'
 import { createCells } from '@bassline/core/cells'
 import { Runtime, std, list, dictCmd, namespace, info, string, event } from '@bassline/tcl'
 import { createSQLiteStore } from './sqlite-store.js'
+import { createSQLResource } from './sql-resource.js'
 
 /**
  * Wrap a resource to make it readonly.
@@ -34,6 +35,7 @@ export const createBlitKit = (conn, parentKit = null, options = {}) => {
   const cells = createCells()
   const store = createSQLiteStore(conn, '_store')
   const fn = createSQLiteStore(conn, '_fn')
+  const sql = createSQLResource(conn)
 
   // Create TCL runtime for this blit
   const rt = new Runtime()
@@ -48,14 +50,29 @@ export const createBlitKit = (conn, parentKit = null, options = {}) => {
   for (const [name, cmd] of Object.entries(event)) rt.register(name, cmd)
 
   // Delegate to parent kit (or return not-found)
-  const delegate = resource({
+  // For known semantic paths, we need to reconstruct the full path
+  const createDelegate = segment =>
+    resource({
+      get: async h => {
+        if (!parentKit) return { headers: { condition: 'not-found' }, body: null }
+        // Reconstruct full path: /segment + remaining path
+        return parentKit.get({ ...h, path: '/' + segment + h.path })
+      },
+      put: async (h, body) => {
+        if (!parentKit) return { headers: { condition: 'not-found' }, body: null }
+        return parentKit.put({ ...h, path: '/' + segment + h.path }, body)
+      },
+    })
+
+  // For unknown paths, the original path is passed unchanged by routes()
+  const unknownDelegate = resource({
     get: async h => {
       if (!parentKit) return { headers: { condition: 'not-found' }, body: null }
-      return parentKit.get({ ...h, path: '/' + h.segment + h.path })
+      return parentKit.get(h)
     },
     put: async (h, body) => {
       if (!parentKit) return { headers: { condition: 'not-found' }, body: null }
-      return parentKit.put({ ...h, path: '/' + h.segment + h.path }, body)
+      return parentKit.put(h, body)
     },
   })
 
@@ -66,15 +83,16 @@ export const createBlitKit = (conn, parentKit = null, options = {}) => {
     cells: wrap(cells),
     store: wrap(store),
     fn: wrap(fn),
+    sql: wrap(sql),
 
-    // Semantic paths delegate to parent
-    changed: delegate,
-    condition: delegate,
-    announce: delegate,
-    verify: delegate,
+    // Semantic paths delegate to parent (need to reconstruct path)
+    changed: createDelegate('changed'),
+    condition: createDelegate('condition'),
+    announce: createDelegate('announce'),
+    verify: createDelegate('verify'),
 
-    // Everything else delegates up
-    unknown: delegate,
+    // Everything else delegates up (routes passes original path)
+    unknown: unknownDelegate,
   })
 
   /**

@@ -6,7 +6,7 @@ import { RC } from '../tok.js'
 import { globToRegex } from '../glob.js'
 
 // Parse a dict string into a Map
-function parseDict(str) {
+export function parseDict(str) {
   const list = parseList(str)
   if (list.length % 2 !== 0) {
     throw new Error('dict: missing value to go with key')
@@ -19,7 +19,7 @@ function parseDict(str) {
 }
 
 // Format a Map into a dict string
-function formatDict(map) {
+export function formatDict(map) {
   const list = []
   for (const [k, v] of map) {
     list.push(k, v)
