@@ -10,8 +10,6 @@ pnpm add @bassline/core
 
 ## Core Primitives
 
-The entire resource model is ~35 lines:
-
 ```javascript
 import { resource, routes, bind } from '@bassline/core'
 
