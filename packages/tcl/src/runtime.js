@@ -1,5 +1,6 @@
 import { TT, tokenize, RC } from './tok.js'
 import { TclError } from './error.js'
+import { parseList } from './libs/list.js'
 
 // Escape sequence interpretation
 const escapes = {
@@ -366,6 +367,7 @@ export class Runtime {
   async run(src) {
     let argv = []
     let prev = TT.EOL
+    let expand = false // Flag for {*} expansion
     this.result = ''
 
     try {
@@ -385,11 +387,29 @@ export class Runtime {
           }
           argv = []
           prev = t
+          expand = false
+          continue
+        }
+
+        // {*} expansion prefix - next word will be expanded
+        if (t === TT.EXP) {
+          expand = true
+          prev = t
           continue
         }
 
         const val = await this.eval(tok)
-        if (prev === TT.SEP || prev === TT.EOL) {
+
+        // Handle {*} expansion
+        if (expand) {
+          const items = parseList(val)
+          argv.push(...items)
+          expand = false
+          prev = t
+          continue
+        }
+
+        if (prev === TT.SEP || prev === TT.EOL || prev === TT.EXP) {
           argv.push(val)
         } else {
           argv[argv.length - 1] += val
