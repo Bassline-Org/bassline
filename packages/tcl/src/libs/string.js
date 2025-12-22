@@ -5,6 +5,17 @@ import { parseList } from './list.js'
 export const commands = {
   length: ([str]) => String(str?.length ?? 0),
   concat: ([...strs]) => strs.join(''),
+  // string map {old new old2 new2 ...} string
+  map: ([mapping, str]) => {
+    const pairs = parseList(mapping)
+    let result = str
+    for (let i = 0; i < pairs.length; i += 2) {
+      const old = pairs[i]
+      const replacement = pairs[i + 1] ?? ''
+      result = result.split(old).join(replacement)
+    }
+    return result
+  },
   compare: ([a, b]) => String(a === b ? 0 : a < b ? -1 : 1),
   equal: ([a, b]) => String(a === b ? 1 : 0),
   first: ([str]) => String(str?.[0] ?? ''),
