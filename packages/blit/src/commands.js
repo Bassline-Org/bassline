@@ -32,6 +32,7 @@ const parseBody = (type, body) => {
       return parseList(body)
     case 'js/num':
       return parseFloat(body)
+    case 'json':
     case 'js/obj':
       return JSON.parse(body)
     case 'js/arr':
