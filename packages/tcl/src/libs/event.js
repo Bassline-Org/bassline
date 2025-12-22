@@ -101,17 +101,9 @@ export const event = {
         type: 'idle',
         timeout: null,
       })
-      // Use queueMicrotask for idle callbacks
-      queueMicrotask(async () => {
-        if (rt.afterEvents.has(id)) {
-          rt.afterEvents.delete(id)
-          try {
-            await rt.run(script)
-          } catch {
-            // Fire-and-forget: errors in after scripts are silently ignored
-          }
-        }
-      })
+      // Queue for processing by vwait/update (cooperative scheduling)
+      if (!rt.idleQueue) rt.idleQueue = []
+      rt.idleQueue.push({ id, script })
       return id
     }
 
@@ -142,9 +134,32 @@ export const event = {
     return id
   },
 
-  // vwait varName - wait until variable is modified
-  // Returns a Promise that resolves when the variable changes
-  vwait: ([varName], rt) => {
+  // vwait varName - wait until variable is modified (or already exists)
+  // Processes idle queue sequentially, then waits for variable if needed
+  vwait: async ([varName], rt) => {
+    // Process idle queue sequentially (cooperative scheduling)
+    if (rt.idleQueue) {
+      while (rt.idleQueue.length > 0) {
+        const { id, script } = rt.idleQueue.shift()
+        if (rt.afterEvents.has(id)) {
+          rt.afterEvents.delete(id)
+          try {
+            await rt.run(script)
+          } catch {
+            // Errors in idle scripts are silently ignored
+          }
+        }
+      }
+    }
+
+    // Check if variable already exists - resolve immediately
+    try {
+      const value = rt.getVar(varName)
+      return value
+    } catch {
+      // Variable doesn't exist, wait for it
+    }
+
     return new Promise(resolve => {
       const callback = (name, op, oldVal, newVal) => {
         rt.removeTrace(varName, ['write'], callback)
@@ -155,15 +170,23 @@ export const event = {
   },
 
   // update ?idletasks? - process pending events
-  // In JS, this yields to the event loop
-  update: args => {
-    const idletasks = args[0] === 'idletasks'
-    if (idletasks) {
-      // Just process microtasks
-      return new Promise(resolve => queueMicrotask(resolve))
+  // Processes idle queue sequentially
+  update: async (args, rt) => {
+    // Process idle queue sequentially
+    if (rt.idleQueue) {
+      while (rt.idleQueue.length > 0) {
+        const { id, script } = rt.idleQueue.shift()
+        if (rt.afterEvents.has(id)) {
+          rt.afterEvents.delete(id)
+          try {
+            await rt.run(script)
+          } catch {
+            // Errors in idle scripts are silently ignored
+          }
+        }
+      }
     }
-    // Process all pending events (one tick of event loop)
-    return new Promise(resolve => setTimeout(resolve, 0))
+    return ''
   },
 
   // unset varName ?varName ...? - unset variables

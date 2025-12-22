@@ -207,6 +207,45 @@ export const std = {
     return result
   },
 
+  // clock seconds - returns current Unix timestamp
+  // clock milliseconds - returns current time in milliseconds
+  // clock format seconds ?-format fmt?
+  clock: ([subcmd, ...args]) => {
+    switch (subcmd) {
+      case 'seconds':
+        return String(Math.floor(Date.now() / 1000))
+      case 'milliseconds':
+        return String(Date.now())
+      case 'format': {
+        const seconds = parseInt(args[0])
+        const date = new Date(seconds * 1000)
+        // Check for -format option
+        const fmtIdx = args.indexOf('-format')
+        if (fmtIdx !== -1 && args[fmtIdx + 1]) {
+          const fmt = args[fmtIdx + 1]
+          // Simple format substitution
+          return fmt
+            .replace(/%Y/g, date.getFullYear())
+            .replace(/%m/g, String(date.getMonth() + 1).padStart(2, '0'))
+            .replace(/%d/g, String(date.getDate()).padStart(2, '0'))
+            .replace(/%H/g, String(date.getHours()).padStart(2, '0'))
+            .replace(/%M/g, String(date.getMinutes()).padStart(2, '0'))
+            .replace(/%S/g, String(date.getSeconds()).padStart(2, '0'))
+        }
+        return date.toISOString()
+      }
+      case 'scan': {
+        // clock scan dateString - parse date string to seconds
+        const dateStr = args[0]
+        const parsed = Date.parse(dateStr)
+        if (isNaN(parsed)) throw new Error(`clock scan: unable to parse "${dateStr}"`)
+        return String(Math.floor(parsed / 1000))
+      }
+      default:
+        throw new Error(`clock: unknown subcommand "${subcmd}"`)
+    }
+  },
+
   // catch script ?resultVar? ?optionsVar?
   catch: async (args, rt) => {
     const [script, resultVar, optionsVar] = args
