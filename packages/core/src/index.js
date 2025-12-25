@@ -1,6 +1,9 @@
 // Core primitives
 export { resource, routes, bind, splitPath, notFound } from './resource.js'
 
+// Circuit - static topology with kit bindings
+export { circuit, withKit } from './circuit.js'
+
 // Store - in-memory storage (same API as file store, etc.)
 export { createMemoryStore } from './store.js'
 
