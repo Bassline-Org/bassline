@@ -69,3 +69,5 @@ bassline-web/.env.test
 *.tmp
 *.temp
 /bassline-web/.react-router/
+
+PLAN.md

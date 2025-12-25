@@ -53,7 +53,7 @@ export default [
   prettier,
   // Source files
   {
-    files: ['packages/*/src/**/*.js', 'apps/*/src/**/*.js'],
+    files: ['packages/*/src/**/*.js', 'apps/*/src/**/*.js', 'agent-skills/**/*.js'],
     languageOptions: {
       globals: nodeGlobals,
     },

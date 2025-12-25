@@ -51,12 +51,6 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)
 
-  apps/cli:
-    dependencies:
-      '@bassline/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-
   apps/tui:
     dependencies:
       '@inkjs/ui':
@@ -165,6 +159,8 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.9)
+
+  skills: {}
 
 packages:
 
