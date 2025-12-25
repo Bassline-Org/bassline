@@ -71,8 +71,8 @@ describe('circuit', () => {
     const c = circuit(
       {
         ports: {
-          '/a': 'nodeA',
-          '/b': 'nodeB',
+          a: 'nodeA',
+          b: 'nodeB',
         },
       },
       { nodeA, nodeB }
@@ -90,7 +90,7 @@ describe('circuit', () => {
       get: async h => ({ headers: {}, body: h.path }),
     })
 
-    const c = circuit({ ports: { '/data': 'node' } }, { node })
+    const c = circuit({ ports: { data: 'node' } }, { node })
 
     const result = await c.get({ path: '/data/foo/bar' })
     expect(result.body).toBe('/foo/bar')
@@ -112,10 +112,10 @@ describe('circuit', () => {
     const c = circuit(
       {
         bindings: {
-          processor: { '/in': 'input' },
+          processor: { in: 'input' },
         },
         ports: {
-          '/process': 'processor',
+          process: 'processor',
         },
       },
       { input, processor }
@@ -152,12 +152,12 @@ describe('circuit', () => {
     const c = circuit(
       {
         bindings: {
-          processor: { '/in': 'input', '/out': 'input' },
+          processor: { in: 'input', out: 'input' },
         },
         ports: {
-          '/write': 'input',
-          '/run': 'processor',
-          '/read': 'output',
+          write: 'input',
+          run: 'processor',
+          read: 'output',
         },
       },
       { input, processor, output }
@@ -187,7 +187,7 @@ describe('circuit', () => {
     const c = circuit(
       {
         bindings: {}, // No bindings
-        ports: { '/check': 'isolated' },
+        ports: { check: 'isolated' },
       },
       { isolated }
     )
@@ -201,7 +201,7 @@ describe('circuit', () => {
       get: async () => ({ headers: {}, body: 'ok' }),
     })
 
-    const c = circuit({ ports: { '/known': 'node' } }, { node })
+    const c = circuit({ ports: { known: 'node' } }, { node })
 
     const result = await c.get({ path: '/unknown' })
     expect(result.headers.condition).toBe('not-found')
@@ -222,9 +222,9 @@ describe('circuit', () => {
     const c = circuit(
       {
         bindings: {
-          reader: { '/source': 'data' },
+          reader: { source: 'data' },
         },
-        ports: { '/read': 'reader' },
+        ports: { read: 'reader' },
       },
       { data, reader }
     )
@@ -239,7 +239,7 @@ describe('circuit', () => {
       get: async () => ({ headers: {}, body: 10 }),
     })
 
-    const innerCircuit = circuit({ ports: { '/value': 'counter' } }, { counter })
+    const innerCircuit = circuit({ ports: { value: 'counter' } }, { counter })
 
     // Outer circuit uses inner circuit as a node
     const doubler = resource({
@@ -252,11 +252,11 @@ describe('circuit', () => {
     const outerCircuit = circuit(
       {
         bindings: {
-          doubler: { '/source': 'inner' },
+          doubler: { source: 'inner' },
         },
         ports: {
-          '/double': 'doubler',
-          '/raw': 'inner',
+          double: 'doubler',
+          raw: 'inner',
         },
       },
       { inner: innerCircuit, doubler }
