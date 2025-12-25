@@ -17,7 +17,7 @@ const typed = (type, headers, body = null) => ({
   body,
 })
 
-const notFound = async () => typed(JS_TYPES.error, { condition: 'not-found' }, null)
+const notFound = () => typed(JS_TYPES.error, { condition: 'not-found' }, null)
 
 const safe = handler => async (h, b) => {
   try {
