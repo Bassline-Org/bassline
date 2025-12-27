@@ -60,6 +60,12 @@ export const circuit = (spec, resources) => {
     wrapped[name] = kit ? withKit(res, kit) : res
   }
 
-  // Build port router
-  return routes(Object.fromEntries(Object.entries(ports).map(([seg, node]) => [seg, wrapped[node]])))
+  return routes({
+    '': {
+      get: async _h => {
+        return spec
+      },
+    },
+    ...Object.fromEntries(Object.entries(ports).map(([seg, node]) => [seg, wrapped[node]])),
+  })
 }
