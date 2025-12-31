@@ -1,6 +1,9 @@
 // Core primitives
 export { resource, routes, bind, splitPath, notFound } from './resource.js'
 
+// Circuit - static topology with kit bindings
+export { circuit, withKit } from './circuit.js'
+
 // Store - in-memory storage (same API as file store, etc.)
 export { createMemoryStore } from './store.js'
 
@@ -24,3 +27,15 @@ export { createFetch } from './fetch.js'
 
 // Types - type definitions (just a memory store with builtins)
 export { createTypes, builtinTypes } from './types.js'
+
+// Deployment - wraps app with management ports
+export { createDeployment } from './deployment.js'
+
+// Daemon - manages multiple deployments
+export { createDaemon } from './daemon.js'
+
+// Orchestrator - coordinates multiple daemons
+export { createOrchestrator } from './orchestrator.js'
+
+// Patterns - reusable circuit patterns
+export { createBreaker, createRetry, createLimiter, createTracer } from './patterns/index.js'

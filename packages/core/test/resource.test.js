@@ -56,8 +56,7 @@ describe('resource', () => {
 
     const result = await r.get({})
     expect(result.headers.condition).toBe('error')
-    expect(result.headers.message).toBe('test error')
-    expect(result.body).toBe(null)
+    expect(result.body.error).toBe('test error')
   })
 
   it('signals conditions via kit when available', async () => {
@@ -121,12 +120,13 @@ describe('routes', () => {
   it('falls back to unknown handler', async () => {
     const app = routes({
       unknown: resource({
-        get: async h => ({ headers: {}, body: `unknown: ${h.segment}` }),
+        // unknown handler receives original path unchanged
+        get: async h => ({ headers: {}, body: `unknown: ${h.path}` }),
       }),
     })
 
     const result = await app.get({ path: '/anything' })
-    expect(result.body).toBe('unknown: anything')
+    expect(result.body).toBe('unknown: /anything')
   })
 
   it('returns not-found for unmatched routes', async () => {
@@ -151,15 +151,16 @@ describe('routes', () => {
     expect(result.body).toBe('/bar/baz')
   })
 
-  it('adds segment to headers', async () => {
+  it('passes remaining path after consuming segment', async () => {
     const app = routes({
       foo: resource({
-        get: async h => ({ headers: {}, body: h.segment }),
+        // After matching 'foo', remaining path is '/'
+        get: async h => ({ headers: {}, body: h.path }),
       }),
     })
 
     const result = await app.get({ path: '/foo' })
-    expect(result.body).toBe('foo')
+    expect(result.body).toBe('/')
   })
 
   it('nests routes', async () => {

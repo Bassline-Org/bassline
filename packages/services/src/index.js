@@ -1,3 +1,5 @@
 export { createServices } from './service.js'
 export { createClaude } from './claude.js'
+export { createOllama } from './ollama.js'
 export { createMCPTools, runAgentLoop } from './mcp-server.js'
+export { createSlurp, createBarf } from './slurp.js'

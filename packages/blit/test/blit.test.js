@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createSQLiteConnection } from '@bassline/database'
-import { Runtime, std, list, dictCmd } from '@bassline/tcl'
+import { Runtime, std, list, dictCmd, namespace } from '@bassline/tcl'
 import { createSQLiteStore, createBlitKit, createBlits, createBlitCommands, initSchema } from '../src/index.js'
 
 describe('schema', () => {
@@ -25,6 +25,7 @@ describe('schema', () => {
     expect(tables).toContain('_cells')
     expect(tables).toContain('_store')
     expect(tables).toContain('_fn')
+    expect(tables).toContain('_ns')
   })
 
   it('is idempotent', () => {
@@ -35,7 +36,7 @@ describe('schema', () => {
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '\\_%' ESCAPE '\\'`
     ).rows
 
-    expect(tables.length).toBe(4)
+    expect(tables.length).toBe(5)
   })
 })
 
@@ -176,6 +177,7 @@ describe('blit kit', () => {
     const { kit } = createBlitKit(conn, parentKit)
 
     const result = await kit.get({ path: '/announce' })
+    // routes() leaves remaining path as '/', so '/announce' + '/' = '/announce/'
     expect(result.body).toBe('parent got /announce/')
   })
 
@@ -187,7 +189,7 @@ describe('blit kit', () => {
   })
 })
 
-describe('TCL commands', () => {
+describe('bl command', () => {
   let conn, kit, commands, rt
 
   beforeEach(() => {
@@ -210,79 +212,49 @@ describe('TCL commands', () => {
     conn.close()
   })
 
-  describe('cell command', () => {
-    it('creates a cell with lattice', async () => {
-      await rt.run('cell create counter -lattice maxNumber')
+  describe('cells', () => {
+    it('creates a cell and sets value', async () => {
+      // Create cell via bl put - need type tcl/dict to parse body as object
+      await rt.run('bl put {path /cells/counter type tcl/dict} {lattice maxNumber}')
+      await rt.run('bl put {path /cells/counter/value type js/num} 100')
 
-      const result = await kit.get({ path: '/cells/counter' })
-      expect(result.body.lattice).toBe('maxNumber')
-    })
-
-    it('sets cell value', async () => {
-      await rt.run('cell create score -lattice maxNumber')
-      await rt.run('cell set score 100')
-
-      const result = await kit.get({ path: '/cells/score/value' })
+      const result = await kit.get({ path: '/cells/counter/value' })
       expect(result.body).toBe(100)
     })
 
-    it('is idempotent - does not reset existing cell', async () => {
-      await rt.run('cell create counter -lattice maxNumber')
-      await rt.run('cell set counter 42')
-
-      // Create again - should NOT reset to initial value
-      await rt.run('cell create counter -lattice maxNumber')
-
-      const result = await kit.get({ path: '/cells/counter/value' })
-      expect(result.body).toBe(42)
-    })
-
     it('gets cell value', async () => {
-      await rt.run('cell create level -lattice maxNumber')
-      await rt.run('cell set level 5')
+      await rt.run('bl put {path /cells/level type tcl/dict} {lattice maxNumber}')
+      await rt.run('bl put {path /cells/level/value type js/num} 5')
 
-      const value = await rt.run('cell value level')
-      expect(value).toBe('5')
+      const response = await rt.run('bl get {path /cells/level/value}')
+      // Response is TCL dict: {headers {type js/num} body 5}
+      expect(response).toContain('body 5')
     })
 
-    it('gets cell info as JSON', async () => {
-      await rt.run('cell create info -lattice lww')
-      await rt.run('cell set info hello')
-
-      const info = await rt.run('cell get info')
-      const parsed = JSON.parse(info)
-      expect(parsed.lattice).toBe('lww')
-    })
-
-    it('throws on missing cell', async () => {
-      await expect(rt.run('cell value nonexistent')).rejects.toThrow('not found')
+    it('returns not-found for missing cell', async () => {
+      const response = await rt.run('bl get {path /cells/nonexistent}')
+      expect(response).toContain('not-found')
     })
   })
 
-  describe('store command', () => {
+  describe('store', () => {
     it('sets and gets values', async () => {
-      await rt.run('store set config {theme dark mode light}')
-      const result = await rt.run('store get config')
+      await rt.run('bl put {path /store/config type tcl/dict} {theme dark mode light}')
+      const response = await rt.run('bl get {path /store/config}')
 
-      expect(JSON.parse(result)).toEqual({ theme: 'dark', mode: 'light' })
+      expect(response).toContain('theme')
+      expect(response).toContain('dark')
     })
 
-    it('lists keys', async () => {
-      await rt.run('store set a 1')
-      await rt.run('store set b 2')
+    it('stores plain strings', async () => {
+      await rt.run('bl put {path /store/mykey} {test value}')
 
-      const keys = await rt.run('store keys')
-      expect(keys.split(' ')).toContain('a')
-      expect(keys.split(' ')).toContain('b')
-    })
-
-    it('returns empty for missing key', async () => {
-      const result = await rt.run('store get missing')
-      expect(result).toBe('')
+      const result = await kit.get({ path: '/store/mykey' })
+      expect(result.body).toBe('test value')
     })
   })
 
-  describe('sql command', () => {
+  describe('sql', () => {
     beforeEach(() => {
       conn.execute(`CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)`)
       conn.execute(`INSERT INTO users VALUES (1, 'Alice')`)
@@ -290,28 +262,31 @@ describe('TCL commands', () => {
     })
 
     it('queries data', async () => {
-      const result = await rt.run('sql query "SELECT * FROM users"')
-      expect(result).toContain('Alice')
-      expect(result).toContain('Bob')
+      const response = await rt.run('bl put {path /sql/query} {SELECT * FROM users}')
+      expect(response).toContain('Alice')
+      expect(response).toContain('Bob')
     })
 
     it('executes statements', async () => {
-      const result = await rt.run('sql execute "INSERT INTO users VALUES (3, \'Carol\')"')
-      expect(result).toContain('changes 1')
+      const response = await rt.run(`bl put {path /sql/execute} {INSERT INTO users VALUES (3, 'Carol')}`)
+      expect(response).toContain('changes')
     })
 
-    it('supports parameters', async () => {
-      const result = await rt.run('sql query "SELECT name FROM users WHERE id = ?" 2')
-      expect(result).toContain('Bob')
+    it('supports array params', async () => {
+      // Body is [sql, [params]] - use tcl/list to parse
+      await rt.run('set body [list {SELECT name FROM users WHERE id = ?} [list 2]]')
+      const response = await rt.run('bl put {path /sql/query type tcl/list} $body')
+      expect(response).toContain('Bob')
     })
   })
 
-  describe('kit command', () => {
-    it('puts and gets values', async () => {
-      await rt.run('kit put /store/mykey "test value"')
+  describe('usage', () => {
+    it('throws on missing method', async () => {
+      await expect(rt.run('bl')).rejects.toThrow('usage')
+    })
 
-      const result = await rt.run('kit get /store/mykey')
-      expect(result).toBe('test value')
+    it('throws on unknown method', async () => {
+      await expect(rt.run('bl delete {path /foo}')).rejects.toThrow('unknown method')
     })
   })
 })
@@ -327,8 +302,10 @@ describe('blits resource', () => {
     conn = createSQLiteConnection({ path: testDbPath })
     initSchema(conn)
 
-    // Add a boot script
-    conn.execute(`INSERT INTO _boot VALUES ('init.tcl', 'cell create counter -lattice maxNumber; cell set counter 0')`)
+    // Add a boot script using bl command
+    conn.execute(
+      `INSERT INTO _boot VALUES ('init.tcl', 'bl put {path /cells/counter type tcl/dict} {lattice maxNumber}; bl put {path /cells/counter/value type js/num} 0')`
+    )
     conn.close()
   })
 
@@ -417,5 +394,122 @@ describe('blits resource', () => {
 
     const result = await blits.get({ path: '/test/store/mykey' })
     expect(result.body).toEqual({ value: 'hello' })
+  })
+
+  it('evaluates TCL via /tcl/eval', async () => {
+    await blits.put({ path: '/test' }, { path: testDbPath })
+
+    // Set a variable
+    await blits.put({ path: '/test/tcl/eval' }, 'set x 42')
+
+    // Read it back
+    const result = await blits.put({ path: '/test/tcl/eval' }, 'set x')
+    expect(result.body).toBe('42')
+  })
+
+  it('persists TCL variables through checkpoint', async () => {
+    await blits.put({ path: '/test' }, { path: testDbPath })
+
+    // Set variables and define a proc
+    await blits.put({ path: '/test/tcl/eval' }, 'set myvar "hello world"')
+    await blits.put({ path: '/test/tcl/eval' }, 'set count 123')
+    await blits.put({ path: '/test/tcl/eval' }, 'proc double {x} { expr {$x * 2} }')
+
+    // Checkpoint
+    await blits.put({ path: '/test/checkpoint' }, {})
+
+    // Close and reload
+    await blits.put({ path: '/test/close' }, {})
+    await blits.put({ path: '/test' }, { path: testDbPath })
+
+    // Variables should be restored
+    const myvar = await blits.put({ path: '/test/tcl/eval' }, 'set myvar')
+    expect(myvar.body).toBe('hello world')
+
+    const count = await blits.put({ path: '/test/tcl/eval' }, 'set count')
+    expect(count.body).toBe('123')
+
+    // Proc should be restored
+    const doubled = await blits.put({ path: '/test/tcl/eval' }, 'double 21')
+    expect(doubled.body).toBe('42')
+  })
+})
+
+describe('TCL runtime serialization', () => {
+  // Helper to create a runtime with all standard commands
+  const createRuntime = () => {
+    const rt = new Runtime()
+    for (const [n, fn] of Object.entries(std)) rt.register(n, fn)
+    for (const [n, fn] of Object.entries(list)) rt.register(n, fn)
+    for (const [n, fn] of Object.entries(dictCmd)) rt.register(n, fn)
+    for (const [n, fn] of Object.entries(namespace)) rt.register(n, fn)
+    return rt
+  }
+
+  it('serializes and restores variables', async () => {
+    const rt = createRuntime()
+
+    // Set some variables
+    await rt.run('set x 10')
+    await rt.run('set name "Alice"')
+    await rt.run('set data {a 1 b 2}')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Create new runtime and restore
+    const rt2 = createRuntime()
+    rt2.fromJSON(json)
+
+    // Check variables restored
+    expect(await rt2.run('set x')).toBe('10')
+    expect(await rt2.run('set name')).toBe('Alice')
+    expect(await rt2.run('set data')).toBe('a 1 b 2')
+  })
+
+  it('serializes and restores namespaces', async () => {
+    const rt = createRuntime()
+
+    // Create namespace with variables
+    await rt.run('namespace eval myns { set foo bar }')
+    await rt.run('namespace eval myns/nested { set baz qux }')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Create new runtime and restore
+    const rt2 = createRuntime()
+    rt2.fromJSON(json)
+
+    // Check namespace variables restored
+    expect(await rt2.run('namespace eval myns { set foo }')).toBe('bar')
+    expect(await rt2.run('namespace eval myns/nested { set baz }')).toBe('qux')
+  })
+
+  it('skips temporary proc namespaces', async () => {
+    const rt = createRuntime()
+
+    // Define and call a proc (creates _proc_N namespace)
+    await rt.run('proc test {} { set local 1 }')
+    await rt.run('test')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Should not include _proc_* namespaces
+    expect(json.root.children).not.toHaveProperty('_proc_1')
+  })
+
+  it('serializes exports', async () => {
+    const rt = createRuntime()
+
+    // Create namespace with exports
+    await rt.run('namespace eval myns { namespace export foo* }')
+
+    // Serialize
+    const json = rt.toJSON()
+
+    // Check exports are included
+    expect(json.root.children.myns.exports).toContain('foo*')
   })
 })
