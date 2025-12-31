@@ -4,129 +4,166 @@ import Sidebar from './Sidebar.js'
 import PageView from './PageView.js'
 import SnippetEditor from './SnippetEditor.js'
 import StatusBar from './StatusBar.js'
-import ConnectionManager from './ConnectionManager.js'
-import SessionManager from './SessionManager.js'
 import CommandPalette from './CommandPalette.js'
-import { loadPage, savePage, createPage, deletePage, loadPageList, createSnippet } from '../pages.js'
-import { Connection, loadConnections } from '../connections.js'
-import { Command, initCommands, registerPageCommands } from '../commands.js'
-import { evalTcl } from '../client.js'
+import { useBlit, useBlitPath, useBlitContext } from '../blit-context.js'
+import { randomUUID } from 'crypto'
 
-interface WorkspaceProps {
-  connection: Connection
-  onDisconnect: () => void
-  onSwitchConnection: (connection: Connection) => void
+interface Page {
+  id: string
+  title: string
+  created: string
+  modified: string
+  snippets: Array<{ id: string; type: string; content: string }>
 }
 
-export default function Workspace({ connection, onDisconnect, onSwitchConnection }: WorkspaceProps) {
-  const [currentPage, setCurrentPage] = useState(null)
+interface WorkspaceProps {
+  onClose: () => void
+}
+
+export default function Workspace({ onClose }: WorkspaceProps) {
+  const kit = useBlit()
+  const blitPath = useBlitPath()
+  const { checkpoint } = useBlitContext()
+
+  const [currentPage, setCurrentPage] = useState<Page | null>(null)
   const [sidebarVisible, setSidebarVisible] = useState(true)
-  const [focus, setFocus] = useState('sidebar') // 'sidebar' | 'page' | 'editor'
-  const [editingIndex, setEditingIndex] = useState(null)
-  const [snippetTypePrompt, setSnippetTypePrompt] = useState(null) // { afterIndex }
+  const [focus, setFocus] = useState<'sidebar' | 'page' | 'editor'>('sidebar')
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [snippetTypePrompt, setSnippetTypePrompt] = useState<{ afterIndex: number } | null>(null)
   const [showHelp, setShowHelp] = useState(false)
-  const [showConnectionManager, setShowConnectionManager] = useState(false)
-  const [showSessionManager, setShowSessionManager] = useState(false)
   const [showCommandPalette, setShowCommandPalette] = useState(false)
-  const [currentSession, setCurrentSession] = useState('default')
 
-  // On mount, ensure at least one page exists and init commands
+  // Load or create initial page
   useEffect(() => {
-    // Initialize command registry from files
-    initCommands()
+    const init = async () => {
+      // Get all store keys and filter for pages (page:uuid format)
+      const result = await kit.get({ path: '/store' })
+      const allKeys = (result.body as string[]) || []
+      const pageKeys = allKeys.filter(k => k.startsWith('page:'))
 
-    const pages = loadPageList()
-    if (pages.length === 0) {
-      const scratchpad = createPage('Scratchpad')
-      setCurrentPage(scratchpad)
-      setFocus('page')
-      setSidebarVisible(false)
-    } else {
-      // Load the most recent page
-      const page = loadPage(pages[0].id)
-      setCurrentPage(page)
-      setFocus('page')
-      setSidebarVisible(false)
-      // Register commands from this page
-      if (page) {
-        registerPageCommands(page.id, page.snippets)
+      if (pageKeys.length === 0) {
+        // Create initial scratchpad
+        const scratchpad = await createPage('Scratchpad')
+        setCurrentPage(scratchpad)
+        setFocus('page')
+        setSidebarVisible(false)
+      } else {
+        // Load most recent page (first in list - we'll sort later)
+        const pageResult = await kit.get({ path: `/store/${pageKeys[0]}` })
+        if (pageResult.body) {
+          setCurrentPage(pageResult.body as Page)
+          setFocus('page')
+          setSidebarVisible(false)
+        }
       }
     }
+    init()
   }, [])
 
-  const handleSelectPage = id => {
-    const page = loadPage(id)
+  const createPage = async (title: string): Promise<Page> => {
+    const now = new Date().toISOString()
+    const page: Page = {
+      id: randomUUID(),
+      title,
+      created: now,
+      modified: now,
+      snippets: [{ id: randomUUID(), type: 'tcl', content: '' }],
+    }
+    await kit.put({ path: `/store/page:${page.id}` }, page)
+    return page
+  }
+
+  const savePage = async (page: Page) => {
+    page.modified = new Date().toISOString()
+    await kit.put({ path: `/store/page:${page.id}` }, page)
+  }
+
+  const deletePage = async (id: string) => {
+    await kit.put({ path: `/store/page:${id}` }, null)
+  }
+
+  const handleSelectPage = async (id: string) => {
+    const result = await kit.get({ path: `/store/page:${id}` })
+    if (result.body) {
+      setCurrentPage(result.body as Page)
+      setSidebarVisible(false)
+      setFocus('page')
+    }
+  }
+
+  const handleCreatePage = async (title: string) => {
+    const page = await createPage(title)
     setCurrentPage(page)
     setSidebarVisible(false)
     setFocus('page')
   }
 
-  const handleCreatePage = title => {
-    const page = createPage(title)
-    setCurrentPage(page)
-    setSidebarVisible(false)
-    setFocus('page')
-  }
-
-  const handleDeletePage = id => {
-    deletePage(id)
+  const handleDeletePage = async (id: string) => {
+    await deletePage(id)
     if (currentPage?.id === id) {
-      const pages = loadPageList()
-      if (pages.length > 0) {
-        setCurrentPage(loadPage(pages[0].id))
+      // Load another page or create scratchpad
+      const result = await kit.get({ path: '/store' })
+      const allKeys = (result.body as string[]) || []
+      const pageKeys = allKeys.filter(k => k.startsWith('page:'))
+      if (pageKeys.length > 0) {
+        const pageResult = await kit.get({ path: `/store/${pageKeys[0]}` })
+        setCurrentPage(pageResult.body as Page)
       } else {
-        const scratchpad = createPage('Scratchpad')
+        const scratchpad = await createPage('Scratchpad')
         setCurrentPage(scratchpad)
       }
     }
   }
 
-  const handlePageChange = action => {
+  const handlePageChange = async (action: { type: string; [key: string]: unknown }) => {
     if (!currentPage) return
 
     const snippets = [...currentPage.snippets]
 
     if (action.type === 'add') {
-      // Show type prompt
-      setSnippetTypePrompt({ afterIndex: action.after })
+      setSnippetTypePrompt({ afterIndex: action.after as number })
       return
     }
 
     if (action.type === 'delete' && snippets.length > 1) {
-      snippets.splice(action.index, 1)
+      snippets.splice(action.index as number, 1)
     }
 
     if (action.type === 'move') {
-      const [moved] = snippets.splice(action.from, 1)
-      snippets.splice(action.to, 0, moved)
+      const [moved] = snippets.splice(action.from as number, 1)
+      snippets.splice(action.to as number, 0, moved)
     }
 
     const updated = { ...currentPage, snippets }
-    savePage(updated)
+    await savePage(updated)
     setCurrentPage(updated)
   }
 
-  const addSnippet = type => {
+  const addSnippet = async (type: string) => {
     if (!snippetTypePrompt || !currentPage) return
     const snippets = [...currentPage.snippets]
-    snippets.splice(snippetTypePrompt.afterIndex + 1, 0, createSnippet(type))
+    snippets.splice(snippetTypePrompt.afterIndex + 1, 0, {
+      id: randomUUID(),
+      type,
+      content: '',
+    })
     const updated = { ...currentPage, snippets }
-    savePage(updated)
+    await savePage(updated)
     setCurrentPage(updated)
     setSnippetTypePrompt(null)
   }
 
-  const handleEdit = index => {
+  const handleEdit = (index: number) => {
     setEditingIndex(index)
     setFocus('editor')
   }
 
-  const handleSaveSnippet = content => {
+  const handleSaveSnippet = async (content: string) => {
     if (editingIndex === null || !currentPage) return
     const snippets = [...currentPage.snippets]
     snippets[editingIndex] = { ...snippets[editingIndex], content }
     const updated = { ...currentPage, snippets }
-    savePage(updated)
+    await savePage(updated)
     setCurrentPage(updated)
     setEditingIndex(null)
     setFocus('page')
@@ -142,19 +179,6 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
     (ch, key) => {
       // Command palette modal
       if (showCommandPalette) {
-        // Handled by CommandPalette component
-        return
-      }
-
-      // Connection manager modal
-      if (showConnectionManager) {
-        // Handled by ConnectionManager component
-        return
-      }
-
-      // Session manager modal
-      if (showSessionManager) {
-        // Handled by SessionManager component
         return
       }
 
@@ -175,18 +199,6 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
       // Toggle help
       if (ch === '?') {
         setShowHelp(true)
-        return
-      }
-
-      // Connection manager
-      if (ch === 'c' && focus !== 'editor') {
-        setShowConnectionManager(true)
-        return
-      }
-
-      // Session manager
-      if (ch === 's' && focus !== 'editor') {
-        setShowSessionManager(true)
         return
       }
 
@@ -221,9 +233,14 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
         setSidebarVisible(false)
         setFocus('page')
       }
+
+      // Checkpoint (Ctrl+S)
+      if (key.ctrl && ch === 's') {
+        checkpoint()
+      }
     },
     {
-      isActive: focus !== 'editor' && !showCommandPalette && !showConnectionManager && !showSessionManager && !showHelp,
+      isActive: focus !== 'editor' && !showCommandPalette && !showHelp,
     }
   )
 
@@ -255,8 +272,7 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
       <Box marginTop={1} flexDirection="column">
         <Text bold>Global:</Text>
         <Text> Ctrl+P Command palette</Text>
-        <Text> s Session manager</Text>
-        <Text> c Connection manager</Text>
+        <Text> Ctrl+S Save checkpoint</Text>
         <Text> ? Help</Text>
         <Text> q Quit</Text>
       </Box>
@@ -264,7 +280,7 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
         <Text bold>Editor:</Text>
         <Text> ↑/↓ Navigate lines</Text>
         <Text> Enter New line</Text>
-        <Text> Backspace Delete empty line (merges up)</Text>
+        <Text> Backspace Delete empty line</Text>
         <Text> Ctrl+K Delete current line</Text>
         <Text> Ctrl+S Save</Text>
         <Text> Esc Cancel</Text>
@@ -275,18 +291,13 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
     </Box>
   )
 
-  const handleConnectionSelect = (conn: Connection) => {
-    setShowConnectionManager(false)
-    onSwitchConnection(conn)
-  }
-
   // Command palette handlers
-  const handlePaletteCommand = async (cmd: Command) => {
-    // Execute the command in default session
+  const handlePaletteCommand = async (cmd: { name: string; content: string }) => {
+    // Execute the command (define proc + call it)
     try {
       const script = `${cmd.content}\n${cmd.name}`
-      await evalTcl(connection.url, script, 'default')
-    } catch (err) {
+      await kit.put({ path: '/tcl/eval' }, script)
+    } catch {
       // Could show error
     }
   }
@@ -295,14 +306,9 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
     handleSelectPage(pageId)
   }
 
-  const handlePaletteConnection = (conn: Connection) => {
-    onSwitchConnection(conn)
-  }
-
   const handlePaletteAction = (actionId: string) => {
     switch (actionId) {
       case 'new-page':
-        // Prompt for name would be better, for now create with default name
         handleCreatePage('New Page')
         break
       case 'toggle-sidebar':
@@ -312,8 +318,8 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
       case 'show-help':
         setShowHelp(true)
         break
-      case 'clear-results':
-        // This would need to be passed to PageView
+      case 'checkpoint':
+        checkpoint()
         break
     }
   }
@@ -333,28 +339,10 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
         <Box flexDirection="column" flexGrow={1} width="100%">
           {showCommandPalette ? (
             <CommandPalette
-              currentConnectionId={connection.id}
               onSelectCommand={handlePaletteCommand}
               onSelectPage={handlePalettePage}
-              onSelectConnection={handlePaletteConnection}
               onSelectAction={handlePaletteAction}
               onClose={() => setShowCommandPalette(false)}
-            />
-          ) : showConnectionManager ? (
-            <ConnectionManager
-              currentConnection={connection}
-              onSelect={handleConnectionSelect}
-              onClose={() => setShowConnectionManager(false)}
-            />
-          ) : showSessionManager ? (
-            <SessionManager
-              currentSession={currentSession}
-              daemonUrl={connection.url}
-              onSelect={sessionId => {
-                setCurrentSession(sessionId)
-                setShowSessionManager(false)
-              }}
-              onClose={() => setShowSessionManager(false)}
             />
           ) : showHelp ? (
             <HelpModal />
@@ -377,7 +365,7 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
                 </Box>
               </Box>
             </Box>
-          ) : focus === 'editor' && editingIndex !== null ? (
+          ) : focus === 'editor' && editingIndex !== null && currentPage ? (
             <SnippetEditor
               snippet={currentPage.snippets[editingIndex]}
               onSave={handleSaveSnippet}
@@ -386,8 +374,6 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
           ) : (
             <PageView
               page={currentPage}
-              daemonUrl={connection.url}
-              sessionId={currentSession}
               onPageChange={handlePageChange}
               onEdit={handleEdit}
               focused={focus === 'page'}
@@ -395,12 +381,7 @@ export default function Workspace({ connection, onDisconnect, onSwitchConnection
           )}
         </Box>
       </Box>
-      <StatusBar
-        connection={connection}
-        session={currentSession}
-        onDisconnect={onDisconnect}
-        canQuit={focus !== 'editor'}
-      />
+      <StatusBar blitPath={blitPath} onQuit={onClose} canQuit={focus !== 'editor'} />
     </Box>
   )
 }

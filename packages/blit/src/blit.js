@@ -1,6 +1,5 @@
 import { resource, routes, bind } from '@bassline/core/resource'
 import { createSQLiteConnection } from '@bassline/database'
-import { Runtime, std, list, dictCmd } from '@bassline/tcl'
 import { createBlitKit } from './blit-kit.js'
 import { initSchema } from './schema.js'
 import { createBlitCommands } from './commands.js'
@@ -12,7 +11,8 @@ import { createBlitCommands } from './commands.js'
  *   GET  /              → list loaded blits
  *   PUT  /:name         → load blit { path: '/path/to/file.blit' }
  *   GET  /:name         → blit info
- *   PUT  /:name/checkpoint → save cell state to SQLite
+ *   PUT  /:name/checkpoint → save all state to SQLite
+ *   PUT  /:name/tcl/eval → evaluate TCL script, body is script text
  *   PUT  /:name/close   → close blit
  *   GET  /:name/*       → forward to blit's kit
  *   PUT  /:name/*       → forward to blit's kit
@@ -36,12 +36,16 @@ export const createBlits = () => {
     // Ensure schema tables exist
     initSchema(conn)
 
-    // Create kit for this blit
-    const { kit, _cells, hydrate, checkpoint } = createBlitKit(conn, parentKit, {
+    // Create kit for this blit (includes TCL runtime with std libs)
+    const { kit, rt, hydrate, checkpoint } = createBlitKit(conn, parentKit, {
       readonly: options.readonly,
     })
 
-    // Hydrate cells from stored state
+    // Register blit-specific commands (all access via kit, not direct refs)
+    const blitCommands = createBlitCommands(conn, kit)
+    for (const [n, fn] of Object.entries(blitCommands)) rt.register(n, fn)
+
+    // Hydrate all state (cells, TCL runtime, procs)
     await hydrate()
 
     // Check initialization status
@@ -56,19 +60,7 @@ export const createBlits = () => {
     if (bootResult.rows.length > 0 && shouldRunBoot) {
       const script = bootResult.rows[0].value
 
-      // Create TCL runtime
-      const rt = new Runtime()
-
-      // Register standard libraries
-      for (const [n, fn] of Object.entries(std)) rt.register(n, fn)
-      for (const [n, fn] of Object.entries(list)) rt.register(n, fn)
-      for (const [n, fn] of Object.entries(dictCmd)) rt.register(n, fn)
-
-      // Register blit-specific commands (all access via kit, not direct refs)
-      const blitCommands = createBlitCommands(conn, kit)
-      for (const [n, fn] of Object.entries(blitCommands)) rt.register(n, fn)
-
-      // Run boot script (runtime now handles async commands)
+      // Run boot script on the shared runtime
       try {
         bootOutput = await rt.run(script)
         // Mark as initialized on successful boot
@@ -84,7 +76,7 @@ export const createBlits = () => {
       bootOutput = { skipped: true, reason: 'already initialized' }
     }
 
-    return { conn, kit, checkpoint, bootOutput }
+    return { conn, kit, rt, checkpoint, bootOutput }
   }
 
   return routes({
@@ -128,12 +120,12 @@ export const createBlits = () => {
               existing.conn.close()
             }
 
-            const { conn, kit, checkpoint, bootOutput } = await loadBlit(h.params.name, path, h.kit, {
+            const { conn, kit, rt, checkpoint, bootOutput } = await loadBlit(h.params.name, path, h.kit, {
               force: !!force,
               readonly: !!readonly,
             })
 
-            blits.set(h.params.name, { path, conn, kit, checkpoint, bootOutput })
+            blits.set(h.params.name, { path, conn, kit, rt, checkpoint, bootOutput })
 
             return {
               headers: { type: '/types/blit' },
@@ -150,6 +142,22 @@ export const createBlits = () => {
             await blit.checkpoint()
             return { headers: {}, body: { checkpointed: true } }
           },
+        }),
+
+        tcl: routes({
+          eval: resource({
+            put: async (h, body) => {
+              const blit = blits.get(h.params.name)
+              if (!blit) return { headers: { condition: 'not-found' }, body: null }
+
+              try {
+                const result = await blit.rt.run(body)
+                return { headers: {}, body: result }
+              } catch (err) {
+                return { headers: { condition: 'error' }, body: err.message }
+              }
+            },
+          }),
         }),
 
         close: resource({

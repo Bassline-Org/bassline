@@ -9,6 +9,7 @@ export const TT = {
   SEP: Symbol('SEP'), // Word separator
   EOL: Symbol('EOL'), // Command terminator
   EOF: Symbol('EOF'), // End of input
+  EXP: Symbol('EXP'), // Expansion prefix {*}
 }
 
 // Return Cases
@@ -109,6 +110,13 @@ export function* tokenize(src) {
     if (char === '{') {
       if (!(type === TT.SEP || type === TT.EOL)) {
         i++
+        continue
+      }
+      // Check for {*} expansion prefix
+      if (src[i + 1] === '*' && src[i + 2] === '}') {
+        type = TT.EXP
+        i += 3 // skip {*}
+        yield { t: TT.EXP }
         continue
       }
       type = TT.BRC

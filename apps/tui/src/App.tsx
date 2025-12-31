@@ -1,39 +1,62 @@
 import React, { useState, useEffect } from 'react'
-import DaemonPicker from './components/DaemonPicker.js'
+import BlitPicker from './components/BlitPicker.js'
 import Workspace from './components/Workspace.js'
-import { Connection, loadConnections, getDefaultConnectionId, getConnection, testConnection } from './connections.js'
+import { BlitProvider } from './blit-context.js'
 
-export default function App() {
-  const [connection, setConnection] = useState<Connection | null>(null)
-  const [loading, setLoading] = useState(true)
+interface BlitState {
+  kit: {
+    get: (h: { path: string }) => Promise<{ headers: Record<string, unknown>; body: unknown }>
+    put: (h: { path: string }, body: unknown) => Promise<{ headers: Record<string, unknown>; body: unknown }>
+  }
+  path: string
+  checkpoint: () => Promise<void>
+  close: () => Promise<void>
+}
 
-  // On mount, try to connect to default connection
+interface AppProps {
+  blitPath?: string
+}
+
+export default function App({ blitPath }: AppProps) {
+  const [blit, setBlit] = useState<BlitState | null>(null)
+
+  // Handle cleanup on exit
   useEffect(() => {
-    const init = async () => {
-      const defaultId = getDefaultConnectionId()
-      if (defaultId) {
-        const conn = getConnection(defaultId)
-        if (conn) {
-          const alive = await testConnection(conn.url)
-          if (alive) {
-            setConnection(conn)
-          }
-        }
+    const cleanup = async () => {
+      if (blit) {
+        await blit.checkpoint()
+        await blit.close()
       }
-      setLoading(false)
     }
-    init()
-  }, [])
 
-  if (loading) {
-    return null // Brief loading state
+    // Handle SIGINT (Ctrl+C)
+    const handleSigint = async () => {
+      await cleanup()
+      process.exit(0)
+    }
+
+    process.on('SIGINT', handleSigint)
+
+    return () => {
+      process.off('SIGINT', handleSigint)
+    }
+  }, [blit])
+
+  const handleClose = async () => {
+    if (blit) {
+      await blit.checkpoint()
+      await blit.close()
+    }
+    setBlit(null)
   }
 
-  if (!connection) {
-    return <DaemonPicker onConnect={setConnection} />
+  if (!blit) {
+    return <BlitPicker defaultPath={blitPath} onOpen={setBlit} />
   }
 
   return (
-    <Workspace connection={connection} onDisconnect={() => setConnection(null)} onSwitchConnection={setConnection} />
+    <BlitProvider value={blit}>
+      <Workspace onClose={handleClose} />
+    </BlitProvider>
   )
 }

@@ -76,8 +76,8 @@ export function assertCondition(response, expectedCondition, expectedMessage) {
   if (response.headers.condition !== expectedCondition) {
     throw new Error(`Expected condition '${expectedCondition}' but got '${response.headers.condition}'`)
   }
-  if (expectedMessage && response.headers.message !== expectedMessage) {
-    throw new Error(`Expected message '${expectedMessage}' but got '${response.headers.message}'`)
+  if (expectedMessage && response.body?.error !== expectedMessage) {
+    throw new Error(`Expected message '${expectedMessage}' but got '${response.body?.error}'`)
   }
 }
 
@@ -87,7 +87,7 @@ export function assertCondition(response, expectedCondition, expectedMessage) {
  */
 export function assertSuccess(response) {
   if (response.headers.condition) {
-    throw new Error(`Expected success but got condition '${response.headers.condition}': ${response.headers.message}`)
+    throw new Error(`Expected success but got condition '${response.headers.condition}': ${response.body?.error}`)
   }
 }
 

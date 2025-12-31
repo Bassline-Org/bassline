@@ -116,8 +116,7 @@ describe('Error Conditions', () => {
     const result = await faulty.get({ path: '/' })
 
     expect(result.headers.condition).toBe('error')
-    expect(result.headers.message).toBe('Something went wrong')
-    expect(result.body).toBe(null)
+    expect(result.body.error).toBe('Something went wrong')
   })
 
   it('errors signal conditions via kit', async () => {
@@ -163,7 +162,7 @@ describe('Error Conditions', () => {
     const result = await faulty.get({ path: '/' })
 
     expect(result.headers.condition).toBe('error')
-    expect(result.headers.message).toBe('Async error')
+    expect(result.body.error).toBe('Async error')
   })
 
   it('errors in nested routes are caught', async () => {
@@ -178,7 +177,7 @@ describe('Error Conditions', () => {
     const result = await app.get({ path: '/broken' })
 
     expect(result.headers.condition).toBe('error')
-    expect(result.headers.message).toBe('Nested error')
+    expect(result.body.error).toBe('Nested error')
   })
 })
 

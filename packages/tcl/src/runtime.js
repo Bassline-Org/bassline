@@ -1,5 +1,6 @@
 import { TT, tokenize, RC } from './tok.js'
 import { TclError } from './error.js'
+import { parseList } from './libs/list.js'
 
 // Escape sequence interpretation
 const escapes = {
@@ -50,6 +51,68 @@ class Namespace {
     if (!this.parent) return '/'
     const parentPath = this.parent.path()
     return parentPath === '/' ? `/${this.name}` : `${parentPath}/${this.name}`
+  }
+
+  /**
+   * Serialize namespace to JSON.
+   * Includes variables, links, exports, and children.
+   * Commands are NOT serialized (they're functions).
+   * @param {object} options - Serialization options
+   * @param {boolean} options.skipTempNamespaces - Skip _proc_* namespaces (default: true)
+   */
+  toJSON(options = {}) {
+    const skipTemp = options.skipTempNamespaces !== false
+
+    // Serialize children, optionally skipping temp namespaces
+    const children = {}
+    for (const [name, ns] of this.children) {
+      if (skipTemp && name.startsWith('_proc_')) continue
+      children[name] = ns.toJSON(options)
+    }
+
+    // Serialize links as { localName: { path, name } }
+    const links = {}
+    for (const [localName, link] of this.links) {
+      links[localName] = { path: link.ns.path(), name: link.name }
+    }
+
+    return {
+      variables: Object.fromEntries(this.variables),
+      links,
+      exports: [...this.exports],
+      children,
+    }
+  }
+
+  /**
+   * Restore namespace from JSON.
+   * Links are stored as pending and resolved in a second pass.
+   * @param {object} data - Serialized namespace data
+   * @param {Namespace|null} parent - Parent namespace
+   * @param {string} name - Namespace name
+   */
+  static fromJSON(data, parent = null, name = '') {
+    const ns = new Namespace(name, parent)
+
+    // Restore variables
+    for (const [k, v] of Object.entries(data.variables || {})) {
+      ns.variables.set(k, v)
+    }
+
+    // Restore exports
+    for (const pattern of data.exports || []) {
+      ns.exports.add(pattern)
+    }
+
+    // Restore children recursively
+    for (const [childName, childData] of Object.entries(data.children || {})) {
+      ns.children.set(childName, Namespace.fromJSON(childData, ns, childName))
+    }
+
+    // Store links as pending (resolved in second pass by Runtime)
+    ns._pendingLinks = data.links || {}
+
+    return ns
   }
 }
 
@@ -304,6 +367,7 @@ export class Runtime {
   async run(src) {
     let argv = []
     let prev = TT.EOL
+    let expand = false // Flag for {*} expansion
     this.result = ''
 
     try {
@@ -323,11 +387,29 @@ export class Runtime {
           }
           argv = []
           prev = t
+          expand = false
+          continue
+        }
+
+        // {*} expansion prefix - next word will be expanded
+        if (t === TT.EXP) {
+          expand = true
+          prev = t
           continue
         }
 
         const val = await this.eval(tok)
-        if (prev === TT.SEP || prev === TT.EOL) {
+
+        // Handle {*} expansion
+        if (expand) {
+          const items = parseList(val)
+          argv.push(...items)
+          expand = false
+          prev = t
+          continue
+        }
+
+        if (prev === TT.SEP || prev === TT.EOL || prev === TT.EXP) {
           argv.push(val)
         } else {
           argv[argv.length - 1] += val
@@ -357,5 +439,83 @@ export class Runtime {
 
   pwd() {
     return this.current.path()
+  }
+
+  /**
+   * Serialize runtime state to JSON.
+   * Includes root namespace tree and current namespace path.
+   * Does NOT include: traces, afterEvents, callStack (runtime-only state).
+   */
+  toJSON() {
+    return {
+      root: this.root.toJSON(),
+      currentPath: this.current.path(),
+    }
+  }
+
+  /**
+   * Restore runtime state from JSON.
+   * Merges into existing namespace tree (preserves commands).
+   * @param {object} data - Serialized runtime data
+   */
+  fromJSON(data) {
+    // Merge into existing root (preserves commands)
+    this.mergeNamespace(this.root, data.root)
+    this.resolveLinks(this.root)
+    this.current = this.resolve(data.currentPath) || this.root
+  }
+
+  /**
+   * Merge serialized namespace data into an existing namespace.
+   * Preserves existing commands while restoring variables/exports/children.
+   * @param {Namespace} ns - Target namespace
+   * @param {object} data - Serialized namespace data
+   */
+  mergeNamespace(ns, data) {
+    // Restore variables
+    for (const [k, v] of Object.entries(data.variables || {})) {
+      ns.variables.set(k, v)
+    }
+
+    // Restore exports
+    for (const pattern of data.exports || []) {
+      ns.exports.add(pattern)
+    }
+
+    // Store pending links for second-pass resolution
+    ns._pendingLinks = data.links || {}
+
+    // Recursively merge children
+    for (const [childName, childData] of Object.entries(data.children || {})) {
+      if (ns.children.has(childName)) {
+        // Merge into existing child
+        this.mergeNamespace(ns.children.get(childName), childData)
+      } else {
+        // Create new child
+        ns.children.set(childName, Namespace.fromJSON(childData, ns, childName))
+      }
+    }
+  }
+
+  /**
+   * Second pass: resolve pending links to namespace references.
+   * Called after fromJSON to convert stored paths back to object references.
+   * @param {Namespace} ns - Namespace to process
+   */
+  resolveLinks(ns) {
+    // Resolve pending links
+    for (const [localName, linkData] of Object.entries(ns._pendingLinks || {})) {
+      const targetNs = this.resolve(linkData.path)
+      if (targetNs) {
+        ns.links.set(localName, { ns: targetNs, name: linkData.name })
+      }
+      // Skip unresolvable links (target namespace was deleted)
+    }
+    delete ns._pendingLinks
+
+    // Recurse into children
+    for (const child of ns.children.values()) {
+      this.resolveLinks(child)
+    }
   }
 }

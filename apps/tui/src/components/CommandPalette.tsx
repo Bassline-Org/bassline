@@ -1,22 +1,22 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Box, Text, useInput } from 'ink'
 import TextInput from 'ink-text-input'
 import { sortByFuzzyScore } from '../fuzzy.js'
-import { getAllCommands, Command } from '../commands.js'
-import { loadConnections, Connection } from '../connections.js'
-import { loadPageList } from '../pages.js'
+import { useBlit } from '../blit-context.js'
+
+interface Command {
+  name: string
+  content: string
+}
 
 export type PaletteItem =
   | { type: 'command'; command: Command }
   | { type: 'page'; id: string; title: string }
-  | { type: 'connection'; connection: Connection }
   | { type: 'action'; id: string; label: string }
 
 interface CommandPaletteProps {
-  currentConnectionId: string
   onSelectCommand: (command: Command) => void
   onSelectPage: (pageId: string) => void
-  onSelectConnection: (connection: Connection) => void
   onSelectAction: (actionId: string) => void
   onClose: () => void
 }
@@ -25,46 +25,70 @@ const BUILT_IN_ACTIONS = [
   { id: 'new-page', label: 'New Page' },
   { id: 'toggle-sidebar', label: 'Toggle Sidebar' },
   { id: 'show-help', label: 'Show Help' },
-  { id: 'clear-results', label: 'Clear Results' },
+  { id: 'checkpoint', label: 'Save Checkpoint' },
 ]
 
 export default function CommandPalette({
-  currentConnectionId,
   onSelectCommand,
   onSelectPage,
-  onSelectConnection,
   onSelectAction,
   onClose,
 }: CommandPaletteProps) {
+  const kit = useBlit()
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
+  const [allItems, setAllItems] = useState<PaletteItem[]>([])
 
-  // Gather all items
-  const allItems: PaletteItem[] = useMemo(() => {
-    const items: PaletteItem[] = []
+  // Load items on mount
+  useEffect(() => {
+    const loadItems = async () => {
+      const items: PaletteItem[] = []
 
-    // Commands
-    for (const cmd of getAllCommands()) {
-      items.push({ type: 'command', command: cmd })
+      // Load pages from blit store (page:uuid format)
+      try {
+        const result = await kit.get({ path: '/store' })
+        const allKeys = (result.body as string[]) || []
+        const pageKeys = allKeys.filter(k => k.startsWith('page:'))
+
+        for (const key of pageKeys) {
+          const pageResult = await kit.get({ path: `/store/${key}` })
+          if (pageResult.body) {
+            const page = pageResult.body as { id: string; title: string }
+            items.push({ type: 'page', id: page.id, title: page.title })
+          }
+        }
+      } catch {
+        // Ignore errors loading pages
+      }
+
+      // Load procs from blit (via /fn store which contains proc sources)
+      try {
+        const result = await kit.get({ path: '/fn' })
+        const fnKeys = (result.body as string[]) || []
+
+        for (const name of fnKeys) {
+          const fnResult = await kit.get({ path: `/fn/${name}` })
+          if (fnResult.body) {
+            items.push({
+              type: 'command',
+              command: { name, content: String(fnResult.body) },
+            })
+          }
+        }
+      } catch {
+        // Ignore errors loading procs
+      }
+
+      // Built-in actions
+      for (const action of BUILT_IN_ACTIONS) {
+        items.push({ type: 'action', ...action })
+      }
+
+      setAllItems(items)
     }
 
-    // Pages
-    for (const page of loadPageList()) {
-      items.push({ type: 'page', id: page.id, title: page.title })
-    }
-
-    // Connections
-    for (const conn of loadConnections()) {
-      items.push({ type: 'connection', connection: conn })
-    }
-
-    // Built-in actions
-    for (const action of BUILT_IN_ACTIONS) {
-      items.push({ type: 'action', ...action })
-    }
-
-    return items
-  }, [])
+    loadItems()
+  }, [kit])
 
   // Filter and sort by fuzzy match
   const filteredItems = useMemo(() => {
@@ -74,8 +98,6 @@ export default function CommandPalette({
           return item.command.name
         case 'page':
           return item.title
-        case 'connection':
-          return item.connection.name
         case 'action':
           return item.label
       }
@@ -99,9 +121,6 @@ export default function CommandPalette({
         break
       case 'page':
         onSelectPage(item.id)
-        break
-      case 'connection':
-        onSelectConnection(item.connection)
         break
       case 'action':
         onSelectAction(item.id)
@@ -130,7 +149,6 @@ export default function CommandPalette({
     const groups: { label: string; items: Array<{ item: PaletteItem; index: number }> }[] = [
       { label: 'Commands', items: [] },
       { label: 'Pages', items: [] },
-      { label: 'Connections', items: [] },
       { label: 'Actions', items: [] },
     ]
 
@@ -142,11 +160,8 @@ export default function CommandPalette({
         case 'page':
           groups[1].items.push({ item, index })
           break
-        case 'connection':
-          groups[2].items.push({ item, index })
-          break
         case 'action':
-          groups[3].items.push({ item, index })
+          groups[2].items.push({ item, index })
           break
       }
     })
@@ -162,7 +177,7 @@ export default function CommandPalette({
         <Text color="magenta" bold>
           {'> '}
         </Text>
-        <TextInput value={query} onChange={setQuery} placeholder="Search commands, pages, connections..." />
+        <TextInput value={query} onChange={setQuery} placeholder="Search commands, pages..." />
       </Box>
 
       {filteredItems.length === 0 ? (
@@ -177,26 +192,12 @@ export default function CommandPalette({
               {group.items.slice(0, maxVisible).map(({ item, index }) => {
                 const isSelected = index === selected
                 const label =
-                  item.type === 'command'
-                    ? item.command.name
-                    : item.type === 'page'
-                      ? item.title
-                      : item.type === 'connection'
-                        ? item.connection.name
-                        : item.label
-
-                const extra =
-                  item.type === 'connection' && item.connection.id === currentConnectionId
-                    ? ' (active)'
-                    : item.type === 'command'
-                      ? ` (${item.command.source})`
-                      : ''
+                  item.type === 'command' ? item.command.name : item.type === 'page' ? item.title : item.label
 
                 return (
                   <Text key={index}>
                     {isSelected ? <Text color="magenta">{'> '}</Text> : '  '}
                     <Text color={isSelected ? 'magenta' : undefined}>{label}</Text>
-                    <Text dimColor>{extra}</Text>
                   </Text>
                 )
               })}

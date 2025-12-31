@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "bassline-mcp": "./src/mcp-stdio.js",
+    "bassline-daemon": "./src/daemon.js"
+  },
+  "dependencies": {
+    "@bassline/blit": "workspace:*",
+    "@bassline/core": "workspace:*",
+    "@bassline/database": "workspace:*",
+    "@bassline/node": "workspace:*",
+    "@bassline/services": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.25.1"
+  }
+}

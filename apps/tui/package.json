@@ -12,6 +12,10 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@bassline/blit": "workspace:*",
+    "@bassline/core": "workspace:*",
+    "@bassline/database": "workspace:*",
+    "@bassline/tcl": "workspace:*",
     "@inkjs/ui": "^2.0.0",
     "fullscreen-ink": "^0.1.0",
     "ink": "^5.0.1",

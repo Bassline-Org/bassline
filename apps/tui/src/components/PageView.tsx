@@ -1,7 +1,12 @@
 import React, { useState } from 'react'
 import { Box, Text, useInput } from 'ink'
-import { evalTcl } from '../client.js'
-import { parseProcName } from '../commands.js'
+import { useBlit } from '../blit-context.js'
+
+// Parse proc name from TCL definition
+function parseProcName(content: string): string | null {
+  const match = content.match(/^\s*proc\s+([a-zA-Z_][a-zA-Z0-9_-]*)\s*[\{\(]/)
+  return match ? match[1] : null
+}
 
 // Simple markdown renderer for Ink
 function renderMarkdown(content: string) {
@@ -52,7 +57,6 @@ function renderMarkdown(content: string) {
     // Bold **text**
     const boldMatch = line.match(/\*\*(.+?)\*\*/g)
     if (boldMatch) {
-      // Simple case - just show the text
       return <Text key={i}>{line.replace(/\*\*(.+?)\*\*/g, '$1')}</Text>
     }
     // Regular text
@@ -60,7 +64,15 @@ function renderMarkdown(content: string) {
   })
 }
 
-function TclSnippet({ content, selected, result }) {
+function TclSnippet({
+  content,
+  selected,
+  result,
+}: {
+  content: string
+  selected: boolean
+  result: { type: string; text: string } | null
+}) {
   return (
     <Box flexDirection="column" width="100%">
       <Box
@@ -84,7 +96,7 @@ function TclSnippet({ content, selected, result }) {
   )
 }
 
-function MarkdownSnippet({ content, selected }) {
+function MarkdownSnippet({ content, selected }: { content: string; selected: boolean }) {
   return (
     <Box
       flexDirection="column"
@@ -98,7 +110,15 @@ function MarkdownSnippet({ content, selected }) {
   )
 }
 
-function CommandSnippet({ content, selected, result }) {
+function CommandSnippet({
+  content,
+  selected,
+  result,
+}: {
+  content: string
+  selected: boolean
+  result: { type: string; text: string } | null
+}) {
   const name = parseProcName(content) || '(unnamed)'
   return (
     <Box flexDirection="column" width="100%">
@@ -119,46 +139,36 @@ function CommandSnippet({ content, selected, result }) {
 
 interface PageViewProps {
   page: { id: string; title: string; snippets: Array<{ id: string; type: string; content: string }> } | null
-  daemonUrl: string
-  sessionId?: string
   onPageChange?: (action: { type: string; [key: string]: unknown }) => void
   onEdit?: (index: number) => void
   focused?: boolean
 }
 
-export default function PageView({
-  page,
-  daemonUrl,
-  sessionId = 'default',
-  onPageChange,
-  onEdit,
-  focused = true,
-}: PageViewProps) {
+export default function PageView({ page, onPageChange, onEdit, focused = true }: PageViewProps) {
+  const kit = useBlit()
   const [selected, setSelected] = useState(0)
-  const [results, setResults] = useState({})
+  const [results, setResults] = useState<Record<string, { type: string; text: string }>>({})
 
   const snippets = page?.snippets || []
 
-  const evaluateSnippet = async snippet => {
+  const evaluateSnippet = async (snippet: { id: string; type: string; content: string }) => {
     if (snippet.type !== 'tcl' && snippet.type !== 'command') return
+
     try {
-      // For commands, we need to define the proc first, then call it
+      // For commands, define the proc first, then call it
       const script =
         snippet.type === 'command' ? `${snippet.content}\n${parseProcName(snippet.content) || ''}` : snippet.content
-      const result = await evalTcl(daemonUrl, script, sessionId)
-      const body = result.body as Record<string, unknown>
-      if (result.headers?.type === 'bl:///types/eval-result') {
-        setResults(prev => ({ ...prev, [snippet.id]: { type: 'output', text: body.result as string } }))
-      } else if (result.headers?.type === 'bl:///types/eval-error') {
-        setResults(prev => ({ ...prev, [snippet.id]: { type: 'error', text: body.error as string } }))
+
+      const result = await kit.put({ path: '/tcl/eval' }, script)
+
+      if (result.headers?.condition === 'error') {
+        setResults(prev => ({ ...prev, [snippet.id]: { type: 'error', text: String(result.body) } }))
       } else {
-        setResults(prev => ({
-          ...prev,
-          [snippet.id]: { type: 'output', text: JSON.stringify(result.body, null, 2) },
-        }))
+        const text = result.body === undefined || result.body === '' ? '(ok)' : String(result.body)
+        setResults(prev => ({ ...prev, [snippet.id]: { type: 'output', text } }))
       }
-    } catch (err) {
-      setResults(prev => ({ ...prev, [snippet.id]: { type: 'error', text: err.message } }))
+    } catch (err: unknown) {
+      setResults(prev => ({ ...prev, [snippet.id]: { type: 'error', text: (err as Error).message } }))
     }
   }
 
