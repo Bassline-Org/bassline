@@ -16,7 +16,7 @@
     "@bassline/tcl": "workspace:*"
   },
   "devDependencies": {
-    "vitest": "^2.0.0"
+    "vitest": "^4.0.16"
   },
   "scripts": {
     "test": "vitest run"
