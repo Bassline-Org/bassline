@@ -12,6 +12,6 @@
     "@bassline/database": "workspace:*",
     "@bassline/node": "workspace:*",
     "@bassline/services": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.25.1"
   }
 }
