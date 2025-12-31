@@ -1,19 +1,18 @@
 {
   "name": "bassline",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Getchyo groove on",
   "repository": {
     "type": "git",
-    "url": "https://github.com/MercuricChloride/bassline.git"
+    "url": "https://github.com/Bassline-Org/bassline.git"
   },
   "license": "AGPL-3.0-only",
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.15.0",
+  "packageManager": "pnpm@10.27.0",
   "scripts": {
     "start": "pnpm --filter @bassline/web start",
     "dev": "./scripts/dev.sh",
@@ -49,17 +48,17 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@fast-check/vitest": "^0.2.4",
-    "@types/node": "^20.19.9",
+    "@types/node": "^25.0.3",
     "@types/react": "^19.1.13",
     "eslint": "^9.16.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^50.6.1",
+    "eslint-plugin-jsdoc": "^61.5.0",
     "husky": "^9.1.7",
     "jsdoc": "^4.0.4",
     "knip": "^5.73.3",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
     "typescript": "^5.3.3",
-    "vitest": "^3.2.4"
+    "vitest": "^4.0.16"
   }
 }

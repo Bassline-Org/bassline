@@ -36,6 +36,9 @@ const barf = createBarf()
 // Create blits manager
 const blits = createBlits()
 
+// Load the default blit
+await blits.put({ path: '/app' }, { path: blitPath })
+
 // Wrap blits to forward to /app
 const blitKit = {
   get: h => blits.get({ ...h, path: '/app' + h.path }),
