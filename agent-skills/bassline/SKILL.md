@@ -1,6 +1,6 @@
 ---
 name: bassline
-description: Work with Bassline - a programming environment where everything is a resource. Create resources with get/put, use cells for state, stores for data, blits for persistence, TCL for scripting, and integrate with Claude for agentic workflows.
+description: Work with Bassline: a programming environment for reflexive distributed systems. Use Bassline when you want to make p2p connections with a simple API, build propagation networks, use a TCL with state serialization or manage agents in distributed settings.
 license: AGPL-3.0
 compatibility: Requires @bassline packages installed in the project
 ---
@@ -78,7 +78,7 @@ const worker = resource({
 })
 ```
 
-**Why kit?** The caller controls what world the resource sees. Same resource, different kit = different capabilities.
+**Why kit?** The caller controls what world the resource sees. Same resource, but different kit = different capabilities.
 
 ## Creating Resources
 
@@ -143,7 +143,7 @@ Bassline is split into focused packages. See the reference files for detailed us
 
 | Package              | Purpose                                          | Reference     |
 | -------------------- | ------------------------------------------------ | ------------- |
-| `@bassline/core`     | Resources, cells, stores, propagators, functions | `core.md`     |
+| `@bassline/core`     | Resources, types, stores, propagators, functions | `core.md`     |
 | `@bassline/blit`     | SQLite-backed persistent applications            | `blit.md`     |
 | `@bassline/tcl`      | TCL scripting for boot scripts and automation    | `tcl.md`      |
 | `@bassline/database` | SQLite database connections and queries          | `database.md` |
