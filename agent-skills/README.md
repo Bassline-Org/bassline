@@ -4,26 +4,9 @@ Agent skills for working with Bassline, following the [Agent Skills standard](ht
 
 Agent skills are markdown files that help LLMs understand and work with your codebase. They provide context, examples, and usage patterns that agents can reference when performing tasks.
 
-## Installation
+## Usage
 
-Install skills to your project:
-
-```bash
-# Install all skills to ./skills
-npx @bassline/skills install
-
-# Install to a custom path
-npx @bassline/skills install --path .claude/skills
-
-# List available skills
-npx @bassline/skills list
-```
-
-## Available Skills
-
-| Skill      | Description                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| `bassline` | Complete Bassline documentation - core resources, blits, TCL, database, services, and trust |
+Copy the `bassline/` directory to your project's skills location (e.g., `.claude/skills/`).
 
 ## Structure
 
@@ -37,10 +20,6 @@ bassline/
 ├── services.md    # Claude API integration
 └── trust.md       # Capability gating
 ```
-
-## Usage with Claude Code
-
-After installing, add the skills path to your Claude Code settings or place them in `.claude/skills/`.
 
 ## Learn More
 
