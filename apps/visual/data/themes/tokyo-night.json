@@ -1,0 +1,39 @@
+{
+  "id": "tokyo-night",
+  "name": "Tokyo Night",
+  "description": "Downtown Tokyo at night",
+  "author": "Enkia",
+  "colors": {
+    "bg-base": "#1a1b26",
+    "bg-surface": "#24283b",
+    "bg-overlay": "#2f3549",
+    "bg-muted": "#3b4261",
+    "bg-inset": "#16161e",
+    "fg-base": "#a9b1d6",
+    "fg-muted": "#9aa5ce",
+    "fg-subtle": "#565f89",
+    "fg-inverse": "#1a1b26",
+    "border-base": "#3b4261",
+    "border-muted": "#24283b",
+    "border-focus": "#7aa2f7",
+    "accent": "#7aa2f7",
+    "accent-fg": "#1a1b26",
+    "accent-muted": "#bb9af7",
+    "success": "#9ece6a",
+    "success-fg": "#1a1b26",
+    "warning": "#e0af68",
+    "warning-fg": "#1a1b26",
+    "error": "#f7768e",
+    "error-fg": "#1a1b26",
+    "node-bg": "#24283b",
+    "node-border": "#3b4261",
+    "node-selected": "#7aa2f7",
+    "edge-default": "#565f89",
+    "edge-selected": "#7aa2f7"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

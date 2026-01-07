@@ -1,0 +1,39 @@
+{
+  "id": "dracula",
+  "name": "Dracula",
+  "description": "Dark theme with purple and pink accents",
+  "author": "Zeno Rocha",
+  "colors": {
+    "bg-base": "#282a36",
+    "bg-surface": "#343746",
+    "bg-overlay": "#44475a",
+    "bg-muted": "#3d4051",
+    "bg-inset": "#1e1f29",
+    "fg-base": "#f8f8f2",
+    "fg-muted": "#bfbfbf",
+    "fg-subtle": "#6272a4",
+    "fg-inverse": "#282a36",
+    "border-base": "#44475a",
+    "border-muted": "#343746",
+    "border-focus": "#bd93f9",
+    "accent": "#bd93f9",
+    "accent-fg": "#282a36",
+    "accent-muted": "#9d79d9",
+    "success": "#50fa7b",
+    "success-fg": "#282a36",
+    "warning": "#f1fa8c",
+    "warning-fg": "#282a36",
+    "error": "#ff5555",
+    "error-fg": "#ffffff",
+    "node-bg": "#343746",
+    "node-border": "#44475a",
+    "node-selected": "#bd93f9",
+    "edge-default": "#6272a4",
+    "edge-selected": "#bd93f9"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

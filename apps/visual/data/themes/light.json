@@ -1,0 +1,39 @@
+{
+  "id": "light",
+  "name": "Light",
+  "description": "Clean light theme",
+  "author": "system",
+  "colors": {
+    "bg-base": "#ffffff",
+    "bg-surface": "#f9fafb",
+    "bg-overlay": "#ffffff",
+    "bg-muted": "#f3f4f6",
+    "bg-inset": "#e5e7eb",
+    "fg-base": "#111827",
+    "fg-muted": "#4b5563",
+    "fg-subtle": "#9ca3af",
+    "fg-inverse": "#ffffff",
+    "border-base": "#d1d5db",
+    "border-muted": "#e5e7eb",
+    "border-focus": "#6366f1",
+    "accent": "#4f46e5",
+    "accent-fg": "#ffffff",
+    "accent-muted": "#6366f1",
+    "success": "#16a34a",
+    "success-fg": "#ffffff",
+    "warning": "#d97706",
+    "warning-fg": "#ffffff",
+    "error": "#dc2626",
+    "error-fg": "#ffffff",
+    "node-bg": "#ffffff",
+    "node-border": "#d1d5db",
+    "node-selected": "#4f46e5",
+    "edge-default": "#9ca3af",
+    "edge-selected": "#4f46e5"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

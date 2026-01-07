@@ -1,0 +1,39 @@
+{
+  "id": "synthwave-84",
+  "name": "Synthwave 84",
+  "description": "Neon retro 80s aesthetic",
+  "author": "Robb Owen",
+  "colors": {
+    "bg-base": "#262335",
+    "bg-surface": "#2a2139",
+    "bg-overlay": "#34294f",
+    "bg-muted": "#3e3059",
+    "bg-inset": "#1e1a2b",
+    "fg-base": "#f0e8ff",
+    "fg-muted": "#bfb3d6",
+    "fg-subtle": "#7a7489",
+    "fg-inverse": "#262335",
+    "border-base": "#34294f",
+    "border-muted": "#2a2139",
+    "border-focus": "#ff7edb",
+    "accent": "#ff7edb",
+    "accent-fg": "#262335",
+    "accent-muted": "#b893ce",
+    "success": "#72f1b8",
+    "success-fg": "#262335",
+    "warning": "#fede5d",
+    "warning-fg": "#262335",
+    "error": "#fe4450",
+    "error-fg": "#ffffff",
+    "node-bg": "#2a2139",
+    "node-border": "#34294f",
+    "node-selected": "#ff7edb",
+    "edge-default": "#7a7489",
+    "edge-selected": "#ff7edb"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}
