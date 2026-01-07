@@ -1,0 +1,10 @@
+{
+  "name": "@bassline/agent-skills",
+  "version": "1.0.0",
+  "description": "Agent skills for working with Bassline (follows Agent Skills standard)",
+  "type": "module",
+  "bin": {
+    "bassline-skills": "./install.js"
+  },
+  "license": "AGPL-3.0"
+}
