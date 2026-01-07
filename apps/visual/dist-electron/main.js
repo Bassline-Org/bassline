@@ -1320,6 +1320,16 @@ const db = {
       this._touchProject(projectId);
       return { id, project_id: projectId, created_at: now, modified_at: now };
     },
+    /** Create entity with a specific ID (used for undo/restore) */
+    createWithId(projectId, id, timestamps) {
+      const db2 = getDb();
+      const now = Date.now();
+      const created_at = (timestamps == null ? void 0 : timestamps.created_at) ?? now;
+      const modified_at = (timestamps == null ? void 0 : timestamps.modified_at) ?? now;
+      db2.prepare("INSERT INTO entities (id, project_id, created_at, modified_at) VALUES (?, ?, ?, ?)").run(id, projectId, created_at, modified_at);
+      this._touchProject(projectId);
+      return { id, project_id: projectId, created_at, modified_at };
+    },
     delete(id) {
       const db2 = getDb();
       const entity = db2.prepare("SELECT project_id FROM entities WHERE id = ?").get(id);
@@ -1493,7 +1503,16 @@ const db = {
       if (!targetEntity) throw new Error("Target entity not found");
       const stamp = this.get(stampId);
       if (!stamp) throw new Error("Stamp not found");
+      const previousAttrs = {};
+      const currentAttrRows = db2.prepare("SELECT key, value FROM attrs WHERE entity_id = ?").all(targetEntityId);
+      for (const row of currentAttrRows) {
+        if (row.value !== null) {
+          previousAttrs[row.key] = row.value;
+        }
+      }
       const createdEntityIds = [];
+      const createdRelationshipIds = [];
+      const appliedAttrs = { ...stamp.attrs };
       const localToEntityId = /* @__PURE__ */ new Map();
       localToEntityId.set(null, targetEntityId);
       const transaction = db2.transaction(() => {
@@ -1518,14 +1537,16 @@ const db = {
           const fromId = localToEntityId.get(rel.from_local_id);
           const toId = localToEntityId.get(rel.to_local_id);
           if (fromId && toId) {
-            relStmt.run(randomUUID(), targetEntity.project_id, fromId, toId, rel.kind);
+            const relId = randomUUID();
+            relStmt.run(relId, targetEntity.project_id, fromId, toId, rel.kind);
+            createdRelationshipIds.push(relId);
           }
         }
         db2.prepare("INSERT OR REPLACE INTO entity_stamps (entity_id, stamp_id, applied_at) VALUES (?, ?, ?)").run(targetEntityId, stampId, now);
         db2.prepare("UPDATE entities SET modified_at = ? WHERE id = ?").run(now, targetEntityId);
       });
       transaction();
-      return { createdEntityIds };
+      return { createdEntityIds, createdRelationshipIds, appliedAttrs, previousAttrs };
     },
     /** Update stamp metadata */
     update(id, data) {
@@ -1610,6 +1631,22 @@ const db = {
       `).run(id, projectId, from_entity, to_entity, kind, label, binding_name);
       this._touchProject(projectId);
       return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name };
+    },
+    /** Create relationship with a specific ID (used for undo/restore) */
+    createWithId(projectId, id, data) {
+      const db2 = getDb();
+      const { from_entity, to_entity, kind, label = null, binding_name = null } = data;
+      db2.prepare(`
+        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name);
+      this._touchProject(projectId);
+      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name };
+    },
+    /** Get a relationship by ID */
+    get(id) {
+      const db2 = getDb();
+      return db2.prepare("SELECT * FROM relationships WHERE id = ?").get(id);
     },
     delete(id) {
       const db2 = getDb();
@@ -2042,6 +2079,10 @@ function setupIpcHandlers() {
   ipcMain.handle("db:entities:list", (_, projectId) => db.entities.list(projectId));
   ipcMain.handle("db:entities:get", (_, id) => db.entities.get(id));
   ipcMain.handle("db:entities:create", (_, projectId) => db.entities.create(projectId));
+  ipcMain.handle(
+    "db:entities:createWithId",
+    (_, projectId, id, timestamps) => db.entities.createWithId(projectId, id, timestamps)
+  );
   ipcMain.handle("db:entities:delete", (_, id) => db.entities.delete(id));
   ipcMain.handle("db:attrs:get", (_, entityId) => db.attrs.get(entityId));
   ipcMain.handle(
@@ -2072,7 +2113,12 @@ function setupIpcHandlers() {
     (_, id, data) => db.stamps.update(id, data)
   );
   ipcMain.handle("db:relationships:list", (_, projectId) => db.relationships.list(projectId));
+  ipcMain.handle("db:relationships:get", (_, id) => db.relationships.get(id));
   ipcMain.handle("db:relationships:create", (_, projectId, data) => db.relationships.create(projectId, data));
+  ipcMain.handle(
+    "db:relationships:createWithId",
+    (_, projectId, id, data) => db.relationships.createWithId(projectId, id, data)
+  );
   ipcMain.handle("db:relationships:delete", (_, id) => db.relationships.delete(id));
   ipcMain.handle("db:uiState:get", (_, projectId) => db.uiState.get(projectId));
   ipcMain.handle("db:uiState:update", (_, projectId, data) => db.uiState.update(projectId, data));

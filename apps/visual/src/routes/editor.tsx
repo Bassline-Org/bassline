@@ -1,19 +1,32 @@
-import { useLoaderData, useFetcher, Link } from 'react-router'
-import { useCallback, useState, useEffect, useRef } from 'react'
+import { useLoaderData, Link } from 'react-router'
+import { useCallback, useState } from 'react'
 import { ArrowLeft, Settings, Stamp } from 'lucide-react'
-import type { EditorLoaderData, EntityWithAttrs } from '../types'
+import type { EditorLoaderData } from '../types'
 import { Canvas } from '../components/Canvas'
 import { PropertyPanel } from '../components/PropertyPanel'
 import { StampsPanel } from '../components/StampsPanel'
 import { Button } from '@/components/ui/button'
 import { useVocabulary } from '../hooks/useVocabulary'
+import { useCommands } from '../hooks/useCommands'
+import {
+  SetAttrCommand,
+  SetAttrBatchCommand,
+  DeleteAttrCommand,
+  CreateEntityCommand,
+  DeleteEntityCommand,
+  CreateRelationshipCommand,
+  DeleteRelationshipCommand,
+  ContainCommand,
+  UncontainCommand,
+  CreateStampCommand,
+  ApplyStampCommand,
+  DeleteStampCommand,
+  ViewportChangeCommand,
+} from '../lib/commands'
 
 export function Editor() {
-  const { project, entities: loadedEntities, relationships, stamps, uiState } = useLoaderData() as EditorLoaderData
-  const fetcher = useFetcher()
-
-  // Local state for entities (allows optimistic updates without full revalidation)
-  const [entities, setEntities] = useState<EntityWithAttrs[]>(loadedEntities)
+  const { project, entities, relationships, stamps, uiState } = useLoaderData() as EditorLoaderData
+  const { execute } = useCommands()
 
   // Local selection state - NOT persisted to DB
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
@@ -24,62 +37,39 @@ export function Editor() {
   // Parse vocabulary from stamps
   const vocabulary = useVocabulary(stamps)
 
-  // Track loaded entities to detect changes from loader (create/delete)
-  const prevLoadedEntitiesRef = useRef(loadedEntities)
-  useEffect(() => {
-    // Only sync when loader data actually changes (structural changes like create/delete)
-    if (prevLoadedEntitiesRef.current !== loadedEntities) {
-      prevLoadedEntitiesRef.current = loadedEntities
-      setEntities(loadedEntities)
-    }
-  }, [loadedEntities])
-
   const selectedEntity = entities.find((e) => e.id === selectedEntityId)
 
   const handleCreateEntity = useCallback(
     (x: number, y: number) => {
       const name = `Entity ${entities.length + 1}`
-      // Use form action for structural changes - triggers revalidation
-      fetcher.submit(
-        { intent: 'createEntity', name, x: x.toString(), y: y.toString() },
-        { method: 'post' }
-      )
+      execute(new CreateEntityCommand(project.id, {
+        name,
+        x: Math.round(x).toString(),
+        y: Math.round(y).toString(),
+      }))
     },
-    [fetcher, entities.length]
+    [execute, entities.length, project.id]
   )
 
   const handleMoveEntity = useCallback(
-    async (entityId: string, x: number, y: number) => {
-      // Direct DB call - NO revalidation needed, React Flow already shows correct position
-      await window.db.attrs.setBatch(entityId, {
+    (entityId: string, x: number, y: number) => {
+      // SetAttrBatchCommand is undoable and triggers revalidation
+      execute(new SetAttrBatchCommand(entityId, {
         x: Math.round(x).toString(),
-        y: Math.round(y).toString()
-      })
-      // Update local state to keep in sync
-      setEntities(prev => prev.map(e =>
-        e.id === entityId
-          ? { ...e, attrs: { ...e.attrs, x: Math.round(x).toString(), y: Math.round(y).toString() } }
-          : e
-      ))
+        y: Math.round(y).toString(),
+      }))
     },
-    []
+    [execute]
   )
 
   const handleResizeEntity = useCallback(
-    async (entityId: string, width: number, height: number) => {
-      // Direct DB call - NO revalidation needed
-      await window.db.attrs.setBatch(entityId, {
+    (entityId: string, width: number, height: number) => {
+      execute(new SetAttrBatchCommand(entityId, {
         'ui.width': Math.round(width).toString(),
-        'ui.height': Math.round(height).toString()
-      })
-      // Update local state to keep in sync
-      setEntities(prev => prev.map(e =>
-        e.id === entityId
-          ? { ...e, attrs: { ...e.attrs, 'ui.width': Math.round(width).toString(), 'ui.height': Math.round(height).toString() } }
-          : e
-      ))
+        'ui.height': Math.round(height).toString(),
+      }))
     },
-    []
+    [execute]
   )
 
   const handleSelectEntity = useCallback(
@@ -92,12 +82,13 @@ export function Editor() {
 
   const handleConnect = useCallback(
     (from: string, to: string) => {
-      fetcher.submit(
-        { intent: 'createRelationship', from, to, kind: 'connects' },
-        { method: 'post' }
-      )
+      execute(new CreateRelationshipCommand(project.id, {
+        from_entity: from,
+        to_entity: to,
+        kind: 'connects',
+      }))
     },
-    [fetcher]
+    [execute, project.id]
   )
 
   const handleDeleteEntity = useCallback(
@@ -106,112 +97,73 @@ export function Editor() {
       if (selectedEntityId === entityId) {
         setSelectedEntityId(null)
       }
-      // Form action for structural change - triggers revalidation
-      fetcher.submit({ intent: 'deleteEntity', entityId }, { method: 'post' })
+      execute(new DeleteEntityCommand(entityId))
     },
-    [fetcher, selectedEntityId]
+    [execute, selectedEntityId]
   )
 
   const handleViewportChange = useCallback(
-    async (x: number, y: number, zoom: number) => {
-      // Direct DB call - no revalidation needed
-      await window.db.uiState.update(project.id, {
-        viewport_x: x,
-        viewport_y: y,
-        viewport_zoom: zoom
-      })
+    (x: number, y: number, zoom: number) => {
+      // ViewportChangeCommand is not undoable - UI state is ephemeral
+      execute(new ViewportChangeCommand(project.id, { x, y, zoom }))
     },
-    [project.id]
+    [execute, project.id]
   )
 
   const handleUpdateAttr = useCallback(
-    async (entityId: string, key: string, value: string) => {
-      // Direct DB call - no revalidation
-      await window.db.attrs.set(entityId, key, value)
-      // Update local state
-      setEntities(prev => prev.map(e =>
-        e.id === entityId
-          ? { ...e, attrs: { ...e.attrs, [key]: value } }
-          : e
-      ))
+    (entityId: string, key: string, value: string) => {
+      execute(new SetAttrCommand(entityId, key, value))
     },
-    []
+    [execute]
   )
 
   const handleDeleteAttr = useCallback(
-    async (entityId: string, key: string) => {
-      // Direct DB call - no revalidation
-      await window.db.attrs.delete(entityId, key)
-      // Update local state
-      setEntities(prev => prev.map(e => {
-        if (e.id !== entityId) return e
-        const { [key]: _, ...restAttrs } = e.attrs
-        return { ...e, attrs: restAttrs }
-      }))
+    (entityId: string, key: string) => {
+      execute(new DeleteAttrCommand(entityId, key))
     },
-    []
+    [execute]
   )
 
   const handleSaveAsStamp = useCallback(
     (entityId: string, stampName: string) => {
-      fetcher.submit(
-        { intent: 'createStamp', sourceEntityId: entityId, stampName },
-        { method: 'post' }
-      )
+      execute(new CreateStampCommand(entityId, stampName))
     },
-    [fetcher]
+    [execute]
   )
 
   const handleApplyStamp = useCallback(
     (stampId: string, entityId: string) => {
-      // Use fetcher for structural change - triggers revalidation
-      // This ensures new child entities are loaded after stamp application
-      fetcher.submit(
-        { intent: 'applyStamp', stampId, targetEntityId: entityId },
-        { method: 'post' }
-      )
+      execute(new ApplyStampCommand(stampId, entityId))
     },
-    [fetcher]
+    [execute]
   )
 
   const handleContain = useCallback(
     (parentId: string, childId: string) => {
-      fetcher.submit(
-        { intent: 'contain', parentId, childId },
-        { method: 'post' }
-      )
+      execute(new ContainCommand(project.id, parentId, childId))
     },
-    [fetcher]
+    [execute, project.id]
   )
 
   const handleUncontain = useCallback(
     (childId: string) => {
-      fetcher.submit(
-        { intent: 'uncontain', childId },
-        { method: 'post' }
-      )
+      execute(new UncontainCommand(project.id, childId))
     },
-    [fetcher]
+    [execute, project.id]
   )
 
   const handleDeleteRelationship = useCallback(
     (relationshipId: string) => {
-      fetcher.submit(
-        { intent: 'deleteRelationship', relationshipId },
-        { method: 'post' }
-      )
+      execute(new DeleteRelationshipCommand(relationshipId))
     },
-    [fetcher]
+    [execute]
   )
 
   const handleDeleteStamp = useCallback(
     (stampId: string) => {
-      fetcher.submit(
-        { intent: 'deleteStamp', stampId },
-        { method: 'post' }
-      )
+      execute(new DeleteStampCommand(stampId))
     },
-    [fetcher]
+    [execute]
   )
 
   return (

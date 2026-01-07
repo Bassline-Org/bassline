@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('db', {
     list: (projectId: string) => ipcRenderer.invoke('db:entities:list', projectId),
     get: (id: string) => ipcRenderer.invoke('db:entities:get', id),
     create: (projectId: string) => ipcRenderer.invoke('db:entities:create', projectId),
+    createWithId: (projectId: string, id: string, timestamps?: { created_at: number; modified_at: number }) =>
+      ipcRenderer.invoke('db:entities:createWithId', projectId, id, timestamps),
     delete: (id: string) => ipcRenderer.invoke('db:entities:delete', id),
   },
   attrs: {
@@ -82,7 +84,10 @@ contextBridge.exposeInMainWorld('db', {
   },
   relationships: {
     list: (projectId: string) => ipcRenderer.invoke('db:relationships:list', projectId),
+    get: (id: string) => ipcRenderer.invoke('db:relationships:get', id),
     create: (projectId: string, data: any) => ipcRenderer.invoke('db:relationships:create', projectId, data),
+    createWithId: (projectId: string, id: string, data: any) =>
+      ipcRenderer.invoke('db:relationships:createWithId', projectId, id, data),
     delete: (id: string) => ipcRenderer.invoke('db:relationships:delete', id),
   },
   uiState: {

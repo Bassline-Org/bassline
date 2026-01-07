@@ -174,6 +174,9 @@ function setupIpcHandlers() {
   ipcMain.handle('db:entities:list', (_, projectId: string) => db.entities.list(projectId))
   ipcMain.handle('db:entities:get', (_, id: string) => db.entities.get(id))
   ipcMain.handle('db:entities:create', (_, projectId: string) => db.entities.create(projectId))
+  ipcMain.handle('db:entities:createWithId', (_, projectId: string, id: string, timestamps?: { created_at: number; modified_at: number }) =>
+    db.entities.createWithId(projectId, id, timestamps)
+  )
   ipcMain.handle('db:entities:delete', (_, id: string) => db.entities.delete(id))
 
   // Attrs
@@ -204,7 +207,11 @@ function setupIpcHandlers() {
 
   // Relationships
   ipcMain.handle('db:relationships:list', (_, projectId: string) => db.relationships.list(projectId))
+  ipcMain.handle('db:relationships:get', (_, id: string) => db.relationships.get(id))
   ipcMain.handle('db:relationships:create', (_, projectId: string, data: any) => db.relationships.create(projectId, data))
+  ipcMain.handle('db:relationships:createWithId', (_, projectId: string, id: string, data: any) =>
+    db.relationships.createWithId(projectId, id, data)
+  )
   ipcMain.handle('db:relationships:delete', (_, id: string) => db.relationships.delete(id))
 
   // UI State

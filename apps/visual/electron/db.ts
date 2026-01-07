@@ -147,6 +147,20 @@ export const db = {
       return { id, project_id: projectId, created_at: now, modified_at: now }
     },
 
+    /** Create entity with a specific ID (used for undo/restore) */
+    createWithId(projectId: string, id: string, timestamps?: { created_at: number; modified_at: number }) {
+      const db = getDb()
+      const now = Date.now()
+      const created_at = timestamps?.created_at ?? now
+      const modified_at = timestamps?.modified_at ?? now
+
+      db.prepare('INSERT INTO entities (id, project_id, created_at, modified_at) VALUES (?, ?, ?, ?)')
+        .run(id, projectId, created_at, modified_at)
+
+      this._touchProject(projectId)
+      return { id, project_id: projectId, created_at, modified_at }
+    },
+
     delete(id: string) {
       const db = getDb()
       const entity = db.prepare('SELECT project_id FROM entities WHERE id = ?').get(id) as { project_id: string } | undefined
@@ -422,7 +436,19 @@ export const db = {
       const stamp = this.get(stampId)
       if (!stamp) throw new Error('Stamp not found')
 
+      // Capture target's current attrs BEFORE applying stamp (for undo)
+      const previousAttrs: Record<string, string> = {}
+      const currentAttrRows = db.prepare('SELECT key, value FROM attrs WHERE entity_id = ?')
+        .all(targetEntityId) as Array<{ key: string; value: string }>
+      for (const row of currentAttrRows) {
+        if (row.value !== null) {
+          previousAttrs[row.key] = row.value
+        }
+      }
+
       const createdEntityIds: string[] = []
+      const createdRelationshipIds: string[] = []
+      const appliedAttrs: Record<string, string> = { ...stamp.attrs }
 
       // Map local_id to new entity ID
       const localToEntityId = new Map<string | null, string>()
@@ -461,7 +487,9 @@ export const db = {
           const fromId = localToEntityId.get(rel.from_local_id)
           const toId = localToEntityId.get(rel.to_local_id)
           if (fromId && toId) {
-            relStmt.run(randomUUID(), targetEntity.project_id, fromId, toId, rel.kind)
+            const relId = randomUUID()
+            relStmt.run(relId, targetEntity.project_id, fromId, toId, rel.kind)
+            createdRelationshipIds.push(relId)
           }
         }
 
@@ -475,7 +503,7 @@ export const db = {
 
       transaction()
 
-      return { createdEntityIds }
+      return { createdEntityIds, createdRelationshipIds, appliedAttrs, previousAttrs }
     },
 
     /** Update stamp metadata */
@@ -578,7 +606,7 @@ export const db = {
       return db.prepare('SELECT * FROM relationships WHERE project_id = ?').all(projectId)
     },
 
-    create(projectId: string, data: { from_entity: string; to_entity: string; kind: string; label?: string; binding_name?: string }) {
+    create(projectId: string, data: { from_entity: string; to_entity: string; kind: string; label?: string | null; binding_name?: string | null }) {
       const db = getDb()
       const id = randomUUID()
       const { from_entity, to_entity, kind, label = null, binding_name = null } = data
@@ -590,6 +618,34 @@ export const db = {
 
       this._touchProject(projectId)
       return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name }
+    },
+
+    /** Create relationship with a specific ID (used for undo/restore) */
+    createWithId(projectId: string, id: string, data: { from_entity: string; to_entity: string; kind: string; label?: string | null; binding_name?: string | null }) {
+      const db = getDb()
+      const { from_entity, to_entity, kind, label = null, binding_name = null } = data
+
+      db.prepare(`
+        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name)
+
+      this._touchProject(projectId)
+      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name }
+    },
+
+    /** Get a relationship by ID */
+    get(id: string) {
+      const db = getDb()
+      return db.prepare('SELECT * FROM relationships WHERE id = ?').get(id) as {
+        id: string
+        project_id: string
+        from_entity: string
+        to_entity: string
+        kind: string
+        label: string | null
+        binding_name: string | null
+      } | null
     },
 
     delete(id: string) {

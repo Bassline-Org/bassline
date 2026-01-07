@@ -1,9 +1,9 @@
-import { contextBridge as i, ipcRenderer as t } from "electron";
-i.exposeInMainWorld("fonts", {
+import { contextBridge as s, ipcRenderer as t } from "electron";
+s.exposeInMainWorld("fonts", {
   list: () => t.invoke("fonts:list"),
   search: (e) => t.invoke("fonts:search", e)
 });
-i.exposeInMainWorld("app", {
+s.exposeInMainWorld("app", {
   // Notifications
   notify: (e, n) => t.invoke("app:notify", e, n),
   // Recent documents
@@ -15,17 +15,17 @@ i.exposeInMainWorld("app", {
   onMenuExportProject: (e) => (t.on("menu:export-project", e), () => t.removeListener("menu:export-project", e)),
   onMenuShowSettings: (e) => (t.on("menu:show-settings", e), () => t.removeListener("menu:show-settings", e)),
   onMenuOpenFile: (e) => {
-    const n = (o, s) => e(s);
+    const n = (o, i) => e(i);
     return t.on("menu:open-file", n), () => t.removeListener("menu:open-file", n);
   },
   onMenuOpenProjectById: (e) => {
-    const n = (o, s) => e(s);
+    const n = (o, i) => e(i);
     return t.on("menu:open-project-by-id", n), () => t.removeListener("menu:open-project-by-id", n);
   },
   // Menu refresh
   refreshMenu: () => t.invoke("app:refreshMenu")
 });
-i.exposeInMainWorld("db", {
+s.exposeInMainWorld("db", {
   projects: {
     list: () => t.invoke("db:projects:list"),
     get: (e) => t.invoke("db:projects:get", e),
@@ -36,11 +36,12 @@ i.exposeInMainWorld("db", {
     list: (e) => t.invoke("db:entities:list", e),
     get: (e) => t.invoke("db:entities:get", e),
     create: (e) => t.invoke("db:entities:create", e),
+    createWithId: (e, n, o) => t.invoke("db:entities:createWithId", e, n, o),
     delete: (e) => t.invoke("db:entities:delete", e)
   },
   attrs: {
     get: (e) => t.invoke("db:attrs:get", e),
-    set: (e, n, o, s) => t.invoke("db:attrs:set", e, n, o, s),
+    set: (e, n, o, i) => t.invoke("db:attrs:set", e, n, o, i),
     delete: (e, n) => t.invoke("db:attrs:delete", e, n),
     setBatch: (e, n) => t.invoke("db:attrs:setBatch", e, n)
   },
@@ -54,7 +55,9 @@ i.exposeInMainWorld("db", {
   },
   relationships: {
     list: (e) => t.invoke("db:relationships:list", e),
+    get: (e) => t.invoke("db:relationships:get", e),
     create: (e, n) => t.invoke("db:relationships:create", e, n),
+    createWithId: (e, n, o) => t.invoke("db:relationships:createWithId", e, n, o),
     delete: (e) => t.invoke("db:relationships:delete", e)
   },
   uiState: {

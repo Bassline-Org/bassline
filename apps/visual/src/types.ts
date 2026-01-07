@@ -131,6 +131,9 @@ export interface StampRelationship {
 /** Result of applying a stamp */
 export interface ApplyStampResult {
   createdEntityIds: string[]
+  createdRelationshipIds: string[]
+  appliedAttrs: Record<string, string>
+  previousAttrs: Record<string, string>
 }
 
 // =============================================================================
@@ -166,6 +169,7 @@ declare global {
         list: (projectId: string) => Promise<EntityWithAttrs[]>
         get: (id: string) => Promise<EntityWithAttrs | null>
         create: (projectId: string) => Promise<Entity>
+        createWithId: (projectId: string, id: string, timestamps?: { created_at: number; modified_at: number }) => Promise<Entity>
         delete: (id: string) => Promise<void>
       }
       attrs: {
@@ -176,7 +180,9 @@ declare global {
       }
       relationships: {
         list: (projectId: string) => Promise<Relationship[]>
+        get: (id: string) => Promise<Relationship | null>
         create: (projectId: string, data: Omit<Relationship, 'id' | 'project_id'>) => Promise<Relationship>
+        createWithId: (projectId: string, id: string, data: Omit<Relationship, 'id' | 'project_id'>) => Promise<Relationship>
         delete: (id: string) => Promise<void>
       }
       uiState: {
