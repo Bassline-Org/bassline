@@ -1,31 +1,34 @@
 /**
  * useSemanticInput Hook
  *
- * Resolves the input entities for a semantic based on what binds to it.
+ * Resolves the input data for a semantic based on what binds to it.
  * If a binding source is another semantic, reads that semantic's output.
  * This enables composition: A → Filter → CodeGen
+ *
+ * Returns DataObject[] - the attrs of each input entity (including id).
+ * This is the core of the semantic I/O model: DataObject[] → DataObject[]
  */
 
 import { useMemo } from 'react'
 import { useLoaderData } from 'react-router'
-import type { EditorLoaderData, EntityWithAttrs, Relationship } from '../types'
+import type { EditorLoaderData, EntityWithAttrs, Relationship, DataObject } from '../types'
 import { useSemanticOutputContext } from '../contexts/SemanticOutputContext'
 import { isSemanticNode } from '../lib/semantics'
 
 interface SemanticInputResult {
-  /** Entities that are input to this semantic */
-  inputEntities: EntityWithAttrs[]
-  /** Relationships between input entities */
+  /** Input data objects for this semantic (just the attrs, including id) */
+  inputData: DataObject[]
+  /** Relationships between input data objects */
   inputRelationships: Relationship[]
   /** Entity IDs that directly bind to this semantic */
   boundEntityIds: string[]
 }
 
 /**
- * Get the input entities for a semantic.
+ * Get the input data for a semantic.
  *
  * @param entity - The semantic's own entity (to find bindings)
- * @returns The resolved input entities and relationships
+ * @returns The resolved input data and relationships
  */
 export function useSemanticInput(entity: EntityWithAttrs): SemanticInputResult {
   const { entities, relationships } = useLoaderData() as EditorLoaderData
@@ -41,7 +44,7 @@ export function useSemanticInput(entity: EntityWithAttrs): SemanticInputResult {
     const boundEntityIds = bindings.map(r => r.from_entity)
 
     // Resolve each binding - if it's a semantic, get its output
-    const inputEntities: EntityWithAttrs[] = []
+    const inputData: DataObject[] = []
     const visitedSemantics = new Set<string>() // Prevent cycles
 
     function resolveBinding(entityId: string) {
@@ -56,12 +59,12 @@ export function useSemanticInput(entity: EntityWithAttrs): SemanticInputResult {
 
         const output = getOutput(entityId)
         if (output) {
-          // Add the semantic's output entities
-          inputEntities.push(...output.entities)
+          // Add the semantic's output data
+          inputData.push(...output.data)
         }
       } else {
-        // Regular entity - include directly
-        inputEntities.push(boundEntity)
+        // Regular entity - use its attrs (which includes id)
+        inputData.push(boundEntity.attrs)
       }
     }
 
@@ -69,14 +72,18 @@ export function useSemanticInput(entity: EntityWithAttrs): SemanticInputResult {
       resolveBinding(entityId)
     }
 
-    // Find relationships between input entities
-    const inputEntityIds = new Set(inputEntities.map(e => e.id))
+    // Find relationships between input data objects (by their id fields)
+    const inputIds = new Set(
+      inputData
+        .map(d => d.id)
+        .filter((id): id is string => typeof id === 'string')
+    )
     const inputRelationships = relationships.filter(
-      r => inputEntityIds.has(r.from_entity) && inputEntityIds.has(r.to_entity)
+      r => inputIds.has(r.from_entity) && inputIds.has(r.to_entity)
     )
 
     return {
-      inputEntities,
+      inputData,
       inputRelationships,
       boundEntityIds,
     }

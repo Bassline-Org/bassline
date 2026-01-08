@@ -32,7 +32,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Markdown } from '@/components/Markdown'
-import type { EntityWithAttrs, EditorLoaderData } from '../types'
+import type { EntityWithAttrs, EditorLoaderData, AttrValue } from '../types'
+import { attrString, getAttr } from '../types'
 import { useSemanticInput, useDirectBindings } from '../hooks/useSemanticInput'
 import { useBl } from '../hooks/useBl'
 import { useLoaderData } from 'react-router'
@@ -51,12 +52,12 @@ const HELP_ATTRS = [
   { key: 'help.examples', label: 'Examples', multiline: true },
 ]
 
-// Extract help attributes from an entity
-function getHelpAttrs(entity: EntityWithAttrs): Record<string, string> {
+// Extract help attributes from an entity's attrs
+function getHelpAttrs(attrs: Record<string, AttrValue>): Record<string, string> {
   const help: Record<string, string> = {}
-  for (const [key, value] of Object.entries(entity.attrs)) {
+  for (const [key, value] of Object.entries(attrs)) {
     if (key.startsWith('help.')) {
-      help[key] = value
+      help[key] = attrString(value)
     }
   }
   return help
@@ -126,22 +127,22 @@ export function HelpSemantic({ entity }: HelpSemanticProps) {
 
   // Get input mode - determines how bound entities are resolved
   // Default to 'direct' so we see the semantic entity itself (with its help.* attrs)
-  const inputMode = (entity.attrs['help.mode'] as InputMode) || 'direct'
+  const inputMode = getAttr(entity.attrs, 'help.mode', 'direct') as InputMode
 
-  // Call both hooks (can't conditionally call hooks)
-  const { inputEntities: outputEntities } = useSemanticInput(entity)
+  // Call useSemanticInput for completeness (hook must be called)
+  useSemanticInput(entity)
   const directEntities = useDirectBindings(entity)
 
-  // Select entities based on mode
-  const inputEntities = inputMode === 'direct' ? directEntities : outputEntities
+  // Select entities based on mode - Help uses direct EntityWithAttrs to get target ID for edits
+  const inputEntities = inputMode === 'direct' ? directEntities : []
 
-  // Get the target entity (first bound entity)
+  // Get the target entity (first bound entity) - we need EntityWithAttrs here for the ID
   const targetEntity = inputEntities[0] || null
 
   // Get help attributes from target
   const helpAttrs = useMemo(() => {
     if (!targetEntity) return {}
-    return getHelpAttrs(targetEntity)
+    return getHelpAttrs(targetEntity.attrs)
   }, [targetEntity])
 
   // Get custom help attrs (not in the standard list)
@@ -192,10 +193,12 @@ export function HelpSemantic({ entity }: HelpSemanticProps) {
 
   // Get display name for target entity (handle semantics specially)
   const getEntityDisplayName = (e: EntityWithAttrs) => {
-    if (e.attrs['semantic.type']) {
-      return e.attrs.name || e.attrs['semantic.type']
+    const semanticType = attrString(e.attrs['semantic.type'])
+    const name = attrString(e.attrs.name)
+    if (semanticType) {
+      return name || semanticType
     }
-    return e.attrs.name || 'Unnamed'
+    return name || 'Unnamed'
   }
 
   // Render a help section
@@ -311,12 +314,12 @@ export function HelpSemantic({ entity }: HelpSemanticProps) {
           </span>
           {targetEntity.attrs['semantic.type'] && (
             <span className="help-semantic__target-role">
-              {targetEntity.attrs['semantic.type']}
+              {attrString(targetEntity.attrs['semantic.type'])}
             </span>
           )}
           {!targetEntity.attrs['semantic.type'] && targetEntity.attrs.role && (
             <span className="help-semantic__target-role">
-              {targetEntity.attrs.role}
+              {attrString(targetEntity.attrs.role)}
             </span>
           )}
         </div>

@@ -8,7 +8,8 @@
  */
 
 import { useMemo } from 'react'
-import type { EntityWithAttrs } from '../types'
+import type { EntityWithAttrs, DataObject } from '../types'
+import { getAttr } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useSemanticOutput } from '../hooks/useSemanticOutput'
 
@@ -17,16 +18,19 @@ interface MergeSemanticProps {
 }
 
 export function MergeSemantic({ entity }: MergeSemanticProps) {
-  const { inputEntities, inputRelationships, boundEntityIds } = useSemanticInput(entity)
+  const { inputData, inputRelationships, boundEntityIds } = useSemanticInput(entity)
 
-  // Deduplicate entities by ID (last one wins)
-  const mergedEntities = useMemo(() => {
-    const seen = new Map<string, EntityWithAttrs>()
-    for (const e of inputEntities) {
-      seen.set(e.id, e)
+  // Deduplicate data objects by ID (last one wins)
+  const mergedData = useMemo((): DataObject[] => {
+    const seen = new Map<string, DataObject>()
+    for (const data of inputData) {
+      const id = typeof data.id === 'string' ? data.id : undefined
+      if (id) {
+        seen.set(id, data)
+      }
     }
     return Array.from(seen.values())
-  }, [inputEntities])
+  }, [inputData])
 
   // Deduplicate relationships by ID
   const mergedRelationships = useMemo(() => {
@@ -39,7 +43,7 @@ export function MergeSemantic({ entity }: MergeSemanticProps) {
 
   // Register output for downstream composition
   useSemanticOutput(entity.id, {
-    entities: mergedEntities,
+    data: mergedData,
     relationships: mergedRelationships,
   })
 
@@ -48,9 +52,9 @@ export function MergeSemantic({ entity }: MergeSemanticProps) {
   return (
     <div className="merge-semantic">
       <div className="merge-semantic__stats">
-        <span className="merge-semantic__count">{mergedEntities.length}</span>
+        <span className="merge-semantic__count">{mergedData.length}</span>
         <span className="merge-semantic__label">
-          {mergedEntities.length === 1 ? 'entity' : 'entities'}
+          {mergedData.length === 1 ? 'entity' : 'entities'}
         </span>
         {sourceCount > 0 && (
           <span className="merge-semantic__sources">
@@ -58,21 +62,25 @@ export function MergeSemantic({ entity }: MergeSemanticProps) {
           </span>
         )}
       </div>
-      {mergedEntities.length > 0 && (
+      {mergedData.length > 0 && (
         <ul className="merge-semantic__list">
-          {mergedEntities.slice(0, 10).map((e) => (
-            <li key={e.id} className="merge-semantic__item">
-              {e.attrs.name || e.id.slice(0, 8)}
-            </li>
-          ))}
-          {mergedEntities.length > 10 && (
+          {mergedData.slice(0, 10).map((data, i) => {
+            const id = typeof data.id === 'string' ? data.id : `_${i}`
+            const name = getAttr(data, 'name', id.slice(0, 8))
+            return (
+              <li key={id} className="merge-semantic__item">
+                {name}
+              </li>
+            )
+          })}
+          {mergedData.length > 10 && (
             <li className="merge-semantic__more">
-              +{mergedEntities.length - 10} more
+              +{mergedData.length - 10} more
             </li>
           )}
         </ul>
       )}
-      {mergedEntities.length === 0 && (
+      {mergedData.length === 0 && (
         <div className="merge-semantic__empty">
           No entities bound. Bind entities or semantics to merge.
         </div>

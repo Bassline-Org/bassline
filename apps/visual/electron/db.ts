@@ -4,9 +4,93 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { randomUUID } from 'crypto'
 import { runMigrations, seed } from './seed'
+import type { AttrType, AttrValue } from '../src/types'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+// =============================================================================
+// Typed Attribute Helpers
+// =============================================================================
+
+interface AttrRow {
+  entity_id: string
+  key: string
+  type: AttrType
+  string_value: string | null
+  number_value: number | null
+  json_value: string | null
+  blob_value: Buffer | null
+}
+
+/**
+ * Deserialize a typed attribute row to its runtime value
+ */
+function deserializeAttr(row: AttrRow): AttrValue {
+  switch (row.type) {
+    case 'number':
+      return row.number_value ?? 0
+    case 'json':
+      try {
+        return row.json_value ? JSON.parse(row.json_value) : {}
+      } catch {
+        return {}
+      }
+    case 'blob':
+      return row.blob_value ?? new ArrayBuffer(0)
+    default:
+      return row.string_value ?? ''
+  }
+}
+
+/**
+ * Serialize a value to typed column values for INSERT
+ */
+function serializeAttr(value: AttrValue, type: AttrType): {
+  string_value: string | null
+  number_value: number | null
+  json_value: string | null
+  blob_value: Buffer | null
+} {
+  return {
+    string_value: type === 'string' ? String(value) : null,
+    number_value: type === 'number' ? Number(value) : null,
+    json_value: type === 'json' ? JSON.stringify(value) : null,
+    blob_value: type === 'blob' ? Buffer.from(value as ArrayBuffer) : null,
+  }
+}
+
+/**
+ * Infer the type from a value for backwards compatibility
+ */
+function inferAttrType(value: AttrValue): AttrType {
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'object' && value !== null) {
+    if (value instanceof ArrayBuffer || Buffer.isBuffer(value)) return 'blob'
+    return 'json'
+  }
+  return 'string'
+}
+
+/**
+ * Deserialize a stamp attr (stored as string value + type) to its runtime value
+ */
+function deserializeStampAttr(value: string | null, type: AttrType | null): AttrValue {
+  if (value === null) return ''
+  const attrType = type || 'string'
+  switch (attrType) {
+    case 'number':
+      return parseFloat(value) || 0
+    case 'json':
+      try {
+        return JSON.parse(value)
+      } catch {
+        return {}
+      }
+    default:
+      return value
+  }
+}
 
 let database: Database.Database | null = null
 
@@ -112,22 +196,24 @@ export const db = {
       if (entityIds.length === 0) return []
 
       const placeholders = entityIds.map(() => '?').join(',')
-      const attrRows = db.prepare(`SELECT entity_id, key, value FROM attrs WHERE entity_id IN (${placeholders})`).all(...entityIds) as Array<{
-        entity_id: string
-        key: string
-        value: string
-      }>
+      const attrRows = db.prepare(
+        `SELECT entity_id, key, type, string_value, number_value, json_value, blob_value FROM attrs WHERE entity_id IN (${placeholders})`
+      ).all(...entityIds) as AttrRow[]
 
-      // Group attrs by entity
-      const attrsByEntity: Record<string, Record<string, string>> = {}
+      // Group attrs by entity with typed deserialization
+      const attrsByEntity: Record<string, Record<string, AttrValue>> = {}
       for (const row of attrRows) {
         if (!attrsByEntity[row.entity_id]) attrsByEntity[row.entity_id] = {}
-        if (row.value !== null) attrsByEntity[row.entity_id][row.key] = row.value
+        attrsByEntity[row.entity_id][row.key] = deserializeAttr(row)
       }
 
+      // Return entities with attrs (including injected id)
       return entities.map(e => ({
         ...e,
-        attrs: attrsByEntity[e.id] || {},
+        attrs: {
+          id: e.id, // Inject entity id into attrs
+          ...attrsByEntity[e.id] || {},
+        },
       }))
     },
 
@@ -142,14 +228,13 @@ export const db = {
 
       if (!entity) return null
 
-      const attrRows = db.prepare('SELECT key, value FROM attrs WHERE entity_id = ?').all(id) as Array<{
-        key: string
-        value: string
-      }>
+      const attrRows = db.prepare(
+        'SELECT key, type, string_value, number_value, json_value, blob_value FROM attrs WHERE entity_id = ?'
+      ).all(id) as Array<Omit<AttrRow, 'entity_id'>>
 
-      const attrs: Record<string, string> = {}
+      const attrs: Record<string, AttrValue> = { id: entity.id } // Inject id
       for (const row of attrRows) {
-        if (row.value !== null) attrs[row.key] = row.value
+        attrs[row.key] = deserializeAttr({ entity_id: id, ...row })
       }
 
       return { ...entity, attrs }
@@ -239,13 +324,13 @@ export const db = {
       const stampIds = stamps.map(s => s.id)
       const placeholders = stampIds.map(() => '?').join(',')
       const attrRows = db.prepare(
-        `SELECT stamp_id, key, value FROM stamp_attrs WHERE stamp_id IN (${placeholders})`
-      ).all(...stampIds) as Array<{ stamp_id: string; key: string; value: string }>
+        `SELECT stamp_id, key, value, type FROM stamp_attrs WHERE stamp_id IN (${placeholders})`
+      ).all(...stampIds) as Array<{ stamp_id: string; key: string; value: string | null; type: AttrType | null }>
 
-      const attrsByStamp: Record<string, Record<string, string>> = {}
+      const attrsByStamp: Record<string, Record<string, AttrValue>> = {}
       for (const row of attrRows) {
         if (!attrsByStamp[row.stamp_id]) attrsByStamp[row.stamp_id] = {}
-        if (row.value !== null) attrsByStamp[row.stamp_id][row.key] = row.value
+        if (row.value !== null) attrsByStamp[row.stamp_id][row.key] = deserializeStampAttr(row.value, row.type)
       }
 
       return stamps.map(s => ({
@@ -271,14 +356,15 @@ export const db = {
 
       if (!stamp) return null
 
-      // Get stamp attrs
-      const attrRows = db.prepare('SELECT key, value FROM stamp_attrs WHERE stamp_id = ?').all(id) as Array<{
+      // Get stamp attrs (with type for proper deserialization)
+      const attrRows = db.prepare('SELECT key, value, type FROM stamp_attrs WHERE stamp_id = ?').all(id) as Array<{
         key: string
-        value: string
+        value: string | null
+        type: AttrType | null
       }>
-      const attrs: Record<string, string> = {}
+      const attrs: Record<string, AttrValue> = {}
       for (const row of attrRows) {
-        if (row.value !== null) attrs[row.key] = row.value
+        if (row.value !== null) attrs[row.key] = deserializeStampAttr(row.value, row.type)
       }
 
       // Get members
@@ -288,18 +374,18 @@ export const db = {
         local_id: string
       }>
 
-      // Get member attrs
+      // Get member attrs (with type for proper deserialization)
       const memberIds = members.map(m => m.id)
-      const memberAttrs: Record<string, Record<string, string>> = {}
+      const memberAttrs: Record<string, Record<string, AttrValue>> = {}
       if (memberIds.length > 0) {
         const placeholders = memberIds.map(() => '?').join(',')
         const memberAttrRows = db.prepare(
-          `SELECT member_id, key, value FROM stamp_member_attrs WHERE member_id IN (${placeholders})`
-        ).all(...memberIds) as Array<{ member_id: string; key: string; value: string }>
+          `SELECT member_id, key, value, type FROM stamp_member_attrs WHERE member_id IN (${placeholders})`
+        ).all(...memberIds) as Array<{ member_id: string; key: string; value: string | null; type: AttrType | null }>
 
         for (const row of memberAttrRows) {
           if (!memberAttrs[row.member_id]) memberAttrs[row.member_id] = {}
-          if (row.value !== null) memberAttrs[row.member_id][row.key] = row.value
+          if (row.value !== null) memberAttrs[row.member_id][row.key] = deserializeStampAttr(row.value, row.type)
         }
       }
 
@@ -355,16 +441,30 @@ export const db = {
           if (!sourceEntity) throw new Error('Source entity not found')
 
           // Copy entity attrs to stamp_attrs (excluding position and name - stamp has its own name)
-          const attrs = db.prepare('SELECT key, value, type FROM attrs WHERE entity_id = ?')
-            .all(data.sourceEntityId) as { key: string; value: string; type: string }[]
+          // Read typed attrs and convert to string for storage in stamp_attrs
+          const attrs = db.prepare(
+            'SELECT key, type, string_value, number_value, json_value FROM attrs WHERE entity_id = ?'
+          ).all(data.sourceEntityId) as Array<{
+            key: string
+            type: AttrType
+            string_value: string | null
+            number_value: number | null
+            json_value: string | null
+          }>
 
           const excludeKeysRoot = new Set(['x', 'y', 'name']) // Root: exclude name (stamp has own name)
           const excludeKeysMember = new Set(['x', 'y'])        // Members: keep name!
           const attrStmt = db.prepare('INSERT INTO stamp_attrs (stamp_id, key, value, type) VALUES (?, ?, ?, ?)')
 
           for (const attr of attrs) {
-            if (!excludeKeysRoot.has(attr.key) && attr.value !== null) {
-              attrStmt.run(stampId, attr.key, attr.value, attr.type)
+            // Convert typed value to string for stamp storage
+            let stringValue: string | null = null
+            if (attr.type === 'string') stringValue = attr.string_value
+            else if (attr.type === 'number' && attr.number_value !== null) stringValue = String(attr.number_value)
+            else if (attr.type === 'json') stringValue = attr.json_value
+
+            if (!excludeKeysRoot.has(attr.key) && stringValue !== null) {
+              attrStmt.run(stampId, attr.key, stringValue, attr.type)
             }
           }
 
@@ -389,13 +489,26 @@ export const db = {
               .run(memberId, stampId, localId)
 
             // Copy attrs (members keep their names, unlike root)
-            const memberAttrs = db.prepare('SELECT key, value, type FROM attrs WHERE entity_id = ?')
-              .all(entityId) as { key: string; value: string; type: string }[]
+            const memberAttrs = db.prepare(
+              'SELECT key, type, string_value, number_value, json_value FROM attrs WHERE entity_id = ?'
+            ).all(entityId) as Array<{
+              key: string
+              type: AttrType
+              string_value: string | null
+              number_value: number | null
+              json_value: string | null
+            }>
 
             const memberAttrStmt = db.prepare('INSERT INTO stamp_member_attrs (member_id, key, value, type) VALUES (?, ?, ?, ?)')
             for (const attr of memberAttrs) {
-              if (!excludeKeysMember.has(attr.key) && attr.value !== null) {
-                memberAttrStmt.run(memberId, attr.key, attr.value, attr.type)
+              // Convert typed value to string for stamp storage
+              let stringValue: string | null = null
+              if (attr.type === 'string') stringValue = attr.string_value
+              else if (attr.type === 'number' && attr.number_value !== null) stringValue = String(attr.number_value)
+              else if (attr.type === 'json') stringValue = attr.json_value
+
+              if (!excludeKeysMember.has(attr.key) && stringValue !== null) {
+                memberAttrStmt.run(memberId, attr.key, stringValue, attr.type)
               }
             }
 
@@ -467,28 +580,33 @@ export const db = {
       if (!stamp) throw new Error('Stamp not found')
 
       // Capture target's current attrs BEFORE applying stamp (for undo)
-      const previousAttrs: Record<string, string> = {}
-      const currentAttrRows = db.prepare('SELECT key, value FROM attrs WHERE entity_id = ?')
-        .all(targetEntityId) as Array<{ key: string; value: string }>
+      const previousAttrs: Record<string, AttrValue> = {}
+      const currentAttrRows = db.prepare(
+        'SELECT key, type, string_value, number_value, json_value FROM attrs WHERE entity_id = ?'
+      ).all(targetEntityId) as Array<Omit<AttrRow, 'entity_id' | 'blob_value'>>
       for (const row of currentAttrRows) {
-        if (row.value !== null) {
-          previousAttrs[row.key] = row.value
-        }
+        previousAttrs[row.key] = deserializeAttr({ entity_id: targetEntityId, blob_value: null, ...row })
       }
 
       const createdEntityIds: string[] = []
       const createdRelationshipIds: string[] = []
-      const appliedAttrs: Record<string, string> = { ...stamp.attrs }
+      const appliedAttrs: Record<string, AttrValue> = { ...stamp.attrs }
 
       // Map local_id to new entity ID
       const localToEntityId = new Map<string | null, string>()
       localToEntityId.set(null, targetEntityId) // root (null) maps to target
 
       const transaction = db.transaction(() => {
-        // Apply stamp attrs to target
-        const attrStmt = db.prepare('INSERT OR REPLACE INTO attrs (entity_id, key, value, type) VALUES (?, ?, ?, ?)')
+        // Apply stamp attrs to target (preserving types)
+        const attrStmt = db.prepare(`
+          INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `)
         for (const [key, value] of Object.entries(stamp.attrs)) {
-          attrStmt.run(targetEntityId, key, value, 'string')
+          // Preserve the type from the stamp attr
+          const attrType = inferAttrType(value)
+          const serialized = serializeAttr(value, attrType)
+          attrStmt.run(targetEntityId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value)
         }
 
         // Create entities for each member
@@ -501,9 +619,11 @@ export const db = {
           db.prepare('INSERT INTO entities (id, project_id, created_at, modified_at) VALUES (?, ?, ?, ?)')
             .run(newId, targetEntity.project_id, now, now)
 
-          // Copy member attrs
+          // Copy member attrs (preserving types)
           for (const [key, value] of Object.entries(member.attrs)) {
-            attrStmt.run(newId, key, value, 'string')
+            const attrType = inferAttrType(value)
+            const serialized = serializeAttr(value, attrType)
+            attrStmt.run(newId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value)
           }
         }
 
@@ -584,22 +704,26 @@ export const db = {
   attrs: {
     get(entityId: string) {
       const db = getDb()
-      const rows = db.prepare('SELECT key, value FROM attrs WHERE entity_id = ?').all(entityId) as Array<{
-        key: string
-        value: string
-      }>
+      const rows = db.prepare(
+        'SELECT key, type, string_value, number_value, json_value, blob_value FROM attrs WHERE entity_id = ?'
+      ).all(entityId) as Array<Omit<AttrRow, 'entity_id'>>
 
-      const attrs: Record<string, string> = {}
+      const attrs: Record<string, AttrValue> = {}
       for (const row of rows) {
-        if (row.value !== null) attrs[row.key] = row.value
+        attrs[row.key] = deserializeAttr({ entity_id: entityId, ...row })
       }
       return attrs
     },
 
-    set(entityId: string, key: string, value: string, type: string = 'string') {
+    set(entityId: string, key: string, value: AttrValue, type?: AttrType) {
       const db = getDb()
-      db.prepare('INSERT OR REPLACE INTO attrs (entity_id, key, value, type) VALUES (?, ?, ?, ?)')
-        .run(entityId, key, value, type)
+      const attrType = type ?? inferAttrType(value)
+      const serialized = serializeAttr(value, attrType)
+
+      db.prepare(`
+        INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(entityId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value)
 
       // Update entity modified_at
       db.prepare('UPDATE entities SET modified_at = ? WHERE id = ?').run(Date.now(), entityId)
@@ -611,13 +735,18 @@ export const db = {
       db.prepare('UPDATE entities SET modified_at = ? WHERE id = ?').run(Date.now(), entityId)
     },
 
-    setBatch(entityId: string, attrs: Record<string, string>) {
+    setBatch(entityId: string, attrs: Record<string, AttrValue>, types?: Record<string, AttrType>) {
       const db = getDb()
-      const stmt = db.prepare('INSERT OR REPLACE INTO attrs (entity_id, key, value, type) VALUES (?, ?, ?, ?)')
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `)
 
       const transaction = db.transaction(() => {
         for (const [key, value] of Object.entries(attrs)) {
-          stmt.run(entityId, key, value, 'string')
+          const attrType = types?.[key] ?? inferAttrType(value)
+          const serialized = serializeAttr(value, attrType)
+          stmt.run(entityId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value)
         }
         db.prepare('UPDATE entities SET modified_at = ? WHERE id = ?').run(Date.now(), entityId)
       })

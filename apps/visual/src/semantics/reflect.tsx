@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import type { EntityWithAttrs, EditorLoaderData } from '../types'
+import { attrString, getAttr } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useBl } from '../hooks/useBl'
 import { useLoaderData } from 'react-router'
@@ -43,7 +44,7 @@ type ExecutionStatus = 'idle' | 'running' | 'success' | 'error'
 
 export function ReflectSemantic({ entity }: ReflectSemanticProps) {
   const { project, entities: allEntities } = useLoaderData() as EditorLoaderData
-  const { inputEntities } = useSemanticInput(entity)
+  const { inputData } = useSemanticInput(entity)
   const { bl, revalidate } = useBl()
 
   // Execution state
@@ -52,9 +53,9 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
   const [error, setError] = useState<string | null>(null)
 
   // Configuration
-  const mode = (entity.attrs['reflect.mode'] || 'create') as ReflectMode
-  const targetId = entity.attrs['reflect.target'] || ''
-  const matchAttr = entity.attrs['reflect.matchAttr'] || 'name'
+  const mode = getAttr(entity.attrs, 'reflect.mode', 'create') as ReflectMode
+  const targetId = getAttr(entity.attrs, 'reflect.target')
+  const matchAttr = getAttr(entity.attrs, 'reflect.matchAttr', 'name')
 
   // Get target entity name for display
   const targetEntity = useMemo(() => {
@@ -74,10 +75,10 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
       return true
     })
 
-    // Map by matchAttr value
+    // Map by matchAttr value (convert to string for lookup key)
     const map = new Map<string, EntityWithAttrs>()
     for (const e of candidates) {
-      const matchValue = e.attrs[matchAttr]
+      const matchValue = attrString(e.attrs[matchAttr])
       if (matchValue) {
         map.set(matchValue, e)
       }
@@ -87,7 +88,7 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
 
   // Execute reflection
   const handleReflect = useCallback(async () => {
-    if (inputEntities.length === 0) return
+    if (inputData.length === 0) return
 
     setStatus('running')
     setError(null)
@@ -98,18 +99,18 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
     try {
       const processedMatchValues = new Set<string>()
 
-      for (const input of inputEntities) {
-        const matchValue = input.attrs[matchAttr]
+      for (const input of inputData) {
+        const matchValue = attrString(input[matchAttr])
         if (matchValue) processedMatchValues.add(matchValue)
 
         // Check for existing entity to update
         const existing = matchValue ? existingMatches.get(matchValue) : undefined
 
         if (existing && (mode === 'update' || mode === 'sync')) {
-          // Update existing entity - copy all non-system attrs
-          for (const [key, value] of Object.entries(input.attrs)) {
+          // Update existing entity - copy all non-system attrs (preserves types via bl.attrs.set)
+          for (const [key, value] of Object.entries(input)) {
             // Skip position and system attrs
-            if (['x', 'y', 'ui.width', 'ui.height'].includes(key)) continue
+            if (['x', 'y', 'ui.width', 'ui.height', 'id'].includes(key)) continue
             if (existing.attrs[key] !== value) {
               await bl.attrs.set(project.id, existing.id, key, value)
             }
@@ -119,9 +120,9 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
           // Create new entity
           const newEntity = await bl.entities.create(project.id, {})
 
-          // Copy all attrs from input (except position)
-          for (const [key, value] of Object.entries(input.attrs)) {
-            if (['x', 'y', 'ui.width', 'ui.height'].includes(key)) continue
+          // Copy all attrs from input (except position and original id)
+          for (const [key, value] of Object.entries(input)) {
+            if (['x', 'y', 'ui.width', 'ui.height', 'id'].includes(key)) continue
             await bl.attrs.set(project.id, newEntity.id, key, value)
           }
 
@@ -154,7 +155,7 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
       setError(err instanceof Error ? err.message : String(err))
       setStatus('error')
     }
-  }, [inputEntities, mode, matchAttr, existingMatches, targetId, bl, project.id, revalidate])
+  }, [inputData, mode, matchAttr, existingMatches, targetId, bl, project.id, revalidate])
 
   // Mode change handler
   const handleModeChange = useCallback(
@@ -168,15 +169,15 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
   // Preview what will happen
   const preview = useMemo(() => {
     if (mode === 'create') {
-      return { create: inputEntities.length, update: 0, delete: 0 }
+      return { create: inputData.length, update: 0, delete: 0 }
     }
 
     let create = 0
     let update = 0
     const processedMatchValues = new Set<string>()
 
-    for (const input of inputEntities) {
-      const matchValue = input.attrs[matchAttr]
+    for (const input of inputData) {
+      const matchValue = attrString(input[matchAttr])
       if (matchValue) processedMatchValues.add(matchValue)
 
       const existing = matchValue ? existingMatches.get(matchValue) : undefined
@@ -197,7 +198,7 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
     }
 
     return { create, update, delete: deleteCount }
-  }, [inputEntities, mode, matchAttr, existingMatches])
+  }, [inputData, mode, matchAttr, existingMatches])
 
   // Mode icon
   const ModeIcon = mode === 'create' ? Plus : mode === 'update' ? Edit : RefreshCw
@@ -233,7 +234,7 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
         </Select>
       </div>
 
-      {inputEntities.length === 0 ? (
+      {inputData.length === 0 ? (
         <div className="reflect-semantic__empty">
           No input entities. Bind a semantic to provide entities.
         </div>
@@ -267,19 +268,22 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
 
             {targetEntity && (
               <div className="reflect-semantic__target">
-                Parent: {targetEntity.attrs.name || targetEntity.id.slice(0, 8)}
+                Parent: {getAttr(targetEntity.attrs, 'name', targetEntity.id.slice(0, 8))}
               </div>
             )}
 
             <div className="reflect-semantic__inputs">
-              {inputEntities.slice(0, 5).map(e => (
-                <div key={e.id} className="reflect-semantic__input-item">
-                  {e.attrs.name || 'Unnamed'}
-                </div>
-              ))}
-              {inputEntities.length > 5 && (
+              {inputData.slice(0, 5).map((data, i) => {
+                const id = typeof data.id === 'string' ? data.id : `_${i}`
+                return (
+                  <div key={id} className="reflect-semantic__input-item">
+                    {getAttr(data, 'name', 'Unnamed')}
+                  </div>
+                )
+              })}
+              {inputData.length > 5 && (
                 <div className="reflect-semantic__more">
-                  +{inputEntities.length - 5} more
+                  +{inputData.length - 5} more
                 </div>
               )}
             </div>
@@ -297,7 +301,7 @@ export function ReflectSemantic({ entity }: ReflectSemanticProps) {
                 <ModeIcon className="h-4 w-4 mr-2" />
               )}
               {mode === 'create' ? 'Create' : mode === 'update' ? 'Update' : 'Sync'}
-              {inputEntities.length > 0 && ` (${inputEntities.length})`}
+              {inputData.length > 0 && ` (${inputData.length})`}
             </Button>
 
             {status === 'success' && (

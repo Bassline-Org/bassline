@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import type { EntityWithAttrs, Relationship } from '../types'
+import { attrNumber, attrString } from '../types'
 import { bl } from '../lib/bl'
 
 interface ClipboardData {
@@ -70,8 +71,8 @@ export function useCommands({
     // Create new entities
     const newEntityIds: string[] = []
     for (const entity of clipboard.entities) {
-      const x = parseFloat(entity.attrs.x || '0') + offset
-      const y = parseFloat(entity.attrs.y || '0') + offset
+      const x = attrNumber(entity.attrs.x) + offset
+      const y = attrNumber(entity.attrs.y) + offset
 
       // Copy all attrs except position (which we offset)
       const attrs: Record<string, string> = {}
@@ -81,9 +82,9 @@ export function useCommands({
         } else if (key === 'y') {
           attrs.y = Math.round(y).toString()
         } else if (key === 'name') {
-          attrs.name = `${value} (copy)`
+          attrs.name = `${attrString(value)} (copy)`
         } else {
-          attrs[key] = value
+          attrs[key] = attrString(value)
         }
       }
 

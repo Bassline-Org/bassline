@@ -29,7 +29,8 @@
 
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import { Filter as FilterIcon, Search, Link, Plus, X } from 'lucide-react'
-import type { EntityWithAttrs, EditorLoaderData } from '../types'
+import type { EntityWithAttrs, EditorLoaderData, DataObject, AttrValue } from '../types'
+import { attrString, getAttr } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useSemanticOutput } from '../hooks/useSemanticOutput'
 import { useLoaderData } from 'react-router'
@@ -77,47 +78,71 @@ function LocalInput({
 }
 
 /**
- * Parse and match a predicate against an entity (manual mode).
+ * Parse and match a predicate against a data object (manual mode).
  *
  * Predicate formats:
  * - "attr:value" - exact match
  * - "attr:*value*" - contains (wildcards)
+ * - "attr:>N" - greater than (numeric)
+ * - "attr:<N" - less than (numeric)
+ * - "attr:>=N" - greater than or equal (numeric)
+ * - "attr:<=N" - less than or equal (numeric)
  * - "attr" - attribute exists
  */
-function matchManualPredicate(entity: EntityWithAttrs, predicate: string): boolean {
+function matchManualPredicate(data: DataObject, predicate: string): boolean {
   if (!predicate) return true
 
   const colonIndex = predicate.indexOf(':')
 
   if (colonIndex === -1) {
     // Just attribute name - check existence
-    return entity.attrs[predicate] !== undefined
+    return data[predicate] !== undefined
   }
 
   const attr = predicate.slice(0, colonIndex)
   const pattern = predicate.slice(colonIndex + 1)
-  const value = entity.attrs[attr]
+  const value = data[attr]
 
   if (value === undefined) return false
+
+  // Numeric comparisons: >=, <=, >, <
+  const compMatch = pattern.match(/^(>=|<=|>|<)(.+)$/)
+  if (compMatch) {
+    const [, op, numStr] = compMatch
+    const predNum = parseFloat(numStr)
+    if (isNaN(predNum)) return false
+    // Use native number if available, otherwise parse string
+    const attrNum = typeof value === 'number' ? value : parseFloat(attrString(value))
+    if (isNaN(attrNum)) return false
+    switch (op) {
+      case '>': return attrNum > predNum
+      case '<': return attrNum < predNum
+      case '>=': return attrNum >= predNum
+      case '<=': return attrNum <= predNum
+    }
+  }
+
+  // String operations need string conversion
+  const valueStr = attrString(value)
 
   // Check for wildcards
   if (pattern.startsWith('*') && pattern.endsWith('*')) {
     const search = pattern.slice(1, -1).toLowerCase()
-    return value.toLowerCase().includes(search)
+    return valueStr.toLowerCase().includes(search)
   }
 
   if (pattern.startsWith('*')) {
     const search = pattern.slice(1).toLowerCase()
-    return value.toLowerCase().endsWith(search)
+    return valueStr.toLowerCase().endsWith(search)
   }
 
   if (pattern.endsWith('*')) {
     const search = pattern.slice(0, -1).toLowerCase()
-    return value.toLowerCase().startsWith(search)
+    return valueStr.toLowerCase().startsWith(search)
   }
 
-  // Exact match
-  return value === pattern
+  // Exact match - compare string representation
+  return valueStr === pattern
 }
 
 /**
@@ -145,31 +170,35 @@ function globMatch(str: string, pattern: string): boolean {
  * - "<N"         - less than
  * - ">=N"        - greater or equal
  * - "<=N"        - less or equal
+ *
+ * Leverages typed attrs: if value is a number, comparisons work natively.
  */
-function matchQueryPredicate(attrValue: string | undefined, predicate: string): boolean {
+function matchQueryPredicate(attrValue: AttrValue | undefined, predicate: string): boolean {
   // For existence check (empty predicate means "has this attr")
   if (!predicate) return attrValue !== undefined
 
-  // Glob pattern: ~pattern
+  if (attrValue === undefined) return false
+
+  // Glob pattern: ~pattern (string operation)
   if (predicate.startsWith('~')) {
-    if (attrValue === undefined) return false
-    return globMatch(attrValue, predicate.slice(1))
+    return globMatch(attrString(attrValue), predicate.slice(1))
   }
 
-  // Not equal: !value
+  // Not equal: !value (compare string representations)
   if (predicate.startsWith('!')) {
     const expected = predicate.slice(1)
-    return attrValue !== expected
+    return attrString(attrValue) !== expected
   }
 
   // Numeric comparisons: >=, <=, >, <
   const compMatch = predicate.match(/^(>=|<=|>|<)(.+)$/)
   if (compMatch) {
     const [, op, numStr] = compMatch
-    if (attrValue === undefined) return false
-    const attrNum = parseFloat(attrValue)
     const predNum = parseFloat(numStr)
-    if (isNaN(attrNum) || isNaN(predNum)) return false
+    if (isNaN(predNum)) return false
+    // Use native number if available, otherwise parse string
+    const attrNum = typeof attrValue === 'number' ? attrValue : parseFloat(attrString(attrValue))
+    if (isNaN(attrNum)) return false
     switch (op) {
       case '>': return attrNum > predNum
       case '<': return attrNum < predNum
@@ -178,17 +207,17 @@ function matchQueryPredicate(attrValue: string | undefined, predicate: string): 
     }
   }
 
-  // Exact match
-  return attrValue === predicate
+  // Exact match - compare string representations
+  return attrString(attrValue) === predicate
 }
 
 export function FilterSemantic({ entity }: FilterSemanticProps) {
   const { project, entities: allEntities } = useLoaderData() as EditorLoaderData
   const { bl, revalidate } = useBl()
 
-  const mode = entity.attrs['filter.mode'] || 'manual'
-  const predicate = entity.attrs['filter.predicate'] || ''
-  const { inputEntities, inputRelationships, boundEntityIds } = useSemanticInput(entity)
+  const mode = getAttr(entity.attrs, 'filter.mode', 'manual')
+  const predicate = getAttr(entity.attrs, 'filter.predicate')
+  const { inputData, inputRelationships, boundEntityIds } = useSemanticInput(entity)
 
   // Parse query predicates from filter.where.* attrs
   const queryPredicates = useMemo(() => {
@@ -196,44 +225,50 @@ export function FilterSemantic({ entity }: FilterSemanticProps) {
     for (const [key, value] of Object.entries(entity.attrs)) {
       if (key.startsWith('filter.where.')) {
         const attrName = key.slice('filter.where.'.length)
-        predicates.push([attrName, value])
+        predicates.push([attrName, attrString(value)])
       }
     }
     return predicates
   }, [entity.attrs])
 
-  // Get entities to filter based on mode
-  const sourceEntities = useMemo(() => {
+  // Get data objects to filter based on mode
+  // In query mode, we use all entities' attrs as DataObjects
+  // In manual mode, we use inputData from bindings
+  const sourceData = useMemo((): DataObject[] => {
     if (mode === 'query') {
       // Query mode: all project entities except semantic entities
-      return allEntities.filter(e =>
-        e.id !== entity.id && !e.attrs['semantic.type']
-      )
+      return allEntities
+        .filter(e => e.id !== entity.id && !e.attrs['semantic.type'])
+        .map(e => e.attrs) // entity.attrs already includes id
     }
-    // Manual mode: bound entities
-    return inputEntities
-  }, [mode, allEntities, inputEntities, entity.id])
+    // Manual mode: bound data objects
+    return inputData
+  }, [mode, allEntities, inputData, entity.id])
 
-  // Apply the filter
-  const filtered = useMemo(() => {
+  // Apply the filter - works on DataObject[]
+  const filtered = useMemo((): DataObject[] => {
     if (mode === 'query') {
       // Query mode: use filter.where.* predicates (ANDed)
-      if (queryPredicates.length === 0) return sourceEntities
-      return sourceEntities.filter(e =>
+      if (queryPredicates.length === 0) return sourceData
+      return sourceData.filter(data =>
         queryPredicates.every(([attr, pred]) =>
-          matchQueryPredicate(e.attrs[attr], pred)
+          matchQueryPredicate(data[attr], pred)
         )
       )
     }
 
     // Manual mode: use filter.predicate
-    if (!predicate) return sourceEntities
-    return sourceEntities.filter(e => matchManualPredicate(e, predicate))
-  }, [mode, sourceEntities, predicate, queryPredicates])
+    if (!predicate) return sourceData
+    return sourceData.filter(data => matchManualPredicate(data, predicate))
+  }, [mode, sourceData, predicate, queryPredicates])
 
-  // Filter relationships to only include those between filtered entities
+  // Filter relationships to only include those between filtered data objects
   const filteredRelationships = useMemo(() => {
-    const filteredIds = new Set(filtered.map(e => e.id))
+    const filteredIds = new Set(
+      filtered
+        .map(d => d.id)
+        .filter((id): id is string => typeof id === 'string')
+    )
     return inputRelationships.filter(
       r => filteredIds.has(r.from_entity) && filteredIds.has(r.to_entity)
     )
@@ -241,7 +276,7 @@ export function FilterSemantic({ entity }: FilterSemanticProps) {
 
   // Expose output for downstream semantics
   useSemanticOutput(entity.id, {
-    entities: filtered,
+    data: filtered,
     relationships: filteredRelationships,
   })
 
@@ -391,22 +426,23 @@ export function FilterSemantic({ entity }: FilterSemanticProps) {
           </div>
 
           <div className="filter-semantic__stats">
-            {filtered.length} / {sourceEntities.length} entities
+            {filtered.length} / {sourceData.length} entities
           </div>
 
           <div className="filter-semantic__list">
-            {filtered.slice(0, 10).map(e => (
-              <div key={e.id} className="filter-semantic__item">
-                <span className="filter-semantic__item-name">
-                  {e.attrs.name || 'Unnamed'}
-                </span>
-                {e.attrs.role && (
-                  <span className="filter-semantic__item-role">
-                    {e.attrs.role}
-                  </span>
-                )}
-              </div>
-            ))}
+            {filtered.slice(0, 10).map((data, i) => {
+              const id = typeof data.id === 'string' ? data.id : `_${i}`
+              const name = getAttr(data, 'name', 'Unnamed')
+              const role = attrString(data.role)
+              return (
+                <div key={id} className="filter-semantic__item">
+                  <span className="filter-semantic__item-name">{name}</span>
+                  {role && (
+                    <span className="filter-semantic__item-role">{role}</span>
+                  )}
+                </div>
+              )
+            })}
             {filtered.length > 10 && (
               <div className="filter-semantic__more">
                 +{filtered.length - 10} more
@@ -430,22 +466,23 @@ export function FilterSemantic({ entity }: FilterSemanticProps) {
           ) : (
             <>
               <div className="filter-semantic__stats">
-                {filtered.length} / {inputEntities.length} entities
+                {filtered.length} / {inputData.length} entities
               </div>
 
               <div className="filter-semantic__list">
-                {filtered.map(e => (
-                  <div key={e.id} className="filter-semantic__item">
-                    <span className="filter-semantic__item-name">
-                      {e.attrs.name || 'Unnamed'}
-                    </span>
-                    {e.attrs.role && (
-                      <span className="filter-semantic__item-role">
-                        {e.attrs.role}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                {filtered.map((data, i) => {
+                  const id = typeof data.id === 'string' ? data.id : `_${i}`
+                  const name = getAttr(data, 'name', 'Unnamed')
+                  const role = attrString(data.role)
+                  return (
+                    <div key={id} className="filter-semantic__item">
+                      <span className="filter-semantic__item-name">{name}</span>
+                      {role && (
+                        <span className="filter-semantic__item-role">{role}</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </>
           )}

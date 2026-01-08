@@ -4,6 +4,7 @@
 
 import { resource, routes, bind } from '@bassline/core'
 import type { db as DbType } from '../db'
+import type { AttrValue } from '../../src/types'
 
 type Db = typeof DbType
 
@@ -122,8 +123,8 @@ export function createStampsResource(db: Db) {
           projectId: string
           createdEntityIds: string[]
           createdRelationshipIds: string[]
-          appliedAttrs: Record<string, string>
-          previousAttrs: Record<string, string>
+          appliedAttrs: Record<string, AttrValue>
+          previousAttrs: Record<string, AttrValue>
         }) => {
           const targetEntityId = h.params?.targetEntityId || ''
 

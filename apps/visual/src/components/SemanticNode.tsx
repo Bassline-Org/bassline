@@ -15,6 +15,7 @@ import { NodeResizer } from '@xyflow/react'
 import { cn } from '@/lib/utils'
 import * as LucideIcons from 'lucide-react'
 import type { EntityWithAttrs } from '../types'
+import { attrString, getAttr } from '../types'
 import type { SemanticType } from '../lib/semantics'
 
 interface SemanticNodeProps {
@@ -40,13 +41,13 @@ export function SemanticNode({
   semantic,
   selected,
 }: SemanticNodeProps) {
-  const name = entity.attrs.name || semantic.name
+  const name = getAttr(entity.attrs, 'name') || semantic.name
   const IconComponent = getIcon(semantic.icon)
   const SemanticComponent = semantic.component
 
   // Get size from entity attrs
-  const uiWidth = entity.attrs['ui.width']
-  const uiHeight = entity.attrs['ui.height']
+  const uiWidth = attrString(entity.attrs['ui.width'])
+  const uiHeight = attrString(entity.attrs['ui.height'])
 
   const style: React.CSSProperties = {}
   if (uiWidth) style.width = `${uiWidth}px`

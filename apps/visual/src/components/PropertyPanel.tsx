@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { X, Trash2, Plus, Palette, Square, Circle, Diamond, Box, Hexagon, Plug, Link, Link2, Maximize2, Minimize2 } from 'lucide-react'
 import type { EntityWithAttrs, Relationship } from '../types'
+import { attrString, getAttr } from '../types'
 import type { Vocabulary, AttrDefinition, PortDefinition } from '../lib/vocabularyParser'
 import { getSemantic } from '../lib/semantics'
 import { Button } from '@/components/ui/button'
@@ -54,14 +55,14 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
   const [newBindingPath, setNewBindingPath] = useState('')
   const [newPortName, setNewPortName] = useState('')
 
-  const name = entity.attrs.name || ''
-  const role = entity.attrs.role || ''
+  const name = attrString(entity.attrs.name)
+  const role = attrString(entity.attrs.role)
 
   // Visual attrs
-  const visualShape = entity.attrs['visual.shape'] || 'rounded'
-  const visualFill = entity.attrs['visual.fill'] || ''
-  const visualStroke = entity.attrs['visual.stroke'] || ''
-  const visualIcon = entity.attrs['visual.icon'] || ''
+  const visualShape = getAttr(entity.attrs, 'visual.shape', 'rounded')
+  const visualFill = attrString(entity.attrs['visual.fill'])
+  const visualStroke = attrString(entity.attrs['visual.stroke'])
+  const visualIcon = attrString(entity.attrs['visual.icon'])
 
   // Get role vocabulary
   const roleVocab = useMemo(() => {
@@ -96,7 +97,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
     if (roleVocab) {
       for (const portDef of roleVocab.ports) {
         const attrKey = `port.${portDef.name}`
-        const attrValue = entity.attrs[attrKey]
+        const attrValue = attrString(entity.attrs[attrKey])
         ports.push({
           name: portDef.name,
           enabled: isPortEnabled(attrValue),
@@ -114,10 +115,11 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
       if (key.startsWith('port.') && value) {
         const portName = key.slice(5)
         if (!seen.has(portName)) {
+          const strValue = attrString(value)
           ports.push({
             name: portName,
-            enabled: isPortEnabled(value),
-            direction: getPortDirection(value),
+            enabled: isPortEnabled(strValue),
+            direction: getPortDirection(strValue),
             fromVocab: false,
           })
         }
@@ -138,7 +140,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
   const kitBindings = useMemo(() => {
     return Object.entries(entity.attrs)
       .filter(([key]) => key.startsWith('kit.'))
-      .map(([key, value]) => [key.slice(4), value] as [string, string])
+      .map(([key, value]) => [key.slice(4), attrString(value)] as [string, string])
       .sort(([a], [b]) => a.localeCompare(b))
   }, [entity.attrs])
 
@@ -148,12 +150,12 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
       .filter(r => r.kind === 'binds' && r.from_entity === entity.id)
       .map(r => {
         const targetEntity = entities.find(e => e.id === r.to_entity)
-        const semanticType = targetEntity?.attrs['semantic.type']
+        const semanticType = targetEntity ? attrString(targetEntity.attrs['semantic.type']) : ''
         const semantic = semanticType ? getSemantic(semanticType) : null
         return {
           relationshipId: r.id,
           targetId: r.to_entity,
-          targetName: targetEntity?.attrs.name || semantic?.name || 'Unknown',
+          targetName: (targetEntity ? attrString(targetEntity.attrs.name) : '') || semantic?.name || 'Unknown',
           semanticType,
         }
       })
@@ -168,7 +170,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
         return {
           relationshipId: r.id,
           sourceId: r.from_entity,
-          sourceName: sourceEntity?.attrs.name || 'Unknown',
+          sourceName: (sourceEntity ? attrString(sourceEntity.attrs.name) : '') || 'Unknown',
         }
       })
   }, [relationships, entities, entity.id])
@@ -242,7 +244,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
 
   // Render a dynamic attribute editor based on type
   const renderAttrEditor = (attrDef: AttrDefinition) => {
-    const value = entity.attrs[attrDef.key] || ''
+    const value = attrString(entity.attrs[attrDef.key])
 
     switch (attrDef.type) {
       case 'select':
@@ -503,7 +505,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
           <div className="space-y-1">
             <Label className="text-xs">Collapse Mode</Label>
             <Select
-              value={entity.attrs['ui.collapse'] || 'expanded'}
+              value={attrString(entity.attrs['ui.collapse']) || 'expanded'}
               onValueChange={(value) => {
                 if (value === 'expanded') {
                   onDeleteAttr('ui.collapse')
@@ -542,7 +544,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
             <div className="space-y-1">
               <Label className="text-xs">Width (px)</Label>
               <DebouncedInput
-                value={entity.attrs['ui.width'] || ''}
+                value={attrString(entity.attrs['ui.width'])}
                 onChange={(value) => {
                   if (value) {
                     onUpdateAttr('ui.width', value)
@@ -558,7 +560,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
             <div className="space-y-1">
               <Label className="text-xs">Height (px)</Label>
               <DebouncedInput
-                value={entity.attrs['ui.height'] || ''}
+                value={attrString(entity.attrs['ui.height'])}
                 onChange={(value) => {
                   if (value) {
                     onUpdateAttr('ui.height', value)
@@ -734,7 +736,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
                   <Label className="text-xs text-muted-foreground">Bound to</Label>
                   {boundToSemantics.map((binding) => (
                     <div key={binding.relationshipId} className="flex items-center gap-2 pl-2">
-                      <span className="text-sm flex-1 truncate" title={binding.targetName}>
+                      <span className="text-sm flex-1 truncate" title={binding.targetName || undefined}>
                         {binding.targetName}
                       </span>
                       {binding.semanticType && (
@@ -762,7 +764,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
                   <Label className="text-xs text-muted-foreground">Bound from</Label>
                   {boundFromEntities.map((binding) => (
                     <div key={binding.relationshipId} className="flex items-center gap-2 pl-2">
-                      <span className="text-sm flex-1 truncate" title={binding.sourceName}>
+                      <span className="text-sm flex-1 truncate" title={binding.sourceName || undefined}>
                         {binding.sourceName}
                       </span>
                       <Button
@@ -810,7 +812,7 @@ export function PropertyPanel({ entity, entities, relationships, vocabulary, onU
               <div className="flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">{key}</Label>
                 <DebouncedInput
-                  value={value}
+                  value={attrString(value)}
                   onChange={(newValue) => onUpdateAttr(key, newValue)}
                   className="h-8 text-sm"
                 />

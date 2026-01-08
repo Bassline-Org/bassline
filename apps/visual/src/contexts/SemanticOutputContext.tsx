@@ -10,11 +10,18 @@
  */
 
 import { createContext, useContext, useState, useCallback, useMemo, type ReactNode } from 'react'
-import type { EntityWithAttrs, Relationship } from '../types'
+import type { DataObject, Relationship } from '../types'
 
+/**
+ * Output from a semantic transformation.
+ *
+ * Semantics transform DataObject[] → DataObject[]:
+ * - `data`: The output DataObjects (includes id if entity-shaped)
+ * - `relationships`: Optional relationships between output objects
+ */
 export interface SyntaxOutput {
-  entities: EntityWithAttrs[]
-  relationships: Relationship[]
+  data: DataObject[]
+  relationships?: Relationship[]
 }
 
 interface SemanticOutputContextValue {

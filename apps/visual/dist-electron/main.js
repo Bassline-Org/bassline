@@ -1250,7 +1250,7 @@ function seedSemanticDocs(db2, docsDir) {
   }
   console.log("[seedDocs] Updating existing semantics with missing docs...");
   const semanticEntities = db2.prepare(`
-    SELECT DISTINCT a.entity_id, a.value as semantic_type
+    SELECT DISTINCT a.entity_id, a.string_value as semantic_type
     FROM attrs a
     WHERE a.key = 'semantic.type'
     AND NOT EXISTS (
@@ -1260,8 +1260,8 @@ function seedSemanticDocs(db2, docsDir) {
     )
   `).all();
   const insertAttr = db2.prepare(`
-    INSERT OR REPLACE INTO attrs (entity_id, key, value, type)
-    VALUES (?, ?, ?, 'string')
+    INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+    VALUES (?, ?, 'string', ?, NULL, NULL, NULL)
   `);
   let updated = 0;
   for (const { entity_id, semantic_type } of semanticEntities) {
@@ -1378,6 +1378,54 @@ function seed(db2, dataDir) {
 }
 const __filename$2 = fileURLToPath(import.meta.url);
 const __dirname$2 = path.dirname(__filename$2);
+function deserializeAttr(row) {
+  switch (row.type) {
+    case "number":
+      return row.number_value ?? 0;
+    case "json":
+      try {
+        return row.json_value ? JSON.parse(row.json_value) : {};
+      } catch {
+        return {};
+      }
+    case "blob":
+      return row.blob_value ?? new ArrayBuffer(0);
+    default:
+      return row.string_value ?? "";
+  }
+}
+function serializeAttr(value, type) {
+  return {
+    string_value: type === "string" ? String(value) : null,
+    number_value: type === "number" ? Number(value) : null,
+    json_value: type === "json" ? JSON.stringify(value) : null,
+    blob_value: type === "blob" ? Buffer.from(value) : null
+  };
+}
+function inferAttrType(value) {
+  if (typeof value === "number") return "number";
+  if (typeof value === "object" && value !== null) {
+    if (value instanceof ArrayBuffer || Buffer.isBuffer(value)) return "blob";
+    return "json";
+  }
+  return "string";
+}
+function deserializeStampAttr(value, type) {
+  if (value === null) return "";
+  const attrType = type || "string";
+  switch (attrType) {
+    case "number":
+      return parseFloat(value) || 0;
+    case "json":
+      try {
+        return JSON.parse(value);
+      } catch {
+        return {};
+      }
+    default:
+      return value;
+  }
+}
 let database = null;
 function getDb() {
   if (!database) {
@@ -1450,25 +1498,33 @@ const db = {
       const entityIds = entities.map((e) => e.id);
       if (entityIds.length === 0) return [];
       const placeholders = entityIds.map(() => "?").join(",");
-      const attrRows = db2.prepare(`SELECT entity_id, key, value FROM attrs WHERE entity_id IN (${placeholders})`).all(...entityIds);
+      const attrRows = db2.prepare(
+        `SELECT entity_id, key, type, string_value, number_value, json_value, blob_value FROM attrs WHERE entity_id IN (${placeholders})`
+      ).all(...entityIds);
       const attrsByEntity = {};
       for (const row of attrRows) {
         if (!attrsByEntity[row.entity_id]) attrsByEntity[row.entity_id] = {};
-        if (row.value !== null) attrsByEntity[row.entity_id][row.key] = row.value;
+        attrsByEntity[row.entity_id][row.key] = deserializeAttr(row);
       }
       return entities.map((e) => ({
         ...e,
-        attrs: attrsByEntity[e.id] || {}
+        attrs: {
+          id: e.id,
+          // Inject entity id into attrs
+          ...attrsByEntity[e.id] || {}
+        }
       }));
     },
     get(id) {
       const db2 = getDb();
       const entity = db2.prepare("SELECT * FROM entities WHERE id = ?").get(id);
       if (!entity) return null;
-      const attrRows = db2.prepare("SELECT key, value FROM attrs WHERE entity_id = ?").all(id);
-      const attrs = {};
+      const attrRows = db2.prepare(
+        "SELECT key, type, string_value, number_value, json_value, blob_value FROM attrs WHERE entity_id = ?"
+      ).all(id);
+      const attrs = { id: entity.id };
       for (const row of attrRows) {
-        if (row.value !== null) attrs[row.key] = row.value;
+        attrs[row.key] = deserializeAttr({ entity_id: id, ...row });
       }
       return { ...entity, attrs };
     },
@@ -1530,12 +1586,12 @@ const db = {
       const stampIds = stamps.map((s) => s.id);
       const placeholders = stampIds.map(() => "?").join(",");
       const attrRows = db2.prepare(
-        `SELECT stamp_id, key, value FROM stamp_attrs WHERE stamp_id IN (${placeholders})`
+        `SELECT stamp_id, key, value, type FROM stamp_attrs WHERE stamp_id IN (${placeholders})`
       ).all(...stampIds);
       const attrsByStamp = {};
       for (const row of attrRows) {
         if (!attrsByStamp[row.stamp_id]) attrsByStamp[row.stamp_id] = {};
-        if (row.value !== null) attrsByStamp[row.stamp_id][row.key] = row.value;
+        if (row.value !== null) attrsByStamp[row.stamp_id][row.key] = deserializeStampAttr(row.value, row.type);
       }
       return stamps.map((s) => ({
         ...s,
@@ -1548,10 +1604,10 @@ const db = {
       const db2 = getDb();
       const stamp = db2.prepare("SELECT * FROM stamps WHERE id = ?").get(id);
       if (!stamp) return null;
-      const attrRows = db2.prepare("SELECT key, value FROM stamp_attrs WHERE stamp_id = ?").all(id);
+      const attrRows = db2.prepare("SELECT key, value, type FROM stamp_attrs WHERE stamp_id = ?").all(id);
       const attrs = {};
       for (const row of attrRows) {
-        if (row.value !== null) attrs[row.key] = row.value;
+        if (row.value !== null) attrs[row.key] = deserializeStampAttr(row.value, row.type);
       }
       const members = db2.prepare("SELECT * FROM stamp_members WHERE stamp_id = ?").all(id);
       const memberIds = members.map((m) => m.id);
@@ -1559,11 +1615,11 @@ const db = {
       if (memberIds.length > 0) {
         const placeholders = memberIds.map(() => "?").join(",");
         const memberAttrRows = db2.prepare(
-          `SELECT member_id, key, value FROM stamp_member_attrs WHERE member_id IN (${placeholders})`
+          `SELECT member_id, key, value, type FROM stamp_member_attrs WHERE member_id IN (${placeholders})`
         ).all(...memberIds);
         for (const row of memberAttrRows) {
           if (!memberAttrs[row.member_id]) memberAttrs[row.member_id] = {};
-          if (row.value !== null) memberAttrs[row.member_id][row.key] = row.value;
+          if (row.value !== null) memberAttrs[row.member_id][row.key] = deserializeStampAttr(row.value, row.type);
         }
       }
       const relationships = db2.prepare("SELECT * FROM stamp_relationships WHERE stamp_id = ?").all(id);
@@ -1592,13 +1648,19 @@ const db = {
         if (data.sourceEntityId) {
           const sourceEntity = db2.prepare("SELECT project_id FROM entities WHERE id = ?").get(data.sourceEntityId);
           if (!sourceEntity) throw new Error("Source entity not found");
-          const attrs = db2.prepare("SELECT key, value, type FROM attrs WHERE entity_id = ?").all(data.sourceEntityId);
+          const attrs = db2.prepare(
+            "SELECT key, type, string_value, number_value, json_value FROM attrs WHERE entity_id = ?"
+          ).all(data.sourceEntityId);
           const excludeKeysRoot = /* @__PURE__ */ new Set(["x", "y", "name"]);
           const excludeKeysMember = /* @__PURE__ */ new Set(["x", "y"]);
           const attrStmt = db2.prepare("INSERT INTO stamp_attrs (stamp_id, key, value, type) VALUES (?, ?, ?, ?)");
           for (const attr of attrs) {
-            if (!excludeKeysRoot.has(attr.key) && attr.value !== null) {
-              attrStmt.run(stampId, attr.key, attr.value, attr.type);
+            let stringValue = null;
+            if (attr.type === "string") stringValue = attr.string_value;
+            else if (attr.type === "number" && attr.number_value !== null) stringValue = String(attr.number_value);
+            else if (attr.type === "json") stringValue = attr.json_value;
+            if (!excludeKeysRoot.has(attr.key) && stringValue !== null) {
+              attrStmt.run(stampId, attr.key, stringValue, attr.type);
             }
           }
           const localIdMap = /* @__PURE__ */ new Map();
@@ -1614,11 +1676,17 @@ const db = {
             const localId = `member_${localIdMap.size}`;
             localIdMap.set(entityId, localId);
             db2.prepare("INSERT INTO stamp_members (id, stamp_id, local_id) VALUES (?, ?, ?)").run(memberId, stampId, localId);
-            const memberAttrs = db2.prepare("SELECT key, value, type FROM attrs WHERE entity_id = ?").all(entityId);
+            const memberAttrs = db2.prepare(
+              "SELECT key, type, string_value, number_value, json_value FROM attrs WHERE entity_id = ?"
+            ).all(entityId);
             const memberAttrStmt = db2.prepare("INSERT INTO stamp_member_attrs (member_id, key, value, type) VALUES (?, ?, ?, ?)");
             for (const attr of memberAttrs) {
-              if (!excludeKeysMember.has(attr.key) && attr.value !== null) {
-                memberAttrStmt.run(memberId, attr.key, attr.value, attr.type);
+              let stringValue = null;
+              if (attr.type === "string") stringValue = attr.string_value;
+              else if (attr.type === "number" && attr.number_value !== null) stringValue = String(attr.number_value);
+              else if (attr.type === "json") stringValue = attr.json_value;
+              if (!excludeKeysMember.has(attr.key) && stringValue !== null) {
+                memberAttrStmt.run(memberId, attr.key, stringValue, attr.type);
               }
             }
             for (const child of getChildren(entityId)) {
@@ -1664,11 +1732,11 @@ const db = {
       const stamp = this.get(stampId);
       if (!stamp) throw new Error("Stamp not found");
       const previousAttrs = {};
-      const currentAttrRows = db2.prepare("SELECT key, value FROM attrs WHERE entity_id = ?").all(targetEntityId);
+      const currentAttrRows = db2.prepare(
+        "SELECT key, type, string_value, number_value, json_value FROM attrs WHERE entity_id = ?"
+      ).all(targetEntityId);
       for (const row of currentAttrRows) {
-        if (row.value !== null) {
-          previousAttrs[row.key] = row.value;
-        }
+        previousAttrs[row.key] = deserializeAttr({ entity_id: targetEntityId, blob_value: null, ...row });
       }
       const createdEntityIds = [];
       const createdRelationshipIds = [];
@@ -1676,9 +1744,14 @@ const db = {
       const localToEntityId = /* @__PURE__ */ new Map();
       localToEntityId.set(null, targetEntityId);
       const transaction = db2.transaction(() => {
-        const attrStmt = db2.prepare("INSERT OR REPLACE INTO attrs (entity_id, key, value, type) VALUES (?, ?, ?, ?)");
+        const attrStmt = db2.prepare(`
+          INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
         for (const [key, value] of Object.entries(stamp.attrs)) {
-          attrStmt.run(targetEntityId, key, value, "string");
+          const attrType = inferAttrType(value);
+          const serialized = serializeAttr(value, attrType);
+          attrStmt.run(targetEntityId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value);
         }
         for (const member of stamp.members) {
           const newId = randomUUID();
@@ -1686,7 +1759,9 @@ const db = {
           createdEntityIds.push(newId);
           db2.prepare("INSERT INTO entities (id, project_id, created_at, modified_at) VALUES (?, ?, ?, ?)").run(newId, targetEntity.project_id, now, now);
           for (const [key, value] of Object.entries(member.attrs)) {
-            attrStmt.run(newId, key, value, "string");
+            const attrType = inferAttrType(value);
+            const serialized = serializeAttr(value, attrType);
+            attrStmt.run(newId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value);
           }
         }
         const relStmt = db2.prepare(`
@@ -1744,16 +1819,23 @@ const db = {
   attrs: {
     get(entityId) {
       const db2 = getDb();
-      const rows = db2.prepare("SELECT key, value FROM attrs WHERE entity_id = ?").all(entityId);
+      const rows = db2.prepare(
+        "SELECT key, type, string_value, number_value, json_value, blob_value FROM attrs WHERE entity_id = ?"
+      ).all(entityId);
       const attrs = {};
       for (const row of rows) {
-        if (row.value !== null) attrs[row.key] = row.value;
+        attrs[row.key] = deserializeAttr({ entity_id: entityId, ...row });
       }
       return attrs;
     },
-    set(entityId, key, value, type = "string") {
+    set(entityId, key, value, type) {
       const db2 = getDb();
-      db2.prepare("INSERT OR REPLACE INTO attrs (entity_id, key, value, type) VALUES (?, ?, ?, ?)").run(entityId, key, value, type);
+      const attrType = type ?? inferAttrType(value);
+      const serialized = serializeAttr(value, attrType);
+      db2.prepare(`
+        INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(entityId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value);
       db2.prepare("UPDATE entities SET modified_at = ? WHERE id = ?").run(Date.now(), entityId);
     },
     delete(entityId, key) {
@@ -1761,12 +1843,17 @@ const db = {
       db2.prepare("DELETE FROM attrs WHERE entity_id = ? AND key = ?").run(entityId, key);
       db2.prepare("UPDATE entities SET modified_at = ? WHERE id = ?").run(Date.now(), entityId);
     },
-    setBatch(entityId, attrs) {
+    setBatch(entityId, attrs, types) {
       const db2 = getDb();
-      const stmt = db2.prepare("INSERT OR REPLACE INTO attrs (entity_id, key, value, type) VALUES (?, ?, ?, ?)");
+      const stmt = db2.prepare(`
+        INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
       const transaction = db2.transaction(() => {
         for (const [key, value] of Object.entries(attrs)) {
-          stmt.run(entityId, key, value, "string");
+          const attrType = (types == null ? void 0 : types[key]) ?? inferAttrType(value);
+          const serialized = serializeAttr(value, attrType);
+          stmt.run(entityId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value);
         }
         db2.prepare("UPDATE entities SET modified_at = ? WHERE id = ?").run(Date.now(), entityId);
       });
@@ -2476,7 +2563,16 @@ function createEntitiesResource(db2) {
             );
           }
         } else {
-          db2.attrs.set(entityId, key, String(body));
+          let value;
+          let type;
+          if (body && typeof body === "object" && "value" in body) {
+            const typed2 = body;
+            value = typed2.value;
+            type = typed2.type;
+          } else {
+            value = body;
+          }
+          db2.attrs.set(entityId, key, value, type);
           if (h.kit && !h.skipHistory) {
             await h.kit.put(
               { path: "/history/push" },

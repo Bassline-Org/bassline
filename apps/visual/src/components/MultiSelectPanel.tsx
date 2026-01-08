@@ -1,6 +1,7 @@
 import { X, Trash2, Package, Ungroup } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { EntityWithAttrs } from '../types'
+import { attrString } from '../types'
 
 interface MultiSelectPanelProps {
   entities: EntityWithAttrs[]
@@ -37,7 +38,7 @@ export function MultiSelectPanel({
         <ul className="text-sm space-y-1 max-h-48 overflow-y-auto">
           {entities.map((e) => (
             <li key={e.id} className="truncate">
-              {e.attrs.name || 'Unnamed'}
+              {attrString(e.attrs.name) || 'Unnamed'}
             </li>
           ))}
         </ul>
