@@ -10,6 +10,8 @@ import { MapSemantic } from './map'
 import { TemplateSemantic } from './template'
 import { ResourceSemantic } from './resource'
 import { DisplaySemantic } from './display'
+import { ReflectSemantic } from './reflect'
+import { HelpSemantic } from './help'
 
 // Register all semantics
 registerSemantic({
@@ -45,4 +47,18 @@ registerSemantic({
   name: 'Display',
   icon: 'layout-grid',
   component: DisplaySemantic,
+})
+
+registerSemantic({
+  id: 'reflect',
+  name: 'Reflect',
+  icon: 'refresh-cw',
+  component: ReflectSemantic,
+})
+
+registerSemantic({
+  id: 'help',
+  name: 'Help',
+  icon: 'help-circle',
+  component: HelpSemantic,
 })

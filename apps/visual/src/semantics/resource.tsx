@@ -14,7 +14,7 @@
  * - shell.cwd = working directory template (optional)
  */
 
-import { useMemo, useCallback, useState, useEffect } from 'react'
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
 import { Play, Loader2, CheckCircle, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -184,30 +184,53 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
         const response = await window.bl.put({ path: resourcePath }, body)
         const result = extractResult(response)
         newResults.set('_standalone', result)
+
+        // Persist result to the Resource entity
+        const resultStr = typeof result === 'string' ? result : JSON.stringify(result)
+        await bl.attrs.set(project.id, entity.id, outputAttr, resultStr)
       } else {
-        // Per-entity execution
+        // Per-entity execution - run for each input, store all results on Resource entity
+        const allResults: string[] = []
         for (const inputEntity of inputEntities) {
           const body = buildRequestBody(inputEntity.attrs)
           const response = await window.bl.put({ path: resourcePath }, body)
           const result = extractResult(response)
           newResults.set(inputEntity.id, result)
+          allResults.push(typeof result === 'string' ? result : JSON.stringify(result))
         }
+
+        // Persist combined results to the Resource entity
+        await bl.attrs.set(project.id, entity.id, outputAttr, allResults.join('\n---\n'))
       }
 
       setResults(newResults)
       setStatus('success')
+      revalidate()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setStatus('error')
     }
-  }, [inputEntities, resourcePath, shellCmd, buildRequestBody])
+  }, [inputEntities, resourcePath, shellCmd, buildRequestBody, bl, project.id, entity.id, outputAttr, revalidate])
+
+  // Track previous input entity IDs to detect actual changes
+  const prevInputKeyRef = useRef<string>('')
 
   // Auto-execute when inputs change (if enabled)
+  // Uses structural comparison to avoid infinite loops
   useEffect(() => {
-    if (autoExecute && inputEntities.length > 0 && shellCmd) {
-      execute()
+    if (!autoExecute || !shellCmd) return
+
+    // Create stable key from input entity IDs
+    const inputKey = inputEntities.map(e => e.id).sort().join(',')
+
+    // Only execute if inputs actually changed
+    if (inputKey !== prevInputKeyRef.current) {
+      prevInputKeyRef.current = inputKey
+      if (inputEntities.length > 0) {
+        execute()
+      }
     }
-  }, [autoExecute, inputEntities, shellCmd, execute])
+  }, [autoExecute, shellCmd, inputEntities, execute])
 
   // Update configuration handlers
   const handlePathChange = useCallback(
