@@ -611,6 +611,64 @@
   border-radius: 2px;
 }
 
+.filter-semantic__mode-select {
+  height: 24px;
+  font-size: 11px;
+  min-width: 90px;
+}
+
+.filter-semantic__query {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-semantic__hint {
+  font-size: 11px;
+  color: var(--color-fg-subtle);
+  font-style: italic;
+}
+
+.filter-semantic__predicates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-semantic__predicate-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--color-bg-inset);
+  padding: 3px 6px;
+  border-radius: 3px;
+}
+
+.filter-semantic__predicate-attr {
+  color: var(--color-accent);
+}
+
+.filter-semantic__predicate-op {
+  color: var(--color-fg-muted);
+}
+
+.filter-semantic__predicate-value {
+  color: var(--color-fg-base);
+}
+
+.filter-semantic__manual {
+  display: flex;
+  align-items: center;
+}
+
+.filter-semantic__more {
+  font-size: 10px;
+  color: var(--color-fg-subtle);
+  padding: 4px 8px;
+}
+
 /* Merge Semantic */
 .merge-semantic {
   display: flex;
@@ -764,6 +822,18 @@
   height: 100%;
 }
 
+.template-semantic__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-semantic__mode-select {
+  height: 24px;
+  font-size: 11px;
+  min-width: 110px;
+}
+
 .template-semantic__config {
   display: flex;
   flex-direction: column;
@@ -791,6 +861,18 @@
   font-size: 11px;
   resize: vertical;
   min-height: 60px;
+}
+
+.template-semantic__hint {
+  font-size: 10px;
+  color: var(--color-fg-subtle);
+  font-style: italic;
+}
+
+.template-semantic__row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .template-semantic__output-attr {
@@ -1208,4 +1290,291 @@
   font-size: 12px;
   color: var(--color-fg-base);
   padding: 2px 0;
+}
+
+/* =============================================================================
+   Reflect Semantic
+   ============================================================================= */
+
+.reflect-semantic {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+}
+
+.reflect-semantic__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-fg-muted);
+}
+
+.reflect-semantic__mode-select {
+  height: 24px;
+  font-size: 11px;
+  min-width: 90px;
+}
+
+.reflect-semantic__empty {
+  font-size: 11px;
+  color: var(--color-fg-subtle);
+  font-style: italic;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.reflect-semantic__preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-bg-inset);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.reflect-semantic__preview-header {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+.reflect-semantic__preview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reflect-semantic__stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--color-bg-muted);
+  border-radius: 3px;
+}
+
+.reflect-semantic__stat--create {
+  color: var(--color-success);
+}
+
+.reflect-semantic__stat--update {
+  color: var(--color-accent);
+}
+
+.reflect-semantic__stat--delete {
+  color: var(--color-danger);
+}
+
+.reflect-semantic__target {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+}
+
+.reflect-semantic__inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reflect-semantic__input-item {
+  font-size: 11px;
+  color: var(--color-fg-base);
+  padding: 2px 4px;
+  background: var(--color-bg-elevated);
+  border-radius: 2px;
+}
+
+.reflect-semantic__more {
+  font-size: 10px;
+  color: var(--color-fg-subtle);
+  padding: 4px;
+}
+
+.reflect-semantic__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reflect-semantic__run {
+  flex: 1;
+}
+
+.reflect-semantic__error {
+  font-size: 11px;
+  color: var(--color-danger);
+  background: var(--color-danger-subtle);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.reflect-semantic__result {
+  font-size: 11px;
+  color: var(--color-success);
+  background: var(--color-success-subtle);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+/* =============================================================================
+   Help Semantic
+   ============================================================================= */
+
+.help-semantic {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+  height: 100%;
+}
+
+.help-semantic__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.help-semantic__target {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-fg-muted);
+  min-width: 0;
+  flex: 1;
+}
+
+.help-semantic__target-name {
+  font-weight: 500;
+  color: var(--color-fg-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.help-semantic__target-role {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  background: var(--color-bg-muted);
+  padding: 1px 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.help-semantic__scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.help-semantic__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.help-semantic__section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.help-semantic__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.help-semantic__section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+
+.help-semantic__delete-btn {
+  height: 18px;
+  width: 18px;
+  padding: 0;
+}
+
+.help-semantic__content {
+  font-size: 12px;
+  color: var(--color-fg-base);
+  line-height: 1.5;
+}
+
+.help-semantic__content p {
+  margin: 0 0 4px 0;
+}
+
+.help-semantic__content p:last-child {
+  margin-bottom: 0;
+}
+
+.help-semantic__input {
+  height: 28px;
+  font-size: 12px;
+}
+
+.help-semantic__textarea {
+  font-size: 12px;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.help-semantic__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--color-fg-subtle);
+  text-align: center;
+  font-size: 12px;
+}
+
+.help-semantic__no-docs {
+  font-size: 12px;
+  color: var(--color-fg-subtle);
+  text-align: center;
+  padding: 16px;
+}
+
+.help-semantic__no-docs p {
+  margin: 0 0 4px 0;
+}
+
+.help-semantic__hint {
+  font-size: 11px;
+  font-style: italic;
+}
+
+.help-semantic__add-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.help-semantic__add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.help-semantic__add-input {
+  flex: 1;
+  height: 28px;
+  font-size: 12px;
+}
+
+.help-semantic__multi-hint {
+  font-size: 10px;
+  color: var(--color-fg-subtle);
+  text-align: center;
+  font-style: italic;
 }
