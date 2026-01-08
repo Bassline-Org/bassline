@@ -533,3 +533,80 @@
   white-space: pre;
   margin: 0;
 }
+
+.json-export__scope-toggle {
+  height: 24px;
+  padding: 2px;
+  background: var(--color-bg-inset);
+}
+
+.json-export__scope-toggle button {
+  height: 20px;
+  width: 24px;
+  padding: 0;
+}
+
+/* Filter Semantic */
+.filter-semantic {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.filter-semantic__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-fg-muted);
+}
+
+.filter-semantic__predicate {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--color-bg-inset);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.filter-semantic__stats {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.filter-semantic__empty {
+  font-size: 11px;
+  color: var(--color-fg-subtle);
+  font-style: italic;
+  padding: 12px 0;
+}
+
+.filter-semantic__list {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-semantic__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--color-bg-inset);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.filter-semantic__item-name {
+  color: var(--color-fg-base);
+}
+
+.filter-semantic__item-role {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  background: var(--color-bg-muted);
+  padding: 1px 4px;
+  border-radius: 2px;
+}

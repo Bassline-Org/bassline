@@ -18,9 +18,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Maximize, Stamp, Save, FolderInput, FolderOutput, Package, Ungroup, Sparkles } from 'lucide-react'
+import { Plus, Trash2, Maximize, Stamp, Save, FolderInput, FolderOutput, Package, Ungroup, Sparkles, Link2 } from 'lucide-react'
 import type { EntityWithAttrs, StampWithAttrs } from '../types'
-import { getAllSemantics } from '../lib/semantics'
+import { getAllSemantics, isSemanticNode } from '../lib/semantics'
 
 interface CanvasContextMenuProps {
   children: React.ReactNode
@@ -37,6 +37,7 @@ interface CanvasContextMenuProps {
   onApplyStamp: (stampId: string, entityId: string) => void
   onSetParent: (parentId: string) => void
   onRemoveFromParent: () => void
+  onBindTo: (targetId: string) => void
   onBundle?: () => void
   onUnbundle?: () => void
 }
@@ -56,6 +57,7 @@ export function CanvasContextMenu({
   onApplyStamp,
   onSetParent,
   onRemoveFromParent,
+  onBindTo,
   onBundle,
   onUnbundle,
 }: CanvasContextMenuProps) {
@@ -109,6 +111,11 @@ export function CanvasContextMenu({
 
   // Get potential parent entities (all entities except the selected ones)
   const potentialParents = entities.filter((e) => !selectedEntityIds.has(e.id))
+
+  // Get semantic nodes that can be bound to (excluding selected entities)
+  const bindableSemantics = entities.filter(
+    (e) => isSemanticNode(e) && !selectedEntityIds.has(e.id)
+  )
 
   return (
     <>
@@ -194,6 +201,26 @@ export function CanvasContextMenu({
                       <FolderOutput className="mr-2 h-4 w-4" />
                       Remove from parent
                     </ContextMenuItem>
+                  )}
+
+                  {/* Bind to semantic - for composition */}
+                  {bindableSemantics.length > 0 && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        <Link2 className="mr-2 h-4 w-4" />
+                        Bind to...
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {bindableSemantics.map((semantic) => (
+                          <ContextMenuItem
+                            key={semantic.id}
+                            onClick={() => onBindTo(semantic.id)}
+                          >
+                            {semantic.attrs.name || semantic.attrs['semantic.type']}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
                   )}
                   <ContextMenuSeparator />
                 </>
