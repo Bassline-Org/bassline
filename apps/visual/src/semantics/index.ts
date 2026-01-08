@@ -13,6 +13,13 @@ import { DisplaySemantic } from './display'
 import { ReflectSemantic } from './reflect'
 import { HelpSemantic } from './help'
 
+// Block semantics
+import { TextSemantic } from './text'
+import { NumberSemantic } from './number'
+import { ListSemantic } from './list'
+import { ObjectSemantic } from './object'
+import { DocumentSemantic } from './document'
+
 // Register all semantics
 registerSemantic({
   id: 'filter',
@@ -61,4 +68,40 @@ registerSemantic({
   name: 'Help',
   icon: 'help-circle',
   component: HelpSemantic,
+})
+
+// Block semantics
+registerSemantic({
+  id: 'text',
+  name: 'Text',
+  icon: 'type',
+  component: TextSemantic,
+})
+
+registerSemantic({
+  id: 'number',
+  name: 'Number',
+  icon: 'hash',
+  component: NumberSemantic,
+})
+
+registerSemantic({
+  id: 'list',
+  name: 'List',
+  icon: 'list',
+  component: ListSemantic,
+})
+
+registerSemantic({
+  id: 'object',
+  name: 'Object',
+  icon: 'braces',
+  component: ObjectSemantic,
+})
+
+registerSemantic({
+  id: 'document',
+  name: 'Document',
+  icon: 'file-text',
+  component: DocumentSemantic,
 })
