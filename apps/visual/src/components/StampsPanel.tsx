@@ -70,22 +70,23 @@ export function StampsPanel({ stamps, onClose, onDeleteStamp }: StampsPanelProps
   const renderStampItem = (stamp: StampWithAttrs) => (
     <div
       key={stamp.id}
-      className="flex items-center justify-between p-2 rounded hover:bg-accent/50 group"
+      className="grid grid-cols-[auto_1fr_auto] items-center gap-2 p-2 rounded hover:bg-accent/50"
     >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <Stamp className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium truncate">{stamp.name}</div>
-          {stamp.description && (
-            <div className="text-xs text-muted-foreground truncate">{stamp.description}</div>
-          )}
-        </div>
+      <Stamp className="h-4 w-4 text-muted-foreground" />
+      <div className="min-w-0">
+        <div className="text-sm font-medium truncate">{stamp.name}</div>
+        {stamp.description && (
+          <div className="text-xs text-muted-foreground truncate">{stamp.description}</div>
+        )}
       </div>
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={() => setDeleteStamp(stamp)}
+        className="h-6 w-6"
+        onClick={(e) => {
+          e.stopPropagation()
+          setDeleteStamp(stamp)
+        }}
       >
         <Trash2 className="h-3 w-3" />
       </Button>
@@ -112,7 +113,7 @@ export function StampsPanel({ stamps, onClose, onDeleteStamp }: StampsPanelProps
           <span className="text-xs text-muted-foreground ml-auto">{stamps.length}</span>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="ml-4 border-l pl-2 space-y-1">
+          <div className="ml-2 border-l pl-2 space-y-1 overflow-hidden">
             {stamps.map(renderStampItem)}
           </div>
         </CollapsibleContent>
@@ -136,8 +137,9 @@ export function StampsPanel({ stamps, onClose, onDeleteStamp }: StampsPanelProps
           </Button>
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-hidden p-0">
-          <ScrollArea className="h-full px-4">
+        <CardContent className="flex-1 min-h-0 p-0 overflow-hidden">
+          <ScrollArea className="h-full w-full">
+            <div className="px-4 w-full max-w-full">
             {stamps.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground text-sm">
                 <Stamp className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -145,7 +147,7 @@ export function StampsPanel({ stamps, onClose, onDeleteStamp }: StampsPanelProps
                 <p className="text-xs mt-1">Right-click an entity → Save as stamp</p>
               </div>
             ) : (
-              <div className="space-y-4 py-2">
+              <div className="space-y-4 py-2 w-full max-w-full overflow-hidden">
                 {/* Templates Section */}
                 {templateCount > 0 && (
                   <Collapsible
@@ -163,7 +165,7 @@ export function StampsPanel({ stamps, onClose, onDeleteStamp }: StampsPanelProps
                       <span className="text-xs text-muted-foreground ml-auto font-normal">{templateCount}</span>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <div className="ml-4 space-y-1">
+                      <div className="ml-2 space-y-1 overflow-hidden">
                         {Object.entries(groupedStamps.templates)
                           .sort(([a], [b]) => a.localeCompare(b))
                           .map(([category, stamps]) =>
@@ -191,7 +193,7 @@ export function StampsPanel({ stamps, onClose, onDeleteStamp }: StampsPanelProps
                       <span className="text-xs text-muted-foreground ml-auto font-normal">{vocabCount}</span>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <div className="ml-4 space-y-1">
+                      <div className="ml-2 space-y-1 overflow-hidden">
                         {Object.entries(groupedStamps.vocabulary)
                           .sort(([a], [b]) => a.localeCompare(b))
                           .map(([category, stamps]) =>
@@ -203,6 +205,7 @@ export function StampsPanel({ stamps, onClose, onDeleteStamp }: StampsPanelProps
                 )}
               </div>
             )}
+            </div>
           </ScrollArea>
         </CardContent>
       </Card>

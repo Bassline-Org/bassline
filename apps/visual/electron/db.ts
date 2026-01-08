@@ -303,13 +303,17 @@ export const db = {
         }
       }
 
-      // Get relationships
+      // Get relationships (including binding metadata)
       const relationships = db.prepare('SELECT * FROM stamp_relationships WHERE stamp_id = ?').all(id) as Array<{
         id: string
         stamp_id: string
         from_local_id: string | null
         to_local_id: string | null
         kind: string
+        label: string | null
+        binding_name: string | null
+        from_port: string | null
+        to_port: string | null
       }>
 
       return {
@@ -406,21 +410,27 @@ export const db = {
             copyMember(child.to_entity, 'root')
           }
 
-          // Copy relationships as stamp_relationships
+          // Copy relationships as stamp_relationships (including binding metadata)
           const allSourceIds = Array.from(localIdMap.keys())
           if (allSourceIds.length > 1) {
             const placeholders = allSourceIds.map(() => '?').join(',')
             const relationships = db.prepare(`
-              SELECT from_entity, to_entity, kind
+              SELECT from_entity, to_entity, kind, label, binding_name, from_port, to_port
               FROM relationships
               WHERE project_id = ? AND from_entity IN (${placeholders}) AND to_entity IN (${placeholders})
             `).all(sourceEntity.project_id, ...allSourceIds, ...allSourceIds) as {
-              from_entity: string; to_entity: string; kind: string
+              from_entity: string
+              to_entity: string
+              kind: string
+              label: string | null
+              binding_name: string | null
+              from_port: string | null
+              to_port: string | null
             }[]
 
             const relStmt = db.prepare(`
-              INSERT INTO stamp_relationships (id, stamp_id, from_local_id, to_local_id, kind)
-              VALUES (?, ?, ?, ?, ?)
+              INSERT INTO stamp_relationships (id, stamp_id, from_local_id, to_local_id, kind, label, binding_name, from_port, to_port)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `)
 
             for (const rel of relationships) {
@@ -430,7 +440,7 @@ export const db = {
                 // NULL for root, local_id for members
                 const fromId = fromLocalId === 'root' ? null : fromLocalId
                 const toId = toLocalId === 'root' ? null : toLocalId
-                relStmt.run(randomUUID(), stampId, fromId, toId, rel.kind)
+                relStmt.run(randomUUID(), stampId, fromId, toId, rel.kind, rel.label, rel.binding_name, rel.from_port, rel.to_port)
               }
             }
           }
@@ -497,10 +507,10 @@ export const db = {
           }
         }
 
-        // Create relationships
+        // Create relationships (including binding metadata)
         const relStmt = db.prepare(`
-          INSERT INTO relationships (id, project_id, from_entity, to_entity, kind)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
 
         for (const rel of stamp.relationships) {
@@ -508,7 +518,7 @@ export const db = {
           const toId = localToEntityId.get(rel.to_local_id)
           if (fromId && toId) {
             const relId = randomUUID()
-            relStmt.run(relId, targetEntity.project_id, fromId, toId, rel.kind)
+            relStmt.run(relId, targetEntity.project_id, fromId, toId, rel.kind, rel.label || null, rel.binding_name || null, rel.from_port || null, rel.to_port || null)
             createdRelationshipIds.push(relId)
           }
         }

@@ -14,6 +14,7 @@ import { createStampsResource } from './stamps'
 import { createUIStateResource } from './ui-state'
 import { createThemesResource } from './themes'
 import { createSettingsResource } from './settings'
+import { createShellResource } from './shell'
 
 type Db = typeof DbType
 
@@ -91,6 +92,9 @@ export function createVisualResources(db: Db) {
     }),
   }))
 
+  // Create shell resource
+  const shell = createShellResource()
+
   // Main resource tree
   const tree = routes({
     projects: routes({
@@ -104,6 +108,7 @@ export function createVisualResources(db: Db) {
     themes,
     settings,
     history,
+    shell,
   })
 
   // Create a wrapper that injects kit (self-reference) into all requests

@@ -13,6 +13,10 @@ interface EntityNodeData {
   entity: EntityWithAttrs
   isContainer?: boolean
   childCount?: number
+  // Used to trigger memo invalidation when bindings change
+  // Semantic nodes depend on this to re-render when bindings are created/deleted
+  // Using IDs (comma-separated string) instead of count ensures re-render on any binding change
+  bindingKey?: string
 }
 
 // Shape mapping for CSS classes
