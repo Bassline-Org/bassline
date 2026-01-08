@@ -610,3 +610,260 @@
   padding: 1px 4px;
   border-radius: 2px;
 }
+
+/* Merge Semantic */
+.merge-semantic {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.merge-semantic__stats {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.merge-semantic__count {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-fg-base);
+}
+
+.merge-semantic__sources {
+  margin-left: 4px;
+}
+
+.merge-semantic__list {
+  flex: 1;
+  overflow: auto;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.merge-semantic__item {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--color-fg-base);
+  border-bottom: 1px solid var(--color-border-muted);
+}
+
+.merge-semantic__item:last-child {
+  border-bottom: none;
+}
+
+.merge-semantic__more {
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  font-style: italic;
+}
+
+.merge-semantic__empty {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  padding: 16px 8px;
+}
+
+/* Map Semantic */
+.map-semantic {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.map-semantic__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.map-semantic__stats {
+  color: var(--color-fg-base);
+}
+
+.map-semantic__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-semantic__rule {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.map-semantic__operation {
+  width: 70px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.map-semantic__attr-name {
+  width: 80px;
+  height: 24px;
+  font-size: 11px;
+}
+
+.map-semantic__equals {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+}
+
+.map-semantic__value {
+  flex: 1;
+  height: 24px;
+  font-size: 11px;
+}
+
+.map-semantic__delete {
+  width: 20px;
+  height: 20px;
+}
+
+.map-semantic__add {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border-muted);
+}
+
+.map-semantic__add-label {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+}
+
+.map-semantic__add-btn {
+  height: 22px;
+  font-size: 10px;
+  padding: 0 6px;
+}
+
+.map-semantic__empty {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  padding: 16px 8px;
+}
+
+/* Template Semantic */
+.template-semantic {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+
+.template-semantic__config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-semantic__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.template-semantic__field--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.template-semantic__label {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+}
+
+.template-semantic__textarea {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.template-semantic__output-attr {
+  height: 24px;
+  font-size: 11px;
+  width: 120px;
+}
+
+.template-semantic__preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.template-semantic__preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.template-semantic__preview-title {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  text-transform: uppercase;
+}
+
+.template-semantic__copy-btn {
+  height: 22px;
+  font-size: 10px;
+}
+
+.template-semantic__outputs {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.template-semantic__output {
+  background: var(--color-bg-inset);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.template-semantic__output-name {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  margin-bottom: 2px;
+}
+
+.template-semantic__output-code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-fg-base);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+}
+
+.template-semantic__more {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 4px;
+}
+
+.template-semantic__empty {
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  text-align: center;
+  padding: 16px 8px;
+}

@@ -6,7 +6,7 @@
  * This enables composition: A → Filter → CodeGen
  */
 
-import { useMemo, useSyncExternalStore } from 'react'
+import { useMemo } from 'react'
 import { useLoaderData } from 'react-router'
 import type { EditorLoaderData, EntityWithAttrs, Relationship } from '../types'
 import { useSemanticOutputContext } from '../contexts/SemanticOutputContext'
@@ -29,14 +29,9 @@ interface SemanticInputResult {
  */
 export function useSemanticInput(entity: EntityWithAttrs): SemanticInputResult {
   const { entities, relationships } = useLoaderData() as EditorLoaderData
-  const outputContext = useSemanticOutputContext()
+  const { getOutput, outputs } = useSemanticOutputContext()
 
-  // Subscribe to output changes for reactivity
-  const subscribe = outputContext.subscribe
-  const getSnapshot = () => outputContext // Trigger re-render on any output change
-
-  useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
-
+  // outputs map changes trigger re-renders automatically via React state
   return useMemo(() => {
     // Find entities that bind to this semantic
     const bindings = relationships.filter(
@@ -59,7 +54,7 @@ export function useSemanticInput(entity: EntityWithAttrs): SemanticInputResult {
         if (visitedSemantics.has(entityId)) return
         visitedSemantics.add(entityId)
 
-        const output = outputContext.getOutput(entityId)
+        const output = getOutput(entityId)
         if (output) {
           // Add the semantic's output entities
           inputEntities.push(...output.entities)
@@ -85,7 +80,7 @@ export function useSemanticInput(entity: EntityWithAttrs): SemanticInputResult {
       inputRelationships,
       boundEntityIds,
     }
-  }, [entity.id, entities, relationships, outputContext])
+  }, [entity.id, entities, relationships, getOutput, outputs])
 }
 
 /**
