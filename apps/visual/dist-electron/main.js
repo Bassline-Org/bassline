@@ -4,11 +4,13 @@ import { fileURLToPath } from "url";
 import require$$1, { existsSync, readdirSync, readFileSync } from "fs";
 import require$$0 from "constants";
 import require$$0$1 from "stream";
-import require$$4 from "util";
+import require$$4, { promisify } from "util";
 import require$$5 from "assert";
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { getFonts } from "font-list";
+import { exec } from "child_process";
+import { homedir } from "os";
 var commonjsGlobal = typeof globalThis !== "undefined" ? globalThis : typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : {};
 function getDefaultExportFromCjs(x) {
   return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, "default") ? x["default"] : x;
@@ -1510,13 +1512,13 @@ const db = {
           if (allSourceIds.length > 1) {
             const placeholders = allSourceIds.map(() => "?").join(",");
             const relationships = db2.prepare(`
-              SELECT from_entity, to_entity, kind
+              SELECT from_entity, to_entity, kind, label, binding_name, from_port, to_port
               FROM relationships
               WHERE project_id = ? AND from_entity IN (${placeholders}) AND to_entity IN (${placeholders})
             `).all(sourceEntity.project_id, ...allSourceIds, ...allSourceIds);
             const relStmt = db2.prepare(`
-              INSERT INTO stamp_relationships (id, stamp_id, from_local_id, to_local_id, kind)
-              VALUES (?, ?, ?, ?, ?)
+              INSERT INTO stamp_relationships (id, stamp_id, from_local_id, to_local_id, kind, label, binding_name, from_port, to_port)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             for (const rel of relationships) {
               const fromLocalId = localIdMap.get(rel.from_entity);
@@ -1524,7 +1526,7 @@ const db = {
               if (fromLocalId && toLocalId) {
                 const fromId = fromLocalId === "root" ? null : fromLocalId;
                 const toId = toLocalId === "root" ? null : toLocalId;
-                relStmt.run(randomUUID(), stampId, fromId, toId, rel.kind);
+                relStmt.run(randomUUID(), stampId, fromId, toId, rel.kind, rel.label, rel.binding_name, rel.from_port, rel.to_port);
               }
             }
           }
@@ -1568,15 +1570,15 @@ const db = {
           }
         }
         const relStmt = db2.prepare(`
-          INSERT INTO relationships (id, project_id, from_entity, to_entity, kind)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         for (const rel of stamp.relationships) {
           const fromId = localToEntityId.get(rel.from_local_id);
           const toId = localToEntityId.get(rel.to_local_id);
           if (fromId && toId) {
             const relId = randomUUID();
-            relStmt.run(relId, targetEntity.project_id, fromId, toId, rel.kind);
+            relStmt.run(relId, targetEntity.project_id, fromId, toId, rel.kind, rel.label || null, rel.binding_name || null, rel.from_port || null, rel.to_port || null);
             createdRelationshipIds.push(relId);
           }
         }
@@ -2841,6 +2843,58 @@ function createSettingsResource(db2) {
     }
   }));
 }
+const execAsync = promisify(exec);
+function expandTilde(path2) {
+  if (path2.startsWith("~/")) {
+    return homedir() + path2.slice(1);
+  }
+  if (path2 === "~") {
+    return homedir();
+  }
+  return path2;
+}
+function createShellResource() {
+  return resource({
+    get: async () => ({
+      headers: { type: "shell" },
+      body: {
+        description: "Execute shell commands",
+        usage: 'PUT /shell { cmd: "...", cwd?: "...", timeout?: 30000 }'
+      }
+    }),
+    put: async (_h, body) => {
+      const { cmd, cwd, timeout = 3e4 } = body;
+      if (!cmd) {
+        return {
+          headers: { condition: "error" },
+          body: { error: "cmd is required" }
+        };
+      }
+      try {
+        const { stdout, stderr } = await execAsync(cmd, {
+          cwd: cwd ? expandTilde(cwd) : void 0,
+          timeout,
+          maxBuffer: 10 * 1024 * 1024
+          // 10MB
+        });
+        return {
+          headers: { status: "ok" },
+          body: { stdout, stderr, code: 0 }
+        };
+      } catch (err) {
+        const error = err;
+        return {
+          headers: { status: "error" },
+          body: {
+            stdout: error.stdout || "",
+            stderr: error.stderr || error.message || "Unknown error",
+            code: error.code || 1
+          }
+        };
+      }
+    }
+  });
+}
 function createVisualResources(db2) {
   const history = createHistory();
   const projects = createProjectsResource(db2);
@@ -2908,6 +2962,7 @@ function createVisualResources(db2) {
       }
     })
   }));
+  const shell2 = createShellResource();
   const tree = routes({
     projects: routes({
       "": resource({
@@ -2919,7 +2974,8 @@ function createVisualResources(db2) {
     stamps,
     themes,
     settings,
-    history
+    history,
+    shell: shell2
   });
   const withKit = (res) => {
     const kit = {

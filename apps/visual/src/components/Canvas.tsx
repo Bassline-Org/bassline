@@ -107,6 +107,24 @@ function CanvasInner({
     return counts
   }, [parentLookup])
 
+  // Track binding relationship IDs for each entity - this triggers memo invalidation when bindings change
+  // Important: Semantic nodes depend on bindings data via useSemanticInput, and without
+  // these IDs in the node data, EntityNode's memo prevents re-renders when bindings change.
+  // Using IDs instead of counts ensures re-render when any binding changes (add/remove/replace)
+  const bindingKeys = useMemo(() => {
+    const keys: Record<string, string> = {}
+    for (const rel of relationships) {
+      if (rel.kind === 'binds') {
+        // Track actual relationship IDs for both source and target
+        const fromKey = keys[rel.from_entity] || ''
+        const toKey = keys[rel.to_entity] || ''
+        keys[rel.from_entity] = fromKey ? `${fromKey},${rel.id}` : rel.id
+        keys[rel.to_entity] = toKey ? `${toKey},${rel.id}` : rel.id
+      }
+    }
+    return keys
+  }, [relationships])
+
   // Get IDs of collapsed/compact nodes whose children should be hidden
   const collapsedParentIds = useMemo(() => {
     const ids = new Set<string>()
@@ -188,7 +206,14 @@ function CanvasInner({
         id: e.id,
         type: 'entity',
         position: { x: parseFloat(e.attrs.x || '0'), y: parseFloat(e.attrs.y || '0') },
-        data: { entity: e, isContainer, childCount },
+        data: {
+          entity: e,
+          isContainer,
+          childCount,
+          // Include binding IDs to force memo invalidation when ANY binding changes
+          // This ensures semantic nodes re-render and pick up new bindings
+          bindingKey: bindingKeys[e.id] || '',
+        },
         selected: selectedEntityIds.has(e.id),
         parentId: hasParent ? parentId : undefined,
         extent: hasParent ? 'parent' as const : undefined,
@@ -196,24 +221,30 @@ function CanvasInner({
         style: nodeStyle,
       }
     })
-  }, [entities, parentLookup, containerIds, selectedEntityIds, childCounts, collapsedParentIds])
+  }, [entities, parentLookup, containerIds, selectedEntityIds, childCounts, collapsedParentIds, bindingKeys])
 
   // Controlled nodes state - React Flow manages this during interactions
   const [nodes, setNodes] = useState<Node[]>(deriveNodes)
 
-  // Sync nodes when entities change (create/delete) or selection changes
+  // Sync nodes when data changes (entities, relationships) or selection changes
+  // IMPORTANT: We must rebuild nodes when relationships change so semantic
+  // components (which depend on binds relationships) re-render with fresh data
   const prevEntitiesRef = useRef(entities)
+  const prevRelationshipsRef = useRef(relationships)
   const prevSelectionRef = useRef(selectedEntityIds)
   useEffect(() => {
     const entitiesChanged = prevEntitiesRef.current !== entities
+    const relationshipsChanged = prevRelationshipsRef.current !== relationships
     const selectionChanged = prevSelectionRef.current !== selectedEntityIds
 
-    if (entitiesChanged || selectionChanged) {
+    if (entitiesChanged || relationshipsChanged || selectionChanged) {
       prevEntitiesRef.current = entities
+      prevRelationshipsRef.current = relationships
       prevSelectionRef.current = selectedEntityIds
 
-      if (entitiesChanged) {
-        // Full rebuild when entities change
+      if (entitiesChanged || relationshipsChanged) {
+        // Full rebuild when data changes - this ensures semantic components
+        // re-render and pick up new binds relationships via useSemanticInput
         setNodes(deriveNodes())
       } else if (selectionChanged) {
         // Just update selection state
@@ -223,7 +254,7 @@ function CanvasInner({
         })))
       }
     }
-  }, [entities, selectedEntityIds, deriveNodes])
+  }, [entities, relationships, selectedEntityIds, deriveNodes])
 
   // Handle all node changes (position, resize, etc.)
   // NOTE: Selection is handled by onSelectionChange, not here

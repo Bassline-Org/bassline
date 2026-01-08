@@ -3,9 +3,14 @@
  *
  * Renders a resizable container with a header that wraps custom semantic components.
  * The semantic component receives just its entity and uses hooks for everything else.
+ *
+ * NOTE: This component is intentionally NOT memoized because semantic components
+ * depend on external data (relationships via useLoaderData) that changes independently
+ * of the entity prop. When relationships change, semantic components need to re-render
+ * to pick up new bindings via useSemanticInput.
  */
 
-import { memo, Suspense } from 'react'
+import { Suspense } from 'react'
 import { NodeResizer } from '@xyflow/react'
 import { cn } from '@/lib/utils'
 import * as LucideIcons from 'lucide-react'
@@ -30,7 +35,7 @@ function getIcon(iconName: string): React.ComponentType<{ className?: string }> 
   return icons[pascalCase] || null
 }
 
-export const SemanticNode = memo(function SemanticNode({
+export function SemanticNode({
   entity,
   semantic,
   selected,
@@ -75,4 +80,4 @@ export const SemanticNode = memo(function SemanticNode({
       </div>
     </div>
   )
-})
+}
