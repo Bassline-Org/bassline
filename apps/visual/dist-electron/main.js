@@ -1248,7 +1248,34 @@ function seedSemanticDocs(db2, docsDir) {
     insertDoc.run(id, doc.name, doc.summary, doc.description, doc.usage, doc.examples, now);
     console.log(`[seedDocs]   ✓ ${doc.name}`);
   }
-  console.log(`[seedDocs] Complete. Seeded ${docs.size} semantic docs.`);
+  console.log("[seedDocs] Updating existing semantics with missing docs...");
+  const semanticEntities = db2.prepare(`
+    SELECT DISTINCT a.entity_id, a.value as semantic_type
+    FROM attrs a
+    WHERE a.key = 'semantic.type'
+    AND NOT EXISTS (
+      SELECT 1 FROM attrs h
+      WHERE h.entity_id = a.entity_id
+      AND h.key = 'help.summary'
+    )
+  `).all();
+  const insertAttr = db2.prepare(`
+    INSERT OR REPLACE INTO attrs (entity_id, key, value, type)
+    VALUES (?, ?, ?, 'string')
+  `);
+  let updated = 0;
+  for (const { entity_id, semantic_type } of semanticEntities) {
+    const doc = docs.get(semantic_type);
+    if (doc) {
+      if (doc.summary) insertAttr.run(entity_id, "help.summary", doc.summary);
+      if (doc.description) insertAttr.run(entity_id, "help.description", doc.description);
+      if (doc.usage) insertAttr.run(entity_id, "help.usage", doc.usage);
+      if (doc.examples) insertAttr.run(entity_id, "help.examples", doc.examples);
+      updated++;
+      console.log(`[seedDocs]   ✓ Updated ${semantic_type} entity ${entity_id.slice(0, 8)}...`);
+    }
+  }
+  console.log(`[seedDocs] Complete. Seeded ${docs.size} docs, updated ${updated} existing semantics.`);
 }
 function columnExists(db2, table, column) {
   const cols = db2.prepare(`PRAGMA table_info(${table})`).all();
