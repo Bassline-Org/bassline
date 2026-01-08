@@ -41,7 +41,13 @@ export function createProjectsResource(db: Db) {
           return { headers: { deleted: true }, body: null }
         }
 
-        // Could support update here in future
+        // UPDATE semantics: PUT with object body
+        if (body && typeof body === 'object') {
+          const data = body as { name?: string }
+          const updated = db.projects.update(projectId, data)
+          return { headers: { updated: true }, body: updated }
+        }
+
         return { headers: { condition: 'not-implemented' }, body: null }
       },
     })),

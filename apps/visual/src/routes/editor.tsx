@@ -10,6 +10,7 @@ import { MultiSelectPanel } from '../components/MultiSelectPanel'
 import { Button } from '@/components/ui/button'
 import { useVocabulary } from '../hooks/useVocabulary'
 import { useBl } from '../hooks/useBl'
+import { useCommands } from '../hooks/useCommands'
 import { VocabularyContext } from '../contexts/VocabularyContext'
 
 export function Editor() {
@@ -28,6 +29,10 @@ export function Editor() {
   // Stamps panel visibility
   const [stampsPanelOpen, setStampsPanelOpen] = useState(false)
 
+  // Project name editing
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [editingName, setEditingName] = useState(project.name)
+
   // Delete container dialog state
   const [deleteDialogState, setDeleteDialogState] = useState<{
     open: boolean
@@ -38,6 +43,16 @@ export function Editor() {
 
   // Parse vocabulary from stamps
   const vocabulary = useVocabulary(stamps)
+
+  // Copy/paste commands (Cmd+C/Cmd+V)
+  useCommands({
+    projectId: project.id,
+    entities,
+    relationships,
+    selectedEntityIds,
+    onPaste: (newEntityIds) => setSelectedEntityIds(new Set(newEntityIds)),
+    revalidate,
+  })
 
   const selectedEntity = entities.find((e) => e.id === selectedEntityId)
 
@@ -63,6 +78,20 @@ export function Editor() {
       revalidate()
     },
     [bl, revalidate, entities.length, project.id]
+  )
+
+  const handleCreateSemantic = useCallback(
+    async (x: number, y: number, semanticType: string) => {
+      await bl.entities.create(project.id, {
+        'semantic.type': semanticType,
+        x: Math.round(x).toString(),
+        y: Math.round(y).toString(),
+        'ui.width': '300',
+        'ui.height': '250',
+      })
+      revalidate()
+    },
+    [bl, revalidate, project.id]
   )
 
   const handleMoveEntity = useCallback(
@@ -281,6 +310,18 @@ export function Editor() {
     [bl, revalidate]
   )
 
+  const handleRenameProject = useCallback(
+    async () => {
+      const trimmed = editingName.trim()
+      if (trimmed && trimmed !== project.name) {
+        await bl.projects.update(project.id, { name: trimmed })
+        revalidate()
+      }
+      setIsEditingName(false)
+    },
+    [bl, revalidate, project.id, project.name, editingName]
+  )
+
   const handleBundle = useCallback(
     async () => {
       if (selectedEntityIds.size < 2) return
@@ -416,7 +457,34 @@ export function Editor() {
             Projects
           </Link>
         </Button>
-        <h1 className="text-base font-medium">{project.name}</h1>
+        {isEditingName ? (
+          <input
+            type="text"
+            value={editingName}
+            onChange={(e) => setEditingName(e.target.value)}
+            onBlur={handleRenameProject}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRenameProject()
+              if (e.key === 'Escape') {
+                setEditingName(project.name)
+                setIsEditingName(false)
+              }
+            }}
+            className="text-base font-medium bg-transparent border-b border-primary outline-none px-1"
+            autoFocus
+          />
+        ) : (
+          <h1
+            className="text-base font-medium cursor-pointer hover:text-primary"
+            onClick={() => {
+              setEditingName(project.name)
+              setIsEditingName(true)
+            }}
+            title="Click to rename"
+          >
+            {project.name}
+          </h1>
+        )}
         <div className="flex-1" />
         <Button
           variant={stampsPanelOpen ? 'secondary' : 'ghost'}
@@ -450,6 +518,7 @@ export function Editor() {
             selectedEntityIds={selectedEntityIds}
             uiState={uiState}
             onCreateEntity={handleCreateEntity}
+            onCreateSemantic={handleCreateSemantic}
             onMoveEntity={handleMoveEntity}
             onResizeEntity={handleResizeEntity}
             onSelectEntities={handleSelectEntities}

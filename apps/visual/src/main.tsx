@@ -6,6 +6,9 @@ import { ThemeProvider } from './providers/ThemeProvider'
 import { bl } from './lib/bl'
 import './index.css'
 
+// Register semantic types
+import './semantics'
+
 declare global {
   interface Window {
     app: {

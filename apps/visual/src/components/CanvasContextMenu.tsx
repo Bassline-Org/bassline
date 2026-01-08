@@ -18,8 +18,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Maximize, Stamp, Save, FolderInput, FolderOutput, Package, Ungroup } from 'lucide-react'
+import { Plus, Trash2, Maximize, Stamp, Save, FolderInput, FolderOutput, Package, Ungroup, Sparkles } from 'lucide-react'
 import type { EntityWithAttrs, StampWithAttrs } from '../types'
+import { getAllSemantics } from '../lib/semantics'
 
 interface CanvasContextMenuProps {
   children: React.ReactNode
@@ -29,6 +30,7 @@ interface CanvasContextMenuProps {
   selectedEntityParentId: string | null
   isSelectedContainer: boolean
   onAddEntity: (x: number, y: number) => void
+  onAddSemantic: (x: number, y: number, semanticType: string) => void
   onDeleteEntity?: () => void
   onFitView: () => void
   onSaveAsStamp: (entityId: string, stampName: string) => void
@@ -47,6 +49,7 @@ export function CanvasContextMenu({
   selectedEntityParentId,
   isSelectedContainer,
   onAddEntity,
+  onAddSemantic,
   onDeleteEntity,
   onFitView,
   onSaveAsStamp,
@@ -71,6 +74,12 @@ export function CanvasContextMenu({
       onAddEntity(contextPosition.x, contextPosition.y)
     }
   }, [contextPosition, onAddEntity])
+
+  const handleAddSemantic = useCallback((semanticType: string) => {
+    if (contextPosition) {
+      onAddSemantic(contextPosition.x, contextPosition.y, semanticType)
+    }
+  }, [contextPosition, onAddSemantic])
 
   const handleSaveAsStampClick = useCallback(() => {
     setStampName('')
@@ -203,6 +212,24 @@ export function CanvasContextMenu({
                 <Plus className="mr-2 h-4 w-4" />
                 Add entity
               </ContextMenuItem>
+              {getAllSemantics().length > 0 && (
+                <ContextMenuSub>
+                  <ContextMenuSubTrigger>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Add semantic
+                  </ContextMenuSubTrigger>
+                  <ContextMenuSubContent>
+                    {getAllSemantics().map((semantic) => (
+                      <ContextMenuItem
+                        key={semantic.id}
+                        onClick={() => handleAddSemantic(semantic.id)}
+                      >
+                        {semantic.name}
+                      </ContextMenuItem>
+                    ))}
+                  </ContextMenuSubContent>
+                </ContextMenuSub>
+              )}
               <ContextMenuSeparator />
             </>
           )}
