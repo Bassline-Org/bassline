@@ -834,4 +834,34 @@ export const db = {
       db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, value)
     },
   },
+
+  // =========================================================================
+  // Semantic Docs
+  // =========================================================================
+
+  semanticDocs: {
+    get(id: string) {
+      const db = getDb()
+      return db.prepare('SELECT * FROM semantic_docs WHERE id = ?').get(id) as {
+        id: string
+        name: string
+        summary: string | null
+        description: string | null
+        usage: string | null
+        examples: string | null
+      } | null
+    },
+
+    list() {
+      const db = getDb()
+      return db.prepare('SELECT * FROM semantic_docs').all() as Array<{
+        id: string
+        name: string
+        summary: string | null
+        description: string | null
+        usage: string | null
+        examples: string | null
+      }>
+    },
+  },
 }

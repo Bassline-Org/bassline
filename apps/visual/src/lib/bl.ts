@@ -350,6 +350,50 @@ export const bl = {
   },
 
   // ===========================================================================
+  // Semantic Docs
+  // ===========================================================================
+
+  semanticDocs: {
+    list: async (): Promise<Array<{
+      id: string
+      name: string
+      summary: string | null
+      description: string | null
+      usage: string | null
+      examples: string | null
+    }>> => {
+      const res = await window.bl.get<Array<{
+        id: string
+        name: string
+        summary: string | null
+        description: string | null
+        usage: string | null
+        examples: string | null
+      }>>({ path: '/semantic-docs' })
+      return res.body
+    },
+
+    get: async (id: string): Promise<{
+      id: string
+      name: string
+      summary: string | null
+      description: string | null
+      usage: string | null
+      examples: string | null
+    } | null> => {
+      const res = await window.bl.get<{
+        id: string
+        name: string
+        summary: string | null
+        description: string | null
+        usage: string | null
+        examples: string | null
+      }>({ path: `/semantic-docs/${id}` })
+      return res.headers.condition === 'not-found' ? null : res.body
+    },
+  },
+
+  // ===========================================================================
   // History (Undo/Redo)
   // ===========================================================================
 

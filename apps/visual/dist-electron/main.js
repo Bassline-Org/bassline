@@ -1161,6 +1161,95 @@ function requireElectronWindowState() {
 }
 var electronWindowStateExports = requireElectronWindowState();
 const windowStateKeeper = /* @__PURE__ */ getDefaultExportFromCjs(electronWindowStateExports);
+function parseFrontmatter(content) {
+  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
+  if (!frontmatterMatch) {
+    return { data: {}, body: content };
+  }
+  const [, frontmatterStr, body] = frontmatterMatch;
+  const data = {};
+  for (const line of frontmatterStr.split("\n")) {
+    const colonIndex = line.indexOf(":");
+    if (colonIndex > 0) {
+      const key = line.slice(0, colonIndex).trim();
+      const value = line.slice(colonIndex + 1).trim();
+      data[key] = value;
+    }
+  }
+  return { data, body };
+}
+function extractSections(markdown) {
+  const sections = {};
+  const lines = markdown.split("\n");
+  let currentSection = "";
+  let currentContent = [];
+  for (const line of lines) {
+    const headerMatch = line.match(/^#\s+(.+)$/);
+    if (headerMatch) {
+      if (currentSection) {
+        sections[currentSection.toLowerCase()] = currentContent.join("\n").trim();
+      }
+      currentSection = headerMatch[1];
+      currentContent = [];
+    } else if (currentSection) {
+      currentContent.push(line);
+    }
+  }
+  if (currentSection) {
+    sections[currentSection.toLowerCase()] = currentContent.join("\n").trim();
+  }
+  return sections;
+}
+function parseSemanticDoc(filePath) {
+  const content = readFileSync(filePath, "utf-8");
+  const { data: frontmatter, body } = parseFrontmatter(content);
+  if (!frontmatter.id) {
+    console.warn(`[seedDocs] Skipping ${filePath}: missing 'id' in frontmatter`);
+    return null;
+  }
+  const sections = extractSections(body);
+  return {
+    id: frontmatter.id,
+    name: frontmatter.name || frontmatter.id,
+    summary: frontmatter.summary || "",
+    description: sections.description || "",
+    usage: sections.usage || "",
+    examples: sections.examples || ""
+  };
+}
+function loadSemanticDocs(docsDir) {
+  const docs = /* @__PURE__ */ new Map();
+  if (!existsSync(docsDir)) {
+    console.warn(`[seedDocs] Docs directory not found: ${docsDir}`);
+    return docs;
+  }
+  const files = readdirSync(docsDir).filter((f) => f.endsWith(".md"));
+  for (const file of files) {
+    const doc = parseSemanticDoc(join(docsDir, file));
+    if (doc) {
+      docs.set(doc.id, doc);
+    }
+  }
+  return docs;
+}
+function seedSemanticDocs(db2, docsDir) {
+  const docs = loadSemanticDocs(docsDir);
+  if (docs.size === 0) {
+    console.log("[seedDocs] No semantic docs found to seed");
+    return;
+  }
+  console.log("[seedDocs] Seeding semantic documentation...");
+  const insertDoc = db2.prepare(`
+    INSERT OR REPLACE INTO semantic_docs (id, name, summary, description, usage, examples, modified_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const now = Date.now();
+  for (const [id, doc] of docs) {
+    insertDoc.run(id, doc.name, doc.summary, doc.description, doc.usage, doc.examples, now);
+    console.log(`[seedDocs]   ✓ ${doc.name}`);
+  }
+  console.log(`[seedDocs] Complete. Seeded ${docs.size} semantic docs.`);
+}
 function columnExists(db2, table, column) {
   const cols = db2.prepare(`PRAGMA table_info(${table})`).all();
   return cols.some((c) => c.name === column);
@@ -1254,6 +1343,10 @@ function seed(db2, dataDir) {
   }
   console.log("[seed] Setting defaults...");
   db2.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`).run("active_theme", "dark");
+  const semanticDocsDir = join(dataDir, "../docs/semantics");
+  if (existsSync(semanticDocsDir)) {
+    seedSemanticDocs(db2, semanticDocsDir);
+  }
   console.log("[seed] Complete.");
 }
 const __filename$2 = fileURLToPath(import.meta.url);
@@ -1804,6 +1897,19 @@ const db = {
     set(key, value) {
       const db2 = getDb();
       db2.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, value);
+    }
+  },
+  // =========================================================================
+  // Semantic Docs
+  // =========================================================================
+  semanticDocs: {
+    get(id) {
+      const db2 = getDb();
+      return db2.prepare("SELECT * FROM semantic_docs WHERE id = ?").get(id);
+    },
+    list() {
+      const db2 = getDb();
+      return db2.prepare("SELECT * FROM semantic_docs").all();
     }
   }
 };
@@ -2895,6 +3001,37 @@ function createShellResource() {
     }
   });
 }
+function createSemanticDocsResource(db2) {
+  const singleDoc = resource({
+    get: async (h) => {
+      var _a;
+      const id = (_a = h.params) == null ? void 0 : _a.id;
+      if (!id) {
+        return { headers: { condition: "error" }, body: "Missing id" };
+      }
+      const doc = db2.semanticDocs.get(id);
+      if (!doc) {
+        return { headers: { condition: "not-found" }, body: null };
+      }
+      return { headers: {}, body: doc };
+    },
+    put: async () => {
+      return { headers: { condition: "not-implemented" }, body: null };
+    }
+  });
+  return routes({
+    "": resource({
+      get: async () => {
+        const docs = db2.semanticDocs.list();
+        return { headers: {}, body: docs };
+      },
+      put: async () => {
+        return { headers: { condition: "not-implemented" }, body: null };
+      }
+    }),
+    unknown: bind("id", singleDoc)
+  });
+}
 function createVisualResources(db2) {
   const history = createHistory();
   const projects = createProjectsResource(db2);
@@ -2963,6 +3100,7 @@ function createVisualResources(db2) {
     })
   }));
   const shell2 = createShellResource();
+  const semanticDocs = createSemanticDocsResource(db2);
   const tree = routes({
     projects: routes({
       "": resource({
@@ -2975,7 +3113,8 @@ function createVisualResources(db2) {
     themes,
     settings,
     history,
-    shell: shell2
+    shell: shell2,
+    "semantic-docs": semanticDocs
   });
   const withKit = (res) => {
     const kit = {

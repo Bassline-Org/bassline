@@ -4,6 +4,11 @@
  * Displays and edits documentation stored as attributes on entities.
  * Bind any entity to see/edit its help.* attributes.
  *
+ * Configuration:
+ * - help.mode = "direct" | "output" (default: "direct")
+ *   - direct: Show bound entities themselves (use for viewing semantic docs)
+ *   - output: Show output entities from bound semantics (for composition)
+ *
  * Recognized attributes:
  * - help.summary = Brief one-line description
  * - help.description = Detailed explanation (supports markdown)
@@ -13,16 +18,26 @@
  */
 
 import { useMemo, useCallback, useState, useEffect } from 'react'
-import { HelpCircle, Edit2, Save, X, Plus } from 'lucide-react'
+import { HelpCircle, Edit2, Save, X, Plus, Link, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Markdown } from '@/components/Markdown'
 import type { EntityWithAttrs, EditorLoaderData } from '../types'
-import { useSemanticInput } from '../hooks/useSemanticInput'
+import { useSemanticInput, useDirectBindings } from '../hooks/useSemanticInput'
 import { useBl } from '../hooks/useBl'
 import { useLoaderData } from 'react-router'
+
+type InputMode = 'direct' | 'output'
 
 interface HelpSemanticProps {
   entity: EntityWithAttrs
@@ -104,11 +119,21 @@ function LocalTextarea({
 
 export function HelpSemantic({ entity }: HelpSemanticProps) {
   const { project } = useLoaderData() as EditorLoaderData
-  const { inputEntities } = useSemanticInput(entity)
   const { bl, revalidate } = useBl()
 
   const [isEditing, setIsEditing] = useState(false)
   const [newAttrKey, setNewAttrKey] = useState('')
+
+  // Get input mode - determines how bound entities are resolved
+  // Default to 'direct' so we see the semantic entity itself (with its help.* attrs)
+  const inputMode = (entity.attrs['help.mode'] as InputMode) || 'direct'
+
+  // Call both hooks (can't conditionally call hooks)
+  const { inputEntities: outputEntities } = useSemanticInput(entity)
+  const directEntities = useDirectBindings(entity)
+
+  // Select entities based on mode
+  const inputEntities = inputMode === 'direct' ? directEntities : outputEntities
 
   // Get the target entity (first bound entity)
   const targetEntity = inputEntities[0] || null
@@ -156,6 +181,23 @@ export function HelpSemantic({ entity }: HelpSemanticProps) {
     [bl, project.id, targetEntity, revalidate]
   )
 
+  // Mode change handler
+  const handleModeChange = useCallback(
+    async (value: string) => {
+      await bl.attrs.set(project.id, entity.id, 'help.mode', value)
+      revalidate()
+    },
+    [bl, project.id, entity.id, revalidate]
+  )
+
+  // Get display name for target entity (handle semantics specially)
+  const getEntityDisplayName = (e: EntityWithAttrs) => {
+    if (e.attrs['semantic.type']) {
+      return e.attrs.name || e.attrs['semantic.type']
+    }
+    return e.attrs.name || 'Unnamed'
+  }
+
   // Render a help section
   const renderHelpSection = (
     key: string,
@@ -197,11 +239,7 @@ export function HelpSemantic({ entity }: HelpSemanticProps) {
             />
           )
         ) : (
-          <div className="help-semantic__content">
-            {value?.split('\n').map((line, i) => (
-              <p key={i}>{line || '\u00A0'}</p>
-            ))}
-          </div>
+          <Markdown content={value || ''} className="help-semantic__content" />
         )}
       </div>
     )
@@ -210,6 +248,28 @@ export function HelpSemantic({ entity }: HelpSemanticProps) {
   if (!targetEntity) {
     return (
       <div className="help-semantic">
+        <div className="help-semantic__mode-bar">
+          <HelpCircle className="h-4 w-4" />
+          <Select value={inputMode} onValueChange={handleModeChange}>
+            <SelectTrigger className="help-semantic__mode-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="direct">
+                <div className="flex items-center gap-2">
+                  <Link className="w-3 h-3" />
+                  Direct
+                </div>
+              </SelectItem>
+              <SelectItem value="output">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-3 h-3" />
+                  Output
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="help-semantic__empty">
           <HelpCircle className="h-8 w-8 opacity-50" />
           <p>Bind an entity to view/edit its documentation</p>
@@ -225,10 +285,36 @@ export function HelpSemantic({ entity }: HelpSemanticProps) {
       <div className="help-semantic__header">
         <div className="help-semantic__target">
           <HelpCircle className="h-4 w-4" />
+          <Select value={inputMode} onValueChange={handleModeChange}>
+            <SelectTrigger className="help-semantic__mode-select">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="direct">
+                <div className="flex items-center gap-2">
+                  <Link className="w-3 h-3" />
+                  Direct
+                </div>
+              </SelectItem>
+              <SelectItem value="output">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-3 h-3" />
+                  Output
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="help-semantic__target-info">
           <span className="help-semantic__target-name">
-            {targetEntity.attrs.name || 'Unnamed'}
+            {getEntityDisplayName(targetEntity)}
           </span>
-          {targetEntity.attrs.role && (
+          {targetEntity.attrs['semantic.type'] && (
+            <span className="help-semantic__target-role">
+              {targetEntity.attrs['semantic.type']}
+            </span>
+          )}
+          {!targetEntity.attrs['semantic.type'] && targetEntity.attrs.role && (
             <span className="help-semantic__target-role">
               {targetEntity.attrs.role}
             </span>

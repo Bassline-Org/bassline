@@ -15,6 +15,7 @@ import { createUIStateResource } from './ui-state'
 import { createThemesResource } from './themes'
 import { createSettingsResource } from './settings'
 import { createShellResource } from './shell'
+import { createSemanticDocsResource } from './semantic-docs'
 
 type Db = typeof DbType
 
@@ -95,6 +96,9 @@ export function createVisualResources(db: Db) {
   // Create shell resource
   const shell = createShellResource()
 
+  // Create semantic docs resource
+  const semanticDocs = createSemanticDocsResource(db)
+
   // Main resource tree
   const tree = routes({
     projects: routes({
@@ -109,6 +113,7 @@ export function createVisualResources(db: Db) {
     settings,
     history,
     shell,
+    'semantic-docs': semanticDocs,
   })
 
   // Create a wrapper that injects kit (self-reference) into all requests

@@ -73,7 +73,11 @@ export function SemanticNode({
         <span className="semantic-node__name">{name}</span>
       </div>
 
-      <div className="semantic-node__content">
+      <div
+        className="semantic-node__content nodrag"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <Suspense fallback={<div className="semantic-node__loading">Loading...</div>}>
           <SemanticComponent entity={entity} />
         </Suspense>

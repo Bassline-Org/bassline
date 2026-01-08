@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { readdirSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
+import { seedSemanticDocs } from './seedDocs'
 
 interface TokenDefinition {
   id: string
@@ -152,6 +153,12 @@ export function seed(db: Database.Database, dataDir: string) {
   console.log('[seed] Setting defaults...')
   db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`)
     .run('active_theme', 'dark')
+
+  // 5. Seed semantic documentation
+  const semanticDocsDir = join(dataDir, '../docs/semantics')
+  if (existsSync(semanticDocsDir)) {
+    seedSemanticDocs(db, semanticDocsDir)
+  }
 
   console.log('[seed] Complete.')
 }
