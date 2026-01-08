@@ -64,18 +64,39 @@ export function PropertyPanel({ entity, vocabulary, onUpdateAttr, onDeleteAttr, 
     return vocabulary.roles.find(r => r.value === role)
   }, [vocabulary.roles, role])
 
+  // Valid direction values
+  const directionValues = ['input', 'output', 'bidirectional'] as const
+  type PortDirection = typeof directionValues[number]
+
+  // Get port direction from attr value
+  const getPortDirection = (value: string | undefined, vocabDef?: PortDefinition): PortDirection => {
+    if (value === 'input' || value === 'output' || value === 'bidirectional') {
+      return value
+    }
+    // Use vocabulary default if available, otherwise bidirectional
+    return vocabDef?.direction ?? 'bidirectional'
+  }
+
+  // Check if port is enabled (value is truthy direction or 'true')
+  const isPortEnabled = (value: string | undefined): boolean => {
+    if (!value || value === 'false') return false
+    return value === 'true' || directionValues.includes(value as PortDirection)
+  }
+
   // Get all ports: vocabulary-defined + custom (from entity attrs)
   const allPorts = useMemo(() => {
-    const ports: { name: string; enabled: boolean; fromVocab: boolean; def?: PortDefinition }[] = []
+    const ports: { name: string; enabled: boolean; direction: PortDirection; fromVocab: boolean; def?: PortDefinition }[] = []
     const seen = new Set<string>()
 
     // First add vocabulary-defined ports
     if (roleVocab) {
       for (const portDef of roleVocab.ports) {
         const attrKey = `port.${portDef.name}`
+        const attrValue = entity.attrs[attrKey]
         ports.push({
           name: portDef.name,
-          enabled: entity.attrs[attrKey] === 'true',
+          enabled: isPortEnabled(attrValue),
+          direction: getPortDirection(attrValue, portDef),
           fromVocab: true,
           def: portDef,
         })
@@ -84,14 +105,15 @@ export function PropertyPanel({ entity, vocabulary, onUpdateAttr, onDeleteAttr, 
     }
 
     // Then add custom ports from entity attrs that aren't in vocabulary
-    // Include both 'true' and 'false' values (false means defined but hidden)
+    // Include 'false' values so disabled ports still show in the list
     for (const [key, value] of Object.entries(entity.attrs)) {
-      if (key.startsWith('port.') && (value === 'true' || value === 'false')) {
+      if (key.startsWith('port.') && value) {
         const portName = key.slice(5)
         if (!seen.has(portName)) {
           ports.push({
             name: portName,
-            enabled: value === 'true',
+            enabled: isPortEnabled(value),
+            direction: getPortDirection(value),
             fromVocab: false,
           })
         }
@@ -527,19 +549,38 @@ export function PropertyPanel({ entity, vocabulary, onUpdateAttr, onDeleteAttr, 
           </Label>
 
           {allPorts.length > 0 && (
-            <div className="flex flex-wrap gap-4">
-              {allPorts.map(({ name: portName, enabled, fromVocab, def }) => (
+            <div className="space-y-2">
+              {allPorts.map(({ name: portName, enabled, direction, fromVocab, def }) => (
                 <div key={portName} className="flex items-center gap-2">
                   <Switch
                     checked={enabled}
                     onCheckedChange={(checked) => {
-                      // Set to 'true' or 'false', don't delete - preserves port definition
-                      onUpdateAttr(`port.${portName}`, checked ? 'true' : 'false')
+                      if (checked) {
+                        // Enable with current direction (or bidirectional default)
+                        onUpdateAttr(`port.${portName}`, direction)
+                      } else {
+                        onUpdateAttr(`port.${portName}`, 'false')
+                      }
                     }}
                   />
-                  <span className="text-sm" title={def?.description}>
-                    {def?.label || portName.toUpperCase()}
+                  <span className="text-sm flex-1" title={def?.description}>
+                    {def?.label || portName}
                   </span>
+                  {enabled && (
+                    <Select
+                      value={direction}
+                      onValueChange={(value) => onUpdateAttr(`port.${portName}`, value)}
+                    >
+                      <SelectTrigger className="h-6 w-20 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bidirectional">Both</SelectItem>
+                        <SelectItem value="input">In</SelectItem>
+                        <SelectItem value="output">Out</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                   {!fromVocab && (
                     <Button
                       variant="ghost"

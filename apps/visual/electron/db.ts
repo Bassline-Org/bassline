@@ -606,32 +606,32 @@ export const db = {
       return db.prepare('SELECT * FROM relationships WHERE project_id = ?').all(projectId)
     },
 
-    create(projectId: string, data: { from_entity: string; to_entity: string; kind: string; label?: string | null; binding_name?: string | null }) {
+    create(projectId: string, data: { from_entity: string; to_entity: string; kind: string; label?: string | null; binding_name?: string | null; from_port?: string | null; to_port?: string | null }) {
       const db = getDb()
       const id = randomUUID()
-      const { from_entity, to_entity, kind, label = null, binding_name = null } = data
+      const { from_entity, to_entity, kind, label = null, binding_name = null, from_port = null, to_port = null } = data
 
       db.prepare(`
-        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name)
+        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
 
       this._touchProject(projectId)
-      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name }
+      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port }
     },
 
     /** Create relationship with a specific ID (used for undo/restore) */
-    createWithId(projectId: string, id: string, data: { from_entity: string; to_entity: string; kind: string; label?: string | null; binding_name?: string | null }) {
+    createWithId(projectId: string, id: string, data: { from_entity: string; to_entity: string; kind: string; label?: string | null; binding_name?: string | null; from_port?: string | null; to_port?: string | null }) {
       const db = getDb()
-      const { from_entity, to_entity, kind, label = null, binding_name = null } = data
+      const { from_entity, to_entity, kind, label = null, binding_name = null, from_port = null, to_port = null } = data
 
       db.prepare(`
-        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name)
+        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
 
       this._touchProject(projectId)
-      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name }
+      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port }
     },
 
     /** Get a relationship by ID */
@@ -645,6 +645,8 @@ export const db = {
         kind: string
         label: string | null
         binding_name: string | null
+        from_port: string | null
+        to_port: string | null
       } | null
     },
 

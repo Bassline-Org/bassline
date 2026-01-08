@@ -2,13 +2,14 @@ import { createHashRouter, redirect } from 'react-router'
 import { ProjectList } from './routes/projects'
 import { Editor } from './routes/editor'
 import { Settings } from './routes/settings'
+import { bl } from './lib/bl'
 
 export const router = createHashRouter([
   {
     path: '/',
     element: <ProjectList />,
     loader: async () => {
-      const projects = await window.db.projects.list()
+      const projects = await bl.projects.list()
       return { projects }
     },
     action: async ({ request }) => {
@@ -17,13 +18,13 @@ export const router = createHashRouter([
 
       if (intent === 'create') {
         const name = formData.get('name') as string
-        const project = await window.db.projects.create(name || 'Untitled Project')
+        const project = await bl.projects.create(name || 'Untitled Project')
         return redirect(`/project/${project.id}`)
       }
 
       if (intent === 'delete') {
         const id = formData.get('id') as string
-        await window.db.projects.delete(id)
+        await bl.projects.delete(id)
         return { ok: true }
       }
 
@@ -33,15 +34,15 @@ export const router = createHashRouter([
   {
     path: '/project/:id',
     element: <Editor />,
-    // All mutations now go through commands which trigger explicit revalidation
+    // All mutations go through bl client, useBl() triggers revalidation
     loader: async ({ params }) => {
       const projectId = params.id!
       const [project, entities, relationships, stamps, uiState] = await Promise.all([
-        window.db.projects.get(projectId),
-        window.db.entities.list(projectId),
-        window.db.relationships.list(projectId),
-        window.db.stamps.list(),
-        window.db.uiState.get(projectId),
+        bl.projects.get(projectId),
+        bl.entities.list(projectId),
+        bl.relationships.list(projectId),
+        bl.stamps.list(),
+        bl.uiState.get(projectId),
       ])
 
       if (!project) {

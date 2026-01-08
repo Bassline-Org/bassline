@@ -7,11 +7,13 @@ import {
   useReactFlow,
   ReactFlowProvider,
   ConnectionMode,
+  SelectionMode,
   type Node,
   type Edge,
   type OnConnect,
   type Viewport,
   type NodeChange,
+  type OnSelectionChangeParams,
   applyNodeChanges,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -27,33 +29,37 @@ interface CanvasProps {
   entities: EntityWithAttrs[]
   relationships: Relationship[]
   stamps: StampWithAttrs[]
-  selectedEntityId: string | null
+  selectedEntityIds: Set<string>
   uiState: UIState
   onCreateEntity: (x: number, y: number) => void
   onMoveEntity: (entityId: string, x: number, y: number) => void
   onResizeEntity: (entityId: string, width: number, height: number) => void
-  onSelectEntity: (entityId: string | null) => void
+  onSelectEntities: (entityIds: Set<string>) => void
   onDeleteEntity: (entityId: string) => void
+  onDeleteEntities: (entityIds: string[]) => void
   onDeleteRelationship: (relationshipId: string) => void
-  onConnect: (from: string, to: string) => void
+  onConnect: (from: string, to: string, fromPort: string | null, toPort: string | null) => void
   onContain: (parentId: string, childId: string) => void
   onUncontain: (childId: string) => void
   onViewportChange: (x: number, y: number, zoom: number) => void
   onSaveAsStamp: (entityId: string, stampName: string) => void
   onApplyStamp: (stampId: string, entityId: string) => void
+  onBundle?: () => void
+  onUnbundle?: () => void
 }
 
 function CanvasInner({
   entities,
   relationships,
   stamps,
-  selectedEntityId,
+  selectedEntityIds,
   uiState,
   onCreateEntity,
   onMoveEntity,
   onResizeEntity,
-  onSelectEntity,
+  onSelectEntities,
   onDeleteEntity,
+  onDeleteEntities,
   onDeleteRelationship,
   onConnect,
   onContain,
@@ -61,12 +67,19 @@ function CanvasInner({
   onViewportChange,
   onSaveAsStamp,
   onApplyStamp,
+  onBundle,
+  onUnbundle,
 }: CanvasProps) {
   const viewportTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { screenToFlowPosition, fitView } = useReactFlow()
 
   // Track selected edge for deletion
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+
+  // Derived single selection for backwards compat with context menu
+  const selectedEntityId = selectedEntityIds.size === 1
+    ? [...selectedEntityIds][0]
+    : null
 
   // Build parent lookup from contains relationships
   const parentLookup = useMemo(() => {
@@ -141,44 +154,59 @@ function CanvasInner({
       const isContainer = containerIds.has(e.id)
       const childCount = childCounts[e.id] || 0
       const hasParent = parentId && !collapsedParentIds.has(parentId)
+      const collapseMode = e.attrs['ui.collapse'] || 'expanded'
 
       // Get dimensions - use explicit ui.width/ui.height or defaults
       const uiWidth = e.attrs['ui.width'] ? parseFloat(e.attrs['ui.width']) : undefined
       const uiHeight = e.attrs['ui.height'] ? parseFloat(e.attrs['ui.height']) : undefined
 
-      // Container nodes need explicit dimensions for extent: 'parent' to work
-      const nodeStyle = isContainer || uiWidth || uiHeight ? {
-        width: uiWidth || (isContainer ? 200 : undefined),
-        height: uiHeight || (isContainer ? 150 : undefined),
-      } : undefined
+      // Calculate node dimensions based on collapse state
+      const nodeStyle = (() => {
+        // Compact mode: small square for icon only
+        if (collapseMode === 'compact') {
+          return { width: 40, height: 40 }
+        }
+        // Collapsed mode: pill shape for name badge
+        if (collapseMode === 'collapsed') {
+          return { width: 120, height: 32 }
+        }
+        // Expanded: use explicit dimensions, container defaults, or let auto-size
+        if (isContainer || uiWidth || uiHeight) {
+          return {
+            width: uiWidth || (isContainer ? 200 : undefined),
+            height: uiHeight || (isContainer ? 150 : undefined),
+          }
+        }
+        return undefined
+      })()
 
       return {
         id: e.id,
         type: 'entity',
         position: { x: parseFloat(e.attrs.x || '0'), y: parseFloat(e.attrs.y || '0') },
         data: { entity: e, isContainer, childCount },
-        selected: e.id === selectedEntityId,
+        selected: selectedEntityIds.has(e.id),
         parentId: hasParent ? parentId : undefined,
         extent: hasParent ? 'parent' as const : undefined,
         expandParent: true,
         style: nodeStyle,
       }
     })
-  }, [entities, parentLookup, containerIds, selectedEntityId, childCounts, collapsedParentIds])
+  }, [entities, parentLookup, containerIds, selectedEntityIds, childCounts, collapsedParentIds])
 
   // Controlled nodes state - React Flow manages this during interactions
   const [nodes, setNodes] = useState<Node[]>(deriveNodes)
 
   // Sync nodes when entities change (create/delete) or selection changes
   const prevEntitiesRef = useRef(entities)
-  const prevSelectionRef = useRef(selectedEntityId)
+  const prevSelectionRef = useRef(selectedEntityIds)
   useEffect(() => {
     const entitiesChanged = prevEntitiesRef.current !== entities
-    const selectionChanged = prevSelectionRef.current !== selectedEntityId
+    const selectionChanged = prevSelectionRef.current !== selectedEntityIds
 
     if (entitiesChanged || selectionChanged) {
       prevEntitiesRef.current = entities
-      prevSelectionRef.current = selectedEntityId
+      prevSelectionRef.current = selectedEntityIds
 
       if (entitiesChanged) {
         // Full rebuild when entities change
@@ -187,25 +215,20 @@ function CanvasInner({
         // Just update selection state
         setNodes(prev => prev.map(n => ({
           ...n,
-          selected: n.id === selectedEntityId
+          selected: selectedEntityIds.has(n.id)
         })))
       }
     }
-  }, [entities, selectedEntityId, deriveNodes])
+  }, [entities, selectedEntityIds, deriveNodes])
 
-  // Handle all node changes (position, selection, resize, etc.)
+  // Handle all node changes (position, resize, etc.)
+  // NOTE: Selection is handled by onSelectionChange, not here
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       setNodes(prev => applyNodeChanges(changes, prev))
 
-      // Check for selection and dimension changes
+      // Handle resize changes only
       for (const change of changes) {
-        if (change.type === 'select') {
-          if (change.selected) {
-            onSelectEntity(change.id)
-          }
-        }
-        // Handle resize changes
         if (change.type === 'dimensions' && change.resizing === false) {
           // Resizing finished - persist the dimensions
           const node = nodes.find(n => n.id === change.id)
@@ -215,42 +238,63 @@ function CanvasInner({
         }
       }
     },
-    [onSelectEntity, onResizeEntity, nodes]
+    [onResizeEntity, nodes]
   )
+
+  // Build entity lookup for collapse state
+  const entityLookup = useMemo(() => {
+    const lookup: Record<string, EntityWithAttrs> = {}
+    for (const e of entities) {
+      lookup[e.id] = e
+    }
+    return lookup
+  }, [entities])
 
   // Derive edges from relationships
   const edges: Edge[] = useMemo(
     () =>
       relationships
         .filter((r) => r.kind === 'connects')
-        .map((r) => ({
-          id: r.id,
-          source: r.from_entity,
-          target: r.to_entity,
-          label: r.label || undefined,
-          type: r.kind === 'binds' ? 'smoothstep' : 'default',
-          style: r.kind === 'binds' ? { strokeDasharray: '5,5' } : undefined,
-          selected: r.id === selectedEdgeId,
-        })),
-    [relationships, selectedEdgeId]
+        .map((r) => {
+          const sourceEntity = entityLookup[r.from_entity]
+          const targetEntity = entityLookup[r.to_entity]
+          const sourceCollapse = sourceEntity?.attrs['ui.collapse']
+          const targetCollapse = targetEntity?.attrs['ui.collapse']
+          const hasCollapsedEnd =
+            sourceCollapse === 'collapsed' || sourceCollapse === 'compact' ||
+            targetCollapse === 'collapsed' || targetCollapse === 'compact'
+
+          return {
+            id: r.id,
+            source: r.from_entity,
+            target: r.to_entity,
+            sourceHandle: r.from_port || undefined,
+            targetHandle: r.to_port || undefined,
+            label: r.label || undefined,
+            type: r.kind === 'binds' ? 'smoothstep' : 'default',
+            style: r.kind === 'binds' ? { strokeDasharray: '5,5' } : undefined,
+            selected: r.id === selectedEdgeId,
+            className: hasCollapsedEnd ? 'collapsed-edge' : undefined,
+          }
+        }),
+    [relationships, selectedEdgeId, entityLookup]
   )
 
-  // Click on node to select
+  // Click on node - selection is handled by React Flow's onSelectionChange
   const handleNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      onSelectEntity(node.id)
-      setSelectedEdgeId(null) // Deselect any edge
+    (_event: React.MouseEvent, _node: Node) => {
+      setSelectedEdgeId(null) // Deselect any edge when clicking a node
     },
-    [onSelectEntity]
+    []
   )
 
   // Click on edge to select
   const handleEdgeClick = useCallback(
     (_event: React.MouseEvent, edge: Edge) => {
       setSelectedEdgeId(edge.id)
-      onSelectEntity(null) // Deselect any node
+      onSelectEntities(new Set()) // Deselect any nodes
     },
-    [onSelectEntity]
+    [onSelectEntities]
   )
 
   // Keyboard handler for Delete/Backspace
@@ -265,14 +309,15 @@ function CanvasInner({
         if (selectedEdgeId) {
           onDeleteRelationship(selectedEdgeId)
           setSelectedEdgeId(null)
-        } else if (selectedEntityId) {
-          onDeleteEntity(selectedEntityId)
+        } else if (selectedEntityIds.size > 0) {
+          // Delete all selected entities
+          onDeleteEntities([...selectedEntityIds])
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedEdgeId, selectedEntityId, onDeleteRelationship, onDeleteEntity])
+  }, [selectedEdgeId, selectedEntityIds, onDeleteRelationship, onDeleteEntities])
 
   // Context menu handlers
   const handleAddEntity = useCallback(
@@ -284,10 +329,14 @@ function CanvasInner({
   )
 
   const handleDeleteSelected = useCallback(() => {
-    if (selectedEntityId) {
-      onDeleteEntity(selectedEntityId)
+    if (selectedEntityIds.size === 1) {
+      // Single delete
+      onDeleteEntity([...selectedEntityIds][0])
+    } else if (selectedEntityIds.size > 1) {
+      // Multi-delete
+      onDeleteEntities([...selectedEntityIds])
     }
-  }, [selectedEntityId, onDeleteEntity])
+  }, [selectedEntityIds, onDeleteEntity, onDeleteEntities])
 
   const handleFitView = useCallback(() => {
     fitView({ padding: 0.2 })
@@ -304,16 +353,29 @@ function CanvasInner({
   const handleConnect: OnConnect = useCallback(
     (params) => {
       if (params.source && params.target) {
-        onConnect(params.source, params.target)
+        onConnect(
+          params.source,
+          params.target,
+          params.sourceHandle || null,
+          params.targetHandle || null
+        )
       }
     },
     [onConnect]
   )
 
+  // Click on empty space - node selection is handled by React Flow's onSelectionChange
   const handlePaneClick = useCallback(() => {
-    onSelectEntity(null)
     setSelectedEdgeId(null)
-  }, [onSelectEntity])
+  }, [])
+
+  // React Flow's selection change handler - this is the source of truth for node selection
+  const handleSelectionChange = useCallback(
+    ({ nodes }: OnSelectionChangeParams) => {
+      onSelectEntities(new Set(nodes.map(n => n.id)))
+    },
+    [onSelectEntities]
+  )
 
   const handleMoveEnd = useCallback(
     (_event: unknown, viewport: Viewport) => {
@@ -337,6 +399,9 @@ function CanvasInner({
   // Get selected entity's parent id
   const selectedEntityParentId = selectedEntityId ? parentLookup[selectedEntityId] || null : null
 
+  // Check if selected entity is a container
+  const isSelectedContainer = selectedEntityId ? containerIds.has(selectedEntityId) : false
+
   const handleSetParent = useCallback(
     (parentId: string) => {
       if (selectedEntityId) {
@@ -356,15 +421,18 @@ function CanvasInner({
     <CanvasContextMenu
       entities={entities}
       stamps={stamps}
-      selectedEntityId={selectedEntityId}
+      selectedEntityIds={selectedEntityIds}
       selectedEntityParentId={selectedEntityParentId}
+      isSelectedContainer={isSelectedContainer}
       onAddEntity={handleAddEntity}
-      onDeleteEntity={selectedEntityId ? handleDeleteSelected : undefined}
+      onDeleteEntity={selectedEntityIds.size > 0 ? handleDeleteSelected : undefined}
       onFitView={handleFitView}
       onSaveAsStamp={onSaveAsStamp}
       onApplyStamp={onApplyStamp}
       onSetParent={handleSetParent}
       onRemoveFromParent={handleRemoveFromParent}
+      onBundle={onBundle}
+      onUnbundle={onUnbundle}
     >
       <ReactFlow
         nodes={nodes}
@@ -377,12 +445,15 @@ function CanvasInner({
         onConnect={handleConnect}
         onPaneClick={handlePaneClick}
         onMoveEnd={handleMoveEnd}
+        onSelectionChange={handleSelectionChange}
         defaultViewport={defaultViewport}
         fitView={entities.length > 0 && uiState.viewport_zoom === 1}
         connectionMode={ConnectionMode.Loose}
         connectOnClick={false}
         snapToGrid
         snapGrid={[10, 10]}
+        selectionOnDrag
+        selectionMode={SelectionMode.Partial}
         proOptions={{ hideAttribution: true }}
       >
         <Background />

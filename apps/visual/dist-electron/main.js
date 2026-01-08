@@ -1159,14 +1159,36 @@ function requireElectronWindowState() {
 }
 var electronWindowStateExports = requireElectronWindowState();
 const windowStateKeeper = /* @__PURE__ */ getDefaultExportFromCjs(electronWindowStateExports);
+function columnExists(db2, table, column) {
+  const cols = db2.prepare(`PRAGMA table_info(${table})`).all();
+  return cols.some((c) => c.name === column);
+}
 function runMigrations(db2, dataDir) {
   const schemaDir = join(dataDir, "schema");
+  db2.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  const applied = new Set(
+    db2.prepare("SELECT name FROM _migrations").all().map((r) => r.name)
+  );
+  if (!applied.has("005_port_columns.sql") && columnExists(db2, "relationships", "from_port")) {
+    db2.prepare("INSERT INTO _migrations (name) VALUES (?)").run("005_port_columns.sql");
+    applied.add("005_port_columns.sql");
+  }
   console.log("[migrations] Running migrations...");
   if (existsSync(schemaDir)) {
     const schemaFiles = readdirSync(schemaDir).filter((f) => f.endsWith(".sql")).sort();
     for (const file of schemaFiles) {
+      if (applied.has(file)) {
+        console.log(`[migrations]   - ${file} (already applied)`);
+        continue;
+      }
       const sql = readFileSync(join(schemaDir, file), "utf-8");
       db2.exec(sql);
+      db2.prepare("INSERT INTO _migrations (name) VALUES (?)").run(file);
       console.log(`[migrations]   ✓ ${file}`);
     }
   }
@@ -1624,24 +1646,24 @@ const db = {
     create(projectId, data) {
       const db2 = getDb();
       const id = randomUUID();
-      const { from_entity, to_entity, kind, label = null, binding_name = null } = data;
+      const { from_entity, to_entity, kind, label = null, binding_name = null, from_port = null, to_port = null } = data;
       db2.prepare(`
-        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name);
+        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port);
       this._touchProject(projectId);
-      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name };
+      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port };
     },
     /** Create relationship with a specific ID (used for undo/restore) */
     createWithId(projectId, id, data) {
       const db2 = getDb();
-      const { from_entity, to_entity, kind, label = null, binding_name = null } = data;
+      const { from_entity, to_entity, kind, label = null, binding_name = null, from_port = null, to_port = null } = data;
       db2.prepare(`
-        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name);
+        INSERT INTO relationships (id, project_id, from_entity, to_entity, kind, label, binding_name, from_port, to_port)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port);
       this._touchProject(projectId);
-      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name };
+      return { id, project_id: projectId, from_entity, to_entity, kind, label, binding_name, from_port, to_port };
     },
     /** Get a relationship by ID */
     get(id) {
@@ -1956,6 +1978,944 @@ function createDockMenu(callbacks, recentProjects = []) {
     ] : []
   ]);
 }
+const BASSLINE_TYPE = Symbol("$BASSLINE_TYPE");
+const JS_TYPES = {
+  arr: "js/arr",
+  obj: "js/obj",
+  str: "js/str",
+  num: "js/num",
+  bigInt: "js/bigInt",
+  null: "js/null",
+  undefined: "js/undefined",
+  bool: "js/boolean",
+  fn: "js/function",
+  sym: "js/symbol",
+  error: "js/error"
+};
+const typed = (type, headers, body = null) => ({
+  headers: { ...headers, type },
+  body
+});
+const notFound = () => typed(JS_TYPES.error, { condition: "not-found" }, null);
+const safe = (handler) => async (h, b) => {
+  var _a, _b;
+  try {
+    return await handler(h, b);
+  } catch (e) {
+    (_b = (_a = h == null ? void 0 : h.kit) == null ? void 0 : _a.put) == null ? void 0 : _b.call(
+      _a,
+      { type: JS_TYPES.error, path: "/condition" },
+      {
+        error: e.message,
+        stack: e.stack,
+        context: { path: h == null ? void 0 : h.path, params: h == null ? void 0 : h.params }
+      }
+    ).catch(() => {
+    });
+    return { headers: { type: JS_TYPES.error, condition: "error" }, body: { error: e.message } };
+  }
+};
+const detectType = (value) => {
+  if (Array.isArray(value)) return JS_TYPES.arr;
+  switch (typeof value) {
+    case "number":
+      return JS_TYPES.num;
+    case "boolean":
+      return JS_TYPES.bool;
+    case "bigint":
+      return JS_TYPES.bigInt;
+    case "function":
+      return JS_TYPES.fn;
+    case "symbol":
+      return JS_TYPES.sym;
+    case "string":
+      return JS_TYPES.str;
+    case "undefined":
+      return JS_TYPES.undefined;
+    case "object": {
+      if (value === null) return JS_TYPES.null;
+      if (value instanceof Error) return JS_TYPES.error;
+      if (value[BASSLINE_TYPE]) return value[BASSLINE_TYPE];
+      return JS_TYPES.obj;
+    }
+  }
+};
+const resource = ({ get = notFound, put = notFound } = {}) => ({
+  get: safe(get),
+  put: safe(async (headers, body) => {
+    if (!(headers == null ? void 0 : headers.type)) {
+      headers.type = detectType(body);
+    }
+    return await put(headers, body);
+  })
+});
+const splitPath = (path2) => {
+  const [segment, ...rest] = (path2 ?? "/").split("/").filter(Boolean);
+  return [segment, rest.length ? "/" + rest.join("/") : "/"];
+};
+const pathRoot = (headers) => {
+  const [segment, remaining] = splitPath(headers.path);
+  return [segment, { ...headers, path: remaining }];
+};
+const disp = (map, dispatchFn) => async (method, headers, body) => {
+  var _a, _b;
+  const [key, rest] = await dispatchFn(headers);
+  const target = map[key ?? ""] ?? map.unknown;
+  if (!target) return notFound();
+  const isUnknown = map[key] === void 0 && map.unknown !== void 0;
+  if (isUnknown) {
+    return ((_a = target[method]) == null ? void 0 : _a.call(target, headers, body)) ?? notFound();
+  }
+  return ((_b = target[method]) == null ? void 0 : _b.call(target, rest, body)) ?? notFound();
+};
+function routes(map, dispatchFn = pathRoot) {
+  const dispatch = disp(map, dispatchFn);
+  return resource({
+    get: (h) => dispatch("get", h),
+    put: (h, b) => dispatch("put", h, b)
+  });
+}
+const bind = (name, target) => {
+  const next = (h) => {
+    const [segment, remaining] = splitPath(h.path);
+    return { ...h, path: remaining, params: { ...h.params, [name]: segment } };
+  };
+  return resource({
+    get: (h) => target.get(next(h)),
+    put: (h, b) => target.put(next(h), b)
+  });
+};
+function isCompound(entry) {
+  return "operations" in entry;
+}
+const MAX_STACK = 100;
+function createHistory() {
+  const undoStack = [];
+  const redoStack = [];
+  let batchOperations = null;
+  return routes({
+    // GET /history - get undo/redo state
+    "": resource({
+      get: async () => ({
+        headers: {},
+        body: {
+          canUndo: undoStack.length > 0,
+          canRedo: redoStack.length > 0,
+          undoCount: undoStack.length,
+          redoCount: redoStack.length,
+          inBatch: batchOperations !== null
+        }
+      })
+    }),
+    // PUT /history/push - record an undoable operation
+    push: resource({
+      put: async (_h, entry) => {
+        if (batchOperations !== null) {
+          batchOperations.push(entry);
+          return { headers: {}, body: { pushed: true, batched: true } };
+        }
+        undoStack.push(entry);
+        if (undoStack.length > MAX_STACK) {
+          undoStack.shift();
+        }
+        redoStack.length = 0;
+        return { headers: {}, body: { pushed: true } };
+      }
+    }),
+    // PUT /history/beginBatch - start collecting operations into a batch
+    beginBatch: resource({
+      put: async () => {
+        if (batchOperations !== null) {
+          return { headers: { condition: "already-batching" }, body: null };
+        }
+        batchOperations = [];
+        return { headers: {}, body: { started: true } };
+      }
+    }),
+    // PUT /history/endBatch - finalize batch as single undo step
+    endBatch: resource({
+      put: async () => {
+        if (batchOperations === null) {
+          return { headers: { condition: "not-batching" }, body: null };
+        }
+        const operations = batchOperations;
+        batchOperations = null;
+        if (operations.length === 0) {
+          return { headers: {}, body: { ended: true, operationCount: 0 } };
+        }
+        if (operations.length === 1) {
+          undoStack.push(operations[0]);
+        } else {
+          undoStack.push({ operations });
+        }
+        if (undoStack.length > MAX_STACK) {
+          undoStack.shift();
+        }
+        redoStack.length = 0;
+        return { headers: {}, body: { ended: true, operationCount: operations.length } };
+      }
+    }),
+    // PUT /history/cancelBatch - discard batch without pushing
+    cancelBatch: resource({
+      put: async () => {
+        if (batchOperations === null) {
+          return { headers: { condition: "not-batching" }, body: null };
+        }
+        const count = batchOperations.length;
+        batchOperations = null;
+        return { headers: {}, body: { cancelled: true, discardedCount: count } };
+      }
+    }),
+    // PUT /history/undo - undo last operation
+    undo: resource({
+      put: async (h) => {
+        const entry = undoStack.pop();
+        if (!entry) {
+          return { headers: { condition: "empty" }, body: null };
+        }
+        if (h.kit) {
+          if (isCompound(entry)) {
+            for (let i = entry.operations.length - 1; i >= 0; i--) {
+              const op = entry.operations[i];
+              await h.kit.put({ path: op.backward.path, skipHistory: true }, op.backward.body);
+            }
+          } else {
+            await h.kit.put({ path: entry.backward.path, skipHistory: true }, entry.backward.body);
+          }
+        }
+        redoStack.push(entry);
+        return { headers: {}, body: { undone: true } };
+      }
+    }),
+    // PUT /history/redo - redo last undone operation
+    redo: resource({
+      put: async (h) => {
+        const entry = redoStack.pop();
+        if (!entry) {
+          return { headers: { condition: "empty" }, body: null };
+        }
+        if (h.kit) {
+          if (isCompound(entry)) {
+            for (const op of entry.operations) {
+              await h.kit.put({ path: op.forward.path, skipHistory: true }, op.forward.body);
+            }
+          } else {
+            await h.kit.put({ path: entry.forward.path, skipHistory: true }, entry.forward.body);
+          }
+        }
+        undoStack.push(entry);
+        return { headers: {}, body: { redone: true } };
+      }
+    }),
+    // PUT /history/clear - clear all history
+    clear: resource({
+      put: async () => {
+        undoStack.length = 0;
+        redoStack.length = 0;
+        return { headers: {}, body: { cleared: true } };
+      }
+    })
+  });
+}
+function createProjectsResource(db2) {
+  return routes({
+    // GET /projects - list all projects
+    // PUT /projects - create new project
+    "": resource({
+      get: async () => ({
+        headers: { type: "js/arr" },
+        body: db2.projects.list()
+      }),
+      put: async (_h, body) => {
+        const project = db2.projects.create((body == null ? void 0 : body.name) || "Untitled Project");
+        return { headers: { created: true }, body: project };
+      }
+    }),
+    // GET /projects/:id - get project
+    // PUT /projects/:id with null body - delete project
+    unknown: bind("projectId", resource({
+      get: async (h) => {
+        var _a;
+        const project = db2.projects.get(((_a = h.params) == null ? void 0 : _a.projectId) || "");
+        if (!project) {
+          return { headers: { condition: "not-found" }, body: null };
+        }
+        return { headers: {}, body: project };
+      },
+      put: async (h, body) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        if (body === null) {
+          db2.projects.delete(projectId);
+          return { headers: { deleted: true }, body: null };
+        }
+        return { headers: { condition: "not-implemented" }, body: null };
+      }
+    }))
+  });
+}
+function createEntitiesResource(db2) {
+  const createAttrsResource = (projectId, entityId) => routes({
+    // GET /attrs - get all attrs
+    // PUT /attrs - batch set attrs
+    "": resource({
+      get: async () => ({
+        headers: { type: "js/obj" },
+        body: db2.attrs.get(entityId)
+      }),
+      put: async (h, body) => {
+        const prev = db2.attrs.get(entityId);
+        db2.attrs.setBatch(entityId, body);
+        if (h.kit && !h.skipHistory) {
+          await h.kit.put(
+            { path: "/history/push" },
+            {
+              forward: {
+                path: `/projects/${projectId}/entities/${entityId}/attrs`,
+                body
+              },
+              backward: {
+                path: `/projects/${projectId}/entities/${entityId}/attrs`,
+                body: prev
+              }
+            }
+          );
+        }
+        return { headers: {}, body };
+      }
+    }),
+    // GET/PUT/DELETE /attrs/:key - single attr
+    unknown: bind("key", resource({
+      get: async (h) => {
+        var _a;
+        const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+        const attrs = db2.attrs.get(entityId);
+        const value = attrs[key];
+        if (value === void 0) {
+          return { headers: { condition: "not-found" }, body: null };
+        }
+        return { headers: {}, body: value };
+      },
+      put: async (h, body) => {
+        var _a;
+        const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+        const attrs = db2.attrs.get(entityId);
+        const prev = attrs[key];
+        const hadValue = key in attrs;
+        if (body === null) {
+          db2.attrs.delete(entityId, key);
+          if (h.kit && hadValue && !h.skipHistory) {
+            await h.kit.put(
+              { path: "/history/push" },
+              {
+                forward: {
+                  path: `/projects/${projectId}/entities/${entityId}/attrs/${key}`,
+                  body: null
+                },
+                backward: {
+                  path: `/projects/${projectId}/entities/${entityId}/attrs/${key}`,
+                  body: prev
+                }
+              }
+            );
+          }
+        } else {
+          db2.attrs.set(entityId, key, String(body));
+          if (h.kit && !h.skipHistory) {
+            await h.kit.put(
+              { path: "/history/push" },
+              {
+                forward: {
+                  path: `/projects/${projectId}/entities/${entityId}/attrs/${key}`,
+                  body
+                },
+                backward: hadValue ? {
+                  path: `/projects/${projectId}/entities/${entityId}/attrs/${key}`,
+                  body: prev
+                } : {
+                  path: `/projects/${projectId}/entities/${entityId}/attrs/${key}`,
+                  body: null
+                }
+              }
+            );
+          }
+        }
+        return { headers: {}, body };
+      }
+    }))
+  });
+  const createEntityResource = (projectId) => bind("entityId", routes({
+    // GET /entities/:id - get entity with attrs
+    // PUT /entities/:id with null - delete entity
+    "": resource({
+      get: async (h) => {
+        var _a;
+        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        const entity = db2.entities.get(entityId);
+        if (!entity) {
+          return { headers: { condition: "not-found" }, body: null };
+        }
+        return { headers: {}, body: entity };
+      },
+      put: async (h, body) => {
+        var _a, _b;
+        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        const isCascadeDelete = body && typeof body === "object" && "cascade" in body && body.cascade;
+        if (body === null || isCascadeDelete) {
+          const entity = db2.entities.get(entityId);
+          if (!entity) {
+            return { headers: { condition: "not-found" }, body: null };
+          }
+          const allRels = db2.relationships.list(projectId);
+          const entitiesToDelete = [];
+          if (isCascadeDelete) {
+            const findDescendants = (parentId) => {
+              const children = allRels.filter((r) => r.kind === "contains" && r.from_entity === parentId).map((r) => r.to_entity);
+              const descendants2 = [...children];
+              for (const childId of children) {
+                descendants2.push(...findDescendants(childId));
+              }
+              return descendants2;
+            };
+            const descendants = findDescendants(entityId);
+            entitiesToDelete.push(...descendants.reverse(), entityId);
+          } else {
+            entitiesToDelete.push(entityId);
+          }
+          const deletedEntities = [];
+          const deletedRelationships = [];
+          for (const id of entitiesToDelete) {
+            const e = db2.entities.get(id);
+            if (e) {
+              deletedEntities.push({
+                entity: { id: e.id, created_at: e.created_at, modified_at: e.modified_at },
+                attrs: e.attrs
+              });
+            }
+          }
+          const entitySet = new Set(entitiesToDelete);
+          for (const rel of allRels) {
+            if (entitySet.has(rel.from_entity) || entitySet.has(rel.to_entity)) {
+              deletedRelationships.push(rel);
+            }
+          }
+          for (const id of entitiesToDelete) {
+            db2.entities.delete(id);
+          }
+          if (h.kit && !h.skipHistory) {
+            await h.kit.put(
+              { path: "/history/push" },
+              {
+                forward: {
+                  path: `/projects/${projectId}/entities/${entityId}`,
+                  body: isCascadeDelete ? { cascade: true } : null
+                },
+                backward: {
+                  path: `/projects/${projectId}/entities/${entityId}`,
+                  body: {
+                    _restoreBatch: true,
+                    entities: deletedEntities,
+                    relationships: deletedRelationships
+                  }
+                }
+              }
+            );
+          }
+          return { headers: { deleted: true, count: entitiesToDelete.length }, body: null };
+        }
+        if (body && typeof body === "object" && "_restore" in body) {
+          const restore = body;
+          db2.entities.createWithId(projectId, restore.entity.id, {
+            created_at: restore.entity.created_at,
+            modified_at: restore.entity.modified_at
+          });
+          if (Object.keys(restore.attrs).length > 0) {
+            db2.attrs.setBatch(restore.entity.id, restore.attrs);
+          }
+          for (const rel of restore.relationships) {
+            db2.relationships.createWithId(projectId, rel.id, {
+              from_entity: rel.from_entity,
+              to_entity: rel.to_entity,
+              kind: rel.kind,
+              label: rel.label,
+              binding_name: rel.binding_name
+            });
+          }
+          return { headers: { restored: true }, body: restore.entity };
+        }
+        if (body && typeof body === "object" && "_restoreBatch" in body) {
+          const restore = body;
+          for (const { entity, attrs } of [...restore.entities].reverse()) {
+            db2.entities.createWithId(projectId, entity.id, {
+              created_at: entity.created_at,
+              modified_at: entity.modified_at
+            });
+            if (Object.keys(attrs).length > 0) {
+              db2.attrs.setBatch(entity.id, attrs);
+            }
+          }
+          for (const rel of restore.relationships) {
+            db2.relationships.createWithId(projectId, rel.id, {
+              from_entity: rel.from_entity,
+              to_entity: rel.to_entity,
+              kind: rel.kind,
+              label: rel.label,
+              binding_name: rel.binding_name,
+              from_port: rel.from_port,
+              to_port: rel.to_port
+            });
+          }
+          return { headers: { restored: true, count: restore.entities.length }, body: (_b = restore.entities[0]) == null ? void 0 : _b.entity };
+        }
+        return { headers: { condition: "not-implemented" }, body: null };
+      }
+    }),
+    // /entities/:id/attrs/...
+    attrs: resource({
+      get: async (h) => {
+        var _a;
+        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        return createAttrsResource(projectId, entityId).get(h);
+      },
+      put: async (h, body) => {
+        var _a;
+        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        return createAttrsResource(projectId, entityId).put(h, body);
+      }
+    })
+  }));
+  return (projectId) => routes({
+    // GET /entities - list all entities
+    // PUT /entities - create new entity
+    "": resource({
+      get: async () => ({
+        headers: { type: "js/arr" },
+        body: db2.entities.list(projectId)
+      }),
+      put: async (h, body) => {
+        const entity = db2.entities.create(projectId);
+        if ((body == null ? void 0 : body.attrs) && Object.keys(body.attrs).length > 0) {
+          db2.attrs.setBatch(entity.id, body.attrs);
+        }
+        if (h.kit && !h.skipHistory) {
+          await h.kit.put(
+            { path: "/history/push" },
+            {
+              forward: {
+                path: `/projects/${projectId}/entities`,
+                body
+              },
+              backward: {
+                path: `/projects/${projectId}/entities/${entity.id}`,
+                body: null
+              }
+            }
+          );
+        }
+        const entityWithAttrs = db2.entities.get(entity.id);
+        return { headers: { created: true }, body: entityWithAttrs };
+      }
+    }),
+    // /entities/:id/...
+    unknown: createEntityResource(projectId)
+  });
+}
+function createRelationshipsResource(db2) {
+  return (projectId) => routes({
+    // GET /relationships - list all relationships
+    // PUT /relationships - create new relationship
+    "": resource({
+      get: async () => ({
+        headers: { type: "js/arr" },
+        body: db2.relationships.list(projectId)
+      }),
+      put: async (h, body) => {
+        const rel = db2.relationships.create(projectId, {
+          from_entity: body.from_entity,
+          to_entity: body.to_entity,
+          kind: body.kind,
+          label: body.label ?? null,
+          binding_name: body.binding_name ?? null,
+          from_port: body.from_port ?? null,
+          to_port: body.to_port ?? null
+        });
+        if (h.kit && !h.skipHistory) {
+          await h.kit.put(
+            { path: "/history/push" },
+            {
+              forward: {
+                path: `/projects/${projectId}/relationships`,
+                body
+              },
+              backward: {
+                path: `/projects/${projectId}/relationships/${rel.id}`,
+                body: null
+              }
+            }
+          );
+        }
+        return { headers: { created: true }, body: rel };
+      }
+    }),
+    // GET/DELETE /relationships/:id
+    unknown: bind("relationshipId", resource({
+      get: async (h) => {
+        var _a;
+        const relId = ((_a = h.params) == null ? void 0 : _a.relationshipId) || "";
+        const rel = db2.relationships.get(relId);
+        if (!rel) {
+          return { headers: { condition: "not-found" }, body: null };
+        }
+        return { headers: {}, body: rel };
+      },
+      put: async (h, body) => {
+        var _a;
+        const relId = ((_a = h.params) == null ? void 0 : _a.relationshipId) || "";
+        if (body === null) {
+          const rel = db2.relationships.get(relId);
+          if (!rel) {
+            return { headers: { condition: "not-found" }, body: null };
+          }
+          db2.relationships.delete(relId);
+          if (h.kit && !h.skipHistory) {
+            await h.kit.put(
+              { path: "/history/push" },
+              {
+                forward: {
+                  path: `/projects/${projectId}/relationships/${relId}`,
+                  body: null
+                },
+                backward: {
+                  path: `/projects/${projectId}/relationships/${relId}`,
+                  body: {
+                    _restore: true,
+                    id: rel.id,
+                    from_entity: rel.from_entity,
+                    to_entity: rel.to_entity,
+                    kind: rel.kind,
+                    label: rel.label,
+                    binding_name: rel.binding_name,
+                    from_port: rel.from_port,
+                    to_port: rel.to_port
+                  }
+                }
+              }
+            );
+          }
+          return { headers: { deleted: true }, body: null };
+        }
+        if (body && typeof body === "object" && "_restore" in body) {
+          const restore = body;
+          db2.relationships.createWithId(projectId, restore.id, {
+            from_entity: restore.from_entity,
+            to_entity: restore.to_entity,
+            kind: restore.kind,
+            label: restore.label,
+            binding_name: restore.binding_name,
+            from_port: restore.from_port,
+            to_port: restore.to_port
+          });
+          return { headers: { restored: true }, body: restore };
+        }
+        return { headers: { condition: "not-implemented" }, body: null };
+      }
+    }))
+  });
+}
+function createStampsResource(db2) {
+  return routes({
+    // GET /stamps - list all stamps
+    // PUT /stamps - create new stamp
+    "": resource({
+      get: async (_h, body) => ({
+        headers: { type: "js/arr" },
+        body: db2.stamps.list(body)
+      }),
+      put: async (_h, body) => {
+        const stampId = db2.stamps.create(body);
+        const stamp = db2.stamps.get(stampId);
+        return { headers: { created: true }, body: stamp };
+      }
+    }),
+    // Individual stamp routes
+    unknown: bind("stampId", routes({
+      // GET /stamps/:id - get stamp with members
+      // DELETE /stamps/:id - delete stamp
+      "": resource({
+        get: async (h) => {
+          var _a;
+          const stampId = ((_a = h.params) == null ? void 0 : _a.stampId) || "";
+          const stamp = db2.stamps.get(stampId);
+          if (!stamp) {
+            return { headers: { condition: "not-found" }, body: null };
+          }
+          return { headers: {}, body: stamp };
+        },
+        put: async (h, body) => {
+          var _a;
+          const stampId = ((_a = h.params) == null ? void 0 : _a.stampId) || "";
+          if (body === null) {
+            db2.stamps.delete(stampId);
+            return { headers: { deleted: true }, body: null };
+          }
+          if (body && typeof body === "object") {
+            db2.stamps.update(stampId, body);
+            const stamp = db2.stamps.get(stampId);
+            return { headers: { updated: true }, body: stamp };
+          }
+          return { headers: { condition: "not-implemented" }, body: null };
+        }
+      }),
+      // PUT /stamps/:id/apply/:targetEntityId - apply stamp to entity
+      apply: bind("targetEntityId", resource({
+        put: async (h) => {
+          var _a, _b;
+          const stampId = ((_a = h.params) == null ? void 0 : _a.stampId) || "";
+          const targetEntityId = ((_b = h.params) == null ? void 0 : _b.targetEntityId) || "";
+          const targetEntity = db2.entities.get(targetEntityId);
+          if (!targetEntity) {
+            return { headers: { condition: "not-found" }, body: { error: "Target entity not found" } };
+          }
+          const projectId = targetEntity.project_id;
+          const result = db2.stamps.apply(stampId, targetEntityId);
+          if (h.kit && !h.skipHistory) {
+            await h.kit.put(
+              { path: "/history/push" },
+              {
+                forward: {
+                  path: `/stamps/${stampId}/apply/${targetEntityId}`,
+                  body: null
+                },
+                backward: {
+                  path: `/stamps/${stampId}/unapply/${targetEntityId}`,
+                  body: {
+                    projectId,
+                    createdEntityIds: result.createdEntityIds,
+                    createdRelationshipIds: result.createdRelationshipIds,
+                    appliedAttrs: result.appliedAttrs,
+                    previousAttrs: result.previousAttrs
+                  }
+                }
+              }
+            );
+          }
+          return { headers: { applied: true }, body: result };
+        }
+      })),
+      // PUT /stamps/:id/unapply/:targetEntityId - undo stamp application
+      unapply: bind("targetEntityId", resource({
+        put: async (h, body) => {
+          var _a;
+          const targetEntityId = ((_a = h.params) == null ? void 0 : _a.targetEntityId) || "";
+          for (const id of [...body.createdRelationshipIds].reverse()) {
+            db2.relationships.delete(id);
+          }
+          for (const id of [...body.createdEntityIds].reverse()) {
+            db2.entities.delete(id);
+          }
+          for (const key of Object.keys(body.appliedAttrs)) {
+            if (!(key in body.previousAttrs)) {
+              db2.attrs.delete(targetEntityId, key);
+            }
+          }
+          if (Object.keys(body.previousAttrs).length > 0) {
+            db2.attrs.setBatch(targetEntityId, body.previousAttrs);
+          }
+          return { headers: { unapplied: true }, body: null };
+        }
+      }))
+    }))
+  });
+}
+function createUIStateResource(db2) {
+  return (projectId) => resource({
+    // GET /ui-state - get current UI state
+    get: async () => ({
+      headers: {},
+      body: db2.uiState.get(projectId)
+    }),
+    // PUT /ui-state - update UI state (partial)
+    put: async (_h, body) => {
+      const updated = db2.uiState.update(projectId, body);
+      return { headers: {}, body: updated };
+    }
+  });
+}
+function createThemesResource(db2) {
+  return routes({
+    // GET /themes - list all themes
+    // PUT /themes - create new theme
+    "": resource({
+      get: async () => ({
+        headers: { type: "js/arr" },
+        body: db2.themes.list()
+      }),
+      put: async (_h, body) => {
+        const theme = db2.themes.create(body.name, body.basedOn);
+        return { headers: { created: true }, body: theme };
+      }
+    }),
+    // Token definitions
+    tokens: resource({
+      get: async () => ({
+        headers: { type: "js/arr" },
+        body: db2.themes.getTokens()
+      })
+    }),
+    // Individual theme routes
+    unknown: bind("themeId", routes({
+      // GET /themes/:id - get theme with colors
+      // PUT /themes/:id with null - delete theme
+      "": resource({
+        get: async (h) => {
+          var _a;
+          const themeId = ((_a = h.params) == null ? void 0 : _a.themeId) || "";
+          const theme = db2.themes.get(themeId);
+          if (!theme) {
+            return { headers: { condition: "not-found" }, body: null };
+          }
+          return { headers: {}, body: theme };
+        },
+        put: async (h, body) => {
+          var _a;
+          const themeId = ((_a = h.params) == null ? void 0 : _a.themeId) || "";
+          if (body === null) {
+            db2.themes.delete(themeId);
+            return { headers: { deleted: true }, body: null };
+          }
+          return { headers: { condition: "not-implemented" }, body: null };
+        }
+      }),
+      // PUT /themes/:id/colors/:tokenId - update color
+      colors: bind("tokenId", resource({
+        put: async (h, body) => {
+          var _a, _b;
+          const themeId = ((_a = h.params) == null ? void 0 : _a.themeId) || "";
+          const tokenId = ((_b = h.params) == null ? void 0 : _b.tokenId) || "";
+          db2.themes.updateColor(themeId, tokenId, body);
+          return { headers: { updated: true }, body };
+        }
+      }))
+    }))
+  });
+}
+function createSettingsResource(db2) {
+  return bind("key", resource({
+    // GET /settings/:key - get setting value
+    get: async (h) => {
+      var _a;
+      const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+      const value = db2.settings.get(key);
+      if (value === null) {
+        return { headers: { condition: "not-found" }, body: null };
+      }
+      return { headers: {}, body: value };
+    },
+    // PUT /settings/:key - set setting value
+    put: async (h, body) => {
+      var _a;
+      const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+      db2.settings.set(key, body);
+      return { headers: { updated: true }, body };
+    }
+  }));
+}
+function createVisualResources(db2) {
+  const history = createHistory();
+  const projects = createProjectsResource(db2);
+  const entitiesFactory = createEntitiesResource(db2);
+  const relationshipsFactory = createRelationshipsResource(db2);
+  const uiStateFactory = createUIStateResource(db2);
+  const stamps = createStampsResource(db2);
+  const themes = createThemesResource(db2);
+  const settings = createSettingsResource(db2);
+  const projectScopedResource = bind("projectId", routes({
+    "": resource({
+      get: async (h) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const project = db2.projects.get(projectId);
+        if (!project) {
+          return { headers: { condition: "not-found" }, body: null };
+        }
+        return { headers: {}, body: project };
+      },
+      put: async (h, body) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        if (body === null) {
+          db2.projects.delete(projectId);
+          return { headers: { deleted: true }, body: null };
+        }
+        return { headers: { condition: "not-implemented" }, body: null };
+      }
+    }),
+    entities: resource({
+      get: async (h) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        return entitiesFactory(projectId).get(h);
+      },
+      put: async (h, body) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        return entitiesFactory(projectId).put(h, body);
+      }
+    }),
+    relationships: resource({
+      get: async (h) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        return relationshipsFactory(projectId).get(h);
+      },
+      put: async (h, body) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        return relationshipsFactory(projectId).put(h, body);
+      }
+    }),
+    "ui-state": resource({
+      get: async (h) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        return uiStateFactory(projectId).get(h);
+      },
+      put: async (h, body) => {
+        var _a;
+        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        return uiStateFactory(projectId).put(h, body);
+      }
+    })
+  }));
+  const tree = routes({
+    projects: routes({
+      "": resource({
+        get: async () => projects.get({ path: "/" }),
+        put: async (h, body) => projects.put({ ...h, path: "/" }, body)
+      }),
+      unknown: projectScopedResource
+    }),
+    stamps,
+    themes,
+    settings,
+    history
+  });
+  const withKit = (res) => {
+    const kit = {
+      get: (h) => withKit(res).get(h),
+      put: (h, b) => withKit(res).put(h, b)
+    };
+    return {
+      get: async (h) => {
+        return res.get({ ...h, kit });
+      },
+      put: async (h, body) => {
+        return res.put({ ...h, kit }, body);
+      }
+    };
+  };
+  return withKit(tree);
+}
 const __filename$1 = fileURLToPath(import.meta.url);
 const __dirname$1 = path.dirname(__filename$1);
 const isMac = process.platform === "darwin";
@@ -2064,75 +3024,21 @@ app.on("window-all-closed", () => {
   }
 });
 function setupIpcHandlers() {
-  ipcMain.handle("db:projects:list", () => db.projects.list());
-  ipcMain.handle("db:projects:get", (_, id) => db.projects.get(id));
-  ipcMain.handle("db:projects:create", (_, name) => {
-    const result = db.projects.create(name);
-    refreshMenu();
+  const resources = createVisualResources(db);
+  ipcMain.handle("bl:get", async (_, headers) => {
+    const result = await resources.get(headers);
+    if (headers.path === "/projects") {
+      refreshMenu();
+    }
     return result;
   });
-  ipcMain.handle("db:projects:delete", (_, id) => {
-    const result = db.projects.delete(id);
-    refreshMenu();
+  ipcMain.handle("bl:put", async (_, headers, body) => {
+    const result = await resources.put(headers, body);
+    if (headers.path.startsWith("/projects")) {
+      refreshMenu();
+    }
     return result;
   });
-  ipcMain.handle("db:entities:list", (_, projectId) => db.entities.list(projectId));
-  ipcMain.handle("db:entities:get", (_, id) => db.entities.get(id));
-  ipcMain.handle("db:entities:create", (_, projectId) => db.entities.create(projectId));
-  ipcMain.handle(
-    "db:entities:createWithId",
-    (_, projectId, id, timestamps) => db.entities.createWithId(projectId, id, timestamps)
-  );
-  ipcMain.handle("db:entities:delete", (_, id) => db.entities.delete(id));
-  ipcMain.handle("db:attrs:get", (_, entityId) => db.attrs.get(entityId));
-  ipcMain.handle(
-    "db:attrs:set",
-    (_, entityId, key, value, type) => db.attrs.set(entityId, key, value, type)
-  );
-  ipcMain.handle("db:attrs:delete", (_, entityId, key) => db.attrs.delete(entityId, key));
-  ipcMain.handle(
-    "db:attrs:setBatch",
-    (_, entityId, attrs) => db.attrs.setBatch(entityId, attrs)
-  );
-  ipcMain.handle(
-    "db:stamps:list",
-    (_, filter) => db.stamps.list(filter)
-  );
-  ipcMain.handle("db:stamps:get", (_, id) => db.stamps.get(id));
-  ipcMain.handle(
-    "db:stamps:create",
-    (_, data) => db.stamps.create(data)
-  );
-  ipcMain.handle(
-    "db:stamps:apply",
-    (_, stampId, targetEntityId) => db.stamps.apply(stampId, targetEntityId)
-  );
-  ipcMain.handle("db:stamps:delete", (_, stampId) => db.stamps.delete(stampId));
-  ipcMain.handle(
-    "db:stamps:update",
-    (_, id, data) => db.stamps.update(id, data)
-  );
-  ipcMain.handle("db:relationships:list", (_, projectId) => db.relationships.list(projectId));
-  ipcMain.handle("db:relationships:get", (_, id) => db.relationships.get(id));
-  ipcMain.handle("db:relationships:create", (_, projectId, data) => db.relationships.create(projectId, data));
-  ipcMain.handle(
-    "db:relationships:createWithId",
-    (_, projectId, id, data) => db.relationships.createWithId(projectId, id, data)
-  );
-  ipcMain.handle("db:relationships:delete", (_, id) => db.relationships.delete(id));
-  ipcMain.handle("db:uiState:get", (_, projectId) => db.uiState.get(projectId));
-  ipcMain.handle("db:uiState:update", (_, projectId, data) => db.uiState.update(projectId, data));
-  ipcMain.handle("db:themes:list", () => db.themes.list());
-  ipcMain.handle("db:themes:get", (_, id) => db.themes.get(id));
-  ipcMain.handle("db:themes:create", (_, name, basedOn) => db.themes.create(name, basedOn));
-  ipcMain.handle(
-    "db:themes:updateColor",
-    (_, themeId, tokenId, value) => db.themes.updateColor(themeId, tokenId, value)
-  );
-  ipcMain.handle("db:themes:delete", (_, id) => db.themes.delete(id));
-  ipcMain.handle("db:themes:getTokens", () => db.themes.getTokens());
-  ipcMain.handle("db:settings:get", (_, key) => db.settings.get(key));
-  ipcMain.handle("db:settings:set", (_, key, value) => db.settings.set(key, value));
   ipcMain.handle("fonts:list", async () => listSystemFonts());
   ipcMain.handle("fonts:search", async (_, query) => {
     const fonts = await listSystemFonts();

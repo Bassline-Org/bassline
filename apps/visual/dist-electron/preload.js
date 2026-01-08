@@ -1,79 +1,31 @@
-import { contextBridge as s, ipcRenderer as t } from "electron";
-s.exposeInMainWorld("fonts", {
-  list: () => t.invoke("fonts:list"),
-  search: (e) => t.invoke("fonts:search", e)
+import { contextBridge as r, ipcRenderer as n } from "electron";
+r.exposeInMainWorld("bl", {
+  get: (e) => n.invoke("bl:get", e),
+  put: (e, o) => n.invoke("bl:put", e, o)
 });
-s.exposeInMainWorld("app", {
+r.exposeInMainWorld("fonts", {
+  list: () => n.invoke("fonts:list"),
+  search: (e) => n.invoke("fonts:search", e)
+});
+r.exposeInMainWorld("app", {
   // Notifications
-  notify: (e, n) => t.invoke("app:notify", e, n),
+  notify: (e, o) => n.invoke("app:notify", e, o),
   // Recent documents
-  addRecentDocument: (e) => t.invoke("app:addRecentDocument", e),
-  clearRecentDocuments: () => t.invoke("app:clearRecentDocuments"),
+  addRecentDocument: (e) => n.invoke("app:addRecentDocument", e),
+  clearRecentDocuments: () => n.invoke("app:clearRecentDocuments"),
   // Menu event listeners
-  onMenuCreateProject: (e) => (t.on("menu:create-project", e), () => t.removeListener("menu:create-project", e)),
-  onMenuOpenProject: (e) => (t.on("menu:open-project", e), () => t.removeListener("menu:open-project", e)),
-  onMenuExportProject: (e) => (t.on("menu:export-project", e), () => t.removeListener("menu:export-project", e)),
-  onMenuShowSettings: (e) => (t.on("menu:show-settings", e), () => t.removeListener("menu:show-settings", e)),
+  onMenuCreateProject: (e) => (n.on("menu:create-project", e), () => n.removeListener("menu:create-project", e)),
+  onMenuOpenProject: (e) => (n.on("menu:open-project", e), () => n.removeListener("menu:open-project", e)),
+  onMenuExportProject: (e) => (n.on("menu:export-project", e), () => n.removeListener("menu:export-project", e)),
+  onMenuShowSettings: (e) => (n.on("menu:show-settings", e), () => n.removeListener("menu:show-settings", e)),
   onMenuOpenFile: (e) => {
-    const n = (o, i) => e(i);
-    return t.on("menu:open-file", n), () => t.removeListener("menu:open-file", n);
+    const o = (p, t) => e(t);
+    return n.on("menu:open-file", o), () => n.removeListener("menu:open-file", o);
   },
   onMenuOpenProjectById: (e) => {
-    const n = (o, i) => e(i);
-    return t.on("menu:open-project-by-id", n), () => t.removeListener("menu:open-project-by-id", n);
+    const o = (p, t) => e(t);
+    return n.on("menu:open-project-by-id", o), () => n.removeListener("menu:open-project-by-id", o);
   },
   // Menu refresh
-  refreshMenu: () => t.invoke("app:refreshMenu")
-});
-s.exposeInMainWorld("db", {
-  projects: {
-    list: () => t.invoke("db:projects:list"),
-    get: (e) => t.invoke("db:projects:get", e),
-    create: (e) => t.invoke("db:projects:create", e),
-    delete: (e) => t.invoke("db:projects:delete", e)
-  },
-  entities: {
-    list: (e) => t.invoke("db:entities:list", e),
-    get: (e) => t.invoke("db:entities:get", e),
-    create: (e) => t.invoke("db:entities:create", e),
-    createWithId: (e, n, o) => t.invoke("db:entities:createWithId", e, n, o),
-    delete: (e) => t.invoke("db:entities:delete", e)
-  },
-  attrs: {
-    get: (e) => t.invoke("db:attrs:get", e),
-    set: (e, n, o, i) => t.invoke("db:attrs:set", e, n, o, i),
-    delete: (e, n) => t.invoke("db:attrs:delete", e, n),
-    setBatch: (e, n) => t.invoke("db:attrs:setBatch", e, n)
-  },
-  stamps: {
-    list: (e) => t.invoke("db:stamps:list", e),
-    get: (e) => t.invoke("db:stamps:get", e),
-    create: (e) => t.invoke("db:stamps:create", e),
-    apply: (e, n) => t.invoke("db:stamps:apply", e, n),
-    delete: (e) => t.invoke("db:stamps:delete", e),
-    update: (e, n) => t.invoke("db:stamps:update", e, n)
-  },
-  relationships: {
-    list: (e) => t.invoke("db:relationships:list", e),
-    get: (e) => t.invoke("db:relationships:get", e),
-    create: (e, n) => t.invoke("db:relationships:create", e, n),
-    createWithId: (e, n, o) => t.invoke("db:relationships:createWithId", e, n, o),
-    delete: (e) => t.invoke("db:relationships:delete", e)
-  },
-  uiState: {
-    get: (e) => t.invoke("db:uiState:get", e),
-    update: (e, n) => t.invoke("db:uiState:update", e, n)
-  },
-  themes: {
-    list: () => t.invoke("db:themes:list"),
-    get: (e) => t.invoke("db:themes:get", e),
-    create: (e, n) => t.invoke("db:themes:create", e, n),
-    updateColor: (e, n, o) => t.invoke("db:themes:updateColor", e, n, o),
-    delete: (e) => t.invoke("db:themes:delete", e),
-    getTokens: () => t.invoke("db:themes:getTokens")
-  },
-  settings: {
-    get: (e) => t.invoke("db:settings:get", e),
-    set: (e, n) => t.invoke("db:settings:set", e, n)
-  }
+  refreshMenu: () => n.invoke("app:refreshMenu")
 });

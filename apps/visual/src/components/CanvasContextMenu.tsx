@@ -18,15 +18,16 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Maximize, Stamp, Save, FolderInput, FolderOutput } from 'lucide-react'
+import { Plus, Trash2, Maximize, Stamp, Save, FolderInput, FolderOutput, Package, Ungroup } from 'lucide-react'
 import type { EntityWithAttrs, StampWithAttrs } from '../types'
 
 interface CanvasContextMenuProps {
   children: React.ReactNode
   entities: EntityWithAttrs[]
   stamps: StampWithAttrs[]
-  selectedEntityId: string | null
+  selectedEntityIds: Set<string>
   selectedEntityParentId: string | null
+  isSelectedContainer: boolean
   onAddEntity: (x: number, y: number) => void
   onDeleteEntity?: () => void
   onFitView: () => void
@@ -34,14 +35,17 @@ interface CanvasContextMenuProps {
   onApplyStamp: (stampId: string, entityId: string) => void
   onSetParent: (parentId: string) => void
   onRemoveFromParent: () => void
+  onBundle?: () => void
+  onUnbundle?: () => void
 }
 
 export function CanvasContextMenu({
   children,
   entities,
   stamps,
-  selectedEntityId,
+  selectedEntityIds,
   selectedEntityParentId,
+  isSelectedContainer,
   onAddEntity,
   onDeleteEntity,
   onFitView,
@@ -49,7 +53,11 @@ export function CanvasContextMenu({
   onApplyStamp,
   onSetParent,
   onRemoveFromParent,
+  onBundle,
+  onUnbundle,
 }: CanvasContextMenuProps) {
+  // Derive single selection for backwards compat
+  const selectedEntityId = selectedEntityIds.size === 1 ? [...selectedEntityIds][0] : null
   const [contextPosition, setContextPosition] = useState<{ x: number; y: number } | null>(null)
   const [stampDialogOpen, setStampDialogOpen] = useState(false)
   const [stampName, setStampName] = useState('')
@@ -86,10 +94,12 @@ export function CanvasContextMenu({
     [selectedEntityId, onApplyStamp]
   )
 
-  const hasSelection = selectedEntityId !== null
+  const hasSelection = selectedEntityIds.size > 0
+  const hasSingleSelection = selectedEntityId !== null
+  const hasMultiSelection = selectedEntityIds.size > 1
 
-  // Get potential parent entities (all entities except the selected one and its current children)
-  const potentialParents = entities.filter((e) => e.id !== selectedEntityId)
+  // Get potential parent entities (all entities except the selected ones)
+  const potentialParents = entities.filter((e) => !selectedEntityIds.has(e.id))
 
   return (
     <>
@@ -102,61 +112,88 @@ export function CanvasContextMenu({
         <ContextMenuContent>
           {hasSelection ? (
             <>
-              {stamps.length > 0 && (
-                <ContextMenuSub>
-                  <ContextMenuSubTrigger>
-                    <Stamp className="mr-2 h-4 w-4" />
-                    Stamp as...
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent>
-                    {stamps.map((stamp) => (
-                      <ContextMenuItem
-                        key={stamp.id}
-                        onClick={() => handleApplyStamp(stamp.id)}
-                      >
-                        {stamp.name || 'Unnamed'}
-                      </ContextMenuItem>
-                    ))}
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
+              {/* Multi-selection: bundle action */}
+              {hasMultiSelection && onBundle && (
+                <>
+                  <ContextMenuItem onClick={onBundle}>
+                    <Package className="mr-2 h-4 w-4" />
+                    Bundle ({selectedEntityIds.size} items)
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                </>
               )}
-              <ContextMenuItem onClick={handleSaveAsStampClick}>
-                <Save className="mr-2 h-4 w-4" />
-                Save as stamp...
-              </ContextMenuItem>
-              <ContextMenuSeparator />
 
-              {/* Containment options */}
-              {potentialParents.length > 0 && (
-                <ContextMenuSub>
-                  <ContextMenuSubTrigger>
-                    <FolderInput className="mr-2 h-4 w-4" />
-                    Move into...
-                  </ContextMenuSubTrigger>
-                  <ContextMenuSubContent>
-                    {potentialParents.map((entity) => (
-                      <ContextMenuItem
-                        key={entity.id}
-                        onClick={() => onSetParent(entity.id)}
-                      >
-                        {entity.attrs.name || 'Unnamed'}
-                      </ContextMenuItem>
-                    ))}
-                  </ContextMenuSubContent>
-                </ContextMenuSub>
+              {/* Single selection: unbundle if container */}
+              {hasSingleSelection && isSelectedContainer && onUnbundle && (
+                <>
+                  <ContextMenuItem onClick={onUnbundle}>
+                    <Ungroup className="mr-2 h-4 w-4" />
+                    Unbundle
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                </>
               )}
-              {selectedEntityParentId && (
-                <ContextMenuItem onClick={onRemoveFromParent}>
-                  <FolderOutput className="mr-2 h-4 w-4" />
-                  Remove from parent
-                </ContextMenuItem>
+
+              {/* Stamp options - single selection only */}
+              {hasSingleSelection && (
+                <>
+                  {stamps.length > 0 && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        <Stamp className="mr-2 h-4 w-4" />
+                        Stamp as...
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {stamps.map((stamp) => (
+                          <ContextMenuItem
+                            key={stamp.id}
+                            onClick={() => handleApplyStamp(stamp.id)}
+                          >
+                            {stamp.name || 'Unnamed'}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                  )}
+                  <ContextMenuItem onClick={handleSaveAsStampClick}>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save as stamp...
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+
+                  {/* Containment options - single selection */}
+                  {potentialParents.length > 0 && (
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>
+                        <FolderInput className="mr-2 h-4 w-4" />
+                        Move into...
+                      </ContextMenuSubTrigger>
+                      <ContextMenuSubContent>
+                        {potentialParents.map((entity) => (
+                          <ContextMenuItem
+                            key={entity.id}
+                            onClick={() => onSetParent(entity.id)}
+                          >
+                            {entity.attrs.name || 'Unnamed'}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                  )}
+                  {selectedEntityParentId && (
+                    <ContextMenuItem onClick={onRemoveFromParent}>
+                      <FolderOutput className="mr-2 h-4 w-4" />
+                      Remove from parent
+                    </ContextMenuItem>
+                  )}
+                  <ContextMenuSeparator />
+                </>
               )}
-              <ContextMenuSeparator />
 
               {onDeleteEntity && (
                 <ContextMenuItem onClick={onDeleteEntity}>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                  Delete{hasMultiSelection ? ` (${selectedEntityIds.size})` : ''}
                 </ContextMenuItem>
               )}
             </>

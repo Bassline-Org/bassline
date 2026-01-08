@@ -128,6 +128,18 @@
   stroke-width: 3;
 }
 
+/* Collapsed edges - connecting to collapsed/compact nodes */
+.react-flow__edge.collapsed-edge .react-flow__edge-path {
+  stroke-dasharray: 4 3;
+  stroke-opacity: 0.6;
+  stroke-width: 1.5;
+}
+
+.react-flow__edge.collapsed-edge:hover .react-flow__edge-path {
+  stroke-opacity: 1;
+  stroke-width: 2;
+}
+
 /* Connection line while dragging */
 .react-flow__connection-line {
   stroke: var(--color-accent);
@@ -314,9 +326,13 @@
 
 /* Collapsed variant - small badge with name and count */
 .entity-node--collapsed {
-  padding: 6px 12px;
+  /* Fill the React Flow node container */
+  width: 100%;
+  height: 100%;
+  padding: 0 12px;
   min-width: auto;
   border-radius: 16px;
+  justify-content: center;
 }
 
 .entity-node__collapsed-content {
@@ -340,7 +356,10 @@
 
 /* Compact variant - icon only */
 .entity-node--compact {
-  padding: 8px;
+  /* Fill the React Flow node container */
+  width: 100%;
+  height: 100%;
+  padding: 0;
   min-width: auto;
   min-height: auto;
   border-radius: 8px;
@@ -353,4 +372,69 @@
   width: 20px;
   height: 20px;
   color: var(--color-foreground);
+}
+
+/* Port container with label */
+.entity-node__port {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.entity-node__port--left {
+  left: 0;
+  flex-direction: row;
+}
+
+.entity-node__port--right {
+  right: 0;
+  flex-direction: row;
+}
+
+.entity-node__port .react-flow__handle {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  transform: none;
+  pointer-events: auto;
+}
+
+.entity-node__port-label {
+  font-size: 10px;
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.entity-node__port-label--left {
+  margin-left: 4px;
+}
+
+.entity-node__port-label--right {
+  margin-right: 4px;
+}
+
+/* Collapsed/compact mode handles - all converged at center */
+.entity-node__handle--collapsed,
+.entity-node__handle--compact {
+  /* Override default positioning - all at center */
+  top: 50% !important;
+  transform: translateY(-50%);
+  /* Smaller and more subtle */
+  width: 8px !important;
+  height: 8px !important;
+  background: var(--color-node-border) !important;
+  opacity: 0.7;
+}
+
+.entity-node__handle--collapsed:hover,
+.entity-node__handle--compact:hover {
+  width: 10px !important;
+  height: 10px !important;
+  background: var(--color-accent) !important;
+  opacity: 1;
 }

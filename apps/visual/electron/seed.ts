@@ -24,8 +24,33 @@ interface ThemeFile {
   typography?: Record<string, string>
 }
 
+// Helper to check if a column exists in a table
+function columnExists(db: Database.Database, table: string, column: string): boolean {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  return cols.some(c => c.name === column)
+}
+
 export function runMigrations(db: Database.Database, dataDir: string) {
   const schemaDir = join(dataDir, 'schema')
+
+  // Create migrations tracking table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+
+  // Get already-applied migrations
+  const applied = new Set(
+    (db.prepare('SELECT name FROM _migrations').all() as { name: string }[]).map(r => r.name)
+  )
+
+  // Backfill: if 005 columns exist but migration not tracked, mark as applied
+  if (!applied.has('005_port_columns.sql') && columnExists(db, 'relationships', 'from_port')) {
+    db.prepare('INSERT INTO _migrations (name) VALUES (?)').run('005_port_columns.sql')
+    applied.add('005_port_columns.sql')
+  }
 
   // Run schema migrations in order
   console.log('[migrations] Running migrations...')
@@ -35,8 +60,14 @@ export function runMigrations(db: Database.Database, dataDir: string) {
       .sort()
 
     for (const file of schemaFiles) {
+      if (applied.has(file)) {
+        console.log(`[migrations]   - ${file} (already applied)`)
+        continue
+      }
+
       const sql = readFileSync(join(schemaDir, file), 'utf-8')
       db.exec(sql)
+      db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(file)
       console.log(`[migrations]   ✓ ${file}`)
     }
   }

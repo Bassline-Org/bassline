@@ -39,6 +39,8 @@ export interface Relationship {
   kind: 'contains' | 'connects' | 'binds'
   label: string | null
   binding_name: string | null
+  from_port: string | null
+  to_port: string | null
 }
 
 /** Stored view (named query) */
@@ -152,63 +154,3 @@ export interface EditorLoaderData {
   uiState: UIState
 }
 
-// =============================================================================
-// Window API
-// =============================================================================
-
-declare global {
-  interface Window {
-    db: {
-      projects: {
-        list: () => Promise<Project[]>
-        get: (id: string) => Promise<Project | null>
-        create: (name: string) => Promise<Project>
-        delete: (id: string) => Promise<void>
-      }
-      entities: {
-        list: (projectId: string) => Promise<EntityWithAttrs[]>
-        get: (id: string) => Promise<EntityWithAttrs | null>
-        create: (projectId: string) => Promise<Entity>
-        createWithId: (projectId: string, id: string, timestamps?: { created_at: number; modified_at: number }) => Promise<Entity>
-        delete: (id: string) => Promise<void>
-      }
-      attrs: {
-        get: (entityId: string) => Promise<Record<string, string>>
-        set: (entityId: string, key: string, value: string, type?: string) => Promise<void>
-        delete: (entityId: string, key: string) => Promise<void>
-        setBatch: (entityId: string, attrs: Record<string, string>) => Promise<void>
-      }
-      relationships: {
-        list: (projectId: string) => Promise<Relationship[]>
-        get: (id: string) => Promise<Relationship | null>
-        create: (projectId: string, data: Omit<Relationship, 'id' | 'project_id'>) => Promise<Relationship>
-        createWithId: (projectId: string, id: string, data: Omit<Relationship, 'id' | 'project_id'>) => Promise<Relationship>
-        delete: (id: string) => Promise<void>
-      }
-      uiState: {
-        get: (projectId: string) => Promise<UIState>
-        update: (projectId: string, data: Partial<UIState>) => Promise<UIState>
-      }
-      themes: {
-        list: () => Promise<Theme[]>
-        get: (id: string) => Promise<Theme | null>
-        create: (name: string, basedOn?: string) => Promise<Theme>
-        updateColor: (themeId: string, tokenId: string, value: string) => Promise<void>
-        delete: (id: string) => Promise<void>
-        getTokens: () => Promise<TokenDefinition[]>
-      }
-      stamps: {
-        list: (filter?: { kind?: 'template' | 'vocabulary'; category?: string }) => Promise<StampWithAttrs[]>
-        get: (id: string) => Promise<StampWithMembers | null>
-        create: (data: { name: string; sourceEntityId?: string; kind?: 'template' | 'vocabulary'; category?: string; description?: string }) => Promise<string>
-        apply: (stampId: string, targetEntityId: string) => Promise<ApplyStampResult>
-        delete: (stampId: string) => Promise<void>
-        update: (id: string, data: Partial<{ name: string; description: string; icon: string; category: string }>) => Promise<void>
-      }
-      settings: {
-        get: (key: string) => Promise<string | null>
-        set: (key: string, value: string) => Promise<void>
-      }
-    }
-  }
-}
