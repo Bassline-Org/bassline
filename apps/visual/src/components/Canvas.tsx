@@ -32,6 +32,7 @@ interface CanvasProps {
   selectedEntityIds: Set<string>
   uiState: UIState
   onCreateEntity: (x: number, y: number) => void
+  onCreateSemantic?: (x: number, y: number, semanticType: string) => void
   onMoveEntity: (entityId: string, x: number, y: number) => void
   onResizeEntity: (entityId: string, width: number, height: number) => void
   onSelectEntities: (entityIds: Set<string>) => void
@@ -55,6 +56,7 @@ function CanvasInner({
   selectedEntityIds,
   uiState,
   onCreateEntity,
+  onCreateSemantic,
   onMoveEntity,
   onResizeEntity,
   onSelectEntities,
@@ -328,6 +330,16 @@ function CanvasInner({
     [screenToFlowPosition, onCreateEntity]
   )
 
+  const handleAddSemantic = useCallback(
+    (screenX: number, screenY: number, semanticType: string) => {
+      if (onCreateSemantic) {
+        const position = screenToFlowPosition({ x: screenX, y: screenY })
+        onCreateSemantic(position.x, position.y, semanticType)
+      }
+    },
+    [screenToFlowPosition, onCreateSemantic]
+  )
+
   const handleDeleteSelected = useCallback(() => {
     if (selectedEntityIds.size === 1) {
       // Single delete
@@ -425,6 +437,7 @@ function CanvasInner({
       selectedEntityParentId={selectedEntityParentId}
       isSelectedContainer={isSelectedContainer}
       onAddEntity={handleAddEntity}
+      onAddSemantic={handleAddSemantic}
       onDeleteEntity={selectedEntityIds.size > 0 ? handleDeleteSelected : undefined}
       onFitView={handleFitView}
       onSaveAsStamp={onSaveAsStamp}

@@ -1300,6 +1300,22 @@ const db = {
     touch(id) {
       const db2 = getDb();
       db2.prepare("UPDATE projects SET modified_at = ? WHERE id = ?").run(Date.now(), id);
+    },
+    update(id, data) {
+      const db2 = getDb();
+      const updates = [];
+      const values = [];
+      if (data.name !== void 0) {
+        updates.push("name = ?");
+        values.push(data.name);
+      }
+      if (updates.length > 0) {
+        updates.push("modified_at = ?");
+        values.push(Date.now());
+        values.push(id);
+        db2.prepare(`UPDATE projects SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+      }
+      return this.get(id);
     }
   },
   // =========================================================================
@@ -2248,6 +2264,11 @@ function createProjectsResource(db2) {
         if (body === null) {
           db2.projects.delete(projectId);
           return { headers: { deleted: true }, body: null };
+        }
+        if (body && typeof body === "object") {
+          const data = body;
+          const updated = db2.projects.update(projectId, data);
+          return { headers: { updated: true }, body: updated };
         }
         return { headers: { condition: "not-implemented" }, body: null };
       }

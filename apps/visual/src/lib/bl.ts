@@ -85,6 +85,11 @@ export const bl = {
     delete: async (id: string): Promise<void> => {
       await window.bl.put({ path: `/projects/${id}` }, null)
     },
+
+    update: async (id: string, data: { name?: string }): Promise<Project> => {
+      const res = await window.bl.put<Project>({ path: `/projects/${id}` }, data)
+      return res.body
+    },
   },
 
   // ===========================================================================

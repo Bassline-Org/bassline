@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import * as LucideIcons from 'lucide-react'
 import { useVocabularyContext } from '../contexts/VocabularyContext'
 import type { Vocabulary, PortDirection } from '../lib/vocabularyParser'
+import { getSemantic } from '../lib/semantics'
+import { SemanticNode } from './SemanticNode'
 
 interface EntityNodeData {
   entity: EntityWithAttrs
@@ -178,6 +180,15 @@ function CompactEntityNode({ entity, selected }: { entity: EntityWithAttrs; sele
 export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps) {
   const { entity, isContainer, childCount = 0 } = data as unknown as EntityNodeData
   const vocabulary = useVocabularyContext()
+
+  // Check if this is a semantic node
+  const semanticType = entity.attrs['semantic.type']
+  if (semanticType) {
+    const semantic = getSemantic(semanticType)
+    if (semantic) {
+      return <SemanticNode entity={entity} semantic={semantic} selected={!!selected} />
+    }
+  }
 
   // Collapse mode
   const collapseMode = entity.attrs['ui.collapse'] || 'expanded'

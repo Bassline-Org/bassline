@@ -71,6 +71,26 @@ export const db = {
       const db = getDb()
       db.prepare('UPDATE projects SET modified_at = ? WHERE id = ?').run(Date.now(), id)
     },
+
+    update(id: string, data: { name?: string }) {
+      const db = getDb()
+      const updates: string[] = []
+      const values: unknown[] = []
+
+      if (data.name !== undefined) {
+        updates.push('name = ?')
+        values.push(data.name)
+      }
+
+      if (updates.length > 0) {
+        updates.push('modified_at = ?')
+        values.push(Date.now())
+        values.push(id)
+        db.prepare(`UPDATE projects SET ${updates.join(', ')} WHERE id = ?`).run(...values)
+      }
+
+      return this.get(id)
+    },
   },
 
   // =========================================================================
