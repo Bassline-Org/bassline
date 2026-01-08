@@ -42,6 +42,7 @@ interface CanvasProps {
   onConnect: (from: string, to: string, fromPort: string | null, toPort: string | null) => void
   onContain: (parentId: string, childId: string) => void
   onUncontain: (childId: string) => void
+  onBindTo: (sourceId: string, targetId: string) => void
   onViewportChange: (x: number, y: number, zoom: number) => void
   onSaveAsStamp: (entityId: string, stampName: string) => void
   onApplyStamp: (stampId: string, entityId: string) => void
@@ -66,6 +67,7 @@ function CanvasInner({
   onConnect,
   onContain,
   onUncontain,
+  onBindTo,
   onViewportChange,
   onSaveAsStamp,
   onApplyStamp,
@@ -429,6 +431,15 @@ function CanvasInner({
     }
   }, [selectedEntityId, onUncontain])
 
+  const handleBindTo = useCallback(
+    (targetId: string) => {
+      if (selectedEntityId) {
+        onBindTo(selectedEntityId, targetId)
+      }
+    },
+    [selectedEntityId, onBindTo]
+  )
+
   return (
     <CanvasContextMenu
       entities={entities}
@@ -444,6 +455,7 @@ function CanvasInner({
       onApplyStamp={onApplyStamp}
       onSetParent={handleSetParent}
       onRemoveFromParent={handleRemoveFromParent}
+      onBindTo={handleBindTo}
       onBundle={onBundle}
       onUnbundle={onUnbundle}
     >

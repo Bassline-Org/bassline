@@ -12,6 +12,7 @@ import { useVocabulary } from '../hooks/useVocabulary'
 import { useBl } from '../hooks/useBl'
 import { useCommands } from '../hooks/useCommands'
 import { VocabularyContext } from '../contexts/VocabularyContext'
+import { SemanticOutputProvider } from '../contexts/SemanticOutputContext'
 
 export function Editor() {
   const { project, entities, relationships, stamps, uiState } = useLoaderData() as EditorLoaderData
@@ -294,6 +295,18 @@ export function Editor() {
     [bl, revalidate, project.id, relationships]
   )
 
+  const handleBindTo = useCallback(
+    async (sourceId: string, targetId: string) => {
+      await bl.relationships.create(project.id, {
+        from_entity: sourceId,
+        to_entity: targetId,
+        kind: 'binds',
+      })
+      revalidate()
+    },
+    [bl, revalidate, project.id]
+  )
+
   const handleDeleteRelationship = useCallback(
     async (relationshipId: string) => {
       await bl.relationships.delete(project.id, relationshipId)
@@ -443,6 +456,7 @@ export function Editor() {
 
   return (
     <VocabularyContext.Provider value={vocabulary}>
+      <SemanticOutputProvider>
       <DeleteContainerDialog
         open={deleteDialogState.open}
         childCount={deleteDialogState.childCount}
@@ -528,6 +542,7 @@ export function Editor() {
             onConnect={handleConnect}
             onContain={handleContain}
             onUncontain={handleUncontain}
+            onBindTo={handleBindTo}
             onViewportChange={handleViewportChange}
             onSaveAsStamp={handleSaveAsStamp}
             onApplyStamp={handleApplyStamp}
@@ -548,15 +563,19 @@ export function Editor() {
         ) : selectedEntity && (
           <PropertyPanel
             entity={selectedEntity}
+            entities={entities}
+            relationships={relationships}
             vocabulary={vocabulary}
             onUpdateAttr={(key, value) => handleUpdateAttr(selectedEntity.id, key, value)}
             onDeleteAttr={(key) => handleDeleteAttr(selectedEntity.id, key)}
+            onDeleteRelationship={handleDeleteRelationship}
             onDelete={() => handleDeleteEntity(selectedEntity.id)}
             onClose={() => handleSelectEntity(null)}
           />
         )}
       </div>
     </div>
+      </SemanticOutputProvider>
     </VocabularyContext.Provider>
   )
 }

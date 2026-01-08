@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from 'react'
-import { X, Trash2, Plus, Palette, Square, Circle, Diamond, Box, Hexagon, Plug, Link, Maximize2, Minimize2 } from 'lucide-react'
-import type { EntityWithAttrs } from '../types'
+import { X, Trash2, Plus, Palette, Square, Circle, Diamond, Box, Hexagon, Plug, Link, Link2, Maximize2, Minimize2 } from 'lucide-react'
+import type { EntityWithAttrs, Relationship } from '../types'
 import type { Vocabulary, AttrDefinition, PortDefinition } from '../lib/vocabularyParser'
+import { getSemantic } from '../lib/semantics'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,9 +20,12 @@ import { DebouncedInput } from './DebouncedInput'
 
 interface PropertyPanelProps {
   entity: EntityWithAttrs
+  entities: EntityWithAttrs[]
+  relationships: Relationship[]
   vocabulary: Vocabulary
   onUpdateAttr: (key: string, value: string) => void
   onDeleteAttr: (key: string) => void
+  onDeleteRelationship: (relationshipId: string) => void
   onDelete: () => void
   onClose: () => void
 }
@@ -43,7 +47,7 @@ const commonIcons = [
   'file', 'folder', 'settings', 'zap', 'globe', 'cpu', 'hard-drive', 'network',
 ]
 
-export function PropertyPanel({ entity, vocabulary, onUpdateAttr, onDeleteAttr, onDelete, onClose }: PropertyPanelProps) {
+export function PropertyPanel({ entity, entities, relationships, vocabulary, onUpdateAttr, onDeleteAttr, onDeleteRelationship, onDelete, onClose }: PropertyPanelProps) {
   const [newAttrKey, setNewAttrKey] = useState('')
   const [newAttrValue, setNewAttrValue] = useState('')
   const [newBindingName, setNewBindingName] = useState('')
@@ -137,6 +141,37 @@ export function PropertyPanel({ entity, vocabulary, onUpdateAttr, onDeleteAttr, 
       .map(([key, value]) => [key.slice(4), value] as [string, string])
       .sort(([a], [b]) => a.localeCompare(b))
   }, [entity.attrs])
+
+  // Semantic bindings - what this entity binds to (outgoing)
+  const boundToSemantics = useMemo(() => {
+    return relationships
+      .filter(r => r.kind === 'binds' && r.from_entity === entity.id)
+      .map(r => {
+        const targetEntity = entities.find(e => e.id === r.to_entity)
+        const semanticType = targetEntity?.attrs['semantic.type']
+        const semantic = semanticType ? getSemantic(semanticType) : null
+        return {
+          relationshipId: r.id,
+          targetId: r.to_entity,
+          targetName: targetEntity?.attrs.name || semantic?.name || 'Unknown',
+          semanticType,
+        }
+      })
+  }, [relationships, entities, entity.id])
+
+  // Entities binding to this (incoming) - mainly relevant for semantic nodes
+  const boundFromEntities = useMemo(() => {
+    return relationships
+      .filter(r => r.kind === 'binds' && r.to_entity === entity.id)
+      .map(r => {
+        const sourceEntity = entities.find(e => e.id === r.from_entity)
+        return {
+          relationshipId: r.id,
+          sourceId: r.from_entity,
+          sourceName: sourceEntity?.attrs.name || 'Unknown',
+        }
+      })
+  }, [relationships, entities, entity.id])
 
   // Get custom attrs (not managed by dedicated sections)
   const customAttrs = useMemo(() => {
@@ -682,6 +717,70 @@ export function PropertyPanel({ entity, vocabulary, onUpdateAttr, onDeleteAttr, 
             </Button>
           </div>
         </div>
+
+        {/* Semantic Bindings Section */}
+        {(boundToSemantics.length > 0 || boundFromEntities.length > 0) && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <Link2 className="h-3 w-3" />
+                Semantic Bindings
+              </Label>
+
+              {/* Bound to (outgoing) */}
+              {boundToSemantics.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Bound to</Label>
+                  {boundToSemantics.map((binding) => (
+                    <div key={binding.relationshipId} className="flex items-center gap-2 pl-2">
+                      <span className="text-sm flex-1 truncate" title={binding.targetName}>
+                        {binding.targetName}
+                      </span>
+                      {binding.semanticType && (
+                        <span className="text-xs text-muted-foreground">
+                          {binding.semanticType}
+                        </span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => onDeleteRelationship(binding.relationshipId)}
+                        title="Remove binding"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Bound from (incoming) */}
+              {boundFromEntities.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Bound from</Label>
+                  {boundFromEntities.map((binding) => (
+                    <div key={binding.relationshipId} className="flex items-center gap-2 pl-2">
+                      <span className="text-sm flex-1 truncate" title={binding.sourceName}>
+                        {binding.sourceName}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => onDeleteRelationship(binding.relationshipId)}
+                        title="Remove binding"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Configuration Section - Dynamic based on role vocabulary */}
         {roleVocab && roleVocab.attrs.length > 0 && (
