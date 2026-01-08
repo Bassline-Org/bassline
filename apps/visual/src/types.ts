@@ -17,17 +17,133 @@ export interface Entity {
   modified_at: number
 }
 
-/** Entity with attrs resolved (for convenience in views) */
-export interface EntityWithAttrs extends Entity {
-  attrs: Record<string, string>
+// =============================================================================
+// Typed Attributes
+// =============================================================================
+
+/** Supported attribute types */
+export type AttrType = 'string' | 'number' | 'json' | 'blob'
+
+/** Attribute value - typed based on AttrType */
+export type AttrValue = string | number | object | ArrayBuffer
+
+/**
+ * Safely convert an AttrValue to string.
+ * Most attrs are strings, this helper handles the type safely.
+ */
+export function attrString(value: AttrValue | undefined): string {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'object') return JSON.stringify(value)
+  return ''
 }
 
-/** Attribute - key/value pair on an entity */
+/**
+ * Get an attr as string, with optional default.
+ * Shorthand for common pattern: attrString(entity.attrs.foo) || 'default'
+ */
+export function getAttr(attrs: Record<string, AttrValue>, key: string, defaultValue = ''): string {
+  return attrString(attrs[key]) || defaultValue
+}
+
+/**
+ * Safely convert an AttrValue to number.
+ * Returns the value if it's already a number, otherwise parses from string.
+ */
+export function attrNumber(value: AttrValue | undefined, defaultValue = 0): number {
+  if (value === undefined || value === null) return defaultValue
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const num = parseFloat(value)
+    return isNaN(num) ? defaultValue : num
+  }
+  return defaultValue
+}
+
+// =============================================================================
+// DataObject Model
+// =============================================================================
+
+/**
+ * A DataObject is a typed key-value object.
+ * It's "entity-shaped" when it has an `id` field.
+ *
+ * This is the core abstraction for semantic I/O:
+ * - Semantics receive DataObject[] as input
+ * - Semantics produce DataObject[] as output
+ * - Entity attrs IS a DataObject (with id injected)
+ *
+ * The `body` field (if present) contains typed payload data.
+ * This aligns with Bassline's request/response model.
+ */
+export type DataObject = Record<string, AttrValue>
+
+/**
+ * Convert a DataObject to a Bassline request.
+ * Extracts `body` as the request body, everything else becomes headers.
+ */
+export function toRequest(data: DataObject): { headers: DataObject; body?: AttrValue } {
+  const { body, ...headers } = data
+  return body !== undefined ? { headers, body } : { headers }
+}
+
+/**
+ * Convert a Bassline response to a DataObject.
+ * Merges headers and body into a single object.
+ */
+export function fromResponse(res: { headers: Record<string, unknown>; body?: unknown }): DataObject {
+  const data: DataObject = {}
+  for (const [key, value] of Object.entries(res.headers)) {
+    if (value !== undefined && value !== null) {
+      data[key] = value as AttrValue
+    }
+  }
+  if (res.body !== undefined) {
+    data.body = res.body as AttrValue
+  }
+  return data
+}
+
+/**
+ * Get relationships that involve the given data objects (by their id fields).
+ * Returns relationships where both from_entity and to_entity are in the data set.
+ */
+export function getRelationshipsForData(
+  data: DataObject[],
+  allRelationships: Relationship[]
+): Relationship[] {
+  const ids = new Set(
+    data
+      .map(d => d.id)
+      .filter((id): id is string => typeof id === 'string')
+  )
+  return allRelationships.filter(r => ids.has(r.from_entity) && ids.has(r.to_entity))
+}
+
+/**
+ * Entity with attrs resolved (for convenience in views)
+ *
+ * The `attrs` object includes:
+ * - `id`: The entity id (always injected)
+ * - All attribute key/value pairs with their typed values
+ *
+ * This aligns with Bassline's request model where attrs = headers
+ * and attrs.body (if present) = body
+ */
+export interface EntityWithAttrs extends Entity {
+  attrs: Record<string, AttrValue>
+}
+
+/** Attribute row as stored in database */
 export interface Attr {
   entity_id: string
   key: string
-  value: string | null
-  type: 'string' | 'number' | 'boolean' | 'json'
+  type: AttrType
+  string_value: string | null
+  number_value: number | null
+  json_value: string | null
+  blob_value: ArrayBuffer | null
 }
 
 /** Relationship between entities */
@@ -100,7 +216,7 @@ export interface Stamp {
 
 /** Stamp with its attrs loaded */
 export interface StampWithAttrs extends Stamp {
-  attrs: Record<string, string>
+  attrs: Record<string, AttrValue>
 }
 
 /** Stamp member (child entity template) */
@@ -112,7 +228,7 @@ export interface StampMember {
 
 /** Stamp member with attrs */
 export interface StampMemberWithAttrs extends StampMember {
-  attrs: Record<string, string>
+  attrs: Record<string, AttrValue>
 }
 
 /** Full stamp with members and relationships */
@@ -134,8 +250,8 @@ export interface StampRelationship {
 export interface ApplyStampResult {
   createdEntityIds: string[]
   createdRelationshipIds: string[]
-  appliedAttrs: Record<string, string>
-  previousAttrs: Record<string, string>
+  appliedAttrs: Record<string, AttrValue>
+  previousAttrs: Record<string, AttrValue>
 }
 
 // =============================================================================

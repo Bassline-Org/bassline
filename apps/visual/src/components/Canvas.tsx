@@ -18,6 +18,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { EntityWithAttrs, Relationship, UIState, StampWithAttrs } from '../types'
+import { attrNumber } from '../types'
 import { EntityNode } from './EntityNode'
 import { CanvasContextMenu } from './CanvasContextMenu'
 
@@ -179,8 +180,8 @@ function CanvasInner({
       const collapseMode = e.attrs['ui.collapse'] || 'expanded'
 
       // Get dimensions - use explicit ui.width/ui.height or defaults
-      const uiWidth = e.attrs['ui.width'] ? parseFloat(e.attrs['ui.width']) : undefined
-      const uiHeight = e.attrs['ui.height'] ? parseFloat(e.attrs['ui.height']) : undefined
+      const uiWidth = e.attrs['ui.width'] ? attrNumber(e.attrs['ui.width']) : undefined
+      const uiHeight = e.attrs['ui.height'] ? attrNumber(e.attrs['ui.height']) : undefined
 
       // Calculate node dimensions based on collapse state
       const nodeStyle = (() => {
@@ -205,7 +206,7 @@ function CanvasInner({
       return {
         id: e.id,
         type: 'entity',
-        position: { x: parseFloat(e.attrs.x || '0'), y: parseFloat(e.attrs.y || '0') },
+        position: { x: attrNumber(e.attrs.x), y: attrNumber(e.attrs.y) },
         data: {
           entity: e,
           isContainer,

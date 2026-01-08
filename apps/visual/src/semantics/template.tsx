@@ -43,7 +43,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { EntityWithAttrs } from '../types'
+import type { EntityWithAttrs, DataObject } from '../types'
+import { attrString, getAttr } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useSemanticOutput } from '../hooks/useSemanticOutput'
 import { useBl } from '../hooks/useBl'
@@ -64,42 +65,38 @@ Handlebars.registerHelper('join', function(array, separator) {
   return array.join(separator || ', ')
 })
 
-// Apply map-mode template to entity using Handlebars
+// Apply map-mode template to data object using Handlebars
+// Handlebars receives typed values - numbers, strings, objects all work
 function applyMapTemplate(
-  inputEntity: EntityWithAttrs,
+  input: DataObject,
   template: string,
   outputAttr: string
-): EntityWithAttrs {
+): DataObject {
   try {
     const compiled = Handlebars.compile(template)
-    const result = compiled(inputEntity.attrs)
+    const result = compiled(input)
     return {
-      ...inputEntity,
-      attrs: {
-        ...inputEntity.attrs,
-        [outputAttr]: result,
-      },
+      ...input,
+      [outputAttr]: result,
     }
   } catch {
-    // On template error, return entity unchanged
-    return inputEntity
+    // On template error, return data unchanged
+    return input
   }
 }
 
-// Apply reduce-mode template to all entities
+// Apply reduce-mode template to all data objects
 function applyReduceTemplate(
-  inputEntities: EntityWithAttrs[],
+  inputData: DataObject[],
   template: string,
   outputAttr: string,
   outputName: string
-): EntityWithAttrs {
+): DataObject {
   const context = {
-    items: inputEntities.map(e => ({ ...e, attrs: e.attrs })),
-    count: inputEntities.length,
-    first: inputEntities[0] ? { ...inputEntities[0], attrs: inputEntities[0].attrs } : null,
-    last: inputEntities[inputEntities.length - 1]
-      ? { ...inputEntities[inputEntities.length - 1], attrs: inputEntities[inputEntities.length - 1].attrs }
-      : null,
+    items: inputData,           // Direct DataObject array
+    count: inputData.length,
+    first: inputData[0] || null,
+    last: inputData[inputData.length - 1] || null,
   }
 
   try {
@@ -107,25 +104,15 @@ function applyReduceTemplate(
     const result = compiled(context)
     return {
       id: `reduce-${Date.now()}`,
-      project_id: inputEntities[0]?.project_id || '',
-      created_at: Date.now(),
-      modified_at: Date.now(),
-      attrs: {
-        name: outputName,
-        [outputAttr]: result,
-      },
+      name: outputName,
+      [outputAttr]: result,
     }
   } catch (err) {
-    // On template error, return empty entity with error message
+    // On template error, return data with error message
     return {
       id: `reduce-${Date.now()}`,
-      project_id: inputEntities[0]?.project_id || '',
-      created_at: Date.now(),
-      modified_at: Date.now(),
-      attrs: {
-        name: outputName,
-        [outputAttr]: `Template error: ${err instanceof Error ? err.message : String(err)}`,
-      },
+      name: outputName,
+      [outputAttr]: `Template error: ${err instanceof Error ? err.message : String(err)}`,
     }
   }
 }
@@ -191,50 +178,53 @@ function LocalInput({
 
 export function TemplateSemantic({ entity }: TemplateSemanticProps) {
   const { project } = useLoaderData() as EditorLoaderData
-  const { inputEntities, inputRelationships } = useSemanticInput(entity)
+  const { inputData, inputRelationships } = useSemanticInput(entity)
   const { bl, revalidate } = useBl()
   const [copied, setCopied] = useState(false)
 
   // Get configuration
-  const mode = entity.attrs['template.mode'] || 'map'
+  const mode = getAttr(entity.attrs, 'template.mode', 'map')
 
   // Map mode config
-  const templateContent = entity.attrs['template.content'] || ''
-  const outputAttr = entity.attrs['template.output'] || 'value.string'
+  const templateContent = getAttr(entity.attrs, 'template.content')
+  const outputAttr = getAttr(entity.attrs, 'template.output', 'value.string')
 
   // Reduce mode config
-  const reduceTemplate = entity.attrs['template.reduce.template'] || ''
-  const reduceOutputAttr = entity.attrs['template.reduce.output'] || 'content'
-  const reduceOutputName = entity.attrs['template.reduce.name'] || 'generated'
+  const reduceTemplate = getAttr(entity.attrs, 'template.reduce.template')
+  const reduceOutputAttr = getAttr(entity.attrs, 'template.reduce.output', 'content')
+  const reduceOutputName = getAttr(entity.attrs, 'template.reduce.name', 'generated')
 
   // Apply template based on mode
-  const outputEntities = useMemo(() => {
+  const outputData = useMemo((): DataObject[] => {
     if (mode === 'reduce') {
-      if (!reduceTemplate || inputEntities.length === 0) {
+      if (!reduceTemplate || inputData.length === 0) {
         return []
       }
-      const reduced = applyReduceTemplate(inputEntities, reduceTemplate, reduceOutputAttr, reduceOutputName)
+      const reduced = applyReduceTemplate(inputData, reduceTemplate, reduceOutputAttr, reduceOutputName)
       return [reduced]
     }
 
     // Map mode
-    if (!templateContent) return inputEntities
-    return inputEntities.map((e) => applyMapTemplate(e, templateContent, outputAttr))
-  }, [mode, inputEntities, templateContent, outputAttr, reduceTemplate, reduceOutputAttr, reduceOutputName])
+    if (!templateContent) return inputData
+    return inputData.map((data) => applyMapTemplate(data, templateContent, outputAttr))
+  }, [mode, inputData, templateContent, outputAttr, reduceTemplate, reduceOutputAttr, reduceOutputName])
 
   // Get all generated outputs for preview
   const generatedOutputs = useMemo(() => {
     const attr = mode === 'reduce' ? reduceOutputAttr : outputAttr
-    return outputEntities.map((e) => ({
-      id: e.id,
-      name: e.attrs.name || e.id.slice(0, 8),
-      output: e.attrs[attr] || '',
-    }))
-  }, [outputEntities, mode, outputAttr, reduceOutputAttr])
+    return outputData.map((data, i) => {
+      const id = typeof data.id === 'string' ? data.id : `_${i}`
+      return {
+        id,
+        name: getAttr(data, 'name', id.slice(0, 8)),
+        output: attrString(data[attr]),
+      }
+    })
+  }, [outputData, mode, outputAttr, reduceOutputAttr])
 
   // Register output for downstream composition
   useSemanticOutput(entity.id, {
-    entities: outputEntities,
+    data: outputData,
     relationships: mode === 'reduce' ? [] : inputRelationships,
   })
 
@@ -402,7 +392,7 @@ export function TemplateSemantic({ entity }: TemplateSemanticProps) {
         <div className="template-semantic__preview-header">
           <span className="template-semantic__preview-title">
             {isReduceMode
-              ? `Output (${inputEntities.length} → 1)`
+              ? `Output (${inputData.length} → 1)`
               : `Preview (${generatedOutputs.length})`}
           </span>
           {generatedOutputs.length > 0 && (
@@ -428,10 +418,10 @@ export function TemplateSemantic({ entity }: TemplateSemanticProps) {
         </div>
 
         <div className="template-semantic__outputs">
-          {generatedOutputs.slice(0, 5).map((o) => (
-            <div key={o.id} className="template-semantic__output">
-              <div className="template-semantic__output-name">{o.name}</div>
-              <pre className="template-semantic__output-code">{o.output || '(empty)'}</pre>
+          {generatedOutputs.slice(0, 5).map((output) => (
+            <div key={output.id} className="template-semantic__output">
+              <div className="template-semantic__output-name">{output.name}</div>
+              <pre className="template-semantic__output-code">{output.output || '(empty)'}</pre>
             </div>
           ))}
           {generatedOutputs.length > 5 && (

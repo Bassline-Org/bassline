@@ -15,7 +15,8 @@ import { useLoaderData } from 'react-router'
 import { Copy, Check, Globe, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import type { EditorLoaderData, EntityWithAttrs } from '../types'
+import type { EditorLoaderData, EntityWithAttrs, DataObject } from '../types'
+import { getAttr } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useSemanticOutput } from '../hooks/useSemanticOutput'
 import { useBl } from '../hooks/useBl'
@@ -26,12 +27,12 @@ interface JsonExportProps {
 
 export function JsonExportSemantic({ entity }: JsonExportProps) {
   const { project, entities, relationships } = useLoaderData() as EditorLoaderData
-  const { inputEntities, inputRelationships, boundEntityIds } = useSemanticInput(entity)
+  const { inputData, inputRelationships, boundEntityIds } = useSemanticInput(entity)
   const { bl, revalidate } = useBl()
   const [copied, setCopied] = useState(false)
 
   // Determine scope from config
-  const scope = (entity.attrs['json-export.scope'] || 'project') as 'project' | 'bindings'
+  const scope = getAttr(entity.attrs, 'json-export.scope', 'project') as 'project' | 'bindings'
   const useBindings = scope === 'bindings' && boundEntityIds.length > 0
 
   const handleScopeChange = useCallback(
@@ -44,14 +45,16 @@ export function JsonExportSemantic({ entity }: JsonExportProps) {
     [bl, project.id, entity.id, revalidate]
   )
 
-  // Select entities based on scope
-  const exportEntities = useMemo(() => {
+  // Select data based on scope - preserves typed values for export
+  const exportData = useMemo((): DataObject[] => {
     if (useBindings) {
-      return inputEntities
+      return inputData
     }
-    // Project scope - filter out semantic nodes
-    return entities.filter(e => !e.attrs['semantic.type'])
-  }, [useBindings, inputEntities, entities])
+    // Project scope - filter out semantic nodes, use attrs (which is DataObject)
+    return entities
+      .filter(e => !e.attrs['semantic.type'])
+      .map(e => e.attrs)
+  }, [useBindings, inputData, entities])
 
   // Select relationships based on scope
   const exportRelationships = useMemo(() => {
@@ -59,22 +62,27 @@ export function JsonExportSemantic({ entity }: JsonExportProps) {
       return inputRelationships
     }
     // Project scope - all relationships between non-semantic entities
-    const exportIds = new Set(exportEntities.map(e => e.id))
+    const exportIds = new Set(
+      exportData
+        .map(d => d.id)
+        .filter((id): id is string => typeof id === 'string')
+    )
     return relationships.filter(
       r => exportIds.has(r.from_entity) && exportIds.has(r.to_entity)
     )
-  }, [useBindings, inputRelationships, relationships, exportEntities])
+  }, [useBindings, inputRelationships, relationships, exportData])
 
   // Register output for downstream composition
   useSemanticOutput(entity.id, {
-    entities: exportEntities,
+    data: exportData,
     relationships: exportRelationships,
   })
 
-  const exportData = {
-    entities: exportEntities.map(e => ({
-      id: e.id,
-      attrs: e.attrs,
+  // Build export structure - preserves typed values (numbers as numbers, objects as objects)
+  const exportStructure = {
+    entities: exportData.map(data => ({
+      id: data.id,
+      attrs: data,
     })),
     relationships: exportRelationships.map(r => ({
       id: r.id,
@@ -85,7 +93,7 @@ export function JsonExportSemantic({ entity }: JsonExportProps) {
     })),
   }
 
-  const json = JSON.stringify(exportData, null, 2)
+  const json = JSON.stringify(exportStructure, null, 2)
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(json)
@@ -128,7 +136,7 @@ export function JsonExportSemantic({ entity }: JsonExportProps) {
           )}
         </Button>
         <span className="json-export__stats">
-          {exportEntities.length} entities, {exportRelationships.length} relationships
+          {exportData.length} entities, {exportRelationships.length} relationships
         </span>
       </div>
       <pre className="json-export__code">{json}</pre>

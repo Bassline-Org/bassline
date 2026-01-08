@@ -1,17 +1,20 @@
 /**
  * Resource Semantic
  *
- * Universal bridge between entities and Bassline resources.
- * Calls a resource for each input entity, storing the response as an attribute.
+ * Universal bridge between data objects and Bassline resources.
+ * Calls a resource for each input DataObject, storing the response in `body`.
  *
  * Configuration:
  * - resource.path = resource path (e.g., "/shell")
- * - resource.output = attr name to store response (default: "resource.result")
  * - resource.auto = "true" to auto-execute on input change
  *
  * Shell-specific:
  * - shell.cmd = command template with {{attr}} interpolation
  * - shell.cwd = working directory template (optional)
+ *
+ * Output:
+ * - Each input DataObject is decorated with a typed `body` containing the response
+ * - For shell responses: body = { stdout, stderr, code }
  */
 
 import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
@@ -27,7 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { EntityWithAttrs } from '../types'
+import type { EntityWithAttrs, DataObject, AttrValue } from '../types'
+import { attrString, getAttr } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useSemanticOutput } from '../hooks/useSemanticOutput'
 import { useBl } from '../hooks/useBl'
@@ -46,10 +50,10 @@ const AVAILABLE_RESOURCES = [
 ]
 
 // Interpolate {{attr}} placeholders in a string
-function interpolate(template: string, attrs: Record<string, string>): string {
+function interpolate(template: string, attrs: DataObject): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_, attrName) => {
     const trimmed = attrName.trim()
-    return attrs[trimmed] ?? ''
+    return attrString(attrs[trimmed])
   })
 }
 
@@ -83,26 +87,25 @@ function LocalInput({
 
 export function ResourceSemantic({ entity }: ResourceSemanticProps) {
   const { project } = useLoaderData() as EditorLoaderData
-  const { inputEntities, inputRelationships } = useSemanticInput(entity)
+  const { inputData, inputRelationships } = useSemanticInput(entity)
   const { bl, revalidate } = useBl()
 
   // Execution state
   const [status, setStatus] = useState<ExecutionStatus>('idle')
-  const [results, setResults] = useState<Map<string, unknown>>(new Map())
+  const [results, setResults] = useState<Map<string, AttrValue>>(new Map())
   const [error, setError] = useState<string | null>(null)
 
-  // Get configuration
-  const resourcePath = entity.attrs['resource.path'] || '/shell'
-  const outputAttr = entity.attrs['resource.output'] || 'resource.result'
-  const autoExecute = entity.attrs['resource.auto'] === 'true'
+  // Get configuration (use getAttr for string config values)
+  const resourcePath = getAttr(entity.attrs, 'resource.path', '/shell')
+  const autoExecute = getAttr(entity.attrs, 'resource.auto') === 'true'
 
   // Shell-specific config
-  const shellCmd = entity.attrs['shell.cmd'] || ''
-  const shellCwd = entity.attrs['shell.cwd'] || ''
+  const shellCmd = getAttr(entity.attrs, 'shell.cmd')
+  const shellCwd = getAttr(entity.attrs, 'shell.cwd')
 
   // Build request body based on resource type
   const buildRequestBody = useCallback(
-    (attrs: Record<string, string>) => {
+    (attrs: DataObject) => {
       if (resourcePath === '/shell') {
         const body: { cmd: string; cwd?: string } = {
           cmd: interpolate(shellCmd, attrs),
@@ -118,37 +121,33 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
     [resourcePath, shellCmd, shellCwd]
   )
 
-  // Build output entities with results attached
-  const outputEntities = useMemo(() => {
-    // Standalone mode: output the Resource entity itself with result attached
-    if (inputEntities.length === 0 && results.has('_standalone')) {
-      const result = results.get('_standalone')
+  // Build output data with results attached
+  // Output is DataObject[] - each input gets a `body` with the typed response
+  const outputData = useMemo((): DataObject[] => {
+    // Standalone mode: output the Resource entity's attrs with result attached
+    if (inputData.length === 0 && results.has('_standalone')) {
+      const result = results.get('_standalone')!
       return [{
-        ...entity,
-        attrs: {
-          ...entity.attrs,
-          [outputAttr]: typeof result === 'string' ? result : JSON.stringify(result),
-        },
+        ...entity.attrs,
+        body: result, // Typed response body - not stringified!
       }]
     }
 
-    // Per-entity mode: attach results to each input entity
-    return inputEntities.map((e) => {
-      const result = results.get(e.id)
-      if (result === undefined) return e
+    // Per-entity mode: attach results to each input DataObject
+    return inputData.map((data) => {
+      const id = typeof data.id === 'string' ? data.id : undefined
+      const result = id ? results.get(id) : undefined
+      if (result === undefined) return data
       return {
-        ...e,
-        attrs: {
-          ...e.attrs,
-          [outputAttr]: typeof result === 'string' ? result : JSON.stringify(result),
-        },
+        ...data,
+        body: result, // Typed response body - not stringified!
       }
     })
-  }, [entity, inputEntities, results, outputAttr])
+  }, [entity.attrs, inputData, results])
 
   // Register output for downstream composition
   useSemanticOutput(entity.id, {
-    entities: outputEntities,
+    data: outputData,
     relationships: inputRelationships,
   })
 
@@ -158,10 +157,10 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
 
     setStatus('running')
     setError(null)
-    const newResults = new Map<string, unknown>()
+    const newResults = new Map<string, AttrValue>()
 
-    // Helper to extract result from response
-    const extractResult = (response: { headers: Record<string, unknown>; body: unknown }) => {
+    // Helper to extract result from response - returns typed value, not stringified
+    const extractResult = (response: { headers: Record<string, unknown>; body: unknown }): AttrValue => {
       if (response.headers.condition === 'error') {
         throw new Error(
           typeof response.body === 'object' && response.body !== null
@@ -169,38 +168,38 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
             : String(response.body)
         )
       }
-      // Extract stdout if it's a shell response, otherwise use full body
-      return typeof response.body === 'object' &&
-        response.body !== null &&
-        'stdout' in response.body
-        ? (response.body as { stdout: string }).stdout
-        : response.body
+      // Return the full response body as typed value
+      // For shell: { stdout, stderr, code }
+      return response.body as AttrValue
     }
 
     try {
-      if (inputEntities.length === 0) {
+      if (inputData.length === 0) {
         // Standalone execution - run once with empty attrs
         const body = buildRequestBody({})
         const response = await window.bl.put({ path: resourcePath }, body)
         const result = extractResult(response)
         newResults.set('_standalone', result)
 
-        // Persist result to the Resource entity
-        const resultStr = typeof result === 'string' ? result : JSON.stringify(result)
-        await bl.attrs.set(project.id, entity.id, outputAttr, resultStr)
+        // Persist result to the Resource entity as typed body
+        await bl.attrs.set(project.id, entity.id, 'body', result, 'json')
       } else {
-        // Per-entity execution - run for each input, store all results on Resource entity
-        const allResults: string[] = []
-        for (const inputEntity of inputEntities) {
-          const body = buildRequestBody(inputEntity.attrs)
+        // Per-entity execution - run for each input
+        for (const input of inputData) {
+          const id = typeof input.id === 'string' ? input.id : `_${inputData.indexOf(input)}`
+          const body = buildRequestBody(input)
           const response = await window.bl.put({ path: resourcePath }, body)
           const result = extractResult(response)
-          newResults.set(inputEntity.id, result)
-          allResults.push(typeof result === 'string' ? result : JSON.stringify(result))
+          newResults.set(id, result)
         }
 
-        // Persist combined results to the Resource entity
-        await bl.attrs.set(project.id, entity.id, outputAttr, allResults.join('\n---\n'))
+        // Persist last result to the Resource entity as typed body (for display)
+        if (newResults.size > 0) {
+          const lastResult = Array.from(newResults.values()).pop()
+          if (lastResult) {
+            await bl.attrs.set(project.id, entity.id, 'body', lastResult, 'json')
+          }
+        }
       }
 
       setResults(newResults)
@@ -210,9 +209,9 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
       setError(err instanceof Error ? err.message : String(err))
       setStatus('error')
     }
-  }, [inputEntities, resourcePath, shellCmd, buildRequestBody, bl, project.id, entity.id, outputAttr, revalidate])
+  }, [inputData, resourcePath, shellCmd, buildRequestBody, bl, project.id, entity.id, revalidate])
 
-  // Track previous input entity IDs to detect actual changes
+  // Track previous input data IDs to detect actual changes
   const prevInputKeyRef = useRef<string>('')
 
   // Auto-execute when inputs change (if enabled)
@@ -220,17 +219,21 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
   useEffect(() => {
     if (!autoExecute || !shellCmd) return
 
-    // Create stable key from input entity IDs
-    const inputKey = inputEntities.map(e => e.id).sort().join(',')
+    // Create stable key from input data IDs
+    const inputKey = inputData
+      .map(d => typeof d.id === 'string' ? d.id : '')
+      .filter(Boolean)
+      .sort()
+      .join(',')
 
     // Only execute if inputs actually changed
     if (inputKey !== prevInputKeyRef.current) {
       prevInputKeyRef.current = inputKey
-      if (inputEntities.length > 0) {
+      if (inputData.length > 0) {
         execute()
       }
     }
-  }, [autoExecute, shellCmd, inputEntities, execute])
+  }, [autoExecute, shellCmd, inputData, execute])
 
   // Update configuration handlers
   const handlePathChange = useCallback(
@@ -252,14 +255,6 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
   const handleCwdChange = useCallback(
     async (value: string) => {
       await bl.attrs.set(project.id, entity.id, 'shell.cwd', value)
-      revalidate()
-    },
-    [bl, project.id, entity.id, revalidate]
-  )
-
-  const handleOutputChange = useCallback(
-    async (value: string) => {
-      await bl.attrs.set(project.id, entity.id, 'resource.output', value)
       revalidate()
     },
     [bl, project.id, entity.id, revalidate]
@@ -335,16 +330,6 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
 
         <div className="resource-semantic__row">
           <div className="resource-semantic__field resource-semantic__field--inline">
-            <Label className="resource-semantic__label">Output attr:</Label>
-            <LocalInput
-              value={outputAttr}
-              onCommit={handleOutputChange}
-              placeholder="resource.result"
-              className="resource-semantic__output"
-            />
-          </div>
-
-          <div className="resource-semantic__field resource-semantic__field--inline">
             <Label className="resource-semantic__label">Auto:</Label>
             <Switch checked={autoExecute} onCheckedChange={handleAutoChange} />
           </div>
@@ -362,7 +347,7 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
           ) : (
             <Play className="h-4 w-4 mr-2" />
           )}
-          {inputEntities.length > 0 ? `Run (${inputEntities.length})` : 'Run'}
+          {inputData.length > 0 ? `Run (${inputData.length})` : 'Run'}
         </Button>
         <StatusIcon />
       </div>
@@ -376,32 +361,40 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
           </div>
           <div className="resource-semantic__results-list">
             {results.has('_standalone') ? (
-              // Standalone result
+              // Standalone result - display stdout from the typed body
               <div className="resource-semantic__result">
                 <div className="resource-semantic__result-name">Output</div>
                 <pre className="resource-semantic__result-output">
                   {(() => {
                     const result = results.get('_standalone')
-                    const str = typeof result === 'string' ? result : JSON.stringify(result)
-                    return str.length > 200 ? str.slice(0, 200) + '...' : str
+                    // Extract stdout if shell response, otherwise stringify
+                    const output = typeof result === 'object' && result !== null && 'stdout' in result
+                      ? (result as { stdout: string }).stdout
+                      : attrString(result)
+                    return output.length > 200 ? output.slice(0, 200) + '...' : output
                   })()}
                 </pre>
               </div>
             ) : (
-              // Per-entity results
+              // Per-data results - display body.stdout from each output
               <>
-                {outputEntities.slice(0, 3).map((e) => {
-                  const result = e.attrs[outputAttr]
+                {outputData.slice(0, 3).map((data, i) => {
+                  const id = typeof data.id === 'string' ? data.id : `_${i}`
+                  const body = data.body
+                  // Extract stdout if shell response
+                  const output = typeof body === 'object' && body !== null && 'stdout' in body
+                    ? (body as { stdout: string }).stdout
+                    : attrString(body)
                   return (
-                    <div key={e.id} className="resource-semantic__result">
+                    <div key={id} className="resource-semantic__result">
                       <div className="resource-semantic__result-name">
-                        {e.attrs.name || e.id.slice(0, 8)}
+                        {attrString(data.name) || id.slice(0, 8)}
                       </div>
                       <pre className="resource-semantic__result-output">
-                        {result
-                          ? result.length > 200
-                            ? result.slice(0, 200) + '...'
-                            : result
+                        {output
+                          ? output.length > 200
+                            ? output.slice(0, 200) + '...'
+                            : output
                           : '(empty)'}
                       </pre>
                     </div>
@@ -416,7 +409,7 @@ export function ResourceSemantic({ entity }: ResourceSemanticProps) {
         </div>
       )}
 
-      {inputEntities.length === 0 && results.size === 0 && (
+      {inputData.length === 0 && results.size === 0 && (
         <div className="resource-semantic__empty">
           Enter a command and click Run, or bind entities for per-entity execution.
         </div>

@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react'
 import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react'
 import type { EntityWithAttrs } from '../types'
+import { attrString, getAttr } from '../types'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import * as LucideIcons from 'lucide-react'
@@ -78,9 +79,9 @@ function getPorts(entity: EntityWithAttrs, vocabulary: Vocabulary | null): PortI
 // Ports are rendered at center position for edge connectivity
 function CollapsedEntityNode({ entity, childCount, selected }: { entity: EntityWithAttrs; childCount: number; selected: boolean }) {
   const vocabulary = useVocabularyContext()
-  const name = entity.attrs.name || 'Unnamed'
-  const fill = entity.attrs['visual.fill']
-  const stroke = entity.attrs['visual.stroke']
+  const name = getAttr(entity.attrs, 'name', 'Unnamed')
+  const fill = attrString(entity.attrs['visual.fill'])
+  const stroke = attrString(entity.attrs['visual.stroke'])
   const ports = useMemo(() => getPorts(entity, vocabulary), [entity, vocabulary])
 
   // Filter by direction
@@ -134,9 +135,9 @@ function CollapsedEntityNode({ entity, childCount, selected }: { entity: EntityW
 // Ports are rendered at center position for edge connectivity
 function CompactEntityNode({ entity, selected }: { entity: EntityWithAttrs; selected: boolean }) {
   const vocabulary = useVocabularyContext()
-  const iconName = entity.attrs['visual.icon'] || 'box'
-  const fill = entity.attrs['visual.fill']
-  const stroke = entity.attrs['visual.stroke']
+  const iconName = getAttr(entity.attrs, 'visual.icon', 'box')
+  const fill = attrString(entity.attrs['visual.fill'])
+  const stroke = attrString(entity.attrs['visual.stroke'])
   const IconComponent = getIcon(iconName)
   const ports = useMemo(() => getPorts(entity, vocabulary), [entity, vocabulary])
 
@@ -152,7 +153,7 @@ function CompactEntityNode({ entity, selected }: { entity: EntityWithAttrs; sele
     <div
       className={cn('entity-node entity-node--compact', selected && 'selected')}
       style={style}
-      title={entity.attrs.name || 'Unnamed'}
+      title={getAttr(entity.attrs, 'name', 'Unnamed')}
     >
       {/* Input handles at center-left */}
       {inputPorts.map(port => (
@@ -186,7 +187,7 @@ export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps
   const vocabulary = useVocabularyContext()
 
   // Check if this is a semantic node
-  const semanticType = entity.attrs['semantic.type']
+  const semanticType = attrString(entity.attrs['semantic.type'])
   if (semanticType) {
     const semantic = getSemantic(semanticType)
     if (semantic) {
@@ -206,18 +207,18 @@ export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps
   }
 
   // Expanded mode - full rendering
-  const name = entity.attrs.name || 'Unnamed'
-  const role = entity.attrs.role
+  const name = getAttr(entity.attrs, 'name', 'Unnamed')
+  const role = attrString(entity.attrs.role)
 
   // Visual attrs
-  const shape = entity.attrs['visual.shape'] || 'rounded'
-  const fill = entity.attrs['visual.fill']
-  const stroke = entity.attrs['visual.stroke']
-  const iconName = entity.attrs['visual.icon']
+  const shape = getAttr(entity.attrs, 'visual.shape', 'rounded')
+  const fill = attrString(entity.attrs['visual.fill'])
+  const stroke = attrString(entity.attrs['visual.stroke'])
+  const iconName = attrString(entity.attrs['visual.icon'])
 
   // UI attrs (size)
-  const uiWidth = entity.attrs['ui.width']
-  const uiHeight = entity.attrs['ui.height']
+  const uiWidth = attrString(entity.attrs['ui.width'])
+  const uiHeight = attrString(entity.attrs['ui.height'])
 
   // Get icon component
   const IconComponent = useMemo(() => getIcon(iconName), [iconName])
@@ -242,7 +243,7 @@ export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps
   // Build class names
   const className = cn(
     'entity-node',
-    shapeClasses[shape] || shapeClasses.rounded,
+    shapeClasses[shape as keyof typeof shapeClasses] || shapeClasses.rounded,
     selected && 'selected',
     isContainer && 'entity-node--container',
     (uiWidth || uiHeight) && 'entity-node--resized'

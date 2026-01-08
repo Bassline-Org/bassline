@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Trash2, Maximize, Stamp, Save, FolderInput, FolderOutput, Package, Ungroup, Sparkles, Link2 } from 'lucide-react'
 import type { EntityWithAttrs, StampWithAttrs } from '../types'
+import { attrString } from '../types'
 import { getAllSemantics, isSemanticNode } from '../lib/semantics'
 
 interface CanvasContextMenuProps {
@@ -190,7 +191,7 @@ export function CanvasContextMenu({
                             key={entity.id}
                             onClick={() => onSetParent(entity.id)}
                           >
-                            {entity.attrs.name || 'Unnamed'}
+                            {attrString(entity.attrs.name) || 'Unnamed'}
                           </ContextMenuItem>
                         ))}
                       </ContextMenuSubContent>
@@ -216,7 +217,7 @@ export function CanvasContextMenu({
                             key={semantic.id}
                             onClick={() => onBindTo(semantic.id)}
                           >
-                            {semantic.attrs.name || semantic.attrs['semantic.type']}
+                            {attrString(semantic.attrs.name) || attrString(semantic.attrs['semantic.type'])}
                           </ContextMenuItem>
                         ))}
                       </ContextMenuSubContent>

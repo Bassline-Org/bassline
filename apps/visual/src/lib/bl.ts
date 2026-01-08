@@ -14,6 +14,8 @@ import type {
   StampWithAttrs,
   StampWithMembers,
   ApplyStampResult,
+  AttrValue,
+  AttrType,
 } from '../types'
 
 // =============================================================================
@@ -113,7 +115,7 @@ export const bl = {
 
     create: async (
       projectId: string,
-      attrs?: Record<string, string>
+      attrs?: Record<string, AttrValue>
     ): Promise<EntityWithAttrs> => {
       const res = await window.bl.put<EntityWithAttrs>(
         { path: `/projects/${projectId}/entities` },
@@ -133,22 +135,30 @@ export const bl = {
   // ===========================================================================
 
   attrs: {
-    get: async (projectId: string, entityId: string): Promise<Record<string, string>> => {
-      const res = await window.bl.get<Record<string, string>>({
+    get: async (projectId: string, entityId: string): Promise<Record<string, AttrValue>> => {
+      const res = await window.bl.get<Record<string, AttrValue>>({
         path: `/projects/${projectId}/entities/${entityId}/attrs`,
       })
       return res.body
     },
 
+    /**
+     * Set an attribute value with optional type.
+     * If type is not specified, it will be inferred from the value.
+     */
     set: async (
       projectId: string,
       entityId: string,
       key: string,
-      value: string
+      value: AttrValue,
+      type?: AttrType
     ): Promise<void> => {
+      // If type specified, send as { value, type } object
+      // Otherwise send value directly for backwards compatibility
+      const body = type !== undefined ? { value, type } : value
       await window.bl.put(
         { path: `/projects/${projectId}/entities/${entityId}/attrs/${key}` },
-        value
+        body
       )
     },
 
@@ -162,7 +172,7 @@ export const bl = {
     setBatch: async (
       projectId: string,
       entityId: string,
-      attrs: Record<string, string>
+      attrs: Record<string, AttrValue>
     ): Promise<void> => {
       await window.bl.put(
         { path: `/projects/${projectId}/entities/${entityId}/attrs` },

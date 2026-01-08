@@ -25,6 +25,7 @@
  */
 
 import type { StampWithAttrs } from '../types'
+import { attrString } from '../types'
 
 /** Types of vocabulary items */
 export type VocabularyKind = 'role' | 'lattice' | 'shape'
@@ -86,11 +87,11 @@ export function parseVocabularyStamp(stamp: StampWithAttrs): VocabularyItem | nu
     return null
   }
 
-  const kind = attrs['vocab.defines'] as VocabularyKind
-  const value = attrs['vocab.value']
-  const label = attrs['vocab.label'] || value
-  const description = attrs['vocab.description']
-  const icon = attrs['vocab.icon']
+  const kind = attrString(attrs['vocab.defines']) as VocabularyKind
+  const value = attrString(attrs['vocab.value'])
+  const label = attrString(attrs['vocab.label']) || value
+  const description = attrString(attrs['vocab.description']) || undefined
+  const icon = attrString(attrs['vocab.icon']) || undefined
 
   // Parse vocab.attr.* entries
   const attrDefs: AttrDefinition[] = []
@@ -111,18 +112,18 @@ export function parseVocabularyStamp(stamp: StampWithAttrs): VocabularyItem | nu
     const prefix = `vocab.attr.${attrName}.`
     const def: AttrDefinition = {
       key: attrName,
-      type: (attrs[`${prefix}type`] as AttrType) || 'string',
-      label: attrs[`${prefix}label`] || attrName,
-      description: attrs[`${prefix}description`],
-      required: attrs[`${prefix}required`] === 'true',
-      default: attrs[`${prefix}default`],
-      placeholder: attrs[`${prefix}placeholder`],
+      type: (attrString(attrs[`${prefix}type`]) as AttrType) || 'string',
+      label: attrString(attrs[`${prefix}label`]) || attrName,
+      description: attrString(attrs[`${prefix}description`]) || undefined,
+      required: attrString(attrs[`${prefix}required`]) === 'true',
+      default: attrString(attrs[`${prefix}default`]) || undefined,
+      placeholder: attrString(attrs[`${prefix}placeholder`]) || undefined,
     }
 
     // Handle options for select type
-    const optionsStr = attrs[`${prefix}options`]
+    const optionsStr = attrString(attrs[`${prefix}options`])
     if (optionsStr) {
-      def.options = optionsStr.split(',').map(s => s.trim())
+      def.options = optionsStr.split(',').map((s: string) => s.trim())
     }
 
     attrDefs.push(def)
@@ -130,13 +131,14 @@ export function parseVocabularyStamp(stamp: StampWithAttrs): VocabularyItem | nu
 
   // Parse vocab.port.* entries
   const portDefs: PortDefinition[] = []
-  for (const [key, value] of Object.entries(attrs)) {
+  for (const [key, rawValue] of Object.entries(attrs)) {
     if (key.startsWith('vocab.port.')) {
       const portName = key.slice('vocab.port.'.length)
       // Value can be: input, output, bidirectional, or a JSON object
       let direction: PortDirection = 'bidirectional'
       let label: string | undefined
       let description: string | undefined
+      const value = attrString(rawValue)
 
       if (value === 'input' || value === 'output' || value === 'bidirectional') {
         direction = value
@@ -164,9 +166,9 @@ export function parseVocabularyStamp(stamp: StampWithAttrs): VocabularyItem | nu
 
   // Collect defaults (non-vocab attrs)
   const defaults: Record<string, string> = {}
-  for (const [key, value] of Object.entries(attrs)) {
-    if (!key.startsWith('vocab.') && value) {
-      defaults[key] = value
+  for (const [key, rawValue] of Object.entries(attrs)) {
+    if (!key.startsWith('vocab.') && rawValue) {
+      defaults[key] = attrString(rawValue)
     }
   }
 

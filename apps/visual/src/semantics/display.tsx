@@ -28,7 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { EntityWithAttrs } from '../types'
+import type { EntityWithAttrs, DataObject } from '../types'
+import { attrString, getAttr } from '../types'
 import { useSemanticInput, useDirectBindings } from '../hooks/useSemanticInput'
 import { useBl } from '../hooks/useBl'
 import { useLoaderData } from 'react-router'
@@ -41,11 +42,11 @@ interface DisplaySemanticProps {
 type ViewType = 'table' | 'code' | 'json' | 'list'
 type InputMode = 'output' | 'direct'
 
-// Interpolate {{attr}} placeholders
-function interpolate(template: string, attrs: Record<string, string>): string {
+// Interpolate {{attr}} placeholders - converts AttrValue to string for display
+function interpolate(template: string, data: DataObject): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_, attrName) => {
     const trimmed = attrName.trim()
-    return attrs[trimmed] ?? ''
+    return attrString(data[trimmed])
   })
 }
 
@@ -79,22 +80,22 @@ function LocalInput({
 
 // Table view component
 function TableView({
-  entities,
+  data,
   columns,
 }: {
-  entities: EntityWithAttrs[]
+  data: DataObject[]
   columns: string[]
 }) {
-  if (entities.length === 0) {
+  if (data.length === 0) {
     return <div className="display-semantic__empty">No entities to display</div>
   }
 
-  // If no columns specified, auto-detect from first few entities
+  // If no columns specified, auto-detect from first few data objects
   const displayColumns =
     columns.length > 0
       ? columns
       : Array.from(
-          new Set(entities.slice(0, 5).flatMap((e) => Object.keys(e.attrs)))
+          new Set(data.slice(0, 5).flatMap((d) => Object.keys(d)))
         ).slice(0, 5)
 
   return (
@@ -110,15 +111,18 @@ function TableView({
           </tr>
         </thead>
         <tbody>
-          {entities.map((e) => (
-            <tr key={e.id} className="display-semantic__tr">
-              {displayColumns.map((col) => (
-                <td key={col} className="display-semantic__td">
-                  {e.attrs[col] || ''}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {data.map((d, i) => {
+            const id = typeof d.id === 'string' ? d.id : `_${i}`
+            return (
+              <tr key={id} className="display-semantic__tr">
+                {displayColumns.map((col) => (
+                  <td key={col} className="display-semantic__td">
+                    {attrString(d[col])}
+                  </td>
+                ))}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -127,18 +131,18 @@ function TableView({
 
 // Code view component
 function CodeView({
-  entities,
+  data,
   attr,
   language,
 }: {
-  entities: EntityWithAttrs[]
+  data: DataObject[]
   attr: string
   language: string
 }) {
   const [copied, setCopied] = useState(false)
 
-  const code = entities
-    .map((e) => e.attrs[attr] || '')
+  const code = data
+    .map((d) => attrString(d[attr]))
     .filter(Boolean)
     .join('\n\n')
 
@@ -171,18 +175,15 @@ function CodeView({
   )
 }
 
-// JSON view component
+// JSON view component - preserves typed values (numbers as numbers, objects as objects)
 function JsonView({
-  entities,
-  scope,
+  data,
 }: {
-  entities: EntityWithAttrs[]
-  scope: 'attrs' | 'full'
+  data: DataObject[]
 }) {
   const [copied, setCopied] = useState(false)
 
-  const data = scope === 'attrs' ? entities.map((e) => e.attrs) : entities
-
+  // For JSON export, data is already typed - numbers stay numbers, objects stay objects
   const json = JSON.stringify(data, null, 2)
 
   const handleCopy = async () => {
@@ -195,7 +196,7 @@ function JsonView({
     <div className="display-semantic__json-wrapper">
       <div className="display-semantic__json-header">
         <span className="display-semantic__json-count">
-          {entities.length} {entities.length === 1 ? 'entity' : 'entities'}
+          {data.length} {data.length === 1 ? 'entity' : 'entities'}
         </span>
         <Button variant="ghost" size="sm" onClick={handleCopy}>
           {copied ? (
@@ -214,25 +215,28 @@ function JsonView({
 
 // List view component
 function ListView({
-  entities,
+  data,
   labelTemplate,
 }: {
-  entities: EntityWithAttrs[]
+  data: DataObject[]
   labelTemplate: string
 }) {
-  if (entities.length === 0) {
+  if (data.length === 0) {
     return <div className="display-semantic__empty">No entities to display</div>
   }
 
   return (
     <ul className="display-semantic__list">
-      {entities.map((e) => (
-        <li key={e.id} className="display-semantic__list-item">
-          {labelTemplate
-            ? interpolate(labelTemplate, e.attrs)
-            : e.attrs.name || e.id.slice(0, 8)}
-        </li>
-      ))}
+      {data.map((d, i) => {
+        const id = typeof d.id === 'string' ? d.id : `_${i}`
+        return (
+          <li key={id} className="display-semantic__list-item">
+            {labelTemplate
+              ? interpolate(labelTemplate, d)
+              : getAttr(d, 'name', id.slice(0, 8))}
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -242,22 +246,28 @@ export function DisplaySemantic({ entity }: DisplaySemanticProps) {
   const { bl, revalidate } = useBl()
 
   // Get input mode - determines how bound entities are resolved
-  const inputMode = (entity.attrs['display.mode'] as InputMode) || 'output'
+  const inputMode = getAttr(entity.attrs, 'display.mode', 'output') as InputMode
 
   // Call both hooks (can't conditionally call hooks)
-  const { inputEntities: outputEntities } = useSemanticInput(entity)
+  const { inputData: outputData } = useSemanticInput(entity)
   const directEntities = useDirectBindings(entity)
 
-  // Select entities based on mode
-  const inputEntities = inputMode === 'direct' ? directEntities : outputEntities
+  // Select data based on mode
+  // For direct mode, we use the entity's attrs (which IS a DataObject)
+  const inputData = useMemo((): DataObject[] => {
+    if (inputMode === 'direct') {
+      return directEntities.map(e => e.attrs)
+    }
+    return outputData
+  }, [inputMode, directEntities, outputData])
 
   // Get configuration
-  const view = (entity.attrs['display.view'] as ViewType) || 'table'
-  const columns = entity.attrs['display.columns'] || ''
-  const attr = entity.attrs['display.attr'] || 'value.string'
-  const language = entity.attrs['display.language'] || 'text'
-  const labelTemplate = entity.attrs['display.label'] || ''
-  const scope = (entity.attrs['display.scope'] as 'attrs' | 'full') || 'attrs'
+  const view = getAttr(entity.attrs, 'display.view', 'table') as ViewType
+  const columns = getAttr(entity.attrs, 'display.columns')
+  const attr = getAttr(entity.attrs, 'display.attr', 'value.string')
+  const language = getAttr(entity.attrs, 'display.language', 'text')
+  const labelTemplate = getAttr(entity.attrs, 'display.label')
+  const scope = getAttr(entity.attrs, 'display.scope', 'attrs')
 
   // Parse columns
   const columnList = useMemo(
@@ -424,18 +434,18 @@ export function DisplaySemantic({ entity }: DisplaySemanticProps) {
 
       <div className="display-semantic__content">
         {view === 'table' && (
-          <TableView entities={inputEntities} columns={columnList} />
+          <TableView data={inputData} columns={columnList} />
         )}
         {view === 'code' && (
-          <CodeView entities={inputEntities} attr={attr} language={language} />
+          <CodeView data={inputData} attr={attr} language={language} />
         )}
-        {view === 'json' && <JsonView entities={inputEntities} scope={scope} />}
+        {view === 'json' && <JsonView data={inputData} />}
         {view === 'list' && (
-          <ListView entities={inputEntities} labelTemplate={labelTemplate} />
+          <ListView data={inputData} labelTemplate={labelTemplate} />
         )}
       </div>
 
-      {inputEntities.length === 0 && (
+      {inputData.length === 0 && (
         <div className="display-semantic__empty">
           No input entities. Bind entities or semantics to display.
         </div>

@@ -161,7 +161,7 @@ export function seedSemanticDocs(db: Database.Database, docsDir: string) {
 
   // Find all semantic entities (have semantic.type attr) that lack help.summary
   const semanticEntities = db.prepare(`
-    SELECT DISTINCT a.entity_id, a.value as semantic_type
+    SELECT DISTINCT a.entity_id, a.string_value as semantic_type
     FROM attrs a
     WHERE a.key = 'semantic.type'
     AND NOT EXISTS (
@@ -172,8 +172,8 @@ export function seedSemanticDocs(db: Database.Database, docsDir: string) {
   `).all() as Array<{ entity_id: string; semantic_type: string }>
 
   const insertAttr = db.prepare(`
-    INSERT OR REPLACE INTO attrs (entity_id, key, value, type)
-    VALUES (?, ?, ?, 'string')
+    INSERT OR REPLACE INTO attrs (entity_id, key, type, string_value, number_value, json_value, blob_value)
+    VALUES (?, ?, 'string', ?, NULL, NULL, NULL)
   `)
 
   let updated = 0

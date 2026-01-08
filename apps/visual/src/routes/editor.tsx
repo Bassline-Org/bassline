@@ -2,6 +2,7 @@ import { useLoaderData, Link } from 'react-router'
 import { useCallback, useState, useMemo } from 'react'
 import { ArrowLeft, Settings, Stamp } from 'lucide-react'
 import type { EditorLoaderData } from '../types'
+import { attrNumber, attrString } from '../types'
 import { Canvas } from '../components/Canvas'
 import { PropertyPanel } from '../components/PropertyPanel'
 import { StampsPanel } from '../components/StampsPanel'
@@ -173,7 +174,7 @@ export function Editor() {
           open: true,
           entityId,
           childCount: entityChildCount,
-          entityName: entity?.attrs.name || 'Unnamed',
+          entityName: entity ? attrString(entity.attrs.name) || 'Unnamed' : 'Unnamed',
         })
         return
       }
@@ -361,10 +362,10 @@ export function Editor() {
       // Calculate bounding box
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
       for (const e of selectedEntities) {
-        const x = parseFloat(e.attrs.x || '0')
-        const y = parseFloat(e.attrs.y || '0')
-        const w = parseFloat(e.attrs['ui.width'] || '120')
-        const h = parseFloat(e.attrs['ui.height'] || '60')
+        const x = attrNumber(e.attrs.x)
+        const y = attrNumber(e.attrs.y)
+        const w = attrNumber(e.attrs['ui.width'], 120)
+        const h = attrNumber(e.attrs['ui.height'], 60)
         minX = Math.min(minX, x)
         minY = Math.min(minY, y)
         maxX = Math.max(maxX, x + w)
@@ -399,8 +400,8 @@ export function Editor() {
         })
 
         // Update entity position to be relative to container
-        const x = parseFloat(e.attrs.x || '0')
-        const y = parseFloat(e.attrs.y || '0')
+        const x = attrNumber(e.attrs.x)
+        const y = attrNumber(e.attrs.y)
         await bl.attrs.setBatch(project.id, e.id, {
           x: Math.round(x - minX).toString(),
           y: Math.round(y - minY).toString(),
@@ -425,8 +426,8 @@ export function Editor() {
       const container = entities.find(e => e.id === containerId)
       if (!container) return
 
-      const containerX = parseFloat(container.attrs.x || '0')
-      const containerY = parseFloat(container.attrs.y || '0')
+      const containerX = attrNumber(container.attrs.x)
+      const containerY = attrNumber(container.attrs.y)
 
       // Find all children
       const childRels = relationships.filter(
@@ -443,8 +444,8 @@ export function Editor() {
       for (const rel of childRels) {
         const child = entities.find(e => e.id === rel.to_entity)
         if (child) {
-          const childX = parseFloat(child.attrs.x || '0')
-          const childY = parseFloat(child.attrs.y || '0')
+          const childX = attrNumber(child.attrs.x)
+          const childY = attrNumber(child.attrs.y)
 
           await bl.attrs.setBatch(project.id, rel.to_entity, {
             x: Math.round(containerX + childX).toString(),

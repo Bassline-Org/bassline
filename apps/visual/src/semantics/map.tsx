@@ -21,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { EntityWithAttrs } from '../types'
+import type { EntityWithAttrs, DataObject, AttrValue } from '../types'
+import { attrString } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useSemanticOutput } from '../hooks/useSemanticOutput'
 import { useBl } from '../hooks/useBl'
@@ -68,7 +69,7 @@ function LocalInput({
 }
 
 // Parse map rules from entity attrs
-function parseMapRules(attrs: Record<string, string>): MapRule[] {
+function parseMapRules(attrs: Record<string, AttrValue>): MapRule[] {
   const rules: MapRule[] = []
 
   for (const [key, value] of Object.entries(attrs)) {
@@ -76,14 +77,14 @@ function parseMapRules(attrs: Record<string, string>): MapRule[] {
       rules.push({
         operation: 'set',
         attrName: key.slice(8),
-        value,
+        value: attrString(value),
         attrKey: key,
       })
     } else if (key.startsWith('map.add.')) {
       rules.push({
         operation: 'add',
         attrName: key.slice(8),
-        value,
+        value: attrString(value),
         attrKey: key,
       })
     } else if (key.startsWith('map.remove.')) {
@@ -99,52 +100,52 @@ function parseMapRules(attrs: Record<string, string>): MapRule[] {
   return rules.sort((a, b) => a.attrName.localeCompare(b.attrName))
 }
 
-// Interpolate ${attr} references in value
-function interpolate(value: string, attrs: Record<string, string>): string {
+// Interpolate ${attr} references in value - converts AttrValue to string for interpolation
+function interpolate(value: string, data: DataObject): string {
   return value.replace(/\$\{([^}]+)\}/g, (_, attrName) => {
-    return attrs[attrName] || ''
+    return attrString(data[attrName])
   })
 }
 
-// Apply rules to an entity
-function applyRules(entity: EntityWithAttrs, rules: MapRule[]): EntityWithAttrs {
-  const newAttrs = { ...entity.attrs }
+// Apply rules to a data object - returns a new DataObject
+function applyRules(data: DataObject, rules: MapRule[]): DataObject {
+  const newData = { ...data }
 
   for (const rule of rules) {
     switch (rule.operation) {
       case 'set':
-        newAttrs[rule.attrName] = interpolate(rule.value, entity.attrs)
+        newData[rule.attrName] = interpolate(rule.value, data)
         break
       case 'add':
-        if (!newAttrs[rule.attrName]) {
-          newAttrs[rule.attrName] = interpolate(rule.value, entity.attrs)
+        if (!newData[rule.attrName]) {
+          newData[rule.attrName] = interpolate(rule.value, data)
         }
         break
       case 'remove':
-        delete newAttrs[rule.attrName]
+        delete newData[rule.attrName]
         break
     }
   }
 
-  return { ...entity, attrs: newAttrs }
+  return newData
 }
 
 export function MapSemantic({ entity }: MapSemanticProps) {
   const { project } = useLoaderData() as EditorLoaderData
-  const { inputEntities, inputRelationships } = useSemanticInput(entity)
+  const { inputData, inputRelationships } = useSemanticInput(entity)
   const { bl, revalidate } = useBl()
 
   // Parse rules from entity attrs
   const rules = useMemo(() => parseMapRules(entity.attrs), [entity.attrs])
 
-  // Apply rules to all input entities
-  const transformedEntities = useMemo(() => {
-    return inputEntities.map((e) => applyRules(e, rules))
-  }, [inputEntities, rules])
+  // Apply rules to all input data objects
+  const transformedData = useMemo((): DataObject[] => {
+    return inputData.map((data) => applyRules(data, rules))
+  }, [inputData, rules])
 
   // Register output for downstream composition
   useSemanticOutput(entity.id, {
-    entities: transformedEntities,
+    data: transformedData,
     relationships: inputRelationships,
   })
 
@@ -203,7 +204,7 @@ export function MapSemantic({ entity }: MapSemanticProps) {
     <div className="map-semantic">
       <div className="map-semantic__header">
         <span className="map-semantic__stats">
-          {transformedEntities.length} {transformedEntities.length === 1 ? 'entity' : 'entities'}
+          {transformedData.length} {transformedData.length === 1 ? 'entity' : 'entities'}
         </span>
         <span className="map-semantic__rules-count">
           {rules.length} {rules.length === 1 ? 'rule' : 'rules'}
@@ -289,7 +290,7 @@ export function MapSemantic({ entity }: MapSemanticProps) {
         </Button>
       </div>
 
-      {inputEntities.length === 0 && (
+      {inputData.length === 0 && (
         <div className="map-semantic__empty">
           No input entities. Bind entities or semantics to transform.
         </div>

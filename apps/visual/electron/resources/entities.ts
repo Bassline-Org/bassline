@@ -4,6 +4,7 @@
 
 import { resource, routes, bind } from '@bassline/core'
 import type { db as DbType } from '../db'
+import type { AttrValue, AttrType } from '../../src/types'
 
 type Db = typeof DbType
 
@@ -27,7 +28,7 @@ export function createEntitiesResource(db: Db) {
           headers: { type: 'js/obj' },
           body: db.attrs.get(entityId),
         }),
-        put: async (h: ResourceHeaders, body: Record<string, string>) => {
+        put: async (h: ResourceHeaders, body: Record<string, AttrValue>) => {
           // Capture previous for undo
           const prev = db.attrs.get(entityId)
 
@@ -94,8 +95,18 @@ export function createEntitiesResource(db: Db) {
               )
             }
           } else {
-            // SET
-            db.attrs.set(entityId, key, String(body))
+            // SET - extract value and type from body
+            // Support both { value, type } format and direct value
+            let value: AttrValue
+            let type: AttrType | undefined
+            if (body && typeof body === 'object' && 'value' in body) {
+              const typed = body as { value: AttrValue; type?: AttrType }
+              value = typed.value
+              type = typed.type
+            } else {
+              value = body as AttrValue
+            }
+            db.attrs.set(entityId, key, value, type)
 
             // Push to history (unless this is an undo/redo operation)
             if (h.kit && !h.skipHistory) {
@@ -189,7 +200,7 @@ export function createEntitiesResource(db: Db) {
             // Collect full state for undo
             const deletedEntities: Array<{
               entity: { id: string; created_at: number; modified_at: number }
-              attrs: Record<string, string>
+              attrs: Record<string, AttrValue>
             }> = []
             const deletedRelationships: typeof allRels = []
 
@@ -245,7 +256,7 @@ export function createEntitiesResource(db: Db) {
             const restore = body as {
               _restore: boolean
               entity: { id: string; created_at: number; modified_at: number }
-              attrs: Record<string, string>
+              attrs: Record<string, AttrValue>
               relationships: Array<{
                 id: string
                 from_entity: string
@@ -284,7 +295,7 @@ export function createEntitiesResource(db: Db) {
               _restoreBatch: boolean
               entities: Array<{
                 entity: { id: string; created_at: number; modified_at: number }
-                attrs: Record<string, string>
+                attrs: Record<string, AttrValue>
               }>
               relationships: Array<{
                 id: string
@@ -353,7 +364,7 @@ export function createEntitiesResource(db: Db) {
           headers: { type: 'js/arr' },
           body: db.entities.list(projectId),
         }),
-        put: async (h: ResourceHeaders, body: { attrs?: Record<string, string> } | null) => {
+        put: async (h: ResourceHeaders, body: { attrs?: Record<string, AttrValue> } | null) => {
           const entity = db.entities.create(projectId)
 
           if (body?.attrs && Object.keys(body.attrs).length > 0) {
