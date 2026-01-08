@@ -22,6 +22,10 @@ import { attrNumber } from '../types'
 import { EntityNode } from './EntityNode'
 import { CanvasContextMenu } from './CanvasContextMenu'
 
+// Block semantic types whose children should NOT be rendered as canvas nodes
+// These semantics render their children inline via BlockRenderer
+const INLINE_CHILD_SEMANTIC_TYPES = new Set(['list', 'object', 'document'])
+
 const nodeTypes = {
   entity: EntityNode,
 }
@@ -138,13 +142,44 @@ function CanvasInner({
     return ids
   }, [entities])
 
+  // Get IDs of block semantic parents (list, object, document) whose children
+  // should be rendered inline by the semantic component, NOT as canvas nodes
+  const blockSemanticParentIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const e of entities) {
+      const semanticType = e.attrs['semantic.type']
+      if (typeof semanticType === 'string' && INLINE_CHILD_SEMANTIC_TYPES.has(semanticType)) {
+        ids.add(e.id)
+      }
+    }
+    return ids
+  }, [entities])
+
+  // Get IDs of entities that are children of block semantic parents
+  // These should NOT be rendered as canvas nodes
+  const inlineBlockChildIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const rel of relationships) {
+      if (rel.kind === 'contains' && blockSemanticParentIds.has(rel.from_entity)) {
+        ids.add(rel.to_entity)
+      }
+    }
+    return ids
+  }, [relationships, blockSemanticParentIds])
+
   // Convert entities to initial nodes (filtering hidden children)
   // IMPORTANT: React Flow requires parent nodes to appear before their children
   const deriveNodes = useCallback((): Node[] => {
     // Filter visible entities
     const visibleEntities = entities.filter((e) => {
+      // Hide children of collapsed/compact nodes
       const parentId = parentLookup[e.id]
       if (parentId && collapsedParentIds.has(parentId)) {
+        return false
+      }
+      // Hide children of block semantic parents (list, object, document)
+      // These are rendered inline by the semantic component, not as canvas nodes
+      if (inlineBlockChildIds.has(e.id)) {
         return false
       }
       return true
@@ -222,7 +257,7 @@ function CanvasInner({
         style: nodeStyle,
       }
     })
-  }, [entities, parentLookup, containerIds, selectedEntityIds, childCounts, collapsedParentIds, bindingKeys])
+  }, [entities, parentLookup, containerIds, selectedEntityIds, childCounts, collapsedParentIds, inlineBlockChildIds, bindingKeys])
 
   // Controlled nodes state - React Flow manages this during interactions
   const [nodes, setNodes] = useState<Node[]>(deriveNodes)
@@ -508,6 +543,8 @@ function CanvasInner({
         connectionMode={ConnectionMode.Loose}
         connectOnClick={false}
         snapToGrid
+        minZoom={0.001}
+        maxZoom={1000}
         snapGrid={[10, 10]}
         selectionOnDrag
         selectionMode={SelectionMode.Partial}
