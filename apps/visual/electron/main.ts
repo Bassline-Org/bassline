@@ -5,6 +5,7 @@ import windowStateKeeper from 'electron-window-state'
 import { db } from './db'
 import { listSystemFonts, searchFonts } from './fonts'
 import { createApplicationMenu, createDockMenu, Project } from './menu'
+import { createVisualResources } from './resources'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -156,81 +157,33 @@ app.on('window-all-closed', () => {
 })
 
 function setupIpcHandlers() {
-  // Projects (refresh menu after create/delete)
-  ipcMain.handle('db:projects:list', () => db.projects.list())
-  ipcMain.handle('db:projects:get', (_, id: string) => db.projects.get(id))
-  ipcMain.handle('db:projects:create', (_, name: string) => {
-    const result = db.projects.create(name)
-    refreshMenu() // Update recent projects menu
+  // ==========================================================================
+  // Bassline Resources (unified API)
+  // ==========================================================================
+
+  const resources = createVisualResources(db)
+
+  ipcMain.handle('bl:get', async (_, headers: { path: string }) => {
+    const result = await resources.get(headers)
+    // Refresh menu when projects change
+    if (headers.path === '/projects') {
+      refreshMenu()
+    }
     return result
   })
-  ipcMain.handle('db:projects:delete', (_, id: string) => {
-    const result = db.projects.delete(id)
-    refreshMenu() // Update recent projects menu
+
+  ipcMain.handle('bl:put', async (_, headers: { path: string }, body: unknown) => {
+    const result = await resources.put(headers, body)
+    // Refresh menu when projects are created/deleted
+    if (headers.path.startsWith('/projects')) {
+      refreshMenu()
+    }
     return result
   })
 
-  // Entities
-  ipcMain.handle('db:entities:list', (_, projectId: string) => db.entities.list(projectId))
-  ipcMain.handle('db:entities:get', (_, id: string) => db.entities.get(id))
-  ipcMain.handle('db:entities:create', (_, projectId: string) => db.entities.create(projectId))
-  ipcMain.handle('db:entities:createWithId', (_, projectId: string, id: string, timestamps?: { created_at: number; modified_at: number }) =>
-    db.entities.createWithId(projectId, id, timestamps)
-  )
-  ipcMain.handle('db:entities:delete', (_, id: string) => db.entities.delete(id))
-
-  // Attrs
-  ipcMain.handle('db:attrs:get', (_, entityId: string) => db.attrs.get(entityId))
-  ipcMain.handle('db:attrs:set', (_, entityId: string, key: string, value: string, type?: string) =>
-    db.attrs.set(entityId, key, value, type)
-  )
-  ipcMain.handle('db:attrs:delete', (_, entityId: string, key: string) => db.attrs.delete(entityId, key))
-  ipcMain.handle('db:attrs:setBatch', (_, entityId: string, attrs: Record<string, string>) =>
-    db.attrs.setBatch(entityId, attrs)
-  )
-
-  // Stamps
-  ipcMain.handle('db:stamps:list', (_, filter?: { kind?: 'template' | 'vocabulary'; category?: string }) =>
-    db.stamps.list(filter)
-  )
-  ipcMain.handle('db:stamps:get', (_, id: string) => db.stamps.get(id))
-  ipcMain.handle('db:stamps:create', (_, data: { name: string; sourceEntityId?: string; kind?: 'template' | 'vocabulary'; category?: string; description?: string }) =>
-    db.stamps.create(data)
-  )
-  ipcMain.handle('db:stamps:apply', (_, stampId: string, targetEntityId: string) =>
-    db.stamps.apply(stampId, targetEntityId)
-  )
-  ipcMain.handle('db:stamps:delete', (_, stampId: string) => db.stamps.delete(stampId))
-  ipcMain.handle('db:stamps:update', (_, id: string, data: Partial<{ name: string; description: string; icon: string; category: string }>) =>
-    db.stamps.update(id, data)
-  )
-
-  // Relationships
-  ipcMain.handle('db:relationships:list', (_, projectId: string) => db.relationships.list(projectId))
-  ipcMain.handle('db:relationships:get', (_, id: string) => db.relationships.get(id))
-  ipcMain.handle('db:relationships:create', (_, projectId: string, data: any) => db.relationships.create(projectId, data))
-  ipcMain.handle('db:relationships:createWithId', (_, projectId: string, id: string, data: any) =>
-    db.relationships.createWithId(projectId, id, data)
-  )
-  ipcMain.handle('db:relationships:delete', (_, id: string) => db.relationships.delete(id))
-
-  // UI State
-  ipcMain.handle('db:uiState:get', (_, projectId: string) => db.uiState.get(projectId))
-  ipcMain.handle('db:uiState:update', (_, projectId: string, data: any) => db.uiState.update(projectId, data))
-
-  // Themes
-  ipcMain.handle('db:themes:list', () => db.themes.list())
-  ipcMain.handle('db:themes:get', (_, id: string) => db.themes.get(id))
-  ipcMain.handle('db:themes:create', (_, name: string, basedOn?: string) => db.themes.create(name, basedOn))
-  ipcMain.handle('db:themes:updateColor', (_, themeId: string, tokenId: string, value: string) =>
-    db.themes.updateColor(themeId, tokenId, value)
-  )
-  ipcMain.handle('db:themes:delete', (_, id: string) => db.themes.delete(id))
-  ipcMain.handle('db:themes:getTokens', () => db.themes.getTokens())
-
-  // Settings
-  ipcMain.handle('db:settings:get', (_, key: string) => db.settings.get(key))
-  ipcMain.handle('db:settings:set', (_, key: string, value: string) => db.settings.set(key, value))
+  // ==========================================================================
+  // Non-resource handlers (fonts, notifications, etc)
+  // ==========================================================================
 
   // Fonts
   ipcMain.handle('fonts:list', async () => listSystemFonts())

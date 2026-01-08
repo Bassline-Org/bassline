@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import type { Theme, TokenDefinition } from '../types'
+import { bl } from '../lib/bl'
 
 interface ThemeContextValue {
   // Current theme
@@ -95,16 +96,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     async function init() {
       try {
         const [activeId, allThemes, allTokens] = await Promise.all([
-          window.db.settings.get('active_theme'),
-          window.db.themes.list(),
-          window.db.themes.getTokens(),
+          bl.settings.get('active_theme'),
+          bl.themes.list(),
+          bl.themes.getTokens(),
         ])
 
         setThemes(allThemes)
         setTokens(allTokens)
 
         const themeId = activeId || 'dark'
-        const themeData = await window.db.themes.get(themeId)
+        const themeData = await bl.themes.get(themeId)
 
         if (themeData) {
           setThemeState(themeData)
@@ -126,9 +127,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback(async (id: string) => {
     try {
-      const themeData = await window.db.themes.get(id)
+      const themeData = await bl.themes.get(id)
       if (themeData) {
-        await window.db.settings.set('active_theme', id)
+        await bl.settings.set('active_theme', id)
         setThemeState(themeData)
         setColors(themeData.colors)
         setTypography(themeData.typography || {})
@@ -152,11 +153,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       applyColors(newColors) // This updates both --color-* and --theme-* vars
 
       try {
-        await window.db.themes.updateColor(theme.id, tokenId, value)
+        await bl.themes.updateColor(theme.id, tokenId, value)
       } catch (error) {
         console.error('Failed to update color:', error)
         // Revert on error
-        const originalTheme = await window.db.themes.get(theme.id)
+        const originalTheme = await bl.themes.get(theme.id)
         if (originalTheme) {
           setColors(originalTheme.colors)
           applyColors(originalTheme.colors)
@@ -180,11 +181,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       try {
         // Typography values use the same updateColor mechanism in the db
-        await window.db.themes.updateColor(theme.id, tokenId, value)
+        await bl.themes.updateColor(theme.id, tokenId, value)
       } catch (error) {
         console.error('Failed to update typography:', error)
         // Revert on error
-        const originalTheme = await window.db.themes.get(theme.id)
+        const originalTheme = await bl.themes.get(theme.id)
         if (originalTheme?.typography) {
           setTypography(originalTheme.typography)
           applyTypography(originalTheme.typography)
@@ -196,7 +197,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const createTheme = useCallback(async (name: string, basedOn?: string) => {
     try {
-      const newTheme = await window.db.themes.create(name, basedOn)
+      const newTheme = await bl.themes.create(name, basedOn)
       if (newTheme) {
         setThemes((t) => [...t, newTheme])
       }
@@ -209,7 +210,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const deleteTheme = useCallback(async (id: string) => {
     try {
-      await window.db.themes.delete(id)
+      await bl.themes.delete(id)
       setThemes((t) => t.filter((th) => th.id !== id))
     } catch (error) {
       console.error('Failed to delete theme:', error)

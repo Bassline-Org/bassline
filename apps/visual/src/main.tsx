@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from './App'
 import { ThemeProvider } from './providers/ThemeProvider'
+import { bl } from './lib/bl'
 import './index.css'
 
 declare global {
@@ -29,7 +30,7 @@ function setupMenuHandlers() {
   // Create Project - navigate home and create a new project
   cleanups.push(
     window.app.onMenuCreateProject(async () => {
-      const project = await window.db.projects.create('Untitled Project')
+      const project = await bl.projects.create('Untitled Project')
       router.navigate(`/project/${project.id}`)
     })
   )

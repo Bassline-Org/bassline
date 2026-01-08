@@ -4,6 +4,8 @@ import type { EntityWithAttrs } from '../types'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import * as LucideIcons from 'lucide-react'
+import { useVocabularyContext } from '../contexts/VocabularyContext'
+import type { Vocabulary, PortDirection } from '../lib/vocabularyParser'
 
 interface EntityNodeData {
   entity: EntityWithAttrs
@@ -34,11 +36,50 @@ function getIcon(iconName: string | undefined): React.ComponentType<{ className?
   return icons[pascalCase] || null
 }
 
+// Port info with direction
+interface PortInfo {
+  name: string
+  direction: PortDirection
+}
+
+// Parse enabled ports from entity attrs with direction support
+function getPorts(entity: EntityWithAttrs, vocabulary: Vocabulary | null): PortInfo[] {
+  const role = entity.attrs.role
+  const roleDef = role ? vocabulary?.roles.find(r => r.value === role) : null
+
+  const ports: PortInfo[] = []
+  for (const [key, value] of Object.entries(entity.attrs)) {
+    if (!key.startsWith('port.') || !value || value === 'false') continue
+
+    const portName = key.slice(5) // Remove 'port.' prefix
+    let direction: PortDirection = 'bidirectional'
+
+    // Check if value is an explicit direction
+    if (value === 'input' || value === 'output' || value === 'bidirectional') {
+      direction = value
+    } else if (value === 'true') {
+      // Look up vocabulary default for this role's port
+      const vocabPort = roleDef?.ports.find(p => p.name === portName)
+      direction = vocabPort?.direction ?? 'bidirectional'
+    }
+
+    ports.push({ name: portName, direction })
+  }
+  return ports.sort((a, b) => a.name.localeCompare(b.name))
+}
+
 // Collapsed variant - shows as a small badge with child count
+// Ports are rendered at center position for edge connectivity
 function CollapsedEntityNode({ entity, childCount, selected }: { entity: EntityWithAttrs; childCount: number; selected: boolean }) {
+  const vocabulary = useVocabularyContext()
   const name = entity.attrs.name || 'Unnamed'
   const fill = entity.attrs['visual.fill']
   const stroke = entity.attrs['visual.stroke']
+  const ports = useMemo(() => getPorts(entity, vocabulary), [entity, vocabulary])
+
+  // Filter by direction
+  const inputPorts = ports.filter(p => p.direction !== 'output')
+  const outputPorts = ports.filter(p => p.direction !== 'input')
 
   const style: React.CSSProperties = {}
   if (fill) style.backgroundColor = fill
@@ -49,7 +90,17 @@ function CollapsedEntityNode({ entity, childCount, selected }: { entity: EntityW
       className={cn('entity-node entity-node--collapsed', selected && 'selected')}
       style={style}
     >
-      <Handle type="target" position={Position.Top} id="default-target" />
+      {/* Input handles at center-left */}
+      {inputPorts.map(port => (
+        <Handle
+          key={`${port.name}-in`}
+          type="target"
+          position={Position.Left}
+          id={`${port.name}-in`}
+          className="entity-node__handle--collapsed"
+        />
+      ))}
+
       <div className="entity-node__collapsed-content">
         <span className="entity-node__collapsed-name">{name}</span>
         {childCount > 0 && (
@@ -58,17 +109,34 @@ function CollapsedEntityNode({ entity, childCount, selected }: { entity: EntityW
           </Badge>
         )}
       </div>
-      <Handle type="source" position={Position.Bottom} id="default-source" />
+
+      {/* Output handles at center-right */}
+      {outputPorts.map(port => (
+        <Handle
+          key={`${port.name}-out`}
+          type="source"
+          position={Position.Right}
+          id={`${port.name}-out`}
+          className="entity-node__handle--collapsed"
+        />
+      ))}
     </div>
   )
 }
 
 // Compact variant - shows as just an icon
+// Ports are rendered at center position for edge connectivity
 function CompactEntityNode({ entity, selected }: { entity: EntityWithAttrs; selected: boolean }) {
+  const vocabulary = useVocabularyContext()
   const iconName = entity.attrs['visual.icon'] || 'box'
   const fill = entity.attrs['visual.fill']
   const stroke = entity.attrs['visual.stroke']
   const IconComponent = getIcon(iconName)
+  const ports = useMemo(() => getPorts(entity, vocabulary), [entity, vocabulary])
+
+  // Filter by direction
+  const inputPorts = ports.filter(p => p.direction !== 'output')
+  const outputPorts = ports.filter(p => p.direction !== 'input')
 
   const style: React.CSSProperties = {}
   if (fill) style.backgroundColor = fill
@@ -80,15 +148,36 @@ function CompactEntityNode({ entity, selected }: { entity: EntityWithAttrs; sele
       style={style}
       title={entity.attrs.name || 'Unnamed'}
     >
-      <Handle type="target" position={Position.Top} id="default-target" />
+      {/* Input handles at center-left */}
+      {inputPorts.map(port => (
+        <Handle
+          key={`${port.name}-in`}
+          type="target"
+          position={Position.Left}
+          id={`${port.name}-in`}
+          className="entity-node__handle--compact"
+        />
+      ))}
+
       {IconComponent && <IconComponent className="entity-node__compact-icon" />}
-      <Handle type="source" position={Position.Bottom} id="default-source" />
+
+      {/* Output handles at center-right */}
+      {outputPorts.map(port => (
+        <Handle
+          key={`${port.name}-out`}
+          type="source"
+          position={Position.Right}
+          id={`${port.name}-out`}
+          className="entity-node__handle--compact"
+        />
+      ))}
     </div>
   )
 }
 
 export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps) {
   const { entity, isContainer, childCount = 0 } = data as unknown as EntityNodeData
+  const vocabulary = useVocabularyContext()
 
   // Collapse mode
   const collapseMode = entity.attrs['ui.collapse'] || 'expanded'
@@ -118,16 +207,12 @@ export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps
   // Get icon component
   const IconComponent = useMemo(() => getIcon(iconName), [iconName])
 
-  // Parse enabled ports from attrs
-  const ports = useMemo(() => {
-    const enabledPorts: string[] = []
-    for (const [key, value] of Object.entries(entity.attrs)) {
-      if (key.startsWith('port.') && value === 'true') {
-        enabledPorts.push(key.slice(5)) // Remove 'port.' prefix
-      }
-    }
-    return enabledPorts.sort()
-  }, [entity.attrs])
+  // Parse enabled ports from attrs with direction
+  const ports = useMemo(() => getPorts(entity, vocabulary), [entity, vocabulary])
+
+  // Filter by direction for rendering
+  const inputPorts = useMemo(() => ports.filter(p => p.direction !== 'output'), [ports])
+  const outputPorts = useMemo(() => ports.filter(p => p.direction !== 'input'), [ports])
 
   // Build inline styles for custom colors and size
   const customStyle = useMemo(() => {
@@ -159,28 +244,24 @@ export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps
         lineClassName="entity-node__resize-line"
       />
 
-      {/* Default connection handles (top/bottom) */}
-      <Handle type="target" position={Position.Top} id="default-target" />
-
       {role && (
         <Badge variant="outline" className="entity-node__role">
           {role}
         </Badge>
       )}
 
-      {/* Port handles - positioned using React Flow's style prop */}
-      {ports.map((port, index) => {
-        // Calculate vertical position as percentage
-        const topPercent = ((index + 1) / (ports.length + 1)) * 100
+      {/* Input port handles with labels */}
+      {inputPorts.map((port, index) => {
+        const topPercent = ((index + 1) / (inputPorts.length + 1)) * 100
         return (
-          <Handle
-            key={`${port}-in`}
-            type="target"
-            position={Position.Left}
-            id={`${port}-in`}
-            style={{ top: `${topPercent}%` }}
-            title={port}
-          />
+          <div key={`${port.name}-in-container`} className="entity-node__port entity-node__port--left" style={{ top: `${topPercent}%` }}>
+            <Handle
+              type="target"
+              position={Position.Left}
+              id={`${port.name}-in`}
+            />
+            <span className="entity-node__port-label entity-node__port-label--left">{port.name}</span>
+          </div>
         )
       })}
 
@@ -191,22 +272,20 @@ export const EntityNode = memo(function EntityNode({ data, selected }: NodeProps
         <div className="entity-node__name">{name}</div>
       </div>
 
-      {/* Output port handles */}
-      {ports.map((port, index) => {
-        const topPercent = ((index + 1) / (ports.length + 1)) * 100
+      {/* Output port handles with labels */}
+      {outputPorts.map((port, index) => {
+        const topPercent = ((index + 1) / (outputPorts.length + 1)) * 100
         return (
-          <Handle
-            key={`${port}-out`}
-            type="source"
-            position={Position.Right}
-            id={`${port}-out`}
-            style={{ top: `${topPercent}%` }}
-            title={port}
-          />
+          <div key={`${port.name}-out-container`} className="entity-node__port entity-node__port--right" style={{ top: `${topPercent}%` }}>
+            <span className="entity-node__port-label entity-node__port-label--right">{port.name}</span>
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={`${port.name}-out`}
+            />
+          </div>
         )
       })}
-
-      <Handle type="source" position={Position.Bottom} id="default-source" />
     </div>
   )
 })
