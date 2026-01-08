@@ -27,8 +27,8 @@
  * - "<=N"        - less than or equal
  */
 
-import { useMemo } from 'react'
-import { Filter as FilterIcon, Search, Link } from 'lucide-react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
+import { Filter as FilterIcon, Search, Link, Plus, X } from 'lucide-react'
 import type { EntityWithAttrs, EditorLoaderData } from '../types'
 import { useSemanticInput } from '../hooks/useSemanticInput'
 import { useSemanticOutput } from '../hooks/useSemanticOutput'
@@ -40,11 +40,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useBl } from '../hooks/useBl'
-import { useCallback } from 'react'
 
 interface FilterSemanticProps {
   entity: EntityWithAttrs
+}
+
+// Local input that persists on blur
+function LocalInput({
+  value,
+  onCommit,
+  placeholder,
+  className,
+}: {
+  value: string
+  onCommit: (v: string) => void
+  placeholder?: string
+  className?: string
+}) {
+  const [local, setLocal] = useState(value)
+  useEffect(() => setLocal(value), [value])
+
+  return (
+    <Input
+      value={local}
+      onChange={(e) => setLocal(e.target.value)}
+      onBlur={() => {
+        if (local !== value) onCommit(local)
+      }}
+      placeholder={placeholder}
+      className={className}
+    />
+  )
 }
 
 /**
@@ -225,6 +254,50 @@ export function FilterSemantic({ entity }: FilterSemanticProps) {
     [bl, project.id, entity.id, revalidate]
   )
 
+  // State for new predicate input
+  const [newAttr, setNewAttr] = useState('')
+  const [newValue, setNewValue] = useState('')
+
+  // Add a new predicate
+  const handleAddPredicate = useCallback(async () => {
+    if (!newAttr.trim()) return
+    await bl.attrs.set(project.id, entity.id, `filter.where.${newAttr.trim()}`, newValue)
+    setNewAttr('')
+    setNewValue('')
+    revalidate()
+  }, [bl, project.id, entity.id, newAttr, newValue, revalidate])
+
+  // Update predicate attr name (rename)
+  const handleUpdateAttr = useCallback(
+    async (oldAttr: string, newAttrName: string) => {
+      const oldKey = `filter.where.${oldAttr}`
+      const newKey = `filter.where.${newAttrName}`
+      const value = entity.attrs[oldKey]
+      await bl.attrs.delete(project.id, entity.id, oldKey)
+      await bl.attrs.set(project.id, entity.id, newKey, value)
+      revalidate()
+    },
+    [bl, project.id, entity.id, entity.attrs, revalidate]
+  )
+
+  // Update predicate value
+  const handleUpdateValue = useCallback(
+    async (attr: string, newVal: string) => {
+      await bl.attrs.set(project.id, entity.id, `filter.where.${attr}`, newVal)
+      revalidate()
+    },
+    [bl, project.id, entity.id, revalidate]
+  )
+
+  // Delete a predicate
+  const handleDeletePredicate = useCallback(
+    async (attr: string) => {
+      await bl.attrs.delete(project.id, entity.id, `filter.where.${attr}`)
+      revalidate()
+    },
+    [bl, project.id, entity.id, revalidate]
+  )
+
   const hasBindings = boundEntityIds.length > 0
   const isQueryMode = mode === 'query'
 
@@ -256,21 +329,66 @@ export function FilterSemantic({ entity }: FilterSemanticProps) {
       {isQueryMode ? (
         // Query mode UI
         <div className="filter-semantic__query">
-          {queryPredicates.length === 0 ? (
-            <div className="filter-semantic__hint">
-              Add filter.where.* attrs to query entities
+          {/* Predicate builder */}
+          <div className="filter-semantic__predicates">
+            {queryPredicates.map(([attr, pred]) => (
+              <div key={attr} className="filter-semantic__predicate-row">
+                <LocalInput
+                  value={attr}
+                  onCommit={(v) => handleUpdateAttr(attr, v)}
+                  placeholder="attr"
+                  className="filter-semantic__predicate-attr-input"
+                />
+                <span className="filter-semantic__predicate-op">=</span>
+                <LocalInput
+                  value={pred}
+                  onCommit={(v) => handleUpdateValue(attr, v)}
+                  placeholder="value"
+                  className="filter-semantic__predicate-value-input"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="filter-semantic__delete-btn"
+                  onClick={() => handleDeletePredicate(attr)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+
+            {/* Add new predicate row */}
+            <div className="filter-semantic__predicate-row filter-semantic__add-row">
+              <Input
+                value={newAttr}
+                onChange={(e) => setNewAttr(e.target.value)}
+                placeholder="attr"
+                className="filter-semantic__predicate-attr-input"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddPredicate()
+                }}
+              />
+              <span className="filter-semantic__predicate-op">=</span>
+              <Input
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                placeholder="value"
+                className="filter-semantic__predicate-value-input"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddPredicate()
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="filter-semantic__add-btn"
+                onClick={handleAddPredicate}
+                disabled={!newAttr.trim()}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
             </div>
-          ) : (
-            <div className="filter-semantic__predicates">
-              {queryPredicates.map(([attr, pred]) => (
-                <div key={attr} className="filter-semantic__predicate-item">
-                  <span className="filter-semantic__predicate-attr">{attr}</span>
-                  <span className="filter-semantic__predicate-op">=</span>
-                  <span className="filter-semantic__predicate-value">{pred}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          </div>
 
           <div className="filter-semantic__stats">
             {filtered.length} / {sourceEntities.length} entities

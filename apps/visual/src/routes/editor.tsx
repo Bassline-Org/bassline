@@ -83,13 +83,29 @@ export function Editor() {
 
   const handleCreateSemantic = useCallback(
     async (x: number, y: number, semanticType: string) => {
-      await bl.entities.create(project.id, {
+      // Base attributes for the semantic entity
+      const attrs: Record<string, string> = {
         'semantic.type': semanticType,
         x: Math.round(x).toString(),
         y: Math.round(y).toString(),
         'ui.width': '300',
         'ui.height': '250',
-      })
+      }
+
+      // Try to fetch documentation for this semantic type
+      try {
+        const doc = await bl.semanticDocs.get(semanticType)
+        if (doc) {
+          if (doc.summary) attrs['help.summary'] = doc.summary
+          if (doc.description) attrs['help.description'] = doc.description
+          if (doc.usage) attrs['help.usage'] = doc.usage
+          if (doc.examples) attrs['help.examples'] = doc.examples
+        }
+      } catch {
+        // If docs not available, continue without them
+      }
+
+      await bl.entities.create(project.id, attrs)
       revalidate()
     },
     [bl, revalidate, project.id]
