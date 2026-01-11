@@ -73,14 +73,38 @@ const { body } = await claude.put(
 )
 ```
 
-The agent receives these tools automatically:
+The MCP integration builds on top of blits, meaning the LLM has access to a full computational sandbox to work inside via a single tool. Because the system is built for discovery, context fills slower as the agent learns in parts.
 
-| Tool             | Description                    |
-| ---------------- | ------------------------------ |
-| `bassline_get`   | GET a resource by URI          |
-| `bassline_put`   | PUT a value to a resource      |
-| `bassline_list`  | List resources at a path       |
-| `bassline_links` | Query links to/from a resource |
+The agent uses a single `bl` tool with the native Bassline protocol:
+
+### bl
+
+Interact with Bassline resources using the native protocol (headers + body).
+
+```javascript
+{
+  name: 'bl',
+  input: {
+    method: 'get',  // or 'put'
+    headers: { path: '/cells/counter/value' },
+    body: null  // for PUT requests
+  }
+}
+```
+
+Key paths to explore:
+
+- `GET {path:"/"}` - Explore available resources
+- `GET {path:"/guide"}` - Learn how the system works
+- `/cells/*` - Lattice-based state (monotonic merge)
+- `/store/*` - Key/value storage
+- `/fn/*` - Stored functions
+- `/tcl/eval` - Evaluate TCL scripts
+
+Headers control routing and behavior:
+
+- `path` - Resource path (required)
+- `type` - Content type hint (e.g., "tcl/dict", "js/num")
 
 ### Agent Example
 
@@ -100,66 +124,15 @@ const result = await claude.put(
   { path: '/agent', kit },
   {
     prompt: 'Create a cell called "score" with maxNumber lattice, set it to 100, then read it back',
-    system:
-      'You are managing Bassline resources. Use bassline_put to create cells and set values, bassline_get to read them.',
+    system: 'You are managing Bassline resources. Use the bl tool to interact with resources.',
   }
 )
 
-// The agent will:
-// 1. PUT /cells/score with { lattice: 'maxNumber' }
-// 2. PUT /cells/score/value with 100
-// 3. GET /cells/score/value
+// The agent will use the bl tool:
+// 1. bl({ method: 'put', headers: { path: '/cells/score' }, body: { lattice: 'maxNumber' } })
+// 2. bl({ method: 'put', headers: { path: '/cells/score/value' }, body: 100 })
+// 3. bl({ method: 'get', headers: { path: '/cells/score/value' } })
 // 4. Return the final result
-```
-
-## Tool Definitions
-
-The MCP-style tools provided to the agent:
-
-### bassline_get
-
-```javascript
-{
-  name: 'bassline_get',
-  input: { uri: 'bl:///cells/counter/value' }
-}
-// Returns the resource headers and body as JSON
-```
-
-### bassline_put
-
-```javascript
-{
-  name: 'bassline_put',
-  input: {
-    uri: 'bl:///cells/counter/value',
-    body: 42
-  }
-}
-// Returns the result of the PUT operation
-```
-
-### bassline_list
-
-```javascript
-{
-  name: 'bassline_list',
-  input: { path: '/cells' }
-}
-// Returns directory entries at the path
-```
-
-### bassline_links
-
-```javascript
-{
-  name: 'bassline_links',
-  input: {
-    direction: 'to',  // or 'from'
-    uri: 'bl:///users/alice'
-  }
-}
-// Returns related resources
 ```
 
 ## Patterns
@@ -222,39 +195,6 @@ await runTask('Initialize the application with a counter at 0 and a config with 
 await runTask('Increment the counter by 5 and add a timestamp to config')
 ```
 
-### With Custom Tools
-
-For advanced use cases, create your own tool definitions:
-
-```javascript
-import { createMCPTools, runAgentLoop } from '@bassline/services'
-
-// Get the standard tools
-const standardTools = createMCPTools(basslineInstance)
-
-// Add custom tools
-const tools = [
-  ...standardTools,
-  {
-    name: 'send_email',
-    description: 'Send an email notification',
-    input_schema: {
-      type: 'object',
-      properties: {
-        to: { type: 'string' },
-        subject: { type: 'string' },
-        body: { type: 'string' },
-      },
-      required: ['to', 'subject', 'body'],
-    },
-    handler: async ({ to, subject, body }) => {
-      // Your email logic
-      return 'Email sent successfully'
-    },
-  },
-]
-```
-
 ### Service Discovery
 
 ```javascript
@@ -287,7 +227,3 @@ if (result.headers.condition === 'error') {
   // Handle rate limits, API errors, etc.
 }
 ```
-
-### Streaming (via Messages API)
-
-For streaming responses, use the underlying Anthropic SDK directly or check for streaming support in your version of the service.
