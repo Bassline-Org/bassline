@@ -87,7 +87,7 @@ export default [
     },
   },
   {
-    // Ignore generated files and experimental packages
-    ignores: ['**/node_modules/**', '**/*.d.ts', 'docs/**', 'packages/tcl/**'],
+    // Ignore generated files, experimental packages, and distributable skills
+    ignores: ['**/node_modules/**', '**/*.d.ts', 'docs/**', 'packages/tcl/**', 'agent-skills/**'],
   },
 ]
