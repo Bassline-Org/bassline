@@ -41,7 +41,8 @@ const word = {
     return this[word._system.mode.data]()
   },
   interp() {
-    panic('no interp() method')
+    word.ds.push(this)
+    //panic('no interp() method')
   },
   compile() {
     if (this.immediate) return this.interp()
@@ -71,6 +72,34 @@ const variable = word._make({
     const w = word.get(name)
     if (w.data === undefined || w.data === null) return this.set(name, ifAbsent)
     return this.set(name, fn(w.data))
+  },
+})
+
+const stack = word._make({
+  make(name) {
+    return this._make({ name, data: [] })
+  },
+  castArr(val) {
+    if (Array.isArray(val)) return val
+    return [val]
+  },
+  push(val) {
+    return this.data.push(val)
+  },
+  pop() {
+    return this.data.pop()
+  },
+  shift() {
+    return this.data.shift()
+  },
+  unshift(val) {
+    return this.data.unshift(...this.castArr(val))
+  },
+  splice(start, del, val) {
+    return this.data.splice(start, del, ...this.castArr(val))
+  },
+  interp() {
+    word.ds.push(this)
   },
 })
 
@@ -144,8 +173,12 @@ fn.make('variable', () => {
   }
   variable.set(name, 0)
 })
+fn.make('stack', () => {
+  const name = parse(WS)
+  stack.make(name)
+})
 fn.make('@', name => [variable.get(name)])
-fn.make('!', (name, val) => [variable.set(name, val)])
+fn.make('!', (val, name) => [variable.set(name, val)])
 // parsing words
 fn.make('parse', () => {
   const chars = parse(WS)
@@ -170,6 +203,19 @@ ifn.make(';', () => (variable.set('mode', 'interp'), []))
 fn.make('immediate', () => ((word.latest.immediate = true), []))
 fn.make('regular', () => ((word.latest.immediate = undefined), []))
 fn.make('dsp', () => console.log(word.ds))
+fn.make('>.', (value, loc) => (loc.unshift(value), []))
+fn.make('.>', (value, loc) => (loc.push(value), []))
+fn.make('>@', (value, index, loc) => (loc.splice(index, 0, value), []))
+fn.make('<.', loc => [loc.shift()])
+fn.make('.<', loc => [loc.pop()])
+fn.make('<@', (loc, index) => [loc.splice(index, 1)])
+fn.make('iota', n => {
+  const out = []
+  for (let i = 0; i < n; i++) {
+    out.push(i + 1)
+  }
+  return [out]
+})
 
 variable.make('inputBuffer', '')
 variable.make('mode', 'interp')
@@ -209,3 +255,22 @@ function panic(msg) {
 }
 
 export { word, variable, compiled, fn, ifn, panic, run }
+
+const program = `
+
+stack foo
+
+: <foo foo .< ;
+: >foo foo >. ;
+
+20 >foo
+
+40 >foo
+
+<foo <foo + .
+
+100 iota >foo
+
+`
+
+run(program)
