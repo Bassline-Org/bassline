@@ -1,0 +1,39 @@
+{
+  "id": "solarized-light",
+  "name": "Solarized Light",
+  "description": "Precision colors for machines and people",
+  "author": "Ethan Schoonover",
+  "colors": {
+    "bg-base": "#fdf6e3",
+    "bg-surface": "#eee8d5",
+    "bg-overlay": "#e4dcc8",
+    "bg-muted": "#d9d0bb",
+    "bg-inset": "#ddd6c3",
+    "fg-base": "#657b83",
+    "fg-muted": "#586e75",
+    "fg-subtle": "#93a1a1",
+    "fg-inverse": "#fdf6e3",
+    "border-base": "#d9d0bb",
+    "border-muted": "#eee8d5",
+    "border-focus": "#268bd2",
+    "accent": "#268bd2",
+    "accent-fg": "#fdf6e3",
+    "accent-muted": "#2aa198",
+    "success": "#859900",
+    "success-fg": "#fdf6e3",
+    "warning": "#b58900",
+    "warning-fg": "#fdf6e3",
+    "error": "#dc322f",
+    "error-fg": "#fdf6e3",
+    "node-bg": "#eee8d5",
+    "node-border": "#d9d0bb",
+    "node-selected": "#268bd2",
+    "edge-default": "#93a1a1",
+    "edge-selected": "#268bd2"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

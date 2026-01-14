@@ -1,0 +1,39 @@
+{
+  "id": "nord",
+  "name": "Nord",
+  "description": "Arctic, north-bluish color palette",
+  "author": "Arctic Ice Studio",
+  "colors": {
+    "bg-base": "#2e3440",
+    "bg-surface": "#3b4252",
+    "bg-overlay": "#434c5e",
+    "bg-muted": "#4c566a",
+    "bg-inset": "#242933",
+    "fg-base": "#eceff4",
+    "fg-muted": "#d8dee9",
+    "fg-subtle": "#a5adba",
+    "fg-inverse": "#2e3440",
+    "border-base": "#4c566a",
+    "border-muted": "#3b4252",
+    "border-focus": "#88c0d0",
+    "accent": "#88c0d0",
+    "accent-fg": "#2e3440",
+    "accent-muted": "#81a1c1",
+    "success": "#a3be8c",
+    "success-fg": "#2e3440",
+    "warning": "#ebcb8b",
+    "warning-fg": "#2e3440",
+    "error": "#bf616a",
+    "error-fg": "#ffffff",
+    "node-bg": "#3b4252",
+    "node-border": "#4c566a",
+    "node-selected": "#88c0d0",
+    "edge-default": "#a5adba",
+    "edge-selected": "#88c0d0"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}
