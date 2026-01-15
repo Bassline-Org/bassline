@@ -64,6 +64,13 @@ const buffer = {
       }
     return []
   },
+  skip(f, dir = 1) {
+    while (this.p >= 0 && this.p < this.size && f(this.data[this.p])) this.p += dir
+    return this.p
+  },
+  slice(start, end) {
+    return this.data.slice(start, end ?? this.p).join('')
+  },
 }
 
 const word = {
@@ -82,6 +89,7 @@ const word = {
   compile() {
     this.immediate ? this.interp() : this.rt.target.write(this)
   },
+  present() {},
   run() {
     this[this.rt.mode]()
   },
@@ -123,8 +131,58 @@ const seq = derive(word, {
       }
     }
   },
-  write(w) {
-    this.body.push(w)
+  write(...w) {
+    this.body.push(...w)
+  },
+  flushConditional() {
+    return this.flushToFlag('branched')
+  },
+  flushToFlag(flag = 'branched') {
+    if (this.rt.mode !== 'compile') {
+      throw new Error('invalid conditional! Can only use conditionals during compilation')
+    }
+    const out = []
+    let w
+    let cond
+    while ((w = this.body.pop())) {
+      if (w[flag] && !w.complete) {
+        cond = w
+        this.body.push(w)
+        break
+      }
+      out.unshift(w)
+    }
+    return [out, cond]
+  },
+})
+
+const branched = derive(word, {
+  branched: true, // so flushConditional() can find it
+  interp() {
+    // Read flag from stack (condition already evaluated before we run)
+    const flag = this.rt.ds.read()
+    // Pick branch based on truthy/falsy
+    const branch = flag ? this.if : this.else
+    if (branch) branch.run()
+  },
+})
+
+const doloop = derive(word, {
+  doloop: true,
+  interp() {
+    const index = this.rt.ds.read()
+    const limit = this.rt.ds.read()
+    // Push loop frame onto runtime's loop stack
+    const frame = { limit, index, leave: false }
+    this.rt.loopStack.push(frame)
+    try {
+      while (frame.index < frame.limit && !frame.leave) {
+        this.body.run()
+        frame.index++
+      }
+    } finally {
+      this.rt.loopStack.pop()
+    }
   },
 })
 
@@ -140,14 +198,68 @@ const stream = derive(word, {
   },
 })
 
-// Runtime
 export function createRuntime() {
   const rt = {
     dict: {},
     last: null,
     mode: 'interp',
     input: buffer.create(),
+
+    _listeners: {},
+    on(event, fn) {
+      ;(this._listeners[event] ||= []).push(fn)
+      return () => this.off(event, fn)
+    },
+    off(event, fn) {
+      const arr = this._listeners[event]
+      if (arr) this._listeners[event] = arr.filter(f => f !== fn)
+    },
+    emit(event, data) {
+      for (const fn of this._listeners[event] || []) fn(data)
+    },
+
+    // parts are for source tracking, tbd if we are going to keep this structure
+    parts: {},
+    currentPart: null,
+    _lastCapturePos: 0,
+    _presentGen: 0,
+
+    addPart(name) {
+      let p = this.parts[name]
+      if (!p) {
+        p = {
+          name,
+          data: '',
+          index: Object.keys(this.parts).length,
+          _gen: this._presentGen,
+        }
+        this.parts[name] = p
+        this.emit('part:added', p)
+      } else if (p._gen !== this._presentGen) {
+        p.data = ''
+        p._gen = this._presentGen
+      }
+      this.currentPart = p
+      return p
+    },
+
+    updatePart(name, data) {
+      const p = this.parts[name]
+      if (p) {
+        p.data = data
+        this.emit('part:changed', p)
+      }
+    },
+
+    toSource() {
+      return Object.values(this.parts)
+        .sort((a, b) => a.index - b.index)
+        .map(p => (p.name === '_default' ? p.data : `part: ${p.name}\n${p.data}`))
+        .join('\n')
+    },
+
     ds: stack.create(),
+    loopStack: [],
     targets: [],
     get target() {
       return this.targets[this.targets.length - 1]
@@ -158,14 +270,16 @@ export function createRuntime() {
     pushTarget(t) {
       return this.targets.push(t)
     },
+
     parse(d) {
       const i = this.input
       while (i.p < i.size && d(i.read())) i.move(1)
       if (i.p >= i.size) return
       const s = i.p
       while (i.p < i.size && !d(i.read())) i.move(1)
-      i.move(1)
-      return i.data.slice(s, i.p - 1).join('')
+      const e = i.p
+      if (i.p < i.size) i.move(1)
+      return i.data.slice(s, e).join('')
     },
 
     next() {
@@ -175,11 +289,22 @@ export function createRuntime() {
       if (!w) {
         const num = Number(t)
         if (isNaN(num)) {
+          if (this.mode === 'present') return this.next() // we skip unbound words in present mode
           throw Error(`unknown: ${t}`)
         }
         w = lit.make(this, { data: +t })
       }
       return w
+    },
+
+    present(src) {
+      this._presentGen++
+      this.currentPart = null
+      this._lastCapturePos = 0
+      this.mode = 'present'
+      this.run(src)
+      this.mode = 'interp'
+      this.emit('present:complete', { parts: this.parts })
     },
 
     run(src) {
@@ -190,12 +315,15 @@ export function createRuntime() {
         w.run()
         w = this.next()
       }
+      if (this.mode === 'present' && this.currentPart) {
+        this.currentPart.data += this.input.slice(this._lastCapturePos)
+      }
     },
   }
 
   const def = (n, f, imm) => fn.make(rt, { name: n, fn: f, immediate: imm })
 
-  // Stream
+  // "Stream" words
   def('.>', (v, s) => {
     s.write(v)
   })
@@ -248,6 +376,14 @@ export function createRuntime() {
   def('*', (a, b) => a * b)
   def('/', (a, b) => a / b)
 
+  // comparison
+  def('>', (a, b) => +(a > b))
+  def('>=', (a, b) => +(a >= b))
+  def('<', (a, b) => +(a < b))
+  def('<=', (a, b) => +(a <= b))
+  def('=', (a, b) => +(a === b))
+  def('0=', a => +(a ?? 0))
+
   // Definitions
   def('variable', () => {
     word.make(rt, { name: rt.parse(isWS), data: 0 })
@@ -257,6 +393,43 @@ export function createRuntime() {
   })
   def('stack', () => {
     stream.make(rt, { name: rt.parse(isWS), stream: stack.create() })
+  })
+
+  // Part definition - structure extraction in present mode
+  word.make(rt, {
+    name: 'part:',
+    immediate: true,
+    interp() {
+      rt.parse(isWS) // skip name, no-op in interp mode
+    },
+    present() {
+      const input = rt.input
+      const end = input.p
+      // Back up over trailing whitespace, then over "part:" token
+      input.move(-1)
+      input.skip(isWS, -1)
+      input.skip(c => !isWS(c), -1)
+      // Handle edge case: if we backtracked past start, clamp to 0
+      const tokenStart = Math.max(0, input.p)
+      input.p = end
+
+      // Only capture content if there's actually something between last capture and this token
+      if (tokenStart > rt._lastCapturePos) {
+        const prevRegion = input.slice(rt._lastCapturePos, tokenStart)
+        if (!rt.currentPart) {
+          if (!prevRegion.match(/^\s*$/)) {
+            rt.addPart('_default')
+            rt.currentPart.data = prevRegion
+          }
+        } else {
+          rt.currentPart.data += prevRegion
+        }
+      }
+
+      const name = rt.parse(isWS)
+      rt._lastCapturePos = input.p
+      rt.addPart(name)
+    },
   })
   def(':', () => {
     rt.mode = 'compile'
@@ -284,6 +457,14 @@ export function createRuntime() {
     return [rt.dict[name].attributes[attr]]
   })
   // Parsing
+  // for comments this is a very simple script, but i'm including this here for simplicitly sake
+  def(
+    '(',
+    () => {
+      rt.parse(c => c === ')')
+    },
+    true
+  )
   def('parse', delim => {
     if (typeof delim !== 'string') throw new Error('invalid parse')
     const str = rt.parse(c => delim.includes(c))
@@ -292,6 +473,75 @@ export function createRuntime() {
   def('parse-word', () => {
     return [rt.parse(isWS)]
   })
+  // 10 20 > if foo bar else baz then ;
+  // Condition is evaluated BEFORE if runs, flag left on stack
+  def(
+    'if',
+    () => {
+      const cond = branched.make(rt, {})
+      cond.label = 'if'
+      rt.target.write(cond)
+    },
+    true
+  )
+  def(
+    'else',
+    () => {
+      const [branch, cond] = rt.target.flushConditional()
+      cond[cond.label] = seq.make(rt, { body: branch })
+      cond.label = 'else'
+    },
+    true
+  )
+  def(
+    'then',
+    () => {
+      const [branch, cond] = rt.target.flushConditional()
+      cond[cond.label] = seq.make(rt, { body: branch })
+      cond.complete = true
+    },
+    true
+  )
+
+  // DO...LOOP
+  // Usage: limit index DO ... LOOP
+  // Example: 10 0 DO I . LOOP  ( prints 0 1 2 3 4 5 6 7 8 9 )
+  def(
+    'do',
+    () => {
+      const loop = doloop.make(rt, {})
+      rt.target.write(loop)
+    },
+    true
+  )
+  def(
+    'loop',
+    () => {
+      const [body, loop] = rt.target.flushToFlag('doloop')
+      loop.body = seq.make(rt, { body })
+      loop.complete = true
+    },
+    true
+  )
+  // I - push current loop index onto stack
+  def('i', () => {
+    const frame = rt.loopStack[rt.loopStack.length - 1]
+    if (!frame) throw new Error('I used outside of loop')
+    return [frame.index]
+  })
+  // J - push outer loop index onto stack (for nested loops)
+  def('j', () => {
+    const frame = rt.loopStack[rt.loopStack.length - 2]
+    if (!frame) throw new Error('J used outside of nested loop')
+    return [frame.index]
+  })
+  // LEAVE - exit the current loop early
+  def('leave', () => {
+    const frame = rt.loopStack[rt.loopStack.length - 1]
+    if (!frame) throw new Error('LEAVE used outside of loop')
+    frame.leave = true
+  })
+
   def(
     "'",
     () => {
