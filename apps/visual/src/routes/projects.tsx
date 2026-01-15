@@ -1,5 +1,5 @@
 import { useLoaderData, Form, useFetcher, Link } from 'react-router'
-import { Settings, Trash2 } from 'lucide-react'
+import { Settings, Trash2, Code2 } from 'lucide-react'
 import type { ProjectsLoaderData, Project } from '../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,6 +17,11 @@ export function ProjectList() {
             <input type="hidden" name="intent" value="create" />
             <Button type="submit">New Project</Button>
           </Form>
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/scripts" title="Borth Scripts">
+              <Code2 className="h-4 w-4" />
+            </Link>
+          </Button>
           <Button variant="ghost" size="icon" asChild>
             <Link to="/settings" title="Settings">
               <Settings className="h-4 w-4" />
