@@ -2,7 +2,6 @@
 
 const WS = ' \t\n\r'
 const isWS = c => WS.includes(c)
-const derive = (base, over) => Object.assign(Object.create(base), over)
 const isNil = v => v === undefined || v === null
 class Exit extends Error {}
 const flush = array => array.splice(0, array.length)
@@ -17,45 +16,38 @@ function castArr(v) {
   if (!Array.isArray(v)) return [v]
   return v
 }
-function stream({ read, write }) {
-  return function () {
-    return {
-      data: [],
-      get length() {
-        return this.data.length
-      },
-      flush() {
-        return flush(this.data)
-      },
-      read() {
-        if (!read) panic('not readable')
-        return read.call(this)
-      },
-      write(...values) {
-        if (!write) panic('not writable')
-        for (const v of values) {
-          write.call(this, v)
-        }
-      },
-    }
+
+class Stream {
+  data = []
+  get length() {
+    return this.data.length
+  }
+  flush() {
+    return flush(this.data)
+  }
+  read() {
+    panic('not readable')
+  }
+  write(..._values) {
+    panic('not writable')
   }
 }
-const stack = stream({
+class Stack extends Stream {
   read() {
     if (!this.length) panic('stack underflow')
     return this.data.pop()
-  },
-  write(v) {
-    this.data.push(v)
-  },
-})
+  }
+  write(...values) {
+    this.data.push(...values)
+  }
+}
 
 function exec(rt, arr) {
   let quote = arr
   if (!Array.isArray(arr)) quote = [arr]
   for (const w of quote) {
     try {
-      if (w.isWord) {
+      if (w instanceof Word) {
         w.run()
       } else {
         rt.target.write(w)
@@ -66,155 +58,172 @@ function exec(rt, arr) {
     }
   }
 }
-const word = {
-  _attributes: {},
-  isWord: true,
-  make(rt, props) {
-    const w = Object.create(this)
-    Object.assign(w, { ...props, rt, attributes: { ...this._attributes, ...(props.attributes ?? {}) } })
-    if (rt && w.attributes.name) {
-      rt.dict[w.attributes.name] = w
-      rt.last = w
-    }
-    return w
-  },
+
+class Word {
+  attributes = {
+    immediate: false,
+  }
   get name() {
     return this.attributes.name
-  },
+  }
   get immediate() {
     return this.attributes.immediate
-  },
+  }
+  get target() {
+    return this.rt.target
+  }
+  constructor(rt, attributes) {
+    this.rt = rt
+    this.attributes = { ...this.attributes, ...attributes }
+    if (this.name && rt) {
+      rt.dict[this.name] = this
+      rt.last = this
+    }
+  }
   interp() {
-    this.rt.target.write(this)
-  },
+    this.target.write(this)
+  }
   compile() {
-    this.immediate ? this.interp() : this.rt.target.write(this)
-  },
+    this.immediate ? this.interp() : this.target.write(this)
+  }
   run() {
     const f = this[this.rt.mode]
     if (!f) panic(`unknown function for mode: ${this.rt.mode}`)
     f.call(this)
-  },
+  }
 }
-
-const variable = derive(word, {
-  _attributes: { type: 'variable' },
+class Var extends Word {
+  constructor(rt, name, value = 0) {
+    super(rt, { name, type: 'variable' })
+    this.data = value
+  }
   read() {
     return this.data
-  },
-  write(val) {
-    this.data = val
-  },
-})
-
-const fn = derive(word, {
-  _attributes: { type: 'fn' },
+  }
+  write(v) {
+    this.data = v
+  }
+}
+class Fn extends Word {
+  constructor(rt, name, fn, immediate = false) {
+    super(rt, { name, type: 'fn', immediate })
+    this.fn = fn
+  }
   interp() {
     const a = []
-    for (let i = 0; i < this.fn.length; i++) a.unshift(this.rt.target.read())
+    for (let i = 0; i < this.fn.length; i++) a.unshift(this.target.read())
     const r = castArr(this.fn(...a)).filter(v => !isNil(v))
     for (const v of r) {
-      this.rt.target.write(v)
+      this.target.write(v)
     }
-  },
-})
-
-const seq = derive(word, {
-  _attributes: { type: 'compiled' },
+  }
+}
+class Wrapped extends Word {
+  constructor(rt, wrapped, name) {
+    super(rt, { type: 'wrapped', name })
+    this.wrapped = wrapped
+  }
+  interp() {
+    return this.target.write(this.wrapped)
+  }
+}
+class Compiled extends Word {
+  constructor(rt, name) {
+    super(rt, { name, type: 'compiled' })
+    this.body = new Stack()
+  }
+  read() {
+    return this.body.read()
+  }
+  write(...values) {
+    this.body.write(...values)
+  }
+  flush() {
+    return this.body.flush()
+  }
   interp() {
     exec(this.rt, this.body)
-  },
-  read() {
-    return this.body.pop()
-  },
-  write(...w) {
-    this.body.push(...w)
-  },
-  flush() {
-    return flush(this.body)
-  },
-})
-
-const wrapped = derive(word, {
-  interp() {
-    this.rt.target.write(this.wrapped)
-  },
-})
-
-export function createRuntime() {
-  const rt = {
-    dict: {},
-    last: null,
-    mode: 'interp',
-    input: buffer(),
-    _listeners: {},
-    on(event, func) {
-      const listeners = this._listeners[event]
-      if (!listeners) {
-        this._listeners[event] = []
-      }
-      listeners.push(func)
-      return () => this.off(event, func)
-    },
-    off(event, func) {
-      const arr = this._listeners[event]
-      if (arr) this._listeners[event] = arr.filter(f => f !== func)
-    },
-    emit(event, data) {
-      for (const func of this._listeners[event] ?? []) func(data)
-    },
-    targets: [stack()],
-    get target() {
-      return this.targets[this.targets.length - 1]
-    },
-    popTarget() {
-      return this.targets.pop()
-    },
-    pushTarget(t) {
-      return this.targets.push(t)
-    },
-    parse(d) {
-      const i = this.input
-      while (i.p < i.size && d(i.read())) i.move(1)
-      if (i.p >= i.size) return
-      const s = i.p
-      while (i.p < i.size && !d(i.read())) i.move(1)
-      const e = i.p
-      if (i.p < i.size) i.move(1)
-      return i.data.slice(s, e).join('')
-    },
-    find(name) {
-      let w = this.dict[name]
-      if (!w) {
-        const num = Number(name)
-        if (isNaN(num)) panic(`unknown word: ${name}`)
-        w = num
-      }
-      return w
-    },
-    next() {
-      const t = this.parse(isWS)
-      if (!t) return
-      return this.find(t)
-    },
-    run(src) {
-      this.input.data = src.split('')
-      this.input.p = 0
-      let w = this.next()
-      while (w !== undefined) {
-        exec(this, w)
-        w = this.next()
-      }
-    },
   }
+}
 
-  const def = (n, f, imm) => fn.make(rt, { fn: f, attributes: { immediate: imm, name: n } })
-  const expose = bindings => {
-    for (const [name, obj] of Object.entries(bindings)) {
-      wrapped.make(rt, { attributes: { name }, wrapped: obj })
+class Runtime {
+  dict = {}
+  last = null
+  mode = 'interp'
+  input = buffer()
+  _listeners = {}
+  get target() {
+    return this.targets.data[this.targets.length - 1]
+  }
+  constructor() {
+    this.targets = new Stack()
+    this.targets.write(new Stack())
+  }
+  // event stuffs
+  on(event, func) {
+    const listeners = this._listeners[event]
+    if (!listeners) {
+      this._listeners[event] = []
+    }
+    listeners.push(func)
+    return () => this.off(event, func)
+  }
+  off(event, func) {
+    const arr = this._listeners[event]
+    if (arr) this._listeners[event] = arr.filter(f => f !== func)
+  }
+  emit(event, data) {
+    for (const func of this._listeners[event] ?? []) func(data)
+  }
+  // parsing & execution
+  parse(d) {
+    const i = this.input
+    while (i.p < i.size && d(i.read())) i.move(1)
+    if (i.p >= i.size) return
+    const s = i.p
+    while (i.p < i.size && !d(i.read())) i.move(1)
+    const e = i.p
+    if (i.p < i.size) i.move(1)
+    return i.data.slice(s, e).join('')
+  }
+  find(name) {
+    let w = this.dict[name]
+    if (!w) {
+      const num = Number(name)
+      if (isNaN(num)) panic(`unknown word: ${name}`)
+      w = num
+    }
+    return w
+  }
+  next() {
+    const t = this.parse(isWS)
+    if (!t) return
+    return this.find(t)
+  }
+  run(src) {
+    this.input.data = src.split('')
+    this.input.p = 0
+    let w = this.next()
+    while (w !== undefined) {
+      exec(this, w)
+      w = this.next()
     }
   }
 
+  // helpers for building out runtimes
+  def(name, fn, immediate) {
+    new Fn(this, name, fn, immediate)
+  }
+  expose(bindings) {
+    for (const [name, obj] of Object.entries(bindings)) {
+      new Wrapped(this, obj, name)
+    }
+  }
+}
+
+export function createRuntime() {
+  const rt = new Runtime()
+  const def = (n, f, imm) => rt.def(n, f, imm)
   // "Stream" words
   def('>>', (v, s) => {
     s.write(v)
@@ -239,7 +248,6 @@ export function createRuntime() {
     return [o]
   })
   def('splice', arr => castArr(arr))
-
   // Stack
   def('dup', a => [a, a])
   def('drop', _a => {})
@@ -264,19 +272,19 @@ export function createRuntime() {
 
   // Definitions
   def('variable', () => {
-    variable.make(rt, { attributes: { name: rt.parse(isWS) }, data: 0 })
+    new Var(rt, rt.parse(isWS))
   })
   def('buffer', () => {
-    wrapped.make(rt, { attributes: { name: rt.parse(isWS) }, wrapped: buffer() })
+    new Wrapped(rt, buffer(), rt.parse(isWS))
   })
   def('stack', () => {
-    wrapped.make(rt, { attributes: { name: rt.parse(isWS) }, wrapped: stack() })
+    new Wrapped(rt, new Stack(), rt.parse(isWS))
   })
   def(
     '[',
     () => {
       rt.mode = 'compile'
-      rt.pushTarget(seq.make(rt, { body: [] }))
+      rt.targets.write(new Compiled(rt))
     },
     true
   )
@@ -287,21 +295,19 @@ export function createRuntime() {
       if (rt.targets.length <= 2) {
         rt.mode = 'interp'
       }
-      const compiled = rt.popTarget()
-      return [compiled.body]
+      return [rt.targets.read().body]
     },
     true
   )
   def(':', () => {
     rt.mode = 'compile'
-    rt.pushTarget(seq.make(rt, { attributes: { name: rt.parse(isWS) }, body: [] }))
+    rt.targets.write(new Compiled(rt, rt.parse(isWS)))
   })
   def(
     ';',
     () => {
       rt.mode = 'interp'
-      const compiled = rt.popTarget()
-      rt.last = compiled
+      rt.last = rt.targets.read()
     },
     true
   )
@@ -343,7 +349,6 @@ export function createRuntime() {
   def('parse-word', () => {
     return [rt.parse(isWS)]
   })
-
   // control flow / iteration
   def('exit', exit)
   def('err', panic)
@@ -429,9 +434,8 @@ export function createRuntime() {
     return [o]
   })
 
-  expose({ console, Math, Array, Object })
-
-  return { rt, def, expose }
+  rt.expose({ console, Math, Array, Object })
+  return rt
 }
 
 function buffer(ring) {
@@ -482,4 +486,4 @@ function buffer(ring) {
   }
 }
 
-export { word, fn, seq, buffer, wrapped, stream }
+export { Word, Fn, Compiled, buffer, Wrapped, Stream, Stack }
