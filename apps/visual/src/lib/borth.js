@@ -1,83 +1,77 @@
-// borth - forth-like for bassline
+// borth, issa concatenative language yo
 
 const WS = ' \t\n\r'
 const isWS = c => WS.includes(c)
 const derive = (base, over) => Object.assign(Object.create(base), over)
-const castArr = v => {
-  if ((v ?? undefined) === undefined) return []
+const isNil = v => v === undefined || v === null
+class Exit extends Error {}
+const flush = array => array.splice(0, array.length)
+function panic(msg) {
+  throw new Error(`panic: ${msg}`)
+}
+function exit() {
+  throw new Exit()
+}
+function castArr(v) {
+  if (isNil(v)) return []
   if (!Array.isArray(v)) return [v]
   return v
 }
-
-const stack = {
-  data: [],
-  create() {
-    const b = Object.create(this)
-    b.data = []
-    return b
-  },
+function stream({ read, write }) {
+  return function () {
+    return {
+      data: [],
+      get length() {
+        return this.data.length
+      },
+      flush() {
+        return flush(this.data)
+      },
+      read() {
+        if (!read) panic('not readable')
+        return read.call(this)
+      },
+      write(...values) {
+        if (!write) panic('not writable')
+        for (const v of values) {
+          write.call(this, v)
+        }
+      },
+    }
+  }
+}
+const stack = stream({
   read() {
-    if (!this.data.length) throw new Error('stack underflow')
+    if (!this.length) panic('stack underflow')
     return this.data.pop()
   },
   write(v) {
     this.data.push(v)
   },
-}
+})
 
-const buffer = {
-  data: [],
-  create(ring) {
-    const b = Object.create(this)
-    b.data = []
-    b.p = 0
-    b.ring = ring
-    return b
-  },
-  get size() {
-    return this.data.length
-  },
-  read() {
-    return this.data[this.p]
-  },
-  write(v) {
-    this.insert(v)
-  },
-  move(n) {
-    const s = this.size
-    this.p = this.ring && s ? (((this.p + n) % s) + s) % s : Math.max(0, Math.min(this.p + n, s))
-    return this.p
-  },
-  insert(...v) {
-    this.data.splice(this.p + 1, 0, ...v)
-    this.p += v.length
-  },
-  delete(n = 1) {
-    this.data.splice(this.p, n)
-  },
-  leap(f, dir = 1) {
-    for (let i = this.p + dir; dir > 0 ? i < this.size : i >= 0; i += dir)
-      if (f(this.data[i])) {
-        const s = this.p
-        this.p = i
-        return dir > 0 ? [s, i] : [i, s]
+function exec(rt, arr) {
+  let quote = arr
+  if (!Array.isArray(arr)) quote = [arr]
+  for (const w of quote) {
+    try {
+      if (w.isWord) {
+        w.run()
+      } else {
+        rt.target.write(w)
       }
-    return []
-  },
-  skip(f, dir = 1) {
-    while (this.p >= 0 && this.p < this.size && f(this.data[this.p])) this.p += dir
-    return this.p
-  },
-  slice(start, end) {
-    return this.data.slice(start, end ?? this.p).join('')
-  },
+    } catch (e) {
+      if (e instanceof Exit) break
+      throw e
+    }
+  }
 }
-
 const word = {
+  _attributes: {},
+  isWord: true,
   make(rt, props) {
     const w = Object.create(this)
-    const attrs = { ...(this.attributes ?? {}), ...(props.attributes ?? {}) }
-    Object.assign(w, { ...props, rt, attributes: attrs })
+    Object.assign(w, { ...props, rt, attributes: { ...this._attributes, ...(props.attributes ?? {}) } })
     if (rt && w.attributes.name) {
       rt.dict[w.attributes.name] = w
       rt.last = w
@@ -90,72 +84,45 @@ const word = {
   get immediate() {
     return this.attributes.immediate
   },
-  attributes: {},
   interp() {
-    this.rt.ds.write(this)
+    this.rt.target.write(this)
   },
   compile() {
     this.immediate ? this.interp() : this.rt.target.write(this)
   },
-  present() {},
   run() {
     const f = this[this.rt.mode]
-    if (!f) {
-      throw new Error(`unknown function for mode: ${this.rt.mode}`)
-    }
+    if (!f) panic(`unknown function for mode: ${this.rt.mode}`)
     f.call(this)
   },
+}
+
+const variable = derive(word, {
+  _attributes: { type: 'variable' },
   read() {
     return this.data
   },
-  write(v) {
-    this.data = v
+  write(val) {
+    this.data = val
   },
-}
+})
 
-const exec = (rt, arr) => {
-  let quote = arr
-  if (!Array.isArray(arr)) quote = [arr]
-  for (const w of quote) {
-    if (word.isPrototypeOf(w)) {
-      w.run()
-    } else {
-      if (rt.mode === 'interp') {
-        rt.ds.write(w)
-      } else {
-        rt.target.write(w)
-      }
-    }
-  }
-}
-
-// Specialized prototypes
 const fn = derive(word, {
-  attributes: { type: 'fn' },
+  _attributes: { type: 'fn' },
   interp() {
     const a = []
-    for (let i = 0; i < this.fn.length; i++) a.unshift(this.rt.ds.read())
-    const r = castArr(this.fn(...a))
-    for (const v of r.filter(Boolean))
-      if (this.rt.mode === 'interp') {
-        this.rt.ds.write(v)
-      } else {
-        this.rt.target.write(v)
-      }
+    for (let i = 0; i < this.fn.length; i++) a.unshift(this.rt.target.read())
+    const r = castArr(this.fn(...a)).filter(v => !isNil(v))
+    for (const v of r) {
+      this.rt.target.write(v)
+    }
   },
 })
 
 const seq = derive(word, {
-  attributes: { type: 'compiled' },
+  _attributes: { type: 'compiled' },
   interp() {
-    for (const w of this.body) {
-      try {
-        exec(this.rt, w)
-      } catch (e) {
-        if (e.exit) break
-        throw e
-      }
-    }
+    exec(this.rt, this.body)
   },
   read() {
     return this.body.pop()
@@ -163,17 +130,14 @@ const seq = derive(word, {
   write(...w) {
     this.body.push(...w)
   },
+  flush() {
+    return flush(this.body)
+  },
 })
 
-const stream = derive(word, {
+const wrapped = derive(word, {
   interp() {
-    this.rt.ds.write(this.stream)
-  },
-  read() {
-    return this.stream.read()
-  },
-  write(v) {
-    this.stream.write(v)
+    this.rt.target.write(this.wrapped)
   },
 })
 
@@ -182,27 +146,24 @@ export function createRuntime() {
     dict: {},
     last: null,
     mode: 'interp',
-    input: buffer.create(),
-
+    input: buffer(),
     _listeners: {},
-    on(event, fn) {
-      let listeners = this._listeners[event]
+    on(event, func) {
+      const listeners = this._listeners[event]
       if (!listeners) {
         this._listeners[event] = []
       }
-      listeners.push(fn)
-      return () => this.off(event, fn)
+      listeners.push(func)
+      return () => this.off(event, func)
     },
-    off(event, fn) {
+    off(event, func) {
       const arr = this._listeners[event]
-      if (arr) this._listeners[event] = arr.filter(f => f !== fn)
+      if (arr) this._listeners[event] = arr.filter(f => f !== func)
     },
     emit(event, data) {
-      for (const fn of this._listeners[event] ?? []) fn(data)
+      for (const func of this._listeners[event] ?? []) func(data)
     },
-
-    ds: stack.create(),
-    targets: [],
+    targets: [stack()],
     get target() {
       return this.targets[this.targets.length - 1]
     },
@@ -212,7 +173,6 @@ export function createRuntime() {
     pushTarget(t) {
       return this.targets.push(t)
     },
-
     parse(d) {
       const i = this.input
       while (i.p < i.size && d(i.read())) i.move(1)
@@ -223,22 +183,20 @@ export function createRuntime() {
       if (i.p < i.size) i.move(1)
       return i.data.slice(s, e).join('')
     },
-
-    next() {
-      const t = this.parse(isWS)
-      if (!t) return
-      let w = this.dict[t]
+    find(name) {
+      let w = this.dict[name]
       if (!w) {
-        const num = Number(t)
-        if (isNaN(num)) {
-          if (this.mode === 'present') return this.next() // we skip unbound words in present mode
-          throw Error(`unknown: ${t}`)
-        }
-        w = +t
+        const num = Number(name)
+        if (isNaN(num)) panic(`unknown word: ${name}`)
+        w = num
       }
       return w
     },
-
+    next() {
+      const t = this.parse(isWS)
+      if (!t) return
+      return this.find(t)
+    },
     run(src) {
       this.input.data = src.split('')
       this.input.p = 0
@@ -251,45 +209,36 @@ export function createRuntime() {
   }
 
   const def = (n, f, imm) => fn.make(rt, { fn: f, attributes: { immediate: imm, name: n } })
+  const expose = bindings => {
+    for (const [name, obj] of Object.entries(bindings)) {
+      wrapped.make(rt, { attributes: { name }, wrapped: obj })
+    }
+  }
 
   // "Stream" words
-  def('.>', (v, s) => {
+  def('>>', (v, s) => {
     s.write(v)
   })
-  def('>.', s => [s.read()])
-  def('..>', (_a, s) => {
-    const a = castArr(_a)
-    for (const v of a) s.write(v)
-  })
-  def('>..', (s, n) => {
-    const o = []
-    for (let i = 0; i < n; i++) o.push(s.read())
-    return [o]
-  })
-  def('ds', () => rt.ds)
+  def('<<', s => [s.read()])
+  def('target', () => rt.target)
   def('take', n => {
     const o = []
-    for (let i = 0; i < n; i++) o.unshift(rt.ds.read())
+    for (let i = 0; i < n; i++) o.unshift(rt.target.read())
     return [o]
   })
-  def('take-to', stop => {
+  def('take-until', quote => {
     const o = []
     let val
-    while (rt.ds.data.length && (val = rt.ds.read())) {
-      if (val === stop) break
+    while (rt.target.data.length && (val = rt.target.read())) {
+      rt.target.write(val)
+      exec(rt, quote)
+      const v = rt.target.read()
+      if (v) break
       o.unshift(val)
     }
     return [o]
   })
   def('splice', arr => castArr(arr))
-  def('exit', () => {
-    const e = new Error('exiting')
-    e.exit = true
-    throw e
-  })
-  def('err', msg => {
-    throw new Error(`err: ${msg}`)
-  })
 
   // Stack
   def('dup', a => [a, a])
@@ -315,13 +264,13 @@ export function createRuntime() {
 
   // Definitions
   def('variable', () => {
-    word.make(rt, { name: rt.parse(isWS), data: 0 })
+    variable.make(rt, { attributes: { name: rt.parse(isWS) }, data: 0 })
   })
   def('buffer', () => {
-    stream.make(rt, { name: rt.parse(isWS), stream: buffer.create() })
+    wrapped.make(rt, { attributes: { name: rt.parse(isWS) }, wrapped: buffer() })
   })
   def('stack', () => {
-    stream.make(rt, { name: rt.parse(isWS), stream: stack.create() })
+    wrapped.make(rt, { attributes: { name: rt.parse(isWS) }, wrapped: stack() })
   })
   def(
     '[',
@@ -334,7 +283,8 @@ export function createRuntime() {
   def(
     ']',
     () => {
-      if (rt.targets.length <= 1) {
+      // [dataStack, compiled], so <= 2 means we are back to interp mode
+      if (rt.targets.length <= 2) {
         rt.mode = 'interp'
       }
       const compiled = rt.popTarget()
@@ -350,17 +300,23 @@ export function createRuntime() {
     ';',
     () => {
       rt.mode = 'interp'
-      rt.popTarget()
+      const compiled = rt.popTarget()
+      rt.last = compiled
     },
     true
   )
-  def('do', w => {
-    exec(rt, w)
-  })
-  def('next', () => {
-    const w = rt.next()
-    exec(rt, w)
-  })
+  def('do', quote => exec(rt, quote))
+  def(
+    'do!',
+    quote => {
+      const mode = rt.mode
+      rt.mode = 'interp'
+      exec(rt, quote)
+      rt.mode = mode
+    },
+    true
+  )
+  def('next', () => exec(rt, rt.next()))
   def('immediate', () => {
     if (rt.last) rt.last.attributes.immediate = true
   })
@@ -380,13 +336,17 @@ export function createRuntime() {
     true
   )
   def('parse', delim => {
-    if (typeof delim !== 'string') throw new Error('invalid parse')
+    if (typeof delim !== 'string') panic('invalid parse')
     const str = rt.parse(c => delim.includes(c))
     return [str]
   })
   def('parse-word', () => {
     return [rt.parse(isWS)]
   })
+
+  // control flow / iteration
+  def('exit', exit)
+  def('err', panic)
   def('if', (flag, ifTrue, ifFalse) => {
     if (flag) {
       exec(rt, ifTrue)
@@ -408,120 +368,118 @@ export function createRuntime() {
   def('times', (n, quote) => {
     for (let i = 0; i < n; i++) {
       try {
-        rt.ds.write(i)
+        rt.target.write(i)
         exec(rt, quote)
       } catch (e) {
-        if (e.exit) {
-          break
-        } else {
-          throw e
-        }
+        if (e instanceof Exit) break
+        throw e
       }
     }
   })
-
   def('quote', val => [[val]])
-
-  def('map', (array, quote) => {
-    return [
-      array.map(v => {
-        rt.ds.write(v)
-        exec(rt, quote)
-        return rt.ds.read()
-      }),
-    ]
-  })
-  def('filter', (array, quote) => {
-    return [
-      array.filter(v => {
-        rt.ds.write(v)
-        exec(rt, quote)
-        return rt.ds.read()
-      }),
-    ]
-  })
-  def('fold', (array, quote, init) => {
-    return [
-      array.reduce((acc, curr) => {
-        rt.ds.write(acc)
-        rt.ds.write(curr)
-        exec(rt, quote)
-        return rt.ds.read()
-      }, init),
-    ]
-  })
+  def('map', (array, quote) => [
+    array.map(v => {
+      rt.target.write(v)
+      exec(rt, quote)
+      return rt.target.read()
+    }),
+  ])
+  def('filter', (array, quote) => [
+    array.filter(v => {
+      rt.target.write(v)
+      exec(rt, quote)
+      return rt.target.read()
+    }),
+  ])
+  def('fold', (array, quote, init) => [
+    array.reduce((acc, curr) => {
+      rt.target.write(acc)
+      rt.target.write(curr)
+      exec(rt, quote)
+      return rt.target.read()
+    }, init),
+  ])
   def('each', (array, quote) => {
     for (const val of array) {
       try {
-        rt.ds.write(val)
+        rt.target.write(val)
         exec(rt, quote)
       } catch (e) {
-        if (e.exit) {
-          break
-        } else {
-          throw e
-        }
+        if (e instanceof Exit) break
+        throw e
       }
     }
   })
 
   def('clear', () => {
-    while (rt.ds.data.length) {
-      rt.ds.read()
-    }
+    rt.target.flush()
   })
-
-  def('nil', () => [undefined])
-
-  def('console', () => [console])
-  def('Math', () => [Math])
-  def('Array', () => [Array])
-  def('Object', () => [Object])
-
-  def('find', name => rt.dict[name])
+  def('find', name => [rt.find(name)])
   def('get', (name, target) => [target[name]])
   def('set', (value, name, target) => {
     target[name] = value
   })
   def('call', (arg, name, target) => target[name].call(target, ...castArr(arg)))
-
-  def('concat', (a, b) => {
-    return [[...castArr(a), ...castArr(b)]]
-  })
-
-  def(
-    "'",
-    () => {
-      const str = rt.parse(isWS)
-      let word = rt.dict[str]
-      if (!word) {
-        const num = Number(str)
-        if (!isNaN(num)) {
-          word = num
-        } else {
-          word = str
-        }
-      }
-      return [word]
-    },
-    true
-  )
-  def(
-    '"',
-    () => {
-      const str = rt.parse(c => c === '"')
-      return [str]
-    },
-    true
-  )
-
+  def('concat', (a, b) => [[...castArr(a), ...castArr(b)]])
+  def("'", () => [rt.find(rt.parse(isWS))], true)
+  def('"', () => [rt.parse(c => c === '"')], true)
   def('iota', n => {
     const o = []
     for (let i = 1; i <= n; i++) o.push(i)
     return [o]
   })
 
-  return rt
+  expose({ console, Math, Array, Object })
+
+  return { rt, def, expose }
 }
 
-export { word, fn, seq, stream, buffer }
+function buffer(ring) {
+  return {
+    data: [],
+    ring,
+    p: 0,
+    get length() {
+      return this.data.length
+    },
+    get size() {
+      return this.data.length
+    },
+    read() {
+      return this.data[this.p]
+    },
+    write(v) {
+      this.insert(v)
+    },
+    move(n) {
+      const s = this.size
+      this.p = this.ring && s ? (((this.p + n) % s) + s) % s : Math.max(0, Math.min(this.p + n, s))
+      return this.p
+    },
+    insert(...v) {
+      this.data.splice(this.p + 1, 0, ...v)
+      this.p += v.length
+    },
+    delete(n = 1) {
+      this.data.splice(this.p, n)
+    },
+    leap(f, dir = 1) {
+      for (let i = this.p + dir; dir > 0 ? i < this.size : i >= 0; i += dir)
+        if (f(this.data[i])) {
+          const s = this.p
+          this.p = i
+          return dir > 0 ? [s, i] : [i, s]
+        }
+      return []
+    },
+    skip(f, dir = 1) {
+      while (this.p >= 0 && this.p < this.size && f(this.data[this.p])) this.p += dir
+      return this.p
+    },
+    slice(start, end) {
+      return this.data.slice(start, end ?? this.p).join('')
+    },
+  }
+}
+
+export { word, fn, seq, buffer, wrapped, stream }
