@@ -76,11 +76,19 @@ const buffer = {
 const word = {
   make(rt, props) {
     const w = Object.create(this)
-    if (rt) w.rt = rt
-    w.attributes = {}
-    Object.assign(w, props)
-    if (rt && w.name) rt.dict[w.name] = rt.last = w
+    const attrs = { ...(this.attributes ?? {}), ...(props.attributes ?? {}) }
+    Object.assign(w, { ...props, rt, attributes: attrs })
+    if (rt && w.attributes.name) {
+      rt.dict[w.attributes.name] = w
+      rt.last = w
+    }
     return w
+  },
+  get name() {
+    return this.attributes.name
+  },
+  get immediate() {
+    return this.attributes.immediate
   },
   attributes: {},
   interp() {
@@ -91,7 +99,11 @@ const word = {
   },
   present() {},
   run() {
-    this[this.rt.mode]()
+    const f = this[this.rt.mode]
+    if (!f) {
+      throw new Error(`unknown function for mode: ${this.rt.mode}`)
+    }
+    f.call(this)
   },
   read() {
     return this.data
@@ -101,88 +113,55 @@ const word = {
   },
 }
 
+const exec = (rt, arr) => {
+  let quote = arr
+  if (!Array.isArray(arr)) quote = [arr]
+  for (const w of quote) {
+    if (word.isPrototypeOf(w)) {
+      w.run()
+    } else {
+      if (rt.mode === 'interp') {
+        rt.ds.write(w)
+      } else {
+        rt.target.write(w)
+      }
+    }
+  }
+}
+
 // Specialized prototypes
 const fn = derive(word, {
+  attributes: { type: 'fn' },
   interp() {
     const a = []
     for (let i = 0; i < this.fn.length; i++) a.unshift(this.rt.ds.read())
     const r = castArr(this.fn(...a))
-    for (const v of r) if (v !== null) this.rt.ds.write(v)
-  },
-})
-
-const lit = derive(word, {
-  interp() {
-    this.rt.ds.write(this.data)
+    for (const v of r.filter(Boolean))
+      if (this.rt.mode === 'interp') {
+        this.rt.ds.write(v)
+      } else {
+        this.rt.target.write(v)
+      }
   },
 })
 
 const seq = derive(word, {
+  attributes: { type: 'compiled' },
   interp() {
     for (const w of this.body) {
       try {
-        w.interp()
+        exec(this.rt, w)
       } catch (e) {
-        if (e.exit) {
-          console.log('breaking')
-          break
-        }
+        if (e.exit) break
         throw e
       }
     }
   },
+  read() {
+    return this.body.pop()
+  },
   write(...w) {
     this.body.push(...w)
-  },
-  flushConditional() {
-    return this.flushToFlag('branched')
-  },
-  flushToFlag(flag = 'branched') {
-    if (this.rt.mode !== 'compile') {
-      throw new Error('invalid conditional! Can only use conditionals during compilation')
-    }
-    const out = []
-    let w
-    let cond
-    while ((w = this.body.pop())) {
-      if (w[flag] && !w.complete) {
-        cond = w
-        this.body.push(w)
-        break
-      }
-      out.unshift(w)
-    }
-    return [out, cond]
-  },
-})
-
-const branched = derive(word, {
-  branched: true, // so flushConditional() can find it
-  interp() {
-    // Read flag from stack (condition already evaluated before we run)
-    const flag = this.rt.ds.read()
-    // Pick branch based on truthy/falsy
-    const branch = flag ? this.if : this.else
-    if (branch) branch.run()
-  },
-})
-
-const doloop = derive(word, {
-  doloop: true,
-  interp() {
-    const index = this.rt.ds.read()
-    const limit = this.rt.ds.read()
-    // Push loop frame onto runtime's loop stack
-    const frame = { limit, index, leave: false }
-    this.rt.loopStack.push(frame)
-    try {
-      while (frame.index < frame.limit && !frame.leave) {
-        this.body.run()
-        frame.index++
-      }
-    } finally {
-      this.rt.loopStack.pop()
-    }
   },
 })
 
@@ -207,7 +186,11 @@ export function createRuntime() {
 
     _listeners: {},
     on(event, fn) {
-      ;(this._listeners[event] ||= []).push(fn)
+      let listeners = this._listeners[event]
+      if (!listeners) {
+        this._listeners[event] = []
+      }
+      listeners.push(fn)
       return () => this.off(event, fn)
     },
     off(event, fn) {
@@ -215,51 +198,10 @@ export function createRuntime() {
       if (arr) this._listeners[event] = arr.filter(f => f !== fn)
     },
     emit(event, data) {
-      for (const fn of this._listeners[event] || []) fn(data)
-    },
-
-    // parts are for source tracking, tbd if we are going to keep this structure
-    parts: {},
-    currentPart: null,
-    _lastCapturePos: 0,
-    _presentGen: 0,
-
-    addPart(name) {
-      let p = this.parts[name]
-      if (!p) {
-        p = {
-          name,
-          data: '',
-          index: Object.keys(this.parts).length,
-          _gen: this._presentGen,
-        }
-        this.parts[name] = p
-        this.emit('part:added', p)
-      } else if (p._gen !== this._presentGen) {
-        p.data = ''
-        p._gen = this._presentGen
-      }
-      this.currentPart = p
-      return p
-    },
-
-    updatePart(name, data) {
-      const p = this.parts[name]
-      if (p) {
-        p.data = data
-        this.emit('part:changed', p)
-      }
-    },
-
-    toSource() {
-      return Object.values(this.parts)
-        .sort((a, b) => a.index - b.index)
-        .map(p => (p.name === '_default' ? p.data : `part: ${p.name}\n${p.data}`))
-        .join('\n')
+      for (const fn of this._listeners[event] ?? []) fn(data)
     },
 
     ds: stack.create(),
-    loopStack: [],
     targets: [],
     get target() {
       return this.targets[this.targets.length - 1]
@@ -292,19 +234,9 @@ export function createRuntime() {
           if (this.mode === 'present') return this.next() // we skip unbound words in present mode
           throw Error(`unknown: ${t}`)
         }
-        w = lit.make(this, { data: +t })
+        w = +t
       }
       return w
-    },
-
-    present(src) {
-      this._presentGen++
-      this.currentPart = null
-      this._lastCapturePos = 0
-      this.mode = 'present'
-      this.run(src)
-      this.mode = 'interp'
-      this.emit('present:complete', { parts: this.parts })
     },
 
     run(src) {
@@ -312,16 +244,13 @@ export function createRuntime() {
       this.input.p = 0
       let w = this.next()
       while (w !== undefined) {
-        w.run()
+        exec(this, w)
         w = this.next()
-      }
-      if (this.mode === 'present' && this.currentPart) {
-        this.currentPart.data += this.input.slice(this._lastCapturePos)
       }
     },
   }
 
-  const def = (n, f, imm) => fn.make(rt, { name: n, fn: f, immediate: imm })
+  const def = (n, f, imm) => fn.make(rt, { fn: f, attributes: { immediate: imm, name: n } })
 
   // "Stream" words
   def('.>', (v, s) => {
@@ -394,46 +323,28 @@ export function createRuntime() {
   def('stack', () => {
     stream.make(rt, { name: rt.parse(isWS), stream: stack.create() })
   })
-
-  // Part definition - structure extraction in present mode
-  word.make(rt, {
-    name: 'part:',
-    immediate: true,
-    interp() {
-      rt.parse(isWS) // skip name, no-op in interp mode
+  def(
+    '[',
+    () => {
+      rt.mode = 'compile'
+      rt.pushTarget(seq.make(rt, { body: [] }))
     },
-    present() {
-      const input = rt.input
-      const end = input.p
-      // Back up over trailing whitespace, then over "part:" token
-      input.move(-1)
-      input.skip(isWS, -1)
-      input.skip(c => !isWS(c), -1)
-      // Handle edge case: if we backtracked past start, clamp to 0
-      const tokenStart = Math.max(0, input.p)
-      input.p = end
-
-      // Only capture content if there's actually something between last capture and this token
-      if (tokenStart > rt._lastCapturePos) {
-        const prevRegion = input.slice(rt._lastCapturePos, tokenStart)
-        if (!rt.currentPart) {
-          if (!prevRegion.match(/^\s*$/)) {
-            rt.addPart('_default')
-            rt.currentPart.data = prevRegion
-          }
-        } else {
-          rt.currentPart.data += prevRegion
-        }
+    true
+  )
+  def(
+    ']',
+    () => {
+      if (rt.targets.length <= 1) {
+        rt.mode = 'interp'
       }
-
-      const name = rt.parse(isWS)
-      rt._lastCapturePos = input.p
-      rt.addPart(name)
+      const compiled = rt.popTarget()
+      return [compiled.body]
     },
-  })
+    true
+  )
   def(':', () => {
     rt.mode = 'compile'
-    rt.pushTarget(seq.make(rt, { name: rt.parse(isWS), body: [] }))
+    rt.pushTarget(seq.make(rt, { attributes: { name: rt.parse(isWS) }, body: [] }))
   })
   def(
     ';',
@@ -443,12 +354,15 @@ export function createRuntime() {
     },
     true
   )
+  def('do', w => {
+    exec(rt, w)
+  })
   def('next', () => {
     const w = rt.next()
-    w.run()
+    exec(rt, w)
   })
   def('immediate', () => {
-    if (rt.last) rt.last.immediate = true
+    if (rt.last) rt.last.attributes.immediate = true
   })
   def('>attr', (key, val) => {
     if (rt.last) rt.last.attributes[key] = val
@@ -473,84 +387,122 @@ export function createRuntime() {
   def('parse-word', () => {
     return [rt.parse(isWS)]
   })
-  // 10 20 > if foo bar else baz then ;
-  // Condition is evaluated BEFORE if runs, flag left on stack
-  def(
-    'if',
-    () => {
-      const cond = branched.make(rt, {})
-      cond.label = 'if'
-      rt.target.write(cond)
-    },
-    true
-  )
-  def(
-    'else',
-    () => {
-      const [branch, cond] = rt.target.flushConditional()
-      cond[cond.label] = seq.make(rt, { body: branch })
-      cond.label = 'else'
-    },
-    true
-  )
-  def(
-    'then',
-    () => {
-      const [branch, cond] = rt.target.flushConditional()
-      cond[cond.label] = seq.make(rt, { body: branch })
-      cond.complete = true
-    },
-    true
-  )
+  def('if', (flag, ifTrue, ifFalse) => {
+    if (flag) {
+      exec(rt, ifTrue)
+    } else {
+      exec(rt, ifFalse)
+    }
+  })
+  def('when', (flag, ifTrue) => {
+    if (flag) {
+      exec(rt, ifTrue)
+    }
+  })
+  def('unless', (flag, ifFalse) => {
+    if (!flag) {
+      exec(rt, ifFalse)
+    }
+  })
 
-  // DO...LOOP
-  // Usage: limit index DO ... LOOP
-  // Example: 10 0 DO I . LOOP  ( prints 0 1 2 3 4 5 6 7 8 9 )
-  def(
-    'do',
-    () => {
-      const loop = doloop.make(rt, {})
-      rt.target.write(loop)
-    },
-    true
-  )
-  def(
-    'loop',
-    () => {
-      const [body, loop] = rt.target.flushToFlag('doloop')
-      loop.body = seq.make(rt, { body })
-      loop.complete = true
-    },
-    true
-  )
-  // I - push current loop index onto stack
-  def('i', () => {
-    const frame = rt.loopStack[rt.loopStack.length - 1]
-    if (!frame) throw new Error('I used outside of loop')
-    return [frame.index]
+  def('times', (n, quote) => {
+    for (let i = 0; i < n; i++) {
+      try {
+        rt.ds.write(i)
+        exec(rt, quote)
+      } catch (e) {
+        if (e.exit) {
+          break
+        } else {
+          throw e
+        }
+      }
+    }
   })
-  // J - push outer loop index onto stack (for nested loops)
-  def('j', () => {
-    const frame = rt.loopStack[rt.loopStack.length - 2]
-    if (!frame) throw new Error('J used outside of nested loop')
-    return [frame.index]
+
+  def('quote', val => [[val]])
+
+  def('map', (array, quote) => {
+    return [
+      array.map(v => {
+        rt.ds.write(v)
+        exec(rt, quote)
+        return rt.ds.read()
+      }),
+    ]
   })
-  // LEAVE - exit the current loop early
-  def('leave', () => {
-    const frame = rt.loopStack[rt.loopStack.length - 1]
-    if (!frame) throw new Error('LEAVE used outside of loop')
-    frame.leave = true
+  def('filter', (array, quote) => {
+    return [
+      array.filter(v => {
+        rt.ds.write(v)
+        exec(rt, quote)
+        return rt.ds.read()
+      }),
+    ]
+  })
+  def('fold', (array, quote, init) => {
+    return [
+      array.reduce((acc, curr) => {
+        rt.ds.write(acc)
+        rt.ds.write(curr)
+        exec(rt, quote)
+        return rt.ds.read()
+      }, init),
+    ]
+  })
+  def('each', (array, quote) => {
+    for (const val of array) {
+      try {
+        rt.ds.write(val)
+        exec(rt, quote)
+      } catch (e) {
+        if (e.exit) {
+          break
+        } else {
+          throw e
+        }
+      }
+    }
+  })
+
+  def('clear', () => {
+    while (rt.ds.data.length) {
+      rt.ds.read()
+    }
+  })
+
+  def('nil', () => [undefined])
+
+  def('console', () => [console])
+  def('Math', () => [Math])
+  def('Array', () => [Array])
+  def('Object', () => [Object])
+
+  def('find', name => rt.dict[name])
+  def('get', (name, target) => [target[name]])
+  def('set', (value, name, target) => {
+    target[name] = value
+  })
+  def('call', (arg, name, target) => target[name].call(target, ...castArr(arg)))
+
+  def('concat', (a, b) => {
+    return [[...castArr(a), ...castArr(b)]]
   })
 
   def(
     "'",
     () => {
       const str = rt.parse(isWS)
-      if (rt.mode === 'compile') {
-        rt.target.write(lit.make(rt, { data: str }))
-      } else {
-        rt.ds.write(str)
+      let word = rt.dict[str]
+      if (!word) {
+        const num = Number(str)
+        if (!isNaN(num)) {
+          word = num
+        } else {
+          word = str
+        }
       }
+      return [word]
     },
     true
   )
@@ -558,11 +510,7 @@ export function createRuntime() {
     '"',
     () => {
       const str = rt.parse(c => c === '"')
-      if (rt.mode === 'compile') {
-        rt.target.write(lit.make(rt, { data: str }))
-      } else {
-        rt.ds.write(str)
-      }
+      return [str]
     },
     true
   )
@@ -576,4 +524,4 @@ export function createRuntime() {
   return rt
 }
 
-export { word, fn, lit, seq, stream, buffer }
+export { word, fn, seq, stream, buffer }
