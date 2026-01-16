@@ -31,6 +31,9 @@ class Stream {
   write(..._values) {
     panic('not writable')
   }
+  print() {
+    JSON.stringify(this.data.map(v => (v.print ? v.print() : JSON.stringify(v))))
+  }
 }
 class Stack extends Stream {
   read() {
@@ -41,7 +44,6 @@ class Stack extends Stream {
     this.data.push(...values)
   }
 }
-
 function exec(rt, arr) {
   let quote = arr
   if (!Array.isArray(arr)) quote = [arr]
@@ -58,10 +60,12 @@ function exec(rt, arr) {
     }
   }
 }
-
 class Word {
   attributes = {
     immediate: false,
+  }
+  accept(visitor) {
+    return visitor.visitWord(this)
   }
   get name() {
     return this.attributes.name
@@ -97,6 +101,9 @@ class Var extends Word {
     super(rt, { name, type: 'variable' })
     this.data = value
   }
+  accept(visitor) {
+    return visitor.visitVar(this)
+  }
   read() {
     return this.data
   }
@@ -104,10 +111,14 @@ class Var extends Word {
     this.data = v
   }
 }
+
 class Fn extends Word {
   constructor(rt, name, fn, immediate = false) {
     super(rt, { name, type: 'fn', immediate })
     this.fn = fn
+  }
+  accept(visitor) {
+    return visitor.visitFn(this)
   }
   interp() {
     const a = []
@@ -123,6 +134,9 @@ class Wrapped extends Word {
     super(rt, { type: 'wrapped', name })
     this.wrapped = wrapped
   }
+  accept(visitor) {
+    return visitor.visitWrapped(this)
+  }
   interp() {
     return this.target.write(this.wrapped)
   }
@@ -131,6 +145,9 @@ class Compiled extends Word {
   constructor(rt, name) {
     super(rt, { name, type: 'compiled' })
     this.body = new Stack()
+  }
+  accept(visitor) {
+    return visitor.visitCompiled(this)
   }
   read() {
     return this.body.read()
@@ -142,7 +159,7 @@ class Compiled extends Word {
     return this.body.flush()
   }
   interp() {
-    exec(this.rt, this.body)
+    exec(this.rt, this.body.data)
   }
 }
 
@@ -195,6 +212,14 @@ class Runtime {
     }
     return w
   }
+  lookup(name) {
+    let w = this.dict[name]
+    if (!w) {
+      const num = Number(name)
+      w = isNaN(num) ? name : num
+    }
+    return w
+  }
   next() {
     const t = this.parse(isWS)
     if (!t) return
@@ -209,7 +234,6 @@ class Runtime {
       w = this.next()
     }
   }
-
   // helpers for building out runtimes
   def(name, fn, immediate) {
     new Fn(this, name, fn, immediate)
@@ -295,7 +319,7 @@ export function createRuntime() {
       if (rt.targets.length <= 2) {
         rt.mode = 'interp'
       }
-      return [rt.targets.read().body]
+      return [rt.targets.read().body.data]
     },
     true
   )
@@ -426,7 +450,7 @@ export function createRuntime() {
   })
   def('call', (arg, name, target) => target[name].call(target, ...castArr(arg)))
   def('concat', (a, b) => [[...castArr(a), ...castArr(b)]])
-  def("'", () => [rt.find(rt.parse(isWS))], true)
+  def("'", () => [rt.lookup(rt.parse(isWS))], true)
   def('"', () => [rt.parse(c => c === '"')], true)
   def('iota', n => {
     const o = []
