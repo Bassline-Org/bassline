@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useTheme } from '../providers/ThemeProvider'
 import { ThemeEditor } from '../components/ThemeEditor'
+import { SettingsPanel } from '../components/SettingsPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -107,6 +108,20 @@ export function Settings() {
             </CardContent>
           </Card>
         )}
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Script Settings
+            </CardTitle>
+            <CardDescription>
+              Settings defined by Borth scripts
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SettingsPanel />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

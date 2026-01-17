@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, nativeImage, Menu, Notification } from 'electron'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import windowStateKeeper from 'electron-window-state'
 import { db } from './db'
@@ -195,7 +196,14 @@ function setupIpcHandlers() {
   // Database queries (for borth)
   ipcMain.handle('db:query', async (_, sql: string, params?: unknown[]) => {
     try {
-      return { data: db.query.all(sql, params || []) }
+      const trimmed = sql.trim().toUpperCase()
+      // Use run() for mutations, all() for queries
+      if (trimmed.startsWith('SELECT')) {
+        return { data: db.query.all(sql, params || []) }
+      } else {
+        const result = db.query.run(sql, params || [])
+        return { data: [], changes: result.changes }
+      }
     } catch (error) {
       return { error: (error as Error).message }
     }
@@ -217,5 +225,42 @@ function setupIpcHandlers() {
   // Menu refresh
   ipcMain.handle('app:refreshMenu', () => {
     refreshMenu()
+  })
+
+  // ==========================================================================
+  // Blemacs Init File
+  // ==========================================================================
+
+  const getInitFilePath = () => path.join(app.getPath('home'), '.homebassrc')
+
+  // Read the init file (returns null if not found)
+  ipcMain.handle('blemacs:readInit', () => {
+    const initPath = getInitFilePath()
+    try {
+      if (fs.existsSync(initPath)) {
+        return fs.readFileSync(initPath, 'utf-8')
+      }
+      return null
+    } catch (error) {
+      console.error('Failed to read init file:', error)
+      return null
+    }
+  })
+
+  // Write the init file
+  ipcMain.handle('blemacs:writeInit', (_, content: string) => {
+    const initPath = getInitFilePath()
+    try {
+      fs.writeFileSync(initPath, content, 'utf-8')
+      return { success: true }
+    } catch (error) {
+      console.error('Failed to write init file:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+  // Get init file path (for display purposes)
+  ipcMain.handle('blemacs:getInitPath', () => {
+    return getInitFilePath()
   })
 }

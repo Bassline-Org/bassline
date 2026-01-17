@@ -9,6 +9,7 @@ build/
 dist/
 dist-browser/
 dist-node/
+apps/visual/dist-electron/
 bassline-web/build/
 bassline-web/dist/
 .DS_Store
