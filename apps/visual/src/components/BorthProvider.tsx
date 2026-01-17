@@ -2,31 +2,20 @@
  * BorthProvider
  *
  * Context provider for borth runtime.
- * - Holds runtime instance
- * - Subscribes to runtime events
- * - Exposes hooks for components
  */
 
-import { createContext, useContext, useRef, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useRef, useState, useCallback, type ReactNode } from 'react'
 // @ts-expect-error - borth.js has no type declarations
 import { createRuntime } from '../lib/borth'
 
 type Runtime = ReturnType<typeof createRuntime>
 
-interface Part {
-  name: string
-  data: string
-  index: number
-}
-
 interface BorthContextValue {
   rt: Runtime
   source: string
   setSource: (src: string) => void
-  run: () => void
-  runPart: (name: string) => void
+  run: (code?: string) => void
   reset: () => void
-  parts: Part[]
   output: {
     stack: unknown[]
     error: string | null
@@ -36,6 +25,22 @@ interface BorthContextValue {
 
 const BorthContext = createContext<BorthContextValue | null>(null)
 
+// Helper to create a configured runtime with db access
+function createConfiguredRuntime() {
+  const rt = createRuntime()
+  // Expose db for raw queries (only if available in Electron context)
+  if (typeof window !== 'undefined' && window.db) {
+    rt.expose({ db: window.db })
+    // Add query word: "SELECT * FROM x WHERE y = ?" [ param ] query
+    rt.def('query', async (params: unknown[], sql: string) => {
+      const result = await window.db.query(sql, params)
+      if (result.error) throw new Error(result.error)
+      return [result.data]
+    })
+  }
+  return rt
+}
+
 export function BorthProvider({
   children,
   initialSource = '',
@@ -43,11 +48,18 @@ export function BorthProvider({
 }: {
   children: ReactNode
   initialSource?: string
-  onSourceChange?: (src: string) => void
+  onSourceChange?: (source: string) => void
 }) {
-  const rtRef = useRef<Runtime>(createRuntime())
-  const [source, setSourceState] = useState(initialSource)
-  const [parts, setParts] = useState<Part[]>([])
+  const rtRef = useRef<Runtime>(createConfiguredRuntime())
+  const [source, setSourceInternal] = useState(initialSource)
+
+  const setSource = useCallback(
+    (src: string) => {
+      setSourceInternal(src)
+      onSourceChange?.(src)
+    },
+    [onSourceChange]
+  )
   const [output, setOutput] = useState<{ stack: unknown[]; error: string | null; logs: string[] }>({
     stack: [],
     error: null,
@@ -56,73 +68,11 @@ export function BorthProvider({
 
   const rt = rtRef.current
 
-  // Helper to get sorted parts array
-  const getSortedParts = (): Part[] => {
-    return (Object.values(rt.parts) as Part[]).sort((a, b) => a.index - b.index)
-  }
-
-  // Subscribe to runtime events
-  useEffect(() => {
-    const unsubs = [
-      rt.on('part:changed', () => {
-        const newSource = rt.toSource()
-        setSourceState(newSource)
-        onSourceChange?.(newSource)
-        setParts(getSortedParts())
-      }),
-      rt.on('present:complete', () => {
-        setParts(getSortedParts())
-      }),
-    ]
-    return () => unsubs.forEach((fn: () => void) => fn())
-  }, [rt, onSourceChange])
-
-  // Parse source into parts (present mode only, no execution)
-  const setSource = useCallback(
-    (src: string) => {
-      rt.present(src)
-      setSourceState(src)
-    },
-    [rt]
-  )
-
-  // Initialize on mount
-  useEffect(() => {
-    if (initialSource) {
-      setSource(initialSource)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Run all parts in order
-  const run = useCallback(() => {
-    rt.ds.data = []
-    const logs: string[] = []
-    const originalLog = console.log
-    console.log = (...args: unknown[]) => {
-      logs.push(args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '))
-    }
-
-    try {
-      for (const part of getSortedParts()) {
-        rt.run(part.data)
-      }
-      setOutput({ stack: [...rt.ds.data], error: null, logs })
-    } catch (e) {
-      setOutput({
-        stack: [...rt.ds.data],
-        error: e instanceof Error ? e.message : String(e),
-        logs,
-      })
-    } finally {
-      console.log = originalLog
-    }
-  }, [rt])
-
-  // Run a single part
-  const runPart = useCallback(
-    (name: string) => {
-      const part = rt.parts[name]
-      if (!part) return
+  // Run code (defaults to full source)
+  const run = useCallback(
+    async (code?: string) => {
+      const toRun = code ?? source
+      if (!toRun.trim()) return
 
       const logs: string[] = []
       const originalLog = console.log
@@ -131,11 +81,11 @@ export function BorthProvider({
       }
 
       try {
-        rt.run(part.data)
-        setOutput({ stack: [...rt.ds.data], error: null, logs })
+        await rt.run(toRun)
+        setOutput({ stack: [...rt.targets.data[0].data], error: null, logs })
       } catch (e) {
         setOutput({
-          stack: [...rt.ds.data],
+          stack: [...rt.targets.data[0].data],
           error: e instanceof Error ? e.message : String(e),
           logs,
         })
@@ -143,22 +93,17 @@ export function BorthProvider({
         console.log = originalLog
       }
     },
-    [rt]
+    [rt, source]
   )
 
-  // Reset runtime completely
+  // Reset runtime
   const reset = useCallback(() => {
-    rtRef.current = createRuntime()
+    rtRef.current = createConfiguredRuntime()
     setOutput({ stack: [], error: null, logs: [] })
-    setParts([])
-    if (source) {
-      rtRef.current.present(source)
-      setParts((Object.values(rtRef.current.parts) as Part[]).sort((a, b) => a.index - b.index))
-    }
-  }, [source])
+  }, [])
 
   return (
-    <BorthContext.Provider value={{ rt, source, setSource, run, runPart, reset, parts, output }}>
+    <BorthContext.Provider value={{ rt: rtRef.current, source, setSource, run, reset, output }}>
       {children}
     </BorthContext.Provider>
   )
@@ -168,10 +113,4 @@ export function useBorth() {
   const ctx = useContext(BorthContext)
   if (!ctx) throw new Error('useBorth must be used inside BorthProvider')
   return ctx
-}
-
-// Hook for subscribing to specific runtime events
-export function useBorthEvent(event: string, handler: (data: unknown) => void) {
-  const { rt } = useBorth()
-  useEffect(() => rt.on(event, handler), [rt, event, handler])
 }

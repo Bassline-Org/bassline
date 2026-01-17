@@ -115,9 +115,9 @@ export function Settings() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-medium">Bassline Visual v0.1.0</p>
+            <p className="font-medium">HomeBass v0.1.0</p>
             <CardDescription>
-              A visual modeling tool for Bassline applications
+              A visual development environment for Bassline
             </CardDescription>
           </CardContent>
         </Card>
