@@ -7,8 +7,8 @@
  * - Edit scripts with BorthEditor
  */
 
-import { useState, useCallback } from 'react'
-import { Link, useLoaderData, useFetcher } from 'react-router'
+import { useState, useCallback, useRef } from 'react'
+import { Link, useLoaderData } from 'react-router'
 import { ArrowLeft, Plus, Trash2, Code2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { BorthProvider } from '../components/BorthProvider'
@@ -101,10 +101,11 @@ export async function scriptsAction({ request }: { request: Request }) {
 }
 
 export function Scripts() {
-  const { scripts } = useLoaderData() as ScriptsLoaderData
-  const fetcher = useFetcher()
+  const { scripts: initialScripts, projectId } = useLoaderData() as ScriptsLoaderData
+  const [scripts, setScripts] = useState(initialScripts)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [localSource, setLocalSource] = useState<string>('')
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Find selected script
   const selectedScript = scripts.find(s => s.id === selectedId)
@@ -115,28 +116,54 @@ export function Scripts() {
     setLocalSource(script.source)
   }, [])
 
-  // Handle source change (local only until save)
+  // Auto-save with debounce
   const handleSourceChange = useCallback((source: string) => {
     setLocalSource(source)
-  }, [])
 
-  // Save current script
-  const saveScript = useCallback(() => {
-    if (selectedId) {
-      fetcher.submit(
-        { intent: 'update', id: selectedId, source: localSource },
-        { method: 'post' }
-      )
+    // Clear pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current)
     }
-  }, [fetcher, selectedId, localSource])
+
+    // Debounced save (500ms)
+    if (selectedId) {
+      saveTimeoutRef.current = setTimeout(async () => {
+        await bl.attrs.set(projectId, selectedId, 'borth.source', source)
+        // Update local scripts state
+        setScripts(prev => prev.map(s =>
+          s.id === selectedId ? { ...s, source } : s
+        ))
+      }, 500)
+    }
+  }, [selectedId, projectId])
 
   // Create new script
-  const createScript = useCallback(() => {
-    fetcher.submit({ intent: 'create' }, { method: 'post' })
-  }, [fetcher])
+  const createScript = useCallback(async () => {
+    const entity = await bl.entities.create(projectId, {
+      name: 'Untitled Script',
+      'borth.source': '\\ New script\n',
+      modified_at: new Date().toISOString(),
+    })
+    const newScript: Script = {
+      id: entity.id,
+      name: 'Untitled Script',
+      source: '\\ New script\n',
+      modified_at: new Date().toISOString(),
+    }
+    setScripts(prev => [newScript, ...prev])
+    setSelectedId(entity.id)
+    setLocalSource(newScript.source)
+  }, [projectId])
 
-  // Check if current script has unsaved changes
-  const hasUnsavedChanges = selectedScript && localSource !== selectedScript.source
+  // Delete script
+  const deleteScript = useCallback(async (id: string) => {
+    await bl.entities.delete(projectId, id)
+    setScripts(prev => prev.filter(s => s.id !== id))
+    if (selectedId === id) {
+      setSelectedId(null)
+      setLocalSource('')
+    }
+  }, [projectId, selectedId])
 
   return (
     <div className="h-screen flex flex-col">
@@ -149,11 +176,6 @@ export function Scripts() {
         </Button>
         <h1 className="text-xl font-semibold">Borth Scripts</h1>
         <div className="ml-auto flex items-center gap-2">
-          {hasUnsavedChanges && (
-            <Button size="sm" onClick={saveScript}>
-              Save
-            </Button>
-          )}
           <Button size="sm" onClick={createScript}>
             <Plus className="h-4 w-4 mr-1" />
             New Script
@@ -177,6 +199,7 @@ export function Scripts() {
                   script={script}
                   selected={script.id === selectedId}
                   onClick={() => selectScript(script)}
+                  onDelete={() => deleteScript(script.id)}
                 />
               ))}
             </div>
@@ -212,13 +235,13 @@ function ScriptItem({
   script,
   selected,
   onClick,
+  onDelete,
 }: {
   script: Script
   selected: boolean
   onClick: () => void
+  onDelete: () => void
 }) {
-  const fetcher = useFetcher()
-
   return (
     <div
       className={cn(
@@ -229,23 +252,19 @@ function ScriptItem({
     >
       <Code2 className="h-4 w-4 shrink-0" />
       <span className="flex-1 truncate text-sm">{script.name}</span>
-      <fetcher.Form method="post" onClick={e => e.stopPropagation()}>
-        <input type="hidden" name="intent" value="delete" />
-        <input type="hidden" name="id" value={script.id} />
-        <Button
-          type="submit"
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:opacity-100"
-          onClick={e => {
-            if (!confirm('Delete this script?')) {
-              e.preventDefault()
-            }
-          }}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
-      </fetcher.Form>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:opacity-100"
+        onClick={e => {
+          e.stopPropagation()
+          if (confirm('Delete this script?')) {
+            onDelete()
+          }
+        }}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
     </div>
   )
 }

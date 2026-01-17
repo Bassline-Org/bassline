@@ -993,4 +993,23 @@ export const db = {
       }>
     },
   },
+
+  // =========================================================================
+  // Raw Query Support (parameterized for safety)
+  // =========================================================================
+
+  query: {
+    all(sql: string, params: unknown[] = []) {
+      const db = getDb()
+      return db.prepare(sql).all(...params)
+    },
+    run(sql: string, params: unknown[] = []) {
+      const db = getDb()
+      return db.prepare(sql).run(...params)
+    },
+    get(sql: string, params: unknown[] = []) {
+      const db = getDb()
+      return db.prepare(sql).get(...params)
+    },
+  },
 }

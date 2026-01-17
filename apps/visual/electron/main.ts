@@ -38,7 +38,7 @@ function createWindow() {
     width: mainWindowState.width,
     height: mainWindowState.height,
     icon: iconPath,
-    title: 'Bassline',
+    title: 'HomeBass',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -110,7 +110,7 @@ export function showNotification(title: string, body: string) {
 
 app.whenReady().then(() => {
   // Set app name
-  app.setName('Bassline')
+  app.setName('HomeBass')
 
   // Set dock icon on macOS
   if (isMac && app.dock) {
@@ -190,6 +190,15 @@ function setupIpcHandlers() {
   ipcMain.handle('fonts:search', async (_, query: string) => {
     const fonts = await listSystemFonts()
     return searchFonts(fonts, query)
+  })
+
+  // Database queries (for borth)
+  ipcMain.handle('db:query', async (_, sql: string, params?: unknown[]) => {
+    try {
+      return { data: db.query.all(sql, params || []) }
+    } catch (error) {
+      return { error: (error as Error).message }
+    }
   })
 
   // Notifications

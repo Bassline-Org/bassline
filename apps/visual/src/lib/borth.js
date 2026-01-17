@@ -1,5 +1,4 @@
 // borth, issa concatenative language yo
-
 const WS = ' \t\n\r'
 const isWS = c => WS.includes(c)
 const isNil = v => v === undefined || v === null
@@ -31,10 +30,8 @@ class Stream {
   write(..._values) {
     panic('not writable')
   }
-  print() {
-    JSON.stringify(this.data.map(v => (v.print ? v.print() : JSON.stringify(v))))
-  }
 }
+
 class Stack extends Stream {
   read() {
     if (!this.length) panic('stack underflow')
@@ -44,13 +41,15 @@ class Stack extends Stream {
     this.data.push(...values)
   }
 }
-function exec(rt, arr) {
+async function exec(rt, arr) {
   let quote = arr
   if (!Array.isArray(arr)) quote = [arr]
   for (const w of quote) {
     try {
       if (w instanceof Word) {
-        w.run()
+        await w.run()
+      } else if (w instanceof Promise) {
+        rt.target.write(await w)
       } else {
         rt.target.write(w)
       }
@@ -60,6 +59,7 @@ function exec(rt, arr) {
     }
   }
 }
+
 class Word {
   attributes = {
     immediate: false,
@@ -88,14 +88,15 @@ class Word {
     this.target.write(this)
   }
   compile() {
-    this.immediate ? this.interp() : this.target.write(this)
+    return this.immediate ? this.interp() : this.target.write(this)
   }
   run() {
     const f = this[this.rt.mode]
     if (!f) panic(`unknown function for mode: ${this.rt.mode}`)
-    f.call(this)
+    return f.call(this)
   }
 }
+
 class Var extends Word {
   constructor(rt, name, value = 0) {
     super(rt, { name, type: 'variable' })
@@ -120,15 +121,20 @@ class Fn extends Word {
   accept(visitor) {
     return visitor.visitFn(this)
   }
-  interp() {
+  async interp() {
     const a = []
     for (let i = 0; i < this.fn.length; i++) a.unshift(this.target.read())
-    const r = castArr(this.fn(...a)).filter(v => !isNil(v))
+    let result = this.fn(...a)
+    if (result instanceof Promise) {
+      result = await result
+    }
+    const r = castArr(result).filter(v => !isNil(v))
     for (const v of r) {
       this.target.write(v)
     }
   }
 }
+
 class Wrapped extends Word {
   constructor(rt, wrapped, name) {
     super(rt, { type: 'wrapped', name })
@@ -141,6 +147,7 @@ class Wrapped extends Word {
     return this.target.write(this.wrapped)
   }
 }
+
 class Compiled extends Word {
   constructor(rt, name) {
     super(rt, { name, type: 'compiled' })
@@ -159,7 +166,11 @@ class Compiled extends Word {
     return this.body.flush()
   }
   interp() {
-    exec(this.rt, this.body.data)
+    const oldMode = this.rt.mode
+    this.rt.mode = 'interp'
+    const r = exec(this.rt, this.body.data)
+    this.rt.mode = oldMode
+    return r
   }
 }
 
@@ -168,6 +179,9 @@ class Runtime {
   last = null
   mode = 'interp'
   input = buffer()
+  options = {
+    'unbound-word-as-string': false,
+  }
   _listeners = {}
   get target() {
     return this.targets.data[this.targets.length - 1]
@@ -204,33 +218,27 @@ class Runtime {
     return i.data.slice(s, e).join('')
   }
   find(name) {
-    let w = this.dict[name]
-    if (!w) {
-      const num = Number(name)
-      if (isNaN(num)) panic(`unknown word: ${name}`)
-      w = num
+    const w = this.dict[name]
+    if (w) return w
+    const num = Number(name)
+    if (!isNaN(num)) return num
+    if (this.options['unbound-word-as-string']) {
+      return name
+    } else {
+      panic(`unknown word: ${name}`)
     }
-    return w
-  }
-  lookup(name) {
-    let w = this.dict[name]
-    if (!w) {
-      const num = Number(name)
-      w = isNaN(num) ? name : num
-    }
-    return w
   }
   next() {
     const t = this.parse(isWS)
     if (!t) return
     return this.find(t)
   }
-  run(src) {
+  async run(src) {
     this.input.data = src.split('')
     this.input.p = 0
     let w = this.next()
     while (w !== undefined) {
-      exec(this, w)
+      await exec(this, w)
       w = this.next()
     }
   }
@@ -259,12 +267,12 @@ export function createRuntime() {
     for (let i = 0; i < n; i++) o.unshift(rt.target.read())
     return [o]
   })
-  def('take-until', quote => {
+  def('take-until', async quote => {
     const o = []
     let val
     while (rt.target.data.length && (val = rt.target.read())) {
       rt.target.write(val)
-      exec(rt, quote)
+      await exec(rt, quote)
       const v = rt.target.read()
       if (v) break
       o.unshift(val)
@@ -279,6 +287,7 @@ export function createRuntime() {
   def('rot', (a, b, c) => [b, c, a])
   def('over', (a, b) => [a, b, a])
   def('.', a => console.log(a))
+  def('.error', a => console.error(a))
 
   // Arithmetic
   def('+', (a, b) => a + b)
@@ -292,7 +301,7 @@ export function createRuntime() {
   def('<', (a, b) => +(a < b))
   def('<=', (a, b) => +(a <= b))
   def('=', (a, b) => +(a === b))
-  def('0=', a => +(a ?? 0))
+  def('0=', a => (a ? 0 : 1))
 
   // Definitions
   def('variable', () => {
@@ -335,26 +344,26 @@ export function createRuntime() {
     },
     true
   )
-  def('do', quote => exec(rt, quote))
-  def(
-    'do!',
-    quote => {
-      const mode = rt.mode
-      rt.mode = 'interp'
-      exec(rt, quote)
-      rt.mode = mode
-    },
-    true
-  )
-  def('next', () => exec(rt, rt.next()))
+  def('do', async quote => await exec(rt, quote))
+  def('next', async () => await exec(rt, rt.next()))
   def('immediate', () => {
     if (rt.last) rt.last.attributes.immediate = true
   })
   def('>attr', (key, val) => {
-    if (rt.last) rt.last.attributes[key] = val
+    if (rt.last) {
+      if(val === 'nil') {
+        delete rt.last.attributes[key]
+      } else {
+        rt.last.attributes[key] = val
+      }
+      
+    }
   })
   def('attr>', (name, attr) => {
     return [rt.dict[name].attributes[attr]]
+  })
+  def('words', () => {
+    return [Object.values(rt.dict)]
   })
   // Parsing
   // for comments this is a very simple script, but i'm including this here for simplicitly sake
@@ -365,40 +374,52 @@ export function createRuntime() {
     },
     true
   )
-  def('parse', delim => {
-    if (typeof delim !== 'string') panic('invalid parse')
-    const str = rt.parse(c => delim.includes(c))
-    return [str]
+  def(
+    'syn:',
+    () => {
+      rt.mode = 'compile'
+      const name = rt.parse(isWS)
+      const parseWord = new Compiled(rt, name)
+      parseWord.attributes.immediate = true
+      rt.targets.write(parseWord)
+    },
+    true
+  )
+  def('parse', stop => {
+    if (typeof stop !== 'string') panic(`parse-tokens, invalid stop ${stop}`)
+    return [rt.parse(c => stop.includes(c))]
   })
-  def('parse-word', () => {
-    return [rt.parse(isWS)]
+  def('parse-tokens', stop => {
+    if (typeof stop !== 'string') panic(`parse-tokens, invalid stop ${stop}`)
+    const str = rt.parse(c => stop.includes(c))
+    return [str.split(/\s+/).filter(Boolean)]
   })
+  def('parse-word', () => [rt.parse(isWS)])
   // control flow / iteration
   def('exit', exit)
   def('err', panic)
-  def('if', (flag, ifTrue, ifFalse) => {
+  def('if', async (flag, ifTrue, ifFalse) => {
     if (flag) {
-      exec(rt, ifTrue)
+      await exec(rt, ifTrue)
     } else {
-      exec(rt, ifFalse)
+      await exec(rt, ifFalse)
     }
   })
-  def('when', (flag, ifTrue) => {
+  def('when', async (flag, ifTrue) => {
     if (flag) {
-      exec(rt, ifTrue)
+      await exec(rt, ifTrue)
     }
   })
-  def('unless', (flag, ifFalse) => {
+  def('unless', async (flag, ifFalse) => {
     if (!flag) {
-      exec(rt, ifFalse)
+      await exec(rt, ifFalse)
     }
   })
-
-  def('times', (n, quote) => {
+  def('times', async (n, quote) => {
     for (let i = 0; i < n; i++) {
       try {
         rt.target.write(i)
-        exec(rt, quote)
+        await exec(rt, quote)
       } catch (e) {
         if (e instanceof Exit) break
         throw e
@@ -406,59 +427,126 @@ export function createRuntime() {
     }
   })
   def('quote', val => [[val]])
-  def('map', (array, quote) => [
-    array.map(v => {
+  def('map', async (array, quote) => {
+    const results = []
+    for (const v of array) {
       rt.target.write(v)
-      exec(rt, quote)
-      return rt.target.read()
-    }),
-  ])
-  def('filter', (array, quote) => [
-    array.filter(v => {
+      await exec(rt, quote)
+      results.push(rt.target.read())
+    }
+    return [results]
+  })
+  def('filter', async (array, quote) => {
+    const results = []
+    for (const v of array) {
       rt.target.write(v)
-      exec(rt, quote)
-      return rt.target.read()
-    }),
-  ])
-  def('fold', (array, quote, init) => [
-    array.reduce((acc, curr) => {
+      await exec(rt, quote)
+      if (rt.target.read()) results.push(v)
+    }
+    return [results]
+  })
+  def('fold', async (array, quote, init) => {
+    let acc = init
+    for (const curr of array) {
       rt.target.write(acc)
       rt.target.write(curr)
-      exec(rt, quote)
-      return rt.target.read()
-    }, init),
-  ])
-  def('each', (array, quote) => {
+      await exec(rt, quote)
+      acc = rt.target.read()
+    }
+    return [acc]
+  })
+  def('each', async (array, quote) => {
     for (const val of array) {
       try {
         rt.target.write(val)
-        exec(rt, quote)
+        await exec(rt, quote)
       } catch (e) {
         if (e instanceof Exit) break
         throw e
       }
     }
   })
-
+  def('opt:', () => {
+    const key = rt.parse(isWS)
+    const val = rt.parse(isWS)
+    if (val === 'nil') {
+      delete rt.options[key]
+    } else {
+      rt.options[key] = val
+    }
+  })
+  def('opt', () => {
+    const key = rt.parse(isWS)
+    return [rt.options[key]]
+  })
   def('clear', () => {
     rt.target.flush()
   })
   def('find', name => [rt.find(name)])
-  def('get', (name, target) => [target[name]])
+  def('get', (name, target) => [castArr(name).reduce((obj, key) => obj[key], target)])
   def('set', (value, name, target) => {
     target[name] = value
   })
-  def('call', (arg, name, target) => target[name].call(target, ...castArr(arg)))
+  def('keys', obj => [Object.keys(obj)])
+  def('values', obj => [Object.values(obj)])
+  def('join', (array, pattern) => array.join(pattern))
+  def('split', (string, pattern) => [string.split(pattern)])
+  def('trim', str => str.trim())
+  def('rg', pattern => [new RegExp(pattern)])
+  def('call', (arg, name, target) => [target[name].call(target, ...castArr(arg))])
   def('concat', (a, b) => [[...castArr(a), ...castArr(b)]])
-  def("'", () => [rt.lookup(rt.parse(isWS))], true)
+  def("'", () => [rt.parse(isWS)], true)
   def('"', () => [rt.parse(c => c === '"')], true)
+  def('""', () => [''], true)
+  def('index', (arr, indexArr) => {
+    const a = castArr(arr)
+    const index = castArr(indexArr)
+    if (a.length < index.length) panic(`length mismatch: arr: ${a} index: ${index}`)
+    const out = new Array(a.length)
+    for (let i = 0; i < index.length; i++) {
+      const idx = index[i]
+      const val = a[idx]
+      out[i] = val
+    }
+    return [out]
+  })
+  def('structure', (data, names) => {
+    const d = castArr(data)
+    const n = castArr(names)
+    if (d.length < n.length) panic(`mismatched lengths: data: ${d} names: ${n}`)
+    const o = {}
+    for (let i = 0; i < n.length; i++) {
+      const name = n[i]
+      const data = d[i]
+      o[name] = data
+    }
+    return [o]
+  })
+  def('extract', (obj, names) => {
+    const o = []
+    for (const name of castArr(names)) {
+      o.push(obj[name])
+    }
+    return [o]
+  })
   def('iota', n => {
     const o = []
     for (let i = 1; i <= n; i++) o.push(i)
     return [o]
   })
 
-  rt.expose({ console, Math, Array, Object })
+  rt.expose({
+    console,
+    Math,
+    Array,
+    Object,
+    options: rt.options,
+    convert: {
+      number: v => [Number(v)],
+      string: v => [String(v)],
+      array: v => [castArr(v)],
+    },
+  })
   return rt
 }
 

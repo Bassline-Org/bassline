@@ -3,6 +3,9 @@ r.exposeInMainWorld("bl", {
   get: (e) => n.invoke("bl:get", e),
   put: (e, o) => n.invoke("bl:put", e, o)
 });
+r.exposeInMainWorld("db", {
+  query: (e, o) => n.invoke("db:query", e, o)
+});
 r.exposeInMainWorld("fonts", {
   list: () => n.invoke("fonts:list"),
   search: (e) => n.invoke("fonts:search", e)

@@ -28,6 +28,12 @@ contextBridge.exposeInMainWorld('bl', {
     ipcRenderer.invoke('bl:put', headers, body),
 })
 
+// Database query API (for borth)
+contextBridge.exposeInMainWorld('db', {
+  query: (sql: string, params?: unknown[]): Promise<{ data?: unknown[]; error?: string }> =>
+    ipcRenderer.invoke('db:query', sql, params),
+})
+
 // =============================================================================
 // Fonts API
 // =============================================================================

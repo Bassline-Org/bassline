@@ -45,6 +45,9 @@ declare global {
       get: <T = unknown>(headers: ResourceHeaders) => Promise<ResourceResponse<T>>
       put: <T = unknown>(headers: ResourceHeaders, body?: unknown) => Promise<ResourceResponse<T>>
     }
+    db: {
+      query: (sql: string, params?: unknown[]) => Promise<{ data?: unknown[]; error?: string }>
+    }
   }
 }
 

@@ -2025,6 +2025,23 @@ const db = {
       const db2 = getDb();
       return db2.prepare("SELECT * FROM semantic_docs").all();
     }
+  },
+  // =========================================================================
+  // Raw Query Support (parameterized for safety)
+  // =========================================================================
+  query: {
+    all(sql, params = []) {
+      const db2 = getDb();
+      return db2.prepare(sql).all(...params);
+    },
+    run(sql, params = []) {
+      const db2 = getDb();
+      return db2.prepare(sql).run(...params);
+    },
+    get(sql, params = []) {
+      const db2 = getDb();
+      return db2.prepare(sql).get(...params);
+    }
   }
 };
 let fontCache = null;
@@ -3278,7 +3295,7 @@ function createWindow() {
     width: mainWindowState.width,
     height: mainWindowState.height,
     icon: iconPath,
-    title: "Bassline",
+    title: "HomeBass",
     webPreferences: {
       preload: path.join(__dirname$1, "preload.js"),
       contextIsolation: true,
@@ -3332,7 +3349,7 @@ function showNotification(title, body) {
   }
 }
 app.whenReady().then(() => {
-  app.setName("Bassline");
+  app.setName("HomeBass");
   if (isMac && app.dock) {
     const iconPath = getIconPath();
     const icon = nativeImage.createFromPath(iconPath);
@@ -3382,6 +3399,13 @@ function setupIpcHandlers() {
   ipcMain.handle("fonts:search", async (_, query) => {
     const fonts = await listSystemFonts();
     return searchFonts(fonts, query);
+  });
+  ipcMain.handle("db:query", async (_, sql, params) => {
+    try {
+      return { data: db.query.all(sql, params || []) };
+    } catch (error) {
+      return { error: error.message };
+    }
   });
   ipcMain.handle("app:notify", (_, title, body) => {
     showNotification(title, body);

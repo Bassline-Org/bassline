@@ -1,8 +1,8 @@
 {
   "name": "@bassline/visual",
-  "productName": "Bassline",
+  "productName": "HomeBass",
   "version": "0.1.0",
-  "description": "Bassline Visual Modeling Tool",
+  "description": "HomeBass - Visual Development Environment",
   "author": {
     "name": "Bassline",
     "email": "hello@bassline.dev"
@@ -65,7 +65,7 @@
   "license": "AGPL-3.0",
   "build": {
     "appId": "com.bassline.visual",
-    "productName": "Bassline",
+    "productName": "HomeBass",
     "directories": {
       "output": "release"
     },

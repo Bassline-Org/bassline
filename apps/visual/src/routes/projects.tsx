@@ -11,7 +11,7 @@ export function ProjectList() {
   return (
     <div className="h-screen flex flex-col">
       <header className="flex justify-between items-center px-6 py-4 bg-card border-b border-border">
-        <h1 className="text-xl font-semibold">Bassline Visual</h1>
+        <h1 className="text-xl font-semibold">HomeBass</h1>
         <div className="flex items-center gap-2">
           <Form method="post">
             <input type="hidden" name="intent" value="create" />
