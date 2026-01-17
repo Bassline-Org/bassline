@@ -1,8 +1,10 @@
-import { StrictMode } from 'react'
+import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from './App'
 import { ThemeProvider } from './providers/ThemeProvider'
+import { ToastProvider } from './components/ToastProvider'
+import { BorthProvider } from './components/BorthProvider'
 import { bl } from './lib/bl'
 import './index.css'
 
@@ -11,6 +13,9 @@ import './semantics'
 
 declare global {
   interface Window {
+    db: {
+      query: (sql: string, params?: unknown[]) => Promise<{ data?: unknown[]; error?: string }>
+    }
     app: {
       notify: (title: string, body: string) => Promise<void>
       addRecentDocument: (filePath: string) => Promise<void>
@@ -22,6 +27,11 @@ declare global {
       onMenuExportProject: (callback: () => void) => () => void
       onMenuShowSettings: (callback: () => void) => () => void
       onMenuOpenFile: (callback: (filePath: string) => void) => () => void
+    }
+    blemacs: {
+      readInit: () => Promise<string | null>
+      writeInit: (content: string) => Promise<{ success: boolean; error?: string }>
+      getInitPath: () => Promise<string>
     }
   }
 }
@@ -83,10 +93,52 @@ if (window.app) {
   setupMenuHandlers()
 }
 
+// App wrapper that loads init file before rendering
+function App() {
+  const [initSource, setInitSource] = useState<string | undefined>(undefined)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Load init file on startup
+    console.log('[App] Loading init file, blemacs available:', !!window.blemacs)
+    if (window.blemacs) {
+      window.blemacs.readInit()
+        .then(content => {
+          console.log('[App] Init file loaded:', content ? `${content.length} chars` : 'not found')
+          if (content) {
+            setInitSource(content)
+          }
+        })
+        .catch(err => {
+          console.error('[App] Failed to load init file:', err)
+        })
+        .finally(() => {
+          setLoading(false)
+        })
+    } else {
+      console.log('[App] window.blemacs not available (not in Electron?)')
+      setLoading(false)
+    }
+  }, [])
+
+  // Show nothing while loading (very brief)
+  if (loading) {
+    return null
+  }
+
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <BorthProvider initSource={initSource}>
+          <RouterProvider router={router} />
+        </BorthProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  )
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider>
-      <RouterProvider router={router} />
-    </ThemeProvider>
+    <App />
   </StrictMode>
 )

@@ -2,7 +2,7 @@
 const WS = ' \t\n\r'
 const isWS = c => WS.includes(c)
 const isNil = v => v === undefined || v === null
-class Exit extends Error {}
+class Exit extends Error { }
 const flush = array => array.splice(0, array.length)
 function panic(msg) {
   throw new Error(`panic: ${msg}`)
@@ -17,7 +17,9 @@ function castArr(v) {
 }
 
 class Stream {
-  data = []
+  constructor(...data) {
+    this.data = data ?? []
+  }
   get length() {
     return this.data.length
   }
@@ -182,29 +184,77 @@ class Runtime {
   options = {
     'unbound-word-as-string': false,
   }
-  _listeners = {}
+  _externalEmit = null
+  _chrons = {}
   get target() {
     return this.targets.data[this.targets.length - 1]
   }
   constructor() {
-    this.targets = new Stack()
-    this.targets.write(new Stack())
+    this.targets = new Stack(new Stack())
   }
-  // event stuffs
-  on(event, func) {
-    const listeners = this._listeners[event]
-    if (!listeners) {
-      this._listeners[event] = []
+  pushTarget(stack) {
+    this.targets.write(stack ?? new Stack())
+  }
+  popTarget() {
+    if (this.targets.length <= 1) {
+      panic('cannot pop base target')
     }
-    listeners.push(func)
-    return () => this.off(event, func)
+    return this.targets.read()
   }
-  off(event, func) {
-    const arr = this._listeners[event]
-    if (arr) this._listeners[event] = arr.filter(f => f !== func)
+  /**
+   * Run a word with an isolated stack, which is popped and discarded after execution
+   * this passes the rest of the arguments as values to put on the stack
+   * so runFresh(someWord, a, b, c) will evaluate someWord with BOS [a, b, c] TOS as it's stack
+   * for now, we don't care about the results, so we just discard them
+   */
+  async runFresh(word, ...stackArgs) {
+    const prevMode = this.mode
+    this.mode = 'interp'
+    const s = new Stack()
+    for (const arg of stackArgs) {
+      s.write(arg)
+    }
+    this.pushTarget(s)
+
+    try {
+      await word.run()
+    } finally {
+      this.popTarget()
+      this.mode = prevMode
+    }
   }
-  emit(event, data) {
-    for (const func of this._listeners[event] ?? []) func(data)
+  /**
+   * Emit an event through the external event bus (if configured).
+   * This is the unified way for Borth code to trigger events.
+   */
+  async emitEvent(event, payload) {
+    if (this._externalEmit) {
+      await this._externalEmit(event, payload)
+    }
+  }
+  // Chrons (timed intervals that emit events through the event bus)
+  startChron(name, intervalMs) {
+    // Stop existing chron with same name
+    this.stopChron(name)
+
+    const eventName = `chron:${name}`
+    const timerId = setInterval(() => {
+      this.emitEvent(eventName, { name, time: new Date().toISOString() })
+    }, intervalMs)
+
+    this._chrons[name] = { interval: intervalMs, timerId }
+  }
+  stopChron(name) {
+    const chron = this._chrons[name]
+    if (chron) {
+      clearInterval(chron.timerId)
+      delete this._chrons[name]
+    }
+  }
+  stopAllChrons() {
+    for (const name of Object.keys(this._chrons)) {
+      this.stopChron(name)
+    }
   }
   // parsing & execution
   parse(d) {
@@ -282,12 +332,16 @@ export function createRuntime() {
   def('splice', arr => castArr(arr))
   // Stack
   def('dup', a => [a, a])
-  def('drop', _a => {})
+  def('drop', _a => { })
   def('swap', (a, b) => [b, a])
   def('rot', (a, b, c) => [b, c, a])
   def('over', (a, b) => [a, b, a])
-  def('.', a => console.log(a))
+  def('.log', a => console.log(a))
   def('.error', a => console.error(a))
+  def('.warn', a => console.warn(a))
+  def('emit', async (eventName, data) => {
+    await rt.emitEvent(eventName, data)
+  })
 
   // Arithmetic
   def('+', (a, b) => a + b)
@@ -349,22 +403,7 @@ export function createRuntime() {
   def('immediate', () => {
     if (rt.last) rt.last.attributes.immediate = true
   })
-  def('>attr', (key, val) => {
-    if (rt.last) {
-      if(val === 'nil') {
-        delete rt.last.attributes[key]
-      } else {
-        rt.last.attributes[key] = val
-      }
-      
-    }
-  })
-  def('attr>', (name, attr) => {
-    return [rt.dict[name].attributes[attr]]
-  })
-  def('words', () => {
-    return [Object.values(rt.dict)]
-  })
+  def('last-word', () => [rt.last])
   // Parsing
   // for comments this is a very simple script, but i'm including this here for simplicitly sake
   def(
@@ -534,6 +573,226 @@ export function createRuntime() {
     for (let i = 1; i <= n; i++) o.push(i)
     return [o]
   })
+  // NOTE: bad stuff that shouldn't be hardcoded, but is for simplicity right now
+  // ( word key -- value ) get attribute from word object
+  def('word-attr', (word, key) => [word?.attributes?.[key] ?? null])
+  // ( word -- name ) get name from word object
+  def('word-name', word => [word?.name ?? null])
+  def('words', () => {
+    return [Object.values(rt.dict)]
+  })
+
+  // ==========================================================================
+  // Blemacs Command System - syntax words for command registration
+  // ==========================================================================
+
+  // cmd - mark last word as a command
+  def(
+    'cmd',
+    () => {
+      if (rt.last) rt.last.attributes.command = true
+    },
+    true
+  )
+
+  // chron - create a named timer that ticks at an interval
+  // Usage: chron backup-tick 5m
+  def('chron', () => {
+    const name = rt.parse(isWS)
+    const interval = rt.parse(isWS)
+    const match = interval.match(/^(\d+)(s|m|h|d)$/)
+    if (match) {
+      const [, num, unit] = match
+      const multipliers = { s: 1000, m: 60000, h: 3600000, d: 86400000 }
+      const ms = parseInt(num, 10) * multipliers[unit]
+      rt.startChron(name, ms)
+    } else {
+      panic(`chron: invalid interval ${interval}`)
+    }
+  })
+
+  // stop-chron - stop a named chron
+  def('stop-chron', () => {
+    const name = rt.parse(isWS)
+    rt.stopChron(name)
+  })
+
+  // trigger - emit an event through the event bus
+  // Usage: { "id" 123 } ' entity:selected trigger
+  def('trigger', async (payload, eventName) => {
+    await rt.emitEvent(eventName, payload)
+  })
+
+  // toast - show a toast notification
+  // Usage: ' success " Success!" toast
+  // Stack: ( type message -- )
+  // Types: info, success, warning, error
+  def('toast', async (type, message) => {
+    await rt.emitEvent('toast:show', { type, message })
+  })
+
+  // doc{ - parse doc string until }
+  def(
+    'doc{',
+    () => {
+      const doc = rt.parse(c => c === '}')
+      if (rt.last) rt.last.attributes.doc = doc.trim()
+    },
+    true
+  )
+
+  // key: - set keybinding (next token)
+  def(
+    'key:',
+    () => {
+      const key = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.key = key
+    },
+    true
+  )
+
+  // menu: - set menu path
+  def(
+    'menu:',
+    () => {
+      const menu = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.menu = menu
+    },
+    true
+  )
+
+  // icon: - set icon identifier
+  def(
+    'icon:',
+    () => {
+      const icon = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.icon = icon
+    },
+    true
+  )
+
+  // when: - set visibility condition word
+  def(
+    'when:',
+    () => {
+      const when = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.when = when
+    },
+    true
+  )
+
+  // category: - set category
+  def(
+    'category:',
+    () => {
+      const category = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.category = category
+    },
+    true
+  )
+
+  def(
+    'on:',
+    () => {
+      if (rt.last) rt.last.attributes.hook = rt.parse(isWS)
+    },
+    true
+  )
+
+  // priority: - set priority for hooks
+  def(
+    'priority:',
+    () => {
+      const priority = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.priority = parseInt(priority, 10)
+    },
+    true
+  )
+
+  // every: - set interval for scheduled tasks and start a chron
+  // Usage: : auto-backup backups sync ; every: 5m
+  // This creates a chron that emits through EventBus, and sets hook attribute
+  def(
+    'every:',
+    () => {
+      const interval = rt.parse(isWS)
+      // Parse interval string like "30s", "5m", "1h", "1d"
+      const match = interval.match(/^(\d+)(s|m|h|d)$/)
+      if (match) {
+        const [, num, unit] = match
+        const multipliers = { s: 1000, m: 60000, h: 3600000, d: 86400000 }
+        const ms = parseInt(num, 10) * multipliers[unit]
+        if (rt.last) {
+          const chronName = rt.last.name
+          rt.last.attributes.interval = ms
+          rt.last.attributes.hook = `chron:${chronName}`
+          rt.startChron(chronName, ms)
+        }
+      } else {
+        panic(`invalid interval: ${interval}`)
+      }
+    },
+    true
+  )
+
+  // setting - mark variable as a setting
+  def(
+    'setting',
+    () => {
+      if (rt.last) rt.last.attributes.setting = true
+    },
+    true
+  )
+
+  // type: - set setting type
+  def(
+    'type:',
+    () => {
+      const type = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.settingType = type
+    },
+    true
+  )
+
+  // min: / max: / step: - numeric constraints
+  def(
+    'min:',
+    () => {
+      const min = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.min = parseFloat(min)
+    },
+    true
+  )
+
+  def(
+    'max:',
+    () => {
+      const max = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.max = parseFloat(max)
+    },
+    true
+  )
+
+  def(
+    'step:',
+    () => {
+      const step = rt.parse(isWS)
+      if (rt.last) rt.last.attributes.step = parseFloat(step)
+    },
+    true
+  )
+  def('choices:', choices => {
+    if (rt.last) rt.last.attributes.choices = choices
+  })
+  def('now', () => [new Date().toISOString()])
+  def('nil?', v => [v === null || v === undefined ? 1 : 0])
+  def('length', v => {
+    if (Array.isArray(v)) return [v.length]
+    if (typeof v === 'string') return [v.length]
+    if (v && typeof v === 'object') return [Object.keys(v).length]
+    return [0]
+  })
+  def('not', v => [v ? 0 : 1])
 
   rt.expose({
     console,

@@ -2,7 +2,6 @@ import { createHashRouter, redirect } from 'react-router'
 import { ProjectList } from './routes/projects'
 import { Editor } from './routes/editor'
 import { Settings } from './routes/settings'
-import { Scripts, scriptsLoader, scriptsAction } from './routes/scripts'
 import { bl } from './lib/bl'
 
 export const router = createHashRouter([
@@ -56,11 +55,5 @@ export const router = createHashRouter([
   {
     path: '/settings',
     element: <Settings />,
-  },
-  {
-    path: '/scripts',
-    element: <Scripts />,
-    loader: scriptsLoader,
-    action: scriptsAction,
   },
 ])

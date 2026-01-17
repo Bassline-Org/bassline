@@ -86,3 +86,14 @@ contextBridge.exposeInMainWorld('app', {
   // Menu refresh
   refreshMenu: () => ipcRenderer.invoke('app:refreshMenu'),
 })
+
+// =============================================================================
+// Blemacs API (init file, etc.)
+// =============================================================================
+
+contextBridge.exposeInMainWorld('blemacs', {
+  readInit: (): Promise<string | null> => ipcRenderer.invoke('blemacs:readInit'),
+  writeInit: (content: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('blemacs:writeInit', content),
+  getInitPath: (): Promise<string> => ipcRenderer.invoke('blemacs:getInitPath'),
+})
