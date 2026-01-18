@@ -97,7 +97,7 @@ class Runtime {
     }
     this.pushTarget(s)
     try {
-      await word.run()
+      await exec(this, word)
     } finally {
       this.popTarget()
       this.mode = prevMode
@@ -192,8 +192,8 @@ class Runtime {
 function defineCore(rt) {
   const def = (n, f, imm) => rt.def(n, f, imm)
   // Streams
-  def('>>', (v, s) => { s.write(v) })
-  def('<<', s => [s.read()])
+  def('.put', (v, s) => { s.write(v) })
+  def('.get', s => [s.read()])
   def('target', () => rt.target)
   def('take', n => {
     const o = []
