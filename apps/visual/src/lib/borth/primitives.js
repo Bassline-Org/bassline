@@ -111,6 +111,14 @@ class Word {
     this.rt = rt
     this.attributes = { ...this.attributes, ...attributes }
     if (this.name && rt) {
+      // Capture provenance from current execution context
+      if (rt._execContext) {
+        this.attributes.provenance = {
+          cardId: rt._execContext.cardId,
+          version: rt._execContext.version,
+          definedAt: Date.now()
+        }
+      }
       if (rt.current) {
         rt.current.define(this)
       }
