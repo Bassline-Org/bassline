@@ -40,13 +40,6 @@ export { Events }
 
 type Runtime = ReturnType<typeof createRuntime>
 
-// Word type for Borth dictionary entries
-interface Word {
-  name: string
-  attributes: Record<string, unknown>
-  run: () => Promise<void>
-}
-
 interface BorthContextValue {
   rt: Runtime
   run: (code?: string) => Promise<void>
@@ -66,15 +59,9 @@ interface BorthProviderProps {
 // Helper to create a configured runtime with db access
 function createConfiguredRuntime() {
   const rt = createRuntime()
-  // Expose db for raw queries (only if available in Electron context)
+  // Expose db for editor vocab's query word (if available in Electron context)
   if (typeof window !== 'undefined' && window.db) {
-    rt.expose({ db: window.db })
-    // Add query word: "SELECT * FROM x WHERE y = ?" [ param ] query
-    rt.def('query', async (params: unknown[], sql: string) => {
-      const result = await window.db.query(sql, params)
-      if (result.error) throw new Error(result.error)
-      return [result.data]
-    })
+    ;(rt as unknown as { db: typeof window.db }).db = window.db
   }
   return rt
 }
@@ -111,17 +98,22 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
 
   // Sync all marked words to the database
   const syncToDb = useCallback(async () => {
-    const words = Object.values(rt.dict) as Word[]
-    for (const word of words) {
-      const attrs = word.attributes || {}
-      if (attrs.command) {
-        await registerCommand(word).catch(console.error)
+    // Iterate all vocabs
+    for (const vocab of rt.vocabs) {
+      for (const [, word] of vocab.words) {
+        const attrs = word.attributes || {}
+        if (attrs.command) await registerCommand(word).catch(console.error)
+        if (attrs.hook) await registerHook(word).catch(console.error)
+        if (attrs.setting) await registerSetting(word).catch(console.error)
       }
-      if (attrs.hook) {
-        await registerHook(word).catch(console.error)
-      }
-      if (attrs.setting) {
-        await registerSetting(word).catch(console.error)
+    }
+    // Also check current vocab if not in vocabs
+    if (rt.current && !rt.vocabs.includes(rt.current)) {
+      for (const [, word] of rt.current.words) {
+        const attrs = word.attributes || {}
+        if (attrs.command) await registerCommand(word).catch(console.error)
+        if (attrs.hook) await registerHook(word).catch(console.error)
+        if (attrs.setting) await registerSetting(word).catch(console.error)
       }
     }
   }, [rt])
@@ -148,8 +140,15 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
       const currentRt = rtRef.current
       if (!currentRt) return { success: false, error: 'Runtime not initialized' }
 
-      const word = currentRt.dict[name]
-      if (!word) {
+      let word
+      try {
+        word = currentRt.find(name)
+      } catch {
+        return { success: false, error: `Unknown command: ${name}` }
+      }
+
+      // find() might return a number or string if that's the fallback
+      if (!word || typeof word !== 'object') {
         return { success: false, error: `Unknown command: ${name}` }
       }
 
@@ -203,8 +202,10 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
   useEffect(() => {
     async function init() {
       try {
-        // 1. Register built-in test command
+        // 1. Register built-in test command (requires editor and events vocabs)
         await run(`
+          in: blemacs ;
+          using: editor events ;
           : blemacs-test ' success " Blemacs is working!" toast ;
           cmd
           doc{ Test command to verify Blemacs is working }
