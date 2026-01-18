@@ -3,6 +3,7 @@ export { createIoVocab } from './io.js'
 export { createEventsVocab } from './events.js'
 export { createEditorVocab } from './editor.js'
 export { createReflectVocab } from './reflect.js'
+export { createGraphVocab } from './graph.js'
 
 // Registry of built-in vocab factories
 export const builtinVocabs = {
@@ -10,4 +11,5 @@ export const builtinVocabs = {
   events: async (rt) => (await import('./events.js')).createEventsVocab(rt),
   editor: async (rt) => (await import('./editor.js')).createEditorVocab(rt),
   reflect: async (rt) => (await import('./reflect.js')).createReflectVocab(rt),
+  graph: async (rt) => (await import('./graph.js')).createGraphVocab(rt),
 }

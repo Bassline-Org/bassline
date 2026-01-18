@@ -411,6 +411,146 @@ describe('core primitives remain available', () => {
   })
 })
 
+describe('graph vocabulary', () => {
+  let rt
+  beforeEach(() => {
+    rt = createRuntime()
+  })
+
+  it('creates empty graph', async () => {
+    await rt.run('in: test ; using: graph ; <graph>')
+    const g = rt.target.read()
+    expect(g.nodes).toEqual([])
+    expect(g.edges).toEqual([])
+  })
+
+  it('gets nodes and edges from graph', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('g .get .nodes length')
+    expect(rt.target.read()).toBe(0)
+    await rt.run('g .get .edges length')
+    expect(rt.target.read()).toBe(0)
+  })
+
+  it('adds nodes with _graph reference', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a')
+    await rt.run(`[ " Alice" " person" ] [ ' name ' type ] structure g .get .add-node a .put`)
+    await rt.run('a .get .graph g .get =')
+    expect(rt.target.read()).toBe(true)
+  })
+
+  it('finds node by id', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run(`[ " Alice" ] [ ' name ] structure g .get .add-node`)
+    const node = rt.target.read()
+    await rt.run(`' name " ${node.id}" g .get .get-node .prop`)
+    expect(rt.target.read()).toBe("Alice")
+  })
+
+  it('removes node and its edges', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a  variable b')
+    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
+    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
+    await rt.run(`" knows" b .get a .get .connect drop`)
+    await rt.run('a .get .rm')
+    await rt.run('g .get .nodes length')
+    expect(rt.target.read()).toBe(1)
+    await rt.run('g .get .edges length')
+    expect(rt.target.read()).toBe(0)
+  })
+
+  it('gets and sets properties with .prop/.prop!', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a')
+    await rt.run(`[ " Alice" ] [ ' name ] structure g .get .add-node a .put`)
+    await rt.run(`30 ' age a .get .prop!`)
+    await rt.run(`' age a .get .prop`)
+    expect(rt.target.read()).toBe(30)
+  })
+
+  it('connects nodes and gets outgoing', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a  variable b')
+    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
+    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
+    await rt.run(`" knows" b .get a .get .connect drop`)
+    await rt.run('a .get .outgoing length')
+    expect(rt.target.read()).toBe(1)
+  })
+
+  it('gets incoming nodes', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a  variable b')
+    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
+    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
+    await rt.run(`" knows" b .get a .get .connect drop`)
+    await rt.run('b .get .incoming length')
+    expect(rt.target.read()).toBe(1)
+  })
+
+  it('disconnects nodes', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a  variable b')
+    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
+    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
+    await rt.run(`" knows" b .get a .get .connect drop`)
+    await rt.run('b .get a .get .disconnect')
+    await rt.run('g .get .edges length')
+    expect(rt.target.read()).toBe(0)
+  })
+
+  it('traverses reachable nodes', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a  variable b  variable c  variable d')
+    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
+    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
+    await rt.run(`[ " C" ] [ ' name ] structure g .get .add-node c .put`)
+    await rt.run(`[ " D" ] [ ' name ] structure g .get .add-node d .put`)
+    await rt.run(`" x" b .get a .get .connect drop`)
+    await rt.run(`" x" c .get b .get .connect drop`)
+    // d is disconnected - should not be visited
+    await rt.run('variable count  0 count .put')
+    await rt.run('[ drop count .get 1 + count .put ] a .get .traverse')
+    await rt.run('count .get')
+    expect(rt.target.read()).toBe(3)
+  })
+
+  it('handles cycles in traversal', async () => {
+    await rt.run('in: test ; using: graph ;')
+    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable a  variable b')
+    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
+    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
+    await rt.run(`" x" b .get a .get .connect drop`)
+    await rt.run(`" x" a .get b .get .connect drop`)  // cycle!
+    // Should not infinite loop - seen set prevents revisiting
+    await rt.run('variable count  0 count .put')
+    await rt.run('[ drop count .get 1 + count .put ] a .get .traverse')
+    await rt.run('count .get')
+    expect(rt.target.read()).toBe(2)
+  })
+
+  it('graph vocab loads via using:', async () => {
+    await rt.run('in: test ; using: graph ;')
+    const graphVocab = rt.vocabs.find(v => v.name === 'graph')
+    expect(graphVocab).toBeDefined()
+    expect(graphVocab.words.has('<graph>')).toBe(true)
+    expect(graphVocab.words.has('.nodes')).toBe(true)
+    expect(graphVocab.words.has('.connect')).toBe(true)
+  })
+})
+
 describe('word recompilation', () => {
   let rt
   beforeEach(() => {
