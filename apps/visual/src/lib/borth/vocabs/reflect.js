@@ -26,6 +26,28 @@ export function createReflectVocab(rt) {
   rt.def('find', name => [rt.find(name)])
   rt.def('last-word', () => [rt.last])
 
+  // Provenance tracking
+  rt.def('word-provenance', word => [word?.attributes?.provenance ?? null])
+  rt.def('exec-context', () => [rt._execContext ?? null])
+  rt.def('words-from-card', cardId => {
+    const results = []
+    for (const v of rt.vocabs) {
+      for (const [, word] of v.words) {
+        if (word.attributes?.provenance?.cardId === cardId) {
+          results.push(word)
+        }
+      }
+    }
+    if (rt.current && !rt.vocabs.includes(rt.current)) {
+      for (const [, word] of rt.current.words) {
+        if (word.attributes?.provenance?.cardId === cardId) {
+          results.push(word)
+        }
+      }
+    }
+    return [results]
+  })
+
   rt.current = saved
   return vocab
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createRuntime, Vocab } from './borth/index.js'
 
 describe('Vocab', () => {
@@ -278,14 +278,6 @@ describe('validation consistency', () => {
     await expect(rt.run('variable x')).rejects.toThrow('requires current vocabulary')
   })
 
-  it('buffer requires current vocab', async () => {
-    await expect(rt.run('buffer x')).rejects.toThrow('requires current vocabulary')
-  })
-
-  it('stack requires current vocab', async () => {
-    await expect(rt.run('stack x')).rejects.toThrow('requires current vocabulary')
-  })
-
   it('syn: requires current vocab', async () => {
     await expect(rt.run('syn: foo ;')).rejects.toThrow('requires current vocabulary')
   })
@@ -426,118 +418,118 @@ describe('graph vocabulary', () => {
 
   it('gets nodes and edges from graph', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
-    await rt.run('g .get .nodes length')
+    await rt.run('variable g  g <graph> .write')
+    await rt.run('g .read .nodes length')
     expect(rt.target.read()).toBe(0)
-    await rt.run('g .get .edges length')
+    await rt.run('g .read .edges length')
     expect(rt.target.read()).toBe(0)
   })
 
   it('adds nodes with _graph reference', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a')
-    await rt.run(`[ " Alice" " person" ] [ ' name ' type ] structure g .get .add-node a .put`)
-    await rt.run('a .get .graph g .get =')
+    await rt.run(`a g .read [ " Alice" " person" ] [ ' name ' type ] structure .add-node .write`)
+    await rt.run('a .read .graph g .read =')
     expect(rt.target.read()).toBe(true)
   })
 
   it('finds node by id', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
-    await rt.run(`[ " Alice" ] [ ' name ] structure g .get .add-node`)
+    await rt.run('variable g  g <graph> .write')
+    await rt.run(`g .read [ " Alice" ] [ ' name ] structure .add-node`)
     const node = rt.target.read()
-    await rt.run(`' name " ${node.id}" g .get .get-node .prop`)
+    await rt.run(`g .read " ${node.id}" .get-node ' name .prop`)
     expect(rt.target.read()).toBe("Alice")
   })
 
   it('removes node and its edges', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a  variable b')
-    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
-    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
-    await rt.run(`" knows" b .get a .get .connect drop`)
-    await rt.run('a .get .rm')
-    await rt.run('g .get .nodes length')
+    await rt.run(`a g .read [ " A" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`b g .read [ " B" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`a .read b .read " knows" .connect drop`)
+    await rt.run('a .read .rm')
+    await rt.run('g .read .nodes length')
     expect(rt.target.read()).toBe(1)
-    await rt.run('g .get .edges length')
+    await rt.run('g .read .edges length')
     expect(rt.target.read()).toBe(0)
   })
 
   it('gets and sets properties with .prop/.prop!', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a')
-    await rt.run(`[ " Alice" ] [ ' name ] structure g .get .add-node a .put`)
-    await rt.run(`30 ' age a .get .prop!`)
-    await rt.run(`' age a .get .prop`)
+    await rt.run(`a g .read [ " Alice" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`a .read ' age 30 .prop!`)
+    await rt.run(`a .read ' age .prop`)
     expect(rt.target.read()).toBe(30)
   })
 
   it('connects nodes and gets outgoing', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a  variable b')
-    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
-    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
-    await rt.run(`" knows" b .get a .get .connect drop`)
-    await rt.run('a .get .outgoing length')
+    await rt.run(`a g .read [ " A" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`b g .read [ " B" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`a .read b .read " knows" .connect drop`)
+    await rt.run('a .read .outgoing length')
     expect(rt.target.read()).toBe(1)
   })
 
   it('gets incoming nodes', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a  variable b')
-    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
-    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
-    await rt.run(`" knows" b .get a .get .connect drop`)
-    await rt.run('b .get .incoming length')
+    await rt.run(`a g .read [ " A" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`b g .read [ " B" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`a .read b .read " knows" .connect drop`)
+    await rt.run('b .read .incoming length')
     expect(rt.target.read()).toBe(1)
   })
 
   it('disconnects nodes', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a  variable b')
-    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
-    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
-    await rt.run(`" knows" b .get a .get .connect drop`)
-    await rt.run('b .get a .get .disconnect')
-    await rt.run('g .get .edges length')
+    await rt.run(`a g .read [ " A" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`b g .read [ " B" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`a .read b .read " knows" .connect drop`)
+    await rt.run('a .read b .read .disconnect')
+    await rt.run('g .read .edges length')
     expect(rt.target.read()).toBe(0)
   })
 
   it('traverses reachable nodes', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a  variable b  variable c  variable d')
-    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
-    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
-    await rt.run(`[ " C" ] [ ' name ] structure g .get .add-node c .put`)
-    await rt.run(`[ " D" ] [ ' name ] structure g .get .add-node d .put`)
-    await rt.run(`" x" b .get a .get .connect drop`)
-    await rt.run(`" x" c .get b .get .connect drop`)
+    await rt.run(`a g .read [ " A" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`b g .read [ " B" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`c g .read [ " C" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`d g .read [ " D" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`a .read b .read " x" .connect drop`)
+    await rt.run(`b .read c .read " x" .connect drop`)
     // d is disconnected - should not be visited
-    await rt.run('variable count  0 count .put')
-    await rt.run('[ drop count .get 1 + count .put ] a .get .traverse')
-    await rt.run('count .get')
+    await rt.run('variable count  count 0 .write')
+    await rt.run('a .read [ drop count .read 1 + count swap .write ] .traverse')
+    await rt.run('count .read')
     expect(rt.target.read()).toBe(3)
   })
 
   it('handles cycles in traversal', async () => {
     await rt.run('in: test ; using: graph ;')
-    await rt.run('variable g  <graph> g .put')
+    await rt.run('variable g  g <graph> .write')
     await rt.run('variable a  variable b')
-    await rt.run(`[ " A" ] [ ' name ] structure g .get .add-node a .put`)
-    await rt.run(`[ " B" ] [ ' name ] structure g .get .add-node b .put`)
-    await rt.run(`" x" b .get a .get .connect drop`)
-    await rt.run(`" x" a .get b .get .connect drop`)  // cycle!
+    await rt.run(`a g .read [ " A" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`b g .read [ " B" ] [ ' name ] structure .add-node .write`)
+    await rt.run(`a .read b .read " x" .connect drop`)
+    await rt.run(`b .read a .read " x" .connect drop`)  // cycle!
     // Should not infinite loop - seen set prevents revisiting
-    await rt.run('variable count  0 count .put')
-    await rt.run('[ drop count .get 1 + count .put ] a .get .traverse')
-    await rt.run('count .get')
+    await rt.run('variable count  count 0 .write')
+    await rt.run('a .read [ drop count .read 1 + count swap .write ] .traverse')
+    await rt.run('count .read')
     expect(rt.target.read()).toBe(2)
   })
 
@@ -625,5 +617,444 @@ describe('word recompilation', () => {
     await rt.run('in: lib ; : helper 2 ;')
     await rt.run('in: app ; use-helper')
     expect(rt.target.read()).toBe(2)
+  })
+})
+
+describe('hooks vocabulary', () => {
+  let rt
+  beforeEach(() => {
+    rt = createRuntime()
+  })
+
+  it('defines a hook', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run('on-click')
+    const hook = rt.target.read()
+    expect(hook._type).toBe('hook')
+  })
+
+  it('registers and triggers handlers', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run('variable called  called 0 .write')
+    await rt.run("on-click ' h1 [ called .read 1 + called swap .write ] .when")
+    await rt.run('on-click .trigger')
+    await rt.run('called .read')
+    expect(rt.target.read()).toBe(1)
+  })
+
+  it('disables handlers', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run('variable called  called 0 .write')
+    await rt.run("on-click ' h1 [ called .read 1 + called swap .write ] .when")
+    await rt.run("on-click ' h1 .disable")
+    await rt.run('on-click .trigger')
+    await rt.run('called .read')
+    expect(rt.target.read()).toBe(0)
+  })
+
+  it('enables handlers', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run('variable called  called 0 .write')
+    await rt.run("on-click ' h1 [ called .read 1 + called swap .write ] .when")
+    await rt.run("on-click ' h1 .disable")
+    await rt.run("on-click ' h1 .enable")
+    await rt.run('on-click .trigger')
+    await rt.run('called .read')
+    expect(rt.target.read()).toBe(1)
+  })
+
+  it('removes handlers', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run("on-click ' h1 [ ] .when")
+    await rt.run("on-click ' h1 .remove")
+    await rt.run('on-click .handlers length')
+    expect(rt.target.read()).toBe(0)
+  })
+
+  it('fires once handlers only once', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run('variable called  called 0 .write')
+    await rt.run('on-click [ called .read 1 + called swap .write ] .once')
+    await rt.run('on-click .trigger')
+    await rt.run('on-click .trigger')
+    await rt.run('called .read')
+    expect(rt.target.read()).toBe(1)
+  })
+
+  it('lists handler keys', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run("on-click ' a [ ] .when")
+    await rt.run("on-click ' b [ ] .when")
+    await rt.run('on-click .handlers length')
+    expect(rt.target.read()).toBe(2)
+  })
+
+  it('clears all handlers', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-click')
+    await rt.run("on-click ' a [ ] .when")
+    await rt.run('on-click [ ] .once')
+    await rt.run('on-click .clear')
+    await rt.run('on-click .handlers length')
+    expect(rt.target.read()).toBe(0)
+  })
+
+  it('hooks vocab loads via using:', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    const hooksVocab = rt.vocabs.find(v => v.name === 'hooks')
+    expect(hooksVocab).toBeDefined()
+    expect(hooksVocab.words.has('hook')).toBe(true)
+    expect(hooksVocab.words.has('.trigger')).toBe(true)
+    expect(hooksVocab.words.has('.when')).toBe(true)
+  })
+
+  it('multiple handlers run in order', async () => {
+    await rt.run('in: test ; using: hooks ;')
+    await rt.run('hook on-event')
+    await rt.run('variable result  result "" .write')
+    await rt.run("on-event ' first [ result .read \" a\" + result swap .write ] .when")
+    await rt.run("on-event ' second [ result .read \" b\" + result swap .write ] .when")
+    await rt.run('on-event .trigger')
+    await rt.run('result .read')
+    const result = rt.target.read()
+    expect(result).toContain('a')
+    expect(result).toContain('b')
+  })
+})
+
+describe('card provenance', () => {
+  let rt
+  beforeEach(() => {
+    rt = createRuntime()
+  })
+
+  it('words defined with context have provenance', async () => {
+    await rt.run('in: test ; : foo 1 ;', { cardId: 'card-1', version: 0 })
+    const foo = rt.current.words.get('foo')
+    expect(foo.attributes.provenance).toEqual({
+      cardId: 'card-1',
+      version: 0,
+      definedAt: expect.any(Number)
+    })
+  })
+
+  it('words defined without context have no provenance', async () => {
+    await rt.run('in: test ; : bar 2 ;')
+    const bar = rt.current.words.get('bar')
+    expect(bar.attributes.provenance).toBeUndefined()
+  })
+
+  it('primitives have no provenance', () => {
+    const dup = rt.vocabs[0].words.get('dup')
+    expect(dup.attributes.provenance).toBeUndefined()
+  })
+
+  it('recompilation preserves provenance', async () => {
+    await rt.run('in: test ; : base 1 ;', { cardId: 'card-1', version: 0 })
+    await rt.run(': user base ;', { cardId: 'card-2', version: 0 })
+    const user = rt.current.words.get('user')
+    expect(user.attributes.provenance.cardId).toBe('card-2')
+
+    // Redefine base - triggers recompilation of user
+    await rt.run(': base 2 ;', { cardId: 'card-1', version: 1 })
+
+    // user's provenance unchanged (it wasn't redefined, just recompiled)
+    expect(user.attributes.provenance.cardId).toBe('card-2')
+    expect(user.attributes.provenance.version).toBe(0)
+  })
+
+  it('redefinition updates provenance', async () => {
+    await rt.run('in: test ; : foo 1 ;', { cardId: 'card-1', version: 0 })
+    await rt.run(': foo 2 ;', { cardId: 'card-1', version: 1 })
+    const foo = rt.current.words.get('foo')
+    expect(foo.attributes.provenance.version).toBe(1)
+  })
+
+  it('nested context is restored', async () => {
+    await rt.run('in: test ; : outer 1 ;', { cardId: 'card-outer', version: 0 })
+    await rt.run(': inner 2 ;', { cardId: 'card-inner', version: 0 })
+
+    const outer = rt.current.words.get('outer')
+    const inner = rt.current.words.get('inner')
+    expect(outer.attributes.provenance.cardId).toBe('card-outer')
+    expect(inner.attributes.provenance.cardId).toBe('card-inner')
+  })
+
+  it('variables get provenance', async () => {
+    await rt.run('in: test ; variable counter', { cardId: 'card-1', version: 0 })
+    const counter = rt.current.words.get('counter')
+    expect(counter.attributes.provenance.cardId).toBe('card-1')
+  })
+
+  it('private words get provenance', async () => {
+    await rt.run('in: test ; :_ helper 1 ;', { cardId: 'card-1', version: 0 })
+    const helper = rt.current.words.get('helper')
+    expect(helper.attributes.provenance.cardId).toBe('card-1')
+    expect(helper.attributes.private).toBe(true)
+  })
+})
+
+// Card storage tests
+import { createCardStorage } from './borth/cards.js'
+import Database from 'better-sqlite3'
+
+function createTestDb() {
+  const db = new Database(':memory:')
+  return {
+    query(sql, params = []) {
+      const stmt = db.prepare(sql)
+      const rows = params.length > 0 ? stmt.all(...params) : stmt.all()
+      return { rows, rowCount: rows.length }
+    },
+    execute(sql, params = []) {
+      const stmt = db.prepare(sql)
+      const info = params.length > 0 ? stmt.run(...params) : stmt.run()
+      return { changes: info.changes, lastInsertRowid: info.lastInsertRowid }
+    },
+    close() {
+      db.close()
+    }
+  }
+}
+
+describe('card storage', () => {
+  let db
+  let cards
+
+  beforeEach(() => {
+    db = createTestDb()
+    cards = createCardStorage(db)
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  describe('sets', () => {
+    it('creates a set', () => {
+      const setId = cards.createSet('my-set')
+      expect(setId).toBeDefined()
+      expect(typeof setId).toBe('string')
+    })
+
+    it('gets a set by id', () => {
+      const setId = cards.createSet('my-set')
+      const set = cards.getSet(setId)
+      expect(set.id).toBe(setId)
+      expect(set.name).toBe('my-set')
+      expect(set.created_at).toBeDefined()
+    })
+
+    it('lists all sets', () => {
+      cards.createSet('set-1')
+      cards.createSet('set-2')
+      const sets = cards.listSets()
+      expect(sets.length).toBe(2)
+    })
+
+    it('deletes a set (orphans cards)', () => {
+      const setId = cards.createSet('my-set')
+      const cardId = cards.createCard(setId, 'test source')
+
+      cards.deleteSet(setId)
+
+      expect(cards.getSet(setId)).toBe(null)
+      // Card should still exist but be orphaned
+      const card = cards.getCard(cardId)
+      expect(card).not.toBe(null)
+      expect(card.set_id).toBe(null)
+    })
+  })
+
+  describe('card creation', () => {
+    it('creates a card with initial source', () => {
+      const setId = cards.createSet('my-set')
+      const cardId = cards.createCard(setId, ': hello "world" ;')
+
+      expect(cardId).toBeDefined()
+      expect(typeof cardId).toBe('string')
+    })
+
+    it('creates orphan card (null set)', () => {
+      const cardId = cards.createCard(null, 'orphan source')
+      const card = cards.getCard(cardId)
+      expect(card.set_id).toBe(null)
+    })
+
+    it('initial version is 0', () => {
+      const cardId = cards.createCard(null, 'source')
+      const card = cards.getCard(cardId)
+      expect(card.head_version).toBe(0)
+    })
+
+    it('gets current source', () => {
+      const cardId = cards.createCard(null, 'initial source')
+      const source = cards.getCardSource(cardId)
+      expect(source).toBe('initial source')
+    })
+  })
+
+  describe('versioning', () => {
+    it('edit creates new version', () => {
+      const cardId = cards.createCard(null, 'v0')
+      const newVersion = cards.editCard(cardId, 'v1')
+
+      expect(newVersion).toBe(1)
+      expect(cards.getCardSource(cardId)).toBe('v1')
+    })
+
+    it('multiple edits increment version', () => {
+      const cardId = cards.createCard(null, 'v0')
+      cards.editCard(cardId, 'v1')
+      cards.editCard(cardId, 'v2')
+      const v3 = cards.editCard(cardId, 'v3')
+
+      expect(v3).toBe(3)
+      expect(cards.getCardSource(cardId)).toBe('v3')
+    })
+
+    it('preserves all versions in history', () => {
+      const cardId = cards.createCard(null, 'v0')
+      cards.editCard(cardId, 'v1')
+      cards.editCard(cardId, 'v2')
+
+      const history = cards.getCardHistory(cardId)
+
+      expect(history.length).toBe(3)
+      expect(history[0].version).toBe(2) // newest first
+      expect(history[0].source).toBe('v2')
+      expect(history[1].version).toBe(1)
+      expect(history[1].source).toBe('v1')
+      expect(history[2].version).toBe(0)
+      expect(history[2].source).toBe('v0')
+    })
+
+    it('gets specific version', () => {
+      const cardId = cards.createCard(null, 'original')
+      cards.editCard(cardId, 'modified')
+
+      const v0 = cards.getCardVersion(cardId, 0)
+      const v1 = cards.getCardVersion(cardId, 1)
+
+      expect(v0.source).toBe('original')
+      expect(v1.source).toBe('modified')
+    })
+
+    it('returns null for non-existent version', () => {
+      const cardId = cards.createCard(null, 'source')
+      const result = cards.getCardVersion(cardId, 999)
+      expect(result).toBe(null)
+    })
+
+    it('edit throws for non-existent card', () => {
+      expect(() => cards.editCard('non-existent', 'source')).toThrow('Card not found')
+    })
+  })
+
+  describe('rollback', () => {
+    it('rollback creates new version with old source', () => {
+      const cardId = cards.createCard(null, 'original')
+      cards.editCard(cardId, 'modified')
+      cards.editCard(cardId, 'latest')
+
+      const newVersion = cards.rollbackCard(cardId, 0)
+
+      expect(newVersion).toBe(3)
+      expect(cards.getCardSource(cardId)).toBe('original')
+    })
+
+    it('rollback preserves full history', () => {
+      const cardId = cards.createCard(null, 'v0')
+      cards.editCard(cardId, 'v1')
+      cards.rollbackCard(cardId, 0)
+
+      const history = cards.getCardHistory(cardId)
+
+      expect(history.length).toBe(3) // v0, v1, rollback-to-v0
+      expect(history[0].source).toBe('v0') // newest is rollback
+      expect(history[1].source).toBe('v1')
+      expect(history[2].source).toBe('v0')
+    })
+
+    it('rollback is reversible', () => {
+      const cardId = cards.createCard(null, 'original')
+      cards.editCard(cardId, 'changed')
+      cards.rollbackCard(cardId, 0) // back to original
+      cards.rollbackCard(cardId, 1) // back to changed
+
+      expect(cards.getCardSource(cardId)).toBe('changed')
+    })
+
+    it('rollback throws for non-existent version', () => {
+      const cardId = cards.createCard(null, 'source')
+      expect(() => cards.rollbackCard(cardId, 999)).toThrow('Version not found')
+    })
+  })
+
+  describe('card management', () => {
+    it('moves card to different set', () => {
+      const set1 = cards.createSet('set-1')
+      const set2 = cards.createSet('set-2')
+      const cardId = cards.createCard(set1, 'source')
+
+      cards.moveCard(cardId, set2)
+
+      const card = cards.getCard(cardId)
+      expect(card.set_id).toBe(set2)
+    })
+
+    it('moves card to orphan (null set)', () => {
+      const setId = cards.createSet('my-set')
+      const cardId = cards.createCard(setId, 'source')
+
+      cards.moveCard(cardId, null)
+
+      const card = cards.getCard(cardId)
+      expect(card.set_id).toBe(null)
+    })
+
+    it('deletes card and all versions', () => {
+      const cardId = cards.createCard(null, 'v0')
+      cards.editCard(cardId, 'v1')
+      cards.editCard(cardId, 'v2')
+
+      cards.deleteCard(cardId)
+
+      expect(cards.getCard(cardId)).toBe(null)
+      expect(cards.getCardSource(cardId)).toBe(null)
+      expect(cards.getCardHistory(cardId)).toEqual([])
+    })
+
+    it('lists all cards with current source', () => {
+      const setId = cards.createSet('my-set')
+      cards.createCard(setId, 'source-1')
+      cards.createCard(setId, 'source-2')
+      cards.createCard(null, 'orphan')
+
+      const allCards = cards.listCards()
+
+      expect(allCards.length).toBe(3)
+      expect(allCards.map(c => c.source).sort()).toEqual(['orphan', 'source-1', 'source-2'])
+    })
+
+    it('getSetCards returns cards in a set', () => {
+      const set1 = cards.createSet('set-1')
+      const set2 = cards.createSet('set-2')
+      cards.createCard(set1, 'in-set-1')
+      cards.createCard(set2, 'in-set-2')
+      cards.createCard(set1, 'also-in-set-1')
+
+      const set1Cards = cards.getSetCards(set1)
+
+      expect(set1Cards.length).toBe(2)
+      expect(set1Cards.map(c => c.source).sort()).toEqual(['also-in-set-1', 'in-set-1'])
+    })
   })
 })

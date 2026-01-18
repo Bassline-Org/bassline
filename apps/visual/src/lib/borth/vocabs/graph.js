@@ -14,10 +14,13 @@ export function createGraphVocab(rt) {
   }])
 
   // === Graph Methods ===
+  // Convention: subject (graph/node) is first param (deepest in stack)
+
   rt.def('.nodes', graph => [graph.nodes])
   rt.def('.edges', graph => [graph.edges])
 
-  rt.def('.add-node', (props, graph) => {
+  // .add-node ( graph props -- node )
+  rt.def('.add-node', (graph, props) => {
     const node = {
       ...props,
       id: props.id || 'n' + (graph._nextId++),
@@ -27,10 +30,12 @@ export function createGraphVocab(rt) {
     return [node]
   })
 
-  rt.def('.get-node', (id, graph) => {
+  // .get-node ( graph id -- node|nil )
+  rt.def('.get-node', (graph, id) => {
     return [graph.nodes.find(n => n.id === id) || null]
   })
 
+  // .rm ( node -- )
   rt.def('.rm', node => {
     const graph = node._graph
     const nodeId = node.id
@@ -41,14 +46,17 @@ export function createGraphVocab(rt) {
   })
 
   // === Node Methods ===
+
+  // .graph ( node -- graph )
   rt.def('.graph', node => [node._graph])
 
-  // Note: .get and .set are already defined in core for streams
-  // We extend them to work with nodes by checking if it's a node (has _graph)
-  // Actually, we need different names to avoid collision - use property access pattern
-  rt.def('.prop', (key, node) => [node[key]])
-  rt.def('.prop!', (value, key, node) => { node[key] = value })
+  // .prop ( node key -- value )
+  rt.def('.prop', (node, key) => [node[key]])
 
+  // .prop! ( node key value -- )
+  rt.def('.prop!', (node, key, value) => { node[key] = value })
+
+  // .outgoing ( node -- nodes )
   rt.def('.outgoing', node => {
     const graph = node._graph
     const nodeId = node.id
@@ -58,6 +66,7 @@ export function createGraphVocab(rt) {
       .filter(Boolean)]
   })
 
+  // .incoming ( node -- nodes )
   rt.def('.incoming', node => {
     const graph = node._graph
     const nodeId = node.id
@@ -67,8 +76,8 @@ export function createGraphVocab(rt) {
       .filter(Boolean)]
   })
 
-  // .connect ( label target node -- edge )
-  rt.def('.connect', (label, target, node) => {
+  // .connect ( node target label -- edge )
+  rt.def('.connect', (node, target, label) => {
     const graph = node._graph
     const edge = {
       id: 'e' + (graph._nextId++),
@@ -80,8 +89,8 @@ export function createGraphVocab(rt) {
     return [edge]
   })
 
-  // .disconnect ( target node -- )
-  rt.def('.disconnect', (target, node) => {
+  // .disconnect ( node target -- )
+  rt.def('.disconnect', (node, target) => {
     const graph = node._graph
     const targetId = typeof target === 'object' ? target.id : target
     graph.edges = graph.edges.filter(e =>
@@ -90,8 +99,9 @@ export function createGraphVocab(rt) {
   })
 
   // === Traversal ===
-  // .traverse ( quot node -- )
-  rt.def('.traverse', async (quot, node) => {
+
+  // .traverse ( node quot -- )
+  rt.def('.traverse', async (node, quot) => {
     const graph = node._graph
     const seen = new Set()
     const queue = [node.id]

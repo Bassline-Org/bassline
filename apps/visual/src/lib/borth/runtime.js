@@ -50,6 +50,7 @@ class Runtime {
   }
   _externalEmit = null
   _chrons = {}
+  _execContext = null
 
   get target() {
     return this.targets.data[this.targets.length - 1]
@@ -167,13 +168,19 @@ class Runtime {
     return this.find(t)
   }
 
-  async run(src) {
-    this.input.data = src.split('')
-    this.input.p = 0
-    let w = this.next()
-    while (w !== undefined) {
-      await exec(this, w)
-      w = this.next()
+  async run(src, context = null) {
+    const prevContext = this._execContext
+    this._execContext = context
+    try {
+      this.input.data = src.split('')
+      this.input.p = 0
+      let w = this.next()
+      while (w !== undefined) {
+        await exec(this, w)
+        w = this.next()
+      }
+    } finally {
+      this._execContext = prevContext
     }
   }
 
@@ -188,19 +195,18 @@ class Runtime {
   }
 }
 
-// Define core words on a runtime
 function defineCore(rt) {
-  const def = (n, f, imm) => rt.def(n, f, imm)
+  const def = (name, fn, immediate) => rt.def(name, fn, immediate);
   // Streams
-  def('.put', (v, s) => { s.write(v) })
-  def('.get', s => [s.read()])
+  def('.write', (s, v) => { s.write(v) })
+  def('.read', s => [s.read()])
   def('target', () => rt.target)
   def('take', n => {
     const o = []
     for (let i = 0; i < n; i++) o.unshift(rt.target.read())
     return [o]
   })
-  def('take-until', async quote => {
+  def('take-until', async (quote) => {
     const o = []
     let val
     while (rt.target.data.length && (val = rt.target.read())) {
@@ -246,14 +252,6 @@ function defineCore(rt) {
   def('variable', () => {
     if (!rt.current) panic('variable requires current vocabulary (use in: first)')
     new Var(rt, rt.parse(isWS))
-  })
-  def('buffer', () => {
-    if (!rt.current) panic('buffer requires current vocabulary (use in: first)')
-    new Wrapped(rt, buffer(), rt.parse(isWS))
-  })
-  def('stack', () => {
-    if (!rt.current) panic('stack requires current vocabulary (use in: first)')
-    new Wrapped(rt, new Stack(), rt.parse(isWS))
   })
 
   def('[', () => {
@@ -339,18 +337,15 @@ function defineCore(rt) {
     parseWord.attributes.immediate = true
     rt.targets.write(parseWord)
   }, true)
-
   def('parse', stop => {
     if (typeof stop !== 'string') panic(`parse-tokens, invalid stop ${stop}`)
     return [rt.parse(c => stop.includes(c))]
   })
-
   def('parse-tokens', stop => {
     if (typeof stop !== 'string') panic(`parse-tokens, invalid stop ${stop}`)
     const str = rt.parse(c => stop.includes(c))
     return [str.split(/\s+/).filter(Boolean)]
   })
-
   def('parse-word', () => [rt.parse(isWS)])
 
   // Control flow
@@ -373,7 +368,7 @@ function defineCore(rt) {
     if (!flag) await exec(rt, ifFalse)
   })
 
-  def('times', async (n, quote) => {
+  def('times', async (quote, n) => {
     for (let i = 0; i < n; i++) {
       try {
         rt.target.write(i)
@@ -449,17 +444,20 @@ function defineCore(rt) {
   def('clear', () => { rt.target.flush() })
 
   // Objects
-  def('get', (name, target) => [castArr(name).reduce((obj, key) => obj[key], target)])
-  def('set', (value, name, target) => { target[name] = value })
+  def('.get', (target, name) => [castArr(name).reduce((obj, key) => obj[key], target)])
+  def('.set', (target, name, value) => { target[name] = value })
   def('keys', obj => [Object.keys(obj)])
   def('values', obj => [Object.values(obj)])
 
   // Strings
   def('join', (array, pattern) => array.join(pattern))
   def('split', (string, pattern) => [string.split(pattern)])
+  def('startsWith', (string, pattern) => [string.startsWith(pattern)])
+  def('endsWith', (string, pattern) => [string.endsWith(pattern)])
+  def('includes', (string, pattern) => [string.includes(pattern)])
   def('trim', str => str.trim())
   def('rg', pattern => [new RegExp(pattern)])
-  def('call', (arg, name, target) => [target[name].call(target, ...castArr(arg))])
+  def('call', (target, name, arg) => [target[name].call(target, ...castArr(arg))])
   def('concat', (a, b) => [[...castArr(a), ...castArr(b)]])
   def("'", () => [rt.parse(isWS)], true)
   def('"', () => [rt.parse(c => c === '"')], true)
@@ -505,12 +503,12 @@ function defineCore(rt) {
   })
 
   def('now', () => [new Date().toISOString()])
-  def('nil?', v => [v === null || v === undefined ? 1 : 0])
+  def('nil?', v => [isNil(v)])
   def('length', v => {
     if (Array.isArray(v)) return [v.length]
     if (typeof v === 'string') return [v.length]
     if (v && typeof v === 'object') return [Object.keys(v).length]
-    return [0]
+    return [-1]
   })
   def('not', v => !v)
 
@@ -552,4 +550,19 @@ export function createRuntime() {
 
   rt.current = null
   return rt
+}
+
+export async function runCard(rt, cards, cardId) {
+  const card = cards.getCard(cardId)
+  if (!card) throw new Error(`Card not found: ${cardId}`)
+  const source = cards.getCardSource(cardId)
+  const context = { cardId, version: card.head_version }
+  await rt.run(source, context)
+}
+
+export async function runCardVersion(rt, cards, cardId, version) {
+  const versionData = cards.getCardVersion(cardId, version)
+  if (!versionData) throw new Error(`Version not found: ${cardId}@${version}`)
+  const context = { cardId, version }
+  await rt.run(versionData.source, context)
 }
