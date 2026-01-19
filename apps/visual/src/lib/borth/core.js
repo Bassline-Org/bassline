@@ -9,6 +9,36 @@ export const castArr = (v) => {
   if (v === undefined || v === null) return []
   return [v]
 }
+export const merge = (a, b) => {
+  const both = (fn) => fn(a) === fn(b);
+  if (both(Array.isArray)) {
+    return [...a, ...b]
+  }
+  if (both(v => v instanceof Map)) {
+    const result = new Map(a)
+    for (const [k, v] of b) result.set(k, v)
+    return result
+  }
+  if (both(v => Object.keys(v)?.length)) {
+    return { ...a, ...b }
+  }
+  if (both(v => typeof v)) {
+    return [a, b]
+  }
+  throw new Error(`Invalid merge: a: ${a} b: ${b}`)
+}
+export const get = (obj, key) => {
+  if (obj instanceof Map) return obj.get(key)
+  return obj[key]
+}
+export const set = (obj, key, value) => {
+  if (obj instanceof Map) return obj.set(key, value)
+  return obj[key] = value
+}
+export const del = (obj, key) => {
+  if (obj instanceof Map) return obj.delete(key, value)
+  delete obj[key]
+}
 // frame access
 export const frame = ctx => ctx.frames[ctx.frames.length - 1]
 export const stack = ctx => frame(ctx).stack
@@ -19,6 +49,7 @@ export const pushFrame = (ctx, mode = COMPILE) => {
 }
 export const popFrame = ctx => ctx.frames.pop()
 export const setMode = (ctx, m) => (frame(ctx).mode = m, ctx)
+export const src = (ctx) => ctx.src
 // stack management
 export const pop = ctx => stack(ctx).pop()
 export const push = (ctx, v) => (stack(ctx).push(v), ctx)
@@ -53,23 +84,18 @@ export const parseUntil = (ctx, suffix) => {
   return ctx.src.slice(start)
 }
 // word management
-export const freshVocab = (name) => ({ name, words: new Map() })
 export const define = (ctx, name, fn, immediate = false) => {
   const word = { name, fn, immediate, [_WORD]: true }
-  ctx.current.words.set(name, word)
+  ctx.ns.set(name, word)
   ctx.last = word
   return ctx
 }
 export const tryFind = (ctx, name) => {
-  if (ctx.current?.words.has(name)) return ctx.current.words.get(name)
-  for (let i = ctx.vocabs.length - 1; i >= 0; i--) {
-    if (ctx.vocabs[i].words.has(name)) return ctx.vocabs[i].words.get(name)
-  }
+  if (ctx.ns.has(name)) return ctx.ns.get(name)
   return undefined
 }
 export const find = (ctx, name) => {
-  const word = tryFind(ctx, name)
-  if (word) return word
+  if (ctx.ns.has(name)) return ctx.ns.get(name)
   const num = Number(name)
   if (!isNaN(num)) return num
   throw new Error(`unknown: ${name}`)
@@ -139,12 +165,30 @@ const core = [
 
   defI('true', () => true),
   defI('false', () => false),
+  defI('nil', () => null),
+  def('merge', (a, b) => [merge(a, b)]),
+  def('<map>', () => new Map()),
 
   // JS Bridge
-  def('.get', (obj, key) => [obj[key]]),
-  def('.set', (obj, key, val) => { obj[key] = val }),
-  def('.call', (obj, method, args) => [obj[method](...castArr(args))]),
+  def('.has', (obj, key) => [get(obj, key) ? true : false]),
+  def('.get', (obj, key) => [get(obj, key)]),
+  def('.set', (obj, key, val) => { set(obj, key, val) }),
+  def('.delete', (obj, key) => { del(obj, key) }),
+  def('.call', (obj, method, args) => [obj[method].call(obj, ...castArr(args))]),
 
+  defR('/context', async c => {
+    push(c, c)
+    return c
+  }),
+  defR('/source', async c => {
+    push(c, src(c))
+    return c
+  }),
+  defR('/clear', async c => {
+    const s = stack(c)
+    s.splice(0, s.length)
+    return c
+  }),
   // Control - stack order: condition true-branch false-branch if
   defR('if', async c => {
     const [cond, t, f] = popN(c, 3)
@@ -200,25 +244,6 @@ const core = [
   defRI('"', async c => push(c, parseUntil(c, '"'))),
   defR('parse', async c => push(c, parseUntil(c, pop(c)))),
 
-  // Vocab
-  defRI('in:', async c => {
-    const name = parseUntil(c, ';').trim()
-    let v = c.vocabs.find(x => x.name === name)
-    if (!v) c.vocabs.push(v = { name, words: new Map() })
-    c.current = v
-    return c
-  }),
-
-  defRI('using:', async c => {
-    for (const name of parseUntil(c, ';').trim().split(/\s+/).filter(Boolean)) {
-      let v = c.vocabs.find(x => x.name === name)
-      if (!v && c.resolver) v = await c.resolver(name)
-      if (!v) throw new Error(`unknown vocab: ${name}`)
-      if (!c.vocabs.includes(v)) c.vocabs.push(v)
-    }
-    return c
-  }),
-
   // Variable
   defRI('variable', async c => {
     const name = nextWord(c)
@@ -232,14 +257,13 @@ const core = [
 export const loadDefs = (context, defs) => castArr(defs).reduce((ctx, d) => d(ctx), context)
 
 export const createRuntime = () => {
-  const coreVocab = freshVocab('core')
+  const coreNs = new Map()
   const ctx = {
     src: '', pos: 0,
     frames: [{ stack: [], mode: 'interp' }],
-    current: coreVocab,
-    vocabs: [coreVocab],
+    ns: coreNs,
+    namespaces: new Map([['core', coreNs]]),
     last: null,
-    resolver: null,
   }
   return loadDefs(ctx, core)
 }

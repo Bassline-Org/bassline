@@ -141,13 +141,14 @@ describe('parsing', () => {
   })
 })
 
-describe('vocabulary', () => {
-  it('core vocab exists', () => {
+describe('namespace', () => {
+  it('core namespace exists', () => {
     const ctx = createRuntime()
-    expect(ctx.vocabs[0].name).toBe('core')
+    expect(ctx.namespaces.has('core')).toBe(true)
+    expect(ctx.ns).toBe(ctx.namespaces.get('core'))
   })
 
-  it('find locates word in core', () => {
+  it('find locates word in ns', () => {
     const ctx = createRuntime()
     const dup = find(ctx, 'dup')
     expect(dup.name).toBe('dup')
@@ -165,11 +166,12 @@ describe('vocabulary', () => {
     expect(() => find(ctx, 'nonexistent')).toThrow('unknown: nonexistent')
   })
 
-  it('define adds word to current vocab', () => {
+  it('define adds word to current namespace', () => {
     const ctx = createRuntime()
     define(ctx, 'test', async c => push(c, 99))
     const w = find(ctx, 'test')
     expect(w.name).toBe('test')
+    expect(ctx.ns.has('test')).toBe(true)
   })
 
   it('define sets ctx.last', () => {
@@ -178,25 +180,23 @@ describe('vocabulary', () => {
     expect(ctx.last.name).toBe('myword')
   })
 
-  it('current vocab shadows core', async () => {
+  it('redefining word shadows previous', async () => {
     const ctx = createRuntime()
-    ctx.current = { name: 'test', words: new Map() }
-    ctx.vocabs.push(ctx.current)
     define(ctx, 'dup', async c => push(c, 'shadowed'))
     await run(ctx, 'dup')
     expect(pop(ctx)).toBe('shadowed')
   })
 
-  it('later vocabs shadow earlier', async () => {
+  it('switching namespace changes word lookup', async () => {
     const ctx = createRuntime()
-    const v1 = { name: 'v1', words: new Map() }
-    const v2 = { name: 'v2', words: new Map() }
-    ctx.vocabs.push(v1)
-    ctx.vocabs.push(v2)
-    v1.words.set('foo', { name: 'foo', fn: async c => push(c, 'v1'), [_WORD]: true })
-    v2.words.set('foo', { name: 'foo', fn: async c => push(c, 'v2'), [_WORD]: true })
+    // Create new namespace and switch to it
+    const newNs = new Map()
+    newNs.set('foo', { name: 'foo', fn: async c => push(c, 42), [_WORD]: true })
+    ctx.ns = newNs
     await run(ctx, 'foo')
-    expect(pop(ctx)).toBe('v2')
+    expect(pop(ctx)).toBe(42)
+    // core words no longer accessible
+    expect(() => find(ctx, 'dup')).toThrow('unknown: dup')
   })
 })
 
@@ -538,72 +538,6 @@ describe('parsing words', () => {
 
   it('empty string via "', async () => {
     expect(await evalTo('" "')).toBe('')
-  })
-})
-
-describe('vocabulary: in:', () => {
-  it('creates new vocab', async () => {
-    const ctx = createRuntime()
-    await run(ctx, 'in: myapp ;')
-    expect(ctx.current.name).toBe('myapp')
-  })
-
-  it('reuses existing vocab', async () => {
-    const ctx = createRuntime()
-    await run(ctx, 'in: myapp ;')
-    const first = ctx.current
-    await run(ctx, 'in: other ;')
-    await run(ctx, 'in: myapp ;')
-    expect(ctx.current).toBe(first)
-  })
-
-  it('adds vocab to lookup list', async () => {
-    const ctx = createRuntime()
-    await run(ctx, 'in: myapp ;')
-    expect(ctx.vocabs.find(v => v.name === 'myapp')).toBe(ctx.current)
-  })
-})
-
-describe('vocabulary: using:', () => {
-  it('adds existing vocab to lookup', async () => {
-    const ctx = createRuntime()
-    const testVocab = { name: 'test', words: new Map() }
-    testVocab.words.set('foo', { name: 'foo', fn: async c => push(c, 42), [_WORD]: true })
-    ctx.vocabs.push(testVocab)
-    await run(ctx, 'using: test ; foo')
-    expect(pop(ctx)).toBe(42)
-  })
-
-  it('throws for unknown vocab without resolver', async () => {
-    const ctx = createRuntime()
-    await expect(run(ctx, 'using: unknown ;')).rejects.toThrow('unknown vocab: unknown')
-  })
-
-  it('uses resolver for unknown vocab', async () => {
-    const ctx = createRuntime()
-    const resolved = { name: 'dynamic', words: new Map() }
-    resolved.words.set('bar', { name: 'bar', fn: async c => push(c, 99), [_WORD]: true })
-    ctx.resolver = async name => name === 'dynamic' ? resolved : null
-    await run(ctx, 'using: dynamic ; bar')
-    expect(pop(ctx)).toBe(99)
-  })
-
-  it('multiple vocabs in one using:', async () => {
-    const ctx = createRuntime()
-    const v1 = { name: 'v1', words: new Map() }
-    const v2 = { name: 'v2', words: new Map() }
-    ctx.vocabs.push(v1)
-    ctx.vocabs.push(v2)
-    await run(ctx, 'using: v1 v2 ;')
-    expect(ctx.vocabs).toContain(v1)
-    expect(ctx.vocabs).toContain(v2)
-  })
-
-  it('does not duplicate vocab', async () => {
-    const ctx = createRuntime()
-    const initialLength = ctx.vocabs.length
-    await run(ctx, 'using: core ;')
-    expect(ctx.vocabs.length).toBe(initialLength)
   })
 })
 
