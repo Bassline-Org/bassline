@@ -1,0 +1,39 @@
+{
+  "id": "midnight",
+  "name": "Midnight",
+  "description": "Deep blue dark theme",
+  "author": "system",
+  "colors": {
+    "bg-base": "#0d1117",
+    "bg-surface": "#161b22",
+    "bg-overlay": "#1f242c",
+    "bg-muted": "#262c36",
+    "bg-inset": "#080b0f",
+    "fg-base": "#c9d1d9",
+    "fg-muted": "#8b949e",
+    "fg-subtle": "#6e7681",
+    "fg-inverse": "#0d1117",
+    "border-base": "#30363d",
+    "border-muted": "#21262d",
+    "border-focus": "#58a6ff",
+    "accent": "#58a6ff",
+    "accent-fg": "#0d1117",
+    "accent-muted": "#388bfd",
+    "success": "#3fb950",
+    "success-fg": "#0d1117",
+    "warning": "#d29922",
+    "warning-fg": "#0d1117",
+    "error": "#f85149",
+    "error-fg": "#ffffff",
+    "node-bg": "#161b22",
+    "node-border": "#30363d",
+    "node-selected": "#58a6ff",
+    "edge-default": "#6e7681",
+    "edge-selected": "#58a6ff"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "solarized-dark",
+  "name": "Solarized Dark",
+  "description": "Precision colors for machines and people",
+  "author": "Ethan Schoonover",
+  "colors": {
+    "bg-base": "#002b36",
+    "bg-surface": "#073642",
+    "bg-overlay": "#094552",
+    "bg-muted": "#0a5260",
+    "bg-inset": "#00212b",
+    "fg-base": "#839496",
+    "fg-muted": "#93a1a1",
+    "fg-subtle": "#586e75",
+    "fg-inverse": "#002b36",
+    "border-base": "#094552",
+    "border-muted": "#073642",
+    "border-focus": "#268bd2",
+    "accent": "#268bd2",
+    "accent-fg": "#fdf6e3",
+    "accent-muted": "#2aa198",
+    "success": "#859900",
+    "success-fg": "#fdf6e3",
+    "warning": "#b58900",
+    "warning-fg": "#fdf6e3",
+    "error": "#dc322f",
+    "error-fg": "#fdf6e3",
+    "node-bg": "#073642",
+    "node-border": "#094552",
+    "node-selected": "#268bd2",
+    "edge-default": "#586e75",
+    "edge-selected": "#268bd2"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

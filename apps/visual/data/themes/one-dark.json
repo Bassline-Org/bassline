@@ -1,0 +1,39 @@
+{
+  "id": "one-dark",
+  "name": "One Dark",
+  "description": "Atom's iconic dark theme",
+  "author": "GitHub/Atom",
+  "colors": {
+    "bg-base": "#282c34",
+    "bg-surface": "#2c313c",
+    "bg-overlay": "#3e4451",
+    "bg-muted": "#4b5263",
+    "bg-inset": "#21252b",
+    "fg-base": "#abb2bf",
+    "fg-muted": "#9da5b4",
+    "fg-subtle": "#5c6370",
+    "fg-inverse": "#282c34",
+    "border-base": "#3e4451",
+    "border-muted": "#2c313c",
+    "border-focus": "#61afef",
+    "accent": "#61afef",
+    "accent-fg": "#282c34",
+    "accent-muted": "#528bff",
+    "success": "#98c379",
+    "success-fg": "#282c34",
+    "warning": "#e5c07b",
+    "warning-fg": "#282c34",
+    "error": "#e06c75",
+    "error-fg": "#282c34",
+    "node-bg": "#2c313c",
+    "node-border": "#3e4451",
+    "node-selected": "#61afef",
+    "edge-default": "#5c6370",
+    "edge-selected": "#61afef"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

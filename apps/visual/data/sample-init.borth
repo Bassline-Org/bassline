@@ -1,0 +1,45 @@
+( Blemacs Sample Init File )
+( This file demonstrates the command system features )
+( Copy to ~/.homebassrc to use )
+
+( ==========================================================================
+   Basic Command Example
+   ========================================================================== )
+
+: hello ' success " Hello from Blemacs!" toast ;
+cmd
+doc{ Displays a friendly greeting }
+key: C-h
+
+( ==========================================================================
+   Command with Multiple Attributes
+   ========================================================================== )
+
+: save-all ' info " Saving all files..." toast ;
+cmd
+doc{ Save all open files }
+key: C-x C-s
+category: file
+menu: File/Save-All
+
+( ==========================================================================
+   Event Handler Example
+   ========================================================================== )
+
+: on-app-ready " App is ready!" .log ;
+on: app:ready
+
+( ==========================================================================
+   Timer/Chron Example
+   ========================================================================== )
+
+: heartbeat " Heartbeat tick" .log ;
+every: 1m
+
+( ==========================================================================
+   Manual Chron with Subscription
+   ========================================================================== )
+
+chron backup-tick 5m
+: do-backup " Backup triggered" .log ;
+on: chron:backup-tick
