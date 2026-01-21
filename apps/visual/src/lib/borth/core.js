@@ -15,8 +15,7 @@ export const merge = (a, b) => {
     return [...a, ...b]
   }
   if (both(v => v instanceof Map)) {
-    const result = new Map(a)
-    for (const [k, v] of b) result.set(k, v)
+    const result = new Map(...a, ...b)
     return result
   }
   if (both(v => Object.keys(v)?.length)) {
@@ -102,7 +101,7 @@ export const find = (ctx, name) => {
 }
 export const lift = fn => async ctx => {
   const args = popN(ctx, fn.length)
-  const result = castArr(fn(...args));
+  const result = castArr(await fn(...args));
   pushN(ctx, result.filter(v => v !== undefined))
   return ctx
 }
@@ -113,7 +112,7 @@ export const defRI = (name, fn) => ctx => define(ctx, name, fn, true)
 export const expose = (name, obj) => ctx => define(ctx, name, lift(async () => [obj]))
 
 export const exec = async (ctx, value) => {
-  const val = castArr(value);
+  const val = castArr(await value);
   for (const value of val) {
     if (value?.ref) {
       ctx = await exec(ctx, find(ctx, value.ref))
@@ -194,9 +193,7 @@ const core = [
     const [cond, t, f] = popN(c, 3)
     return exec(c, cond ? t : f)
   }),
-
   defR('do', async c => exec(c, pop(c))),
-
   defR('times', async c => {
     const [n, body] = popN(c, 2)
     for (let i = 0; i < n; i++) {
@@ -238,10 +235,47 @@ const core = [
     if (c.frames.length === 1) setMode(c, 'interp')
     return push(c, f.stack)
   }),
+  defR('map', async c => {
+    const [arr, quote] = popN(c, 2);
+    const out = []
+    for (const item of castArr(arr)) {
+      c = await exec(c, [item, ...quote]);
+      out.push(pop(c))
+    }
+    return push(c, out)
+  }),
+  defR('filter', async c => {
+    const [arr, quote] = popN(c, 2);
+    const out = []
+    for (const item of castArr(arr)) {
+      c = await exec(c, [item, ...quote]);
+      if (pop(c)) {
+        out.push(item)
+      }
+    }
+    return push(c, out)
+  }),
+  defR('fold', async c => {
+    const [arr, quote, init] = popN(c, 3);
+    let acc = init;
+    for (const item of castArr(arr)) {
+      c = await exec(c, [acc, item, ...quote]);
+      acc = pop(c);
+    }
+    return push(c, acc)
+  }),
+  defR('take-n', async c => {
+    const n = pop(c);
+    const arr = popN(c, n);
+    push(c, arr)
+    return c;
+  }),
+  def('splice', async arr => castArr(arr)),
 
   // Parsing
   defRI("'", async c => push(c, nextWord(c))),
   defRI('"', async c => push(c, parseUntil(c, '"'))),
+  defR('parse-word', async c => push(c, nextWord(c))),
   defR('parse', async c => push(c, parseUntil(c, pop(c)))),
 
   // Variable
