@@ -1,23 +1,13 @@
 let _gensymCount = 0
 export const gensym = (name = 'GENERATED') => `'@@GENSYM'__${name}__${_gensymCount++}`
 
-export const tracing = {
-  active: true,
-  log(...args) {
-    this.active && console.log(...args)
-  },
-  warn(...args) {
-    this.active && console.warn(...args)
-  },
-}
-
 export const WS = ' \t\n\r'
 export const isWS = c => WS.includes(c)
 
-const panic = (msg, label = 'panic') => {
+export const panic = (msg, label = 'panic') => {
   throw new Error(`${label}: ${msg}`)
 }
-const assert = (cond, msg) => cond || panic(`Assertion failed! ${msg}`, 'assert')
+export const assert = (cond, msg) => cond || panic(`Assertion failed! ${msg}`, 'assert')
 
 export const nary = (...fns) => {
   const impls = fns.reduce((acc, f) => ({ ...acc, [f.length]: f }), {})
@@ -26,18 +16,6 @@ export const nary = (...fns) => {
     if (!impl) panic(`no implemented for ${args.length} arguments!`)
     return impl(...args)
   }
-}
-
-export const naryGS = key => {
-  const f = nary(
-    obj => obj[key],
-    (obj, value) => ((obj[key] = value), obj),
-    (obj, value, replace) => {
-      const original = f(obj)
-      return original === undefined ? f(obj, value) : f(obj, replace(original, value))
-    }
-  )
-  return f
 }
 
 export const castArr = v => {
@@ -56,43 +34,52 @@ export const pop = (ctx, n = 1) => {
 export const push = (ctx, ...items) => (ctx.stack.push(...items), ctx)
 
 export const nextToken = ctx => {
+  const lastPos = ctx.pos ?? 0
   while (ctx.pos < ctx.src.length && isWS(ctx.src[ctx.pos])) ctx.pos++
   if (ctx.pos >= ctx.src.length) return undefined
   const start = ctx.pos
   while (ctx.pos < ctx.src.length && !isWS(ctx.src[ctx.pos])) ctx.pos++
+  ctx.lastPos = lastPos
   return ctx.src.slice(start, ctx.pos)
 }
+export const nextTokens = (ctx, n) => {
+  const out = []
+  for (let i = 0; i < n; i++) out.push(nextToken(ctx))
+  return out
+}
 export const parseUntil = (ctx, stopToken) => {
-  const start = ctx.pos
+  // skip the trailing space of the start token
+  const start = ctx.pos + 1
   let next
   while ((next = nextToken(ctx))) {
     if (next === stopToken) {
-      // remove 1 extra token because of leading whitespace for tokens
+      // stop 1 char earlier because of trailing space for tokens
       const stop = ctx.pos - stopToken.length - 1
       return ctx.src.slice(start, stop)
     }
   }
-  panic(`unmatched delimiter, expected: ${stopToken}`)
+  panic(`unmatched delimiter starting beginning at pos: ${start} expected: ${stopToken}`)
 }
 
-const currentScope = ctx => ctx.scope.at(-1)
-const stage = (ctx, ...items) => {
+export const currentScope = ctx => ctx.scope.at(-1)
+export const stage = (ctx, ...items) => {
   const current = currentScope(ctx)
   current.staging.push(...items)
   return ctx
 }
-const enterCompilationScope = (ctx, onExit) => {
+export const enterCompilationScope = (ctx, onExit) => {
   const scope = {
     staging: [],
-    startPos: ctx.pos,
     onExit,
   }
   ctx.scope.push(scope)
   return ctx
 }
-const exitCompilationScope = async ctx => {
+export const exitCompilationScope = async ctx => {
   const { onExit, ...scope } = ctx.scope.pop()
   scope.stopPos = ctx.pos
+  const definition = ctx.src.slice(scope.startPos, scope.stopPos)
+  await ctx.emit({ definition })
   assert(scope, `failed to exit compilation scope`)
   const current = currentScope(ctx)
   const toStage = castArr(await onExit(ctx, scope))
@@ -104,6 +91,9 @@ const exitCompilationScope = async ctx => {
 
 export const find = (ctx, name) => {
   if (ctx.ns.has(name)) return ctx.ns.get(name)
+  for (const ns of ctx.search) {
+    if (ns.has(name)) return ns.get(name)
+  }
   const num = Number(name)
   if (!isNaN(num)) return constant(num)
   panic(`unknown: ${name}`)
@@ -112,18 +102,15 @@ export const define = (ctx, word) => {
   let name = props(word).name
   if (!name) {
     name = gensym()
-    tracing.log('[define] generating name: ', name)
     props(word, { name })
   }
   let defined
   if (ctx.ns.has(name)) {
     const w = ctx.ns.get(name)
-    tracing.log('[define] updating: ', name)
     impl(w, word.impl)
     w.props = word.props
     defined = w
   } else {
-    tracing.log('[define] creating: ', name)
     ctx.ns.set(name, word)
     defined = word
   }
@@ -137,7 +124,7 @@ export const word = nary(
     props,
     impl: fn,
     async exec(ctx) {
-      return this.impl(await ctx)
+      return this.impl.call(this, await ctx)
     },
   })
 )
@@ -164,36 +151,17 @@ export const stackify = fn => async ctx => {
   return push(ctx, ...result)
 }
 
-export const constant = value =>
+export const variable = (initial, extraProps) =>
   word(
-    stackify(() => [value]),
-    { type: 'constant' }
+    stackify(() => [props(this).slot]),
+    { type: 'variable', slot: initial, ...extraProps }
   )
-export const variable = initial => {
-  const w = word(
-    stackify(() => [props(w).slot]),
-    { type: 'variable', slot: initial }
-  )
-  return w
-}
-export const def = fn => word(stackify(fn), { type: 'primitive' })
-export const syn = fn => word(fn, { type: 'syntax', parsing: true })
-export const docol = (name, words, additionalProps) => {
-  const w = word(
-    async c => {
-      const { words } = props(w)
-      for (const subword of words) {
-        await subword.exec(c)
-      }
-      return c
-    },
-    { type: 'compiled', name, words, ...additionalProps }
-  )
-  return w
-}
+export const def = (fn, extraProps) => word(stackify(fn), { type: 'primitive', ...extraProps })
+export const syn = (fn, extraProps) => word(fn, { type: 'syntax', parsing: true, ...extraProps })
+export const constant = (value, e) => def(() => [value], { type: 'constant', ...e })
 
 export const compile = async (ctx, source) => {
-  let compCtx = { ...ctx, src: source, pos: 0, stack: undefined }
+  let compCtx = { ...ctx, src: source, lastPos: 0, pos: 0, stack: undefined }
   enterCompilationScope(compCtx, (ctx, { staging }) => staging)
   let name
   while ((name = nextToken(compCtx)) !== undefined) {
@@ -205,7 +173,7 @@ export const compile = async (ctx, source) => {
       await stage(compCtx, word)
     }
   }
-  return await exitCompilationScope(compCtx)
+  return exitCompilationScope(compCtx)
 }
 
 export const evaluate = async (ctx, compiled) => {
@@ -220,88 +188,23 @@ export const run = async (ctx, source) => {
   return ctx
 }
 
+export const docol = (name, words, additionalProps) => {
+  const w = word(
+    //async c => (await evaluate(c, props(w).words), c),
+    async c => (await evaluate(c, words), c),
+    { type: 'compiled', name, words, ...additionalProps }
+  )
+  return w
+}
 export const freshContext = () => {
   const scratch = new Map()
   const ctx = {
     ns: scratch,
+    emit: console.log,
     vocabs: { scratch },
+    search: [],
     stack: [],
     scope: [],
   }
   return ctx
 }
-
-const c = freshContext()
-
-const colonDef = syn(c => {
-  const start = c.pos
-  const name = nextToken(c)
-  enterCompilationScope(c, async (ctx, { staging }) => {
-    // with definitions, we don't stage anything
-    await define(ctx, await docol(name, staging))
-  })
-  currentScope(c).startPos = start
-  return c
-})
-const syntaxDef = syn(c => {
-  const start = c.pos
-  const name = nextToken(c)
-  enterCompilationScope(c, async (ctx, { staging }) => {
-    // with definitions, we don't stage anything
-    await define(ctx, await docol(name, staging, { parsing: true }))
-  })
-  currentScope(c).startPos = start
-  return c
-})
-const delim = syn(async c => {
-  await exitCompilationScope(c)
-  return c
-})
-
-const scratch = new Map()
-scratch.set(':', colonDef)
-scratch.set('syn: ', syntaxDef)
-scratch.set(';', delim)
-scratch.set(
-  '\\',
-  syn(c => {
-    const name = nextToken(c)
-    const w = find(w, name)
-    currentScope(c).parts.push(constant(w))
-  })
-)
-scratch.set(
-  '+',
-  def((a, b) => [a + b])
-)
-scratch.set(
-  '.',
-  def(a => {
-    console.log(a)
-  })
-)
-scratch.set('bar', constant(10))
-scratch.set('baz', constant(20))
-
-c.ns = scratch
-c.vocabs['scratch'] = scratch
-
-const s = `
-  : bar baz 69 ;
-
-  : foo baz baz ;
-
-  foo + .
-`
-
-console.log('before evaluation: ', c.stack)
-const comp = await compile(c, s)
-
-await evaluate(c, comp)
-console.log('after evaluation: ', c.stack)
-
-console.log('recompiling')
-await run(c, ': foo 420 100 ; ')
-
-await evaluate(c, comp)
-console.log('evaluation after recompiling', c.stack)
