@@ -1,5 +1,5 @@
 import { useLoaderData, Link } from 'react-router'
-import { useCallback, useState, useMemo } from 'react'
+import { useCallback, useState, useMemo, useEffect } from 'react'
 import { ArrowLeft, Settings, Stamp } from 'lucide-react'
 import type { EditorLoaderData } from '../types'
 import { attrNumber, attrString } from '../types'
@@ -12,12 +12,23 @@ import { Button } from '@/components/ui/button'
 import { useVocabulary } from '../hooks/useVocabulary'
 import { useBl } from '../hooks/useBl'
 import { useCommands } from '../hooks/useCommands'
+import { useBorth } from '../components/BorthProvider'
 import { VocabularyContext } from '../contexts/VocabularyContext'
 import { SemanticOutputProvider } from '../contexts/SemanticOutputContext'
 
 export function Editor() {
   const { project, entities, relationships, stamps, uiState } = useLoaderData() as EditorLoaderData
   const { bl, revalidate } = useBl()
+  const { setProject } = useBorth()
+
+  // Set project context in Borth runtime when project changes
+  useEffect(() => {
+    setProject(project, null)
+    return () => {
+      // Clear project context when leaving
+      setProject(null, null)
+    }
+  }, [project.id, setProject])
 
   // Local selection state - NOT persisted to DB
   // Using Set for multi-selection support

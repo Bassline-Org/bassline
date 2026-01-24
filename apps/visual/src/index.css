@@ -1719,3 +1719,653 @@
 .markdown-content em {
   font-style: italic;
 }
+
+/* =============================================================================
+   3D Parallax Card Browser
+   ============================================================================= */
+
+/* Parallax card container */
+.parallax-card {
+  aspect-ratio: 4/3;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.parallax-card:focus-visible {
+  outline: 2px solid var(--theme-ring);
+  outline-offset: 2px;
+}
+
+/* Card source preview with fade */
+.card-source-preview {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--color-fg-muted);
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent 100%);
+}
+
+/* Card box variants */
+.card-box {
+  background: var(--theme-card);
+  border: 1px solid var(--theme-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-box--glass {
+  background: color-mix(in srgb, var(--theme-card) 80%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.card-box--elevated {
+  box-shadow: 0 4px 20px rgb(0 0 0 / 0.3);
+}
+
+.card-box--outlined {
+  background: transparent;
+  border: 2px solid var(--theme-border);
+}
+
+/* Card set background patterns */
+.card-set-pattern {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--theme-primary) 10%, var(--theme-card)),
+    color-mix(in srgb, var(--theme-accent) 10%, var(--theme-card))
+  );
+  border-radius: var(--radius-lg);
+}
+
+/* Code pattern background for cards */
+.code-pattern-bg {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1.2em,
+    color-mix(in srgb, var(--theme-border) 20%, transparent) 1.2em,
+    color-mix(in srgb, var(--theme-border) 20%, transparent) 1.25em
+  );
+  border-radius: var(--radius-lg);
+  opacity: 0.5;
+}
+
+/* =============================================================================
+   Card Display Mode Styles
+   ============================================================================= */
+
+/* Aspect ratios per display mode */
+.parallax-card--code {
+  aspect-ratio: 4/3;
+}
+
+.parallax-card--art {
+  aspect-ratio: 3/4;
+}
+
+.parallax-card--text {
+  aspect-ratio: 1/1;
+}
+
+.parallax-card--minimal {
+  aspect-ratio: auto;
+  min-height: 48px;
+}
+
+/* Art mode overlay gradient */
+.card-art-overlay {
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.85) 0%,
+    rgba(0, 0, 0, 0.4) 40%,
+    transparent 70%
+  );
+}
+
+/* Ensure parallax layers don't clip */
+.parallax-card {
+  overflow: visible;
+}
+
+/* Fix overflow clipping on Tilt wrapper */
+.parallax-card > div {
+  overflow: visible;
+}
+
+/* =============================================================================
+   TCG-Style Card Frame (MTG-inspired)
+   ============================================================================= */
+
+.tcg-card {
+  /* Outer frame */
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.tcg-card__inner {
+  /* Inner card area */
+  width: 100%;
+  height: 100%;
+  background: #0f0f1a;
+  border-radius: 8px;
+  border: 1px solid #2a2a4a;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tcg-card__title {
+  /* Title bar */
+  background: linear-gradient(180deg, #2a2a4a 0%, #1a1a3a 100%);
+  padding: 8px 12px;
+  border-bottom: 1px solid #3a3a5a;
+  flex-shrink: 0;
+}
+
+.tcg-card__title-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e4e4e7;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.tcg-card__art {
+  /* Art window - approximately 45% of card */
+  flex: 0 0 45%;
+  position: relative;
+  border-bottom: 2px solid #2a2a4a;
+  overflow: hidden;
+}
+
+.tcg-card__art-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tcg-card__type {
+  /* Type line */
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 6px 12px;
+  border-bottom: 1px solid #2a2a4a;
+  color: #a1a1aa;
+  background: linear-gradient(180deg, #1a1a2a 0%, #15152a 100%);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.tcg-card__text {
+  /* Text box */
+  background: linear-gradient(180deg, #1a1a2a 0%, #12121f 100%);
+  padding: 8px 12px;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+}
+
+.tcg-card__text-content {
+  font-size: 10px;
+  line-height: 1.5;
+  color: #c4c4cc;
+  font-style: italic;
+  margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  font-family: var(--font-sans);
+}
+
+.tcg-card__stats {
+  /* Stats bar */
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: #0a0a12;
+  border-top: 1px solid #2a2a4a;
+  flex-shrink: 0;
+}
+
+.tcg-card__stat {
+  font-size: 9px;
+  color: #71717a;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* =============================================================================
+   Card Category Colors (Semantic Visual Language)
+   ============================================================================= */
+
+:root {
+  /* Category color palette */
+  --category-core: #71717a;      /* Slate - Pure computation */
+  --category-ui: #f59e0b;        /* Amber - User interaction */
+  --category-graph: #8b5cf6;     /* Violet - Graph operations */
+  --category-entities: #06b6d4;  /* Cyan - Entity operations */
+  --category-events: #f43f5e;    /* Rose - Event emission */
+  --category-cards: #10b981;     /* Emerald - Meta-programming */
+  --category-command: #6366f1;   /* Indigo - Commands */
+}
+
+/* Category-tinted title bar backgrounds */
+.tcg-card--category-core .tcg-card__title {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-core) 20%, #2a2a4a) 0%,
+    #1a1a3a 100%);
+}
+
+.tcg-card--category-ui .tcg-card__title {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-ui) 20%, #2a2a4a) 0%,
+    #1a1a3a 100%);
+}
+
+.tcg-card--category-graph .tcg-card__title {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-graph) 20%, #2a2a4a) 0%,
+    #1a1a3a 100%);
+}
+
+.tcg-card--category-entities .tcg-card__title {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-entities) 20%, #2a2a4a) 0%,
+    #1a1a3a 100%);
+}
+
+.tcg-card--category-events .tcg-card__title {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-events) 20%, #2a2a4a) 0%,
+    #1a1a3a 100%);
+}
+
+.tcg-card--category-cards .tcg-card__title {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-cards) 20%, #2a2a4a) 0%,
+    #1a1a3a 100%);
+}
+
+.tcg-card--category-command .tcg-card__title {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-command) 20%, #2a2a4a) 0%,
+    #1a1a3a 100%);
+}
+
+/* Category edge glow */
+.tcg-card--category-core { box-shadow: 0 0 20px -5px var(--category-core); }
+.tcg-card--category-ui { box-shadow: 0 0 20px -5px var(--category-ui); }
+.tcg-card--category-graph { box-shadow: 0 0 20px -5px var(--category-graph); }
+.tcg-card--category-entities { box-shadow: 0 0 20px -5px var(--category-entities); }
+.tcg-card--category-events { box-shadow: 0 0 20px -5px var(--category-events); }
+.tcg-card--category-cards { box-shadow: 0 0 20px -5px var(--category-cards); }
+.tcg-card--category-command { box-shadow: 0 0 20px -5px var(--category-command); }
+
+/* Category tint overlay on artwork */
+.tcg-card--category-ui .tcg-card__art::after,
+.tcg-card--category-graph .tcg-card__art::after,
+.tcg-card--category-entities .tcg-card__art::after,
+.tcg-card--category-events .tcg-card__art::after,
+.tcg-card--category-cards .tcg-card__art::after,
+.tcg-card--category-command .tcg-card__art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tcg-card--category-ui .tcg-card__art::after {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-ui) 15%, transparent) 0%,
+    transparent 50%);
+}
+
+.tcg-card--category-graph .tcg-card__art::after {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-graph) 15%, transparent) 0%,
+    transparent 50%);
+}
+
+.tcg-card--category-entities .tcg-card__art::after {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-entities) 15%, transparent) 0%,
+    transparent 50%);
+}
+
+.tcg-card--category-events .tcg-card__art::after {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-events) 15%, transparent) 0%,
+    transparent 50%);
+}
+
+.tcg-card--category-cards .tcg-card__art::after {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-cards) 15%, transparent) 0%,
+    transparent 50%);
+}
+
+.tcg-card--category-command .tcg-card__art::after {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--category-command) 15%, transparent) 0%,
+    transparent 50%);
+}
+
+/* =============================================================================
+   Card State Modifiers
+   ============================================================================= */
+
+/* Private cards - reduced opacity and hatched overlay */
+.tcg-card--private {
+  opacity: 0.7;
+}
+
+.tcg-card--private::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(0, 0, 0, 0.1) 4px,
+    rgba(0, 0, 0, 0.1) 8px
+  );
+  pointer-events: none;
+  border-radius: 12px;
+  z-index: 5;
+}
+
+/* Command cards - holographic shimmer effect */
+.tcg-card--command {
+  position: relative;
+}
+
+.tcg-card--command::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.05) 55%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  pointer-events: none;
+  border-radius: 12px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tcg-card--command:hover::after {
+  opacity: 1;
+  animation: shimmer 3s infinite linear;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Blocking cards - pulsing amber border */
+.tcg-card--blocking {
+  position: relative;
+}
+
+.tcg-card--blocking::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--category-ui);
+  border-radius: 14px;
+  pointer-events: none;
+  animation: pulse-border 2s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+/* =============================================================================
+   Complexity Depth Layers
+   ============================================================================= */
+
+/* Simple cards (< 5 LoC) - flat, single layer */
+.tcg-card--simple {
+  transform: translateZ(0);
+}
+
+.tcg-card--simple .parallax-layer--back {
+  transform: translateZ(-10px);
+}
+
+.tcg-card--simple .parallax-layer--front {
+  transform: translateZ(15px);
+}
+
+/* Medium cards (5-20 LoC) - two layers */
+.tcg-card--medium .parallax-layer--back {
+  transform: translateZ(-15px);
+}
+
+.tcg-card--medium .parallax-layer--front {
+  transform: translateZ(25px);
+}
+
+/* Complex cards (20+ LoC) - three layers, pronounced 3D */
+.tcg-card--complex .parallax-layer--back {
+  transform: translateZ(-20px);
+}
+
+.tcg-card--complex .parallax-layer--front {
+  transform: translateZ(35px);
+}
+
+.tcg-card--complex {
+  box-shadow:
+    0 0 20px -5px var(--category-command),
+    0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* =============================================================================
+   Card Set Deck Stack Effect
+   ============================================================================= */
+
+.card-set-stack-wrapper {
+  position: relative;
+  /* Ensure pseudo-elements are visible outside the main card */
+  overflow: visible;
+}
+
+/* Stacked cards behind using pseudo-elements - more pronounced */
+.card-set-stack-wrapper::before,
+.card-set-stack-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  border: 1px solid #3a3a5a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Back card - most offset */
+.card-set-stack-wrapper::before {
+  transform: translateY(12px) translateX(6px) rotate(3deg);
+  z-index: -2;
+  opacity: 0.7;
+}
+
+/* Middle card */
+.card-set-stack-wrapper::after {
+  transform: translateY(6px) translateX(3px) rotate(1.5deg);
+  z-index: -1;
+  opacity: 0.85;
+}
+
+/* Hover effect - fan out the stack */
+.card-set-stack-wrapper:hover::before {
+  transform: translateY(16px) translateX(10px) rotate(5deg);
+  transition: transform 0.2s ease-out;
+}
+
+.card-set-stack-wrapper:hover::after {
+  transform: translateY(8px) translateX(5px) rotate(2.5deg);
+  transition: transform 0.2s ease-out;
+}
+
+/* Legacy class for backwards compatibility */
+.card-set-stack {
+  position: relative;
+}
+
+.card-set-stack::before,
+.card-set-stack::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  border: 1px solid #3a3a5a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.card-set-stack::before {
+  transform: translateY(12px) translateX(6px) rotate(3deg);
+  z-index: -2;
+  opacity: 0.7;
+}
+
+.card-set-stack::after {
+  transform: translateY(6px) translateX(3px) rotate(1.5deg);
+  z-index: -1;
+  opacity: 0.85;
+}
+
+/* Vocab distribution bar */
+.vocab-distribution {
+  display: flex;
+  height: 4px;
+  width: 100%;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.vocab-distribution__segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* =============================================================================
+   Enhanced TCG Card Frame Elements
+   ============================================================================= */
+
+/* Title bar with category and badges */
+.tcg-card__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tcg-card__title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tcg-card__badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Type line with blocking indicator */
+.tcg-card__type-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Stats bar with keybinding */
+.tcg-card__stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tcg-card__stats-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* =============================================================================
+   Running State Animation (Future)
+   ============================================================================= */
+
+.tcg-card--running {
+  position: relative;
+}
+
+.tcg-card--running::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(
+    90deg,
+    var(--category-command),
+    var(--category-events),
+    var(--category-command)
+  );
+  background-size: 200% 100%;
+  border-radius: 14px;
+  z-index: -1;
+  animation: running-gradient 1s linear infinite;
+}
+
+@keyframes running-gradient {
+  0% { background-position: 0% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* =============================================================================
+   Immediate Cards (Gold Accent)
+   ============================================================================= */
+
+.tcg-card--immediate {
+  border-color: #fbbf24;
+}
+
+.tcg-card--immediate .tcg-card__inner {
+  border-color: color-mix(in srgb, #fbbf24 50%, #2a2a4a);
+}

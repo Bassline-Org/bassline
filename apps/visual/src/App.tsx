@@ -2,6 +2,8 @@ import { createHashRouter, redirect } from 'react-router'
 import { ProjectList } from './routes/projects'
 import { Editor } from './routes/editor'
 import { Settings } from './routes/settings'
+import { Cards } from './routes/cards'
+import { Repl } from './routes/repl'
 import { bl } from './lib/bl'
 
 export const router = createHashRouter([
@@ -55,5 +57,28 @@ export const router = createHashRouter([
   {
     path: '/settings',
     element: <Settings />,
+  },
+  {
+    path: '/cards',
+    element: <Cards />,
+    loader: async () => {
+      const sets = await bl.cards.listSets()
+      return { sets }
+    },
+  },
+  {
+    path: '/cards/set/:setId',
+    element: <Cards />,
+    loader: async ({ params }) => {
+      const [sets, currentSetCards] = await Promise.all([
+        bl.cards.listSets(),
+        bl.cards.getSetCards(params.setId!),
+      ])
+      return { sets, currentSetId: params.setId, currentSetCards }
+    },
+  },
+  {
+    path: '/repl',
+    element: <Repl />,
   },
 ])

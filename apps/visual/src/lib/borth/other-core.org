@@ -1,0 +1,371 @@
+#+title: Borth Core Implementation
+#+PROPERTY: header-args :tangle other-core.js
+* Core
+** General Structure
+All words in the system are functions that take a runtime context, and return a runtime context.
+
+The runtime context contains:
+- the input buffer (for parsing words)
+- a data stack
+- a compilation-unit stack
+- a dictionary of all vocabularies in the system
+
+** Misc / Utils
+Random things that don't warrant their own top level section.
+*** Gensym
+Symbol generation so even anonymous things can be proper words in a vocab
+#+begin_src js
+let _gensymCount = 0
+const gensym = (name = 'GENERATED') => `'@@GENSYM'__${name}__${_gensymCount++}`
+#+end_src
+*** Constants / Predicates
+The only constants we need to formally specify in the implementation are what the whitespace seperators are.
+#+begin_src js
+const WS = ' \t\n\r';
+const isWS = c => WS.includes(c)
+const arrayify = v =>
+      Array.isArray(v)
+      ? v
+      : v === undefined
+      ? []
+      : [v]
+#+end_src
+*** Errors / Assertions
+Useful little errors and things so I don't have ugly if statements and throw statements.
+#+begin_src js
+const panic = (msg, label = 'panic') => {
+  throw new Error(`${label}: ${msg}`)
+}
+#+end_src
+** Context Access
+*** Stack Manipulation
+#+begin_src js
+const take = (arr, n) => arr.splice(arr.length - n, n)
+const append = (arr, ...items) => arr.splice(arr.length, 0, ...items)
+const last = (arr) => arr.at(-1);
+#+end_src
+
+*** Tokenization
+#+begin_src js
+const nextToken = ctx => {
+  const lastPos = ctx.pos ?? 0
+  while (ctx.pos < ctx.src.length && isWS(ctx.src[ctx.pos])) ctx.pos++
+  if (ctx.pos >= ctx.src.length) return undefined
+  const start = ctx.pos
+  while (ctx.pos < ctx.src.length && !isWS(ctx.src[ctx.pos])) ctx.pos++
+  ctx.lastPos = lastPos
+  return ctx.src.slice(start, ctx.pos)
+}
+#+end_src
+
+#+begin_src js :tangle no
+const nextTokens = (ctx, n) => {
+  const out = []
+  for (let i = 0; i < n; i++) out.push(nextToken(ctx))
+  return out
+}
+const parseUntil = (ctx, stopToken) => {
+  let next
+  while ((next = nextToken(ctx))) {
+    if (next === stopToken) return ctx.src.slice(ctx.pos + 1, ctx.pos - stopToken.length - 1)
+  }
+  panic(`unmatched delimiter starting beginning at pos: ${start} expected: ${stopToken}`)
+}
+#+end_src
+*** Staged Compilation
+#+begin_src js
+const stage = (ctx, ...items) => (append(last(ctx.scope).staging, ...items), ctx)
+const scope = (onExit) => ({staging: [], onExit})
+const enter = (ctx, onExit) => (append(ctx.scope, scope(onExit)), ctx);
+const exit = async (ctx) => {
+  const s = ctx.scope.pop()
+  const r = await s.onExit(ctx, s.staging)
+  if (last(ctx.scope)) stage(ctx, ...arrayify(r))
+  return r
+}
+#+end_src
+*** Word Resolution
+Words resolution simply takes a word name, and attempts to return the defined word.
+If it is not found:
+- We check if the word is a valid number
+- If it is, we return the number
+- Otherwise we throw an error
+
+  #+begin_src js
+const resolveNs = (ctx, name) => {
+  if(ctx.vocabs[name]) return ctx.vocabs[name]
+  ctx.vocabs[name] = {}
+  return ctx.vocabs[name]
+}
+const find = (ctx, name) => {
+  if(name in ctx.ns) return ctx.ns[name]
+  for (const ns of ctx.search) {
+    if(ns[name]) return ns[name]
+  }
+  const num = Number(name)
+  if (!isNaN(num)) return constant(num)
+  panic(`unknown: ${name}`)
+}
+const define = (ctx, word) => {
+  if (!word.props.name) word.props.name = gensym()
+  const name = word.props.name;
+  const existing = ctx.ns[name];
+  if(existing) {
+    existing.impl = word.impl; existing.props = word.props;
+    return existing
+  }
+  ctx.ns[name] = word
+  return word
+}
+  #+end_src
+** Words
+These just make host language words easier to write.
+*** word, makes a word
+Words are functions of the form: =ctx -> ctx=.
+We can make new words using =word(fn)= or =word(fn, props)= to include default properties.
+
+Word functions have two additional properties:
+- =.impl=
+  The implementation of the words behavior
+  Access using =impl(word)=, update using =impl(word, fn)=
+
+- =.props=
+  An object representing the words properties.
+  Access using =props(word)=
+  Update using =props(word, anObject)=
+  Replace using =props(word, aReplacementFn)=
+
+  #+begin_src js
+const word = (fn = () => panic("No implemented!"), props = {}) => ({
+  props,
+  impl: fn,
+  async exec(ctx) {
+    return this.impl(await ctx)
+  }
+})
+  #+end_src
+
+*** stackify, helper for easy stack fns
+Stackify wraps a function and makes it work naturally with the stack.
+
+This returns a word implementation function, =ctx -> ctx=.
+
+It will:
++ Bind arguments from lowest to highest from the stack
+  So for a function with 2 args =(a, b)=, and a stack =[1, 2, 3]=:
+  + a is 2
+  + b is 3
++ Append the result to the stack
+   It will coerce the result to an array, and append this array to the stack.
+   To return an array as a single value, wrap it in an array.
+
+This makes the args and outputs have the same "orientation".
+=(deepest, highest) -> [deepest, highest]=
+
+Note:
++ It will throw a stack underflow error if there are not enough items on the stack.
++ It filters undefined elements of the result array before appending
+  Use null or false when representing missing values
+
+#+begin_src js
+const stackify = fn => arr => {
+  const args = take(arr, fn.length)
+  const r = fn(...args);
+  append(arr, ...r)
+}
+#+end_src
+
+*** Useful word factories
+#+begin_src js
+const variable = (init) => {
+  const w = word(
+    (c) => (c.stack.push(w.props.slot), c),
+    {type: 'variable', slot: init}
+  )
+  return w;
+}
+const prim = (name, fn) => word(
+  (c) => (stackify(fn)(c.stack), c),
+  {type: 'primitive', name}
+)
+const syn = (name, fn) => word(
+  async (c) => await (fn(c) ?? c),
+  {type: 'syntax', name, parsing: true}
+)
+const constant = (value) => word((c) => (append(c.stack, value), c), {type: 'constant', value})
+#+end_src
+
+** Compilation
+*** How compilation works
+In our system we perform compilation with words that push a new compilation unit onto the compilation-unit stack, similar to Factor.
+
+These words are special because when used inside of a compilation-unit (as we do when compiling some source), they don't append a reference to their word, instead they evaluate immediately. We call these words parsing words, since they evaluate at parse time.
+
+So if a word normally evaluates at phase n, parsing words evaluate at phase n-1.
+
+Different parsing words will modify compilation units differently. Parsing words such as =;= are delimiters, which just means they exit the current compilation context word, which will commit the accumulated staging words.
+
+So in short, compilation is a function of the form =compile(ctx, source) -> quotation=
+
+#+begin_src js
+const compile = async (ctx, src) => {
+  const c = { ...ctx, src, pos: 0 }
+  enter(c, (_, s) => s)
+  let t
+  while ((t = nextToken(c))) {
+    const w = find(c, t)
+    w.props.parsing ? await w.exec(c) : stage(c, w)
+  }
+  return await exit(c)
+}
+const evaluate = async (ctx, compiled) => {
+  for (const w of compiled) ctx = await w.exec(await ctx)
+}
+const run = async (ctx, source) => (await evaluate(ctx, await compile(ctx, source)), ctx)
+#+end_src
+
+** Context Creation
+#+begin_src js
+const docol = (name, words, p) => {
+  const w = word(
+    async c => (await evaluate(c, w.props.words), c),
+    { type: 'compiled', name, words, ...p }
+  );
+  return w
+}
+const context = () => {
+  const scratch = {}
+  return {
+    ns: scratch,
+    search: [],
+    vocabs: {scratch},
+    search: [],
+    stack: [],
+    scope: []
+  }
+}
+#+end_src
+
+#+begin_src js
+
+const c = context()
+
+const src = `
+  : foo 10 20 + ;
+
+  foo
+`
+
+const lib = [
+  prim('+', (a, b) => [a + b]),
+  prim('-', (a, b) => [a - b]),
+  prim('*', (a, b) => [a * b]),
+  prim('/', (a, b) => [a / b]),
+  syn(':', (c) => {
+    const name = nextToken(c);
+    enter(c, (c, staging) => {define(c, docol(name, staging))})
+    return c
+  }),
+  syn(';', async (c) => {
+    await exit(c)
+    return c;
+  })
+]
+for(const w of lib) define(c, w);
+
+const compiled = await compile(c, src)
+console.log(compiled)
+await evaluate(c, compiled)
+console.log(c.stack)
+#+end_src
+
+* Playground
+#+begin_src js :tangle no
+const c = freshContext()
+
+const colonDef = syn(c => {
+  const start = c.lastPos;
+  const name = nextToken(c)
+  enterCompilationScope(c, async (ctx, {staging}) => {
+    // with definitions, we don't stage anything
+    await define(ctx, await docol(name, staging));
+  });
+  currentScope(c).startPos = start
+  return c
+})
+const syntaxDef = syn(c => {
+  const start = c.pos;
+  const name = nextToken(c)
+  enterCompilationScope(c, async (ctx, {staging}) => {
+    // with definitions, we don't stage anything
+    await define(ctx, await docol(name, staging, {parsing: true}));
+  });
+  currentScope(c).startPos = start
+  return c
+});
+const delim = syn(async c => {
+  await exitCompilationScope(c)
+  return c;
+})
+
+const scratch = new Map()
+scratch.set(':', colonDef)
+scratch.set('syn:', syntaxDef)
+scratch.set(';', delim)
+scratch.set('parse:', syn(async c => {
+  const name = nextToken(c);
+  const delimiter = nextToken(c);
+  const parserWord = syn(async c => {
+    const parsed = parseUntil(c, delimiter);
+    stage(c, constant(parsed))
+    return c
+  })
+  props(parserWord, {name})
+  define(c, parserWord)
+  return c
+}))
+scratch.set('\\', syn(c => {
+  const name = nextToken(c);
+  const w = find(c, name);
+  stage(c, constant(w))
+  return c
+}))
+scratch.set('+', def((a, b) => [a + b]))
+scratch.set('.', word(async c => {
+  const [a] = pop(c, 1)
+  await c.emit({log: a})
+  return c
+}, {type: 'primitive'}))
+
+c.ns = scratch
+c.vocabs['scratch'] = scratch
+
+const s = `
+  parse: << >>
+
+  : bar << hello there this is a test of custom parsing >> ;
+  : baz 20 ;
+  : foo baz baz ;
+
+  : literally-foo \\ foo ;
+
+  foo + .
+  bar .
+
+  literally-foo .
+`
+
+console.log("before evaluation: ", c.stack)
+const comp = await compile(c, s)
+
+await evaluate(c, comp)
+console.log("after evaluation: ", c.stack)
+
+console.log('recompiling')
+await run(c, ': foo 420 100 ; ')
+
+await evaluate(c, comp)
+console.log("evaluation after recompiling", c.stack)
+#+end_src
+
+#+RESULTS:

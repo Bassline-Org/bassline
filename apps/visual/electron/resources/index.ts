@@ -16,6 +16,7 @@ import { createThemesResource } from './themes'
 import { createSettingsResource } from './settings'
 import { createShellResource } from './shell'
 import { createSemanticDocsResource } from './semantic-docs'
+import { createCardsResource } from './cards'
 
 type Db = typeof DbType
 
@@ -99,6 +100,9 @@ export function createVisualResources(db: Db) {
   // Create semantic docs resource
   const semanticDocs = createSemanticDocsResource(db)
 
+  // Create cards resource
+  const cards = createCardsResource(db)
+
   // Main resource tree
   const tree = routes({
     projects: routes({
@@ -114,6 +118,7 @@ export function createVisualResources(db: Db) {
     history,
     shell,
     'semantic-docs': semanticDocs,
+    cards,
   })
 
   // Create a wrapper that injects kit (self-reference) into all requests

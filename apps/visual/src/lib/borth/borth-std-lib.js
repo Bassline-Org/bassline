@@ -78,6 +78,25 @@ export const syntax = [
   'syntax',
   syn('str:', c => staging(c).push(constant(nextToken(c)))),
   syn('\\', c => staging(c).push(constant(find(c, nextToken(c))))),
+  syn('macro:', async c => {
+    const name = nextToken(c)
+    b.enterCompilationScope(c, async (ctx, {staging}) => {
+      const w = b.word(
+        async (c) => {
+          const old = c.stack;
+          c.stack = [];
+          await b.evaluate(c, staging)
+          const toCompile = c.stack.map(constant);
+          b.stage(ctx, ...toCompile)
+          c.stack = old;
+          return c
+        },
+        {type: 'macro', parsing: true, name}
+      );
+      await define(ctx, w);
+    })
+    return c
+  })
 ]
 
 const c = b.freshContext()
@@ -87,76 +106,39 @@ const src = `
   in: something
   using: prelude syntax ;
   : foo 20 10 + ;
-
-  foo drop
-
-  in: another
-
-  using: prelude something ;
-
-  foo drop
-
-  in: something
-  using: prelude syntax ;
-  : foo 20 10 + ;
-
-  foo drop
-
-  in: another
-
-  using: prelude something ;
-
-  foo drop
-
-  in: something
-  using: prelude syntax ;
-  : foo 20 10 + ;
-
-  foo drop
-
-  in: another
-
-  using: prelude something ;
-
-  foo drop
-
-  in: something
-  using: prelude syntax ;
-  : foo 20 10 + ;
-
-  foo drop
-
-  in: another
-
-  using: prelude something ;
-
-  foo drop
-
-  in: something
-  using: prelude syntax ;
-  : foo 20 10 + ;
-
-  foo drop
-
-  in: another
-
-  using: prelude something ;
-
-  foo drop
+  foo .
 `
+const other = `
+  in: another
+  using: prelude syntax ;
+  macro: foo 20 10 + ;
+  foo .
+`
+
+const compare = async (src, times = 1000000) => {
 //console.log('ns: ', c.ns, c.search)
 let now = Date.now()
-const elapsed = () => Date.now() - now
+const elapsed = () => Date.now() - now;
 c.emit = () => {}
-const times = 100000
-for (let i = 0; i < times; i++) {
+for(let i = 0; i < times; i++) {
   await b.run(c, src)
 }
 console.log(`${times} runs in: ${elapsed()}`)
 const compiled = await b.compile(c, src)
-console.log('compiled: ${compiled}')
 now = Date.now()
-for (let i = 0; i < times; i++) {
+for(let i = 0; i < times; i++) {
   await b.evaluate(c, compiled)
 }
 console.log(`${times} compiled runs in: ${elapsed()}`)
+}
+
+await compare(src)
+await compare(other)
+
+// {
+//   const baz = c.vocabs['something'].get('baz')
+//   for(const w of b.props(baz).words) {
+//     console.log('word: ', b.props(w))
+//   }
+// }
+//console.log(`${times} compiled runs in: ${elapsed()}`)
