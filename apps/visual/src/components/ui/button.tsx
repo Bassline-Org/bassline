@@ -1,11 +1,13 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
+import { motion, type HTMLMotionProps } from "framer-motion"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+import { easing } from "@/lib/motion"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -34,18 +36,41 @@ const buttonVariants = cva(
 )
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends Omit<HTMLMotionProps<"button">, "size">,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  /** Disable motion animations */
+  disableMotion?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+  ({ className, variant, size, asChild = false, disableMotion = false, ...props }, ref) => {
+    // For asChild, use Slot without motion
+    if (asChild) {
+      return (
+        <Slot
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}
+        />
+      )
+    }
+
+    // Link variant should not have scale effects
+    const isLink = variant === "link"
+    const motionProps = disableMotion || isLink
+      ? {}
+      : {
+          whileHover: { scale: 1.02 },
+          whileTap: { scale: 0.98 },
+          transition: easing.spring,
+        }
+
     return (
-      <Comp
+      <motion.button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        {...motionProps}
         {...props}
       />
     )

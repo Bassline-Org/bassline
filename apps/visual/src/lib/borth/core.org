@@ -67,14 +67,8 @@ export const castArr = v => {
 ** Context Access
 *** Stack Manipulation
 #+begin_src js
-export const pop = (ctx, n = 1) => {
-  if(n === 0) return []
-  const s = ctx.stack
-  assert(s.length >= n, 'stack underflow');
-  assert(n > 0, `n must be greater than 0, got: ${n}`)
-  return s.splice(s.length - n, n)
-}
-export const push = (ctx, ...items) => (ctx.stack.push(...items), ctx)
+const take = (arr, n) => arr.splice(arr.length - n, n)
+const append (arr, items) => arr.splice(arr.length, 0, ...items)
 #+end_src
 
 *** Tokenization
@@ -143,7 +137,34 @@ If it is not found:
 - We check if the word is a valid number
 - If it is, we return the number
 - Otherwise we throw an error
-#+begin_src js
+
+  #+begin_src js
+export const find = (ctx, name) => {
+  if (ctx.ns.has(name)) return ctx.ns.get(name)
+  for (const ns of ctx.search) {
+    if(ns.has(name)) return ns.get(name)
+  }
+  const num = Number(name)
+  if (!isNaN(num)) return constant(num)
+  panic(`unknown: ${name}`)
+}
+export const define = (ctx, word) => {
+  if (!word.props.name) {
+    word.props.name = gensym()
+  }
+  if(ctx.ns.has(name)) {
+    const w = ctx.ns.get(name);
+    w.impl = word.impl;
+    w.props = word.props
+    return w
+  } else {
+    ctx.ns.set(name, word)
+    return word
+  }
+}
+  #+end_src
+**** Old
+#+begin_src js :tangle no
 export const find = (ctx, name) => {
   if (ctx.ns.has(name)) return ctx.ns.get(name)
   for (const ns of ctx.search) {
@@ -189,7 +210,18 @@ Word functions have two additional properties:
   Update using =props(word, anObject)=
   Replace using =props(word, aReplacementFn)=
 
-#+begin_src js
+  #+begin_src js
+export const word = (fn, props = {}) => ({
+  props,
+  impl: fn ?? () => panic("No implemented!"),
+  async exec() {
+    return this.impl(await ctx)
+  }
+})
+  #+end_src
+
+**** old
+#+begin_src js :tangle no
 export const word = nary(
   () => word((_ctx) => panic('No implementation!'), {}),
   (fn) => word(fn, {}),
@@ -256,7 +288,7 @@ export const variable = (initial, extraProps) => word(
   )
 export const def = (fn, extraProps) => word(stackify(fn), { type: 'primitive', ...extraProps })
 export const syn = (fn, extraProps) => word(fn, { type: 'syntax', parsing: true, ...extraProps })
-export const constant = (value, e) => def(() => [value], {type: 'constant', ...e})
+export const constant = (value, e) => def(() => [value], {type: 'constant', value, ...e})
 #+end_src
 
 ** Compilation

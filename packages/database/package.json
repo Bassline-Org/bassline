@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@bassline/core": "workspace:*",
-    "better-sqlite3": "^11.7.0"
+    "better-sqlite3": "^12.6.2"
   },
   "devDependencies": {},
   "scripts": {

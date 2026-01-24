@@ -1,16 +1,16 @@
-import { contextBridge as r, ipcRenderer as n } from "electron";
-r.exposeInMainWorld("bl", {
+import { contextBridge as t, ipcRenderer as n } from "electron";
+t.exposeInMainWorld("bl", {
   get: (e) => n.invoke("bl:get", e),
   put: (e, o) => n.invoke("bl:put", e, o)
 });
-r.exposeInMainWorld("db", {
+t.exposeInMainWorld("db", {
   query: (e, o) => n.invoke("db:query", e, o)
 });
-r.exposeInMainWorld("fonts", {
+t.exposeInMainWorld("fonts", {
   list: () => n.invoke("fonts:list"),
   search: (e) => n.invoke("fonts:search", e)
 });
-r.exposeInMainWorld("app", {
+t.exposeInMainWorld("app", {
   // Notifications
   notify: (e, o) => n.invoke("app:notify", e, o),
   // Recent documents
@@ -22,13 +22,18 @@ r.exposeInMainWorld("app", {
   onMenuExportProject: (e) => (n.on("menu:export-project", e), () => n.removeListener("menu:export-project", e)),
   onMenuShowSettings: (e) => (n.on("menu:show-settings", e), () => n.removeListener("menu:show-settings", e)),
   onMenuOpenFile: (e) => {
-    const o = (p, t) => e(t);
+    const o = (i, r) => e(r);
     return n.on("menu:open-file", o), () => n.removeListener("menu:open-file", o);
   },
   onMenuOpenProjectById: (e) => {
-    const o = (p, t) => e(t);
+    const o = (i, r) => e(r);
     return n.on("menu:open-project-by-id", o), () => n.removeListener("menu:open-project-by-id", o);
   },
   // Menu refresh
   refreshMenu: () => n.invoke("app:refreshMenu")
+});
+t.exposeInMainWorld("blemacs", {
+  readInit: () => n.invoke("blemacs:readInit"),
+  writeInit: (e) => n.invoke("blemacs:writeInit", e),
+  getInitPath: () => n.invoke("blemacs:getInitPath")
 });

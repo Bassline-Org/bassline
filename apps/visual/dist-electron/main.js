@@ -1,7 +1,7 @@
-import require$$1$1, { app, shell, Menu, nativeImage, BrowserWindow, ipcMain, Notification } from "electron";
+import require$$1, { app, shell, Menu, nativeImage, BrowserWindow, ipcMain, Notification } from "electron";
 import path, { join } from "path";
+import fs, { existsSync, readdirSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
-import require$$1, { existsSync, readdirSync, readFileSync } from "fs";
 import require$$0 from "constants";
 import require$$0$1 from "stream";
 import require$$4, { promisify } from "util";
@@ -42,54 +42,54 @@ function requirePolyfills() {
     if (Object.setPrototypeOf) Object.setPrototypeOf(process.chdir, chdir);
   }
   polyfills = patch;
-  function patch(fs) {
+  function patch(fs2) {
     if (constants.hasOwnProperty("O_SYMLINK") && process.version.match(/^v0\.6\.[0-2]|^v0\.5\./)) {
-      patchLchmod(fs);
+      patchLchmod(fs2);
     }
-    if (!fs.lutimes) {
-      patchLutimes(fs);
+    if (!fs2.lutimes) {
+      patchLutimes(fs2);
     }
-    fs.chown = chownFix(fs.chown);
-    fs.fchown = chownFix(fs.fchown);
-    fs.lchown = chownFix(fs.lchown);
-    fs.chmod = chmodFix(fs.chmod);
-    fs.fchmod = chmodFix(fs.fchmod);
-    fs.lchmod = chmodFix(fs.lchmod);
-    fs.chownSync = chownFixSync(fs.chownSync);
-    fs.fchownSync = chownFixSync(fs.fchownSync);
-    fs.lchownSync = chownFixSync(fs.lchownSync);
-    fs.chmodSync = chmodFixSync(fs.chmodSync);
-    fs.fchmodSync = chmodFixSync(fs.fchmodSync);
-    fs.lchmodSync = chmodFixSync(fs.lchmodSync);
-    fs.stat = statFix(fs.stat);
-    fs.fstat = statFix(fs.fstat);
-    fs.lstat = statFix(fs.lstat);
-    fs.statSync = statFixSync(fs.statSync);
-    fs.fstatSync = statFixSync(fs.fstatSync);
-    fs.lstatSync = statFixSync(fs.lstatSync);
-    if (fs.chmod && !fs.lchmod) {
-      fs.lchmod = function(path2, mode, cb) {
+    fs2.chown = chownFix(fs2.chown);
+    fs2.fchown = chownFix(fs2.fchown);
+    fs2.lchown = chownFix(fs2.lchown);
+    fs2.chmod = chmodFix(fs2.chmod);
+    fs2.fchmod = chmodFix(fs2.fchmod);
+    fs2.lchmod = chmodFix(fs2.lchmod);
+    fs2.chownSync = chownFixSync(fs2.chownSync);
+    fs2.fchownSync = chownFixSync(fs2.fchownSync);
+    fs2.lchownSync = chownFixSync(fs2.lchownSync);
+    fs2.chmodSync = chmodFixSync(fs2.chmodSync);
+    fs2.fchmodSync = chmodFixSync(fs2.fchmodSync);
+    fs2.lchmodSync = chmodFixSync(fs2.lchmodSync);
+    fs2.stat = statFix(fs2.stat);
+    fs2.fstat = statFix(fs2.fstat);
+    fs2.lstat = statFix(fs2.lstat);
+    fs2.statSync = statFixSync(fs2.statSync);
+    fs2.fstatSync = statFixSync(fs2.fstatSync);
+    fs2.lstatSync = statFixSync(fs2.lstatSync);
+    if (fs2.chmod && !fs2.lchmod) {
+      fs2.lchmod = function(path2, mode, cb) {
         if (cb) process.nextTick(cb);
       };
-      fs.lchmodSync = function() {
+      fs2.lchmodSync = function() {
       };
     }
-    if (fs.chown && !fs.lchown) {
-      fs.lchown = function(path2, uid, gid, cb) {
+    if (fs2.chown && !fs2.lchown) {
+      fs2.lchown = function(path2, uid, gid, cb) {
         if (cb) process.nextTick(cb);
       };
-      fs.lchownSync = function() {
+      fs2.lchownSync = function() {
       };
     }
     if (platform === "win32") {
-      fs.rename = typeof fs.rename !== "function" ? fs.rename : (function(fs$rename) {
+      fs2.rename = typeof fs2.rename !== "function" ? fs2.rename : (function(fs$rename) {
         function rename(from, to, cb) {
           var start = Date.now();
           var backoff = 0;
           fs$rename(from, to, function CB(er) {
             if (er && (er.code === "EACCES" || er.code === "EPERM" || er.code === "EBUSY") && Date.now() - start < 6e4) {
               setTimeout(function() {
-                fs.stat(to, function(stater, st) {
+                fs2.stat(to, function(stater, st) {
                   if (stater && stater.code === "ENOENT")
                     fs$rename(from, to, CB);
                   else
@@ -105,9 +105,9 @@ function requirePolyfills() {
         }
         if (Object.setPrototypeOf) Object.setPrototypeOf(rename, fs$rename);
         return rename;
-      })(fs.rename);
+      })(fs2.rename);
     }
-    fs.read = typeof fs.read !== "function" ? fs.read : (function(fs$read) {
+    fs2.read = typeof fs2.read !== "function" ? fs2.read : (function(fs$read) {
       function read(fd, buffer, offset, length, position, callback_) {
         var callback;
         if (callback_ && typeof callback_ === "function") {
@@ -115,22 +115,22 @@ function requirePolyfills() {
           callback = function(er, _, __) {
             if (er && er.code === "EAGAIN" && eagCounter < 10) {
               eagCounter++;
-              return fs$read.call(fs, fd, buffer, offset, length, position, callback);
+              return fs$read.call(fs2, fd, buffer, offset, length, position, callback);
             }
             callback_.apply(this, arguments);
           };
         }
-        return fs$read.call(fs, fd, buffer, offset, length, position, callback);
+        return fs$read.call(fs2, fd, buffer, offset, length, position, callback);
       }
       if (Object.setPrototypeOf) Object.setPrototypeOf(read, fs$read);
       return read;
-    })(fs.read);
-    fs.readSync = typeof fs.readSync !== "function" ? fs.readSync : /* @__PURE__ */ (function(fs$readSync) {
+    })(fs2.read);
+    fs2.readSync = typeof fs2.readSync !== "function" ? fs2.readSync : /* @__PURE__ */ (function(fs$readSync) {
       return function(fd, buffer, offset, length, position) {
         var eagCounter = 0;
         while (true) {
           try {
-            return fs$readSync.call(fs, fd, buffer, offset, length, position);
+            return fs$readSync.call(fs2, fd, buffer, offset, length, position);
           } catch (er) {
             if (er.code === "EAGAIN" && eagCounter < 10) {
               eagCounter++;
@@ -140,10 +140,10 @@ function requirePolyfills() {
           }
         }
       };
-    })(fs.readSync);
-    function patchLchmod(fs2) {
-      fs2.lchmod = function(path2, mode, callback) {
-        fs2.open(
+    })(fs2.readSync);
+    function patchLchmod(fs22) {
+      fs22.lchmod = function(path2, mode, callback) {
+        fs22.open(
           path2,
           constants.O_WRONLY | constants.O_SYMLINK,
           mode,
@@ -152,80 +152,80 @@ function requirePolyfills() {
               if (callback) callback(err);
               return;
             }
-            fs2.fchmod(fd, mode, function(err2) {
-              fs2.close(fd, function(err22) {
+            fs22.fchmod(fd, mode, function(err2) {
+              fs22.close(fd, function(err22) {
                 if (callback) callback(err2 || err22);
               });
             });
           }
         );
       };
-      fs2.lchmodSync = function(path2, mode) {
-        var fd = fs2.openSync(path2, constants.O_WRONLY | constants.O_SYMLINK, mode);
+      fs22.lchmodSync = function(path2, mode) {
+        var fd = fs22.openSync(path2, constants.O_WRONLY | constants.O_SYMLINK, mode);
         var threw = true;
         var ret;
         try {
-          ret = fs2.fchmodSync(fd, mode);
+          ret = fs22.fchmodSync(fd, mode);
           threw = false;
         } finally {
           if (threw) {
             try {
-              fs2.closeSync(fd);
+              fs22.closeSync(fd);
             } catch (er) {
             }
           } else {
-            fs2.closeSync(fd);
+            fs22.closeSync(fd);
           }
         }
         return ret;
       };
     }
-    function patchLutimes(fs2) {
-      if (constants.hasOwnProperty("O_SYMLINK") && fs2.futimes) {
-        fs2.lutimes = function(path2, at, mt, cb) {
-          fs2.open(path2, constants.O_SYMLINK, function(er, fd) {
+    function patchLutimes(fs22) {
+      if (constants.hasOwnProperty("O_SYMLINK") && fs22.futimes) {
+        fs22.lutimes = function(path2, at, mt, cb) {
+          fs22.open(path2, constants.O_SYMLINK, function(er, fd) {
             if (er) {
               if (cb) cb(er);
               return;
             }
-            fs2.futimes(fd, at, mt, function(er2) {
-              fs2.close(fd, function(er22) {
+            fs22.futimes(fd, at, mt, function(er2) {
+              fs22.close(fd, function(er22) {
                 if (cb) cb(er2 || er22);
               });
             });
           });
         };
-        fs2.lutimesSync = function(path2, at, mt) {
-          var fd = fs2.openSync(path2, constants.O_SYMLINK);
+        fs22.lutimesSync = function(path2, at, mt) {
+          var fd = fs22.openSync(path2, constants.O_SYMLINK);
           var ret;
           var threw = true;
           try {
-            ret = fs2.futimesSync(fd, at, mt);
+            ret = fs22.futimesSync(fd, at, mt);
             threw = false;
           } finally {
             if (threw) {
               try {
-                fs2.closeSync(fd);
+                fs22.closeSync(fd);
               } catch (er) {
               }
             } else {
-              fs2.closeSync(fd);
+              fs22.closeSync(fd);
             }
           }
           return ret;
         };
-      } else if (fs2.futimes) {
-        fs2.lutimes = function(_a, _b, _c, cb) {
+      } else if (fs22.futimes) {
+        fs22.lutimes = function(_a, _b, _c, cb) {
           if (cb) process.nextTick(cb);
         };
-        fs2.lutimesSync = function() {
+        fs22.lutimesSync = function() {
         };
       }
     }
     function chmodFix(orig) {
       if (!orig) return orig;
       return function(target, mode, cb) {
-        return orig.call(fs, target, mode, function(er) {
+        return orig.call(fs2, target, mode, function(er) {
           if (chownErOk(er)) er = null;
           if (cb) cb.apply(this, arguments);
         });
@@ -235,7 +235,7 @@ function requirePolyfills() {
       if (!orig) return orig;
       return function(target, mode) {
         try {
-          return orig.call(fs, target, mode);
+          return orig.call(fs2, target, mode);
         } catch (er) {
           if (!chownErOk(er)) throw er;
         }
@@ -244,7 +244,7 @@ function requirePolyfills() {
     function chownFix(orig) {
       if (!orig) return orig;
       return function(target, uid, gid, cb) {
-        return orig.call(fs, target, uid, gid, function(er) {
+        return orig.call(fs2, target, uid, gid, function(er) {
           if (chownErOk(er)) er = null;
           if (cb) cb.apply(this, arguments);
         });
@@ -254,7 +254,7 @@ function requirePolyfills() {
       if (!orig) return orig;
       return function(target, uid, gid) {
         try {
-          return orig.call(fs, target, uid, gid);
+          return orig.call(fs2, target, uid, gid);
         } catch (er) {
           if (!chownErOk(er)) throw er;
         }
@@ -274,13 +274,13 @@ function requirePolyfills() {
           }
           if (cb) cb.apply(this, arguments);
         }
-        return options ? orig.call(fs, target, options, callback) : orig.call(fs, target, callback);
+        return options ? orig.call(fs2, target, options, callback) : orig.call(fs2, target, callback);
       };
     }
     function statFixSync(orig) {
       if (!orig) return orig;
       return function(target, options) {
-        var stats = options ? orig.call(fs, target, options) : orig.call(fs, target);
+        var stats = options ? orig.call(fs2, target, options) : orig.call(fs2, target);
         if (stats) {
           if (stats.uid < 0) stats.uid += 4294967296;
           if (stats.gid < 0) stats.gid += 4294967296;
@@ -310,7 +310,7 @@ function requireLegacyStreams() {
   hasRequiredLegacyStreams = 1;
   var Stream = require$$0$1.Stream;
   legacyStreams = legacy;
-  function legacy(fs) {
+  function legacy(fs2) {
     return {
       ReadStream,
       WriteStream
@@ -353,7 +353,7 @@ function requireLegacyStreams() {
         });
         return;
       }
-      fs.open(this.path, this.flags, this.mode, function(err, fd) {
+      fs2.open(this.path, this.flags, this.mode, function(err, fd) {
         if (err) {
           self2.emit("error", err);
           self2.readable = false;
@@ -392,7 +392,7 @@ function requireLegacyStreams() {
       this.busy = false;
       this._queue = [];
       if (this.fd === null) {
-        this._open = fs.open;
+        this._open = fs2.open;
         this._queue.push([this._open, this.path, this.flags, this.mode, void 0]);
         this.flush();
       }
@@ -428,7 +428,7 @@ var hasRequiredGracefulFs;
 function requireGracefulFs() {
   if (hasRequiredGracefulFs) return gracefulFs;
   hasRequiredGracefulFs = 1;
-  var fs = require$$1;
+  var fs$1 = fs;
   var polyfills2 = requirePolyfills();
   var legacy = requireLegacyStreams();
   var clone = requireClone();
@@ -436,8 +436,8 @@ function requireGracefulFs() {
   var gracefulQueue;
   var previousSymbol;
   if (typeof Symbol === "function" && typeof Symbol.for === "function") {
-    gracefulQueue = Symbol.for("graceful-fs.queue");
-    previousSymbol = Symbol.for("graceful-fs.previous");
+    gracefulQueue = /* @__PURE__ */ Symbol.for("graceful-fs.queue");
+    previousSymbol = /* @__PURE__ */ Symbol.for("graceful-fs.previous");
   } else {
     gracefulQueue = "___graceful-fs.queue";
     previousSymbol = "___graceful-fs.previous";
@@ -460,12 +460,12 @@ function requireGracefulFs() {
       m = "GFS4: " + m.split(/\n/).join("\nGFS4: ");
       console.error(m);
     };
-  if (!fs[gracefulQueue]) {
+  if (!fs$1[gracefulQueue]) {
     var queue = commonjsGlobal[gracefulQueue] || [];
-    publishQueue(fs, queue);
-    fs.close = (function(fs$close) {
+    publishQueue(fs$1, queue);
+    fs$1.close = (function(fs$close) {
       function close(fd, cb) {
-        return fs$close.call(fs, fd, function(err) {
+        return fs$close.call(fs$1, fd, function(err) {
           if (!err) {
             resetQueue();
           }
@@ -477,31 +477,31 @@ function requireGracefulFs() {
         value: fs$close
       });
       return close;
-    })(fs.close);
-    fs.closeSync = (function(fs$closeSync) {
+    })(fs$1.close);
+    fs$1.closeSync = (function(fs$closeSync) {
       function closeSync(fd) {
-        fs$closeSync.apply(fs, arguments);
+        fs$closeSync.apply(fs$1, arguments);
         resetQueue();
       }
       Object.defineProperty(closeSync, previousSymbol, {
         value: fs$closeSync
       });
       return closeSync;
-    })(fs.closeSync);
+    })(fs$1.closeSync);
     if (/\bgfs4\b/i.test(process.env.NODE_DEBUG || "")) {
       process.on("exit", function() {
-        debug(fs[gracefulQueue]);
-        require$$5.equal(fs[gracefulQueue].length, 0);
+        debug(fs$1[gracefulQueue]);
+        require$$5.equal(fs$1[gracefulQueue].length, 0);
       });
     }
   }
   if (!commonjsGlobal[gracefulQueue]) {
-    publishQueue(commonjsGlobal, fs[gracefulQueue]);
+    publishQueue(commonjsGlobal, fs$1[gracefulQueue]);
   }
-  gracefulFs = patch(clone(fs));
-  if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs.__patched) {
-    gracefulFs = patch(fs);
-    fs.__patched = true;
+  gracefulFs = patch(clone(fs$1));
+  if (process.env.TEST_GRACEFUL_FS_GLOBAL_PATCH && !fs$1.__patched) {
+    gracefulFs = patch(fs$1);
+    fs$1.__patched = true;
   }
   function patch(fs2) {
     polyfills2(fs2);
@@ -743,16 +743,16 @@ function requireGracefulFs() {
   }
   function enqueue(elem) {
     debug("ENQUEUE", elem[0].name, elem[1]);
-    fs[gracefulQueue].push(elem);
+    fs$1[gracefulQueue].push(elem);
     retry();
   }
   var retryTimer;
   function resetQueue() {
     var now = Date.now();
-    for (var i = 0; i < fs[gracefulQueue].length; ++i) {
-      if (fs[gracefulQueue][i].length > 2) {
-        fs[gracefulQueue][i][3] = now;
-        fs[gracefulQueue][i][4] = now;
+    for (var i = 0; i < fs$1[gracefulQueue].length; ++i) {
+      if (fs$1[gracefulQueue][i].length > 2) {
+        fs$1[gracefulQueue][i][3] = now;
+        fs$1[gracefulQueue][i][4] = now;
       }
     }
     retry();
@@ -760,9 +760,9 @@ function requireGracefulFs() {
   function retry() {
     clearTimeout(retryTimer);
     retryTimer = void 0;
-    if (fs[gracefulQueue].length === 0)
+    if (fs$1[gracefulQueue].length === 0)
       return;
-    var elem = fs[gracefulQueue].shift();
+    var elem = fs$1[gracefulQueue].shift();
     var fn = elem[0];
     var args = elem[1];
     var err = elem[2];
@@ -784,7 +784,7 @@ function requireGracefulFs() {
         debug("RETRY", fn.name, args);
         fn.apply(null, args.concat([startTime]));
       } else {
-        fs[gracefulQueue].push(elem);
+        fs$1[gracefulQueue].push(elem);
       }
     }
     if (retryTimer === void 0) {
@@ -802,7 +802,7 @@ function requireJsonfile() {
   try {
     _fs = requireGracefulFs();
   } catch (_) {
-    _fs = require$$1;
+    _fs = fs;
   }
   function readFile(file, options, callback) {
     if (callback == null) {
@@ -813,12 +813,12 @@ function requireJsonfile() {
       options = { encoding: options };
     }
     options = options || {};
-    var fs = options.fs || _fs;
+    var fs2 = options.fs || _fs;
     var shouldThrow = true;
     if ("throws" in options) {
       shouldThrow = options.throws;
     }
-    fs.readFile(file, options, function(err, data) {
+    fs2.readFile(file, options, function(err, data) {
       if (err) return callback(err);
       data = stripBom(data);
       var obj;
@@ -840,13 +840,13 @@ function requireJsonfile() {
     if (typeof options === "string") {
       options = { encoding: options };
     }
-    var fs = options.fs || _fs;
+    var fs2 = options.fs || _fs;
     var shouldThrow = true;
     if ("throws" in options) {
       shouldThrow = options.throws;
     }
     try {
-      var content = fs.readFileSync(file, options);
+      var content = fs2.readFileSync(file, options);
       content = stripBom(content);
       return JSON.parse(content, options.reviver);
     } catch (err) {
@@ -878,7 +878,7 @@ function requireJsonfile() {
       options = {};
     }
     options = options || {};
-    var fs = options.fs || _fs;
+    var fs2 = options.fs || _fs;
     var str = "";
     try {
       str = stringify(obj, options);
@@ -886,13 +886,13 @@ function requireJsonfile() {
       if (callback) callback(err, null);
       return;
     }
-    fs.writeFile(file, str, options, callback);
+    fs2.writeFile(file, str, options, callback);
   }
   function writeFileSync(file, obj, options) {
     options = options || {};
-    var fs = options.fs || _fs;
+    var fs2 = options.fs || _fs;
     var str = stringify(obj, options);
-    return fs.writeFileSync(file, str, options);
+    return fs2.writeFileSync(file, str, options);
   }
   function stripBom(content) {
     if (Buffer.isBuffer(content)) content = content.toString("utf8");
@@ -914,7 +914,7 @@ function requireMkdirp() {
   if (hasRequiredMkdirp) return mkdirp;
   hasRequiredMkdirp = 1;
   var path$1 = path;
-  var fs = require$$1;
+  var fs$1 = fs;
   var _0777 = parseInt("0777", 8);
   mkdirp = mkdirP.mkdirp = mkdirP.mkdirP = mkdirP;
   function mkdirP(p, opts, f, made) {
@@ -925,7 +925,7 @@ function requireMkdirp() {
       opts = { mode: opts };
     }
     var mode = opts.mode;
-    var xfs = opts.fs || fs;
+    var xfs = opts.fs || fs$1;
     if (mode === void 0) {
       mode = _0777;
     }
@@ -964,7 +964,7 @@ function requireMkdirp() {
       opts = { mode: opts };
     }
     var mode = opts.mode;
-    var xfs = opts.fs || fs;
+    var xfs = opts.fs || fs$1;
     if (mode === void 0) {
       mode = _0777;
     }
@@ -1003,7 +1003,7 @@ function requireElectronWindowState() {
   if (hasRequiredElectronWindowState) return electronWindowState;
   hasRequiredElectronWindowState = 1;
   const path$1 = path;
-  const electron = require$$1$1;
+  const electron = require$$1;
   const jsonfile = requireJsonfile();
   const mkdirp2 = requireMkdirp();
   electronWindowState = function(options) {
@@ -1441,6 +1441,8 @@ const db = {
     const db2 = getDb();
     const dataDir = app.isPackaged ? path.join(process.resourcesPath, "data") : path.join(__dirname$2, "../data");
     runMigrations(db2, dataDir);
+    this.cards._initSchema();
+    this.cards._seedExamples();
     seed(db2, dataDir);
   },
   // =========================================================================
@@ -1540,8 +1542,8 @@ const db = {
     createWithId(projectId, id, timestamps) {
       const db2 = getDb();
       const now = Date.now();
-      const created_at = (timestamps == null ? void 0 : timestamps.created_at) ?? now;
-      const modified_at = (timestamps == null ? void 0 : timestamps.modified_at) ?? now;
+      const created_at = timestamps?.created_at ?? now;
+      const modified_at = timestamps?.modified_at ?? now;
       db2.prepare("INSERT INTO entities (id, project_id, created_at, modified_at) VALUES (?, ?, ?, ?)").run(id, projectId, created_at, modified_at);
       this._touchProject(projectId);
       return { id, project_id: projectId, created_at, modified_at };
@@ -1569,11 +1571,11 @@ const db = {
       let sql = "SELECT * FROM stamps";
       const conditions = [];
       const params = [];
-      if (filter == null ? void 0 : filter.kind) {
+      if (filter?.kind) {
         conditions.push("kind = ?");
         params.push(filter.kind);
       }
-      if (filter == null ? void 0 : filter.category) {
+      if (filter?.category) {
         conditions.push("category = ?");
         params.push(filter.category);
       }
@@ -1851,7 +1853,7 @@ const db = {
       `);
       const transaction = db2.transaction(() => {
         for (const [key, value] of Object.entries(attrs)) {
-          const attrType = (types == null ? void 0 : types[key]) ?? inferAttrType(value);
+          const attrType = types?.[key] ?? inferAttrType(value);
           const serialized = serializeAttr(value, attrType);
           stmt.run(entityId, key, attrType, serialized.string_value, serialized.number_value, serialized.json_value, serialized.blob_value);
         }
@@ -2006,7 +2008,7 @@ const db = {
     get(key) {
       const db2 = getDb();
       const result = db2.prepare("SELECT value FROM settings WHERE key = ?").get(key);
-      return (result == null ? void 0 : result.value) || null;
+      return result?.value || null;
     },
     set(key, value) {
       const db2 = getDb();
@@ -2024,6 +2026,267 @@ const db = {
     list() {
       const db2 = getDb();
       return db2.prepare("SELECT * FROM semantic_docs").all();
+    }
+  },
+  // =========================================================================
+  // Cards (Borth source code units)
+  // =========================================================================
+  cards: {
+    /** Initialize card tables (called from db.init) */
+    _initSchema() {
+      const db2 = getDb();
+      db2.exec(`
+        CREATE TABLE IF NOT EXISTS card_sets (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+      `);
+      db2.exec(`
+        CREATE TABLE IF NOT EXISTS cards (
+          id TEXT PRIMARY KEY,
+          set_id TEXT REFERENCES card_sets(id),
+          head_version INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL
+        )
+      `);
+      db2.exec(`
+        CREATE TABLE IF NOT EXISTS card_versions (
+          card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+          version INTEGER NOT NULL,
+          source TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (card_id, version)
+        )
+      `);
+    },
+    /** Seed example card sets (idempotent - only runs if no sets exist) */
+    _seedExamples() {
+      const db2 = getDb();
+      const existing = db2.prepare("SELECT COUNT(*) as count FROM card_sets").get();
+      if (existing.count > 0) return;
+      const exampleSets = [
+        {
+          name: "Core Basics",
+          cards: [
+            `( Square a number )
+: square dup * ;
+( 5 square -> 25 )`,
+            `( Even/Odd predicates )
+: is-even 2 mod 0 = ;
+: is-odd is-even not ;`,
+            `( Factorial - recursive )
+: factorial
+  dup 1 <= if drop 1 exit then
+  dup 1 - factorial * ;`,
+            `( Fibonacci sequence )
+: fib
+  dup 1 <= if exit then
+  dup 1 - fib swap 2 - fib + ;`,
+            `( Max and Min of two values )
+: max 2dup < if swap then drop ;
+: min 2dup > if swap then drop ;`
+          ]
+        },
+        {
+          name: "Collections",
+          cards: [
+            `( Sum and Product of a list )
+: sum 0 swap [ + ] fold ;
+: product 1 swap [ * ] fold ;`,
+            `( List transformations )
+: double-all [ 2 * ] map ;
+: square-all [ dup * ] map ;`,
+            `( Filtering lists )
+: evens [ 2 mod 0 = ] filter ;
+: positives [ 0 > ] filter ;`,
+            `( Find and Count helpers )
+: contains swap [ = ] each-while not ;
+: count-if 0 swap rot [ swap 1 + swap ] when each drop ;`
+          ]
+        },
+        {
+          name: "Graph Patterns",
+          cards: [
+            `( Create a social network graph )
+in: social ; using: graph ;
+
+variable g  g <graph> .write
+variable alice  variable bob
+
+alice g .read [ " Alice" ] [ ' name ] structure .add-node .write
+bob g .read [ " Bob" ] [ ' name ] structure .add-node .write`,
+            `( Connection helpers )
+in: social ; using: graph ;
+
+: follow swap .read swap .read " follows" .connect drop ;
+: followers .incoming [ ' name .prop ] map ;
+: following .outgoing [ ' name .prop ] map ;`,
+            `( Graph traversal )
+in: social ; using: graph ;
+
+: print-network
+  .read [ ' name .prop . ] .traverse ;`
+          ]
+        },
+        {
+          name: "UI Behaviors",
+          cards: [
+            `( Counter component )
+in: ui ;
+
+: counter/render
+  self ' count .prop self .set-label ;
+
+: counter/click
+  self ' count .prop 1 + self ' count .prop! ;`,
+            `( Toggle component )
+in: ui ;
+
+: toggle/render
+  self ' active .prop
+  if " ON" else " OFF" then
+  self .set-label ;
+
+: toggle/click
+  self ' active .prop not self ' active .prop! ;`,
+            `( Timer display component )
+in: ui ;
+
+: timer/render
+  self ' seconds .prop
+  " Time: " swap concat self .set-label ;
+
+: timer/tick
+  self ' seconds .prop 1 + self ' seconds .prop! ;`
+          ]
+        },
+        {
+          name: "Commands",
+          cards: [
+            `( Hello Command )
+: hello ' success " Hello from Borth!" toast ;
+cmd
+doc{ Displays a friendly greeting }
+key: C-h`,
+            `( Save Command )
+: save-all ' info " Saving..." toast ;
+cmd
+doc{ Save all open files }
+key: C-x C-s
+category: file`,
+            `( Toggle Theme Command )
+: toggle-theme
+  current-theme " dark" =
+  if " light" else " dark" then
+  set-theme ;
+cmd
+doc{ Switch between light and dark themes }
+key: C-t`
+          ]
+        }
+      ];
+      for (const set of exampleSets) {
+        const setResult = this.createSet(set.name);
+        for (const source of set.cards) {
+          this.createCard(setResult.id, source);
+        }
+      }
+    },
+    // --- Set operations ---
+    listSets() {
+      const db2 = getDb();
+      return db2.prepare("SELECT id, name, created_at FROM card_sets ORDER BY created_at DESC").all();
+    },
+    getSet(id) {
+      const db2 = getDb();
+      return db2.prepare("SELECT id, name, created_at FROM card_sets WHERE id = ?").get(id);
+    },
+    createSet(name) {
+      const db2 = getDb();
+      const id = randomUUID();
+      const now = Date.now();
+      db2.prepare("INSERT INTO card_sets (id, name, created_at) VALUES (?, ?, ?)").run(id, name, now);
+      return { id, name, created_at: now };
+    },
+    deleteSet(id) {
+      const db2 = getDb();
+      db2.prepare("UPDATE cards SET set_id = NULL WHERE set_id = ?").run(id);
+      db2.prepare("DELETE FROM card_sets WHERE id = ?").run(id);
+    },
+    getSetCardCount(setId) {
+      const db2 = getDb();
+      const result = db2.prepare("SELECT COUNT(*) as count FROM cards WHERE set_id = ?").get(setId);
+      return result.count;
+    },
+    // --- Card operations ---
+    listCards() {
+      const db2 = getDb();
+      return db2.prepare(`
+        SELECT c.id, c.set_id, c.head_version, c.created_at, v.source
+        FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        ORDER BY c.created_at DESC
+      `).all();
+    },
+    getSetCards(setId) {
+      const db2 = getDb();
+      return db2.prepare(`
+        SELECT c.id, c.set_id, c.head_version, c.created_at, v.source
+        FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        WHERE c.set_id = ?
+        ORDER BY c.created_at
+      `).all(setId);
+    },
+    getCard(id) {
+      const db2 = getDb();
+      const card = db2.prepare("SELECT id, set_id, head_version, created_at FROM cards WHERE id = ?").get(id);
+      return card;
+    },
+    getCardWithSource(id) {
+      const db2 = getDb();
+      return db2.prepare(`
+        SELECT c.id, c.set_id, c.head_version, c.created_at, v.source
+        FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        WHERE c.id = ?
+      `).get(id);
+    },
+    getCardSource(id) {
+      const db2 = getDb();
+      const result = db2.prepare(`
+        SELECT v.source FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        WHERE c.id = ?
+      `).get(id);
+      return result?.source ?? null;
+    },
+    createCard(setId, source) {
+      const db2 = getDb();
+      const id = randomUUID();
+      const now = Date.now();
+      db2.prepare("INSERT INTO cards (id, set_id, head_version, created_at) VALUES (?, ?, 0, ?)").run(id, setId, now);
+      db2.prepare("INSERT INTO card_versions (card_id, version, source, created_at) VALUES (?, 0, ?, ?)").run(id, source, now);
+      return { id, set_id: setId, head_version: 0, created_at: now, source };
+    },
+    editCard(id, newSource) {
+      const db2 = getDb();
+      const card = db2.prepare("SELECT head_version FROM cards WHERE id = ?").get(id);
+      if (!card) throw new Error(`Card not found: ${id}`);
+      const newVersion = card.head_version + 1;
+      const now = Date.now();
+      db2.prepare("INSERT INTO card_versions (card_id, version, source, created_at) VALUES (?, ?, ?, ?)").run(id, newVersion, newSource, now);
+      db2.prepare("UPDATE cards SET head_version = ? WHERE id = ?").run(newVersion, id);
+      return newVersion;
+    },
+    deleteCard(id) {
+      const db2 = getDb();
+      db2.prepare("DELETE FROM cards WHERE id = ?").run(id);
+    },
+    moveCard(cardId, newSetId) {
+      const db2 = getDb();
+      db2.prepare("UPDATE cards SET set_id = ? WHERE id = ?").run(newSetId, cardId);
     }
   },
   // =========================================================================
@@ -2233,7 +2496,7 @@ function createDockMenu(callbacks, recentProjects = []) {
     ] : []
   ]);
 }
-const BASSLINE_TYPE = Symbol("$BASSLINE_TYPE");
+const BASSLINE_TYPE = /* @__PURE__ */ Symbol("$BASSLINE_TYPE");
 const JS_TYPES = {
   arr: "js/arr",
   obj: "js/obj",
@@ -2253,17 +2516,15 @@ const typed = (type, headers, body = null) => ({
 });
 const notFound = () => typed(JS_TYPES.error, { condition: "not-found" }, null);
 const safe = (handler) => async (h, b) => {
-  var _a, _b;
   try {
     return await handler(h, b);
   } catch (e) {
-    (_b = (_a = h == null ? void 0 : h.kit) == null ? void 0 : _a.put) == null ? void 0 : _b.call(
-      _a,
+    h?.kit?.put?.(
       { type: JS_TYPES.error, path: "/condition" },
       {
         error: e.message,
         stack: e.stack,
-        context: { path: h == null ? void 0 : h.path, params: h == null ? void 0 : h.params }
+        context: { path: h?.path, params: h?.params }
       }
     ).catch(() => {
     });
@@ -2298,7 +2559,7 @@ const detectType = (value) => {
 const resource = ({ get = notFound, put = notFound } = {}) => ({
   get: safe(get),
   put: safe(async (headers, body) => {
-    if (!(headers == null ? void 0 : headers.type)) {
+    if (!headers?.type) {
       headers.type = detectType(body);
     }
     return await put(headers, body);
@@ -2313,15 +2574,14 @@ const pathRoot = (headers) => {
   return [segment, { ...headers, path: remaining }];
 };
 const disp = (map, dispatchFn) => async (method, headers, body) => {
-  var _a, _b;
   const [key, rest] = await dispatchFn(headers);
   const target = map[key ?? ""] ?? map.unknown;
   if (!target) return notFound();
   const isUnknown = map[key] === void 0 && map.unknown !== void 0;
   if (isUnknown) {
-    return ((_a = target[method]) == null ? void 0 : _a.call(target, headers, body)) ?? notFound();
+    return target[method]?.(headers, body) ?? notFound();
   }
-  return ((_b = target[method]) == null ? void 0 : _b.call(target, rest, body)) ?? notFound();
+  return target[method]?.(rest, body) ?? notFound();
 };
 function routes(map, dispatchFn = pathRoot) {
   const dispatch = disp(map, dispatchFn);
@@ -2482,7 +2742,7 @@ function createProjectsResource(db2) {
         body: db2.projects.list()
       }),
       put: async (_h, body) => {
-        const project = db2.projects.create((body == null ? void 0 : body.name) || "Untitled Project");
+        const project = db2.projects.create(body?.name || "Untitled Project");
         return { headers: { created: true }, body: project };
       }
     }),
@@ -2490,16 +2750,14 @@ function createProjectsResource(db2) {
     // PUT /projects/:id with null body - delete project
     unknown: bind("projectId", resource({
       get: async (h) => {
-        var _a;
-        const project = db2.projects.get(((_a = h.params) == null ? void 0 : _a.projectId) || "");
+        const project = db2.projects.get(h.params?.projectId || "");
         if (!project) {
           return { headers: { condition: "not-found" }, body: null };
         }
         return { headers: {}, body: project };
       },
       put: async (h, body) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         if (body === null) {
           db2.projects.delete(projectId);
           return { headers: { deleted: true }, body: null };
@@ -2547,8 +2805,7 @@ function createEntitiesResource(db2) {
     // GET/PUT/DELETE /attrs/:key - single attr
     unknown: bind("key", resource({
       get: async (h) => {
-        var _a;
-        const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+        const key = h.params?.key || "";
         const attrs = db2.attrs.get(entityId);
         const value = attrs[key];
         if (value === void 0) {
@@ -2557,8 +2814,7 @@ function createEntitiesResource(db2) {
         return { headers: {}, body: value };
       },
       put: async (h, body) => {
-        var _a;
-        const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+        const key = h.params?.key || "";
         const attrs = db2.attrs.get(entityId);
         const prev = attrs[key];
         const hadValue = key in attrs;
@@ -2618,8 +2874,7 @@ function createEntitiesResource(db2) {
     // PUT /entities/:id with null - delete entity
     "": resource({
       get: async (h) => {
-        var _a;
-        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        const entityId = h.params?.entityId || "";
         const entity = db2.entities.get(entityId);
         if (!entity) {
           return { headers: { condition: "not-found" }, body: null };
@@ -2627,8 +2882,7 @@ function createEntitiesResource(db2) {
         return { headers: {}, body: entity };
       },
       put: async (h, body) => {
-        var _a, _b;
-        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        const entityId = h.params?.entityId || "";
         const isCascadeDelete = body && typeof body === "object" && "cascade" in body && body.cascade;
         if (body === null || isCascadeDelete) {
           const entity = db2.entities.get(entityId);
@@ -2734,7 +2988,7 @@ function createEntitiesResource(db2) {
               to_port: rel.to_port
             });
           }
-          return { headers: { restored: true, count: restore.entities.length }, body: (_b = restore.entities[0]) == null ? void 0 : _b.entity };
+          return { headers: { restored: true, count: restore.entities.length }, body: restore.entities[0]?.entity };
         }
         return { headers: { condition: "not-implemented" }, body: null };
       }
@@ -2742,13 +2996,11 @@ function createEntitiesResource(db2) {
     // /entities/:id/attrs/...
     attrs: resource({
       get: async (h) => {
-        var _a;
-        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        const entityId = h.params?.entityId || "";
         return createAttrsResource(projectId, entityId).get(h);
       },
       put: async (h, body) => {
-        var _a;
-        const entityId = ((_a = h.params) == null ? void 0 : _a.entityId) || "";
+        const entityId = h.params?.entityId || "";
         return createAttrsResource(projectId, entityId).put(h, body);
       }
     })
@@ -2763,7 +3015,7 @@ function createEntitiesResource(db2) {
       }),
       put: async (h, body) => {
         const entity = db2.entities.create(projectId);
-        if ((body == null ? void 0 : body.attrs) && Object.keys(body.attrs).length > 0) {
+        if (body?.attrs && Object.keys(body.attrs).length > 0) {
           db2.attrs.setBatch(entity.id, body.attrs);
         }
         if (h.kit && !h.skipHistory) {
@@ -2829,8 +3081,7 @@ function createRelationshipsResource(db2) {
     // GET/DELETE /relationships/:id
     unknown: bind("relationshipId", resource({
       get: async (h) => {
-        var _a;
-        const relId = ((_a = h.params) == null ? void 0 : _a.relationshipId) || "";
+        const relId = h.params?.relationshipId || "";
         const rel = db2.relationships.get(relId);
         if (!rel) {
           return { headers: { condition: "not-found" }, body: null };
@@ -2838,8 +3089,7 @@ function createRelationshipsResource(db2) {
         return { headers: {}, body: rel };
       },
       put: async (h, body) => {
-        var _a;
-        const relId = ((_a = h.params) == null ? void 0 : _a.relationshipId) || "";
+        const relId = h.params?.relationshipId || "";
         if (body === null) {
           const rel = db2.relationships.get(relId);
           if (!rel) {
@@ -2912,8 +3162,7 @@ function createStampsResource(db2) {
       // DELETE /stamps/:id - delete stamp
       "": resource({
         get: async (h) => {
-          var _a;
-          const stampId = ((_a = h.params) == null ? void 0 : _a.stampId) || "";
+          const stampId = h.params?.stampId || "";
           const stamp = db2.stamps.get(stampId);
           if (!stamp) {
             return { headers: { condition: "not-found" }, body: null };
@@ -2921,8 +3170,7 @@ function createStampsResource(db2) {
           return { headers: {}, body: stamp };
         },
         put: async (h, body) => {
-          var _a;
-          const stampId = ((_a = h.params) == null ? void 0 : _a.stampId) || "";
+          const stampId = h.params?.stampId || "";
           if (body === null) {
             db2.stamps.delete(stampId);
             return { headers: { deleted: true }, body: null };
@@ -2938,9 +3186,8 @@ function createStampsResource(db2) {
       // PUT /stamps/:id/apply/:targetEntityId - apply stamp to entity
       apply: bind("targetEntityId", resource({
         put: async (h) => {
-          var _a, _b;
-          const stampId = ((_a = h.params) == null ? void 0 : _a.stampId) || "";
-          const targetEntityId = ((_b = h.params) == null ? void 0 : _b.targetEntityId) || "";
+          const stampId = h.params?.stampId || "";
+          const targetEntityId = h.params?.targetEntityId || "";
           const targetEntity = db2.entities.get(targetEntityId);
           if (!targetEntity) {
             return { headers: { condition: "not-found" }, body: { error: "Target entity not found" } };
@@ -2974,8 +3221,7 @@ function createStampsResource(db2) {
       // PUT /stamps/:id/unapply/:targetEntityId - undo stamp application
       unapply: bind("targetEntityId", resource({
         put: async (h, body) => {
-          var _a;
-          const targetEntityId = ((_a = h.params) == null ? void 0 : _a.targetEntityId) || "";
+          const targetEntityId = h.params?.targetEntityId || "";
           for (const id of [...body.createdRelationshipIds].reverse()) {
             db2.relationships.delete(id);
           }
@@ -3037,8 +3283,7 @@ function createThemesResource(db2) {
       // PUT /themes/:id with null - delete theme
       "": resource({
         get: async (h) => {
-          var _a;
-          const themeId = ((_a = h.params) == null ? void 0 : _a.themeId) || "";
+          const themeId = h.params?.themeId || "";
           const theme = db2.themes.get(themeId);
           if (!theme) {
             return { headers: { condition: "not-found" }, body: null };
@@ -3046,8 +3291,7 @@ function createThemesResource(db2) {
           return { headers: {}, body: theme };
         },
         put: async (h, body) => {
-          var _a;
-          const themeId = ((_a = h.params) == null ? void 0 : _a.themeId) || "";
+          const themeId = h.params?.themeId || "";
           if (body === null) {
             db2.themes.delete(themeId);
             return { headers: { deleted: true }, body: null };
@@ -3058,9 +3302,8 @@ function createThemesResource(db2) {
       // PUT /themes/:id/colors/:tokenId - update color
       colors: bind("tokenId", resource({
         put: async (h, body) => {
-          var _a, _b;
-          const themeId = ((_a = h.params) == null ? void 0 : _a.themeId) || "";
-          const tokenId = ((_b = h.params) == null ? void 0 : _b.tokenId) || "";
+          const themeId = h.params?.themeId || "";
+          const tokenId = h.params?.tokenId || "";
           db2.themes.updateColor(themeId, tokenId, body);
           return { headers: { updated: true }, body };
         }
@@ -3072,8 +3315,7 @@ function createSettingsResource(db2) {
   return bind("key", resource({
     // GET /settings/:key - get setting value
     get: async (h) => {
-      var _a;
-      const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+      const key = h.params?.key || "";
       const value = db2.settings.get(key);
       if (value === null) {
         return { headers: { condition: "not-found" }, body: null };
@@ -3082,8 +3324,7 @@ function createSettingsResource(db2) {
     },
     // PUT /settings/:key - set setting value
     put: async (h, body) => {
-      var _a;
-      const key = ((_a = h.params) == null ? void 0 : _a.key) || "";
+      const key = h.params?.key || "";
       db2.settings.set(key, body);
       return { headers: { updated: true }, body };
     }
@@ -3144,8 +3385,7 @@ function createShellResource() {
 function createSemanticDocsResource(db2) {
   const singleDoc = resource({
     get: async (h) => {
-      var _a;
-      const id = (_a = h.params) == null ? void 0 : _a.id;
+      const id = h.params?.id;
       if (!id) {
         return { headers: { condition: "error" }, body: "Missing id" };
       }
@@ -3172,6 +3412,106 @@ function createSemanticDocsResource(db2) {
     unknown: bind("id", singleDoc)
   });
 }
+function createCardsResource(db2) {
+  const setsResource = routes({
+    // GET /cards/sets - list all sets with card counts
+    // PUT /cards/sets - create new set
+    "": resource({
+      get: async () => {
+        const sets = db2.cards.listSets();
+        const setsWithCounts = sets.map((set) => ({
+          ...set,
+          card_count: db2.cards.getSetCardCount(set.id)
+        }));
+        return { headers: { type: "js/arr" }, body: setsWithCounts };
+      },
+      put: async (_h, body) => {
+        const set = db2.cards.createSet(body?.name || "Untitled Set");
+        return { headers: { created: true }, body: set };
+      }
+    }),
+    // GET /cards/sets/:setId - get set with card count
+    // PUT /cards/sets/:setId with null - delete set
+    unknown: bind("setId", routes({
+      "": resource({
+        get: async (h) => {
+          const setId = h.params?.setId || "";
+          const set = db2.cards.getSet(setId);
+          if (!set) {
+            return { headers: { condition: "not-found" }, body: null };
+          }
+          return {
+            headers: {},
+            body: {
+              ...set,
+              card_count: db2.cards.getSetCardCount(setId)
+            }
+          };
+        },
+        put: async (h, body) => {
+          const setId = h.params?.setId || "";
+          if (body === null) {
+            db2.cards.deleteSet(setId);
+            return { headers: { deleted: true }, body: null };
+          }
+          return { headers: { condition: "not-implemented" }, body: null };
+        }
+      }),
+      // GET /cards/sets/:setId/cards - get cards in set
+      cards: resource({
+        get: async (h) => {
+          const setId = h.params?.setId || "";
+          const cards = db2.cards.getSetCards(setId);
+          return { headers: { type: "js/arr" }, body: cards };
+        }
+      })
+    }))
+  });
+  const cardResource = bind("cardId", resource({
+    // GET /cards/:cardId - get card with source
+    get: async (h) => {
+      const cardId = h.params?.cardId || "";
+      const card = db2.cards.getCardWithSource(cardId);
+      if (!card) {
+        return { headers: { condition: "not-found" }, body: null };
+      }
+      return { headers: {}, body: card };
+    },
+    // PUT /cards/:cardId with null - delete card
+    // PUT /cards/:cardId with { source } - edit card
+    put: async (h, body) => {
+      const cardId = h.params?.cardId || "";
+      if (body === null) {
+        db2.cards.deleteCard(cardId);
+        return { headers: { deleted: true }, body: null };
+      }
+      if (body && typeof body === "object" && "source" in body) {
+        const newVersion = db2.cards.editCard(cardId, body.source);
+        const updated = db2.cards.getCardWithSource(cardId);
+        return { headers: { updated: true, version: newVersion }, body: updated };
+      }
+      return { headers: { condition: "not-implemented" }, body: null };
+    }
+  }));
+  return routes({
+    // GET /cards - list all cards
+    // PUT /cards - create new card
+    "": resource({
+      get: async () => {
+        const cards = db2.cards.listCards();
+        return { headers: { type: "js/arr" }, body: cards };
+      },
+      put: async (_h, body) => {
+        const card = db2.cards.createCard(body?.set_id ?? null, body?.source || "");
+        return { headers: { created: true }, body: card };
+      }
+    }),
+    // /cards/sets/*
+    sets: setsResource,
+    // /cards/:cardId
+    unknown: cardResource
+  });
+}
 function createVisualResources(db2) {
   const history = createHistory();
   const projects = createProjectsResource(db2);
@@ -3184,8 +3524,7 @@ function createVisualResources(db2) {
   const projectScopedResource = bind("projectId", routes({
     "": resource({
       get: async (h) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         const project = db2.projects.get(projectId);
         if (!project) {
           return { headers: { condition: "not-found" }, body: null };
@@ -3193,8 +3532,7 @@ function createVisualResources(db2) {
         return { headers: {}, body: project };
       },
       put: async (h, body) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         if (body === null) {
           db2.projects.delete(projectId);
           return { headers: { deleted: true }, body: null };
@@ -3204,43 +3542,38 @@ function createVisualResources(db2) {
     }),
     entities: resource({
       get: async (h) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         return entitiesFactory(projectId).get(h);
       },
       put: async (h, body) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         return entitiesFactory(projectId).put(h, body);
       }
     }),
     relationships: resource({
       get: async (h) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         return relationshipsFactory(projectId).get(h);
       },
       put: async (h, body) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         return relationshipsFactory(projectId).put(h, body);
       }
     }),
     "ui-state": resource({
       get: async (h) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         return uiStateFactory(projectId).get(h);
       },
       put: async (h, body) => {
-        var _a;
-        const projectId = ((_a = h.params) == null ? void 0 : _a.projectId) || "";
+        const projectId = h.params?.projectId || "";
         return uiStateFactory(projectId).put(h, body);
       }
     })
   }));
   const shell2 = createShellResource();
   const semanticDocs = createSemanticDocsResource(db2);
+  const cards = createCardsResource(db2);
   const tree = routes({
     projects: routes({
       "": resource({
@@ -3254,7 +3587,8 @@ function createVisualResources(db2) {
     settings,
     history,
     shell: shell2,
-    "semantic-docs": semanticDocs
+    "semantic-docs": semanticDocs,
+    cards
   });
   const withKit = (res) => {
     const kit = {
@@ -3317,19 +3651,19 @@ function createWindow() {
 }
 const menuCallbacks = {
   createProject: () => {
-    mainWindow == null ? void 0 : mainWindow.webContents.send("menu:create-project");
+    mainWindow?.webContents.send("menu:create-project");
   },
   openProject: () => {
-    mainWindow == null ? void 0 : mainWindow.webContents.send("menu:open-project");
+    mainWindow?.webContents.send("menu:open-project");
   },
   openProjectById: (id) => {
-    mainWindow == null ? void 0 : mainWindow.webContents.send("menu:open-project-by-id", id);
+    mainWindow?.webContents.send("menu:open-project-by-id", id);
   },
   exportProject: () => {
-    mainWindow == null ? void 0 : mainWindow.webContents.send("menu:export-project");
+    mainWindow?.webContents.send("menu:export-project");
   },
   showSettings: () => {
-    mainWindow == null ? void 0 : mainWindow.webContents.send("menu:show-settings");
+    mainWindow?.webContents.send("menu:show-settings");
   }
 };
 function refreshMenu() {
@@ -3402,7 +3736,13 @@ function setupIpcHandlers() {
   });
   ipcMain.handle("db:query", async (_, sql, params) => {
     try {
-      return { data: db.query.all(sql, params || []) };
+      const trimmed = sql.trim().toUpperCase();
+      if (trimmed.startsWith("SELECT")) {
+        return { data: db.query.all(sql, params || []) };
+      } else {
+        const result = db.query.run(sql, params || []);
+        return { data: [], changes: result.changes };
+      }
     } catch (error) {
       return { error: error.message };
     }
@@ -3418,6 +3758,32 @@ function setupIpcHandlers() {
   });
   ipcMain.handle("app:refreshMenu", () => {
     refreshMenu();
+  });
+  const getInitFilePath = () => path.join(app.getPath("home"), ".homebassrc");
+  ipcMain.handle("blemacs:readInit", () => {
+    const initPath = getInitFilePath();
+    try {
+      if (fs.existsSync(initPath)) {
+        return fs.readFileSync(initPath, "utf-8");
+      }
+      return null;
+    } catch (error) {
+      console.error("Failed to read init file:", error);
+      return null;
+    }
+  });
+  ipcMain.handle("blemacs:writeInit", (_, content) => {
+    const initPath = getInitFilePath();
+    try {
+      fs.writeFileSync(initPath, content, "utf-8");
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to write init file:", error);
+      return { success: false, error: error.message };
+    }
+  });
+  ipcMain.handle("blemacs:getInitPath", () => {
+    return getInitFilePath();
   });
 }
 export {

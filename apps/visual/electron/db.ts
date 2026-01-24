@@ -114,6 +114,12 @@ export const db = {
     // Always run migrations (idempotent)
     runMigrations(db, dataDir)
 
+    // Initialize card tables (idempotent - uses CREATE IF NOT EXISTS)
+    this.cards._initSchema()
+
+    // Seed example cards (idempotent - only runs if no sets exist)
+    this.cards._seedExamples()
+
     // Always seed themes (idempotent - uses INSERT OR REPLACE)
     seed(db, dataDir)
   },
@@ -991,6 +997,342 @@ export const db = {
         usage: string | null
         examples: string | null
       }>
+    },
+  },
+
+  // =========================================================================
+  // Cards (Borth source code units)
+  // =========================================================================
+
+  cards: {
+    /** Initialize card tables (called from db.init) */
+    _initSchema() {
+      const db = getDb()
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS card_sets (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+      `)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cards (
+          id TEXT PRIMARY KEY,
+          set_id TEXT REFERENCES card_sets(id),
+          head_version INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL
+        )
+      `)
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS card_versions (
+          card_id TEXT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+          version INTEGER NOT NULL,
+          source TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          PRIMARY KEY (card_id, version)
+        )
+      `)
+    },
+
+    /** Seed example card sets (idempotent - only runs if no sets exist) */
+    _seedExamples() {
+      const db = getDb()
+
+      // Check if already seeded
+      const existing = db.prepare('SELECT COUNT(*) as count FROM card_sets').get() as { count: number }
+      if (existing.count > 0) return
+
+      const exampleSets = [
+        {
+          name: 'Core Basics',
+          cards: [
+            `( Square a number )
+: square dup * ;
+( 5 square -> 25 )`,
+
+            `( Even/Odd predicates )
+: is-even 2 mod 0 = ;
+: is-odd is-even not ;`,
+
+            `( Factorial - recursive )
+: factorial
+  dup 1 <= if drop 1 exit then
+  dup 1 - factorial * ;`,
+
+            `( Fibonacci sequence )
+: fib
+  dup 1 <= if exit then
+  dup 1 - fib swap 2 - fib + ;`,
+
+            `( Max and Min of two values )
+: max 2dup < if swap then drop ;
+: min 2dup > if swap then drop ;`,
+          ],
+        },
+        {
+          name: 'Collections',
+          cards: [
+            `( Sum and Product of a list )
+: sum 0 swap [ + ] fold ;
+: product 1 swap [ * ] fold ;`,
+
+            `( List transformations )
+: double-all [ 2 * ] map ;
+: square-all [ dup * ] map ;`,
+
+            `( Filtering lists )
+: evens [ 2 mod 0 = ] filter ;
+: positives [ 0 > ] filter ;`,
+
+            `( Find and Count helpers )
+: contains swap [ = ] each-while not ;
+: count-if 0 swap rot [ swap 1 + swap ] when each drop ;`,
+          ],
+        },
+        {
+          name: 'Graph Patterns',
+          cards: [
+            `( Create a social network graph )
+in: social ; using: graph ;
+
+variable g  g <graph> .write
+variable alice  variable bob
+
+alice g .read [ " Alice" ] [ ' name ] structure .add-node .write
+bob g .read [ " Bob" ] [ ' name ] structure .add-node .write`,
+
+            `( Connection helpers )
+in: social ; using: graph ;
+
+: follow swap .read swap .read " follows" .connect drop ;
+: followers .incoming [ ' name .prop ] map ;
+: following .outgoing [ ' name .prop ] map ;`,
+
+            `( Graph traversal )
+in: social ; using: graph ;
+
+: print-network
+  .read [ ' name .prop . ] .traverse ;`,
+          ],
+        },
+        {
+          name: 'UI Behaviors',
+          cards: [
+            `( Counter component )
+in: ui ;
+
+: counter/render
+  self ' count .prop self .set-label ;
+
+: counter/click
+  self ' count .prop 1 + self ' count .prop! ;`,
+
+            `( Toggle component )
+in: ui ;
+
+: toggle/render
+  self ' active .prop
+  if " ON" else " OFF" then
+  self .set-label ;
+
+: toggle/click
+  self ' active .prop not self ' active .prop! ;`,
+
+            `( Timer display component )
+in: ui ;
+
+: timer/render
+  self ' seconds .prop
+  " Time: " swap concat self .set-label ;
+
+: timer/tick
+  self ' seconds .prop 1 + self ' seconds .prop! ;`,
+          ],
+        },
+        {
+          name: 'Commands',
+          cards: [
+            `( Hello Command )
+: hello ' success " Hello from Borth!" toast ;
+cmd
+doc{ Displays a friendly greeting }
+key: C-h`,
+
+            `( Save Command )
+: save-all ' info " Saving..." toast ;
+cmd
+doc{ Save all open files }
+key: C-x C-s
+category: file`,
+
+            `( Toggle Theme Command )
+: toggle-theme
+  current-theme " dark" =
+  if " light" else " dark" then
+  set-theme ;
+cmd
+doc{ Switch between light and dark themes }
+key: C-t`,
+          ],
+        },
+      ]
+
+      // Create sets and cards
+      for (const set of exampleSets) {
+        const setResult = this.createSet(set.name)
+        for (const source of set.cards) {
+          this.createCard(setResult.id, source)
+        }
+      }
+    },
+
+    // --- Set operations ---
+
+    listSets() {
+      const db = getDb()
+      return db.prepare('SELECT id, name, created_at FROM card_sets ORDER BY created_at DESC').all() as Array<{
+        id: string
+        name: string
+        created_at: number
+      }>
+    },
+
+    getSet(id: string) {
+      const db = getDb()
+      return db.prepare('SELECT id, name, created_at FROM card_sets WHERE id = ?').get(id) as {
+        id: string
+        name: string
+        created_at: number
+      } | null
+    },
+
+    createSet(name: string) {
+      const db = getDb()
+      const id = randomUUID()
+      const now = Date.now()
+      db.prepare('INSERT INTO card_sets (id, name, created_at) VALUES (?, ?, ?)').run(id, name, now)
+      return { id, name, created_at: now }
+    },
+
+    deleteSet(id: string) {
+      const db = getDb()
+      // Orphan cards (set their set_id to null)
+      db.prepare('UPDATE cards SET set_id = NULL WHERE set_id = ?').run(id)
+      db.prepare('DELETE FROM card_sets WHERE id = ?').run(id)
+    },
+
+    getSetCardCount(setId: string) {
+      const db = getDb()
+      const result = db.prepare('SELECT COUNT(*) as count FROM cards WHERE set_id = ?').get(setId) as { count: number }
+      return result.count
+    },
+
+    // --- Card operations ---
+
+    listCards() {
+      const db = getDb()
+      return db.prepare(`
+        SELECT c.id, c.set_id, c.head_version, c.created_at, v.source
+        FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        ORDER BY c.created_at DESC
+      `).all() as Array<{
+        id: string
+        set_id: string | null
+        head_version: number
+        created_at: number
+        source: string
+      }>
+    },
+
+    getSetCards(setId: string) {
+      const db = getDb()
+      return db.prepare(`
+        SELECT c.id, c.set_id, c.head_version, c.created_at, v.source
+        FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        WHERE c.set_id = ?
+        ORDER BY c.created_at
+      `).all(setId) as Array<{
+        id: string
+        set_id: string | null
+        head_version: number
+        created_at: number
+        source: string
+      }>
+    },
+
+    getCard(id: string) {
+      const db = getDb()
+      const card = db.prepare('SELECT id, set_id, head_version, created_at FROM cards WHERE id = ?').get(id) as {
+        id: string
+        set_id: string | null
+        head_version: number
+        created_at: number
+      } | null
+      return card
+    },
+
+    getCardWithSource(id: string) {
+      const db = getDb()
+      return db.prepare(`
+        SELECT c.id, c.set_id, c.head_version, c.created_at, v.source
+        FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        WHERE c.id = ?
+      `).get(id) as {
+        id: string
+        set_id: string | null
+        head_version: number
+        created_at: number
+        source: string
+      } | null
+    },
+
+    getCardSource(id: string) {
+      const db = getDb()
+      const result = db.prepare(`
+        SELECT v.source FROM cards c
+        JOIN card_versions v ON c.id = v.card_id AND c.head_version = v.version
+        WHERE c.id = ?
+      `).get(id) as { source: string } | undefined
+      return result?.source ?? null
+    },
+
+    createCard(setId: string | null, source: string) {
+      const db = getDb()
+      const id = randomUUID()
+      const now = Date.now()
+
+      db.prepare('INSERT INTO cards (id, set_id, head_version, created_at) VALUES (?, ?, 0, ?)').run(id, setId, now)
+      db.prepare('INSERT INTO card_versions (card_id, version, source, created_at) VALUES (?, 0, ?, ?)').run(id, source, now)
+
+      return { id, set_id: setId, head_version: 0, created_at: now, source }
+    },
+
+    editCard(id: string, newSource: string) {
+      const db = getDb()
+      const card = db.prepare('SELECT head_version FROM cards WHERE id = ?').get(id) as { head_version: number } | undefined
+      if (!card) throw new Error(`Card not found: ${id}`)
+
+      const newVersion = card.head_version + 1
+      const now = Date.now()
+
+      db.prepare('INSERT INTO card_versions (card_id, version, source, created_at) VALUES (?, ?, ?, ?)').run(id, newVersion, newSource, now)
+      db.prepare('UPDATE cards SET head_version = ? WHERE id = ?').run(newVersion, id)
+
+      return newVersion
+    },
+
+    deleteCard(id: string) {
+      const db = getDb()
+      // card_versions cascade delete via ON DELETE CASCADE
+      db.prepare('DELETE FROM cards WHERE id = ?').run(id)
+    },
+
+    moveCard(cardId: string, newSetId: string | null) {
+      const db = getDb()
+      db.prepare('UPDATE cards SET set_id = ? WHERE id = ?').run(newSetId, cardId)
     },
   },
 

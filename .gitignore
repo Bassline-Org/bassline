@@ -70,3 +70,5 @@ bassline-web/.env.test
 *.tmp
 *.temp
 /bassline-web/.react-router/
+
+apps/visual/release/

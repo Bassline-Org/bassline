@@ -7,6 +7,7 @@ export interface Project {
   name: string
   created_at: number
   modified_at: number
+  boot_card_id?: string | null
 }
 
 /** Core entity - just identity. All properties are attrs. */
@@ -270,3 +271,72 @@ export interface EditorLoaderData {
   uiState: UIState
 }
 
+// =============================================================================
+// Cards (Borth source code units)
+// =============================================================================
+
+/** Card set - collection of related cards */
+export interface CardSet {
+  id: string
+  name: string
+  created_at: number
+  card_count?: number
+}
+
+/** Card - unit of Borth source code with version history */
+export interface Card {
+  id: string
+  set_id: string | null
+  head_version: number
+  created_at: number
+  source: string
+}
+
+/** Card without source (basic metadata only) */
+export interface CardMeta {
+  id: string
+  set_id: string | null
+  head_version: number
+  created_at: number
+}
+
+// Re-export parsed semantic metadata types from lib/cards
+export type { ParsedCardMeta } from '@/lib/cards/parseCardMeta'
+export type { CardCategory } from '@/lib/cards/categoryColors'
+
+/** Loader data for card browser */
+export interface CardsLoaderData {
+  sets: CardSet[]
+  currentSetId?: string
+  currentSetCards?: Card[]
+}
+
+// =============================================================================
+// Card Display System
+// =============================================================================
+
+/** Display modes for cards */
+export type CardDisplayMode = 'code' | 'art' | 'text' | 'minimal'
+
+/** Card density options */
+export type CardDensity = 'compact' | 'default' | 'spacious'
+
+/** Display metadata for a card */
+export interface CardDisplayMeta {
+  displayMode?: CardDisplayMode
+  title?: string
+  description?: string
+  artworkSeed?: string      // defaults to card.id
+  artworkGrayscale?: boolean
+  artworkBlur?: number      // 0-10
+  tags?: string[]
+}
+
+/** View configuration for card browser */
+export interface CardViewConfig {
+  defaultDisplayMode: CardDisplayMode
+  defaultSetDisplayMode: CardDisplayMode
+  boxVariant: 'default' | 'elevated' | 'outlined' | 'glass'
+  parallax: boolean
+  density: CardDensity
+}

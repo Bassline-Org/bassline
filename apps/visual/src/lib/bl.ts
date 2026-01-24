@@ -16,6 +16,8 @@ import type {
   ApplyStampResult,
   AttrValue,
   AttrType,
+  CardSet,
+  Card,
 } from '../types'
 
 // =============================================================================
@@ -441,6 +443,64 @@ export const bl = {
     /** Cancel a batch - discards collected operations without adding to history */
     cancelBatch: async (): Promise<void> => {
       await window.bl.put({ path: '/history/cancelBatch' }, null)
+    },
+  },
+
+  // ===========================================================================
+  // Cards (Borth source code units)
+  // ===========================================================================
+
+  cards: {
+    // --- Sets ---
+
+    listSets: async (): Promise<CardSet[]> => {
+      const res = await window.bl.get<CardSet[]>({ path: '/cards/sets' })
+      return res.body
+    },
+
+    getSet: async (id: string): Promise<CardSet | null> => {
+      const res = await window.bl.get<CardSet>({ path: `/cards/sets/${id}` })
+      return res.headers.condition === 'not-found' ? null : res.body
+    },
+
+    createSet: async (name: string): Promise<CardSet> => {
+      const res = await window.bl.put<CardSet>({ path: '/cards/sets' }, { name })
+      return res.body
+    },
+
+    deleteSet: async (id: string): Promise<void> => {
+      await window.bl.put({ path: `/cards/sets/${id}` }, null)
+    },
+
+    getSetCards: async (setId: string): Promise<Card[]> => {
+      const res = await window.bl.get<Card[]>({ path: `/cards/sets/${setId}/cards` })
+      return res.body
+    },
+
+    // --- Cards ---
+
+    listAll: async (): Promise<Card[]> => {
+      const res = await window.bl.get<Card[]>({ path: '/cards' })
+      return res.body
+    },
+
+    get: async (id: string): Promise<Card | null> => {
+      const res = await window.bl.get<Card>({ path: `/cards/${id}` })
+      return res.headers.condition === 'not-found' ? null : res.body
+    },
+
+    create: async (setId: string | null, source: string): Promise<Card> => {
+      const res = await window.bl.put<Card>({ path: '/cards' }, { set_id: setId, source })
+      return res.body
+    },
+
+    update: async (id: string, source: string): Promise<Card> => {
+      const res = await window.bl.put<Card>({ path: `/cards/${id}` }, { source })
+      return res.body
+    },
+
+    delete: async (id: string): Promise<void> => {
+      await window.bl.put({ path: `/cards/${id}` }, null)
     },
   },
 }

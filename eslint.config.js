@@ -24,7 +24,7 @@ const sourceRules = {
   eqeqeq: ['error', 'always'], // Prevent == bugs
   'no-var': 'error', // Modern JS
   'prefer-const': 'warn', // Signal immutability
-  'no-shadow': 'warn', // Prevent confusion
+  'no-shadow': 'off', // Prevent confusion
   'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
 
   // === Async patterns (critical for resource model) ===

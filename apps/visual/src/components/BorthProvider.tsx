@@ -15,11 +15,14 @@ import {
   type ReactNode,
 } from 'react'
 // @ts-expect-error - borth.js has no type declarations
-import { createRuntime } from '../lib/borth'
+import { createRuntime, runCard } from '../lib/borth'
 import { registerCommand, registerHook, registerSetting } from '../lib/CommandRegistry'
 import { createEventBus, Events } from '../lib/EventBus'
 import { useToast } from './ToastProvider'
 import { CommandPalette } from './CommandPalette'
+import { PromptDialog } from './interactions/PromptDialog'
+import { ConfirmDialog } from './interactions/ConfirmDialog'
+import { EditorDialog } from './interactions/EditorDialog'
 import { useKeybindings } from '../hooks/useKeybindings'
 
 // Re-export CommandRegistry functions for convenience
@@ -40,6 +43,17 @@ export { Events }
 
 type Runtime = ReturnType<typeof createRuntime>
 
+interface CardStorage {
+  getCard: (cardId: string) => { head_version: number } | null
+  getCardSource: (cardId: string) => string | null
+}
+
+interface Project {
+  id: string
+  name: string
+  boot_card_id?: string | null
+}
+
 interface BorthContextValue {
   rt: Runtime
   run: (code?: string) => Promise<void>
@@ -47,6 +61,7 @@ interface BorthContextValue {
   emit: (event: string, payload?: unknown) => Promise<void>
   openCommandPalette: () => void
   reset: () => void
+  setProject: (project: Project | null, cardStorage?: CardStorage | null) => Promise<void>
 }
 
 const BorthContext = createContext<BorthContextValue | null>(null)
@@ -66,10 +81,17 @@ function createConfiguredRuntime() {
   return rt
 }
 
+interface PendingInteraction {
+  type: 'prompt' | 'confirm' | 'edit'
+  config: Record<string, unknown>
+}
+
 export function BorthProvider({ children, initSource }: BorthProviderProps) {
   const { showToast } = useToast()
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [ready, setReady] = useState(false)
+  const [interaction, setInteraction] = useState<PendingInteraction | null>(null)
+  const resolverRef = useRef<((result: unknown) => void) | null>(null)
 
   // Create runtime + eventbus together (in ref to persist across renders)
   const rtRef = useRef<Runtime | null>(null)
@@ -77,6 +99,20 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
 
   if (!rtRef.current) {
     rtRef.current = createConfiguredRuntime()
+  }
+
+  // Set up the interaction handler on the runtime
+  // This is updated on every render to capture the latest refs
+  if (rtRef.current) {
+    ;(rtRef.current as unknown as { handleInteraction: typeof rtRef.current.handleInteraction }).handleInteraction = (
+      type: 'prompt' | 'confirm' | 'edit',
+      config: Record<string, unknown>
+    ) => {
+      return new Promise((resolve) => {
+        setInteraction({ type, config })
+        resolverRef.current = resolve
+      })
+    }
   }
 
   // EventBus needs showToast which can change, so we create it in useEffect
@@ -176,6 +212,39 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
       eventBusRef.current.emit
   }, [showToast])
 
+  // Set project context and run boot card if present
+  const setProject = useCallback(
+    async (project: Project | null, cardStorage?: CardStorage | null): Promise<void> => {
+      const currentRt = rtRef.current
+      if (!currentRt) return
+
+      // Clear previous project context
+      ;(currentRt as unknown as { setProject: (id: string | null, cs: CardStorage | null) => void }).setProject(
+        project?.id ?? null,
+        cardStorage ?? null
+      )
+
+      // Run boot card if project has one and we have card storage
+      if (project?.boot_card_id && cardStorage) {
+        try {
+          await runCard(currentRt, cardStorage, project.boot_card_id)
+          await eventBus.emit('project:ready', { projectId: project.id })
+        } catch (err) {
+          console.error('Boot card failed:', err)
+          showToast({
+            type: 'error',
+            title: 'Boot card failed',
+            message: err instanceof Error ? err.message : String(err),
+          })
+        }
+      } else if (project) {
+        // Project loaded without boot card
+        await eventBus.emit('project:ready', { projectId: project.id })
+      }
+    },
+    [eventBus, showToast]
+  )
+
   // Window focus/blur events
   useEffect(() => {
     const handleFocus = () => eventBus.emit(Events.WINDOW_FOCUS, {})
@@ -256,6 +325,15 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
     onCommandPalette: () => setPaletteOpen(true),
   })
 
+  // Handle interaction resolution
+  const handleInteractionResolve = useCallback((result: unknown) => {
+    if (resolverRef.current) {
+      resolverRef.current(result)
+      resolverRef.current = null
+    }
+    setInteraction(null)
+  }, [])
+
   // Context value with all global functions
   const contextValue: BorthContextValue = {
     rt,
@@ -264,6 +342,7 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
     emit: eventBus.emit,
     openCommandPalette: () => setPaletteOpen(true),
     reset,
+    setProject,
   }
 
   // Don't render children until init is complete
@@ -279,6 +358,24 @@ export function BorthProvider({ children, initSource }: BorthProviderProps) {
         onClose={() => setPaletteOpen(false)}
         onRunCommand={handleRunCommand}
       />
+      {interaction?.type === 'prompt' && (
+        <PromptDialog
+          config={interaction.config as { label: string; defaultValue?: string }}
+          onResolve={handleInteractionResolve}
+        />
+      )}
+      {interaction?.type === 'confirm' && (
+        <ConfirmDialog
+          config={interaction.config as { message: string; title?: string }}
+          onResolve={handleInteractionResolve}
+        />
+      )}
+      {interaction?.type === 'edit' && (
+        <EditorDialog
+          config={interaction.config as { text: string; title?: string }}
+          onResolve={handleInteractionResolve}
+        />
+      )}
     </BorthContext.Provider>
   )
 }
