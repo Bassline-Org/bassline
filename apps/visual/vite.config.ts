@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 import electron from 'vite-plugin-electron'
-import renderer from 'vite-plugin-electron-renderer'
 import path from 'path'
 import { builtinModules } from 'module'
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     react(),
     electron([
       {
@@ -21,7 +22,7 @@ export default defineConfig({
                 'font-list',
                 'electron',
                 ...builtinModules,
-                ...builtinModules.map((m) => `node:${m}`),
+                ...builtinModules.map(m => `node:${m}`),
               ],
             },
           },
@@ -39,7 +40,6 @@ export default defineConfig({
         },
       },
     ]),
-    renderer(),
   ],
   resolve: {
     alias: {
@@ -51,5 +51,13 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+  },
+  optimizeDeps: {
+    include: ['koota'],
+    esbuildOptions: {
+      // Ensure ESM resolution
+      mainFields: ['module', 'main'],
+      conditions: ['import', 'module', 'browser', 'default'],
+    },
   },
 })
