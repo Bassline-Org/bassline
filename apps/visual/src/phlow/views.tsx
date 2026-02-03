@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Textarea } from '../components/ui/textarea'
-import { DescribedForm, useDescribedState, type AnyDescription } from '@/magritte'
+import { BoundForm, useBoundState } from '@/magritte'
 import { ColumnedList, Descriptor, Explicit, Forward, List, PhlowViewType, TextEditor, IViewable } from './phlow'
 
 export function TextView({ item }: { item: TextEditor }) {
@@ -80,30 +80,18 @@ export function ExplicitView({ item }: { item: Explicit }) {
   return <>{item.component()}</>
 }
 
-export function DescriptorView<T>({ item }: { item: Descriptor<T> }) {
-  const description = useMemo(() => item.description(), [item])
+export function DescriptorView<T extends object>({ item }: { item: Descriptor<T> }) {
+  const schema = useMemo(() => item.description(), [item])
   const initialModel = useMemo(() => item.model(), [item])
 
-  const { draft, update, validation, hasErrors } = useDescribedState(description, initialModel)
+  const { bound, model, validation, hasErrors } = useBoundState<T>(schema, initialModel)
 
   // Notify on changes (consequential - doesn't block)
   useEffect(() => {
-    item.onUpdate?.(draft)
-  }, [draft, item])
+    item.onUpdate?.(model)
+  }, [model, item])
 
-  const handleChange = (desc: AnyDescription<T>, value: unknown) => {
-    update(desc as AnyDescription<T> & { accessor: { read: (m: T) => unknown; write: (m: T, v: unknown) => T } }, value)
-  }
-
-  return (
-    <DescribedForm
-      description={description}
-      model={draft}
-      onChange={handleChange}
-      validation={validation}
-      hasErrors={hasErrors}
-    />
-  )
+  return <BoundForm bound={bound} validation={validation} hasErrors={hasErrors} />
 }
 
 export function PhlowView<T>({ item }: { item: PhlowViewType<T> }) {
@@ -143,7 +131,7 @@ export function PhlowView<T>({ item }: { item: PhlowViewType<T> }) {
     body = <ColumnedListView item={item} />
   }
   if (type === 'descriptor') {
-    body = <DescriptorView item={item} />
+    body = <DescriptorView item={item as Descriptor<object>} />
   }
 
   return (

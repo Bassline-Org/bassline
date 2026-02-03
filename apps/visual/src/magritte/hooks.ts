@@ -1,167 +1,134 @@
 /**
- * React hooks for Magritte descriptions
+ * React hooks for Magritte bound descriptions
  *
- * Uses jotai-immer for draft state management, providing
+ * Uses jotai-immer for state management, providing
  * memento-like behavior without explicit memento classes.
  */
 
 import { useMemo, useCallback, useRef } from 'react'
 import { useAtom } from 'jotai'
 import { atomWithImmer } from 'jotai-immer'
-import type { ContainerDescription, AnyDescription, ValidationResult } from './description'
+import type { ContainerSchema, ValidationResult } from './schema'
+import type { BoundContainer, AnyBound } from './bound'
+import { bindContainer } from './bound'
+import { validateBound, hasValidationErrors, hasValidationWarnings } from './validation'
 
-/**
- * Check if a value is "undefined" according to a description
- */
-function isUndefinedValue<T, V>(value: V, desc: AnyDescription<T>): boolean {
-  if (value === null || value === undefined) return true
+export type ValidationMap = Map<AnyBound, ValidationResult>
 
-  if ('undefinedValue' in desc && desc.undefinedValue !== undefined) {
-    return value === desc.undefinedValue
-  }
-
-  if (typeof value === 'string' && value === '') return true
-
-  return false
-}
-
-/**
- * Validate a single description against a model
- */
-function validateDescription<T>(desc: AnyDescription<T>, model: T): ValidationResult {
-  const value = desc.accessor.read(model)
-
-  // Check required
-  if (desc.required && isUndefinedValue(value, desc)) {
-    return {
-      valid: false,
-      errors: [{ message: 'Required', severity: 'warning' }],
-    }
-  }
-
-  // Run custom validation
-  if (desc.validate) {
-    return desc.validate(value as never, model)
-  }
-
-  return { valid: true, errors: [] }
-}
-
-/**
- * Validate all descriptions in a container
- */
-function validateContainer<T>(container: ContainerDescription<T>, model: T): Map<AnyDescription<T>, ValidationResult> {
-  const results = new Map<AnyDescription<T>, ValidationResult>()
-
-  for (const desc of container.children) {
-    results.set(desc, validateDescription(desc, model))
-  }
-
-  return results
-}
-
-export type DescribedState<T> = {
-  /** Current draft value */
-  draft: T
-  /** Update a field using its description */
-  update: <V>(desc: AnyDescription<T> & { accessor: { read: (m: T) => V; write: (m: T, v: V) => T } }, value: V) => void
-  /** Validation results for each description */
-  validation: Map<AnyDescription<T>, ValidationResult>
+export type BoundState<T extends object> = {
+  /** Bound container with all fields */
+  bound: BoundContainer
+  /** Current model value */
+  model: T
+  /** Validation results for each bound field */
+  validation: ValidationMap
   /** Whether any errors exist (warnings don't count) */
   hasErrors: boolean
-  /** Reset draft to initial value */
+  /** Whether any warnings exist */
+  hasWarnings: boolean
+  /** Reset model to initial value */
   reset: () => void
   /** Get the initial value */
   initial: T
 }
 
 /**
- * Hook for editing a value according to a container description.
+ * Hook for editing a value according to a container schema.
  *
  * Provides memento-like behavior using jotai-immer:
  * - Draft mutations are isolated from committed state
  * - Validation runs on every change (consequential - doesn't block)
  * - Reset returns to initial value
  */
-export function useDescribedState<T>(container: ContainerDescription<T>, initial: T): DescribedState<T> {
+export function useBoundState<T extends object>(schema: ContainerSchema, initial: T): BoundState<T> {
   // Store initial value in a ref to avoid recreating atom on every render
   const initialRef = useRef(initial)
 
   // Create atom lazily - jotai-immer handles draft mutations
-  const draftAtom = useMemo(() => atomWithImmer(initialRef.current), [])
-  const [draft, setDraft] = useAtom(draftAtom)
+  const modelAtom = useMemo(() => atomWithImmer(initialRef.current), [])
+  const [model, setModel] = useAtom(modelAtom)
 
-  // Compute validation for all fields (consequential - doesn't block)
-  const validation = useMemo(() => validateContainer(container, draft), [draft, container])
-
-  // Update function that works with any description
-  const update = useCallback(
-    <V>(desc: AnyDescription<T> & { accessor: { read: (m: T) => V; write: (m: T, v: V) => T } }, value: V) => {
-      setDraft(d => {
-        const updated = desc.accessor.write(d as T, value)
-        // Immer handles the mutation
-        Object.assign(d as object, updated)
-      })
-    },
-    [setDraft]
+  // Create the bound container, passing setModel as onChange
+  const bound = useMemo(
+    () => bindContainer(schema, model as object, newModel => setModel(() => newModel as T)),
+    [schema, model, setModel]
   )
 
-  // Check if form has any errors (warnings don't count)
-  const hasErrors = useMemo(() => {
-    for (const result of validation.values()) {
-      if (!result.valid && result.errors.some(e => e.severity === 'error')) {
-        return true
-      }
-    }
-    return false
-  }, [validation])
+  // Compute validation for all fields (consequential - doesn't block)
+  const validation = useMemo(() => validateBound(bound), [bound])
+
+  // Check if form has errors or warnings
+  const hasErrors = useMemo(() => hasValidationErrors(validation), [validation])
+  const hasWarnings = useMemo(() => hasValidationWarnings(validation), [validation])
 
   // Reset to initial value
   const reset = useCallback(() => {
-    setDraft(() => initialRef.current)
-  }, [setDraft])
+    setModel(() => initialRef.current)
+  }, [setModel])
 
   return {
-    draft,
-    update,
+    bound,
+    model: model as T,
     validation,
     hasErrors,
+    hasWarnings,
     reset,
     initial: initialRef.current,
   }
 }
 
 /**
- * Simpler hook for reading description validation without state management.
+ * Simpler hook for reading validation without state management.
  * Useful when you already have state from elsewhere.
  */
-export function useDescriptionValidation<T>(
-  container: ContainerDescription<T>,
-  model: T
-): {
-  validation: Map<AnyDescription<T>, ValidationResult>
+export function useBoundValidation(bound: BoundContainer): {
+  validation: ValidationMap
   hasErrors: boolean
   hasWarnings: boolean
 } {
-  const validation = useMemo(() => validateContainer(container, model), [model, container])
-
-  const hasErrors = useMemo(() => {
-    for (const result of validation.values()) {
-      if (result.errors.some(e => e.severity === 'error')) {
-        return true
-      }
-    }
-    return false
-  }, [validation])
-
-  const hasWarnings = useMemo(() => {
-    for (const result of validation.values()) {
-      if (result.errors.some(e => e.severity === 'warning')) {
-        return true
-      }
-    }
-    return false
-  }, [validation])
+  const validation = useMemo(() => validateBound(bound), [bound])
+  const hasErrors = useMemo(() => hasValidationErrors(validation), [validation])
+  const hasWarnings = useMemo(() => hasValidationWarnings(validation), [validation])
 
   return { validation, hasErrors, hasWarnings }
+}
+
+/**
+ * Hook for inline editing with draft state.
+ * Used by ToOne and ToMany fields.
+ */
+export function useInlineEdit<T>(
+  initial: T,
+  onSave: (value: T) => void
+): {
+  draft: T
+  setDraft: (updater: T | ((prev: T) => T)) => void
+  isEditing: boolean
+  startEdit: () => void
+  cancel: () => void
+  save: () => void
+} {
+  const draftAtom = useMemo(() => atomWithImmer(initial), [initial])
+  const [draft, setDraft] = useAtom(draftAtom)
+  const editingAtom = useMemo(() => atomWithImmer(false), [])
+  const [isEditing, setIsEditing] = useAtom(editingAtom)
+
+  const startEdit = useCallback(() => setIsEditing(() => true), [setIsEditing])
+  const cancel = useCallback(() => {
+    setDraft(() => initial)
+    setIsEditing(() => false)
+  }, [initial, setDraft, setIsEditing])
+  const save = useCallback(() => {
+    onSave(draft as T)
+    setIsEditing(() => false)
+  }, [draft, onSave, setIsEditing])
+
+  return {
+    draft: draft as T,
+    setDraft: setDraft as (updater: T | ((prev: T) => T)) => void,
+    isEditing,
+    startEdit,
+    cancel,
+    save,
+  }
 }

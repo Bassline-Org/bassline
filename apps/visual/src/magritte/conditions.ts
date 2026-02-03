@@ -5,7 +5,7 @@
  * They are converted to validators for use with descriptions.
  */
 
-import type { ValidationResult, ValidationError } from './description'
+import type { ValidationResult, ValidationError } from './schema'
 
 export type Condition<V> = (value: V) => boolean
 
