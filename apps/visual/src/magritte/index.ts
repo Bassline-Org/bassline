@@ -2,38 +2,87 @@
  * Magritte Meta-Description Framework
  *
  * A framework for describing object structure with consequential validation.
- * Named after Ren Magritte's "Ceci n'est pas une pipe" - this is not a description,
- * it's a description of a description.
+ *
+ * ## Architecture: Schema + Bound
+ *
+ * - **Schema**: Pure metadata, no generics, defines structure and constraints
+ * - **Bound**: Runtime binding that connects schemas to model instances
+ *
+ * This design eliminates type casts in components by using discriminated union narrowing.
  */
 
-// Core description types and factories
+// === Schema Layer (metadata, no generics) ===
+
 export {
-  // Types
-  type Accessor,
+  // Schema types
+  type StringSchema,
+  type NumberSchema,
+  type BooleanSchema,
+  type ContainerSchema,
+  type ToOneSchema,
+  type ToManySchema,
+  type AnySchema,
+
+  // Validation types
   type ValidationError,
   type ValidationEffect,
   type ValidationResult,
-  type StringDescription,
-  type NumberDescription,
-  type BooleanDescription,
-  type ContainerDescription,
-  type ToOneDescription,
-  type ToManyDescription,
-  type AnyDescription,
-
-  // Utilities
-  prop,
-  path,
   validResult,
   invalidResult,
 
-  // Factory object
-  describe,
-} from './description'
+  // Factory
+  schema,
+} from './schema'
 
-// Condition system
+// === Bound Layer (runtime binding) ===
+
 export {
-  // Condition type
+  // Bound types (concrete, no generics)
+  type BoundString,
+  type BoundNumber,
+  type BoundBoolean,
+  type BoundContainer,
+  type BoundToOne,
+  type BoundToMany,
+  type AnyBound,
+
+  // Binding functions
+  bindContainer,
+  bindField,
+  createBinder,
+} from './bound'
+
+// === Validation ===
+
+export {
+  type ValidationMap,
+  isUndefinedValue,
+  validateBound,
+  validateBoundDeep,
+  hasValidationErrors,
+  hasValidationWarnings,
+  getValidationErrors,
+  hasBoundErrors,
+  getBoundValidation,
+} from './validation'
+
+// === React Hooks ===
+
+export { type BoundState, useBoundState, useBoundValidation, useInlineEdit } from './hooks'
+
+// === React Components ===
+
+export {
+  BoundField,
+  BoundForm,
+  // Legacy aliases
+  DescribedField,
+  DescribedForm,
+} from './fields'
+
+// === Conditions (commonly used) ===
+
+export {
   type Condition,
 
   // Combinators
@@ -44,47 +93,17 @@ export {
   // String conditions
   minLength,
   maxLength,
-  lengthBetween,
   pattern,
-  nonEmpty,
-  startsWith,
-  endsWith,
-  contains,
   isEmail,
-  isUrl,
-  isAlphanumeric,
 
   // Number conditions
   min,
   max,
   range,
   integer,
-  positive,
-  negative,
-  nonZero,
-  finite,
-  multipleOf,
 
-  // Boolean conditions
-  isTrue,
-  isFalse,
-
-  // Generic conditions
-  isNull,
-  isUndefined,
-  isNullish,
-  isDefined,
-  equals,
-  oneOf,
-
-  // Conversion utilities
+  // Validator conversion
   conditionToValidator,
   combineValidators,
   conditionalValidator,
 } from './conditions'
-
-// React hooks
-export { type DescribedState, useDescribedState, useDescriptionValidation } from './hooks'
-
-// Field components
-export { DescribedField, DescribedForm } from './fields'
