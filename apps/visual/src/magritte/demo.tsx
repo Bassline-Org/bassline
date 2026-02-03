@@ -4,9 +4,9 @@
  * This demonstrates composed forms with toOne and toMany relations.
  */
 
-import { useState } from 'react'
 import { describe, prop, type AnyDescription } from './description'
 import { DescribedForm } from './fields'
+import { useDescribedState } from './hooks'
 
 // === Models ===
 
@@ -83,7 +83,7 @@ const projectDescription = describe.container<Project>({
 // === Demo Component ===
 
 export function RelationsDemo() {
-  const [project, setProject] = useState<Project>({
+  const { draft, update, validation, hasErrors } = useDescribedState(projectDescription, {
     name: 'My Project',
     author: availableAuthors[0],
     tasks: [
@@ -93,18 +93,28 @@ export function RelationsDemo() {
   })
 
   const handleChange = (desc: AnyDescription<Project>, value: unknown) => {
-    // Cast accessor to handle the union type variance issue
-    const accessor = desc.accessor as { read: (m: Project) => unknown; write: (m: Project, v: unknown) => Project }
-    setProject(accessor.write(project, value))
+    // Cast description to the expected type for update
+    update(
+      desc as AnyDescription<Project> & {
+        accessor: { read: (m: Project) => unknown; write: (m: Project, v: unknown) => Project }
+      },
+      value
+    )
   }
 
   return (
     <div className="p-6 max-w-xl">
       <h2 className="text-lg font-semibold mb-4">Project Form</h2>
-      <DescribedForm description={projectDescription} model={project} onChange={handleChange} />
+      <DescribedForm
+        description={projectDescription}
+        model={draft}
+        onChange={handleChange}
+        validation={validation}
+        hasErrors={hasErrors}
+      />
       <div className="mt-6 p-4 bg-muted rounded-md">
         <h3 className="text-sm font-medium mb-2">Current State:</h3>
-        <pre className="text-xs overflow-auto">{JSON.stringify(project, null, 2)}</pre>
+        <pre className="text-xs overflow-auto">{JSON.stringify(draft, null, 2)}</pre>
       </div>
     </div>
   )

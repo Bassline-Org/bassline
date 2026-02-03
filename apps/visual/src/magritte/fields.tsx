@@ -5,7 +5,8 @@
  * with consequential validation feedback.
  */
 
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useCallback, useEffect, memo } from 'react'
+import { atom, useAtom, PrimitiveAtom } from 'jotai'
 import { Field, FieldLabel, FieldDescription, FieldError, FieldContent, FieldGroup } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -293,10 +294,15 @@ type ToOneFieldProps<T, V> = {
   validation?: Map<AnyDescription<T>, ValidationResult>
 }
 
+// State for ToOne field: includes draft data and editing flag
+type ToOneState<V> = {
+  data: V | null
+  isEditing: boolean
+}
+
 function ToOneField<T, V>({ description, model, onChange, validation }: ToOneFieldProps<T, V>) {
   if (!description.visible) return null
 
-  const [isEditing, setIsEditing] = useState(false)
   const value = description.accessor.read(model) as V | null
   const result = validation?.get(description as AnyDescription<T>)
   const errors = result?.errors.filter(e => e.severity === 'error')
@@ -305,35 +311,65 @@ function ToOneField<T, V>({ description, model, onChange, validation }: ToOneFie
   const optionLabel = description.optionLabel ?? ((v: V) => String(v))
   const relatedDescription = description.reference()
 
+  // Local atom with combined state for fine-grained reactivity
+  const stateAtom = useMemo(
+    () => atom<ToOneState<V>>({ data: value, isEditing: false }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [] // Only create once
+  )
+  const [state, setState] = useAtom(stateAtom)
+
+  // Sync when selection changes from dropdown (external change)
+  useEffect(() => {
+    setState(prev => {
+      // Only update data if not editing (avoid overwriting draft edits)
+      if (!prev.isEditing) {
+        return { ...prev, data: value }
+      }
+      return prev
+    })
+  }, [value, setState])
+
   const handleSelect = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const idx = parseInt(e.target.value, 10)
-      if (idx === -1) {
-        onChange(description as AnyDescription<T>, null)
-      } else {
-        onChange(description as AnyDescription<T>, options[idx])
-      }
+      const newValue = idx === -1 ? null : options[idx]
+      // Update both local state and parent
+      setState(prev => ({ ...prev, data: newValue, isEditing: false }))
+      onChange(description as AnyDescription<T>, newValue)
     },
-    [description, onChange, options]
+    [description, onChange, options, setState]
   )
 
   const handleClear = useCallback(() => {
+    setState(prev => ({ ...prev, data: null, isEditing: false }))
     onChange(description as AnyDescription<T>, null)
-  }, [description, onChange])
+  }, [description, onChange, setState])
 
-  // Handle changes to the related object's fields
+  // Handle changes to the related object's fields (draft edits)
   const handleRelatedChange = useCallback(
     (childDesc: AnyDescription<V>, childValue: unknown) => {
-      if (!value) return
-      // Cast accessor to handle the union type variance issue
-      const accessor = childDesc.accessor as { read: (m: V) => unknown; write: (m: V, v: unknown) => V }
-      const updatedValue = accessor.write(value, childValue)
-      onChange(description as AnyDescription<T>, updatedValue)
+      setState(prev => {
+        if (!prev.data) return prev
+        // Cast accessor to handle the union type variance issue
+        const accessor = childDesc.accessor as { read: (m: V) => unknown; write: (m: V, v: unknown) => V }
+        return { ...prev, data: accessor.write(prev.data, childValue) }
+      })
     },
-    [description, onChange, value]
+    [setState]
   )
 
-  const selectedIndex = value ? options.findIndex(o => o === value) : -1
+  // Toggle editing - commit on close
+  const handleToggleEdit = useCallback(() => {
+    if (state.isEditing && state.data) {
+      // Commit on close
+      onChange(description as AnyDescription<T>, state.data)
+    }
+    setState(prev => ({ ...prev, isEditing: !prev.isEditing }))
+  }, [state.isEditing, state.data, description, onChange, setState])
+
+  // Use label-based comparison for dropdown selection (fixes reference equality issue)
+  const selectedIndex = value ? options.findIndex(o => optionLabel(o) === optionLabel(value)) : -1
 
   return (
     <Field orientation="vertical" data-invalid={!result?.valid || undefined}>
@@ -359,10 +395,10 @@ function ToOneField<T, V>({ description, model, onChange, validation }: ToOneFie
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsEditing(!isEditing)}
-                title={isEditing ? 'Close editor' : 'Edit'}
+                onClick={handleToggleEdit}
+                title={state.isEditing ? 'Close editor' : 'Edit'}
               >
-                {isEditing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                {state.isEditing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
               </Button>
               {description.nullable && (
                 <Button type="button" variant="ghost" size="icon" onClick={handleClear} title="Clear">
@@ -372,13 +408,13 @@ function ToOneField<T, V>({ description, model, onChange, validation }: ToOneFie
             </>
           )}
         </div>
-        {/* Inline edit of selected value */}
-        {isEditing && value && (
+        {/* Inline edit of selected value - uses draft state */}
+        {state.isEditing && state.data && (
           <div className="mt-2 ml-4 p-3 border rounded-md bg-muted/30">
             <div className="text-xs text-muted-foreground mb-2">Editing {description.label}</div>
             <ContainerField
               description={relatedDescription}
-              model={value}
+              model={state.data}
               onChange={handleRelatedChange}
               validation={undefined}
             />
@@ -401,10 +437,103 @@ type ToManyFieldProps<T, V> = {
   validation?: Map<AnyDescription<T>, ValidationResult>
 }
 
+// State for each ToMany item: includes draft data and editing flag
+type ItemState<V> = {
+  data: V
+  isEditing: boolean
+}
+
+// Separate component for each item - completely isolated with its own atom
+type ToManyItemProps<V> = {
+  itemAtom: PrimitiveAtom<ItemState<V>>
+  index: number
+  relatedDescription: ContainerDescription<V>
+  onCommit: (index: number, newItem: V) => void
+  onRemove: (index: number) => void
+  canRemove: boolean
+  readOnly?: boolean
+  getItemLabel: (item: V, index: number) => string
+}
+
+function ToManyItemInner<V>({
+  itemAtom,
+  index,
+  relatedDescription,
+  onCommit,
+  onRemove,
+  canRemove,
+  readOnly,
+  getItemLabel,
+}: ToManyItemProps<V>) {
+  const [state, setState] = useAtom(itemAtom)
+  const { data, isEditing } = state
+
+  const handleFieldChange = useCallback(
+    (childDesc: AnyDescription<V>, childValue: unknown) => {
+      setState(prev => {
+        const accessor = childDesc.accessor as { write: (m: V, v: unknown) => V }
+        return { ...prev, data: accessor.write(prev.data, childValue) }
+      })
+    },
+    [setState]
+  )
+
+  const handleToggleEdit = useCallback(() => {
+    if (isEditing) {
+      // Commit on close
+      onCommit(index, data)
+    }
+    setState(prev => ({ ...prev, isEditing: !prev.isEditing }))
+  }, [isEditing, data, index, onCommit, setState])
+
+  const handleRemove = useCallback(() => {
+    onRemove(index)
+  }, [onRemove, index])
+
+  return (
+    <div className="border rounded-md bg-background">
+      <div className="flex items-center gap-2 p-2">
+        <span className="flex-1 text-sm truncate">{getItemLabel(data, index)}</span>
+        {!readOnly && (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleToggleEdit}
+              title={isEditing ? 'Close editor' : 'Edit'}
+            >
+              {isEditing ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+            </Button>
+            {canRemove && (
+              <Button type="button" variant="ghost" size="icon" onClick={handleRemove} title="Remove">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+      {/* Inline edit of item */}
+      {isEditing && (
+        <div className="p-3 border-t bg-muted/30">
+          <ContainerField
+            description={relatedDescription}
+            model={data}
+            onChange={handleFieldChange}
+            validation={undefined}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Memoized version to prevent unnecessary re-renders
+const ToManyItem = memo(ToManyItemInner) as typeof ToManyItemInner
+
 function ToManyField<T, V>({ description, model, onChange, validation }: ToManyFieldProps<T, V>) {
   if (!description.visible) return null
 
-  const [editingIndex, setEditingIndex] = useState<number | null>(null)
   const items = (description.accessor.read(model) as V[]) ?? []
 
   const result = validation?.get(description as AnyDescription<T>)
@@ -417,51 +546,67 @@ function ToManyField<T, V>({ description, model, onChange, validation }: ToManyF
     (description.maxItems === undefined || items.length < description.maxItems)
   const canRemove = !description.readOnly && (description.minItems === undefined || items.length > description.minItems)
 
+  // Create atoms for each item - tracked by a stable reference
+  // We use a ref to track atoms and sync them with items
+  const atomsRef = useMemo(() => {
+    return { atoms: [] as PrimitiveAtom<ItemState<V>>[] }
+  }, [])
+
+  // Sync atoms with items array
+  useMemo(() => {
+    // Add new atoms if items grew
+    while (atomsRef.atoms.length < items.length) {
+      const idx = atomsRef.atoms.length
+      atomsRef.atoms.push(atom<ItemState<V>>({ data: items[idx], isEditing: false }))
+    }
+    // Remove extra atoms if items shrunk
+    if (atomsRef.atoms.length > items.length) {
+      atomsRef.atoms.length = items.length
+    }
+  }, [items.length, atomsRef])
+
+  // Get a display label for an item (use first string field or fallback)
+  const getItemLabel = useCallback(
+    (item: V, index: number): string => {
+      const children = relatedDescription.children
+      const stringDesc = children.find(c => c.kind === 'string')
+      if (stringDesc) {
+        const val = stringDesc.accessor.read(item)
+        if (val) return String(val)
+      }
+      return `Item ${index + 1}`
+    },
+    [relatedDescription.children]
+  )
+
   const handleAdd = useCallback(() => {
     if (!description.createItem) return
     const newItem = description.createItem()
     const newItems = [...items, newItem]
+    // Create atom for new item with editing enabled
+    atomsRef.atoms.push(atom<ItemState<V>>({ data: newItem, isEditing: true }))
     onChange(description as AnyDescription<T>, newItems)
-    setEditingIndex(newItems.length - 1)
-  }, [description, onChange, items])
+  }, [description, onChange, items, atomsRef])
 
   const handleRemove = useCallback(
     (index: number) => {
       const newItems = items.filter((_, i) => i !== index)
+      // Remove the atom at this index
+      atomsRef.atoms.splice(index, 1)
       onChange(description as AnyDescription<T>, newItems)
-      if (editingIndex === index) {
-        setEditingIndex(null)
-      } else if (editingIndex !== null && editingIndex > index) {
-        setEditingIndex(editingIndex - 1)
-      }
     },
-    [description, onChange, items, editingIndex]
+    [description, onChange, items, atomsRef]
   )
 
-  // Handle changes to an item's fields
-  const handleItemChange = useCallback(
-    (index: number, childDesc: AnyDescription<V>, childValue: unknown) => {
-      const item = items[index]
-      // Cast accessor to handle the union type variance issue
-      const accessor = childDesc.accessor as { read: (m: V) => unknown; write: (m: V, v: unknown) => V }
-      const updatedItem = accessor.write(item, childValue)
+  // Commit changes from an item's draft to the parent state
+  const handleCommit = useCallback(
+    (index: number, newItem: V) => {
       const newItems = [...items]
-      newItems[index] = updatedItem
+      newItems[index] = newItem
       onChange(description as AnyDescription<T>, newItems)
     },
     [description, onChange, items]
   )
-
-  // Get a display label for an item (use first string field or fallback)
-  const getItemLabel = (item: V, index: number): string => {
-    const children = relatedDescription.children
-    const stringDesc = children.find(c => c.kind === 'string')
-    if (stringDesc) {
-      const val = stringDesc.accessor.read(item)
-      if (val) return String(val)
-    }
-    return `Item ${index + 1}`
-  }
 
   return (
     <Field orientation="vertical" data-invalid={!result?.valid || undefined}>
@@ -476,47 +621,18 @@ function ToManyField<T, V>({ description, model, onChange, validation }: ToManyF
       </div>
       <FieldContent>
         <div className="space-y-2">
-          {items.map((item, index) => (
-            <div key={index} className="border rounded-md bg-background">
-              <div className="flex items-center gap-2 p-2">
-                <span className="flex-1 text-sm truncate">{getItemLabel(item, index)}</span>
-                {!description.readOnly && (
-                  <>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setEditingIndex(editingIndex === index ? null : index)}
-                      title={editingIndex === index ? 'Close editor' : 'Edit'}
-                    >
-                      {editingIndex === index ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-                    </Button>
-                    {canRemove && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemove(index)}
-                        title="Remove"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-              {/* Inline edit of item */}
-              {editingIndex === index && (
-                <div className="p-3 border-t bg-muted/30">
-                  <ContainerField
-                    description={relatedDescription}
-                    model={item}
-                    onChange={(childDesc, childValue) => handleItemChange(index, childDesc, childValue)}
-                    validation={undefined}
-                  />
-                </div>
-              )}
-            </div>
+          {atomsRef.atoms.map((itemAtom, index) => (
+            <ToManyItem
+              key={index}
+              itemAtom={itemAtom}
+              index={index}
+              relatedDescription={relatedDescription}
+              onCommit={handleCommit}
+              onRemove={handleRemove}
+              canRemove={canRemove}
+              readOnly={description.readOnly}
+              getItemLabel={getItemLabel}
+            />
           ))}
         </div>
         {items.length === 0 && <div className="text-sm text-muted-foreground italic p-2">No items</div>}
