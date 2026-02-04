@@ -1,10 +1,10 @@
 import { atom, useAtom } from 'jotai'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Textarea } from '../components/ui/textarea'
-import { BoundForm, useBoundState } from '@/magritte'
+import { Form } from '@/forms'
 import { ColumnedList, Descriptor, Explicit, Forward, List, PhlowViewType, TextEditor, IViewable } from './phlow'
 
 export function TextView({ item }: { item: TextEditor }) {
@@ -80,18 +80,24 @@ export function ExplicitView({ item }: { item: Explicit }) {
   return <>{item.component()}</>
 }
 
-export function DescriptorView<T extends object>({ item }: { item: Descriptor<T> }) {
-  const schema = useMemo(() => item.description(), [item])
-  const initialModel = useMemo(() => item.model(), [item])
+export function DescriptorView({ item }: { item: Descriptor<any> }) {
+  const schema = useMemo(() => item.schema(), [item])
 
-  const { bound, model, validation, hasErrors } = useBoundState<T>(schema, initialModel)
+  // Capture snapshot ONCE on mount - don't react to external changes
+  // This preserves user's edits if external data changes while editing
+  const snapshotRef = useRef<any>(null)
+  if (snapshotRef.current === null) {
+    snapshotRef.current = item.model()
+  }
 
-  // Notify on changes (consequential - doesn't block)
-  useEffect(() => {
-    item.onUpdate?.(model)
-  }, [model, item])
+  // Only call onUpdate when user explicitly submits
+  const handleSubmit = (data: any) => {
+    item.onUpdate?.(data)
+    // Update snapshot after successful submit
+    snapshotRef.current = data
+  }
 
-  return <BoundForm bound={bound} validation={validation} hasErrors={hasErrors} />
+  return <Form schema={schema} values={snapshotRef.current ?? undefined} onSubmit={handleSubmit} />
 }
 
 export function PhlowView<T>({ item }: { item: PhlowViewType<T> }) {
@@ -131,7 +137,7 @@ export function PhlowView<T>({ item }: { item: PhlowViewType<T> }) {
     body = <ColumnedListView item={item} />
   }
   if (type === 'descriptor') {
-    body = <DescriptorView item={item as Descriptor<object>} />
+    body = <DescriptorView item={item as Descriptor<any>} />
   }
 
   return (
