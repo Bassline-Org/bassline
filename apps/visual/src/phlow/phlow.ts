@@ -1,5 +1,5 @@
 import type React from 'react'
-import type { ContainerSchema } from '@/magritte'
+import type { z } from 'zod'
 
 export const PRIORITY = {
   low: 100,
@@ -54,7 +54,7 @@ export type Explicit = Base & {
 
 export type Descriptor<T = unknown> = Base & {
   phlow: 'descriptor'
-  description: () => ContainerSchema
+  schema: () => z.ZodObject<z.ZodRawShape>
   model: () => T
   onUpdate?: (model: T) => void
 }
@@ -112,7 +112,7 @@ export const phlow = {
 
   descriptor<T>(
     config: Partial<Omit<Descriptor<T>, 'phlow'>> & {
-      description: () => ContainerSchema
+      schema: () => z.ZodObject<z.ZodRawShape>
       model: () => T
     }
   ): Descriptor<T> {
