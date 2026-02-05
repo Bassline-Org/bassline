@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Forward } from '../../core/types'
-import { PhlowView } from './PhlowView'
+import { ViewRenderer } from './ViewRenderer'
 
 export interface ForwardViewProps<T> {
   item: Forward<T>
@@ -18,5 +18,5 @@ export function ForwardView<T>({ item, onInspect }: ForwardViewProps<T>) {
     return <div style={{ color: 'var(--inspector-muted, #888)', fontSize: '0.875rem' }}>No view available</div>
   }
 
-  return <PhlowView item={targetView} onInspect={onInspect} />
+  return <ViewRenderer view={targetView} onInspect={onInspect} />
 }

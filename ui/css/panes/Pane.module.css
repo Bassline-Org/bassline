@@ -59,32 +59,10 @@
   white-space: nowrap;
 }
 
-.closeButton {
-  flex-shrink: 0;
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  font-size: 0.75rem;
-}
-
-.tabs {
-  flex-shrink: 0;
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--inspector-border-light, #f0f0f0);
-  overflow-x: auto;
-}
-
-.tab {
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
 .content {
   flex: 1;
   overflow: auto;
-  padding: 0.75rem;
+  padding: 0;
 }
 
 /* Maximized state */
@@ -104,6 +82,14 @@
   align-items: center;
   gap: 0.25rem;
   flex-shrink: 0;
+}
+
+.closeButton {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  font-size: 0.75rem;
 }
 
 .maximizeButton {

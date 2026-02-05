@@ -21,6 +21,11 @@
   cursor: not-allowed;
 }
 
+.actionButton.error {
+  color: var(--error-color, #ef4444);
+  border-color: var(--error-color, #ef4444);
+}
+
 .icon {
   display: inline-flex;
   align-items: center;

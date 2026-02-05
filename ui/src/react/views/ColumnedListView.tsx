@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useComponents } from '../context'
 import type { ColumnedList } from '../../core/types'
 import { inspect, canInspect } from '../../core/inspect'
-import styles from './ColumnedListView.module.css'
+import styles from '~/css/views/ColumnedListView.module.css'
 
 export interface ColumnedListViewProps<T> {
   item: ColumnedList<T>

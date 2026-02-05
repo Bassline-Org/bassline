@@ -20,7 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "~/*": ["src/*"],
+      "~/css/*": ["css/*"]
     },
     "outDir": "./dist"
   },

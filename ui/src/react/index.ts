@@ -1,10 +1,10 @@
 // Context and provider
 export * from './context'
 
-// Hooks
-export * from './hooks'
+// Hooks - re-export from new location
+export * from '../hooks'
 
-// State atoms - export selectively to avoid InspectorPane collision
+// State atoms - re-export from new location
 export {
   inspectorChainAtom,
   currentPaneAtom,
@@ -25,7 +25,7 @@ export {
   type InspectorPane as InspectorPaneState,
   type InspectorChainState,
   type InspectPayload,
-} from './atoms'
+} from '../state/atoms'
 
 // Portal system
 export * from './portal'
@@ -33,7 +33,11 @@ export * from './portal'
 // View components
 export * from './views'
 
-// Inspector components
-export { InspectorPane, type InspectorPaneProps } from './inspector/InspectorPane'
-export { InspectorPager, type InspectorPagerProps } from './inspector/InspectorPager'
-export { ActionBar, type ActionBarProps } from './inspector/ActionBar'
+// Pane components (new names)
+export { Pane, PaneContainer, type PaneProps, type PaneContainerProps } from '../panes'
+
+// Inspector components (old names for backwards compatibility)
+export { InspectorPane, InspectorPager, type InspectorPaneProps, type InspectorPagerProps } from '../panes'
+
+// Tools
+export { ActionBar, type ActionBarProps, InspectorTool, type InspectorToolProps, tools } from '../tools'

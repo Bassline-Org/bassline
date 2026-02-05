@@ -1,0 +1,37 @@
+/**
+ * @bassline/ui - Default styles
+ *
+ * Import this file to get default styling for inspector components.
+ * You can customize the appearance by setting CSS custom properties.
+ *
+ * Example:
+ * ```css
+ * :root {
+ *   --inspector-primary: #3b82f6;
+ *   --inspector-foreground: #1f2937;
+ * }
+ * ```
+ */
+
+@import './variables.css';
+
+/* Import component styles */
+@import '../css/components/Card.module.css';
+@import '../css/components/Button.module.css';
+@import '../css/components/Table.module.css';
+@import '../css/components/Textarea.module.css';
+@import '../css/components/Form.module.css';
+
+/* Import view styles */
+@import '../css/views/ListView.module.css';
+@import '../css/views/ColumnedListView.module.css';
+@import '../css/views/InfoView.module.css';
+@import '../css/views/ViewRenderer.module.css';
+
+/* Import tool styles */
+@import '../css/tools/InspectorTool.module.css';
+@import '../css/tools/ActionBar.module.css';
+
+/* Import pane styles */
+@import '../css/panes/Pane.module.css';
+@import '../css/panes/PaneContainer.module.css';

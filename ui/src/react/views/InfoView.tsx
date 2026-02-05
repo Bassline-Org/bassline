@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useComponents } from '../context'
 import type { Info } from '../../core/types'
 import { inspect, canInspect } from '../../core/inspect'
-import styles from './InfoView.module.css'
+import styles from '~/css/views/InfoView.module.css'
 
 export interface InfoViewProps {
   item: Info

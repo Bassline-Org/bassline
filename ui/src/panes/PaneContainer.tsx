@@ -3,17 +3,17 @@ import { useAtomValue, useSetAtom } from 'jotai'
 import {
   inspectorChainAtom,
   closePaneAtom,
-  selectViewAtom,
   focusPaneAtom,
   navigateFocusAtom,
   selectToolAtom,
   toggleMaximizeAtom,
   maximizedPaneIdAtom,
-} from '../atoms'
-import { InspectorPane } from './InspectorPane'
-import styles from './InspectorPager.module.css'
+} from '../state/atoms'
+import { shouldIgnoreKeyboardEvent, isTextInputElement } from '../core/keyboard'
+import { Pane } from './Pane'
+import styles from '~/css/panes/PaneContainer.module.css'
 
-export interface InspectorPagerProps {
+export interface PaneContainerProps {
   /** Width of each pane in pixels */
   paneWidth?: number
   /** Whether to auto-scroll to newly added panes */
@@ -25,19 +25,18 @@ export interface InspectorPagerProps {
 }
 
 /**
- * Miller columns inspector pager.
- * Renders a horizontally scrolling list of inspector panes.
+ * Miller columns container.
+ * Renders a horizontally scrolling list of panes.
  */
-export function InspectorPager({
+export function PaneContainer({
   paneWidth = 400,
   autoScrollToNew = true,
   className,
   emptyMessage = 'Select an object to inspect',
-}: InspectorPagerProps) {
+}: PaneContainerProps) {
   const chainState = useAtomValue(inspectorChainAtom)
   const maximizedPaneId = useAtomValue(maximizedPaneIdAtom)
   const closePane = useSetAtom(closePaneAtom)
-  const selectView = useSetAtom(selectViewAtom)
   const focusPane = useSetAtom(focusPaneAtom)
   const navigateFocus = useSetAtom(navigateFocusAtom)
   const selectTool = useSetAtom(selectToolAtom)
@@ -60,6 +59,11 @@ export function InspectorPager({
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Don't capture if target has nocapture class or is a text input
+      if (shouldIgnoreKeyboardEvent(e) || isTextInputElement(e.target)) {
+        return
+      }
+
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
         navigateFocus('left')
@@ -89,13 +93,12 @@ export function InspectorPager({
         const isMaximized = pane.id === maximizedPaneId
         const isHidden = maximizedPaneId !== null && !isMaximized
 
-        // Hide non-maximized panes when another is maximized
         if (isHidden) {
           return null
         }
 
         return (
-          <InspectorPane
+          <Pane
             key={pane.id}
             pane={pane}
             paneIndex={index}
@@ -104,7 +107,6 @@ export function InspectorPager({
             isMaximized={isMaximized}
             paneWidth={paneWidth}
             onClose={() => closePane(index)}
-            onSelectView={viewIndex => selectView({ paneIndex: index, viewIndex })}
             onSelectTool={toolId => selectTool({ paneIndex: index, toolId })}
             onToggleMaximize={() => toggleMaximize(pane.id)}
             onFocus={() => focusPane(index)}
