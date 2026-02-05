@@ -46,4 +46,11 @@ export default defineConfig({
       { find: '~', replacement: resolve(__dirname, 'src') },
     ],
   },
+  css: {
+    modules: {
+      // Use stable, deterministic class names instead of hashes.
+      // This prevents Vite's pre-bundling from regenerating mismatched hashes.
+      generateScopedName: 'bui-[name]__[local]',
+    },
+  },
 })

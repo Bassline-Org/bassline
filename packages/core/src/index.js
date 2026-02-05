@@ -1,6 +1,9 @@
 // Core primitives
 export { resource, routes, bind, splitPath, notFound } from './resource.js'
 
+// Protocols - primitive composition
+export { puter as leaf, forward, broadcast, select, notify, pipeline, scatterGather } from './protocols.js'
+
 // Circuit - static topology with kit bindings
 export { circuit, withKit } from './circuit.js'
 

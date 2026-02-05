@@ -6,6 +6,7 @@
   flex-direction: column;
   gap: 0.25rem;
   overflow: auto;
+  color: var(--inspector-foreground, #1f2937);
 }
 
 .item {
@@ -16,6 +17,7 @@
   align-items: center;
   justify-content: space-between;
   transition: background-color 0.15s ease;
+  color: var(--inspector-foreground, #1f2937);
 }
 
 .item:hover {
@@ -36,6 +38,7 @@
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+  color: var(--inspector-foreground, #1f2937);
 }
 
 .chevron {

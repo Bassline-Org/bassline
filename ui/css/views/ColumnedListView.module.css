@@ -1,6 +1,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  color: var(--inspector-foreground, #1f2937);
 }
 
 .headerRow {

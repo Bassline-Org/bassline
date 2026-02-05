@@ -1,3 +1,6 @@
+// Import base styles with CSS variables
+import '../styles/index.css'
+
 // Core exports (no React dependency)
 export * from './core'
 
