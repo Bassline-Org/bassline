@@ -298,7 +298,7 @@ export const tool = {
    * // Only show player for audio files
    * [phlowTools] = [
    *   () => this.path.endsWith('.mp3')
-   *     ? tool.window({ title: 'Player', component: AudioPlayer })
+   *     ? tool.window({ id: 'player', title: 'Player', component: AudioPlayer })
    *     : tool.empty()
    * ]
    */
@@ -310,6 +310,7 @@ export const tool = {
    * Create a window tool (a complete application view)
    */
   window<T>(config: {
+    id: string
     title: string
     priority?: number
     icon?: ReactNode
@@ -317,6 +318,7 @@ export const tool = {
   }): WindowTool<T> {
     return {
       phlow: 'windowTool',
+      id: config.id,
       title: config.title,
       priority: config.priority ?? PRIORITY.med,
       icon: config.icon,

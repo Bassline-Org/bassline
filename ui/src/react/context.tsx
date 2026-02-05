@@ -3,6 +3,8 @@ import {
   useContext,
   useMemo,
   useRef,
+  useState,
+  useCallback,
   type ComponentType,
   type PropsWithChildren,
   type ReactNode,
@@ -203,50 +205,44 @@ export function InspectorProvider({ children, components: customComponents }: In
     [DefaultComponents, customComponents]
   )
 
-  // Portal refs for extension slots
-  const portalRefs = {
-    bar: useRef<HTMLDivElement>(null),
-    actions: useRef<HTMLDivElement>(null),
-    search: useRef<HTMLDivElement>(null),
-    footer: useRef<HTMLDivElement>(null),
-  }
+  // Portal refs for extension slots - defined separately to avoid recreation
+  const barRef = useRef<HTMLDivElement>(null)
+  const actionsRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
 
-  // Extensions state (using ref + forceUpdate pattern for simplicity)
-  const extensionsRef = useRef<InspectorExtension[]>([])
-  const forceUpdateRef = useRef<() => void>(() => {})
-
-  // Force re-render when extensions change
-  const [, _setTick] = useMemo(() => {
-    let tick = 0
-    const setTickFn = (_t: number) => {}
-    forceUpdateRef.current = () => setTickFn(++tick)
-    return [tick, setTickFn]
-  }, [])
-
-  const registerExtension = useMemo(
-    () => (ext: Omit<InspectorExtension, 'id'>) => {
-      const id = generateExtensionId()
-      const fullExt = { ...ext, id }
-      extensionsRef.current = [...extensionsRef.current, fullExt].sort((a, b) => a.priority - b.priority)
-      forceUpdateRef.current()
-
-      // Return cleanup function
-      return () => {
-        extensionsRef.current = extensionsRef.current.filter(e => e.id !== id)
-        forceUpdateRef.current()
-      }
-    },
+  const portalRefs = useMemo(
+    () => ({
+      bar: barRef,
+      actions: actionsRef,
+      search: searchRef,
+      footer: footerRef,
+    }),
     []
   )
+
+  // Extensions state - using proper useState for reactivity
+  const [extensions, setExtensions] = useState<InspectorExtension[]>([])
+
+  const registerExtension = useCallback((ext: Omit<InspectorExtension, 'id'>) => {
+    const id = generateExtensionId()
+    const fullExt = { ...ext, id }
+    setExtensions(prev => [...prev, fullExt].sort((a, b) => a.priority - b.priority))
+
+    // Return cleanup function
+    return () => {
+      setExtensions(prev => prev.filter(e => e.id !== id))
+    }
+  }, [])
 
   const contextValue = useMemo<InspectorContextValue>(
     () => ({
       components: mergedComponents,
       portalRefs,
-      extensions: extensionsRef.current,
+      extensions,
       registerExtension,
     }),
-    [mergedComponents, registerExtension]
+    [mergedComponents, portalRefs, extensions, registerExtension]
   )
 
   return (

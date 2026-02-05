@@ -166,6 +166,8 @@ export interface ToolProps<T> {
  */
 export type WindowTool<T = unknown> = {
   phlow: 'windowTool'
+  /** Unique identifier for tool selection (stable, not user-facing) */
+  id: string
   /** Display title for the tool dropdown */
   title: string
   /** Lower number = higher priority (shown first) */

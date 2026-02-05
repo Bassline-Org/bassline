@@ -1,6 +1,6 @@
 import { useState, type FormHTMLAttributes } from 'react'
 import { Button } from './Button'
-import styles from './Form.module.css'
+import styles from '~/css/components/Form.module.css'
 
 export interface FormProps<T = unknown> extends Omit<FormHTMLAttributes<HTMLFormElement>, 'onSubmit'> {
   /** The validation schema (not used in basic form) */

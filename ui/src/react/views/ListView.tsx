@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { List } from '../../core/types'
 import { inspect, canInspect } from '../../core/inspect'
-import styles from './ListView.module.css'
+import styles from '~/css/views/ListView.module.css'
 
 export interface ListViewProps<T> {
   item: List<T>
