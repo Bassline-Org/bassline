@@ -1,0 +1,81 @@
+{
+  "name": "@bassline/ui",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Contextual inspector framework, inspired by the lovely GlamorousToolkit",
+  "sideEffects": [
+    "*.css"
+  ],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./components": {
+      "types": "./dist/components/index.d.ts",
+      "import": "./dist/components/index.js"
+    },
+    "./zod-form": {
+      "types": "./dist/zod-form/index.d.ts",
+      "import": "./dist/zod-form/index.js"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && tsc --emitDeclarationOnly",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "optionalDependencies": {
+    "zod": "^3.0.0 || ^4.0.0",
+    "@autoform/react": "^4.0.0",
+    "@autoform/zod": "^5.0.0"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "jotai": "^2.17.0",
+    "jotai-immer": "^0.4.1",
+    "immer": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.6",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.3.3",
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bassline-Org/bassline.git",
+    "directory": "ui"
+  },
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "inspector",
+    "phlow",
+    "react",
+    "ui",
+    "glamorous-toolkit"
+  ]
+}

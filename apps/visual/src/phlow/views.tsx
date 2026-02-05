@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table'
 import { Textarea } from '../components/ui/textarea'
 import { Form } from '@/forms'
-import { ColumnedList, Descriptor, Explicit, Forward, List, PhlowViewType, TextEditor, IViewable } from './phlow'
+import { ColumnedList, Descriptor, Explicit, Forward, Info, List, TextEditor, View } from './types'
+import { phlowViews, Viewable } from './phlow'
 
 export function TextView({ item }: { item: TextEditor }) {
   const textAtom = useMemo(() => atom(item.text()), [item])
@@ -64,10 +65,28 @@ export function ColumnedListView<T>({ item }: { item: ColumnedList<T> }) {
   )
 }
 
-export function ForwardView({ item }: { item: Forward }) {
-  const targetViews = useMemo(() => item.target().phlowViews, [item])
-  const viewIndex = item.viewIndex ?? 0
-  const targetView = targetViews[viewIndex]
+export function InfoView({ item: { entries } }: { item: Info }) {
+  const columns = useMemo(() => Object.entries(entries), [entries])
+  return (
+    <Table>
+      <TableHeader>
+        {columns.map(([key, value]) => (
+          <TableRow className="border-b border-border/50">
+            <TableHead key={key} className="w-14 text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+              {key}
+            </TableHead>
+            <TableHead key={key} className="text-xs uppercase tracking-wide text-foreground font-semibold">
+              {value().text}
+            </TableHead>
+          </TableRow>
+        ))}
+      </TableHeader>
+    </Table>
+  )
+}
+
+export function ForwardView<T>({ item }: { item: Forward<T> }) {
+  const targetView = useMemo(() => item.view(), [item])
 
   if (!targetView || targetView.phlow === 'empty') {
     return <div className="text-muted-foreground text-sm">No view available</div>
@@ -100,7 +119,7 @@ export function DescriptorView({ item }: { item: Descriptor<any> }) {
   return <Form schema={schema} values={snapshotRef.current ?? undefined} onSubmit={handleSubmit} />
 }
 
-export function PhlowView<T>({ item }: { item: PhlowViewType<T> }) {
+export function PhlowView<T>({ item }: { item: View<T> }) {
   const type = item.phlow
 
   if (type === 'empty') return null
@@ -139,10 +158,13 @@ export function PhlowView<T>({ item }: { item: PhlowViewType<T> }) {
   if (type === 'descriptor') {
     body = <DescriptorView item={item as Descriptor<any>} />
   }
+  if (type === 'info') {
+    body = <InfoView item={item} />
+  }
 
   return (
     <Card className="h-full w-full flex flex-col overflow-hidden">
-      <CardHeader className="flex-shrink-0">
+      <CardHeader className="shrink-0">
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto">{body}</CardContent>
@@ -150,9 +172,9 @@ export function PhlowView<T>({ item }: { item: PhlowViewType<T> }) {
   )
 }
 
-export function Inspector({ target }: { target: IViewable }) {
+export function Inspector<T>({ target }: { target: Viewable<T> }) {
   const views = useMemo(() => {
-    const v = target.phlowViews.filter(view => view.phlow !== 'empty')
+    const v = target[phlowViews]().filter(view => view.phlow !== 'empty')
     return v.sort((a, b) => {
       const aPriority = 'priority' in a ? a.priority : 100
       const bPriority = 'priority' in b ? b.priority : 100
@@ -169,7 +191,7 @@ export function Inspector({ target }: { target: IViewable }) {
 
   return (
     <div className="flex gap-4 h-full w-full">
-      <Card className="flex-shrink-0 p-2">
+      <Card className="shrink-0 p-2">
         <div className="flex flex-col gap-1">
           {views.map((view, i) => (
             <Button
