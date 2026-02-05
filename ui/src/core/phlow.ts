@@ -27,23 +27,40 @@ export const PRIORITY = {
 
 /**
  * Well-known symbol for declaring views on objects.
- * Objects implement Viewable by defining a method with this symbol key.
+ * Objects implement Viewable by defining an array of view producer functions with this symbol key.
  */
 export const phlowViews = Symbol.for('$$PHLOW_VIEWS$$')
 
 /**
+ * A function that produces a view.
+ * Views are produced lazily to allow dynamic registration and fresh data.
+ */
+export type ViewProducer<T = unknown> = () => View<T>
+
+/**
  * Interface for objects that can be inspected.
- * Implement this by adding a [phlowViews]() method that returns an array of views.
+ * Implement this by adding a [phlowViews] property that is an array of view producer functions.
+ *
+ * @example
+ * class MyClass implements Viewable<MyClass> {
+ *   [phlowViews] = [
+ *     () => phlow.info({ title: 'Info', ... }),
+ *     () => phlow.list({ title: 'List', ... }),
+ *   ]
+ * }
+ *
+ * // Dynamic view addition:
+ * obj[phlowViews].push(() => phlow.explicit({ ... }))
  */
 export interface Viewable<T = unknown> {
-  [phlowViews](): View<T>[]
+  [phlowViews]: ViewProducer<T>[]
 }
 
 /**
  * Type guard to check if an object is Viewable
  */
 export function isViewable(obj: unknown): obj is Viewable<unknown> {
-  return obj !== null && typeof obj === 'object' && phlowViews in obj && typeof (obj as any)[phlowViews] === 'function'
+  return obj !== null && typeof obj === 'object' && phlowViews in obj && Array.isArray((obj as any)[phlowViews])
 }
 
 /**

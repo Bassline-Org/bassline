@@ -12,22 +12,31 @@ import { Flip } from 'gsap/Flip'
 import { SplitText } from 'gsap/SplitText'
 import { DrawSVGPlugin } from 'gsap/DrawSVGPlugin'
 import { MotionPathPlugin } from 'gsap/MotionPathPlugin'
-import { ReactFlow, ReactFlowProvider, useReactFlow } from '@xyflow/react'
+import { ReactFlow, ReactFlowProvider } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { PropsWithChildren } from 'react'
-import { CustomEdge, DrawnNode, TextNode, ViewPanel } from './Flow.tsx'
-import { dims, drawn, edge, group, node, parent, pos, tags, text } from './nodes.ts'
+import { CustomEdge, DrawnNode, TextNode } from './Flow.tsx'
+import { node, pos } from './nodes.ts'
 import { useTheme } from './atoms/theme.ts'
 import { useEdits, useGraphChanges, useGraphState } from './atoms/graph.ts'
-import { Toaster } from './components/ui/sonner.tsx'
-import { SmokeyBackground } from './ShaderBg.tsx'
-import { useState, useEffect } from 'react'
-import { Inspector, phlow, PhlowViewType, PRIORITY, IViewable } from './phlow'
+import {
+  InspectorProvider,
+  InspectorPager,
+  phlow,
+  phlowViews,
+  PRIORITY,
+  type Viewable,
+  initPrimitiveViews,
+  useInspector,
+} from '@bassline/ui'
+import '@bassline/ui/styles.css'
+import { Inspectors } from './inspectors'
 import { Button } from './components/ui/button'
 import { Card } from './components/ui/card'
 import { z } from 'zod'
-import { FormsDemo } from './forms'
-import { useGraph, useSeedNamespace } from './namespace'
+
+// Initialize primitive views for Arrays and Objects
+initPrimitiveViews()
 
 gsap.registerPlugin(
   useGSAP,
@@ -95,81 +104,52 @@ export function Flow({ children }: PropsWithChildren) {
   )
 }
 
-class TextDocument implements IViewable {
+class TextDocument implements Viewable<any> {
   text: string
 
   constructor(initialText: string) {
     this.text = initialText
   }
 
-  phlowViews: PhlowViewType<any>[] = [
-    phlow.textEditor({
-      title: 'text',
-      priority: PRIORITY.high,
-      text: () => this.text,
-      onBlur: t => (this.text = t),
-    }),
-    phlow.columnedList<[string, number]>({
-      title: 'character frequency',
-      priority: PRIORITY.med,
-      items: () => {
-        const chars = this.text.split('')
-        const freq: Record<string, number> = {}
-        for (const char of chars) {
-          if (freq[char]) {
-            freq[char]++
-          } else {
-            freq[char] = 1
+  [phlowViews] = [
+    () =>
+      phlow.textEditor({
+        title: 'text',
+        priority: PRIORITY.high,
+        text: () => this.text,
+        onBlur: t => (this.text = t),
+      }),
+    () =>
+      phlow.columnedList<[string, number]>({
+        title: 'character frequency',
+        priority: PRIORITY.med,
+        items: () => {
+          const chars = this.text.split('')
+          const freq: Record<string, number> = {}
+          for (const char of chars) {
+            if (freq[char]) {
+              freq[char]++
+            } else {
+              freq[char] = 1
+            }
           }
-        }
-        const entries = Object.entries(freq)
-        entries.sort(([_, a], [__, b]) => b - a)
-        return entries
-      },
-      columns: {
-        char: { text: ([char]) => `[${char}]` },
-        code: { text: ([char]) => char.charCodeAt(0).toString() },
-        freq: { text: ([_, count]) => count.toString() },
-      },
-    }),
-
-    phlow.list<string>({
-      title: 'lines',
-      priority: PRIORITY.low,
-      items: () => this.text.split('\n'),
-      text: item => item,
-    }),
-  ]
-
-  static phlowViews: PhlowViewType[] = [
-    phlow.explicit({
-      title: 'class info',
-      priority: PRIORITY.high,
-      component: () => (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold">TextDocument</h2>
-          <p className="text-muted-foreground">
-            A simple text document class that provides multiple views of its content.
-          </p>
-          <div className="space-y-2">
-            <h3 className="font-medium">Properties</h3>
-            <ul className="list-disc list-inside text-sm">
-              <li>
-                <code>text: string</code> - The document content
-              </li>
-            </ul>
-          </div>
-          <div className="space-y-2">
-            <h3 className="font-medium">Methods</h3>
-            <ul className="list-disc list-inside text-sm">
-              <li>
-                <code>constructor(initialText: string)</code>
-              </li>
-            </ul>
-          </div>
-        </div>
-      ),
-    }),
+          const entries = Object.entries(freq)
+          entries.sort(([_, a], [__, b]) => b - a)
+          return entries
+        },
+        columns: {
+          char: { text: ([char]) => `[${char}]` },
+          code: { text: ([char]) => char.charCodeAt(0).toString() },
+          freq: { text: ([_, count]) => count.toString() },
+        },
+      }),
+    () =>
+      phlow.list<string>({
+        title: 'lines',
+        priority: PRIORITY.low,
+        items: () => this.text.split('\n'),
+        text: item => item,
+      }),
   ]
 }
 
@@ -216,48 +196,49 @@ const projectConfigSchema = z.object({
 
 type ProjectConfig = z.infer<typeof projectConfigSchema>
 
-class ProjectConfigModel implements IViewable {
+class ProjectConfigModel implements Viewable<any> {
   config: ProjectConfig
 
   constructor(initialConfig: ProjectConfig) {
     this.config = initialConfig
   }
 
-  phlowViews: PhlowViewType<any>[] = [
-    phlow.descriptor<ProjectConfig>({
-      title: 'Configuration',
-      priority: PRIORITY.high,
-      schema: () => projectConfigSchema,
-      model: () => this.config,
-      onUpdate: updated => {
-        this.config = updated
-        console.log('Config updated:', updated)
-      },
-    }),
-
-    phlow.textEditor({
-      title: 'JSON',
-      priority: PRIORITY.med,
-      text: () => JSON.stringify(this.config, null, 2),
-      onBlur: text => {
-        try {
-          this.config = JSON.parse(text)
-        } catch (e) {
-          console.error('Invalid JSON:', e)
-        }
-      },
-    }),
-
-    phlow.columnedList<[string, unknown]>({
-      title: 'Fields',
-      priority: PRIORITY.low,
-      items: () => Object.entries(this.config),
-      columns: {
-        field: { text: ([key]) => key },
-        type: { text: ([, value]) => typeof value },
-        value: { text: ([, value]) => String(value) },
-      },
-    }),
+  [phlowViews] = [
+    () =>
+      phlow.descriptor<ProjectConfig>({
+        title: 'Configuration',
+        priority: PRIORITY.high,
+        schema: () => projectConfigSchema,
+        model: () => this.config,
+        onUpdate: updated => {
+          this.config = updated
+          console.log('Config updated:', updated)
+        },
+      }),
+    () =>
+      phlow.textEditor({
+        title: 'JSON',
+        priority: PRIORITY.med,
+        text: () => JSON.stringify(this.config, null, 2),
+        onBlur: text => {
+          try {
+            this.config = JSON.parse(text)
+          } catch (e) {
+            console.error('Invalid JSON:', e)
+          }
+        },
+      }),
+    () =>
+      phlow.columnedList<[string, unknown]>({
+        title: 'Fields',
+        priority: PRIORITY.low,
+        items: () => Object.entries(this.config),
+        columns: {
+          field: { text: ([key]) => key },
+          type: { text: ([, value]) => typeof value },
+          value: { text: ([, value]) => String(value) },
+        },
+      }),
   ]
 }
 
@@ -276,75 +257,49 @@ const projectConfig = new ProjectConfigModel({
   debugMode: false,
 })
 
-type InspectTarget = 'document' | 'documentClass' | 'projectConfig' | 'forms' | 'namespace'
+/**
+ * Toolbar component that uses the inspector hooks
+ */
+function InspectorToolbar() {
+  const { inspectRoot, paneCount } = useInspector()
+
+  return (
+    <Card className="shrink-0 p-2">
+      <div className="flex gap-2 items-center flex-wrap">
+        <span className="text-sm text-muted-foreground px-2">Inspect:</span>
+        <Button variant="ghost" size="sm" onClick={() => inspectRoot(projectConfig as any)}>
+          Project Config (Zod)
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => inspectRoot(document as any)}>
+          TextDocument
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => inspectRoot([1, 2, 3, 4, 5, 6] as any)}>
+          Array
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => inspectRoot({ foo: '123', bar: 'hello' } as any)}>
+          Object
+        </Button>
+        {paneCount > 0 && (
+          <span className="text-xs text-muted-foreground ml-auto">
+            {paneCount} pane{paneCount !== 1 ? 's' : ''} open
+          </span>
+        )}
+      </div>
+    </Card>
+  )
+}
 
 export default function App() {
   useTheme() // Initialize theme on document root
-  const [target, setTarget] = useState<InspectTarget>('namespace')
-  const [seeded, setSeeded] = useState(false)
-
-  const graphViewable = useGraph()
-  const seedNamespace = useSeedNamespace()
-
-  // Seed namespace data on first mount
-  useEffect(() => {
-    if (!seeded) {
-      seedNamespace()
-      setSeeded(true)
-    }
-  }, [seeded, seedNamespace])
-
-  const viewable = target === 'document' ? document : target === 'documentClass' ? TextDocument : projectConfig
 
   return (
-    <div className="flex flex-col w-screen h-screen p-4 gap-4 bg-background">
-      <Card className="shrink-0 p-2">
-        <div className="flex gap-2 items-center flex-wrap">
-          <span className="text-sm text-muted-foreground px-2">Inspect:</span>
-          <Button
-            variant={target === 'namespace' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setTarget('namespace')}
-          >
-            Namespace
-          </Button>
-          <Button variant={target === 'forms' ? 'secondary' : 'ghost'} size="sm" onClick={() => setTarget('forms')}>
-            Forms Demo (AutoForm + Zod)
-          </Button>
-          <Button
-            variant={target === 'projectConfig' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setTarget('projectConfig')}
-          >
-            Project Config (Zod)
-          </Button>
-          <Button
-            variant={target === 'document' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setTarget('document')}
-          >
-            TextDocument (instance)
-          </Button>
-          <Button
-            variant={target === 'documentClass' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setTarget('documentClass')}
-          >
-            TextDocument (class)
-          </Button>
+    <InspectorProvider components={Inspectors}>
+      <div className="flex flex-col w-screen h-screen p-4 gap-4 bg-background">
+        <InspectorToolbar />
+        <div className="flex-1 min-h-0 overflow-hidden border rounded-lg">
+          <InspectorPager paneWidth={420} />
         </div>
-      </Card>
-      <div className="flex-1 min-h-0 overflow-auto">
-        {target === 'forms' ? (
-          <Card className="p-4">
-            <FormsDemo />
-          </Card>
-        ) : target === 'namespace' ? (
-          <Inspector target={graphViewable} />
-        ) : (
-          <Inspector target={viewable} />
-        )}
       </div>
-    </div>
+    </InspectorProvider>
   )
 }

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useComponents } from '../context'
 import type { Info } from '../../core/types'
-import { isViewable } from '../../core/phlow'
+import { inspect, canInspect } from '../../core/inspect'
 import styles from './InfoView.module.css'
 
 export interface InfoViewProps {
@@ -11,7 +11,9 @@ export interface InfoViewProps {
 }
 
 /**
- * Renders a key-value info view with optional drill-down on entries
+ * Renders a key-value info view with optional drill-down on entries.
+ * If `target` is provided, it's used for inspection.
+ * Otherwise, if `value` is provided, it's used for inspection.
  */
 export function InfoView({ item, onInspect }: InfoViewProps) {
   const { Table, TableHeader, TableRow, TableHead } = useComponents()
@@ -22,23 +24,28 @@ export function InfoView({ item, onInspect }: InfoViewProps) {
     <Table className={styles.table}>
       <TableHeader>
         {entries.map(([key, getValue]) => {
-          const { text, target } = getValue()
-          const canInspect = target !== undefined && onInspect && isViewable(target)
+          const { text, value, target } = getValue()
+          // target takes precedence over value
+          const inspectTarget = target !== undefined ? target : value
+          const isClickable = inspectTarget !== undefined && onInspect && canInspect(inspectTarget)
 
           return (
             <TableRow
               key={key}
-              className={`${styles.row} ${canInspect ? styles.clickable : ''}`}
+              className={`${styles.row} ${isClickable ? styles.clickable : ''}`}
               onClick={() => {
-                if (canInspect) {
-                  onInspect(target, key)
+                if (isClickable && inspectTarget !== undefined) {
+                  const viewable = inspect(inspectTarget)
+                  if (viewable) {
+                    onInspect(viewable, key)
+                  }
                 }
               }}
             >
               <TableHead className={styles.keyCell}>{key}</TableHead>
               <TableHead className={styles.valueCell}>
                 <span className={styles.value}>{text}</span>
-                {canInspect && <span className={styles.chevron}>›</span>}
+                {isClickable && <span className={styles.chevron}>›</span>}
               </TableHead>
             </TableRow>
           )
