@@ -60,7 +60,9 @@ export type Info = Base & {
   entries: {
     [key in string]: () => {
       text: string
-      /** Optional target to inspect when entry is clicked */
+      /** The underlying value (used for default inspection if no target) */
+      value?: unknown
+      /** Optional target to inspect when entry is clicked (overrides value) */
       target?: unknown
     }
   }
@@ -74,7 +76,6 @@ export type Column<T> = {
   text?: (item: T) => string
   /** Converts item to icon (emoji or string) */
   icon?: (item: T) => string
-  target: T
 }
 
 /**

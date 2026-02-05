@@ -34,7 +34,7 @@
 .valueCell {
   padding: 0.5rem;
   font-size: 0.875rem;
-  color: var(--inspector-foreground, #333);
+  color: var(--inspector-foreground, #dbdbdb);
   font-weight: 600;
   display: flex;
   align-items: center;

@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { List } from '../../core/types'
-import { isViewable } from '../../core/phlow'
+import { inspect, canInspect } from '../../core/inspect'
 import styles from './ListView.module.css'
 
 export interface ListViewProps<T> {
@@ -10,17 +10,27 @@ export interface ListViewProps<T> {
 }
 
 /**
- * Renders a simple list view with optional drill-down navigation
+ * Renders a simple list view with optional drill-down navigation.
+ * By default, clicking an item inspects the item itself.
+ * If `send` is provided, it overrides what gets inspected.
  */
 export function ListView<T>({ item, onInspect }: ListViewProps<T>) {
   const items = useMemo(() => item.items(), [item])
-  const canInspect = !!item.send && !!onInspect
+
+  // Get the inspection target for an item
+  const getTarget = (e: T): unknown => (item.send ? item.send(e) : e)
+
+  // Check if an item can be inspected (including primitives)
+  const canInspectItem = (e: T): boolean => {
+    if (!onInspect) return false
+    return canInspect(getTarget(e))
+  }
 
   return (
-    <ul className={styles.list}>
+    <ol className={styles.list} start={0}>
       {items.map((e, i) => {
         const text = item.text(e)
-        const isClickable = canInspect && item.send
+        const isClickable = canInspectItem(e)
 
         return (
           <li
@@ -28,9 +38,10 @@ export function ListView<T>({ item, onInspect }: ListViewProps<T>) {
             className={`${styles.item} ${isClickable ? styles.clickable : ''}`}
             onClick={() => {
               if (isClickable) {
-                const target = item.send!(e)
-                if (target && isViewable(target)) {
-                  onInspect(target, text)
+                const target = getTarget(e)
+                const viewable = inspect(target)
+                if (viewable) {
+                  onInspect!(viewable, text)
                 }
               }
             }}
@@ -40,6 +51,6 @@ export function ListView<T>({ item, onInspect }: ListViewProps<T>) {
           </li>
         )
       })}
-    </ul>
+    </ol>
   )
 }

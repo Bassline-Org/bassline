@@ -198,6 +198,7 @@ export function useInspectFrom(sourcePaneId: string) {
 
 /**
  * Hook that extracts and sorts views from a Viewable target.
+ * Calls each view producer function to get the actual views.
  */
 export function useViews<T>(target: Viewable<T> | null): View<T>[] {
   return useMemo(() => {
@@ -205,7 +206,10 @@ export function useViews<T>(target: Viewable<T> | null): View<T>[] {
       return []
     }
 
-    const rawViews = target[phlowViews]()
+    // Call each producer function to get the views
+    const producers = target[phlowViews]
+    const rawViews = producers.map(producer => producer())
+
     return rawViews
       .filter(v => v.phlow !== 'empty')
       .sort((a, b) => {
