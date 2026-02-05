@@ -24,6 +24,8 @@ export interface InspectorPane {
     paneId: string
     itemIndex?: number
   }
+  /** Currently selected tool ID ('inspector' by default) */
+  selectedToolId: string
 }
 
 /**
@@ -34,6 +36,8 @@ export interface InspectorChainState {
   panes: InspectorPane[]
   /** Index of the focused pane (-1 if none) */
   focusedPaneIndex: number
+  /** ID of maximized pane (null if none) - only one pane can be maximized at a time */
+  maximizedPaneId: string | null
 }
 
 // ============================================================================
@@ -53,6 +57,7 @@ export const generatePaneId = () => `pane-${++_paneId}`
 const createInitialState = (): InspectorChainState => ({
   panes: [],
   focusedPaneIndex: -1,
+  maximizedPaneId: null,
 })
 
 /**
@@ -118,6 +123,7 @@ export const inspectAtom = atom(null, (_get, set, payload: InspectPayload) => {
       selectedViewIndex: 0,
       breadcrumbLabel,
       source: fromPaneIndex !== undefined ? { paneId: draft.panes[fromPaneIndex]?.id } : undefined,
+      selectedToolId: 'inspector',
     }
 
     draft.panes.push(newPane)
@@ -135,9 +141,11 @@ export const inspectRootAtom = atom(null, (_get, set, target: Viewable<unknown>)
         id: generatePaneId(),
         target,
         selectedViewIndex: 0,
+        selectedToolId: 'inspector',
       },
     ]
     draft.focusedPaneIndex = 0
+    draft.maximizedPaneId = null
   })
 })
 
@@ -206,4 +214,38 @@ export const navigateFocusAtom = atom(null, (_get, set, direction: 'left' | 'rig
  */
 export const clearChainAtom = atom(null, (_get, set) => {
   set(inspectorChainAtom, createInitialState())
+})
+
+// ============================================================================
+// Tool Action Atoms
+// ============================================================================
+
+/**
+ * Maximized pane ID (derived atom)
+ */
+export const maximizedPaneIdAtom = atom(get => get(inspectorChainAtom).maximizedPaneId)
+
+/**
+ * Select a tool for a pane
+ */
+export const selectToolAtom = atom(null, (_get, set, payload: { paneIndex: number; toolId: string }) => {
+  const { paneIndex, toolId } = payload
+  set(inspectorChainAtom, draft => {
+    if (paneIndex >= 0 && paneIndex < draft.panes.length) {
+      draft.panes[paneIndex].selectedToolId = toolId
+    }
+  })
+})
+
+/**
+ * Toggle maximize state for a pane
+ */
+export const toggleMaximizeAtom = atom(null, (_get, set, paneId: string) => {
+  set(inspectorChainAtom, draft => {
+    if (draft.maximizedPaneId === paneId) {
+      draft.maximizedPaneId = null
+    } else {
+      draft.maximizedPaneId = paneId
+    }
+  })
 })

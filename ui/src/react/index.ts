@@ -18,6 +18,9 @@ export {
   focusPaneAtom,
   navigateFocusAtom,
   clearChainAtom,
+  selectToolAtom,
+  toggleMaximizeAtom,
+  maximizedPaneIdAtom,
   generatePaneId,
   type InspectorPane as InspectorPaneState,
   type InspectorChainState,
@@ -33,3 +36,4 @@ export * from './views'
 // Inspector components
 export { InspectorPane, type InspectorPaneProps } from './inspector/InspectorPane'
 export { InspectorPager, type InspectorPagerProps } from './inspector/InspectorPager'
+export { ActionBar, type ActionBarProps } from './inspector/ActionBar'

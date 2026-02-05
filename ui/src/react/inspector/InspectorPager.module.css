@@ -7,6 +7,12 @@
   overflow-y: hidden;
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
+  position: relative;
+}
+
+/* When a pane is maximized, disable scroll */
+.hasMaximized {
+  overflow: hidden;
 }
 
 .container:focus {
