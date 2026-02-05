@@ -1,6 +1,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  color: var(--inspector-foreground, #1f2937);
 }
 
 .row {
@@ -34,7 +35,7 @@
 .valueCell {
   padding: 0.5rem;
   font-size: 0.875rem;
-  color: var(--inspector-foreground, #dbdbdb);
+  color: var(--inspector-foreground, #1f2937);
   font-weight: 600;
   display: flex;
   align-items: center;

@@ -8,6 +8,8 @@
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
   position: relative;
+  color: var(--inspector-foreground, #1f2937);
+  background: var(--inspector-background, #fff);
 }
 
 /* When a pane is maximized, disable scroll */
