@@ -1,62 +1,13 @@
-import type React from 'react'
 import type { z } from 'zod'
-
+import { Empty, Forward, List, ColumnedList, TextEditor, Explicit, Descriptor, Config, View, Info } from './types'
 export const PRIORITY = {
   low: 100,
   med: 50,
   high: 10,
 }
-
-export type PhlowViewType<T = unknown> = Empty | NonEmptyView<T>
-export type NonEmptyView<T> = Forward | List<T> | ColumnedList<T> | TextEditor | Explicit | Descriptor<T>
-export interface IViewable {
-  phlowViews: PhlowViewType<any>[]
-}
-
-export type Base = {
-  title: string
-  priority: number
-}
-
-export type Empty = {
-  phlow: 'empty'
-}
-export type Forward = Base & {
-  phlow: 'forward'
-  target(): IViewable
-  viewIndex?: number
-}
-
-export type List<T = unknown> = Base & {
-  phlow: 'list'
-  items(): T[]
-  text(item: T): string
-}
-export type ColumnedList<T = unknown> = Base & {
-  phlow: 'columnedList'
-  items(): T[]
-  columns: Record<string, Column<T>>
-}
-export type Column<T> = {
-  text?: (item: T) => string
-  icon?: (item: T) => string
-}
-export type TextEditor = Base & {
-  phlow: 'textEditor'
-  text: () => string
-  onBlur?: (text: string) => void
-  onChange?: (text: string) => void
-}
-export type Explicit = Base & {
-  phlow: 'explicit'
-  component: () => React.ReactNode
-}
-
-export type Descriptor<T = unknown> = Base & {
-  phlow: 'descriptor'
-  schema: () => z.ZodObject<z.ZodRawShape>
-  model: () => T
-  onUpdate?: (model: T) => void
+export const phlowViews = Symbol.for('$$PHLOW_VIEWS$$')
+export interface Viewable<T = unknown> {
+  [phlowViews](): View<T>[]
 }
 
 export const phlow = {
@@ -64,11 +15,11 @@ export const phlow = {
     return { phlow: 'empty' }
   },
 
-  forward(config: Omit<Forward, 'phlow' | 'priority'> & Partial<Pick<Forward, 'priority'>>): Forward {
-    return { phlow: 'forward', priority: PRIORITY.low, ...config }
+  forward<T>(config: Config<Forward<T>, 'phlow' | 'priority'>): Forward<T> {
+    return { phlow: 'forward', priority: PRIORITY.low, title: 'forwarded', view: () => phlow.empty(), ...config }
   },
 
-  list<T>(config: Partial<Omit<List<T>, 'phlow'>> = {}): List<T> {
+  list<T>(config: Config<List<T>> = {}): List<T> {
     return {
       phlow: 'list',
       title: 'a list',
@@ -86,6 +37,16 @@ export const phlow = {
       priority: PRIORITY.low,
       items: () => [],
       columns: {},
+      ...config,
+    }
+  },
+
+  info(config: Config<Info>): Info {
+    return {
+      phlow: 'info',
+      title: 'info',
+      priority: PRIORITY.low,
+      entries: {},
       ...config,
     }
   },
