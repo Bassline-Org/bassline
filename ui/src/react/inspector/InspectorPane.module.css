@@ -86,3 +86,87 @@
   overflow: auto;
   padding: 0.75rem;
 }
+
+/* Maximized state */
+.maximized {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  border-right: none;
+}
+
+/* Header buttons container */
+.headerButtons {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.maximizeButton {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  font-size: 0.75rem;
+}
+
+/* Tool selector dropdown */
+.toolSelector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.toolButton {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.dropdownArrow {
+  font-size: 0.625rem;
+  opacity: 0.7;
+}
+
+.toolDropdownBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 19;
+}
+
+.toolDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 120px;
+  background: var(--popover, var(--card, var(--background, white)));
+  border: 1px solid var(--border, var(--inspector-border, #e0e0e0));
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.toolOption {
+  width: 100%;
+  justify-content: flex-start;
+  font-size: 0.75rem;
+  padding: 0.375rem 0.5rem;
+}
+
+.toolIcon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.375rem;
+}

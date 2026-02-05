@@ -1,7 +1,19 @@
 import { useCallback, useMemo, useEffect } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
-import { phlowViews, isViewable, type Viewable } from '../core/phlow'
-import type { View } from '../core/types'
+import {
+  phlowViews,
+  phlowActions,
+  phlowTools,
+  isViewable,
+  shouldInheritViews,
+  shouldInheritActions,
+  shouldInheritTools,
+  type Viewable,
+  type ViewProducer,
+  type ActionProducer,
+  type ToolProducer,
+} from '../core/phlow'
+import type { View, Action, Tool } from '../core/types'
 import { useInspectorContext } from './context'
 import {
   inspectorChainAtom,
@@ -193,30 +205,143 @@ export function useInspectFrom(sourcePaneId: string) {
 }
 
 // ============================================================================
+// Prototype Chain Collection
+// ============================================================================
+
+/**
+ * Collect producer functions from an object's prototype chain.
+ * Stops when:
+ * - An object opts out of inheritance (via the shouldInherit check)
+ * - We reach Object.prototype or null
+ *
+ * @param target - The object to start from
+ * @param symbol - The symbol key to collect (e.g., phlowViews)
+ * @param shouldInherit - Function to check if inheritance should continue
+ * @returns Array of collected producer functions
+ */
+function collectFromPrototypeChain<T>(target: object, symbol: symbol, shouldInherit: (obj: unknown) => boolean): T[] {
+  const allProducers: T[] = []
+  let current: object | null = target
+
+  while (current !== null) {
+    // Stop if this object opts out of inheritance (except for the target itself)
+    if (current !== target && !shouldInherit(current)) {
+      break
+    }
+
+    // Collect from this level if it has the symbol
+    if (symbol in current) {
+      const producers = (current as any)[symbol]
+      if (Array.isArray(producers)) {
+        allProducers.push(...producers)
+      }
+    }
+
+    // Move to prototype
+    current = Object.getPrototypeOf(current)
+
+    // Stop at Object.prototype or null
+    if (current === Object.prototype || current === null) {
+      break
+    }
+  }
+
+  return allProducers
+}
+
+// ============================================================================
 // View Collection Hook
 // ============================================================================
 
 /**
  * Hook that extracts and sorts views from a Viewable target.
+ * Collects views from the object and its prototype chain.
  * Calls each view producer function to get the actual views.
  */
 export function useViews<T>(target: Viewable<T> | null): View<T>[] {
   return useMemo(() => {
-    if (!target || !isViewable(target)) {
+    if (!target) {
       return []
     }
 
-    // Call each producer function to get the views
-    const producers = target[phlowViews]
-    const rawViews = producers.map(producer => producer())
+    // Collect view producers from prototype chain
+    const allProducers = collectFromPrototypeChain<ViewProducer<T>>(target, phlowViews, shouldInheritViews)
 
-    return rawViews
+    // Call producers and filter/sort results
+    const views = allProducers
+      .map(producer => producer())
       .filter(v => v.phlow !== 'empty')
       .sort((a, b) => {
         const aPriority = 'priority' in a ? a.priority : 100
         const bPriority = 'priority' in b ? b.priority : 100
         return aPriority - bPriority
-      }) as View<T>[]
+      })
+
+    return views as View<T>[]
+  }, [target])
+}
+
+// ============================================================================
+// Action Collection Hook
+// ============================================================================
+
+/**
+ * Hook that extracts and sorts actions from an object.
+ * Collects actions from the object and its prototype chain.
+ * Calls each action producer function to get the actual actions.
+ */
+export function useActions(target: object | null): Action[] {
+  return useMemo(() => {
+    if (!target) {
+      return []
+    }
+
+    // Collect action producers from prototype chain
+    const allProducers = collectFromPrototypeChain<ActionProducer>(target, phlowActions, shouldInheritActions)
+
+    // Call producers and filter results
+    const actions = allProducers
+      .map(producer => producer())
+      .filter(a => a.phlow !== 'emptyAction')
+      .sort((a, b) => {
+        const aPriority = 'priority' in a ? (a.priority ?? 50) : 50
+        const bPriority = 'priority' in b ? (b.priority ?? 50) : 50
+        return aPriority - bPriority
+      })
+
+    return actions
+  }, [target])
+}
+
+// ============================================================================
+// Tool Collection Hook
+// ============================================================================
+
+/**
+ * Hook that extracts and sorts tools from an object.
+ * Collects tools from the object and its prototype chain.
+ * Calls each tool producer function to get the actual tools.
+ */
+export function useTools<T>(target: Viewable<T> | null): Tool<T>[] {
+  return useMemo(() => {
+    if (!target) {
+      return []
+    }
+
+    // Collect tool producers from prototype chain
+    const allProducers = collectFromPrototypeChain<ToolProducer<T>>(target, phlowTools, shouldInheritTools)
+
+    // Call producers and filter/sort results
+    const tools = allProducers
+      .map(producer => producer())
+      .filter(t => t.phlow !== 'emptyTool')
+      .sort((a, b) => {
+        const aPriority = 'priority' in a ? (a.priority ?? 50) : 50
+        const bPriority = 'priority' in b ? (b.priority ?? 50) : 50
+        return aPriority - bPriority
+      })
+
+    return tools as Tool<T>[]
   }, [target])
 }
 

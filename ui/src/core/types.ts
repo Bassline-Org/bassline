@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, ComponentType } from 'react'
 
 /**
  * Configuration helper type for building views
@@ -135,4 +135,76 @@ export type Descriptor<T = unknown> = Base & {
   model: () => T
   /** Called when user submits the form */
   onUpdate?: (model: T) => void
+}
+
+// ============================================================================
+// Tool Types
+// ============================================================================
+
+/**
+ * Union of all tool types
+ */
+export type Tool<T = unknown> = EmptyTool | WindowTool<T>
+
+/**
+ * Empty tool - placeholder when tool shouldn't be shown (conditional display)
+ */
+export type EmptyTool = { phlow: 'emptyTool' }
+
+/**
+ * Props passed to tool components
+ */
+export interface ToolProps<T> {
+  /** The target object being inspected */
+  target: T
+  /** Open inspector for a value (for context menu integration) */
+  onInspect: (value: unknown, label?: string) => void
+}
+
+/**
+ * Window tool - a complete application for interacting with an object
+ */
+export type WindowTool<T = unknown> = {
+  phlow: 'windowTool'
+  /** Display title for the tool dropdown */
+  title: string
+  /** Lower number = higher priority (shown first) */
+  priority?: number
+  /** Optional icon for the dropdown */
+  icon?: ReactNode
+  /** The React component to render as the tool */
+  component: ComponentType<ToolProps<T>>
+}
+
+// ============================================================================
+// Action Types
+// ============================================================================
+
+/**
+ * Union of all action types
+ */
+export type Action = EmptyAction | ButtonAction
+
+/**
+ * Empty action - placeholder when action shouldn't be shown (conditional display)
+ */
+export type EmptyAction = { phlow: 'emptyAction' }
+
+/**
+ * Button action - a clickable button that triggers behavior
+ */
+export type ButtonAction = {
+  phlow: 'buttonAction'
+  /** Display label for the button */
+  label: string
+  /** Optional icon for the button */
+  icon?: ReactNode
+  /** Tooltip text */
+  tooltip?: string
+  /** Lower number = higher priority (shown first) */
+  priority?: number
+  /** Whether the action is currently available (default: true) */
+  enabled?: () => boolean
+  /** Called when button is clicked */
+  onClick: () => void | Promise<void>
 }

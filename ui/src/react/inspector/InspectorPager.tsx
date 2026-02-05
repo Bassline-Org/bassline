@@ -1,6 +1,15 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
-import { inspectorChainAtom, closePaneAtom, selectViewAtom, focusPaneAtom, navigateFocusAtom } from '../atoms'
+import {
+  inspectorChainAtom,
+  closePaneAtom,
+  selectViewAtom,
+  focusPaneAtom,
+  navigateFocusAtom,
+  selectToolAtom,
+  toggleMaximizeAtom,
+  maximizedPaneIdAtom,
+} from '../atoms'
 import { InspectorPane } from './InspectorPane'
 import styles from './InspectorPager.module.css'
 
@@ -26,10 +35,13 @@ export function InspectorPager({
   emptyMessage = 'Select an object to inspect',
 }: InspectorPagerProps) {
   const chainState = useAtomValue(inspectorChainAtom)
+  const maximizedPaneId = useAtomValue(maximizedPaneIdAtom)
   const closePane = useSetAtom(closePaneAtom)
   const selectView = useSetAtom(selectViewAtom)
   const focusPane = useSetAtom(focusPaneAtom)
   const navigateFocus = useSetAtom(navigateFocusAtom)
+  const selectTool = useSetAtom(selectToolAtom)
+  const toggleMaximize = useSetAtom(toggleMaximizeAtom)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastPaneCountRef = useRef(chainState.panes.length)
@@ -69,23 +81,36 @@ export function InspectorPager({
   return (
     <div
       ref={scrollContainerRef}
-      className={`${styles.container} ${className ?? ''}`}
+      className={`${styles.container} ${maximizedPaneId ? styles.hasMaximized : ''} ${className ?? ''}`}
       onKeyDown={handleKeyDown}
       tabIndex={0}
     >
-      {chainState.panes.map((pane, index) => (
-        <InspectorPane
-          key={pane.id}
-          pane={pane}
-          paneIndex={index}
-          isLast={index === chainState.panes.length - 1}
-          isFocused={index === chainState.focusedPaneIndex}
-          paneWidth={paneWidth}
-          onClose={() => closePane(index)}
-          onSelectView={viewIndex => selectView({ paneIndex: index, viewIndex })}
-          onFocus={() => focusPane(index)}
-        />
-      ))}
+      {chainState.panes.map((pane, index) => {
+        const isMaximized = pane.id === maximizedPaneId
+        const isHidden = maximizedPaneId !== null && !isMaximized
+
+        // Hide non-maximized panes when another is maximized
+        if (isHidden) {
+          return null
+        }
+
+        return (
+          <InspectorPane
+            key={pane.id}
+            pane={pane}
+            paneIndex={index}
+            isLast={index === chainState.panes.length - 1}
+            isFocused={index === chainState.focusedPaneIndex}
+            isMaximized={isMaximized}
+            paneWidth={paneWidth}
+            onClose={() => closePane(index)}
+            onSelectView={viewIndex => selectView({ paneIndex: index, viewIndex })}
+            onSelectTool={toolId => selectTool({ paneIndex: index, toolId })}
+            onToggleMaximize={() => toggleMaximize(pane.id)}
+            onFocus={() => focusPane(index)}
+          />
+        )
+      })}
     </div>
   )
 }
