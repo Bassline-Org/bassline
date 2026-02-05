@@ -15,7 +15,6 @@ export function TextView({ item }: TextViewProps) {
 
   return (
     <Textarea
-      className="min-h-[200px] w-full"
       value={text}
       onChange={e => {
         const value = e.target.value
