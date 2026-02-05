@@ -2,16 +2,6 @@
 
 A minimal protocol for reflexive distributed systems.
 
-Built with <3 by your friends at Bassline :)
-
-## 🚧 IMPORTANT NOTE! 🚧
-
-This is stable not yet!
-
-We just recently made this public to share, and you are welcome to play with it or check out the code. But you probably shouldn't use this for anything serious as we are ironing our concrete usage patterns.
-
-But do reach out if you have any questions!
-
 ## Resources
 
 A resource is something you can `get` from or `put` to.
@@ -59,20 +49,20 @@ Oracles answer questions. Databases, function registries, evaluators are all cas
 
 Scouts discover things autonomously and report what they find. Monitors, crawlers, peer discovery.
 
-See [packages/core/docs/Resource-Kinds.md](./packages/core/docs/Resource-Kinds.md) for some more details (there are still stubs, unfortunate!).
+See [packages/core/docs/Resource-Kinds.md](./packages/core/docs/Resource-Kinds.md) for more details.
 
 ## Packages
 
 ```
-packages/core/       Resource primitives, cells, propagators, plumber, functions, timers
+packages/core/       Resource primitives, cells, propagators, circuit, deployment, timers, and more
+packages/blit/       Portable SQLite-backed bassline applications
 packages/node/       Node.js: HTTP server, WebSocket server, file store
 packages/remote/     WebSocket client for connecting to remote basslines
 packages/database/   SQLite
-packages/services/   AI integration (Claude)
+packages/services/   AI integration
 packages/trust/      Capability-based trust experiments
-packages/tcl/        Our TCL interpreter (right now it maintains tcl semantics, but we have plans to have basslines relate directly to commands)
-
-apps/cli/            Daemon and MCP server (actively getting ripped out and replaced with blits)
+packages/tcl/        Our TCL interpreter
+apps/cli/            Daemon and MCP server
 apps/tui/            Terminal UI
 ```
 
