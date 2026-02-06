@@ -2,13 +2,9 @@ import {
   createContext,
   useContext,
   useMemo,
-  useRef,
-  useState,
-  useCallback,
   type ComponentType,
   type PropsWithChildren,
   type ReactNode,
-  type RefObject,
   type HTMLAttributes,
   type TextareaHTMLAttributes,
   type ButtonHTMLAttributes,
@@ -111,41 +107,12 @@ export interface InspectorComponents {
 }
 
 // ============================================================================
-// Extension System Types
-// ============================================================================
-
-/**
- * An extension that can be attached to inspector slots
- */
-export interface InspectorExtension {
-  id: string
-  paneId: string
-  slot: 'bar' | 'actions' | 'search' | 'footer'
-  priority: number
-  render: () => ReactNode
-}
-
-// ============================================================================
 // Context Types
 // ============================================================================
 
 export interface InspectorContextValue {
   /** UI component overrides */
   components: InspectorComponents
-
-  /** Portal refs for extension slots */
-  portalRefs: {
-    bar: RefObject<HTMLDivElement | null>
-    actions: RefObject<HTMLDivElement | null>
-    search: RefObject<HTMLDivElement | null>
-    footer: RefObject<HTMLDivElement | null>
-  }
-
-  /** Registered extensions */
-  extensions: InspectorExtension[]
-
-  /** Register an extension, returns cleanup function */
-  registerExtension: (ext: Omit<InspectorExtension, 'id'>) => () => void
 }
 
 // ============================================================================
@@ -163,9 +130,6 @@ export interface InspectorProviderProps extends PropsWithChildren {
   /** Custom component overrides */
   components?: Partial<InspectorComponents>
 }
-
-let _extensionId = 0
-const generateExtensionId = () => `ext-${++_extensionId}`
 
 // Import will be provided by consumer or use empty defaults
 // This avoids circular dependency issues
@@ -205,45 +169,7 @@ export function InspectorProvider({ children, components: customComponents }: In
     [DefaultComponents, customComponents]
   )
 
-  // Portal refs for extension slots - defined separately to avoid recreation
-  const barRef = useRef<HTMLDivElement>(null)
-  const actionsRef = useRef<HTMLDivElement>(null)
-  const searchRef = useRef<HTMLDivElement>(null)
-  const footerRef = useRef<HTMLDivElement>(null)
-
-  const portalRefs = useMemo(
-    () => ({
-      bar: barRef,
-      actions: actionsRef,
-      search: searchRef,
-      footer: footerRef,
-    }),
-    []
-  )
-
-  // Extensions state - using proper useState for reactivity
-  const [extensions, setExtensions] = useState<InspectorExtension[]>([])
-
-  const registerExtension = useCallback((ext: Omit<InspectorExtension, 'id'>) => {
-    const id = generateExtensionId()
-    const fullExt = { ...ext, id }
-    setExtensions(prev => [...prev, fullExt].sort((a, b) => a.priority - b.priority))
-
-    // Return cleanup function
-    return () => {
-      setExtensions(prev => prev.filter(e => e.id !== id))
-    }
-  }, [])
-
-  const contextValue = useMemo<InspectorContextValue>(
-    () => ({
-      components: mergedComponents,
-      portalRefs,
-      extensions,
-      registerExtension,
-    }),
-    [mergedComponents, portalRefs, extensions, registerExtension]
-  )
+  const contextValue = useMemo<InspectorContextValue>(() => ({ components: mergedComponents }), [mergedComponents])
 
   return (
     <ComponentContext.Provider value={mergedComponents}>

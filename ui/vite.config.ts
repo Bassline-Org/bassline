@@ -20,7 +20,6 @@ export default defineConfig({
         'zod-form/index': resolve(__dirname, 'src/zod-form/index.ts'),
         // New entry points
         'views/index': resolve(__dirname, 'src/views/index.ts'),
-        'tools/index': resolve(__dirname, 'src/tools/index.ts'),
         'panes/index': resolve(__dirname, 'src/panes/index.ts'),
         'hooks/index': resolve(__dirname, 'src/hooks/index.ts'),
         'state/index': resolve(__dirname, 'src/state/index.ts'),

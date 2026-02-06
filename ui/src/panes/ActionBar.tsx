@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useComponents } from '../react/context'
-import type { ButtonAction } from '../core/types'
+import { useInspector } from '../hooks'
+import { inspect } from '../core/inspect'
+import type { PhlowButtonAction } from '../core/views'
 import styles from '~/css/tools/ActionBar.module.css'
 
 export interface ActionBarProps {
-  /** Actions to render (only ButtonActions are supported) */
-  actions: ButtonAction[]
+  /** Actions to render */
+  actions: PhlowButtonAction[]
 }
 
 /**
@@ -27,14 +29,15 @@ export function ActionBar({ actions }: ActionBarProps) {
 }
 
 interface ActionButtonProps {
-  action: ButtonAction
+  action: PhlowButtonAction
 }
 
 function ActionButton({ action }: ActionButtonProps) {
   const { Button } = useComponents()
+  const { inspect: inspectTarget } = useInspector()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const enabled = action.enabled?.() ?? true
+  const enabled = action.isEnabled()
 
   const handleClick = async () => {
     if (!enabled || loading) return
@@ -42,11 +45,19 @@ function ActionButton({ action }: ActionButtonProps) {
     setLoading(true)
     setError(null)
     try {
-      await action.onClick()
+      const result = action.onClick()
+
+      if (result !== undefined) {
+        const value = result instanceof Promise ? await result : result
+
+        const viewable = inspect(value)
+        if (viewable) {
+          inspectTarget(viewable)
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Action failed'
       setError(message)
-      // Clear error after 3 seconds
       setTimeout(() => setError(null), 3000)
     } finally {
       setLoading(false)

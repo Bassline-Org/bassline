@@ -29,7 +29,6 @@
 @import '../css/views/ViewRenderer.module.css';
 
 /* Import tool styles */
-@import '../css/tools/InspectorTool.module.css';
 @import '../css/tools/ActionBar.module.css';
 
 /* Import pane styles */

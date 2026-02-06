@@ -24,8 +24,8 @@ So to create humane and explainable systems, we must embrace this fact.
 This library provides React primitives for this approach:
 
 - **Views** — Contextual visualizations attached to objects
-- **Tools** — Complete applications for specific interactions
 - **Actions** — Buttons that trigger object-specific behaviors
+- **Search** — Declarative, query-parameterized search sources attached to objects
 - **Panes** — Miller columns for navigating object graphs
 
 ## Installation
@@ -39,7 +39,7 @@ pnpm add @bassline/ui
 ## Quick Start
 
 ```tsx
-import { phlowViews, phlow, InspectorProvider, PaneContainer, useInspect } from '@bassline/ui'
+import { phlowViews, views, PRIORITY, InspectorProvider, PaneContainer, useInspector, inspect } from '@bassline/ui'
 
 // Define how your class presents itself
 class Person {
@@ -49,39 +49,34 @@ class Person {
     public friends: Person[] = []
   ) {}
 
-  [phlowViews] = [
-    // Primary view: key-value pairs
-    () =>
-      phlow.info({
-        title: 'Info',
-        priority: 10,
-        entries: {
-          Name: () => ({ text: this.name }),
-          Age: () => ({ text: String(this.age) }),
-        },
-      }),
-
-    // Secondary view: list of friends
-    () =>
-      phlow.list({
-        title: 'Friends',
-        priority: 20,
-        items: () => this.friends,
-        text: friend => friend.name,
-        send: friend => friend, // clicking opens friend in new pane
-      }),
-  ]
+  // Attach views using the fluent builder
+  [phlowViews] = views<Person>()
+    .info(self => ({
+      title: 'Info',
+      priority: PRIORITY.high,
+      entries: {
+        Name: () => ({ text: self.name }),
+        Age: () => ({ text: String(self.age) }),
+      },
+    }))
+    .list(self => ({
+      title: 'Friends',
+      priority: PRIORITY.med,
+      items: () => self.friends,
+      text: friend => friend.name,
+      send: friend => friend, // clicking opens friend in new pane
+    }))
 }
 
 // Use in your app
 function App() {
-  const inspect = useInspect()
+  const { inspectRoot } = useInspector()
   const alice = new Person('Alice', 30)
 
   return (
     <InspectorProvider>
-      <button onClick={() => inspect(alice, 'Alice')}>Inspect Alice</button>
-      <PaneContainer />
+      <button onClick={() => inspectRoot(inspect(alice)!)}>Inspect Alice</button>
+      <PaneContainer paneWidth={400} />
     </InspectorProvider>
   )
 }
@@ -91,50 +86,62 @@ function App() {
 
 ### Views
 
-Views are contextual visualizations. Objects declare their views using the `phlowViews` symbol.
+Views are contextual visualizations. Objects declare their views using the `phlowViews` symbol and the `views<T>()` fluent builder.
 
 ```tsx
-import { phlowViews, phlow, PRIORITY } from '@bassline/ui'
+import { phlowViews, views, PRIORITY } from '@bassline/ui'
 
 class DataSet {
-  data = ([
-    /* ... */
-  ][phlowViews] = [
-    // Factory functions produce views lazily
-    () =>
-      phlow.columnedList({
-        title: 'Table',
-        priority: PRIORITY.high,
-        items: () => this.data,
-        columns: {
-          id: { text: row => row.id },
-          value: { text: row => String(row.value) },
-        },
-        send: row => row, // drill down into row
-      }),
-
-    () =>
-      phlow.explicit({
-        title: 'Chart',
-        priority: PRIORITY.med,
-        component: () => <BarChart data={this.data} />,
-      }),
-  ])
+  data: Array<{ id: string; value: number }> = ([][phlowViews] = views<DataSet>()
+    .columnedList(self => ({
+      title: 'Table',
+      priority: PRIORITY.high,
+      items: () => self.data,
+      columns: {
+        id: { text: row => row.id },
+        value: { text: row => String(row.value) },
+      },
+      send: row => row, // drill down into row
+    }))
+    .explicit(self => ({
+      title: 'Chart',
+      priority: PRIORITY.med,
+      component: () => <BarChart data={self.data} />,
+    }))
+    .panel(self => ({
+      title: 'Dashboard',
+      component: onInspect => <Dashboard data={self.data} onInspect={onInspect} />,
+    })))
 }
 ```
 
 #### View Types
 
-| Factory                                          | Description                 |
-| ------------------------------------------------ | --------------------------- |
-| `phlow.empty()`                                  | Placeholder/null view       |
-| `phlow.forward({ view })`                        | Delegates to another view   |
-| `phlow.list({ items, text, send? })`             | Simple vertical list        |
-| `phlow.columnedList({ items, columns, send? })`  | Table with multiple columns |
-| `phlow.info({ entries })`                        | Key-value pairs display     |
-| `phlow.textEditor({ text, onBlur?, onChange? })` | Editable text area          |
-| `phlow.explicit({ component })`                  | Custom React component      |
-| `phlow.descriptor({ schema, model, onUpdate? })` | Form with validation        |
+| Builder Method    | Description                                       |
+| ----------------- | ------------------------------------------------- |
+| `.info()`         | Key-value pairs display                           |
+| `.list()`         | Simple vertical list                              |
+| `.columnedList()` | Table with multiple columns                       |
+| `.textEditor()`   | Editable text area                                |
+| `.explicit()`     | Custom React component                            |
+| `.descriptor()`   | Form with validation (Zod)                        |
+| `.forward()`      | Delegates to another view                         |
+| `.panel()`        | Full-pane component (shown via dropdown selector) |
+
+Each view config takes `title`, `priority?` (defaults to `PRIORITY.low`), and type-specific fields.
+
+#### Panels
+
+Panels are full-pane components that replace the tab view area. When an object has both regular views and panels, the pane shows a dropdown selector to switch between "Inspector" (tab views) and each panel.
+
+```tsx
+.panel(self => ({
+  title: 'Preview',
+  component: (onInspect) => <Preview doc={self} onInspect={onInspect} />,
+}))
+```
+
+The `component` receives an `onInspect` callback: `(target: unknown, label?: string) => void`.
 
 #### Priority
 
@@ -145,74 +152,60 @@ import { PRIORITY } from '@bassline/ui'
 
 PRIORITY.high // 10 - Primary views
 PRIORITY.med // 50 - Important but secondary
-PRIORITY.low // 100 - Fallback views
+PRIORITY.low // 100 - Default (used when priority is omitted)
 ```
-
-### Tools
-
-Tools are complete applications for interacting with an object. The inspector is the default tool, but objects can define additional tools.
-
-```tsx
-import { phlowTools, tool } from '@bassline/ui'
-
-class AudioFile {
-  constructor(public path: string) {}
-
-  [phlowTools] = [
-    () =>
-      tool.window({
-        title: 'Player',
-        icon: '🎵',
-        component: ({ target }) => <AudioPlayer src={target.path} />,
-      }),
-
-    // Conditional tools
-    () => (this.hasLyrics() ? tool.window({ title: 'Lyrics', component: LyricsView }) : tool.empty()),
-  ]
-}
-```
-
-#### Tool Types
-
-| Factory                                    | Description                         |
-| ------------------------------------------ | ----------------------------------- |
-| `tool.empty()`                             | Null tool (for conditional display) |
-| `tool.window({ title, component, icon? })` | Complete application view           |
 
 ### Actions
 
-Actions are buttons that appear in the inspector header and trigger behaviors.
+Actions are buttons that appear in the pane header and trigger behaviors.
 
 ```tsx
-import { phlowActions, action } from '@bassline/ui'
+import { phlowActions, actions } from '@bassline/ui'
 
 class Document {
-  [phlowActions] = [
-    () =>
-      action.button({
-        label: 'Save',
-        icon: '💾',
-        tooltip: 'Save document',
-        onClick: async () => await this.save(),
-      }),
-
-    () =>
-      action.button({
-        label: 'Delete',
-        icon: '🗑️',
-        enabled: () => !this.isReadOnly,
-        onClick: () => this.delete(),
-      }),
-  ]
+  text = (''[phlowActions] = actions<Document>()
+    .button(self => ({
+      label: 'Save',
+      icon: '💾',
+      tooltip: 'Save document',
+      onClick: async () => await self.save(),
+    }))
+    .button(self => ({
+      label: 'Delete',
+      enabled: () => !self.isReadOnly,
+      onClick: () => self.delete(),
+    })))
 }
 ```
 
-#### Action Types
+Button config: `label`, `onClick`, `icon?`, `tooltip?`, `priority?`, `enabled?`.
 
-| Factory                                                        | Description                           |
-| -------------------------------------------------------------- | ------------------------------------- |
-| `action.empty()`                                               | Null action (for conditional display) |
-| `action.button({ label, onClick, icon?, tooltip?, enabled? })` | Clickable button                      |
+If `onClick` returns a value (or a Promise that resolves to a value), the result is automatically inspected in a new pane.
+
+### Search
+
+Objects declare search sources using the `phlowSearches` symbol and the `searches<T>()` fluent builder. A search source is a query-parameterized list: `items(query)` returns matching items, `text(item)` labels them, `send(item)` gives the inspect target.
+
+```tsx
+import { phlowSearches, searches } from '@bassline/ui'
+
+class TextDocument {
+  text = (''[phlowSearches] = searches<TextDocument>()
+    .source(self => ({
+      title: 'Lines',
+      items: query => self.text.split('\n').filter(l => l.toLowerCase().includes(query.toLowerCase())),
+      text: line => line,
+      send: line => ({ line, length: line.length }),
+    }))
+    .source(self => ({
+      title: 'Words',
+      items: query => [...new Set(self.text.split(/\s+/))].filter(w => w.toLowerCase().startsWith(query.toLowerCase())),
+      text: word => word,
+    })))
+}
+```
+
+When an object has search sources, a search button appears in the pane header. Clicking it opens a text input; results replace the view content, grouped by source title. Clicking a result with a `send` function inspects the result. Escape closes search.
 
 ### Panes (Miller Columns)
 
@@ -230,88 +223,134 @@ function Explorer() {
 }
 ```
 
+### Primitives and `inspect()`
+
+The `inspect()` function wraps any JavaScript value into a `Viewable` object with appropriate views:
+
+```tsx
+import { inspect } from '@bassline/ui'
+
+inspect('hello') // ViewableString with value, length, character list views
+inspect(42) // ViewableNumber with value, hex, binary views
+inspect(true) // ViewableBoolean
+inspect([1, 2, 3]) // ViewableArray with items list, JSON views
+inspect({ a: 1 }) // ViewableObject with properties, keys views
+inspect(promise) // ViewablePromise with loading/resolved/rejected states
+inspect(viewableObj) // Returns the object as-is if already Viewable
+inspect(null) // Returns null
+```
+
+Objects that already implement `[phlowViews]` are returned directly. This is how you bridge plain values into the inspection system.
+
 ## API Reference
 
 ### Hooks
 
 ```tsx
-// Trigger inspection
-const inspect = useInspect()
-inspect(object, 'label')
+// Main inspector navigation
+const {
+  panes, // InspectorPane[]
+  paneCount, // number
+  focusedPane, // InspectorPane | null
+  focusedPaneIndex, // number
+  currentPane, // InspectorPane | null
+  inspect, // (target, breadcrumbLabel?) => void
+  inspectRoot, // (target) => void — replaces all panes
+  closeCurrent, // () => void
+  clear, // () => void
+  goBack, // () => void — focus previous pane
+  goForward, // () => void — focus next pane
+} = useInspector()
 
-// Read current inspector state
-const chain = useInspectorChain()
-// { panes: PaneState[], focusedPaneIndex: number }
+// Pane-specific controls
+const { pane, selectView, close, focus } = usePane(paneId)
 
-// Get views for an object
-const views = useViews(object)
+// Currently focused pane
+const activePane = useActivePane()
 
-// Get tools for an object
-const tools = useTools(object)
+// Inspection callback scoped to a source pane
+const inspectFrom = useInspectFrom(sourcePaneId)
 
-// Get actions for an object
-const actions = useActions(object)
+// Collect views/actions/searches from an object
+const views = useViews(target) // PhlowView[]
+const actions = useActions(target) // PhlowButtonAction[]
+const searches = useSearches(target) // PhlowSearchSource[]
+
+// Component registry access
+const components = useComponents()
 ```
 
 ### State Atoms (Advanced)
 
-For advanced use cases, atoms are exposed directly:
+For advanced use cases, Jotai atoms are exposed directly:
 
 ```tsx
 import {
   inspectorChainAtom, // Main state
   inspectAtom, // Action: open new pane
+  inspectRootAtom, // Action: replace with new root
   closePaneAtom, // Action: close pane by index
+  closePaneByIdAtom, // Action: close pane by ID
   focusPaneAtom, // Action: focus pane by index
   navigateFocusAtom, // Action: move focus left/right
-  selectToolAtom, // Action: select tool in pane
+  selectViewAtom, // Action: select view tab in pane
   toggleMaximizeAtom, // Action: maximize/restore pane
   maximizedPaneIdAtom, // Derived: currently maximized pane
+  clearChainAtom, // Action: clear all panes
+  currentPaneAtom, // Derived: last pane
+  focusedPaneAtom, // Derived: focused pane
+  paneCountAtom, // Derived: number of panes
 } from '@bassline/ui'
 ```
 
 ### Inheritance Control
 
-By default, views/tools/actions inherit from the prototype chain. Control this per-object:
+By default, views inherit from the prototype chain. Control this per-object:
 
 ```tsx
-import { phlowInheritViews, phlowInheritActions, phlowInheritTools } from '@bassline/ui'
+import { phlowInheritViews } from '@bassline/ui'
 
 class Child extends Parent {
-  // Don't inherit parent's views
-  [phlowInheritViews] = (false[phlowViews] = [
+  [phlowInheritViews] = false // Don't inherit parent's views
+
+  [phlowViews] = views<Child>()
+    .info(self => ({ ... }))
     // Only these views will be shown
-  ])
 }
 ```
 
+Actions and search sources do **not** walk the prototype chain — they are always object-specific.
+
 ## Customization
 
-### Component Provider
+### Component Overrides
 
-Override default UI components to match your design system:
+Override default UI components to match your design system by passing them to `InspectorProvider`:
 
 ```tsx
-import { ComponentProvider } from '@bassline/ui'
-import { Button, Card, Table } from './my-components'
+import { InspectorProvider, PaneContainer } from '@bassline/ui'
+import { Button, Card, CardHeader, CardTitle, CardContent, Table } from './my-components'
 
 function App() {
   return (
-    <ComponentProvider
+    <InspectorProvider
       components={{
         Button,
         Card,
+        CardHeader,
+        CardTitle,
+        CardContent,
         Table,
         // ... other overrides
       }}
     >
-      <InspectorProvider>
-        <PaneContainer />
-      </InspectorProvider>
-    </ComponentProvider>
+      <PaneContainer />
+    </InspectorProvider>
   )
 }
 ```
+
+Overridable components: `Card`, `CardHeader`, `CardTitle`, `CardContent`, `Button`, `Textarea`, `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`, `Form`.
 
 ### Keyboard Navigation
 
@@ -325,7 +364,7 @@ The pane container handles keyboard navigation:
 
 #### Bypassing Keyboard Capture
 
-When using text inputs inside panes, you may want arrow keys to work normally (move cursor) rather than navigate panes. The `isTextInputElement` check handles this automatically for:
+When using text inputs inside panes, arrow keys work normally (move cursor) rather than navigate panes. The `isTextInputElement` check handles this automatically for:
 
 - `<textarea>`
 - `<input type="text|search|url|tel|email|password|number">`
@@ -343,25 +382,6 @@ import { KEYBOARD_NOCAPTURE } from '@bassline/ui'
 ```
 
 The check walks up the DOM tree, so adding `nocapture` to a container protects all children.
-
-## Roadmap
-
-### Contextual Search (Planned)
-
-A key capability in Glamorous Toolkit is contextual search: search results are views, not strings. Each result knows how to present itself, and searches can span multiple object types with per-type rendering.
-
-```tsx
-// Future API (not yet implemented)
-const results = await search('config', {
-  searchers: [
-    fileSearcher, // Files show path + preview
-    functionSearcher, // Functions show signature + docstring
-    configSearcher, // Configs show key-value pairs
-  ],
-})
-
-// Each result renders using its own views
-```
 
 ## Inspiration & Credits
 

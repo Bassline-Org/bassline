@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
-import type { Forward } from '../../core/types'
+import type { PhlowForwardView } from '../../core/views'
 import { ViewRenderer } from './ViewRenderer'
 
-export interface ForwardViewProps<T> {
-  item: Forward<T>
+export interface ForwardViewProps {
+  item: PhlowForwardView
   /** Passed through to the forwarded view */
   onInspect?: (target: unknown, label?: string) => void
 }
@@ -11,10 +11,10 @@ export interface ForwardViewProps<T> {
 /**
  * Renders a forward view by delegating to the target view
  */
-export function ForwardView<T>({ item, onInspect }: ForwardViewProps<T>) {
+export function ForwardView({ item, onInspect }: ForwardViewProps) {
   const targetView = useMemo(() => item.view(), [item])
 
-  if (!targetView || targetView.phlow === 'empty') {
+  if (!targetView || targetView.isEmpty()) {
     return <div style={{ color: 'var(--inspector-muted, #888)', fontSize: '0.875rem' }}>No view available</div>
   }
 

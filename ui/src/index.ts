@@ -7,11 +7,8 @@ export * from './core'
 // React integration (context, hooks, atoms, views, inspector)
 export * from './react'
 
-// Views registry (factory functions for creating views)
-export { views, PRIORITY as VIEW_PRIORITY } from './views'
-
-// Tools registry (factory functions for creating tools)
-export { tools } from './tools'
+// Views registry (factory functions for creating view/search containers)
+export { views, searches, PRIORITY as VIEW_PRIORITY } from './views'
 
 // Default components - export only the components, not the prop types (those come from ./react/context)
 export { DefaultComponents } from './components/defaults'

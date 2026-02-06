@@ -1,9 +1,9 @@
 import { useMemo, useRef } from 'react'
 import { useComponents } from '../context'
-import type { Descriptor } from '../../core/types'
+import type { PhlowDescriptorView } from '../../core/views'
 
 export interface DescriptorViewProps<T> {
-  item: Descriptor<T>
+  item: PhlowDescriptorView<any, T>
 }
 
 /**
@@ -15,16 +15,13 @@ export function DescriptorView<T>({ item }: DescriptorViewProps<T>) {
   const schema = useMemo(() => item.schema(), [item])
 
   // Capture snapshot ONCE on mount - don't react to external changes
-  // This preserves user's edits if external data changes while editing
   const snapshotRef = useRef<T | null>(null)
   if (snapshotRef.current === null) {
     snapshotRef.current = item.model()
   }
 
-  // Only call onUpdate when user explicitly submits
   const handleSubmit = (data: T) => {
-    item.onUpdate?.(data)
-    // Update snapshot after successful submit
+    item.onUpdate(data)
     snapshotRef.current = data
   }
 

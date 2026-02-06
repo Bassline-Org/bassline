@@ -1,4 +1,7 @@
-import { phlow, phlowViews, type Viewable, type ViewProducer } from './phlow'
+import { phlowViews, PRIORITY, type Viewable } from './phlow'
+import { views } from './container'
+import { PromiseView } from '../react/views/PromiseView'
+import React from 'react'
 
 // ============================================================================
 // Primitive Wrapper Classes
@@ -6,183 +9,135 @@ import { phlow, phlowViews, type Viewable, type ViewProducer } from './phlow'
 
 /**
  * Viewable wrapper for string values.
- * Use this to inspect primitive strings that can't have prototype methods.
  */
-export class ViewableString implements Viewable<string> {
+export class ViewableString implements Viewable<ViewableString> {
   constructor(public value: string) {}
 
-  [phlowViews]: ViewProducer<string>[] = [
-    () =>
-      phlow.info({
-        title: 'Info',
-        priority: 1,
-        entries: {
-          value: () => ({ text: this.value }),
-          length: () => ({ text: this.value.length.toString() }),
-          trimmed: () => ({ text: this.value.trim() }),
-        },
-      }),
-    () =>
-      phlow.list<string>({
-        title: 'Characters',
-        priority: 2,
-        items: () => this.value.split(''),
-        text: char => `"${char}" (${char.charCodeAt(0)})`,
-      }),
-  ]
+  [phlowViews] = views<ViewableString>()
+    .info(self => ({
+      title: 'Info',
+      priority: 1,
+      entries: {
+        value: () => ({ text: self.value, value: self.value }),
+        length: () => ({ text: self.value.length.toString(), value: self.value.length }),
+        trimmed: () => ({ text: self.value.trim(), value: self.value.trim() }),
+      },
+    }))
+    .list(self => ({
+      title: 'Characters',
+      priority: 2,
+      items: () => self.value.split(''),
+      text: (char: string) => `"${char}" (${char.charCodeAt(0)})`,
+    }))
 }
 
 /**
  * Viewable wrapper for number values.
- * Use this to inspect primitive numbers that can't have prototype methods.
  */
-export class ViewableNumber implements Viewable<number> {
+export class ViewableNumber implements Viewable<ViewableNumber> {
   constructor(public value: number) {}
 
-  [phlowViews]: ViewProducer<number>[] = [
-    () => {
-      const info = (v: any) => () => ({ text: v.toString(), target: v })
-      const value = info(this.value.toString())
-      const hex = info(`0x${this.value.toString(16)}`)
-      const binary = info(`0b${this.value.toString(2)}`)
-      const octal = info(`0o${this.value.toString(8)}`)
-      const isInteger = info(Number.isInteger(this.value))
-      const isFinite = info(Number.isFinite(this.value))
-      const isNaN = info(Number.isNaN(this.value))
-      return phlow.info({
-        title: 'Info',
-        priority: 1,
-        entries: {
-          value,
-          hex,
-          binary,
-          octal,
-          isInteger,
-          isFinite,
-          isNaN,
-        },
-      })
-    },
-  ]
+  [phlowViews] = views<ViewableNumber>().info(self => {
+    const info = (v: any) => () => ({ text: v.toString(), target: v })
+    return {
+      title: 'Info',
+      priority: 1,
+      entries: {
+        value: info(self.value.toString()),
+        hex: info(`0x${self.value.toString(16)}`),
+        binary: info(`0b${self.value.toString(2)}`),
+        octal: info(`0o${self.value.toString(8)}`),
+        isInteger: info(Number.isInteger(self.value)),
+        isFinite: info(Number.isFinite(self.value)),
+        isNaN: info(Number.isNaN(self.value)),
+      },
+    }
+  })
 }
 
 /**
  * Viewable wrapper for boolean values.
  */
-export class ViewableBoolean implements Viewable<boolean> {
+export class ViewableBoolean implements Viewable<ViewableBoolean> {
   constructor(public value: boolean) {}
 
-  [phlowViews]: ViewProducer<boolean>[] = [
-    () =>
-      phlow.info({
-        title: 'Info',
-        priority: 1,
-        entries: {
-          value: () => ({ text: this.value.toString() }),
+  [phlowViews] = views<ViewableBoolean>().info(self => ({
+    title: 'Info',
+    priority: 1,
+    entries: {
+      value: () => ({ text: self.value.toString(), value: self.value }),
+    },
+  }))
+}
+
+/**
+ * Viewable wrapper for array values.
+ */
+export class ViewableArray implements Viewable<ViewableArray> {
+  constructor(public value: unknown[]) {}
+
+  [phlowViews] = views<ViewableArray>()
+    .info(self => ({
+      title: 'Array',
+      priority: PRIORITY.high,
+      entries: {
+        length: () => ({ text: self.value.length.toString(), value: self.value.length }),
+        json: () => ({ text: JSON.stringify(self.value), value: self.value }),
+      },
+    }))
+    .list(self => ({
+      title: 'Items',
+      priority: PRIORITY.med,
+      items: () => self.value,
+      text: (item: unknown) => JSON.stringify(item),
+    }))
+}
+
+/**
+ * Viewable wrapper for object values.
+ */
+export class ViewableObject implements Viewable<ViewableObject> {
+  constructor(public value: object) {}
+
+  [phlowViews] = views<ViewableObject>()
+    .info(self => ({
+      title: 'Object',
+      priority: PRIORITY.high,
+      entries: {
+        size: () => ({ text: Object.keys(self.value).length.toString(), value: Object.keys(self.value).length }),
+        prototype: () => {
+          const proto = Object.getPrototypeOf(self.value)
+          return { text: proto?.constructor?.name ?? String(proto), target: proto }
         },
-      }),
-  ]
-}
-
-// ============================================================================
-// Prototype Extensions
-// ============================================================================
-
-/**
- * Adds default phlow views to Array.prototype.
- * Call this once at app startup to enable inspection of arrays.
- */
-export function addArrayViews(): void {
-  Reflect.defineProperty(Array.prototype, phlowViews, {
-    get: function (this: unknown[]) {
-      // Return array of producer functions
-      // Use getter so `this` is bound correctly each time
-      return [
-        () =>
-          phlow.info({
-            title: 'Info',
-            priority: 1,
-            entries: {
-              length: () => ({
-                text: this.length.toString(),
-              }),
-              json: () => ({
-                text: JSON.stringify(this),
-              }),
-            },
-          }),
-        () =>
-          phlow.list<unknown>({
-            title: 'Items',
-            priority: 2,
-            items: () => this,
-            text: item => JSON.stringify(item),
-          }),
-      ]
-    },
-    configurable: true,
-  })
+        keys: () => {
+          const keys = Object.keys(self.value)
+          return { text: keys.join(', '), target: keys }
+        },
+      },
+    }))
+    .columnedList(self => ({
+      title: 'Properties',
+      priority: PRIORITY.med,
+      items: () => Object.entries(self.value),
+      columns: {
+        key: { text: ([k]: [string, unknown]) => k },
+        type: { text: ([, v]: [string, unknown]) => typeof v },
+        value: { text: ([, v]: [string, unknown]) => String(v) },
+      },
+      send: ([, v]: [string, unknown]) => v,
+      sendLabel: ([k]: [string, unknown]) => k,
+    }))
 }
 
 /**
- * Adds default phlow views to Object.prototype.
- * Call this once at app startup to enable inspection of plain objects.
+ * Viewable wrapper for Promise values.
  */
-export function addObjectViews(): boolean {
-  return Reflect.defineProperty(Object.prototype, phlowViews, {
-    get: function (this: object) {
-      // Return array of producer functions
-      // Use getter so `this` is bound correctly each time
-      return [
-        () =>
-          phlow.info({
-            title: 'Object',
-            priority: 1,
-            entries: {
-              size: () => ({
-                text: Object.keys(this).length.toString(),
-              }),
-              prototype: () => {
-                const proto = Object.getPrototypeOf(this)
-                return {
-                  text: proto?.constructor?.name ?? String(proto),
-                  target: proto,
-                }
-              },
-              keys: () => {
-                const keys = Object.keys(this)
-                return {
-                  text: keys.join(', '),
-                  target: keys,
-                }
-              },
-              extensible: () => ({
-                text: Object.isExtensible(this).toString(),
-              }),
-            },
-          }),
-        () =>
-          phlow.columnedList<[string, unknown]>({
-            title: 'Properties',
-            priority: 2,
-            items: () => Object.entries(this),
-            columns: {
-              key: { text: ([k]) => k },
-              type: { text: ([, v]) => typeof v },
-              value: { text: ([, v]) => String(v) },
-            },
-          }),
-      ]
-    },
-    configurable: true,
-  })
-}
+export class ViewablePromise implements Viewable<ViewablePromise> {
+  constructor(public value: Promise<unknown>) {}
 
-/**
- * Initialize all primitive view extensions.
- * Call this once at app startup.
- */
-export function initPrimitiveViews(): void {
-  addArrayViews()
-  addObjectViews()
+  [phlowViews] = views<ViewablePromise>().explicit(self => ({
+    title: 'Loading...',
+    priority: PRIORITY.high,
+    component: () => React.createElement(PromiseView, { promise: self.value }),
+  }))
 }
