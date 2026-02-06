@@ -1,53 +1,59 @@
-import { isViewable, type Viewable } from './phlow'
-import { ViewableString, ViewableNumber, ViewableBoolean } from './primitives'
+import { phlowViews, type Viewable } from './phlow'
+import {
+  ViewableString,
+  ViewableNumber,
+  ViewableBoolean,
+  ViewableArray,
+  ViewableObject,
+  ViewablePromise,
+} from './primitives'
 
 /**
  * Wrap a value in a Viewable wrapper if needed.
- * - If already Viewable, returns as-is
+ * - If it has [phlowViews], returns as-is (already viewable)
  * - Primitives (string, number, boolean) get wrapped in ViewableX classes
+ * - Arrays get wrapped in ViewableArray
+ * - Promises get wrapped in ViewablePromise
+ * - Plain objects get wrapped in ViewableObject
  * - null/undefined return null
- * - Objects/arrays should be Viewable via prototype extension (if initPrimitiveViews was called)
  */
 export function inspect(value: unknown): Viewable<unknown> | null {
   if (value === null || value === undefined) {
     return null
   }
 
-  if (isViewable(value)) {
-    return value
+  // Anything with the phlowViews symbol is already viewable
+  if (typeof value === 'object' && value !== null && phlowViews in (value as object)) {
+    return value as Viewable<unknown>
   }
 
-  if (typeof value === 'string') {
-    return new ViewableString(value) as Viewable<unknown>
+  switch (typeof value) {
+    case 'string':
+      return new ViewableString(value) as Viewable<unknown>
+    case 'number':
+      return new ViewableNumber(value) as Viewable<unknown>
+    case 'boolean':
+      return new ViewableBoolean(value) as Viewable<unknown>
   }
 
-  if (typeof value === 'number') {
-    return new ViewableNumber(value) as Viewable<unknown>
+  if (value instanceof Promise) {
+    return new ViewablePromise(value) as Viewable<unknown>
   }
 
-  if (typeof value === 'boolean') {
-    return new ViewableBoolean(value) as Viewable<unknown>
+  if (Array.isArray(value)) {
+    return new ViewableArray(value) as Viewable<unknown>
   }
 
-  // Objects and arrays should already be Viewable via prototype extension
-  // But if initPrimitiveViews() wasn't called, they won't be
+  if (typeof value === 'object') {
+    return new ViewableObject(value as object) as Viewable<unknown>
+  }
+
   return null
 }
 
 /**
- * Check if a value can be inspected (is Viewable or can be wrapped as one).
- * This is useful for determining if an item should be clickable.
+ * Check if a value can be inspected.
  */
 export function canInspect(value: unknown): boolean {
-  if (value === null || value === undefined) {
-    return false
-  }
-
-  if (isViewable(value)) {
-    return true
-  }
-
-  // Primitives can always be wrapped
-  const type = typeof value
-  return type === 'string' || type === 'number' || type === 'boolean'
+  return inspect(value) !== null
 }

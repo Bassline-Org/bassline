@@ -1,21 +1,19 @@
 import { useMemo } from 'react'
 import { useComponents } from '../context'
-import type { ColumnedList } from '../../core/types'
+import type { PhlowColumnedListView } from '../../core/views'
 import { inspect, canInspect } from '../../core/inspect'
 import styles from '~/css/views/ColumnedListView.module.css'
 
-export interface ColumnedListViewProps<T> {
-  item: ColumnedList<T>
+export interface ColumnedListViewProps {
+  item: PhlowColumnedListView<any, any>
   /** Called when a row is clicked and has a send target */
   onInspect?: (target: unknown, label?: string) => void
 }
 
 /**
  * Renders a columned list (table) view with optional drill-down navigation.
- * By default, clicking a row inspects the row item itself.
- * If `send` is provided, it overrides what gets inspected.
  */
-export function ColumnedListView<T>({ item, onInspect }: ColumnedListViewProps<T>) {
+export function ColumnedListView({ item, onInspect }: ColumnedListViewProps) {
   const { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } = useComponents()
 
   const items = useMemo(() => item.items(), [item])
@@ -23,10 +21,10 @@ export function ColumnedListView<T>({ item, onInspect }: ColumnedListViewProps<T
   const columnNames = columns.map(([k]) => k)
 
   // Get the inspection target for a row
-  const getTarget = (row: T): unknown => (item.send ? item.send(row) : row)
+  const getTarget = (row: unknown): unknown => (item.hasSend() ? item.sendFor(row) : row)
 
   // Check if a row can be inspected (including primitives)
-  const canInspectRow = (row: T): boolean => {
+  const canInspectRow = (row: unknown): boolean => {
     if (!onInspect) return false
     return canInspect(getTarget(row))
   }
@@ -43,7 +41,7 @@ export function ColumnedListView<T>({ item, onInspect }: ColumnedListViewProps<T
         </TableRow>
       </TableHeader>
       <TableBody>
-        {items.map((row, i) => {
+        {items.map((row: any, i: number) => {
           const isClickable = canInspectRow(row)
           return (
             <TableRow
@@ -54,7 +52,7 @@ export function ColumnedListView<T>({ item, onInspect }: ColumnedListViewProps<T
                   const target = getTarget(row)
                   const viewable = inspect(target)
                   if (viewable) {
-                    const label = item.sendLabel?.(row)
+                    const label = item.sendLabelFor(row)
                     onInspect!(viewable, label)
                   }
                 }

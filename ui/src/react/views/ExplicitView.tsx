@@ -1,7 +1,7 @@
-import type { Explicit } from '../../core/types'
+import type { PhlowExplicitView } from '../../core/views'
 
 export interface ExplicitViewProps {
-  item: Explicit
+  item: PhlowExplicitView
 }
 
 /**

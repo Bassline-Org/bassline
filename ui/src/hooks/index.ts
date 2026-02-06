@@ -1,22 +1,9 @@
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
-import {
-  phlowViews,
-  phlowActions,
-  phlowTools,
-  isViewable,
-  shouldInheritViews,
-  shouldInheritActions,
-  shouldInheritTools,
-  type Viewable,
-  type ViewProducer,
-  type ActionProducer,
-  type ToolProducer,
-} from '../core/phlow'
-import type { View, ButtonAction, WindowTool } from '../core/types'
-import { collectFromPrototypeChain } from '../core/collectors'
-import { useInspectorContext } from '../react/context'
-import { tools as toolsRegistry } from '../tools'
+import { isViewable, type Viewable } from '../core/phlow'
+import type { PhlowView, PhlowButtonAction, PhlowSearchSource } from '../core/views'
+import { ViewContainer, ActionContainer, SearchContainer } from '../core/container'
+import { inspect } from '../core/inspect'
 import {
   inspectorChainAtom,
   currentPaneAtom,
@@ -174,13 +161,12 @@ export function useInspectFrom(sourcePaneId: string) {
 
   return useCallback(
     (target: unknown, breadcrumbLabel?: string) => {
-      if (!isViewable(target)) {
-        return
-      }
+      const viewable = isViewable(target) ? target : inspect(target)
+      if (!viewable) return
 
       const sourceIndex = chainState.panes.findIndex(p => p.id === sourcePaneId)
       _inspect({
-        target,
+        target: viewable,
         fromPaneIndex: sourceIndex >= 0 ? sourceIndex : undefined,
         breadcrumbLabel,
       })
@@ -195,24 +181,12 @@ export function useInspectFrom(sourcePaneId: string) {
 
 /**
  * Hook that extracts and sorts views from a Viewable target.
- * Filters out empty views.
+ * Uses ViewContainer.collect() to walk the prototype chain.
  */
-export function useViews<T>(target: Viewable<T> | null): View<T>[] {
+export function useViews<T>(target: Viewable<T> | null): PhlowView<T>[] {
   return useMemo(() => {
     if (!target) return []
-
-    const allProducers = collectFromPrototypeChain<ViewProducer<T>>(target, phlowViews, shouldInheritViews)
-
-    const views = allProducers
-      .map(producer => producer())
-      .filter(v => v.phlow !== 'empty')
-      .sort((a, b) => {
-        const aPriority = 'priority' in a ? a.priority : 100
-        const bPriority = 'priority' in b ? b.priority : 100
-        return aPriority - bPriority
-      })
-
-    return views as View<T>[]
+    return ViewContainer.collect<T>(target)
   }, [target])
 }
 
@@ -222,103 +196,24 @@ export function useViews<T>(target: Viewable<T> | null): View<T>[] {
 
 /**
  * Hook that extracts and sorts actions from an object.
- * Filters out empty actions and returns only ButtonActions.
  */
-export function useActions(target: object | null): ButtonAction[] {
+export function useActions(target: object | null): PhlowButtonAction[] {
   return useMemo(() => {
     if (!target) return []
-
-    const allProducers = collectFromPrototypeChain<ActionProducer>(target, phlowActions, shouldInheritActions)
-
-    const actions = allProducers
-      .map(producer => producer())
-      .filter((a): a is ButtonAction => a.phlow === 'buttonAction')
-      .sort((a, b) => {
-        const aPriority = a.priority ?? 50
-        const bPriority = b.priority ?? 50
-        return aPriority - bPriority
-      })
-
-    return actions
+    return ActionContainer.collect(target)
   }, [target])
 }
 
 // ============================================================================
-// Tool Collection Hook
+// Search Collection Hook
 // ============================================================================
 
 /**
- * Hook that extracts and sorts tools from an object.
- * Always includes the Inspector tool as the first tool.
- * Filters out empty tools and returns only WindowTools.
+ * Hook that extracts and sorts search sources from an object.
  */
-export function useTools<T>(target: Viewable<T> | null): WindowTool<T>[] {
+export function useSearches(target: object | null): PhlowSearchSource[] {
   return useMemo(() => {
     if (!target) return []
-
-    // Always include inspector as the first tool
-    const allTools: WindowTool<T>[] = [toolsRegistry.inspector<T>()]
-
-    // Collect custom tools from prototype chain
-    const producers = collectFromPrototypeChain<ToolProducer<T>>(target, phlowTools, shouldInheritTools)
-
-    for (const producer of producers) {
-      const tool = producer()
-      // Filter out empty tools - only include WindowTools
-      if (tool.phlow === 'windowTool') {
-        allTools.push(tool)
-      }
-    }
-
-    return allTools.sort((a, b) => {
-      const aPriority = a.priority ?? 50
-      const bPriority = b.priority ?? 50
-      return aPriority - bPriority
-    })
+    return SearchContainer.collect(target)
   }, [target])
-}
-
-// ============================================================================
-// Extension Hooks
-// ============================================================================
-
-/**
- * Hook for registering an extension to an inspector slot.
- */
-export function useInspectorExtension(
-  paneId: string,
-  slot: 'bar' | 'actions' | 'search' | 'footer',
-  priority: number = 50
-) {
-  const { registerExtension } = useInspectorContext()
-
-  return useCallback(
-    (render: () => React.ReactNode) => {
-      return registerExtension({
-        paneId,
-        slot,
-        priority,
-        render,
-      })
-    },
-    [registerExtension, paneId, slot, priority]
-  )
-}
-
-/**
- * Effect-based extension registration.
- */
-export function useExtension(
-  paneId: string,
-  slot: 'bar' | 'actions' | 'search' | 'footer',
-  render: () => React.ReactNode,
-  deps: React.DependencyList = [],
-  priority: number = 50
-) {
-  const register = useInspectorExtension(paneId, slot, priority)
-
-  useEffect(() => {
-    return register(render)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [register, ...deps])
 }

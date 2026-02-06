@@ -5,7 +5,6 @@ import {
   closePaneAtom,
   focusPaneAtom,
   navigateFocusAtom,
-  selectToolAtom,
   toggleMaximizeAtom,
   maximizedPaneIdAtom,
 } from '../state/atoms'
@@ -39,7 +38,6 @@ export function PaneContainer({
   const closePane = useSetAtom(closePaneAtom)
   const focusPane = useSetAtom(focusPaneAtom)
   const navigateFocus = useSetAtom(navigateFocusAtom)
-  const selectTool = useSetAtom(selectToolAtom)
   const toggleMaximize = useSetAtom(toggleMaximizeAtom)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -107,7 +105,6 @@ export function PaneContainer({
             isMaximized={isMaximized}
             paneWidth={paneWidth}
             onClose={() => closePane(index)}
-            onSelectTool={toolId => selectTool({ paneIndex: index, toolId })}
             onToggleMaximize={() => toggleMaximize(pane.id)}
             onFocus={() => focusPane(index)}
           />

@@ -11,7 +11,6 @@ export {
   focusPaneAtom,
   navigateFocusAtom,
   clearChainAtom,
-  selectToolAtom,
   toggleMaximizeAtom,
   maximizedPaneIdAtom,
   generatePaneId,

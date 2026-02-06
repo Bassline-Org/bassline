@@ -24,8 +24,6 @@ export interface InspectorPane {
     paneId: string
     itemIndex?: number
   }
-  /** Currently selected tool ID ('Inspector' by default) */
-  selectedToolId: string
 }
 
 /**
@@ -105,10 +103,11 @@ export const inspectAtom = atom(null, (_get, set, payload: InspectPayload) => {
       selectedViewIndex: 0,
       breadcrumbLabel,
       source: fromPaneIndex !== undefined ? { paneId: draft.panes[fromPaneIndex]?.id } : undefined,
-      selectedToolId: 'inspector',
     }
 
-    draft.panes.push(newPane)
+    // Cast needed: Immer's WritableDraft tries to make ViewContainer.factories mutable,
+    // but we never draft through the target — it's stored as-is.
+    draft.panes.push(newPane as any)
     draft.focusedPaneIndex = draft.panes.length - 1
   })
 })
@@ -118,9 +117,8 @@ export const inspectRootAtom = atom(null, (_get, set, target: Viewable<unknown>)
     draft.panes = [
       {
         id: generatePaneId(),
-        target,
+        target: target as any,
         selectedViewIndex: 0,
-        selectedToolId: 'inspector',
       },
     ]
     draft.focusedPaneIndex = 0
@@ -174,15 +172,6 @@ export const navigateFocusAtom = atom(null, (_get, set, direction: 'left' | 'rig
 
 export const clearChainAtom = atom(null, (_get, set) => {
   set(inspectorChainAtom, createInitialState())
-})
-
-export const selectToolAtom = atom(null, (_get, set, payload: { paneIndex: number; toolId: string }) => {
-  const { paneIndex, toolId } = payload
-  set(inspectorChainAtom, draft => {
-    if (paneIndex >= 0 && paneIndex < draft.panes.length) {
-      draft.panes[paneIndex].selectedToolId = toolId
-    }
-  })
 })
 
 export const toggleMaximizeAtom = atom(null, (_get, set, paneId: string) => {

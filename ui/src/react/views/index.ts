@@ -5,6 +5,5 @@ export * from './InfoView'
 export * from './ForwardView'
 export * from './ExplicitView'
 export * from './DescriptorView'
+export * from './PromiseView'
 export * from './ViewRenderer'
-// Keep PhlowView export for backwards compatibility
-export { PhlowView, type PhlowViewProps } from './ViewRenderer'

@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useComponents } from '../context'
-import type { TextEditor } from '../../core/types'
+import type { PhlowTextEditorView } from '../../core/views'
 
 export interface TextViewProps {
-  item: TextEditor
+  item: PhlowTextEditorView
 }
 
 /**
@@ -19,9 +19,9 @@ export function TextView({ item }: TextViewProps) {
       onChange={e => {
         const value = e.target.value
         setText(value)
-        item?.onChange?.(value)
+        item.onChange(value)
       }}
-      onBlur={e => item?.onBlur?.(e.target.value)}
+      onBlur={e => item.onBlur(e.target.value)}
     />
   )
 }
