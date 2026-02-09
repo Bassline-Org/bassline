@@ -38,7 +38,7 @@ export async function command() {
   }
   log()
 
-  const ok = await confirm({ message: `Delete ${name} from bassline.config.json?` })
+  const ok = await confirm({ message: `Delete ${name} from bassline.config.json?`, default: false })
   if (!ok) {
     info('Cancelled.')
     return

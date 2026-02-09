@@ -5,8 +5,7 @@ import { confirm } from '@inquirer/prompts'
 import { readConfig, writeConfig, getInstalledItems } from './protocol/config.js'
 import { log, success, error, warn, info, heading, item } from '../log.js'
 
-export async function command(ref) {
-  const config = await readConfig()
+async function removeOne(ref, config) {
   const installed = getInstalledItems(config)
   const entry = installed[ref]
 
@@ -18,7 +17,7 @@ export async function command(ref) {
       for (const n of names) item(n)
     }
     process.exitCode = 1
-    return
+    return false
   }
 
   heading(`${ref}@${entry.version}`)
@@ -74,8 +73,8 @@ export async function command(ref) {
   log()
   const ok = await confirm({ message: `Remove ${ref}?` })
   if (!ok) {
-    info('Cancelled.')
-    return
+    info('Skipped.')
+    return false
   }
 
   // Delete files
@@ -124,7 +123,21 @@ export async function command(ref) {
 
   // Remove installed record
   delete config.installed[ref]
-  await writeConfig(config)
-  log()
-  success(`Removed ${ref}`)
+
+  return true
+}
+
+export async function command(refs) {
+  const config = await readConfig()
+
+  let removed = 0
+  for (const ref of refs) {
+    if (await removeOne(ref, config)) removed++
+  }
+
+  if (removed) {
+    await writeConfig(config)
+    log()
+    success(`Removed ${removed} item${removed !== 1 ? 's' : ''}`)
+  }
 }

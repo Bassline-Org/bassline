@@ -1,4 +1,4 @@
-import { input, search, confirm } from '@inquirer/prompts'
+import { input, checkbox, confirm } from '@inquirer/prompts'
 import { normalizeSelector } from '@bassline/core/alt'
 import { readConfig, writeConfig, getAllProtocolNames, resolveProtocol, getProjectProtocols } from './config.js'
 import { log, success, info, item } from '../../log.js'
@@ -10,24 +10,11 @@ function validatePascalCase(value) {
 
 async function promptExtends(config) {
   const available = getAllProtocolNames(config)
-  const selected = []
-
-  while (true) {
-    const choice = await search({
-      message: selected.length
-        ? 'Extend another (type to search, empty to skip):'
-        : 'Extend a protocol (type to search, empty to skip):',
-      source: async term => {
-        const filtered = available
-          .filter(n => !selected.includes(n))
-          .filter(n => !term || n.toLowerCase().includes(term.toLowerCase()))
-        return [{ value: '', name: '(skip)' }, ...filtered.map(n => ({ value: n, name: n }))]
-      },
-    })
-    if (!choice) break
-    selected.push(choice)
-  }
-  return selected
+  if (!available.length) return []
+  return checkbox({
+    message: 'Extend protocols:',
+    choices: available.map(n => ({ value: n, name: n })),
+  })
 }
 
 async function promptSelectors(label) {

@@ -114,18 +114,16 @@ function formatProtocolPreview(name, def, config) {
   return parts.join('\n')
 }
 
-export async function command(ref) {
-  const config = await readConfig()
-
+async function addOne(ref, config) {
   const fetched = await fetchItem(ref, config)
-  if (!fetched) return
+  if (!fetched) return false
 
   const errors = validateItem(fetched)
   if (errors.length) {
     error('Invalid registry item:')
     for (const e of errors) item(`- ${e}`)
     process.exitCode = 1
-    return
+    return false
   }
 
   const qualifiedName = parseItemRef(ref)?.type === 'registry' ? ref : `local/${fetched.name}`
@@ -136,8 +134,8 @@ export async function command(ref) {
     info(`${qualifiedName}@${installed[qualifiedName].version} is already installed.`)
     const overwrite = await confirm({ message: `Overwrite with ${fetched.version}?` })
     if (!overwrite) {
-      info('Cancelled.')
-      return
+      info('Skipped.')
+      return false
     }
   }
 
@@ -149,13 +147,13 @@ export async function command(ref) {
     if (coreProtocolNames.includes(protoName)) {
       error(`Protocol conflict: "${protoName}" shadows a core protocol.`)
       process.exitCode = 1
-      return
+      return false
     }
     const source = isInstalledProtocol(config, protoName)
     if (source && source !== qualifiedName) {
       error(`Protocol conflict: "${protoName}" is already provided by ${source}.`)
       process.exitCode = 1
-      return
+      return false
     }
     if (projectProtocols[protoName] && !source) {
       warnings.push(`Protocol "${protoName}" exists as a user-defined protocol and will be overwritten.`)
@@ -223,8 +221,8 @@ export async function command(ref) {
   log()
   const ok = await confirm({ message: 'Add to project?' })
   if (!ok) {
-    info('Cancelled.')
-    return
+    info('Skipped.')
+    return false
   }
 
   // Write files
@@ -270,7 +268,20 @@ export async function command(ref) {
     npmDependencies: fetched.npmDependencies ?? {},
   }
 
-  await writeConfig(config)
-  log()
-  success(`Installed ${qualifiedName}@${fetched.version}`)
+  return true
+}
+
+export async function command(refs) {
+  const config = await readConfig()
+
+  let added = 0
+  for (const ref of refs) {
+    if (await addOne(ref, config)) added++
+  }
+
+  if (added) {
+    await writeConfig(config)
+    log()
+    success(`Installed ${added} item${added !== 1 ? 's' : ''}`)
+  }
 }

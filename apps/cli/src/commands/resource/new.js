@@ -1,4 +1,4 @@
-import { input, select, search, confirm } from '@inquirer/prompts'
+import { input, select, checkbox, confirm } from '@inquirer/prompts'
 import { writeFile, mkdir } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { existsSync } from 'node:fs'
@@ -16,25 +16,11 @@ function toCamelCase(kebab) {
 }
 
 async function promptProtocols(labelText, available) {
-  const selected = []
-  while (true) {
-    const remaining = available.filter(n => !selected.includes(n))
-    if (!remaining.length) break
-    const choice = await search({
-      message: selected.length
-        ? `${labelText} another (type to search, empty to finish):`
-        : `${labelText} (type to search, empty to skip):`,
-      source: async term => [
-        { value: '', name: '(done)' },
-        ...remaining
-          .filter(n => !term || n.toLowerCase().includes(term.toLowerCase()))
-          .map(n => ({ value: n, name: n })),
-      ],
-    })
-    if (!choice) break
-    selected.push(choice)
-  }
-  return selected
+  if (!available.length) return []
+  return checkbox({
+    message: `${labelText}:`,
+    choices: available.map(n => ({ value: n, name: n })),
+  })
 }
 
 export async function command() {

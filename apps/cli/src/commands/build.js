@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises'
 import { join, relative } from 'node:path'
-import { select } from '@inquirer/prompts'
+import { checkbox } from '@inquirer/prompts'
 import { readConfig, getProjectProtocols, getResourcePath } from './protocol/config.js'
 import { log, success, error, info, item } from '../log.js'
 
@@ -85,15 +85,20 @@ export async function command(name, options) {
   }
 
   // Interactive selection when no name given and multiple resources exist
+  let selected
   if (!name && names.length > 1) {
-    const choice = await select({
-      message: 'Build which resource:',
-      choices: [{ value: '__all__', name: '(all)' }, ...names.map(n => ({ value: n, name: n }))],
+    selected = await checkbox({
+      message: 'Build which resources:',
+      choices: names.map(n => ({ value: n, name: n, checked: true })),
+      required: true,
     })
-    if (choice !== '__all__') name = choice
   }
 
-  const toBuild = name ? { [name]: resources[name] } : resources
+  const toBuild = name
+    ? { [name]: resources[name] }
+    : selected
+      ? Object.fromEntries(Object.entries(resources).filter(([n]) => selected.includes(n)))
+      : resources
 
   if (name && !resources[name]) {
     error(`Resource "${name}" not found.`)

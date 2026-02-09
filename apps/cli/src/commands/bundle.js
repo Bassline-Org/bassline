@@ -1,5 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { existsSync } from 'node:fs'
+import { confirm } from '@inquirer/prompts'
 import { readConfig } from './protocol/config.js'
 import { collectProjectFiles } from './files.js'
 import { log, success, info, item } from '../log.js'
@@ -18,6 +20,10 @@ export async function command() {
   }
 
   const outPath = join(process.cwd(), `${name}.bundle.json`)
+  if (existsSync(outPath)) {
+    const ok = await confirm({ message: `${name}.bundle.json exists. Overwrite?` })
+    if (!ok) { info('Cancelled.'); return }
+  }
   await writeFile(outPath, JSON.stringify(bundle, null, 2) + '\n')
 
   log()

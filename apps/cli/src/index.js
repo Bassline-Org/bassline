@@ -22,8 +22,8 @@ program.command('new [name]').description('Create a new bassline project').actio
 program.addCommand(protocol)
 program.addCommand(resource)
 program.addCommand(registry)
-program.command('add <ref>').description('Add a registry item to the project').action(addItem)
-program.command('remove <ref>').description('Remove an installed item').action(removeItem)
+program.command('add <refs...>').description('Add registry items to the project').action(addItem)
+program.command('remove <refs...>').description('Remove installed items').action(removeItem)
 program.command('ls').description('List installed items').action(listItems)
 program
   .command('build [name]')

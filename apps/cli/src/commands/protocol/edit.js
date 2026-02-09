@@ -1,4 +1,4 @@
-import { input, search, confirm } from '@inquirer/prompts'
+import { input, search, checkbox, confirm } from '@inquirer/prompts'
 import { normalizeSelector } from '@bassline/core/alt'
 import {
   readConfig,
@@ -12,29 +12,13 @@ import { log, success, info, item } from '../../log.js'
 
 async function promptExtends(config, current) {
   const available = getAllProtocolNames(config)
-  const selected = [...current]
-
-  if (current.length) {
-    info(`  Current extends: ${current.join(', ')}`)
-  }
-
-  while (true) {
-    const choice = await search({
-      message:
-        selected.length > current.length
-          ? 'Extend another (type to search, empty to finish):'
-          : 'Add/change extends (type to search, empty to keep):',
-      source: async term => {
-        const filtered = available
-          .filter(n => !selected.includes(n))
-          .filter(n => !term || n.toLowerCase().includes(term.toLowerCase()))
-        return [{ value: '', name: '(done)' }, ...filtered.map(n => ({ value: n, name: n }))]
-      },
-    })
-    if (!choice) break
-    selected.push(choice)
-  }
-  return selected
+  if (!available.length) return current
+  return checkbox({
+    message: 'Extend protocols:',
+    choices: available.map(n => ({
+      value: n, name: n, checked: current.includes(n),
+    })),
+  })
 }
 
 async function promptSelectors(label, current) {
