@@ -5,13 +5,12 @@ import { command as newProject } from './commands/new/index.js'
 import { protocol } from './commands/protocol/index.js'
 import { resource } from './commands/resource/index.js'
 import { registry } from './commands/registry/index.js'
+import { service } from './commands/service/index.js'
 import { command as addItem } from './commands/add.js'
 import { command as removeItem } from './commands/remove.js'
 import { command as listItems } from './commands/ls.js'
 import { command as build } from './commands/build.js'
-import { command as serve } from './commands/serve.js'
-import { command as bundle } from './commands/bundle.js'
-import { command as fork } from './commands/fork.js'
+import { command as start } from './commands/start.js'
 
 const require = createRequire(import.meta.url)
 const { version } = require('../package.json')
@@ -21,6 +20,7 @@ program.name('bl').description('Bassline project tools').version(version, '-v --
 program.command('new [name]').description('Create a new bassline project').action(newProject)
 program.addCommand(protocol)
 program.addCommand(resource)
+program.addCommand(service)
 program.addCommand(registry)
 program.command('add <refs...>').description('Add registry items to the project').action(addItem)
 program.command('remove <refs...>').description('Remove installed items').action(removeItem)
@@ -31,11 +31,9 @@ program
   .option('--output <dir>', 'Output directory', 'public/r')
   .action(build)
 program
-  .command('serve')
-  .description('Serve built registry items')
-  .option('--port <port>', 'Port number', '2017')
-  .action(serve)
-program.command('bundle').description('Bundle project into a portable file').action(bundle)
-program.command('fork <path>').description('Fork a project from a directory or bundle').action(fork)
+  .command('start')
+  .description('Run the project')
+  .option('--service <name>', 'Run a specific service')
+  .action(start)
 
 program.parse()

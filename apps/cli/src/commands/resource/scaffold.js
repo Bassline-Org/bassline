@@ -135,8 +135,10 @@ export function generateScaffold(exportName, implementedNames, config) {
   const parts = []
   parts.push(`import { resource } from '@bassline/core/alt'`)
   parts.push('')
+  parts.push(`// Configure via environment:`)
+  parts.push(`// const myVar = process.env.MY_VAR`)
+  parts.push('')
   parts.push(`export const ${exportName} = resource({`)
-  parts.push(`  // TODO: initialize your resource state here`)
   parts.push('')
 
   if (allGet.size) {
@@ -156,6 +158,9 @@ export function generateScaffold(exportName, implementedNames, config) {
 
 export function generateGenericScaffold(exportName) {
   return `import { resource } from '@bassline/core/alt'
+
+// Configure via environment:
+// const myVar = process.env.MY_VAR
 
 export const ${exportName} = resource({
   get(msg) {

@@ -2,9 +2,10 @@ import * as project from './project.js'
 import * as git from './git.js'
 import * as lexicon from './lexicon.js'
 import * as config from './config.js'
+import * as entry from './entry.js'
 import { log, success, item } from '../../log.js'
 
-const steps = [project, git, lexicon, config]
+const steps = [project, git, lexicon, config, entry]
 
 export async function command(name) {
   let ctx = { name }

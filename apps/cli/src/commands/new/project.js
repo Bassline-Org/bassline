@@ -24,6 +24,9 @@ export async function apply(ctx) {
         name: projectName,
         version: '0.1.0',
         type: 'module',
+        scripts: {
+          start: 'node --env-file=.env index.js',
+        },
         dependencies: {
           '@bassline/core': '^1.0.0',
         },

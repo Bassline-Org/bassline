@@ -19,7 +19,7 @@ export async function apply(ctx) {
 
   execSync('git init', { cwd: dir, stdio: 'ignore' })
 
-  await writeFile(join(dir, '.gitignore'), 'node_modules/\n')
+  await writeFile(join(dir, '.gitignore'), 'node_modules/\n.env\n')
 
   return ['.git/', '.gitignore']
 }
