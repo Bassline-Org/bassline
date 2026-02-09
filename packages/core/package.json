@@ -14,7 +14,11 @@
     "./fn": "./src/fn.js",
     "./timers": "./src/timers.js",
     "./fetch": "./src/fetch.js",
-    "./types": "./src/types.js"
+    "./types": "./src/types.js",
+    "./alt": {
+      "types": "./src/alt/types/index.d.ts",
+      "default": "./src/alt/index.js"
+    }
   },
   "scripts": {
     "test": "vitest run"
