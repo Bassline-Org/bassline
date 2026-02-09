@@ -66,6 +66,10 @@ function buildItem(name, resource, version, allProtocols, files) {
 
   entry.files = files
 
+  if (resource.dependencies && Object.keys(resource.dependencies).length) {
+    entry.npmDependencies = resource.dependencies
+  }
+
   return entry
 }
 
@@ -117,6 +121,27 @@ export async function command(name, options) {
       error(`${resName}: failed — ${e.message}`)
     }
   }
+
+  // Generate index.json from all built items in output dir
+  try {
+    const outputDir = join(process.cwd(), output)
+    const allFiles = await readdir(outputDir)
+    const index = { items: {} }
+    for (const f of allFiles) {
+      if (!f.endsWith('.json') || f === 'index.json') continue
+      try {
+        const raw = JSON.parse(await readFile(join(outputDir, f), 'utf-8'))
+        const name = f.replace('.json', '')
+        index.items[name] = {
+          version: raw.version ?? '',
+          description: raw.description ?? '',
+          protocols: Object.keys(raw.protocols ?? {}),
+          implements: raw.implements ?? [],
+        }
+      } catch { /* skip malformed files */ }
+    }
+    await writeFile(join(outputDir, 'index.json'), JSON.stringify(index, null, 2) + '\n')
+  } catch { /* index generation is best-effort */ }
 
   log()
   success(`Built ${built} item${built !== 1 ? 's' : ''} → ${output}/`)

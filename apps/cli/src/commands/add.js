@@ -267,6 +267,7 @@ export async function command(ref) {
     files: (fetched.files ?? []).map(f => f.path),
     protocols: addedProtocols,
     implements: fetched.implements ?? [],
+    npmDependencies: fetched.npmDependencies ?? {},
   }
 
   await writeConfig(config)

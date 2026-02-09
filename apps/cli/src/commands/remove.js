@@ -1,9 +1,9 @@
-import { unlink } from 'node:fs/promises'
+import { readFile, writeFile, unlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { confirm } from '@inquirer/prompts'
 import { readConfig, writeConfig, getInstalledItems } from './protocol/config.js'
-import { log, success, error, info, heading, item } from '../log.js'
+import { log, success, error, warn, info, heading, item } from '../log.js'
 
 export async function command(ref) {
   const config = await readConfig()
@@ -51,6 +51,26 @@ export async function command(ref) {
     }
   }
 
+  // npm dependency preview
+  const entryDeps = Object.keys(entry.npmDependencies ?? {})
+  if (entryDeps.length) {
+    const safeToRemoveDeps = entryDeps.filter(dep => {
+      for (const [name, other] of Object.entries(installed)) {
+        if (name !== ref && other.npmDependencies && dep in other.npmDependencies) return false
+      }
+      return true
+    })
+    const sharedDeps = entryDeps.filter(d => !safeToRemoveDeps.includes(d))
+    if (safeToRemoveDeps.length) {
+      heading('npm dependencies to remove:')
+      for (const d of safeToRemoveDeps) item(d)
+    }
+    if (sharedDeps.length) {
+      heading('npm dependencies kept (used by other items):')
+      for (const d of sharedDeps) item(d)
+    }
+  }
+
   log()
   const ok = await confirm({ message: `Remove ${ref}?` })
   if (!ok) {
@@ -76,6 +96,29 @@ export async function command(ref) {
       if (!providedByOther) {
         delete config.spec.protocols[p]
       }
+    }
+  }
+
+  // Remove npm dependencies from package.json
+  const depsToRemove = Object.keys(entry.npmDependencies ?? {}).filter(dep => {
+    for (const [name, other] of Object.entries(installed)) {
+      if (name !== ref && other.npmDependencies && dep in other.npmDependencies) return false
+    }
+    return true
+  })
+  if (depsToRemove.length) {
+    try {
+      const pkgPath = join(process.cwd(), 'package.json')
+      const pkg = JSON.parse(await readFile(pkgPath, 'utf-8'))
+      if (pkg.dependencies) {
+        for (const dep of depsToRemove) {
+          delete pkg.dependencies[dep]
+        }
+        await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+        item('updated package.json dependencies')
+      }
+    } catch {
+      warn('could not update package.json')
     }
   }
 

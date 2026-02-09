@@ -10,6 +10,8 @@ import { command as removeItem } from './commands/remove.js'
 import { command as listItems } from './commands/ls.js'
 import { command as build } from './commands/build.js'
 import { command as serve } from './commands/serve.js'
+import { command as bundle } from './commands/bundle.js'
+import { command as fork } from './commands/fork.js'
 
 const require = createRequire(import.meta.url)
 const { version } = require('../package.json')
@@ -33,5 +35,7 @@ program
   .description('Serve built registry items')
   .option('--port <port>', 'Port number', '2017')
   .action(serve)
+program.command('bundle').description('Bundle project into a portable file').action(bundle)
+program.command('fork <path>').description('Fork a project from a directory or bundle').action(fork)
 
 program.parse()

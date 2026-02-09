@@ -23,6 +23,9 @@ export async function command() {
     if (item.files?.length) {
       label('files:', item.files.join(', '))
     }
+    if (item.npmDependencies && Object.keys(item.npmDependencies).length) {
+      label('npm deps:', Object.entries(item.npmDependencies).map(([k, v]) => `${k}@${v}`).join(', '))
+    }
     log()
   }
 }

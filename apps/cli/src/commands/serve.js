@@ -33,16 +33,24 @@ export async function command(options) {
       return
     }
 
-    // List available items at root
+    // Serve index at root — prefer index.json, fall back to directory listing
     if (!pathname || pathname === '/') {
       try {
-        const files = await readdir(baseDir)
-        const items = files.filter(f => f.endsWith('.json')).map(f => f.replace('.json', ''))
+        const indexContent = await readFile(join(baseDir, 'index.json'), 'utf-8')
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ items }))
+        res.end(indexContent)
       } catch {
-        res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ items: [] }))
+        try {
+          const files = await readdir(baseDir)
+          const items = files
+            .filter(f => f.endsWith('.json') && f !== 'index.json')
+            .map(f => f.replace('.json', ''))
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ items }))
+        } catch {
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ items: [] }))
+        }
       }
       return
     }

@@ -24,6 +24,8 @@ export async function command() {
     label('path:', `${resPath}${pathTag}`)
     if (r.implements?.length) label('implements:', r.implements.join(', '))
     if (r.protocols?.length) label('distributes:', r.protocols.join(', '))
+    if (r.dependencies && Object.keys(r.dependencies).length)
+      label('dependencies:', Object.entries(r.dependencies).map(([k, v]) => `${k}@${v}`).join(', '))
     log()
   }
 }
