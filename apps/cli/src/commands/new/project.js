@@ -15,7 +15,7 @@ export async function apply(ctx) {
   const { dir, projectName } = ctx
 
   await mkdir(join(dir, 'scripts'), { recursive: true })
-  await mkdir(join(dir, 'services'), { recursive: true })
+  await mkdir(join(dir, 'resources'), { recursive: true })
 
   await writeFile(
     join(dir, 'package.json'),
@@ -25,7 +25,7 @@ export async function apply(ctx) {
         version: '0.1.0',
         type: 'module',
         dependencies: {
-          '@bassline/core': 'workspace:*',
+          '@bassline/core': '^1.0.0',
         },
       },
       null,
@@ -33,5 +33,5 @@ export async function apply(ctx) {
     ) + '\n'
   )
 
-  return ['package.json', 'scripts/', 'services/']
+  return ['package.json', 'scripts/', 'resources/']
 }

@@ -1,8 +1,10 @@
 import * as project from './project.js'
 import * as git from './git.js'
+import * as lexicon from './lexicon.js'
 import * as config from './config.js'
+import { log, success, item } from '../../log.js'
 
-const steps = [project, git, config]
+const steps = [project, git, lexicon, config]
 
 export async function command(name) {
   let ctx = { name }
@@ -11,6 +13,7 @@ export async function command(name) {
   const created = []
   for (const step of steps) created.push(...(await step.apply(ctx)))
 
-  console.log(`\nCreated ${ctx.projectName}/`)
-  for (const path of created) console.log(`  ${path}`)
+  log()
+  success(`Created ${ctx.projectName}/`)
+  for (const path of created) item(path)
 }
