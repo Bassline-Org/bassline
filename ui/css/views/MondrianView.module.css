@@ -1,0 +1,148 @@
+.container {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.edge {
+  transition: stroke 0.15s ease;
+}
+
+.node {
+  transition: opacity 0.15s ease;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover rect,
+.clickable:hover ellipse {
+  stroke: var(--inspector-primary, #3b82f6);
+  stroke-width: 2;
+}
+
+.label {
+  font-size: 0.6875rem;
+  fill: var(--inspector-foreground, #1f2937);
+  pointer-events: none;
+  user-select: none;
+  font-family: inherit;
+}
+
+.tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: var(--inspector-card-bg, #fff);
+  border: 1px solid var(--inspector-border, #e5e7eb);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--inspector-foreground, #1f2937);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tooltipValue {
+  color: var(--inspector-muted, #888);
+}
+
+/* Pan/Zoom */
+
+.panZoomContainer {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.panZoomContainer .svg {
+  cursor: grab;
+}
+
+.panZoomContainer .svg:active {
+  cursor: grabbing;
+}
+
+.zoomControls {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.25rem;
+  z-index: 20;
+}
+
+.zoomButton {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--inspector-card-bg, #fff);
+  border: 1px solid var(--inspector-border, #e5e7eb);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: var(--inspector-foreground, #1f2937);
+  cursor: pointer;
+  padding: 0;
+}
+
+.zoomButton:hover {
+  background: var(--inspector-hover-bg, rgba(0, 0, 0, 0.04));
+}
+
+/* Layout selector */
+
+.layoutSelector {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  padding: 0.25rem 0.375rem;
+  border-bottom: 1px solid var(--inspector-border, #e5e7eb);
+  background: var(--inspector-card-bg, #fff);
+}
+
+.layoutPill {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  line-height: 1.4;
+  border: none;
+  border-radius: 0.1875rem;
+  background: transparent;
+  color: var(--inspector-muted, #888);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.layoutPill:hover {
+  color: var(--inspector-foreground, #1f2937);
+  background: var(--inspector-hover-bg, rgba(0, 0, 0, 0.04));
+}
+
+.layoutPillActive {
+  color: var(--inspector-foreground, #1f2937);
+  background: var(--inspector-hover-bg-active, rgba(0, 0, 0, 0.08));
+  font-weight: 600;
+}
+
+/* Stencil foreignObject wrapper */
+
+.foreignObjectWrapper {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}

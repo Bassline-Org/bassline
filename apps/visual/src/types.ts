@@ -300,9 +300,6 @@ export interface CardMeta {
   created_at: number
 }
 
-// Re-export parsed semantic metadata types from lib/cards
-export type { ParsedCardMeta } from '@/lib/cards/parseCardMeta'
-export type { CardCategory } from '@/lib/cards/categoryColors'
 
 /** Loader data for card browser */
 export interface CardsLoaderData {

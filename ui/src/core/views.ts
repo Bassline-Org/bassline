@@ -302,6 +302,150 @@ export class PhlowPanelView<T = unknown> extends PhlowView<T> {
   }
 }
 
+// --- Mondrian ---
+
+export type GraphNode = {
+  label: string
+  value?: number
+  children?: GraphNode[]
+  target?: unknown
+  color?: string
+  id?: string
+  subgraph?: {
+    nodes: GraphNode[]
+    layout?: MondrianLayoutType
+    edges?: MondrianEdgeConnection[]
+  }
+}
+
+export type MondrianLayoutType = 'tree' | 'treemap' | 'radialTree' | 'force' | 'circle' | 'grid' | 'pack'
+
+export type MondrianNodeConfig = {
+  width?: number
+  height?: number
+  stencil?: (node: GraphNode) => ReactNode
+}
+
+export type MondrianEdgeConnection = {
+  from: string | ((node: GraphNode) => boolean)
+  to: string | ((node: GraphNode) => boolean)
+}
+
+export type MondrianEdgeConfig = {
+  shape?: 'curve' | 'line' | 'step'
+  stroke?: string
+  strokeWidth?: number
+  connect?: MondrianEdgeConnection[]
+}
+
+export type MondrianWithConfig<Model = unknown> = {
+  items: () => Model[]
+  label: (model: Model) => string
+  value?: (model: Model) => number
+  color?: (model: Model) => string | undefined
+  target?: (model: Model) => unknown
+}
+
+export type MondrianConfig = {
+  title: string
+  priority: number
+  root?: () => GraphNode
+  with?: MondrianWithConfig<any>
+  type?: MondrianLayoutType
+  layout?: 'vertical' | 'horizontal'
+  nodes?: MondrianNodeConfig
+  edges?: MondrianEdgeConfig
+  padding?: number
+  palette?: Record<string, string>
+}
+
+export class PhlowMondrianView<T = unknown> extends PhlowView<T> {
+  readonly phlow = 'mondrian' as const
+  readonly title: string
+  readonly priority: number
+  private _root: () => GraphNode
+  private _with?: MondrianWithConfig<any>
+  private _type: MondrianLayoutType
+  private _layout: 'vertical' | 'horizontal'
+  private _nodes: Required<Pick<MondrianNodeConfig, 'width' | 'height'>> & Pick<MondrianNodeConfig, 'stencil'>
+  private _edges: Required<Pick<MondrianEdgeConfig, 'shape' | 'stroke' | 'strokeWidth'>> & Pick<MondrianEdgeConfig, 'connect'>
+  private _padding: number
+  private _palette: Record<string, string>
+
+  constructor(target: T, config: MondrianConfig) {
+    super(target)
+    this.title = config.title
+    this.priority = config.priority
+    if (config.with) {
+      this._with = config.with
+      this._root = () => this._buildRootFromWith()
+    } else {
+      this._root = config.root!
+    }
+    this._type = config.type ?? 'tree'
+    this._layout = config.layout ?? 'vertical'
+    this._nodes = {
+      width: config.nodes?.width ?? 120,
+      height: config.nodes?.height ?? 40,
+      stencil: config.nodes?.stencil,
+    }
+    this._edges = {
+      shape: config.edges?.shape ?? 'curve',
+      stroke: config.edges?.stroke ?? '',
+      strokeWidth: config.edges?.strokeWidth ?? 1.5,
+      connect: config.edges?.connect,
+    }
+    this._padding = config.padding ?? 2
+    this._palette = config.palette ?? {}
+  }
+
+  private _buildRootFromWith(): GraphNode {
+    const w = this._with!
+    const items = w.items()
+    const children: GraphNode[] = items.map(item => ({
+      label: w.label(item),
+      value: w.value?.(item),
+      color: w.color?.(item),
+      target: w.target?.(item),
+    }))
+    return { label: this.title, children }
+  }
+
+  root(): GraphNode {
+    return this._root()
+  }
+
+  get type(): MondrianLayoutType {
+    return this._type
+  }
+
+  get layout(): 'vertical' | 'horizontal' {
+    return this._layout
+  }
+
+  get nodes(): Required<Pick<MondrianNodeConfig, 'width' | 'height'>> & Pick<MondrianNodeConfig, 'stencil'> {
+    return this._nodes
+  }
+
+  get edges(): Required<Pick<MondrianEdgeConfig, 'shape' | 'stroke' | 'strokeWidth'>> & Pick<MondrianEdgeConfig, 'connect'> {
+    return this._edges
+  }
+
+  get padding(): number {
+    return this._padding
+  }
+
+  get palette(): Record<string, string> {
+    return this._palette
+  }
+
+  isEmpty(): boolean {
+    if (this._with) return this._with.items().length === 0
+    const r = this._root()
+    return !r.children || r.children.length === 0
+  }
+}
+
 // ============================================================================
 // PhlowSearchSource
 // ============================================================================

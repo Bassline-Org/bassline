@@ -8,6 +8,7 @@ import { InfoView } from './InfoView'
 import { ForwardView } from './ForwardView'
 import { ExplicitView } from './ExplicitView'
 import { DescriptorView } from './DescriptorView'
+import { MondrianView } from './MondrianView'
 import styles from '~/css/views/ViewRenderer.module.css'
 
 export interface ViewRendererProps {
@@ -64,6 +65,8 @@ export function ViewRenderer({ view, onInspect, withCard = true }: ViewRendererP
     body = <DescriptorView item={view as PhlowDescriptorView<any, any>} />
   } else if (type === 'info') {
     body = <InfoView item={view as any} onInspect={onInspect} />
+  } else if (type === 'mondrian') {
+    body = <MondrianView item={view as any} onInspect={onInspect} />
   }
 
   if (!withCard) {

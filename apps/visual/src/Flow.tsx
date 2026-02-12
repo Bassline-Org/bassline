@@ -1,6 +1,6 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
-import { Drawn, ExampleText } from './TestComponents'
+// import { Drawn, ExampleText } from './TestComponents'
 import { Position, getStraightPath, BaseEdge, EdgeProps, Panel, NodeProps, Node, Handle, useNodes } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
@@ -30,7 +30,7 @@ export function TextNode({ data }: NodeProps<TextNode>) {
   }
   return (
     <>
-      <ExampleText>{textComponent}</ExampleText>
+      {textComponent}
       <Handle position={Position.Left} type="target" />
       <Handle position={Position.Right} type="source" />
     </>
@@ -40,7 +40,7 @@ export function TextNode({ data }: NodeProps<TextNode>) {
 export function DrawnNode() {
   return (
     <>
-      <Drawn />
+      <div />
       <Handle position={Position.Left} type="target" />
       <Handle position={Position.Right} type="source" />
     </>

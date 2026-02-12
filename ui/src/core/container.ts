@@ -9,6 +9,7 @@ import {
   PhlowDescriptorView,
   PhlowForwardView,
   PhlowPanelView,
+  PhlowMondrianView,
   PhlowAction,
   PhlowButtonAction,
   PhlowSearchSource,
@@ -20,6 +21,7 @@ import {
   type DescriptorConfig,
   type ForwardConfig,
   type PanelConfig,
+  type MondrianConfig,
   type ButtonActionConfig,
   type SearchSourceConfig,
 } from './views'
@@ -95,6 +97,14 @@ export class ViewContainer<T = unknown> {
     this._factories.push(self => {
       const config = configFn(self)
       return new PhlowPanelView(self, { priority: PRIORITY.low, ...config })
+    })
+    return this
+  }
+
+  mondrian(configFn: (self: T) => PartialPriority<MondrianConfig>): this {
+    this._factories.push(self => {
+      const config = configFn(self)
+      return new PhlowMondrianView(self, { priority: PRIORITY.low, ...config })
     })
     return this
   }

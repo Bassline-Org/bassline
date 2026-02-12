@@ -1,12 +1,12 @@
-import { NodeProps, useNodesData, useReactFlow } from '@xyflow/react'
+import { useNodesData, useReactFlow } from '@xyflow/react'
 import { BaseNode, BaseNodeContent, BaseNodeFooter } from '../base-node'
-import { ComponentProps, memo, useCallback, useEffect } from 'react'
+import { ComponentProps, memo, useEffect } from 'react'
 import { Button } from '../ui/button'
 import { ImplicitHandle } from './handle'
 
 export function ImplicitNode({ id, ...props }: ComponentProps<typeof BaseNode>) {
   const rf = useReactFlow()
-  const { data } = useNodesData(id!)
+  const nodeData = useNodesData(id!)
   const incoming = rf.getNodeConnections({ nodeId: id!, type: 'target', handleId: 'implicit' })
   useEffect(() => {
     console.log('implicit: ', incoming)
@@ -14,13 +14,12 @@ export function ImplicitNode({ id, ...props }: ComponentProps<typeof BaseNode>) 
 
   return (
     <BaseNode id={id} {...props}>
-      <BaseNodeContent>{JSON.stringify(data)}</BaseNodeContent>
+      <BaseNodeContent>{JSON.stringify(nodeData?.data)}</BaseNodeContent>
     </BaseNode>
   )
 }
 
-export const ImplicitBase = memo(({ id }: NodeProps) => {
-  const rf = useReactFlow()
+export const ImplicitBase = memo(() => {
   return (
     <BaseNode className="w-96">
       <ImplicitHandle />

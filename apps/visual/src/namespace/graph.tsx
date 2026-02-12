@@ -2,7 +2,11 @@ import { useMemo } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { z } from 'zod'
 import { storeAtom, patchHistoryAtom, trackedStoreAtom, type PatchEntry } from './index'
-import { phlow, PRIORITY, type IViewable } from '../phlow/phlow'
+interface IViewable {
+  phlowViews: unknown[]
+}
+
+const PRIORITY = { high: 10, med: 50, low: 100 } as const
 import { isSchema } from './types'
 
 /**
@@ -54,41 +58,41 @@ export function useGraph(): IViewable {
     return {
       phlowViews: [
         // 1. Browser - names sorted by path
-        phlow.columnedList<[string, object]>({
+        {
           title: 'Browser',
           priority: PRIORITY.high,
-          items: () => [...store.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+          items: () => [...store.entries()].sort((a: [string, object], b: [string, object]) => a[0].localeCompare(b[0])),
           columns: {
-            name: { text: ([name]) => name },
-            kind: { text: ([_, obj]) => (obj as any).$kind ?? '?' },
-            schema: { text: ([_, obj]) => (obj as any).$schema ?? '' },
+            name: { text: ([name]: [string, object]) => name },
+            kind: { text: ([_, obj]: [string, object]) => (obj as any).$kind ?? '?' },
+            schema: { text: ([_, obj]: [string, object]) => (obj as any).$schema ?? '' },
           },
-        }),
+        },
 
         // 2. Changes - patch history (most recent first)
-        phlow.columnedList<PatchEntry>({
+        {
           title: 'Changes',
           priority: PRIORITY.med,
           items: () => [...patches].reverse(),
           columns: {
-            time: { text: p => new Date(p.timestamp).toLocaleTimeString() },
+            time: { text: (p: PatchEntry) => new Date(p.timestamp).toLocaleTimeString() },
             ops: {
-              text: p =>
+              text: (p: PatchEntry) =>
                 p.patches
-                  .map(x => `${x.op} ${x.path.join('/')}`)
+                  .map((x: { op: string; path: (string | number)[] }) => `${x.op} ${x.path.join('/')}`)
                   .join(', ')
                   .slice(0, 60),
             },
           },
-        }),
+        },
 
         // 3. Add Entity form
-        phlow.descriptor<{ path: string; $schema: string }>({
+        {
           title: 'Add Entity',
           priority: PRIORITY.low,
           schema: () => addEntitySchema,
           model: () => ({ path: '', $schema: schemaNames[0] ?? '' }),
-          onUpdate: data => {
+          onUpdate: (data: { path: string; $schema: string }) => {
             if (data.path && data.$schema) {
               setStore(draft => {
                 draft.set(data.path, {
@@ -98,15 +102,15 @@ export function useGraph(): IViewable {
               })
             }
           },
-        }),
+        },
 
         // 4. New Schema form
-        phlow.descriptor<{ path: string; name: string }>({
+        {
           title: 'New Schema',
           priority: PRIORITY.low,
           schema: () => newSchemaSchema,
           model: () => ({ path: '', name: '' }),
-          onUpdate: data => {
+          onUpdate: (data: { path: string; name: string }) => {
             if (data.path && data.name) {
               setStore(draft => {
                 draft.set(data.path, {
@@ -117,15 +121,15 @@ export function useGraph(): IViewable {
               })
             }
           },
-        }),
+        },
 
         // 5. New Query form
-        phlow.descriptor<{ name: string; description?: string; matchSchema?: string; matchKind?: string }>({
+        {
           title: 'New Query',
           priority: PRIORITY.low,
           schema: () => newQuerySchema,
           model: () => ({ name: '', description: '', matchSchema: '', matchKind: '' }),
-          onUpdate: data => {
+          onUpdate: (data: { name: string; description?: string; matchSchema?: string; matchKind?: string }) => {
             if (data.name) {
               setStore(draft => {
                 draft.set(data.name, {
@@ -142,15 +146,15 @@ export function useGraph(): IViewable {
               })
             }
           },
-        }),
+        },
 
         // 6. New Document form
-        phlow.descriptor<{ path: string; title?: string; format: 'text' | 'markdown' | 'json' }>({
+        {
           title: 'New Document',
           priority: PRIORITY.low,
           schema: () => newDocumentSchema,
           model: () => ({ path: '', title: '', format: 'markdown' as const }),
-          onUpdate: data => {
+          onUpdate: (data: { path: string; title?: string; format: 'text' | 'markdown' | 'json' }) => {
             if (data.path) {
               setStore(draft => {
                 draft.set(data.path, {
@@ -162,7 +166,7 @@ export function useGraph(): IViewable {
               })
             }
           },
-        }),
+        },
       ],
     }
   }, [store, patches, setStore])

@@ -9,7 +9,12 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { AudioSystem, type AudioAnalysis } from './AudioSystem'
-import type { PresenceState } from '../presence/usePresence'
+export interface PresenceState {
+  hasMoved: boolean
+  focused: boolean
+  velocity: number
+  idleMs: number
+}
 
 export interface AmbientAudioState {
   isReady: boolean
