@@ -1,0 +1,39 @@
+{
+  "id": "monokai",
+  "name": "Monokai",
+  "description": "Iconic color scheme from Sublime Text",
+  "author": "Wimer Hazenberg",
+  "colors": {
+    "bg-base": "#272822",
+    "bg-surface": "#2d2e27",
+    "bg-overlay": "#3e3d32",
+    "bg-muted": "#49483e",
+    "bg-inset": "#1e1f1c",
+    "fg-base": "#f8f8f2",
+    "fg-muted": "#cfcfc2",
+    "fg-subtle": "#75715e",
+    "fg-inverse": "#272822",
+    "border-base": "#3e3d32",
+    "border-muted": "#2d2e27",
+    "border-focus": "#f92672",
+    "accent": "#f92672",
+    "accent-fg": "#ffffff",
+    "accent-muted": "#ae81ff",
+    "success": "#a6e22e",
+    "success-fg": "#272822",
+    "warning": "#e6db74",
+    "warning-fg": "#272822",
+    "error": "#f92672",
+    "error-fg": "#ffffff",
+    "node-bg": "#2d2e27",
+    "node-border": "#3e3d32",
+    "node-selected": "#f92672",
+    "edge-default": "#75715e",
+    "edge-selected": "#f92672"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}

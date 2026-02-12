@@ -1,0 +1,39 @@
+{
+  "id": "rose-pine",
+  "name": "Rose Pine",
+  "description": "All natural pine, faux fur, and soho vibes",
+  "author": "Rose Pine",
+  "colors": {
+    "bg-base": "#191724",
+    "bg-surface": "#1f1d2e",
+    "bg-overlay": "#26233a",
+    "bg-muted": "#312e45",
+    "bg-inset": "#13111d",
+    "fg-base": "#e0def4",
+    "fg-muted": "#908caa",
+    "fg-subtle": "#6e6a86",
+    "fg-inverse": "#191724",
+    "border-base": "#26233a",
+    "border-muted": "#1f1d2e",
+    "border-focus": "#c4a7e7",
+    "accent": "#c4a7e7",
+    "accent-fg": "#191724",
+    "accent-muted": "#9ccfd8",
+    "success": "#9ccfd8",
+    "success-fg": "#191724",
+    "warning": "#f6c177",
+    "warning-fg": "#191724",
+    "error": "#eb6f92",
+    "error-fg": "#191724",
+    "node-bg": "#1f1d2e",
+    "node-border": "#26233a",
+    "node-selected": "#c4a7e7",
+    "edge-default": "#6e6a86",
+    "edge-selected": "#c4a7e7"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}
