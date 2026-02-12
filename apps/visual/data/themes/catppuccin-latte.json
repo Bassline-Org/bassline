@@ -1,0 +1,39 @@
+{
+  "id": "catppuccin-latte",
+  "name": "Catppuccin Latte",
+  "description": "Soothing warm pastel light theme",
+  "author": "Catppuccin",
+  "colors": {
+    "bg-base": "#eff1f5",
+    "bg-surface": "#e6e9ef",
+    "bg-overlay": "#dce0e8",
+    "bg-muted": "#ccd0da",
+    "bg-inset": "#bcc0cc",
+    "fg-base": "#4c4f69",
+    "fg-muted": "#5c5f77",
+    "fg-subtle": "#9ca0b0",
+    "fg-inverse": "#eff1f5",
+    "border-base": "#ccd0da",
+    "border-muted": "#dce0e8",
+    "border-focus": "#8839ef",
+    "accent": "#8839ef",
+    "accent-fg": "#ffffff",
+    "accent-muted": "#7287fd",
+    "success": "#40a02b",
+    "success-fg": "#ffffff",
+    "warning": "#df8e1d",
+    "warning-fg": "#ffffff",
+    "error": "#d20f39",
+    "error-fg": "#ffffff",
+    "node-bg": "#e6e9ef",
+    "node-border": "#ccd0da",
+    "node-selected": "#8839ef",
+    "edge-default": "#9ca0b0",
+    "edge-selected": "#8839ef"
+  },
+  "typography": {
+    "font-sans": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', Consolas, monospace",
+    "font-size-base": "14"
+  }
+}
