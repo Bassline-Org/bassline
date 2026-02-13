@@ -1,10 +1,18 @@
 export class DNU extends Error {
     constructor(resource, msg) {
-        super(`Resource: ${resource} does not understand ${msg}`)
+        console.error("resource: ", resource, " message: ", msg)
+        super(`Message not understood!`)
     }
 }
 export class KeyNotFound extends Error {
     constructor(resource, key) {
-        super(`Key not found in Collection: ${resource} key: ${key}`)
+        console.error("resource: ", resource, " key: ", key)
+        super(`Key not found in Collection!`)
+    }
+}
+export class InvalidSelector extends Error {
+    constructor(selector, msg = '') {
+        console.error(selector, "! \n", msg)
+        super('Invalid Selector!')
     }
 }

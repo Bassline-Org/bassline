@@ -1,13 +1,5 @@
 import { resource } from './core.js'
-
-export const normalizeSelector = (sel) => {
-  if (typeof sel !== 'string') throw new TypeError(`selector must be a string, got ${typeof sel}`)
-  return sel === '' ? '' : sel.split(':').filter(Boolean).sort().map(k => k + ':').join('')
-}
-
-export const selector = (msg) => normalizeSelector(
-  Object.keys(msg).map(k => k + ':').join('')
-)
+import { selector } from './selector.js'
 
 export const coreSpec = {
   name: '@bassline/core',
