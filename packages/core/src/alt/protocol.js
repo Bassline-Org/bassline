@@ -1,6 +1,6 @@
 import { resource } from './core.js'
 
-const normalizeSelector = (sel) => {
+export const normalizeSelector = (sel) => {
   if (typeof sel !== 'string') throw new TypeError(`selector must be a string, got ${typeof sel}`)
   return sel === '' ? '' : sel.split(':').filter(Boolean).sort().map(k => k + ':').join('')
 }
@@ -14,14 +14,17 @@ export const coreSpec = {
   version: '1.0.0',
   protocols: {
     Slot: {
+      description: 'A single readable/writable value',
       get: [''],
       put: [''],
     },
     Slots: {
+      description: 'A keyed collection of values',
       get: ['at:', 'at:ifAbsentPut:'],
       put: ['at:'],
     },
     Watchable: {
+      description: 'A slot that notifies watchers on change',
       extends: ['Slot'],
       get: ['watch:', 'unwatch:'],
     },

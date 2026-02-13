@@ -1,10 +1,12 @@
 export interface ProtocolDefinition {
+  description?: string;
   extends?: string[];
   get?: string[];
   put?: string[];
 }
 
 export interface ResolvedProtocol {
+  description?: string;
   get: string[];
   put: string[];
 }
@@ -29,6 +31,7 @@ export type ConformsResult =
   | { ok: true; selector: string; dispatch: 'get' | 'put' }
   | { ok: false; error: string };
 
+export declare function normalizeSelector(sel: string): string;
 export declare const coreSpec: SpecData;
 export declare function spec(data: SpecData): SpecResource;
 export declare function selector(msg: Record<string, any>): string;

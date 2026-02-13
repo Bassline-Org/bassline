@@ -1,8 +1,11 @@
 import { DNU, KeyNotFound } from './errors.js'
-export const RESOURCE = Symbol.for('$$_RESOURCE_$$')
-export const isResource = v => v[RESOURCE]
+const RESOURCE = Symbol.for('$$_RESOURCE_$$');
 
-export function resource(options) {
+function isResource(v) {
+  return v && v[RESOURCE]
+}
+
+function resource(options) {
   const defaultOptions = {
     dnu(msg) {
       throw new DNU(this, msg)
@@ -28,8 +31,8 @@ export function resource(options) {
   return _resource
 }
 
-export const slot = value =>
-  resource({
+function slot(value) {
+  return resource({
     value,
     get() {
       return this.value
@@ -39,24 +42,41 @@ export const slot = value =>
       return this.value
     },
   })
+}
 
-export const adapt = (target, options = {}) =>
-  resource({
+function adapt(target, options = {}) {
+  return resource({
     target,
-    input(msg) { return msg },
-    output(result) { return result },
-    dnu(msg) { return this.output(this.target(this.input(msg))) },
+    input(msg) {
+      return msg
+    },
+    output(result) {
+      return result
+    },
+    dnu(msg) {
+      const result = this.target(this.input(msg))
+      return result?.then ? result.then(r => this.output(r)) : this.output(result)
+    },
     ...options,
   })
+}
 
-export const pipe = (...fns) => x => fns.reduce((v, f) => f(v), x)
+function pipe(...fns) {
+  return x => fns.reduce((v, f) => f(v), x)
+}
 
-export const watchable = target =>
-  adapt(target, {
+function watchable(target) {
+  return adapt(target, {
     watchers: new Set(),
     get(msg) {
-      if (msg.watch) { this.watchers.add(msg.watch); return }
-      if (msg.unwatch) { this.watchers.delete(msg.unwatch); return }
+      if (msg.watch) {
+        this.watchers.add(msg.watch)
+        return
+      }
+      if (msg.unwatch) {
+        this.watchers.delete(msg.unwatch)
+        return
+      }
       return this.target(msg)
     },
     put(value, rest) {
@@ -66,9 +86,10 @@ export const watchable = target =>
       return result
     },
   })
+}
 
-export const slots = () =>
-  resource({
+function slots() {
+  return resource({
     slots: new Map(),
     notFound(key) {
       throw new KeyNotFound(this, key)
@@ -96,3 +117,6 @@ export const slots = () =>
       return s({ put: value })
     },
   })
+}
+
+export { RESOURCE, isResource, resource, slot, slots, adapt, pipe, watchable }
