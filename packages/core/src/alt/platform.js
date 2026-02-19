@@ -1,9 +1,10 @@
-import { send } from "./utils.js";
+import utils from "./utils.js";
 
 export class Platform {
     eventTarget = new EventTarget()
+    utils = utils;
     resource(aResourceModule) {
-        const sendTo = send(aResourceModule)
+        const sendTo = this.utils.send(aResourceModule)
         const resourceFn = msg => {
             const result = sendTo(msg)
             this.announce('resource.fired', { resource: resourceFn, msg, result })

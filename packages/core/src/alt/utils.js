@@ -19,3 +19,11 @@ export const send = aResource => (msg = {}) => {
         return aResource.get(msg)
     }
 }
+
+export default {
+    isArray,
+    isNil,
+    isPromise,
+    hasKeys,
+    send
+}

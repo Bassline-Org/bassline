@@ -99,18 +99,6 @@ export default function (p) {
         return r
     }
 
-    function broadcast({ targets }) {
-        return p.resource({
-            targets,
-            get(msg) {
-                return this.targets.map(r => r(msg))
-            },
-            put(body, msg) {
-                return this.targets.map(r => r({ put: body, ...msg }))
-            }
-        })
-    }
-
     return {
         slot({ value } = {}) {
             return reducer({ value, reduce: ({ current }) => current })
