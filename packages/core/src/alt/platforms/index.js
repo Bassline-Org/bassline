@@ -1,1 +1,1 @@
-export * from "./async.js"
+export { default as fuse } from "./fuse.js"
