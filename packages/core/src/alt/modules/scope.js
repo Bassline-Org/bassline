@@ -14,7 +14,7 @@ export default function (platform) {
    *
    * ## Get protocol
    *
-   *   {}                  → list child names (string[])
+   *   {}                  → list child names ({ hrefs: string[] })
    *   { name }            → resolve child by name (resourceFn)
    *   { walk: 'a/b/c' }  → resolve path through nested scopes (resourceFn)
    *   { has: name }       → check if name exists (boolean)
@@ -95,7 +95,7 @@ export default function (platform) {
       if (this.#customList) {
         for (const n of this.#customList()) names.add(n)
       }
-      return [...names]
+      return { hrefs: [...names] }
     }
 
     put(body, { name, prefix, meta } = {}) {
