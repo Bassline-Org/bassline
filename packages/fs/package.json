@@ -1,0 +1,17 @@
+{
+  "name": "@bassline/fs",
+  "version": "0.2.0",
+  "description": "FUSE filesystems in JavaScript via a Rust bridge",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "protobufjs": "^7.0.0"
+  }
+}

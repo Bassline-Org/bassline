@@ -1,0 +1,20 @@
+{
+  "name": "@bassline/eth",
+  "version": "1.0.0",
+  "description": "Resources for Ethereum",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "ethers": "^6.16.0"
+  },
+  "peerDependencies": {
+    "@bassline/core": "workspace:*"
+  }
+}

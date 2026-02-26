@@ -9,13 +9,13 @@ function deployHealth(platform) {
   const r = new R()
   r.get = () => ({ ok: true, uptime: Date.now() - started, tags: [...platform._tags] })
   const health = platform.resource(r)
-  platform.root({ put: health, name: '_health' })
+  platform.root({ put: health, at: '_health' })
 }
 deployHealth.tags = ['health']
 deployHealth.id = 'health'
 
 function deployGreeting(platform) {
-  platform.root({ put: platform.create.Slot({ value: 'hello' }), name: 'greeting' })
+  platform.root({ put: platform.create.Slot({ value: 'hello' }), at: 'greeting' })
 }
 deployGreeting.id = 'greeting'
 
