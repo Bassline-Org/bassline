@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/alt/platform.js'
-import { reducers, scope } from '../src/alt/modules/index.js'
+import { Platform } from '../src/platform.js'
+import { reducers, scope } from '../src/modules/index.js'
 
 function setup() {
   const p = new Platform()
@@ -92,10 +92,14 @@ describe('platform.deploy — dependency ordering', () => {
   it('script with dependencies runs after provider', async () => {
     const order = []
 
-    function a(p) { order.push('a') }
+    function a(_p) {
+      order.push('a')
+    }
     a.tags = ['A']
 
-    function b(p) { order.push('b') }
+    function b(_p) {
+      order.push('b')
+    }
     b.dependencies = ['A']
 
     // Pass b first — should still run a first
@@ -106,14 +110,20 @@ describe('platform.deploy — dependency ordering', () => {
   it('three-script chain: A → B → C', async () => {
     const order = []
 
-    function a(p) { order.push('a') }
+    function a(_p) {
+      order.push('a')
+    }
     a.tags = ['A']
 
-    function b(p) { order.push('b') }
+    function b(_p) {
+      order.push('b')
+    }
     b.tags = ['B']
     b.dependencies = ['A']
 
-    function c(p) { order.push('c') }
+    function c(_p) {
+      order.push('c')
+    }
     c.dependencies = ['B']
 
     await setup().deploy(c, b, a)
@@ -123,18 +133,26 @@ describe('platform.deploy — dependency ordering', () => {
   it('diamond dependency: D depends on B and C, both depend on A', async () => {
     const order = []
 
-    function a(p) { order.push('a') }
+    function a(_p) {
+      order.push('a')
+    }
     a.tags = ['A']
 
-    function b(p) { order.push('b') }
+    function b(_p) {
+      order.push('b')
+    }
     b.tags = ['B']
     b.dependencies = ['A']
 
-    function c(p) { order.push('c') }
+    function c(_p) {
+      order.push('c')
+    }
     c.tags = ['C']
     c.dependencies = ['A']
 
-    function d(p) { order.push('d') }
+    function d(_p) {
+      order.push('d')
+    }
     d.dependencies = ['B', 'C']
 
     await setup().deploy(d, c, b, a)
@@ -148,13 +166,19 @@ describe('platform.deploy — dependency ordering', () => {
   it('script providing multiple tags satisfies multiple consumers', async () => {
     const order = []
 
-    function provider(p) { order.push('provider') }
+    function provider(_p) {
+      order.push('provider')
+    }
     provider.tags = ['A', 'B']
 
-    function needsA(p) { order.push('needsA') }
+    function needsA(_p) {
+      order.push('needsA')
+    }
     needsA.dependencies = ['A']
 
-    function needsB(p) { order.push('needsB') }
+    function needsB(_p) {
+      order.push('needsB')
+    }
     needsB.dependencies = ['B']
 
     await setup().deploy(needsA, needsB, provider)
@@ -167,10 +191,14 @@ describe('platform.deploy — dependency ordering', () => {
     const p = setup()
     const order = []
 
-    function a(pl) { order.push('a') }
+    function a(_pl) {
+      order.push('a')
+    }
     a.tags = ['A']
 
-    function b(pl) { order.push('b') }
+    function b(_pl) {
+      order.push('b')
+    }
     b.dependencies = ['A']
 
     await p.deploy(a)
@@ -180,27 +208,33 @@ describe('platform.deploy — dependency ordering', () => {
 
   it('scripts without tags/deps preserve input order', async () => {
     const order = []
-    function x(p) { order.push('x') }
-    function y(p) { order.push('y') }
-    function z(p) { order.push('z') }
+    function x(_p) {
+      order.push('x')
+    }
+    function y(_p) {
+      order.push('y')
+    }
+    function z(_p) {
+      order.push('z')
+    }
 
     await setup().deploy(x, y, z)
     expect(order).toEqual(['x', 'y', 'z'])
   })
 
   it('throws on missing dependency', async () => {
-    function broken(p) {}
+    function broken(_p) {}
     broken.dependencies = ['doesNotExist']
 
     await expect(setup().deploy(broken)).rejects.toThrow('missing dependency')
   })
 
   it('throws on circular dependency', async () => {
-    function a(p) {}
+    function a(_p) {}
     a.tags = ['A']
     a.dependencies = ['B']
 
-    function b(p) {}
+    function b(_p) {}
     b.tags = ['B']
     b.dependencies = ['A']
 
@@ -208,7 +242,7 @@ describe('platform.deploy — dependency ordering', () => {
   })
 
   it('self-dependency throws circular', async () => {
-    function a(p) {}
+    function a(_p) {}
     a.tags = ['A']
     a.dependencies = ['A']
 
@@ -219,13 +253,15 @@ describe('platform.deploy — dependency ordering', () => {
 describe('platform.deploy — async', () => {
   it('awaits async deploy scripts', async () => {
     const order = []
-    async function slow(p) {
+    async function slow(_p) {
       await new Promise(r => setTimeout(r, 10))
       order.push('slow')
     }
     slow.tags = ['slow']
 
-    function fast(p) { order.push('fast') }
+    function fast(_p) {
+      order.push('fast')
+    }
     fast.dependencies = ['slow']
 
     await setup().deploy(fast, slow)
@@ -234,7 +270,9 @@ describe('platform.deploy — async', () => {
 
   it('awaits async skip function', async () => {
     let ran = false
-    function skippable(p) { ran = true }
+    function skippable(_p) {
+      ran = true
+    }
     skippable.skip = async () => {
       await new Promise(r => setTimeout(r, 5))
       return true
@@ -248,7 +286,9 @@ describe('platform.deploy — async', () => {
 describe('platform.deploy — idempotency', () => {
   it('script with .id only runs once', async () => {
     let count = 0
-    function tracked(p) { count++ }
+    function tracked(_p) {
+      count++
+    }
     tracked.id = 'once-only'
 
     const p = setup()
@@ -259,7 +299,9 @@ describe('platform.deploy — idempotency', () => {
 
   it('script with .id across separate deploy calls — still once', async () => {
     let count = 0
-    function tracked(p) { count++ }
+    function tracked(_p) {
+      count++
+    }
     tracked.id = 'cross-call'
 
     const p = setup()
@@ -271,7 +313,9 @@ describe('platform.deploy — idempotency', () => {
 
   it('script without .id runs every time', async () => {
     let count = 0
-    function untracked(p) { count++ }
+    function untracked(_p) {
+      count++
+    }
 
     const p = setup()
     await p.deploy(untracked)
@@ -281,7 +325,9 @@ describe('platform.deploy — idempotency', () => {
 
   it('.skip returning true prevents execution', async () => {
     let ran = false
-    function skippable(p) { ran = true }
+    function skippable(_p) {
+      ran = true
+    }
     skippable.skip = () => true
 
     await setup().deploy(skippable)
@@ -290,7 +336,9 @@ describe('platform.deploy — idempotency', () => {
 
   it('.skip returning false allows execution', async () => {
     let ran = false
-    function skippable(p) { ran = true }
+    function skippable(_p) {
+      ran = true
+    }
     skippable.skip = () => false
 
     await setup().deploy(skippable)
@@ -300,18 +348,18 @@ describe('platform.deploy — idempotency', () => {
   it('skipped scripts tags still satisfy later dependencies', async () => {
     const p = setup()
 
-    function a(pl) {}
+    function a(_pl) {}
     a.tags = ['A']
     a.skip = () => true
 
-    function b(pl) {}
+    function b(_pl) {}
     b.dependencies = ['A']
 
     // a is skipped but its tag 'A' should still be registered
     await p.deploy(a, b)
 
     // Subsequent deploy depending on 'A' should also work
-    function c(pl) {}
+    function c(_pl) {}
     c.dependencies = ['A']
     await p.deploy(c) // should not throw 'missing dependency'
   })
@@ -412,27 +460,29 @@ describe('realistic deployment', () => {
     // --- Deploy scripts ---
 
     function deployCells(platform) {
-      platform.root({ put: {
-        cells: {
-          counter: platform.create.Slot({ value: 0, reduce: Math.max }),
-          title: platform.create.Slot({ value: 'untitled' }),
-          total: platform.create.Slot({ value: 0, reduce: Math.max }),
-        }
-      }})
+      platform.root({
+        put: {
+          cells: {
+            counter: platform.create.Slot({ value: 0, reduce: Math.max }),
+            title: platform.create.Slot({ value: 'untitled' }),
+            total: platform.create.Slot({ value: 0, reduce: Math.max }),
+          },
+        },
+      })
     }
     deployCells.tags = ['cells']
     deployCells.id = 'deploy-cells'
 
     async function deployStore(platform) {
       // Simulate async I/O (loading config from disk/network)
-      const config = await new Promise(resolve =>
-        setTimeout(() => resolve({ name: 'My App', version: '1.0' }), 10)
-      )
-      platform.root({ put: {
-        store: {
-          config: platform.create.Slot({ value: config }),
-        }
-      }})
+      const config = await new Promise(resolve => setTimeout(() => resolve({ name: 'My App', version: '1.0' }), 10))
+      platform.root({
+        put: {
+          store: {
+            config: platform.create.Slot({ value: config }),
+          },
+        },
+      })
     }
     deployStore.tags = ['store']
     deployStore.id = 'deploy-store'
@@ -458,7 +508,7 @@ describe('realistic deployment', () => {
           counter: cells({ at: 'counter' })({}),
           title: cells({ at: 'title' })({}),
           config: store({ at: 'config' })({}),
-        }
+        },
       })
       platform.root({ put: app, at: 'app', meta: { version: '1.0' } })
     }
@@ -488,10 +538,7 @@ describe('realistic deployment', () => {
     upgradeStoreV2.id = 'store-v2'
 
     // --- Deploy everything (scripts in arbitrary order) ---
-    await p.deploy(
-      deployApp, upgradeStoreV2, deployCompute,
-      upgradeAddTags, deployStore, deployCells
-    )
+    await p.deploy(deployApp, upgradeStoreV2, deployCompute, upgradeAddTags, deployStore, deployCells)
 
     // --- Verify scope tree ---
     const root = p.root
@@ -535,11 +582,7 @@ describe('realistic deployment', () => {
     expect(mountEvents).toContain('app')
 
     // --- Idempotency: deploy + upgrade again ---
-    const mountCountBefore = mountEvents.length
-    await p.deploy(
-      deployApp, upgradeStoreV2, deployCompute,
-      upgradeAddTags, deployStore, deployCells
-    )
+    await p.deploy(deployApp, upgradeStoreV2, deployCompute, upgradeAddTags, deployStore, deployCells)
 
     // upgrade scripts with .id should not have run again
     // deployCells/deployStore/etc (no .id) will re-run but produce same tree structure
@@ -558,20 +601,22 @@ describe('realistic deployment', () => {
   it('async scripts block dependents until resolved', async () => {
     const order = []
 
-    async function slow(p) {
+    async function slow(_p) {
       await new Promise(r => setTimeout(r, 20))
       order.push('slow')
     }
     slow.tags = ['slow']
 
-    async function medium(p) {
+    async function medium(_p) {
       await new Promise(r => setTimeout(r, 5))
       order.push('medium')
     }
     medium.tags = ['medium']
     medium.dependencies = ['slow']
 
-    function fast(p) { order.push('fast') }
+    function fast(_p) {
+      order.push('fast')
+    }
     fast.dependencies = ['slow', 'medium']
 
     await setup().deploy(fast, medium, slow)

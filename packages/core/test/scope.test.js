@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/alt/platform.js'
-import { reducers, scope } from '../src/alt/modules/index.js'
+import { Platform } from '../src/platform.js'
+import { reducers, scope } from '../src/modules/index.js'
 
 function setup() {
   const p = new Platform()
@@ -156,8 +156,8 @@ describe('Scope', () => {
           },
           store: {
             config: p.create.Slot({ value: {} }),
-          }
-        }
+          },
+        },
       })
 
       expect(root({})).toEqual({ hrefs: ['cells', 'store'] })
@@ -183,7 +183,7 @@ describe('Scope', () => {
         },
         list() {
           return ['latest']
-        }
+        },
       })
 
       const block = root({ at: 'block-123' })
@@ -194,7 +194,9 @@ describe('Scope', () => {
     it('list merges entry names with custom list', () => {
       const p = setup()
       const root = p.create.Scope({
-        list() { return ['dynamic-a', 'dynamic-b'] }
+        list() {
+          return ['dynamic-a', 'dynamic-b']
+        },
       })
       root({ put: p.create.Slot({ value: 1 }), at: 'static' })
 
@@ -210,7 +212,7 @@ describe('Scope', () => {
       const root = p.create.Scope({
         lookup() {
           return p.create.Slot({ value: 'dynamic' })
-        }
+        },
       })
       root({ put: staticSlot, at: 'x' })
 
@@ -231,7 +233,10 @@ describe('Scope', () => {
       const root = p.create.Scope()
       const visited = []
       const visitor = {
-        visitScope(scope) { visited.push(scope); return 'visited' }
+        visitScope(scope) {
+          visited.push(scope)
+          return 'visited'
+        },
       }
       expect(root._resource.accept(visitor)).toBe('visited')
       expect(visited).toHaveLength(1)
@@ -241,7 +246,9 @@ describe('Scope', () => {
       const p = setup()
       const root = p.create.Scope()
       const visitor = {
-        visitResource(resource) { return 'fallback' }
+        visitResource(_resource) {
+          return 'fallback'
+        },
       }
       expect(root._resource.accept(visitor)).toBe('fallback')
     })
@@ -314,7 +321,7 @@ describe('Scope', () => {
         lookup(name) {
           if (name === 'dynamic') return p.create.Slot({ value: 1 })
           return null
-        }
+        },
       })
       expect(root({ has: 'dynamic' })).toBe(true)
     })
@@ -322,7 +329,9 @@ describe('Scope', () => {
     it('returns false when lookup returns null', () => {
       const p = setup()
       const root = p.create.Scope({
-        lookup() { return null }
+        lookup() {
+          return null
+        },
       })
       expect(root({ has: 'missing' })).toBe(false)
     })
@@ -382,8 +391,8 @@ describe('Scope walk', () => {
     const counter = p.create.Slot({ value: 42 })
     const root = p.create.Scope({
       entries: {
-        cells: { counter }
-      }
+        cells: { counter },
+      },
     })
 
     const result = root({ walk: 'cells/counter' })
@@ -395,8 +404,8 @@ describe('Scope walk', () => {
     const p = setup()
     const root = p.create.Scope({
       entries: {
-        a: { b: { c: p.create.Slot({ value: 'leaf' }) } }
-      }
+        a: { b: { c: p.create.Slot({ value: 'leaf' }) } },
+      },
     })
 
     const b = root({ walk: 'a/b' })

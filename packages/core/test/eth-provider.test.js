@@ -1,19 +1,27 @@
 import { describe, it, expect } from 'vitest'
 import { vi } from 'vitest'
-import { Platform } from '../src/alt/platform.js'
-import { reducers, scope } from '../src/alt/modules/index.js'
+import { Platform } from '../src/platform.js'
+import { reducers, scope } from '../src/modules/index.js'
 
 // Stub @bassline/fs so fuse.js can import without the Rust bridge
 vi.mock('@bassline/fs', () => ({
-  Fuse: class Fuse { constructor() {} async mount() {} },
-  FileSystem: class FileSystem { constructor() {} },
+  Fuse: class Fuse {
+    constructor() {}
+    async mount() {}
+  },
+  FileSystem: class FileSystem {
+    constructor() {}
+  },
   FuseError: class FuseError extends Error {
-    constructor(code) { super(`FUSE error (${code})`); this.code = code }
+    constructor(code) {
+      super(`FUSE error (${code})`)
+      this.code = code
+    }
   },
   errno: { EPERM: -1, ENOENT: -2, EIO: -5, EACCES: -13, ENOTDIR: -20, EISDIR: -21, ENOSYS: -38 },
 }))
 
-const { default: fuse } = await import('../src/alt/platforms/fuse.js')
+const { default: fuse } = await import('../src/platforms/fuse.js')
 const { default: ethModule } = await import('../../eth/src/index.js')
 
 const ADDR = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'

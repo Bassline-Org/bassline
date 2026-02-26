@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { Platform } from '../src/alt/platform.js'
-import { reducers, scope } from '../src/alt/modules/index.js'
-import http from '../src/alt/platforms/http.js'
+import { Platform } from '../src/platform.js'
+import { reducers, scope } from '../src/modules/index.js'
+import http from '../src/platforms/http.js'
 
 function setup() {
   const p = new Platform()
@@ -18,7 +18,7 @@ async function request(port, path, opts = {}) {
   const text = await res.text()
   return {
     status: res.status,
-    body: text ? JSON.parse(text) : undefined
+    body: text ? JSON.parse(text) : undefined,
   }
 }
 
@@ -44,10 +44,12 @@ describe('HTTP platform', () => {
 
     const res = await request(9100, '/')
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ hrefs: [
-      { name: 'counter', href: '/counter' },
-      { name: 'title', href: '/title' },
-    ]})
+    expect(res.body).toEqual({
+      hrefs: [
+        { name: 'counter', href: '/counter' },
+        { name: 'title', href: '/title' },
+      ],
+    })
   })
 
   it('GET /counter returns slot value', async () => {
@@ -89,7 +91,7 @@ describe('HTTP platform', () => {
     await serve(p, 9104)
 
     const res = await request(9104, '/', {
-      headers: { 'X-Bl': JSON.stringify({ has: 'counter' }) }
+      headers: { 'X-Bl': JSON.stringify({ has: 'counter' }) },
     })
     expect(res.status).toBe(200)
     expect(res.body).toBe(true)
@@ -143,7 +145,7 @@ describe('HTTP platform', () => {
     await serve(p, 9109)
 
     const res = await request(9109, '/', {
-      headers: { 'X-Bl': 'not-json' }
+      headers: { 'X-Bl': 'not-json' },
     })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/malformed/)
@@ -156,10 +158,12 @@ describe('HTTP platform', () => {
 
     const res = await request(9110, '/cells')
     expect(res.status).toBe(200)
-    expect(res.body).toEqual({ hrefs: [
-      { name: 'counter', href: '/cells/counter' },
-      { name: 'title', href: '/cells/title' },
-    ]})
+    expect(res.body).toEqual({
+      hrefs: [
+        { name: 'counter', href: '/cells/counter' },
+        { name: 'title', href: '/cells/title' },
+      ],
+    })
   })
 
   it('returns null for undefined result', async () => {

@@ -5,9 +5,8 @@
 // Usage:
 //   RPC_URL=https://... node mount.js [mountpoint]
 //
-import { Platform } from '@bassline/core/alt/platform'
-import { reducers, scope } from '@bassline/core/alt/modules/index'
-import { fuse } from '@bassline/core/alt/platforms/index'
+import { Platform, reducers, scope } from '@bassline/core'
+import fuse from '@bassline/core/platforms/fuse'
 import ethModule from './src/index.js'
 
 const RPC_URL = process.env.RPC_URL

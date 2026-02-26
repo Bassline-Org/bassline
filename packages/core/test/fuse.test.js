@@ -1,21 +1,28 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/alt/platform.js'
-import { reducers, scope } from '../src/alt/modules/index.js'
+import { Platform } from '../src/platform.js'
+import { reducers, scope } from '../src/modules/index.js'
 
 // Stub @bassline/fs so fuse.js can import without the Rust bridge
 import { vi } from 'vitest'
 vi.mock('@bassline/fs', () => ({
-  Fuse: class Fuse { constructor() {} async mount() {} },
-  FileSystem: class FileSystem { constructor() {} },
+  Fuse: class Fuse {
+    constructor() {}
+    async mount() {}
+  },
+  FileSystem: class FileSystem {
+    constructor() {}
+  },
   FuseError: class FuseError extends Error {
-    constructor(code) { super(`FUSE error (${code})`); this.code = code }
+    constructor(code) {
+      super(`FUSE error (${code})`)
+      this.code = code
+    }
   },
   errno: { EPERM: -1, ENOENT: -2, EIO: -5, EACCES: -13, ENOTDIR: -20, EISDIR: -21, ENOSYS: -38 },
 }))
 
 // Re-import after mock
-const { FuseError, errno } = await import('@bassline/fs')
-const { default: fuse } = await import('../src/alt/platforms/fuse.js')
+const { default: fuse } = await import('../src/platforms/fuse.js')
 
 function setup() {
   const p = new Platform()
@@ -274,7 +281,7 @@ describe('FUSE platform — dynamic Scope (lookup)', () => {
           return p.create.Slot({ value: { id: name } })
         }
       },
-      list: () => ['item-cached']
+      list: () => ['item-cached'],
     })
     p.root({ put: dynamicScope, at: 'items' })
 
@@ -291,7 +298,7 @@ describe('FUSE platform — dynamic Scope (lookup)', () => {
       lookup(name) {
         if (name !== 'ctl') return p.create.Slot({ value: name })
       },
-      list: () => ['dynamic-a', 'dynamic-b']
+      list: () => ['dynamic-a', 'dynamic-b'],
     })
     dynamicScope({ put: ctl, at: 'ctl' })
     p.root({ put: dynamicScope, at: 'dyn' })
@@ -307,12 +314,12 @@ describe('FUSE platform — dynamic Scope (lookup)', () => {
     p.use(reducers, scope, fuse)
 
     const inner = p.create.Scope({
-      entries: { value: p.create.Slot({ value: 42 }) }
+      entries: { value: p.create.Slot({ value: 42 }) },
     })
     const outer = p.create.Scope({
       lookup(name) {
         if (name === 'found') return inner
-      }
+      },
     })
     p.root({ put: outer, at: 'outer' })
 
