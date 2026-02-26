@@ -15,7 +15,7 @@ export default function (platform) {
    * ## Get protocol
    *
    *   {}                  → list child names ({ hrefs: string[] })
-   *   { name }            → resolve child by name (resourceFn)
+   *   { at }              → resolve child by name (resourceFn)
    *   { walk: 'a/b/c' }  → resolve path through nested scopes (resourceFn)
    *   { has: name }       → check if name exists (boolean)
    *   { meta: name }      → retrieve metadata for name (object | null)
@@ -25,10 +25,10 @@ export default function (platform) {
    *
    * ## Put protocol
    *
-   *   { put: fn, name }            → mount resource function at name
-   *   { put: fn, name, meta }      → mount with metadata
-   *   { put: null, name }          → remove child at name
-   *   { put: { key: fn, ... } }    → expand plain object tree into nested scopes
+   *   { put: fn, at }            → mount resource function at name
+   *   { put: fn, at, meta }      → mount with metadata
+   *   { put: null, at }          → remove child at name
+   *   { put: { key: fn, ... } }  → expand plain object tree into nested scopes
    *   { put: ..., prefix: 'a/b' }  → auto-create intermediate scopes, then mount
    *
    * Tree expansion is recursive and merge-safe: putting { cells: { tags } }
@@ -53,19 +53,19 @@ export default function (platform) {
       this.#customList = list ?? null
       if (entries) {
         for (const [key, value] of Object.entries(entries)) {
-          this.put(value, { name: key })
+          this.put(value, { at: key })
         }
       }
     }
 
-    get({ name, walk, has, meta } = {}) {
+    get({ at, walk, has, meta } = {}) {
       // Walk: resolve a path through nested scopes
       if (walk !== undefined) {
         const { maybeThen } = this.utils
         const segments = typeof walk === 'string' ? walk.split('/').filter(Boolean) : walk
-        if (segments.length === 0) return this.get({ name })
+        if (segments.length === 0) return this.get({ at })
         const [first, ...rest] = segments
-        return maybeThen(this.get({ name: first }), child => {
+        return maybeThen(this.get({ at: first }), child => {
           if (rest.length === 0) return child
           if (typeof child !== 'function')
             throw new Error(`walk: '${first}' is not a resource`)
@@ -82,14 +82,14 @@ export default function (platform) {
       if (meta !== undefined) {
         return this.#metadata.get(meta) ?? null
       }
-      if (name !== undefined) {
-        const entry = this.#entries.get(name)
+      if (at !== undefined) {
+        const entry = this.#entries.get(at)
         if (entry != null) return entry
         if (this.#customLookup) {
-          const custom = this.#customLookup(name)
+          const custom = this.#customLookup(at)
           if (custom != null) return custom
         }
-        throw new Error(`not found: ${name}`)
+        throw new Error(`not found: ${at}`)
       }
       const names = new Set(this.#entries.keys())
       if (this.#customList) {
@@ -98,7 +98,7 @@ export default function (platform) {
       return { hrefs: [...names] }
     }
 
-    put(body, { name, prefix, meta } = {}) {
+    put(body, { at, prefix, meta } = {}) {
       if (prefix) {
         const segments = prefix.split('/').filter(Boolean)
         if (segments.length > 0) {
@@ -111,40 +111,40 @@ export default function (platform) {
           }
           const msg = { put: body }
           if (rest.length > 0) msg.prefix = rest.join('/')
-          if (name != null) msg.name = name
+          if (at != null) msg.at = at
           return child(msg)
         }
       }
 
       // Remove: null body deletes a child
       if (body === null) {
-        if (name == null) throw new Error('name required for remove')
-        this.#entries.delete(name)
-        this.#metadata.delete(name)
-        this.announce('unmounted', { name })
+        if (at == null) throw new Error('at required for remove')
+        this.#entries.delete(at)
+        this.#metadata.delete(at)
+        this.announce('unmounted', { name: at })
         return
       }
 
       if (typeof body === 'function') {
-        if (name == null) throw new Error('name required')
-        this.#entries.set(name, body)
-        if (meta != null) this.#metadata.set(name, meta)
-        this.announce('mounted', { name, child: body })
+        if (at == null) throw new Error('at required')
+        this.#entries.set(at, body)
+        if (meta != null) this.#metadata.set(at, meta)
+        this.announce('mounted', { name: at, child: body })
         return body
       }
 
       if (isPlainObject(body)) {
-        if (name != null) {
-          let child = this.#entries.get(name)
+        if (at != null) {
+          let child = this.#entries.get(at)
           if (child == null || !(child._resource instanceof Scope)) {
             child = this.platform.create.Scope()
-            this.#entries.set(name, child)
-            this.announce('mounted', { name, child })
+            this.#entries.set(at, child)
+            this.announce('mounted', { name: at, child })
           }
           return child({ put: body })
         }
         for (const [key, value] of Object.entries(body)) {
-          this.put(value, { name: key })
+          this.put(value, { at: key })
         }
         return
       }

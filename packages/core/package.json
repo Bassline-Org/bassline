@@ -18,10 +18,17 @@
     "./alt": {
       "types": "./src/alt/types/index.d.ts",
       "default": "./src/alt/index.js"
-    }
+    },
+    "./alt/platform": "./src/alt/platform.js",
+    "./alt/mountable": "./src/alt/modules/mountable.js",
+    "./alt/fuse-bridge": "./src/alt/modules/fuse-bridge.js",
+    "./alt/platforms/http": "./src/alt/platforms/http.js"
   },
   "scripts": {
     "test": "vitest run"
   },
-  "license": "AGPL-3.0"
+  "license": "AGPL-3.0",
+  "dependencies": {
+    "@bassline/fs": "workspace:*"
+  }
 }
