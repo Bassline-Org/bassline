@@ -4,9 +4,11 @@
   "description": "Platform, Scope, Slot — resources all the way down",
   "type": "module",
   "main": "src/index.js",
+  "types": "src/types.d.ts",
   "exports": {
     ".": "./src/index.js",
     "./platform": "./src/platform.js",
+    "./modules": "./src/modules/index.js",
     "./modules/tracing": "./src/modules/tracing.js",
     "./platforms/http": "./src/platforms/http.js",
     "./platforms/fuse": "./src/platforms/fuse.js"

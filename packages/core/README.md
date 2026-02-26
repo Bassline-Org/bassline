@@ -1,211 +1,91 @@
 # @bassline/core
 
-Resource primitives and utilities for Bassline.
+Everything in Bassline is a resource. A resource is a small computational thing that communicates via messages. There are two kinds of messages:
 
-## Install
+- A **get** is a request for information. It's metadata only — "give me the thing at this name," "list your children," "do you have this?"
+- A **put** carries a payload alongside the metadata. It's giving information to the resource — a value to store, a child to mount, a tree to expand.
 
-```bash
-pnpm add @bassline/core
-```
+Payloads can be anything — values, functions, even other messages. The get/put split is just a logical distinction between the two underlying intents: asking vs. telling.
 
-## Core Primitives
-
-```javascript
-import { resource, routes, bind } from '@bassline/core'
-
-// A resource has get and put
-const counter = resource({
-  get: async h => ({ headers: {}, body: count }),
-  put: async (h, body) => ({ headers: {}, body: (count += body) }),
-})
-
-// Routes dispatch by path segment
-const app = routes({
-  counter,
-  users: bind('id', userResource), // captures :id param
-  unknown: fallbackResource, // handles unmatched paths
-})
-
-// Use it
-const result = await app.get({ path: '/counter' })
-await app.put({ path: '/users/alice' }, { name: 'Alice' })
-```
-
-## Exports
-
-### Resource Primitives
+In JavaScript, we expose resources as functions. The presence of a `put` key in the message determines which kind it is:
 
 ```javascript
-import { resource, routes, bind, splitPath, notFound } from '@bassline/core'
+counter({ put: 5 }) // put — giving it a value
+counter({}) // get — asking for the value → 5
+```
 
-// Create a resource
-const myResource = resource({
-  get: async headers => ({ headers: {}, body: 'hello' }),
-  put: async (headers, body) => ({ headers: {}, body }),
-})
+We define resource types using classes (subclassing `Resource` with `get()` and `put()` methods), but that's an API choice, not the concept itself. Resources are the underlying thing that handles the message. The function is the interface, the class is the implementation — both are just how we happened to wire it up in JS.
 
-// Compose with routing
-const app = routes({
-  '': myResource, // handles root path
-  items: itemsResource, // handles /items/*
-  unknown: fallbackResource, // handles unmatched
-})
+Scopes, slots, computed values, whole applications — all resources, same message protocol.
 
-// Bind path parameters
-const userRoutes = bind(
-  'id',
-  resource({
-    get: async h => ({ headers: {}, body: { id: h.params.id } }),
+## Quick start
+
+```javascript
+import { Platform, reducers, scope } from '@bassline/core'
+
+const app = new Platform().use(reducers, scope)
+
+function deploy(platform) {
+  platform.root({
+    put: {
+      counter: platform.create.Slot({ value: 0, reduce: Math.max }),
+      title: platform.create.Slot({ value: 'untitled' }),
+    },
   })
-)
+}
+
+await app.deploy(deploy)
+
+app.root({ walk: 'counter' })({ put: 42 })
+app.root({ walk: 'counter' })({}) // → 42
 ```
 
-### Cells
+## What's in the box
 
-Lattice-based state that merges monotonically.
+**Portable** (works in browsers and Node):
+
+- `Platform` — wires together modules, deploy scripts, events, and a root scope
+- `Resource` — base class. Subclass it, define `get()` and `put()`
+- `Slot` — state with a reducer (last-write-wins by default)
+- `Max`, `Min`, `Union` — slots with built-in reducers
+- `Scope` — namespace that maps names to child resources, with walk/mount/tree expansion
+
+**Node-specific** (import separately):
+
+- `@bassline/core/platforms/http` — HTTP server that projects the resource tree as a REST API
+- `@bassline/core/platforms/fuse` — FUSE filesystem projection (requires `@bassline/fs`)
+- `@bassline/core/modules/tracing` — structured event logging to stdout
+
+## Modules and deploy scripts
+
+Everything has the same shape: `(platform) => void`.
+
+Modules extend the platform with new resource classes. Deploy scripts mount resources into the tree. They compose the same way:
 
 ```javascript
-import { createCells, lattices } from '@bassline/core'
+const app = new Platform()
+  .use(reducers, scope) // modules
+  .use(http, tracing) // more modules
 
-const cells = createCells()
-
-// Create a cell with maxNumber lattice
-await cells.put({ path: '/counter' }, { lattice: 'maxNumber' })
-
-// Set value - merges with lattice
-await cells.put({ path: '/counter/value' }, 5)
-await cells.put({ path: '/counter/value' }, 3) // still 5, max wins
-
-const result = await cells.get({ path: '/counter/value' })
-// → { headers: {}, body: 5 }
+await app.deploy(a, b, c) // deploy scripts
 ```
 
-Available lattices: `maxNumber`, `minNumber`, `setUnion`, `lww` (last-writer-wins)
+Deploy scripts can declare `.tags` (what they provide) and `.dependencies` (what they need). The platform topologically sorts them so dependencies run first. Give a script an `.id` and it only runs once.
 
-### Propagators
+## Messages
 
-Reactive computation between cells.
+Resources respond to messages. Scopes understand:
 
 ```javascript
-import { createPropagators } from '@bassline/core'
-
-const propagators = createPropagators()
-
-// Create a propagator that sums two cells
-await propagators.put(
-  { path: '/sum', kit },
-  {
-    inputs: ['/cells/a', '/cells/b'],
-    output: '/cells/total',
-    fn: '/fn/sum',
-  }
-)
-
-// When /cells/a or /cells/b change, /cells/total is recomputed
+scope({}) // list children
+scope({ at: 'name' }) // resolve child
+scope({ walk: 'a/b/c' }) // walk a path
+scope({ has: 'name' }) // check existence
+scope({ put: fn, at: 'name' }) // mount a resource
+scope({ put: null, at: 'x' }) // remove
+scope({ put: { a: { b: fn } } }) // tree expansion
 ```
 
-### Plumber
+## License
 
-Message routing based on pattern matching.
-
-```javascript
-import { createPlumber } from '@bassline/core'
-
-const plumber = createPlumber()
-
-// Add a routing rule
-await plumber.put(
-  { path: '/rules/log-errors' },
-  {
-    match: { headers: { level: 'error' } },
-    to: '/cells/errors',
-  }
-)
-
-// Send a message
-await plumber.put({ path: '/send', kit }, { level: 'error', msg: 'Oops' })
-// Message routed to /cells/errors via kit
-```
-
-### Functions
-
-Registry for named functions.
-
-```javascript
-import { createFn, builtins } from '@bassline/core'
-
-const fn = createFn()
-
-// Register a function
-await fn.put({ path: '/double' }, { fn: x => x * 2 })
-
-// Get and call
-const result = await fn.get({ path: '/double' })
-result.body.fn(21) // → 42
-
-// Builtins available: sum, product, max, min, count, first, last, identity
-```
-
-### Timers
-
-Time-based events.
-
-```javascript
-import { createTimers } from '@bassline/core'
-
-const timers = createTimers()
-
-// Create a timer that fires every second
-await timers.put(
-  { path: '/heartbeat', kit },
-  {
-    interval: 1000,
-    to: '/cells/heartbeat',
-  }
-)
-
-// Stop a timer
-await timers.put({ path: '/heartbeat/stop' }, {})
-```
-
-### Memory Store
-
-In-memory key-value storage with directory semantics.
-
-```javascript
-import { createMemoryStore } from '@bassline/core'
-
-const store = createMemoryStore({ initial: 'data' })
-
-await store.put({ path: '/users/alice' }, { name: 'Alice' })
-const user = await store.get({ path: '/users/alice' })
-// → { headers: {}, body: { name: 'Alice' } }
-
-// Directory listing
-const users = await store.get({ path: '/users' })
-// → { headers: { type: 'directory' }, body: ['alice'] }
-```
-
-## The Kit Pattern
-
-Resources access the outside world through `h.kit`:
-
-```javascript
-const worker = resource({
-  put: async (h, task) => {
-    // Access external resources via kit
-    const config = await h.kit.get({ path: '/config' })
-    await h.kit.put({ path: '/results' }, processTask(task, config.body))
-    return { headers: {}, body: { done: true } }
-  },
-})
-```
-
-Kit is just a resource passed in headers. The caller controls what it routes to.
-
-## Related
-
-- [@bassline/node](../node) - HTTP/WebSocket servers, file store
-- [@bassline/remote](../remote) - WebSocket client
-- [@bassline/database](../database) - SQLite
-- [@bassline/trust](../trust) - Capability-based trust
+AGPL-3.0

@@ -18,5 +18,5 @@
     "outDir": "./dist"
   },
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.d.ts"],
-  "exclude": ["**/*.test.js", "**/test/**", "src/alt/**/*.js"]
+  "exclude": ["**/*.test.js", "**/test/**"]
 }

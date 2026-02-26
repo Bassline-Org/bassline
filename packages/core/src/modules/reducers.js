@@ -52,14 +52,16 @@ export default function (platform) {
 
   /** Slot that keeps the maximum value. */
   class Max extends Slot {
-    value = -Infinity
-    reduce = Math.max
+    constructor({ value = -Infinity, reduce = Math.max } = {}) {
+      super({ value, reduce })
+    }
   }
 
   /** Slot that keeps the minimum value. */
   class Min extends Slot {
-    value = Infinity
-    reduce = Math.min
+    constructor({ value = Infinity, reduce = Math.min } = {}) {
+      super({ value, reduce })
+    }
   }
 
   /** Slot that accumulates a Set of values. */
@@ -78,10 +80,10 @@ export default function (platform) {
     /**
      * @param {Set<unknown>} [prev]
      * @param {unknown} curr
-     * @returns {Set<unknown> | undefined}
+     * @returns {Set<unknown>}
      */
     reduce = (prev = new Set(), curr) => {
-      if (prev.has(curr) || utils.isNil(curr)) return
+      if (prev.has(curr) || utils.isNil(curr)) return prev
       if (typeof curr === 'string') return prev.add(curr)
       if (curr instanceof Set) {
         for (const val of curr.values()) {

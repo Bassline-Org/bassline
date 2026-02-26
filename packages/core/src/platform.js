@@ -194,9 +194,8 @@ export class Platform {
    */
   once(aTopic, aCallback) {
     const unsub = this.on(aTopic, e => {
-      const res = aCallback(e)
       unsub()
-      return res
+      aCallback(e)
     })
     return this
   }

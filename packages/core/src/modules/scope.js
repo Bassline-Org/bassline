@@ -134,6 +134,7 @@ export default function (platform) {
           const msg = { put: body }
           if (rest.length > 0) msg.prefix = rest.join('/')
           if (at != null) msg.at = at
+          if (meta != null) msg.meta = meta
           return child(msg)
         }
       }

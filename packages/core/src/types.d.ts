@@ -61,7 +61,7 @@ export declare class Platform {
   announce(topic: string, message?: Record<string, unknown>): this;
 
   /** Subscribe to a platform event. Returns an unsubscribe function. */
-  on(topic: string, callback: (detail: unknown) => void): () => void;
+  on(topic: string, callback: (detail: unknown) => void, opts?: AddEventListenerOptions): () => void;
 
   /** Subscribe to a platform event, firing only once. */
   once(topic: string, callback: (detail: unknown) => void): this;

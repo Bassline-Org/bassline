@@ -10,10 +10,10 @@ A resource is a function that receives a message. One key splits it:
 - Otherwise → `get(msg)` — read
 
 ```javascript
-resource({ put: 42 })           // → put(42, {})
-resource({ put: fn, at: 'x' })  // → put(fn, { at: 'x' })
-resource({})                     // → get({})
-resource({ at: 'counter' })     // → get({ at: 'counter' })
+resource({ put: 42 }) // → put(42, {})
+resource({ put: fn, at: 'x' }) // → put(fn, { at: 'x' })
+resource({}) // → get({})
+resource({ at: 'counter' }) // → get({ at: 'counter' })
 ```
 
 Cells, scopes, computed values, entire applications — all resources. Same interface.
@@ -28,8 +28,12 @@ A module, a deploy script, a platform extension — they're all the same thing: 
 // A module that defines a new resource class
 export default function (platform) {
   class MyThing extends platform.classes.Resource {
-    get() { return this.value }
-    put(v) { this.value = v }
+    get() {
+      return this.value
+    }
+    put(v) {
+      this.value = v
+    }
   }
   platform.define({ MyThing })
 }
@@ -54,9 +58,7 @@ This matters because:
 Resources live on a platform. The platform provides classes, a root scope, events, and deployment.
 
 ```javascript
-const app = new Platform()
-  .use(reducers, scope)
-  .use(http, tracing)
+const app = new Platform().use(reducers, scope).use(http, tracing)
 
 await app.deploy(deployCells, deployCompute)
 app.serve()
@@ -71,21 +73,21 @@ Resources are defined by which messages they understand.
 Get messages:
 
 ```javascript
-resource({})                  // empty read — "tell me what you are"
-resource({ at: 'counter' })  // resolve child by name
-resource({ walk: 'a/b/c' })  // walk path through nested scopes
-resource({ has: 'x' })       // check existence (boolean)
-resource({ meta: 'x' })      // retrieve metadata for a binding
+resource({}) // empty read — "tell me what you are"
+resource({ at: 'counter' }) // resolve child by name
+resource({ walk: 'a/b/c' }) // walk path through nested scopes
+resource({ has: 'x' }) // check existence (boolean)
+resource({ meta: 'x' }) // retrieve metadata for a binding
 ```
 
 Put messages:
 
 ```javascript
-resource({ put: 5 })                           // reduce: merge via reducer
-resource({ put: fn, at: 'x' })                 // mount child at name
-resource({ put: fn, at: 'x', meta: {} })       // mount with metadata
-resource({ put: null, at: 'x' })               // remove child
-resource({ put: { a: fn1, b: fn2 } })          // tree expansion into nested scopes
+resource({ put: 5 }) // reduce: merge via reducer
+resource({ put: fn, at: 'x' }) // mount child at name
+resource({ put: fn, at: 'x', meta: {} }) // mount with metadata
+resource({ put: null, at: 'x' }) // remove child
+resource({ put: { a: fn1, b: fn2 } }) // tree expansion into nested scopes
 resource({ put: fn, prefix: 'a/b', at: 'x' }) // auto-create intermediates
 ```
 
@@ -97,9 +99,9 @@ State with a reducer. The reducer defines what "write" means.
 
 ```javascript
 const counter = platform.create.Slot({ value: 0, reduce: Math.max })
-counter({ put: 5 })  // → 5
-counter({ put: 3 })  // → 5 (max wins)
-counter({})           // → 5
+counter({ put: 5 }) // → 5
+counter({ put: 3 }) // → 5 (max wins)
+counter({}) // → 5
 ```
 
 Built-in: `Slot` (last-write-wins), `Max`, `Min`, `Union` (set accumulation).
@@ -110,8 +112,8 @@ Namespace — maps names to children. Plain objects expand recursively into nest
 
 ```javascript
 root({ put: { cells: { counter, title, tags } } })
-root({ at: 'cells' })({ at: 'counter' })({})  // → 0
-root({ walk: 'cells/counter' })({})            // same thing
+root({ at: 'cells' })({ at: 'counter' })({}) // → 0
+root({ walk: 'cells/counter' })({}) // same thing
 ```
 
 Dynamic children: `Scope({ lookup(name) {}, list() {} })`
@@ -122,12 +124,14 @@ Scripts mount resources into the root. Topologically sorted by tags/dependencies
 
 ```javascript
 function deployCells(platform) {
-  platform.root({ put: {
-    cells: {
-      counter: platform.create.Slot({ value: 0, reduce: Math.max }),
-      title: platform.create.Slot({ value: 'untitled' }),
-    }
-  }})
+  platform.root({
+    put: {
+      cells: {
+        counter: platform.create.Slot({ value: 0, reduce: Math.max }),
+        title: platform.create.Slot({ value: 'untitled' }),
+      },
+    },
+  })
 }
 deployCells.tags = ['cells']
 deployCells.id = 'deploy-cells'
@@ -190,13 +194,14 @@ fuse/           # Standalone Rust FUSE binary
 
 ## Key Files
 
-- `packages/core/src/alt/platform.js` — Platform, Resource, dispatch, deploy, create proxy
-- `packages/core/src/alt/modules/scope.js` — Scope
-- `packages/core/src/alt/modules/reducers.js` — Slot, Max, Min, Union
-- `packages/core/src/alt/platforms/http.js` — HTTP projection
-- `packages/core/src/alt/platforms/fuse.js` — FUSE projection (to be decoupled)
-- `packages/core/src/alt/modules/tracing.js` — structured event logging
-- `packages/core/src/alt/protocols.md` — full protocol documentation
+- `packages/core/src/platform.js` — Platform, Resource, dispatch, deploy, create proxy
+- `packages/core/src/types.d.ts` — TypeScript type declarations
+- `packages/core/src/modules/scope.js` — Scope
+- `packages/core/src/modules/reducers.js` — Slot, Max, Min, Union
+- `packages/core/src/platforms/http.js` — HTTP projection
+- `packages/core/src/platforms/fuse.js` — FUSE projection (to be decoupled)
+- `packages/core/src/modules/tracing.js` — structured event logging
+- `packages/core/src/protocols.md` — full protocol documentation
 
 ## Running
 

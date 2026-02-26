@@ -45,7 +45,7 @@ export default function http(platform) {
         if (result instanceof Promise) result = await result
 
         if (typeof result === 'function') {
-          result = result({})
+          result = result(msg)
           if (result instanceof Promise) result = await result
         }
 
