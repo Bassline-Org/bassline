@@ -70,4 +70,35 @@ export declare class Platform {
   define(classes: Record<string, typeof Resource>): this;
 }
 
+/**
+ * Scope — composite resource that maps names to child resources.
+ */
+export declare class Scope extends Resource {
+  constructor(options?: {
+    entries?: Record<string, unknown>;
+    lookup?: (name: string) => ResourceFn | null;
+    list?: () => string[];
+  });
+}
+
+/**
+ * Propagator — a reactive scope with a fixed keyspace.
+ * Stateless: holds no state of its own, enforces relationships between resources.
+ */
+export declare class Propagator extends Scope {
+  constructor(options?: {
+    cells?: Record<string, ResourceFn | null>;
+    body?: (bindings: Record<string, ResourceFn>) => void;
+  });
+  shouldActivate(cells: Record<string, ResourceFn | null>): boolean;
+  body(bindings: Record<string, ResourceFn>): void;
+  onError(error: Error): void;
+  /** Schedule execution. Override for custom scheduling. */
+  run(): void;
+  /** Build bindings and call body. Override for custom execution logic. */
+  execute(): void;
+  fire(): void;
+  readonly keys: Set<string>;
+}
+
 export declare function platform(): Platform;

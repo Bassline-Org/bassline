@@ -1,79 +1,54 @@
 # Bassline
 
-A minimal protocol for reflexive distributed systems.
+A programming environment where everything is a resource.
 
-Built with <3 by your friends at Bassline :)
-
-## 🚧 IMPORTANT NOTE! 🚧
-
-This is stable not yet!
-
-We just recently made this public to share, and you are welcome to play with it or check out the code. But you probably shouldn't use this for anything serious as we are ironing our concrete usage patterns.
-
-But do reach out if you have any questions!
+A resource is a small computational thing that communicates via messages. Messages are either gets (asking for information) or puts (giving information). That's the whole protocol.
 
 ## Resources
 
-A resource is something you can `get` from or `put` to.
+In JavaScript, resources are exposed as functions. A `put` key in the message distinguishes the two kinds:
 
 ```javascript
-{
-  get: async (headers) => ({ headers, body }),
-  put: async (headers, body) => ({ headers, body })
+counter({ put: 5 }) // put — giving it a value
+counter({}) // get — asking for the value → 5
+```
+
+We define resource types using classes, but that's an API choice. The resource is the thing that handles the message — the function is just the interface, the class is just the implementation.
+
+## Platforms and modules
+
+Loosely inspired by Newspeak's module system, nothing in Bassline imports from packages. Instead, everything is a function that receives the platform:
+
+```javascript
+// a module
+export default function (platform) {
+  class MyThing extends platform.classes.Resource {
+    get() {
+      return this.value
+    }
+    put(v) {
+      this.value = v
+    }
+  }
+  platform.define({ MyThing })
+}
+
+// a deploy script — same shape
+function setup(platform) {
+  platform.root({ put: platform.create.Slot({ value: 0 }), at: 'counter' })
 }
 ```
 
-Resources compose through routing, and we only interact with resources through local addressing. See [packages/core/src/resource.js](./packages/core/src/resource.js).
-
-Routing can do more than just find things! For example the `/unknown` route is our fallback route, which let's us have load binding of modules & other resources in the system.
-
-## Kits
-
-When a resource needs to reach outside itself, it uses `h.kit`:
-
-```javascript
-const worker = resource({
-  put: async (h, task) => {
-    const config = await h.kit.get({ path: '/config' })
-    await h.kit.put({ path: '/results' }, processTask(task, config.body))
-    return { headers: {}, body: { done: true } }
-  },
-})
-```
-
-Kit is just a resource passed in through headers. The caller decides what it routes to. Could be local, remote, sandboxed, logged. The resource using it doesn't know or care.
-
-Because of local addressing, kit interactions represent semantic actions, not concrete locations of things, so we can have quite flexible resource interactions.
-
-This can work across network boundaries because our transports are resources too. So when crossing the wire, the transport passes a link that routes back through itself. Local addressing keeps this sane.
-
-## Resource Kinds
-
-Patterns for thinking about resources based on how they behave.
-
-Cells accumulate partial information through merging. Writes don't replace, they merge. Good for distributed state where ordering can't be coordinated.
-
-Propagators connect cells. When inputs change, they recompute and write outputs. Reactive dataflow, and while pure they maintain lattice properties.
-
-Oracles answer questions. Databases, function registries, evaluators are all cases of these.
-
-Scouts discover things autonomously and report what they find. Monitors, crawlers, peer discovery.
-
-See [packages/core/docs/Resource-Kinds.md](./packages/core/docs/Resource-Kinds.md) for some more details (there are still stubs, unfortunate!).
+The platform provides everything a function needs. Swap the platform and the code sees a different world without knowing. A gated platform with fewer classes or a narrower root is a capability boundary.
 
 ## Packages
 
 ```
-packages/core/       Resource primitives, cells, propagators, plumber, functions, timers
-packages/node/       Node.js: HTTP server, WebSocket server, file store
-packages/remote/     WebSocket client for connecting to remote basslines
-packages/database/   SQLite
-packages/services/   AI integration (Claude)
-packages/trust/      Capability-based trust experiments
-packages/tcl/        Our TCL interpreter (right now it maintains tcl semantics, but we have plans to have basslines relate directly to commands)
+packages/core/       Platform, resources, projections (HTTP, FUSE)
+packages/eth/        Ethereum JSON-RPC as a resource tree
+packages/fs/         Standalone Rust FUSE bridge
 
-apps/cli/            Daemon and MCP server (actively getting ripped out and replaced with blits)
-apps/tui/            Terminal UI
+apps/visual/         Visual inspector UI
 ```
 
 ## Running

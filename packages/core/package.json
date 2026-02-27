@@ -1,7 +1,7 @@
 {
   "name": "@bassline/core",
   "version": "2.0.0",
-  "description": "Platform, Scope, Slot — resources all the way down",
+  "description": "Resources all the way down",
   "type": "module",
   "main": "src/index.js",
   "types": "src/types.d.ts",
@@ -10,6 +10,7 @@
     "./platform": "./src/platform.js",
     "./modules": "./src/modules/index.js",
     "./modules/tracing": "./src/modules/tracing.js",
+    "./modules/propagators": "./src/modules/propagators.js",
     "./platforms/http": "./src/platforms/http.js",
     "./platforms/fuse": "./src/platforms/fuse.js"
   },

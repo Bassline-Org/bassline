@@ -19,6 +19,7 @@ const sharedGlobals = {
   EventTarget: 'readonly',
   CustomEvent: 'readonly',
   Event: 'readonly',
+  queueMicrotask: 'readonly',
 }
 
 // Shared rules for source files
