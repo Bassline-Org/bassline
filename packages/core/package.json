@@ -13,13 +13,15 @@
     "./modules/propagators": "./src/modules/propagators.js",
     "./modules/garage": "./src/modules/garage.js",
     "./platforms/http": "./src/platforms/http.js",
-    "./platforms/fuse": "./src/platforms/fuse.js"
+    "./platforms/fuse": "./src/platforms/fuse.js",
+    "./platforms/ws": "./src/platforms/ws.js"
   },
   "scripts": {
     "test": "vitest run"
   },
   "license": "AGPL-3.0",
   "dependencies": {
-    "@bassline/fs": "workspace:*"
+    "@bassline/fs": "workspace:*",
+    "ws": "^8.18.0"
   }
 }

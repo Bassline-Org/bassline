@@ -124,14 +124,101 @@ export declare class Propagator extends Scope {
 }
 
 /**
- * Garage — parks resource functions and issues serializable tokens.
+ * Garage — parks values and issues serializable tokens.
+ * Values with a [kResource] identity are deduplicated.
  */
 export declare class Garage {
-  park(resourceFn: ResourceFn): string;
+  park(value: unknown): string;
   mint(ticket: string): string;
-  resolve(token: string): ResourceFn;
-  redeem(ticket: string): ResourceFn;
+  resolve(token: string): unknown;
+  redeem(ticket: string): unknown;
   has(token: string): boolean;
 }
+
+/**
+ * Transport — abstract send/receive interface for BSP sessions.
+ */
+export interface Transport {
+  send(msg: unknown): void;
+  onMessage(cb: (msg: unknown) => void): void;
+  close(): void;
+  onClose(cb: () => void): void;
+}
+
+/**
+ * Session — BSP session over a transport. Extends Resource.
+ *
+ * Both peers create a Session. Both can send requests and serve requests.
+ * Wire format: { T, msg } for requests, { R, msg } for responses,
+ * { R, error } for error responses.
+ */
+export declare class Session extends Resource {
+  constructor(opts: { transport: Transport; root?: ResourceFn | null });
+  closed: boolean;
+  readonly garage: Garage;
+}
+
+/**
+ * Create an in-memory transport pair for testing.
+ * Returns two symmetric endpoints. Close propagates to both.
+ */
+export declare function memoryTransport(): { a: Transport; b: Transport };
+
+/**
+ * GatedScope — wraps a scope and checks capabilities before forwarding.
+ */
+export declare class GatedScope extends Scope {
+  constructor(options: {
+    target: ResourceFn;
+    capabilities?: {
+      get?: boolean;
+      put?: boolean;
+      walk?: string[];
+    };
+    check?: (msg: unknown) => boolean | void;
+  });
+}
+
+/**
+ * Storage adapter interface for persistence.
+ */
+export interface StorageAdapter {
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
+  delete(key: string): void;
+  list(): string[];
+}
+
+/**
+ * PersistentSlot — Slot backed by a storage adapter.
+ * Lazy loads on first read, persists on every write.
+ */
+export declare class PersistentSlot extends Slot {
+  constructor(options: {
+    storage: StorageAdapter;
+    key: string;
+    value?: unknown;
+    reduce?: (prev: unknown, curr: unknown) => unknown;
+  });
+}
+
+/**
+ * PersistentScope — Scope backed by a storage adapter.
+ * Persists child structure and restores from storage.
+ */
+export declare class PersistentScope extends Scope {
+  constructor(options: {
+    storage: StorageAdapter;
+    prefix?: string;
+    lookup?: (name: string) => ResourceFn | null;
+    list?: () => string[];
+  });
+}
+
+/**
+ * Wrap a WebSocket into a Transport.
+ * Works with both the `ws` library and the global WebSocket (Node 22+).
+ */
+export declare function wsTransport(ws: WebSocket): Transport;
 
 export declare function platform(): Platform;

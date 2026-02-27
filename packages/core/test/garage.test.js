@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/platform.js'
+import { Platform, kResource } from '../src/platform.js'
 import { reducers, scope, garage } from '../src/modules/index.js'
+import { Garage } from '../src/modules/garage.js'
 
 function setup() {
   const p = new Platform()
@@ -9,101 +10,110 @@ function setup() {
 }
 
 describe('Garage', () => {
+  it('is exported as a plain class', () => {
+    expect(Garage).toBeDefined()
+    expect(new Garage()).toBeInstanceOf(Garage)
+  })
+
+  it('is available on platform after module is loaded', () => {
+    const p = setup()
+    expect(p.Garage).toBe(Garage)
+  })
+
   describe('park', () => {
     it('returns a string ticket', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const slot = p.create.Slot({ value: 1 })
-      const ticket = g.park(slot)
+      const g = new Garage()
+      const ticket = g.park('anything')
       expect(typeof ticket).toBe('string')
     })
 
-    it('deduplicates by resource identity', () => {
+    it('deduplicates by kResource identity', () => {
       const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       const slot = p.create.Slot({ value: 1 })
       const t1 = g.park(slot)
       const t2 = g.park(slot)
       expect(t1).toBe(t2)
     })
 
-    it('rejects non-functions', () => {
-      const p = setup()
-      const g = new p.Garage()
-      expect(() => g.park(42)).toThrow('can only park functions')
-      expect(() => g.park('hello')).toThrow('can only park functions')
-      expect(() => g.park(null)).toThrow('can only park functions')
+    it('parks values without kResource without dedup', () => {
+      const g = new Garage()
+      const t1 = g.park(42)
+      const t2 = g.park(42)
+      expect(typeof t1).toBe('string')
+      expect(t1).not.toBe(t2) // no kResource → no identity → no dedup
+      expect(g.resolve(t1)).toBe(42)
     })
 
     it('gives different tickets to different resources', () => {
       const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       const a = p.create.Slot({ value: 1 })
       const b = p.create.Slot({ value: 2 })
       expect(g.park(a)).not.toBe(g.park(b))
     })
 
-    it('parks plain functions (no kResource) without dedup', () => {
-      const p = setup()
-      const g = new p.Garage()
+    it('parks plain functions without dedup', () => {
+      const g = new Garage()
       const fn = () => 42
       const t1 = g.park(fn)
       const t2 = g.park(fn)
       expect(t1).not.toBe(t2)
     })
+
+    it('parks any value type', () => {
+      const g = new Garage()
+      expect(typeof g.park('hello')).toBe('string')
+      expect(typeof g.park(null)).toBe('string')
+      expect(typeof g.park({ x: 1 })).toBe('string')
+      expect(typeof g.park([1, 2, 3])).toBe('string')
+    })
   })
 
   describe('resolve', () => {
-    it('resolves a ticket to the original function', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const slot = p.create.Slot({ value: 1 })
-      const ticket = g.park(slot)
-      expect(g.resolve(ticket)).toBe(slot)
+    it('resolves a ticket to the parked value', () => {
+      const g = new Garage()
+      const obj = { data: 42 }
+      const ticket = g.park(obj)
+      expect(g.resolve(ticket)).toBe(obj)
     })
 
-    it('resolves a reference to the original function', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const slot = p.create.Slot({ value: 1 })
-      const ticket = g.park(slot)
+    it('resolves a reference to the parked value', () => {
+      const g = new Garage()
+      const obj = { data: 42 }
+      const ticket = g.park(obj)
       const ref = g.mint(ticket)
-      expect(g.resolve(ref)).toBe(slot)
+      expect(g.resolve(ref)).toBe(obj)
     })
 
     it('throws for invalid token', () => {
-      const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       expect(() => g.resolve('bogus')).toThrow('invalid token')
     })
   })
 
   describe('has', () => {
     it('returns true for valid ticket', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const ticket = g.park(p.create.Slot({ value: 1 }))
+      const g = new Garage()
+      const ticket = g.park('value')
       expect(g.has(ticket)).toBe(true)
     })
 
     it('returns true for valid ref', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const ticket = g.park(p.create.Slot({ value: 1 }))
+      const g = new Garage()
+      const ticket = g.park('value')
       const ref = g.mint(ticket)
       expect(g.has(ref)).toBe(true)
     })
 
     it('returns false for unknown token', () => {
-      const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       expect(g.has('nonexistent')).toBe(false)
     })
 
     it('returns false after redeem', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const ticket = g.park(p.create.Slot({ value: 1 }))
+      const g = new Garage()
+      const ticket = g.park('value')
       g.redeem(ticket)
       expect(g.has(ticket)).toBe(false)
     })
@@ -111,48 +121,42 @@ describe('Garage', () => {
 
   describe('mint', () => {
     it('creates a ref from a ticket', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const ticket = g.park(p.create.Slot({ value: 1 }))
+      const g = new Garage()
+      const ticket = g.park('value')
       const ref = g.mint(ticket)
       expect(typeof ref).toBe('string')
       expect(ref).not.toBe(ticket)
     })
 
     it('throws for invalid ticket', () => {
-      const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       expect(() => g.mint('bogus')).toThrow('invalid ticket')
     })
 
-    it('multiple refs all resolve to same function', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const slot = p.create.Slot({ value: 1 })
-      const ticket = g.park(slot)
+    it('multiple refs all resolve to same value', () => {
+      const g = new Garage()
+      const obj = { data: 1 }
+      const ticket = g.park(obj)
       const r1 = g.mint(ticket)
       const r2 = g.mint(ticket)
       const r3 = g.mint(ticket)
-      expect(g.resolve(r1)).toBe(slot)
-      expect(g.resolve(r2)).toBe(slot)
-      expect(g.resolve(r3)).toBe(slot)
+      expect(g.resolve(r1)).toBe(obj)
+      expect(g.resolve(r2)).toBe(obj)
+      expect(g.resolve(r3)).toBe(obj)
     })
   })
 
   describe('redeem', () => {
-    it('returns the original function', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const slot = p.create.Slot({ value: 1 })
-      const ticket = g.park(slot)
-      expect(g.redeem(ticket)).toBe(slot)
+    it('returns the parked value', () => {
+      const g = new Garage()
+      const obj = { data: 1 }
+      const ticket = g.park(obj)
+      expect(g.redeem(ticket)).toBe(obj)
     })
 
     it('invalidates ticket and all refs', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const slot = p.create.Slot({ value: 1 })
-      const ticket = g.park(slot)
+      const g = new Garage()
+      const ticket = g.park('value')
       const r1 = g.mint(ticket)
       const r2 = g.mint(ticket)
 
@@ -162,9 +166,9 @@ describe('Garage', () => {
       expect(g.has(r2)).toBe(false)
     })
 
-    it('cleans dedup map so re-parking gives a fresh ticket', () => {
+    it('cleans identity map so re-parking gives a fresh ticket', () => {
       const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       const slot = p.create.Slot({ value: 1 })
       const t1 = g.park(slot)
       g.redeem(t1)
@@ -173,27 +177,25 @@ describe('Garage', () => {
     })
 
     it('rejects reference tokens', () => {
-      const p = setup()
-      const g = new p.Garage()
-      const ticket = g.park(p.create.Slot({ value: 1 }))
+      const g = new Garage()
+      const ticket = g.park('value')
       const ref = g.mint(ticket)
       expect(() => g.redeem(ref)).toThrow('cannot redeem a reference token')
     })
 
     it('throws for invalid ticket', () => {
-      const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       expect(() => g.redeem('bogus')).toThrow('invalid ticket')
     })
 
     it('park-redeem-park cycle works', () => {
       const p = setup()
-      const g = new p.Garage()
+      const g = new Garage()
       const slot = p.create.Slot({ value: 1 })
 
       const t1 = g.park(slot)
-      const fn = g.redeem(t1)
-      expect(fn).toBe(slot)
+      const val = g.redeem(t1)
+      expect(val).toBe(slot)
 
       const t2 = g.park(slot)
       expect(t2).not.toBe(t1)
@@ -201,25 +203,18 @@ describe('Garage', () => {
     })
   })
 
-  describe('visitor via reflect', () => {
+  describe('with mirrors', () => {
     it('p.reflect(fn).accept(visitor) dispatches correctly', () => {
       const p = setup()
       const slot = p.create.Slot({ value: 1 })
-      const scope = p.create.Scope()
+      const sc = p.create.Scope()
 
       const visitor = {
-        visitScope() {
-          return 'scope'
-        },
-        visitSlot() {
-          return 'slot'
-        },
-        visitResource() {
-          return 'resource'
-        },
+        visitScope() { return 'scope' },
+        visitResource() { return 'resource' },
       }
 
-      expect(p.reflect(scope).accept(visitor)).toBe('scope')
+      expect(p.reflect(sc).accept(visitor)).toBe('scope')
       expect(p.reflect(slot).accept(visitor)).toBe('resource')
     })
   })
