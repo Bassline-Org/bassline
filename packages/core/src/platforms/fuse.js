@@ -75,8 +75,7 @@ export default function fuse(platform) {
    * @returns {boolean}
    */
   function isScope(resourceFn) {
-    const { Scope } = platform.classes
-    return Scope && resourceFn?._resource instanceof Scope
+    return platform.reflect(resourceFn)?.isScope() ?? false
   }
 
   /**
@@ -84,8 +83,7 @@ export default function fuse(platform) {
    * @returns {boolean}
    */
   function isWritable(resourceFn) {
-    const { Slot } = platform.classes
-    return Slot && resourceFn?._resource instanceof Slot
+    return platform.reflect(resourceFn)?.isWritable() ?? false
   }
 
   // --- Parent resolution (for metadata) ---

@@ -238,7 +238,7 @@ describe('Scope', () => {
           return 'visited'
         },
       }
-      expect(root._resource.accept(visitor)).toBe('visited')
+      expect(p.reflect(root).accept(visitor)).toBe('visited')
       expect(visited).toHaveLength(1)
     })
 
@@ -250,7 +250,7 @@ describe('Scope', () => {
           return 'fallback'
         },
       }
-      expect(root._resource.accept(visitor)).toBe('fallback')
+      expect(p.reflect(root).accept(visitor)).toBe('fallback')
     })
   })
 
@@ -381,6 +381,39 @@ describe('Scope', () => {
       expect(events).toHaveLength(1)
       expect(events[0].name).toBe('x')
       expect(events[0].child).toBe(slot)
+    })
+
+    it('fires unmounted then mounted when overwriting a function entry', () => {
+      const p = setup()
+      const events = []
+      p.on('resource.mounted', e => events.push({ type: 'mounted', name: e.name }))
+      p.on('resource.unmounted', e => events.push({ type: 'unmounted', name: e.name }))
+
+      const root = p.create.Scope()
+      const a = p.create.Slot({ value: 1 })
+      const b = p.create.Slot({ value: 2 })
+      root({ put: a, at: 'x' })
+      root({ put: b, at: 'x' })
+
+      expect(events).toEqual([
+        { type: 'mounted', name: 'x' },
+        { type: 'unmounted', name: 'x' },
+        { type: 'mounted', name: 'x' },
+      ])
+    })
+
+    it('fires unmounted when a non-scope is replaced by tree expansion', () => {
+      const p = setup()
+      const events = []
+      p.on('resource.unmounted', e => events.push(e.name))
+
+      const root = p.create.Scope()
+      const slot = p.create.Slot({ value: 1 })
+      root({ put: slot, at: 'x' })
+      // overwrite non-scope 'x' with a plain object (creates scope)
+      root({ put: { child: p.create.Slot({ value: 2 }) }, at: 'x' })
+
+      expect(events).toContain('x')
     })
   })
 })

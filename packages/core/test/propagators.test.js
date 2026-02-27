@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/platform.js'
+import { Platform, kResource } from '../src/platform.js'
 import { reducers, scope, propagators } from '../src/modules/index.js'
 
 const flush = () => new Promise(r => setTimeout(r, 0))
@@ -157,7 +157,7 @@ describe('Propagator', () => {
       const prop = p.create.Checker({ cells: { x } })
       await flush()
 
-      expect(selfRef).toBe(prop._resource)
+      expect(selfRef).toBe(prop[kResource])
     })
   })
 
@@ -522,7 +522,7 @@ describe('Propagator', () => {
     it('accepts visitPropagator', () => {
       const p = setup()
       const prop = p.create.Propagator({ cells: { a: null }, body() {} })
-      const result = prop._resource.accept({
+      const result = p.reflect(prop).accept({
         visitPropagator() {
           return 'propagator'
         },
@@ -539,7 +539,7 @@ describe('Propagator', () => {
     it('falls back to visitScope', () => {
       const p = setup()
       const prop = p.create.Propagator({ cells: { a: null }, body() {} })
-      const result = prop._resource.accept({
+      const result = p.reflect(prop).accept({
         visitScope() {
           return 'scope'
         },
@@ -553,7 +553,7 @@ describe('Propagator', () => {
     it('falls back to visitResource', () => {
       const p = setup()
       const prop = p.create.Propagator({ cells: { a: null }, body() {} })
-      const result = prop._resource.accept({
+      const result = p.reflect(prop).accept({
         visitResource() {
           return 'resource'
         },
@@ -720,6 +720,111 @@ describe('Propagator', () => {
 
       // body should NOT have fired — shouldActivate check in execute() prevents it
       expect(fireCount).toBe(0)
+    })
+  })
+
+  describe('Union change detection', () => {
+    it('propagator reacts when Union accumulates a new value', async () => {
+      const p = setup()
+      const { Propagator } = p.classes
+
+      class Watcher extends Propagator {
+        body({ tags, count }) {
+          const s = tags({})
+          count({ put: s.size })
+        }
+      }
+      p.define({ Watcher })
+
+      const tags = p.create.Union()
+      const count = p.create.Slot({ value: 0 })
+
+      p.create.Watcher({ cells: { tags, count } })
+      await flush()
+      expect(count({})).toBe(0)
+
+      tags({ put: 'a' })
+      await flush()
+      expect(count({})).toBe(1)
+
+      tags({ put: 'b' })
+      await flush()
+      expect(count({})).toBe(2)
+
+      // duplicate — no change, propagator should not re-fire
+      const countBefore = count({})
+      tags({ put: 'a' })
+      await flush()
+      expect(count({})).toBe(countBefore)
+    })
+  })
+
+  describe('listener cleanup', () => {
+    it('unsubscribes from resource.changed when all cells are unbound', async () => {
+      const p = setup()
+      const { Propagator } = p.classes
+      let fireCount = 0
+
+      class Counter extends Propagator {
+        shouldActivate() {
+          return true
+        }
+        body() {
+          fireCount++
+        }
+      }
+      p.define({ Counter })
+
+      const a = p.create.Slot({ value: 1 })
+      const b = p.create.Slot({ value: 2 })
+      const prop = p.create.Counter({ cells: { a, b } })
+      await flush()
+
+      // unbind both cells — the unbind itself may trigger runs
+      prop({ put: null, at: 'a' })
+      prop({ put: null, at: 'b' })
+      await flush()
+      const countAfterUnbind = fireCount
+
+      // changes to formerly watched resources should not trigger
+      a({ put: 99 })
+      b({ put: 99 })
+      await flush()
+      expect(fireCount).toBe(countAfterUnbind)
+    })
+
+    it('re-subscribes after unbind-all then rebind', async () => {
+      const p = setup()
+      const { Propagator } = p.classes
+
+      class Copier extends Propagator {
+        body({ src, dst }) {
+          dst({ put: src({}) })
+        }
+      }
+      p.define({ Copier })
+
+      const src = p.create.Slot({ value: 1 })
+      const dst = p.create.Slot({ value: 0 })
+      const prop = p.create.Copier({ cells: { src, dst } })
+      await flush()
+      expect(dst({})).toBe(1)
+
+      // unbind all
+      prop({ put: null, at: 'src' })
+      prop({ put: null, at: 'dst' })
+      await flush()
+
+      // rebind
+      prop({ put: src, at: 'src' })
+      prop({ put: dst, at: 'dst' })
+      await flush()
+      expect(dst({})).toBe(1)
+
+      // should still react
+      src({ put: 42 })
+      await flush()
+      expect(dst({})).toBe(42)
     })
   })
 

@@ -11,6 +11,7 @@
     "./modules": "./src/modules/index.js",
     "./modules/tracing": "./src/modules/tracing.js",
     "./modules/propagators": "./src/modules/propagators.js",
+    "./modules/garage": "./src/modules/garage.js",
     "./platforms/http": "./src/platforms/http.js",
     "./platforms/fuse": "./src/platforms/fuse.js"
   },

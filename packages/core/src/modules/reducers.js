@@ -84,21 +84,21 @@ export default function (platform) {
      */
     reduce = (prev = new Set(), curr) => {
       if (prev.has(curr) || utils.isNil(curr)) return prev
-      if (typeof curr === 'string') return prev.add(curr)
+      const next = new Set(prev)
+      if (typeof curr === 'string') {
+        next.add(curr)
+        return next
+      }
       if (curr instanceof Set) {
-        for (const val of curr.values()) {
-          prev.add(val)
-        }
-        return prev
+        for (const val of curr.values()) next.add(val)
+        return next
       }
       if (curr[Symbol.iterator]) {
-        for (const val of curr) {
-          prev.add(val)
-        }
-        return prev
+        for (const val of curr) next.add(val)
+        return next
       }
-      prev.add(curr)
-      return prev
+      next.add(curr)
+      return next
     }
   }
 

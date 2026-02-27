@@ -4,9 +4,14 @@ import utils from './utils.js'
 /** @typedef {import('./types').DeployScript} DeployScript */
 /** @typedef {import('./types').Module} Module */
 
+/** Well-known symbol for resource identity. */
+export const kResource = Symbol.for('bassline.resource')
+
 export class Resource {
   /** @type {Platform} */
-  platform = null
+  platform = null;
+
+  [kResource] = this
 
   get utils() {
     return this?.platform?.utils
@@ -111,6 +116,33 @@ function topoSort(scripts, satisfiedTags) {
   return sorted
 }
 
+export class ResourceMirror {
+  #resource
+
+  constructor(resource) {
+    this[kResource] = resource
+    this.#resource = resource
+  }
+
+  getClass() {
+    return this.#resource.constructor
+  }
+
+  isScope() {
+    const { Scope } = this.#resource.platform.classes
+    return Scope ? this.#resource instanceof Scope : false
+  }
+
+  isWritable() {
+    const { Slot } = this.#resource.platform.classes
+    return Slot ? this.#resource instanceof Slot : false
+  }
+
+  accept(visitor) {
+    return this.#resource.accept(visitor)
+  }
+}
+
 export class Platform {
   eventTarget = new EventTarget()
   utils = utils
@@ -124,6 +156,22 @@ export class Platform {
 
   /** @type {Set<string>} */
   _tags = new Set()
+
+  #mirrors = new WeakMap()
+
+  /**
+   * Get a mirror for a resource or resource function.
+   * @param {unknown} thing
+   * @returns {ResourceMirror | null}
+   */
+  reflect(thing) {
+    const resource = thing?.[kResource]
+    if (!resource) return null
+    if (!this.#mirrors.has(resource)) {
+      this.#mirrors.set(resource, new ResourceMirror(resource))
+    }
+    return this.#mirrors.get(resource)
+  }
 
   createHandler = {
     get(target, prop, _receiver) {
@@ -157,7 +205,7 @@ export class Platform {
    */
   resource(aResource) {
     const resourceFn = aResource.dispatch.bind(aResource)
-    resourceFn._resource = aResource
+    resourceFn[kResource] = aResource
     this.announce('resource.created', { resource: resourceFn })
     return resourceFn
   }

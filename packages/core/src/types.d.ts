@@ -3,11 +3,15 @@
  */
 export type ResourceFn = (msg: unknown) => unknown;
 
+/** Well-known symbol for resource identity. */
+export declare const kResource: unique symbol;
+
 /**
  * Base resource class. Subclass to define get/put behavior.
  */
 export declare class Resource {
   platform: Platform;
+  [kResource]: Resource;
   get utils(): typeof import('./utils.js').default;
   accept(visitor: Record<string, Function>): unknown;
   announce(type: string, data?: Record<string, unknown>): void;
@@ -15,6 +19,18 @@ export declare class Resource {
   get(msg: unknown): unknown;
   put(body: unknown, headers: unknown): unknown;
   static forPlatform(platform: Platform): typeof Resource;
+}
+
+/**
+ * Mirror — reflective interface for a resource.
+ */
+export declare class ResourceMirror {
+  constructor(resource: Resource);
+  [kResource]: Resource;
+  getClass(): typeof Resource;
+  isScope(): boolean;
+  isWritable(): boolean;
+  accept(visitor: Record<string, Function>): unknown;
 }
 
 /**
@@ -68,6 +84,12 @@ export declare class Platform {
 
   /** Register resource classes on the platform. */
   define(classes: Record<string, typeof Resource>): this;
+
+  /** Get a mirror for a resource or resource function. */
+  reflect(thing: unknown): ResourceMirror | null;
+
+  /** Garage class, available after garage module is loaded. */
+  Garage: typeof Garage;
 }
 
 /**
@@ -99,6 +121,17 @@ export declare class Propagator extends Scope {
   execute(): void;
   fire(): void;
   readonly keys: Set<string>;
+}
+
+/**
+ * Garage — parks resource functions and issues serializable tokens.
+ */
+export declare class Garage {
+  park(resourceFn: ResourceFn): string;
+  mint(ticket: string): string;
+  resolve(token: string): ResourceFn;
+  redeem(ticket: string): ResourceFn;
+  has(token: string): boolean;
 }
 
 export declare function platform(): Platform;

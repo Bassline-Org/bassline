@@ -349,6 +349,6 @@ describe('FUSE platform — serialize/deserialize', () => {
     p.fuse.write('/num', Buffer.from('99\n'), 0)
     await p.fuse.release('/num')
 
-    expect(slot._resource.value).toBe(99)
+    expect(slot({})).toBe(99)
   })
 })

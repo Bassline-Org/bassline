@@ -150,6 +150,7 @@ export default function (platform) {
 
       if (typeof body === 'function') {
         if (at == null) throw new Error('at required')
+        if (this.#entries.has(at)) this.announce('unmounted', { name: at })
         this.#entries.set(at, body)
         if (meta != null) this.#metadata.set(at, meta)
         this.announce('mounted', { name: at, child: body })
@@ -159,7 +160,8 @@ export default function (platform) {
       if (isPlainObject(body)) {
         if (at != null) {
           let child = this.#entries.get(at)
-          if (child == null || !(child._resource instanceof Scope)) {
+          if (child == null || !this.platform.reflect(child)?.isScope()) {
+            if (child != null) this.announce('unmounted', { name: at })
             child = this.platform.create.Scope()
             this.#entries.set(at, child)
             this.announce('mounted', { name: at, child })

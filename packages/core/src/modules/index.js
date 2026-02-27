@@ -1,4 +1,5 @@
 export { default as reducers } from './reducers.js'
 export { default as scope } from './scope.js'
 export { default as propagators } from './propagators.js'
+export { default as garage } from './garage.js'
 // tracing is Node-specific — import directly from '@bassline/core/modules/tracing'

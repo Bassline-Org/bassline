@@ -1,5 +1,6 @@
 /** @param {import('../types').Platform} platform */
 export default function (platform) {
+  const kResource = Symbol.for('bassline.resource')
   const {
     classes: { Scope },
   } = platform
@@ -95,9 +96,12 @@ export default function (platform) {
 
       this.#watched.delete(at)
       const result = super.put(body, headers)
-      if (body != null && body._resource) {
-        this.#watched.set(at, body._resource)
+      if (body != null && body[kResource]) {
+        this.#watched.set(at, body[kResource])
         this.#ensureListener()
+      } else if (this.#watched.size === 0 && this.#unsub) {
+        this.#unsub()
+        this.#unsub = null
       }
 
       this.run()
