@@ -1,0 +1,847 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2026-03-04 Wed 23:34 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bassline V2</title>
+<meta name="author" content="Alexander Gusev" />
+<meta name="description" content="An improvement over the original Bassline api, with dramatically simpler internals and composition." />
+<meta name="generator" content="Org Mode" />
+<link rel="stylesheet" href="book.css"/>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Bassline V2
+<br />
+<span class="subtitle">Now with message sends!</span>
+</h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#orgb6925c6">1. Introduction</a>
+<ul>
+<li><a href="#org73bad83">1.1. TLDR</a></li>
+<li><a href="#org9736fcf">1.2. What was wrong with the last version?</a></li>
+</ul>
+</li>
+<li><a href="#orgca7bab7">2. The Kernel</a>
+<ul>
+<li><a href="#orgf84893c">2.1. Messages</a></li>
+<li><a href="#orgb2862da">2.2. Message Sends</a></li>
+<li><a href="#orgfd70257">2.3. Resources</a></li>
+</ul>
+</li>
+<li><a href="#org3662b20">3. Utilities</a>
+<ul>
+<li><a href="#org9b5aa36">3.1. Type Predicates</a></li>
+<li><a href="#org5e47717">3.2. Structural Predicates</a></li>
+<li><a href="#org8e5f577">3.3. Misc</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgb6925c6" class="outline-2">
+<h2 id="orgb6925c6"><span class="section-number-2">1.</span> Introduction</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+This literate document contains the source code for the core of <a href="https://bassline.dev">Bassline</a> v2.
+</p>
+
+<p>
+Bassline is designed to be hacked on and modified, so we encourage people to read this!
+</p>
+</div>
+<div id="outline-container-org73bad83" class="outline-3">
+<h3 id="org73bad83"><span class="section-number-3">1.1.</span> TLDR</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+Bassline is a system for partial information programming.
+</p>
+
+<p>
+To support this, we must define two concepts:
+</p>
+
+<ol class="org-ol">
+<li><p>
+Messages
+A message is a unit of partial information.
+It can be a request for information, a <code>get</code>.
+Or it can be an offering of information, a <code>put</code>.
+</p>
+
+<p>
+This roughly corresponds to a question and a statement.
+Everything in bassline communicates via messages.
+</p></li>
+
+<li><p>
+Resources
+A resource is a computational unit that can interpret messages.
+</p>
+
+<p>
+It is not obligated to be total and does not have to answer all messages they receive.
+They can ignore, delegate, relay, modify, etc.
+</p></li>
+</ol>
+</div>
+</div>
+<div id="outline-container-org9736fcf" class="outline-3">
+<h3 id="org9736fcf"><span class="section-number-3">1.2.</span> What was wrong with the last version?</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+The previous release of Bassline has some ugly quirks.
+</p>
+
+<p>
+The primary pain points were:
+</p>
+<ul class="org-ul">
+<li>Different methods for <code>get</code> and <code>put</code></li>
+<li>No concept of message sends, making message routing and validation clumsy</li>
+<li>Heavy use of path like access for resources</li>
+<li>Insane deployment machinery</li>
+<li>No client interfaces for making the platform simple for users (message sends make this much cleaner)</li>
+<li>Overuse of &ldquo;stringly-typed&rdquo; identification of things, rather than richer semantic access patterns</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-orgca7bab7" class="outline-2">
+<h2 id="orgca7bab7"><span class="section-number-2">2.</span> The Kernel</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Recall that in Bassline we have two concepts, messages and resources.
+</p>
+
+<p>
+The primary difference in this version, is greatly improved the mechanisms for message sends.
+</p>
+
+<p>
+This dramatically reduces the complexity and verbosity of the code, and makes for a much more joyous experience.
+</p>
+
+<blockquote>
+<p>
+Previous versions of Bassline had no explicit model for sends, because they are implementation details.
+Instead they were implicit in the dispatch machinery, which made composition harder than it needed to be.
+</p>
+</blockquote>
+
+<p>
+Before we cover this, we have to first cover the implementation of a message.
+</p>
+</div>
+<div id="outline-container-orgf84893c" class="outline-3">
+<h3 id="orgf84893c"><span class="section-number-3">2.1.</span> Messages</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+A message is a unit of partial information.
+It has a <code>content</code> object, which is a map of keys to values.
+We treat <code>content.body</code> as the logical payload of the message, which indicates that it is a <code>put</code>.
+We treat everything else as the head of the message.
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Part</th>
+<th scope="col" class="org-left">Presence</th>
+<th scope="col" class="org-left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">head</td>
+<td class="org-left">always</td>
+<td class="org-left">The metadata for the message (everything except <code>body</code>)</td>
+</tr>
+
+<tr>
+<td class="org-left">body</td>
+<td class="org-left">optional</td>
+<td class="org-left">The optional payload of the message</td>
+</tr>
+
+<tr>
+<td class="org-left">op</td>
+<td class="org-left">computed</td>
+<td class="org-left">Either <code>get</code> or <code>put</code>, derived from the presence of a <code>body</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>
+We also include an <code>update</code> method, which lets us modify the message with a callback for convenience.
+</p>
+</div>
+<div id="outline-container-org93d0582" class="outline-4">
+<h4 id="org93d0582"><span class="section-number-4">2.1.1.</span> Simple Messages</h4>
+<div class="outline-text-4" id="text-2-1-1">
+<p>
+This represents about the simplest message we can form
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> {isPlainObject} from <span style="color: #539AFC;">"./utils.js"</span>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">class</span> Message {
+  content = {}
+  update(callback) {
+    callback(<span style="color: #E27E8D;">this</span>.content)
+    <span style="color: #5EC4FF;">if</span>(<span style="color: #539AFC;">'body'</span> <span style="color: #5EC4FF;">in</span> <span style="color: #E27E8D;">this</span>.content
+       &amp;&amp; <span style="color: #E27E8D;">this</span>.content.body === <span style="color: #E27E8D;">undefined</span>) {
+      <span style="color: #5EC4FF;">delete</span> <span style="color: #E27E8D;">this</span>.content.body
+    }
+    <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">this</span>
+  }
+  get op() {
+    <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">this</span>.content?.body === <span style="color: #E27E8D;">undefined</span> ? <span style="color: #539AFC;">'get'</span> : <span style="color: #539AFC;">'put'</span>
+  }
+  get isEmpty() {
+    <span style="color: #5EC4FF;">return</span> Object.keys(<span style="color: #E27E8D;">this</span>.content).length === <span style="color: #E27E8D; font-weight: bold;">0</span>
+  }
+  toJSON() {
+    <span style="color: #5EC4FF;">return</span> { <span style="color: #539AFC;">'@message'</span>: { content: <span style="color: #E27E8D;">this</span>.content } }
+  }
+  <span style="color: #5EC4FF;">static</span> from(content) {
+    <span style="color: #5EC4FF;">if</span> (content <span style="color: #5EC4FF;">instanceof</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>) <span style="color: #5EC4FF;">return</span> content
+    <span style="color: #5EC4FF;">if</span> (content === <span style="color: #E27E8D;">undefined</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>()
+    <span style="color: #5EC4FF;">if</span> (isPlainObject(content)) {
+      <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>().update(c =&gt; Object.assign(c, content ?? {}))
+    } <span style="color: #5EC4FF;">else</span> {
+      <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>().update(c =&gt; c.body = content)
+    }
+  }
+}
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">message</span> = c =&gt; Message.from(c)
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">default</span> message
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org6b18075" class="outline-4">
+<h4 id="org6b18075"><span class="section-number-4">2.1.2.</span> Message Idioms</h4>
+<div class="outline-text-4" id="text-2-1-2">
+<p>
+The head of a message is where we store information related to what the message means, or the message&rsquo;s intent.
+</p>
+
+<p>
+The head is free-form, it can contain as much or as little information as needed,
+however we should discuss some common conventions.
+</p>
+</div>
+<ol class="org-ol">
+<li><a id="org73784e4"></a>Message transcript<br />
+<div class="outline-text-5" id="text-2-1-2-1">
+<p>
+Inside the head, the transcript is a common location to record messages during processing.
+</p>
+
+<p>
+For example if somebody is doing something slightly wrong, we can add a warning to the transcript so
+they can correct their usage.
+</p>
+
+<p>
+Or if we need to record an effect that should fire, we can record an effect message.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">transcribe</span> = (msg, content) =&gt;
+  msg.update(c =&gt; {
+    <span style="color: #5EC4FF;">if</span> (c.transcript === <span style="color: #E27E8D;">undefined</span>) c.transcript = []
+    c.transcript.push(message(content))
+  })
+</pre>
+</div>
+</div>
+</li>
+</ol>
+</div>
+<div id="outline-container-orgef6b878" class="outline-4">
+<h4 id="orgef6b878"><span class="section-number-4">2.1.3.</span> Exception Messages</h4>
+<div class="outline-text-4" id="text-2-1-3">
+<p>
+We cannot expect our systems to run smoothly, which is why we define these message.
+</p>
+
+<p>
+These indicate that some exceptional state has ocurred while processing a message.
+Using our <a href="#orgb2862da">combinators</a> we can handle these gracefully if we want to.
+</p>
+
+<p>
+Conceptually there are two kinds of conditional states.
+</p>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">condition</th>
+<th scope="col" class="org-left">what it means</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">Warning</td>
+<td class="org-left">It&rsquo;s workable, but you should know something</td>
+</tr>
+
+<tr>
+<td class="org-left">Fault</td>
+<td class="org-left">Something went wrong, and I cannot continue</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ol class="org-ol">
+<li><a id="orgbe5133f"></a>Non Fatal Exceptions: Warnings<br />
+<div class="outline-text-5" id="text-2-1-3-1">
+<p>
+This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
+</p>
+
+<p>
+The <code>warn</code> function records a warning message to the transcript, so something else can process it.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">warning</span> = reason =&gt; message({type: <span style="color: #539AFC;">'warning'</span>, body: reason})
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">warn</span> = (msg, reason) =&gt; transcribe(msg, warning(reason))
+</pre>
+</div>
+</div>
+</li>
+<li><a id="org7978833"></a>Fatal Errors: Fault<br />
+<div class="outline-text-5" id="text-2-1-3-2">
+<p>
+This indicates that processing cannot continue, and we must stop.
+</p>
+
+<p>
+Unlike warnings, which are used to annotate the message being processed, we throw the fault message.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fault</span> = (condition, msg, context = {}) =&gt; {
+  <span style="color: #5EC4FF;">throw</span> message({fault: condition, on: msg, ...context})
+}
+</pre>
+</div>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-orgb2862da" class="outline-3">
+<h3 id="orgb2862da"><span class="section-number-3">2.2.</span> Message Sends</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+A message send is a function that passes a message to resource, and has control over how the message is resolved to the original sender.
+</p>
+
+<p>
+This means that resource implementations are no longer coupled with cumbersome dispatch and validation logic.
+We replaced all of that with simpler more orthogonal sends and combinators for constructing those sends.
+</p>
+
+<blockquote>
+<p>
+Technically sends are resources!
+</p>
+
+<p>
+Sends are computational units that process messages, just like resources.
+</p>
+
+<p>
+However most of the time, they exist to modulate how we use resources, rather than defining a new &ldquo;thing&rdquo;.
+</p>
+</blockquote>
+</div>
+<div id="outline-container-orgeb14d38" class="outline-4">
+<h4 id="orgeb14d38"><span class="section-number-4">2.2.1.</span> Simple Sends</h4>
+<div class="outline-text-4" id="text-2-2-1">
+<p>
+The simplest send we can build is just a promise.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { message, fault } from <span style="color: #539AFC;">'./messages.js'</span>
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">async</span> <span style="color: #5EC4FF;">function</span> send(<span style="color: #718CA1;">target</span>, <span style="color: #718CA1;">aMessage</span>, { <span style="color: #718CA1;">timeout</span>: <span style="color: #718CA1;">ms</span> = <span style="color: #E27E8D; font-weight: bold;">30000</span>, <span style="color: #718CA1;">tap</span>: <span style="color: #718CA1;">taps</span> = [] } = {}) {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMessage)
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">timer</span>
+  <span style="color: #5EC4FF;">try</span> {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = message(
+      <span style="color: #5EC4FF;">await</span> Promise.race([
+        target(msg),
+        <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>((_, rej) =&gt; {
+          timer = setTimeout(() =&gt; rej(message({fault: <span style="color: #539AFC;">'timeout'</span>, on: msg})), ms)
+        }),
+      ])
+    )
+    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">t</span> <span style="color: #5EC4FF;">of</span> taps) <span style="color: #5EC4FF;">await</span> t(result)
+    <span style="color: #5EC4FF;">return</span> result
+  } <span style="color: #5EC4FF;">finally</span> {
+    clearTimeout(timer)
+  }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org52391b2" class="outline-4">
+<h4 id="org52391b2"><span class="section-number-4">2.2.2.</span> Send Combinators</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+We compose sends using combinators, letting us build flexible and expressive sends from simple and modular components.
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Combinator</th>
+<th scope="col" class="org-left">Behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><code>all</code></td>
+<td class="org-left">Fan-out: sends to every target in parallel, collects all results</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>race</code></td>
+<td class="org-left">Sends in parallel, returning first defined result</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>tap</code></td>
+<td class="org-left">Send with side effects</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>thread</code></td>
+<td class="org-left">Short-circuit: tries each target in order, returns first result</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>pipe</code></td>
+<td class="org-left">Pipeline: chains targets, feeding each result into the next</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>fallback</code></td>
+<td class="org-left">Short-circuit on first non-throwing defined result</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>sife</code></td>
+<td class="org-left">send if, else</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>retry</code></td>
+<td class="org-left">constructs a send that will retry on failure with backoff</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ol class="org-ol">
+<li><a id="org3275a42"></a>All<br />
+<div class="outline-text-5" id="text-2-2-2-1">
+<p>
+The <code>all</code> combinator takes an array of targets, and produces a send that waits for all targets to respond, and uses this as the body of the response message.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">all</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = <span style="color: #5EC4FF;">await</span> Promise.all(targets.map(t =&gt; t(msg)))
+  <span style="color: #5EC4FF;">return</span> message(result)
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="org25ce45f"></a>Race<br />
+<div class="outline-text-5" id="text-2-2-2-2">
+<p>
+The <code>race</code> combinator takes an array of targets, and produces a send that returns the first target to resolve, discarding the rest.
+</p>
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">race</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = <span style="color: #5EC4FF;">await</span> Promise.race(targets.map(t =&gt; t(msg)));
+  <span style="color: #5EC4FF;">return</span> message(result)
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="org143d213"></a>Tap<br />
+<div class="outline-text-5" id="text-2-2-2-3">
+<p>
+The <code>tap</code> combinator produces a send that runs a number of side effects, discarding the results.
+</p>
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">tap</span> = (effects) =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
+  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">effect</span> <span style="color: #5EC4FF;">of</span> effects) <span style="color: #5EC4FF;">await</span> effect(msg)
+  <span style="color: #5EC4FF;">return</span> msg
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgd829e2a"></a>Thread<br />
+<div class="outline-text-5" id="text-2-2-2-4">
+<p>
+The <code>thread</code> combinator produces a send that will pass the message, one at a time, to each target. Returning early when a target produces a value.
+</p>
+
+<p>
+This lets us build short-circuiting pipelines: enrich messages via resources, or guard access to other resources, without complex dispatch machinery.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">thread</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
+  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">target</span> <span style="color: #5EC4FF;">of</span> targets) {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = message(<span style="color: #5EC4FF;">await</span> target(msg))
+    <span style="color: #5EC4FF;">if</span> (!result.isEmpty) <span style="color: #5EC4FF;">return</span> result
+  }
+  <span style="color: #5EC4FF;">return</span> message()
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgfc29dfc"></a>Pipe<br />
+<div class="outline-text-5" id="text-2-2-2-5">
+<p>
+The <code>pipe</code> combinator is the dual of <code>thread</code>: where <code>thread</code> controls <i>input</i> (which resource handles the message), <code>pipe</code> controls <i>output</i> (how results flow between resources).
+</p>
+
+<p>
+It sends to each target in sequence, feeding each result into the next, skipping empty messages.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">pipe</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">result</span> = message(aMsg)
+  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">target</span> <span style="color: #5EC4FF;">of</span> targets) {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">res</span> = message(<span style="color: #5EC4FF;">await</span> target(result))
+    <span style="color: #5EC4FF;">if</span> (res.isEmpty) <span style="color: #5EC4FF;">continue</span>
+    result = res
+  }
+  <span style="color: #5EC4FF;">return</span> result
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgb9474f8"></a>Fallback<br />
+<div class="outline-text-5" id="text-2-2-2-6">
+<p>
+The <code>fallback</code> combinator produces a send, similar to thread, but short-circuits on the first defined result that doesn&rsquo;t throw.
+</p>
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fallback</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
+  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">target</span> <span style="color: #5EC4FF;">of</span> targets) {
+    <span style="color: #5EC4FF;">try</span> {
+      <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = message(<span style="color: #5EC4FF;">await</span> target(msg))
+      <span style="color: #5EC4FF;">if</span> (!result.isEmpty) <span style="color: #5EC4FF;">return</span> result
+    } <span style="color: #5EC4FF;">catch</span> (_) {}
+  }
+  <span style="color: #5EC4FF;">return</span> message()
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgbbe3e2c"></a>Sife<br />
+<div class="outline-text-5" id="text-2-2-2-7">
+<p>
+Then <code>sife</code> combinator allows us to conditionally forward a send to one of two other sends.
+</p>
+
+<p>
+I would name this <code>if</code>, but alas javascript has restricted keywords.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">sife</span> = (condition, whenTrue, whenFalse) =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
+  <span style="color: #5EC4FF;">if</span> (<span style="color: #5EC4FF;">await</span> condition(msg)) {
+    <span style="color: #5EC4FF;">return</span> message(<span style="color: #5EC4FF;">await</span> whenTrue(msg))
+  } <span style="color: #5EC4FF;">else</span> {
+    <span style="color: #5EC4FF;">return</span> message(<span style="color: #5EC4FF;">await</span> whenFalse?.(msg))
+  }
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orga659e14"></a>Retry<br />
+<div class="outline-text-5" id="text-2-2-2-8">
+<p>
+The <code>retry</code> combinator lets build a send that will attempt the send, retrying on a failure.
+</p>
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">retry</span> =
+  (target, times = <span style="color: #E27E8D; font-weight: bold;">5</span>, backoff = <span style="color: #E27E8D; font-weight: bold;">5000</span>) =&gt;
+  <span style="color: #5EC4FF;">async</span> aMessage =&gt; {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMessage)
+    <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">failures</span> = <span style="color: #E27E8D; font-weight: bold;">0</span>
+    <span style="color: #5EC4FF;">while</span> (<span style="color: #E27E8D;">true</span>) {
+      <span style="color: #5EC4FF;">try</span> {
+        <span style="color: #5EC4FF;">return</span> message(<span style="color: #5EC4FF;">await</span> target(msg))
+      } <span style="color: #5EC4FF;">catch</span> (e) {
+        failures += <span style="color: #E27E8D; font-weight: bold;">1</span>
+        <span style="color: #5EC4FF;">if</span> (failures &gt;= times) <span style="color: #5EC4FF;">throw</span> e
+        <span style="color: #5EC4FF;">await</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(r =&gt; setTimeout(r, failures * backoff))
+      }
+    }
+  }
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">default</span> { send, all, race, tap, thread, pipe, fallback, sife, retry }
+</pre>
+</div>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-orgfd70257" class="outline-3">
+<h3 id="orgfd70257"><span class="section-number-3">2.3.</span> Resources</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+<b>NOTE: This section is incomplete, these resources here are all stubs and shouldn&rsquo;t be referenced!</b>
+</p>
+
+<p>
+Now that we understand the mechanics for how messages and sends behave, we can cover the final part of the kernel, resources.
+</p>
+
+<p>
+Recall, resources are computational units that process messages. They can have their own state or be stateless.
+</p>
+
+<p>
+We present them as arity-1 functions in this implementation:
+</p>
+
+<p>
+<code>resource(msg) → Promise&lt;Message&gt;</code>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> message from <span style="color: #539AFC;">"./messages.js"</span>
+<span style="color: #5EC4FF;">import</span> {thread, send} from <span style="color: #539AFC;">"./sends.js"</span>
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> log({ content, op }) {
+  <span style="color: #5EC4FF;">const</span> { body, ...head } = content
+  <span style="color: #5EC4FF;">if</span> (head.nolog) <span style="color: #5EC4FF;">return</span>
+  console.log(<span style="color: #539AFC;">'op: '</span>, op)
+  <span style="color: #5EC4FF;">if</span> (head) console.log(<span style="color: #539AFC;">'head: '</span>, head)
+  <span style="color: #5EC4FF;">if</span> (body) console.log(<span style="color: #539AFC;">'body: '</span>, body)
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">rand</span> = (_msg) =&gt; Math.floor(Math.random() * <span style="color: #E27E8D; font-weight: bold;">1000</span>)
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">logrand</span> = thread([log, rand])
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> ping(<span style="color: #718CA1;">content</span> = {}) {
+  <span style="color: #5EC4FF;">return</span> message({ ping: Date.now(), ...content })
+}
+
+<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = ping()
+<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">r</span> = <span style="color: #5EC4FF;">await</span> send(logrand, p)
+
+console.log(r)
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org3662b20" class="outline-2">
+<h2 id="org3662b20"><span class="section-number-2">3.</span> Utilities</h2>
+<div class="outline-text-2" id="text-3">
+</div>
+<div id="outline-container-org9b5aa36" class="outline-3">
+<h3 id="org9b5aa36"><span class="section-number-3">3.1.</span> Type Predicates</h3>
+<div class="outline-text-3" id="text-3-1">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Predicate</th>
+<th scope="col" class="org-left">Tests for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><code>isArray</code></td>
+<td class="org-left"><code>Array.isArray</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><code>isNil</code></td>
+<td class="org-left"><code>null</code> or <code>undefined</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><code>isPromise</code></td>
+<td class="org-left"><code>instanceof Promise</code></td>
+</tr>
+
+<tr>
+<td class="org-left"><code>isNumber</code></td>
+<td class="org-left"><code>typeof ==</code> &rsquo;number&rsquo;=</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>isString</code></td>
+<td class="org-left"><code>typeof ==</code> &rsquo;string&rsquo;=</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>isFunction</code></td>
+<td class="org-left"><code>typeof ==</code> &rsquo;function&rsquo;=</td>
+</tr>
+
+<tr>
+<td class="org-left"><code>isPlainObject</code></td>
+<td class="org-left"><code>prototype =</code> Object.prototype=</td>
+</tr>
+</tbody>
+</table>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isArray</span> = v =&gt; Array.isArray(v)
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isNil</span> = obj =&gt; obj == <span style="color: #E27E8D;">null</span>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isPromise</span> = obj =&gt; obj <span style="color: #5EC4FF;">instanceof</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isNumber</span> = v =&gt; <span style="color: #5EC4FF;">typeof</span> v === <span style="color: #539AFC;">'number'</span>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isString</span> = v =&gt; <span style="color: #5EC4FF;">typeof</span> v === <span style="color: #539AFC;">'string'</span>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isFunction</span> = v =&gt; <span style="color: #5EC4FF;">typeof</span> v === <span style="color: #539AFC;">'function'</span>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isPlainObject</span> = obj =&gt; {
+  <span style="color: #5EC4FF;">if</span> (obj == <span style="color: #E27E8D;">null</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">false</span>;
+  <span style="color: #5EC4FF;">return</span> Object.getPrototypeOf(obj) === Object.<span style="color: #E27E8D;">prototype</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org5e47717" class="outline-3">
+<h3 id="org5e47717"><span class="section-number-3">3.2.</span> Structural Predicates</h3>
+<div class="outline-text-3" id="text-3-2">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="org-left" />
+
+<col  class="org-left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Predicate</th>
+<th scope="col" class="org-left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><code>hasKeys</code></td>
+<td class="org-left">Check whether an object has all of the specified keys</td>
+</tr>
+</tbody>
+</table>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #707b86; font-style: italic;">/**</span>
+<span style="color: #707b86; font-style: italic;"> * Check whether obj has all of the specified keys.</span>
+<span style="color: #707b86; font-style: italic;"> * @param {unknown} obj</span>
+<span style="color: #707b86; font-style: italic;"> * @param {string | string[]} [keys]</span>
+<span style="color: #707b86; font-style: italic;"> * @returns {boolean}</span>
+<span style="color: #707b86; font-style: italic;"> */</span>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">hasKeys</span> = (obj, keys = []) =&gt; {
+  <span style="color: #5EC4FF;">if</span> (isNil(obj)) <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">false</span>
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">requiredKeys</span> = isArray(keys) ? keys : [keys],
+    objectKeys = <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Set</span>(Object.keys(obj))
+
+  <span style="color: #5EC4FF;">return</span> requiredKeys.every(key =&gt; objectKeys.has(key))
+}
+
+<span style="color: #707b86; font-style: italic;">/**</span>
+<span style="color: #707b86; font-style: italic;"> * True if obj is a plain object (created by {} or Object.create(null)).</span>
+<span style="color: #707b86; font-style: italic;"> * @param {unknown} obj</span>
+<span style="color: #707b86; font-style: italic;"> * @returns {boolean}</span>
+<span style="color: #707b86; font-style: italic;"> */</span>
+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org8e5f577" class="outline-3">
+<h3 id="org8e5f577"><span class="section-number-3">3.3.</span> Misc</h3>
+<div class="outline-text-3" id="text-3-3">
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">castArr</span> = (value) =&gt; isArray(value) ? value : [value]
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">panic</span> = msg =&gt; {
+  <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(msg)
+}
+</pre>
+</div>
+
+<footer class="book-footer">
+  <div class="footer-links">
+    <a href="https://bassline.dev">bassline.dev</a>
+    <span class="separator">&middot;</span>
+    <a href="https://github.com/Bassline-Org/bassline">GitHub</a>
+  </div>
+  <p class="footer-license">AGPLv3</p>
+</footer>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

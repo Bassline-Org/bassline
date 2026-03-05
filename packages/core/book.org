@@ -1,0 +1,436 @@
+#+title: Bassline V2
+#+subtitle: Now with message sends!
+#+description: An improvement over the original Bassline api, with dramatically simpler internals and composition.
+#+property: header-args:js  :mkdirp yes :noweb yes
+#+property: header-args:js+ :results output
+#+OPTIONS: toc:2 num:t html-style:nil html-postamble:nil ^:nil
+#+HTML_HEAD: <link rel="stylesheet" href="book.css"/>
+
+* Introduction
+This literate document contains the source code for the core of [[https://bassline.dev][Bassline]] v2.
+
+Bassline is designed to be hacked on and modified, so we encourage people to read this!
+
+** TLDR
+Bassline is a system for partial information programming.
+
+To support this, we must define two concepts:
+
+1. Messages
+   A message is a unit of partial information.
+   It can be a request for information, a =get=.
+   Or it can be an offering of information, a =put=.
+
+   This roughly corresponds to a question and a statement.
+   Everything in bassline communicates via messages.
+
+2. Resources
+   A resource is a computational unit that can interpret messages.
+
+   It is not obligated to be total and does not have to answer all messages they receive.
+   They can ignore, delegate, relay, modify, etc.
+
+** What was wrong with the last version?
+The previous release of Bassline has some ugly quirks.
+
+The primary pain points were:
+- Different methods for =get= and =put=
+- No concept of message sends, making message routing and validation clumsy
+- Heavy use of path like access for resources
+- Insane deployment machinery
+- No client interfaces for making the platform simple for users (message sends make this much cleaner)
+- Overuse of "stringly-typed" identification of things, rather than richer semantic access patterns
+
+* The Kernel
+Recall that in Bassline we have two concepts, messages and resources.
+
+The primary difference in this version, is greatly improved the mechanisms for message sends.
+
+This dramatically reduces the complexity and verbosity of the code, and makes for a much more joyous experience.
+
+#+begin_quote
+Previous versions of Bassline had no explicit model for sends, because they are implementation details.
+Instead they were implicit in the dispatch machinery, which made composition harder than it needed to be.
+#+end_quote
+
+Before we cover this, we have to first cover the implementation of a message.
+
+** Messages
+:PROPERTIES:
+:header-args: :tangle book/messages.js
+:END:
+
+A message is a unit of partial information.
+It has a =content= object, which is a map of keys to values.
+We treat =content.body= as the logical payload of the message, which indicates that it is a =put=.
+We treat everything else as the head of the message.
+
+| Part | Presence | Description                                            |
+|------+----------+--------------------------------------------------------|
+| head | always   | The metadata for the message (everything except =body=)  |
+| body | optional | The optional payload of the message                    |
+| op   | computed | Either =get= or =put=, derived from the presence of a =body= |
+
+We also include an =update= method, which lets us modify the message with a callback for convenience.
+
+*** Simple Messages
+
+This represents about the simplest message we can form
+
+#+begin_src js
+import {isPlainObject} from "./utils.js"
+
+export class Message {
+  content = {}
+  update(callback) {
+    callback(this.content)
+    if('body' in this.content
+       && this.content.body === undefined) {
+      delete this.content.body
+    }
+    return this
+  }
+  get op() {
+    return this.content?.body === undefined ? 'get' : 'put'
+  }
+  get isEmpty() {
+    return Object.keys(this.content).length === 0
+  }
+  toJSON() {
+    return this.content
+  }
+  static from(content) {
+    if (content instanceof Message) return content
+    if (content === undefined) return new Message()
+    if (isPlainObject(content)) {
+      return new Message().update(c => Object.assign(c, content ?? {}))
+    } else {
+      return new Message().update(c => c.body = content)
+    }
+  }
+}
+export const message = c => Message.from(c)
+export default message
+#+end_src
+
+*** Message Idioms
+The head of a message is where we store information related to what the message means, or the message's intent.
+
+The head is free-form, it can contain as much or as little information as needed,
+however we should discuss some common conventions.
+
+**** Message transcript
+Inside the head, the transcript is a common location to record messages during processing.
+
+For example if somebody is doing something slightly wrong, we can add a warning to the transcript so
+they can correct their usage.
+
+Or if we need to record an effect that should fire, we can record an effect message.
+
+#+begin_src js
+export const transcribe = (msg, content) =>
+  msg.update(c => {
+    if (c.transcript === undefined) c.transcript = []
+    c.transcript.push(message(content))
+  })
+#+end_src
+
+*** Exception Messages
+We cannot expect our systems to run smoothly, which is why we define these message.
+
+These indicate that some exceptional state has ocurred while processing a message.
+Using our [[*Message Sends][combinators]] we can handle these gracefully if we want to.
+
+For now we define two kinds of exceptional states.
+| condition | what it means                                |
+|-----------+----------------------------------------------|
+| Warning   | It's workable, but you should know something |
+| Fault     | Something went wrong, and I cannot continue  |
+**** Non Fatal Exceptions: Warnings
+
+This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
+
+The =warn= function records a warning message to the transcript, so something else can process it.
+
+#+begin_src js
+export const warning = reason => message({type: 'warning', body: reason})
+export const warn = (msg, reason) => transcribe(msg, warning(reason))
+#+end_src
+
+**** Fatal Errors: Fault
+This indicates that processing cannot continue, and we must stop.
+
+Unlike warnings, which are used to annotate the message being processed, we throw the fault message.
+
+#+begin_src js
+export const fault = (condition, msg, context = {}) => message({fault: condition, on: msg, ...context})
+export const throwFault = (condition, msg, context = {}) => {throw fault(condition, msg, context)};
+#+end_src
+
+** Message Sends
+:properties:
+:header-args: :tangle book/sends.js
+:end:
+
+A message send is a function that passes a message to resource, and has control over how the message is resolved to the original sender.
+
+This means that resource implementations are no longer coupled with cumbersome dispatch and validation logic.
+We replaced all of that with simpler more orthogonal sends and combinators for constructing those sends.
+
+#+begin_quote
+Technically sends are resources!
+
+Sends are computational units that process messages, just like resources.
+
+However most of the time, they exist to modulate how we use resources, rather than defining a new "thing".
+#+end_quote
+
+*** Defining a send
+When defining a send, we can utilize the =sendify= helper.
+
+This helper will take an arity-1 function, and ensure inputs and outputs are messages. Meaning we don't need to use =message= everywhere.
+
+#+begin_src js
+import { message, fault } from './messages.js'
+
+export async function sendTo(fn, aMessage) {
+  const msg = message(aMessage);
+  const result = await fn(msg);
+  return message(result)
+}
+export const sendify = fn => msg => sendTo(fn, msg)
+#+end_src
+
+*** Simple Sends
+The simplest send we can build is just a promise.
+
+#+begin_src js
+export async function send(target, msg, { timeout: ms = 30000, tap: taps = [] } = {}) {
+  let timer
+  try {
+    const result = await Promise.race([
+        sendTo(target, msg),
+        new Promise((_, rej) => {
+          timer = setTimeout(() => rej(fault('timeout', msg)), ms)
+        }),
+      ]);
+    for (const t of taps) await t(result)
+    return result
+  } finally {
+    clearTimeout(timer)
+  }
+}
+#+end_src
+
+*** Send Combinators
+
+We compose sends using combinators, letting us build flexible and expressive sends from simple and modular components.
+
+| Combinator | Behavior                                                         |
+|------------+------------------------------------------------------------------|
+| =all=        | Fan-out: sends to every target in parallel, collects all results |
+| =race=       | Sends in parallel, returning first defined result                |
+| =tap=        | Send with side effects                                           |
+| =thread=     | Short-circuit: tries each target in order, returns first result  |
+| =pipe=       | Pipeline: chains targets, feeding each result into the next      |
+| =fallback=   | Short-circuit on first non-throwing defined result               |
+| =sife=       | send if, else                                                    |
+| =when=       | send if, empty else                                              |
+| =retry=      | constructs a send that will retry on failure with backoff        |
+
+**** All
+The =all= combinator takes an array of targets, and produces a send that waits for all targets to respond, and uses this as the body of the response message.
+
+#+begin_src js
+export const all = targets => sendify(msg => Promise.all(targets.map(t => sendTo(t, msg))))
+#+end_src
+
+**** Race
+The =race= combinator takes an array of targets, and produces a send that returns the first target to resolve, discarding the rest.
+#+begin_src js
+export const race = targets => sendify(msg => Promise.race(targets.map(t => sendTo(t, msg))))
+#+end_src
+
+**** Tap
+The =tap= combinator produces a send that runs a number of side effects, discarding the results.
+#+begin_src js
+export const tap = targets => sendify(async msg => {
+  for(const target of targets) await sendTo(target, msg)
+  return msg
+})
+#+end_src
+
+**** Thread
+The =thread= combinator produces a send that will pass the message, one at a time, to each target. Returning early when a target produces a value.
+
+This lets us build short-circuiting pipelines: enrich messages via resources, or guard access to other resources, without complex dispatch machinery.
+
+#+begin_src js
+export const thread = targets => sendify(async msg => {
+  for(const target of targets) {
+    const result = await sendTo(target, msg);
+    if(!result.isEmpty) return result;
+  }
+})
+#+end_src
+
+**** Pipe
+The =pipe= combinator is the dual of =thread=: where =thread= controls /input/ (which resource handles the message), =pipe= controls /output/ (how results flow between resources).
+
+It sends to each target in sequence, feeding each result into the next, skipping empty messages.
+
+#+begin_src js
+export const pipe = targets => sendify(async msg => {
+  let result = msg;
+  for(const target of targets) {
+    const res = await sendTo(target, result);
+    if(res.isEmpty) continue;
+    result = res;
+  }
+  return result
+})
+#+end_src
+
+**** Fallback
+The =fallback= combinator produces a send, similar to thread, but short-circuits on the first defined result that doesn't throw.
+#+begin_src js
+export const fallback = targets => sendify(async msg => {
+  for (const target of targets) {
+    try {
+      const result = await sendTo(target, msg)
+      if (!result.isEmpty) return result
+    } catch (_) {}
+  }
+})
+#+end_src
+**** Sife
+Then =sife= combinator allows us to conditionally forward a send to one of two other sends.
+
+I would name this =if=, but alas javascript has restricted keywords.
+
+#+begin_src js
+export const sife = (predicate, whenTrue, whenFalse) => sendify(async msg => {
+  if (await predicate(msg)) {
+    return whenTrue(msg)
+  } else {
+    return whenFalse?.(msg)
+  }
+})
+#+end_src
+**** When
+Single sided sife
+#+begin_src js
+export const when = (predicate, whenTrue) => sife(predicate, whenTrue)
+#+end_src
+**** Retry
+The =retry= combinator lets build a send that will attempt the send, retrying on a failure.
+#+begin_src js
+export const retry =
+  (target, times = 5, backoff = 5000) =>
+  sendify(async msg => {
+    let failures = 0
+    while (true) {
+      try {
+        return message(await target(msg))
+      } catch (e) {
+        failures += 1
+        if (failures >= times) throw e
+        await new Promise(r => setTimeout(r, failures * backoff))
+      }
+    }
+  })
+
+export default { send, all, race, tap, thread, pipe, fallback, sife, retry }
+#+end_src
+
+** Resources
+:properties:
+:header-args: :tangle book/resources.js
+:end:
+
+*NOTE: This section is incomplete, these resources here are all stubs and shouldn't be referenced!*
+
+Now that we understand the mechanics for how messages and sends behave, we can cover the final part of the kernel, resources.
+
+Recall, resources are computational units that process messages. They can have their own state or be stateless.
+
+We present them as arity-1 functions in this implementation:
+
+=resource(msg) → Promise<Message>=
+
+#+begin_src js
+import message from "./messages.js"
+import {thread, send} from "./sends.js"
+
+export function log({ content, op }) {
+  const { body, ...head } = content
+  if (head.nolog) return
+  console.log('op: ', op)
+  if (head) console.log('head: ', head)
+  if (body) console.log('body: ', body)
+}
+
+export const rand = (_msg) => Math.floor(Math.random() * 1000)
+export const logrand = thread([log, rand])
+
+export function ping(content = {}) {
+  return message({ ping: Date.now(), ...content })
+}
+
+const p = ping()
+const r = await send(logrand, p)
+
+console.log(r)
+#+end_src
+
+* Utilities
+:PROPERTIES:
+:header-args: :tangle book/utils.js
+:END:
+** Type Predicates
+
+| Predicate     | Tests for                                             |
+|---------------+-------------------------------------------------------|
+| =isArray=       | =Array.isArray=                                         |
+| =isNil=         | =null= or =undefined=                                     |
+| =isPromise=     | =instanceof Promise=                                    |
+| =isNumber=      | =typeof === 'number'=                                    |
+| =isString=      | =typeof === 'string'=                                    |
+| =isFunction=    | =typeof === 'function'=                                  |
+| =isPlainObject= | =prototype == Object.prototype=                          |
+| =hasKeys=       | Check whether an object has all of the specified keys |
+
+#+begin_src js
+export const isArray = v => Array.isArray(v)
+export const isNil = obj => obj == null
+export const isPromise = obj => obj instanceof Promise
+export const isNumber = v => typeof v === 'number'
+export const isString = v => typeof v === 'string'
+export const isFunction = v => typeof v === 'function'
+export const isPlainObject = obj => {
+  if (obj == null) return false;
+  return Object.getPrototypeOf(obj) === Object.prototype;
+}
+export const hasKeys = (obj, keys = []) => {
+  if (isNil(obj)) return false
+  const requiredKeys = isArray(keys) ? keys : [keys],
+    objectKeys = new Set(Object.keys(obj))
+
+  return requiredKeys.every(key => objectKeys.has(key))
+}
+#+end_src
+** Misc
+#+begin_src js
+export const castArr = (value) => isArray(value) ? value : [value]
+#+end_src
+
+#+BEGIN_EXPORT html
+<footer class="book-footer">
+  <div class="footer-links">
+    <a href="https://bassline.dev">bassline.dev</a>
+    <span class="separator">&middot;</span>
+    <a href="https://github.com/Bassline-Org/bassline">GitHub</a>
+  </div>
+  <p class="footer-license">AGPLv3</p>
+</footer>
+#+END_EXPORT
