@@ -17,18 +17,24 @@ Bassline is a system for partial information programming.
 To support this, we must define two concepts:
 
 1. Messages
-   A message is a unit of partial information.
-   It can be a request for information, a =get=.
-   Or it can be an offering of information, a =put=.
+   A message is a unit of partial information, it is a record, and can be empty.
+   Message can include other messages.
 
-   This roughly corresponds to a question and a statement.
-   Everything in bassline communicates via messages.
+   We categorize messages structurally. And by convention, we categorize based on =body= & =continue=.
+
+   |         | no continue | continue |
+   | no body | =signal=      | =get=      |
+   | body    | =statement=   | =offer=    |
+
+   Everything in bassline communicates via messages, and all control flow is expressed via messages.
 
 2. Resources
    A resource is a computational unit that can interpret messages.
 
    It is not obligated to be total and does not have to answer all messages they receive.
    They can ignore, delegate, relay, modify, etc.
+
+   A Resource that contextualizes and composes other resources, is called a =bassline=.
 
 ** What was wrong with the last version?
 The previous release of Bassline has some ugly quirks.
@@ -88,11 +94,24 @@ export class Message {
        && this.content.body === undefined) {
       delete this.content.body
     }
+    if('continue' in this.content
+       && this.content.body === undefined) {
+      delete this.content.body
+    }
     return this
   }
-  get op() {
-    return this.content?.body === undefined ? 'get' : 'put'
-  }
+  // get op() {
+  //   return this.content?.body === undefined ? 'get' : 'put'
+    // }
+    get op() {
+        if('body' in this.content) {
+            if('continue' in this.content) return 'offer'
+            return 'assert'
+        } else {
+            if('continue' in this.content) return 'get'
+            return 'signal'
+        }
+    }
   get isEmpty() {
     return Object.keys(this.content).length === 0
   }
@@ -133,6 +152,12 @@ export const transcribe = (msg, content) =>
     if (c.transcript === undefined) c.transcript = []
     c.transcript.push(message(content))
   })
+export const flushTranscript = (msg, filter) => {
+  if(msg.content?.transcript === null) return []
+  msg.update(c => {
+
+  })
+}
 #+end_src
 
 *** Exception Messages
@@ -166,6 +191,12 @@ Unlike warnings, which are used to annotate the message being processed, we thro
 export const fault = (condition, msg, context = {}) => message({fault: condition, on: msg, ...context})
 export const throwFault = (condition, msg, context = {}) => {throw fault(condition, msg, context)};
 #+end_src
+*** Effect Messages
+To perform effects, we can record effects to the transcript.
+
+#+begin_src js
+export const effect = (kind, data) => message({type: 'effect', kind, data})
+#+end_src
 
 ** Message Sends
 :properties:
@@ -186,35 +217,44 @@ However most of the time, they exist to modulate how we use resources, rather th
 #+end_quote
 
 *** Defining a send
-When defining a send, we can utilize the =sendify= helper.
+The =send= helper has two modes of operation.
 
-This helper will take an arity-1 function, and ensure inputs and outputs are messages. Meaning we don't need to use =message= everywhere.
+We can use =send(aFn, aMsg)= to interact with a function, ensuring that =aMsg= and the resulting value are messages.
+
+Using =send(aFn)= to produce a curried version of the send, allowing us to easily construct a new send we can pass around.
 
 #+begin_src js
 import { message, fault } from './messages.js'
 
-export async function sendTo(fn, aMessage) {
-  const msg = message(aMessage);
-  const result = await fn(msg);
+async function sendTo(fn, aMessage) {
+  const msg = message(aMessage)
+  const result = await fn(msg)
   return message(result)
 }
-export const sendify = fn => msg => sendTo(fn, msg)
+const sendify = fn => msg => sendTo(fn, msg)
+
+export const send = (...args) => {
+  const [fn, msg] = args;
+  if(args.length === 1) return sendify(fn)
+  if(args.length === 2) return sendTo(fn, msg)
+  throw new Error(`[send] invalid arity: ${args.length}`)
+}
 #+end_src
 
 *** Simple Sends
 The simplest send we can build is just a promise.
 
 #+begin_src js
-export async function send(target, msg, { timeout: ms = 30000, tap: taps = [] } = {}) {
+export async function sendPromise(target, msg, { timeout: ms = 30000, tap: taps = [] } = {}) {
   let timer
   try {
     const result = await Promise.race([
-        sendTo(target, msg),
+        send(target, msg),
         new Promise((_, rej) => {
           timer = setTimeout(() => rej(fault('timeout', msg)), ms)
         }),
-      ]);
-    for (const t of taps) await t(result)
+    ]);
+    await Promise.all(taps.map(t => send(t, result)))
     return result
   } finally {
     clearTimeout(timer)
@@ -242,20 +282,20 @@ We compose sends using combinators, letting us build flexible and expressive sen
 The =all= combinator takes an array of targets, and produces a send that waits for all targets to respond, and uses this as the body of the response message.
 
 #+begin_src js
-export const all = targets => sendify(msg => Promise.all(targets.map(t => sendTo(t, msg))))
+export const all = targets => send(msg => Promise.all(targets.map(t => send(t, msg))))
 #+end_src
 
 **** Race
 The =race= combinator takes an array of targets, and produces a send that returns the first target to resolve, discarding the rest.
 #+begin_src js
-export const race = targets => sendify(msg => Promise.race(targets.map(t => sendTo(t, msg))))
+export const race = targets => send(msg => Promise.race(targets.map(t => send(t, msg))))
 #+end_src
 
 **** Tap
 The =tap= combinator produces a send that runs a number of side effects, discarding the results.
 #+begin_src js
-export const tap = targets => sendify(async msg => {
-  for(const target of targets) await sendTo(target, msg)
+export const tap = targets => send(async msg => {
+  await Promise.all(targets.map(t => send(t, msg)))
   return msg
 })
 #+end_src
@@ -266,38 +306,36 @@ The =thread= combinator produces a send that will pass the message, one at a tim
 This lets us build short-circuiting pipelines: enrich messages via resources, or guard access to other resources, without complex dispatch machinery.
 
 #+begin_src js
-export const thread = targets => sendify(async msg => {
+export const thread = targets => send(async msg => {
   for(const target of targets) {
-    const result = await sendTo(target, msg);
+    const result = await send(target, msg);
     if(!result.isEmpty) return result;
   }
 })
 #+end_src
-
 **** Pipe
 The =pipe= combinator is the dual of =thread=: where =thread= controls /input/ (which resource handles the message), =pipe= controls /output/ (how results flow between resources).
 
 It sends to each target in sequence, feeding each result into the next, skipping empty messages.
 
 #+begin_src js
-export const pipe = targets => sendify(async msg => {
+export const pipe = targets => send(async msg => {
   let result = msg;
   for(const target of targets) {
-    const res = await sendTo(target, result);
+    const res = await send(target, result);
     if(res.isEmpty) continue;
     result = res;
   }
   return result
 })
 #+end_src
-
 **** Fallback
 The =fallback= combinator produces a send, similar to thread, but short-circuits on the first defined result that doesn't throw.
 #+begin_src js
-export const fallback = targets => sendify(async msg => {
+export const fallback = targets => send(async msg => {
   for (const target of targets) {
     try {
-      const result = await sendTo(target, msg)
+      const result = await send(target, msg)
       if (!result.isEmpty) return result
     } catch (_) {}
   }
@@ -309,7 +347,7 @@ Then =sife= combinator allows us to conditionally forward a send to one of two o
 I would name this =if=, but alas javascript has restricted keywords.
 
 #+begin_src js
-export const sife = (predicate, whenTrue, whenFalse) => sendify(async msg => {
+export const sife = (predicate, whenTrue, whenFalse) => send(async msg => {
   if (await predicate(msg)) {
     return whenTrue(msg)
   } else {
@@ -327,11 +365,11 @@ The =retry= combinator lets build a send that will attempt the send, retrying on
 #+begin_src js
 export const retry =
   (target, times = 5, backoff = 5000) =>
-  sendify(async msg => {
+  send(async msg => {
     let failures = 0
     while (true) {
       try {
-        return message(await target(msg))
+        return await send(target, msg)
       } catch (e) {
         failures += 1
         if (failures >= times) throw e
@@ -348,15 +386,7 @@ export default { send, all, race, tap, thread, pipe, fallback, sife, retry }
 :header-args: :tangle book/resources.js
 :end:
 
-*NOTE: This section is incomplete, these resources here are all stubs and shouldn't be referenced!*
-
 Now that we understand the mechanics for how messages and sends behave, we can cover the final part of the kernel, resources.
-
-Recall, resources are computational units that process messages. They can have their own state or be stateless.
-
-We present them as arity-1 functions in this implementation:
-
-=resource(msg) → Promise<Message>=
 
 #+begin_src js
 import message from "./messages.js"
@@ -381,6 +411,192 @@ const p = ping()
 const r = await send(logrand, p)
 
 console.log(r)
+#+end_src
+
+** Actorish Things
+:properties:
+:header-args: :tangle book/actors.js
+:end:
+
+*** Actors
+#+begin_src js :tangle no
+import { message, throwFault } from './messages.js'
+
+export const actor = (behavior, opts) => {
+  const { open, close } = opts ?? {}
+  if(behavior == null) throwFault('behavior must be provided')
+
+  const targets = new Set()
+  let status = 'active'
+
+  const disconnect = target => {
+    if (!targets.has(target)) return
+    targets.delete(target)
+    close?.(target)
+  }
+  const connect = target => {
+    if (!targets.has(target)) {
+      targets.add(target)
+      open?.(target)
+    }
+    return () => disconnect(target)
+  }
+  const shutdown = () => {
+    status = 'shutdown'
+    for (const target of targets) disconnect(target)
+  }
+  const output = result => {
+    if (result == null) return
+    for (const target of targets) target(result)
+  }
+  async function send(aMsg) {
+    const msg = message(aMsg)
+    if (status !== 'active') throwFault('actor shutdown', msg)
+    if (aMsg == null) return
+    await behavior(msg, output)
+  }
+  send.connect = connect
+  send.disconnect = disconnect
+  send.shutdown = shutdown
+  return send
+}
+
+const double = (msg, out) => {
+  const num = msg.content?.body;
+  if(num != null) out(num * 2)
+}
+const log = message => msg => console.log(message, ': ', msg)
+
+const doubler = actor(double, {
+  open: t => t({hello: 'world'}),
+  close: t => t({goodbye: 'world'})
+})
+
+const a = actor(log('a'))
+const b = actor(log('b'))
+const c = actor(log('c'))
+
+doubler.connect(a)
+doubler.connect(b)
+
+await doubler({body: 123})
+
+doubler.connect(c)
+
+doubler.disconnect(b)
+
+await doubler({body: 456})
+
+doubler.shutdown()
+
+await doubler({body: 789}).catch(e => console.error(e))
+#+end_src
+*** Channel
+#+begin_src js
+export function channel() {
+  const queue = []
+  const waiters = []
+  let closed = false
+  let error = null
+  let consumed = false
+
+  function write(value) {
+    if (closed || value === undefined) return
+    if (waiters.length > 0) waiters.shift().resolve({ value, done: false })
+    else queue.push(value)
+  }
+
+  function close() {
+    closed = true
+    for (const w of waiters) w.resolve({ value: undefined, done: true })
+    waiters.length = 0
+  }
+
+  function err(e) {
+    if (error) return
+    error = e
+    if (queue.length === 0) {
+      for (const w of waiters) w.reject(e)
+      waiters.length = 0
+    }
+    closed = true
+  }
+
+  function consume() {
+    if (consumed) throw new Error('cannot consume a channel multiple times!')
+    consumed = true
+    return {
+      [Symbol.asyncIterator]: () => ({
+        next: () => {
+          if (queue.length > 0) return Promise.resolve({ value: queue.shift(), done: false })
+          if (error) return Promise.reject(error)
+          if (closed) return Promise.resolve({ value: undefined, done: true })
+          return new Promise((resolve, reject) => waiters.push({ resolve, reject }))
+        },
+      }),
+    }
+  }
+
+  const send = (...values) => {
+    for (const v of values) write(v)
+  }
+
+  return {
+    send,
+    close,
+    err,
+    consume,
+  }
+}
+
+export async function sink(chan, fn) {
+  for await (const val of chan.consume()) {
+    await fn(val)
+  }
+}
+
+export function actor(fn) {
+  let started = false
+  const { send, close, err, ...input } = channel()
+  async function start() {
+    if (started) return
+    started = true
+    await sink(input, fn)
+  }
+
+  return {
+    send,
+    start,
+    stop: close,
+    close,
+    err,
+    get started() {
+      return started
+    }
+  }
+}
+
+export function swarm(...children) {
+  let started = false
+  let stopped = false
+  function stop() {
+    if (stopped) return
+    stopped = true
+    for (const child of children) child.stop()
+  }
+  function err(e) {
+    if (stopped) return
+    stopped = true
+    for (const child of children) child.err(e)
+  }
+  async function start() {
+    if (started) return
+    started = true
+    const p = Promise.all([...children].map(c => c.start())).catch(e => err(e))
+    await p
+  }
+  return { stop, err, start, children }
+}
 #+end_src
 
 * Utilities
