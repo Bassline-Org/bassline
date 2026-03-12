@@ -414,6 +414,9 @@ console.log(r)
 #+end_src
 
 ** Actorish Things
+::PROPERTIES:
+
+:END:
 :properties:
 :header-args: :tangle book/actors.js
 :end:
@@ -492,34 +495,37 @@ doubler.shutdown()
 await doubler({body: 789}).catch(e => console.error(e))
 #+end_src
 *** Channel
-#+begin_src js
+#+begin_src js :tangle book/channel.js
+export const ERR = Symbol.for('channel.err')
+export const WAITING = Symbol.for('channel.waiting')
+export const CLOSED = Symbol.for('channel.closed')
+
 export function channel() {
   const queue = []
   const waiters = []
-  let closed = false
-  let error = null
+  let state = WAITING
   let consumed = false
+  let error = null
 
   function write(value) {
-    if (closed || value === undefined) return
+    if (state === CLOSED || state === ERR) return
     if (waiters.length > 0) waiters.shift().resolve({ value, done: false })
     else queue.push(value)
   }
 
   function close() {
-    closed = true
+    state = CLOSED
     for (const w of waiters) w.resolve({ value: undefined, done: true })
     waiters.length = 0
   }
 
   function err(e) {
-    if (error) return
+    state = ERR
     error = e
     if (queue.length === 0) {
       for (const w of waiters) w.reject(e)
       waiters.length = 0
     }
-    closed = true
   }
 
   function consume() {
@@ -529,74 +535,250 @@ export function channel() {
       [Symbol.asyncIterator]: () => ({
         next: () => {
           if (queue.length > 0) return Promise.resolve({ value: queue.shift(), done: false })
-          if (error) return Promise.reject(error)
-          if (closed) return Promise.resolve({ value: undefined, done: true })
+          if (state === ERR) return Promise.reject(error)
+          if (state === CLOSED) return Promise.resolve({ value: undefined, done: true })
           return new Promise((resolve, reject) => waiters.push({ resolve, reject }))
+        },
+        return: () => {
+          close()
+          return Promise.resolve({ value: undefined, done: true })
         },
       }),
     }
   }
 
-  const send = (...values) => {
-    for (const v of values) write(v)
-  }
+  const send = (...values) => values.forEach(v => write(v))
 
-  return {
+  const reader = {
+    consume,
+    sink: fn => sink(reader, fn),
+    map: fn => map(reader, fn),
+    filter: fn => filter(reader, fn),
+    tee: count => tee(reader, count),
+    take: n => take(reader, n),
+    scan: (fn, seed) => scan(reader, fn, seed),
+    tap: fn => reader.map(v => (fn(v), v)),
+    thru: cb => cb(reader),
+    merge: readers => merge([reader, ...readers])
+  }
+  const writer = {
     send,
     close,
     err,
-    consume,
   }
+  return [reader, writer]
 }
-
-export async function sink(chan, fn) {
-  for await (const val of chan.consume()) {
+export async function sink(reader, fn) {
+  for await (const val of reader.consume()) {
     await fn(val)
   }
 }
+export function map(reader, fn) {
+  const [out, writer] = channel()
+  reader
+    .sink(async v => writer.send(await fn(v)))
+    .then(writer.close)
+    .catch(writer.err)
+  return out
+}
+export function filter(reader, fn) {
+  const [out, writer] = channel()
+  reader
+    .sink(async v => {
+      if (await fn(v)) writer.send(v)
+    })
+    .then(writer.close)
+    .catch(writer.err)
+  return out
+}
+export function tee(reader, count = 2) {
+  const channels = []
+  for (let i = 0; i < count; i++) channels.push(channel())
+  reader
+    .sink(v => channels.forEach(([read, write]) => write.send(v)))
+    .then(() => channels.forEach(([_, write]) => write.close()))
+    .catch(e => channels.forEach(([_, write]) => write.err(e)))
+  return channels.map(([read, write]) => read)
+}
+export function take(reader, n = 10) {
+  if (typeof n !== 'number' || n < 1) throw new Error('invalid take: ' + n)
+  const [out, writer] = channel()
+  ;(async () => {
+    try {
+      let count = 0
+      for await (const v of reader.consume()) {
+        writer.send(v)
+        if (++count >= n) break
+      }
+      writer.close()
+    } catch (e) {
+      writer.err(e)
+    }
+  })()
+  return out
+}
+export function scan(reader, fn, seed) {
+  const [out, write] = channel()
+  let last = seed
+  reader
+    .sink(async v => {
+      last = await fn(last, v)
+      write.send(last)
+    })
+    .then(write.close)
+    .catch(write.err)
+  return out
+}
+export function merge(readers) {
+  const [out, write] = channel()
+  Promise.all(readers.map(r => r.sink(write.send)))
+         .then(write.close)
+         .catch(write.err);
+  return out
+}
+#+end_src
 
-export function actor(fn) {
-  let started = false
-  const { send, close, err, ...input } = channel()
+*** Actors
+
+#+begin_src js :tangle no
+export function spawn(fn) {
+  let task = null
+  let ch = null
+
+  const send = (...values) => ch?.send(...values)
+
   async function start() {
-    if (started) return
-    started = true
-    await sink(input, fn)
-  }
-
-  return {
-    send,
-    start,
-    stop: close,
-    close,
-    err,
-    get started() {
-      return started
+    if (task) return task
+    ch = channel()
+    try {
+      task = sink(ch, fn)
+      await task
+    } finally {
+      task = null
+      ch = null
     }
   }
+
+  return { send, start }
+}
+
+export function supervise(children, { oneForOne = true, maxRestarts = 5 } = {}) {
+  let restarts = 0
+  let task = null
+
+  const send = (...values) => children.forEach(child => child.send(...values))
+
+  async function run() {
+    if (oneForOne) {
+      await Promise.all(
+        children.map(async child => {
+          while (true) {
+            try {
+              await child.start()
+              return
+            } catch (e) {
+              if (++restarts > maxRestarts) {
+                send({ [STOP]: true })
+                throw e
+              }
+            }
+          }
+        })
+      )
+    } else {
+      while (true) {
+        const tasks = children.map(c => c.start())
+        try {
+          await Promise.all(tasks)
+          return
+        } catch (e) {
+          if (++restarts > maxRestarts) throw e
+          send({ [STOP]: true })
+          await Promise.allSettled(tasks)
+        }
+      }
+    }
+  }
+
+  async function start() {
+    if (task) return task
+    try {
+      task = run()
+      await task
+    } finally {
+      task = null
+    }
+  }
+
+  return { send, start }
 }
 
 export function swarm(...children) {
-  let started = false
-  let stopped = false
-  function stop() {
-    if (stopped) return
-    stopped = true
-    for (const child of children) child.stop()
+  let task = null
+
+  const send = (...values) => {
+    for (const child of children) child.send(...values)
   }
-  function err(e) {
-    if (stopped) return
-    stopped = true
-    for (const child of children) child.err(e)
-  }
+
   async function start() {
-    if (started) return
-    started = true
-    const p = Promise.all([...children].map(c => c.start())).catch(e => err(e))
-    await p
+    if (task) return task
+    const tasks = children.map(c => c.start())
+    task = Promise.race(tasks)
+    try {
+      await task
+    } finally {
+      send({ [STOP]: true })
+      await Promise.allSettled(tasks)
+      task = null
+    }
   }
-  return { stop, err, start, children }
+
+  return { send, start }
 }
+#+end_src
+
+*** Channel Combinators
+
+#+begin_src js :tangle book/channel-example.js
+import { channel, merge } from "./actors.js"
+
+const timeout = ms => new Promise(res => setTimeout(res, ms))
+
+const debounce = (reader, ms = 300) => reader.map(async v => {
+  await timeout(ms);
+  return v
+})
+
+const dedup = (diff, seed) => reader => {
+  const compare = diff ?? ((acc, curr) => acc !== curr);
+  let last = seed;
+  return reader.filter(async v => {
+    const res = await compare(last, v)
+    if(res) {
+      last = v
+    }
+    return res
+  })
+}
+
+const max = (reader, seed = 0) => reader
+      .filter(v => typeof v === 'number')
+      .scan((acc, curr) => acc > curr ? acc : curr, seed)
+      .thru(dedup(null, seed))
+
+const log = v => console.log('log: ', v)
+
+const [r, w] = channel()
+w.send(1,2,3,4,5,6,7,7,7,7,8,9,10);
+w.close()
+
+let count = 0;
+await merge(r.tee(100))
+  .tap(() => count++)
+  .thru(max)
+  .sink(console.log)
+
+console.log(count)
 #+end_src
 
 * Utilities
