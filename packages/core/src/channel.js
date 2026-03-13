@@ -2,6 +2,12 @@ export const ERR = Symbol.for('channel.err')
 export const WAITING = Symbol.for('channel.waiting')
 export const CLOSED = Symbol.for('channel.closed')
 
+export class ConsumedChannelError extends Error {
+  constructor() {
+    super('Cannot consume a channel more than once!')
+  }
+}
+
 export class Channel {
   queue = []
   waiters = []
@@ -30,7 +36,7 @@ export class Channel {
     }
   }
   consume() {
-    if (this.consumed) throw new Error('cannot consume a channel multiple times!')
+    if (this.consumed) throw new ConsumedChannelError()
     this.consumed = true
     return {
       [Symbol.asyncIterator]: () => ({
@@ -40,9 +46,13 @@ export class Channel {
           if (this.state === CLOSED) return Promise.resolve({ value: undefined, done: true })
           return new Promise((resolve, reject) => this.waiters.push({ resolve, reject }))
         },
-        return: () => {
+        return: value => {
           this.close()
-          return Promise.resolve({ value: undefined, done: true })
+          return Promise.resolve({ value, done: true })
+        },
+        throw: e => {
+          this.err(e)
+          return Promise.resolve({ value: e, done: true })
         },
       }),
     }

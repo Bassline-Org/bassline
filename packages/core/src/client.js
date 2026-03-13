@@ -15,7 +15,7 @@ export function readFrames(socket) {
       try {
         write.send(message(JSON.parse(line)))
       } catch (e) {
-        console.error('failed to parse: ', e)
+        console.error('parse error: ', e)
       }
     }
   })
