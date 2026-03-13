@@ -49,4 +49,4 @@ If you can `get` from a resource, and it matches the [schema](./Bassline-Schema.
 >A Bassline simply answers "what?" and "how?" for our system
 
 ## Learn more
-Check out the [schema](./Bassline-Schema.md) document to read specifics and examples
+Check out the [schema](./Bassline-Schema.md) document and [resource protocols](./Protocols.md) for specifics and examples.

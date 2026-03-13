@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { Platform, kResource } from '../src/platform.js'
-import { reducers, scope, garage } from '../src/modules/index.js'
-import { Garage } from '../src/modules/garage.js'
+import { Platform, kResource } from '../src/kernel/platform.js'
+import { reducers, scope } from '../src/resources/index.js'
+import garage from '../src/infra/garage.js'
+import { Garage } from '../src/infra/garage.js'
 
 function setup() {
   const p = new Platform()

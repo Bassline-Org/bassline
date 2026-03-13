@@ -2,8 +2,8 @@ import { serve } from './server.js'
 import { message } from './messages.js'
 
 const resource = msg => {
-    console.log('got:', msg.toJSON())
-    return message({ pong: true, got: msg.toJSON() })
+    console.log('got:', msg)
+    return message({ pong: true, got: msg })
 }
 
 const sock = '/tmp/bl-book-test.sock'

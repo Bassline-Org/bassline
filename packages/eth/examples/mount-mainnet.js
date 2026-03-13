@@ -3,16 +3,16 @@
 // Mount Ethereum mainnet as a filesystem.
 //
 // Usage:
-//   RPC_URL=https://... node mount.js [mountpoint]
+//   RPC_URL=https://... node examples/mount-mainnet.js [mountpoint]
 //
 import { Platform, reducers, scope } from '@bassline/core'
 import fuse from '@bassline/core/platforms/fuse'
-import ethModule from './src/index.js'
+import ethModule from '../src/index.js'
 
 const RPC_URL = process.env.RPC_URL
 if (!RPC_URL) {
   console.error('RPC_URL environment variable required')
-  console.error('Usage: RPC_URL=https://... node mount.js [mountpoint]')
+  console.error('Usage: RPC_URL=https://... node examples/mount-mainnet.js [mountpoint]')
   process.exit(1)
 }
 

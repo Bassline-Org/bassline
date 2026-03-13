@@ -1,172 +1,140 @@
 /**
- * A resource function — receives a message, dispatches to get/put.
+ * A resource function — receives a message, dispatches through grammar to backend.
  */
-export type ResourceFn = (msg: unknown) => unknown;
+export type ResourceFn = (msg?: unknown) => unknown;
 
 /** Well-known symbol for resource identity. */
 export declare const kResource: unique symbol;
 
+// --- Grammar Layer ---
+
 /**
- * Base resource class. Subclass to define get/put behavior.
+ * Grammar base class. Parses messages into backend algebra calls.
  */
-export declare class Resource {
-  platform: Platform;
-  [kResource]: Resource;
-  get utils(): typeof import('./utils.js').default;
+export declare class Grammar {
+  dispatch(msg: unknown, impl: unknown): unknown;
+  static parsePath(path: string | string[]): string[];
+  static isPlainObject(obj: unknown): boolean;
+}
+
+/**
+ * Thrown when a grammar cannot recognize a message.
+ */
+export declare class DoesNotUnderstandError extends Error {
+  msg: unknown;
+  constructor(msg: unknown);
+}
+
+/**
+ * Chains multiple grammars. First match wins.
+ */
+export declare class ComposedGrammar extends Grammar {
+  constructor(...grammars: Grammar[]);
+}
+
+/**
+ * Fallback backend composition — first backend with the method handles it.
+ */
+export declare function fallback(...backends: object[]): object;
+
+/**
+ * Broadcast backend composition — all backends handle it, return last result.
+ */
+export declare function broadcast(...backends: object[]): object;
+
+// --- Connect ---
+
+/**
+ * Wire a grammar to a backend, producing a resource function.
+ */
+export declare function connect(grammar: Grammar, impl: object): ResourceFn;
+
+// --- EventBus ---
+
+export declare class EventBusGrammar extends Grammar {}
+
+export declare class EventBus {
+  publish(event: { type: string; [key: string]: unknown }): void;
+  subscribe(topic: string, callback: (data: unknown) => void): () => void;
+  topics(): string[];
+}
+
+// --- Slot ---
+
+export declare class SlotGrammar extends Grammar {
+  constructor(events?: ResourceFn);
+}
+
+export declare class Slot {
+  value: unknown;
+  reduce: (prev: unknown, curr: unknown) => unknown;
+  constructor(options?: { value?: unknown; reduce?: (prev: unknown, curr: unknown) => unknown });
+  read(): unknown;
+  write(value: unknown): unknown;
   accept(visitor: Record<string, Function>): unknown;
-  announce(type: string, data?: Record<string, unknown>): void;
-  dispatch(msg: unknown): unknown;
-  get(msg: unknown): unknown;
-  put(body: unknown, headers: unknown): unknown;
-  static forPlatform(platform: Platform): typeof Resource;
 }
 
-/**
- * Mirror — reflective interface for a resource.
- */
-export declare class ResourceMirror {
-  constructor(resource: Resource);
-  [kResource]: Resource;
-  getClass(): typeof Resource;
-  isScope(): boolean;
-  isWritable(): boolean;
-  accept(visitor: Record<string, Function>): unknown;
+export declare class Max extends Slot {
+  constructor(options?: { value?: number; reduce?: (prev: number, curr: number) => number });
 }
 
-/**
- * Deploy script — a function that receives a platform and mounts resources.
- */
-export interface DeployScript {
-  (platform: Platform): void | Promise<void>;
-  /** Tags this script provides (other scripts can depend on these). */
-  tags?: string[];
-  /** Tags this script requires (must be provided by earlier scripts). */
-  dependencies?: string[];
-  /** Unique ID for idempotent deployment (script runs at most once per ID). */
-  id?: string;
-  /** If returns true, skip this script. */
-  skip?: (platform: Platform) => boolean | Promise<boolean>;
+export declare class Min extends Slot {
+  constructor(options?: { value?: number; reduce?: (prev: number, curr: number) => number });
 }
 
-/**
- * Module — a function that extends the platform with new resource classes or capabilities.
- * Same shape as a deploy script: `(platform) => void`.
- */
-export type Module = (platform: Platform) => void;
-
-/**
- * The platform — provides classes, a root scope, events, and deployment.
- */
-export declare class Platform {
-  utils: typeof import('./utils.js').default;
-  classes: Record<string, typeof Resource>;
-  create: Record<string, (init?: unknown) => ResourceFn>;
-
-  get root(): ResourceFn;
-
-  /** Register modules that extend the platform. */
-  use(...modules: Module[]): this;
-
-  /** Deploy scripts into the platform. Topologically sorted by tags/dependencies. */
-  deploy(...scripts: DeployScript[]): Promise<this>;
-
-  /** Wrap a Resource instance into a callable resource function. */
-  resource(r: Resource): ResourceFn;
-
-  /** Emit a platform event. */
-  announce(topic: string, message?: Record<string, unknown>): this;
-
-  /** Subscribe to a platform event. Returns an unsubscribe function. */
-  on(topic: string, callback: (detail: unknown) => void, opts?: AddEventListenerOptions): () => void;
-
-  /** Subscribe to a platform event, firing only once. */
-  once(topic: string, callback: (detail: unknown) => void): this;
-
-  /** Register resource classes on the platform. */
-  define(classes: Record<string, typeof Resource>): this;
-
-  /** Get a mirror for a resource or resource function. */
-  reflect(thing: unknown): ResourceMirror | null;
-
-  /** Garage class, available after garage module is loaded. */
-  Garage: typeof Garage;
+export declare class Union extends Slot {
+  constructor(options?: { value?: unknown });
 }
 
-/**
- * Scope — composite resource that maps names to child resources.
- */
-export declare class Scope extends Resource {
+// --- Scope ---
+
+export declare class ScopeGrammar extends Grammar {
+  constructor(events?: ResourceFn);
+  dispatchRead(msg: unknown, impl: unknown): unknown;
+  dispatchWrite(msg: unknown, impl: unknown): unknown;
+  walk(path: string | string[], impl: unknown): unknown;
+}
+
+export declare class ExtendedScopeGrammar extends ScopeGrammar {
+  constructor(events?: ResourceFn, createScope?: () => ResourceFn, reflectFn?: (thing: unknown) => ResourceMirror | null);
+}
+
+export declare class Scope {
   constructor(options?: {
     entries?: Record<string, unknown>;
     lookup?: (name: string) => ResourceFn | null;
     list?: () => string[];
   });
+  resolve(name: string): ResourceFn;
+  list(): string[];
+  mount(name: string, child: ResourceFn, meta?: Record<string, unknown>): void;
+  unmount(name: string): void;
+  has(name: string): boolean;
+  meta(name: string): Record<string, unknown> | null;
+  accept(visitor: Record<string, Function>): unknown;
 }
 
-/**
- * Propagator — a reactive scope with a fixed keyspace.
- * Stateless: holds no state of its own, enforces relationships between resources.
- */
+// --- Propagator ---
+
 export declare class Propagator extends Scope {
+  platform: Platform;
   constructor(options?: {
     cells?: Record<string, ResourceFn | null>;
     body?: (bindings: Record<string, ResourceFn>) => void;
   });
+  readonly keys: Set<string>;
   shouldActivate(cells: Record<string, ResourceFn | null>): boolean;
   body(bindings: Record<string, ResourceFn>): void;
   onError(error: Error): void;
-  /** Schedule execution. Override for custom scheduling. */
   run(): void;
-  /** Build bindings and call body. Override for custom execution logic. */
   execute(): void;
   fire(): void;
-  readonly keys: Set<string>;
+  bindCell(name: string, value: ResourceFn, meta?: Record<string, unknown>): void;
+  unbindCell(name: string): void;
 }
 
-/**
- * Garage — parks values and issues serializable tokens.
- * Values with a [kResource] identity are deduplicated.
- */
-export declare class Garage {
-  park(value: unknown): string;
-  mint(ticket: string): string;
-  resolve(token: string): unknown;
-  redeem(ticket: string): unknown;
-  has(token: string): boolean;
-}
+// --- Gate ---
 
-/**
- * Transport — abstract send/receive interface for BSP sessions.
- */
-export interface Transport {
-  send(msg: unknown): void;
-  onMessage(cb: (msg: unknown) => void): void;
-  close(): void;
-  onClose(cb: () => void): void;
-}
-
-/**
- * Session — BSP session over a transport. Extends Resource.
- *
- * Both peers create a Session. Both can send requests and serve requests.
- * Wire format: { T, msg } for requests, { R, msg } for responses,
- * { R, error } for error responses.
- */
-export declare class Session extends Resource {
-  constructor(opts: { transport: Transport; root?: ResourceFn | null });
-  closed: boolean;
-  readonly garage: Garage;
-}
-
-/**
- * Create an in-memory transport pair for testing.
- * Returns two symmetric endpoints. Close propagates to both.
- */
-export declare function memoryTransport(): { a: Transport; b: Transport };
-
-/**
- * GatedScope — wraps a scope and checks capabilities before forwarding.
- */
 export declare class GatedScope extends Scope {
   constructor(options: {
     target: ResourceFn;
@@ -177,11 +145,12 @@ export declare class GatedScope extends Scope {
     };
     check?: (msg: unknown) => boolean | void;
   });
+  allow(msg: unknown): void;
+  forward(msg: unknown): unknown;
 }
 
-/**
- * Storage adapter interface for persistence.
- */
+// --- Persistence ---
+
 export interface StorageAdapter {
   get(key: string): unknown;
   set(key: string, value: unknown): void;
@@ -189,10 +158,8 @@ export interface StorageAdapter {
   list(): string[];
 }
 
-/**
- * PersistentSlot — Slot backed by a storage adapter.
- * Lazy loads on first read, persists on every write.
- */
+export declare function memoryStorage(): StorageAdapter;
+
 export declare class PersistentSlot extends Slot {
   constructor(options: {
     storage: StorageAdapter;
@@ -202,10 +169,6 @@ export declare class PersistentSlot extends Slot {
   });
 }
 
-/**
- * PersistentScope — Scope backed by a storage adapter.
- * Persists child structure and restores from storage.
- */
 export declare class PersistentScope extends Scope {
   constructor(options: {
     storage: StorageAdapter;
@@ -215,10 +178,210 @@ export declare class PersistentScope extends Scope {
   });
 }
 
+// --- Resource (backward compat) ---
+
 /**
- * Wrap a WebSocket into a Transport.
- * Works with both the `ws` library and the global WebSocket (Node 22+).
+ * Backward-compatible Resource base class.
+ * Use for custom resource types that use dispatch()/get()/put() pattern.
  */
-export declare function wsTransport(ws: WebSocket): Transport;
+export declare class Resource {
+  platform: Platform;
+  [kResource]: Resource;
+  get utils(): object;
+  accept(visitor: Record<string, Function>): unknown;
+  dispatch(msg: unknown): unknown;
+  get(msg: unknown): unknown;
+  put(body: unknown, headers: unknown): unknown;
+}
+
+/**
+ * Mirror — reflective interface for a resource backend.
+ */
+export declare class ResourceMirror {
+  constructor(impl: unknown);
+  [kResource]: unknown;
+  getClass(): Function;
+  isScope(platform?: Platform): boolean;
+  isWritable(platform?: Platform): boolean;
+  accept(visitor: Record<string, Function>): unknown;
+}
+
+// --- Deploy ---
+
+export interface DeployScript {
+  (platform: Platform): void | Promise<void>;
+  tags?: string[];
+  dependencies?: string[];
+  id?: string;
+  skip?: (platform: Platform) => boolean | Promise<boolean>;
+}
+
+export type Module = (platform: Platform) => void;
+
+// --- Platform ---
+
+export declare class Platform {
+  utils: object;
+  classes: Record<string, Function>;
+  grammars: Record<string, Grammar | ((platform: Platform) => Grammar)>;
+
+  readonly events: ResourceFn;
+  readonly root: ResourceFn;
+
+  reflect(thing: unknown): ResourceMirror | null;
+  connect(grammar: Grammar, impl: object): ResourceFn;
+  resource(aResource: Resource): ResourceFn;
+  define(classes?: Record<string, Function>, grammars?: Record<string, Grammar | ((platform: Platform) => Grammar)>): this;
+  create: Record<string, (init?: unknown) => ResourceFn>;
+  announce(topic: string, data?: Record<string, unknown>): this;
+  on(topic: string, callback: (detail: unknown) => void): () => void;
+  once(topic: string, callback: (detail: unknown) => void): this;
+  use(...modules: Module[]): this;
+  deploy(...scripts: DeployScript[]): Promise<this>;
+
+  /** Available after persistence module is loaded. */
+  memoryStorage: typeof memoryStorage;
+
+  /** Garage class, available after garage module is loaded. */
+  Garage: typeof Garage;
+
+  /** Link runtime, available after link module is loaded. */
+  link: {
+    open(opts: {
+      transport: Transport;
+      localScope?: ResourceFn;
+    }): LinkHandle;
+  };
+
+  /** Managed client runtime, available after client module is loaded. */
+  client: {
+    ManagedConnection: typeof ManagedConnection;
+  };
+
+  /** WebSocket runtime, available after ws module is loaded. */
+  ws: {
+    serve(opts: { port: number; localScope?: ResourceFn }): {
+      wss: unknown;
+      close(): Promise<void>;
+    };
+    connect(opts: { url: string; localScope?: ResourceFn }): Promise<LinkHandle>;
+  };
+}
 
 export declare function platform(): Platform;
+
+// --- Garage ---
+
+export declare class Garage {
+  park(value: unknown): string;
+  mint(ticket: string): string;
+  resolve(token: string): unknown;
+  redeem(ticket: string): unknown;
+  has(token: string): boolean;
+}
+
+// --- Link ---
+
+export type LinkErrorCode =
+  | 'E_PROTOCOL'
+  | 'E_TARGET'
+  | 'E_CLOSED'
+  | 'E_INTERNAL'
+  | 'E_TIMEOUT';
+
+export type ClientErrorCode = LinkErrorCode | 'E_ABORT';
+
+export interface LinkErrorPayload {
+  code: LinkErrorCode | string;
+  message: string;
+}
+
+export interface ClientErrorPayload {
+  code: ClientErrorCode | string;
+  message: string;
+  source: 'client' | 'link';
+}
+
+export interface LinkRequestEnvelope {
+  v: number;
+  id: string;
+  op: 'REQUEST';
+  msg: unknown;
+  targetRef?: string;
+}
+
+export interface LinkResponseEnvelopeSuccess {
+  v: number;
+  id: string;
+  op: 'RESPONSE';
+  ok: true;
+  result: unknown;
+}
+
+export interface LinkResponseEnvelopeError {
+  v: number;
+  id: string;
+  op: 'RESPONSE';
+  ok: false;
+  error: LinkErrorPayload;
+}
+
+export type LinkEnvelope =
+  | LinkRequestEnvelope
+  | LinkResponseEnvelopeSuccess
+  | LinkResponseEnvelopeError;
+
+export interface RequestOptions {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+export interface ReconnectOptions {
+  maxAttempts?: number;
+  minDelayMs?: number;
+  maxDelayMs?: number;
+  factor?: number;
+  jitterRatio?: number;
+}
+
+export interface HeartbeatOptions {
+  idleMs?: number;
+  timeoutMs?: number;
+  probeMessage?: unknown;
+}
+
+export interface ManagedConnectionOptions {
+  connect: () => Promise<LinkHandle>;
+  defaultTimeoutMs?: number;
+  reconnect?: ReconnectOptions;
+  heartbeat?: HeartbeatOptions;
+}
+
+export declare class ManagedConnection {
+  constructor(options: ManagedConnectionOptions);
+  send(msg: unknown, opts?: RequestOptions): Promise<unknown>;
+  close(): Promise<void>;
+  readonly connected: boolean;
+  readonly closed: boolean;
+}
+
+export interface Transport {
+  send(msg: unknown): void;
+  onMessage(cb: (msg: unknown) => void): void;
+  close(): void;
+  onClose(cb: () => void): void;
+}
+
+export interface LinkHandle {
+  localScope: ResourceFn;
+  remoteScope: ResourceFn;
+  close(): void;
+  readonly closed: boolean;
+}
+
+export declare function memoryTransport(): { a: Transport; b: Transport };
+
+/**
+ * Wrap a WebSocket into a Transport.
+ */
+export declare function wsTransport(ws: WebSocket): Transport;

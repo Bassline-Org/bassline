@@ -1,4 +1,4 @@
-import { WebSocketServer } from 'ws'
+import { WebSocketServer, WebSocket as NodeWebSocket } from 'ws'
 
 /**
  * Wrap a WebSocket into a Transport.
@@ -10,6 +10,22 @@ import { WebSocketServer } from 'ws'
 export function wsTransport(ws) {
   let closed = false
   const closeHandlers = []
+
+  /**
+   * @param {unknown} payload
+   */
+  const parsePayload = payload => {
+    try {
+      if (typeof payload === 'string') return JSON.parse(payload)
+      if (payload instanceof ArrayBuffer) return JSON.parse(Buffer.from(payload).toString('utf8'))
+      if (ArrayBuffer.isView(payload)) {
+        return JSON.parse(Buffer.from(payload.buffer, payload.byteOffset, payload.byteLength).toString('utf8'))
+      }
+      return JSON.parse(String(payload))
+    } catch {
+      return { __parseError: true }
+    }
+  }
 
   ws.addEventListener('close', () => {
     if (closed) return
@@ -23,7 +39,7 @@ export function wsTransport(ws) {
       ws.send(JSON.stringify(msg))
     },
     onMessage(cb) {
-      ws.addEventListener('message', e => cb(JSON.parse(e.data)))
+      ws.addEventListener('message', e => cb(parsePayload(e?.data)))
     },
     close() {
       if (closed) return
@@ -41,17 +57,18 @@ export function wsTransport(ws) {
 export default function wsPlatform(platform) {
   platform.ws = {
     /**
-     * Start a WebSocket server. Each connection gets a Session with platform.root.
+     * Start a WebSocket server. Each connection gets a link to localScope.
      *
-     * @param {{ port: number }} opts
+     * @param {{ port: number, localScope?: import('../types').ResourceFn }} opts
      * @returns {{ wss: WebSocketServer, close: () => Promise<void> }}
      */
-    serve({ port }) {
+    serve({ port, localScope = platform.root }) {
+      if (!platform.link?.open) throw new Error('link module required (platform.use(link))')
       const wss = new WebSocketServer({ port })
 
       wss.on('connection', ws => {
         const transport = wsTransport(ws)
-        platform.create.Session({ transport, root: platform.root })
+        platform.link.open({ transport, localScope })
       })
 
       function close() {
@@ -65,20 +82,24 @@ export default function wsPlatform(platform) {
     },
 
     /**
-     * Connect to a WebSocket server and return a Session resource function.
+     * Connect to a WebSocket server and return a link handle.
      *
-     * @param {{ url: string }} opts
-     * @returns {Promise<import('../types').ResourceFn>}
+     * @param {{ url: string, localScope?: import('../types').ResourceFn }} opts
+     * @returns {Promise<import('../types').LinkHandle>}
      */
-    connect({ url }) {
+    connect({ url, localScope }) {
+      if (!platform.link?.open) throw new Error('link module required (platform.use(link))')
       return new Promise((resolve, reject) => {
-        const ws = new WebSocket(url)
+        const WebSocketImpl = globalThis.WebSocket ?? NodeWebSocket
+        const ws = new WebSocketImpl(url)
 
         ws.addEventListener('open', () => {
           const transport = wsTransport(ws)
-          const session = platform.create.Session({ transport })
-          session.close = () => transport.close()
-          resolve(session)
+          const linkHandle = platform.link.open({
+            transport,
+            localScope: localScope ?? platform.create.Scope(),
+          })
+          resolve(linkHandle)
         })
 
         ws.addEventListener('error', e => {

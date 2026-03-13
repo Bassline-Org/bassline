@@ -1,45 +1,31 @@
-import {isPlainObject} from "./utils.js"
+import { isPlainObject, isFunction } from './utils.js'
 
-export class Message {
-  content = {}
-  update(callback) {
-    callback(this.content)
-    if('body' in this.content
-       && this.content.body === undefined) {
-      delete this.content.body
-    }
-    return this
-  }
-  get op() {
-    return this.content?.body === undefined ? 'get' : 'put'
-  }
-  get isEmpty() {
-    return Object.keys(this.content).length === 0
-  }
-  toJSON() {
-    return this.content
-  }
-  static from(content) {
-    if (content instanceof Message) return content
-    if (content === undefined) return new Message()
-    if (isPlainObject(content)) {
-      return new Message().update(c => Object.assign(c, content ?? {}))
-    } else {
-      return new Message().update(c => c.body = content)
-    }
-  }
+export const message = content => {
+  if (content === undefined) return {}
+  if (isPlainObject(content)) return { ...content }
+  return { body: content }
 }
-export const message = c => Message.from(c)
+
+export const update = (...args) => {
+  if (args.length === 1) {
+    const [updatefn] = args;
+    if(!isFunction(updatefn)) throw new Error(`invalid update fn`)
+    const fn = args[0]
+    return msg => ({ ...msg, ...fn(msg) })
+  }
+  if(args.length === 2) {
+    const [msg, fn] = args
+    if(!isFunction(fn)) throw new Error('invalid update fn')
+    return { ...msg, ...fn(msg) }
+  }
+  throw new Error(`invalid update arity: ${args.length}`)
+}
+
+export const isEmpty = msg => Object.keys(msg).length === 0
+
 export default message
 
-export const transcribe = (msg, content) =>
-  msg.update(c => {
-    if (c.transcript === undefined) c.transcript = []
-    c.transcript.push(message(content))
-  })
-
 export const warning = reason => message({type: 'warning', body: reason})
-export const warn = (msg, reason) => transcribe(msg, warning(reason))
 
 export const fault = (condition, msg, context = {}) => message({fault: condition, on: msg, ...context})
 export const throwFault = (condition, msg, context = {}) => {throw fault(condition, msg, context)};

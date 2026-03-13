@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/platform.js'
-import { reducers, scope } from '../src/modules/index.js'
-import gate from '../src/modules/gate.js'
+import { Platform } from '../src/kernel/platform.js'
+import { reducers, scope } from '../src/resources/index.js'
+import gate from '../src/resources/gate.js'
 
 function setup() {
   const p = new Platform()

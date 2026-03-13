@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { Platform } from '../src/platform.js'
-import { reducers, scope } from '../src/modules/index.js'
-import tracing from '../src/modules/tracing.js'
+import { Platform } from '../src/kernel/platform.js'
+import { reducers, scope } from '../src/resources/index.js'
+import tracing from '../src/infra/tracing.js'
 
 describe('Tracing module', () => {
   let writeSpy

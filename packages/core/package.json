@@ -7,14 +7,18 @@
   "types": "src/types.d.ts",
   "exports": {
     ".": "./src/index.js",
-    "./platform": "./src/platform.js",
-    "./modules": "./src/modules/index.js",
-    "./modules/tracing": "./src/modules/tracing.js",
-    "./modules/propagators": "./src/modules/propagators.js",
-    "./modules/garage": "./src/modules/garage.js",
+    "./platform": "./src/kernel/platform.js",
+    "./resources": "./src/resources/index.js",
+    "./resources/propagators": "./src/resources/propagators.js",
+    "./infra/garage": "./src/infra/garage.js",
+    "./infra/tracing": "./src/infra/tracing.js",
+    "./link/runtime": "./src/link/runtime.js",
+    "./link/client": "./src/link/client.js",
+    "./link/protocol-v1": "./src/link/protocol-v1.js",
     "./platforms/http": "./src/platforms/http.js",
     "./platforms/fuse": "./src/platforms/fuse.js",
-    "./platforms/ws": "./src/platforms/ws.js"
+    "./platforms/ws": "./src/platforms/ws.js",
+    "./platforms/fuse-remote": "./src/platforms/fuse-remote.js"
   },
   "scripts": {
     "test": "vitest run"

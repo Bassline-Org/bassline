@@ -1,6 +1,6 @@
 import { channel } from './channel.js'
 import { connect } from './client.js'
-import { message } from './messages.js'
+import { message, update } from './messages.js'
 import { debounce } from "./channel-example.js"
 
 const sock = '/tmp/bl-book-test.sock'
@@ -11,7 +11,7 @@ const [r, w] = channel()
 const task = r
     .thru(debounce(1000))
     .map(v => message(v))
-    .map(msg => msg.update(c => c.theTimeIs = Date.now()))
+    .map(update(msg => ({ theTimeIs: Date.now() })))
     .sink(write.send)
     .then(write.close)
     .catch(write.err)

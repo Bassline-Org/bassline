@@ -1,5 +1,5 @@
 import path from 'path';
-import { Fuse, FileSystem, errno, FuseError } from './index.js';
+import { Fuse, FileSystem, errno, FuseError } from '../index.js';
 
 function now() { return Math.floor(Date.now() / 1000); }
 

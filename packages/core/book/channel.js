@@ -2,79 +2,134 @@ export const ERR = Symbol.for('channel.err')
 export const WAITING = Symbol.for('channel.waiting')
 export const CLOSED = Symbol.for('channel.closed')
 
-export function channel() {
-  const queue = []
-  const waiters = []
-  let state = WAITING
-  let consumed = false
-  let error = null
+export class Channel {
+  queue = []
+  waiters = []
+  state = WAITING
+  consumed = false
+  error = null
 
-  function write(value) {
-    if (state === CLOSED || state === ERR) return
-    if (waiters.length > 0) waiters.shift().resolve({ value, done: false })
-    else queue.push(value)
+  write(value) {
+    if (this.state === CLOSED || this.state === ERR) return
+    if (this.waiters.length > 0) this.waiters.shift().resolve({ value, done: false })
+    else this.queue.push(value)
   }
-
-  function close() {
-    state = CLOSED
-    for (const w of waiters) w.resolve({ value: undefined, done: true })
-    waiters.length = 0
+  close() {
+    if (this.state !== WAITING) return
+    this.state = CLOSED
+    for (const w of this.waiters) w.resolve({ value: undefined, done: true })
+    this.waiters.length = 0
   }
-
-  function err(e) {
-    state = ERR
-    error = e
-    if (queue.length === 0) {
-      for (const w of waiters) w.reject(e)
-      waiters.length = 0
+  err(e) {
+    if (this.state !== WAITING) return
+    this.state = ERR
+    this.error = e
+    if (this.queue.length === 0) {
+      for (const w of this.waiters) w.reject(e)
+      this.waiters.length = 0
     }
   }
-
-  function consume() {
-    if (consumed) throw new Error('cannot consume a channel multiple times!')
-    consumed = true
+  consume() {
+    if (this.consumed) throw new Error('cannot consume a channel multiple times!')
+    this.consumed = true
     return {
       [Symbol.asyncIterator]: () => ({
         next: () => {
-          if (queue.length > 0) return Promise.resolve({ value: queue.shift(), done: false })
-          if (state === ERR) return Promise.reject(error)
-          if (state === CLOSED) return Promise.resolve({ value: undefined, done: true })
-          return new Promise((resolve, reject) => waiters.push({ resolve, reject }))
+          if (this.queue.length > 0) return Promise.resolve({ value: this.queue.shift(), done: false })
+          if (this.state === ERR) return Promise.reject(this.error)
+          if (this.state === CLOSED) return Promise.resolve({ value: undefined, done: true })
+          return new Promise((resolve, reject) => this.waiters.push({ resolve, reject }))
         },
         return: () => {
-          close()
+          this.close()
           return Promise.resolve({ value: undefined, done: true })
         },
       }),
     }
   }
-
-  const send = (...values) => values.forEach(v => write(v))
-
-  const reader = {
-    consume,
-    sink: fn => sink(reader, fn),
-    map: fn => map(reader, fn),
-    filter: fn => filter(reader, fn),
-    tee: count => tee(reader, count),
-    take: n => take(reader, n),
-    scan: (fn, seed) => scan(reader, fn, seed),
-    tap: fn => reader.map(v => (fn(v), v)),
-    thru: cb => cb(reader),
-    merge: readers => merge([reader, ...readers])
+  send(...values) {
+    values.forEach(v => this.write(v))
   }
-  const writer = {
-    send,
-    close,
-    err,
+  reader() {
+    const reader = {
+      consume: () => this.consume(),
+      sink: fn => sink(reader, fn),
+      map: fn => map(reader, fn),
+      filter: fn => filter(reader, fn),
+      tee: count => tee(reader, count),
+      take: n => take(reader, n),
+      scan: (fn, seed) => scan(reader, fn, seed),
+      tap: fn => reader.map(v => (fn(v), v)),
+      thru: cb => cb(reader),
+      merge: readers => merge([reader, ...readers]),
+    }
+    return reader
   }
-  return [reader, writer]
+  writer() {
+    const writer = {
+      send: (...values) => this.send(...values),
+      close: () => this.close(),
+      err: e => this.err(e),
+    }
+    return writer
+  }
 }
+
+export class SlidingChannel extends Channel {
+  constructor(size = 1) {
+    super()
+    this.size = size
+  }
+  write(value) {
+    if (this.state === CLOSED || this.state === ERR) return
+    if (this.waiters.length > 0) this.waiters.shift().resolve({ value, done: false })
+    else {
+      while (this.queue.length >= this.size) this.queue.shift()
+      this.queue.push(value)
+    }
+  }
+}
+
+export class ClockChannel extends SlidingChannel {
+  constructor(ms, size = 1) {
+    super(size);
+    this.interval = setInterval(() => this.write(Date.now()), ms)
+  }
+  close() {
+    clearInterval(this.interval)
+    super.close()
+  }
+  err(e) {
+    clearInterval(this.interval)
+    super.err(e)
+  }
+  writer() {
+    const w = super.writer();
+    return {close: w.close}
+  }
+}
+
+export const channel = () => {
+  const chan = new Channel()
+  return [chan.reader(), chan.writer()]
+}
+
+export const slidingChannel = (size = 1) => {
+  const chan = new SlidingChannel(size)
+  return [chan.reader(), chan.writer()]
+}
+
+export const clock = (ms = 1000, size = 1) => {
+  const chan = new ClockChannel(ms, size)
+  return [chan.reader(), chan.writer()]
+}
+
 export async function sink(reader, fn) {
   for await (const val of reader.consume()) {
     await fn(val)
   }
 }
+
 export function map(reader, fn) {
   const [out, writer] = channel()
   reader
@@ -83,6 +138,7 @@ export function map(reader, fn) {
     .catch(writer.err)
   return out
 }
+
 export function filter(reader, fn) {
   const [out, writer] = channel()
   reader
@@ -93,6 +149,7 @@ export function filter(reader, fn) {
     .catch(writer.err)
   return out
 }
+
 export function tee(reader, count = 2) {
   const channels = []
   for (let i = 0; i < count; i++) channels.push(channel())
@@ -102,6 +159,7 @@ export function tee(reader, count = 2) {
     .catch(e => channels.forEach(([_, write]) => write.err(e)))
   return channels.map(([read, write]) => read)
 }
+
 export function take(reader, n = 10) {
   if (typeof n !== 'number' || n < 1) throw new Error('invalid take: ' + n)
   const [out, writer] = channel()
@@ -119,6 +177,7 @@ export function take(reader, n = 10) {
   })()
   return out
 }
+
 export function scan(reader, fn, seed) {
   const [out, write] = channel()
   let last = seed
@@ -131,10 +190,11 @@ export function scan(reader, fn, seed) {
     .catch(write.err)
   return out
 }
+
 export function merge(readers) {
   const [out, write] = channel()
   Promise.all(readers.map(r => r.sink(write.send)))
-         .then(write.close)
-         .catch(write.err);
+    .then(write.close)
+    .catch(write.err)
   return out
 }

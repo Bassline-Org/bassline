@@ -8,7 +8,8 @@
     ".": "./index.js"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "example:demo": "node examples/demo-fs.js"
   },
   "license": "AGPL-3.0",
   "dependencies": {

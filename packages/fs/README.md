@@ -340,14 +340,14 @@ fuse.on('exit', (code) => process.exit(code || 0));
 
 ## Running the Demo
 
-The included `example.js` demonstrates a filesystem with three files:
+The included `examples/demo-fs.js` demonstrates a filesystem with three files:
 
 - `hello.txt` — always contains `hello world\n`
 - `time.txt` — contains the current ISO timestamp each time you read it
 - `echo.txt` — writable; starts with `write to me\n`, stores whatever you write to it
 
 ```bash
-node example.js ~/mnt
+node examples/demo-fs.js ~/mnt
 ```
 
 Then in another terminal:
@@ -362,7 +362,7 @@ cat ~/mnt/echo.txt                    # test
 
 To unmount: `umount ~/mnt` or Ctrl-C the Node process.
 
-`example.js` accepts an optional mountpoint argument; it defaults to `$HOME/mnt`.
+`examples/demo-fs.js` accepts an optional mountpoint argument; it defaults to `$HOME/mnt`.
 
 ---
 
@@ -377,6 +377,7 @@ fs/
 │   ├── errors.js         — FuseError class and errno constants
 │   ├── filesystem.js     — FileSystem base class
 │   └── fuse.js           — Fuse class (bridge lifecycle, protobuf framing, dispatch)
-├── example.js            — demo filesystem application
+├── examples/
+│   └── demo-fs.js        — demo filesystem application
 └── fuse-bridge/          — Rust bridge binary (built separately)
 ```

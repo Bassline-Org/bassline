@@ -3,12 +3,12 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-03-04 Wed 23:34 -->
+<!-- 2026-03-12 Thu 15:36 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bassline V2</title>
 <meta name="author" content="Alexander Gusev" />
-<meta name="description" content="An improvement over the original Bassline api, with dramatically simpler internals and composition." />
+<meta name="description" content="A literate implementation of Bassline's core: messages, communication, transports, and deployment." />
 <meta name="generator" content="Org Mode" />
 <link rel="stylesheet" href="book.css"/>
 </head>
@@ -16,37 +16,46 @@
 <div id="content" class="content">
 <h1 class="title">Bassline V2
 <br />
-<span class="subtitle">Now with message sends!</span>
+<span class="subtitle">Messages, communication, and transports</span>
 </h1>
 <div id="table-of-contents" role="doc-toc">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#orgb6925c6">1. Introduction</a>
+<li><a href="#org4681235">1. Introduction</a>
 <ul>
-<li><a href="#org73bad83">1.1. TLDR</a></li>
-<li><a href="#org9736fcf">1.2. What was wrong with the last version?</a></li>
+<li><a href="#org128b2eb">1.1. TLDR</a></li>
 </ul>
 </li>
-<li><a href="#orgca7bab7">2. The Kernel</a>
+<li><a href="#orgfd4cbfd">2. The Kernel</a>
 <ul>
-<li><a href="#orgf84893c">2.1. Messages</a></li>
-<li><a href="#orgb2862da">2.2. Message Sends</a></li>
-<li><a href="#orgfd70257">2.3. Resources</a></li>
+<li><a href="#orgeb0becf">2.1. Messages</a></li>
+<li><a href="#org0c1b13b">2.2. Communication</a></li>
 </ul>
 </li>
-<li><a href="#org3662b20">3. Utilities</a>
+<li><a href="#orgcb15519">3. Transports</a>
 <ul>
-<li><a href="#org9b5aa36">3.1. Type Predicates</a></li>
-<li><a href="#org5e47717">3.2. Structural Predicates</a></li>
-<li><a href="#org8e5f577">3.3. Misc</a></li>
+<li><a href="#org03139e3">3.1. Abstractly</a></li>
+<li><a href="#org4497e8c">3.2. Concretely</a></li>
+</ul>
+</li>
+<li><a href="#orgd3c51cf">4. Deployment</a>
+<ul>
+<li><a href="#orgb9b206b">4.1. Abstractly</a></li>
+<li><a href="#orgea10c3d">4.2. Concretely</a></li>
+</ul>
+</li>
+<li><a href="#orgfd531a8">5. Utilities</a>
+<ul>
+<li><a href="#orgbf5f293">5.1. Type Predicates</a></li>
+<li><a href="#org1ffe0db">5.2. Misc</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-orgb6925c6" class="outline-2">
-<h2 id="orgb6925c6"><span class="section-number-2">1.</span> Introduction</h2>
+<div id="outline-container-org4681235" class="outline-2">
+<h2 id="org4681235"><span class="section-number-2">1.</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 This literate document contains the source code for the core of <a href="https://bassline.dev">Bassline</a> v2.
@@ -56,239 +65,125 @@ This literate document contains the source code for the core of <a href="https:/
 Bassline is designed to be hacked on and modified, so we encourage people to read this!
 </p>
 </div>
-<div id="outline-container-org73bad83" class="outline-3">
-<h3 id="org73bad83"><span class="section-number-3">1.1.</span> TLDR</h3>
+<div id="outline-container-org128b2eb" class="outline-3">
+<h3 id="org128b2eb"><span class="section-number-3">1.1.</span> TLDR</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
 Bassline is a system for partial information programming.
 </p>
 
 <p>
-To support this, we must define two concepts:
-</p>
-
-<ol class="org-ol">
-<li><p>
-Messages
-A message is a unit of partial information.
-It can be a request for information, a <code>get</code>.
-Or it can be an offering of information, a <code>put</code>.
+Programs in Bassline work from incomplete messages. They build local understanding from what they have, act on new information, and continue.
 </p>
 
 <p>
-This roughly corresponds to a question and a statement.
-Everything in bassline communicates via messages.
-</p></li>
-
-<li><p>
-Resources
-A resource is a computational unit that can interpret messages.
+Anything outside your local perspective is encountered through communication. When that communication yields information that matters, we observe it as a resource. We do not need a complete account of what it is, where it is, or how it produces what we receive.
 </p>
 
 <p>
-It is not obligated to be total and does not have to answer all messages they receive.
-They can ignore, delegate, relay, modify, etc.
-</p></li>
-</ol>
-</div>
-</div>
-<div id="outline-container-org9736fcf" class="outline-3">
-<h3 id="org9736fcf"><span class="section-number-3">1.2.</span> What was wrong with the last version?</h3>
-<div class="outline-text-3" id="text-1-2">
-<p>
-The previous release of Bassline has some ugly quirks.
+Identity, location, provenance, timing, order, and sameness are therefore not taken as settled facts. They are judgments made from partial information, and different participants may have different grounds for believing them.
 </p>
 
 <p>
-The primary pain points were:
+And because the model never assumes a closed world, growth uses the same mechanism as ordinary operation. New message shapes, participants, and behavior do not require a separate extensibility system. They arrive as more messages to interpret.
 </p>
-<ul class="org-ul">
-<li>Different methods for <code>get</code> and <code>put</code></li>
-<li>No concept of message sends, making message routing and validation clumsy</li>
-<li>Heavy use of path like access for resources</li>
-<li>Insane deployment machinery</li>
-<li>No client interfaces for making the platform simple for users (message sends make this much cleaner)</li>
-<li>Overuse of &ldquo;stringly-typed&rdquo; identification of things, rather than richer semantic access patterns</li>
-</ul>
 </div>
 </div>
 </div>
-<div id="outline-container-orgca7bab7" class="outline-2">
-<h2 id="orgca7bab7"><span class="section-number-2">2.</span> The Kernel</h2>
+<div id="outline-container-orgfd4cbfd" class="outline-2">
+<h2 id="orgfd4cbfd"><span class="section-number-2">2.</span> The Kernel</h2>
 <div class="outline-text-2" id="text-2">
 <p>
-Recall that in Bassline we have two concepts, messages and resources.
+The kernel here starts with messages and a local capability for communication. In this book that capability is implemented with reader/writer pairs backed by channels. The important thing is the ability to exchange and observe information, not the queue or the exact interface shape.
 </p>
 
 <p>
-The primary difference in this version, is greatly improved the mechanisms for message sends.
-</p>
-
-<p>
-This dramatically reduces the complexity and verbosity of the code, and makes for a much more joyous experience.
-</p>
-
-<blockquote>
-<p>
-Previous versions of Bassline had no explicit model for sends, because they are implementation details.
-Instead they were implicit in the dispatch machinery, which made composition harder than it needed to be.
-</p>
-</blockquote>
-
-<p>
-Before we cover this, we have to first cover the implementation of a message.
+For each part of the kernel, we will separate the abstract idea from the concrete implementation used in this book. The abstract layer explains what shape of thing we are modeling. The concrete layer shows one minimal JavaScript realization of that shape.
 </p>
 </div>
-<div id="outline-container-orgf84893c" class="outline-3">
-<h3 id="orgf84893c"><span class="section-number-3">2.1.</span> Messages</h3>
+<div id="outline-container-orgeb0becf" class="outline-3">
+<h3 id="orgeb0becf"><span class="section-number-3">2.1.</span> Messages</h3>
 <div class="outline-text-3" id="text-2-1">
-<p>
-A message is a unit of partial information.
-It has a <code>content</code> object, which is a map of keys to values.
-We treat <code>content.body</code> as the logical payload of the message, which indicates that it is a <code>put</code>.
-We treat everything else as the head of the message.
-</p>
-
-<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
-
-
-<colgroup>
-<col  class="org-left" />
-
-<col  class="org-left" />
-
-<col  class="org-left" />
-</colgroup>
-<thead>
-<tr>
-<th scope="col" class="org-left">Part</th>
-<th scope="col" class="org-left">Presence</th>
-<th scope="col" class="org-left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="org-left">head</td>
-<td class="org-left">always</td>
-<td class="org-left">The metadata for the message (everything except <code>body</code>)</td>
-</tr>
-
-<tr>
-<td class="org-left">body</td>
-<td class="org-left">optional</td>
-<td class="org-left">The optional payload of the message</td>
-</tr>
-
-<tr>
-<td class="org-left">op</td>
-<td class="org-left">computed</td>
-<td class="org-left">Either <code>get</code> or <code>put</code>, derived from the presence of a <code>body</code></td>
-</tr>
-</tbody>
-</table>
-
-<p>
-We also include an <code>update</code> method, which lets us modify the message with a callback for convenience.
-</p>
 </div>
-<div id="outline-container-org93d0582" class="outline-4">
-<h4 id="org93d0582"><span class="section-number-4">2.1.1.</span> Simple Messages</h4>
+<div id="outline-container-orgc7a1f13" class="outline-4">
+<h4 id="orgc7a1f13"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
 <div class="outline-text-4" id="text-2-1-1">
 <p>
-This represents about the simplest message we can form
+A message is a fragment of partial information. It is whatever can be locally held, passed around, inspected, and combined without requiring a complete picture of the world.
+</p>
+
+<p>
+A message does not come with privileged meaning beyond what participants give it. If provenance, correlation, naming, coordination hints, or other structure matters, it lives in the message like any other data. This is important because Bassline does not want a separate metadata plane that is somehow more real than the information being exchanged.
+</p>
+</div>
+</div>
+<div id="outline-container-orgdf45c47" class="outline-4">
+<h4 id="orgdf45c47"><span class="section-number-4">2.1.2.</span> Concretely</h4>
+<div class="outline-text-4" id="text-2-1-2">
+<p>
+A message is a plain object with string keys. It can be empty, partially filled, or nested inside other messages.
+</p>
+
+<p>
+The concrete representation is intentionally minimal. Plain objects are open-ended, nest naturally, and are easy to serialize, enrich, and inspect. That keeps the message lightweight and avoids forcing a closed protocol up front.
+</p>
+
+<p>
+<code>message()</code> normalizes its input: plain objects pass through, <code>undefined</code> becomes <code>{}</code>, and anything else is wrapped as <code>{body: value}</code>.
+</p>
+
+<p>
+<code>update</code> is auto-curried. With two arguments <code>(msg, fn)</code> it returns a new message. With one argument <code>(fn)</code> it returns a transform you can pass to <code>.map()</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> {isPlainObject} from <span style="color: #539AFC;">"./utils.js"</span>
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">class</span> Message {
-  content = {}
-  update(callback) {
-    callback(<span style="color: #E27E8D;">this</span>.content)
-    <span style="color: #5EC4FF;">if</span>(<span style="color: #539AFC;">'body'</span> <span style="color: #5EC4FF;">in</span> <span style="color: #E27E8D;">this</span>.content
-       &amp;&amp; <span style="color: #E27E8D;">this</span>.content.body === <span style="color: #E27E8D;">undefined</span>) {
-      <span style="color: #5EC4FF;">delete</span> <span style="color: #E27E8D;">this</span>.content.body
-    }
-    <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">this</span>
-  }
-  get op() {
-    <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">this</span>.content?.body === <span style="color: #E27E8D;">undefined</span> ? <span style="color: #539AFC;">'get'</span> : <span style="color: #539AFC;">'put'</span>
-  }
-  get isEmpty() {
-    <span style="color: #5EC4FF;">return</span> Object.keys(<span style="color: #E27E8D;">this</span>.content).length === <span style="color: #E27E8D; font-weight: bold;">0</span>
-  }
-  toJSON() {
-    <span style="color: #5EC4FF;">return</span> { <span style="color: #539AFC;">'@message'</span>: { content: <span style="color: #E27E8D;">this</span>.content } }
-  }
-  <span style="color: #5EC4FF;">static</span> from(content) {
-    <span style="color: #5EC4FF;">if</span> (content <span style="color: #5EC4FF;">instanceof</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>) <span style="color: #5EC4FF;">return</span> content
-    <span style="color: #5EC4FF;">if</span> (content === <span style="color: #E27E8D;">undefined</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>()
-    <span style="color: #5EC4FF;">if</span> (isPlainObject(content)) {
-      <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>().update(c =&gt; Object.assign(c, content ?? {}))
-    } <span style="color: #5EC4FF;">else</span> {
-      <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Message</span>().update(c =&gt; c.body = content)
-    }
-  }
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { isPlainObject, isFunction } from <span style="color: #539AFC;">'./utils.js'</span>
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">message</span> = content =&gt; {
+  <span style="color: #5EC4FF;">if</span> (content === <span style="color: #E27E8D;">undefined</span>) <span style="color: #5EC4FF;">return</span> {}
+  <span style="color: #5EC4FF;">if</span> (isPlainObject(content)) <span style="color: #5EC4FF;">return</span> { ...content }
+  <span style="color: #5EC4FF;">return</span> { body: content }
 }
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">message</span> = c =&gt; Message.from(c)
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">update</span> = (...args) =&gt; {
+  <span style="color: #5EC4FF;">if</span> (args.length === <span style="color: #E27E8D; font-weight: bold;">1</span>) {
+    <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">updatefn</span>] = args;
+    <span style="color: #5EC4FF;">if</span>(!isFunction(updatefn)) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">`invalid update fn`</span>)
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fn</span> = args[<span style="color: #E27E8D; font-weight: bold;">0</span>]
+    <span style="color: #5EC4FF;">return</span> msg =&gt; ({ ...msg, ...fn(msg) })
+  }
+  <span style="color: #5EC4FF;">if</span>(args.length === <span style="color: #E27E8D; font-weight: bold;">2</span>) {
+    <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">msg</span>, <span style="color: #718CA1;">fn</span>] = args
+    <span style="color: #5EC4FF;">if</span>(!isFunction(fn)) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'invalid update fn'</span>)
+    <span style="color: #5EC4FF;">return</span> { ...msg, ...fn(msg) }
+  }
+  <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">`invalid update arity: ${args.length}`</span>)
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">isEmpty</span> = msg =&gt; Object.keys(msg).length === <span style="color: #E27E8D; font-weight: bold;">0</span>
+
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">default</span> message
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-org6b18075" class="outline-4">
-<h4 id="org6b18075"><span class="section-number-4">2.1.2.</span> Message Idioms</h4>
-<div class="outline-text-4" id="text-2-1-2">
-<p>
-The head of a message is where we store information related to what the message means, or the message&rsquo;s intent.
-</p>
-
-<p>
-The head is free-form, it can contain as much or as little information as needed,
-however we should discuss some common conventions.
-</p>
-</div>
-<ol class="org-ol">
-<li><a id="org73784e4"></a>Message transcript<br />
-<div class="outline-text-5" id="text-2-1-2-1">
-<p>
-Inside the head, the transcript is a common location to record messages during processing.
-</p>
-
-<p>
-For example if somebody is doing something slightly wrong, we can add a warning to the transcript so
-they can correct their usage.
-</p>
-
-<p>
-Or if we need to record an effect that should fire, we can record an effect message.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">transcribe</span> = (msg, content) =&gt;
-  msg.update(c =&gt; {
-    <span style="color: #5EC4FF;">if</span> (c.transcript === <span style="color: #E27E8D;">undefined</span>) c.transcript = []
-    c.transcript.push(message(content))
-  })
-</pre>
-</div>
-</div>
-</li>
-</ol>
-</div>
-<div id="outline-container-orgef6b878" class="outline-4">
-<h4 id="orgef6b878"><span class="section-number-4">2.1.3.</span> Exception Messages</h4>
+<div id="outline-container-orgc2a3d79" class="outline-4">
+<h4 id="orgc2a3d79"><span class="section-number-4">2.1.3.</span> Exception Messages</h4>
 <div class="outline-text-4" id="text-2-1-3">
 <p>
-We cannot expect our systems to run smoothly, which is why we define these message.
+We cannot expect our systems to run smoothly, which is why we define these messages.
 </p>
 
 <p>
 These indicate that some exceptional state has ocurred while processing a message.
-Using our <a href="#orgb2862da">combinators</a> we can handle these gracefully if we want to.
 </p>
 
 <p>
-Conceptually there are two kinds of conditional states.
+Even here, Bassline stays in the same conceptual world. Warnings and faults are still expressed as messages because exceptional states are still partial information that must be communicated and interpreted.
+</p>
+
+<p>
+For now we define two kinds of exceptional states.
 </p>
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
@@ -318,24 +213,19 @@ Conceptually there are two kinds of conditional states.
 </table>
 </div>
 <ol class="org-ol">
-<li><a id="orgbe5133f"></a>Non Fatal Exceptions: Warnings<br />
+<li><a id="org6b1f1b7"></a>Non Fatal Exceptions: Warnings<br />
 <div class="outline-text-5" id="text-2-1-3-1">
 <p>
 This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
 </p>
 
-<p>
-The <code>warn</code> function records a warning message to the transcript, so something else can process it.
-</p>
-
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">warning</span> = reason =&gt; message({type: <span style="color: #539AFC;">'warning'</span>, body: reason})
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">warn</span> = (msg, reason) =&gt; transcribe(msg, warning(reason))
 </pre>
 </div>
 </div>
 </li>
-<li><a id="org7978833"></a>Fatal Errors: Fault<br />
+<li><a id="org38767fe"></a>Fatal Errors: Fault<br />
 <div class="outline-text-5" id="text-2-1-3-2">
 <p>
 This indicates that processing cannot continue, and we must stop.
@@ -346,9 +236,8 @@ Unlike warnings, which are used to annotate the message being processed, we thro
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fault</span> = (condition, msg, context = {}) =&gt; {
-  <span style="color: #5EC4FF;">throw</span> message({fault: condition, on: msg, ...context})
-}
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fault</span> = (condition, msg, context = {}) =&gt; message({fault: condition, on: msg, ...context})
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">throwFault</span> = (condition, msg, context = {}) =&gt; {<span style="color: #5EC4FF;">throw</span> fault(condition, msg, context)};
 </pre>
 </div>
 </div>
@@ -356,353 +245,655 @@ Unlike warnings, which are used to annotate the message being processed, we thro
 </ol>
 </div>
 </div>
-<div id="outline-container-orgb2862da" class="outline-3">
-<h3 id="orgb2862da"><span class="section-number-3">2.2.</span> Message Sends</h3>
+<div id="outline-container-org0c1b13b" class="outline-3">
+<h3 id="org0c1b13b"><span class="section-number-3">2.2.</span> Communication</h3>
 <div class="outline-text-3" id="text-2-2">
-<p>
-A message send is a function that passes a message to resource, and has control over how the message is resolved to the original sender.
-</p>
-
-<p>
-This means that resource implementations are no longer coupled with cumbersome dispatch and validation logic.
-We replaced all of that with simpler more orthogonal sends and combinators for constructing those sends.
-</p>
-
-<blockquote>
-<p>
-Technically sends are resources!
-</p>
-
-<p>
-Sends are computational units that process messages, just like resources.
-</p>
-
-<p>
-However most of the time, they exist to modulate how we use resources, rather than defining a new &ldquo;thing&rdquo;.
-</p>
-</blockquote>
 </div>
-<div id="outline-container-orgeb14d38" class="outline-4">
-<h4 id="orgeb14d38"><span class="section-number-4">2.2.1.</span> Simple Sends</h4>
+<div id="outline-container-orgeb58f15" class="outline-4">
+<h4 id="orgeb58f15"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
 <div class="outline-text-4" id="text-2-2-1">
 <p>
-The simplest send we can build is just a promise.
+Communication is the local capability to receive new information and contribute new information. Bassline does not start from a rigid request-response model, because that assumes too much structure too early. Instead, communication is ongoing, and participants coordinate by processing messages and inferring enough structure from what they know to continue.
 </p>
 
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { message, fault } from <span style="color: #539AFC;">'./messages.js'</span>
-
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">async</span> <span style="color: #5EC4FF;">function</span> send(<span style="color: #718CA1;">target</span>, <span style="color: #718CA1;">aMessage</span>, { <span style="color: #718CA1;">timeout</span>: <span style="color: #718CA1;">ms</span> = <span style="color: #E27E8D; font-weight: bold;">30000</span>, <span style="color: #718CA1;">tap</span>: <span style="color: #718CA1;">taps</span> = [] } = {}) {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMessage)
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">timer</span>
-  <span style="color: #5EC4FF;">try</span> {
-    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = message(
-      <span style="color: #5EC4FF;">await</span> Promise.race([
-        target(msg),
-        <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>((_, rej) =&gt; {
-          timer = setTimeout(() =&gt; rej(message({fault: <span style="color: #539AFC;">'timeout'</span>, on: msg})), ms)
-        }),
-      ])
-    )
-    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">t</span> <span style="color: #5EC4FF;">of</span> taps) <span style="color: #5EC4FF;">await</span> t(result)
-    <span style="color: #5EC4FF;">return</span> result
-  } <span style="color: #5EC4FF;">finally</span> {
-    clearTimeout(timer)
-  }
-}
-</pre>
+<p>
+Communication needs a shape that preserves decoupling. Producers should be able to contribute information without needing a fixed understanding of every consumer, and consumers should be able to build their own understanding from the flow they observe.
+</p>
 </div>
 </div>
-</div>
-<div id="outline-container-org52391b2" class="outline-4">
-<h4 id="org52391b2"><span class="section-number-4">2.2.2.</span> Send Combinators</h4>
+<div id="outline-container-org6aaaf1f" class="outline-4">
+<h4 id="org6aaaf1f"><span class="section-number-4">2.2.2.</span> Concretely</h4>
 <div class="outline-text-4" id="text-2-2-2">
 <p>
-We compose sends using combinators, letting us build flexible and expressive sends from simple and modular components.
+In this book, communication is exposed as a <code>[reader, writer]</code> pair. The reader consumes arriving messages. The writer contributes messages. Together they let producers and consumers stay decoupled while still participating in the same flow of information.
 </p>
 
-<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
-
-
-<colgroup>
-<col  class="org-left" />
-
-<col  class="org-left" />
-</colgroup>
-<thead>
-<tr>
-<th scope="col" class="org-left">Combinator</th>
-<th scope="col" class="org-left">Behavior</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="org-left"><code>all</code></td>
-<td class="org-left">Fan-out: sends to every target in parallel, collects all results</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>race</code></td>
-<td class="org-left">Sends in parallel, returning first defined result</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>tap</code></td>
-<td class="org-left">Send with side effects</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>thread</code></td>
-<td class="org-left">Short-circuit: tries each target in order, returns first result</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>pipe</code></td>
-<td class="org-left">Pipeline: chains targets, feeding each result into the next</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>fallback</code></td>
-<td class="org-left">Short-circuit on first non-throwing defined result</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>sife</code></td>
-<td class="org-left">send if, else</td>
-</tr>
-
-<tr>
-<td class="org-left"><code>retry</code></td>
-<td class="org-left">constructs a send that will retry on failure with backoff</td>
-</tr>
-</tbody>
-</table>
-</div>
-<ol class="org-ol">
-<li><a id="org3275a42"></a>All<br />
-<div class="outline-text-5" id="text-2-2-2-1">
 <p>
-The <code>all</code> combinator takes an array of targets, and produces a send that waits for all targets to respond, and uses this as the body of the response message.
+That pair is implemented with channels. Calling <code>channel()</code> returns a <code>[reader, writer]</code> pair. The writer pushes values in; the reader consumes them through combinators. <code>sink</code> is the primary way to consume a reader. It drives the reader and calls a function for each value. Every combinator (<code>map</code>, <code>filter</code>, <code>scan</code>, etc.) returns a new reader with the same combinator methods, so pipelines compose naturally.
+</p>
+
+<p>
+Coordination is not a special subsystem layered on top of this. It is what happens when participants interpret messages, infer enough structure to proceed, and respond from what they know. If something protocol-like emerges, it does so as a stable pattern in message flow, not as a privileged runtime concept.
+</p>
+</div>
+</div>
+<div id="outline-container-org3fa42a0" class="outline-4">
+<h4 id="org3fa42a0"><span class="section-number-4">2.2.3.</span> Channel Implementation</h4>
+<div class="outline-text-4" id="text-2-2-3">
+<p>
+The concrete implementation here uses channel classes that manage a queue of values with a set of waiting consumers. When a value is written and someone is waiting, it resolves immediately. Otherwise it buffers. This implementation is single-consumer: calling <code>consume()</code> more than once throws.
+</p>
+
+<p>
+Users do not touch these classes directly. The factories below return <code>[reader, writer]</code> pairs that hide the internals.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">all</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = <span style="color: #5EC4FF;">await</span> Promise.all(targets.map(t =&gt; t(msg)))
-  <span style="color: #5EC4FF;">return</span> message(result)
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="org25ce45f"></a>Race<br />
-<div class="outline-text-5" id="text-2-2-2-2">
-<p>
-The <code>race</code> combinator takes an array of targets, and produces a send that returns the first target to resolve, discarding the rest.
-</p>
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">race</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = <span style="color: #5EC4FF;">await</span> Promise.race(targets.map(t =&gt; t(msg)));
-  <span style="color: #5EC4FF;">return</span> message(result)
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="org143d213"></a>Tap<br />
-<div class="outline-text-5" id="text-2-2-2-3">
-<p>
-The <code>tap</code> combinator produces a send that runs a number of side effects, discarding the results.
-</p>
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">tap</span> = (effects) =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
-  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">effect</span> <span style="color: #5EC4FF;">of</span> effects) <span style="color: #5EC4FF;">await</span> effect(msg)
-  <span style="color: #5EC4FF;">return</span> msg
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="orgd829e2a"></a>Thread<br />
-<div class="outline-text-5" id="text-2-2-2-4">
-<p>
-The <code>thread</code> combinator produces a send that will pass the message, one at a time, to each target. Returning early when a target produces a value.
-</p>
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">ERR</span> = Symbol.<span style="color: #5EC4FF;">for</span>(<span style="color: #539AFC;">'channel.err'</span>)
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">WAITING</span> = Symbol.<span style="color: #5EC4FF;">for</span>(<span style="color: #539AFC;">'channel.waiting'</span>)
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">CLOSED</span> = Symbol.<span style="color: #5EC4FF;">for</span>(<span style="color: #539AFC;">'channel.closed'</span>)
 
-<p>
-This lets us build short-circuiting pipelines: enrich messages via resources, or guard access to other resources, without complex dispatch machinery.
-</p>
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">class</span> Channel {
+  queue = []
+  waiters = []
+  state = WAITING
+  consumed = <span style="color: #E27E8D;">false</span>
+  error = <span style="color: #E27E8D;">null</span>
 
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">thread</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
-  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">target</span> <span style="color: #5EC4FF;">of</span> targets) {
-    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = message(<span style="color: #5EC4FF;">await</span> target(msg))
-    <span style="color: #5EC4FF;">if</span> (!result.isEmpty) <span style="color: #5EC4FF;">return</span> result
+  write(value) {
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.state === CLOSED || <span style="color: #E27E8D;">this</span>.state === ERR) <span style="color: #5EC4FF;">return</span>
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.waiters.length &gt; <span style="color: #E27E8D; font-weight: bold;">0</span>) <span style="color: #E27E8D;">this</span>.waiters.shift().resolve({ value, done: <span style="color: #E27E8D;">false</span> })
+    <span style="color: #5EC4FF;">else</span> <span style="color: #E27E8D;">this</span>.queue.push(value)
   }
-  <span style="color: #5EC4FF;">return</span> message()
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="orgfc29dfc"></a>Pipe<br />
-<div class="outline-text-5" id="text-2-2-2-5">
-<p>
-The <code>pipe</code> combinator is the dual of <code>thread</code>: where <code>thread</code> controls <i>input</i> (which resource handles the message), <code>pipe</code> controls <i>output</i> (how results flow between resources).
-</p>
-
-<p>
-It sends to each target in sequence, feeding each result into the next, skipping empty messages.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">pipe</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
-  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">result</span> = message(aMsg)
-  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">target</span> <span style="color: #5EC4FF;">of</span> targets) {
-    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">res</span> = message(<span style="color: #5EC4FF;">await</span> target(result))
-    <span style="color: #5EC4FF;">if</span> (res.isEmpty) <span style="color: #5EC4FF;">continue</span>
-    result = res
+  close() {
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.state !== WAITING) <span style="color: #5EC4FF;">return</span>
+    <span style="color: #E27E8D;">this</span>.state = CLOSED
+    <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">w</span> <span style="color: #5EC4FF;">of</span> <span style="color: #E27E8D;">this</span>.waiters) w.resolve({ value: <span style="color: #E27E8D;">undefined</span>, done: <span style="color: #E27E8D;">true</span> })
+    <span style="color: #E27E8D;">this</span>.waiters.length = <span style="color: #E27E8D; font-weight: bold;">0</span>
   }
-  <span style="color: #5EC4FF;">return</span> result
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="orgb9474f8"></a>Fallback<br />
-<div class="outline-text-5" id="text-2-2-2-6">
-<p>
-The <code>fallback</code> combinator produces a send, similar to thread, but short-circuits on the first defined result that doesn&rsquo;t throw.
-</p>
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">fallback</span> = targets =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
-  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">target</span> <span style="color: #5EC4FF;">of</span> targets) {
-    <span style="color: #5EC4FF;">try</span> {
-      <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">result</span> = message(<span style="color: #5EC4FF;">await</span> target(msg))
-      <span style="color: #5EC4FF;">if</span> (!result.isEmpty) <span style="color: #5EC4FF;">return</span> result
-    } <span style="color: #5EC4FF;">catch</span> (_) {}
-  }
-  <span style="color: #5EC4FF;">return</span> message()
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="orgbbe3e2c"></a>Sife<br />
-<div class="outline-text-5" id="text-2-2-2-7">
-<p>
-Then <code>sife</code> combinator allows us to conditionally forward a send to one of two other sends.
-</p>
-
-<p>
-I would name this <code>if</code>, but alas javascript has restricted keywords.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">sife</span> = (condition, whenTrue, whenFalse) =&gt; <span style="color: #5EC4FF;">async</span> aMsg =&gt; {
-  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMsg)
-  <span style="color: #5EC4FF;">if</span> (<span style="color: #5EC4FF;">await</span> condition(msg)) {
-    <span style="color: #5EC4FF;">return</span> message(<span style="color: #5EC4FF;">await</span> whenTrue(msg))
-  } <span style="color: #5EC4FF;">else</span> {
-    <span style="color: #5EC4FF;">return</span> message(<span style="color: #5EC4FF;">await</span> whenFalse?.(msg))
-  }
-}
-</pre>
-</div>
-</div>
-</li>
-<li><a id="orga659e14"></a>Retry<br />
-<div class="outline-text-5" id="text-2-2-2-8">
-<p>
-The <code>retry</code> combinator lets build a send that will attempt the send, retrying on a failure.
-</p>
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">retry</span> =
-  (target, times = <span style="color: #E27E8D; font-weight: bold;">5</span>, backoff = <span style="color: #E27E8D; font-weight: bold;">5000</span>) =&gt;
-  <span style="color: #5EC4FF;">async</span> aMessage =&gt; {
-    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">msg</span> = message(aMessage)
-    <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">failures</span> = <span style="color: #E27E8D; font-weight: bold;">0</span>
-    <span style="color: #5EC4FF;">while</span> (<span style="color: #E27E8D;">true</span>) {
-      <span style="color: #5EC4FF;">try</span> {
-        <span style="color: #5EC4FF;">return</span> message(<span style="color: #5EC4FF;">await</span> target(msg))
-      } <span style="color: #5EC4FF;">catch</span> (e) {
-        failures += <span style="color: #E27E8D; font-weight: bold;">1</span>
-        <span style="color: #5EC4FF;">if</span> (failures &gt;= times) <span style="color: #5EC4FF;">throw</span> e
-        <span style="color: #5EC4FF;">await</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(r =&gt; setTimeout(r, failures * backoff))
-      }
+  err(e) {
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.state !== WAITING) <span style="color: #5EC4FF;">return</span>
+    <span style="color: #E27E8D;">this</span>.state = ERR
+    <span style="color: #E27E8D;">this</span>.error = e
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.queue.length === <span style="color: #E27E8D; font-weight: bold;">0</span>) {
+      <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">w</span> <span style="color: #5EC4FF;">of</span> <span style="color: #E27E8D;">this</span>.waiters) w.reject(e)
+      <span style="color: #E27E8D;">this</span>.waiters.length = <span style="color: #E27E8D; font-weight: bold;">0</span>
     }
   }
+  consume() {
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.consumed) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'cannot consume a channel multiple times!'</span>)
+    <span style="color: #E27E8D;">this</span>.consumed = <span style="color: #E27E8D;">true</span>
+    <span style="color: #5EC4FF;">return</span> {
+      [Symbol.asyncIterator]: () =&gt; ({
+        next: () =&gt; {
+          <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.queue.length &gt; <span style="color: #E27E8D; font-weight: bold;">0</span>) <span style="color: #5EC4FF;">return</span> Promise.resolve({ value: <span style="color: #E27E8D;">this</span>.queue.shift(), done: <span style="color: #E27E8D;">false</span> })
+          <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.state === ERR) <span style="color: #5EC4FF;">return</span> Promise.reject(<span style="color: #E27E8D;">this</span>.error)
+          <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.state === CLOSED) <span style="color: #5EC4FF;">return</span> Promise.resolve({ value: <span style="color: #E27E8D;">undefined</span>, done: <span style="color: #E27E8D;">true</span> })
+          <span style="color: #5EC4FF;">return</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>((resolve, reject) =&gt; <span style="color: #E27E8D;">this</span>.waiters.push({ resolve, reject }))
+        },
+        <span style="color: #5EC4FF;">return</span>: () =&gt; {
+          <span style="color: #E27E8D;">this</span>.close()
+          <span style="color: #5EC4FF;">return</span> Promise.resolve({ value: <span style="color: #E27E8D;">undefined</span>, done: <span style="color: #E27E8D;">true</span> })
+        },
+      }),
+    }
+  }
+  send(...values) {
+    values.forEach(v =&gt; <span style="color: #E27E8D;">this</span>.write(v))
+  }
+  reader() {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">reader</span> = {
+      consume: () =&gt; <span style="color: #E27E8D;">this</span>.consume(),
+      sink: fn =&gt; sink(reader, fn),
+      map: fn =&gt; map(reader, fn),
+      filter: fn =&gt; filter(reader, fn),
+      tee: count =&gt; tee(reader, count),
+      take: n =&gt; take(reader, n),
+      scan: (fn, seed) =&gt; scan(reader, fn, seed),
+      tap: fn =&gt; reader.map(v =&gt; (fn(v), v)),
+      thru: cb =&gt; cb(reader),
+      merge: readers =&gt; merge([reader, ...readers]),
+    }
+    <span style="color: #5EC4FF;">return</span> reader
+  }
+  writer() {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">writer</span> = {
+      send: (...values) =&gt; <span style="color: #E27E8D;">this</span>.send(...values),
+      close: () =&gt; <span style="color: #E27E8D;">this</span>.close(),
+      err: e =&gt; <span style="color: #E27E8D;">this</span>.err(e),
+    }
+    <span style="color: #5EC4FF;">return</span> writer
+  }
+}
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">default</span> { send, all, race, tap, thread, pipe, fallback, sife, retry }
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">class</span> SlidingChannel <span style="color: #5EC4FF;">extends</span> Channel {
+  constructor(size = <span style="color: #E27E8D; font-weight: bold;">1</span>) {
+    <span style="color: #5EC4FF;">super</span>()
+    <span style="color: #E27E8D;">this</span>.size = size
+  }
+  write(value) {
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.state === CLOSED || <span style="color: #E27E8D;">this</span>.state === ERR) <span style="color: #5EC4FF;">return</span>
+    <span style="color: #5EC4FF;">if</span> (<span style="color: #E27E8D;">this</span>.waiters.length &gt; <span style="color: #E27E8D; font-weight: bold;">0</span>) <span style="color: #E27E8D;">this</span>.waiters.shift().resolve({ value, done: <span style="color: #E27E8D;">false</span> })
+    <span style="color: #5EC4FF;">else</span> {
+      <span style="color: #5EC4FF;">while</span> (<span style="color: #E27E8D;">this</span>.queue.length &gt;= <span style="color: #E27E8D;">this</span>.size) <span style="color: #E27E8D;">this</span>.queue.shift()
+      <span style="color: #E27E8D;">this</span>.queue.push(value)
+    }
+  }
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">class</span> ClockChannel <span style="color: #5EC4FF;">extends</span> SlidingChannel {
+  constructor(ms, size = <span style="color: #E27E8D; font-weight: bold;">1</span>) {
+    <span style="color: #5EC4FF;">super</span>(size);
+    <span style="color: #E27E8D;">this</span>.interval = setInterval(() =&gt; <span style="color: #E27E8D;">this</span>.write(Date.now()), ms)
+  }
+  close() {
+    clearInterval(<span style="color: #E27E8D;">this</span>.interval)
+    <span style="color: #5EC4FF;">super</span>.close()
+  }
+  err(e) {
+    clearInterval(<span style="color: #E27E8D;">this</span>.interval)
+    <span style="color: #5EC4FF;">super</span>.err(e)
+  }
+  writer() {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">w</span> = <span style="color: #5EC4FF;">super</span>.writer();
+    <span style="color: #5EC4FF;">return</span> {close: w.close}
+  }
+}
 </pre>
 </div>
+</div>
+</div>
+<div id="outline-container-orgb6637e3" class="outline-4">
+<h4 id="orgb6637e3"><span class="section-number-4">2.2.4.</span> Factories</h4>
+<div class="outline-text-4" id="text-2-2-4">
+<p>
+The factories are the public API. Each returns a <code>[reader, writer]</code> pair.
+</p>
+
+<ul class="org-ul">
+<li><code>channel()</code> : unbounded queue</li>
+<li><code>slidingChannel(size)</code> : bounded queue that drops the oldest value when full</li>
+<li><code>clock(ms, size)</code> : sliding channel that emits <code>Date.now()</code> on an interval</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">channel</span> = () =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">chan</span> = <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Channel</span>()
+  <span style="color: #5EC4FF;">return</span> [chan.reader(), chan.writer()]
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">slidingChannel</span> = (size = <span style="color: #E27E8D; font-weight: bold;">1</span>) =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">chan</span> = <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">SlidingChannel</span>(size)
+  <span style="color: #5EC4FF;">return</span> [chan.reader(), chan.writer()]
+}
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">clock</span> = (ms = <span style="color: #E27E8D; font-weight: bold;">1000</span>, size = <span style="color: #E27E8D; font-weight: bold;">1</span>) =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">chan</span> = <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">ClockChannel</span>(ms, size)
+  <span style="color: #5EC4FF;">return</span> [chan.reader(), chan.writer()]
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org2774bce" class="outline-4">
+<h4 id="org2774bce"><span class="section-number-4">2.2.5.</span> Combinators</h4>
+<div class="outline-text-4" id="text-2-2-5">
+<p>
+Combinators transform readers into new readers. Every reader object has these as methods (<code>reader.map(fn)</code>, <code>reader.filter(fn)</code>, etc.), and the returned reader has them too, so they chain.
+</p>
+</div>
+<ol class="org-ol">
+<li><a id="orgede6b13"></a><code>sink(reader, fn)</code><br />
+<div class="outline-text-5" id="text-2-2-5-1">
+<p>
+The terminal combinator. Consumes every value from the reader, calling <code>fn</code> for each one. Returns a promise that resolves when the reader closes.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">async</span> <span style="color: #5EC4FF;">function</span> sink(<span style="color: #718CA1;">reader</span>, <span style="color: #718CA1;">fn</span>) {
+  <span style="color: #5EC4FF;">for</span> <span style="color: #5EC4FF;">await</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">val</span> <span style="color: #5EC4FF;">of</span> reader.consume()) {
+    <span style="color: #5EC4FF;">await</span> fn(val)
+  }
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgce51411"></a><code>map(reader, fn)</code><br />
+<div class="outline-text-5" id="text-2-2-5-2">
+<p>
+Transforms each value through <code>fn</code>. The function can be async. Returns a new reader of the transformed values.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> map(<span style="color: #718CA1;">reader</span>, <span style="color: #718CA1;">fn</span>) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">out</span>, <span style="color: #718CA1;">writer</span>] = channel()
+  reader
+    .sink(<span style="color: #5EC4FF;">async</span> v =&gt; writer.send(<span style="color: #5EC4FF;">await</span> fn(v)))
+    .then(writer.close)
+    .<span style="color: #5EC4FF;">catch</span>(writer.err)
+  <span style="color: #5EC4FF;">return</span> out
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="org9b06f03"></a><code>filter(reader, fn)</code><br />
+<div class="outline-text-5" id="text-2-2-5-3">
+<p>
+Keeps only values for which <code>fn</code> returns truthy. The predicate can be async.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> filter(<span style="color: #718CA1;">reader</span>, <span style="color: #718CA1;">fn</span>) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">out</span>, <span style="color: #718CA1;">writer</span>] = channel()
+  reader
+    .sink(<span style="color: #5EC4FF;">async</span> v =&gt; {
+      <span style="color: #5EC4FF;">if</span> (<span style="color: #5EC4FF;">await</span> fn(v)) writer.send(v)
+    })
+    .then(writer.close)
+    .<span style="color: #5EC4FF;">catch</span>(writer.err)
+  <span style="color: #5EC4FF;">return</span> out
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="org11188ca"></a><code>tee(reader, count)</code><br />
+<div class="outline-text-5" id="text-2-2-5-4">
+<p>
+Splits one reader into <code>count</code> independent readers. Every value is sent to all of them.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> tee(<span style="color: #718CA1;">reader</span>, <span style="color: #718CA1;">count</span> = <span style="color: #E27E8D; font-weight: bold;">2</span>) {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">channels</span> = []
+  <span style="color: #5EC4FF;">for</span> (<span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">i</span> = <span style="color: #E27E8D; font-weight: bold;">0</span>; i &lt; count; i++) channels.push(channel())
+  reader
+    .sink(v =&gt; channels.forEach(([read, write]) =&gt; write.send(v)))
+    .then(() =&gt; channels.forEach(([_, write]) =&gt; write.close()))
+    .<span style="color: #5EC4FF;">catch</span>(e =&gt; channels.forEach(([_, write]) =&gt; write.err(e)))
+  <span style="color: #5EC4FF;">return</span> channels.map(([read, write]) =&gt; read)
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="org00e7af8"></a><code>take(reader, n)</code><br />
+<div class="outline-text-5" id="text-2-2-5-5">
+<p>
+Reads at most <code>n</code> values from the reader, then closes.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> take(<span style="color: #718CA1;">reader</span>, <span style="color: #718CA1;">n</span> = <span style="color: #E27E8D; font-weight: bold;">10</span>) {
+  <span style="color: #5EC4FF;">if</span> (<span style="color: #5EC4FF;">typeof</span> n !== <span style="color: #539AFC;">'number'</span> || n &lt; <span style="color: #E27E8D; font-weight: bold;">1</span>) <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(<span style="color: #539AFC;">'invalid take: '</span> + n)
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">out</span>, <span style="color: #718CA1;">writer</span>] = channel()
+  ;(<span style="color: #5EC4FF;">async</span> () =&gt; {
+    <span style="color: #5EC4FF;">try</span> {
+      <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">count</span> = <span style="color: #E27E8D; font-weight: bold;">0</span>
+      <span style="color: #5EC4FF;">for</span> <span style="color: #5EC4FF;">await</span> (<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">v</span> <span style="color: #5EC4FF;">of</span> reader.consume()) {
+        writer.send(v)
+        <span style="color: #5EC4FF;">if</span> (++count &gt;= n) <span style="color: #5EC4FF;">break</span>
+      }
+      writer.close()
+    } <span style="color: #5EC4FF;">catch</span> (e) {
+      writer.err(e)
+    }
+  })()
+  <span style="color: #5EC4FF;">return</span> out
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgf10f175"></a><code>scan(reader, fn, seed)</code><br />
+<div class="outline-text-5" id="text-2-2-5-6">
+<p>
+Accumulates values. Like <code>Array.reduce</code>, but emits each intermediate result. <code>fn(accumulator, value)</code> returns the next accumulator, which is sent downstream.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> scan(<span style="color: #718CA1;">reader</span>, <span style="color: #718CA1;">fn</span>, <span style="color: #718CA1;">seed</span>) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">out</span>, <span style="color: #718CA1;">write</span>] = channel()
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">last</span> = seed
+  reader
+    .sink(<span style="color: #5EC4FF;">async</span> v =&gt; {
+      last = <span style="color: #5EC4FF;">await</span> fn(last, v)
+      write.send(last)
+    })
+    .then(write.close)
+    .<span style="color: #5EC4FF;">catch</span>(write.err)
+  <span style="color: #5EC4FF;">return</span> out
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="orgb766c68"></a><code>merge(readers)</code><br />
+<div class="outline-text-5" id="text-2-2-5-7">
+<p>
+Combines multiple readers into one. Values arrive in whatever order the sources produce them. Closes when all sources close.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> merge(<span style="color: #718CA1;">readers</span>) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">out</span>, <span style="color: #718CA1;">write</span>] = channel()
+  Promise.all(readers.map(r =&gt; r.sink(write.send)))
+    .then(write.close)
+    .<span style="color: #5EC4FF;">catch</span>(write.err)
+  <span style="color: #5EC4FF;">return</span> out
+}
+</pre>
+</div>
+
+<p>
+Readers also have two convenience methods that aren&rsquo;t standalone functions:
+</p>
+
+<ul class="org-ul">
+<li><code>tap(fn)</code> : like <code>map</code>, but runs <code>fn</code> for its side effect and passes the value through unchanged</li>
+<li><code>thru(cb)</code> : passes the reader itself to <code>cb</code> and returns whatever <code>cb</code> returns. This is the extension point for user-defined combinators.</li>
+</ul>
 </div>
 </li>
 </ol>
 </div>
-</div>
-<div id="outline-container-orgfd70257" class="outline-3">
-<h3 id="orgfd70257"><span class="section-number-3">2.3.</span> Resources</h3>
-<div class="outline-text-3" id="text-2-3">
+<div id="outline-container-org4444e35" class="outline-4">
+<h4 id="org4444e35"><span class="section-number-4">2.2.6.</span> User-level Combinators</h4>
+<div class="outline-text-4" id="text-2-2-6">
 <p>
-<b>NOTE: This section is incomplete, these resources here are all stubs and shouldn&rsquo;t be referenced!</b>
-</p>
-
-<p>
-Now that we understand the mechanics for how messages and sends behave, we can cover the final part of the kernel, resources.
-</p>
-
-<p>
-Recall, resources are computational units that process messages. They can have their own state or be stateless.
-</p>
-
-<p>
-We present them as arity-1 functions in this implementation:
-</p>
-
-<p>
-<code>resource(msg) → Promise&lt;Message&gt;</code>
+The <code>thru</code> method on readers lets users build their own combinators as simple functions from reader to reader. Here are some examples.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> message from <span style="color: #539AFC;">"./messages.js"</span>
-<span style="color: #5EC4FF;">import</span> {thread, send} from <span style="color: #539AFC;">"./sends.js"</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { channel, merge } from <span style="color: #539AFC;">"./channel.js"</span>
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> log({ content, op }) {
-  <span style="color: #5EC4FF;">const</span> { body, ...head } = content
-  <span style="color: #5EC4FF;">if</span> (head.nolog) <span style="color: #5EC4FF;">return</span>
-  console.log(<span style="color: #539AFC;">'op: '</span>, op)
-  <span style="color: #5EC4FF;">if</span> (head) console.log(<span style="color: #539AFC;">'head: '</span>, head)
-  <span style="color: #5EC4FF;">if</span> (body) console.log(<span style="color: #539AFC;">'body: '</span>, body)
+<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">timeout</span> = ms =&gt; <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(res =&gt; setTimeout(res, ms))
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">debounce</span> = (ms = <span style="color: #E27E8D; font-weight: bold;">300</span>) =&gt; reader =&gt; reader.map(<span style="color: #5EC4FF;">async</span> v =&gt; {
+  <span style="color: #5EC4FF;">await</span> timeout(ms);
+  <span style="color: #5EC4FF;">return</span> v
+})
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">dedup</span> = (diff, seed) =&gt; reader =&gt; {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">compare</span> = diff ?? ((acc, curr) =&gt; acc !== curr);
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">last</span> = seed;
+  <span style="color: #5EC4FF;">return</span> reader.filter(<span style="color: #5EC4FF;">async</span> v =&gt; {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">res</span> = <span style="color: #5EC4FF;">await</span> compare(last, v)
+    <span style="color: #5EC4FF;">if</span>(res) {
+      last = v
+    }
+    <span style="color: #5EC4FF;">return</span> res
+  })
 }
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">rand</span> = (_msg) =&gt; Math.floor(Math.random() * <span style="color: #E27E8D; font-weight: bold;">1000</span>)
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">logrand</span> = thread([log, rand])
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">max</span> = (seed = <span style="color: #E27E8D; font-weight: bold;">0</span>) =&gt; reader =&gt; reader
+      .filter(v =&gt; <span style="color: #5EC4FF;">typeof</span> v === <span style="color: #539AFC;">'number'</span>)
+      .scan((acc, curr) =&gt; acc &gt; curr ? acc : curr, seed)
+      .thru(dedup(<span style="color: #E27E8D;">null</span>, seed))
 
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> ping(<span style="color: #718CA1;">content</span> = {}) {
-  <span style="color: #5EC4FF;">return</span> message({ ping: Date.now(), ...content })
+<span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">r</span>, <span style="color: #718CA1;">w</span>] = channel()
+w.send(<span style="color: #E27E8D; font-weight: bold;">1</span>,<span style="color: #E27E8D; font-weight: bold;">2</span>,<span style="color: #E27E8D; font-weight: bold;">3</span>,<span style="color: #E27E8D; font-weight: bold;">4</span>,<span style="color: #E27E8D; font-weight: bold;">5</span>,<span style="color: #E27E8D; font-weight: bold;">6</span>,<span style="color: #E27E8D; font-weight: bold;">7</span>,<span style="color: #E27E8D; font-weight: bold;">7</span>,<span style="color: #E27E8D; font-weight: bold;">7</span>,<span style="color: #E27E8D; font-weight: bold;">7</span>,<span style="color: #E27E8D; font-weight: bold;">8</span>,<span style="color: #E27E8D; font-weight: bold;">9</span>,<span style="color: #E27E8D; font-weight: bold;">10</span>);
+w.close()
+
+<span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">count</span> = <span style="color: #E27E8D; font-weight: bold;">0</span>;
+<span style="color: #5EC4FF;">await</span> merge(r.tee(<span style="color: #E27E8D; font-weight: bold;">100</span>))
+  .tap(() =&gt; count++)
+  .thru(max())
+  .sink(console.log)
+
+console.log(count)
+</pre>
+</div>
+
+<p>
+<code>debounce</code>, <code>dedup</code>, and <code>max</code> all follow the same shape: a configuration function that returns a <code>reader → reader</code> transform, suitable for <code>thru</code>.
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgcb15519" class="outline-2">
+<h2 id="orgcb15519"><span class="section-number-2">3.</span> Transports</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+As above, it helps to separate the abstract role of a transport from the concrete transport used in this book.
+</p>
+</div>
+<div id="outline-container-org03139e3" class="outline-3">
+<h3 id="org03139e3"><span class="section-number-3">3.1.</span> Abstractly</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+A transport adapts some external medium into local communication capabilities. This matters because the programming model should not change just because information crossed a process boundary, a machine boundary, or a device boundary. Local and non-local communication differ in mechanics, but they should not require different conceptual tools.
+</p>
+</div>
+</div>
+<div id="outline-container-org4497e8c" class="outline-3">
+<h3 id="org4497e8c"><span class="section-number-3">3.2.</span> Concretely</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+In this book, transports are presented as a <code>[reader, writer]</code> pair. Anything that can produce or consume bytes can be wrapped this way: a TCP socket, a serial port, a printer, stdio.
+</p>
+
+<p>
+What follows is one transport: newline-delimited JSON over Unix sockets. It exists to exercise the composition of reader/writer flows over a real medium.
+</p>
+</div>
+<div id="outline-container-orgc7382f2" class="outline-4">
+<h4 id="orgc7382f2"><span class="section-number-4">3.2.1.</span> Framing</h4>
+<div class="outline-text-4" id="text-3-2-1">
+<p>
+<code>readFrames</code> turns a socket&rsquo;s data events into a reader of parsed messages. <code>writeFrames</code> does the reverse.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> net from <span style="color: #539AFC;">'node:net'</span>
+<span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'./messages.js'</span>
+<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">"./channel.js"</span>
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> readFrames(<span style="color: #718CA1;">socket</span>) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">read</span>, <span style="color: #718CA1;">write</span>] = channel()
+  <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">buffer</span> = <span style="color: #539AFC;">''</span>
+  socket.on(<span style="color: #539AFC;">'data'</span>, chunk =&gt; {
+    buffer += chunk
+    <span style="color: #5EC4FF;">let</span> <span style="color: #718CA1;">newline</span>
+    <span style="color: #5EC4FF;">while</span> ((newline = buffer.indexOf(<span style="color: #539AFC;">'\n'</span>)) !== -<span style="color: #E27E8D; font-weight: bold;">1</span>) {
+      <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">line</span> = buffer.slice(<span style="color: #E27E8D; font-weight: bold;">0</span>, newline)
+      buffer = buffer.slice(newline + <span style="color: #E27E8D; font-weight: bold;">1</span>)
+      <span style="color: #5EC4FF;">if</span> (!line) <span style="color: #5EC4FF;">continue</span>
+      <span style="color: #5EC4FF;">try</span> { write.send(message(JSON.parse(line))) }
+      <span style="color: #5EC4FF;">catch</span> { }
+    }
+  })
+  socket.on(<span style="color: #539AFC;">'close'</span>, () =&gt; {
+    write.close()
+    console.log(<span style="color: #539AFC;">'connection closed'</span>)
+  })
+  socket.on(<span style="color: #539AFC;">'error'</span>, e =&gt; {
+    write.err(e)
+    console.log(<span style="color: #539AFC;">'connection error'</span>)
+  })
+  <span style="color: #5EC4FF;">return</span> read
 }
 
-<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">p</span> = ping()
-<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">r</span> = <span style="color: #5EC4FF;">await</span> send(logrand, p)
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> writeFrames(<span style="color: #718CA1;">socket</span>) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">read</span>, <span style="color: #718CA1;">write</span>] = channel();
+  read.sink(v =&gt; socket.write(JSON.stringify(v) + <span style="color: #539AFC;">'\n'</span>))
+    .then(() =&gt; socket.destroy())
+    .<span style="color: #5EC4FF;">catch</span>(e =&gt; socket.destroy(e))
+  socket.on(<span style="color: #539AFC;">'close'</span>, write.close)
+  socket.on(<span style="color: #539AFC;">'error'</span>, write.err)
+  <span style="color: #5EC4FF;">return</span> write
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org00703b8" class="outline-4">
+<h4 id="org00703b8"><span class="section-number-4">3.2.2.</span> Connecting</h4>
+<div class="outline-text-4" id="text-3-2-2">
+<p>
+A client connects to a socket and gets back a local <code>[reader, writer]</code> pair backed by network I/O.
+</p>
 
-console.log(r)
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> connect(<span style="color: #718CA1;">options</span> = {}) {
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">socket</span> = net.createConnection(options)
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">read</span> = readFrames(socket)
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">write</span> = writeFrames(socket)
+  <span style="color: #5EC4FF;">return</span> [read, write]
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-org671b7fa" class="outline-4">
+<h4 id="org671b7fa"><span class="section-number-4">3.2.3.</span> Serving</h4>
+<div class="outline-text-4" id="text-3-2-3">
+<p>
+A server listens on a socket and produces a reader of connections. Each connection is itself a <code>[reader, writer]</code> pair. In this implementation, the incoming connections are surfaced through the same channel-backed reader interface.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> net from <span style="color: #539AFC;">'node:net'</span>
+<span style="color: #5EC4FF;">import</span> { readFrames, writeFrames } from <span style="color: #539AFC;">'./client.js'</span>
+<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> serve(<span style="color: #718CA1;">options</span> = {}) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">r</span>, <span style="color: #718CA1;">w</span>] = channel();
+
+  <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">server</span> = net.createServer(socket =&gt; {
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">read</span> = readFrames(socket)
+    <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">write</span> = writeFrames(socket);
+    w.send([read, write])
+  })
+  server.listen(options)
+  server.on(<span style="color: #539AFC;">'close'</span>, w.close)
+  server.on(<span style="color: #539AFC;">'error'</span>, w.err)
+  <span style="color: #5EC4FF;">return</span> [r, server]
+}
 </pre>
 </div>
 </div>
 </div>
 </div>
-<div id="outline-container-org3662b20" class="outline-2">
-<h2 id="org3662b20"><span class="section-number-2">3.</span> Utilities</h2>
-<div class="outline-text-2" id="text-3">
 </div>
-<div id="outline-container-org9b5aa36" class="outline-3">
-<h3 id="org9b5aa36"><span class="section-number-3">3.1.</span> Type Predicates</h3>
-<div class="outline-text-3" id="text-3-1">
+<div id="outline-container-orgd3c51cf" class="outline-2">
+<h2 id="orgd3c51cf"><span class="section-number-2">4.</span> Deployment</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Deployment also has an abstract layer and a concrete one.
+</p>
+</div>
+<div id="outline-container-orgb9b206b" class="outline-3">
+<h3 id="orgb9b206b"><span class="section-number-3">4.1.</span> Abstractly</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+A bassline system is deployed by making communication available somewhere and wiring local logic to it. Deployment is not where the system acquires a fixed command surface or a closed set of capabilities. It is where some part of the world becomes reachable for communication.
+</p>
+
+<p>
+The reason this stays lightweight is the same reason the rest of the model stays lightweight: coordination is driven by message flow and local interpretation, not by a privileged deployment schema.
+</p>
+</div>
+</div>
+<div id="outline-container-orgea10c3d" class="outline-3">
+<h3 id="orgea10c3d"><span class="section-number-3">4.2.</span> Concretely</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+A bassline system can run as a daemon, a long-lived process listening on a socket. Interacting with it means obtaining a communication capability and exchanging messages.
+</p>
+</div>
+<div id="outline-container-org839cb9a" class="outline-4">
+<h4 id="org839cb9a"><span class="section-number-4">4.2.1.</span> The daemon is just a server with a sink</h4>
+<div class="outline-text-4" id="text-4-2-1">
+<p>
+A boot script opens a socket and starts consuming connections. Each connection is a <code>[reader, writer]</code> pair. What the daemon does with those messages is determined by whatever logic is wired into the pipeline. There is no fixed set of capabilities.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { serve } from <span style="color: #539AFC;">'./server.js'</span>
+
+<span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">connections</span>, <span style="color: #718CA1;">server</span>] = serve({ path: <span style="color: #539AFC;">'~/.bassline/sock'</span> })
+
+<span style="color: #5EC4FF;">await</span> connections.sink(([read, write]) =&gt; {
+  read
+    .map(handle)
+    .sink(write.send)
+})
+</pre>
+</div>
+
+<p>
+The <code>handle</code> function is where all the logic lives. It could route messages onward, evaluate expressions, update state, or do nothing. The daemon just opens the door.
+</p>
+</div>
+</div>
+<div id="outline-container-org2f3a189" class="outline-4">
+<h4 id="org2f3a189"><span class="section-number-4">4.2.2.</span> A REPL is just a transport</h4>
+<div class="outline-text-4" id="text-4-2-2">
+<p>
+A command-line interface is a connection over stdio instead of a socket. The input side reads lines, parses them into messages, and writes them into the local reader/writer implementation. The output side consumes from that same interface and prints.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
+<span style="color: #5EC4FF;">import</span> readline from <span style="color: #539AFC;">'node:readline'</span>
+
+<span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">rl</span> = readline.createInterface({ input: process.stdin })
+<span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">read</span>, <span style="color: #718CA1;">write</span>] = channel()
+
+rl.on(<span style="color: #539AFC;">'line'</span>, line =&gt; write.send(parse(line)))
+rl.on(<span style="color: #539AFC;">'close'</span>, write.close)
+</pre>
+</div>
+
+<p>
+The <code>parse</code> function is what makes the REPL a REPL. Different parsers produce different command languages. A JSON parser gives you raw message access. A line parser with custom syntax gives you a shell. The transport doesn&rsquo;t care.
+</p>
+</div>
+</div>
+<div id="outline-container-orgff26dc1" class="outline-4">
+<h4 id="orgff26dc1"><span class="section-number-4">4.2.3.</span> Custom command languages are just maps</h4>
+<div class="outline-text-4" id="text-4-2-3">
+<p>
+Since a parser is a function from strings to messages, and <code>map</code> transforms a reader, a custom command language is just:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js">stdin.map(parseBasslineShell)    <span style="color: #41505E; font-style: italic;">// </span><span style="color: #41505E; font-style: italic;">one language</span>
+stdin.map(parseJSON)             <span style="color: #41505E; font-style: italic;">// </span><span style="color: #41505E; font-style: italic;">another</span>
+stdin.map(parseS_expressions)   <span style="color: #41505E; font-style: italic;">// </span><span style="color: #41505E; font-style: italic;">another</span>
+</pre>
+</div>
+
+<p>
+The downstream pipeline sees messages either way.
+</p>
+</div>
+</div>
+<div id="outline-container-orgc5046be" class="outline-4">
+<h4 id="orgc5046be"><span class="section-number-4">4.2.4.</span> Convention</h4>
+<div class="outline-text-4" id="text-4-2-4">
+<p>
+By convention, a bassline daemon keeps its state under <code>~/.bassline/</code>, with <code>BASSLINE_HOME</code> as an override. The socket lives there. What else lives there (persistence files, logs, configuration) depends on what the boot script sets up.
+</p>
+
+<p>
+The boot script is the only thing that&rsquo;s &ldquo;configured&rdquo; in the traditional sense. Everything else emerges from the messages the system receives after it starts listening.
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-orgfd531a8" class="outline-2">
+<h2 id="orgfd531a8"><span class="section-number-2">5.</span> Utilities</h2>
+<div class="outline-text-2" id="text-5">
+</div>
+<div id="outline-container-orgbf5f293" class="outline-3">
+<h3 id="orgbf5f293"><span class="section-number-3">5.1.</span> Type Predicates</h3>
+<div class="outline-text-3" id="text-5-1">
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
 
@@ -752,6 +943,11 @@ console.log(r)
 <td class="org-left"><code>isPlainObject</code></td>
 <td class="org-left"><code>prototype =</code> Object.prototype=</td>
 </tr>
+
+<tr>
+<td class="org-left"><code>hasKeys</code></td>
+<td class="org-left">Check whether an object has all of the specified keys</td>
+</tr>
 </tbody>
 </table>
 
@@ -766,42 +962,6 @@ console.log(r)
   <span style="color: #5EC4FF;">if</span> (obj == <span style="color: #E27E8D;">null</span>) <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">false</span>;
   <span style="color: #5EC4FF;">return</span> Object.getPrototypeOf(obj) === Object.<span style="color: #E27E8D;">prototype</span>;
 }
-</pre>
-</div>
-</div>
-</div>
-<div id="outline-container-org5e47717" class="outline-3">
-<h3 id="org5e47717"><span class="section-number-3">3.2.</span> Structural Predicates</h3>
-<div class="outline-text-3" id="text-3-2">
-<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
-
-
-<colgroup>
-<col  class="org-left" />
-
-<col  class="org-left" />
-</colgroup>
-<thead>
-<tr>
-<th scope="col" class="org-left">Predicate</th>
-<th scope="col" class="org-left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="org-left"><code>hasKeys</code></td>
-<td class="org-left">Check whether an object has all of the specified keys</td>
-</tr>
-</tbody>
-</table>
-
-<div class="org-src-container">
-<pre class="src src-js"><span style="color: #707b86; font-style: italic;">/**</span>
-<span style="color: #707b86; font-style: italic;"> * Check whether obj has all of the specified keys.</span>
-<span style="color: #707b86; font-style: italic;"> * @param {unknown} obj</span>
-<span style="color: #707b86; font-style: italic;"> * @param {string | string[]} [keys]</span>
-<span style="color: #707b86; font-style: italic;"> * @returns {boolean}</span>
-<span style="color: #707b86; font-style: italic;"> */</span>
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">hasKeys</span> = (obj, keys = []) =&gt; {
   <span style="color: #5EC4FF;">if</span> (isNil(obj)) <span style="color: #5EC4FF;">return</span> <span style="color: #E27E8D;">false</span>
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">requiredKeys</span> = isArray(keys) ? keys : [keys],
@@ -809,25 +969,15 @@ console.log(r)
 
   <span style="color: #5EC4FF;">return</span> requiredKeys.every(key =&gt; objectKeys.has(key))
 }
-
-<span style="color: #707b86; font-style: italic;">/**</span>
-<span style="color: #707b86; font-style: italic;"> * True if obj is a plain object (created by {} or Object.create(null)).</span>
-<span style="color: #707b86; font-style: italic;"> * @param {unknown} obj</span>
-<span style="color: #707b86; font-style: italic;"> * @returns {boolean}</span>
-<span style="color: #707b86; font-style: italic;"> */</span>
-
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-org8e5f577" class="outline-3">
-<h3 id="org8e5f577"><span class="section-number-3">3.3.</span> Misc</h3>
-<div class="outline-text-3" id="text-3-3">
+<div id="outline-container-org1ffe0db" class="outline-3">
+<h3 id="org1ffe0db"><span class="section-number-3">5.2.</span> Misc</h3>
+<div class="outline-text-3" id="text-5-2">
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">castArr</span> = (value) =&gt; isArray(value) ? value : [value]
-<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">panic</span> = msg =&gt; {
-  <span style="color: #5EC4FF;">throw</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Error</span>(msg)
-}
 </pre>
 </div>
 

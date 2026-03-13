@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { Platform } from '../src/platform.js'
-import { reducers, scope } from '../src/modules/index.js'
+import { Platform } from '../src/kernel/platform.js'
+import { reducers, scope } from '../src/resources/index.js'
 import http from '../src/platforms/http.js'
 
 function setup() {

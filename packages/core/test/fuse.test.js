@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/platform.js'
-import { reducers, scope } from '../src/modules/index.js'
+import { Platform } from '../src/kernel/platform.js'
+import { reducers, scope } from '../src/resources/index.js'
 
 // Stub @bassline/fs so fuse.js can import without the Rust bridge
 import { vi } from 'vitest'

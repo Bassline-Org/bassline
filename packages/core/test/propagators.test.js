@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { Platform, kResource } from '../src/platform.js'
-import { reducers, scope, propagators } from '../src/modules/index.js'
+import { Platform, kResource } from '../src/kernel/platform.js'
+import { reducers, scope, propagators } from '../src/resources/index.js'
 
 const flush = () => new Promise(r => setTimeout(r, 0))
 

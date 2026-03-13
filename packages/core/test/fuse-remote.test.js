@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/platform.js'
-import { reducers, scope, garage } from '../src/modules/index.js'
-import session, { memoryTransport } from '../src/modules/session.js'
+import { Platform } from '../src/kernel/platform.js'
+import { reducers, scope } from '../src/resources/index.js'
+import link, { memoryTransport } from '../src/link/runtime.js'
 import fuseRemote from '../src/platforms/fuse-remote.js'
 
 function setup() {
   const p = new Platform()
-  p.use(reducers, scope, garage, session, fuseRemote)
+  p.use(reducers, scope, link, fuseRemote)
   return p
 }
 
@@ -111,8 +111,9 @@ describe('FUSE Remote Projection', () => {
     it('getattr works over remote scope', async () => {
       const { p, root } = setupWithTree()
       const { a, b } = memoryTransport()
-      p.create.Session({ transport: a, root })
-      const client = p.create.Session({ transport: b })
+      p.link.open({ transport: a, localScope: root })
+      const clientLink = p.link.open({ transport: b, localScope: p.create.Scope() })
+      const client = clientLink.remoteScope
 
       const fs = p.fuseRemote.createFileSystem(client)
 
@@ -126,8 +127,9 @@ describe('FUSE Remote Projection', () => {
     it('readdir works over remote scope', async () => {
       const { p, root } = setupWithTree()
       const { a, b } = memoryTransport()
-      p.create.Session({ transport: a, root })
-      const client = p.create.Session({ transport: b })
+      p.link.open({ transport: a, localScope: root })
+      const clientLink = p.link.open({ transport: b, localScope: p.create.Scope() })
+      const client = clientLink.remoteScope
 
       const fs = p.fuseRemote.createFileSystem(client)
 
@@ -139,8 +141,9 @@ describe('FUSE Remote Projection', () => {
     it('read works over remote scope', async () => {
       const { p, root } = setupWithTree()
       const { a, b } = memoryTransport()
-      p.create.Session({ transport: a, root })
-      const client = p.create.Session({ transport: b })
+      p.link.open({ transport: a, localScope: root })
+      const clientLink = p.link.open({ transport: b, localScope: p.create.Scope() })
+      const client = clientLink.remoteScope
 
       const fs = p.fuseRemote.createFileSystem(client)
 
@@ -151,8 +154,9 @@ describe('FUSE Remote Projection', () => {
     it('write + release works over remote scope', async () => {
       const { p, root } = setupWithTree()
       const { a, b } = memoryTransport()
-      p.create.Session({ transport: a, root })
-      const client = p.create.Session({ transport: b })
+      p.link.open({ transport: a, localScope: root })
+      const clientLink = p.link.open({ transport: b, localScope: p.create.Scope() })
+      const client = clientLink.remoteScope
 
       const fs = p.fuseRemote.createFileSystem(client)
 

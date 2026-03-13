@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { vi } from 'vitest'
-import { Platform } from '../src/platform.js'
-import { reducers, scope } from '../src/modules/index.js'
+import { Platform, reducers, scope } from '@bassline/core'
 
 // Stub @bassline/fs so fuse.js can import without the Rust bridge
 vi.mock('@bassline/fs', () => ({
@@ -21,8 +20,8 @@ vi.mock('@bassline/fs', () => ({
   errno: { EPERM: -1, ENOENT: -2, EIO: -5, EACCES: -13, ENOTDIR: -20, EISDIR: -21, ENOSYS: -38 },
 }))
 
-const { default: fuse } = await import('../src/platforms/fuse.js')
-const { default: ethModule } = await import('../../eth/src/index.js')
+const { default: fuse } = await import('@bassline/core/platforms/fuse')
+const { default: ethModule } = await import('../src/index.js')
 
 const ADDR = '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'
 const HASH = '0x' + 'ab'.repeat(32)

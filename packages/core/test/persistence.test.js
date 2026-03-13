@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { Platform } from '../src/platform.js'
-import { reducers, scope } from '../src/modules/index.js'
-import persistence from '../src/modules/persistence.js'
+import { Platform } from '../src/kernel/platform.js'
+import { reducers, scope } from '../src/resources/index.js'
+import persistence from '../src/resources/persistence.js'
 
 function setup() {
   const p = new Platform()

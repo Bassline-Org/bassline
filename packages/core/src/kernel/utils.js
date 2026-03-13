@@ -2,10 +2,14 @@
 export const isArray = v => Array.isArray(v)
 
 /** @param {unknown} obj */
-export const isNil = obj => obj === undefined || obj === null
+export const isNil = obj => obj == null
 
 /** @param {unknown} obj */
 export const isPromise = obj => obj instanceof Promise
+
+export const isNumber = v => typeof v === 'number'
+export const isString = v => typeof v === 'string'
+export const isFunction = v => typeof v === 'function'
 
 /**
  * @param {string} msg
@@ -37,11 +41,11 @@ export const maybeThen = (value, fn) => {
  */
 export const assert =
   pred =>
-  (...args) => {
-    if (!pred(...args)) {
-      throw new Error('assertion failed!')
+    (...args) => {
+      if (!pred(...args)) {
+        throw new Error('assertion failed!')
+      }
     }
-  }
 
 /**
  * Check whether obj has all of the specified keys.
@@ -62,24 +66,13 @@ export const hasKeys = (obj, keys = []) => {
  * @param {unknown} obj
  * @returns {boolean}
  */
-export const isPlainObject = obj =>
-  obj !== null && typeof obj === 'object' && !Array.isArray(obj) && Object.getPrototypeOf(obj) === Object.prototype
+export const isPlainObject = obj => {
+  if (obj == null) return false;
+  if (typeof obj !== 'object') return false;
+  if (Array.isArray(obj)) return false;
+  return Object.getPrototypeOf(obj) === Object.prototype;
+}
 
-/**
- * Create a dispatcher function for a Resource instance.
- * @param {import('./types').Resource} aResource
- * @returns {import('./types').ResourceFn}
- */
-export const send =
-  aResource =>
-  (msg = {}) => {
-    if (hasKeys(msg, 'put')) {
-      const { put, ...rest } = msg
-      return aResource.put(put, rest)
-    } else {
-      return aResource.get(msg)
-    }
-  }
 
 export default {
   isArray,
@@ -87,7 +80,6 @@ export default {
   isPromise,
   isPlainObject,
   hasKeys,
-  send,
   panic,
   maybeThen,
 }
