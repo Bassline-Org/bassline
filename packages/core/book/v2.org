@@ -471,95 +471,187 @@ A transport adapts some external medium into local communication capabilities. T
 
 ** Concretely
 
-In this book, transports are presented as a =[reader, writer]= pair. Anything that can produce or consume bytes can be wrapped this way: a TCP socket, a serial port, a printer, stdio.
+Every transport produces the same thing: a =[reader, writer]= pair. What differs is the medium underneath and whether that medium carries raw bytes or discrete messages.
 
-What follows is one transport: newline-delimited JSON over Unix sockets. It exists to exercise the composition of reader/writer flows over a real medium.
+Byte transports (TCP sockets, stdio, serial) carry raw chunks. They need a framing layer to delimit and parse messages. Message transports (WebSocket, WebWorker/MessagePort) carry discrete messages natively and skip framing entirely.
 
 *** Framing
 :PROPERTIES:
-:header-args: :tangle ../src/client.js
+:header-args: :tangle ../src/frame/jsonl.js
 :END:
 
-=readFrames= turns a socket's data events into a reader of parsed messages. =writeFrames= does the reverse.
+Framing is separated from any specific transport. =readFrame= is a =reader → reader= transform: it accumulates chunks, splits on newlines, and parses each line as JSON. =writeFrame= is a plain function that serializes a message as a JSON line.
+
+#+begin_src js
+import { message } from '../messages.js'
+import { channel } from '../channel.js'
+
+export const readFrame = reader => {
+  const [out, write] = channel()
+  let buffer = ''
+  reader
+    .sink(chunk => {
+      buffer += chunk
+      let nl
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl)
+        buffer = buffer.slice(nl + 1)
+        if (!line) continue
+        try { write.send(message(JSON.parse(line))) }
+        catch (e) { console.error('readFrame parse error: ', e)}
+      }
+    })
+    .then(write.close)
+    .catch(write.err)
+  return out
+}
+
+export const writeFrame = msg => JSON.stringify(msg) + '\n'
+#+end_src
+
+=readFrame= is not a =scan= because one input chunk may produce zero or many messages. It uses =sink= internally to feed a new channel. =writeFrame= is used as =.map(writeFrame)= on the outgoing side.
+
+*** Socket
+:PROPERTIES:
+:header-args: :tangle ../src/transports/socket.js
+:END:
+
+A socket is a byte transport. =fromSocket= adapts a Node.js socket into a =[reader, writer]= pair by wiring socket events to channels on the read side and piping through =writeFrame= on the write side. =readFrame= parses the incoming chunks.
 
 #+begin_src js
 import net from 'node:net'
-import { message } from './messages.js'
-import { channel } from "./channel.js"
+import { channel } from '../channel.js'
+import { readFrame, writeFrame } from '../frame/jsonl.js'
 
-export function readFrames(socket) {
+export function fromSocket(socket) {
   const [read, write] = channel()
-  let buffer = ''
-  socket.on('data', chunk => {
-    buffer += chunk
-    let newline
-    while ((newline = buffer.indexOf('\n')) !== -1) {
-      const line = buffer.slice(0, newline)
-      buffer = buffer.slice(newline + 1)
-      if (!line) continue
-      try { write.send(message(JSON.parse(line))) }
-      catch (e) { console.error('parse error: ', e)}
-    }
-  })
-  socket.on('close', () => {
-    write.close()
-    console.log('connection closed')
-  })
-  socket.on('error', e => {
-    write.err(e)
-    console.log('connection error')
-  })
-  return read
-}
+  socket.on('data', chunk => write.send(chunk.toString()))
+  socket.on('close', () => write.close())
+  socket.on('error', e => write.err(e))
 
-export function writeFrames(socket) {
-  const [read, write] = channel();
-  read.sink(v => socket.write(JSON.stringify(v) + '\n'))
+  const [outRead, outWrite] = channel()
+  outRead
+    .map(writeFrame)
+    .sink(data => socket.write(data))
     .then(() => socket.destroy())
     .catch(e => socket.destroy(e))
-  socket.on('close', write.close)
-  socket.on('error', write.err)
-  return write
+  socket.on('close', outWrite.close)
+  socket.on('error', outWrite.err)
+
+  return [read.thru(readFrame), outWrite]
 }
-#+end_src
 
-*** Connecting
-
-A client connects to a socket and gets back a local =[reader, writer]= pair backed by network I/O.
-
-#+begin_src js :tangle ../src/client.js
 export function connect(options = {}) {
-  const socket = net.createConnection(options)
-  const read = readFrames(socket)
-  const write = writeFrames(socket)
-  return [read, write]
+  return fromSocket(net.createConnection(options))
 }
 #+end_src
 
 *** Serving
 :PROPERTIES:
-:header-args: :tangle ../src/server.js
+:header-args: :tangle ../src/transports/server.js
 :END:
 
-A server listens on a socket and produces a reader of connections. Each connection is itself a =[reader, writer]= pair. In this implementation, the incoming connections are surfaced through the same channel-backed reader interface.
+A server listens on a socket and produces a reader of connections. Each connection is itself a =[reader, writer]= pair, produced by =fromSocket=.
 
 #+begin_src js
 import net from 'node:net'
-import { readFrames, writeFrames } from './client.js'
-import { channel } from './channel.js'
+import { fromSocket } from './socket.js'
+import { channel } from '../channel.js'
 
 export function serve(options = {}) {
-  const [r, w] = channel();
-
+  const [r, w] = channel()
   const server = net.createServer(socket => {
-    const read = readFrames(socket)
-    const write = writeFrames(socket);
-    w.send([read, write])
+    w.send(fromSocket(socket))
   })
   server.listen(options)
   server.on('close', w.close)
   server.on('error', w.err)
   return [r, server]
+}
+#+end_src
+
+*** WebSocket
+:PROPERTIES:
+:header-args: :tangle ../src/transports/websocket.js
+:END:
+
+A WebSocket is a message transport. Each =ws.send()= is one discrete message, so no framing is needed — just JSON encode/decode. This works in the browser with native =WebSocket=, in Node.js with the =ws= package, and for =RTCDataChannel= (same event interface).
+
+#+begin_src js
+import { channel } from '../channel.js'
+import { message } from '../messages.js'
+
+export function fromWebSocket(ws) {
+  const [read, write] = channel()
+  ws.addEventListener('message', e => {
+    try { write.send(message(JSON.parse(e.data))) }
+    catch (e) { console.error('failed to send: ', e)}
+  })
+  ws.addEventListener('close', () => write.close())
+  ws.addEventListener('error', e => write.err(e))
+
+  const [outRead, outWrite] = channel()
+  outRead
+    .sink(v => ws.send(JSON.stringify(v)))
+    .then(outWrite.close)
+    .catch(outWrite.err)
+
+  return [read, outWrite]
+}
+#+end_src
+
+*** WebWorker
+:PROPERTIES:
+:header-args: :tangle ../src/transports/worker.js
+:END:
+
+A =MessagePort= is a message transport that uses structured clone — objects cross the boundary without serialization. Works with =Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
+
+#+begin_src js
+import { channel } from '../channel.js'
+import { message } from '../messages.js'
+
+export function fromPort(port) {
+  const [read, write] = channel()
+  port.onmessage = e => write.send(message(e.data))
+  port.onmessageerror = e => write.err(e)
+
+  const [outRead, outWrite] = channel()
+  outRead
+    .sink(v => port.postMessage(v))
+    .then(outWrite.close)
+    .catch(outWrite.err)
+
+  return [read, outWrite]
+}
+#+end_src
+
+*** Stdio
+:PROPERTIES:
+:header-args: :tangle ../src/transports/stdio.js
+:END:
+
+Stdio is a byte transport, like TCP. It uses the same =readFrame=/=writeFrame= framing. This is what makes a REPL "just another transport."
+
+#+begin_src js
+import readline from 'node:readline'
+import { channel } from '../channel.js'
+import { readFrame, writeFrame } from '../frame/jsonl.js'
+
+export function fromStdio() {
+  const rl = readline.createInterface({ input: process.stdin })
+  const [read, write] = channel()
+  rl.on('line', line => write.send(line + '\n'))
+  rl.on('close', () => write.close())
+
+  const [outRead, outWrite] = channel()
+  outRead
+    .map(writeFrame)
+    .sink(data => process.stdout.write(data))
+    .then(outWrite.close)
+    .catch(outWrite.err)
+
+  return [read.thru(readFrame), outWrite]
 }
 #+end_src
 
@@ -582,7 +674,7 @@ A bassline system can run as a daemon, a long-lived process listening on a socke
 A boot script opens a socket and starts consuming connections. Each connection is a =[reader, writer]= pair. What the daemon does with those messages is determined by whatever logic is wired into the pipeline. There is no fixed set of capabilities.
 
 #+begin_src js :tangle no
-import { serve } from './server.js'
+import { serve } from './transports/server.js'
 
 const [connections, server] = serve({ path: '~/.bassline/sock' })
 
@@ -597,20 +689,15 @@ The =handle= function is where all the logic lives. It could route messages onwa
 
 *** A REPL is just a transport
 
-A command-line interface is a connection over stdio instead of a socket. The input side reads lines, parses them into messages, and writes them into the local reader/writer implementation. The output side consumes from that same interface and prints.
+A command-line interface is a connection over stdio instead of a socket. =fromStdio()= gives you a =[reader, writer]= pair backed by stdin/stdout with the same framing as TCP.
 
 #+begin_src js :tangle no
-import { channel } from './channel.js'
-import readline from 'node:readline'
+import { fromStdio } from './transports/stdio.js'
 
-const rl = readline.createInterface({ input: process.stdin })
-const [read, write] = channel()
-
-rl.on('line', line => write.send(parse(line)))
-rl.on('close', write.close)
+const [read, write] = fromStdio()
 #+end_src
 
-The =parse= function is what makes the REPL a REPL. Different parsers produce different command languages. A JSON parser gives you raw message access. A line parser with custom syntax gives you a shell. The transport doesn't care.
+The downstream pipeline sees messages either way — same interface whether the transport is a socket, a WebSocket, or a terminal.
 
 *** Custom command languages are just maps
 

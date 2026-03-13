@@ -1,5 +1,5 @@
 import { channel } from '../src/channel.js'
-import { connect } from '../src/client.js'
+import { connect } from '../src/transports/socket.js'
 import { message, update } from '../src/messages.js'
 import { debounce } from './channel-example.js'
 
