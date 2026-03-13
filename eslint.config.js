@@ -20,6 +20,10 @@ const sharedGlobals = {
   CustomEvent: 'readonly',
   Event: 'readonly',
   queueMicrotask: 'readonly',
+  document: 'readonly',
+  WebSocket: 'readonly',
+  self: 'readonly',
+  Worker: 'readonly',
 }
 
 // Shared rules for source files

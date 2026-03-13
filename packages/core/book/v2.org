@@ -546,16 +546,16 @@ export function connect(options = {}) {
 }
 #+end_src
 
-*** Serving
+*** Serving (TCP)
 :PROPERTIES:
-:header-args: :tangle ../src/transports/server.js
+:header-args: :tangle ../src/serve/tcp.js
 :END:
 
-A server listens on a socket and produces a reader of connections. Each connection is itself a =[reader, writer]= pair, produced by =fromSocket=.
+A TCP server listens on a socket and produces a reader of connections. Each connection is itself a =[reader, writer]= pair, produced by =fromSocket=.
 
 #+begin_src js
 import net from 'node:net'
-import { fromSocket } from './socket.js'
+import { fromSocket } from '../transports/socket.js'
 import { channel } from '../channel.js'
 
 export function serve(options = {}) {
@@ -567,6 +567,26 @@ export function serve(options = {}) {
   server.on('close', w.close)
   server.on('error', w.err)
   return [r, server]
+}
+#+end_src
+
+*** Serving (WebSocket)
+:PROPERTIES:
+:header-args: :tangle ../src/serve/ws.js
+:END:
+
+A WebSocket server wraps an existing =WebSocketServer= instance and produces a reader of connections, matching the TCP serve API shape. The caller brings their own =WebSocketServer= — no =ws= dependency in core.
+
+#+begin_src js
+import { fromWebSocket } from '../transports/websocket.js'
+import { channel } from '../channel.js'
+
+export function serve(wss) {
+  const [r, w] = channel()
+  wss.on('connection', ws => w.send(fromWebSocket(ws)))
+  wss.on('close', () => w.close())
+  wss.on('error', e => w.err(e))
+  return [r, wss]
 }
 #+end_src
 
@@ -674,7 +694,7 @@ A bassline system can run as a daemon, a long-lived process listening on a socke
 A boot script opens a socket and starts consuming connections. Each connection is a =[reader, writer]= pair. What the daemon does with those messages is determined by whatever logic is wired into the pipeline. There is no fixed set of capabilities.
 
 #+begin_src js :tangle no
-import { serve } from './transports/server.js'
+import { serve } from './serve/tcp.js'
 
 const [connections, server] = serve({ path: '~/.bassline/sock' })
 

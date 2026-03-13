@@ -1,5 +1,5 @@
 import net from 'node:net'
-import { fromSocket } from './socket.js'
+import { fromSocket } from '../transports/socket.js'
 import { channel } from '../channel.js'
 
 export function serve(options = {}) {

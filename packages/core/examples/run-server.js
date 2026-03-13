@@ -1,4 +1,4 @@
-import { serve } from '../src/transports/server.js'
+import { serve } from '../src/serve/tcp.js'
 import { message } from '../src/messages.js'
 
 const resource = msg => {

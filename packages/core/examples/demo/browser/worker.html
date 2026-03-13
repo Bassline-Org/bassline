@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>bassline — WebWorker</title>
+  <style>
+    body { font-family: monospace; margin: 2em; }
+    #messages { list-style: none; padding: 0; }
+    #messages li { padding: 0.25em 0; border-bottom: 1px solid #eee; }
+    #input { width: 60%; font-family: monospace; font-size: 1em; padding: 0.3em; }
+    .meta { color: #999; }
+  </style>
+</head>
+<body>
+  <h2>WebWorker client</h2>
+  <p class="meta">transport: browser &rarr; MessagePort &rarr; WebWorker &rarr; WebSocket &rarr; server</p>
+  <p class="meta">session: <span id="session"></span></p>
+  <form id="form">
+    <input id="input" placeholder="type a message..." autofocus />
+  </form>
+  <ul id="messages"></ul>
+  <script type="module" src="worker-main.js"></script>
+</body>
+</html>
