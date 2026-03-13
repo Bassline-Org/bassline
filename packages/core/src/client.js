@@ -1,6 +1,6 @@
 import net from 'node:net'
 import { message } from './messages.js'
-import { channel } from "./channel.js"
+import { channel } from './channel.js'
 
 export function readFrames(socket) {
   const [read, write] = channel()
@@ -12,8 +12,11 @@ export function readFrames(socket) {
       const line = buffer.slice(0, newline)
       buffer = buffer.slice(newline + 1)
       if (!line) continue
-      try { write.send(message(JSON.parse(line))) }
-      catch { }
+      try {
+        write.send(message(JSON.parse(line)))
+      } catch (e) {
+        console.error('failed to parse: ', e)
+      }
     }
   })
   socket.on('close', () => {
@@ -28,8 +31,9 @@ export function readFrames(socket) {
 }
 
 export function writeFrames(socket) {
-  const [read, write] = channel();
-  read.sink(v => socket.write(JSON.stringify(v) + '\n'))
+  const [read, write] = channel()
+  read
+    .sink(v => socket.write(JSON.stringify(v) + '\n'))
     .then(() => socket.destroy())
     .catch(e => socket.destroy(e))
   socket.on('close', write.close)

@@ -1,6 +1,0 @@
-export { default as reducers } from './reducers.js'
-export { default as scope } from './scope.js'
-export { default as propagators } from './propagators.js'
-export { default as gate } from './gate.js'
-export { default as persistence } from './persistence.js'
-// non-resource modules live under '@bassline/core/infra/*'

@@ -92,7 +92,7 @@ export class SlidingChannel extends Channel {
 
 export class ClockChannel extends SlidingChannel {
   constructor(ms, size = 1) {
-    super(size);
+    super(size)
     this.interval = setInterval(() => this.write(Date.now()), ms)
   }
   close() {
@@ -104,8 +104,8 @@ export class ClockChannel extends SlidingChannel {
     super.err(e)
   }
   writer() {
-    const w = super.writer();
-    return {close: w.close}
+    const w = super.writer()
+    return { close: w.close }
   }
 }
 
@@ -154,10 +154,10 @@ export function tee(reader, count = 2) {
   const channels = []
   for (let i = 0; i < count; i++) channels.push(channel())
   reader
-    .sink(v => channels.forEach(([read, write]) => write.send(v)))
+    .sink(v => channels.forEach(([_, write]) => write.send(v)))
     .then(() => channels.forEach(([_, write]) => write.close()))
     .catch(e => channels.forEach(([_, write]) => write.err(e)))
-  return channels.map(([read, write]) => read)
+  return channels.map(([read, _]) => read)
 }
 
 export function take(reader, n = 10) {

@@ -3,29 +3,13 @@
   "version": "2.0.0",
   "description": "Resources all the way down",
   "type": "module",
-  "main": "src/index.js",
   "types": "src/types.d.ts",
   "exports": {
-    ".": "./src/index.js",
-    "./platform": "./src/kernel/platform.js",
-    "./resources": "./src/resources/index.js",
-    "./resources/propagators": "./src/resources/propagators.js",
-    "./infra/garage": "./src/infra/garage.js",
-    "./infra/tracing": "./src/infra/tracing.js",
-    "./link/runtime": "./src/link/runtime.js",
-    "./link/client": "./src/link/client.js",
-    "./link/protocol-v1": "./src/link/protocol-v1.js",
-    "./platforms/http": "./src/platforms/http.js",
-    "./platforms/fuse": "./src/platforms/fuse.js",
-    "./platforms/ws": "./src/platforms/ws.js",
-    "./platforms/fuse-remote": "./src/platforms/fuse-remote.js"
+    ".": "./src/index.js"
   },
   "scripts": {
     "test": "vitest run"
   },
   "license": "AGPL-3.0",
-  "dependencies": {
-    "@bassline/fs": "workspace:*",
-    "ws": "^8.18.0"
-  }
+  "dependencies": {}
 }

@@ -4,7 +4,7 @@
 #+property: header-args:js  :mkdirp yes :noweb yes
 #+property: header-args:js+ :results output
 #+OPTIONS: toc:2 num:t html-style:nil html-postamble:nil ^:nil
-#+HTML_HEAD: <link rel="stylesheet" href="book.css"/>
+#+HTML_HEAD: <link rel="stylesheet" href="style.css"/>
 
 * Introduction
 This literate document contains the source code for the core of [[https://bassline.dev][Bassline]] v2.
@@ -30,7 +30,7 @@ For each part of the kernel, we will separate the abstract idea from the concret
 
 ** Messages
 :PROPERTIES:
-:header-args: :tangle book/messages.js
+:header-args: :tangle ../src/messages.js
 :END:
 
 *** Abstractly
@@ -110,7 +110,7 @@ export const throwFault = (condition, msg, context = {}) => {throw fault(conditi
 
 ** Communication
 :PROPERTIES:
-:header-args: :tangle book/channel.js
+:header-args: :tangle ../src/channel.js
 :END:
 
 *** Abstractly
@@ -401,8 +401,8 @@ Readers also have two convenience methods that aren't standalone functions:
 
 The =thru= method on readers lets users build their own combinators as simple functions from reader to reader. Here are some examples.
 
-#+begin_src js :tangle book/channel-example.js
-import { channel, merge } from "./channel.js"
+#+begin_src js :tangle ../examples/channel-example.js
+import { channel, merge } from "../src/channels.js"
 
 const timeout = ms => new Promise(res => setTimeout(res, ms))
 
@@ -459,7 +459,7 @@ What follows is one transport: newline-delimited JSON over Unix sockets. It exis
 
 *** Framing
 :PROPERTIES:
-:header-args: :tangle book/client.js
+:header-args: :tangle ../src/client.js
 :END:
 
 =readFrames= turns a socket's data events into a reader of parsed messages. =writeFrames= does the reverse.
@@ -509,7 +509,7 @@ export function writeFrames(socket) {
 
 A client connects to a socket and gets back a local =[reader, writer]= pair backed by network I/O.
 
-#+begin_src js :tangle book/client.js
+#+begin_src js :tangle ../src/client.js
 export function connect(options = {}) {
   const socket = net.createConnection(options)
   const read = readFrames(socket)
@@ -520,7 +520,7 @@ export function connect(options = {}) {
 
 *** Serving
 :PROPERTIES:
-:header-args: :tangle book/server.js
+:header-args: :tangle ../src/server.js
 :END:
 
 A server listens on a socket and produces a reader of connections. Each connection is itself a =[reader, writer]= pair. In this implementation, the incoming connections are surfaced through the same channel-backed reader interface.
@@ -614,7 +614,7 @@ The boot script is the only thing that's "configured" in the traditional sense. 
 
 * Utilities
 :PROPERTIES:
-:header-args: :tangle book/utils.js
+:header-args: :tangle ../src/utils.js
 :END:
 ** Type Predicates
 

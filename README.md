@@ -1,61 +1,27 @@
 # Bassline
 
-A programming environment where everything is a resource.
+A system for partial information programming.
 
-A resource is a small computational thing that communicates via messages. Messages are either gets (asking for information) or puts (giving information). That's the whole protocol.
+Programs in Bassline work from incomplete messages. They build local understanding from what they have, act on new information, and continue.
 
-## Resources
+Anything outside your local perspective is encountered through communication. When that communication yields information that matters, we observe it as a resource. We do not need a complete account of what it is, where it is, or how it produces what we receive.
 
-In JavaScript, resources are exposed as functions. A `put` key in the message distinguishes the two kinds:
+## Source
 
-```javascript
-counter({ put: 5 }) // put — giving it a value
-counter({}) // get — asking for the value → 5
-```
-
-We define resource types using classes, but that's an API choice. The resource is the thing that handles the message — the function is just the interface, the class is just the implementation.
-
-## Platforms and modules
-
-Loosely inspired by Newspeak's module system, nothing in Bassline imports from packages. Instead, everything is a function that receives the platform:
-
-```javascript
-// a module
-export default function (platform) {
-  class MyThing extends platform.classes.Resource {
-    get() {
-      return this.value
-    }
-    put(v) {
-      this.value = v
-    }
-  }
-  platform.define({ MyThing })
-}
-
-// a deploy script — same shape
-function setup(platform) {
-  platform.root({ put: platform.create.Slot({ value: 0 }), at: 'counter' })
-}
-```
-
-The platform provides everything a function needs. Swap the platform and the code sees a different world without knowing. A gated platform with fewer classes or a narrower root is a capability boundary.
-
-## Packages
+The core is a literate document: [`packages/core/book/v2.org`](packages/core/book/v2.org)
 
 ```
-packages/core/       Platform, resources, projections (HTTP, FUSE)
-packages/eth/        Ethereum JSON-RPC as a resource tree
-packages/fs/         Standalone Rust FUSE bridge
-
-apps/visual/         Visual inspector UI
+packages/
+  core/       messages, channels, transports, deployment
+  eth/        Ethereum JSON-RPC as a resource tree
+  fs/         FUSE bridge
 ```
 
 ## Running
 
 ```bash
 pnpm install
-pnpm test
+node packages/core/book/channel-example.js
 ```
 
 ## License
