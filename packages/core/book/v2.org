@@ -133,7 +133,16 @@ In this book, communication is exposed as a =[reader, writer]= pair. The reader 
 
 That pair is implemented with channels. Calling =channel()= returns a =[reader, writer]= pair. The writer pushes values in; the reader consumes them through combinators. =sink= is the primary way to consume a reader. It drives the reader and calls a function for each value. Every combinator (=map=, =filter=, =scan=, etc.) returns a new reader with the same combinator methods, so pipelines compose naturally.
 
-Coordination is not a special subsystem layered on top of this. It is what happens when participants interpret messages, infer enough structure to proceed, and respond from what they know. If something protocol-like emerges, it does so as a stable pattern in message flow, not as a privileged runtime concept.
+#+begin_quote
+IMPORTANT!
+While channels are "single-consumer" they can easily perform fanout by using a custom =sink= to consume the reader and forward consumed values, or by using the =tee= combinator.
+
+The reason for this design is by making channels single-consumer consumers and producers are decoupled and the implementation stays simple.
+
+If they were multiple-consumer, then the channel would be responsible for handling replication, and tracking references, which would hurt the simplicity of the system!
+#+end_quote
+
+Coordination doesn't need a special subsystem for our system. Because coordination is just what happens when participants interpret messages, infer enough structure to proceed, and respond from what they know. If something protocol-like emerges, it does so as a stable pattern in message flow, not as a privileged runtime concept.
 
 *** Channel Implementation
 
@@ -142,6 +151,8 @@ The concrete implementation here uses channel classes that manage a queue of val
 Users do not touch these classes directly. The factories below return =[reader, writer]= pairs that hide the internals.
 
 #+begin_src js
+import { fault } from "./messages.js"
+
 export const ERR = Symbol.for('channel.err')
 export const WAITING = Symbol.for('channel.waiting')
 export const CLOSED = Symbol.for('channel.closed')
@@ -210,6 +221,7 @@ export class Channel {
       sink: fn => sink(reader, fn),
       map: fn => map(reader, fn),
       filter: fn => filter(reader, fn),
+      guard: (pred, cb) => guard(reader, pred, cb),
       tee: count => tee(reader, count),
       take: n => take(reader, n),
       scan: (fn, seed) => scan(reader, fn, seed),
@@ -320,20 +332,36 @@ export function map(reader, fn) {
 }
 #+end_src
 
+**** =guard(reader, predicate, ifFalse)=
+
+This gives us a combinator that easily expresses policy and further consideration upon receiving a message.
+
+If the predicate is =falsy= for a value, it will execute =ifFalse(value, writer)=, otherwise it will pass through.
+
+#+begin_src js
+const defaultGuard = (value, _writer) => fault('guard clause failed, exiting', value)
+
+export function guard(reader, predicate, ifFalse = defaultGuard) {
+  const [out, writer] = channel()
+  reader
+    .sink(async v => {
+      if(await predicate(v)) writer.send(v)
+      else await ifFalse(v, writer)
+    })
+    .then(writer.close)
+    .catch(writer.err)
+  return out
+}
+#+end_src
+
+
 **** =filter(reader, fn)=
 
 Keeps only values for which =fn= returns truthy. The predicate can be async.
 
 #+begin_src js
 export function filter(reader, fn) {
-  const [out, writer] = channel()
-  reader
-    .sink(async v => {
-      if (await fn(v)) writer.send(v)
-    })
-    .then(writer.close)
-    .catch(writer.err)
-  return out
+  return guard(reader, fn, () => {})
 }
 #+end_src
 

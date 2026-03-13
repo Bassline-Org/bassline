@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-03-12 Thu 20:42 -->
+<!-- 2026-03-12 Thu 22:28 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bassline V2</title>
@@ -22,40 +22,40 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org1612907">1. Introduction</a>
+<li><a href="#org0856fe8">1. Introduction</a>
 <ul>
-<li><a href="#org7a284a8">1.1. TLDR</a></li>
+<li><a href="#org35b7a30">1.1. TLDR</a></li>
 </ul>
 </li>
-<li><a href="#orgd2f633c">2. The Kernel</a>
+<li><a href="#org83ae226">2. The Kernel</a>
 <ul>
-<li><a href="#org373d8b2">2.1. Messages</a></li>
-<li><a href="#orgc02aff6">2.2. Communication</a></li>
+<li><a href="#org27561bd">2.1. Messages</a></li>
+<li><a href="#org79b87e7">2.2. Communication</a></li>
 </ul>
 </li>
-<li><a href="#orgd683449">3. Transports</a>
+<li><a href="#orga48fcdb">3. Transports</a>
 <ul>
-<li><a href="#orgf2cdf8e">3.1. Abstractly</a></li>
-<li><a href="#orga3e7a70">3.2. Concretely</a></li>
+<li><a href="#org0ed8b7e">3.1. Abstractly</a></li>
+<li><a href="#orgf497d46">3.2. Concretely</a></li>
 </ul>
 </li>
-<li><a href="#orgb3ce095">4. Deployment</a>
+<li><a href="#orga7e695f">4. Deployment</a>
 <ul>
-<li><a href="#org49b3531">4.1. Abstractly</a></li>
-<li><a href="#org309b028">4.2. Concretely</a></li>
+<li><a href="#org0694715">4.1. Abstractly</a></li>
+<li><a href="#org5124d55">4.2. Concretely</a></li>
 </ul>
 </li>
-<li><a href="#orga87d086">5. Utilities</a>
+<li><a href="#org5752c28">5. Utilities</a>
 <ul>
-<li><a href="#orgacbab44">5.1. Type Predicates</a></li>
-<li><a href="#org6fd6b68">5.2. Misc</a></li>
+<li><a href="#orgf64cefb">5.1. Type Predicates</a></li>
+<li><a href="#orgf7aaef1">5.2. Misc</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org1612907" class="outline-2">
-<h2 id="org1612907"><span class="section-number-2">1.</span> Introduction</h2>
+<div id="outline-container-org0856fe8" class="outline-2">
+<h2 id="org0856fe8"><span class="section-number-2">1.</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 This literate document contains the source code for the core of <a href="https://bassline.dev">Bassline</a> v2.
@@ -65,8 +65,8 @@ This literate document contains the source code for the core of <a href="https:/
 Bassline is designed to be hacked on and modified, so we encourage people to read this!
 </p>
 </div>
-<div id="outline-container-org7a284a8" class="outline-3">
-<h3 id="org7a284a8"><span class="section-number-3">1.1.</span> TLDR</h3>
+<div id="outline-container-org35b7a30" class="outline-3">
+<h3 id="org35b7a30"><span class="section-number-3">1.1.</span> TLDR</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
 Bassline is a system for partial information programming.
@@ -90,8 +90,8 @@ And because the model never assumes a closed world, growth uses the same mechani
 </div>
 </div>
 </div>
-<div id="outline-container-orgd2f633c" class="outline-2">
-<h2 id="orgd2f633c"><span class="section-number-2">2.</span> The Kernel</h2>
+<div id="outline-container-org83ae226" class="outline-2">
+<h2 id="org83ae226"><span class="section-number-2">2.</span> The Kernel</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 The kernel here starts with messages and a local capability for communication. In this book that capability is implemented with reader/writer pairs backed by channels. The important thing is the ability to exchange and observe information, not the queue or the exact interface shape.
@@ -101,12 +101,12 @@ The kernel here starts with messages and a local capability for communication. I
 For each part of the kernel, we will separate the abstract idea from the concrete implementation used in this book. The abstract layer explains what shape of thing we are modeling. The concrete layer shows one minimal JavaScript realization of that shape.
 </p>
 </div>
-<div id="outline-container-org373d8b2" class="outline-3">
-<h3 id="org373d8b2"><span class="section-number-3">2.1.</span> Messages</h3>
+<div id="outline-container-org27561bd" class="outline-3">
+<h3 id="org27561bd"><span class="section-number-3">2.1.</span> Messages</h3>
 <div class="outline-text-3" id="text-2-1">
 </div>
-<div id="outline-container-org3dbfcbe" class="outline-4">
-<h4 id="org3dbfcbe"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
+<div id="outline-container-org7ce4ccc" class="outline-4">
+<h4 id="org7ce4ccc"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
 <div class="outline-text-4" id="text-2-1-1">
 <p>
 A message is a fragment of partial information. It is whatever can be locally held, passed around, inspected, and combined without requiring a complete picture of the world.
@@ -117,8 +117,8 @@ A message does not come with privileged meaning beyond what participants give it
 </p>
 </div>
 </div>
-<div id="outline-container-org39c3723" class="outline-4">
-<h4 id="org39c3723"><span class="section-number-4">2.1.2.</span> Concretely</h4>
+<div id="outline-container-org80868d3" class="outline-4">
+<h4 id="org80868d3"><span class="section-number-4">2.1.2.</span> Concretely</h4>
 <div class="outline-text-4" id="text-2-1-2">
 <p>
 A message is a plain object with string keys. It can be empty, partially filled, or nested inside other messages.
@@ -166,8 +166,8 @@ The concrete representation is intentionally minimal. Plain objects are open-end
 </div>
 </div>
 </div>
-<div id="outline-container-org339d6ea" class="outline-4">
-<h4 id="org339d6ea"><span class="section-number-4">2.1.3.</span> Exception Messages</h4>
+<div id="outline-container-org3e7f6fc" class="outline-4">
+<h4 id="org3e7f6fc"><span class="section-number-4">2.1.3.</span> Exception Messages</h4>
 <div class="outline-text-4" id="text-2-1-3">
 <p>
 We cannot expect our systems to run smoothly, which is why we define these messages.
@@ -212,7 +212,7 @@ For now we define two kinds of exceptional states.
 </table>
 </div>
 <ol class="org-ol">
-<li><a id="org78b4448"></a>Non Fatal Exceptions: Warnings<br />
+<li><a id="org3fff254"></a>Non Fatal Exceptions: Warnings<br />
 <div class="outline-text-5" id="text-2-1-3-1">
 <p>
 This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
@@ -224,7 +224,7 @@ This means that something was able to complete what it needed to, but it has som
 </div>
 </div>
 </li>
-<li><a id="org2a53a79"></a>Fatal Errors: Fault<br />
+<li><a id="org39c9036"></a>Fatal Errors: Fault<br />
 <div class="outline-text-5" id="text-2-1-3-2">
 <p>
 This indicates that processing cannot continue, and we must stop.
@@ -253,12 +253,12 @@ Unlike warnings, which are used to annotate the message being processed, we thro
 </ol>
 </div>
 </div>
-<div id="outline-container-orgc02aff6" class="outline-3">
-<h3 id="orgc02aff6"><span class="section-number-3">2.2.</span> Communication</h3>
+<div id="outline-container-org79b87e7" class="outline-3">
+<h3 id="org79b87e7"><span class="section-number-3">2.2.</span> Communication</h3>
 <div class="outline-text-3" id="text-2-2">
 </div>
-<div id="outline-container-org1b754ec" class="outline-4">
-<h4 id="org1b754ec"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
+<div id="outline-container-org5e3612d" class="outline-4">
+<h4 id="org5e3612d"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
 <div class="outline-text-4" id="text-2-2-1">
 <p>
 Communication is the local capability to receive new information and contribute new information. Bassline does not start from a rigid request-response model, because that assumes too much structure too early. Instead, communication is ongoing, and participants coordinate by processing messages and inferring enough structure from what they know to continue.
@@ -269,8 +269,8 @@ Communication needs a shape that preserves decoupling. Producers should be able 
 </p>
 </div>
 </div>
-<div id="outline-container-org1e4ba3d" class="outline-4">
-<h4 id="org1e4ba3d"><span class="section-number-4">2.2.2.</span> Concretely</h4>
+<div id="outline-container-orgef6ee36" class="outline-4">
+<h4 id="orgef6ee36"><span class="section-number-4">2.2.2.</span> Concretely</h4>
 <div class="outline-text-4" id="text-2-2-2">
 <p>
 In this book, communication is exposed as a <code>[reader, writer]</code> pair. The reader consumes arriving messages. The writer contributes messages. Together they let producers and consumers stay decoupled while still participating in the same flow of information.
@@ -285,8 +285,8 @@ Coordination is not a special subsystem layered on top of this. It is what happe
 </p>
 </div>
 </div>
-<div id="outline-container-org1dfad54" class="outline-4">
-<h4 id="org1dfad54"><span class="section-number-4">2.2.3.</span> Channel Implementation</h4>
+<div id="outline-container-org6c0d714" class="outline-4">
+<h4 id="org6c0d714"><span class="section-number-4">2.2.3.</span> Channel Implementation</h4>
 <div class="outline-text-4" id="text-2-2-3">
 <p>
 The concrete implementation here uses channel classes that manage a queue of values with a set of waiting consumers. When a value is written and someone is waiting, it resolves immediately. Otherwise it buffers. This implementation is single-consumer: calling <code>consume()</code> more than once throws.
@@ -421,8 +421,8 @@ Users do not touch these classes directly. The factories below return <code>[rea
 </div>
 </div>
 </div>
-<div id="outline-container-orgf528218" class="outline-4">
-<h4 id="orgf528218"><span class="section-number-4">2.2.4.</span> Factories</h4>
+<div id="outline-container-org7811e53" class="outline-4">
+<h4 id="org7811e53"><span class="section-number-4">2.2.4.</span> Factories</h4>
 <div class="outline-text-4" id="text-2-2-4">
 <p>
 The factories are the public API. Each returns a <code>[reader, writer]</code> pair.
@@ -453,15 +453,15 @@ The factories are the public API. Each returns a <code>[reader, writer]</code> p
 </div>
 </div>
 </div>
-<div id="outline-container-org442bf01" class="outline-4">
-<h4 id="org442bf01"><span class="section-number-4">2.2.5.</span> Combinators</h4>
+<div id="outline-container-org44c181c" class="outline-4">
+<h4 id="org44c181c"><span class="section-number-4">2.2.5.</span> Combinators</h4>
 <div class="outline-text-4" id="text-2-2-5">
 <p>
 Combinators transform readers into new readers. Every reader object has these as methods (<code>reader.map(fn)</code>, <code>reader.filter(fn)</code>, etc.), and the returned reader has them too, so they chain.
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="org721a0b6"></a><code>sink(reader, fn)</code><br />
+<li><a id="orgd5f14b3"></a><code>sink(reader, fn)</code><br />
 <div class="outline-text-5" id="text-2-2-5-1">
 <p>
 The terminal combinator. Consumes every value from the reader, calling <code>fn</code> for each one. Returns a promise that resolves when the reader closes.
@@ -477,7 +477,7 @@ The terminal combinator. Consumes every value from the reader, calling <code>fn<
 </div>
 </div>
 </li>
-<li><a id="org59940cb"></a><code>map(reader, fn)</code><br />
+<li><a id="orgf39b107"></a><code>map(reader, fn)</code><br />
 <div class="outline-text-5" id="text-2-2-5-2">
 <p>
 Transforms each value through <code>fn</code>. The function can be async. Returns a new reader of the transformed values.
@@ -496,7 +496,7 @@ Transforms each value through <code>fn</code>. The function can be async. Return
 </div>
 </div>
 </li>
-<li><a id="orga5b9fc0"></a><code>filter(reader, fn)</code><br />
+<li><a id="org3e25df1"></a><code>filter(reader, fn)</code><br />
 <div class="outline-text-5" id="text-2-2-5-3">
 <p>
 Keeps only values for which <code>fn</code> returns truthy. The predicate can be async.
@@ -517,7 +517,7 @@ Keeps only values for which <code>fn</code> returns truthy. The predicate can be
 </div>
 </div>
 </li>
-<li><a id="org5037bb4"></a><code>tee(reader, count)</code><br />
+<li><a id="orgdb708f6"></a><code>tee(reader, count)</code><br />
 <div class="outline-text-5" id="text-2-2-5-4">
 <p>
 Splits one reader into <code>count</code> independent readers. Every value is sent to all of them.
@@ -537,7 +537,7 @@ Splits one reader into <code>count</code> independent readers. Every value is se
 </div>
 </div>
 </li>
-<li><a id="org4b6ce54"></a><code>take(reader, n)</code><br />
+<li><a id="org89658a4"></a><code>take(reader, n)</code><br />
 <div class="outline-text-5" id="text-2-2-5-5">
 <p>
 Reads at most <code>n</code> values from the reader, then closes.
@@ -565,7 +565,7 @@ Reads at most <code>n</code> values from the reader, then closes.
 </div>
 </div>
 </li>
-<li><a id="org9e03b82"></a><code>scan(reader, fn, seed)</code><br />
+<li><a id="orge732aa5"></a><code>scan(reader, fn, seed)</code><br />
 <div class="outline-text-5" id="text-2-2-5-6">
 <p>
 Accumulates values. Like <code>Array.reduce</code>, but emits each intermediate result. <code>fn(accumulator, value)</code> returns the next accumulator, which is sent downstream.
@@ -588,7 +588,7 @@ Accumulates values. Like <code>Array.reduce</code>, but emits each intermediate 
 </div>
 </div>
 </li>
-<li><a id="org250fa46"></a><code>merge(readers)</code><br />
+<li><a id="org4beb381"></a><code>merge(readers)</code><br />
 <div class="outline-text-5" id="text-2-2-5-7">
 <p>
 Combines multiple readers into one. Values arrive in whatever order the sources produce them. Closes when all sources close.
@@ -617,8 +617,8 @@ Readers also have two convenience methods that aren&rsquo;t standalone functions
 </li>
 </ol>
 </div>
-<div id="outline-container-org8ecc3c9" class="outline-4">
-<h4 id="org8ecc3c9"><span class="section-number-4">2.2.6.</span> User-level Combinators</h4>
+<div id="outline-container-org1fb4be7" class="outline-4">
+<h4 id="org1fb4be7"><span class="section-number-4">2.2.6.</span> User-level Combinators</h4>
 <div class="outline-text-4" id="text-2-2-6">
 <p>
 The <code>thru</code> method on readers lets users build their own combinators as simple functions from reader to reader. Here are some examples.
@@ -672,23 +672,23 @@ console.log(count)
 </div>
 </div>
 </div>
-<div id="outline-container-orgd683449" class="outline-2">
-<h2 id="orgd683449"><span class="section-number-2">3.</span> Transports</h2>
+<div id="outline-container-orga48fcdb" class="outline-2">
+<h2 id="orga48fcdb"><span class="section-number-2">3.</span> Transports</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 As above, it helps to separate the abstract role of a transport from the concrete transport used in this book.
 </p>
 </div>
-<div id="outline-container-orgf2cdf8e" class="outline-3">
-<h3 id="orgf2cdf8e"><span class="section-number-3">3.1.</span> Abstractly</h3>
+<div id="outline-container-org0ed8b7e" class="outline-3">
+<h3 id="org0ed8b7e"><span class="section-number-3">3.1.</span> Abstractly</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
 A transport adapts some external medium into local communication capabilities. This matters because the programming model should not change just because information crossed a process boundary, a machine boundary, or a device boundary. Local and non-local communication differ in mechanics, but they should not require different conceptual tools.
 </p>
 </div>
 </div>
-<div id="outline-container-orga3e7a70" class="outline-3">
-<h3 id="orga3e7a70"><span class="section-number-3">3.2.</span> Concretely</h3>
+<div id="outline-container-orgf497d46" class="outline-3">
+<h3 id="orgf497d46"><span class="section-number-3">3.2.</span> Concretely</h3>
 <div class="outline-text-3" id="text-3-2">
 <p>
 Every transport produces the same thing: a <code>[reader, writer]</code> pair. What differs is the medium underneath and whether that medium carries raw bytes or discrete messages.
@@ -698,16 +698,16 @@ Every transport produces the same thing: a <code>[reader, writer]</code> pair. W
 Byte transports (TCP sockets, stdio, serial) carry raw chunks. They need a framing layer to delimit and parse messages. Message transports (WebSocket, WebWorker/MessagePort) carry discrete messages natively and skip framing entirely.
 </p>
 </div>
-<div id="outline-container-orgbf6201b" class="outline-4">
-<h4 id="orgbf6201b"><span class="section-number-4">3.2.1.</span> Framing</h4>
+<div id="outline-container-org46867b3" class="outline-4">
+<h4 id="org46867b3"><span class="section-number-4">3.2.1.</span> Framing</h4>
 <div class="outline-text-4" id="text-3-2-1">
 <p>
 Framing is separated from any specific transport. <code>readFrame</code> is a <code>reader → reader</code> transform: it accumulates chunks, splits on newlines, and parses each line as JSON. <code>writeFrame</code> is a plain function that serializes a message as a JSON line.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'./messages.js'</span>
-<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'../messages.js'</span>
+<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'../channel.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">readFrame</span> = reader =&gt; {
   <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">out</span>, <span style="color: #718CA1;">write</span>] = channel()
@@ -721,7 +721,7 @@ Framing is separated from any specific transport. <code>readFrame</code> is a <c
         buffer = buffer.slice(nl + <span style="color: #E27E8D; font-weight: bold;">1</span>)
         <span style="color: #5EC4FF;">if</span> (!line) <span style="color: #5EC4FF;">continue</span>
         <span style="color: #5EC4FF;">try</span> { write.send(message(JSON.parse(line))) }
-        <span style="color: #5EC4FF;">catch</span> (_) {}
+        <span style="color: #5EC4FF;">catch</span> (e) { console.error(<span style="color: #539AFC;">'readFrame parse error: '</span>, e)}
       }
     })
     .then(write.close)
@@ -738,8 +738,8 @@ Framing is separated from any specific transport. <code>readFrame</code> is a <c
 </p>
 </div>
 </div>
-<div id="outline-container-orgc2875a0" class="outline-4">
-<h4 id="orgc2875a0"><span class="section-number-4">3.2.2.</span> Socket</h4>
+<div id="outline-container-org72508ca" class="outline-4">
+<h4 id="org72508ca"><span class="section-number-4">3.2.2.</span> Socket</h4>
 <div class="outline-text-4" id="text-3-2-2">
 <p>
 A socket is a byte transport. <code>fromSocket</code> adapts a Node.js socket into a <code>[reader, writer]</code> pair by wiring socket events to channels on the read side and piping through <code>writeFrame</code> on the write side. <code>readFrame</code> parses the incoming chunks.
@@ -747,8 +747,8 @@ A socket is a byte transport. <code>fromSocket</code> adapts a Node.js socket in
 
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">import</span> net from <span style="color: #539AFC;">'node:net'</span>
-<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
-<span style="color: #5EC4FF;">import</span> { readFrame, writeFrame } from <span style="color: #539AFC;">'./frames.js'</span>
+<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'../channel.js'</span>
+<span style="color: #5EC4FF;">import</span> { readFrame, writeFrame } from <span style="color: #539AFC;">'../frame/jsonl.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromSocket(<span style="color: #718CA1;">socket</span>) {
   <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">read</span>, <span style="color: #718CA1;">write</span>] = channel()
@@ -775,17 +775,17 @@ A socket is a byte transport. <code>fromSocket</code> adapts a Node.js socket in
 </div>
 </div>
 </div>
-<div id="outline-container-orgfd99824" class="outline-4">
-<h4 id="orgfd99824"><span class="section-number-4">3.2.3.</span> Serving</h4>
+<div id="outline-container-org55bea36" class="outline-4">
+<h4 id="org55bea36"><span class="section-number-4">3.2.3.</span> Serving (TCP)</h4>
 <div class="outline-text-4" id="text-3-2-3">
 <p>
-A server listens on a socket and produces a reader of connections. Each connection is itself a <code>[reader, writer]</code> pair, produced by <code>fromSocket</code>.
+A TCP server listens on a socket and produces a reader of connections. Each connection is itself a <code>[reader, writer]</code> pair, produced by <code>fromSocket</code>.
 </p>
 
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">import</span> net from <span style="color: #539AFC;">'node:net'</span>
-<span style="color: #5EC4FF;">import</span> { fromSocket } from <span style="color: #539AFC;">'./client.js'</span>
-<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
+<span style="color: #5EC4FF;">import</span> { fromSocket } from <span style="color: #539AFC;">'../transports/socket.js'</span>
+<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'../channel.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> serve(<span style="color: #718CA1;">options</span> = {}) {
   <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">r</span>, <span style="color: #718CA1;">w</span>] = channel()
@@ -801,22 +801,44 @@ A server listens on a socket and produces a reader of connections. Each connecti
 </div>
 </div>
 </div>
-<div id="outline-container-org4db88a6" class="outline-4">
-<h4 id="org4db88a6"><span class="section-number-4">3.2.4.</span> WebSocket</h4>
+<div id="outline-container-org8eccd24" class="outline-4">
+<h4 id="org8eccd24"><span class="section-number-4">3.2.4.</span> Serving (WebSocket)</h4>
 <div class="outline-text-4" id="text-3-2-4">
+<p>
+A WebSocket server wraps an existing <code>WebSocketServer</code> instance and produces a reader of connections, matching the TCP serve API shape. The caller brings their own <code>WebSocketServer</code> — no <code>ws</code> dependency in core.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { fromWebSocket } from <span style="color: #539AFC;">'../transports/websocket.js'</span>
+<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'../channel.js'</span>
+
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> serve(<span style="color: #718CA1;">wss</span>) {
+  <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">r</span>, <span style="color: #718CA1;">w</span>] = channel()
+  wss.on(<span style="color: #539AFC;">'connection'</span>, ws =&gt; w.send(fromWebSocket(ws)))
+  wss.on(<span style="color: #539AFC;">'close'</span>, () =&gt; w.close())
+  wss.on(<span style="color: #539AFC;">'error'</span>, e =&gt; w.err(e))
+  <span style="color: #5EC4FF;">return</span> [r, wss]
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-orga79641d" class="outline-4">
+<h4 id="orga79641d"><span class="section-number-4">3.2.5.</span> WebSocket</h4>
+<div class="outline-text-4" id="text-3-2-5">
 <p>
 A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete message, so no framing is needed — just JSON encode/decode. This works in the browser with native <code>WebSocket</code>, in Node.js with the <code>ws</code> package, and for <code>RTCDataChannel</code> (same event interface).
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
-<span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'./messages.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'../channel.js'</span>
+<span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'../messages.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromWebSocket(<span style="color: #718CA1;">ws</span>) {
   <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">read</span>, <span style="color: #718CA1;">write</span>] = channel()
   ws.addEventListener(<span style="color: #539AFC;">'message'</span>, e =&gt; {
     <span style="color: #5EC4FF;">try</span> { write.send(message(JSON.parse(e.data))) }
-    <span style="color: #5EC4FF;">catch</span> (_) {}
+    <span style="color: #5EC4FF;">catch</span> (e) { console.error(<span style="color: #539AFC;">'failed to send: '</span>, e)}
   })
   ws.addEventListener(<span style="color: #539AFC;">'close'</span>, () =&gt; write.close())
   ws.addEventListener(<span style="color: #539AFC;">'error'</span>, e =&gt; write.err(e))
@@ -833,16 +855,16 @@ A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete 
 </div>
 </div>
 </div>
-<div id="outline-container-org8709ae5" class="outline-4">
-<h4 id="org8709ae5"><span class="section-number-4">3.2.5.</span> WebWorker</h4>
-<div class="outline-text-4" id="text-3-2-5">
+<div id="outline-container-org21ecc3e" class="outline-4">
+<h4 id="org21ecc3e"><span class="section-number-4">3.2.6.</span> WebWorker</h4>
+<div class="outline-text-4" id="text-3-2-6">
 <p>
 A <code>MessagePort</code> is a message transport that uses structured clone — objects cross the boundary without serialization. Works with <code>Worker</code>, <code>MessagePort</code>, <code>SharedWorker.port</code>, and <code>BroadcastChannel</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
-<span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'./messages.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'../channel.js'</span>
+<span style="color: #5EC4FF;">import</span> { message } from <span style="color: #539AFC;">'../messages.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromPort(<span style="color: #718CA1;">port</span>) {
   <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">read</span>, <span style="color: #718CA1;">write</span>] = channel()
@@ -861,17 +883,17 @@ A <code>MessagePort</code> is a message transport that uses structured clone —
 </div>
 </div>
 </div>
-<div id="outline-container-orgeadd283" class="outline-4">
-<h4 id="orgeadd283"><span class="section-number-4">3.2.6.</span> Stdio</h4>
-<div class="outline-text-4" id="text-3-2-6">
+<div id="outline-container-org6de004a" class="outline-4">
+<h4 id="org6de004a"><span class="section-number-4">3.2.7.</span> Stdio</h4>
+<div class="outline-text-4" id="text-3-2-7">
 <p>
 Stdio is a byte transport, like TCP. It uses the same <code>readFrame=/=writeFrame</code> framing. This is what makes a REPL &ldquo;just another transport.&rdquo;
 </p>
 
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">import</span> readline from <span style="color: #539AFC;">'node:readline'</span>
-<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'./channel.js'</span>
-<span style="color: #5EC4FF;">import</span> { readFrame, writeFrame } from <span style="color: #539AFC;">'./frames.js'</span>
+<span style="color: #5EC4FF;">import</span> { channel } from <span style="color: #539AFC;">'../channel.js'</span>
+<span style="color: #5EC4FF;">import</span> { readFrame, writeFrame } from <span style="color: #539AFC;">'../frame/jsonl.js'</span>
 
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">function</span> fromStdio() {
   <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">rl</span> = readline.createInterface({ input: process.stdin })
@@ -894,15 +916,15 @@ Stdio is a byte transport, like TCP. It uses the same <code>readFrame=/=writeFra
 </div>
 </div>
 </div>
-<div id="outline-container-orgb3ce095" class="outline-2">
-<h2 id="orgb3ce095"><span class="section-number-2">4.</span> Deployment</h2>
+<div id="outline-container-orga7e695f" class="outline-2">
+<h2 id="orga7e695f"><span class="section-number-2">4.</span> Deployment</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 Deployment also has an abstract layer and a concrete one.
 </p>
 </div>
-<div id="outline-container-org49b3531" class="outline-3">
-<h3 id="org49b3531"><span class="section-number-3">4.1.</span> Abstractly</h3>
+<div id="outline-container-org0694715" class="outline-3">
+<h3 id="org0694715"><span class="section-number-3">4.1.</span> Abstractly</h3>
 <div class="outline-text-3" id="text-4-1">
 <p>
 A bassline system is deployed by making communication available somewhere and wiring local logic to it. Deployment is not where the system acquires a fixed command surface or a closed set of capabilities. It is where some part of the world becomes reachable for communication.
@@ -913,22 +935,22 @@ The reason this stays lightweight is the same reason the rest of the model stays
 </p>
 </div>
 </div>
-<div id="outline-container-org309b028" class="outline-3">
-<h3 id="org309b028"><span class="section-number-3">4.2.</span> Concretely</h3>
+<div id="outline-container-org5124d55" class="outline-3">
+<h3 id="org5124d55"><span class="section-number-3">4.2.</span> Concretely</h3>
 <div class="outline-text-3" id="text-4-2">
 <p>
 A bassline system can run as a daemon, a long-lived process listening on a socket. Interacting with it means obtaining a communication capability and exchanging messages.
 </p>
 </div>
-<div id="outline-container-orgaffd6bc" class="outline-4">
-<h4 id="orgaffd6bc"><span class="section-number-4">4.2.1.</span> The daemon is just a server with a sink</h4>
+<div id="outline-container-orgba6adc9" class="outline-4">
+<h4 id="orgba6adc9"><span class="section-number-4">4.2.1.</span> The daemon is just a server with a sink</h4>
 <div class="outline-text-4" id="text-4-2-1">
 <p>
 A boot script opens a socket and starts consuming connections. Each connection is a <code>[reader, writer]</code> pair. What the daemon does with those messages is determined by whatever logic is wired into the pipeline. There is no fixed set of capabilities.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { serve } from <span style="color: #539AFC;">'./server.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { serve } from <span style="color: #539AFC;">'./serve/tcp.js'</span>
 
 <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">connections</span>, <span style="color: #718CA1;">server</span>] = serve({ path: <span style="color: #539AFC;">'~/.bassline/sock'</span> })
 
@@ -945,15 +967,15 @@ The <code>handle</code> function is where all the logic lives. It could route me
 </p>
 </div>
 </div>
-<div id="outline-container-orgc6f2dab" class="outline-4">
-<h4 id="orgc6f2dab"><span class="section-number-4">4.2.2.</span> A REPL is just a transport</h4>
+<div id="outline-container-org064742e" class="outline-4">
+<h4 id="org064742e"><span class="section-number-4">4.2.2.</span> A REPL is just a transport</h4>
 <div class="outline-text-4" id="text-4-2-2">
 <p>
 A command-line interface is a connection over stdio instead of a socket. <code>fromStdio()</code> gives you a <code>[reader, writer]</code> pair backed by stdin/stdout with the same framing as TCP.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { fromStdio } from <span style="color: #539AFC;">'./stdio.js'</span>
+<pre class="src src-js"><span style="color: #5EC4FF;">import</span> { fromStdio } from <span style="color: #539AFC;">'./transports/stdio.js'</span>
 
 <span style="color: #5EC4FF;">const</span> [<span style="color: #718CA1;">read</span>, <span style="color: #718CA1;">write</span>] = fromStdio()
 </pre>
@@ -964,8 +986,8 @@ The downstream pipeline sees messages either way — same interface whether the 
 </p>
 </div>
 </div>
-<div id="outline-container-org499ba08" class="outline-4">
-<h4 id="org499ba08"><span class="section-number-4">4.2.3.</span> Custom command languages are just maps</h4>
+<div id="outline-container-org924fc92" class="outline-4">
+<h4 id="org924fc92"><span class="section-number-4">4.2.3.</span> Custom command languages are just maps</h4>
 <div class="outline-text-4" id="text-4-2-3">
 <p>
 Since a parser is a function from strings to messages, and <code>map</code> transforms a reader, a custom command language is just:
@@ -983,8 +1005,8 @@ The downstream pipeline sees messages either way.
 </p>
 </div>
 </div>
-<div id="outline-container-orgc2761ec" class="outline-4">
-<h4 id="orgc2761ec"><span class="section-number-4">4.2.4.</span> Convention</h4>
+<div id="outline-container-org605e319" class="outline-4">
+<h4 id="org605e319"><span class="section-number-4">4.2.4.</span> Convention</h4>
 <div class="outline-text-4" id="text-4-2-4">
 <p>
 By convention, a bassline daemon keeps its state under <code>~/.bassline/</code>, with <code>BASSLINE_HOME</code> as an override. The socket lives there. What else lives there (persistence files, logs, configuration) depends on what the boot script sets up.
@@ -997,12 +1019,12 @@ The boot script is the only thing that&rsquo;s &ldquo;configured&rdquo; in the t
 </div>
 </div>
 </div>
-<div id="outline-container-orga87d086" class="outline-2">
-<h2 id="orga87d086"><span class="section-number-2">5.</span> Utilities</h2>
+<div id="outline-container-org5752c28" class="outline-2">
+<h2 id="org5752c28"><span class="section-number-2">5.</span> Utilities</h2>
 <div class="outline-text-2" id="text-5">
 </div>
-<div id="outline-container-orgacbab44" class="outline-3">
-<h3 id="orgacbab44"><span class="section-number-3">5.1.</span> Type Predicates</h3>
+<div id="outline-container-orgf64cefb" class="outline-3">
+<h3 id="orgf64cefb"><span class="section-number-3">5.1.</span> Type Predicates</h3>
 <div class="outline-text-3" id="text-5-1">
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
@@ -1083,8 +1105,8 @@ The boot script is the only thing that&rsquo;s &ldquo;configured&rdquo; in the t
 </div>
 </div>
 </div>
-<div id="outline-container-org6fd6b68" class="outline-3">
-<h3 id="org6fd6b68"><span class="section-number-3">5.2.</span> Misc</h3>
+<div id="outline-container-orgf7aaef1" class="outline-3">
+<h3 id="orgf7aaef1"><span class="section-number-3">5.2.</span> Misc</h3>
 <div class="outline-text-3" id="text-5-2">
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">castArr</span> = (value) =&gt; isArray(value) ? value : [value]

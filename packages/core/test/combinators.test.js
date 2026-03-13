@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { channel, merge } from '../src/channel.js'
-import { update } from '../src/messages.js'
+import { Fault, update } from '../src/messages.js'
 
 // helper: create a channel with values already written and closed
 function of(...values) {
@@ -61,6 +61,45 @@ describe('filter', () => {
   it('empty result when nothing matches', async () => {
     const result = await collect(of(1, 2, 3).filter(() => false))
     expect(result).toEqual([])
+  })
+})
+
+describe('guard', () => {
+  it('passes values through when the predicate matches', async () => {
+    const result = await collect(of(2, 4, 6).guard(v => v % 2 === 0))
+    expect(result).toEqual([2, 4, 6])
+  })
+
+  it('lets ifFalse drop values and continue', async () => {
+    const result = await collect(
+      of(1, 2, 3, 4).guard(
+        v => v % 2 === 0,
+        async () => {}
+      )
+    )
+
+    expect(result).toEqual([2, 4])
+  })
+
+  it('lets ifFalse emit replacement values', async () => {
+    const result = await collect(
+      of(1, 2, 3).guard(
+        v => v % 2 === 0,
+        async (value, writer) => writer.send({ rejected: value })
+      )
+    )
+
+    expect(result).toEqual([{ rejected: 1 }, 2, { rejected: 3 }])
+  })
+
+  it('faults the stream by default when the predicate fails', async () => {
+    const collecting = collect(of('ok', 'bad').guard(v => v === 'ok'))
+
+    await expect(collecting).rejects.toBeInstanceOf(Fault)
+    await expect(collecting).rejects.toMatchObject({
+      condition: 'guard clause failed, exiting',
+      msg: 'bad',
+    })
   })
 })
 

@@ -1,3 +1,5 @@
+import { fault } from './messages.js'
+
 export const ERR = Symbol.for('channel.err')
 export const WAITING = Symbol.for('channel.waiting')
 export const CLOSED = Symbol.for('channel.closed')
@@ -66,6 +68,7 @@ export class Channel {
       sink: fn => sink(reader, fn),
       map: fn => map(reader, fn),
       filter: fn => filter(reader, fn),
+      guard: (pred, cb) => guard(reader, pred, cb),
       tee: count => tee(reader, count),
       take: n => take(reader, n),
       scan: (fn, seed) => scan(reader, fn, seed),
@@ -149,15 +152,22 @@ export function map(reader, fn) {
   return out
 }
 
-export function filter(reader, fn) {
+const defaultGuard = (value, _writer) => fault('guard clause failed, exiting', value)
+
+export function guard(reader, predicate, ifFalse = defaultGuard) {
   const [out, writer] = channel()
   reader
     .sink(async v => {
-      if (await fn(v)) writer.send(v)
+      if (await predicate(v)) writer.send(v)
+      else await ifFalse(v, writer)
     })
     .then(writer.close)
     .catch(writer.err)
   return out
+}
+
+export function filter(reader, fn) {
+  return guard(reader, fn, () => {})
 }
 
 export function tee(reader, count = 2) {
