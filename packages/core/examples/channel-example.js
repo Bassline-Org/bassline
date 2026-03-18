@@ -5,10 +5,7 @@ const timeout = ms => new Promise(res => setTimeout(res, ms))
 export const debounce =
   (ms = 300) =>
   reader =>
-    reader.map(async v => {
-      await timeout(ms)
-      return v
-    })
+    reader.map(async v => (await timeout(ms), v))
 
 export const dedup = (diff, seed) => reader => {
   const compare = diff ?? ((acc, curr) => acc !== curr)

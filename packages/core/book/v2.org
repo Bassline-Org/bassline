@@ -70,12 +70,12 @@ export const message = content => {
 }
 
 export function updateWith(msg, fn) {
-  return {...msg, ...fn(msg)}
+  return { ...msg, ...fn(msg) }
 }
 
 export function update(...args) {
   if (args.length === 1) {
-    const [fn] = args;
+    const [fn] = args
     return msg => updateWith(msg, fn)
   }
   if (args.length === 2) {
@@ -104,7 +104,7 @@ For now we define two kinds of exceptional states.
 This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
 
 #+begin_src js
-export const warning = reason => message({type: 'warning', body: reason})
+export const warning = reason => message({ type: 'warning', body: reason })
 #+end_src
 
 **** Fatal Errors: Fault
@@ -116,9 +116,9 @@ Unlike warnings, which are used to annotate the message being processed, we thro
 export class Fault extends Error {
   constructor(condition, msg, context = {}) {
     super(`fault: ${condition}`)
-    this.condition = condition;
-    this.msg = msg;
-    this.context = context;
+    this.condition = condition
+    this.msg = msg
+    this.context = context
   }
 }
 export const fault = (condition, msg, context) => {
@@ -332,12 +332,8 @@ Do note that this is an utility built on top of the single consumer channels, an
 #+begin_src js
 export const net = (chan = channel) => {
   const writers = new Set()
-  const wNet = {
-    send: msg => writers.forEach(w => w.send(msg)),
-    close: () => closeAll(...writers),
-    err: e => errAll(e, ...writers)
-  }
-  function join(cb = (r) => r) {
+
+  function join(cb = r => r) {
     const [rFromNet, wFromNet] = chan()
     const [rToNet, wToNet] = chan()
     const writer = {
@@ -349,13 +345,18 @@ export const net = (chan = channel) => {
       err: e => {
         errAll(e, wFromNet, wToNet)
         writers.delete(writer)
-      }
+      },
     }
     writers.add(writer)
-    rToNet.sink(netSink)
+    rToNet.sink(writer)
     return [cb(rFromNet), wToNet]
   }
-  return {join, send, close, err}
+  return {
+    send: msg => writers.forEach(w => w.send(msg)),
+    close: () => closeAll(...writers),
+    err: e => errAll(e, ...writers),
+    join,
+  }
 }
 #+end_src
 
@@ -376,7 +377,7 @@ async function sinkWriter(reader, writer) {
   try {
     await sink(reader, msg => writer.send(msg))
     writer.close?.()
-  } catch(e) {
+  } catch (e) {
     writer.err?.(e)
   }
 }
@@ -428,7 +429,7 @@ Just a guard that applies a boolean not to the result of the predicate.
 So rather than the guard clause firing if the result is false, it will fire when the result is true.
 
 #+begin_src js
-export function gate(reader, predicate, ifTrue = (v => v)) {
+export function gate(reader, predicate, ifTrue = v => v) {
   return guard(reader, async v => !(await predicate(v)), ifTrue)
 }
 #+end_src
@@ -454,7 +455,7 @@ export function tee(reader, count = 2) {
   reader.sink({
     send: v => channels.forEach(([_, write]) => write.send(v)),
     close: () => channels.forEach(([_, write]) => write.close()),
-    err: e => channels.forEach(([_, write]) => write.err(e))
+    err: e => channels.forEach(([_, write]) => write.err(e)),
   })
   return channels.map(([read, _]) => read)
 }
@@ -466,7 +467,7 @@ Calls =reader.tee(2)= and allows us to fork a pipeline without directly messing 
 
 #+begin_src js
 export function fork(reader, cb) {
-  const [a, b] = reader.tee(2);
+  const [a, b] = reader.tee(2)
   cb(b)
   return a
 }
@@ -538,37 +539,40 @@ Readers also have two convenience methods that aren't standalone functions:
 The =thru= method on readers lets users build their own combinators as simple functions from reader to reader. Here are some examples.
 
 #+begin_src js :tangle ../examples/channel-example.js
-import { channel, merge } from "../src/channel.js"
+import { channel, merge } from '../src/channel.js'
 
 const timeout = ms => new Promise(res => setTimeout(res, ms))
 
-export const debounce = (ms = 300) => reader => reader.map(async v => {
-  await timeout(ms);
-  return v
-})
+export const debounce =
+  (ms = 300) =>
+  reader =>
+    reader.map(async v => (await timeout(ms), v))
 
 export const dedup = (diff, seed) => reader => {
-  const compare = diff ?? ((acc, curr) => acc !== curr);
-  let last = seed;
+  const compare = diff ?? ((acc, curr) => acc !== curr)
+  let last = seed
   return reader.filter(async v => {
     const res = await compare(last, v)
-    if(res) {
+    if (res) {
       last = v
     }
     return res
   })
 }
 
-export const max = (seed = 0) => reader => reader
+export const max =
+  (seed = 0) =>
+  reader =>
+    reader
       .filter(v => typeof v === 'number')
-      .scan((acc, curr) => acc > curr ? acc : curr, seed)
+      .scan((acc, curr) => (acc > curr ? acc : curr), seed)
       .thru(dedup(null, seed))
 
 const [r, w] = channel()
-w.send(1,2,3,4,5,6,7,7,7,7,8,9,10);
+w.send(1, 2, 3, 4, 5, 6, 7, 7, 7, 7, 8, 9, 10)
 w.close()
 
-let count = 0;
+let count = 0
 await merge(r.tee(100))
   .tap(() => count++)
   .thru(max())
@@ -726,8 +730,11 @@ import { message } from '../messages.js'
 export function fromWebSocket(ws) {
   const [incoming, incomingWriter] = channel()
   ws.addEventListener('message', e => {
-    try { incomingWriter.send(message(JSON.parse(e.data))) }
-    catch (e) { console.error('failed to send: ', e) }
+    try {
+      incomingWriter.send(message(JSON.parse(e.data)))
+    } catch (e) {
+      console.error('failed to send: ', e)
+    }
   })
   ws.addEventListener('close', () => incomingWriter.close())
   ws.addEventListener('error', e => incomingWriter.err(e))
@@ -886,8 +893,8 @@ export const isNumber = v => typeof v === 'number'
 export const isString = v => typeof v === 'string'
 export const isFunction = v => typeof v === 'function'
 export const isPlainObject = obj => {
-  if (obj == null) return false;
-  return Object.getPrototypeOf(obj) === Object.prototype;
+  if (obj == null) return false
+  return Object.getPrototypeOf(obj) === Object.prototype
 }
 export const hasKeys = (obj, keys = []) => {
   if (isNil(obj)) return false
@@ -899,7 +906,7 @@ export const hasKeys = (obj, keys = []) => {
 #+end_src
 ** Misc
 #+begin_src js
-export const castArr = (value) => isArray(value) ? value : [value]
+export const castArr = value => isArray(value) ? value : [value]
 #+end_src
 
 #+BEGIN_EXPORT html
