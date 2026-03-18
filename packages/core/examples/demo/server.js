@@ -1,60 +1,48 @@
 import { WebSocketServer } from 'ws'
 import { serve as serveTcp } from '../../src/serve/tcp.js'
 import { serve as serveWs } from '../../src/serve/ws.js'
-import { merge } from '../../src/channel.js'
-import fs from 'node:fs'
+import { merge, net } from '../../src/channel.js'
+import { fault } from '../../src/messages.js'
 
-const sock = '/tmp/bl-demo.sock'
-try {
-  fs.unlinkSync(sock)
-} catch (e) {
-  console.log('failed to unlink socket: ', e)
-}
+const sock = process.argv[2] ?? '/tmp/bl-demo.sock'
+const port = Number(process.argv[3] ?? 3000)
+const serverName = process.argv[4] ?? 'primus-sux'
+const log = (...args) => console.log(`[${serverName}]`, ...args)
 
-const wss = new WebSocketServer({ port: 3000 })
+const wss = new WebSocketServer({ port })
 const [tcpConns, tcpServer] = serveTcp({ path: sock })
 const [wsConns] = serveWs(wss)
 const allConns = merge([tcpConns, wsConns])
 
-const clients = new Map()
+const lobby = net()
 
-console.log('ws  : ws://localhost:3000')
-console.log('tcp : ' + sock)
-console.log('---')
+log(`ws  : ws://localhost:${port}`)
+log(`tcp : ${sock}`)
+log('---')
+
+function converseWithClient(rClient, wClient) {
+  const [rNet, wNet] = lobby.join()
+  const clientId = crypto.randomUUID()
+
+  lobby.send({ joined: clientId })
+  wClient.send({ hello: 'welcome to the server, here is your id!', id: clientId })
+
+  rNet.sink(wClient)
+  rClient
+    .guard(
+      msg => msg?.id == null || msg?.id === clientId,
+      msg => fault('musnt change your id, for I am god over your identity', msg, { clientId })
+    )
+    .map(msg => ({ ...msg, id: clientId, reflectedBy: serverName, ts: Date.now() }))
+    .tap(msg => log('msg', JSON.stringify(msg)))
+    .sink(wNet)
+    .then(() => lobby.send({ left: clientId }))
+}
+
+await allConns.sink(([read, write]) => converseWithClient(read, write))
 
 process.on('SIGINT', () => {
   tcpServer.close()
   wss.close()
   process.exit()
-})
-
-function broadcast(msg) {
-  for (const w of clients.keys()) w.send(msg)
-}
-
-await allConns.sink(([read, write]) => {
-  clients.set(write, null)
-  console.log(`+ connection (${clients.size} total)`)
-  read
-    .sink(msg => {
-      if (msg.from && !clients.get(write)) {
-        clients.set(write, msg.from)
-        const join = { from: 'server', body: `${msg.from} has joined`, ts: Date.now() }
-        console.log('reflect:', join)
-        broadcast(join)
-      }
-      const reflected = { ...msg, via: 'server', ts: Date.now() }
-      console.log('reflect:', reflected)
-      broadcast(reflected)
-    })
-    .then(() => {
-      const id = clients.get(write)
-      clients.delete(write)
-      console.log(`- connection (${clients.size} total)`)
-      if (id) {
-        const leave = { from: 'server', body: `${id} has left`, ts: Date.now() }
-        console.log('reflect:', leave)
-        broadcast(leave)
-      }
-    })
 })

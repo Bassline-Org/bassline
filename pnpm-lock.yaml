@@ -50,6 +50,9 @@ importers:
       vitest:
         specifier: ^4.0.16
         version: 4.0.16(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2)
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
 
   apps/visual:
     dependencies:
@@ -241,14 +244,7 @@ importers:
         specifier: ^0.14.6
         version: 0.14.6
 
-  packages/core:
-    dependencies:
-      '@bassline/fs':
-        specifier: workspace:*
-        version: link:../fs
-      ws:
-        specifier: ^8.18.0
-        version: 8.19.0
+  packages/core: {}
 
   packages/eth:
     dependencies:
@@ -264,6 +260,15 @@ importers:
       protobufjs:
         specifier: ^7.0.0
         version: 7.5.4
+
+  packages/react:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+      react:
+        specifier: '>=18.0.0'
+        version: 19.2.4
 
 packages:
 
@@ -4686,6 +4691,7 @@ packages:
   tar@7.5.7:
     resolution: {integrity: sha512-fov56fJiRuThVFXD6o6/Q354S7pnWMJIVlDBYijsTNx6jKSE4pvrDTs6lUnmGvNyfJwFQQwWy3owKz1ucIhveQ==}
     engines: {node: '>=18'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   temp-file@3.4.0:
     resolution: {integrity: sha512-C5tjlC/HCtVUOi3KWVokd4vHVViOmGjtLwIh4MuzPo/nMYTV/p1urt3RnMz2IWXDdKEGJH3k5+KPxtqRsUYGtg==}

@@ -24,6 +24,7 @@ const sharedGlobals = {
   WebSocket: 'readonly',
   self: 'readonly',
   Worker: 'readonly',
+  crypto: 'readonly',
 }
 
 // Shared rules for source files

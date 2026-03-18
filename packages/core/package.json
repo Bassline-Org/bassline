@@ -1,11 +1,17 @@
 {
   "name": "@bassline/core",
   "version": "2.0.0",
-  "description": "Resources all the way down",
+  "description": "Partial Information Programming",
   "type": "module",
   "types": "src/types.d.ts",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./node": "./src/node.js",
+    "./transports/socket": "./src/transports/socket.js",
+    "./transports/stdio": "./src/transports/stdio.js",
+    "./serve/tcp": "./src/serve/tcp.js",
+    "./serve/ws": "./src/serve/ws.js",
+    "./frame/jsonl": "./src/frame/jsonl.js"
   },
   "scripts": {
     "test": "vitest run"

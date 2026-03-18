@@ -2,22 +2,22 @@ import { channel } from '../channel.js'
 import { message } from '../messages.js'
 
 export function fromWebSocket(ws) {
-  const [read, write] = channel()
+  const [incoming, incomingWriter] = channel()
   ws.addEventListener('message', e => {
     try {
-      write.send(message(JSON.parse(e.data)))
+      incomingWriter.send(message(JSON.parse(e.data)))
     } catch (e) {
       console.error('failed to send: ', e)
     }
   })
-  ws.addEventListener('close', () => write.close())
-  ws.addEventListener('error', e => write.err(e))
+  ws.addEventListener('close', () => incomingWriter.close())
+  ws.addEventListener('error', e => incomingWriter.err(e))
 
-  const [outRead, outWrite] = channel()
-  outRead
+  const [outgoing, outgoingWriter] = channel()
+  outgoing
     .sink(v => ws.send(JSON.stringify(v)))
-    .then(outWrite.close)
-    .catch(outWrite.err)
+    .then(outgoingWriter.close)
+    .catch(outgoingWriter.err)
 
-  return [read, outWrite]
+  return [incoming, outgoingWriter]
 }

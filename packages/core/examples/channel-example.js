@@ -1,4 +1,4 @@
-import { channel, merge } from '../src/channels.js'
+import { channel, merge } from '../src/channel.js'
 
 const timeout = ms => new Promise(res => setTimeout(res, ms))
 

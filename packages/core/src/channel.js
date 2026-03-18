@@ -65,6 +65,7 @@ export class Channel {
   reader() {
     const reader = {
       consume: () => this.consume(),
+      thru: cb => cb(reader),
       sink: fn => sink(reader, fn),
       map: fn => map(reader, fn),
       filter: fn => filter(reader, fn),
@@ -73,7 +74,7 @@ export class Channel {
       take: n => take(reader, n),
       scan: (fn, seed) => scan(reader, fn, seed),
       tap: fn => reader.map(v => (fn(v), v)),
-      thru: cb => cb(reader),
+      fork: cb => fork(reader, cb),
       merge: readers => merge([reader, ...readers]),
     }
     return reader
@@ -137,7 +138,48 @@ export const clock = (ms = 1000, size = 1) => {
   return [chan.reader(), chan.writer()]
 }
 
+export const closeAll = (...writers) => writers.forEach(w => w.close())
+export const errAll = (e, ...writers) => writers.forEach(w => w.err(e))
+
+export const net = (chan = channel) => {
+  const writers = new Set()
+
+  function join(cb = r => r) {
+    const [rFromNet, wFromNet] = chan()
+    const [rToNet, wToNet] = chan()
+    const writer = {
+      send: msg => writers.forEach(w => w !== writer && w.send(msg)),
+      close: () => {
+        closeAll(wFromNet, wToNet)
+        writers.delete(writer)
+      },
+      err: e => {
+        errAll(e, wFromNet, wToNet)
+        writers.delete(writer)
+      },
+    }
+    writers.add(writer)
+    rToNet.sink(writer)
+    return [cb(rFromNet), wToNet]
+  }
+  return {
+    send: msg => writers.forEach(w => w.send(msg)),
+    close: () => closeAll(...writers),
+    err: e => errAll(e, ...writers),
+    join,
+  }
+}
+
+async function sinkWriter(reader, writer) {
+  try {
+    await sink(reader, msg => writer.send(msg))
+    writer.close?.()
+  } catch (e) {
+    writer.err?.(e)
+  }
+}
 export async function sink(reader, fn) {
+  if (fn.send) return sinkWriter(reader, fn)
   for await (const val of reader.consume()) {
     await fn(val)
   }
@@ -145,10 +187,8 @@ export async function sink(reader, fn) {
 
 export function map(reader, fn) {
   const [out, writer] = channel()
-  reader
-    .sink(async v => writer.send(await fn(v)))
-    .then(writer.close)
-    .catch(writer.err)
+  const send = async v => writer.send(await fn(v))
+  reader.sink({ ...writer, send })
   return out
 }
 
@@ -156,14 +196,16 @@ const defaultGuard = (value, _writer) => fault('guard clause failed, exiting', v
 
 export function guard(reader, predicate, ifFalse = defaultGuard) {
   const [out, writer] = channel()
-  reader
-    .sink(async v => {
-      if (await predicate(v)) writer.send(v)
-      else await ifFalse(v, writer)
-    })
-    .then(writer.close)
-    .catch(writer.err)
+  const send = async v => {
+    if (await predicate(v)) writer.send(v)
+    else await ifFalse(v, writer)
+  }
+  reader.sink({ ...writer, send })
   return out
+}
+
+export function gate(reader, predicate, ifTrue = v => v) {
+  return guard(reader, async v => !(await predicate(v)), ifTrue)
 }
 
 export function filter(reader, fn) {
@@ -173,11 +215,18 @@ export function filter(reader, fn) {
 export function tee(reader, count = 2) {
   const channels = []
   for (let i = 0; i < count; i++) channels.push(channel())
-  reader
-    .sink(v => channels.forEach(([_, write]) => write.send(v)))
-    .then(() => channels.forEach(([_, write]) => write.close()))
-    .catch(e => channels.forEach(([_, write]) => write.err(e)))
+  reader.sink({
+    send: v => channels.forEach(([_, write]) => write.send(v)),
+    close: () => channels.forEach(([_, write]) => write.close()),
+    err: e => channels.forEach(([_, write]) => write.err(e)),
+  })
   return channels.map(([read, _]) => read)
+}
+
+export function fork(reader, cb) {
+  const [a, b] = reader.tee(2)
+  cb(b)
+  return a
 }
 
 export function take(reader, n = 10) {
@@ -201,13 +250,12 @@ export function take(reader, n = 10) {
 export function scan(reader, fn, seed) {
   const [out, write] = channel()
   let last = seed
-  reader
-    .sink(async v => {
-      last = await fn(last, v)
-      write.send(last)
-    })
-    .then(write.close)
-    .catch(write.err)
+  const send = async v => {
+    last = await fn(last, v)
+    write.send(last)
+  }
+
+  reader.sink({ ...write, send })
   return out
 }
 

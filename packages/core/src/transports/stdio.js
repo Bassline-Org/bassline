@@ -1,19 +1,19 @@
 import readline from 'node:readline'
 import { channel } from '../channel.js'
-import { readFrame, writeFrame } from '../frame/jsonl.js'
+import defaultFrame from '../frame/jsonl.js'
 
-export function fromStdio() {
+export function fromStdio(frame = defaultFrame) {
   const rl = readline.createInterface({ input: process.stdin })
-  const [read, write] = channel()
-  rl.on('line', line => write.send(line + '\n'))
-  rl.on('close', () => write.close())
+  const [lines, lineWriter] = channel()
+  rl.on('line', line => lineWriter.send(line + '\n'))
+  rl.on('close', () => lineWriter.close())
 
-  const [outRead, outWrite] = channel()
-  outRead
-    .map(writeFrame)
+  const [outgoing, outgoingWriter] = channel()
+  outgoing
+    .map(frame.format)
     .sink(data => process.stdout.write(data))
-    .then(outWrite.close)
-    .catch(outWrite.err)
+    .then(outgoingWriter.close)
+    .catch(outgoingWriter.err)
 
-  return [read.thru(readFrame), outWrite]
+  return [lines.thru(frame.read), outgoingWriter]
 }

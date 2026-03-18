@@ -1,25 +1,24 @@
 import net from 'node:net'
-import { channel } from '../channel.js'
-import { readFrame, writeFrame } from '../frame/jsonl.js'
+import { channel, closeAll, errAll } from '../channel.js'
+import defaultFrame from '../frame/jsonl.js'
 
-export function fromSocket(socket) {
-  const [read, write] = channel()
-  socket.on('data', chunk => write.send(chunk.toString()))
-  socket.on('close', () => write.close())
-  socket.on('error', e => write.err(e))
+export function fromSocket(socket, frame = defaultFrame) {
+  const [incoming, writeIncoming] = channel()
+  const [outgoing, writeOutgoing] = channel()
 
-  const [outRead, outWrite] = channel()
-  outRead
-    .map(writeFrame)
+  socket.on('data', chunk => writeIncoming.send(chunk.toString()))
+  socket.on('close', () => closeAll(writeIncoming, writeOutgoing))
+  socket.on('error', e => errAll(e, writeIncoming, writeOutgoing))
+
+  outgoing
+    .map(v => frame.format(v))
     .sink(data => socket.write(data))
     .then(() => socket.destroy())
     .catch(e => socket.destroy(e))
-  socket.on('close', outWrite.close)
-  socket.on('error', outWrite.err)
 
-  return [read.thru(readFrame), outWrite]
+  return [incoming.thru(frame.read), writeOutgoing]
 }
 
-export function connect(options = {}) {
-  return fromSocket(net.createConnection(options))
+export function connect(options = {}, frame = defaultFrame) {
+  return fromSocket(net.createConnection(options), frame)
 }

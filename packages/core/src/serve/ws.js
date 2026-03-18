@@ -2,9 +2,9 @@ import { fromWebSocket } from '../transports/websocket.js'
 import { channel } from '../channel.js'
 
 export function serve(wss) {
-  const [r, w] = channel()
-  wss.on('connection', ws => w.send(fromWebSocket(ws)))
-  wss.on('close', () => w.close())
-  wss.on('error', e => w.err(e))
-  return [r, wss]
+  const [connections, connectionsWriter] = channel()
+  wss.on('connection', ws => connectionsWriter.send(fromWebSocket(ws)))
+  wss.on('close', connectionsWriter.close)
+  wss.on('error', connectionsWriter.err)
+  return [connections, wss]
 }

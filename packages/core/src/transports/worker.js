@@ -2,15 +2,15 @@ import { channel } from '../channel.js'
 import { message } from '../messages.js'
 
 export function fromPort(port) {
-  const [read, write] = channel()
-  port.onmessage = e => write.send(message(e.data))
-  port.onmessageerror = e => write.err(e)
+  const [incoming, incomingWriter] = channel()
+  port.onmessage = e => incomingWriter.send(message(e.data))
+  port.onmessageerror = e => incomingWriter.err(e)
 
-  const [outRead, outWrite] = channel()
-  outRead
+  const [outgoing, outgoingWriter] = channel()
+  outgoing
     .sink(v => port.postMessage(v))
-    .then(outWrite.close)
-    .catch(outWrite.err)
+    .then(outgoingWriter.close)
+    .catch(outgoingWriter.err)
 
-  return [read, outWrite]
+  return [incoming, outgoingWriter]
 }

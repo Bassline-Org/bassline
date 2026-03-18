@@ -2,7 +2,7 @@ import { message } from '../messages.js'
 import { channel } from '../channel.js'
 
 export const readFrame = reader => {
-  const [out, write] = channel()
+  const [readMsg, writeMsg] = channel()
   let buffer = ''
   reader
     .sink(chunk => {
@@ -13,15 +13,17 @@ export const readFrame = reader => {
         buffer = buffer.slice(nl + 1)
         if (!line) continue
         try {
-          write.send(message(JSON.parse(line)))
+          writeMsg.send(message(JSON.parse(line)))
         } catch (e) {
           console.error('readFrame parse error: ', e)
         }
       }
     })
-    .then(write.close)
-    .catch(write.err)
-  return out
+    .then(writeMsg.close)
+    .catch(writeMsg.err)
+  return readMsg
 }
 
-export const writeFrame = msg => JSON.stringify(msg) + '\n'
+export const format = msg => JSON.stringify(msg) + '\n'
+
+export default { read: readFrame, format }

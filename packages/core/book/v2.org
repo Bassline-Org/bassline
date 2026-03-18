@@ -1,6 +1,6 @@
 #+title: Bassline V2
-#+subtitle: Messages, communication, and transports
-#+description: A literate implementation of Bassline's core: messages, communication, transports, and deployment.
+#+subtitle: Non-local ontology considered harmful
+#+author: Goose
 #+property: header-args:js  :mkdirp yes :noweb yes
 #+property: header-args:js+ :results output
 #+OPTIONS: toc:2 num:t html-style:nil html-postamble:nil ^:nil
@@ -12,32 +12,43 @@ This literate document contains the source code for the core of [[https://bassli
 Bassline is designed to be hacked on and modified, so we encourage people to read this!
 
 ** TLDR
+
 Bassline is a system for partial information programming.
 
-Programs in Bassline work from incomplete messages. They build local understanding from what they have, act on new information, and continue.
+Programs in Bassline work with incomplete messages. They build local understanding from what they already know while acting on new information.
 
-Anything outside your local perspective is encountered through communication. When that communication yields information that matters, we observe it as a resource. We do not need a complete account of what it is, where it is, or how it produces what we receive.
+Anything outside your local perspective is encountered through communication.
+When that communication yields information that matters, we observe it as a resource.
+We do not need a complete account of what it is, where it is, or how it produces what we receive.
 
-Identity, location, provenance, timing, order, and sameness are therefore not taken as settled facts. They are judgments made from partial information, and different participants may have different grounds for believing them.
+Identity, location, provenance, timing, and order are therefore not taken as settled facts.
+They are local judgments made from partial information.
+Different participants may have different grounds for believing them, and that is good.
 
-And because the model never assumes a closed world, growth uses the same mechanism as ordinary operation. New message shapes, participants, and behavior do not require a separate extensibility system. They arrive as more messages to interpret.
+The model never assumes a closed world, so growth uses the same mechanism as ordinary operation.
+New message shapes, participants, and behavior do not require a separate extensibility system, they arrive as more messages to interpret.
 
 * The Kernel
 
-The kernel here starts with messages and a local capability for communication. In this book that capability is implemented with reader/writer pairs backed by channels. The important thing is the ability to exchange and observe information, not the queue or the exact interface shape.
+The kernel starts with messages and a local capability for communication.
+In this book that capability is implemented with reader/writer pairs backed by channels.
+Keep in mind the important thing is the ability to exchange and observe information, not the queue or the exact interface shape.
 
-For each part of the kernel, we will separate the abstract idea from the concrete implementation used in this book. The abstract layer explains what shape of thing we are modeling. The concrete layer shows one minimal JavaScript realization of that shape.
+For each part of the kernel, we will separate the abstract idea from the concrete implementation used in this book.
+The abstract layer explains what shape of thing we are modeling.
+The concrete layer shows one minimal JavaScript realization of that shape.
 
 ** Messages
 :PROPERTIES:
 :header-args: :tangle ../src/messages.js
 :END:
-
 *** Abstractly
 
 A message is a fragment of partial information. It is whatever can be locally held, passed around, inspected, and combined without requiring a complete picture of the world.
 
-A message does not come with privileged meaning beyond what participants give it. If provenance, correlation, naming, coordination hints, or other structure matters, it lives in the message like any other data. This is important because Bassline does not want a separate metadata plane that is somehow more real than the information being exchanged.
+A message does not come with privileged meaning beyond what participants give it.
+If provenance, correlation, naming, coordination hints, or other structure matters, it lives in the message like any other data.
+Bassline does not want a separate metadata plane that is somehow more real than the information being exchanged.
 
 *** Concretely
 
@@ -78,17 +89,16 @@ export const isEmpty = msg => Object.keys(msg).length === 0
 #+end_src
 
 *** Exception Messages
-We cannot expect our systems to run smoothly, which is why we define these messages.
 
-These indicate that some exceptional state has ocurred while processing a message.
-
-Even here, Bassline stays in the same conceptual world. Warnings and faults are still expressed as messages because exceptional states are still partial information that must be communicated and interpreted.
+We should not expect our systems to run smoothly, so we define these messages to indicate that some exceptional state has occurred while interpreting a message.
 
 For now we define two kinds of exceptional states.
+
 | condition | what it means                                |
 |-----------+----------------------------------------------|
 | Warning   | It's workable, but you should know something |
 | Fault     | Something went wrong, and I cannot continue  |
+
 **** Non Fatal Exceptions: Warnings
 
 This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
@@ -135,11 +145,14 @@ That pair is implemented with channels. Calling =channel()= returns a =[reader, 
 
 #+begin_quote
 IMPORTANT!
+
 While channels are "single-consumer" they can easily perform fanout by using a custom =sink= to consume the reader and forward consumed values, or by using the =tee= combinator.
 
-The reason for this design is by making channels single-consumer consumers and producers are decoupled and the implementation stays simple.
+The reason for this design is by making channels single-consumer, consumers and producers stay fully decoupled and the implementation stays simple.
 
-If they were multiple-consumer, then the channel would be responsible for handling replication, and tracking references, which would hurt the simplicity of the system!
+If they were multiple-consumer, then the channel would be responsible for handling copying and tracking references, which would hurt the simplicity of the system!
+
+This is also why we don't implement backpressure for the channels, since it leaks information about the consumer to the producer, which is not good!
 #+end_quote
 
 Coordination doesn't need a special subsystem for our system. Because coordination is just what happens when participants interpret messages, infer enough structure to proceed, and respond from what they know. If something protocol-like emerges, it does so as a stable pattern in message flow, not as a privileged runtime concept.
@@ -151,7 +164,7 @@ The concrete implementation here uses channel classes that manage a queue of val
 Users do not touch these classes directly. The factories below return =[reader, writer]= pairs that hide the internals.
 
 #+begin_src js
-import { fault } from "./messages.js"
+import { fault } from './messages.js'
 
 export const ERR = Symbol.for('channel.err')
 export const WAITING = Symbol.for('channel.waiting')
@@ -201,14 +214,14 @@ export class Channel {
           if (this.state === CLOSED) return Promise.resolve({ value: undefined, done: true })
           return new Promise((resolve, reject) => this.waiters.push({ resolve, reject }))
         },
-        return: (value) => {
+        return: value => {
           this.close()
           return Promise.resolve({ value, done: true })
         },
-        throw: (e) => {
+        throw: e => {
           this.err(e)
-          return Promise.resolve({value: e, done: true })
-        }
+          return Promise.resolve({ value: e, done: true })
+        },
       }),
     }
   }
@@ -218,6 +231,7 @@ export class Channel {
   reader() {
     const reader = {
       consume: () => this.consume(),
+      thru: cb => cb(reader),
       sink: fn => sink(reader, fn),
       map: fn => map(reader, fn),
       filter: fn => filter(reader, fn),
@@ -226,7 +240,7 @@ export class Channel {
       take: n => take(reader, n),
       scan: (fn, seed) => scan(reader, fn, seed),
       tap: fn => reader.map(v => (fn(v), v)),
-      thru: cb => cb(reader),
+      fork: cb => fork(reader, cb),
       merge: readers => merge([reader, ...readers]),
     }
     return reader
@@ -258,7 +272,7 @@ export class SlidingChannel extends Channel {
 
 export class ClockChannel extends SlidingChannel {
   constructor(ms, size = 1) {
-    super(size);
+    super(size)
     this.interval = setInterval(() => this.write(Date.now()), ms)
   }
   close() {
@@ -270,8 +284,8 @@ export class ClockChannel extends SlidingChannel {
     super.err(e)
   }
   writer() {
-    const w = super.writer();
-    return {close: w.close}
+    const w = super.writer()
+    return { close: w.close }
   }
 }
 #+end_src
@@ -301,16 +315,73 @@ export const clock = (ms = 1000, size = 1) => {
 }
 #+end_src
 
+*** Convenience helpers
+
+**** Writer controls
+We export =closeAll= and =errAll=, which are just two functions that allow us to close many writers, and err many writers at once.
+#+begin_src js
+export const closeAll = (...writers) => writers.forEach(w => w.close())
+export const errAll = (e, ...writers) => writers.forEach(w => w.err(e))
+#+end_src
+
+**** Net
+We export a =net= function which will produce a "network" allowing for multiple participant interaction, each with their own control to leave the network.
+
+Do note that this is an utility built on top of the single consumer channels, and doesn't violate our principles of non-local ontology, because the members set is totally local and encapsulated.
+
+#+begin_src js
+export const net = (chan = channel) => {
+  const writers = new Set()
+  const wNet = {
+    send: msg => writers.forEach(w => w.send(msg)),
+    close: () => closeAll(...writers),
+    err: e => errAll(e, ...writers)
+  }
+  function join(cb = (r) => r) {
+    const [rFromNet, wFromNet] = chan()
+    const [rToNet, wToNet] = chan()
+    const writer = {
+      send: msg => writers.forEach(w => w !== writer && w.send(msg)),
+      close: () => {
+        closeAll(wFromNet, wToNet)
+        writers.delete(writer)
+      },
+      err: e => {
+        errAll(e, wFromNet, wToNet)
+        writers.delete(writer)
+      }
+    }
+    writers.add(writer)
+    rToNet.sink(netSink)
+    return [cb(rFromNet), wToNet]
+  }
+  return {join, send, close, err}
+}
+#+end_src
+
 *** Combinators
 
-Combinators transform readers into new readers. Every reader object has these as methods (=reader.map(fn)=, =reader.filter(fn)=, etc.), and the returned reader has them too, so they chain.
+These define a handful of ways to turn readers into new readers.
+
+Every reader object has these as methods (=reader.map(fn)=, =reader.filter(fn)=, etc.), and the returned reader has them too, so they chain.
 
 **** =sink(reader, fn)=
 
 The terminal combinator. Consumes every value from the reader, calling =fn= for each one. Returns a promise that resolves when the reader closes.
 
+If =fn= is a writer instead of a function, then sink will send each msg to the writer, closing the writer on completion, and err-ing the writer on an error.
+
 #+begin_src js
+async function sinkWriter(reader, writer) {
+  try {
+    await sink(reader, msg => writer.send(msg))
+    writer.close?.()
+  } catch(e) {
+    writer.err?.(e)
+  }
+}
 export async function sink(reader, fn) {
+  if (fn.send) return sinkWriter(reader, fn)
   for await (const val of reader.consume()) {
     await fn(val)
   }
@@ -324,10 +395,8 @@ Transforms each value through =fn=. The function can be async. Returns a new rea
 #+begin_src js
 export function map(reader, fn) {
   const [out, writer] = channel()
-  reader
-    .sink(async v => writer.send(await fn(v)))
-    .then(writer.close)
-    .catch(writer.err)
+  const send = async v => writer.send(await fn(v))
+  reader.sink({ ...writer, send })
   return out
 }
 #+end_src
@@ -343,17 +412,26 @@ const defaultGuard = (value, _writer) => fault('guard clause failed, exiting', v
 
 export function guard(reader, predicate, ifFalse = defaultGuard) {
   const [out, writer] = channel()
-  reader
-    .sink(async v => {
-      if(await predicate(v)) writer.send(v)
-      else await ifFalse(v, writer)
-    })
-    .then(writer.close)
-    .catch(writer.err)
+  const send = async v => {
+    if (await predicate(v)) writer.send(v)
+    else await ifFalse(v, writer)
+  }
+  reader.sink({ ...writer, send })
   return out
 }
 #+end_src
 
+**** =gate(reader, predicate, ifTrue)=
+
+Just a guard that applies a boolean not to the result of the predicate.
+
+So rather than the guard clause firing if the result is false, it will fire when the result is true.
+
+#+begin_src js
+export function gate(reader, predicate, ifTrue = (v => v)) {
+  return guard(reader, async v => !(await predicate(v)), ifTrue)
+}
+#+end_src
 
 **** =filter(reader, fn)=
 
@@ -373,11 +451,24 @@ Splits one reader into =count= independent readers. Every value is sent to all o
 export function tee(reader, count = 2) {
   const channels = []
   for (let i = 0; i < count; i++) channels.push(channel())
-  reader
-    .sink(v => channels.forEach(([_, write]) => write.send(v)))
-    .then(() => channels.forEach(([_, write]) => write.close()))
-    .catch(e => channels.forEach(([_, write]) => write.err(e)))
+  reader.sink({
+    send: v => channels.forEach(([_, write]) => write.send(v)),
+    close: () => channels.forEach(([_, write]) => write.close()),
+    err: e => channels.forEach(([_, write]) => write.err(e))
+  })
   return channels.map(([read, _]) => read)
+}
+#+end_src
+
+**** =fork(reader, callback)=
+
+Calls =reader.tee(2)= and allows us to fork a pipeline without directly messing with downstream consumers.
+
+#+begin_src js
+export function fork(reader, cb) {
+  const [a, b] = reader.tee(2);
+  cb(b)
+  return a
 }
 #+end_src
 
@@ -413,13 +504,12 @@ Accumulates values. Like =Array.reduce=, but emits each intermediate result. =fn
 export function scan(reader, fn, seed) {
   const [out, write] = channel()
   let last = seed
-  reader
-    .sink(async v => {
-      last = await fn(last, v)
-      write.send(last)
-    })
-    .then(write.close)
-    .catch(write.err)
+  const send = async v => {
+    last = await fn(last, v)
+    write.send(last)
+  }
+
+  reader.sink({ ...write, send })
   return out
 }
 #+end_src
@@ -448,7 +538,7 @@ Readers also have two convenience methods that aren't standalone functions:
 The =thru= method on readers lets users build their own combinators as simple functions from reader to reader. Here are some examples.
 
 #+begin_src js :tangle ../examples/channel-example.js
-import { channel, merge } from "../src/channels.js"
+import { channel, merge } from "../src/channel.js"
 
 const timeout = ms => new Promise(res => setTimeout(res, ms))
 
@@ -508,14 +598,14 @@ Byte transports (TCP sockets, stdio, serial) carry raw chunks. They need a frami
 :header-args: :tangle ../src/frame/jsonl.js
 :END:
 
-Framing is separated from any specific transport. =readFrame= is a =reader → reader= transform: it accumulates chunks, splits on newlines, and parses each line as JSON. =writeFrame= is a plain function that serializes a message as a JSON line.
+Framing is separated from any specific transport. =readFrame= is a =reader → reader= transform: it accumulates chunks, splits on newlines, and parses each line as JSON. =format= is a plain function that serializes a message as a JSON line.
 
 #+begin_src js
 import { message } from '../messages.js'
 import { channel } from '../channel.js'
 
 export const readFrame = reader => {
-  const [out, write] = channel()
+  const [readMsg, writeMsg] = channel()
   let buffer = ''
   reader
     .sink(chunk => {
@@ -525,52 +615,56 @@ export const readFrame = reader => {
         const line = buffer.slice(0, nl)
         buffer = buffer.slice(nl + 1)
         if (!line) continue
-        try { write.send(message(JSON.parse(line))) }
-        catch (e) { console.error('readFrame parse error: ', e)}
+        try {
+          writeMsg.send(message(JSON.parse(line)))
+        } catch (e) {
+          console.error('readFrame parse error: ', e)
+        }
       }
     })
-    .then(write.close)
-    .catch(write.err)
-  return out
+    .then(writeMsg.close)
+    .catch(writeMsg.err)
+  return readMsg
 }
 
-export const writeFrame = msg => JSON.stringify(msg) + '\n'
+export const format = msg => JSON.stringify(msg) + '\n'
+
+export default { read: readFrame, format }
 #+end_src
 
-=readFrame= is not a =scan= because one input chunk may produce zero or many messages. It uses =sink= internally to feed a new channel. =writeFrame= is used as =.map(writeFrame)= on the outgoing side.
+=readFrame= is not a =scan= because one input chunk may produce zero or many messages. It uses =sink= internally to feed a new channel. =format= is used as =.map(frame.format)= on the outgoing side.
 
 *** Socket
 :PROPERTIES:
 :header-args: :tangle ../src/transports/socket.js
 :END:
 
-A socket is a byte transport. =fromSocket= adapts a Node.js socket into a =[reader, writer]= pair by wiring socket events to channels on the read side and piping through =writeFrame= on the write side. =readFrame= parses the incoming chunks.
+A socket is a byte transport. =fromSocket= adapts a Node.js socket into a =[reader, writer]= pair by wiring socket events to channels on the read side and piping through =frame.format= on the write side. =frame.read= parses the incoming chunks.
 
 #+begin_src js
 import net from 'node:net'
-import { channel } from '../channel.js'
-import { readFrame, writeFrame } from '../frame/jsonl.js'
+import { channel, closeAll, errAll } from '../channel.js'
+import defaultFrame from '../frame/jsonl.js'
 
-export function fromSocket(socket) {
-  const [read, write] = channel()
-  socket.on('data', chunk => write.send(chunk.toString()))
-  socket.on('close', () => write.close())
-  socket.on('error', e => write.err(e))
+export function fromSocket(socket, frame = defaultFrame) {
+  const [incoming, writeIncoming] = channel()
+  const [outgoing, writeOutgoing] = channel()
 
-  const [outRead, outWrite] = channel()
-  outRead
-    .map(writeFrame)
+  socket.on('data', chunk => writeIncoming.send(chunk.toString()))
+  socket.on('close', () => closeAll(writeIncoming, writeOutgoing))
+  socket.on('error', e => errAll(e, writeIncoming, writeOutgoing))
+
+  outgoing
+    .map(v => frame.format(v))
     .sink(data => socket.write(data))
     .then(() => socket.destroy())
     .catch(e => socket.destroy(e))
-  socket.on('close', outWrite.close)
-  socket.on('error', outWrite.err)
 
-  return [read.thru(readFrame), outWrite]
+  return [incoming.thru(frame.read), writeOutgoing]
 }
 
-export function connect(options = {}) {
-  return fromSocket(net.createConnection(options))
+export function connect(options = {}, frame = defaultFrame) {
+  return fromSocket(net.createConnection(options), frame)
 }
 #+end_src
 
@@ -586,15 +680,15 @@ import net from 'node:net'
 import { fromSocket } from '../transports/socket.js'
 import { channel } from '../channel.js'
 
-export function serve(options = {}) {
-  const [r, w] = channel()
+export function serve(options = {}, frame) {
+  const [connections, connectionsWriter] = channel()
   const server = net.createServer(socket => {
-    w.send(fromSocket(socket))
+    connectionsWriter.send(fromSocket(socket, frame))
   })
   server.listen(options)
-  server.on('close', w.close)
-  server.on('error', w.err)
-  return [r, server]
+  server.on('close', connectionsWriter.close)
+  server.on('error', connectionsWriter.err)
+  return [connections, server]
 }
 #+end_src
 
@@ -610,11 +704,11 @@ import { fromWebSocket } from '../transports/websocket.js'
 import { channel } from '../channel.js'
 
 export function serve(wss) {
-  const [r, w] = channel()
-  wss.on('connection', ws => w.send(fromWebSocket(ws)))
-  wss.on('close', () => w.close())
-  wss.on('error', e => w.err(e))
-  return [r, wss]
+  const [connections, connectionsWriter] = channel()
+  wss.on('connection', ws => connectionsWriter.send(fromWebSocket(ws)))
+  wss.on('close', connectionsWriter.close)
+  wss.on('error', connectionsWriter.err)
+  return [connections, wss]
 }
 #+end_src
 
@@ -623,28 +717,28 @@ export function serve(wss) {
 :header-args: :tangle ../src/transports/websocket.js
 :END:
 
-A WebSocket is a message transport. Each =ws.send()= is one discrete message, so no framing is needed — just JSON encode/decode. This works in the browser with native =WebSocket=, in Node.js with the =ws= package, and for =RTCDataChannel= (same event interface).
+A WebSocket is a message transport. Each =ws.send()= is one discrete message, so no framing is needed. This works in the browser with native =WebSocket=, in Node.js with the =ws= package, and for =RTCDataChannel= since it has the same event interface.
 
 #+begin_src js
 import { channel } from '../channel.js'
 import { message } from '../messages.js'
 
 export function fromWebSocket(ws) {
-  const [read, write] = channel()
+  const [incoming, incomingWriter] = channel()
   ws.addEventListener('message', e => {
-    try { write.send(message(JSON.parse(e.data))) }
-    catch (e) { console.error('failed to send: ', e)}
+    try { incomingWriter.send(message(JSON.parse(e.data))) }
+    catch (e) { console.error('failed to send: ', e) }
   })
-  ws.addEventListener('close', () => write.close())
-  ws.addEventListener('error', e => write.err(e))
+  ws.addEventListener('close', () => incomingWriter.close())
+  ws.addEventListener('error', e => incomingWriter.err(e))
 
-  const [outRead, outWrite] = channel()
-  outRead
+  const [outgoing, outgoingWriter] = channel()
+  outgoing
     .sink(v => ws.send(JSON.stringify(v)))
-    .then(outWrite.close)
-    .catch(outWrite.err)
+    .then(outgoingWriter.close)
+    .catch(outgoingWriter.err)
 
-  return [read, outWrite]
+  return [incoming, outgoingWriter]
 }
 #+end_src
 
@@ -653,24 +747,24 @@ export function fromWebSocket(ws) {
 :header-args: :tangle ../src/transports/worker.js
 :END:
 
-A =MessagePort= is a message transport that uses structured clone — objects cross the boundary without serialization. Works with =Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
+A =MessagePort= is a message transport that uses structured clone. Objects cross the boundary without serialization. Works with =Worker=, =MessagePort=, =SharedWorker.port=, and =BroadcastChannel=.
 
 #+begin_src js
 import { channel } from '../channel.js'
 import { message } from '../messages.js'
 
 export function fromPort(port) {
-  const [read, write] = channel()
-  port.onmessage = e => write.send(message(e.data))
-  port.onmessageerror = e => write.err(e)
+  const [incoming, incomingWriter] = channel()
+  port.onmessage = e => incomingWriter.send(message(e.data))
+  port.onmessageerror = e => incomingWriter.err(e)
 
-  const [outRead, outWrite] = channel()
-  outRead
+  const [outgoing, outgoingWriter] = channel()
+  outgoing
     .sink(v => port.postMessage(v))
-    .then(outWrite.close)
-    .catch(outWrite.err)
+    .then(outgoingWriter.close)
+    .catch(outgoingWriter.err)
 
-  return [read, outWrite]
+  return [incoming, outgoingWriter]
 }
 #+end_src
 
@@ -679,31 +773,33 @@ export function fromPort(port) {
 :header-args: :tangle ../src/transports/stdio.js
 :END:
 
-Stdio is a byte transport, like TCP. It uses the same =readFrame=/=writeFrame= framing. This is what makes a REPL "just another transport."
+Stdio is a byte transport, like TCP, and uses framing internally to produce a stream of messages.
 
 #+begin_src js
 import readline from 'node:readline'
 import { channel } from '../channel.js'
-import { readFrame, writeFrame } from '../frame/jsonl.js'
+import defaultFrame from '../frame/jsonl.js'
 
-export function fromStdio() {
+export function fromStdio(frame = defaultFrame) {
   const rl = readline.createInterface({ input: process.stdin })
-  const [read, write] = channel()
-  rl.on('line', line => write.send(line + '\n'))
-  rl.on('close', () => write.close())
+  const [lines, lineWriter] = channel()
+  rl.on('line', line => lineWriter.send(line + '\n'))
+  rl.on('close', () => lineWriter.close())
 
-  const [outRead, outWrite] = channel()
-  outRead
-    .map(writeFrame)
+  const [outgoing, outgoingWriter] = channel()
+  outgoing
+    .map(frame.format)
     .sink(data => process.stdout.write(data))
-    .then(outWrite.close)
-    .catch(outWrite.err)
+    .then(outgoingWriter.close)
+    .catch(outgoingWriter.err)
 
-  return [read.thru(readFrame), outWrite]
+  return [lines.thru(frame.read), outgoingWriter]
 }
 #+end_src
 
-* Deployment
+* Deployment (Draft)
+
+This is a stub, so you can ignore this for now!
 
 Deployment also has an abstract layer and a concrete one.
 
@@ -745,7 +841,7 @@ import { fromStdio } from './transports/stdio.js'
 const [read, write] = fromStdio()
 #+end_src
 
-The downstream pipeline sees messages either way — same interface whether the transport is a socket, a WebSocket, or a terminal.
+The downstream pipeline sees messages either way, regardless of whether the transport is a socket, a WebSocket, a terminal, or whatever else.
 
 *** Custom command languages are just maps
 
