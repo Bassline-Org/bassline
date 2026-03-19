@@ -1,0 +1,15 @@
+{
+  "name": "@bassline/react",
+  "version": "2.0.0",
+  "description": "React bindings for Bassline",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.jsx"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "@bassline/core": "workspace:*"
+  },
+  "license": "AGPL-3.0",
+  "dependencies": {}
+}

@@ -14,7 +14,6 @@ export {
   clock,
   closeAll,
   errAll,
-  controlAll,
   sink,
   map,
   filter,

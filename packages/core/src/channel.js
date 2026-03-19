@@ -70,6 +70,7 @@ export class Channel {
       map: fn => map(reader, fn),
       filter: fn => filter(reader, fn),
       guard: (pred, cb) => guard(reader, pred, cb),
+      gate: (pred, cb) => gate(reader, pred, cb),
       tee: count => tee(reader, count),
       take: n => take(reader, n),
       scan: (fn, seed) => scan(reader, fn, seed),
@@ -148,7 +149,7 @@ export const net = (chan = channel) => {
     const [rFromNet, wFromNet] = chan()
     const [rToNet, wToNet] = chan()
     const writer = {
-      send: msg => writers.forEach(w => w !== writer && w.send(msg)),
+      send: wFromNet.send,
       close: () => {
         closeAll(wFromNet, wToNet)
         writers.delete(writer)
@@ -159,7 +160,10 @@ export const net = (chan = channel) => {
       },
     }
     writers.add(writer)
-    rToNet.sink(writer)
+    rToNet.sink({
+      ...writer,
+      send: msg => writers.forEach(w => w !== writer && w.send(msg)),
+    })
     return [cb(rFromNet), wToNet]
   }
   return {

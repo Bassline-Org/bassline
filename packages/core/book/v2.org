@@ -236,6 +236,7 @@ export class Channel {
       map: fn => map(reader, fn),
       filter: fn => filter(reader, fn),
       guard: (pred, cb) => guard(reader, pred, cb),
+      gate: (pred, cb) => gate(reader, pred, cb),
       tee: count => tee(reader, count),
       take: n => take(reader, n),
       scan: (fn, seed) => scan(reader, fn, seed),
@@ -327,7 +328,16 @@ export const errAll = (e, ...writers) => writers.forEach(w => w.err(e))
 **** Net
 We export a =net= function which will produce a "network" allowing for multiple participant interaction, each with their own control to leave the network.
 
-Do note that this is an utility built on top of the single consumer channels, and doesn't violate our principles of non-local ontology, because the members set is totally local and encapsulated.
+
+#+begin_quote
+IMPORTANT!
+
+*A net is not a "thing" in the kernel!*
+
+It is a local concept assembled from our core communication capabilities, and defines a local ontology for how the channels are connected and produced.
+
+As such it doesn't violate our principles of non-local ontology, because participants in the net are not aware they are talking with many things, all they see is their communication capabilities.
+#+end_quote
 
 #+begin_src js
 export const net = (chan = channel) => {
@@ -337,7 +347,7 @@ export const net = (chan = channel) => {
     const [rFromNet, wFromNet] = chan()
     const [rToNet, wToNet] = chan()
     const writer = {
-      send: msg => writers.forEach(w => w !== writer && w.send(msg)),
+      send: wFromNet.send,
       close: () => {
         closeAll(wFromNet, wToNet)
         writers.delete(writer)
@@ -348,7 +358,10 @@ export const net = (chan = channel) => {
       },
     }
     writers.add(writer)
-    rToNet.sink(writer)
+    rToNet.sink({
+      ...writer,
+      send: msg => writers.forEach(w => w !== writer && w.send(msg)),
+    })
     return [cb(rFromNet), wToNet]
   }
   return {
