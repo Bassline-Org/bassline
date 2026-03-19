@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { channel } from '@bassline/core'
 
 const NetContext = createContext(null)
 
@@ -17,14 +18,24 @@ export function useJoin(net, cb = r => r) {
   return ref.current
 }
 
-export function useSink(reader, seed) {
-  const [state, setState] = useState(seed)
+export function useSink(reader, cb) {
   const sunk = useRef(false)
   useEffect(() => {
     if (!sunk.current) {
       sunk.current = true
-      reader.sink(v => setState(v))
+      reader.sink(cb)
     }
   }, [])
-  return state
+}
+
+export function useChannel(chan = channel) {
+  const ref = useRef(null)
+  if (!ref.current) ref.current = chan()
+  return ref.current
+}
+
+export function useBridgedWriter(target, bridge) {
+  const [reader, writer] = useChannel()
+  useSink(reader, { ...target, send: bridge(target) })
+  return writer
 }

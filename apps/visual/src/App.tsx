@@ -1,18 +1,29 @@
-// @ts-ignore -- @bassline/react is untyped JSX
-import { useSink } from '@bassline/react'
+import { ReactFlow, ReactFlowProvider, Controls, Background } from '@xyflow/react'
+import { useBridgedWriter } from '@bassline/react'
+import { useGraphState, useXyflowHandlers, bridgeToGraph } from './graph/xyflow'
+import type { Reader, Writer } from '@bassline/core'
+import '@xyflow/react/dist/style.css'
 
-export default function App({ reader, writer }: { reader: any; writer: any }) {
-  const msg = useSink(reader, null)
+function GraphCanvas({ reader, changeWriter }: { reader: Reader; changeWriter: Writer }) {
+  const { nodes, setNodes, edges, setEdges } = useGraphState(reader)
+  const handlers = useXyflowHandlers(changeWriter, setNodes, setEdges)
 
   return (
-    <div className="flex h-screen items-center justify-center gap-4">
-      <pre className="text-sm">{JSON.stringify(msg, null, 2)}</pre>
-      <button
-        className="rounded border px-3 py-1 text-sm"
-        onClick={() => writer.send({ hello: 'world', t: Date.now() })}
-      >
-        Send
-      </button>
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <ReactFlow nodes={nodes} edges={edges} {...handlers} fitView>
+        <Controls />
+        <Background />
+      </ReactFlow>
     </div>
+  )
+}
+
+export default function App({ reader, writer }: { reader: Reader; writer: Writer }) {
+  const changeWriter = useBridgedWriter(writer, bridgeToGraph)
+
+  return (
+    <ReactFlowProvider>
+      <GraphCanvas reader={reader} changeWriter={changeWriter} />
+    </ReactFlowProvider>
   )
 }

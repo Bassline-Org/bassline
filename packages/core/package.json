@@ -5,7 +5,10 @@
   "type": "module",
   "types": "src/types.d.ts",
   "exports": {
-    ".": "./src/index.js",
+    ".": {
+      "types": "./src/types.d.ts",
+      "default": "./src/index.js"
+    },
     "./node": "./src/node.js",
     "./transports/socket": "./src/transports/socket.js",
     "./transports/stdio": "./src/transports/stdio.js",

@@ -4,7 +4,10 @@
   "description": "React bindings for Bassline",
   "type": "module",
   "exports": {
-    ".": "./src/index.jsx"
+    ".": {
+      "types": "./src/types.d.ts",
+      "default": "./src/index.jsx"
+    }
   },
   "peerDependencies": {
     "react": ">=18.0.0",

@@ -1,7 +1,6 @@
 import './index.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-// @ts-ignore -- @bassline/core is untyped JS
 import { fromPort } from '@bassline/core'
 import App from './App'
 
