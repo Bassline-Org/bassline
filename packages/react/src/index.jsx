@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { channel } from '@bassline/core'
 
 const NetContext = createContext(null)

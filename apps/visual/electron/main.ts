@@ -1,6 +1,7 @@
 import { app, BrowserWindow, MessageChannelMain, MessagePortMain } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { Reader, Writer } from '@bassline/core'
 import { net, fromPort } from '@bassline/core'
 import { store } from '../src/graph/store'
 import { graph } from '../src/graph/messages'
@@ -10,17 +11,17 @@ const __dirname = path.dirname(__filename)
 
 function adaptPort(electronPort: MessagePortMain) {
   return {
-    postMessage: (data: any) => electronPort.postMessage(data),
-    set onmessage(fn: (e: { data: any }) => void) {
+    postMessage: (data: unknown) => electronPort.postMessage(data),
+    set onmessage(fn: (e: { data: unknown }) => void) {
       electronPort.on('message', e => fn({ data: e.data }))
       electronPort.start()
     },
-    set onmessageerror(_fn: (e: any) => void) {},
+    set onmessageerror(_fn: (e: unknown) => void) {},
   }
 }
 
-function observe(label: string, [reader]: [any, any]) {
-  reader.sink((msg: any) => console.log(`[${label}]`, JSON.stringify(msg)))
+function observe(label: string, [reader]: [Reader, Writer]) {
+  reader.sink((msg: unknown) => console.log(`[${label}]`, JSON.stringify(msg)))
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -57,7 +58,7 @@ function createWindow() {
     mainWindow!.webContents.postMessage('port', null, [port2])
 
     // Seed initial graph
-    const g = graph({ send: (msg: any) => graphNet.send(msg) } as any)
+    const g = graph(graphNet)
     g.addNode('n1')
     g.position('n1', 100, 150)
     g.label('n1', 'Hello')

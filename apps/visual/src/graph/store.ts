@@ -1,19 +1,21 @@
 import type { Reader, Writer } from '@bassline/core'
 import { graph } from './messages'
-import type { GraphMsg } from './messages'
+import type { AssertMsg, RetractMsg, QueryMsg } from './messages'
 
-export function store([reader, writer]: [Reader<GraphMsg>, Writer]) {
+type StoreMsg = AssertMsg | RetractMsg | QueryMsg
+
+export function store([reader, writer]: [Reader<StoreMsg>, Writer]) {
   const g = graph(writer)
-  const spo = new Map<string, Map<string, any>>()
+  const spo = new Map<string, Map<string, unknown>>()
 
-  function assertTriple(s: string, p: string, o: any) {
+  function assertTriple(s: string, p: string, o: unknown) {
     if (!spo.has(s)) spo.set(s, new Map())
     spo.get(s)!.set(p, o)
   }
 
-  function retractTriple(s: string | null, p: string | null, _o: any) {
+  function retractTriple(s: string | null, p: string | null) {
     if (s == null) {
-      for (const [subj] of spo) retractTriple(subj, p, _o)
+      for (const [subj] of spo) retractTriple(subj, p)
       return
     }
     if (!spo.has(s)) return
@@ -26,8 +28,8 @@ export function store([reader, writer]: [Reader<GraphMsg>, Writer]) {
     }
   }
 
-  function queryTriples(s: string | null, p: string | null, o: any) {
-    const results: { s: string; p: string; o: any }[] = []
+  function queryTriples(s: string | null, p: string | null, o: unknown) {
+    const results: { s: string; p: string; o: unknown }[] = []
     const subjects = s != null ? (spo.has(s) ? [[s, spo.get(s)!] as const] : []) : [...spo.entries()]
     for (const [subj, preds] of subjects) {
       const predicates = p != null ? (preds.has(p) ? [[p, preds.get(p)!] as const] : []) : [...preds.entries()]
@@ -39,14 +41,13 @@ export function store([reader, writer]: [Reader<GraphMsg>, Writer]) {
     return results
   }
 
-  reader.sink((msg: GraphMsg) => {
+  reader.sink((msg: StoreMsg) => {
     switch (msg.type) {
       case 'assert':
         assertTriple(msg.s, msg.p, msg.o)
         break
       case 'retract':
-        if (msg.s != null) retractTriple(msg.s, msg.p, msg.o)
-        else retractTriple(null, msg.p, msg.o)
+        retractTriple(msg.s, msg.p)
         break
       case 'query':
         g.result(msg.qid, queryTriples(msg.s, msg.p, msg.o))

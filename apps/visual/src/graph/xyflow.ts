@@ -11,59 +11,89 @@ import {
 import { useState, useCallback } from 'react'
 import { useSink } from '@bassline/react'
 import { graph } from './messages'
-import type { GraphMsg } from './messages'
+import type { AssertMsg, RetractMsg } from './messages'
 import type { Reader, Writer } from '@bassline/core'
 
 type SetState<T> = (fn: (prev: T) => T) => void
 
+type GraphKindAssert = AssertMsg<string> & { p: 'kind' }
+type GraphPositionAssert = AssertMsg<{ x: number; y: number }> & { p: 'position' }
+type GraphLabelAssert = AssertMsg<string> & { p: 'label' }
+type GraphSourceAssert = AssertMsg<string> & { p: 'source' }
+type GraphTargetAssert = AssertMsg<string> & { p: 'target' }
+
+type GraphViewAssert = GraphKindAssert | GraphPositionAssert | GraphLabelAssert | GraphSourceAssert | GraphTargetAssert
+
+type GraphViewTriple =
+  | { s: string; p: 'kind'; o: string }
+  | { s: string; p: 'position'; o: { x: number; y: number } }
+  | { s: string; p: 'label'; o: string }
+  | { s: string; p: 'source'; o: string }
+  | { s: string; p: 'target'; o: string }
+
+type GraphViewResult = { type: 'result'; qid: string; triples: GraphViewTriple[] }
+type GraphViewFact = GraphViewAssert | GraphViewTriple
+
+export type InboundMsg = GraphViewAssert | RetractMsg | GraphViewResult
+
+export type XyflowEvent =
+  | { kind: 'nodesChange'; changes: NodeChange[] }
+  | { kind: 'edgesChange'; changes: EdgeChange[] }
+  | { kind: 'connect'; id: string; connection: Connection }
+  | { kind: 'delete'; nodes: Node[]; edges: Edge[] }
+
 // --- Inbound: graph messages → xyflow React state ---
 
-export function useGraphState(reader: Reader<GraphMsg>) {
+export function useGraphState(reader: Reader<InboundMsg>) {
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
-  useSink(reader, (msg: any) => applyGraphMsg(msg, setNodes, setEdges))
+  useSink(reader, (msg: InboundMsg) => applyGraphMsg(msg, setNodes, setEdges))
   return { nodes, setNodes, edges, setEdges }
 }
 
-function applyGraphMsg(msg: GraphMsg, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
+function applyGraphMsg(msg: InboundMsg, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
   switch (msg.type) {
     case 'assert':
-      applyAssert(msg.s, msg.p, msg.o, setNodes, setEdges)
+      applyAssert(msg, setNodes, setEdges)
       break
     case 'retract':
       applyRetract(msg.s, msg.p, setNodes, setEdges)
       break
     case 'result':
-      for (const { s, p, o } of msg.triples) {
-        applyAssert(s, p, o, setNodes, setEdges)
+      for (const triple of msg.triples) {
+        applyAssert(triple, setNodes, setEdges)
       }
       break
   }
 }
 
-function applyAssert(s: string, p: string, o: any, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
-  switch (p) {
+function applyAssert(msg: GraphViewFact, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
+  switch (msg.p) {
     case 'kind':
-      if (o === 'edge') {
-        setEdges(eds => (eds.some(e => e.id === s) ? eds : [...eds, { id: s, source: '', target: '', data: {} }]))
+      if (msg.o === 'edge') {
+        setEdges(eds =>
+          eds.some(e => e.id === msg.s) ? eds : [...eds, { id: msg.s, source: '', target: '', data: {} }]
+        )
       } else {
         setNodes(nds =>
-          nds.some(n => n.id === s) ? nds : [...nds, { id: s, type: o, position: { x: 0, y: 0 }, data: { label: s } }]
+          nds.some(n => n.id === msg.s)
+            ? nds
+            : [...nds, { id: msg.s, type: msg.o, position: { x: 0, y: 0 }, data: { label: msg.s } }]
         )
       }
       break
     case 'position':
-      setNodes(nds => nds.map(n => (n.id === s ? { ...n, position: o } : n)))
+      setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, position: msg.o } : n)))
       break
     case 'label':
-      setNodes(nds => nds.map(n => (n.id === s ? { ...n, data: { ...n.data, label: o } } : n)))
-      setEdges(eds => eds.map(e => (e.id === s ? { ...e, data: { ...e.data, label: o } } : e)))
+      setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, data: { ...n.data, label: msg.o } } : n)))
+      setEdges(eds => eds.map(e => (e.id === msg.s ? { ...e, data: { ...e.data, label: msg.o } } : e)))
       break
     case 'source':
-      setEdges(eds => eds.map(e => (e.id === s ? { ...e, source: o } : e)))
+      setEdges(eds => eds.map(e => (e.id === msg.s ? { ...e, source: msg.o } : e)))
       break
     case 'target':
-      setEdges(eds => eds.map(e => (e.id === s ? { ...e, target: o } : e)))
+      setEdges(eds => eds.map(e => (e.id === msg.s ? { ...e, target: msg.o } : e)))
       break
   }
 }
@@ -76,29 +106,25 @@ function applyRetract(s: string | null, _p: string | null, setNodes: SetState<No
 
 // --- Outbound: xyflow events → writer ---
 
-export function useXyflowHandlers(writer: Writer, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
+export function useXyflowHandlers(writer: Writer<XyflowEvent>, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes(nds => applyNodeChanges(changes, nds))
-    for (const c of changes) {
-      if (c.type === 'position' && c.position && !c.dragging) {
-        writer.send({ kind: 'position', id: c.id, x: c.position.x, y: c.position.y })
-      }
-    }
+    writer.send({ kind: 'nodesChange', changes })
   }, [])
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     setEdges(eds => applyEdgeChanges(changes, eds))
+    writer.send({ kind: 'edgesChange', changes })
   }, [])
 
   const onConnect = useCallback((connection: Connection) => {
     const id = `e-${crypto.randomUUID().slice(0, 8)}`
     setEdges(eds => addEdge({ ...connection, id }, eds))
-    writer.send({ kind: 'connect', id, source: connection.source, target: connection.target })
+    writer.send({ kind: 'connect', id, connection })
   }, [])
 
   const onDelete = useCallback(({ nodes: dn, edges: de }: { nodes: Node[]; edges: Edge[] }) => {
-    for (const n of dn) writer.send({ kind: 'remove', id: n.id })
-    for (const e of de) writer.send({ kind: 'remove', id: e.id })
+    writer.send({ kind: 'delete', nodes: dn, edges: de })
   }, [])
 
   return { onNodesChange, onEdgesChange, onConnect, onDelete }
@@ -108,16 +134,21 @@ export function useXyflowHandlers(writer: Writer, setNodes: SetState<Node[]>, se
 
 export function bridgeToGraph(target: Writer) {
   const g = graph(target)
-  return (event: any) => {
+  return (event: XyflowEvent) => {
     switch (event.kind) {
-      case 'position':
-        g.position(event.id, event.x, event.y)
+      case 'nodesChange':
+        for (const c of event.changes) {
+          if (c.type === 'position' && c.position && !c.dragging) {
+            g.position(c.id, c.position.x, c.position.y)
+          }
+        }
         break
       case 'connect':
-        g.connect(event.id, event.source, event.target)
+        g.connect(event.id, event.connection.source, event.connection.target)
         break
-      case 'remove':
-        g.remove(event.id)
+      case 'delete':
+        for (const n of event.nodes) g.remove(n.id)
+        for (const e of event.edges) g.remove(e.id)
         break
     }
   }
