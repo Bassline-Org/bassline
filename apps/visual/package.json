@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "postinstall": "electron-rebuild",
     "electron:dev": "vite build && electron .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:runtime": "ELECTRON_RUN_AS_NODE=1 electron ../../node_modules/vitest/vitest.mjs run src/storage/sqlite.test.js src/graph/service.test.js"
   },
   "dependencies": {
     "@bassline/core": "workspace:*",

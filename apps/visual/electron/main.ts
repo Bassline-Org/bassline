@@ -1,10 +1,10 @@
 import { app, BrowserWindow, MessageChannelMain, MessagePortMain } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import Database from 'better-sqlite3'
 import type { Reader, Writer } from '@bassline/core'
-import { net, fromPort } from '@bassline/core'
-import { store } from '../src/graph/store'
-import { graph } from '../src/graph/messages'
+import { fromPort } from '@bassline/core'
+import { createGraphService, seedDefaultGraph } from '../src/graph/service'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -24,6 +24,20 @@ function observe(label: string, [reader]: [Reader, Writer]) {
   reader.sink((msg: unknown) => console.log(`[${label}]`, JSON.stringify(msg)))
 }
 
+const dbPath = path.join(app.getPath('userData'), 'homebass.db')
+const db = new Database(dbPath)
+let graphService: ReturnType<typeof createGraphService> | null = null
+let observingGraph = false
+
+function getGraphService() {
+  if (!graphService) graphService = createGraphService(db)
+  if (!observingGraph) {
+    observe('graph', graphService.join())
+    observingGraph = true
+  }
+  return graphService
+}
+
 let mainWindow: BrowserWindow | null = null
 
 function createWindow() {
@@ -39,17 +53,10 @@ function createWindow() {
 
   mainWindow.webContents.once('did-finish-load', () => {
     const { port1, port2 } = new MessageChannelMain()
-
-    const graphNet = net()
-
-    // Observer participant
-    observe('graph', graphNet.join())
-
-    // Store participant
-    store(graphNet.join())
+    const service = getGraphService()
 
     // Bridge graph net to renderer via port
-    const [rNet, wNet] = graphNet.join()
+    const [rNet, wNet] = service.join()
     const [rPort, wPort] = fromPort(adaptPort(port1))
     rNet.sink(wPort)
     rPort.sink(wNet)
@@ -57,14 +64,12 @@ function createWindow() {
     // Send port to renderer
     mainWindow!.webContents.postMessage('port', null, [port2])
 
-    // Seed initial graph
-    const g = graph(graphNet)
-    g.addNode('n1')
-    g.position('n1', 100, 150)
-    g.label('n1', 'Hello')
-    g.addNode('n2')
-    g.position('n2', 350, 200)
-    g.label('n2', 'World')
+    // Seed on first run through the public graph surface.
+    if (service.isEmpty()) {
+      const [_reader, writer] = service.join()
+      seedDefaultGraph(writer)
+      writer.close()
+    }
   })
 
   if (process.env.VITE_DEV_SERVER_URL) {
