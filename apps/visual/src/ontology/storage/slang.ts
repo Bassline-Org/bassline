@@ -1,4 +1,4 @@
-import type { Entry, EntryReadSelector, Ref, Checkpoint, StorageMsg } from './messages'
+import type { Entry, EntryReadSelector, Ref, Checkpoint, StorageMsg } from './schema'
 
 export function storage(send: (msg: StorageMsg) => void) {
   return {

@@ -1,11 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { net } from '@bassline/core'
 import { request } from '@bassline/ontology'
-import { isEntryResultMsg } from '../storage/messages.js'
-import { storage } from '../storage/slang.js'
-import { createSqliteStorage } from '../storage/sqlite.js'
-import { createGraphService } from './service.js'
-import { seedDefaultGraph } from './slang.js'
+import { isEntryResultMsg } from '../../src/ontology/storage/schema.js'
+import { storage } from '../../src/ontology/storage/slang.js'
+import { createSqliteStorage } from '../../src/ontology/storage/sqlite.js'
+import { createGraphService } from '../../src/ontology/graph/service.js'
+import { graphView } from '../../src/ontology/xyflow/slang.js'
 
 const runtimeDescribe = process.versions.electron ? describe : describe.skip
 let Database
@@ -165,7 +165,13 @@ runtimeDescribe('graph service', () => {
 
     expect(await readEntries(storageNet, { space: 'graph', key: 'ops', limit: 1 })).toHaveLength(0)
     const seedSlot = graphJoin()
-    seedDefaultGraph(seedSlot.send)
+    const g = graphView(seedSlot.send)
+    g.addNode('n1')
+    g.position('n1', 100, 150)
+    g.label('n1', 'Hello')
+    g.addNode('n2')
+    g.position('n2', 350, 200)
+    g.label('n2', 'World')
     seedSlot.close()
 
     await vi.waitFor(async () => {

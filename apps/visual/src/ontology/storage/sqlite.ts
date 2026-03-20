@@ -19,7 +19,7 @@ import {
   type RefReadMsg,
   type RefSetMsg,
   type StorageMsg,
-} from './messages'
+} from './schema'
 
 function serializeJson(label: string, value: unknown, debug: (msg: unknown) => void) {
   try {

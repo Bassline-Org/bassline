@@ -31,12 +31,178 @@ New message shapes, participants, and behavior do not require a separate extensi
 * The Kernel
 
 The kernel starts with messages and a local capability for communication.
-In this book that capability is implemented with reader/writer pairs backed by channels.
-Keep in mind the important thing is the ability to exchange and observe information, not the queue or the exact interface shape.
+In this book that capability is implemented with ports, a minimal set of capabilities for communication.
+Keep in mind the important thing is the ability to exchange and observe information, not any particular interface shape.
 
 For each part of the kernel, we will separate the abstract idea from the concrete implementation used in this book.
 The abstract layer explains what shape of thing we are modeling.
 The concrete layer shows one minimal JavaScript realization of that shape.
+
+** Communication
+:PROPERTIES:
+:header-args: :tangle ../src/comm.js
+:END:
+
+*** Abstractly
+
+Communication is the local capability to receive new information and contribute new information.
+Bassline treats communication as an ongoing process in which participants coordinate by processing messages and inferring enough structure from what they know to continue.
+
+Communication needs a shape that preserves decoupling. Producers should be able to contribute information without needing a fixed understanding of any consumer, and consumers should be able to build their own understanding from the flow they observe.
+
+*** Concretely
+
+In this book, communication is implemented as ports.
+
+A port gives us 3 capabilities:
+
+1. =send=
+
+   Which let's us send a message to something
+
+2. =recv=
+
+   Which let's us pull a message from a local buffer, blocking until one is available.
+
+3. =close=
+
+   To ignore any future messages, stopping communication from our end.
+
+A port is a minimal surface that faithfully implements what we care about from communication.
+
+An important thing to note is that there is no builtin lifecycle propagation with ports.
+This is because closing a port is a local decision made when a participant decides they aren't interested anymore, or that the conversation is not useful to them anymore.
+
+Senders are not notified and their messages are dropped should they send to the closed port.
+This ensures neither side requires knowledge of the other's state / status without the other side explicitly sharing this.
+
+**** Port implementation
+
+The port implementation is rather simple.
+
+It maintains a buffer for messages, and a queue of promises to resolve.
+We can give the buffer a fixed capacity, in which it will act as a sliding buffer, dropping the oldest messages.
+Or if we give it a capacity of 0, it will not buffer any messages, requiring a listener actively be waiting for a message, dropping all others.
+
+The only other thing to note is the local convenience of EOF.
+
+EOF is a symbol sent through and used by local port consumers to indicate that the port closed.
+It is not universal and will serialize over the wire meaningfully.
+It only exists to make our lives simpler in js.
+And it is trivial to build your own interpretation of what should signal EOF locally.
+
+You cannot send EOF directly through a port, nor should you ever have to.
+It should only be created internally inside of a port to notify a local consumer we are closed.
+
+#+begin_src js
+export const EOF = Symbol.for('$$BASSLINE_EOF$$')
+export const isEOF = v => v === EOF
+export function port(size = Infinity) {
+  const buffer = []
+  const waiters = []
+  let closed = false
+  const close = () => {
+    closed = true
+    for (const w of waiters) w(EOF)
+    waiters.length = 0
+  }
+  const send = msg => {
+    if (isEOF(msg)) throw new Error('Bassline EOF is reserved')
+    if (closed) return
+    if (waiters.length > 0) return waiters.shift()(msg)
+    if (buffer.length >= size) buffer.shift() // sliding buffer
+    if (size > 0) buffer.push(msg) // no buffer
+  }
+  const recv = () => {
+    if (buffer.length > 0) return Promise.resolve(buffer.shift())
+    if (closed) return Promise.resolve(EOF)
+    return new Promise(resolve => waiters.push(resolve))
+  }
+  return { send, recv, close }
+}
+#+end_src
+
+**** Using a port
+
+The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
+
+We define a helper for this called =consume=. It let's us build actor-like processes from our ports, and is convenient.
+
+If you need to define more sophisticated control flow inside of the loop, just write the extra 3 lines. :)
+
+#+begin_src js
+export async function consume(recv, callback) {
+  let msg
+  while (true) {
+    msg = await recv()
+    if (isEOF(msg)) break
+    await callback(msg)
+  }
+}
+#+end_src
+
+**** Nets
+Now our ports look like "point-to-point" communication, however in Bassline we don't talk to "something", we observe information from our perspective.
+
+This let's us do some neat things when it comes to communication.
+For example, a common structure we use is a =net=.
+
+A =net= is a local structure that gives us ports backed by any number of things.
+Meaning that we build a compound communication interface without the consumers or producers ever knowing directly.
+They might be able to tell if they see more information, but they can never know for sure.
+
+This highlights that in bassline cooperating participants appear as a single participant, even if they are totally unaware of each other.
+
+#+begin_src js
+export function net() {
+  const ports = new Set()
+
+  function join(size) {
+    const p = port(size)
+    let closed = false
+    ports.add(p)
+    const send = msg => {
+      if (closed) return
+      ports.forEach(port => port !== p && port.send(msg))
+    }
+    const close = () => {
+      closed = true
+      ports.delete(p)
+      p.close()
+    }
+
+    return {
+      recv: p.recv,
+      send,
+      close,
+    }
+  }
+  return join
+}
+#+end_src
+
+**** Communication without input
+Not all communication take input.
+
+A clock is an example of a one-sided communication participant, it can say things, but will never listen.
+
+It can be used with anything that wants a capability to receive information, and can be used for local chron jobs, scheduling, and similar things.
+
+#+begin_src js
+export const clock = (ms = 1000) => {
+  const p = port(1)
+  const tick = () => p.send({ ts: Date.now() })
+  const interval = setInterval(tick, ms)
+  tick()
+  return {
+    recv: p.recv,
+    close: () => {
+      clearInterval(interval)
+      p.close()
+    },
+  }
+}
+#+end_src
 
 ** Messages
 :PROPERTIES:
@@ -58,7 +224,7 @@ The concrete representation is intentionally minimal. Plain objects are open-end
 
 =message()= normalizes its input: plain objects pass through, =undefined= becomes ={}=, and anything else is wrapped as ={body: value}=.
 
-=update= is auto-curried. With two arguments =(msg, fn)= it returns a new message. With one argument =(fn)= it returns a transform you can pass to =.map()=.
+=update= is auto-curried. With two arguments =(msg, fn)= it returns a new message. With one argument =(fn)= it returns a transform you can pass a message into.
 
 #+begin_src js
 import { isPlainObject } from './utils.js'
@@ -126,110 +292,7 @@ export const fault = (condition, msg, context) => {
 }
 #+end_src
 
-** Communication
-:PROPERTIES:
-:header-args: :tangle ../src/comm.js
-:END:
-
-*** Abstractly
-
-Communication is the local capability to receive new information and contribute new information. Bassline does not start from a rigid request-response model, because that assumes too much structure too early. Instead, communication is ongoing, and participants coordinate by processing messages and inferring enough structure from what they know to continue.
-
-Communication needs a shape that preserves decoupling. Producers should be able to contribute information without needing a fixed understanding of every consumer, and consumers should be able to build their own understanding from the flow they observe.
-
-*** Concretely
-
-In this book, communication is built from ports. A port is a buffered message endpoint with three operations: =send= pushes a message in, =recv= pulls a message out (blocking until one is available), and =close= permanently stops the port.
-
-Calling =port()= creates a new port. =net()= returns a join function that creates broadcast-connected ports — when one participant sends, all others receive. Participants write simple =recv= loops to process messages, using plain conditionals for dispatch.
-
-There is no lifecycle propagation between ports. Close is a local decision — the port owner stops accepting messages. Senders are not notified; their messages are simply dropped. This preserves the locality principle: neither side has knowledge of the other's state.
-
-Coordination doesn't need a special subsystem for our system. Because coordination is just what happens when participants interpret messages, infer enough structure to proceed, and respond from what they know. If something protocol-like emerges, it does so as a stable pattern in message flow, not as a privileged runtime concept.
-
-*** Implementation
-
-#+begin_src js
-export const EOF = Symbol.for('$$BASSLINE_EOF$$')
-export const isEOF = v => v === EOF
-export function port(size = Infinity) {
-  const buffer = []
-  const waiters = []
-  let closed = false
-  const close = () => {
-    closed = true
-    for (const w of waiters) w(EOF)
-    waiters.length = 0
-  }
-  const send = msg => {
-    if (isEOF(msg)) throw new Error('Bassline EOF is reserved')
-    if (closed) return console.warn('dropped: ', msg)
-    if (waiters.length > 0) return waiters.shift()(msg)
-    if (buffer.length >= size) buffer.shift() // sliding buffer
-    if (size > 0) buffer.push(msg) // no buffer
-  }
-
-  const recv = () => {
-    if (buffer.length > 0) return Promise.resolve(buffer.shift())
-    if (closed) return Promise.resolve(EOF)
-    return new Promise(resolve => waiters.push(resolve))
-  }
-
-  return { send, recv, close }
-}
-
-export function net() {
-  const ports = new Set()
-
-  function join(size) {
-    const p = port(size)
-    let closed = false
-    ports.add(p)
-    const send = msg => {
-      if (closed) console.warn('net.dropped: ', msg)
-      else ports.forEach(port => port !== p && port.send(msg))
-    }
-    const close = () => {
-      closed = true
-      ports.delete(p)
-      p.close()
-    }
-
-    return {
-      recv: p.recv,
-      send,
-      close,
-    }
-  }
-  return join
-}
-
-export const clock = (ms = 1000) => {
-  const p = port(1)
-  const tick = () => p.send({ ts: Date.now() })
-  const interval = setInterval(tick, ms)
-  tick()
-  return {
-    recv: p.recv,
-    close: () => {
-      clearInterval(interval)
-      p.close()
-    },
-  }
-}
-
-export async function consume(recv, callback) {
-  let msg
-  while (true) {
-    msg = await recv()
-    if (isEOF(msg)) break
-    await callback(msg)
-  }
-}
-#+end_src
-
 * Transports
-
 As above, it helps to separate the abstract role of a transport from the concrete transport used in this book.
 
 ** Abstractly

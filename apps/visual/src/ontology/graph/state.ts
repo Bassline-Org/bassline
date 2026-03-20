@@ -1,4 +1,4 @@
-import type { AssertMsg, RetractMsg, Triple } from './messages'
+import type { AssertMsg, RetractMsg, Triple } from './schema'
 
 export type GraphCheckpointState = {
   subjects: Record<string, Record<string, unknown>>

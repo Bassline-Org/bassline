@@ -8,8 +8,8 @@ import {
   isEntryStoredMsg,
   isRefResultMsg,
   isRefStoredMsg,
-} from './messages.ts'
-import { createSqliteStorage } from './sqlite.ts'
+} from '../../src/ontology/storage/schema.ts'
+import { createSqliteStorage } from '../../src/ontology/storage/sqlite.ts'
 
 const runtimeDescribe = process.versions.electron ? describe : describe.skip
 let Database

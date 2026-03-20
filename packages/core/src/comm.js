@@ -11,19 +11,26 @@ export function port(size = Infinity) {
   }
   const send = msg => {
     if (isEOF(msg)) throw new Error('Bassline EOF is reserved')
-    if (closed) return console.warn('dropped: ', msg)
+    if (closed) return
     if (waiters.length > 0) return waiters.shift()(msg)
     if (buffer.length >= size) buffer.shift() // sliding buffer
     if (size > 0) buffer.push(msg) // no buffer
   }
-
   const recv = () => {
     if (buffer.length > 0) return Promise.resolve(buffer.shift())
     if (closed) return Promise.resolve(EOF)
     return new Promise(resolve => waiters.push(resolve))
   }
-
   return { send, recv, close }
+}
+
+export async function consume(recv, callback) {
+  let msg
+  while (true) {
+    msg = await recv()
+    if (isEOF(msg)) break
+    await callback(msg)
+  }
 }
 
 export function net() {
@@ -34,8 +41,8 @@ export function net() {
     let closed = false
     ports.add(p)
     const send = msg => {
-      if (closed) console.warn('net.dropped: ', msg)
-      else ports.forEach(port => port !== p && port.send(msg))
+      if (closed) return
+      ports.forEach(port => port !== p && port.send(msg))
     }
     const close = () => {
       closed = true
@@ -63,14 +70,5 @@ export const clock = (ms = 1000) => {
       clearInterval(interval)
       p.close()
     },
-  }
-}
-
-export async function consume(recv, callback) {
-  let msg
-  while (true) {
-    msg = await recv()
-    if (isEOF(msg)) break
-    await callback(msg)
   }
 }

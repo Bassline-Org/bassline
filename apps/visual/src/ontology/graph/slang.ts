@@ -1,28 +1,14 @@
-import { graph } from './messages'
+import type { Triple } from './schema'
 
-export function graphView(send: (...args: any[]) => void) {
-  const g = graph(send)
+export function graph(send: (...args: any[]) => void) {
   return {
-    ...g,
-    addNode: (id: string, kind = 'default') => g.assert(id, 'kind', kind),
-    position: (id: string, x: number, y: number) => g.assert(id, 'position', { x, y }),
-    dimensions: (id: string, w: number, h: number) => g.assert(id, 'dimensions', { w, h }),
-    label: (id: string, text: string) => g.assert(id, 'label', text),
-    connect: (id: string, source: string, target: string) => {
-      g.assert(id, 'kind', 'edge')
-      g.assert(id, 'source', source)
-      g.assert(id, 'target', target)
+    assert: (s: string, p: string, o: unknown) => send({ type: 'assert', s, p, o }),
+    retract: (s: string | null, p: string | null, o: unknown = null) => send({ type: 'retract', s, p, o }),
+    query: (s: string | null, p: string | null, o: unknown = null) => {
+      const qid = crypto.randomUUID()
+      send({ type: 'query', s, p, o, qid })
+      return qid
     },
-    remove: (id: string) => g.retract(id, null),
+    result: (qid: string, triples: Triple[]) => send({ type: 'result', qid, triples }),
   } as const
-}
-
-export function seedDefaultGraph(send: (...args: any[]) => void) {
-  const g = graphView(send)
-  g.addNode('n1')
-  g.position('n1', 100, 150)
-  g.label('n1', 'Hello')
-  g.addNode('n2')
-  g.position('n2', 350, 200)
-  g.label('n2', 'World')
 }

@@ -20,10 +20,18 @@ export function useJoin(join) {
 
 export function useConsume(recv, cb) {
   const loop = useRef(null)
+  const recvRef = useRef(recv)
+
+  if (recvRef.current !== recv) {
+    throw new Error(
+      'useConsume requires a stable recv for the lifetime of the mounted component. Remount the consumer when the source changes.'
+    )
+  }
+
+  if (loop.current) loop.current.cb = cb
 
   useEffect(() => {
     if (!loop.current) {
-      // First mount: start the single consume loop
       const state = { active: true, cb }
       loop.current = state
       ;(async () => {
@@ -34,9 +42,7 @@ export function useConsume(recv, cb) {
         }
       })()
     } else {
-      // StrictMode remount: reactivate with current callback
       loop.current.active = true
-      loop.current.cb = cb
     }
 
     return () => {

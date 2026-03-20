@@ -1,7 +1,7 @@
 import { consume } from '@bassline/core'
 import type { EOF } from '@bassline/core'
-import { graph } from './messages'
-import type { GraphWriteMsg } from './messages'
+import { graph } from './slang'
+import type { GraphWriteMsg } from './schema'
 import { createGraphState } from './state'
 
 export function store({

@@ -9,11 +9,11 @@ import {
   type EntryReadSelector,
   type EntryResultMsg,
   type StorageMsg,
-} from '../src/ontology/storage/messages'
+} from '../src/ontology/storage/schema'
 import { storage } from '../src/ontology/storage/slang'
 import { createSqliteStorage } from '../src/ontology/storage/sqlite'
 import { createGraphService } from '../src/ontology/graph/service'
-import { seedDefaultGraph } from '../src/ontology/graph/slang'
+import { graphView } from '../src/ontology/xyflow/slang'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -85,7 +85,13 @@ function createWindow() {
 
     if ((await readStorageEntries({ space: 'graph', key: 'ops', limit: 1 })).length === 0) {
       const slot = graphJoin()
-      seedDefaultGraph(slot.send)
+      const g = graphView(slot.send)
+      g.addNode('n1')
+      g.position('n1', 100, 150)
+      g.label('n1', 'Hello')
+      g.addNode('n2')
+      g.position('n2', 350, 200)
+      g.label('n2', 'World')
       slot.close()
     }
 

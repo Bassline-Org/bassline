@@ -1,7 +1,7 @@
 import { net, consume } from '@bassline/core'
 import { store } from './store'
-import { isGraphMutationMsg, type GraphWriteMsg, type ResultMsg } from './messages'
-import type { Entry } from '../storage/messages'
+import { isGraphMutationMsg, type GraphWriteMsg, type ResultMsg } from './schema'
+import type { Entry } from '../storage/schema'
 
 type GraphMsg = GraphWriteMsg | ResultMsg
 
