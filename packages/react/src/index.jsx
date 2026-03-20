@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
+import { createContext, useContext, useEffect, useRef } from 'react'
 import { port, consume, isEOF } from '@bassline/core'
 
 const NetContext = createContext(null)
@@ -18,12 +18,29 @@ export function useJoin(join) {
   return ref.current
 }
 
-export function useSink(recv, cb) {
-  const started = useRef(false)
+export function useConsume(recv, cb) {
+  const loop = useRef(null)
+
   useEffect(() => {
-    if (!started.current) {
-      started.current = true
-      consume(recv, cb)
+    if (!loop.current) {
+      // First mount: start the single consume loop
+      const state = { active: true, cb }
+      loop.current = state
+      ;(async () => {
+        while (true) {
+          const msg = await recv()
+          if (isEOF(msg)) break
+          if (state.active) state.cb(msg)
+        }
+      })()
+    } else {
+      // StrictMode remount: reactivate with current callback
+      loop.current.active = true
+      loop.current.cb = cb
+    }
+
+    return () => {
+      if (loop.current) loop.current.active = false
     }
   }, [])
 }

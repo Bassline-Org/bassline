@@ -10,7 +10,7 @@ export interface Port<T = unknown> {
 }
 
 export function port<T = unknown>(size?: number): Port<T>
-export function net<T = unknown>(): () => Port<T>
+export function net<T = unknown>(): (size?: number) => Port<T>
 export function clock(ms?: number): { recv(): Promise<{ ts: number } | typeof EOF>; close(): void }
 export function consume<T>(
   recv: () => Promise<T | typeof EOF>,

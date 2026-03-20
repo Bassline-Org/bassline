@@ -6,5 +6,12 @@ export function serve(wss) {
   wss.on('connection', ws => p.send(fromWebSocket(ws)))
   wss.on('close', () => p.close())
   wss.on('error', () => p.close())
-  return { recv: p.recv, close: () => p.close(), wss }
+  return {
+    recv: p.recv,
+    close: () => {
+      p.close()
+      wss.close()
+    },
+    wss,
+  }
 }

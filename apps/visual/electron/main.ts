@@ -36,16 +36,19 @@ let observingGraph = false
 async function readStorageEntries(select: EntryReadSelector) {
   const qid = crypto.randomUUID()
   const slot = storageNet()
-  slot.send({ type: 'entry-read', qid, select })
-  while (true) {
-    const msg = await slot.recv()
-    if (isEOF(msg)) break
-    if (isEntryResultMsg(msg) && msg.qid === qid) {
-      slot.close()
-      return msg.entries
+  try {
+    slot.send({ type: 'entry-read', qid, select })
+    while (true) {
+      const msg = await slot.recv()
+      if (isEOF(msg)) break
+      if (isEntryResultMsg(msg) && msg.qid === qid) {
+        return msg.entries
+      }
     }
+    return []
+  } finally {
+    slot.close()
   }
-  return []
 }
 
 async function getGraphService() {
@@ -92,6 +95,11 @@ function createWindow() {
     consume(ipc.recv, msg => graphSlot.send(msg as any))
 
     mainWindow!.webContents.postMessage('port', null, [port2])
+
+    mainWindow!.once('closed', () => {
+      graphSlot.close()
+      ipc.close()
+    })
   })
 
   if (process.env.VITE_DEV_SERVER_URL) {

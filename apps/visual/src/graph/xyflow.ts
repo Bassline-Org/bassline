@@ -9,7 +9,7 @@ import {
   type Connection,
 } from '@xyflow/react'
 import { useState, useCallback } from 'react'
-import { useSink } from '@bassline/react'
+import { useConsume } from '@bassline/react'
 import { graph } from './messages'
 import type { AssertMsg, RetractMsg } from './messages'
 import type { EOF } from '@bassline/core'
@@ -18,7 +18,7 @@ import type { EOF } from '@bassline/core'
 export function useGraphState(recv: () => Promise<InboundMsg | typeof EOF>) {
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
-  useSink(recv, (msg: InboundMsg) => applyGraphMsg(msg, setNodes, setEdges))
+  useConsume(recv, (msg: InboundMsg) => applyGraphMsg(msg, setNodes, setEdges))
   return { nodes, setNodes, edges, setEdges }
 }
 
@@ -69,10 +69,34 @@ function applyAssert(msg: GraphViewFact, setNodes: SetState<Node[]>, setEdges: S
   }
 }
 
-function applyRetract(s: string | null, _p: string | null, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
+function applyRetract(s: string | null, p: string | null, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
   if (s == null) return
-  setNodes(nds => nds.filter(n => n.id !== s))
-  setEdges(eds => eds.filter(e => e.id !== s))
+  if (p == null) {
+    // Wildcard: remove the entire entity
+    setNodes(nds => nds.filter(n => n.id !== s))
+    setEdges(eds => eds.filter(e => e.id !== s))
+    return
+  }
+  // Predicate-level retract: reset the specific property
+  switch (p) {
+    case 'kind':
+      setNodes(nds => nds.filter(n => n.id !== s))
+      setEdges(eds => eds.filter(e => e.id !== s))
+      break
+    case 'position':
+      setNodes(nds => nds.map(n => (n.id === s ? { ...n, position: { x: 0, y: 0 } } : n)))
+      break
+    case 'label':
+      setNodes(nds => nds.map(n => (n.id === s ? { ...n, data: { ...n.data, label: s } } : n)))
+      setEdges(eds => eds.map(e => (e.id === s ? { ...e, data: { ...e.data, label: undefined } } : e)))
+      break
+    case 'source':
+      setEdges(eds => eds.map(e => (e.id === s ? { ...e, source: '' } : e)))
+      break
+    case 'target':
+      setEdges(eds => eds.map(e => (e.id === s ? { ...e, target: '' } : e)))
+      break
+  }
 }
 
 // --- Outbound: xyflow events → send ---

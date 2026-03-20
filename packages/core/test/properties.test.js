@@ -73,12 +73,12 @@ it.prop([fc.array(fc.anything(), { minLength: 0, maxLength: 50 })])(
   'port preserves order for any values',
   async values => {
     const p = port()
-    values.forEach(v => {
+    for (const v of values) {
+      if (isEOF(v)) continue
       p.send(v)
-    })
+    }
     p.close()
     const result = await collect(p.recv)
-    // filter out any EOF symbols that were skipped
     const expected = values.filter(v => !isEOF(v))
     expect(result.length).toBe(expected.length)
     for (let i = 0; i < expected.length; i++) {
