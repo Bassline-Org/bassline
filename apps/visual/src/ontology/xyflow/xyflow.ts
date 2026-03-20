@@ -10,8 +10,8 @@ import {
 } from '@xyflow/react'
 import { useState, useCallback } from 'react'
 import { useConsume } from '@bassline/react'
-import { graph } from './messages'
-import type { AssertMsg, RetractMsg } from './messages'
+import { graphView } from '../graph/slang'
+import type { AssertMsg, RetractMsg } from '../graph/messages'
 import type { EOF } from '@bassline/core'
 
 // --- Inbound: graph messages → xyflow React state ---
@@ -130,7 +130,7 @@ export function useXyflowHandlers(
 
 // --- Bridge: xyflow → graph ---
 export function bridgeToGraph(send: (msg: unknown) => void): (event: XyflowEvent) => void {
-  const g = graph(send)
+  const g = graphView(send)
   return (event: XyflowEvent) => {
     switch (event.kind) {
       case 'nodesChange':
@@ -152,11 +152,11 @@ export function bridgeToGraph(send: (msg: unknown) => void): (event: XyflowEvent
 }
 
 type SetState<T> = (fn: (prev: T) => T) => void
-type GraphKindAssert = AssertMsg<string> & { p: 'kind' }
-type GraphPositionAssert = AssertMsg<{ x: number; y: number }> & { p: 'position' }
-type GraphLabelAssert = AssertMsg<string> & { p: 'label' }
-type GraphSourceAssert = AssertMsg<string> & { p: 'source' }
-type GraphTargetAssert = AssertMsg<string> & { p: 'target' }
+type GraphKindAssert = AssertMsg & { p: 'kind'; o: string }
+type GraphPositionAssert = AssertMsg & { p: 'position'; o: { x: number; y: number } }
+type GraphLabelAssert = AssertMsg & { p: 'label'; o: string }
+type GraphSourceAssert = AssertMsg & { p: 'source'; o: string }
+type GraphTargetAssert = AssertMsg & { p: 'target'; o: string }
 type GraphViewAssert = GraphKindAssert | GraphPositionAssert | GraphLabelAssert | GraphSourceAssert | GraphTargetAssert
 type GraphViewTriple =
   | { s: string; p: 'kind'; o: string }

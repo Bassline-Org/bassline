@@ -1,9 +1,5 @@
 import { z } from 'zod'
-
-export const guard =
-  <T>(schema: z.ZodType<T>) =>
-  (msg: unknown): msg is T =>
-    schema.safeParse(msg).success
+import { guard } from '@bassline/ontology'
 
 const EntrySchema = z.object({
   id: z.string(),
@@ -115,10 +111,6 @@ export type StorageResponseMsg =
   | CheckpointResultMsg
 
 export type StorageMsg = StorageRequestMsg | StorageResponseMsg
-
-export function entryWriter(send: (msg: StorageMsg) => void): (entry: Entry) => void {
-  return (entry: Entry) => send({ type: 'entry-append', entry })
-}
 
 export const isEntryAppendMsg = guard(EntryAppendMsgSchema)
 export const isEntryStoredMsg = guard(EntryStoredMsgSchema)

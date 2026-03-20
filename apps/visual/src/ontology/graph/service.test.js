@@ -1,8 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { net, isEOF } from '@bassline/core'
-import { entryWriter, isEntryResultMsg } from '../storage/messages.js'
+import { net } from '@bassline/core'
+import { request } from '@bassline/ontology'
+import { isEntryResultMsg } from '../storage/messages.js'
+import { storage } from '../storage/slang.js'
 import { createSqliteStorage } from '../storage/sqlite.js'
-import { createGraphService, seedDefaultGraph } from './service.js'
+import { createGraphService } from './service.js'
+import { seedDefaultGraph } from './slang.js'
 
 const runtimeDescribe = process.versions.electron ? describe : describe.skip
 let Database
@@ -16,27 +19,14 @@ function makeDb() {
   return new Database(':memory:')
 }
 
-function makeStorage(db, warn = vi.fn()) {
+function makeStorage(db, debug = vi.fn()) {
   const storageNet = net()
-  createSqliteStorage(storageNet(), db, warn)
-  return { storageNet, warn }
-}
-
-async function requestOne(join, request, predicate) {
-  const { send, recv, close } = join()
-  send(request)
-  while (true) {
-    const msg = await recv()
-    if (isEOF(msg)) return null
-    if (predicate(msg)) {
-      close()
-      return msg
-    }
-  }
+  createSqliteStorage(storageNet(), db, debug)
+  return { storageNet, debug }
 }
 
 async function readEntries(storageNet, select, qid = crypto.randomUUID()) {
-  const result = await requestOne(
+  const result = await request(
     storageNet,
     { type: 'entry-read', qid, select },
     msg => isEntryResultMsg(msg) && msg.qid === qid
@@ -45,19 +35,15 @@ async function readEntries(storageNet, select, qid = crypto.randomUUID()) {
 }
 
 async function appendEntry(storageNet, entry, qid = crypto.randomUUID()) {
-  await requestOne(
-    storageNet,
-    { type: 'entry-append', qid, entry },
-    msg => msg.type === 'entry-stored' && msg.qid === qid
-  )
+  await request(storageNet, { type: 'entry-append', qid, entry }, msg => msg.type === 'entry-stored' && msg.qid === qid)
 }
 
 runtimeDescribe('graph service', () => {
   it('persists assert and retract ops as graph history', async () => {
     const db = makeDb()
-    const { storageNet, warn } = makeStorage(db)
+    const { storageNet, debug } = makeStorage(db)
     const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
@@ -75,15 +61,15 @@ runtimeDescribe('graph service', () => {
 
   it('does not persist queries', async () => {
     const db = makeDb()
-    const { storageNet, warn } = makeStorage(db)
+    const { storageNet, debug } = makeStorage(db)
     const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
     graphSlot.send({ type: 'query', s: 'n1', p: null, o: null, qid: 'q1' })
 
-    const result = await requestOne(
+    const result = await request(
       graphJoin,
       { type: 'query', s: 'n1', p: null, o: null, qid: 'q2' },
       msg => msg.type === 'result' && msg.qid === 'q2'
@@ -101,9 +87,9 @@ runtimeDescribe('graph service', () => {
 
   it('links persisted ops through prev ids', async () => {
     const db = makeDb()
-    const { storageNet, warn } = makeStorage(db)
+    const { storageNet, debug } = makeStorage(db)
     const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
@@ -123,9 +109,9 @@ runtimeDescribe('graph service', () => {
 
   it('reconstructs graph state from persisted graph history', async () => {
     const db = makeDb()
-    const { storageNet, warn } = makeStorage(db)
+    const { storageNet, debug } = makeStorage(db)
     const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
@@ -147,10 +133,10 @@ runtimeDescribe('graph service', () => {
     })
     const restarted = createGraphService({
       history: await readEntries(storageNet, { space: 'graph', key: 'ops' }),
-      warn,
+      debug,
     })
 
-    const result = await requestOne(
+    const result = await request(
       restarted,
       { type: 'query', s: null, p: null, o: null, qid: 'restart' },
       msg => msg.type === 'result' && msg.qid === 'restart'
@@ -173,9 +159,9 @@ runtimeDescribe('graph service', () => {
 
   it('seeds only once and exposes recovered state through query on later boots', async () => {
     const db = makeDb()
-    const { storageNet, warn } = makeStorage(db)
+    const { storageNet, debug } = makeStorage(db)
     const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
 
     expect(await readEntries(storageNet, { space: 'graph', key: 'ops', limit: 1 })).toHaveLength(0)
     const seedSlot = graphJoin()
@@ -188,10 +174,10 @@ runtimeDescribe('graph service', () => {
 
     const second = createGraphService({
       history: await readEntries(storageNet, { space: 'graph', key: 'ops' }),
-      warn,
+      debug,
     })
 
-    const result = await requestOne(
+    const result = await request(
       second,
       { type: 'query', s: null, p: null, o: null, qid: 'seeded' },
       msg => msg.type === 'result' && msg.qid === 'seeded'

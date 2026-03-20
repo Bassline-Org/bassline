@@ -1,7 +1,7 @@
 import { ReactFlow, ReactFlowProvider, Controls, Background } from '@xyflow/react'
 import { useEffect, useMemo } from 'react'
-import { useGraphState, useXyflowHandlers, bridgeToGraph, type InboundMsg } from './graph/xyflow'
-import { graph } from './graph/messages'
+import { useGraphState, useXyflowHandlers, bridgeToGraph, type InboundMsg } from './ontology/xyflow/xyflow'
+import { graph } from './ontology/graph/messages'
 import type { EOF } from '@bassline/core'
 import '@xyflow/react/dist/style.css'
 

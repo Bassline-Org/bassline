@@ -1,5 +1,5 @@
-import { consume } from '@bassline/core'
 import type { Port } from '@bassline/core'
+import { dispatch } from '@bassline/ontology'
 import type BetterSqlite3 from 'better-sqlite3'
 import {
   isCheckpointReadMsg,
@@ -21,20 +21,20 @@ import {
   type StorageMsg,
 } from './messages'
 
-function serializeJson(label: string, value: unknown, warn: Warn) {
+function serializeJson(label: string, value: unknown, debug: (msg: unknown) => void) {
   try {
     return JSON.stringify(value)
   } catch (error) {
-    warn(`${label}: failed to serialize JSON`, { value, error })
+    debug({ source: label, body: 'failed to serialize JSON', context: { value, error } })
     return null
   }
 }
 
-function parseJson<T>(label: string, value: string, warn: Warn) {
+function parseJson<T>(label: string, value: string, debug: (msg: unknown) => void) {
   try {
     return JSON.parse(value) as T
   } catch (error) {
-    warn(`${label}: failed to parse JSON`, { value, error })
+    debug({ source: label, body: 'failed to parse JSON', context: { value, error } })
     return null
   }
 }
@@ -42,95 +42,55 @@ function parseJson<T>(label: string, value: string, warn: Warn) {
 export function createSqliteStorage(
   { recv, send }: Pick<Port<StorageMsg>, 'recv' | 'send'>,
   db: BetterSqlite3.Database,
-  warn: Warn = console.warn
+  debug: (msg: unknown) => void = () => {}
 ) {
   ensureStorageSchema(db)
-  const ops = prepareDbOps(db, warn)
+  const ops = prepareDbOps(db, debug)
 
-  function setRef(ref: Ref) {
-    try {
-      ops.upsertRef.run(ref.space, ref.name, ref.target?.kind ?? null, ref.target?.id ?? null)
-      return ref
-    } catch (error) {
-      warn('storage.ref-set: failed to set ref', { ref, error })
-      return null
-    }
-  }
-
-  function readRef(space: string, name: string) {
-    const row = ops.selectRef.get(space, name)
-    if (!row) return null
-    return {
-      space: row.space,
-      name: row.name,
-      target: row.target_kind && row.target_id ? { kind: row.target_kind, id: row.target_id } : null,
-    } satisfies Ref
-  }
-
-  function setCheckpoint(checkpoint: Checkpoint) {
-    const stateJson = serializeJson('storage.checkpoint-set', checkpoint.state, warn)
-    if (stateJson == null) return null
-
-    try {
-      ops.upsertCheckpoint.run(checkpoint.space, checkpoint.name, checkpoint.tail, stateJson)
-      return checkpoint
-    } catch (error) {
-      warn('storage.checkpoint-set: failed to set checkpoint', { checkpoint, error })
-      return null
-    }
-  }
-
-  function readCheckpoint(space: string, name: string) {
-    const row = ops.selectCheckpoint.get(space, name)
-    if (!row) return null
-    const state = parseJson<unknown>('storage.checkpoint-read', row.state_json, warn)
-    if (state == null) return null
-    return {
-      space: row.space,
-      name: row.name,
-      tail: row.tail_entry_id,
-      state,
-    } satisfies Checkpoint
-  }
-
-  function handleEntryAppend(msg: EntryAppendMsg) {
-    const entry = ops.appendEntry(msg.entry)
-    if (entry) send({ type: 'entry-stored', entry, qid: msg.qid })
-  }
-
-  function handleEntryRead(msg: EntryReadMsg) {
-    send({ type: 'entry-result', qid: msg.qid, entries: ops.readEntries(msg.select) })
-  }
-
-  function handleRefSet(msg: RefSetMsg) {
-    const ref = setRef(msg.ref)
-    if (ref) send({ type: 'ref-stored', ref, qid: msg.qid })
-  }
-
-  function handleRefRead(msg: RefReadMsg) {
-    send({ type: 'ref-result', qid: msg.qid, ref: readRef(msg.space, msg.name) })
-  }
-
-  function handleCheckpointSet(msg: CheckpointSetMsg) {
-    const checkpoint = setCheckpoint(msg.checkpoint)
-    if (checkpoint) send({ type: 'checkpoint-stored', checkpoint, qid: msg.qid })
-  }
-
-  function handleCheckpointRead(msg: CheckpointReadMsg) {
-    send({ type: 'checkpoint-result', qid: msg.qid, checkpoint: readCheckpoint(msg.space, msg.name) })
-  }
-
-  consume(recv, (msg: StorageMsg) => {
-    if (isEntryAppendMsg(msg)) handleEntryAppend(msg)
-    else if (isEntryReadMsg(msg)) handleEntryRead(msg)
-    else if (isRefSetMsg(msg)) handleRefSet(msg)
-    else if (isRefReadMsg(msg)) handleRefRead(msg)
-    else if (isCheckpointSetMsg(msg)) handleCheckpointSet(msg)
-    else if (isCheckpointReadMsg(msg)) handleCheckpointRead(msg)
-  })
+  dispatch(recv, [
+    [
+      isEntryAppendMsg,
+      (msg: EntryAppendMsg) => {
+        const entry = ops.appendEntry(msg.entry)
+        if (entry) send({ type: 'entry-stored', entry, qid: msg.qid })
+      },
+    ],
+    [
+      isEntryReadMsg,
+      (msg: EntryReadMsg) => {
+        send({ type: 'entry-result', qid: msg.qid, entries: ops.readEntries(msg.select) })
+      },
+    ],
+    [
+      isRefSetMsg,
+      (msg: RefSetMsg) => {
+        const ref = ops.setRef(msg.ref)
+        if (ref) send({ type: 'ref-stored', ref, qid: msg.qid })
+      },
+    ],
+    [
+      isRefReadMsg,
+      (msg: RefReadMsg) => {
+        send({ type: 'ref-result', qid: msg.qid, ref: ops.readRef(msg.space, msg.name) })
+      },
+    ],
+    [
+      isCheckpointSetMsg,
+      (msg: CheckpointSetMsg) => {
+        const checkpoint = ops.setCheckpoint(msg.checkpoint)
+        if (checkpoint) send({ type: 'checkpoint-stored', checkpoint, qid: msg.qid })
+      },
+    ],
+    [
+      isCheckpointReadMsg,
+      (msg: CheckpointReadMsg) => {
+        send({ type: 'checkpoint-result', qid: msg.qid, checkpoint: ops.readCheckpoint(msg.space, msg.name) })
+      },
+    ],
+  ])
 }
 
-function prepareDbOps(db: BetterSqlite3.Database, warn: Warn) {
+function prepareDbOps(db: BetterSqlite3.Database, debug: (msg: unknown) => void) {
   const insertEntry = db.prepare(
     'INSERT INTO entries (entry_id, space, key, prev_entry_id, msg_json) VALUES (?, ?, ?, ?, ?)'
   )
@@ -160,14 +120,14 @@ function prepareDbOps(db: BetterSqlite3.Database, warn: Warn) {
   )
 
   function appendEntry(entry: Entry) {
-    const msgJson = serializeJson('storage.entry-append', entry.msg, warn)
+    const msgJson = serializeJson('storage.entry-append', entry.msg, debug)
     if (msgJson == null) return null
 
     try {
       insertEntry.run(entry.id, entry.space, entry.key, entry.prev ?? null, msgJson)
       return { ...entry, prev: entry.prev ?? null } satisfies Entry
     } catch (error) {
-      warn('storage.entry-append: failed to insert entry', { entry, error })
+      debug({ source: 'storage.entry-append', body: 'failed to insert entry', context: { entry, error } })
       return null
     }
   }
@@ -176,7 +136,7 @@ function prepareDbOps(db: BetterSqlite3.Database, warn: Warn) {
     if (!after) return null
     const row = selectEntrySeq.get(after)
     if (!row) {
-      warn('storage.entry-read: missing after entry', { after })
+      debug({ source: 'storage.entry-read', body: 'missing after entry', context: { after } })
       return null
     }
     return row.seq
@@ -217,7 +177,7 @@ function prepareDbOps(db: BetterSqlite3.Database, warn: Warn) {
     const entries: Entry[] = []
 
     for (const row of rows) {
-      const msg = parseJson<unknown>('storage.entry-read', row.msg_json, warn)
+      const msg = parseJson<unknown>('storage.entry-read', row.msg_json, debug)
       if (msg == null) continue
       entries.push({
         id: row.entry_id,
@@ -229,17 +189,53 @@ function prepareDbOps(db: BetterSqlite3.Database, warn: Warn) {
     }
     return entries
   }
-  return {
-    insertEntry,
-    selectEntrySeq,
-    upsertRef,
-    selectRef,
-    upsertCheckpoint,
-    selectCheckpoint,
-    appendEntry,
-    getAfterSeq,
-    readEntries,
-  } as const
+
+  function setRef(ref: Ref) {
+    try {
+      upsertRef.run(ref.space, ref.name, ref.target?.kind ?? null, ref.target?.id ?? null)
+      return ref
+    } catch (error) {
+      debug({ source: 'storage.ref-set', body: 'failed to set ref', context: { ref, error } })
+      return null
+    }
+  }
+
+  function readRef(space: string, name: string) {
+    const row = selectRef.get(space, name)
+    if (!row) return null
+    return {
+      space: row.space,
+      name: row.name,
+      target: row.target_kind && row.target_id ? { kind: row.target_kind, id: row.target_id } : null,
+    } satisfies Ref
+  }
+
+  function setCheckpoint(checkpoint: Checkpoint) {
+    const stateJson = serializeJson('storage.checkpoint-set', checkpoint.state, debug)
+    if (stateJson == null) return null
+    try {
+      upsertCheckpoint.run(checkpoint.space, checkpoint.name, checkpoint.tail, stateJson)
+      return checkpoint
+    } catch (error) {
+      debug({ source: 'storage.checkpoint-set', body: 'failed to set checkpoint', context: { checkpoint, error } })
+      return null
+    }
+  }
+
+  function readCheckpoint(space: string, name: string) {
+    const row = selectCheckpoint.get(space, name)
+    if (!row) return null
+    const state = parseJson<unknown>('storage.checkpoint-read', row.state_json, debug)
+    if (state == null) return null
+    return {
+      space: row.space,
+      name: row.name,
+      tail: row.tail_entry_id,
+      state,
+    } satisfies Checkpoint
+  }
+
+  return { appendEntry, readEntries, setRef, readRef, setCheckpoint, readCheckpoint } as const
 }
 
 export function ensureStorageSchema(db: BetterSqlite3.Database) {
@@ -273,7 +269,6 @@ export function ensureStorageSchema(db: BetterSqlite3.Database) {
   `)
 }
 
-type Warn = (message: string, context?: unknown) => void
 type EntryRow = {
   entry_id: string
   space: string

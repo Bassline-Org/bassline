@@ -1,24 +1,17 @@
 import { net, consume } from '@bassline/core'
-import { graph } from './messages'
 import { store } from './store'
-import { isGraphMutationMsg, type GraphWriteMsg } from './shapes'
-import type { ResultMsg } from './messages'
+import { isGraphMutationMsg, type GraphWriteMsg, type ResultMsg } from './messages'
 import type { Entry } from '../storage/messages'
 
-type Warn = (message: string, context?: unknown) => void
 type GraphMsg = GraphWriteMsg | ResultMsg
 
 type GraphServiceOptions = {
   history?: Entry[]
   persist?: (entry: Entry) => void
-  warn?: Warn
+  debug?: (msg: unknown) => void
 }
 
-export function createGraphService({
-  history = [],
-  persist = () => {},
-  warn = console.warn,
-}: GraphServiceOptions = {}) {
+export function createGraphService({ history = [], persist = () => {}, debug = () => {} }: GraphServiceOptions = {}) {
   const graphNet = net<GraphMsg>()
 
   const slot = graphNet()
@@ -28,7 +21,7 @@ export function createGraphService({
   for (const entry of history) {
     const { msg, id } = entry
     if (!isGraphMutationMsg(msg)) {
-      warn('graph.service: skipping invalid graph history entry', { entry })
+      debug({ type: 'warn', source: 'graph.service', body: 'skipping invalid graph history entry', context: { entry } })
       continue
     }
     state.apply(msg)
@@ -51,14 +44,4 @@ export function createGraphService({
   })
 
   return graphNet
-}
-
-export function seedDefaultGraph(send: (...args: any[]) => void) {
-  const g = graph(send)
-  g.addNode('n1')
-  g.position('n1', 100, 150)
-  g.label('n1', 'Hello')
-  g.addNode('n2')
-  g.position('n2', 350, 200)
-  g.label('n2', 'World')
 }

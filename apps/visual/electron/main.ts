@@ -2,10 +2,18 @@ import { app, BrowserWindow, MessageChannelMain, MessagePortMain } from 'electro
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import { fromPort, net, consume, isEOF } from '@bassline/core'
-import { entryWriter, isEntryResultMsg, type EntryReadSelector, type StorageMsg } from '../src/storage/messages'
-import { createSqliteStorage } from '../src/storage/sqlite'
-import { createGraphService, seedDefaultGraph } from '../src/graph/service'
+import { fromPort, net, consume } from '@bassline/core'
+import { request } from '@bassline/ontology'
+import {
+  isEntryResultMsg,
+  type EntryReadSelector,
+  type EntryResultMsg,
+  type StorageMsg,
+} from '../src/ontology/storage/messages'
+import { storage } from '../src/ontology/storage/slang'
+import { createSqliteStorage } from '../src/ontology/storage/sqlite'
+import { createGraphService } from '../src/ontology/graph/service'
+import { seedDefaultGraph } from '../src/ontology/graph/slang'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -35,28 +43,20 @@ let observingGraph = false
 
 async function readStorageEntries(select: EntryReadSelector) {
   const qid = crypto.randomUUID()
-  const slot = storageNet()
-  try {
-    slot.send({ type: 'entry-read', qid, select })
-    while (true) {
-      const msg = await slot.recv()
-      if (isEOF(msg)) break
-      if (isEntryResultMsg(msg) && msg.qid === qid) {
-        return msg.entries
-      }
-    }
-    return []
-  } finally {
-    slot.close()
-  }
+  const result = await request<EntryResultMsg>(
+    storageNet,
+    { type: 'entry-read', qid, select },
+    (msg): msg is EntryResultMsg => isEntryResultMsg(msg) && msg.qid === qid
+  )
+  return result?.entries ?? []
 }
 
 async function getGraphService() {
   if (!graphService) {
-    const storageSlot = storageNet()
+    const storageSlot = storageNet(0)
     graphService = createGraphService({
       history: await readStorageEntries({ space: 'graph', key: 'ops' }),
-      persist: entryWriter(storageSlot.send),
+      persist: storage(storageSlot.send).appendEntry,
     })
   }
   if (!observingGraph) {

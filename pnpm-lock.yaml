@@ -67,6 +67,9 @@ importers:
       '@bassline/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@bassline/ontology':
+        specifier: workspace:*
+        version: link:../../packages/ontology
       '@bassline/react':
         specifier: workspace:*
         version: link:../../packages/react
@@ -220,6 +223,15 @@ importers:
       protobufjs:
         specifier: ^7.0.0
         version: 7.5.4
+
+  packages/ontology:
+    dependencies:
+      '@bassline/core':
+        specifier: workspace:*
+        version: link:../core
+      zod:
+        specifier: '>=3.0.0'
+        version: 4.3.6
 
   packages/react:
     dependencies:

@@ -1,18 +1,18 @@
 {
-  "name": "@bassline/react",
+  "name": "@bassline/ontology",
   "version": "2.0.0",
-  "description": "React bindings for Bassline",
+  "description": "Tooling for local ontology construction",
   "type": "module",
   "types": "src/types.d.ts",
   "exports": {
     ".": {
       "types": "./src/types.d.ts",
-      "default": "./src/index.jsx"
+      "default": "./src/index.js"
     }
   },
   "peerDependencies": {
-    "react": ">=18.0.0",
-    "@bassline/core": "workspace:*"
+    "@bassline/core": "workspace:*",
+    "zod": ">=3.0.0"
   },
   "license": "AGPL-3.0",
   "dependencies": {}

@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { net, isEOF } from '@bassline/core'
+import { request } from '@bassline/ontology'
 import {
   isCheckpointResultMsg,
   isCheckpointStoredMsg,
@@ -23,24 +24,11 @@ function delay(ms = 20) {
 }
 
 function makeStorage() {
-  const warn = vi.fn()
+  const debug = vi.fn()
   const db = new Database(':memory:')
   const storageNet = net()
-  createSqliteStorage(storageNet(), db, warn)
-  return { db, warn, storageNet }
-}
-
-async function requestOne(storageNet, request, predicate) {
-  const { send, recv, close } = storageNet()
-  send(request)
-  while (true) {
-    const msg = await recv()
-    if (isEOF(msg)) return null
-    if (predicate(msg)) {
-      close()
-      return msg
-    }
-  }
+  createSqliteStorage(storageNet(), db, debug)
+  return { db, debug, storageNet }
 }
 
 async function observeDuring(storageNet, predicate, sendFn) {
@@ -61,11 +49,11 @@ async function observeDuring(storageNet, predicate, sendFn) {
 }
 
 async function appendEntry(storageNet, entry, qid = crypto.randomUUID()) {
-  return requestOne(storageNet, { type: 'entry-append', entry, qid }, msg => isEntryStoredMsg(msg) && msg.qid === qid)
+  return request(storageNet, { type: 'entry-append', entry, qid }, msg => isEntryStoredMsg(msg) && msg.qid === qid)
 }
 
 async function readEntries(storageNet, select, qid = crypto.randomUUID()) {
-  const result = await requestOne(
+  const result = await request(
     storageNet,
     { type: 'entry-read', qid, select },
     msg => isEntryResultMsg(msg) && msg.qid === qid
@@ -74,11 +62,11 @@ async function readEntries(storageNet, select, qid = crypto.randomUUID()) {
 }
 
 async function setRef(storageNet, ref, qid = crypto.randomUUID()) {
-  return requestOne(storageNet, { type: 'ref-set', ref, qid }, msg => isRefStoredMsg(msg) && msg.qid === qid)
+  return request(storageNet, { type: 'ref-set', ref, qid }, msg => isRefStoredMsg(msg) && msg.qid === qid)
 }
 
 async function readRef(storageNet, space, name, qid = crypto.randomUUID()) {
-  const result = await requestOne(
+  const result = await request(
     storageNet,
     { type: 'ref-read', qid, space, name },
     msg => isRefResultMsg(msg) && msg.qid === qid
@@ -87,7 +75,7 @@ async function readRef(storageNet, space, name, qid = crypto.randomUUID()) {
 }
 
 async function setCheckpoint(storageNet, checkpoint, qid = crypto.randomUUID()) {
-  return requestOne(
+  return request(
     storageNet,
     { type: 'checkpoint-set', checkpoint, qid },
     msg => isCheckpointStoredMsg(msg) && msg.qid === qid
@@ -95,7 +83,7 @@ async function setCheckpoint(storageNet, checkpoint, qid = crypto.randomUUID()) 
 }
 
 async function readCheckpoint(storageNet, space, name, qid = crypto.randomUUID()) {
-  const result = await requestOne(
+  const result = await request(
     storageNet,
     { type: 'checkpoint-read', qid, space, name },
     msg => isCheckpointResultMsg(msg) && msg.qid === qid
@@ -177,7 +165,7 @@ runtimeDescribe('sqlite storage', () => {
   })
 
   it('keeps entries immutable by rejecting duplicate ids and emitting no success ack', async () => {
-    const { storageNet, warn, db } = makeStorage()
+    const { storageNet, debug, db } = makeStorage()
 
     await appendEntry(storageNet, { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } }, 'first')
 
@@ -195,13 +183,13 @@ runtimeDescribe('sqlite storage', () => {
 
     expect(seen).toEqual([])
     expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toHaveLength(1)
-    expect(warn).toHaveBeenCalled()
+    expect(debug).toHaveBeenCalled()
 
     db.close()
   })
 
   it('rejects non-json-serializable entry and checkpoint payloads cleanly with no success ack', async () => {
-    const { storageNet, warn, db } = makeStorage()
+    const { storageNet, debug, db } = makeStorage()
     const circular = {}
     circular.self = circular
 
@@ -232,13 +220,13 @@ runtimeDescribe('sqlite storage', () => {
     expect(entryAcks).toEqual([])
     expect(checkpointAcks).toEqual([])
     expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toEqual([])
-    expect(warn).toHaveBeenCalled()
+    expect(debug).toHaveBeenCalled()
 
     db.close()
   })
 
   it('skips corrupt stored rows while still returning valid rows', async () => {
-    const { storageNet, warn, db } = makeStorage()
+    const { storageNet, debug, db } = makeStorage()
 
     await appendEntry(storageNet, { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } })
     db.prepare('INSERT INTO entries (entry_id, space, key, prev_entry_id, msg_json) VALUES (?, ?, ?, ?, ?)').run(
@@ -250,7 +238,7 @@ runtimeDescribe('sqlite storage', () => {
     )
 
     expect((await readEntries(storageNet, { space: 'graph', key: 'ops' })).map(entry => entry.id)).toEqual(['e1'])
-    expect(warn).toHaveBeenCalled()
+    expect(debug).toHaveBeenCalled()
 
     db.close()
   })
