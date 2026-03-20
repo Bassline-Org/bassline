@@ -1,12 +1,26 @@
 import { ReactFlow, ReactFlowProvider, Controls, Background } from '@xyflow/react'
 import { useBridgedWriter } from '@bassline/react'
+import { useEffect } from 'react'
 import { useGraphState, useXyflowHandlers, bridgeToGraph, type XyflowEvent, type InboundMsg } from './graph/xyflow'
 import type { Reader, Writer } from '@bassline/core'
+import { graph } from './graph/messages'
 import '@xyflow/react/dist/style.css'
 
-function GraphCanvas({ reader, changeWriter }: { reader: Reader<InboundMsg>; changeWriter: Writer<XyflowEvent> }) {
+function GraphCanvas({
+  reader,
+  writer,
+  changeWriter,
+}: {
+  reader: Reader<InboundMsg>
+  writer: Writer
+  changeWriter: Writer<XyflowEvent>
+}) {
   const { nodes, setNodes, edges, setEdges } = useGraphState(reader)
   const handlers = useXyflowHandlers(changeWriter, setNodes, setEdges)
+
+  useEffect(() => {
+    graph(writer).query(null, null, null)
+  }, [writer])
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -23,7 +37,7 @@ export default function App({ reader, writer }: { reader: Reader<InboundMsg>; wr
 
   return (
     <ReactFlowProvider>
-      <GraphCanvas reader={reader} changeWriter={changeWriter} />
+      <GraphCanvas reader={reader} writer={writer} changeWriter={changeWriter} />
     </ReactFlowProvider>
   )
 }

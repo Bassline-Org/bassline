@@ -139,37 +139,33 @@ export const clock = (ms = 1000, size = 1) => {
   return [chan.reader(), chan.writer()]
 }
 
-export const closeAll = (...writers) => writers.forEach(w => w.close())
-export const errAll = (e, ...writers) => writers.forEach(w => w.err(e))
+export const sendAll = writers => msg => writers.forEach(w => w.send(msg))
+export const closeAll = writers => () => writers.forEach(w => w.close())
+export const errAll = writers => e => writers.forEach(w => w.err(e))
+export const nullWriter = () => ({ send: () => undefined, close: () => undefined, err: () => undefined })
 
 export const net = (chan = channel) => {
   const writers = new Set()
-
-  function join(cb = r => r) {
+  function join() {
     const [rFromNet, wFromNet] = chan()
-    const [rToNet, wToNet] = chan()
+    writers.add(wFromNet)
     const writer = {
-      send: wFromNet.send,
+      send: msg => writers.forEach(w => w !== wFromNet && w.send(msg)),
       close: () => {
-        closeAll(wFromNet, wToNet)
-        writers.delete(writer)
+        wFromNet.close()
+        writers.delete(wFromNet)
       },
       err: e => {
-        errAll(e, wFromNet, wToNet)
-        writers.delete(writer)
+        wFromNet.err(e)
+        writers.delete(wFromNet)
       },
     }
-    writers.add(writer)
-    rToNet.sink({
-      ...writer,
-      send: msg => writers.forEach(w => w !== writer && w.send(msg)),
-    })
-    return [cb(rFromNet), wToNet]
+    return [rFromNet, writer]
   }
   return {
-    send: msg => writers.forEach(w => w.send(msg)),
-    close: () => closeAll(...writers),
-    err: e => errAll(e, ...writers),
+    send: sendAll(writers),
+    close: closeAll(writers),
+    err: errAll(writers),
     join,
   }
 }
@@ -213,7 +209,7 @@ export function gate(reader, predicate, ifTrue = v => v) {
 }
 
 export function filter(reader, fn) {
-  return guard(reader, fn, () => {})
+  return guard(reader, fn, () => undefined)
 }
 
 export function tee(reader, count = 2) {

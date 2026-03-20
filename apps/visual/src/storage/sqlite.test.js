@@ -1,4 +1,13 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { net } from '@bassline/core'
+import {
+  isCheckpointResultMsg,
+  isCheckpointStoredMsg,
+  isEntryResultMsg,
+  isEntryStoredMsg,
+  isRefResultMsg,
+  isRefStoredMsg,
+} from './messages.ts'
 import { createSqliteStorage } from './sqlite.ts'
 
 const runtimeDescribe = process.versions.electron ? describe : describe.skip
@@ -9,76 +18,150 @@ beforeAll(async () => {
   Database = (await import('better-sqlite3')).default
 })
 
+const collectN = n => async reader => {
+  const values = []
+  await reader.take(n).sink(value => values.push(value))
+  return values
+}
+
+function delay(ms = 20) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 function makeStorage() {
   const warn = vi.fn()
   const db = new Database(':memory:')
-  const storage = createSqliteStorage(db, warn)
-  return { db, storage, warn }
+  const storageNet = net()
+  createSqliteStorage(storageNet.join(), db, warn)
+  return { db, warn, storageNet }
+}
+
+async function requestOne(storageNet, request, predicate) {
+  const [reader, writer] = storageNet.join()
+  writer.send(request)
+  const [result] = await reader.filter(predicate).thru(collectN(1))
+  writer.close()
+  return result
+}
+
+async function observeDuring(storageNet, predicate, send) {
+  const [reader, writer] = storageNet.join()
+  const seen = []
+  const done = reader.filter(predicate).sink(value => seen.push(value))
+  await send(writer)
+  await delay()
+  writer.close()
+  await done
+  return seen
+}
+
+async function appendEntry(storageNet, entry, qid = crypto.randomUUID()) {
+  return requestOne(storageNet, { type: 'entry-append', entry, qid }, msg => isEntryStoredMsg(msg) && msg.qid === qid)
+}
+
+async function readEntries(storageNet, select, qid = crypto.randomUUID()) {
+  const result = await requestOne(
+    storageNet,
+    { type: 'entry-read', qid, select },
+    msg => isEntryResultMsg(msg) && msg.qid === qid
+  )
+  return result.entries
+}
+
+async function setRef(storageNet, ref, qid = crypto.randomUUID()) {
+  return requestOne(storageNet, { type: 'ref-set', ref, qid }, msg => isRefStoredMsg(msg) && msg.qid === qid)
+}
+
+async function readRef(storageNet, space, name, qid = crypto.randomUUID()) {
+  const result = await requestOne(
+    storageNet,
+    { type: 'ref-read', qid, space, name },
+    msg => isRefResultMsg(msg) && msg.qid === qid
+  )
+  return result.ref
+}
+
+async function setCheckpoint(storageNet, checkpoint, qid = crypto.randomUUID()) {
+  return requestOne(
+    storageNet,
+    { type: 'checkpoint-set', checkpoint, qid },
+    msg => isCheckpointStoredMsg(msg) && msg.qid === qid
+  )
+}
+
+async function readCheckpoint(storageNet, space, name, qid = crypto.randomUUID()) {
+  const result = await requestOne(
+    storageNet,
+    { type: 'checkpoint-read', qid, space, name },
+    msg => isCheckpointResultMsg(msg) && msg.qid === qid
+  )
+  return result.checkpoint
 }
 
 runtimeDescribe('sqlite storage', () => {
-  it('appends and reads entries by exact key', () => {
-    const { storage, db } = makeStorage()
+  it('appends and reads entries by exact key', async () => {
+    const { storageNet, db } = makeStorage()
 
-    storage.appendEntry({
+    await appendEntry(storageNet, {
       id: 'e1',
       space: 'graph',
       key: 'ops',
       msg: { type: 'assert', s: 'n1', p: 'label', o: 'Hello' },
     })
 
-    expect(storage.readEntries({ space: 'graph', key: 'ops' })).toEqual([
+    expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toEqual([
       { id: 'e1', space: 'graph', key: 'ops', msg: { type: 'assert', s: 'n1', p: 'label', o: 'Hello' }, prev: null },
     ])
 
     db.close()
   })
 
-  it('reads entries by prefix', () => {
-    const { storage, db } = makeStorage()
+  it('reads entries by prefix', async () => {
+    const { storageNet, db } = makeStorage()
 
-    storage.appendEntry({ id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } })
-    storage.appendEntry({ id: 'e2', space: 'graph', key: 'ops/node/a', msg: { body: 2 } })
-    storage.appendEntry({ id: 'e3', space: 'graph', key: 'other', msg: { body: 3 } })
+    await appendEntry(storageNet, { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } })
+    await appendEntry(storageNet, { id: 'e2', space: 'graph', key: 'ops/node/a', msg: { body: 2 } })
+    await appendEntry(storageNet, { id: 'e3', space: 'graph', key: 'other', msg: { body: 3 } })
 
-    expect(storage.readEntries({ space: 'graph', prefix: 'ops' }).map(entry => entry.id)).toEqual(['e1', 'e2'])
-
-    db.close()
-  })
-
-  it('reads entries with after and limit', () => {
-    const { storage, db } = makeStorage()
-
-    storage.appendEntry({ id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } })
-    storage.appendEntry({ id: 'e2', space: 'graph', key: 'ops', msg: { body: 2 } })
-    storage.appendEntry({ id: 'e3', space: 'graph', key: 'ops', msg: { body: 3 } })
-
-    expect(storage.readEntries({ space: 'graph', key: 'ops', after: 'e1', limit: 1 }).map(entry => entry.id)).toEqual([
+    expect((await readEntries(storageNet, { space: 'graph', prefix: 'ops' })).map(entry => entry.id)).toEqual([
+      'e1',
       'e2',
     ])
 
     db.close()
   })
 
-  it('sets and reads refs and checkpoints', () => {
-    const { storage, db } = makeStorage()
+  it('reads entries with after and limit', async () => {
+    const { storageNet, db } = makeStorage()
 
-    expect(storage.setRef({ space: 'graph', name: 'head', target: { kind: 'entry', id: 'e2' } })).toBe(true)
-    expect(storage.readRef('graph', 'head')).toEqual({
+    await appendEntry(storageNet, { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } })
+    await appendEntry(storageNet, { id: 'e2', space: 'graph', key: 'ops', msg: { body: 2 } })
+    await appendEntry(storageNet, { id: 'e3', space: 'graph', key: 'ops', msg: { body: 3 } })
+
+    expect(
+      (await readEntries(storageNet, { space: 'graph', key: 'ops', after: 'e1', limit: 1 })).map(entry => entry.id)
+    ).toEqual(['e2'])
+
+    db.close()
+  })
+
+  it('sets and reads refs and checkpoints', async () => {
+    const { storageNet, db } = makeStorage()
+
+    await setRef(storageNet, { space: 'graph', name: 'head', target: { kind: 'entry', id: 'e2' } })
+    expect(await readRef(storageNet, 'graph', 'head')).toEqual({
       space: 'graph',
       name: 'head',
       target: { kind: 'entry', id: 'e2' },
     })
 
-    expect(
-      storage.setCheckpoint({
-        space: 'graph',
-        name: 'current',
-        tail: 'e2',
-        state: { subjects: { n1: { label: 'Hello' } } },
-      })
-    ).toBe(true)
-    expect(storage.readCheckpoint('graph', 'current')).toEqual({
+    await setCheckpoint(storageNet, {
+      space: 'graph',
+      name: 'current',
+      tail: 'e2',
+      state: { subjects: { n1: { label: 'Hello' } } },
+    })
+    expect(await readCheckpoint(storageNet, 'graph', 'current')).toEqual({
       space: 'graph',
       name: 'current',
       tail: 'e2',
@@ -88,25 +171,151 @@ runtimeDescribe('sqlite storage', () => {
     db.close()
   })
 
-  it('keeps entries immutable by rejecting duplicate ids', () => {
-    const { storage, warn, db } = makeStorage()
+  it('keeps entries immutable by rejecting duplicate ids and emitting no success ack', async () => {
+    const { storageNet, warn, db } = makeStorage()
 
-    expect(storage.appendEntry({ id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } })).toBe(true)
-    expect(storage.appendEntry({ id: 'e1', space: 'graph', key: 'ops', msg: { body: 2 } })).toBe(false)
-    expect(storage.readEntries({ space: 'graph', key: 'ops' })).toHaveLength(1)
+    await appendEntry(storageNet, { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } }, 'first')
+
+    const seen = await observeDuring(
+      storageNet,
+      msg => isEntryStoredMsg(msg) && msg.qid === 'duplicate',
+      async writer => {
+        writer.send({
+          type: 'entry-append',
+          qid: 'duplicate',
+          entry: { id: 'e1', space: 'graph', key: 'ops', msg: { body: 2 } },
+        })
+      }
+    )
+
+    expect(seen).toEqual([])
+    expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toHaveLength(1)
     expect(warn).toHaveBeenCalled()
 
     db.close()
   })
 
-  it('rejects non-json-serializable payloads cleanly', () => {
-    const { storage, warn, db } = makeStorage()
+  it('rejects non-json-serializable entry and checkpoint payloads cleanly with no success ack', async () => {
+    const { storageNet, warn, db } = makeStorage()
     const circular = {}
     circular.self = circular
 
-    expect(storage.appendEntry({ id: 'e1', space: 'graph', key: 'ops', msg: circular })).toBe(false)
-    expect(storage.readEntries({ space: 'graph', key: 'ops' })).toEqual([])
+    const entryAcks = await observeDuring(
+      storageNet,
+      msg => isEntryStoredMsg(msg) && msg.qid === 'bad-entry',
+      async writer => {
+        writer.send({
+          type: 'entry-append',
+          qid: 'bad-entry',
+          entry: { id: 'e1', space: 'graph', key: 'ops', msg: circular },
+        })
+      }
+    )
+
+    const checkpointAcks = await observeDuring(
+      storageNet,
+      msg => isCheckpointStoredMsg(msg) && msg.qid === 'bad-checkpoint',
+      async writer => {
+        writer.send({
+          type: 'checkpoint-set',
+          qid: 'bad-checkpoint',
+          checkpoint: { space: 'graph', name: 'current', tail: null, state: circular },
+        })
+      }
+    )
+
+    expect(entryAcks).toEqual([])
+    expect(checkpointAcks).toEqual([])
+    expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toEqual([])
     expect(warn).toHaveBeenCalled()
+
+    db.close()
+  })
+
+  it('skips corrupt stored rows while still returning valid rows', async () => {
+    const { storageNet, warn, db } = makeStorage()
+
+    await appendEntry(storageNet, { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } })
+    db.prepare('INSERT INTO entries (entry_id, space, key, prev_entry_id, msg_json) VALUES (?, ?, ?, ?, ?)').run(
+      'broken',
+      'graph',
+      'ops',
+      null,
+      '{not-json'
+    )
+
+    expect((await readEntries(storageNet, { space: 'graph', key: 'ops' })).map(entry => entry.id)).toEqual(['e1'])
+    expect(warn).toHaveBeenCalled()
+
+    db.close()
+  })
+
+  it('ignores storage response messages on the input reader', async () => {
+    const { storageNet, db } = makeStorage()
+
+    const [_reader, writer] = storageNet.join()
+    writer.send({
+      type: 'entry-stored',
+      qid: 'noop',
+      entry: { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } },
+    })
+    await delay()
+
+    expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toEqual([])
+
+    writer.close()
+    db.close()
+  })
+
+  it('emits exactly one matching ack per successful write and exactly one result per read qid', async () => {
+    const { storageNet, db } = makeStorage()
+
+    const entryAcks = await observeDuring(
+      storageNet,
+      msg => isEntryStoredMsg(msg) && msg.qid === 'entry-q',
+      async writer => {
+        writer.send({
+          type: 'entry-append',
+          qid: 'entry-q',
+          entry: { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } },
+        })
+      }
+    )
+    const refAcks = await observeDuring(
+      storageNet,
+      msg => isRefStoredMsg(msg) && msg.qid === 'ref-q',
+      async writer => {
+        writer.send({
+          type: 'ref-set',
+          qid: 'ref-q',
+          ref: { space: 'graph', name: 'head', target: { kind: 'entry', id: 'e1' } },
+        })
+      }
+    )
+    const checkpointAcks = await observeDuring(
+      storageNet,
+      msg => isCheckpointStoredMsg(msg) && msg.qid === 'checkpoint-q',
+      async writer => {
+        writer.send({
+          type: 'checkpoint-set',
+          qid: 'checkpoint-q',
+          checkpoint: { space: 'graph', name: 'current', tail: 'e1', state: { ok: true } },
+        })
+      }
+    )
+    const entryResults = await observeDuring(
+      storageNet,
+      msg => isEntryResultMsg(msg) && msg.qid === 'read-q',
+      async writer => {
+        writer.send({ type: 'entry-read', qid: 'read-q', select: { space: 'graph', key: 'ops' } })
+      }
+    )
+
+    expect(entryAcks).toHaveLength(1)
+    expect(refAcks).toHaveLength(1)
+    expect(checkpointAcks).toHaveLength(1)
+    expect(entryResults).toHaveLength(1)
+    expect(entryResults[0].qid).toBe('read-q')
 
     db.close()
   })

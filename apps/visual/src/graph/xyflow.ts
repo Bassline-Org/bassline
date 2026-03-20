@@ -14,36 +14,7 @@ import { graph } from './messages'
 import type { AssertMsg, RetractMsg } from './messages'
 import type { Reader, Writer } from '@bassline/core'
 
-type SetState<T> = (fn: (prev: T) => T) => void
-
-type GraphKindAssert = AssertMsg<string> & { p: 'kind' }
-type GraphPositionAssert = AssertMsg<{ x: number; y: number }> & { p: 'position' }
-type GraphLabelAssert = AssertMsg<string> & { p: 'label' }
-type GraphSourceAssert = AssertMsg<string> & { p: 'source' }
-type GraphTargetAssert = AssertMsg<string> & { p: 'target' }
-
-type GraphViewAssert = GraphKindAssert | GraphPositionAssert | GraphLabelAssert | GraphSourceAssert | GraphTargetAssert
-
-type GraphViewTriple =
-  | { s: string; p: 'kind'; o: string }
-  | { s: string; p: 'position'; o: { x: number; y: number } }
-  | { s: string; p: 'label'; o: string }
-  | { s: string; p: 'source'; o: string }
-  | { s: string; p: 'target'; o: string }
-
-type GraphViewResult = { type: 'result'; qid: string; triples: GraphViewTriple[] }
-type GraphViewFact = GraphViewAssert | GraphViewTriple
-
-export type InboundMsg = GraphViewAssert | RetractMsg | GraphViewResult
-
-export type XyflowEvent =
-  | { kind: 'nodesChange'; changes: NodeChange[] }
-  | { kind: 'edgesChange'; changes: EdgeChange[] }
-  | { kind: 'connect'; id: string; connection: Connection }
-  | { kind: 'delete'; nodes: Node[]; edges: Edge[] }
-
 // --- Inbound: graph messages → xyflow React state ---
-
 export function useGraphState(reader: Reader<InboundMsg>) {
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
@@ -105,7 +76,6 @@ function applyRetract(s: string | null, _p: string | null, setNodes: SetState<No
 }
 
 // --- Outbound: xyflow events → writer ---
-
 export function useXyflowHandlers(writer: Writer<XyflowEvent>, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes(nds => applyNodeChanges(changes, nds))
@@ -131,7 +101,6 @@ export function useXyflowHandlers(writer: Writer<XyflowEvent>, setNodes: SetStat
 }
 
 // --- Bridge: xyflow → graph ---
-
 export function bridgeToGraph(target: Writer) {
   const g = graph(target)
   return (event: XyflowEvent) => {
@@ -153,3 +122,25 @@ export function bridgeToGraph(target: Writer) {
     }
   }
 }
+
+type SetState<T> = (fn: (prev: T) => T) => void
+type GraphKindAssert = AssertMsg<string> & { p: 'kind' }
+type GraphPositionAssert = AssertMsg<{ x: number; y: number }> & { p: 'position' }
+type GraphLabelAssert = AssertMsg<string> & { p: 'label' }
+type GraphSourceAssert = AssertMsg<string> & { p: 'source' }
+type GraphTargetAssert = AssertMsg<string> & { p: 'target' }
+type GraphViewAssert = GraphKindAssert | GraphPositionAssert | GraphLabelAssert | GraphSourceAssert | GraphTargetAssert
+type GraphViewTriple =
+  | { s: string; p: 'kind'; o: string }
+  | { s: string; p: 'position'; o: { x: number; y: number } }
+  | { s: string; p: 'label'; o: string }
+  | { s: string; p: 'source'; o: string }
+  | { s: string; p: 'target'; o: string }
+type GraphViewResult = { type: 'result'; qid: string; triples: GraphViewTriple[] }
+type GraphViewFact = GraphViewAssert | GraphViewTriple
+export type InboundMsg = GraphViewAssert | RetractMsg | GraphViewResult
+export type XyflowEvent =
+  | { kind: 'nodesChange'; changes: NodeChange[] }
+  | { kind: 'edgesChange'; changes: EdgeChange[] }
+  | { kind: 'connect'; id: string; connection: Connection }
+  | { kind: 'delete'; nodes: Node[]; edges: Edge[] }
