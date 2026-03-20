@@ -2,11 +2,12 @@ import { net, nullWriter } from '@bassline/core'
 import type { Reader, Writer } from '@bassline/core'
 import { graph } from './messages'
 import { store } from './store'
-import { isGraphMutationMsg, isGraphWriteMsg, type GraphReadMsg, type GraphWriteMsg } from './shapes'
+import { isGraphMutationMsg, isGraphWriteMsg, type GraphWriteMsg } from './shapes'
+import type { ResultMsg } from './messages'
 import type { Entry } from '../storage/messages'
 
 type Warn = (message: string, context?: unknown) => void
-type GraphMsg = GraphReadMsg | GraphWriteMsg
+type GraphMsg = GraphWriteMsg | ResultMsg
 
 type GraphServiceOptions = {
   history?: Entry[]
@@ -18,7 +19,7 @@ const storeState = ([r, w]: [Reader, Writer]) => store([r.filter(isGraphWriteMsg
 
 export function createGraphService({
   history = [],
-  persist = nullWriter(),
+  persist = nullWriter,
   warn = console.warn,
 }: GraphServiceOptions = {}) {
   const graphNet = net<GraphMsg>()

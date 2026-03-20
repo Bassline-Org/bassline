@@ -13,7 +13,10 @@ export function useNet() {
 
 export function useJoin(net, cb = r => r) {
   const ref = useRef(null)
-  if (!ref.current) ref.current = net.join(cb)
+  if (!ref.current) {
+    const [r, w] = net.join()
+    ref.current = [cb(r), w]
+  }
   useEffect(() => () => ref.current[1].close(), [])
   return ref.current
 }

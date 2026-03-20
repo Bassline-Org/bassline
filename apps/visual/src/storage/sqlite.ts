@@ -127,7 +127,7 @@ export function createSqliteStorage(
     .gate(isRefReadMsg, handleRefRead)
     .gate(isCheckpointReadMsg, handleCheckpointRead)
     .gate(isCheckpointSetMsg, handleCheckpointSet)
-    .sink(nullWriter())
+    .sink(nullWriter)
 }
 
 function prepareDbOps(db: BetterSqlite3.Database, warn: Warn) {

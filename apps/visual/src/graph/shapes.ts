@@ -1,38 +1,36 @@
-import { hasKeys, isString, isNull, isArray } from '@bassline/core'
+import { z } from 'zod'
 import type { AssertMsg, QueryMsg, ResultMsg, RetractMsg } from './messages'
-import { hasType } from '@/utils'
+import { guard } from '../storage/messages'
 
+const AssertMsgSchema = z.object({ type: z.literal('assert'), s: z.string(), p: z.string(), o: z.unknown() })
+const RetractMsgSchema = z.object({
+  type: z.literal('retract'),
+  s: z.string().nullable(),
+  p: z.string().nullable(),
+  o: z.unknown(),
+})
+const QueryMsgSchema = z.object({
+  type: z.literal('query'),
+  s: z.string().nullable(),
+  p: z.string().nullable(),
+  o: z.unknown(),
+  qid: z.string(),
+})
+const ResultMsgSchema = z.object({
+  type: z.literal('result'),
+  qid: z.string(),
+  triples: z.array(z.object({ s: z.string(), p: z.string(), o: z.unknown() })),
+})
+
+export const isGraphAssertMsg = guard<AssertMsg>(AssertMsgSchema as z.ZodType<AssertMsg>)
+export const isGraphRetractMsg = guard<RetractMsg>(RetractMsgSchema as z.ZodType<RetractMsg>)
+export const isGraphQueryMsg = guard<QueryMsg>(QueryMsgSchema as z.ZodType<QueryMsg>)
+export const isGraphResultMsg = guard<ResultMsg>(ResultMsgSchema as z.ZodType<ResultMsg>)
+
+const GraphMutationMsgSchema = z.union([AssertMsgSchema, RetractMsgSchema])
 export type GraphMutationMsg = AssertMsg | RetractMsg
+export const isGraphMutationMsg = guard<GraphMutationMsg>(GraphMutationMsgSchema as z.ZodType<GraphMutationMsg>)
+
+const GraphWriteMsgSchema = z.union([AssertMsgSchema, RetractMsgSchema, QueryMsgSchema])
 export type GraphWriteMsg = GraphMutationMsg | QueryMsg
-export type GraphReadMsg = GraphMutationMsg | ResultMsg
-
-function isTriple(value: unknown): value is { s: string; p: string; o: unknown } {
-  return hasKeys(value, ['s', 'p', 'o']) && isString(value.s) && isString(value.p)
-}
-
-export function isGraphAssertMsg(value: unknown): value is AssertMsg {
-  return isTriple(value) && hasType(value, 'assert')
-}
-
-export function isGraphRetractMsg(value: unknown): value is RetractMsg {
-  return isTriple(value) && hasType(value, 'retract')
-}
-
-export function isGraphQueryMsg(value: unknown): value is QueryMsg {
-  const isQuerySp = (v: unknown) => isString(v) || isNull(v)
-  return (
-    hasType(value, 'query') &&
-    hasKeys(value, ['qid', 's', 'p', 'o']) &&
-    isString(value.qid) &&
-    isQuerySp(value.s) &&
-    isQuerySp(value.p)
-  )
-}
-export function isGraphResultMsg(value: unknown): value is ResultMsg {
-  return hasType(value, 'result') && hasKeys(value, ['qid', 'triples']) && isString(value.qid) && isArray(value.triples)
-}
-
-export const isGraphMutationMsg = (value: unknown) => isGraphAssertMsg(value) || isGraphRetractMsg(value)
-export const isGraphWriteMsg = (value: unknown) => isGraphMutationMsg(value) || isGraphQueryMsg(value)
-export const isGraphReadMsg = (value: unknown) =>
-  isGraphAssertMsg(value) || isGraphRetractMsg(value) || isGraphResultMsg(value)
+export const isGraphWriteMsg = guard<GraphWriteMsg>(GraphWriteMsgSchema as z.ZodType<GraphWriteMsg>)

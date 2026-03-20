@@ -142,7 +142,7 @@ export const clock = (ms = 1000, size = 1) => {
 export const sendAll = writers => msg => writers.forEach(w => w.send(msg))
 export const closeAll = writers => () => writers.forEach(w => w.close())
 export const errAll = writers => e => writers.forEach(w => w.err(e))
-export const nullWriter = () => ({ send: () => undefined, close: () => undefined, err: () => undefined })
+export const nullWriter = Object.freeze({ send: () => undefined, close: () => undefined, err: () => undefined })
 
 export const net = (chan = channel) => {
   const writers = new Set()

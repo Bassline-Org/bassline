@@ -92,12 +92,3 @@ export function createGraphState() {
     },
   }
 }
-
-export function isGraphCheckpointState(value: unknown): value is GraphCheckpointState {
-  if (!value || typeof value !== 'object') return false
-  const subjects = (value as { subjects?: unknown }).subjects
-  if (!subjects || typeof subjects !== 'object' || Array.isArray(subjects)) return false
-  return Object.values(subjects).every(
-    predicates => predicates && typeof predicates === 'object' && !Array.isArray(predicates)
-  )
-}

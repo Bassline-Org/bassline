@@ -1,51 +1,103 @@
-import { hasType } from '@/utils'
+import { z } from 'zod'
 import { type Writer } from '@bassline/core'
 
-export type Entry = {
-  id: string
-  space: string
-  key: string
-  msg: unknown
-  prev?: string | null
-}
+export const guard =
+  <T>(schema: z.ZodType<T>) =>
+  (msg: unknown): msg is T =>
+    schema.safeParse(msg).success
 
-export type RefTarget = { kind: 'entry' | 'checkpoint'; id: string } | null
+const EntrySchema = z.object({
+  id: z.string(),
+  space: z.string(),
+  key: z.string(),
+  msg: z.unknown(),
+  prev: z.string().nullable().optional(),
+})
+export type Entry = z.infer<typeof EntrySchema>
 
-export type Ref = {
-  space: string
-  name: string
-  target: RefTarget
-}
+const RefTargetSchema = z.union([z.object({ kind: z.enum(['entry', 'checkpoint']), id: z.string() }), z.null()])
+export type RefTarget = z.infer<typeof RefTargetSchema>
 
-export type Checkpoint = {
-  space: string
-  name: string
-  tail: string | null
-  state: unknown
-}
+const RefSchema = z.object({
+  space: z.string(),
+  name: z.string(),
+  target: RefTargetSchema,
+})
+export type Ref = z.infer<typeof RefSchema>
 
-export type EntryReadSelector = {
-  space: string
-  key?: string
-  prefix?: string
-  after?: string
-  limit?: number
-}
+const CheckpointSchema = z.object({
+  space: z.string(),
+  name: z.string(),
+  tail: z.string().nullable(),
+  state: z.unknown(),
+})
+export type Checkpoint = z.infer<typeof CheckpointSchema>
 
-export type EntryAppendMsg = { type: 'entry-append'; entry: Entry; qid?: string }
-export type EntryStoredMsg = { type: 'entry-stored'; entry: Entry; qid?: string }
-export type EntryReadMsg = { type: 'entry-read'; qid: string; select: EntryReadSelector }
-export type EntryResultMsg = { type: 'entry-result'; qid: string; entries: Entry[] }
+const EntryReadSelectorSchema = z.object({
+  space: z.string(),
+  key: z.string().optional(),
+  prefix: z.string().optional(),
+  after: z.string().optional(),
+  limit: z.number().optional(),
+})
+export type EntryReadSelector = z.infer<typeof EntryReadSelectorSchema>
 
-export type RefSetMsg = { type: 'ref-set'; ref: Ref; qid?: string }
-export type RefStoredMsg = { type: 'ref-stored'; ref: Ref; qid?: string }
-export type RefReadMsg = { type: 'ref-read'; qid: string; space: string; name: string }
-export type RefResultMsg = { type: 'ref-result'; qid: string; ref: Ref | null }
+const EntryAppendMsgSchema = z.object({
+  type: z.literal('entry-append'),
+  entry: EntrySchema,
+  qid: z.string().optional(),
+})
+const EntryStoredMsgSchema = z.object({
+  type: z.literal('entry-stored'),
+  entry: EntrySchema,
+  qid: z.string().optional(),
+})
+const EntryReadMsgSchema = z.object({ type: z.literal('entry-read'), qid: z.string(), select: EntryReadSelectorSchema })
+const EntryResultMsgSchema = z.object({
+  type: z.literal('entry-result'),
+  qid: z.string(),
+  entries: z.array(EntrySchema),
+})
 
-export type CheckpointSetMsg = { type: 'checkpoint-set'; checkpoint: Checkpoint; qid?: string }
-export type CheckpointStoredMsg = { type: 'checkpoint-stored'; checkpoint: Checkpoint; qid?: string }
-export type CheckpointReadMsg = { type: 'checkpoint-read'; qid: string; space: string; name: string }
-export type CheckpointResultMsg = { type: 'checkpoint-result'; qid: string; checkpoint: Checkpoint | null }
+const RefSetMsgSchema = z.object({ type: z.literal('ref-set'), ref: RefSchema, qid: z.string().optional() })
+const RefStoredMsgSchema = z.object({ type: z.literal('ref-stored'), ref: RefSchema, qid: z.string().optional() })
+const RefReadMsgSchema = z.object({ type: z.literal('ref-read'), qid: z.string(), space: z.string(), name: z.string() })
+const RefResultMsgSchema = z.object({ type: z.literal('ref-result'), qid: z.string(), ref: RefSchema.nullable() })
+
+const CheckpointSetMsgSchema = z.object({
+  type: z.literal('checkpoint-set'),
+  checkpoint: CheckpointSchema,
+  qid: z.string().optional(),
+})
+const CheckpointStoredMsgSchema = z.object({
+  type: z.literal('checkpoint-stored'),
+  checkpoint: CheckpointSchema,
+  qid: z.string().optional(),
+})
+const CheckpointReadMsgSchema = z.object({
+  type: z.literal('checkpoint-read'),
+  qid: z.string(),
+  space: z.string(),
+  name: z.string(),
+})
+const CheckpointResultMsgSchema = z.object({
+  type: z.literal('checkpoint-result'),
+  qid: z.string(),
+  checkpoint: CheckpointSchema.nullable(),
+})
+
+export type EntryAppendMsg = z.infer<typeof EntryAppendMsgSchema>
+export type EntryStoredMsg = z.infer<typeof EntryStoredMsgSchema>
+export type EntryReadMsg = z.infer<typeof EntryReadMsgSchema>
+export type EntryResultMsg = z.infer<typeof EntryResultMsgSchema>
+export type RefSetMsg = z.infer<typeof RefSetMsgSchema>
+export type RefStoredMsg = z.infer<typeof RefStoredMsgSchema>
+export type RefReadMsg = z.infer<typeof RefReadMsgSchema>
+export type RefResultMsg = z.infer<typeof RefResultMsgSchema>
+export type CheckpointSetMsg = z.infer<typeof CheckpointSetMsgSchema>
+export type CheckpointStoredMsg = z.infer<typeof CheckpointStoredMsgSchema>
+export type CheckpointReadMsg = z.infer<typeof CheckpointReadMsgSchema>
+export type CheckpointResultMsg = z.infer<typeof CheckpointResultMsgSchema>
 
 export type StorageRequestMsg =
   | EntryAppendMsg
@@ -77,76 +129,15 @@ export function entryWriter(writer: Writer<StorageMsg>): EntryWriter {
   }
 }
 
-export function isEntryAppendMsg(msg: unknown): msg is EntryAppendMsg {
-  return hasType(msg, 'entry-append')
-}
-
-export function isEntryStoredMsg(msg: unknown): msg is EntryStoredMsg {
-  return hasType(msg, 'entry-stored')
-}
-
-export function isEntryReadMsg(msg: unknown): msg is EntryReadMsg {
-  return hasType(msg, 'entry-read')
-}
-
-export function isEntryResultMsg(msg: unknown): msg is EntryResultMsg {
-  return hasType(msg, 'entry-result')
-}
-
-export function isRefSetMsg(msg: unknown): msg is RefSetMsg {
-  return hasType(msg, 'ref-set')
-}
-
-export function isRefStoredMsg(msg: unknown): msg is RefStoredMsg {
-  return hasType(msg, 'ref-stored')
-}
-
-export function isRefReadMsg(msg: unknown): msg is RefReadMsg {
-  return hasType(msg, 'ref-read')
-}
-
-export function isRefResultMsg(msg: unknown): msg is RefResultMsg {
-  return hasType(msg, 'ref-result')
-}
-
-export function isCheckpointSetMsg(msg: unknown): msg is CheckpointSetMsg {
-  return hasType(msg, 'checkpoint-set')
-}
-
-export function isCheckpointStoredMsg(msg: unknown): msg is CheckpointStoredMsg {
-  return hasType(msg, 'checkpoint-stored')
-}
-
-export function isCheckpointReadMsg(msg: unknown): msg is CheckpointReadMsg {
-  return hasType(msg, 'checkpoint-read')
-}
-
-export function isCheckpointResultMsg(msg: unknown): msg is CheckpointResultMsg {
-  return hasType(msg, 'checkpoint-result')
-}
-
-export function isStorageRequestMsg(msg: unknown): msg is StorageRequestMsg {
-  return (
-    isEntryAppendMsg(msg) ||
-    isEntryReadMsg(msg) ||
-    isRefSetMsg(msg) ||
-    isRefReadMsg(msg) ||
-    isCheckpointSetMsg(msg) ||
-    isCheckpointReadMsg(msg)
-  )
-}
-
-export function isStorageResponseMsg(msg: unknown): msg is StorageResponseMsg {
-  return (
-    isEntryStoredMsg(msg) ||
-    isEntryResultMsg(msg) ||
-    isRefStoredMsg(msg) ||
-    isRefResultMsg(msg) ||
-    isCheckpointStoredMsg(msg) ||
-    isCheckpointResultMsg(msg)
-  )
-}
-
-export function isStorageMsg(msg: unknown): msg is StorageMsg {
-  return isStorageRequestMsg(msg) || isStorageResponseMsg(msg)
-}
+export const isEntryAppendMsg = guard(EntryAppendMsgSchema)
+export const isEntryStoredMsg = guard(EntryStoredMsgSchema)
+export const isEntryReadMsg = guard(EntryReadMsgSchema)
+export const isEntryResultMsg = guard(EntryResultMsgSchema)
+export const isRefSetMsg = guard(RefSetMsgSchema)
+export const isRefStoredMsg = guard(RefStoredMsgSchema)
+export const isRefReadMsg = guard(RefReadMsgSchema)
+export const isRefResultMsg = guard(RefResultMsgSchema)
+export const isCheckpointSetMsg = guard(CheckpointSetMsgSchema)
+export const isCheckpointStoredMsg = guard(CheckpointStoredMsgSchema)
+export const isCheckpointReadMsg = guard(CheckpointReadMsgSchema)
+export const isCheckpointResultMsg = guard(CheckpointResultMsgSchema)

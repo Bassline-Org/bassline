@@ -39,7 +39,7 @@ export interface Writer<T = unknown> {
 }
 
 export interface Net<T = unknown> {
-  join<R = Reader<T>>(): [R, Writer<T>]
+  join(): [Reader<T>, Writer<T>]
   send(msg: T): void
   close(): void
   err(e: unknown): void
@@ -77,15 +77,14 @@ export class ClockChannel extends SlidingChannel {
 
 export class ConsumedChannelError extends Error {}
 
-export function channel<T, U>(): [Reader<T>, Writer<U>]
+export function channel<T>(): [Reader<T>, Writer<T>]
 export function slidingChannel<T = unknown>(size?: number): [Reader<T>, Writer<T>]
 export function clock(ms?: number, size?: number): [Reader<number>, { close(): void }]
-export function pipe<T = unknown>(cb: (reader: Reader<T>) => void, chan?: () => Channel): Writer<T>
-export function nullWriter(): Writer<unknown>
+export const nullWriter: Readonly<Writer<unknown>>
 
-export function sendAll(...writers: Writer[]): (msg: unknown) => void;
-export function closeAll(...writers: Writer[]): () => void;
-export function errAll(...writers: Writer[]): (e: unknown) => void;
+export function sendAll(writers: Writer[]): (msg: unknown) => void;
+export function closeAll(writers: Writer[]): () => void;
+export function errAll(writers: Writer[]): (e: unknown) => void;
 
 export function net<T = unknown>(chan?: () => [Reader<T>, Writer<T>]): Net<T>
 

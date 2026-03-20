@@ -327,7 +327,7 @@ We also export =nullWriter=, which is a dummy writer that doesn't do anything.
 export const sendAll = (writers) => msg => writers.forEach(w => w.send(msg))
 export const closeAll = (writers) => () => writers.forEach(w => w.close())
 export const errAll = (writers) => e => writers.forEach(w => w.err(e))
-export const nullWriter = () => ({send: () => undefined, close: () => undefined, err: () => undefined})
+export const nullWriter = Object.freeze({send: () => undefined, close: () => undefined, err: () => undefined})
 #+end_src
 
 **** Net
