@@ -1,22 +1,26 @@
 import net from 'node:net'
-import { channel, closeAll, errAll } from '../channel.js'
+import { port } from '../comm.js'
 import defaultFrame from '../frame/jsonl.js'
 
 export function fromSocket(socket, frame = defaultFrame) {
-  const [incoming, writeIncoming] = channel()
-  const [outgoing, writeOutgoing] = channel()
+  const raw = port()
+  const msgs = port()
 
-  socket.on('data', chunk => writeIncoming.send(chunk.toString()))
-  socket.on('close', () => closeAll(writeIncoming, writeOutgoing))
-  socket.on('error', e => errAll(e, writeIncoming, writeOutgoing))
+  socket.on('data', chunk => raw.send(chunk.toString()))
+  socket.on('close', () => raw.close())
+  socket.on('error', () => raw.close())
 
-  outgoing
-    .map(v => frame.format(v))
-    .sink(data => socket.write(data))
-    .then(() => socket.destroy())
-    .catch(e => socket.destroy(e))
+  frame.read(raw.recv, msgs.send)
 
-  return [incoming.thru(frame.read), writeOutgoing]
+  return {
+    recv: msgs.recv,
+    send: msg => socket.write(frame.format(msg)),
+    close: () => {
+      msgs.close()
+      raw.close()
+      socket.destroy()
+    },
+  }
 }
 
 export function connect(options = {}, frame = defaultFrame) {

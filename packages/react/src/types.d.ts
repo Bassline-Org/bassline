@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
-import type { Reader, Writer, Net } from '@bassline/core'
+import type { Port, EOF } from '@bassline/core'
 
-export function Net(props: { net: Net; children: ReactNode }): ReactNode
-export function useNet(): Net | null
-export function useJoin<T = unknown>(net: Net<T>, cb?: (reader: Reader<T>) => Reader<T>): [Reader<T>, Writer<T>]
-export function useSink<T>(reader: Reader<T>, cb: ((value: T) => void) | Writer<T>): void
-export function useChannel<T = unknown>(chan?: () => [Reader<T>, Writer<T>]): [Reader<T>, Writer<T>]
-export function useBridgedWriter<T = unknown>(target: Writer, bridge: (target: Writer) => (msg: T) => void): Writer<T>
+export function Net(props: { join: () => Port; children: ReactNode }): ReactNode
+export function useNet(): (() => Port) | null
+export function useJoin<T = unknown>(join: () => Port<T>): Port<T>
+export function useSink<T>(recv: () => Promise<T | typeof EOF>, cb: (value: T) => void | Promise<void>): void
+export function usePort<T = unknown>(factory?: () => Port<T>): Port<T>

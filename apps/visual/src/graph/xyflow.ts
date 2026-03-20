@@ -12,13 +12,13 @@ import { useState, useCallback } from 'react'
 import { useSink } from '@bassline/react'
 import { graph } from './messages'
 import type { AssertMsg, RetractMsg } from './messages'
-import type { Reader, Writer } from '@bassline/core'
+import type { EOF } from '@bassline/core'
 
 // --- Inbound: graph messages → xyflow React state ---
-export function useGraphState(reader: Reader<InboundMsg>) {
+export function useGraphState(recv: () => Promise<InboundMsg | typeof EOF>) {
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
-  useSink(reader, (msg: InboundMsg) => applyGraphMsg(msg, setNodes, setEdges))
+  useSink(recv, (msg: InboundMsg) => applyGraphMsg(msg, setNodes, setEdges))
   return { nodes, setNodes, edges, setEdges }
 }
 
@@ -75,34 +75,38 @@ function applyRetract(s: string | null, _p: string | null, setNodes: SetState<No
   setEdges(eds => eds.filter(e => e.id !== s))
 }
 
-// --- Outbound: xyflow events → writer ---
-export function useXyflowHandlers(writer: Writer<XyflowEvent>, setNodes: SetState<Node[]>, setEdges: SetState<Edge[]>) {
+// --- Outbound: xyflow events → send ---
+export function useXyflowHandlers(
+  onEvent: (event: XyflowEvent) => void,
+  setNodes: SetState<Node[]>,
+  setEdges: SetState<Edge[]>
+) {
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes(nds => applyNodeChanges(changes, nds))
-    writer.send({ kind: 'nodesChange', changes })
+    onEvent({ kind: 'nodesChange', changes })
   }, [])
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     setEdges(eds => applyEdgeChanges(changes, eds))
-    writer.send({ kind: 'edgesChange', changes })
+    onEvent({ kind: 'edgesChange', changes })
   }, [])
 
   const onConnect = useCallback((connection: Connection) => {
     const id = `e-${crypto.randomUUID().slice(0, 8)}`
     setEdges(eds => addEdge({ ...connection, id }, eds))
-    writer.send({ kind: 'connect', id, connection })
+    onEvent({ kind: 'connect', id, connection })
   }, [])
 
   const onDelete = useCallback(({ nodes: dn, edges: de }: { nodes: Node[]; edges: Edge[] }) => {
-    writer.send({ kind: 'delete', nodes: dn, edges: de })
+    onEvent({ kind: 'delete', nodes: dn, edges: de })
   }, [])
 
   return { onNodesChange, onEdgesChange, onConnect, onDelete }
 }
 
 // --- Bridge: xyflow → graph ---
-export function bridgeToGraph(target: Writer) {
-  const g = graph(target)
+export function bridgeToGraph(send: (msg: unknown) => void): (event: XyflowEvent) => void {
+  const g = graph(send)
   return (event: XyflowEvent) => {
     switch (event.kind) {
       case 'nodesChange':

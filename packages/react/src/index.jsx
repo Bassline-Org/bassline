@@ -1,44 +1,35 @@
-import { createContext, useContext, useEffect, useRef } from 'react'
-import { channel } from '@bassline/core'
+import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
+import { port, consume, isEOF } from '@bassline/core'
 
 const NetContext = createContext(null)
 
-export function Net({ net, children }) {
-  return <NetContext.Provider value={net}>{children}</NetContext.Provider>
+export function Net({ join, children }) {
+  return <NetContext.Provider value={join}>{children}</NetContext.Provider>
 }
 
 export function useNet() {
   return useContext(NetContext)
 }
 
-export function useJoin(net, cb = r => r) {
+export function useJoin(join) {
   const ref = useRef(null)
-  if (!ref.current) {
-    const [r, w] = net.join()
-    ref.current = [cb(r), w]
-  }
-  useEffect(() => () => ref.current[1].close(), [])
+  if (!ref.current) ref.current = join()
+  useEffect(() => () => ref.current.close(), [])
   return ref.current
 }
 
-export function useSink(reader, cb) {
-  const sunk = useRef(false)
+export function useSink(recv, cb) {
+  const started = useRef(false)
   useEffect(() => {
-    if (!sunk.current) {
-      sunk.current = true
-      reader.sink(cb)
+    if (!started.current) {
+      started.current = true
+      consume(recv, cb)
     }
   }, [])
 }
 
-export function useChannel(chan = channel) {
+export function usePort(factory = port) {
   const ref = useRef(null)
-  if (!ref.current) ref.current = chan()
+  if (!ref.current) ref.current = factory()
   return ref.current
-}
-
-export function useBridgedWriter(target, bridge) {
-  const [reader, writer] = useChannel()
-  useSink(reader, { ...target, send: bridge(target) })
-  return writer
 }

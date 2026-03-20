@@ -1,17 +1,22 @@
-import type { Reader, Writer } from '@bassline/core'
+import { consume } from '@bassline/core'
+import type { EOF } from '@bassline/core'
 import { graph } from './messages'
 import type { GraphWriteMsg } from './shapes'
 import { createGraphState } from './state'
 
-export function store([reader, writer]: [Reader<GraphWriteMsg>, Writer]) {
-  const g = graph(writer)
+export function store({
+  recv,
+  send,
+}: {
+  recv: () => Promise<GraphWriteMsg | typeof EOF>
+  send: (...args: any[]) => void
+}) {
+  const g = graph(send)
   const state = createGraphState()
 
-  reader.sink((msg: GraphWriteMsg) => {
+  consume(recv, (msg: GraphWriteMsg) => {
     switch (msg.type) {
       case 'assert':
-        state.apply(msg)
-        break
       case 'retract':
         state.apply(msg)
         break

@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { type Writer } from '@bassline/core'
 
 export const guard =
   <T>(schema: z.ZodType<T>) =>
@@ -117,16 +116,8 @@ export type StorageResponseMsg =
 
 export type StorageMsg = StorageRequestMsg | StorageResponseMsg
 
-export type EntryWriter = Writer<Entry>
-
-export function entryWriter(writer: Writer<StorageMsg>): EntryWriter {
-  return {
-    send: (...entries: Entry[]) => {
-      for (const entry of entries) writer.send({ type: 'entry-append', entry })
-    },
-    close: () => writer.close(),
-    err: e => writer.err(e),
-  }
+export function entryWriter(send: (msg: StorageMsg) => void): (entry: Entry) => void {
+  return (entry: Entry) => send({ type: 'entry-append', entry })
 }
 
 export const isEntryAppendMsg = guard(EntryAppendMsgSchema)

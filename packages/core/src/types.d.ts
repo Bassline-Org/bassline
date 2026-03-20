@@ -1,127 +1,23 @@
-export type Predicate<T> = (value: T) => boolean | Promise<boolean>
-export type Refinement<T, S extends T> = (value: T) => value is S
+// --- Communication ---
 
-export interface Reader<T = unknown> {
-  consume(): AsyncIterable<T>
-  thru<R>(cb: (reader: Reader<T>) => R): R
-  sink(fn: ((value: T) => void | Promise<void>) | Writer<T>): Promise<void>
-  map<U>(fn: (value: T) => U | Promise<U>): Reader<U>
-  filter<S extends T>(fn: Refinement<T, S>): Reader<S>
-  filter(fn: Predicate<T>): Reader<T>
-  guard<S extends T>(
-    predicate: Refinement<T, S>,
-    ifFalse?: (value: Exclude<T, S>, writer: Writer<S>) => void | Promise<void>
-  ): Reader<S>
-  guard(
-    predicate: Predicate<T>,
-    ifFalse?: (value: T, writer: Writer<T>) => void | Promise<void>
-  ): Reader<T>
-  gate<S extends T>(
-    predicate: Refinement<T, S>,
-    ifTrue?: (value: S) => void | Promise<void>
-  ): Reader<Exclude<T, S>>
-  gate(
-    predicate: Predicate<T>,
-    ifTrue?: (value: T) => void | Promise<void>
-  ): Reader<T>
-  tee(count?: number): Reader<T>[]
-  take(n?: number): Reader<T>
-  scan<U>(fn: (acc: U, value: T) => U | Promise<U>, seed: U): Reader<U>
-  tap(fn: (value: T) => void): Reader<T>
-  fork(cb: (reader: Reader<T>) => void): Reader<T>
-  merge(readers: Reader<T>[]): Reader<T>
-}
+export const EOF: unique symbol
+export function isEOF(v: unknown): v is typeof EOF
 
-export interface Writer<T = unknown> {
-  send(...values: T[]): void
-  close(): void
-  err(e: unknown): void
-}
-
-export interface Net<T = unknown> {
-  join(): [Reader<T>, Writer<T>]
+export interface Port<T = unknown> {
   send(msg: T): void
+  recv(): Promise<T | typeof EOF>
   close(): void
-  err(e: unknown): void
 }
 
-export const ERR: unique symbol
-export const WAITING: unique symbol
-export const CLOSED: unique symbol
+export function port<T = unknown>(size?: number): Port<T>
+export function net<T = unknown>(): () => Port<T>
+export function clock(ms?: number): { recv(): Promise<{ ts: number } | typeof EOF>; close(): void }
+export function consume<T>(
+  recv: () => Promise<T | typeof EOF>,
+  callback: (msg: T) => void | Promise<void>
+): Promise<void>
 
-export class Channel {
-  queue: unknown[]
-  waiters: unknown[]
-  state: symbol
-  consumed: boolean
-  error: unknown
-  write(value: unknown): void
-  close(): void
-  err(e: unknown): void
-  consume(): AsyncIterable<unknown>
-  send(...values: unknown[]): void
-  reader(): Reader
-  writer(): Writer
-}
-
-export class SlidingChannel extends Channel {
-  constructor(size?: number)
-  size: number
-}
-
-export class ClockChannel extends SlidingChannel {
-  constructor(ms: number, size?: number)
-  interval: ReturnType<typeof setInterval>
-  writer(): { close(): void }
-}
-
-export class ConsumedChannelError extends Error {}
-
-export function channel<T>(): [Reader<T>, Writer<T>]
-export function slidingChannel<T = unknown>(size?: number): [Reader<T>, Writer<T>]
-export function clock(ms?: number, size?: number): [Reader<number>, { close(): void }]
-export const nullWriter: Readonly<Writer<unknown>>
-
-export function sendAll(writers: Writer[]): (msg: unknown) => void;
-export function closeAll(writers: Writer[]): () => void;
-export function errAll(writers: Writer[]): (e: unknown) => void;
-
-export function net<T = unknown>(chan?: () => [Reader<T>, Writer<T>]): Net<T>
-
-export function sink<T>(reader: Reader<T>, fn: ((value: T) => void | Promise<void>) | Writer<T>): Promise<void>
-export function map<T, U>(reader: Reader<T>, fn: (value: T) => U | Promise<U>): Reader<U>
-
-export function filter<T, S extends T>(reader: Reader<T>, fn: Refinement<T, S>): Reader<S>
-export function filter<T>(reader: Reader<T>, fn: Predicate<T>): Reader<T>
-
-export function guard<T, S extends T>(
-  reader: Reader<T>,
-  predicate: Refinement<T, S>,
-  ifFalse?: (value: Exclude<T, S>, writer: Writer<S>) => void | Promise<void>
-): Reader<S>
-export function guard<T>(
-  reader: Reader<T>,
-  predicate: Predicate<T>,
-  ifFalse?: (value: T, writer: Writer<T>) => void | Promise<void>
-): Reader<T>
-
-export function gate<T, S extends T>(
-  reader: Reader<T>,
-  predicate: Refinement<T, S>,
-  ifTrue?: (value: S) => void | Promise<void>
-): Reader<Exclude<T, S>>
-export function gate<T>(
-  reader: Reader<T>,
-  predicate: Predicate<T>,
-  ifTrue?: (value: T) => void | Promise<void>
-): Reader<T>
-export function tee<T>(reader: Reader<T>, count?: number): Reader<T>[]
-export function take<T>(reader: Reader<T>, n?: number): Reader<T>
-export function scan<T, U>(reader: Reader<T>, fn: (acc: U, value: T) => U | Promise<U>, seed: U): Reader<U>
-export function merge<T>(readers: Reader<T>[]): Reader<T>
-export function fork<T>(reader: Reader<T>, cb: (reader: Reader<T>) => void): Reader<T>
-
-export type Bridge<A, B> = (reader: Reader<A>, writer: Writer<B>) => void
+// --- Messages ---
 
 export type MessageShape = Record<string, unknown>
 export type Message<T extends object = MessageShape> = MessageShape & T
@@ -156,6 +52,8 @@ export class Fault extends Error {
 }
 export function fault(condition: string, msg?: unknown, context?: unknown): never
 
+// --- Utils ---
+
 export function isArray(x: unknown): x is unknown[]
 export function isNil(x: unknown): x is null | undefined
 export function isPromise(x: unknown): x is Promise<unknown>
@@ -170,8 +68,12 @@ export function hasKeys<const K extends readonly string[]>(
 ): obj is Record<K[number], unknown>
 export function castArr<T>(x: T | T[]): T[]
 
-export function fromWebSocket(ws: unknown): [Reader<Message>, Writer]
-export function fromPort(port: unknown): [Reader<Message>, Writer]
+// --- Transports ---
 
-export function readFrame(reader: Reader<string>): Reader<Message>
+export function fromWebSocket(ws: unknown): Port<Message>
+export function fromPort(port: unknown): Port<Message>
+
+// --- Framing ---
+
+export function readFrame(recv: () => Promise<unknown>, send: (msg: Message) => void): void
 export function format(msg: unknown): string

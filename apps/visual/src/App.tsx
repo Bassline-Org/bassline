@@ -1,26 +1,25 @@
 import { ReactFlow, ReactFlowProvider, Controls, Background } from '@xyflow/react'
-import { useBridgedWriter } from '@bassline/react'
-import { useEffect } from 'react'
-import { useGraphState, useXyflowHandlers, bridgeToGraph, type XyflowEvent, type InboundMsg } from './graph/xyflow'
-import type { Reader, Writer } from '@bassline/core'
+import { useEffect, useMemo } from 'react'
+import { useGraphState, useXyflowHandlers, bridgeToGraph, type InboundMsg } from './graph/xyflow'
 import { graph } from './graph/messages'
+import type { EOF } from '@bassline/core'
 import '@xyflow/react/dist/style.css'
 
 function GraphCanvas({
-  reader,
-  writer,
-  changeWriter,
+  send,
+  recv,
+  onXyflowEvent,
 }: {
-  reader: Reader<InboundMsg>
-  writer: Writer
-  changeWriter: Writer<XyflowEvent>
+  send: (msg: unknown) => void
+  recv: () => Promise<InboundMsg | typeof EOF>
+  onXyflowEvent: (event: any) => void
 }) {
-  const { nodes, setNodes, edges, setEdges } = useGraphState(reader)
-  const handlers = useXyflowHandlers(changeWriter, setNodes, setEdges)
+  const { nodes, setNodes, edges, setEdges } = useGraphState(recv)
+  const handlers = useXyflowHandlers(onXyflowEvent, setNodes, setEdges)
 
   useEffect(() => {
-    graph(writer).query(null, null, null)
-  }, [writer])
+    graph(send).query(null, null, null)
+  }, [send])
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -32,12 +31,18 @@ function GraphCanvas({
   )
 }
 
-export default function App({ reader, writer }: { reader: Reader<InboundMsg>; writer: Writer }) {
-  const changeWriter = useBridgedWriter(writer, bridgeToGraph)
+export default function App({
+  send,
+  recv,
+}: {
+  send: (msg: unknown) => void
+  recv: () => Promise<InboundMsg | typeof EOF>
+}) {
+  const onXyflowEvent = useMemo(() => bridgeToGraph(send), [send])
 
   return (
     <ReactFlowProvider>
-      <GraphCanvas reader={reader} writer={writer} changeWriter={changeWriter} />
+      <GraphCanvas send={send} recv={recv} onXyflowEvent={onXyflowEvent} />
     </ReactFlowProvider>
   )
 }

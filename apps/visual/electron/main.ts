@@ -2,8 +2,7 @@ import { app, BrowserWindow, MessageChannelMain, MessagePortMain } from 'electro
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
-import type { Reader, Writer } from '@bassline/core'
-import { fromPort, net } from '@bassline/core'
+import { fromPort, net, consume, isEOF } from '@bassline/core'
 import { entryWriter, isEntryResultMsg, type EntryReadSelector, type StorageMsg } from '../src/storage/messages'
 import { createSqliteStorage } from '../src/storage/sqlite'
 import { createGraphService, seedDefaultGraph } from '../src/graph/service'
@@ -22,48 +21,43 @@ function adaptPort(electronPort: MessagePortMain) {
   }
 }
 
-function observe(label: string, [reader]: [Reader, Writer]) {
-  reader.sink((msg: unknown) => console.log(`[${label}]`, JSON.stringify(msg)))
+function observe(label: string, slot: { recv: () => Promise<unknown> }) {
+  consume(slot.recv, (msg: unknown) => console.log(`[${label}]`, JSON.stringify(msg)))
 }
-
-const collectN =
-  (n: number) =>
-  async <T>(reader: Reader<T>) => {
-    const values: T[] = []
-    await reader.take(n).sink(value => void values.push(value))
-    return values
-  }
 
 const dbPath = path.join(app.getPath('userData'), 'homebass.db')
 const db = new Database(dbPath)
 const storageNet = net<StorageMsg>()
-createSqliteStorage(storageNet.join(), db)
+createSqliteStorage(storageNet(), db)
 
 let graphService: ReturnType<typeof createGraphService> | null = null
 let observingGraph = false
 
 async function readStorageEntries(select: EntryReadSelector) {
   const qid = crypto.randomUUID()
-  const [reader, writer] = storageNet.join()
-  writer.send({ type: 'entry-read', qid, select })
-  const [result] = await reader
-    .filter(isEntryResultMsg)
-    .filter(msg => msg.qid === qid)
-    .thru(collectN(1))
-  writer.close()
-  return result.entries
+  const slot = storageNet()
+  slot.send({ type: 'entry-read', qid, select })
+  while (true) {
+    const msg = await slot.recv()
+    if (isEOF(msg)) break
+    if (isEntryResultMsg(msg) && msg.qid === qid) {
+      slot.close()
+      return msg.entries
+    }
+  }
+  return []
 }
 
 async function getGraphService() {
   if (!graphService) {
-    const [_storageReader, storageWriter] = storageNet.join()
+    const storageSlot = storageNet()
     graphService = createGraphService({
       history: await readStorageEntries({ space: 'graph', key: 'ops' }),
-      persist: entryWriter(storageWriter),
+      persist: entryWriter(storageSlot.send),
     })
   }
   if (!observingGraph) {
-    observe('graph', graphService.join())
+    observe('graph', graphService())
     observingGraph = true
   }
   return graphService
@@ -84,18 +78,18 @@ function createWindow() {
 
   mainWindow.webContents.once('did-finish-load', async () => {
     const { port1, port2 } = new MessageChannelMain()
-    const graph = await getGraphService()
+    const graphJoin = await getGraphService()
 
     if ((await readStorageEntries({ space: 'graph', key: 'ops', limit: 1 })).length === 0) {
-      const [_reader, writer] = graph.join()
-      seedDefaultGraph(writer)
-      writer.close()
+      const slot = graphJoin()
+      seedDefaultGraph(slot.send)
+      slot.close()
     }
 
-    const [rNet, wNet] = graph.join()
-    const [rPort, wPort] = fromPort(adaptPort(port1))
-    rNet.sink(wPort)
-    rPort.sink(wNet)
+    const graphSlot = graphJoin()
+    const ipc = fromPort(adaptPort(port1))
+    consume(graphSlot.recv, msg => ipc.send(msg))
+    consume(ipc.recv, msg => graphSlot.send(msg as any))
 
     mainWindow!.webContents.postMessage('port', null, [port2])
   })

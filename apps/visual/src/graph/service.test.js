@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { net } from '@bassline/core'
+import { net, isEOF } from '@bassline/core'
 import { entryWriter, isEntryResultMsg } from '../storage/messages.js'
 import { createSqliteStorage } from '../storage/sqlite.js'
 import { createGraphService, seedDefaultGraph } from './service.js'
@@ -12,29 +12,27 @@ beforeAll(async () => {
   Database = (await import('better-sqlite3')).default
 })
 
-const collectN = n => async reader => {
-  const values = []
-  await reader.take(n).sink(value => values.push(value))
-  return values
-}
-
 function makeDb() {
   return new Database(':memory:')
 }
 
 function makeStorage(db, warn = vi.fn()) {
   const storageNet = net()
-  createSqliteStorage(storageNet.join(), db, warn)
+  createSqliteStorage(storageNet(), db, warn)
   return { storageNet, warn }
 }
 
-async function requestOne(storageNet, request, predicate) {
-  const [reader, writer] = storageNet.join()
-  const resultP = reader.filter(predicate).thru(collectN(1))
-  writer.send(request)
-  const [result] = await resultP
-  writer.close()
-  return result
+async function requestOne(join, request, predicate) {
+  const { send, recv, close } = join()
+  send(request)
+  while (true) {
+    const msg = await recv()
+    if (isEOF(msg)) return null
+    if (predicate(msg)) {
+      close()
+      return msg
+    }
+  }
 }
 
 async function readEntries(storageNet, select, qid = crypto.randomUUID()) {
@@ -58,58 +56,58 @@ runtimeDescribe('graph service', () => {
   it('persists assert and retract ops as graph history', async () => {
     const db = makeDb()
     const { storageNet, warn } = makeStorage(db)
-    const [_storageReader, storageWriter] = storageNet.join()
-    const graph = createGraphService({ persist: entryWriter(storageWriter), warn })
-    const [_reader, writer] = graph.join()
+    const storageSlot = storageNet()
+    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphSlot = graphJoin()
 
-    writer.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
-    writer.send({ type: 'retract', s: 'n1', p: 'label', o: null })
+    graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
+    graphSlot.send({ type: 'retract', s: 'n1', p: 'label', o: null })
 
     await vi.waitFor(async () => {
       const entries = await readEntries(storageNet, { space: 'graph', key: 'ops' })
       expect(entries.map(entry => entry.msg.type)).toEqual(['assert', 'retract'])
     })
 
-    writer.close()
-    storageWriter.close()
+    graphSlot.close()
+    storageSlot.close()
     db.close()
   })
 
   it('does not persist queries', async () => {
     const db = makeDb()
     const { storageNet, warn } = makeStorage(db)
-    const [_storageReader, storageWriter] = storageNet.join()
-    const graph = createGraphService({ persist: entryWriter(storageWriter), warn })
-    const [reader, writer] = graph.join()
+    const storageSlot = storageNet()
+    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphSlot = graphJoin()
 
-    const resultPromise = reader.filter(msg => msg.type === 'result').thru(collectN(1))
+    graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
+    graphSlot.send({ type: 'query', s: 'n1', p: null, o: null, qid: 'q1' })
 
-    writer.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
-    writer.send({ type: 'query', s: 'n1', p: null, o: null, qid: 'q1' })
+    const result = await requestOne(
+      graphJoin,
+      { type: 'query', s: 'n1', p: null, o: null, qid: 'q2' },
+      msg => msg.type === 'result' && msg.qid === 'q2'
+    )
+    expect(result.triples).toEqual([{ s: 'n1', p: 'label', o: 'Hello' }])
 
-    expect((await resultPromise)[0]).toEqual({
-      type: 'result',
-      qid: 'q1',
-      triples: [{ s: 'n1', p: 'label', o: 'Hello' }],
-    })
     await vi.waitFor(async () => {
       expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toHaveLength(1)
     })
 
-    writer.close()
-    storageWriter.close()
+    graphSlot.close()
+    storageSlot.close()
     db.close()
   })
 
   it('links persisted ops through prev ids', async () => {
     const db = makeDb()
     const { storageNet, warn } = makeStorage(db)
-    const [_storageReader, storageWriter] = storageNet.join()
-    const graph = createGraphService({ persist: entryWriter(storageWriter), warn })
-    const [_reader, writer] = graph.join()
+    const storageSlot = storageNet()
+    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphSlot = graphJoin()
 
-    writer.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
-    writer.send({ type: 'assert', s: 'n1', p: 'position', o: { x: 10, y: 20 } })
+    graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
+    graphSlot.send({ type: 'assert', s: 'n1', p: 'position', o: { x: 10, y: 20 } })
 
     await vi.waitFor(async () => {
       const entries = await readEntries(storageNet, { space: 'graph', key: 'ops' })
@@ -118,20 +116,20 @@ runtimeDescribe('graph service', () => {
       expect(entries[1].prev).toBe(entries[0].id)
     })
 
-    writer.close()
-    storageWriter.close()
+    graphSlot.close()
+    storageSlot.close()
     db.close()
   })
 
   it('reconstructs graph state from persisted graph history', async () => {
     const db = makeDb()
     const { storageNet, warn } = makeStorage(db)
-    const [_storageReader, storageWriter] = storageNet.join()
-    const graph = createGraphService({ persist: entryWriter(storageWriter), warn })
-    const [_reader, writer] = graph.join()
+    const storageSlot = storageNet()
+    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
+    const graphSlot = graphJoin()
 
-    writer.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
-    writer.send({ type: 'assert', s: 'n1', p: 'position', o: { x: 10, y: 20 } })
+    graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
+    graphSlot.send({ type: 'assert', s: 'n1', p: 'position', o: { x: 10, y: 20 } })
 
     await vi.waitFor(async () => {
       expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toHaveLength(2)
@@ -151,12 +149,14 @@ runtimeDescribe('graph service', () => {
       history: await readEntries(storageNet, { space: 'graph', key: 'ops' }),
       warn,
     })
-    const [restartReader, restartWriter] = restarted.join()
-    const resultPromise = restartReader.filter(msg => msg.type === 'result').thru(collectN(1))
 
-    restartWriter.send({ type: 'query', s: null, p: null, o: null, qid: 'restart' })
+    const result = await requestOne(
+      restarted,
+      { type: 'query', s: null, p: null, o: null, qid: 'restart' },
+      msg => msg.type === 'result' && msg.qid === 'restart'
+    )
 
-    expect((await resultPromise)[0]).toEqual({
+    expect(result).toEqual({
       type: 'result',
       qid: 'restart',
       triples: [
@@ -166,22 +166,21 @@ runtimeDescribe('graph service', () => {
       ],
     })
 
-    restartWriter.close()
-    writer.close()
-    storageWriter.close()
+    graphSlot.close()
+    storageSlot.close()
     db.close()
   })
 
   it('seeds only once and exposes recovered state through query on later boots', async () => {
     const db = makeDb()
     const { storageNet, warn } = makeStorage(db)
-    const [_storageReader, storageWriter] = storageNet.join()
-    const graph = createGraphService({ persist: entryWriter(storageWriter), warn })
+    const storageSlot = storageNet()
+    const graphJoin = createGraphService({ persist: entryWriter(storageSlot.send), warn })
 
     expect(await readEntries(storageNet, { space: 'graph', key: 'ops', limit: 1 })).toHaveLength(0)
-    const [_reader, seedWriter] = graph.join()
-    seedDefaultGraph(seedWriter)
-    seedWriter.close()
+    const seedSlot = graphJoin()
+    seedDefaultGraph(seedSlot.send)
+    seedSlot.close()
 
     await vi.waitFor(async () => {
       expect(await readEntries(storageNet, { space: 'graph', key: 'ops', limit: 1 })).toHaveLength(1)
@@ -192,12 +191,13 @@ runtimeDescribe('graph service', () => {
       warn,
     })
 
-    const [reader, writer] = second.join()
-    const resultPromise = reader.filter(msg => msg.type === 'result').thru(collectN(1))
+    const result = await requestOne(
+      second,
+      { type: 'query', s: null, p: null, o: null, qid: 'seeded' },
+      msg => msg.type === 'result' && msg.qid === 'seeded'
+    )
 
-    writer.send({ type: 'query', s: null, p: null, o: null, qid: 'seeded' })
-
-    expect((await resultPromise)[0]).toEqual({
+    expect(result).toEqual({
       type: 'result',
       qid: 'seeded',
       triples: [
@@ -210,8 +210,7 @@ runtimeDescribe('graph service', () => {
       ],
     })
 
-    writer.close()
-    storageWriter.close()
+    storageSlot.close()
     db.close()
   })
 })

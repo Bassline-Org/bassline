@@ -1,14 +1,21 @@
-import net from 'node:net'
+import nodeNet from 'node:net'
 import { fromSocket } from '../transports/socket.js'
-import { channel } from '../channel.js'
+import { port } from '../comm.js'
 
 export function serve(options = {}, frame) {
-  const [connections, connectionsWriter] = channel()
-  const server = net.createServer(socket => {
-    connectionsWriter.send(fromSocket(socket, frame))
+  const p = port()
+  const server = nodeNet.createServer(socket => {
+    p.send(fromSocket(socket, frame))
   })
   server.listen(options)
-  server.on('close', connectionsWriter.close)
-  server.on('error', connectionsWriter.err)
-  return [connections, server]
+  server.on('close', () => p.close())
+  server.on('error', () => p.close())
+  return {
+    recv: p.recv,
+    close: () => {
+      p.close()
+      server.close()
+    },
+    server,
+  }
 }

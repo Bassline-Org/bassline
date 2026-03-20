@@ -1,5 +1,5 @@
-import type { Reader, Writer } from '@bassline/core'
-import { nullWriter } from '@bassline/core'
+import { consume } from '@bassline/core'
+import type { Port } from '@bassline/core'
 import type BetterSqlite3 from 'better-sqlite3'
 import {
   isCheckpointReadMsg,
@@ -40,7 +40,7 @@ function parseJson<T>(label: string, value: string, warn: Warn) {
 }
 
 export function createSqliteStorage(
-  [reader, writer]: [Reader<StorageMsg>, Writer<StorageMsg>],
+  { recv, send }: Pick<Port<StorageMsg>, 'recv' | 'send'>,
   db: BetterSqlite3.Database,
   warn: Warn = console.warn
 ) {
@@ -95,39 +95,39 @@ export function createSqliteStorage(
 
   function handleEntryAppend(msg: EntryAppendMsg) {
     const entry = ops.appendEntry(msg.entry)
-    if (entry) writer.send({ type: 'entry-stored', entry, qid: msg.qid })
+    if (entry) send({ type: 'entry-stored', entry, qid: msg.qid })
   }
 
   function handleEntryRead(msg: EntryReadMsg) {
-    writer.send({ type: 'entry-result', qid: msg.qid, entries: ops.readEntries(msg.select) })
+    send({ type: 'entry-result', qid: msg.qid, entries: ops.readEntries(msg.select) })
   }
 
   function handleRefSet(msg: RefSetMsg) {
     const ref = setRef(msg.ref)
-    if (ref) writer.send({ type: 'ref-stored', ref, qid: msg.qid })
+    if (ref) send({ type: 'ref-stored', ref, qid: msg.qid })
   }
 
   function handleRefRead(msg: RefReadMsg) {
-    writer.send({ type: 'ref-result', qid: msg.qid, ref: readRef(msg.space, msg.name) })
+    send({ type: 'ref-result', qid: msg.qid, ref: readRef(msg.space, msg.name) })
   }
 
   function handleCheckpointSet(msg: CheckpointSetMsg) {
     const checkpoint = setCheckpoint(msg.checkpoint)
-    if (checkpoint) writer.send({ type: 'checkpoint-stored', checkpoint, qid: msg.qid })
+    if (checkpoint) send({ type: 'checkpoint-stored', checkpoint, qid: msg.qid })
   }
 
   function handleCheckpointRead(msg: CheckpointReadMsg) {
-    writer.send({ type: 'checkpoint-result', qid: msg.qid, checkpoint: readCheckpoint(msg.space, msg.name) })
+    send({ type: 'checkpoint-result', qid: msg.qid, checkpoint: readCheckpoint(msg.space, msg.name) })
   }
 
-  reader
-    .gate(isEntryAppendMsg, handleEntryAppend)
-    .gate(isEntryReadMsg, handleEntryRead)
-    .gate(isRefSetMsg, handleRefSet)
-    .gate(isRefReadMsg, handleRefRead)
-    .gate(isCheckpointReadMsg, handleCheckpointRead)
-    .gate(isCheckpointSetMsg, handleCheckpointSet)
-    .sink(nullWriter)
+  consume(recv, (msg: StorageMsg) => {
+    if (isEntryAppendMsg(msg)) handleEntryAppend(msg)
+    else if (isEntryReadMsg(msg)) handleEntryRead(msg)
+    else if (isRefSetMsg(msg)) handleRefSet(msg)
+    else if (isRefReadMsg(msg)) handleRefRead(msg)
+    else if (isCheckpointSetMsg(msg)) handleCheckpointSet(msg)
+    else if (isCheckpointReadMsg(msg)) handleCheckpointRead(msg)
+  })
 }
 
 function prepareDbOps(db: BetterSqlite3.Database, warn: Warn) {

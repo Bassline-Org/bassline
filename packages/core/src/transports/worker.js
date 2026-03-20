@@ -1,16 +1,14 @@
-import { channel } from '../channel.js'
+import { port } from '../comm.js'
 import { message } from '../messages.js'
 
-export function fromPort(port) {
-  const [incoming, incomingWriter] = channel()
-  port.onmessage = e => incomingWriter.send(message(e.data))
-  port.onmessageerror = e => incomingWriter.err(e)
+export function fromPort(messagePort) {
+  const p = port()
+  messagePort.onmessage = e => p.send(message(e.data))
+  messagePort.onmessageerror = () => p.close()
 
-  const [outgoing, outgoingWriter] = channel()
-  outgoing
-    .sink(v => port.postMessage(v))
-    .then(outgoingWriter.close)
-    .catch(outgoingWriter.err)
-
-  return [incoming, outgoingWriter]
+  return {
+    recv: p.recv,
+    send: msg => messagePort.postMessage(msg),
+    close: () => p.close(),
+  }
 }

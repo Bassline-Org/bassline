@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { net } from '@bassline/core'
+import { net, isEOF } from '@bassline/core'
 import {
   isCheckpointResultMsg,
   isCheckpointStoredMsg,
@@ -18,12 +18,6 @@ beforeAll(async () => {
   Database = (await import('better-sqlite3')).default
 })
 
-const collectN = n => async reader => {
-  const values = []
-  await reader.take(n).sink(value => values.push(value))
-  return values
-}
-
 function delay(ms = 20) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -32,26 +26,37 @@ function makeStorage() {
   const warn = vi.fn()
   const db = new Database(':memory:')
   const storageNet = net()
-  createSqliteStorage(storageNet.join(), db, warn)
+  createSqliteStorage(storageNet(), db, warn)
   return { db, warn, storageNet }
 }
 
 async function requestOne(storageNet, request, predicate) {
-  const [reader, writer] = storageNet.join()
-  writer.send(request)
-  const [result] = await reader.filter(predicate).thru(collectN(1))
-  writer.close()
-  return result
+  const { send, recv, close } = storageNet()
+  send(request)
+  while (true) {
+    const msg = await recv()
+    if (isEOF(msg)) return null
+    if (predicate(msg)) {
+      close()
+      return msg
+    }
+  }
 }
 
-async function observeDuring(storageNet, predicate, send) {
-  const [reader, writer] = storageNet.join()
+async function observeDuring(storageNet, predicate, sendFn) {
+  const slot = storageNet()
   const seen = []
-  const done = reader.filter(predicate).sink(value => seen.push(value))
-  await send(writer)
+  const collecting = (async () => {
+    while (true) {
+      const msg = await slot.recv()
+      if (isEOF(msg)) break
+      if (predicate(msg)) seen.push(msg)
+    }
+  })()
+  await sendFn(slot)
   await delay()
-  writer.close()
-  await done
+  slot.close()
+  await collecting
   return seen
 }
 
@@ -179,8 +184,8 @@ runtimeDescribe('sqlite storage', () => {
     const seen = await observeDuring(
       storageNet,
       msg => isEntryStoredMsg(msg) && msg.qid === 'duplicate',
-      async writer => {
-        writer.send({
+      async slot => {
+        slot.send({
           type: 'entry-append',
           qid: 'duplicate',
           entry: { id: 'e1', space: 'graph', key: 'ops', msg: { body: 2 } },
@@ -203,8 +208,8 @@ runtimeDescribe('sqlite storage', () => {
     const entryAcks = await observeDuring(
       storageNet,
       msg => isEntryStoredMsg(msg) && msg.qid === 'bad-entry',
-      async writer => {
-        writer.send({
+      async slot => {
+        slot.send({
           type: 'entry-append',
           qid: 'bad-entry',
           entry: { id: 'e1', space: 'graph', key: 'ops', msg: circular },
@@ -215,8 +220,8 @@ runtimeDescribe('sqlite storage', () => {
     const checkpointAcks = await observeDuring(
       storageNet,
       msg => isCheckpointStoredMsg(msg) && msg.qid === 'bad-checkpoint',
-      async writer => {
-        writer.send({
+      async slot => {
+        slot.send({
           type: 'checkpoint-set',
           qid: 'bad-checkpoint',
           checkpoint: { space: 'graph', name: 'current', tail: null, state: circular },
@@ -253,8 +258,8 @@ runtimeDescribe('sqlite storage', () => {
   it('ignores storage response messages on the input reader', async () => {
     const { storageNet, db } = makeStorage()
 
-    const [_reader, writer] = storageNet.join()
-    writer.send({
+    const slot = storageNet()
+    slot.send({
       type: 'entry-stored',
       qid: 'noop',
       entry: { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } },
@@ -263,7 +268,7 @@ runtimeDescribe('sqlite storage', () => {
 
     expect(await readEntries(storageNet, { space: 'graph', key: 'ops' })).toEqual([])
 
-    writer.close()
+    slot.close()
     db.close()
   })
 
@@ -273,8 +278,8 @@ runtimeDescribe('sqlite storage', () => {
     const entryAcks = await observeDuring(
       storageNet,
       msg => isEntryStoredMsg(msg) && msg.qid === 'entry-q',
-      async writer => {
-        writer.send({
+      async slot => {
+        slot.send({
           type: 'entry-append',
           qid: 'entry-q',
           entry: { id: 'e1', space: 'graph', key: 'ops', msg: { body: 1 } },
@@ -284,8 +289,8 @@ runtimeDescribe('sqlite storage', () => {
     const refAcks = await observeDuring(
       storageNet,
       msg => isRefStoredMsg(msg) && msg.qid === 'ref-q',
-      async writer => {
-        writer.send({
+      async slot => {
+        slot.send({
           type: 'ref-set',
           qid: 'ref-q',
           ref: { space: 'graph', name: 'head', target: { kind: 'entry', id: 'e1' } },
@@ -295,8 +300,8 @@ runtimeDescribe('sqlite storage', () => {
     const checkpointAcks = await observeDuring(
       storageNet,
       msg => isCheckpointStoredMsg(msg) && msg.qid === 'checkpoint-q',
-      async writer => {
-        writer.send({
+      async slot => {
+        slot.send({
           type: 'checkpoint-set',
           qid: 'checkpoint-q',
           checkpoint: { space: 'graph', name: 'current', tail: 'e1', state: { ok: true } },
@@ -306,8 +311,8 @@ runtimeDescribe('sqlite storage', () => {
     const entryResults = await observeDuring(
       storageNet,
       msg => isEntryResultMsg(msg) && msg.qid === 'read-q',
-      async writer => {
-        writer.send({ type: 'entry-read', qid: 'read-q', select: { space: 'graph', key: 'ops' } })
+      async slot => {
+        slot.send({ type: 'entry-read', qid: 'read-q', select: { space: 'graph', key: 'ops' } })
       }
     )
 

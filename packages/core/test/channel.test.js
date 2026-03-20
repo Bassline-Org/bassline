@@ -1,202 +1,204 @@
 import { describe, it, expect } from 'vitest'
-import { channel, slidingChannel, clock, Channel, ConsumedChannelError } from '../src/channel.js'
+import { port, net, clock, consume, EOF, isEOF } from '../src/comm.js'
 
-// helper: collect all values from a reader into an array
-async function collect(reader) {
+async function collect(recv) {
   const values = []
-  await reader.sink(v => values.push(v))
+  await consume(recv, v => values.push(v))
   return values
 }
 
-describe('channel lifecycle', () => {
+describe('port', () => {
   it('delivers values in order', async () => {
-    const [read, write] = channel()
-    write.send(1)
-    write.send(2)
-    write.send(3)
-    write.close()
-    expect(await collect(read)).toEqual([1, 2, 3])
+    const p = port()
+    p.send(1)
+    p.send(2)
+    p.send(3)
+    p.close()
+    expect(await collect(p.recv)).toEqual([1, 2, 3])
   })
 
-  it('delivers all queued values before signaling done', async () => {
-    const [read, write] = channel()
-    write.send('a')
-    write.send('b')
-    write.send('c')
-    write.close()
-
-    const values = []
-    for await (const v of read.consume()) {
-      values.push(v)
-    }
-    expect(values).toEqual(['a', 'b', 'c'])
+  it('drains buffer before returning EOF', async () => {
+    const p = port()
+    p.send('a')
+    p.send('b')
+    p.close()
+    expect(await p.recv()).toBe('a')
+    expect(await p.recv()).toBe('b')
+    expect(await p.recv()).toBe(EOF)
   })
 
-  it('sink resolves when writer closes', async () => {
-    const [read, write] = channel()
-    write.close()
-    const values = await collect(read)
-    expect(values).toEqual([])
+  it('resolves pending recv with EOF on close', async () => {
+    const p = port()
+    const pending = p.recv()
+    p.close()
+    expect(await pending).toBe(EOF)
   })
 
   it('works when consumer waits for producer', async () => {
-    const [read, write] = channel()
-
-    // start consuming before any values are written
-    const collecting = collect(read)
-
-    // write after a microtask
+    const p = port()
+    const collecting = collect(p.recv)
     await Promise.resolve()
-    write.send(1)
-    write.send(2)
-    write.close()
-
+    p.send(1)
+    p.send(2)
+    p.close()
     expect(await collecting).toEqual([1, 2])
   })
-})
 
-describe('single consumption', () => {
-  it('throws ConsumedChannelError on second consume', () => {
-    const [read, write] = channel()
-    write.close()
-    read.consume() // first consume
-    expect(() => read.consume()).toThrow(ConsumedChannelError)
+  it('drops sends after close', async () => {
+    const p = port()
+    p.send(1)
+    p.close()
+    p.send(2)
+    expect(await collect(p.recv)).toEqual([1])
   })
 
-  it('sink counts as consuming', () => {
-    const [read, write] = channel()
-    write.close()
-    read.sink(() => {}) // consumes
-    expect(() => read.consume()).toThrow(ConsumedChannelError)
+  it('throws when sending EOF', () => {
+    const p = port()
+    expect(() => p.send(EOF)).toThrow('Bassline EOF is reserved')
+    p.close()
   })
 })
 
-describe('error handling', () => {
-  it('rejects sink when error with empty queue', async () => {
-    const [read, write] = channel()
-    const error = new Error('boom')
-    write.err(error)
-    await expect(collect(read)).rejects.toBe(error)
-  })
-
-  it('delivers queued values then errors', async () => {
-    const [read, write] = channel()
-    write.send(1)
-    write.send(2)
-    write.err(new Error('after values'))
-
-    const values = []
-    try {
-      await read.sink(v => values.push(v))
-    } catch (e) {
-      expect(e.message).toBe('after values')
-    }
-    expect(values).toEqual([1, 2])
-  })
-})
-
-describe('state transitions', () => {
-  it('write after close is a no-op', async () => {
-    const [read, write] = channel()
-    write.send(1)
-    write.close()
-    write.send(2) // should be ignored
-    expect(await collect(read)).toEqual([1])
-  })
-
-  it('write after err is a no-op', async () => {
-    const [read, write] = channel()
-    write.err(new Error('x'))
-    write.send(1) // should be ignored
-    await expect(collect(read)).rejects.toThrow()
-  })
-
-  it('close after close is a no-op', async () => {
-    const [read, write] = channel()
-    write.close()
-    write.close() // no throw
-    expect(await collect(read)).toEqual([])
-  })
-
-  it('err after close is a no-op', async () => {
-    const [read, write] = channel()
-    write.close()
-    write.err(new Error('too late')) // no throw, no effect
-    expect(await collect(read)).toEqual([])
-  })
-})
-
-describe('writer', () => {
-  it('send accepts multiple values', async () => {
-    const [read, write] = channel()
-    write.send(1, 2, 3)
-    write.close()
-    expect(await collect(read)).toEqual([1, 2, 3])
-  })
-})
-
-describe('iterator protocol', () => {
-  it('return closes channel and resolves with value', async () => {
-    const chan = new Channel()
-    chan.send(1)
-    const iter = chan.consume()[Symbol.asyncIterator]()
-
-    const first = await iter.next()
-    expect(first).toEqual({ value: 1, done: false })
-
-    const ret = await iter.return('fin')
-    expect(ret).toEqual({ value: 'fin', done: true })
-
-    // channel is now closed
-    const after = await iter.next()
-    expect(after).toEqual({ value: undefined, done: true })
-  })
-
-  it('throw errors the channel', async () => {
-    const chan = new Channel()
-    const iter = chan.consume()[Symbol.asyncIterator]()
-    const error = new Error('injected')
-
-    // per async iterator protocol, throw should resolve (not reject)
-    const result = await iter.throw(error)
-    expect(result).toEqual({ value: error, done: true })
-  })
-})
-
-describe('SlidingChannel', () => {
+describe('port sliding buffer', () => {
   it('drops oldest values beyond size', async () => {
-    const [read, write] = slidingChannel(2)
-    write.send(1)
-    write.send(2)
-    write.send(3) // should drop 1
-    write.send(4) // should drop 2
-    write.close()
-    expect(await collect(read)).toEqual([3, 4])
+    const p = port(2)
+    p.send(1)
+    p.send(2)
+    p.send(3) // drops 1
+    p.send(4) // drops 2
+    p.close()
+    expect(await collect(p.recv)).toEqual([3, 4])
   })
 
   it('size=1 keeps only the latest value', async () => {
-    const [read, write] = slidingChannel(1)
-    write.send('a')
-    write.send('b')
-    write.send('c')
-    write.close()
-    expect(await collect(read)).toEqual(['c'])
+    const p = port(1)
+    p.send('a')
+    p.send('b')
+    p.send('c')
+    p.close()
+    expect(await collect(p.recv)).toEqual(['c'])
+  })
+
+  it('size=0 drops all if nobody is waiting', async () => {
+    const p = port(0)
+    p.send(1)
+    p.send(2)
+    p.close()
+    expect(await p.recv()).toBe(EOF)
+  })
+
+  it('size=0 delivers if someone is waiting', async () => {
+    const p = port(0)
+    const pending = p.recv()
+    p.send(42)
+    expect(await pending).toBe(42)
+    p.close()
   })
 })
 
-describe('ClockChannel', () => {
-  it('emits timestamps and can be closed', async () => {
-    const [read, write] = clock(10) // 10ms interval
-    await read.take(2).sink(v => {
-      expect(typeof v).toBe('number')
-    })
-    write.close()
+describe('net', () => {
+  it('broadcasts to all participants', async () => {
+    const join = net()
+    const a = join()
+    const b = join()
+    const c = join()
+
+    a.send('hello')
+    b.close()
+    c.close()
+
+    expect(await b.recv()).toBe('hello')
+    expect(await c.recv()).toBe('hello')
+
+    a.close()
   })
 
-  it('writer only exposes close', () => {
-    const [_, write] = clock(1000)
-    expect(write.close).toBeDefined()
-    expect(write.send).toBeUndefined()
-    write.close()
+  it('does not receive own messages', async () => {
+    const join = net()
+    const a = join()
+    const b = join()
+
+    a.send('from-a')
+    b.send('from-b')
+
+    expect(await a.recv()).toBe('from-b')
+    expect(await b.recv()).toBe('from-a')
+
+    a.close()
+    b.close()
+  })
+
+  it('close removes from routing and produces EOF', async () => {
+    const join = net()
+    const a = join()
+    const b = join()
+
+    a.close()
+    b.send('after-close')
+
+    // a's recv should return EOF since we closed
+    expect(await a.recv()).toBe(EOF)
+    b.close()
+  })
+})
+
+describe('clock', () => {
+  it('emits timestamps', async () => {
+    const c = clock(10)
+    const msg = await c.recv()
+    expect(isEOF(msg)).toBe(false)
+    expect(msg.ts).toBeTypeOf('number')
+    c.close()
+  })
+
+  it('close produces EOF after draining buffer', async () => {
+    const c = clock(10)
+    c.close()
+    // first recv drains the initial tick
+    const first = await c.recv()
+    expect(isEOF(first)).toBe(false)
+    // second recv gets EOF
+    expect(await c.recv()).toBe(EOF)
+  })
+})
+
+describe('consume', () => {
+  it('processes all messages until EOF', async () => {
+    const p = port()
+    p.send(1)
+    p.send(2)
+    p.send(3)
+    p.close()
+
+    const values = []
+    await consume(p.recv, v => values.push(v))
+    expect(values).toEqual([1, 2, 3])
+  })
+
+  it('handles async callbacks', async () => {
+    const p = port()
+    p.send('a')
+    p.send('b')
+    p.close()
+
+    const values = []
+    await consume(p.recv, async v => {
+      await new Promise(r => setTimeout(r, 5))
+      values.push(v)
+    })
+    expect(values).toEqual(['a', 'b'])
+  })
+})
+
+describe('isEOF', () => {
+  it('returns true for EOF', () => {
+    expect(isEOF(EOF)).toBe(true)
+  })
+
+  it('returns false for other values', () => {
+    expect(isEOF(null)).toBe(false)
+    expect(isEOF(undefined)).toBe(false)
+    expect(isEOF(42)).toBe(false)
+    expect(isEOF(Symbol())).toBe(false)
   })
 })
