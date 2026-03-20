@@ -28,7 +28,18 @@ export {
   fork,
 } from './channel.js'
 
-export { isArray, isNil, isPromise, isNumber, isString, isFunction, isPlainObject, hasKeys, castArr } from './utils.js'
+export {
+  isArray,
+  isNil,
+  isPromise,
+  isNumber,
+  isString,
+  isFunction,
+  isNull,
+  isPlainObject,
+  hasKeys,
+  castArr,
+} from './utils.js'
 
 export { fromWebSocket } from './transports/websocket.js'
 export { fromPort } from './transports/worker.js'

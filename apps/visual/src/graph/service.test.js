@@ -30,8 +30,9 @@ function makeStorage(db, warn = vi.fn()) {
 
 async function requestOne(storageNet, request, predicate) {
   const [reader, writer] = storageNet.join()
+  const resultP = reader.filter(predicate).thru(collectN(1))
   writer.send(request)
-  const [result] = await reader.filter(predicate).thru(collectN(1))
+  const [result] = await resultP
   writer.close()
   return result
 }

@@ -22,7 +22,7 @@ export function isGraphQueryMsg(value: unknown): value is QueryMsg {
   const isQuerySp = (v: unknown) => isString(v) || isNull(v)
   return (
     hasType(value, 'query') &&
-    hasKeys(value, ['query', 'qid', 's', 'p', 'o']) &&
+    hasKeys(value, ['qid', 's', 'p', 'o']) &&
     isString(value.qid) &&
     isQuerySp(value.s) &&
     isQuerySp(value.p)
