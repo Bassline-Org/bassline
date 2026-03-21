@@ -12,7 +12,7 @@ import {
 } from '../src/ontology/storage/schema'
 import { storage } from '../src/ontology/storage/slang'
 import { createSqliteStorage } from '../src/ontology/storage/sqlite'
-import { createGraphService } from '../src/ontology/graph/service'
+import { createGraphService, type GraphMutationMsg } from '@bassline/ontology/graph'
 import { graphView } from '../src/ontology/xyflow/slang'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -53,10 +53,18 @@ async function readStorageEntries(select: EntryReadSelector) {
 
 async function getGraphService() {
   if (!graphService) {
+    const entries = await readStorageEntries({ space: 'graph', key: 'ops' })
     const storageSlot = storageNet(0)
+    const s = storage(storageSlot.send)
+    let head: string | null = entries.at(-1)?.id ?? null
+
     graphService = createGraphService({
-      history: await readStorageEntries({ space: 'graph', key: 'ops' }),
-      persist: storage(storageSlot.send).appendEntry,
+      history: entries.map(e => e.msg as GraphMutationMsg),
+      persist: (mutation: GraphMutationMsg) => {
+        const id = crypto.randomUUID()
+        s.appendEntry({ id, space: 'graph', key: 'ops', msg: mutation, prev: head })
+        head = id
+      },
     })
   }
   if (!observingGraph) {

@@ -9,8 +9,14 @@ export interface Port<T = unknown> {
   close(): void
 }
 
+export type NetJoin<T = unknown> = {
+  (size?: number): Port<T>
+  close: Port<T>['close']
+  send: Port<T>['send']
+}
+
 export function port<T = unknown>(size?: number): Port<T>
-export function net<T = unknown>(): (size?: number) => Port<T>
+export function net<T = unknown>(): NetJoin<T>
 export function clock(ms?: number): { recv(): Promise<{ ts: number } | typeof EOF>; close(): void }
 export function consume<T>(
   recv: () => Promise<T | typeof EOF>,
@@ -62,10 +68,7 @@ export function isString(x: unknown): x is string
 export function isFunction(x: unknown): x is Function
 export function isPlainObject(x: unknown): x is Record<string, unknown>
 export function isNull(x: unknown): x is null
-export function hasKeys<const K extends readonly string[]>(
-  obj: unknown,
-  keys: K
-): obj is Record<K[number], unknown>
+export function hasKeys<const K extends readonly string[]>(obj: unknown, keys: K): obj is Record<K[number], unknown>
 export function castArr<T>(x: T | T[]): T[]
 
 // --- Transports ---

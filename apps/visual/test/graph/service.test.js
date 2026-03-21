@@ -4,7 +4,7 @@ import { request } from '@bassline/ontology'
 import { isEntryResultMsg } from '../../src/ontology/storage/schema.js'
 import { storage } from '../../src/ontology/storage/slang.js'
 import { createSqliteStorage } from '../../src/ontology/storage/sqlite.js'
-import { createGraphService } from '../../src/ontology/graph/service.js'
+import { createGraphService } from '@bassline/ontology/graph'
 import { graphView } from '../../src/ontology/xyflow/slang.js'
 
 const runtimeDescribe = process.versions.electron ? describe : describe.skip
@@ -38,12 +38,36 @@ async function appendEntry(storageNet, entry, qid = crypto.randomUUID()) {
   await request(storageNet, { type: 'entry-append', qid, entry }, msg => msg.type === 'entry-stored' && msg.qid === qid)
 }
 
+function makePersist(storageNet) {
+  const storageSlot = storageNet(0)
+  const s = storage(storageSlot.send)
+  let head = null
+  return {
+    storageSlot,
+    persist: mutation => {
+      const id = crypto.randomUUID()
+      s.appendEntry({ id, space: 'graph', key: 'ops', msg: mutation, prev: head })
+      head = id
+    },
+  }
+}
+
+async function makeGraphService(storageNet, debug) {
+  const { storageSlot, persist } = makePersist(storageNet)
+  const entries = await readEntries(storageNet, { space: 'graph', key: 'ops' })
+  const graphJoin = createGraphService({
+    history: entries.map(e => e.msg),
+    persist,
+    debug,
+  })
+  return { graphJoin, storageSlot }
+}
+
 runtimeDescribe('graph service', () => {
   it('persists assert and retract ops as graph history', async () => {
     const db = makeDb()
     const { storageNet, debug } = makeStorage(db)
-    const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
+    const { graphJoin, storageSlot } = await makeGraphService(storageNet, debug)
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
@@ -62,8 +86,7 @@ runtimeDescribe('graph service', () => {
   it('does not persist queries', async () => {
     const db = makeDb()
     const { storageNet, debug } = makeStorage(db)
-    const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
+    const { graphJoin, storageSlot } = await makeGraphService(storageNet, debug)
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
@@ -88,8 +111,7 @@ runtimeDescribe('graph service', () => {
   it('links persisted ops through prev ids', async () => {
     const db = makeDb()
     const { storageNet, debug } = makeStorage(db)
-    const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
+    const { graphJoin, storageSlot } = await makeGraphService(storageNet, debug)
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
@@ -110,8 +132,7 @@ runtimeDescribe('graph service', () => {
   it('reconstructs graph state from persisted graph history', async () => {
     const db = makeDb()
     const { storageNet, debug } = makeStorage(db)
-    const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
+    const { graphJoin, storageSlot } = await makeGraphService(storageNet, debug)
     const graphSlot = graphJoin()
 
     graphSlot.send({ type: 'assert', s: 'n1', p: 'label', o: 'Hello' })
@@ -132,7 +153,7 @@ runtimeDescribe('graph service', () => {
       msg: { type: 'assert', s: 'n2', p: 'label', o: 'World' },
     })
     const restarted = createGraphService({
-      history: await readEntries(storageNet, { space: 'graph', key: 'ops' }),
+      history: (await readEntries(storageNet, { space: 'graph', key: 'ops' })).map(e => e.msg),
       debug,
     })
 
@@ -160,8 +181,7 @@ runtimeDescribe('graph service', () => {
   it('seeds only once and exposes recovered state through query on later boots', async () => {
     const db = makeDb()
     const { storageNet, debug } = makeStorage(db)
-    const storageSlot = storageNet()
-    const graphJoin = createGraphService({ persist: storage(storageSlot.send).appendEntry, debug })
+    const { graphJoin, storageSlot } = await makeGraphService(storageNet, debug)
 
     expect(await readEntries(storageNet, { space: 'graph', key: 'ops', limit: 1 })).toHaveLength(0)
     const seedSlot = graphJoin()
@@ -179,7 +199,7 @@ runtimeDescribe('graph service', () => {
     })
 
     const second = createGraphService({
-      history: await readEntries(storageNet, { space: 'graph', key: 'ops' }),
+      history: (await readEntries(storageNet, { space: 'graph', key: 'ops' })).map(e => e.msg),
       debug,
     })
 

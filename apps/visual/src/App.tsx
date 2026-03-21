@@ -3,7 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { useGraphState, useXyflowHandlers } from './ontology/xyflow/participants'
 import { bridgeToGraph } from './ontology/xyflow/bridge'
 import type { InboundMsg } from './ontology/xyflow/types'
-import { graph } from './ontology/graph/slang'
+import { graph } from '@bassline/ontology/graph'
 import type { EOF } from '@bassline/core'
 import '@xyflow/react/dist/style.css'
 

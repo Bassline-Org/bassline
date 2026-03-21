@@ -1,8 +1,8 @@
 import { consume } from '@bassline/core'
 import type { EOF } from '@bassline/core'
-import { graph } from './slang'
-import type { GraphWriteMsg } from './schema'
-import { createGraphState } from './state'
+import { graph } from './slang.js'
+import type { GraphWriteMsg } from './schema.js'
+import { createGraphState } from './state.js'
 
 export function store({
   recv,

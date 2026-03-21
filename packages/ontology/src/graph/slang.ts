@@ -1,4 +1,4 @@
-import type { Triple } from './schema'
+import type { Triple } from './schema.js'
 
 export function graph(send: (...args: any[]) => void) {
   return {

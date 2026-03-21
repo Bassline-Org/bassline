@@ -56,6 +56,8 @@ export function net() {
       close,
     }
   }
+  join.close = () => [...ports].forEach(p => p.close())
+  join.send = msg => [...ports].forEach(p => p.send(msg))
   return join
 }
 

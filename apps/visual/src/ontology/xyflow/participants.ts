@@ -53,13 +53,17 @@ function applyAssert(msg: GraphViewFact, setNodes: SetState<Node[]>, setEdges: S
         )
       }
       break
-    case 'position':
-      setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, position: msg.o } : n)))
+    case 'pos-x':
+      setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, position: { ...n.position, x: msg.o } } : n)))
       break
-    case 'dimensions':
-      setNodes(nds =>
-        nds.map(n => (n.id === msg.s ? { ...n, style: { ...n.style, width: msg.o.w, height: msg.o.h } } : n))
-      )
+    case 'pos-y':
+      setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, position: { ...n.position, y: msg.o } } : n)))
+      break
+    case 'dim-w':
+      setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, style: { ...n.style, width: msg.o } } : n)))
+      break
+    case 'dim-h':
+      setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, style: { ...n.style, height: msg.o } } : n)))
       break
     case 'label':
       setNodes(nds => nds.map(n => (n.id === msg.s ? { ...n, data: { ...n.data, label: msg.o } } : n)))
@@ -86,14 +90,26 @@ function applyRetract(s: string | null, p: string | null, setNodes: SetState<Nod
       setNodes(nds => nds.filter(n => n.id !== s))
       setEdges(eds => eds.filter(e => e.id !== s))
       break
-    case 'position':
-      setNodes(nds => nds.map(n => (n.id === s ? { ...n, position: { x: 0, y: 0 } } : n)))
+    case 'pos-x':
+      setNodes(nds => nds.map(n => (n.id === s ? { ...n, position: { ...n.position, x: 0 } } : n)))
       break
-    case 'dimensions':
+    case 'pos-y':
+      setNodes(nds => nds.map(n => (n.id === s ? { ...n, position: { ...n.position, y: 0 } } : n)))
+      break
+    case 'dim-w':
       setNodes(nds =>
         nds.map(n => {
           if (n.id !== s) return n
-          const { width, height, ...rest } = n.style ?? {}
+          const { width, ...rest } = n.style ?? {}
+          return { ...n, style: rest }
+        })
+      )
+      break
+    case 'dim-h':
+      setNodes(nds =>
+        nds.map(n => {
+          if (n.id !== s) return n
+          const { height, ...rest } = n.style ?? {}
           return { ...n, style: rest }
         })
       )
