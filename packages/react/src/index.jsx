@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef } from 'react'
-import { port, consume, isEOF } from '@bassline/core'
+import { port, consume } from '@bassline/core'
 
 const NetContext = createContext(null)
 
@@ -19,35 +19,10 @@ export function useJoin(join) {
 }
 
 export function useConsume(recv, cb) {
-  const loop = useRef(null)
-  const recvRef = useRef(recv)
-
-  if (recvRef.current !== recv) {
-    throw new Error(
-      'useConsume requires a stable recv for the lifetime of the mounted component. Remount the consumer when the source changes.'
-    )
-  }
-
-  if (loop.current) loop.current.cb = cb
-
+  const cbRef = useRef(cb)
+  cbRef.current = cb
   useEffect(() => {
-    if (!loop.current) {
-      const state = { active: true, cb }
-      loop.current = state
-      ;(async () => {
-        while (true) {
-          const msg = await recv()
-          if (isEOF(msg)) break
-          if (state.active) state.cb(msg)
-        }
-      })()
-    } else {
-      loop.current.active = true
-    }
-
-    return () => {
-      if (loop.current) loop.current.active = false
-    }
+    consume(recv, msg => cbRef.current(msg))
   }, [])
 }
 
