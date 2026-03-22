@@ -15,12 +15,15 @@
     }
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "demo:tt": "tsx src/tea-time/tea-time.ts"
   },
   "peerDependencies": {
     "@bassline/core": "workspace:*",
     "zod": ">=3.0.0"
   },
   "license": "AGPL-3.0",
-  "dependencies": {}
+  "dependencies": {
+    "graphology": "^0.26.0"
+  }
 }

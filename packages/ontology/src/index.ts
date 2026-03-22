@@ -17,7 +17,7 @@ export async function request<Res>(
     while (true) {
       const m = await slot.recv()
       if (isEOF(m)) return null
-      if (match(m)) return m as Res
+      if (match(m)) return m
     }
   } finally {
     slot.close()
@@ -46,3 +46,5 @@ export function dispatch<T>(
     }
   })
 }
+
+export * from './property-graph/index.js'

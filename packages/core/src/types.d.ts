@@ -3,31 +3,38 @@
 export const EOF: unique symbol
 export function isEOF(v: unknown): v is typeof EOF
 
+type MessageShape = Record<string, unknown>
+type MessagePatch<T> = T extends MessageShape ? T : {}
+export type Message<T = {}> = MessageShape & T
+
+
 export interface Port<T = unknown> {
-  send(msg: T): void
-  recv(): Promise<T | typeof EOF>
-  close(): void
+  send: Send<T>
+  recv: Recv<T>
+  close: Close
 }
+
+export type Send<T = unknown> = (msg: T) => void
+export type Recv<T = unknown> = () => Promise<T | typeof EOF>
+export type Close = () => void
 
 export type NetJoin<T = unknown> = {
   (size?: number): Port<T>
-  close: Port<T>['close']
-  send: Port<T>['send']
+  close: Close
+  send: Send<T>
 }
 
 export function port<T = unknown>(size?: number): Port<T>
 export function net<T = unknown>(): NetJoin<T>
-export function clock(ms?: number): { recv(): Promise<{ ts: number } | typeof EOF>; close(): void }
+export function clock(ms?: number): { 
+  recv: Recv<{ ts: number }>;
+  close: Close
+}
+
 export function consume<T>(
-  recv: () => Promise<T | typeof EOF>,
-  callback: (msg: T) => void | Promise<void>
+  recv: Recv<T>,
+  callback: Send<T>
 ): Promise<void>
-
-// --- Messages ---
-
-export type MessageShape = Record<string, unknown>
-export type Message<T extends object = MessageShape> = MessageShape & T
-type MessagePatch<T> = T extends MessageShape ? T : {}
 
 export function message(): Message
 export function message(content: undefined): Message
@@ -70,6 +77,7 @@ export function isPlainObject(x: unknown): x is Record<string, unknown>
 export function isNull(x: unknown): x is null
 export function hasKeys<const K extends readonly string[]>(obj: unknown, keys: K): obj is Record<K[number], unknown>
 export function castArr<T>(x: T | T[]): T[]
+export function delay(ms: number): Promise<void>
 
 // --- Transports ---
 

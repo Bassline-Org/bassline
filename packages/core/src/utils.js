@@ -19,5 +19,9 @@ export const hasKeys = (obj, keys = []) => {
 export const not = predicate => value => !predicate(value)
 export const constant = value => () => value
 export const identity = value => value
+export const delay = async (ms = 1000) => {
+  await new Promise(res => setTimeout(res, ms))
+  return
+}
 
 export const castArr = value => (isArray(value) ? value : [value])

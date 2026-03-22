@@ -13,6 +13,7 @@ export {
   isPlainObject,
   hasKeys,
   castArr,
+  delay,
 } from './utils.js'
 
 export { fromWebSocket } from './transports/websocket.js'
