@@ -56,15 +56,15 @@ In this book, communication is implemented as ports.
 
 A port gives us 3 capabilities:
 
-1. =send=
+1. =send(aMessage) -> void=
 
    Which let's us send a message to something
 
-2. =recv=
+2. =recv() -> Promise<aMessage>=
 
    Which let's us pull a message from a local buffer, blocking until one is available.
 
-3. =close=
+3. =close() -> void=
 
    To ignore any future messages, stopping communication from our end.
 

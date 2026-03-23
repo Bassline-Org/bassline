@@ -35,7 +35,8 @@ import type { Send, Recv, Close } from '@bassline/core'
  *
  * After a certain point (a few message in a chain), it is finalized and we can prune the history if we want, otherwise it could be aborted.
  * We omit that from this implementation
- */
+ **/
+
 const shouldDelay = true
 const rand = (max: number) => Math.floor(Math.random() * max)
 async function delay(ms = 2000, force = false) {

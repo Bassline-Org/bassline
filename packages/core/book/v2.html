@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2026-03-20 Fri 11:36 -->
+<!-- 2026-03-22 Sun 15:04 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Bassline V2</title>
@@ -21,40 +21,40 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org1e63d46">1. Introduction</a>
+<li><a href="#orgf294443">1. Introduction</a>
 <ul>
-<li><a href="#orge717564">1.1. TLDR</a></li>
+<li><a href="#org0ec00da">1.1. TLDR</a></li>
 </ul>
 </li>
-<li><a href="#org88893f9">2. The Kernel</a>
+<li><a href="#org8b7370f">2. The Kernel</a>
 <ul>
-<li><a href="#orgd48c653">2.1. Communication</a></li>
-<li><a href="#org3c06348">2.2. Messages</a></li>
+<li><a href="#org293399c">2.1. Communication</a></li>
+<li><a href="#org72c8fb0">2.2. Messages</a></li>
 </ul>
 </li>
-<li><a href="#orgd4786b3">3. Transports</a>
+<li><a href="#org4274216">3. Transports</a>
 <ul>
-<li><a href="#org459e83d">3.1. Abstractly</a></li>
-<li><a href="#org303d32b">3.2. Concretely</a></li>
+<li><a href="#org08218e7">3.1. Abstractly</a></li>
+<li><a href="#org1605419">3.2. Concretely</a></li>
 </ul>
 </li>
-<li><a href="#orgbb41e3a">4. Deployment (Draft)</a>
+<li><a href="#org38f98ec">4. Deployment (Draft)</a>
 <ul>
-<li><a href="#org23686a8">4.1. Abstractly</a></li>
-<li><a href="#orgc7e35c7">4.2. Concretely</a></li>
+<li><a href="#org13fdc2f">4.1. Abstractly</a></li>
+<li><a href="#org42f15f5">4.2. Concretely</a></li>
 </ul>
 </li>
-<li><a href="#org2791a23">5. Utilities</a>
+<li><a href="#org6af51b4">5. Utilities</a>
 <ul>
-<li><a href="#org48be7e5">5.1. Type Predicates</a></li>
-<li><a href="#org658d638">5.2. Misc</a></li>
+<li><a href="#orgf22fcdc">5.1. Type Predicates</a></li>
+<li><a href="#org73702ec">5.2. Misc</a></li>
 </ul>
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-org1e63d46" class="outline-2">
-<h2 id="org1e63d46"><span class="section-number-2">1.</span> Introduction</h2>
+<div id="outline-container-orgf294443" class="outline-2">
+<h2 id="orgf294443"><span class="section-number-2">1.</span> Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 This literate document contains the source code for the core of <a href="https://bassline.dev">Bassline</a> v2.
@@ -64,8 +64,8 @@ This literate document contains the source code for the core of <a href="https:/
 Bassline is designed to be hacked on and modified, so we encourage people to read this!
 </p>
 </div>
-<div id="outline-container-orge717564" class="outline-3">
-<h3 id="orge717564"><span class="section-number-3">1.1.</span> TLDR</h3>
+<div id="outline-container-org0ec00da" class="outline-3">
+<h3 id="org0ec00da"><span class="section-number-3">1.1.</span> TLDR</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
 Bassline is a system for partial information programming.
@@ -94,8 +94,8 @@ New message shapes, participants, and behavior do not require a separate extensi
 </div>
 </div>
 </div>
-<div id="outline-container-org88893f9" class="outline-2">
-<h2 id="org88893f9"><span class="section-number-2">2.</span> The Kernel</h2>
+<div id="outline-container-org8b7370f" class="outline-2">
+<h2 id="org8b7370f"><span class="section-number-2">2.</span> The Kernel</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 The kernel starts with messages and a local capability for communication.
@@ -109,12 +109,12 @@ The abstract layer explains what shape of thing we are modeling.
 The concrete layer shows one minimal JavaScript realization of that shape.
 </p>
 </div>
-<div id="outline-container-orgd48c653" class="outline-3">
-<h3 id="orgd48c653"><span class="section-number-3">2.1.</span> Communication</h3>
+<div id="outline-container-org293399c" class="outline-3">
+<h3 id="org293399c"><span class="section-number-3">2.1.</span> Communication</h3>
 <div class="outline-text-3" id="text-2-1">
 </div>
-<div id="outline-container-org64aa04d" class="outline-4">
-<h4 id="org64aa04d"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
+<div id="outline-container-orgeab2eb8" class="outline-4">
+<h4 id="orgeab2eb8"><span class="section-number-4">2.1.1.</span> Abstractly</h4>
 <div class="outline-text-4" id="text-2-1-1">
 <p>
 Communication is the local capability to receive new information and contribute new information.
@@ -126,8 +126,8 @@ Communication needs a shape that preserves decoupling. Producers should be able 
 </p>
 </div>
 </div>
-<div id="outline-container-orgd50d89a" class="outline-4">
-<h4 id="orgd50d89a"><span class="section-number-4">2.1.2.</span> Concretely</h4>
+<div id="outline-container-orgc684f87" class="outline-4">
+<h4 id="orgc684f87"><span class="section-number-4">2.1.2.</span> Concretely</h4>
 <div class="outline-text-4" id="text-2-1-2">
 <p>
 In this book, communication is implemented as ports.
@@ -139,7 +139,7 @@ A port gives us 3 capabilities:
 
 <ol class="org-ol">
 <li><p>
-<code>send</code>
+<code>send(aMessage) -&gt; void</code>
 </p>
 
 <p>
@@ -147,7 +147,7 @@ Which let&rsquo;s us send a message to something
 </p></li>
 
 <li><p>
-<code>recv</code>
+<code>recv() -&gt; Promise&lt;aMessage&gt;</code>
 </p>
 
 <p>
@@ -155,7 +155,7 @@ Which let&rsquo;s us pull a message from a local buffer, blocking until one is a
 </p></li>
 
 <li><p>
-<code>close</code>
+<code>close() -&gt; void</code>
 </p>
 
 <p>
@@ -178,7 +178,7 @@ This ensures neither side requires knowledge of the other&rsquo;s state / status
 </p>
 </div>
 <ol class="org-ol">
-<li><a id="orgd72c7e3"></a>Port implementation<br />
+<li><a id="org2daa391"></a>Port implementation<br />
 <div class="outline-text-5" id="text-2-1-2-1">
 <p>
 The port implementation is rather simple.
@@ -195,14 +195,15 @@ The only other thing to note is the local convenience of EOF.
 </p>
 
 <p>
-EOF is a symbol that is sent through and used by local port consumers to indicate that the port has been closed.
-It is not universal and will not be serialized over the wire meaningfully.
-It only exists to make our lives simpler in js, and is trivial to implement your own implementation of an EOF interpretation.
+EOF is a symbol sent through and used by local port consumers to indicate that the port closed.
+It is not universal and will serialize over the wire meaningfully.
+It only exists to make our lives simpler in js.
+And it is trivial to build your own interpretation of what should signal EOF locally.
 </p>
 
 <p>
 You cannot send EOF directly through a port, nor should you ever have to.
-It should only be created internally inside of a port, to signal to the local consumer, we are done.
+It should only be created internally inside of a port to notify a local consumer we are closed.
 </p>
 
 <div class="org-src-container">
@@ -235,7 +236,7 @@ It should only be created internally inside of a port, to signal to the local co
 </div>
 </div>
 </li>
-<li><a id="org5ec0422"></a>Using a port<br />
+<li><a id="org1f95135"></a>Using a port<br />
 <div class="outline-text-5" id="text-2-1-2-2">
 <p>
 The most common way to use a port, is inside of an endless async loop that exists when we recv EOF.
@@ -262,7 +263,7 @@ If you need to define more sophisticated control flow inside of the loop, just w
 </div>
 </div>
 </li>
-<li><a id="org6f0d664"></a>Nets<br />
+<li><a id="org18f461d"></a>Nets<br />
 <div class="outline-text-5" id="text-2-1-2-3">
 <p>
 Now our ports look like &ldquo;point-to-point&rdquo; communication, however in Bassline we don&rsquo;t talk to &ldquo;something&rdquo;, we observe information from our perspective.
@@ -307,13 +308,15 @@ This highlights that in bassline cooperating participants appear as a single par
       close,
     }
   }
+  join.close = () =&gt; [...ports].forEach(p =&gt; p.close())
+  join.send = msg =&gt; [...ports].forEach(p =&gt; p.send(msg))
   <span style="color: #5EC4FF;">return</span> join
 }
 </pre>
 </div>
 </div>
 </li>
-<li><a id="orgb8388c7"></a>Communication without input<br />
+<li><a id="org01d7065"></a>Communication without input<br />
 <div class="outline-text-5" id="text-2-1-2-4">
 <p>
 Not all communication take input.
@@ -348,12 +351,12 @@ It can be used with anything that wants a capability to receive information, and
 </ol>
 </div>
 </div>
-<div id="outline-container-org3c06348" class="outline-3">
-<h3 id="org3c06348"><span class="section-number-3">2.2.</span> Messages</h3>
+<div id="outline-container-org72c8fb0" class="outline-3">
+<h3 id="org72c8fb0"><span class="section-number-3">2.2.</span> Messages</h3>
 <div class="outline-text-3" id="text-2-2">
 </div>
-<div id="outline-container-org67d80b1" class="outline-4">
-<h4 id="org67d80b1"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
+<div id="outline-container-orgce76965" class="outline-4">
+<h4 id="orgce76965"><span class="section-number-4">2.2.1.</span> Abstractly</h4>
 <div class="outline-text-4" id="text-2-2-1">
 <p>
 A message is a fragment of partial information. It is whatever can be locally held, passed around, inspected, and combined without requiring a complete picture of the world.
@@ -366,8 +369,8 @@ Bassline does not want a separate metadata plane that is somehow more real than 
 </p>
 </div>
 </div>
-<div id="outline-container-orgc901912" class="outline-4">
-<h4 id="orgc901912"><span class="section-number-4">2.2.2.</span> Concretely</h4>
+<div id="outline-container-org97a80bd" class="outline-4">
+<h4 id="org97a80bd"><span class="section-number-4">2.2.2.</span> Concretely</h4>
 <div class="outline-text-4" id="text-2-2-2">
 <p>
 A message is a plain object with string keys. It can be empty, partially filled, or nested inside other messages.
@@ -415,8 +418,8 @@ The concrete representation is intentionally minimal. Plain objects are open-end
 </div>
 </div>
 </div>
-<div id="outline-container-org3d29f00" class="outline-4">
-<h4 id="org3d29f00"><span class="section-number-4">2.2.3.</span> Exception Messages</h4>
+<div id="outline-container-orgbb97d9a" class="outline-4">
+<h4 id="orgbb97d9a"><span class="section-number-4">2.2.3.</span> Exception Messages</h4>
 <div class="outline-text-4" id="text-2-2-3">
 <p>
 We should not expect our systems to run smoothly, so we define these messages to indicate that some exceptional state has occurred while interpreting a message.
@@ -454,7 +457,7 @@ For now we define two kinds of exceptional states.
 </table>
 </div>
 <ol class="org-ol">
-<li><a id="org9dc0011"></a>Non Fatal Exceptions: Warnings<br />
+<li><a id="orga812f72"></a>Non Fatal Exceptions: Warnings<br />
 <div class="outline-text-5" id="text-2-2-3-1">
 <p>
 This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
@@ -466,7 +469,7 @@ This means that something was able to complete what it needed to, but it has som
 </div>
 </div>
 </li>
-<li><a id="org5797f4d"></a>Fatal Errors: Fault<br />
+<li><a id="orgc69ef23"></a>Fatal Errors: Fault<br />
 <div class="outline-text-5" id="text-2-2-3-2">
 <p>
 This indicates that processing cannot continue, and we must stop.
@@ -496,23 +499,23 @@ Unlike warnings, which are used to annotate the message being processed, we thro
 </div>
 </div>
 </div>
-<div id="outline-container-orgd4786b3" class="outline-2">
-<h2 id="orgd4786b3"><span class="section-number-2">3.</span> Transports</h2>
+<div id="outline-container-org4274216" class="outline-2">
+<h2 id="org4274216"><span class="section-number-2">3.</span> Transports</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 As above, it helps to separate the abstract role of a transport from the concrete transport used in this book.
 </p>
 </div>
-<div id="outline-container-org459e83d" class="outline-3">
-<h3 id="org459e83d"><span class="section-number-3">3.1.</span> Abstractly</h3>
+<div id="outline-container-org08218e7" class="outline-3">
+<h3 id="org08218e7"><span class="section-number-3">3.1.</span> Abstractly</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
 A transport adapts some external medium into local communication capabilities. This matters because the programming model should not change just because information crossed a process boundary, a machine boundary, or a device boundary. Local and non-local communication differ in mechanics, but they should not require different conceptual tools.
 </p>
 </div>
 </div>
-<div id="outline-container-org303d32b" class="outline-3">
-<h3 id="org303d32b"><span class="section-number-3">3.2.</span> Concretely</h3>
+<div id="outline-container-org1605419" class="outline-3">
+<h3 id="org1605419"><span class="section-number-3">3.2.</span> Concretely</h3>
 <div class="outline-text-3" id="text-3-2">
 <p>
 Every transport produces the same thing: a port with <code>send</code>, <code>recv</code>, and <code>close</code>. What differs is the medium underneath and whether that medium carries raw bytes or discrete messages.
@@ -522,8 +525,8 @@ Every transport produces the same thing: a port with <code>send</code>, <code>re
 Byte transports (TCP sockets, stdio, serial) carry raw chunks. They need a framing layer to delimit and parse messages. Message transports (WebSocket, WebWorker/MessagePort) carry discrete messages natively and skip framing entirely.
 </p>
 </div>
-<div id="outline-container-org40294c2" class="outline-4">
-<h4 id="org40294c2"><span class="section-number-4">3.2.1.</span> Framing</h4>
+<div id="outline-container-org7f2d3c2" class="outline-4">
+<h4 id="org7f2d3c2"><span class="section-number-4">3.2.1.</span> Framing</h4>
 <div class="outline-text-4" id="text-3-2-1">
 <p>
 Framing is separated from any specific transport. <code>readFrame</code> bridges a byte-level <code>recv</code> to a message-level <code>send</code>: it consumes chunks, accumulates them in a buffer, splits on newlines, and emits parsed messages. <code>format</code> is a plain function that serializes a message as a JSON line.
@@ -562,8 +565,8 @@ Framing is separated from any specific transport. <code>readFrame</code> bridges
 </p>
 </div>
 </div>
-<div id="outline-container-org2ea154b" class="outline-4">
-<h4 id="org2ea154b"><span class="section-number-4">3.2.2.</span> Socket</h4>
+<div id="outline-container-orga6ee88e" class="outline-4">
+<h4 id="orga6ee88e"><span class="section-number-4">3.2.2.</span> Socket</h4>
 <div class="outline-text-4" id="text-3-2-2">
 <p>
 A socket is a byte transport. <code>fromSocket</code> creates a raw port for byte chunks, a message port for parsed messages, and bridges them through <code>frame.read</code>. Outgoing messages are formatted and written directly to the socket.
@@ -602,8 +605,8 @@ A socket is a byte transport. <code>fromSocket</code> creates a raw port for byt
 </div>
 </div>
 </div>
-<div id="outline-container-org04b0890" class="outline-4">
-<h4 id="org04b0890"><span class="section-number-4">3.2.3.</span> Serving (TCP)</h4>
+<div id="outline-container-org3e5c818" class="outline-4">
+<h4 id="org3e5c818"><span class="section-number-4">3.2.3.</span> Serving (TCP)</h4>
 <div class="outline-text-4" id="text-3-2-3">
 <p>
 A TCP server listens on a socket and produces a port of connections. Each connection is itself a port, produced by <code>fromSocket</code>.
@@ -635,8 +638,8 @@ A TCP server listens on a socket and produces a port of connections. Each connec
 </div>
 </div>
 </div>
-<div id="outline-container-org8d727e6" class="outline-4">
-<h4 id="org8d727e6"><span class="section-number-4">3.2.4.</span> Serving (WebSocket)</h4>
+<div id="outline-container-orgd83b2cf" class="outline-4">
+<h4 id="orgd83b2cf"><span class="section-number-4">3.2.4.</span> Serving (WebSocket)</h4>
 <div class="outline-text-4" id="text-3-2-4">
 <p>
 A WebSocket server wraps an existing <code>WebSocketServer</code> instance and produces a port of connections, matching the TCP serve API shape. The caller brings their own <code>WebSocketServer</code> — no <code>ws</code> dependency in core.
@@ -664,8 +667,8 @@ A WebSocket server wraps an existing <code>WebSocketServer</code> instance and p
 </div>
 </div>
 </div>
-<div id="outline-container-orgdde204e" class="outline-4">
-<h4 id="orgdde204e"><span class="section-number-4">3.2.5.</span> WebSocket</h4>
+<div id="outline-container-orgdc72696" class="outline-4">
+<h4 id="orgdc72696"><span class="section-number-4">3.2.5.</span> WebSocket</h4>
 <div class="outline-text-4" id="text-3-2-5">
 <p>
 A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete message, so no framing is needed. This works in the browser with native <code>WebSocket</code>, in Node.js with the <code>ws</code> package, and for <code>RTCDataChannel</code> since it has the same event interface.
@@ -700,8 +703,8 @@ A WebSocket is a message transport. Each <code>ws.send()</code> is one discrete 
 </div>
 </div>
 </div>
-<div id="outline-container-orgfeea307" class="outline-4">
-<h4 id="orgfeea307"><span class="section-number-4">3.2.6.</span> WebWorker</h4>
+<div id="outline-container-org630ef8d" class="outline-4">
+<h4 id="org630ef8d"><span class="section-number-4">3.2.6.</span> WebWorker</h4>
 <div class="outline-text-4" id="text-3-2-6">
 <p>
 A <code>MessagePort</code> is a message transport that uses structured clone. Objects cross the boundary without serialization. Works with <code>Worker</code>, <code>MessagePort</code>, <code>SharedWorker.port</code>, and <code>BroadcastChannel</code>.
@@ -726,8 +729,8 @@ A <code>MessagePort</code> is a message transport that uses structured clone. Ob
 </div>
 </div>
 </div>
-<div id="outline-container-orge077d3d" class="outline-4">
-<h4 id="orge077d3d"><span class="section-number-4">3.2.7.</span> Stdio</h4>
+<div id="outline-container-org923a973" class="outline-4">
+<h4 id="org923a973"><span class="section-number-4">3.2.7.</span> Stdio</h4>
 <div class="outline-text-4" id="text-3-2-7">
 <p>
 Stdio is a byte transport, like TCP, and uses framing internally to produce a port of messages.
@@ -764,8 +767,8 @@ Stdio is a byte transport, like TCP, and uses framing internally to produce a po
 </div>
 </div>
 </div>
-<div id="outline-container-orgbb41e3a" class="outline-2">
-<h2 id="orgbb41e3a"><span class="section-number-2">4.</span> Deployment (Draft)</h2>
+<div id="outline-container-org38f98ec" class="outline-2">
+<h2 id="org38f98ec"><span class="section-number-2">4.</span> Deployment (Draft)</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 This is a stub, so you can ignore this for now!
@@ -775,8 +778,8 @@ This is a stub, so you can ignore this for now!
 Deployment also has an abstract layer and a concrete one.
 </p>
 </div>
-<div id="outline-container-org23686a8" class="outline-3">
-<h3 id="org23686a8"><span class="section-number-3">4.1.</span> Abstractly</h3>
+<div id="outline-container-org13fdc2f" class="outline-3">
+<h3 id="org13fdc2f"><span class="section-number-3">4.1.</span> Abstractly</h3>
 <div class="outline-text-3" id="text-4-1">
 <p>
 A bassline system is deployed by making communication available somewhere and wiring local logic to it. Deployment is not where the system acquires a fixed command surface or a closed set of capabilities. It is where some part of the world becomes reachable for communication.
@@ -787,15 +790,15 @@ The reason this stays lightweight is the same reason the rest of the model stays
 </p>
 </div>
 </div>
-<div id="outline-container-orgc7e35c7" class="outline-3">
-<h3 id="orgc7e35c7"><span class="section-number-3">4.2.</span> Concretely</h3>
+<div id="outline-container-org42f15f5" class="outline-3">
+<h3 id="org42f15f5"><span class="section-number-3">4.2.</span> Concretely</h3>
 <div class="outline-text-3" id="text-4-2">
 <p>
 A bassline system can run as a daemon, a long-lived process listening on a socket. Interacting with it means obtaining a communication capability and exchanging messages.
 </p>
 </div>
-<div id="outline-container-orgc2a9827" class="outline-4">
-<h4 id="orgc2a9827"><span class="section-number-4">4.2.1.</span> The daemon is just a server with a recv loop</h4>
+<div id="outline-container-orgdc76ad9" class="outline-4">
+<h4 id="orgdc76ad9"><span class="section-number-4">4.2.1.</span> The daemon is just a server with a recv loop</h4>
 <div class="outline-text-4" id="text-4-2-1">
 <p>
 A boot script opens a socket and starts consuming connections. Each connection is a port. What the daemon does with those messages is determined by whatever logic is wired in. There is no fixed set of capabilities.
@@ -818,8 +821,8 @@ The <code>handle</code> function is where all the logic lives. It could route me
 </p>
 </div>
 </div>
-<div id="outline-container-orgb40b02a" class="outline-4">
-<h4 id="orgb40b02a"><span class="section-number-4">4.2.2.</span> A REPL is just a transport</h4>
+<div id="outline-container-org72e55e9" class="outline-4">
+<h4 id="org72e55e9"><span class="section-number-4">4.2.2.</span> A REPL is just a transport</h4>
 <div class="outline-text-4" id="text-4-2-2">
 <p>
 A command-line interface is a connection over stdio instead of a socket. <code>fromStdio()</code> gives you a port backed by stdin/stdout with the same framing as TCP.
@@ -837,8 +840,8 @@ The downstream logic sees messages either way, regardless of whether the transpo
 </p>
 </div>
 </div>
-<div id="outline-container-org0c62e04" class="outline-4">
-<h4 id="org0c62e04"><span class="section-number-4">4.2.3.</span> Convention</h4>
+<div id="outline-container-orgc6cd0ff" class="outline-4">
+<h4 id="orgc6cd0ff"><span class="section-number-4">4.2.3.</span> Convention</h4>
 <div class="outline-text-4" id="text-4-2-3">
 <p>
 By convention, a bassline daemon keeps its state under <code>~/.bassline/</code>, with <code>BASSLINE_HOME</code> as an override. The socket lives there. What else lives there (persistence files, logs, configuration) depends on what the boot script sets up.
@@ -851,12 +854,12 @@ The boot script is the only thing that&rsquo;s &ldquo;configured&rdquo; in the t
 </div>
 </div>
 </div>
-<div id="outline-container-org2791a23" class="outline-2">
-<h2 id="org2791a23"><span class="section-number-2">5.</span> Utilities</h2>
+<div id="outline-container-org6af51b4" class="outline-2">
+<h2 id="org6af51b4"><span class="section-number-2">5.</span> Utilities</h2>
 <div class="outline-text-2" id="text-5">
 </div>
-<div id="outline-container-org48be7e5" class="outline-3">
-<h3 id="org48be7e5"><span class="section-number-3">5.1.</span> Type Predicates</h3>
+<div id="outline-container-orgf22fcdc" class="outline-3">
+<h3 id="orgf22fcdc"><span class="section-number-3">5.1.</span> Type Predicates</h3>
 <div class="outline-text-3" id="text-5-1">
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
 
@@ -937,12 +940,16 @@ The boot script is the only thing that&rsquo;s &ldquo;configured&rdquo; in the t
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">not</span> = predicate =&gt; value =&gt; !predicate(value)
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">constant</span> = value =&gt; () =&gt; value
 <span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">identity</span> = value =&gt; value
+<span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">delay</span> = <span style="color: #5EC4FF;">async</span> (ms = <span style="color: #E27E8D; font-weight: bold;">1000</span>) =&gt; {
+    <span style="color: #5EC4FF;">await</span> <span style="color: #5EC4FF;">new</span> <span style="color: #a9a9a9; font-weight: bold;">Promise</span>(res =&gt; setTimeout(res, ms))
+    <span style="color: #5EC4FF;">return</span>
+}
 </pre>
 </div>
 </div>
 </div>
-<div id="outline-container-org658d638" class="outline-3">
-<h3 id="org658d638"><span class="section-number-3">5.2.</span> Misc</h3>
+<div id="outline-container-org73702ec" class="outline-3">
+<h3 id="org73702ec"><span class="section-number-3">5.2.</span> Misc</h3>
 <div class="outline-text-3" id="text-5-2">
 <div class="org-src-container">
 <pre class="src src-js"><span style="color: #5EC4FF;">export</span> <span style="color: #5EC4FF;">const</span> <span style="color: #718CA1;">castArr</span> = value =&gt; (isArray(value) ? value : [value])

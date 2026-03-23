@@ -110,28 +110,25 @@ async function example() {
 
 await example()
 
-export type GraphEdit = Update | Remove
+export type GraphEdit = NodeUpdate | NodeRemove | EdgeUpdate | EdgeRemove
 type Attrs = Record<string, unknown>
-type Update =
-  | {
-      type: 'graph.update.node'
-      node: string
-      attributes: Attrs
-    }
-  | {
-      type: 'graph.update.edge'
-      source: string
-      target: string
-      attributes: Attrs
-    }
-
-type Remove =
-  | {
-      type: 'graph.remove.node'
-      node: string
-    }
-  | {
-      type: 'graph.remove.edge'
-      source: string
-      target: string
-    }
+type NodeUpdate = {
+  type: 'graph.update.node'
+  node: string
+  attributes: Attrs
+}
+type EdgeUpdate = {
+  type: 'graph.update.edge'
+  source: string
+  target: string
+  attributes: Attrs
+}
+type NodeRemove = {
+  type: 'graph.remove.node'
+  node: string
+}
+type EdgeRemove = {
+  type: 'graph.remove.edge'
+  source: string
+  target: string
+}
