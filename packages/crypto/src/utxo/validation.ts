@@ -1,5 +1,4 @@
-import { hexToBytes } from '@noble/hashes/utils.js'
-import { Spend, UTXO, pubKeyHash, hashSpend, verify, invalid } from '../helpers.js'
+import { Spend, UTXO, hash, hashSpend, verify, invalid } from '../helpers.js'
 
 export const isValid = {
   inputs(spend: Spend, store: Map<UTXO['id'], UTXO>) {
@@ -16,14 +15,14 @@ export const isValid = {
     return spending
   },
   spender(spend: Spend, spending: UTXO[]) {
-    const signerHash = pubKeyHash(hexToBytes(spend.pubKey))
+    const signerHash = hash(spend.pubKey)
     for (const tx of spending) {
       if (tx.pubKeyHash !== signerHash) {
         throw invalid(`input ${tx.id.slice(0, 8)}… not owned by signer`)
       }
     }
-    const hash = hashSpend(spend.inputs, spend.outputs)
-    const valid = verify(spend.signature, hash, spend.pubKey)
+    const spendHash = hashSpend(spend.inputs, spend.outputs)
+    const valid = verify(spend.signature, spendHash, spend.pubKey)
     if (!valid) throw invalid('invalid signature')
   },
   balance<T extends { value: number }>(spend: T) {

@@ -1,16 +1,25 @@
-import { Send } from '@bassline/core'
+import { isString, Send } from '@bassline/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
 
 export const enc = new TextEncoder()
 
+export { bytesToHex, hexToBytes }
+
 export const generateKeyPair = () => {
   const privKey = secp256k1.utils.randomSecretKey()
   const pubKey = secp256k1.getPublicKey(privKey)
   return { privKey, pubKey } as const
 }
-export const pubKeyHash = (pubKey: Uint8Array) => bytesToHex(sha256(pubKey))
+
+type Hashable = Uint8Array | string
+export const hash = (data: Hashable) => {
+  let bytes
+  if (isString(data)) return (bytes = sha256(enc.encode(data)))
+  else bytes = sha256(data)
+  return bytesToHex(bytes)
+}
 
 export const hashSpend = (inputs: UTXO[], outputs: Coin[]) => {
   return sha256(enc.encode(JSON.stringify({ inputs, outputs })))
@@ -35,7 +44,7 @@ export const createSpend = (privKey: Uint8Array, pubKey: Uint8Array, inputs: UTX
 }
 
 export function wallet(store: Map<string, UTXO>, sendTx?: Send<Spend>, kp = generateKeyPair()) {
-  const address = pubKeyHash(kp.pubKey)
+  const address = hash(kp.pubKey)
   const w = {
     address,
     get: (id: string) => store.get(id),
