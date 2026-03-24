@@ -1,4 +1,4 @@
-export { message, update, isEmpty, warning, Fault, fault } from './messages.js'
+export { message, update, isEmpty, Fault, fault } from './messages.js'
 
 export { EOF, isEOF, port, net, clock, consume } from './comm.js'
 

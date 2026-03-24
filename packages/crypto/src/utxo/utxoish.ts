@@ -33,7 +33,7 @@ export function utxoish<Msg, Result>({ validate, finalize }: Utxoish<Msg, Result
   } as const
 }
 
-type Utxoish<W, K> = {
-  validate: (witness: W) => K | Promise<K>
-  finalize: (result: K) => void | Promise<void>
+type Utxoish<W, R> = {
+  validate: (witness: W) => R | Promise<R>
+  finalize: (result: R) => void | Promise<void>
 }
