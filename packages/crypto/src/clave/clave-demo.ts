@@ -1,5 +1,5 @@
 import { port, hasKeys, isString } from '@bassline/core'
-import { createClave, Rule, Tx, ruleOk, ruleErr } from './clave.js'
+import { createClave, Rule, Tx, ruleOk, ruleErr, TxResult } from './clave.js'
 import { claveClient } from './clave-client.js'
 
 const log = (label: string, ...args: unknown[]) => console.log(`[${label}]`, ...args)
@@ -10,12 +10,11 @@ function isGrant(tx: unknown): tx is Grant {
   return hasKeys(tx, ['recipient', 'capability']) && isString(tx.capability) && isString(tx.recipient)
 }
 const grantRule: Rule = tx => {
-  if (!isGrant) return ruleErr('grant requires recipient and capability')
+  if (!isGrant(tx)) return ruleErr('grant requires recipient and capability')
   const { recipient, capability } = tx
   return ruleOk([], [{ type: 'capability', data: { recipient, capability } }])
 }
 
-type Use = Tx & { action: string }
 type Cap = Tx & { type: 'capability'; data: { capability: string } }
 function isCapability(tx: unknown): tx is Cap {
   return (
@@ -35,21 +34,23 @@ const useRule: Rule = tx => {
   return ruleOk([cap], [{ type: 'receipt', data: { action, consumed: cap.id } }])
 }
 
-const results = port()
+const results = port<TxResult>()
 
 const clave = createClave({
   trace: msg => {
-    log('trace', msg.type, msg.result)
-    if (msg.type === 'clave.tx') results.send(msg.result)
+    log('trace', msg)
+    if (msg.type === 'clave.tx.result') {
+      results.send(msg.result)
+    }
   },
 })
 
-clave.register('grant', grantRule)
-clave.register('use', useRule)
+clave.rules.register('grant', grantRule)
+clave.rules.register('use', useRule)
 
 const client = claveClient({ port: { send: clave.send, recv: results.recv, close: results.close } })
 
-const seed = clave.mint('seed', { purpose: 'genesis' })
+const seed = clave.tokens.mint<{ purpose: string }>('seed', { purpose: 'genesis' })
 log('mint', `seed: ${seed.id.slice(0, 12)}…`)
 
 log('tx', 'granting "deploy" to alice')

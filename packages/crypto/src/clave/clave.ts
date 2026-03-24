@@ -10,79 +10,96 @@ import type { Message, Send } from '@bassline/core'
 import { utxoish } from '../utxo/utxoish.js'
 import { generateKeyPair, pubKeyHash, sign, enc, KeyPair } from '../helpers.js'
 
-class InvalidTx extends Error {}
-const invalid = (error: string) => new InvalidTx(error)
+class InvalidTx extends Error {
+  static reason(error: string) {
+    return new InvalidTx(error)
+  }
+}
 
-const valid = {}
-
-export function createClave({
-  kp = generateKeyPair(),
-  tokens = new Map(),
-  rules = new Map(),
-  trace = () => {},
-}: ClaveOptions = {}) {
-  const address = pubKeyHash(kp.pubKey)
-
+export function createClave(opts: ClaveOptions = {}) {
+  const kp = opts.kp ?? generateKeyPair()
+  const trace = opts.trace ?? (() => {})
   const hash = (s: string) => bytesToHex(sha256(enc.encode(s)))
+  const address = pubKeyHash(kp.pubKey)
   const signFields = (id: string, type: string, data: unknown) =>
     sign(sha256(enc.encode(JSON.stringify({ id, type, data }))), kp.privKey)
 
-  function mint(type: string, data: unknown, origin = 'coinbase'): Token {
-    const id = crypto.randomUUID()
-    const token = {
-      id,
-      type,
-      data,
-      origin,
-      issuer: address,
-      sig: signFields(id, type, data),
-    } satisfies Token
-    tokens.set(id, token)
-    trace?.({ type: 'clave.mint', token })
-    return token
+  const tokens = {
+    store: opts.tokens ?? new Map<string, Token>(),
+
+    create(type: string, data: unknown, origin = 'coinbase') {
+      const id = crypto.randomUUID()
+      return {
+        id,
+        type,
+        data,
+        origin,
+        issuer: address,
+        sig: signFields(id, type, data),
+      } satisfies Token
+    },
+    burn(token: Token) {
+      tokens.store.delete(token.id)
+      trace({ type: 'clave.token.burn', token })
+    },
+    mint<T = unknown>(token: Token & T) {
+      tokens.store.set(token.id, token)
+      trace({ type: 'clave.token.mint', token })
+    },
+
+    assertLive(tx: Tx) {
+      for (const { id } of tx.tokens) {
+        if (!tokens.store.has(id)) throw InvalidTx.reason(`token ${id.slice(0, 8)}… not live`)
+      }
+    },
   }
 
-  function register(type: string, rule: Rule) {
-    rules.set(type, rule)
-    trace?.({ type: 'clave.register', rule: type })
+  const rules = {
+    store: opts.rules ?? new Map<string, Rule>(),
+
+    register(type: string, rule: Rule) {
+      rules.store.set(type, rule)
+      trace?.({ type: 'clave.rule.register', rule: type })
+    },
+    revoke(type: string) {
+      rules.store.delete(type)
+      trace?.({ type: 'clave.rule.revoke', rule: type })
+    },
+
+    assertKnown(tx: Tx) {
+      const rule = rules.store.get(tx.type)
+      if (!rule) throw InvalidTx.reason(`unknown tx type: ${tx.type}`)
+      return rule!
+    },
   }
-  const allTokensLive = (tx: Tx) => {
-    for (const { id } of tx.tokens) {
-      if (!tokens.has(id)) throw invalid(`token ${id.slice(0, 8)}… not live`)
-    }
-  }
-  const knownTxType = (tx: Tx) => {
-    const rule = rules.get(tx.type)
-    if (!rule) throw invalid(`unknown tx type: ${tx.type}`)
-    return rule!
-  }
-  const validate = (tx: Tx): TxResult => {
+
+  function validate(tx: Tx) {
     try {
-      allTokensLive(tx)
-      const rule = knownTxType(tx)
-      const result = rule(tx, id => tokens.get(id))
-      if (result.status === 'err') throw invalid(result.error)
+      tokens.assertLive(tx)
+      const rule = rules.assertKnown(tx)
+      const result = rule(tx, id => tokens.store.get(id))
+      if (result.status === 'err') throw InvalidTx.reason(result.error)
 
       const txId = hash(JSON.stringify(tx))
-      const minted = result.produce.map(out => mint(out.type, out.data, txId))
-      return { status: 'ok', consumed: result.consume, minted, tx, txId }
+      const minted = result.produce.map(out => tokens.create(out.type, out.data, txId))
+      return { status: 'ok', consumed: result.consume, minted, tx, txId } satisfies TxResult
     } catch (e) {
-      if (e instanceof InvalidTx) return { status: 'err', error: e.message, tx }
+      if (e instanceof InvalidTx) return { status: 'err', error: e.message, tx } satisfies TxResult
       throw e
     }
   }
 
   const finalize = (result: TxResult) => {
     if (result.status === 'ok') {
-      for (const token of result.consumed) tokens.delete(token.id)
-      for (const token of result.minted) tokens.set(token.id, token)
+      for (const t of result.consumed) tokens.burn(t)
+      for (const t of result.minted) tokens.mint(t)
     }
-    trace?.({ type: 'clave.tx', result })
+    trace?.({ type: 'clave.tx.result', result })
   }
 
   const { send, close, task } = utxoish<Tx, TxResult>({ validate, finalize })
 
-  return { send, close, task, mint, register, address, tokens } as const
+  return { send, close, task, address, rules, tokens } as const
 }
 
 export const ruleOk = (consume: RuleOk['consume'] = [], produce: RuleOk['produce'] = []): RuleOk => ({
@@ -116,7 +133,14 @@ export type TxResult =
   | { status: 'ok'; consumed: Token[]; minted: Token[]; tx: Tx; txId: string }
   | { status: 'err'; error: string; tx: Tx }
 
-type ClaveTrace = Message<{ type: 'clave.tx'; result: TxResult }> | Message<{ type: string }>
+type Trace<S extends string, T> = { type: `clave.${S}` } & T
+type ClaveTrace =
+  | Trace<'tx.result', { result: TxResult }>
+  | Trace<'token.mint', { token: Token }>
+  | Trace<'token.burn', { token: Token }>
+  | Trace<'rule.register', { rule: string }>
+  | Trace<'rule.revoke', { rule: string }>
+
 type ClaveOptions = {
   kp?: KeyPair
   tokens?: Map<string, Token>
