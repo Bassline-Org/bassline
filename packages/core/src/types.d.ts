@@ -20,7 +20,7 @@ export type NetJoin<T, K> = {
 }
 
 export function port<T, K = T>(size?: number): Port<T, K>
-export function net<T>(): NetJoin<T, K>
+export function net<T, K = T>(): NetJoin<T, K>
 export function clock(ms?: number): Omit<Port<{ts: number}>, 'send'>
 
 export function consume<T>(

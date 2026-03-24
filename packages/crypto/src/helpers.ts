@@ -62,8 +62,8 @@ export class InvalidTx extends Error {}
 export const invalid = (msg: string) => new InvalidTx(msg)
 
 export type KeyPair = {
-  privkey: Uint8Array<ArrayBufferLike>
-  pubkey: Uint8Array<ArrayBufferLike>
+  privKey: Uint8Array<ArrayBufferLike>
+  pubKey: Uint8Array<ArrayBufferLike>
 }
 export type Coin = {
   value: number
