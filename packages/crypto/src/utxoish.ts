@@ -16,12 +16,12 @@ import { port, consume } from '@bassline/core'
  *
  */
 
-type Validation<W, K> = {
+type Utxoish<W, K> = {
   validate: (witness: W) => K | Promise<K>
   finalize: (result: K) => void | Promise<void>
 }
 
-export function utxoish<Msg, Result>({ validate, finalize }: Validation<Msg, Result>) {
+export function utxoish<Msg, Result>({ validate, finalize }: Utxoish<Msg, Result>) {
   const validator = port<Msg>()
   const finalizer = port<Result>()
   const task = Promise.all([

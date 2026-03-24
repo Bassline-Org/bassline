@@ -20,7 +20,6 @@ const seeded = chain.coinbase([
 log('coinbase', `minted ${seeded.length} UTXOs`)
 log('balances', balances())
 
-// 2. Alice sends 30 to Bob, 20 back to herself (from first UTXO)
 log('spend', 'Alice → 30 to Bob, 20 change')
 alice.sendTx({
   inputs: [seeded[0].id],
@@ -33,7 +32,6 @@ alice.sendTx({
 await new Promise(r => setTimeout(r, 0))
 log('balances', balances())
 
-// 3. Bob sends 15 to Carol, 15 back to himself
 log('spend', 'Bob → 15 to Carol, 15 change')
 bob.sendTx({
   inputs: [bob.forOwner()[0].id],
@@ -46,7 +44,6 @@ bob.sendTx({
 await new Promise(r => setTimeout(r, 0))
 log('balances', balances())
 
-// 4. Alice tries to double-spend the UTXO she already spent
 log('spend', 'Alice tries to double-spend her first UTXO')
 alice.sendTx({
   inputs: [seeded[0].id],
@@ -55,7 +52,6 @@ alice.sendTx({
 
 await new Promise(r => setTimeout(r, 0))
 
-// 5. Values don't balance
 log('spend', 'Alice tries to spend 50 but only output 10')
 const aliceNow = alice.forOwner()
 alice.sendTx({
@@ -65,7 +61,6 @@ alice.sendTx({
 
 await new Promise(r => setTimeout(r, 0))
 
-// 6. Bob tries to spend Alice's UTXO
 log('spend', "Bob tries to spend Alice's UTXO")
 bob.sendTx({
   inputs: [aliceNow[0].id],
@@ -74,7 +69,6 @@ bob.sendTx({
 
 await new Promise(r => setTimeout(r, 0))
 
-// Final state
 log('final', `UTXO set size: ${chain.store.size}`)
 log('final', balances())
 log('final', 'all UTXOs:', chain.store.values())
