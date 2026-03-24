@@ -1,3 +1,4 @@
+import { Send } from '@bassline/core'
 import { secp256k1 } from '@noble/curves/secp256k1.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js'
@@ -11,6 +12,7 @@ export const generateKeyPair = () => {
 }
 
 export const pubKeyHash = (pubKey: Uint8Array) => bytesToHex(sha256(pubKey))
+
 export const hashSpend = (inputs: string[], outputs: Output[]) =>
   sha256(enc.encode(JSON.stringify({ inputs, outputs })))
 
@@ -32,6 +34,35 @@ export const createSpend = (privKey: Uint8Array, pubKey: Uint8Array, inputs: str
   }
 }
 
+export function wallet(store: Map<string, UTXO>, sendTx?: Send<Spend>, kp = generateKeyPair()) {
+  const address = pubKeyHash(kp.pubKey)
+  const w = {
+    address,
+    get: (id: string) => store.get(id),
+    has: (id: string) => store.has(id),
+    forOwner: (pkh = address) => [...store.values()].filter(u => u.pubKeyHash === pkh),
+    balance: (pkh = address) => w.forOwner(pkh).reduce((s, i) => s + i.value, 0),
+    get size() {
+      return store.size
+    },
+    all: () => [...store.values()],
+    sendTx: (spend: Omit<Spend, 'signature' | 'pubKey'>, target = sendTx) => {
+      const signed = createSpend(kp.privKey, kp.pubKey, spend.inputs, spend.outputs)
+      if (target) {
+        target(signed)
+      } else {
+        console.warn('failed to spend, not connected')
+      }
+    },
+  } as const
+  return w
+}
+
+export class InvalidTx extends Error {}
+export const invalid = (msg: string) => new InvalidTx(msg)
+
+export type KeyPair = ReturnType<typeof generateKeyPair>
+
 export type UTXO = {
   id: string
   value: number
@@ -43,10 +74,15 @@ export type Output = {
   pubKeyHash: string
 }
 
+export type Unsigned<T> = Omit<T, 'signature'>
 export type Spend = {
   inputs: string[]
   outputs: Output[]
   signature: string
   pubKey: string
 }
+
+export type ValidationResult =
+  | { status: 'ok'; spending: UTXO[]; minting: UTXO[]; spend: Spend }
+  | { status: 'err'; error: string; spend: Spend }
 export type ApplyResult = { minted: UTXO[]; spend: Spend } | { err: string; spend: Spend }
