@@ -1,16 +1,16 @@
 import type { z } from 'zod'
-import type { Port, EOF } from '@bassline/core'
+import type { Port, EOF, Message } from '@bassline/core'
 import { isEOF, consume } from '@bassline/core'
 
 export function guard<T>(schema: z.ZodType<T>): (msg: unknown) => msg is T {
   return (msg: unknown): msg is T => schema.safeParse(msg).success
 }
 
-export async function request<Res>(
+export async function request<R extends Message>(
   join: (size?: number) => Port,
-  msg: Record<string, unknown>,
-  match: (msg: unknown) => msg is Res
-): Promise<Res | null> {
+  msg: Message,
+  match: (msg: Message) => msg is R
+): Promise<R | null> {
   const slot = join()
   try {
     slot.send(msg)
@@ -24,13 +24,13 @@ export async function request<Res>(
   }
 }
 
-export async function query<Res>(
+export async function query<R extends Message>(
   join: (size?: number) => Port,
-  msg: Record<string, unknown>,
-  match: (msg: unknown, qid: string) => msg is Res
-): Promise<Res | null> {
+  msg: Message,
+  match: (msg: unknown, qid: string) => msg is R
+): Promise<R | null> {
   const qid = crypto.randomUUID()
-  return request(join, { ...msg, qid }, (m): m is Res => match(m, qid))
+  return request(join, { ...msg, qid }, (m): m is R => match(m, qid))
 }
 
 export function dispatch<T>(

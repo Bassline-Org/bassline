@@ -6,6 +6,9 @@
 #+OPTIONS: toc:2 num:t html-style:nil html-postamble:nil ^:nil
 #+HTML_HEAD: <link rel="stylesheet" href="style.css"/>
 
+* TODO Update the transports & frame fault story
+I need to cleanup the fault handling story there.
+
 * Introduction
 This literate document contains the source code for the core of [[https://bassline.dev][Bassline]] v2.
 
@@ -224,61 +227,51 @@ A message is a plain object with string keys. It can be empty, partially filled,
 
 The concrete representation is intentionally minimal. Plain objects are open-ended, nest naturally, and are easy to serialize, enrich, and inspect. That keeps the message lightweight and avoids forcing a closed protocol up front.
 
-=message()= normalizes its input: plain objects pass through, =undefined= becomes ={}=, and anything else is wrapped as ={body: value}=.
+=message()= normalizes its input into a message:
+- plain objects pass through
+- =undefined= becomes ={}=
+- Anything else is wrapped as ={body: value}=.
 
-=update= is auto-curried. With two arguments =(msg, fn)= it returns a new message. With one argument =(fn)= it returns a transform you can pass a message into.
-
-#+begin_src js
+  #+begin_src js
 import { isPlainObject } from './utils.js'
 
+export const isEmpty = msg => Object.keys(msg).length === 0
 export const message = content => {
   if (content === undefined) return {}
   if (isPlainObject(content)) return { ...content }
   return { body: content }
 }
-
-export function updateWith(msg, fn) {
-  return { ...msg, ...fn(msg) }
-}
-
-export function update(...args) {
-  if (args.length === 1) {
-    const [fn] = args
-    return msg => updateWith(msg, fn)
-  }
-  if (args.length === 2) {
-    const [msg, fn] = args
-    return updateWith(msg, fn)
-  }
-  throw new Error(`invalid update arity: ${args.length}`)
-}
-
-export const isEmpty = msg => Object.keys(msg).length === 0
 #+end_src
 
-*** Exception Messages
+=update=, as the name implies, updates a message using a function.
 
-We should not expect our systems to run smoothly, so we define these messages to indicate that some exceptional state has occurred while interpreting a message.
-
-For now we define two kinds of exceptional states.
-
-| condition | what it means                                |
-|-----------+----------------------------------------------|
-| Warning   | It's workable, but you should know something |
-| Fault     | Something went wrong, and I cannot continue  |
-
-**** Non Fatal Exceptions: Warnings
-
-This means that something was able to complete what it needed to, but it has something to say about how it could be done better, or some remark on if there is a better way of doing it.
+Calling update with two arguments =update(msg, fn)= will apply =fn(msg)=, and normalize the output as a message.
+Calling update with a single argument is curried, =update(fn)= produces a function  =msg -> update(msg, fn)=.
 
 #+begin_src js
-export const warning = reason => message({ type: 'warning', body: reason })
+export function update(...args) {
+  switch (args.length) {
+    case 1: {
+      const [fn] = args
+      return msg => message(fn(msg))
+    }
+    case 2: {
+      const [msg, fn] = args
+      return message(fn(msg))
+    }
+    default:
+      throw new Error(`invalid update arity: ${args.length}`)
+  }
+}
 #+end_src
 
-**** Fatal Errors: Fault
-This indicates that processing cannot continue, and we must stop.
+#+RESULTS:
 
-Unlike warnings, which are used to annotate the message being processed, we throw the fault message.
+*** Faults
+
+This indicates that local processing cannot continue, and we must stop.
+
+You don't have to use this construct, but it's convenient since it's message aware.
 
 #+begin_src js
 export class Fault extends Error {
@@ -288,10 +281,12 @@ export class Fault extends Error {
     this.msg = msg
     this.context = context
   }
+  toMessage() {
+    return message({ condition: this.condition, msg: this.msg, ...this.context })
+  }
 }
-export const fault = (condition, msg, context) => {
-  throw new Fault(condition, msg, context)
-}
+
+export const fault = (condition, msg, context) => new Fault(condition, msg, context)
 #+end_src
 
 * Transports

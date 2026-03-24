@@ -4,12 +4,7 @@ import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { fromPort, net, consume } from '@bassline/core'
 import { request } from '@bassline/ontology'
-import {
-  isEntryResultMsg,
-  type EntryReadSelector,
-  type EntryResultMsg,
-  type StorageMsg,
-} from '../src/ontology/storage/schema'
+import { isEntryResultMsg, type EntryReadSelector, type EntryResultMsg } from '../src/ontology/storage/schema'
 import { storage } from '../src/ontology/storage/slang'
 import { createSqliteStorage } from '../src/ontology/storage/sqlite'
 import { createGraphService, type GraphMutationMsg } from '@bassline/ontology/graph'
@@ -35,7 +30,7 @@ function observe(label: string, slot: { recv: () => Promise<unknown> }) {
 
 const dbPath = path.join(app.getPath('userData'), 'homebass.db')
 const db = new Database(dbPath)
-const storageNet = net<StorageMsg>()
+const storageNet = net()
 createSqliteStorage(storageNet(), db)
 
 let graphService: ReturnType<typeof createGraphService> | null = null

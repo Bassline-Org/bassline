@@ -1,6 +1,8 @@
 packages:
-  - apps/*
-  - packages/*
+  - apps/visual
+  - packages/core
+  - packages/ontology
+  - packages/crypto
 
 onlyBuiltDependencies:
   - esbuild

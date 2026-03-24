@@ -1,35 +1,27 @@
-// --- Communication ---
-
 export const EOF: unique symbol
 export function isEOF(v: unknown): v is typeof EOF
 
-type MessageShape = Record<string, unknown>
-type MessagePatch<T> = T extends MessageShape ? T : {}
-export type Message<T = {}> = MessageShape & T
+export type Message<T = unknown> = Record<string, unknown> & T
 
-
-export interface Port<T = unknown> {
+export type Port<T = Message, K = T> = {
   send: Send<T>
-  recv: Recv<T>
+  recv: Recv<K>
   close: Close
 }
 
-export type Send<T = unknown> = (msg: T) => void
-export type Recv<T = unknown> = () => Promise<T | typeof EOF>
+export type Send<T = Message> = (msg: T) => void
+export type Recv<T = Message> = () => Promise<T | typeof EOF>
 export type Close = () => void
 
-export type NetJoin<T = unknown> = {
-  (size?: number): Port<T>
+export type NetJoin<T, K> = {
+  (size?: number): Port<T, K>
   close: Close
   send: Send<T>
 }
 
-export function port<T = unknown>(size?: number): Port<T>
-export function net<T = unknown>(): NetJoin<T>
-export function clock(ms?: number): { 
-  recv: Recv<{ ts: number }>;
-  close: Close
-}
+export function port<T, K = T>(size?: number): Port<T, K>
+export function net<T>(): NetJoin<T, K>
+export function clock(ms?: number): Omit<Port<{ts: number}>, 'send'>
 
 export function consume<T>(
   recv: Recv<T>,
@@ -38,32 +30,28 @@ export function consume<T>(
 
 export function message(): Message
 export function message(content: undefined): Message
-export function message<T extends MessageShape>(content: T): Message<T>
+export function message<T extends Message>(content: T): Message<T>
 export function message<T>(content: T): Message<{ body: T }>
 
-export function updateWith<T extends MessageShape, U>(
-  msg: Message<T>,
-  fn: (msg: Message<T>) => U
-): Message<T & MessagePatch<U>>
+type Mapping<T, U = T> = (msg: T) => U
 
-export function update<T extends MessageShape, U>(
-  fn: (msg: Message<T>) => U
-): (msg: Message<T>) => Message<T & MessagePatch<U>>
-
-export function update<T extends MessageShape, U>(
-  msg: Message<T>,
-  fn: (msg: Message<T>) => U
-): Message<T & MessagePatch<U>>
+export function update<T, U>(
+  fn: Mapping<T, U>
+): Mapping<T, Message<U>>
+export function update<T, U>(
+  msg: T,
+  fn: Mapping<T, U>
+): Message<U>
 
 export function isEmpty(msg: Message): msg is {}
-export function warning(reason: string): Message<{ type: 'warning'; body: string }>
 export class Fault extends Error {
   condition: string
   msg: unknown
   context: unknown
   constructor(condition: string, msg?: unknown, context?: unknown)
+  toMessage(): Message<Pick<Fault, 'condition' | 'msg' | 'context'>>
 }
-export function fault(condition: string, msg?: unknown, context?: unknown): never
+export function fault(condition: string, msg?: unknown, context?: unknown): Fault
 
 // --- Utils ---
 

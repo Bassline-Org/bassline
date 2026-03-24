@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { message, update, updateWith, isEmpty, warning, Fault, fault } from '../src/messages.js'
+import { message, update, isEmpty, Fault, fault } from '../src/messages.js'
 
 describe('message', () => {
   it('normalizes undefined to empty object', () => {
@@ -37,30 +37,25 @@ describe('message', () => {
 describe('update', () => {
   it('applies fn and merges (two args)', () => {
     const msg = { temperature: 72 }
-    const result = update(msg, () => ({ seen: true }))
+    const result = update(msg, () => ({ ...msg, seen: true }))
     expect(result).toEqual({ temperature: 72, seen: true })
   })
 
   it('fn receives the original message', () => {
     const msg = { temperature: 72 }
-    const result = update(msg, m => ({ warm: m.temperature > 70 }))
+    const result = update(msg, m => ({ ...m, warm: m.temperature > 70 }))
     expect(result).toEqual({ temperature: 72, warm: true })
   })
 
-  it('overwrites existing keys', () => {
-    const result = update({ a: 1, b: 2 }, () => ({ b: 99 }))
-    expect(result).toEqual({ a: 1, b: 99 })
-  })
-
   it('returns a transform when curried (one arg)', () => {
-    const addSeen = update(() => ({ seen: true }))
+    const addSeen = update(msg => ({ ...msg, seen: true }))
     expect(typeof addSeen).toBe('function')
     expect(addSeen({ temperature: 72 })).toEqual({ temperature: 72, seen: true })
   })
 
   it('curried form works in pipelines', () => {
     const msgs = [{ a: 1 }, { a: 2 }, { a: 3 }]
-    const transform = update(m => ({ doubled: m.a * 2 }))
+    const transform = update(m => ({ ...m, doubled: m.a * 2 }))
     const results = msgs.map(transform)
     expect(results).toEqual([
       { a: 1, doubled: 2 },
@@ -85,12 +80,6 @@ describe('update', () => {
   })
 })
 
-describe('updateWith', () => {
-  it('merges fn result into msg', () => {
-    expect(updateWith({ a: 1 }, () => ({ b: 2 }))).toEqual({ a: 1, b: 2 })
-  })
-})
-
 describe('isEmpty', () => {
   it('true for empty object', () => {
     expect(isEmpty({})).toBe(true)
@@ -102,15 +91,6 @@ describe('isEmpty', () => {
 
   it('true for message()', () => {
     expect(isEmpty(message())).toBe(true)
-  })
-})
-
-describe('warning', () => {
-  it('produces a warning message', () => {
-    expect(warning('something happened')).toEqual({
-      type: 'warning',
-      body: 'something happened',
-    })
   })
 })
 
@@ -140,13 +120,15 @@ describe('Fault', () => {
 
 describe('fault', () => {
   it('throws a Fault', () => {
-    expect(() => fault('boom', { x: 1 })).toThrow(Fault)
+    expect(() => {
+      throw fault('boom', { x: 1 })
+    }).toThrow(Fault)
   })
 
   it('thrown Fault has correct fields', () => {
     expect.assertions(3)
     try {
-      fault('boom', { x: 1 }, { retry: true })
+      throw fault('boom', { x: 1 }, { retry: true })
     } catch (e) {
       expect(e.condition).toBe('boom')
       expect(e.msg).toEqual({ x: 1 })

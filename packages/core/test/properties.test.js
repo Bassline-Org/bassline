@@ -2,6 +2,7 @@ import { test, expect } from 'vitest'
 import { fc, it } from '@fast-check/vitest'
 import { message, update, isEmpty } from '../src/messages.js'
 import { port, consume, isEOF } from '../src/comm.js'
+import { isPlainObject } from '../src/utils.js'
 
 async function collect(recv) {
   const values = []
@@ -55,16 +56,12 @@ it.prop([plainObject, updateFn])('update curried and direct forms equivalent wit
 
 it.prop([plainObject])('update with fn returning undefined is a copy', obj => {
   const result = update(obj, () => undefined)
-  expect(result).toEqual(obj)
+  expect(result).toEqual({})
 })
 
-it.prop([plainObject, updateFn])('update result contains all original keys plus fn keys', (obj, fn) => {
+it.prop([fc.anything(), updateFn])('update always returns a message', (obj, fn) => {
   const result = update(obj, fn)
-  const fnResult = fn(obj)
-  for (const key of Object.keys(obj)) expect(result).toHaveProperty(key)
-  if (fnResult && typeof fnResult === 'object') {
-    for (const key of Object.keys(fnResult)) expect(result).toHaveProperty(key)
-  }
+  expect(isPlainObject(result)).toBe(true)
 })
 
 // --- port order preservation ---
